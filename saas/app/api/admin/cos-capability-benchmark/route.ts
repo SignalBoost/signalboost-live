@@ -22,6 +22,7 @@ const BENCHMARK_PROBE_TIMEOUT_MS = 90_000
 const STALE_RUN_MS = 10 * 60_000
 const terms = (value: unknown) => Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : []
 const errorText = (value: unknown): string => value instanceof Error ? value.message : typeof value === 'string' ? value : JSON.stringify(value) || String(value ?? 'Unknown benchmark error')
+const cleanTrack = (value: unknown) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
 
 async function reconcileStaleRuns(db: NonNullable<ReturnType<typeof cosServiceDb>>) {
   const cutoff = new Date(Date.now() - STALE_RUN_MS).toISOString()
@@ -35,7 +36,7 @@ export async function GET() {
   const db = cosServiceDb(); if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
   await reconcileStaleRuns(db)
   const [cases, runs] = await Promise.all([
-    db.from('cos_capability_benchmark_cases').select('id,track,active,origin,created_at').order('created_at', { ascending: false }).limit(200),
+    db.from('cos_capability_benchmark_cases').select('id,track,active,origin,evaluation_profile,created_at').order('created_at', { ascending: false }).limit(200),
     db.from('cos_capability_benchmark_runs').select('id,started_at,completed_at,attempted,passed,status,error').order('started_at', { ascending: false }).limit(20),
   ])
   if (cases.error || runs.error) return NextResponse.json({ error: cases.error?.message ?? runs.error?.message }, { status: 500 })
@@ -48,12 +49,14 @@ export async function POST(request: NextRequest) {
   const db = cosServiceDb(); if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
   const body = await request.json().catch(() => ({}))
   const limit = Math.max(1, Math.min(MAX_CASES_PER_RUN, Math.floor(Number(body.limit) || MAX_CASES_PER_RUN)))
-  const cases = await db.from('cos_capability_benchmark_cases').select('id,track,prompt,required_terms,forbidden_terms,requires_local_reasoning,origin').eq('active', true).order('created_at', { ascending: true }).limit(200)
+  const requestedTrack = cleanTrack(body.track)
+  const cases = await db.from('cos_capability_benchmark_cases').select('id,track,prompt,required_terms,forbidden_terms,requires_local_reasoning,origin,evaluation_profile').eq('active', true).order('created_at', { ascending: true }).limit(200)
   if (cases.error) return NextResponse.json({ error: cases.error.message }, { status: 500 })
   const completedRuns = await db.from('cos_capability_benchmark_runs').select('id').eq('status', 'completed').limit(2000)
   if (completedRuns.error) return NextResponse.json({ error: completedRuns.error.message }, { status: 500 })
-  const activeCases = (cases.data ?? []).filter(row => isPrivateCapabilityAcceptanceOrigin(row.origin))
-  const start = activeCases.length ? ((completedRuns.data?.length ?? 0) * limit) % activeCases.length : 0
+  const activeCases = (cases.data ?? []).filter(row => isPrivateCapabilityAcceptanceOrigin(row.origin) && (!requestedTrack || String(row.track) === requestedTrack))
+  if (!activeCases.length) return NextResponse.json({ ok: false, error: requestedTrack ? `No active private benchmark cases for track ${requestedTrack}.` : 'No active private benchmark cases.' }, { status: 404 })
+  const start = ((completedRuns.data?.length ?? 0) * limit) % activeCases.length
   const selected = [...activeCases.slice(start), ...activeCases.slice(0, start)].slice(0, limit)
   const run = await db.from('cos_capability_benchmark_runs').insert({ requested_limit: limit }).select('id').single()
   if (run.error || !run.data) return NextResponse.json({ error: run.error?.message ?? 'Could not create benchmark run.' }, { status: 500 })
@@ -97,7 +100,16 @@ export async function POST(request: NextRequest) {
       for (const row of selected) {
         attempted += 1
         try {
-          const outcome = await runPrivateCapabilityCase({ id: String(row.id), track: String(row.track), prompt: String(row.prompt), requiredTerms: terms(row.required_terms), forbiddenTerms: terms(row.forbidden_terms), requiresProvenance: true, requiresLocalReasoning: Boolean(row.requires_local_reasoning) })
+          const outcome = await runPrivateCapabilityCase({
+            id: String(row.id),
+            track: String(row.track),
+            prompt: String(row.prompt),
+            requiredTerms: terms(row.required_terms),
+            forbiddenTerms: terms(row.forbidden_terms),
+            requiresProvenance: true,
+            requiresLocalReasoning: Boolean(row.requires_local_reasoning),
+            evaluationProfile: String(row.evaluation_profile || '') || undefined,
+          })
           if (outcome.score.passed) passed += 1
           const inserted = await db.from('cos_capability_benchmark_results').insert({
             run_id: run.data.id,
@@ -128,10 +140,10 @@ export async function POST(request: NextRequest) {
     }
 
     await db.from('cos_capability_benchmark_runs').update({ status: 'completed', completed_at: new Date().toISOString(), attempted, passed }).eq('id', run.data.id)
-    return NextResponse.json({ ok: true, runId: run.data.id, attempted, passed, passRate: attempted ? passed / attempted : 0, reasonerReady, reasonerError: reasonerError || undefined })
+    return NextResponse.json({ ok: true, runId: run.data.id, track: requestedTrack || null, attempted, passed, passRate: attempted ? passed / attempted : 0, reasonerReady, reasonerError: reasonerError || undefined })
   } catch (error) {
     const message = errorText(error).slice(0, 2000)
     await db.from('cos_capability_benchmark_runs').update({ status: 'failed', completed_at: new Date().toISOString(), attempted, passed, error: message }).eq('id', run.data.id)
-    return NextResponse.json({ ok: false, runId: run.data.id, error: message, reasonerReady, reasonerError: reasonerError || undefined }, { status: 500 })
+    return NextResponse.json({ ok: false, runId: run.data.id, track: requestedTrack || null, error: message, reasonerReady, reasonerError: reasonerError || undefined }, { status: 500 })
   }
 }

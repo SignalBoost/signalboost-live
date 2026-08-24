@@ -64,11 +64,11 @@ function noPriorProvenanceReply(languageCode: string): string {
 // nor the preceding-answer text was available to verify against, so the record below is the most
 // recent one on file for this account, not a confirmed match to the specific answer just given.
 function unverifiedProvenanceCaveat(languageCode: string): string {
-  if (languageCode === 'es') return '⚠️ No pude confirmar que este registro corresponda exactamente a la respuesta anterior (no había ID de conversación ni texto de la respuesta previa para verificarlo) — muestro el registro de procedencia más reciente de esta cuenta. Si algo no coincide, esa es la razón.'
-  if (languageCode === 'pt') return '⚠️ Não consegui confirmar que este registro corresponde exatamente à resposta anterior (não havia ID de conversa nem texto da resposta anterior para verificar) — mostrando o registro de proveniência mais recente desta conta. Se algo não bater, essa é a razão.'
-  if (languageCode === 'pl') return '⚠️ Nie udało się potwierdzić, że ten zapis dokładnie odpowiada poprzedniej odpowiedzi (brak ID rozmowy i tekstu poprzedniej odpowiedzi do weryfikacji) — pokazuję najnowszy zapis proweniencji dla tego konta. Jeśli coś się nie zgadza, to właśnie dlatego.'
-  if (languageCode === 'ru') return '⚠️ Не удалось подтвердить, что эта запись точно соответствует предыдущему ответу (не было ID беседы или текста предыдущего ответа для проверки) — показана самая последняя запись происхождения для этого аккаунта. Если что-то не сходится, вот причина.'
-  return "⚠️ I could not confirm this record matches the immediately preceding answer exactly — no conversation ID or prior-answer text was available to verify against, so this is the most recent provenance record on file for this account, not a confirmed match to the specific answer just given. If something looks off, that mismatch is why."
+  if (languageCode === 'es') return '⚠️ No pude confirmar que este registro corresponda exactamente a la respuesta anterior (no hubo una coincidencia precisa de conversación o contenido de respuesta para verificarlo) — muestro el registro de procedencia más reciente de esta cuenta. Si algo no coincide, esa es la razón.'
+  if (languageCode === 'pt') return '⚠️ Não consegui confirmar que este registro corresponde exatamente à resposta anterior (não houve correspondência precisa de conversa ou conteúdo da resposta para verificar) — mostrando o registro de proveniência mais recente desta conta. Se algo não bater, essa é a razão.'
+  if (languageCode === 'pl') return '⚠️ Nie udało się potwierdzić, że ten zapis dokładnie odpowiada poprzedniej odpowiedzi (nie było precyzyjnego dopasowania rozmowy ani treści odpowiedzi do weryfikacji) — pokazuję najnowszy zapis proweniencji dla tego konta. Jeśli coś się nie zgadza, to właśnie dlatego.'
+  if (languageCode === 'ru') return '⚠️ Не удалось подтвердить, что эта запись точно соответствует предыдущему ответу (не было точного совпадения беседы или содержимого ответа для проверки) — показана самая последняя запись происхождения для этого аккаунта. Если что-то не сходится, вот причина.'
+  return "⚠️ I could not confirm this record matches the immediately preceding answer exactly — a precise conversation or answer-content match was not available to verify against, so this is the most recent provenance record on file for this account, not a confirmed match to the specific answer just given. If something looks off, that mismatch is why."
 }
 
 function deterministicProvenance(body: any, prompt: string): RecordedTurnProvenance | null {
@@ -239,7 +239,8 @@ export async function POST(req: NextRequest) {
     let recorded = conversationId ? await latestRecordedTurnProvenance(conversationId, userId) : null
     if (!recorded && precedingAssistant) recorded = await recordedTurnProvenanceByContent(userId, precedingAssistant)
     if (!recorded && precedingAssistant) recorded = await latestUserTurnProvenance(userId, precedingAssistant)
-    if (!recorded && !precedingAssistant) {
+    // LAST RESORT, NOW REACHABLE: a failed precise match may still return the latest record, explicitly unverified.
+    if (!recorded) {
       recorded = await latestUserTurnProvenance(userId)
       verified = false
     }

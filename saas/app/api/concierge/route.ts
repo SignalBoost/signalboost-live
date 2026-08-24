@@ -7,6 +7,7 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { attachRecordedTurnProvenance, recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance'
 import { getAccess } from '@/lib/auth/access'
+import { isPublicDeliveryScope, withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { detectPrimaryCorruption } from '@/lib/cos-backup/policy'
 import { recordCosRecovery, runBackupCos } from '@/lib/cos-backup/runtime'
 import { advanceProspectCampaigns, createProspectCampaignJob } from '@/lib/outreach/prospectCampaign'
@@ -311,7 +312,26 @@ function timeoutReply(language: string) {
   return messages[language] || messages.en
 }
 
-export async function POST(req: NextRequest) {
+function publicContinuityReply(language: string) {
+  const messages: Record<string, string> = {
+    en: 'COS is temporarily unavailable on the public Concierge. I cannot use private company systems as a fallback here. Please try again shortly or continue in another public SignalBoost workspace.',
+    es: 'COS no está disponible temporalmente en el Concierge público. No puedo usar sistemas privados de la empresa como respaldo aquí. Inténtalo de nuevo en breve o continúa en otro espacio público de SignalBoost.',
+    pt: 'O COS está temporariamente indisponível no Concierge público. Não posso usar sistemas privados da empresa como alternativa aqui. Tente novamente em breve ou continue em outro espaço público do SignalBoost.',
+    pl: 'COS jest chwilowo niedostępny w publicznym Concierge. Nie mogę tutaj użyć prywatnych systemów firmy jako rozwiązania awaryjnego. Spróbuj ponownie za chwilę lub przejdź do innego publicznego obszaru SignalBoost.',
+    ru: 'COS временно недоступен в публичном Concierge. Я не могу использовать частные системы компании как резервный путь. Попробуйте снова немного позже или продолжите в другом публичном разделе SignalBoost.',
+  }
+  return messages[language] || messages.en
+}
+
+export async function POST(req: NextRequest): Promise<Response> {
+  // Concierge is the public face of COS. Run the entire request (including
+  // fallbacks and any nested support-route calls) inside a public-only scope so
+  // an owner/admin browser session can never promote this endpoint into an
+  // internal Chief-of-Staff channel.
+  if (!isPublicDeliveryScope()) {
+    return withPublicDeliveryScope(() => POST(req))
+  }
+
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   const language = languageFrom(body)
@@ -397,30 +417,34 @@ export async function POST(req: NextRequest) {
     source: primarySnapshot.source,
   })
 
-  if (primary && immediateReasons.length === 0) {
-    const healthyPrimary = primary
+  // A healthy public Primary is returned directly. The ordinary continuity
+  // shadow invokes Backup COS with the internal approved brain snapshot, so it
+  // is intentionally disabled on the public delivery surface.
+  if (primary && immediateReasons.length === 0) return primary
 
-    after(async () => {
-      const backup = await runBackupCos(input, language).catch(() => null)
-      if (!backup?.ok) return
-      const shadowReasons = detectPrimaryCorruption({
-        status: healthyPrimary.status,
-        reply: primarySnapshot.reply,
-        source: primarySnapshot.source,
-        backup,
-      })
-      if (!shadowReasons.includes('primary_backup_quality_divergence')) return
-      await recordCosRecovery({
-        ok: true,
-        sourceCommit: sourceCommit(),
-        action: 'Flagged Primary for Review',
-        reason: shadowReasons.join(', '),
-        timestamp: timestamp(),
-        divergenceDetails: shadowReasons,
-        recoveryStatus: 'primary_returned_shadow_alert',
-      })
+  // Fail safe BEFORE Backup COS. Public Concierge must never load the internal
+  // brain snapshot, even during continuity recovery.
+  if (isPublicDeliveryScope()) {
+    const reasons = immediateReasons.length ? immediateReasons : ['primary_unavailable']
+    await recordCosRecovery({
+      ok: false,
+      sourceCommit: sourceCommit(),
+      action: 'Activated Backup Read-Only Continuity',
+      reason: `${reasons.join(', ')}; public delivery forbids internal Backup COS`,
+      timestamp: timestamp(),
+      divergenceDetails: [...reasons, 'public_delivery_internal_backup_forbidden'],
+      recoveryStatus: 'backup_failed',
     })
-    return healthyPrimary
+    return NextResponse.json({
+      reply: publicContinuityReply(language),
+      source: 'cos-public-safe-fallback',
+      continuity_mode: 'public_fail_safe',
+      primary_quarantined: true,
+      divergence: reasons,
+      sourceCommit: sourceCommit(),
+      execution_allowed: false,
+      external_action_taken: false,
+    }, { status: 200 })
   }
 
   const backup = await runBackupCos(input, language).catch(() => null)
@@ -444,17 +468,6 @@ export async function POST(req: NextRequest) {
   })
 
   if (recovered && backup) {
-    // PERSIST BACKUP-SERVED TURNS. Persistence normally happens inside /api/support, which this
-    // failover path bypasses entirely — so a Backup-served answer left NO row in
-    // assistant_messages. Confirmed 2026-08-23 by querying the three most recent assistant rows
-    // after a Backup-served turn: the turn was simply absent. Two user-visible failures followed
-    // from that single gap:
-    //   1. "Could not save feedback" — feedback resolves against a stored row, and there was none.
-    //   2. Provenance introspection answered "this is the start of our conversation" — accurate
-    //      for what it was given, since neither a stored turn nor conversation history existed.
-    // The provenance recorded here is deliberately honest about what Backup is: read-only,
-    // advisory-only, no evidence retrieval, no learning. It must never be mistaken for a Primary
-    // lineage record.
     const backupProvenance = {
       authority: 'server_execution_telemetry',
       schema_version: 4,

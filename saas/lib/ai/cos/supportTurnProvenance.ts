@@ -4,6 +4,7 @@ import { recordedSourceForProvenance } from './responseLineage.ts'
 export type RecordedTurnProvenance = Record<string, unknown>
 
 const MAX_STORED_CONTENT = 4000
+const MIN_COMPARABLE_PREFIX = 200
 
 function validId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
@@ -55,6 +56,15 @@ export function assistantContentMatchesForProvenance(storedValue: unknown, expec
   return false
 }
 
+function sameAnswer(storedContent: unknown, expectedContent: string): boolean {
+  const stored = normalizeAssistantContent(storedContent)
+  const expected = normalizeAssistantContent(expectedContent)
+  if (!stored || !expected) return false
+  const width = Math.min(stored.length, expected.length)
+  if (width < MIN_COMPARABLE_PREFIX) return stored === expected
+  return stored.slice(0, width) === expected.slice(0, width)
+}
+
 export async function latestRecordedTurnProvenance(conversationId: string,userId: string): Promise<RecordedTurnProvenance | null> {
   if (!validId(conversationId) || !userId) return null
   const db = cosServiceDb(); if (!db) return null
@@ -75,7 +85,7 @@ export async function recordedTurnProvenanceByContent(userId: string,assistantCo
   try {
     const { data, error } = await db.from('assistant_messages').select('provenance,content').eq('user_id', userId).eq('role', 'assistant').order('created_at', { ascending: false }).limit(20)
     if (error) throw error
-    const row = (data ?? []).find((item: any) => assistantContentMatchesForProvenance(item?.content, assistantContent))
+    const row = (data ?? []).find((item: any) => sameAnswer(item?.content, assistantContent))
     return normalize(row?.provenance)
   } catch (error) {
     console.error('supportTurnProvenance: content provenance read failed', error)
@@ -102,7 +112,7 @@ export async function latestUserTurnProvenance(userId:string,expectedAssistantCo
   try{
     const {data,error}=await db.from('cos_latest_turn_provenance').select('assistant_content,provenance').eq('user_id',userId).maybeSingle()
     if(error)throw error
-    if(expectedAssistantContent&&data?.assistant_content&&!assistantContentMatchesForProvenance(data.assistant_content,expectedAssistantContent))return null
+    if(expectedAssistantContent&&data?.assistant_content&&!sameAnswer(data.assistant_content,expectedAssistantContent))return null
     return normalize(data?.provenance)
   }catch(error){console.error('supportTurnProvenance: latest-user provenance read failed',error);return null}
 }

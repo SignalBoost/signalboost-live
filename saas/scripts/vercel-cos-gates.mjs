@@ -2,6 +2,8 @@ import { spawnSync } from 'node:child_process'
 
 const tests = [
   'tests/conciergeBrowserIngressRouting.node.test.ts',
+  'tests/conciergeFullTranscript.node.test.ts',
+  'tests/cosPublicProvenanceAuditIdentity.node.test.ts',
   'tests/textTransformationInput.node.test.ts',
   'tests/executiveCommunication.node.test.ts',
   'tests/assistantComposerReset.node.test.ts',

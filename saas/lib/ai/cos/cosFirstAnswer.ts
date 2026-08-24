@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosFirstAnswer.ts
 // Compatibility entrypoint. Ordinary COS reasoning remains in cosFirstAnswerEnterprise.
 // Volatile/current facts are intercepted here and MUST be re-verified live on every request before
 // any model is allowed to answer. No answer cache, Knowledge Graph, learned corpus, Enterprise
@@ -172,6 +173,7 @@ async function tryPublicStatelessAnswer(input: {
       'Do not identify the underlying model/provider or internal implementation. If asked, say that COS powers the Concierge and implementation details are not public.',
       'For ordinary timeless/general questions, you may use your general model knowledge. Do not turn mutable/current claims into facts without live evidence.',
       'You may edit, rewrite, summarize, explain, brainstorm, reason, draft, and help with ordinary public tasks just like a general assistant, subject to the public-only boundary.',
+      'For diagnostic, troubleshooting, or root-cause questions, only state a cause as an actual finding when the request identifies a real, specific system or incident. For a generic, hypothetical, or architecture-design question with no real system named, present causes as illustrative reasoning about the class of problem, not as a diagnosis — do not label a cause "primary" or "most likely" as if it were confirmed.',
       input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
     ].join(' '),
     prompt: [

@@ -7,6 +7,7 @@ type ServiceDb = NonNullable<Awaited<ReturnType<typeof import('@/lib/cos-core/st
 
 const REJECTED_PREFIX = 'relevance_rejected:'
 const ELIGIBLE_FILTER = `fact_extraction_error.is.null,fact_extraction_error.not.ilike.${REJECTED_PREFIX}%`
+const MAX_LEARNED_CORPUS_EMBEDDING_CHARS = 1000
 
 async function serviceDb(): Promise<ServiceDb | null> {
   const { cosServiceDb } = await import('@/lib/cos-core/storage/supabase')
@@ -30,6 +31,15 @@ function stableText(value: unknown, max: number): string {
     try { raw = JSON.stringify(value) } catch { raw = String(value) }
   } else raw = String(value ?? '')
   return raw.replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+function boundedEmbeddingText(text: string): string {
+  if (text.length <= MAX_LEARNED_CORPUS_EMBEDDING_CHARS) return text
+  const marker = '\n…\n'
+  const available = MAX_LEARNED_CORPUS_EMBEDDING_CHARS - marker.length
+  const head = Math.floor(available * 0.75)
+  const tail = available - head
+  return `${text.slice(0, head)}${marker}${text.slice(-tail)}`
 }
 
 export function learnedCorpusRowRejected(row: { fact_extraction_error?: unknown }): boolean {
@@ -75,7 +85,8 @@ export function learnedCorpusEmbeddingText(row: {
   const facts = Array.isArray(row.facts)
     ? row.facts.slice(0, 6).map(fact => stableText(fact, 400)).filter(Boolean).join(' ')
     : ''
-  return [stableText(row.subject, 240), stableText(row.summary, 1600), facts].filter(Boolean).join('\n')
+  const combined = [stableText(row.subject, 240), stableText(row.summary, 1600), facts].filter(Boolean).join('\n')
+  return boundedEmbeddingText(combined)
 }
 
 /** Nearest retained corpus rows in the ACTIVE embedding model space only. */

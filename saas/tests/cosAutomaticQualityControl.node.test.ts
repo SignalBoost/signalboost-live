@@ -17,7 +17,7 @@ test('automatic quality route samples existing benchmark cohorts and routes inci
   assert.match(source, /qualityIncidentForSample/)
   assert.match(source, /qualityBacklogIncident/)
   assert.match(source, /remediateNativeIncidents/)
-  assert.match(source, /maxIncidents: 1/)
+  assert.match(source, /countPendingFailureAutopsyPrivateValidations/)
   assert.match(source, /automatic: true/)
 })
 
@@ -40,6 +40,15 @@ test('only a scored regression or backlog receives the exact pre-authorized reco
   assert.match(source, /\.\.\.\(preauthorized \? \{ registeredRecoveryAction:/)
 })
 
+test('actionable quality recovery cannot be starved by an earlier runtime failure', () => {
+  const source = file('../app/api/cron/cos-quality-control/route.ts')
+  assert.match(source, /actionableIncidentPriority/)
+  assert.match(source, /cos_quality_benchmark_regression/)
+  assert.match(source, /cos_quality_autopsy_backlog/)
+  assert.match(source, /sort\(\(a, b\) => actionableIncidentPriority\(a\) - actionableIncidentPriority\(b\)\)/)
+  assert.match(source, /remediateNativeIncidents\(\[remediationIncident\]/)
+})
+
 test('quality recovery is a registered reversible Agent Gateway action, not model-authored mutation authority', () => {
   const policy = file('../self-healing-host/self-healing-gateway-policy.ts')
   const resolver = file('../self-healing-host/native-repair-action-resolver.ts')
@@ -56,15 +65,18 @@ test('quality recovery is a registered reversible Agent Gateway action, not mode
 
   assert.match(host, /createCosQualityRecoveryExecutor\(\)/)
   assert.match(action, /runNextFailureAutopsyRetest/)
-  assert.match(action, /reconcileFailureAutopsySkills/)
-  assert.match(action, /does not edit application code, provider configuration, credentials, billing/)
+  assert.match(action, /runNextFailureAutopsyPrivateValidation/)
+  assert.match(action, /ONE bounded quality-recovery stage/)
 })
 
-test('quality repair graduates only through the existing validated cognitive-skill lifecycle and can roll back by weakening', () => {
+test('controlled retests remain practice-only and private acceptance cases own holdout validation', () => {
   const promotion = file('../lib/ai/cos/failureAutopsyPromotion.ts')
+  const privateValidation = file('../lib/ai/cos/failureAutopsyPrivateValidation.ts')
   const context = file('../lib/ai/cos/cognitiveSkillContext.ts')
-  assert.match(promotion, /status: 'validated'/)
-  assert.match(promotion, /weakened_at: now/)
-  assert.match(promotion, /original_prompt_stored: false/)
+  assert.match(promotion, /source_kind: 'failure_autopsy_controlled_practice'/)
+  assert.match(promotion, /status: 'practiced'/)
+  assert.doesNotMatch(promotion, /status: 'validated'/)
+  assert.match(privateValidation, /source_kind: 'failure_autopsy_private_holdout'/)
+  assert.match(privateValidation, /refreshCognitiveSkillStatus/)
   assert.match(context, /\.in\('status', \['validated', 'learned', 'mastered'\]\)/)
 })

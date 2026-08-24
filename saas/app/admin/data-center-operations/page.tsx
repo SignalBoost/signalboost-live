@@ -44,6 +44,36 @@ type Result = {
   diagnostics?: Diagnostic[]
   error?: string
 }
+type BenchmarkCase = {
+  id: string
+  track: string
+  active: boolean
+  origin?: string | null
+  evaluation_profile?: string | null
+}
+type BenchmarkList = {
+  ok?: boolean
+  cases?: BenchmarkCase[]
+  error?: string
+}
+type BenchmarkRun = {
+  ok?: boolean
+  attempted?: number
+  passed?: number
+  error?: string
+}
+type BenchmarkState = {
+  total: number
+  completed: number
+  attempted: number
+  passed: number
+  done: boolean
+  error: string
+}
+
+const DATA_CENTER_BENCHMARK_TRACK = 'data_center_operations'
+const DATA_CENTER_BENCHMARK_ORIGIN = 'data-center-private-v1'
+const BENCHMARK_BATCH_SIZE = 2
 
 export default function DataCenterOperationsPage() {
   const { lang } = useI18n()
@@ -52,6 +82,8 @@ export default function DataCenterOperationsPage() {
   const [scenario, setScenario] = useState<Scenario>('cooling-loop-degradation')
   const [result, setResult] = useState<Result | null>(null)
   const [loading, setLoading] = useState(false)
+  const [benchmarkLoading, setBenchmarkLoading] = useState(false)
+  const [benchmark, setBenchmark] = useState<BenchmarkState | null>(null)
 
   async function run() {
     if (loading) return
@@ -72,11 +104,61 @@ export default function DataCenterOperationsPage() {
     }
   }
 
+  async function runPrivateBenchmark() {
+    if (benchmarkLoading) return
+    setBenchmarkLoading(true)
+    setBenchmark({ total: 0, completed: 0, attempted: 0, passed: 0, done: false, error: '' })
+    try {
+      const listResponse = await fetch('/api/admin/cos-capability-benchmark', { cache: 'no-store' })
+      const listPayload = await listResponse.json().catch(() => null) as BenchmarkList | null
+      if (!listResponse.ok || !listPayload?.ok) throw new Error(listPayload?.error || `benchmark_list_http_${listResponse.status}`)
+
+      const caseIds = (listPayload.cases || [])
+        .filter(item => item.active && item.track === DATA_CENTER_BENCHMARK_TRACK && item.origin === DATA_CENTER_BENCHMARK_ORIGIN)
+        .map(item => item.id)
+
+      if (!caseIds.length) throw new Error('data_center_benchmark_cases_unavailable')
+      let attempted = 0
+      let passed = 0
+      let completed = 0
+      setBenchmark({ total: caseIds.length, completed, attempted, passed, done: false, error: '' })
+
+      for (let index = 0; index < caseIds.length; index += BENCHMARK_BATCH_SIZE) {
+        const batch = caseIds.slice(index, index + BENCHMARK_BATCH_SIZE)
+        const response = await fetch('/api/admin/cos-capability-benchmark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ track: DATA_CENTER_BENCHMARK_TRACK, limit: batch.length, caseIds: batch }),
+        })
+        const payload = await response.json().catch(() => null) as BenchmarkRun | null
+        if (!response.ok || !payload?.ok) throw new Error(payload?.error || `benchmark_run_http_${response.status}`)
+        attempted += Number(payload.attempted) || 0
+        passed += Number(payload.passed) || 0
+        completed += batch.length
+        setBenchmark({ total: caseIds.length, completed, attempted, passed, done: false, error: '' })
+      }
+
+      setBenchmark({ total: caseIds.length, completed, attempted, passed, done: true, error: '' })
+    } catch (error) {
+      setBenchmark(current => ({
+        total: current?.total || 0,
+        completed: current?.completed || 0,
+        attempted: current?.attempted || 0,
+        passed: current?.passed || 0,
+        done: false,
+        error: error instanceof Error ? error.message : 'benchmark_request_failed',
+      }))
+    } finally {
+      setBenchmarkLoading(false)
+    }
+  }
+
   const scenarios: Array<{ id: Scenario; label: string }> = [
     { id: 'cooling-loop-degradation', label: c('cooling') },
     { id: 'pdu-overload', label: c('pdu') },
     { id: 'unrelated-concurrent-alerts', label: c('unrelated') },
   ]
+  const benchmarkPassRate = benchmark?.attempted ? Math.round((benchmark.passed / benchmark.attempted) * 100) : 0
 
   return <main style={{ maxWidth: 1180, margin: '0 auto', padding: '30px 22px 70px' }}>
     <header style={{ marginBottom: 22 }}>
@@ -84,6 +166,21 @@ export default function DataCenterOperationsPage() {
       <p style={{ opacity: .78, marginTop: 8 }}>{c('subtitle')}</p>
       <div style={{ marginTop: 12, padding: '10px 12px', border: '1px solid rgba(245,196,81,.35)', borderRadius: 10, background: 'rgba(245,196,81,.08)' }}>{c('safety')}</div>
     </header>
+
+    <section style={{ marginBottom: 30, padding: 18, border: '1px solid rgba(92,225,230,.25)', borderRadius: 14, background: 'rgba(8,14,28,.48)' }}>
+      <h2 style={{ marginTop: 0 }}>{c('benchmarkTitle')}</h2>
+      <p style={{ opacity: .8, lineHeight: 1.55 }}>{c('benchmarkBody')}</p>
+      <button type="button" onClick={() => void runPrivateBenchmark()} disabled={benchmarkLoading} style={{ padding: '11px 18px', borderRadius: 10, border: 0, fontWeight: 800, cursor: benchmarkLoading ? 'wait' : 'pointer' }}>{benchmarkLoading ? c('benchmarkRunning') : c('benchmarkRun')}</button>
+      {benchmarkLoading ? <p style={{ marginBottom: 0, opacity: .72 }}>{c('benchmarkKeepOpen')}</p> : null}
+      {benchmark ? <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', marginTop: 16 }}>
+        <div style={{ padding: 12, border: '1px solid rgba(255,255,255,.12)', borderRadius: 10 }}><div style={{ fontSize: 12, opacity: .65 }}>{c('benchmarkCases')}</div><strong style={{ fontSize: 22 }}>{benchmark.total}</strong></div>
+        <div style={{ padding: 12, border: '1px solid rgba(255,255,255,.12)', borderRadius: 10 }}><div style={{ fontSize: 12, opacity: .65 }}>{c('benchmarkProgress')}</div><strong style={{ fontSize: 22 }}>{benchmark.completed}/{benchmark.total || 0}</strong></div>
+        <div style={{ padding: 12, border: '1px solid rgba(255,255,255,.12)', borderRadius: 10 }}><div style={{ fontSize: 12, opacity: .65 }}>{c('benchmarkPassed')}</div><strong style={{ fontSize: 22 }}>{benchmark.passed}/{benchmark.attempted}</strong></div>
+        <div style={{ padding: 12, border: '1px solid rgba(255,255,255,.12)', borderRadius: 10 }}><div style={{ fontSize: 12, opacity: .65 }}>{c('benchmarkPassRate')}</div><strong style={{ fontSize: 22 }}>{benchmarkPassRate}%</strong></div>
+      </div> : null}
+      {benchmark?.done ? <p style={{ marginBottom: 0, fontWeight: 750 }}>{c('benchmarkComplete')}</p> : null}
+      {benchmark?.error ? <p style={{ marginBottom: 0 }}><strong>{c('benchmarkFailed')}:</strong> {benchmark.error}</p> : null}
+    </section>
 
     <section style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))' }}>
       {scenarios.map(item => <button key={item.id} type="button" onClick={() => setScenario(item.id)} style={{ textAlign: 'left', padding: 14, borderRadius: 12, border: scenario === item.id ? '1px solid #5ce1e6' : '1px solid rgba(255,255,255,.16)', background: scenario === item.id ? 'rgba(92,225,230,.1)' : 'rgba(255,255,255,.04)', color: 'inherit', cursor: 'pointer' }}>{item.label}</button>)}

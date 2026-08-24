@@ -1,8 +1,9 @@
 // saas/lib/ai/cos/contentGenerationIntent.ts
 //
-// Authoring creates an artifact; it is not a current-world factual lookup. This classifier exists
-// so that "write me X" is never hijacked into live web retrieval and then failed closed for want
-// of evidence it never needed.
+// Authoring and transforming user-supplied material create or modify an artifact; they are not
+// current-world factual lookups. This classifier exists so requests such as "write me X",
+// "edit this email", "summarize this text", or "translate this paragraph" are never hijacked
+// into live web retrieval and then failed closed for evidence they never needed.
 //
 // WHY THE ANCHOR MOVED (2026-08-23): the pattern was anchored to the start of the WHOLE prompt, so
 // the authoring verb had to be the very first word. Real executive requests state the situation
@@ -20,11 +21,23 @@
 // The verb must still LEAD ITS OWN CLAUSE — that is what separates a real instruction ("design a
 // strategy") from an incidental mention ("who designed the Eiffel Tower", "the report writes
 // well"). So instead of anchoring to the prompt, anchor to each sentence/clause and accept if any
-// one of them opens with an authoring verb.
+// one of them opens with an authoring/transformation verb.
 
-const AUTHORING_VERB = 'write|draft|create|generate|design|produce|escribe|redacta|crea|escreva|redija|crie|napisz|stw[oó]rz|zaprojektuj|напиши|создай|сгенерируй'
+const AUTHORING_VERB = [
+  // English
+  'write', 'draft', 'create', 'generate', 'design', 'produce',
+  'edit', 'rewrite', 'proofread', 'polish', 'rephrase', 'shorten', 'tighten', 'summarize', 'summarise', 'translate',
+  // Spanish
+  'escribe', 'redacta', 'crea', 'edita', 'reescribe', 'revisa', 'corrige', 'resume', 'traduce',
+  // Portuguese
+  'escreva', 'redija', 'crie', 'edite', 'reescreva', 'revise', 'corrija', 'resuma', 'traduza',
+  // Polish
+  'napisz', 'stw[oó]rz', 'zaprojektuj', 'edytuj', 'przeredaguj', 'zredaguj', 'popraw', 'skr[oó][ćc]', 'stre[sś][ćc]', 'przet[lł]umacz',
+  // Russian
+  'напиши', 'создай', 'сгенерируй', 'отредактируй', 'перепиши', 'исправь', 'улучши', 'сократи', 'резюмируй', 'переведи',
+].join('|')
 
-/** Matches an authoring verb at the start of the string. */
+/** Matches an authoring/transformation verb at the start of the string. */
 const GENERATION = new RegExp(`^\\s*(?:${AUTHORING_VERB})\\b`, 'iu')
 
 /**
@@ -45,8 +58,8 @@ function clausesOf(input: string): string[] {
 }
 
 /**
- * True when any clause is an instruction to author something. Checking per clause rather than per
- * prompt is what lets a request that supplies context first still be recognized as authoring.
+ * True when any clause is an instruction to author or transform supplied material. Checking per
+ * clause rather than per prompt lets a request that supplies context first still be recognized.
  */
 export function isContentGenerationRequest(input: string): boolean {
   const text = String(input || '').trim()

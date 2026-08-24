@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { clusterDataCenterObservations } from '../lib/data-center/correlation.ts'
+import { diagnoseDataCenterCluster } from '../lib/data-center/diagnostic.ts'
 import {
   dataCenterObservationToSupervisorIncident,
   normalizeDataCenterObservation,
@@ -77,6 +78,52 @@ test('correlated data-center evidence enters Supervisor with root cause explicit
   assert.match(evidenceBlock, /Facility-control authority: NONE/i)
   assert.match(evidenceBlock, /cdu-2/i)
   assert.match(evidenceBlock, /rack-b17/i)
+})
+
+test('COS diagnostic contract separates observations hypotheses missing evidence and operator checks', async () => {
+  const cluster = clusterDataCenterObservations(createDataCenterSimulation('cooling-loop-degradation'))[0]
+  let capturedPrompt = ''
+  const diagnostic = await diagnoseDataCenterCluster(cluster, {
+    async generate(input) {
+      capturedPrompt = input.prompt
+      return JSON.stringify({
+        summary: 'Cooling-loop B shows correlated pressure and inlet-temperature degradation that warrants operator review.',
+        observedFacts: [
+          'CDU-2 differential pressure is 31 psi versus a supplied 38 psi baseline.',
+          'Rack B17 and B18 inlet temperatures are above supplied baselines.',
+        ],
+        hypotheses: [{
+          label: 'Cooling-loop B flow degradation',
+          confidence: 'moderate',
+          rationale: 'The pressure decline and rising inlet temperatures share an explicit cooling-loop-B correlation key, but no pump state or flow measurement proves the cause.',
+          supportingObservationIds: ['sim-cooling-cdu2-pressure', 'sim-cooling-rack-b17-temp', 'invented-id-must-be-dropped'],
+        }],
+        operatorChecks: [{
+          priority: 1,
+          action: 'Inspect CDU-2 pump/filter condition and compare approved local readings with the supplied pressure trend.',
+          reason: 'This checks the leading hypothesis without changing any facility control state.',
+        }],
+        missingEvidence: ['Direct coolant flow measurement', 'CDU pump state/current', 'Approved maintenance history'],
+      })
+    },
+  })
+
+  assert.equal(diagnostic.controlAuthority, 'none')
+  assert.equal(diagnostic.rootCauseStatus, 'unproven')
+  assert.equal(diagnostic.hypotheses[0].confidence, 'moderate')
+  assert.deepEqual(diagnostic.hypotheses[0].supportingObservationIds, ['sim-cooling-cdu2-pressure', 'sim-cooling-rack-b17-temp'])
+  assert.match(capturedPrompt, /Use ONLY the supplied evidence/)
+  assert.match(capturedPrompt, /Correlation does not establish root cause/)
+  assert.match(capturedPrompt, /Do NOT recommend changing a setpoint/)
+  assert.match(capturedPrompt, /Facility-control authority: NONE/)
+})
+
+test('COS diagnostic rejects incomplete model output instead of fabricating an advisory result', async () => {
+  const cluster = clusterDataCenterObservations(createDataCenterSimulation('pdu-overload'))[0]
+  await assert.rejects(
+    diagnoseDataCenterCluster(cluster, { async generate() { return '{"summary":"Looks bad"}' } }),
+    /data_center_diagnostic_incomplete/,
+  )
 })
 
 test('simulation fixtures are explicitly sandbox evidence and never imply facility-control authority', () => {

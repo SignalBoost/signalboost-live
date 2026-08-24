@@ -3,11 +3,11 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.23  
+**Version:** 1.24  
 **Updated:** 2026-08-24 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Baseline `main`:** `43061d553533b49ab562e547b7219a599f092aab`  
-**Baseline Production deployment:** `dpl_58XyagLUyewQXbcnzPjmtTAzeTfF` — READY, `saas.signalboostapp.com` attached  
+**Baseline `main`:** `6a5cc137ec2bd7f709a26ae55db55553b4a3fb40`  
+**Baseline Production deployment:** `dpl_ALEc7zZvo1R3WnqC9YS4aV3c1saL` — READY, `saas.signalboostapp.com` attached  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
@@ -15,8 +15,8 @@
 **Procedural-learning state:** autonomous certification architecture is Production; individual skills still earn lifecycle status from evidence  
 **Next learning priority:** observe real certification progression, then Retrieval Self-Reflection and calibration / strategy-selection learning  
 **Owner knowledge intake:** Feed COS directed study is LIVE at `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚 entry, owner-only)  
-**Concierge/COS public-assistant state:** public/private execution boundary and five-language text transformation are Production; additional semantic-edit + conversation-handoff hardening is Preview READY on `fix/cos-semantic-edit-and-conversation-handoff-20260824` and is **not yet Production**  
-**New product workstream:** `SignalBoost Data Center Operations Intelligence` — Phase 1 architecture starts as a read-only/advisory vertical extension of Self-Healing Supervisor + COS + Integrations Hub; branch `feat/datacenter-operations-intelligence-20260824`
+**Concierge/COS public-assistant state:** public/private execution boundary and five-language text transformation are Production; additional semantic-edit + conversation-handoff hardening is Preview evidence until current `main` is reverified  
+**New product workstream:** `SignalBoost Data Center Operations Intelligence` — Phase 1 read-only/advisory implementation is active on `feat/datacenter-operations-intelligence-20260824`; it is **not yet Production**
 
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
@@ -137,7 +137,7 @@ Accepted facts:
 
 ---
 
-# SignalBoost Data Center Operations Intelligence — PROJECT CHARTER / PHASE 1 STARTED
+# SignalBoost Data Center Operations Intelligence — PHASE 1 PREVIEW WORKSTREAM
 
 ## Product goal
 
@@ -167,6 +167,34 @@ Do not rebuild these capabilities:
 
 The new workstream therefore adds a **data-center domain layer**, not another orchestration platform.
 
+## Phase 1 implementation state — PREVIEW BRANCH, NOT PRODUCTION
+
+Implemented on `feat/datacenter-operations-intelligence-20260824`:
+
+- `saas/lib/data-center/observation.ts` — normalized read-only facility observation/event contract with secret-shaped metadata rejection and finite-value checks;
+- `saas/lib/data-center/correlation.ts` — conservative deterministic clustering: same site plus explicit shared correlation key or exact asset identity inside a bounded window; same-site/same-time alone is not sufficient;
+- `saas/lib/data-center/simulator.ts` — sandbox Texas cooling-loop, Arizona PDU-load, and unrelated-concurrent-alert fixtures;
+- `saas/lib/data-center/supervisorBridge.ts` — maps observations/clusters into the existing Supervisor incident schema while explicitly marking physical root cause as unproven and facility control as disallowed;
+- `saas/lib/data-center/diagnostic.ts` — structured COS diagnostic contract separating observed facts, hypotheses, missing evidence and human operator checks; invented observation IDs are discarded and incomplete model output fails closed;
+- `saas/app/api/admin/data-center-operations/simulate/route.ts` — owner-only sandbox simulation endpoint using the local COS reasoning port; no external teacher and no facility-control authority;
+- `saas/app/admin/data-center-operations/page.tsx` — owner-only operator demo showing evidence → clusters → COS advisory diagnosis; five-language copy is supplied by `saas/lib/data-center/uiCopy.ts`;
+- `saas/tests/dataCenterOperations.node.test.ts` — deterministic safety/correlation/diagnostic regression coverage, included in `saas/scripts/vercel-cos-gates.mjs`.
+
+Known acceptance before the latest `main` synchronization:
+
+- Vercel Preview `dpl_3GRsCJPvrVJFZsHieEbS2AxLxkPs` — READY on `4f7eaaed75ded2e11990e71ecea986b0cb45ee64`;
+- mandatory COS gate: **188/188 tests passed, 0 failed**;
+- all 9 data-center operations tests passed;
+- route-config guard passed;
+- strip-safety guard passed;
+- i18n page-copy and locale-key guards passed;
+- generated UI completeness remained 2,828 keys across EN/ES/PT/PL/RU;
+- optimized Next.js compile and build completed.
+
+The branch was subsequently synchronized with current `main` (`6a5cc137…`) through merge commit `bae42757f166306ceb5c39a5add08d1c3d21ea38`. Exact acceptance must be rerun on the final documentation/head commit before PR merge. Do not reuse the earlier Preview as proof for the synchronized head.
+
+The owner demo route is currently `/admin/data-center-operations`. It is intentionally an owner/admin development surface, not a customer-facing production product page.
+
 ## Phase 1 safety boundary — READ ONLY / ADVISORY
 
 Phase 1 may ingest, normalize, correlate, analyze and explain data-center operational evidence. It may recommend what an operator should inspect next.
@@ -187,7 +215,7 @@ Read-only adapters and simulated data are acceptable. Any future write/control c
 
 The initial software should focus on five useful operator outcomes:
 
-1. **Incident correlation and probable root cause** — combine many alarms/events into a smaller number of explainable incident clusters and identify the most likely causal chain without pretending correlation proves causation.
+1. **Incident correlation and probable root cause** — combine many alarms/events into a smaller number of explainable incident clusters and identify plausible causal chains without pretending correlation proves causation.
 2. **Operations knowledge copilot** — answer questions from buyer-provided manuals, SOPs, MOPs, EOPs, runbooks, vendor bulletins and prior incident reports, with provenance to the exact supporting material.
 3. **Power/cooling/reliability risk intelligence** — identify abnormal or worsening patterns across UPS/PDU/environmental/cooling evidence and explain the operational risk.
 4. **Capacity/efficiency advisory** — surface potential stranded electrical/thermal capacity, abnormal consumption or sustained constraint patterns when the supplied telemetry supports that conclusion.
@@ -211,7 +239,7 @@ BACnet/Modbus support, if explored later, should initially be through a hardened
 
 ## Canonical data-center observation/event model
 
-The new layer should normalize evidence before COS sees it. Minimum concepts should include:
+The data-center layer normalizes evidence before COS sees it. Minimum concepts include:
 
 - site / facility / hall / room / row / rack identity;
 - source system and vendor;
@@ -229,9 +257,9 @@ The normalized layer must preserve raw-source evidence separately from COS infer
 
 ## MVP: simulator before real-facility integration
 
-The first executable MVP should use synthetic/simulated data rather than a live facility.
+The first executable MVP uses synthetic/simulated data rather than a live facility.
 
-Suggested simulated estate:
+Longer-term suggested simulated estate:
 
 ```text
 2 UPS systems
@@ -243,23 +271,28 @@ environmental temperature/humidity sensors
 selected network/power/cooling status events
 ```
 
-Initial scenario families:
+Current initial fixture families:
 
-- cooling pump/CDU degradation;
-- rising rack inlet temperature with stable workload;
-- overloaded or imbalanced PDU;
-- UPS battery degradation;
-- coolant-flow/pressure anomaly;
+- Texas cooling-loop degradation: CDU pressure decline plus rising rack inlet temperatures sharing an explicit cooling-loop correlation key;
+- Arizona PDU load pressure: PDU load plus branch-current evidence;
+- unrelated concurrent alerts: UPS battery degradation and a network-switch uplink flap that occur at the same site/time but must remain separate.
+
+Expand next with:
+
 - generator availability failure;
-- network-switch/fiber failure;
+- broader UPS/battery degradation;
+- coolant-flow/pressure anomaly variants;
+- network-switch/fiber failure variants;
 - abnormal energy-consumption trend;
-- multiple unrelated alerts that must NOT be incorrectly collapsed into one incident.
+- false-correlation/adversarial cases.
 
 The simulator exists to prove the software contract, correlation logic and COS diagnostic quality. Synthetic cases are **practice/engineering fixtures**, not independent proof that the product works in a real data center.
 
 ## COS data-center knowledge curriculum
 
-The existing `dataCenterEnergyLearning.ts` proof of concept is useful background but currently emphasizes site/grid intelligence, regulatory compliance, power markets, hardware lifecycle, fiber planning and construction/permitting topics. Keep useful background knowledge, but the product curriculum must move toward operations.
+The owner-supplied `dataCenterEnergyLearning.ts` text was **design input / proof-of-concept material only** and is **not currently a repository module**. Its site/grid, regulatory, power-market, hardware-lifecycle, fiber and cooling topics may inform useful background learning later, but they must not be reported as already-live data-center learning code.
+
+The product curriculum should move toward operations first.
 
 Priority learning tracks:
 
@@ -276,7 +309,7 @@ Owner-directed study is appropriate for authoritative manuals/standards when lic
 
 ## First acceptance benchmark
 
-Create the benchmark **before** claiming capability. Initial private/curated cases should test:
+The current 9 deterministic tests are regression coverage, **not the full private capability benchmark**. Before claiming operator capability, create a broader private/curated benchmark that tests:
 
 - correct incident grouping vs false grouping;
 - likely root-cause ranking from supplied evidence;
@@ -293,23 +326,23 @@ A passing synthetic benchmark proves only the bounded MVP behavior. It does not 
 ## Phase 1 engineering sequence
 
 ```text
-1. data-center observation/event contract
-2. deterministic normalization + validation
-3. simulator + diverse incident fixtures
-4. map normalized evidence into Supervisor incident intake/runtime
-5. COS diagnostic/correlation layer with evidence boundaries
-6. buyer-document/runbook retrieval path
-7. operator-facing incident explanation + recommended checks
-8. private benchmark and regression gate
-9. Preview deployment/demo
-10. only then evaluate read-only integration with a real monitoring/DCIM source
+1. data-center observation/event contract                         IMPLEMENTED ON BRANCH
+2. deterministic normalization + validation                      IMPLEMENTED ON BRANCH
+3. simulator + diverse incident fixtures                         INITIAL SET IMPLEMENTED; EXPAND
+4. map normalized evidence into Supervisor incident runtime      IMPLEMENTED ON BRANCH
+5. COS diagnostic/correlation layer with evidence boundaries     IMPLEMENTED ON BRANCH
+6. buyer-document/runbook retrieval path                         PENDING
+7. operator-facing incident explanation + recommended checks     OWNER DEMO IMPLEMENTED
+8. private benchmark and regression gate                         REGRESSION GATE LIVE; PRIVATE BENCHMARK PENDING
+9. Preview deployment/demo                                       IMPLEMENTED; FINAL SYNCED HEAD MUST REVALIDATE
+10. read-only integration with a real monitoring/DCIM source     PENDING
 ```
 
 Commercial claim boundary: until real operator evidence exists, describe this as a development/preview data-center operations capability. Do not claim proven predictive maintenance, MTTR reduction, energy savings, uptime improvement or facility-control capability without measured evidence.
 
 ---
 
-# Public Concierge / COS general-assistant boundary and text transformation — IMPLEMENTED; HARDENING BRANCH PENDING MERGE
+# Public Concierge / COS general-assistant boundary and text transformation — IMPLEMENTED; CURRENT STATE MUST BE REQUERIED
 
 Architectural role is explicit:
 
@@ -360,15 +393,6 @@ Relevant merged sequence on 2026-08-24:
 - **#1479** — quoted email retained as read-only context, second-pass professional copy editing, and initial composer-reset work.
 
 Historical Production baseline immediately after #1479 plus the first deterministic contextual guard was `main` `3a3dc7a8c0d246f5b6b884b820ddab89e3811947`, deployment `dpl_7RMTmwRwCrSjPkyhVY8F8cpbiYrX` — READY. Always use the current top-of-file baseline for present Production state.
-
-## Known Production defect discovered after #1479
-
-Two issues remained observable after the first Production fixes:
-
-1. A malformed draft phrase such as `person post` could still drift through model editing as `personal post`, even though the quoted email makes the intended meaning `one-person post`. The same class of problem can leave vague phrases such as `cancelling this` instead of binding them to `the outbound shipment`, or fail to answer the sender's direct question explicitly.
-2. The homepage **Continue with COS** link still reinjects the entire previous request as `/dashboard/assistant?prompt=<old request>`. The assistant page then intentionally hydrates `?prompt=` into the composer. This is why the large old request can remain at the bottom even after reset logic appears correct. It is a handoff-design issue, not merely a textarea reset issue.
-
-Do not report those two items as fully fixed in Production until current `main` is re-inspected and the exact Production behavior is verified; concurrent commits after #1479 may have advanced this state.
 
 ## Historical hardening branch evidence
 
@@ -940,7 +964,8 @@ Non-negotiable:
 - #1478 — five-language executive communication framework wired into direct COS transformation.
 - #1479 — context-aware quoted-mail editing, second-pass professional copy editing and first composer-reset implementation.
 - `3a3dc7a8…` — first deterministic contextual edit quality guard landed on `main`; later commits may supersede this historical checkpoint.
-- #1481 / `43061d55…` — owner-directed study relevance authority clarified and Production baseline advanced; owner direction controls relevance, not factual truth/grounding.
+- #1481 / `43061d55…` — owner-directed study relevance authority clarified; owner direction controls relevance, not factual truth/grounding.
+- `87f2549b…` / `6a5cc137…` — current general-reasoning discipline and protected canonical COS brain guidance advanced on `main`.
 - Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
 - Evidence-triggered answer retest — bounded evidence-arrival promotion of failed prompts into budgeted benchmark cases.
 - Owner-directed study (Feed COS) — gated owner intake page/API with URL, paste and `.txt`/`.md`/`.pdf` upload (dependency-free PDF extraction), same grounding/admission gates as autonomous acquisition.
@@ -956,18 +981,18 @@ Always query current state; this sequence can advance after this document is mer
 
 # Immediate next engineering priorities
 
-1. **Data Center Operations Intelligence Phase 1:** implement the normalized read-only observation/event contract and simulator on `feat/datacenter-operations-intelligence-20260824`; reuse Self-Healing Supervisor incident intake/runtime rather than creating a parallel orchestration stack.
-2. **Data Center Operations private benchmark:** define diverse incident-correlation/root-cause/advisory cases before claiming capability; include false-correlation and insufficient-evidence cases.
-3. **Re-inspect current Concierge semantic/handoff state** before continuing that older workstream because `main` has advanced beyond the historical green branch documented above.
-4. **Observe the first real #1376 certification cycles** and verify the seeded ambiguity candidate progresses only when private understanding/practice/holdout evidence passes. Do not manually set lifecycle flags/counters.
-5. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
-6. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
-7. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
-8. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
-9. **Add independent certification profiles only where justified** by a private/curated test family; unsupported procedural candidates must continue to fail closed.
-10. **Retention continuity:** prove delayed refresh + weaken/quarantine paths under the current reasoner without inflating holdout breadth.
-11. **Episodic → semantic compression:** multi-episode corroboration and reversible promotion.
-12. **SFT/LoRA readiness only after** sufficient high-integrity outcome-labelled data, contamination controls and a separate held-out comparison exist.
+1. **Data Center Operations Phase 1 acceptance:** revalidate the synchronized branch head against current `main`, create/merge the PR only after exact Preview is green, then verify the exact Production deployment. Do not call the capability Production before this sequence completes.
+2. **Data Center Operations private benchmark:** expand beyond the 9 deterministic regression tests into diverse incident-correlation/root-cause/advisory cases, including false-correlation and insufficient-evidence cases.
+3. **Data Center Operations knowledge path:** add buyer-document/runbook retrieval with exact provenance before attempting real-facility diagnostics.
+4. **First read-only real integration:** after benchmark acceptance, evaluate one monitoring/DCIM source through the existing signed Supervisor incident/intake boundary; no facility writes.
+5. **Re-inspect current Concierge semantic/handoff state** before continuing that older workstream because `main` has advanced beyond the historical green branch documented above.
+6. **Observe the first real #1376 certification cycles** and verify the seeded ambiguity candidate progresses only when private understanding/practice/holdout evidence passes. Do not manually set lifecycle flags/counters.
+7. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
+8. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
+9. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
+10. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
+11. **Add independent certification profiles only where justified** by a private/curated test family; unsupported procedural candidates must continue to fail closed.
+12. **Retention continuity / episodic compression / SFT readiness:** continue only with independently supported evidence and separate held-out acceptance.
 
 ---
 

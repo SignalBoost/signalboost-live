@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 const tests = [
   'tests/conciergeBrowserIngressRouting.node.test.ts',
   'tests/textTransformationInput.node.test.ts',
+  'tests/executiveCommunication.node.test.ts',
   'tests/cosTurnExperience.node.test.ts',
   'tests/cosOutcomeCorrelation.node.test.ts',
   'tests/cosFailureAutopsy.node.test.ts',

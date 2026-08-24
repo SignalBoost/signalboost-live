@@ -1,3 +1,4 @@
+// saas/tests/cosLiveSystemStateProvenance.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { authoritativeProvenance, formatAuthoritativeProvenance } from '../lib/ai/cos/cosOrchestration.ts'
@@ -24,7 +25,7 @@ test('provenance omits zero-activity components and preserves live state',()=>{
   assert.match(text,/Enterprise Memory: 3 retrieved/)
   assert.match(text,/Learned Corpus: 16 retrieved/)
   assert.match(text,/Explicitly Not Used/)
-  assert.match(text,/External AI Provider: NOT USED/)
+  assert.match(text,/External Fallback \/ Teacher: NOT USED/)
   assert.match(text,/LIVE SYSTEM STATE — queried now/)
   assert.match(text,/Knowledge Graph\s+: 17 active; 2 quarantined/)
 })
@@ -57,11 +58,11 @@ test('cache replay renders original lineage separately from current retrieval at
 
   assert.match(text,/Answer Origin\s+: CACHE — written 2026-08-16T03:54:03\.385Z by qwen2\.5-coder:32b/)
   assert.match(text,/Original Lineage/)
-  assert.match(text,/Primary Reasoner\s+: INVOKED — qwen2\.5-coder:32b/)
+  assert.match(text,/Local Reasoning Engine\s+: INVOKED — qwen2\.5-coder:32b/)
   assert.match(text,/Learned Corpus\s+: 40 retrieved → 14 relevant → 6 selected → 6 injected → 0 cited/)
   assert.match(text,/Enterprise Memory\s+: 3 retrieved → 0 relevant → 0 selected → 0 injected → 0 cited/)
   assert.match(text,/Knowledge Graph\s+: 2 retrieved → 0 relevant → 0 selected → 0 injected → 0 cited/)
-  assert.match(text,/COS Confidence\s+: 0\.78 — threshold 0\.72 \(based on original lineage\)/)
+  assert.match(text,/COS Answer Confidence\s+: 0\.78 — threshold 0\.72 \(based on original lineage\)/)
 
   assert.match(text,/Current Retrieval Attempt/)
   assert.match(text,/Learned Corpus\s+: 40 retrieved → 14 relevant → 6 selected → 0 injected — NOT INJECTED into the cached answer/)
@@ -71,7 +72,7 @@ test('cache replay renders original lineage separately from current retrieval at
   assert.match(text,/Explicitly Not Used/)
   assert.match(text,/Autonomous Research: NOT USED/)
   assert.match(text,/Local Reasoning Engine \(current replay\): NOT USED/)
-  assert.match(text,/External AI Provider \(current replay\): NOT USED/)
+  assert.match(text,/External Fallback \/ Teacher \(current replay\): NOT USED/)
   assert.doesNotMatch(text,/Learned Corpus\s+: USED/)
 })
 

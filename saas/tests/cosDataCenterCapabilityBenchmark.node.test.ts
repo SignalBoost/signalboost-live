@@ -73,6 +73,27 @@ test('private benchmark route supports track-scoped profile-aware runs without e
   assert.doesNotMatch(source, /select\('id,track,prompt,active,origin,evaluation_profile,created_at'\)/)
 })
 
+test('owner benchmark route accepts bounded exact case-id batches without exposing or widening cases', () => {
+  const source = fs.readFileSync(new URL('../app/api/admin/cos-capability-benchmark/route.ts', import.meta.url), 'utf8')
+  assert.match(source, /cleanCaseIds\(body\.caseIds\)/)
+  assert.match(source, /slice\(0, MAX_CASES_PER_RUN\)/)
+  assert.match(source, /requested\.has\(String\(row\.id\)\)/)
+  assert.match(source, /selected\.length !== requestedCaseIds\.length/)
+  assert.match(source, /caseIds: selected\.map/)
+  assert.match(source, /requireOwner/)
+})
+
+test('data-center admin page runs the hidden cohort in bounded exact batches through the owner route', () => {
+  const source = fs.readFileSync(new URL('../app/admin/data-center-operations/page.tsx', import.meta.url), 'utf8')
+  assert.match(source, /DATA_CENTER_BENCHMARK_TRACK = 'data_center_operations'/)
+  assert.match(source, /DATA_CENTER_BENCHMARK_ORIGIN = 'data-center-private-v1'/)
+  assert.match(source, /BENCHMARK_BATCH_SIZE = 2/)
+  assert.match(source, /fetch\('\/api\/admin\/cos-capability-benchmark'/)
+  assert.match(source, /caseIds: batch/)
+  assert.match(source, /benchmarkPassRate/)
+  assert.doesNotMatch(source, /prompt\s*:/)
+})
+
 test('evaluation-profile migration adds metadata only and does not commit hidden cases', () => {
   const source = fs.readFileSync(new URL('../supabase/migrations/20260824_cos_capability_benchmark_evaluation_profile.sql', import.meta.url), 'utf8')
   assert.match(source, /add column if not exists evaluation_profile text/)

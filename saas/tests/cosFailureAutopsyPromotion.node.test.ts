@@ -11,14 +11,14 @@ import {
 
 const file = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
 
-function row(index: number, passed = true, problemClass = 'incident diagnosis'): AutopsyPromotionRow {
+function row(index: number, passed = true, problemClass = 'incident diagnosis', retestCaseId = `case-${index}`): AutopsyPromotionRow {
   return {
     id: `a-${index}`,
     problem_class: problemClass,
     primary_stage: 'reasoning',
     corrective_guidance: 'Compare candidate explanations against the supplied facts and state concrete falsifiers.',
     falsifier: 'A separate comparable case still fails after the procedure is applied.',
-    retest_case_id: `case-${index}`,
+    retest_case_id: retestCaseId,
     retest_passed: passed,
     lesson_retained: passed,
     status: passed ? 'retest_passed' : 'retest_failed',
@@ -42,6 +42,16 @@ test('five clean independent retests form one exact problem-class/stage cohort',
   assert.equal(new Set(candidate.successRows.map(item => item.retest_case_id)).size, 5)
   assert.equal(candidate.problemClass, 'incident diagnosis')
   assert.equal(candidate.stage, 'reasoning')
+})
+
+test('duplicate controlled retest cases count only once toward promotion', () => {
+  const candidate = deriveAutopsySkillCandidates([
+    row(0), row(1), row(2), row(3), row(4),
+    row(8, true, 'incident diagnosis', 'case-4'),
+    row(9, true, 'incident diagnosis', 'case-4'),
+  ])[0]
+  assert.equal(candidate.successRows.length, 5)
+  assert.equal(new Set(candidate.successRows.map(item => item.retest_case_id)).size, 5)
 })
 
 test('any failed retest remains attached to the exact cohort so runtime reconciliation can weaken it', () => {

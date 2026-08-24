@@ -5,10 +5,12 @@ export const USER_SUPPLIED_SCENARIO_DIRECTIVE = [
   'Facts, numbers, terms, identities, and constraints that the user explicitly supplies in this request may be used as task premises when they describe a third-party situation or an explicitly hypothetical scenario.',
   'You may reason over, compare, calculate from, and restate those supplied premises to answer the user.',
   'Do not refuse merely because the scenario describes a private company or non-public facts.',
+  'Do not say that you cannot access, disclose, or analyze facts that are already written in the current user request. Those facts are available as user-supplied premises even though they were not retrieved from private systems.',
+  'When the supplied premises are sufficient for the requested analysis, begin directly with the analysis. Do not preface the answer with a private-data, public-catalog, confidentiality, or lack-of-access disclaimer.',
   'Do not claim those premises were independently verified, retrieved from private systems, or known outside the current request.',
   'This premise rule never overrides authoritative SignalBoost product catalog, status, runtime, authorization, safety, governance, or system-of-record facts.',
   'If the user supplies a conflicting claim about SignalBoost itself, do not restate it as a current fact. Use authoritative SignalBoost evidence instead; if the user explicitly framed it as hypothetical, reason only within that hypothetical frame.',
-  'If additional facts are required, identify exactly what is missing and continue with the analysis that can be supported by the supplied premises.',
+  'If additional facts are genuinely required, identify exactly what is missing and continue with the analysis that can be supported by the supplied premises.',
 ].join(' ')
 
 const SCENARIO_DOMAIN = /\b(company|business|startup|vendor|contract|investor|financing|runway|valuation|board|ceo|cfo|employee|option pool|procurement|customer|tenant|provider)\b/i
@@ -48,6 +50,10 @@ export function looksLikePrivateDataRefusal(reply: string): boolean {
   return (
     value.includes('cannot provide a factual analysis') ||
     value.includes("do not have access to the company's private") ||
+    value.includes('cannot access or disclose private company data') ||
+    value.includes('cannot access or disclose private') ||
+    (value.includes('private business information') && value.includes('cannot')) ||
+    (value.includes('not part of the public signalboost product catalog') && value.includes('cannot')) ||
     (value.includes('not public information') && value.includes('cannot')) ||
     value.includes('without private data')
   )

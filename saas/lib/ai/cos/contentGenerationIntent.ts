@@ -21,7 +21,7 @@
 // from an incidental mention ("who designed the Eiffel Tower"). Unicode-aware boundaries are used
 // so Polish and Russian commands are treated the same way as English, Spanish, and Portuguese.
 
-import { looksLikeArtifactContinuation } from './cosArtifactConversationContext.ts'
+import { looksLikeArtifactContinuation } from './artifactContinuationIntent.ts'
 
 const AUTHORING_VERB = [
   // English

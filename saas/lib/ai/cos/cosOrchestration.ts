@@ -218,11 +218,11 @@ export function restrictedProvenanceReply(language: string): string {
 export function publicProvenanceReply(language: string, provenance?: any, originalRequest?: string): string {
   const request = String(originalRequest || '').replace(/\s+/g, ' ').trim().slice(0, 600)
   if (request) {
-    if (language === 'es') return `La creé directamente a partir de las instrucciones que diste: “${request}”. No se usaron fuentes externas ni datos privados.`
-    if (language === 'pt') return `Eu a criei diretamente a partir das instruções que você deu: “${request}”. Nenhuma fonte externa ou dado privado foi usado.`
-    if (language === 'pl') return `Stworzyłem ją bezpośrednio na podstawie podanych instrukcji: „${request}”. Nie użyto źródeł zewnętrznych ani danych prywatnych.`
-    if (language === 'ru') return `Я создал его непосредственно по вашим инструкциям: «${request}». Внешние источники и частные данные не использовались.`
-    return `I created it directly from the instructions you gave: “${request}”. No external sources or private data were used.`
+    if (language === 'es') return 'Fue un borrador original creado para esta conversación. No se usaron fuentes externas ni datos privados.'
+    if (language === 'pt') return 'Foi um rascunho original criado para esta conversa. Nenhuma fonte externa ou dado privado foi usado.'
+    if (language === 'pl') return 'To był oryginalny tekst przygotowany dla tej rozmowy. Nie użyto źródeł zewnętrznych ani danych prywatnych.'
+    if (language === 'ru') return 'Это был оригинальный текст, созданный для этого разговора. Внешние источники и частные данные не использовались.'
+    return 'That was an original draft created for this conversation. No external research or private data was used.'
   }
   const fromCache = Boolean(provenance?.answer_origin?.from_cache)
   const usedPublicSources = Boolean(provenance?.autonomous_research_attempted || provenance?.autonomousResearchAttempted || provenance?.fresh_evidence?.used || provenance?.freshEvidence?.used)

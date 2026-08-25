@@ -31,8 +31,12 @@ function envList(name: string): string[] {
     .filter(Boolean)
 }
 
+// SignalBoost's primary owner must retain access even when deployment configuration
+// is incomplete or has been reset. OWNER_EMAILS may add further owner accounts.
+const DEFAULT_OWNER_EMAILS = ['cadomos@gmail.com']
+
 function ownerEmails(): string[] {
-  return envList('OWNER_EMAILS')
+  return [...new Set([...DEFAULT_OWNER_EMAILS, ...envList('OWNER_EMAILS')])]
 }
 
 function envRole(email: string): Role {

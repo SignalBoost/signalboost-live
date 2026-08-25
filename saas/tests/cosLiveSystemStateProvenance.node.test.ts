@@ -58,7 +58,7 @@ test('cache replay renders original lineage separately from current retrieval at
 
   assert.match(text,/Answer Origin\s+: CACHE — written 2026-08-16T03:54:03\.385Z by qwen2\.5-coder:32b/)
   assert.match(text,/Original Lineage/)
-  assert.match(text,/Local Reasoning Engine\s+: INVOKED — qwen2\.5-coder:32b/)
+  assert.match(text,/Primary Reasoner\s+: INVOKED — qwen2\.5-coder:32b/)
   assert.match(text,/Learned Corpus\s+: 40 retrieved → 14 relevant → 6 selected → 6 injected → 0 cited/)
   assert.match(text,/Enterprise Memory\s+: 3 retrieved → 0 relevant → 0 selected → 0 injected → 0 cited/)
   assert.match(text,/Knowledge Graph\s+: 2 retrieved → 0 relevant → 0 selected → 0 injected → 0 cited/)

@@ -13,8 +13,13 @@
 // stakes management scenarios. That prevents a generic model instinct from turning sparse facts
 // into invented savings percentages, blanket freezes, accusations about department leaders, or
 // simplistic "cost center = expendable" recommendations.
+//
+// It also carries professional-document structure. Keeping that rule at this request-specific
+// seam means every COS reasoner worker receives the same document contract without duplicating it
+// across public, owner, editor, and specialist prompts.
 
 import { regulatedOperationalScenarioDirective } from './regulatedOperationalScenarioIntent.ts'
+import { professionalDocumentDirective } from './professionalDocumentEngine.ts'
 
 export type ScriptRequestMode = 'content' | 'code' | 'none'
 
@@ -113,6 +118,7 @@ export function scriptRequestDirective(prompt: string): string | null {
     pureScriptDirective(input),
     executiveDecisionDirective(input),
     regulatedOperationalScenarioDirective(input),
+    professionalDocumentDirective(prompt),
   ].filter(Boolean)
   return directives.length ? directives.join('\n\n') : null
 }

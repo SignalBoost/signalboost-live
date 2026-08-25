@@ -27,9 +27,10 @@ export function authoritativeProvenance(
 
   const canonical = current?.canonicalSelfKnowledgeUsed ?? null
   provenance.canonical_self_knowledge = {
-    used: Boolean(canonical?.enterpriseMemoryDefinition || canonical?.semanticCacheDefinition),
+    used: Boolean(canonical?.enterpriseMemoryDefinition || canonical?.semanticCacheDefinition || canonical?.companyIdentityDefinition),
     enterprise_memory_definition: Boolean(canonical?.enterpriseMemoryDefinition),
     semantic_cache_definition: Boolean(canonical?.semanticCacheDefinition),
+    company_identity_definition: Boolean(canonical?.companyIdentityDefinition),
   }
 
   const premises = current?.userSuppliedPremises ?? null
@@ -166,6 +167,7 @@ function recordedInfluenceInterpretation(provenance: any): string {
     const definitions = [
       canonical.enterprise_memory_definition ? 'Enterprise Memory definition' : null,
       canonical.semantic_cache_definition ? 'Semantic Cache definition' : null,
+      canonical.company_identity_definition ? 'SignalBoost company-identity definition' : null,
     ].filter(Boolean).join(', ')
     material.push(`Canonical Self-Knowledge — MATERIAL: ${definitions || 'recorded canonical definitions'} contributed.`)
   }
@@ -196,12 +198,28 @@ function correctBackupContinuityConfidence(text: string, provenance: any): strin
   )
 }
 
+// Provenance introspection ("where did you get that answer from?") discloses the primary
+// reasoner model, inference host/provider, and internal memory-layer status — real technical
+// architecture detail. That is appropriate for the owner's own audit/debugging use of COS, but
+// none of the three call sites that answer provenance questions (support/route.ts,
+// routeCoreLegacy.ts, cos-primary/baseRoute.ts) gated it to privileged callers before this fix —
+// any caller, including an unauthenticated public visitor, could trigger the same disclosure.
+// Owner-verified requirement (2026-08-24): COS must never give up provenance, architecture, or
+// model details outside an owner/admin session. This is the shared non-privileged reply.
+export function restrictedProvenanceReply(language: string): string {
+  if (language === 'es') return 'No puedo compartir información de procedencia técnica, arquitectura o modelo en este canal.'
+  if (language === 'pt') return 'Não posso compartilhar informações de proveniência técnica, arquitetura ou modelo neste canal.'
+  if (language === 'pl') return 'Nie mogę udostępniać technicznych informacji o pochodzeniu, architekturze ani modelu na tym kanale.'
+  if (language === 'ru') return 'Я не могу делиться технической информацией о происхождении ответа, архитектуре или модели в этом канале.'
+  return 'I can\'t share technical provenance, architecture, or model details on this channel.'
+}
+
 export function formatAuthoritativeProvenance(provenance: any, language: string): string {
   let formatted = liveFormatAuthoritativeProvenance(provenance, language)
   formatted = correctBackupContinuityConfidence(formatted, provenance)
   const canonical = provenance?.canonical_self_knowledge ?? {}
   const canonicalLine = canonical.used
-    ? `Canonical Self-Knowledge: USED — ${[canonical.enterprise_memory_definition ? 'Enterprise Memory definition' : null, canonical.semantic_cache_definition ? 'Semantic Cache definition' : null].filter(Boolean).join(', ')} contributed material to the answer.`
+    ? `Canonical Self-Knowledge: USED — ${[canonical.enterprise_memory_definition ? 'Enterprise Memory definition' : null, canonical.semantic_cache_definition ? 'Semantic Cache definition' : null, canonical.company_identity_definition ? 'SignalBoost company-identity definition' : null].filter(Boolean).join(', ')} contributed material to the answer.`
     : 'Canonical Self-Knowledge: NOT USED.'
   formatted = insertBeforeLiveSystemState(formatted, canonicalLine)
   const originFromCache = Boolean(provenance?.answer_origin?.from_cache)

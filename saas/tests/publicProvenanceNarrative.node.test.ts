@@ -85,22 +85,47 @@ test('leftover mid-sentence "the previous answer" narration is still rejected', 
 test('too-short and too-long output is rejected (forces a real sentence, blocks runaway)', () => {
   const facts = extractPublicProvenanceFacts({ record: null })
   assert.equal(acceptPublicNarrative('ok', facts), null)
-  assert.equal(acceptPublicNarrative('a'.repeat(1300), facts), null)
+  assert.equal(acceptPublicNarrative('a'.repeat(2400), facts), null)
 })
 
-test('instruction demands own voice + variety, forbids names and verbatim quoting, carries facts', () => {
+test('instruction demands the structured first-person shape with labeled summary and topic naming', () => {
   const facts = extractPublicProvenanceFacts({ record: null, originalRequest: 'write a compliance script', priorAnswer: 'TITLE: THE COMPLIANCE CHECK' })
   const instruction = buildPublicProvenanceInstruction(facts, 'where did you get the answer from?', 'en')
   assert.ok(/FIRST PERSON/.test(instruction.system))
   assert.ok(/never narrate yourself in the third person/i.test(instruction.system))
-  assert.ok(/vary your wording/i.test(instruction.system))
-  assert.ok(/never name any specific ai model/i.test(instruction.system))
+  assert.ok(/It was generated from:/.test(instruction.system))
+  assert.ok(/Primary source:/.test(instruction.system))
+  assert.ok(/External web retrieval:/.test(instruction.system))
+  assert.ok(/COS pretrained knowledge/.test(instruction.system))
+  assert.ok(/never name any specific underlying ai model/i.test(instruction.system))
   assert.ok(/name the TOPIC/i.test(instruction.system))
-  assert.ok(/never refer to it generically/i.test(instruction.system))
+  assert.ok(/vary your wording/i.test(instruction.system))
   assert.ok(/drawing on your own training, memory and general knowledge/i.test(instruction.prompt))
   const cached = buildPublicProvenanceInstruction(extractPublicProvenanceFacts({ record: CACHE_RECORD }), 'source?', 'pt')
   assert.ok(/reusing a reply/i.test(cached.prompt))
   assert.ok(/Portuguese/.test(cached.system))
+})
+
+test('a full structured ChatGPT-shape reply passes the gate with newlines preserved', () => {
+  const facts = extractPublicProvenanceFacts({ record: null, originalRequest: 'evaluate fail-open vs fail-closed AI design' })
+  const structured = [
+    'I did not take that from any external source, and I ran no web search for it.',
+    '',
+    'It was generated from:',
+    '* my pretrained knowledge about fail-open versus fail-closed behavior in AI systems;',
+    '* reasoning applied to the statement you gave me about verification gates.',
+    '',
+    'Primary source: COS pretrained knowledge',
+    'External web retrieval: None',
+    'Your request: Yes — it was the subject being evaluated',
+    'Private data: None',
+    'Fresh factual verification: None',
+    '',
+    'I was commenting analytically on your statement, not claiming independent verification of it.',
+  ].join('\n')
+  const accepted = acceptPublicNarrative(structured, facts)
+  assert.equal(accepted, structured)
+  assert.ok((accepted as string).includes('\n'), 'newlines must survive normalization')
 })
 
 test('emergency line exists in all five languages and speaks in the owner-requested voice', () => {

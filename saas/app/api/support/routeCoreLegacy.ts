@@ -11,6 +11,7 @@ import {
   authoritativeProvenance,
   formatAuthoritativeProvenance,
   restrictedProvenanceReply,
+  publicProvenanceReply,
   escalationReason,
   logEscalation,
   confidenceThreshold as cosConfidenceThreshold,
@@ -1653,9 +1654,10 @@ export async function POST(req: NextRequest) {
 
     if (isProvenanceQuestion) {
       if (!isPrivileged) {
+        const priorTurn = [...sanitized].reverse().find(m => m.role === 'assistant')
         return NextResponse.json({
-          reply: restrictedProvenanceReply(languageCode),
-          source: 'cos-provenance-restricted',
+          reply: publicProvenanceReply(languageCode, (priorTurn as any)?.provenance),
+          source: 'cos-public-provenance-summary',
           external_ai_invoked: false,
         })
       }

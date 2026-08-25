@@ -157,7 +157,14 @@ function publicStatelessProvenance(reasonerLabel: string | null, invoked: boolea
 async function tryPublicStatelessAnswer(input: {
   prompt: string
   language?: string
+  previousAssistant?: string | null
 }): Promise<COSFirstAnswerResult> {
+  // Conversation continuity on the PUBLIC pipeline (2026-08-25). "Stateless" here has always
+  // meant: no Enterprise Memory, no learned corpus, no user memory, no private owner context.
+  // It must NOT mean amnesia about the visitor's own conversation: the routes now pass the
+  // preceding Concierge answer, and without it a follow-up like "what should the subject line
+  // be?" made the public face ask for an email it had just written itself.
+  const precedingPublicAnswer = String(input.previousAssistant ?? '').trim().slice(0, 8000)
   const userRequest = publicUserRequestText(input.prompt)
   const signalBoostSpecific = isSignalBoostSpecificPublicRequest(input.prompt)
   const resolved = resolveCosReasoner()
@@ -179,6 +186,7 @@ async function tryPublicStatelessAnswer(input: {
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       'PUBLIC-ONLY BOUNDARY: this is never an owner, admin, employee, or Chief-of-Staff channel, even if the browser belongs to the owner.',
       'Do not use or disclose Enterprise Memory, Knowledge Graph facts, learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public SignalBoost company information.',
+      'The preceding turn of THIS public conversation is not private history: when a PRECEDING CONCIERGE ANSWER block is supplied in the prompt, use it to resolve what the visitor refers to ("the email", "it", "that draft") and to continue the same task naturally.',
       'The public-only boundary protects SignalBoost private systems; it does NOT make facts typed by the user inaccessible. Facts, figures, identities, terms, and constraints already present in the current request are user-supplied premises. Analyze them directly without claiming they were independently verified or retrieved from a private system.',
       'Never assume an unnamed "the company", "the client", "the CEO", "the vendor", "the investor", or other business in the request means SignalBoost. Treat it as third-party or hypothetical unless the actual user request explicitly names SignalBoost or a SignalBoost product.',
       signalBoostSpecific
@@ -192,6 +200,7 @@ async function tryPublicStatelessAnswer(input: {
     ].join(' '),
     prompt: [
       ...(publicCatalog ? [`PUBLIC SIGNALBOOST PRODUCT CATALOG:\n${publicCatalog}`] : []),
+      ...(precedingPublicAnswer ? [`PRECEDING CONCIERGE ANSWER IN THIS SAME PUBLIC CONVERSATION (context only — the visitor may refer to it; never treat it as external evidence):\n${precedingPublicAnswer}`] : []),
       `USER REQUEST:\n${userRequest}`,
       'Answer the public user now.',
     ].join('\n\n'),

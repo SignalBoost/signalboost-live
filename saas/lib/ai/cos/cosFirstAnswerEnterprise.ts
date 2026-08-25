@@ -22,7 +22,7 @@ import { resolveCosEnterpriseMemoryScope } from '@/lib/ai/cos/cosEnterpriseMemor
 import { retrieveEnterpriseMemoryContext } from '@/lib/enterprise/memory/retriever'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { selectLearnedCorpusRows, classifyLearnedEvidence, learnedEvidenceLabel } from '@/lib/ai/cos/learnedEvidenceClass'
-import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
+import { ENTERPRISE_MEMORY_DEFINITION, SEMANTIC_ANSWER_CACHE_DEFINITION, SIGNALBOOST_COMPANY_IDENTITY_DEFINITION, MEMORY_LAYER_COMPARISON_GUARDRAIL, canonicalSelfKnowledgeContribution } from '@/lib/ai/cos/cosMemoryLayerDefinitions'
 import { stripInternalEvidenceIds } from '@/lib/ai/cos/answerEvidenceIdHygiene'
 import { detectUserSuppliedPremises } from '@/lib/ai/cos/userSuppliedPremises'
 import { correctCompoundingArithmetic } from '@/lib/ai/cos/compoundingArithmeticCheck'
@@ -59,7 +59,7 @@ export type COSProvenance = {
   enterpriseMemoriesCited?:number
   userMemoriesCited?:number
   cognitiveSkillsCited?:number
-  canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean}
+  canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
   // Facts the user stated inline in the prompt. Provenance previously accounted only for
   // RETRIEVED evidence, so an answer grounded entirely in pasted records reported the reasoner as
   // its lone contributor — implying the facts came from nowhere (2026-08-23).
@@ -88,7 +88,7 @@ type CachedAnswerOrigin = {
   cognitiveSkillsCited:number
   evidenceFunnel?:COSEvidenceFunnel
   cognitiveSkillFunnel?:EvidenceFunnelStage
-  canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean}
+  canonicalSelfKnowledgeUsed?:{enterpriseMemoryDefinition:boolean; semanticCacheDefinition:boolean; companyIdentityDefinition:boolean}
   // Facts the user stated inline in the prompt. Provenance previously accounted only for
   // RETRIEVED evidence, so an answer grounded entirely in pasted records reported the reasoner as
   // its lone contributor — implying the facts came from nowhere (2026-08-23).
@@ -308,8 +308,9 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
     'Reason from the question, your own model knowledge, and any supplied internal evidence.',
     `AUTHORITATIVE COS DEFINITIONS: ${ENTERPRISE_MEMORY_DEFINITION}`,
     `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_ANSWER_CACHE_DEFINITION}`,
+    `AUTHORITATIVE COS DEFINITIONS: ${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`,
     `SCOPE RULE: ${MEMORY_LAYER_COMPARISON_GUARDRAIL}`,
-    'These AUTHORITATIVE COS DEFINITIONS are foundational platform knowledge that is always true and always available to you — they are not retrieved evidence and require no [KG#]/[CL#]/[OEM#] citation to use. When a question asks what a COS component is, how two COS components differ, or anything else these definitions directly answer, answer directly from them. The absence of a matching [KG#]/[CL#]/[OEM#] row is not a reason to decline or hedge on a question these definitions already answer.',
+    'These AUTHORITATIVE COS DEFINITIONS are foundational platform knowledge that is always true and always available to you — they are not retrieved evidence and require no [KG#]/[CL#]/[OEM#] citation to use. When a question asks what a COS component is, how two COS components differ, what SignalBoost is or who owns it, or anything else these definitions directly answer, answer directly from them. Do not add, guess, or speculate about any fact beyond what the SignalBoost company-identity definition states — no owner name, founding date, headquarters, or other detail not present in that sentence. The absence of a matching [KG#]/[CL#]/[OEM#] row is not a reason to decline or hedge on a question these definitions already answer.',
     '',
     'SELF-KNOWLEDGE AND IMPROVEMENT BOUNDARIES:',
     '- COS can propose or implement governed changes to application code, prompts, retrieval, tools, workflows, knowledge, and validated procedures. Such changes require tests and approved deployment; do not claim they happened unless supplied evidence says so.',
@@ -853,7 +854,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     cognitiveSkillsCited:cited.sk,
     evidenceFunnel:executionFunnel(context, true, cited, enterpriseCited),
     cognitiveSkillFunnel:executionSkillFunnel(context, true, cited.sk),
-    ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition } } : {}),
+    ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition, companyIdentityDefinition:canonicalSelfKnowledgeUsed.companyIdentityDefinition } } : {}),
   }
   const groundedCount = citedKnowledgeEvidenceCount({ kg:cited.kg, cl:cited.cl, oem:enterpriseCited })
   const ceiling = groundedEvidenceCeiling(groundedCount)
@@ -901,7 +902,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
       cognitiveSkillsCited:cited.sk,
       evidenceFunnel:citedProvenance.evidenceFunnel,
       cognitiveSkillFunnel:citedProvenance.cognitiveSkillFunnel,
-      ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition } } : {}),
+      ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition, companyIdentityDefinition:canonicalSelfKnowledgeUsed.companyIdentityDefinition } } : {}),
     },
   }
   const cacheWriteBudgetMs = Number(process.env.COS_CACHE_WRITE_BUDGET_MS ?? '8000')

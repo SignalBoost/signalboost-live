@@ -5,6 +5,7 @@ const tests = [
   'tests/conciergeFullTranscript.node.test.ts',
   'tests/cosPublicProvenanceAuditIdentity.node.test.ts',
   'tests/textTransformationInput.node.test.ts',
+  'tests/cosEditIntentFidelity.node.test.ts',
   'tests/executiveCommunication.node.test.ts',
   'tests/assistantComposerReset.node.test.ts',
   'tests/dataCenterOperations.node.test.ts',

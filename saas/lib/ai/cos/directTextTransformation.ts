@@ -3,7 +3,12 @@ import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
 import type { COSFirstAnswerResult } from './cosFirstAnswerEnterprise.ts'
 import { executiveCommunicationBlock } from './executiveCommunication.ts'
-import { contextualEditAnchorBlock, prepareContextualEdit, repairContextualEditDrift } from './contextualEditQuality.ts'
+import {
+  contextualEditAnchorBlock,
+  contextualEditIntentViolation,
+  prepareContextualEdit,
+  repairContextualEditDrift,
+} from './contextualEditQuality.ts'
 import {
   detectDirectTextTransformation,
   splitQuotedEmailThread,
@@ -28,6 +33,9 @@ export type { DirectTextTransformationRequest } from './textTransformationInput.
 const MEANING_FIDELITY_RULES = [
   'MEANING FIDELITY IS THE HIGHEST PRIORITY AND OUTRANKS EVERY STYLE RULE BELOW.',
   '- Preserve the user\'s intended meaning, first-person voice, names, titles, numbers, dates, links, commitments, and level of certainty unless the user explicitly asks to change them.',
+  '- Preserve the COMMUNICATIVE INTENT of every sentence: who is asking, offering, refusing, informing, promising, questioning, or referring whom to do what. Grammar cleanup must never change those actor/action/recipient relationships.',
+  '- Never broaden the requested action. If the user asks the recipient to identify WHO or WHICH OFFICE can provide information or perform an action, the edit must remain a routing/referral request; it must NOT also ask the recipient to provide that information or perform that action.',
+  '- Preserve request scope exactly. Do not convert guidance into a request, a request into a demand, willingness into a commitment, uncertainty into certainty, or a referral request into direct responsibility.',
   '- The permitted scope of correction is grammar, spelling, agreement, articles, hyphenation, punctuation, word order, and sentence structure. Nothing wider.',
   '- Do NOT replace any of the user\'s nouns, noun phrases, roles, or terms of art with a different word that carries a different meaning. Normalize the user\'s own term instead of substituting it: "one person post" becomes "one-person post", never "personal post".',
   '- Unusual or non-native-looking business terminology is presumed intentional. Posts, positions, offices, centers, units, programs, departments, and job titles supplied by the user are facts, not wording errors.',
@@ -59,7 +67,7 @@ function provenance(reasonerLabel: string | null, invoked: boolean) {
     escalationReason: invoked ? null : 'The configured COS reasoner was unavailable for the direct text-transformation request.',
     localModelInvoked: invoked,
     reasonerLabel,
-    internalSystemsConsulted: ['Direct Text Transformation', 'Meaning Fidelity Contract', 'Executive Communication Framework', 'Editorial Quality Pass', ...(invoked ? ['Independent Local Reasoner'] : [])],
+    internalSystemsConsulted: ['Direct Text Transformation', 'Meaning Fidelity Contract', 'Communicative Intent Guard', 'Executive Communication Framework', 'Editorial Quality Pass', ...(invoked ? ['Independent Local Reasoner'] : [])],
     knowledgeFactsUsed: 0,
     learnedItemsUsed: 0,
     enterpriseMemoriesUsed: 0,
@@ -106,6 +114,8 @@ async function refineProfessionalDraft(input: {
       'You are the FINAL COS professional copy editor. The candidate below has already been drafted once. Release a better final version; do not explain it.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       'MEANING FIDELITY OUTRANKS POLISH. Before improving anything, silently compare the candidate against the ORIGINAL EDITABLE SOURCE and repair these regressions first:',
+      '- If the candidate changed who is being asked to do what, restore the ORIGINAL actor/action/recipient relationship. In particular, a request to identify a person or office must not become a request for the current recipient to perform the underlying task or provide the underlying information.',
+      '- If the candidate broadened the user\'s requested action, remove the added request. Preserve referral-only, information-only, approval-only, confirmation-only, and action-only scopes exactly as written.',
       '- If the candidate replaced any of the user\'s nouns, roles, titles, or terms of art with a different-meaning word, restore the user\'s term and fix only its grammar, hyphenation, or spelling.',
       '- If the candidate added, inverted, or redirected any consequence, obligation, or responsibility that the source does not state, remove it.',
       '- If the candidate introduced any fact, promise, deadline, or characterization of the recipient that is not present in the source or reference context, remove it.',
@@ -146,10 +156,9 @@ export async function tryDirectTextTransformation(input: {
   const sourceSplit = splitQuotedEmailThread(request.sourceText)
   const rawEditableSource = sourceSplit.editableSource || request.sourceText
   const referenceContext = sourceSplit.referenceContext
-  // Deterministic pre-pass. contextualEditQuality normalizes the known rough phrasings the
-  // model keeps getting wrong (notably "a person post" -> "a one-person post") and emits
-  // SEMANTIC ANCHORS that state the resolved meaning as a hard requirement, so the fix does
-  // not depend on the model choosing to honour a prose rule.
+  // Deterministic pre-pass. contextualEditQuality normalizes known rough phrasings and emits
+  // SEMANTIC ANCHORS for factual meaning plus communicative intent, so the model may improve
+  // wording without silently reassigning responsibility or broadening the user's request.
   const prepared = prepareContextualEdit(rawEditableSource, referenceContext)
   const editableSource = prepared.editableSource
   const anchorBlock = contextualEditAnchorBlock(prepared.anchors)
@@ -228,14 +237,22 @@ export async function tryDirectTextTransformation(input: {
     finalConfidence = refined.confidence
   }
 
-  // Deterministic post-pass. Even a compliant model can drift back to "personal post" or drop
-  // the explicit answer; this repairs the released text rather than trusting the prompt.
+  // Deterministic post-pass. Even a compliant model can drift back to a different term,
+  // drop an explicit answer, or reassign a referral-only request to the current recipient.
   finalAnswer = repairContextualEditDrift({
     originalSource: rawEditableSource,
     referenceContext,
     answer: finalAnswer,
     language: input.language,
   })
+
+  // A polished sentence is not acceptable if it changes who is responsible for the requested
+  // action. If deterministic repair cannot eliminate that expansion, fail safe to the prepared
+  // source rather than release an edit with changed intent.
+  if (contextualEditIntentViolation({ originalSource: rawEditableSource, answer: finalAnswer })) {
+    finalAnswer = editableSource.trim()
+    finalConfidence = Math.min(finalConfidence, 0.5)
+  }
 
   // Editing user-supplied text is not a factual assertion. Once a non-empty, fidelity-checked
   // draft exists, release it; a generic answer-confidence threshold must not turn it into a refusal.

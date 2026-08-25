@@ -6,6 +6,7 @@ const tests = [
   'tests/cosPublicProvenanceAuditIdentity.node.test.ts',
   'tests/cosProvenanceParaphraseContinuity.node.test.ts',
   'tests/cosCreativeConstraintFidelity.node.test.ts',
+  'tests/cosReasonerQuality.node.test.ts',
   'tests/textTransformationInput.node.test.ts',
   'tests/cosEditIntentFidelity.node.test.ts',
   'tests/writingElementFollowup.node.test.ts',

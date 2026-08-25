@@ -218,3 +218,25 @@ test('supplied security launch scenarios stay on the reasoning route', () => {
   assert.equal(requiresFreshExternalEvidence(scenario), false)
   assert.equal(requiresFreshExternalEvidence('Is CVE-2026-12345 still unpatched?'), true)
 })
+
+
+test('company identity questions never reach public web search, in any phrasing or platform language', () => {
+  for (const question of [
+    'what or who is signalboost and who owns it?',   // exact production phrasing 2026-08-25
+    'what is SignalBoost?',
+    'who owns SignalBoost?',
+    'who is the CEO of SignalBoost?',
+    'who founded signalboost and when?',
+    'what does the SignalBoost platform do?',
+    '¿quién es el dueño de SignalBoost?',
+    'quem é o dono da SignalBoost?',
+    'kto jest właścicielem SignalBoost?',
+    'кто владелец SignalBoost?',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(question), false, question)
+  }
+  // The exclusion is scoped to SignalBoost itself — real-world ownership stays live-verified.
+  for (const question of ['who owns Nike?', 'who is the CEO of Microsoft?']) {
+    assert.equal(requiresFreshExternalEvidence(question), true, question)
+  }
+})

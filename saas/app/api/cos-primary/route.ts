@@ -39,7 +39,6 @@ import {
   authoritativeProvenance,
   formatAuthoritativeProvenance,
   restrictedProvenanceReply,
-  publicProvenanceReply,
   escalationReason,
   logEscalation,
   confidenceThreshold,
@@ -135,10 +134,9 @@ export async function POST(req:NextRequest){
 
   if(isProvenanceIntrospection(input) || asksWhereTheAnswerCameFrom(input)){
     if(!isPrivileged){
-      const prior=await readCosPrimaryPriorProvenance(userId,precedingAssistant||undefined)
-      const reply=publicProvenanceReply(language,prior)
+      const reply=restrictedProvenanceReply(language)
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'deterministic',confidence:1,externalAiInvoked:false})
-      return NextResponse.json({reply,source:'cos-public-provenance-summary',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+      return NextResponse.json({reply,source:'cos-provenance-restricted',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
     const prior=await readCosPrimaryPriorProvenance(userId,precedingAssistant||undefined)
     const reply=prior?formatAuthoritativeProvenance(prior as any,language):noPriorReply(language)

@@ -13,11 +13,12 @@ import {
 } from '@/lib/ai/cos/authoritativeFactGrounding'
 import {
   attachFreshEvidenceProvenance,
-  freshEvidenceMeetsAuthority,
   freshEvidenceSearchQuery,
   prepareFreshEvidence,
   type FreshEvidenceSource,
 } from '@/lib/ai/cos/cosFreshGrounding'
+import { freshEvidenceMeetsQuestionAuthority } from '@/lib/ai/cos/cosFreshAuthority'
+import { resolveFreshConversationContext } from '@/lib/ai/cos/cosFreshConversationContext'
 import { writeVolatileAnswerCache } from '@/lib/ai/cos/cosVolatileAnswerCache'
 import { buildCosLiveTelemetry, emitCosLiveTelemetry, type CosLiveResponseSource } from '@/lib/ai/cos/cosLiveTelemetry'
 import { readCosPrimaryPriorProvenance, writeCosPrimaryProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
@@ -25,7 +26,6 @@ import { asksWhereTheAnswerCameFrom } from '@/lib/ai/cos/provenanceIntrospection
 import { readStrategyProfile } from '@/lib/ai/cos/strategyProfileReport'
 import { appliedStrategyOverrides } from '@/lib/ai/cos/strategyProfile'
 import { recordTeacherEscalation } from '@/lib/ai/cos/teacherLearning'
-import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalSynthesis'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
@@ -112,6 +112,13 @@ export async function POST(req:NextRequest){
   const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body)
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body),isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
+  // Fresh/current-fact follow-ups ("when did she die?") are not complete queries on their own.
+  // resolveFreshConversationContext carries forward only the user's own prior message — assistant
+  // text is never trusted as a factual referent (verified: it filters to role==='user' only).
+  // lookupInput is the resolved question used for every fresh-evidence lookup and cache key below;
+  // it equals the raw input unless a genuine follow-up pattern was detected.
+  const freshConversationContext=resolveFreshConversationContext(body, input)
+  const lookupInput=freshConversationContext.lookupInput
 
   // Repository inspection is an owner-authorized, read-only operation. Execute it here so a model/tool-choice loop cannot skip it.
   if(access?.isOwner&&isOwnerRepoScanRequest(input)){
@@ -161,7 +168,7 @@ export async function POST(req:NextRequest){
     const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:[directSource],retrievedAt:grounded.fetchedAt,error:null,synthesisAccepted:null})
     ;(executionProvenance as any).authoritative_source={used:true,attempted:true,category:grounded.categoryId,id:grounded.sourceId,label:grounded.sourceLabel,url:grounded.sourceUrl,fetched_at:grounded.fetchedAt}
     ;(executionProvenance as any).answer_origin={from_cache:false,provider:null,model:null,authoritative_source:grounded.sourceId,grounded_at:grounded.fetchedAt}
-    const volatileCacheWritten=await writeVolatileAnswerCache({prompt:input,language,value:{reply,groundedAt:grounded.fetchedAt,liveSources:[directSource],externalProvider:null,externalModel:null}})
+    const volatileCacheWritten=await writeVolatileAnswerCache({prompt:lookupInput,language,value:{reply,groundedAt:grounded.fetchedAt,liveSources:[directSource],externalProvider:null,externalModel:null}})
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'authoritative_source',confidence:1,externalAiInvoked:false})
     logEscalation({event:'authoritative_direct_fact_hit',category:grounded.categoryId,provider:'authoritative_source',model:grounded.sourceId,status:200,source_url:grounded.sourceUrl,external_ai_invoked:false,local_model_invoked:false})
     await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-authoritative-source',{prompt:input,answered:true,confidence:1,branch:'authoritative_source'})
@@ -169,39 +176,27 @@ export async function POST(req:NextRequest){
   }
 
   let freshSources:FreshEvidenceSource[]=[],freshRetrievedAt:string|null=null,freshError:string|null=null
-  let freshLocalAttempted=false,freshLocalModel:string|null=null
+  // Local-model synthesis and deterministic office-holder shortcuts were removed from this path
+  // (owner-verified 2026-08-24): fresh/current facts are answered from external, evidence-grounded
+  // synthesis ONLY — never from local Qwen or model memory. These two stay false/null by
+  // construction now; nothing below ever sets them to true.
+  const freshLocalAttempted=false,freshLocalModel:string|null=null
   if(requiresFreshEvidence){
     freshRetrievedAt=new Date().toISOString()
-    const query=freshEvidenceSearchQuery(input)
+    const query=freshEvidenceSearchQuery(lookupInput)
     const live=await getExternalInfo(query,8,{bypassCache:true})
     freshError=live.ok?null:live.error||'Live search returned no usable evidence.'
     freshSources=live.ok?prepareFreshEvidence(live.results,8):[]
-    const authoritySatisfied=freshEvidenceMeetsAuthority(input,freshSources)&&securityScenarioEvidenceIsSpecific(input,freshSources)
-    logEscalation({event:'fresh_external_evidence_result',query,documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url)})
+    const sources=freshSources
+    const authoritySatisfied=freshEvidenceMeetsQuestionAuthority(lookupInput, sources)&&securityScenarioEvidenceIsSpecific(lookupInput,freshSources)
+    logEscalation({event:'fresh_external_evidence_result',query,documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     if(!authoritySatisfied){
       const detail=freshError||'Live search did not return authoritative evidence required for this current fact.'
       const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:detail,synthesisAccepted:false})
-      const reply=freshEvidenceUnavailableReply(language,input),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
-      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-unavailable',{prompt:input,answered:false,confidence:0,branch:'fresh_evidence_unavailable'})
+      ;Object.assign(executionProvenance as any, {policy:'fresh_live_data_external_only', assistant_text_used_for_resolution:false})
+      const reply=freshEvidenceUnavailableReply(language,lookupInput),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-unavailable',{prompt:lookupInput,answered:false,confidence:0,branch:'fresh_evidence_unavailable'})
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-unavailable',confidence_score:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
-    }
-
-    if(!requestedAction){
-      freshLocalAttempted=true
-      freshLocalModel=localReasonerLabel()
-      const localSynthesis=await synthesizeFreshEvidenceLocally({input,sources:freshSources,retrievedAt:freshRetrievedAt,language})
-      if(localSynthesis){
-        freshLocalModel=localSynthesis.reasonerLabel
-        const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:localSynthesis.reasonerLabel,confidence:1,accepted:true})
-        const executionProvenance=attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:true})
-        ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:localSynthesis.reasonerLabel,grounded_at:freshRetrievedAt}
-        logEscalation({event:'fresh_local_synthesis_accepted',documents_acquired:freshSources.length,reasoner:localSynthesis.reasonerLabel,external_ai_invoked:false,local_model_invoked:true})
-        const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:localSynthesis.reply,source:'local_cos_reasoning',confidence:1,provenance:freshTelemetryProvenance(true,localSynthesis.reasonerLabel),externalAiInvoked:false})
-        const volatileCacheWritten=await writeVolatileAnswerCache({prompt:input,language,value:{reply:localSynthesis.reply,groundedAt:freshRetrievedAt,liveSources:freshSources,externalProvider:null,externalModel:null}})
-        await writeCosPrimaryProvenance(userId,localSynthesis.reply,executionProvenance,'cos-fresh-local-grounded',{prompt:input,answered:true,confidence:0.8,branch:'fresh_local_grounded'})
-        return NextResponse.json({ok:true,reply:localSynthesis.reply,source:'cos-fresh-local-grounded',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
-      }
-      logEscalation({event:'fresh_local_synthesis_declined',documents_acquired:freshSources.length,external_ai_invoked:false,local_model_invoked:true})
     }
   }
 
@@ -237,26 +232,27 @@ export async function POST(req:NextRequest){
   // loop and would repeat freshness retrieval. Use the COS text gateway directly as a constrained
   // sources-only phraser, then fail closed if its evidence-id contract is not satisfied.
   if(requiresFreshEvidence&&freshRetrievedAt){
-    const externalFresh=await synthesizeFreshEvidenceExternally({input,sources:freshSources,retrievedAt:freshRetrievedAt,language})
+    const externalFresh=await synthesizeFreshEvidenceExternally({ input: lookupInput, sources:freshSources,retrievedAt:freshRetrievedAt,language})
     const externalInvoked=externalFresh.source==='provider'||(externalFresh.source===null&&externalFresh.attempted)
     const externalProvider=normalizeProvider(externalFresh.provider)
     let baseProvenance=authoritativeProvenance(null,{invoked:externalInvoked,provider:externalProvider,model:externalFresh.model})
     baseProvenance=markFreshLocalReasoning(baseProvenance,{invoked:freshLocalAttempted,model:freshLocalModel,accepted:false})
     const executionProvenance=attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:externalFresh.accepted?null:'External fresh-evidence synthesis was unavailable or rejected by the evidence contract.',synthesisAccepted:externalFresh.accepted})
+    ;Object.assign(executionProvenance as any, {policy:'fresh_live_data_external_only', assistant_text_used_for_resolution:false})
     logEscalation({event:'fresh_external_synthesis_result',provider:externalProvider,model:externalFresh.model,provider_source:externalFresh.source,external_ai_invoked:externalInvoked,local_model_invoked:freshLocalAttempted,fresh_documents_acquired:freshSources.length,fresh_synthesis_accepted:externalFresh.accepted})
 
     if(!externalFresh.accepted||!externalFresh.reply){
-      const reply=freshSynthesisRejectedReply(language,input)
+      const reply=freshSynthesisRejectedReply(language,lookupInput)
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,provenance:freshTelemetryProvenance(freshLocalAttempted,freshLocalModel),externalAiInvoked:externalInvoked})
-      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-synthesis-rejected',{prompt:input,answered:false,confidence:0,branch:'fresh_evidence_synthesis_rejected'})
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-synthesis-rejected',{prompt:lookupInput,answered:false,confidence:0,branch:'fresh_evidence_synthesis_rejected'})
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-synthesis-rejected',confidence_score:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:externalInvoked,external_provider:externalProvider,external_model:externalFresh.model,external_provider_source:externalFresh.source,external_fallback_invoked:externalInvoked,external_fallback_succeeded:false,local_model_invoked:freshLocalAttempted,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
     }
 
     const reply=externalFresh.reply
     ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:externalProvider,model:externalFresh.model,grounded_at:freshRetrievedAt}
-    const volatileCacheWritten=await writeVolatileAnswerCache({prompt:input,language,value:{reply,groundedAt:freshRetrievedAt,liveSources:freshSources,externalProvider,externalModel:externalFresh.model}})
+    const volatileCacheWritten=await writeVolatileAnswerCache({prompt:lookupInput,language,value:{reply,groundedAt:freshRetrievedAt,liveSources:freshSources,externalProvider,externalModel:externalFresh.model}})
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'external_fallback',confidence:1,provenance:freshTelemetryProvenance(freshLocalAttempted,freshLocalModel),externalAiInvoked:externalInvoked})
-    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'external_fresh_grounded',{prompt:input,answered:true,confidence:0.9,branch:'external_fresh_grounded'})
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'external_fresh_grounded',{prompt:lookupInput,answered:true,confidence:0.9,branch:'external_fresh_grounded'})
     return NextResponse.json({ok:true,reply,source:'external_fresh_grounded',confidence_score:1,confidence_threshold:confidenceThreshold(),cos_first_attempted:freshLocalAttempted,cos_first_handled:false,cos_first_confidence:null,cos_first_reason:reason.detail,escalation_reason_code:reason.code,execution_provenance:executionProvenance,external_ai_invoked:externalInvoked,external_provider:externalProvider,external_model:externalFresh.model,external_provider_source:externalFresh.source,external_fallback_invoked:externalInvoked,external_fallback_succeeded:true,local_model_invoked:freshLocalAttempted,isolation_mode:false,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
   }
 

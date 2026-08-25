@@ -1,3 +1,5 @@
+import { peekConversationArtifactContext } from './cosArtifactConversationContext.ts'
+
 export type DirectTextTransformationRequest = {
   instruction: string
   sourceText: string
@@ -42,6 +44,19 @@ function delimiterAfterIntent(prompt: string, startAt: number): { index: number;
 
 export function detectDirectTextTransformation(prompt: string): DirectTextTransformationRequest | null {
   const raw = String(prompt || '').trim()
+  if (!raw) return null
+
+  // Conversation continuation path: the immediately preceding assistant reply is allowed here only
+  // as an editable artifact. The prior user turn is attached behind a quoted-thread boundary so the
+  // existing editor treats it as read-only reference context rather than text to rewrite.
+  const artifactContext = peekConversationArtifactContext(raw)
+  if (artifactContext) {
+    const sourceText = artifactContext.previousUserText
+      ? `${artifactContext.assistantArtifact}\n\n--- Original Message ---\n${artifactContext.previousUserText}`
+      : artifactContext.assistantArtifact
+    return { instruction: raw, sourceText }
+  }
+
   if (raw.length < 20) return null
 
   const stripped = raw.replace(LEADING_REQUEST_RE, '')

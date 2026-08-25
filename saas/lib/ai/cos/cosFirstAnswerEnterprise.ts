@@ -682,7 +682,7 @@ async function waitForCacheWritesWithinBudget(work: Promise<unknown>, budgetMs: 
   }
 }
 
-export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null;language?:string;privileged?:boolean;disableCache?:boolean}):Promise<COSFirstAnswerResult> {
+export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:string|null;userId?:string|null;language?:string;privileged?:boolean;disableCache?:boolean}):Promise<COSFirstAnswerResult> {
   const startedAt = Date.now()
   const context = await retrieveInternalContext(input.prompt, input.userId, Boolean(input.privileged))
   const userSuppliedPremises = detectUserSuppliedPremises(input.prompt)
@@ -709,7 +709,8 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
   const cacheMaxAgeMs = cosCacheMaxAgeMs()
   const knowledge = semanticKnowledgeLayer()
 
-  const cacheAllowed = !input.disableCache && semanticCacheAllowedForPrompt(input.prompt)
+  // A follow-up depends on the preceding answer. Never replay a prompt-only cache entry into that conversation.
+  const cacheAllowed = !input.disableCache && !input.previousAssistant?.trim() && semanticCacheAllowedForPrompt(input.prompt)
   if (cacheAllowed && knowledge && !scopedMemorySelected) {
     const nearest = await knowledge.lookupSemanticCache(cacheTaskId, input.prompt, contextWindow)
     if (nearest) {
@@ -769,7 +770,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;userId?:string|null
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English'),
-    prompt:`${internalContext || 'No matching durable internal evidence was retrieved for this input.'}\n\nUSER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}`,
+    prompt:`${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,12000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}`,
   }).catch(error => {
     // Previously swallowed entirely (`.catch(() => null)`), so a wake-and-reason turn that failed
     // for ANY reason — cold-start timeout, aborted fetch, HTTP error from the endpoint, wake permission

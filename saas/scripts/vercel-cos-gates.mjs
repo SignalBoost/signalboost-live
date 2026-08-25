@@ -4,6 +4,8 @@ const tests = [
   'tests/conciergeBrowserIngressRouting.node.test.ts',
   'tests/conciergeFullTranscript.node.test.ts',
   'tests/cosPublicProvenanceAuditIdentity.node.test.ts',
+  'tests/cosProvenanceParaphraseContinuity.node.test.ts',
+  'tests/cosCreativeConstraintFidelity.node.test.ts',
   'tests/textTransformationInput.node.test.ts',
   'tests/cosEditIntentFidelity.node.test.ts',
   'tests/writingElementFollowup.node.test.ts',

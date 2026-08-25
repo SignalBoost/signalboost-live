@@ -1,6 +1,7 @@
 import { assistantContentMatchesForProvenance, recordLatestUserTurnProvenance } from './supportTurnProvenance.ts'
 import { buildCosLiveSystemState } from './cosLiveSystemState.ts'
 import { responseLineageStrength } from './responseLineage.ts'
+import { isCosGeneratedProvenanceReply } from './provenanceReplyContinuity.ts'
 import { getAccess } from '@/lib/auth/access'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
@@ -40,7 +41,9 @@ export async function readCosPrimaryPriorProvenance(userId:string|null,preceding
   try{
     const {data,error}=await db.from('cos_latest_turn_provenance').select('assistant_content,provenance').eq('user_id',effectiveUserId).maybeSingle()
     if(error)throw error
-    if(data?.provenance&&publicScopeCompatible(data.provenance)&&(!precedingAssistant||assistantContentMatchesForProvenance(data.assistant_content,precedingAssistant)))prior=data.provenance as Record<string,unknown>
+    const transcriptMatches=!precedingAssistant||assistantContentMatchesForProvenance(data?.assistant_content,precedingAssistant)
+    const repeatedIntrospection=isCosGeneratedProvenanceReply(precedingAssistant)
+    if(data?.provenance&&publicScopeCompatible(data.provenance)&&(transcriptMatches||repeatedIntrospection))prior=data.provenance as Record<string,unknown>
   }catch(error){
     console.error('cosPrimaryTurnProvenance: prior provenance read failed',error)
   }
@@ -111,10 +114,6 @@ export async function writeCosPrimaryProvenance(userId:string|null,reply:string,
     if(turnId)await recordOutOfPipelineTurnExperience(turnId,turn)
   }
 
-  // The COS-primary wrapper can make attempt A, then call the legacy/support path which makes
-  // attempt B. The support path persists B before control returns here. Never let a rejected A
-  // overwrite B merely because the outer wrapper completes a few milliseconds later. Public
-  // requests compare only against public-scoped lineage so internal owner provenance cannot leak.
   const existing=await recentResponseBoundLineage(effectiveUserId,reply)
   const candidateStrength=responseLineageStrength(recordedProvenance)
   const existingStrength=responseLineageStrength(existing?.provenance)

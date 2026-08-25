@@ -36,13 +36,24 @@ function sourceSignalsReferralRequest(source: string): boolean {
   ].some(pattern => pattern.test(value))
 }
 
-function sourceExplicitlyRequestsRecipientUnderlyingInfo(source: string): boolean {
-  const value = compact(source)
+function requestsRecipientUnderlyingInfo(value: string): boolean {
+  const text = compact(value)
   return [
-    /\b(?:can|could|would|will)\s+you\b.{0,50}\b(?:provide|give|send|share|confirm)\b.{0,100}\b(?:status|update|information|info)\b/i,
-    /\bplease\b.{0,30}\b(?:provide|give|send|share|confirm)\b.{0,100}\b(?:status|update|information|info)\b/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
+    /\bplease\b.{0,40}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\badvise\b(?:\s+(?:me|us))?\s+(?:on|about|of)\s+(?:the\s+)?(?:status|update|information|info)\b/i,
+    /\bplease\b.{0,30}\badvise\b(?:\s+(?:me|us))?\s+(?:on|about|of)\s+(?:the\s+)?(?:status|update|information|info)\b/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\bupdate\s+(?:me|us)\b(?:\s+(?:on|about|with))?/i,
+    /\bplease\b.{0,30}\bupdate\s+(?:me|us)\b(?:\s+(?:on|about|with))?/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\btell\s+(?:me|us)\b.{0,30}\b(?:the|what)\b.{0,30}\b(?:status|update)\b/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\blet\s+(?:me|us)\s+know\b.{0,40}\b(?:the|what)\b.{0,30}\b(?:status|update)\b/i,
     /\b(?:do|would)\s+you\b.{0,40}\b(?:have|know)\b.{0,60}\b(?:the\s+)?(?:status|update)\b/i,
-  ].some(pattern => pattern.test(value))
+    /\bwhat\s+(?:is|'s)\s+(?:the\s+)?(?:current\s+)?(?:status|update)\b/i,
+  ].some(pattern => pattern.test(text))
+}
+
+function sourceExplicitlyRequestsRecipientUnderlyingInfo(source: string): boolean {
+  return requestsRecipientUnderlyingInfo(source)
 }
 
 function sourceSignalsReferralOnly(source: string): boolean {
@@ -50,12 +61,7 @@ function sourceSignalsReferralOnly(source: string): boolean {
 }
 
 function answerRequestsRecipientUnderlyingInfo(answer: string): boolean {
-  const value = compact(answer)
-  return [
-    /\b(?:can|could|would|will)\s+you\b.{0,60}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
-    /\bplease\b.{0,30}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
-    /\b(?:do|would)\s+you\b.{0,40}\b(?:have|know)\b.{0,60}\b(?:the\s+)?(?:status|update)\b/i,
-  ].some(pattern => pattern.test(value))
+  return requestsRecipientUnderlyingInfo(answer)
 }
 
 export function contextualEditIntentViolation(input: {
@@ -82,7 +88,7 @@ export function prepareContextualEdit(editableSource: string, referenceContext?:
   }
 
   if (sourceSignalsReferralOnly(normalized)) {
-    anchors.push('The user is asking this recipient for ROUTING/REFERRAL only: identify the correct person, office, team, or point of contact who can provide the underlying information. Do NOT broaden this into a request for this recipient to provide the underlying status, update, or information themselves.')
+    anchors.push('The user is asking this recipient for ROUTING/REFERRAL only: identify the correct person, office, team, or point of contact who can provide the underlying information. Do NOT broaden this into a request for this recipient to provide, advise on, confirm, or otherwise supply the underlying status, update, or information themselves.')
   }
 
   if (/\bcancel(?:ing|ling)\s+(?:the\s+)?outbound\s+shipment\b/i.test(context)) {
@@ -121,11 +127,22 @@ function repairReferralOnlyRoleExpansion(source: string, answer: string): string
   // The topic normally remains explicit in the preceding sentence; the safe fallback asks
   // only for routing and therefore cannot assign the underlying work to the wrong office.
   const directQuestion = /\b(?:Could|Can|Would|Will)\s+you\b[^?]*(?:\?|$)/i
-  if (!directQuestion.test(answer)) return answer
-  return answer.replace(
-    directQuestion,
-    'Could you please let us know who or which office we should contact for more information?',
-  )
+  if (directQuestion.test(answer)) {
+    return answer.replace(
+      directQuestion,
+      'Could you please let us know who or which office we should contact for more information?',
+    )
+  }
+
+  const directSentence = /(^|[.!?]\s+|\n+)(?:Please|Kindly)\b[^.!?\n]*(?:[.!?]|$)/i
+  if (directSentence.test(answer)) {
+    return answer.replace(
+      directSentence,
+      '$1Could you please let us know who or which office we should contact for more information?',
+    )
+  }
+
+  return answer
 }
 
 export function repairContextualEditDrift(input: {

@@ -36,13 +36,24 @@ function sourceSignalsReferralRequest(source: string): boolean {
   ].some(pattern => pattern.test(value))
 }
 
-function sourceExplicitlyRequestsRecipientUnderlyingInfo(source: string): boolean {
-  const value = compact(source)
+function requestsRecipientUnderlyingInfo(value: string): boolean {
+  const text = compact(value)
   return [
-    /\b(?:can|could|would|will)\s+you\b.{0,50}\b(?:provide|give|send|share|confirm)\b.{0,100}\b(?:status|update|information|info)\b/i,
-    /\bplease\b.{0,30}\b(?:provide|give|send|share|confirm)\b.{0,100}\b(?:status|update|information|info)\b/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
+    /\bplease\b.{0,40}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\badvise\b(?:\s+(?:me|us))?\s+(?:on|about|of)\s+(?!(?:who|whom|which)\b|the\s+(?:right|correct|appropriate)\s+(?:person|office|contact)\b).{0,80}\b(?:status|update|information|info)\b/i,
+    /\bplease\b.{0,30}\badvise\b(?:\s+(?:me|us))?\s+(?:on|about|of)\s+(?!(?:who|whom|which)\b|the\s+(?:right|correct|appropriate)\s+(?:person|office|contact)\b).{0,80}\b(?:status|update|information|info)\b/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\bupdate\s+(?:me|us)\b(?:\s+(?:on|about|with))?/i,
+    /\bplease\b.{0,30}\bupdate\s+(?:me|us)\b(?:\s+(?:on|about|with))?/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\btell\s+(?:me|us)\b.{0,30}\b(?:the|what)\b.{0,30}\b(?:status|update)\b/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\blet\s+(?:me|us)\s+know\b.{0,40}\b(?:the|what)\b.{0,30}\b(?:status|update)\b/i,
     /\b(?:do|would)\s+you\b.{0,40}\b(?:have|know)\b.{0,60}\b(?:the\s+)?(?:status|update)\b/i,
-  ].some(pattern => pattern.test(value))
+    /\bwhat\s+(?:is|'s)\s+(?:the\s+)?(?:current\s+)?(?:status|update)\b/i,
+  ].some(pattern => pattern.test(text))
+}
+
+function sourceExplicitlyRequestsRecipientUnderlyingInfo(source: string): boolean {
+  return requestsRecipientUnderlyingInfo(source)
 }
 
 function sourceSignalsReferralOnly(source: string): boolean {
@@ -50,12 +61,7 @@ function sourceSignalsReferralOnly(source: string): boolean {
 }
 
 function answerRequestsRecipientUnderlyingInfo(answer: string): boolean {
-  const value = compact(answer)
-  return [
-    /\b(?:can|could|would|will)\s+you\b.{0,60}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
-    /\bplease\b.{0,30}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
-    /\b(?:do|would)\s+you\b.{0,40}\b(?:have|know)\b.{0,60}\b(?:the\s+)?(?:status|update)\b/i,
-  ].some(pattern => pattern.test(value))
+  return requestsRecipientUnderlyingInfo(answer)
 }
 
 export function contextualEditIntentViolation(input: {
@@ -74,15 +80,12 @@ export function prepareContextualEdit(editableSource: string, referenceContext?:
   const anchors: string[] = []
 
   if (sourceSignalsOnePersonPost(normalized, context)) {
-    // One idempotent pass. The previous two-step chain rewrote "a person post" to
-    // "a one-person post" and then matched "person post" again inside it, emitting
-    // "a one-one-person post". The optional one- prefix makes re-application a no-op.
     normalized = normalized.replace(/\b(?:one-)?person\s+post\b/gi, 'one-person post')
     anchors.push('The rough phrase "person post" means "one-person post" (a post being covered by one person), NOT "personal post".')
   }
 
   if (sourceSignalsReferralOnly(normalized)) {
-    anchors.push('The user is asking this recipient for ROUTING/REFERRAL only: identify the correct person, office, team, or point of contact who can provide the underlying information. Do NOT broaden this into a request for this recipient to provide the underlying status, update, or information themselves.')
+    anchors.push('The user is asking this recipient for ROUTING/REFERRAL only: identify the correct person, office, team, or point of contact who can provide the underlying information. Do NOT broaden this into a request for this recipient to provide, advise on, confirm, or otherwise supply the underlying status, update, or information themselves.')
   }
 
   if (/\bcancel(?:ing|ling)\s+(?:the\s+)?outbound\s+shipment\b/i.test(context)) {
@@ -114,18 +117,29 @@ function insertBeforeClosing(answer: string, sentence: string): string {
   return `${before}\n\n${sentence}\n\n${after}`.trim()
 }
 
-function repairReferralOnlyRoleExpansion(source: string, answer: string): string {
-  if (!sourceSignalsReferralOnly(source) || !answerRequestsRecipientUnderlyingInfo(answer)) return answer
+const REFERRAL_ONLY_REQUEST = 'Could you please let us know who or which office we should contact for more information?'
 
-  // Keep the surrounding edited draft, but replace only the broadened recipient request.
-  // The topic normally remains explicit in the preceding sentence; the safe fallback asks
-  // only for routing and therefore cannot assign the underlying work to the wrong office.
-  const directQuestion = /\b(?:Could|Can|Would|Will)\s+you\b[^?]*(?:\?|$)/i
-  if (!directQuestion.test(answer)) return answer
-  return answer.replace(
-    directQuestion,
-    'Could you please let us know who or which office we should contact for more information?',
-  )
+function repairReferralOnlyRoleExpansion(source: string, answer: string): string {
+  if (!sourceSignalsReferralOnly(source)) return answer
+
+  // Referral-only is a structural intent, not a vocabulary choice. Once the source has been
+  // classified as referral-only, do not rely on an exhaustive list of model paraphrases to spot
+  // drift. Deterministically normalize the released request sentence back to referral-only scope.
+  const modalRequest = /\b(?:Could|Can|Would|Will)\s+you\b[^?]*(?:\?|$)/i
+  if (modalRequest.test(answer)) {
+    return answer.replace(modalRequest, REFERRAL_ONLY_REQUEST)
+  }
+
+  const politeRequest = /(^|[.!?]\s+|\n+)(?:Please|Kindly)\b[^.!?\n]*(?:[.!?]|$)/i
+  if (politeRequest.test(answer)) {
+    return answer.replace(politeRequest, `$1${REFERRAL_ONLY_REQUEST}`)
+  }
+
+  if (!sourceSignalsReferralRequest(answer)) {
+    return insertBeforeClosing(answer, REFERRAL_ONLY_REQUEST)
+  }
+
+  return answer
 }
 
 export function repairContextualEditDrift(input: {

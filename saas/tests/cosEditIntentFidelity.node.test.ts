@@ -55,6 +55,24 @@ test('the second live AskISSO drift using advise on status is rejected and repai
   assert.match(repaired, /who or which office we should contact/i)
 })
 
+test('referral-only finalization does not depend on enumerating every model synonym', () => {
+  const unseenParaphrase = 'Dear AskISSO,\n\nWe had Enterprise Wi-Fi installed in Paramaribo a few months ago. Could you please brief us regarding the activation situation or direct us to the appropriate contact?\n\nThank you.'
+
+  // "brief us regarding the activation situation" is intentionally not part of the lexical
+  // violation detector. The structural finalizer must still force the request back to referral-only.
+  assert.equal(contextualEditIntentViolation({ originalSource: askIssoSource, answer: unseenParaphrase }), null)
+
+  const repaired = repairContextualEditDrift({
+    originalSource: askIssoSource,
+    referenceContext: null,
+    answer: unseenParaphrase,
+    language: 'en',
+  })
+
+  assert.doesNotMatch(repaired, /brief us regarding/i)
+  assert.match(repaired, /who or which office we should contact/i)
+})
+
 test('semantic variants of a direct underlying-status request cannot bypass referral-only scope', () => {
   for (const drifted of [
     'Could you please advise us on the status of the activation?',

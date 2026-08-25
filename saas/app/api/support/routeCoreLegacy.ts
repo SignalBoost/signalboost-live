@@ -1,4 +1,4 @@
-// saas/app/api/support/route.ts
+// saas/app/api/support/routeCoreLegacy.ts
 import Anthropic from '@anthropic-ai/sdk'
 import { portableBrandName } from '@/lib/portable/companyIdentity'
 import { NextRequest, NextResponse } from 'next/server'
@@ -1687,7 +1687,12 @@ export async function POST(req: NextRequest) {
 
     if (!requestedAction) {
       try {
-        cosFirst = await tryCOSFirstAnswer({ prompt: latestUserMessage, userId, language: languageCode, privileged: isPrivileged })
+        // Conversation continuity (2026-08-25): pass the preceding assistant answer, exactly as
+        // cos-primary route.ts and baseRoute.ts already do. Without it a Concierge follow-up like
+        // "what should the subject line be?" reached the reasoner with no email in sight, and it
+        // asked the visitor for context that was already in the conversation.
+        const precedingAssistant = [...sanitized].reverse().find(m => m.role === 'assistant')?.content?.trim() || null
+        cosFirst = await tryCOSFirstAnswer({ prompt: latestUserMessage, previousAssistant: precedingAssistant, userId, language: languageCode, privileged: isPrivileged })
       } catch (error) {
         cosFirstError = error instanceof Error ? error.message : String(error)
         console.error('[cos-first-error]', cosFirstError)

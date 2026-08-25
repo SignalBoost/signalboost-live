@@ -21,6 +21,8 @@
 // from an incidental mention ("who designed the Eiffel Tower"). Unicode-aware boundaries are used
 // so Polish and Russian commands are treated the same way as English, Spanish, and Portuguese.
 
+import { looksLikeArtifactContinuation } from './artifactContinuationIntent.ts'
+
 const AUTHORING_VERB = [
   // English
   'write', 'draft', 'create', 'generate', 'design', 'produce',
@@ -58,10 +60,15 @@ function clausesOf(input: string): string[] {
 /**
  * True when any clause is an instruction to author or transform supplied material. Checking per
  * clause rather than per prompt lets a request that supplies context first still be recognized.
+ *
+ * Immediate artifact continuations ("what would be the subject line for this email?", "make it
+ * more formal") belong here too. They operate on prior conversation text and must never be
+ * mistaken for public current-fact lookups merely because they begin with "what".
  */
 export function isContentGenerationRequest(input: string): boolean {
   const text = String(input || '').trim()
   if (!text) return false
+  if (looksLikeArtifactContinuation(text)) return true
   if (GENERATION.test(text)) return true
   if (isWritingElementQuestion(text)) return true
   return clausesOf(text).some(clause => GENERATION.test(clause))

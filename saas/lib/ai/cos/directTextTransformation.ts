@@ -172,7 +172,7 @@ export async function tryDirectTextTransformation(input: {
     }
   }
 
-  const reasoned = await callCosReasoner({
+  let reasoned = await callCosReasoner({
     temperature: 0.05,
     maxTokens: 2400,
     systemPrompt: [

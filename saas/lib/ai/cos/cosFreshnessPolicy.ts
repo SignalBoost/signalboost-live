@@ -84,15 +84,24 @@ const INTERNAL_PLATFORM_SELF_KNOWLEDGE = new RegExp(
 )
 
 // Company-identity questions ("what is SignalBoost", "who owns SignalBoost") are self-knowledge
-// too, but they don't mention any SELF_KNOWLEDGE_TOPIC word above (owner-verified 2026-08-24:
-// "what is signalboost and who owns it" fell through this classifier entirely and was sent to
-// external live search, which correctly failed closed rather than guess). The fixed, owner-approved
-// SIGNALBOOST_COMPANY_IDENTITY_DEFINITION in cosMemoryLayerDefinitions.ts is the authoritative
-// answer to this narrow question — not a general license to skip freshness for anything mentioning
-// the company name, so this stays scoped to "what is" / "who owns" identity phrasing specifically.
-// owns?/own — the live phrasing that surfaced this bug used "who own it" (no s); both forms mean
-// the same question and must both be caught.
-const SIGNALBOOST_COMPANY_IDENTITY_QUESTION = /^\s*(?:what\s+is\s+signalboost\b(?:\s*[,.]?\s*(?:and\s+)?who\s+owns?\s+it)?|who\s+owns?\s+signalboost|who\s+is\s+the\s+owner\s+of\s+signalboost|is\s+signalboost\s+(?:privately\s+)?owned)\s*[?.!]*\s*$/i
+// too, but they don't mention any SELF_KNOWLEDGE_TOPIC word above. The first fix (2026-08-24)
+// used an anchored whole-message regex; production broke it the very next day with "what OR WHO
+// is signalboost and who owns it?" — one extra word and the anchor missed, sending the platform's
+// own identity to public web search, which fail-closed. Anchored exact phrasings cannot win this
+// game. Scope by MEANING instead: the message names SignalBoost AND asks an identity/ownership/
+// leadership/product question about it. The platform is the sole authority on itself — the owner
+// channel answers from canonical internal identity (cosMemoryLayerDefinitions.ts), the public
+// channel from the public catalog with its not-public-information rule — so no phrasing of this
+// question is ever a public-web lookup. Ordinary tasks that merely mention the company are not
+// questions and are excluded earlier by the content-generation classifier.
+const MENTIONS_SIGNALBOOST = /\bsignalboost\b/i
+const IDENTITY_INTERROGATIVE = /(?<![\p{L}\p{N}_])(?:who|what|whom|whose|qui[eé]n(?:es)?|qu[eé]|quem|o\s+que|kto|co|czyj[ae]?|кто|что|чей|чья)(?![\p{L}\p{N}_])/iu
+const IDENTITY_SUBJECT = /(?<![\p{L}\p{N}_])(?:is|are|owns?|owned|owner(?:s)?|founder(?:s)?|founded|created|built|runs?|behind|about|company|startup|business|platform|product(?:s)?|does|ceo|leadership|es|son|due[nñ]o|fundador(?:a|es)?|empresa|[eé]|s[aã]o|dono|jest|w[lł]a[sś]ciciel(?:em)?|firma|это|владелец|владельц[аеу]|компани[яию]|основа[лт]|созда[лт])(?![\p{L}\p{N}_])/iu
+
+function isSignalboostIdentityQuestion(text: string): boolean {
+  if (!MENTIONS_SIGNALBOOST.test(text)) return false
+  return IDENTITY_INTERROGATIVE.test(text) && IDENTITY_SUBJECT.test(text)
+}
 
 // Pure arithmetic and local clock/date questions have deterministic utilities. They should never
 // consume a public search merely because they begin with "what".
@@ -110,7 +119,7 @@ function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
 }
 
 function looksLikeInternalOperationalState(text: string): boolean {
-  return INTERNAL_OPERATIONAL_STATE.test(text) || COS_SELF_IMPROVEMENT.test(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text) || SIGNALBOOST_COMPANY_IDENTITY_QUESTION.test(text)
+  return INTERNAL_OPERATIONAL_STATE.test(text) || COS_SELF_IMPROVEMENT.test(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text) || isSignalboostIdentityQuestion(text)
 }
 
 function isLocalDeterministicUtility(text: string): boolean {

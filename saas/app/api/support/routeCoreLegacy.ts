@@ -19,6 +19,7 @@ import {
 import { cachedSystem, recordUsage } from '@/lib/ai/usage'
 import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
 import { getAccess } from '@/lib/auth/access'
+import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { getLivePricing } from '@/lib/ai/tools/getPricing'
 import { getBusinessMetrics, formatMetricsForAI } from '@/lib/ai/tools/getBusinessMetrics' 
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
@@ -1719,7 +1720,11 @@ export async function POST(req: NextRequest) {
 
     const local = getConciergeAnswer(latestUserMessage, languageCode, currentPage)
 
-    if (!process.env.ANTHROPIC_API_KEY) {
+    // Public Concierge is Qwen/COS-first. A stale ANTHROPIC_API_KEY must never
+    // turn an ordinary public request into a paid closed-model fallback or expose
+    // an Anthropic outage. If Qwen is unavailable, return the bounded local
+    // Concierge answer; private administration has its own separately governed path.
+    if (isPublicDeliveryScope() || !process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json({ reply: local.reply, telemetry: local, source: 'deterministic-concierge' })
     }
 

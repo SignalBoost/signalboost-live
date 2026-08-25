@@ -134,13 +134,31 @@ test('owner benchmark route accepts exact case ids while forcing data-center req
   assert.match(source, /requireOwner/)
 })
 
-test('data-center admin page runs the hidden cohort as one-case requests through the owner route', () => {
+test('owner benchmark route has a native form sequence fallback without widening authorization', () => {
+  const source = fs.readFileSync(new URL('../app/api/admin/cos-capability-benchmark/route.ts', import.meta.url), 'utf8')
+  assert.match(source, /readBenchmarkBody\(request\)/)
+  assert.match(source, /application\/x-www-form-urlencoded/)
+  assert.match(source, /nativeSequence = parsed\.nativeForm/)
+  assert.match(source, /requestedTrack !== DATA_CENTER_BENCHMARK_TRACK/)
+  assert.match(source, /selected = \[activeCases\[nativeStep\]\]/)
+  assert.match(source, /NextResponse\.redirect\(next, 307\)/)
+  assert.match(source, /benchmarkNative: 'complete'/)
+  assert.match(source, /requestedTrack !== DATA_CENTER_BENCHMARK_TRACK\) \{/)
+  assert.match(source, /requireOwner/)
+})
+
+test('data-center admin page runs the hidden cohort as one-case requests and has a native form fallback', () => {
   const source = fs.readFileSync(new URL('../app/admin/data-center-operations/page.tsx', import.meta.url), 'utf8')
   assert.match(source, /DATA_CENTER_BENCHMARK_TRACK = 'data_center_operations'/)
   assert.match(source, /DATA_CENTER_BENCHMARK_ORIGIN = 'data-center-private-v1'/)
   assert.match(source, /BENCHMARK_BATCH_SIZE = 1/)
+  assert.match(source, /NATIVE_BENCHMARK_ACTION/)
+  assert.match(source, /<form action=\{NATIVE_BENCHMARK_ACTION\} method="post"/)
+  assert.match(source, /event\.preventDefault\(\)/)
+  assert.match(source, /name="track" value=\{DATA_CENTER_BENCHMARK_TRACK\}/)
   assert.match(source, /fetch\('\/api\/admin\/cos-capability-benchmark'/)
   assert.match(source, /caseIds: batch/)
+  assert.match(source, /benchmarkNative/)
   assert.match(source, /benchmarkPassRate/)
   assert.doesNotMatch(source, /prompt\s*:/)
 })

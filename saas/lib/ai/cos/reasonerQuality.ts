@@ -10,6 +10,82 @@ const CONTENT_SCRIPT_REFUSAL = /\b(?:a single script cannot be written|cannot wr
 const EXECUTIVE_UNSUPPORTED_CERTAINTY = /\b(?:risk of (?:cannibali[sz]ation|downgrad(?:e|ing)) is low|(?:renewals?|contracts?) (?:are|is) safe|(?:clients?|customers?) will not (?:downgrade|leave)|must (?:stay|remain) on (?:enterprise|the enterprise tier)|cannot (?:practically )?(?:move|downgrade)|is (?:safe|manageable) because)\b/i
 const SECURITY_SCENARIO = /\b(?:zero[- ]day|vulnerabilit|tenant\s+metadata|infosec|security\s+lead)\b/i
 const UNSUPPORTED_SECURITY_FRAMEWORK = /\b(?:IL[2456]|impact\s+level\s*[2456]|authorizing\s+official|system\s+security\s+plan|\bSSP\b|fedramp|rmf|nist\s*800[- ]53)\b/i
+const QUANTITATIVE_TASK = /\b(?:calculate|compute|quantif(?:y|ication)|break[- ]even|overhead|cost\s+savings?|power\s+cost|bandwidth|throughput|latency|checkpoint|synchroni[sz]ation|equation|formula|exact)\b/i
+const ECHO_MIN_PROMPT_CHARS = 180
+const ECHO_MIN_ANSWER_CHARS = 60
+const ECHO_STOPWORDS = new Set([
+  'a','an','the','and','or','but','to','of','in','on','for','with','from','by','as','at','is','are','was','were','be','been','being','this','that','these','those','it','its','into','versus','vs','using','use','needed','need','define','calculate',
+])
+
+function latestUserRequest(prompt: string): string {
+  const text = String(prompt || '').trim()
+  const markers = [
+    'CURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):',
+    'CURRENT USER INPUT:',
+    'USER REQUEST:',
+    'USER QUESTION:',
+    'USER INSTRUCTION:',
+  ]
+  let bestIndex = -1
+  let bestMarker = ''
+  for (const marker of markers) {
+    const index = text.lastIndexOf(marker)
+    if (index > bestIndex) {
+      bestIndex = index
+      bestMarker = marker
+    }
+  }
+  let request = (bestIndex >= 0 ? text.slice(bestIndex + bestMarker.length) : text).trim()
+  request = request.replace(/\n\n(?:Answer the public user now\.|Return the corrected answer now\.|Write your reply now\.)[\s\S]*$/i, '').trim()
+  return request.slice(0, 16_000)
+}
+
+function allTokens(text: string): string[] {
+  return (String(text || '').toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter(Boolean)
+}
+
+function contentTokens(text: string): string[] {
+  return allTokens(text).filter(token => token.length > 1 && !ECHO_STOPWORDS.has(token))
+}
+
+function ngramOverlap(answerTokens: string[], promptTokens: string[], size = 4): number {
+  if (answerTokens.length < size || promptTokens.length < size) return 0
+  const promptNgrams = new Set<string>()
+  for (let i = 0; i <= promptTokens.length - size; i += 1) {
+    promptNgrams.add(promptTokens.slice(i, i + size).join(' '))
+  }
+  let overlap = 0
+  const total = answerTokens.length - size + 1
+  for (let i = 0; i <= answerTokens.length - size; i += 1) {
+    if (promptNgrams.has(answerTokens.slice(i, i + size).join(' '))) overlap += 1
+  }
+  return total > 0 ? overlap / total : 0
+}
+
+/**
+ * Reject a long answer that is essentially a span/paraphrase copied from the user's own request.
+ * This prevents a low-confidence best-effort path from presenting the task itself as though it
+ * were a solution. Short factual questions are excluded so concise direct answers remain safe.
+ */
+export function promptEchoNonAnswer(prompt: string, raw: string): boolean {
+  const parsed = parseLocalResult(String(raw ?? ''))
+  if (!parsed) return false
+  const request = latestUserRequest(prompt)
+  const answer = parsed.answer.trim()
+  if (request.length < ECHO_MIN_PROMPT_CHARS || answer.length < ECHO_MIN_ANSWER_CHARS) return false
+
+  const requestContent = contentTokens(request)
+  const answerContent = contentTokens(answer)
+  if (requestContent.length < 12 || answerContent.length < 8) return false
+
+  const requestSet = new Set(requestContent)
+  const covered = answerContent.filter(token => requestSet.has(token)).length
+  const coverage = covered / answerContent.length
+  const novel = new Set(answerContent.filter(token => !requestSet.has(token)))
+  const phraseOverlap = ngramOverlap(allTokens(answer), allTokens(request), 4)
+
+  return coverage >= 0.84 && novel.size <= 5 && phraseOverlap >= 0.42
+}
 
 /**
  * Executive recommendations may state user-supplied facts, but must not turn uncertain outcomes
@@ -82,6 +158,9 @@ export function contentScriptSemanticMismatch(prompt: string, raw: string): bool
  * draft failed the deterministic quality gate.
  */
 export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
+  // A prompt echo is not a low-confidence answer. It is a non-answer and gets one bounded local
+  // repair before any best-effort release path can expose it.
+  if (promptEchoNonAnswer(prompt, raw)) return true
   // The answer may invent open creative details, but it may never retroactively claim the user
   // requested a constraint that is absent from the real prompt.
   if (unsupportedCreativeConstraintClaims(prompt, raw).length) return true
@@ -100,6 +179,27 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
 export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: string): string {
   const scriptDirective = scriptRequestDirective(originalPrompt)
   const creativeConstraintRepair = creativeConstraintRepairInstruction(originalPrompt, firstRaw)
+  if (promptEchoNonAnswer(originalPrompt, firstRaw)) {
+    const quantitative = QUANTITATIVE_TASK.test(latestUserRequest(originalPrompt))
+    return [
+      originalPrompt,
+      '',
+      'QUALITY REPAIR — the prior draft restated or paraphrased the request instead of answering it.',
+      'Solve the ORIGINAL user request directly. Do not use the request itself as the answer and do not spend the response apologizing for uncertainty.',
+      ...(quantitative ? [
+        'This is a quantitative/engineering task. Separate what can be computed from what cannot be computed from the supplied premises.',
+        'For every calculable quantity, show the equation, units, and substitution from user-supplied values.',
+        'If an exact numeric result requires a missing variable (for example power draw, egress price, checkpoint size, bandwidth, transfer duration, utilization, or efficiency), name the missing input and give the symbolic break-even formula or sensitivity relation instead of inventing a value.',
+        'Complete any non-numeric portion of the request — such as a protocol, consistency rule, algorithm, decision procedure, or validation sequence — when it can be answered from general technical reasoning without those missing values.',
+        'Clearly distinguish assumptions from user-supplied facts. Do not present an illustrative assumption as measured reality.',
+      ] : [
+        'Add substantive reasoning, conclusions, or requested deliverables that are not merely copied from the prompt.',
+        'If information is genuinely missing, state the missing input and still complete every part of the task that can be answered without it.',
+      ]),
+      '',
+      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Do not mention this repair instruction or the rejected draft.',
+    ].join('\n')
+  }
   if (creativeConstraintRepair) {
     return [
       originalPrompt,
@@ -170,6 +270,11 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: st
 }
 
 export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRaw: string): boolean {
+  const firstEcho = promptEchoNonAnswer(prompt, firstRaw)
+  const repairedEcho = promptEchoNonAnswer(prompt, repairedRaw)
+  if (firstEcho !== repairedEcho) return !repairedEcho
+  if (firstEcho && repairedEcho) return false
+
   const firstCreativeViolations = unsupportedCreativeConstraintClaims(prompt, firstRaw)
   const repairedCreativeViolations = unsupportedCreativeConstraintClaims(prompt, repairedRaw)
   if (firstCreativeViolations.length !== repairedCreativeViolations.length) return repairedCreativeViolations.length < firstCreativeViolations.length

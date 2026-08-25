@@ -100,6 +100,9 @@ function pureScriptDirective(input: string): string | null {
     'Write the requested script directly. Do not output Python, JavaScript, Bash, classes, functions, or other executable code, and do not ask the user to choose a programming language.',
     'If the user explicitly says not to assume what the named subject is, treat that as a content constraint: use type-neutral wording and do not invent whether the subject is a person, product, company, service, or anything else.',
     'Ambiguity about the subject does not make the writing task impossible; satisfy the request with neutral language instead of refusing or substituting a software template.',
+    'Deliver a complete, usable script—not a list of the requested style rules and not a generic reminder about them. Use a clear format appropriate to the request, such as a title, brief setting, speakers, and dialogue.',
+    'When the requested style combines humor with professionalism or compliance, make the humor part of the situation or dialogue: restrained, intelligible, and safe. Do not merely say that humor is allowed, describe the rules, or use vague filler.',
+    'Honor explicit length and tone constraints. Short sentences do not mean repetitive fragments or a one-paragraph summary.',
     rationaleRule,
   ].filter(Boolean).join(' ')
 }

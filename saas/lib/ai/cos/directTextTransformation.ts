@@ -232,17 +232,24 @@ export async function tryDirectTextTransformation(input: {
   }
 
   const parsed = parseLocalResult(reasoned.text)
-  if (!parsed || parsed.truncated || !parsed.answer.trim()) {
+  // The editor has already been asked for JSON, but an otherwise valid prose draft must not make
+  // the Concierge unavailable merely because the provider omitted that envelope.
+  const plainDraft = String(reasoned.text || '')
+    .trim()
+    .replace(/^\\x60\\x60\\x60(?:json|text)?\\s*/i, '')
+    .replace(/\\s*\\x60\\x60\\x60$/i, '')
+    .trim()
+  if ((!parsed || parsed.truncated || !parsed.answer.trim()) && !plainDraft) {
     return {
       handled: false,
       confidence: 0,
-      reason: 'The direct COS text-transformation result was empty, truncated, or unparseable.',
+      reason: 'The direct COS text-transformation result was empty or truncated.',
       provenance: baseProvenance as any,
     }
   }
 
-  let finalAnswer = parsed.answer.trim()
-  let finalConfidence = Math.max(0, Math.min(1, parsed.confidence))
+  let finalAnswer = parsed && !parsed.truncated && parsed.answer.trim() ? parsed.answer.trim() : plainDraft
+  let finalConfidence = parsed && !parsed.truncated ? Math.max(0, Math.min(1, parsed.confidence)) : 0.6
 
   const refined = await refineProfessionalDraft({
     instruction: request.instruction,

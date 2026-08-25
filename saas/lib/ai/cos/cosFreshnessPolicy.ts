@@ -103,6 +103,21 @@ function isSignalboostIdentityQuestion(text: string): boolean {
   return IDENTITY_INTERROGATIVE.test(text) && IDENTITY_SUBJECT.test(text)
 }
 
+/**
+ * Platform self-knowledge prompts — SignalBoost identity/ownership questions and questions about
+ * COS's own architecture, model, or configuration. Exported for the cache safety policy: these
+ * answers depend on live configuration (which model, which host, current policy) and on the
+ * caller's privilege, so a cached replay can serve yesterday's stack or the wrong disclosure
+ * tier. They must be reasoned afresh every turn (owner-verified 2026-08-25: the privileged
+ * technical self-description shipped, but repeated identity questions kept replaying the
+ * pre-change cached answer, so the owner never saw it).
+ */
+export function isPlatformSelfKnowledgePrompt(input: string): boolean {
+  const text = normalizedText(input)
+  if (!text) return false
+  return isSignalboostIdentityQuestion(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
+}
+
 // Pure arithmetic and local clock/date questions have deterministic utilities. They should never
 // consume a public search merely because they begin with "what".
 const LOCAL_ARITHMETIC = /^\s*(?:what\s+is\s+)?[\d\s()+\-*/%.^=]+[?!.]*\s*$/i

@@ -328,7 +328,12 @@ export default function AssistantPage() {
       const deadline = setTimeout(() => { hitDeadline = true; controller.abort() }, CLIENT_DEADLINE_MS)
 
       try {
-        const res = await fetch('/api/concierge', {
+        // Owner-verified fix (2026-08-24): this page previously posted to /api/concierge, which
+        // deliberately wraps every request in public-only delivery scope ("an owner/admin browser
+        // session can never promote this endpoint") — so getAccess() returned GUEST for the owner
+        // too, and the personal assistant was architecturally identical to the public Concierge.
+        // /api/cos-primary performs real access detection, so the owner is answered as the owner.
+        const res = await fetch('/api/cos-primary', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           signal: controller.signal,

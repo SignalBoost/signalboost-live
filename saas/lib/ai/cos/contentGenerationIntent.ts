@@ -38,10 +38,6 @@ const AUTHORING_VERB = [
 /** Matches an authoring/transformation verb at the start of the string. */
 const GENERATION = new RegExp(`^\\s*(?:${AUTHORING_VERB})(?![\\p{L}\\p{N}_])`, 'iu')
 
-// Requests for the label of a user-authored artifact are writing tasks, even when phrased as
-// a question. They must retain conversation context rather than becoming web lookups.
-const ARTIFACT_LABEL_REQUEST = /\b(?:what|which|suggest|give|need|would|could|should)\b.{0,80}\b(?:subject(?:\s+line)?|email\s+subject|title|headline|caption|tagline|opening\s+line)\b/i
-
 /**
  * Split on sentence terminators and on clause boundaries that commonly precede an instruction
  * ("..., so design a plan", "... — draft the memo", "and then write the summary"). Newlines and
@@ -67,6 +63,70 @@ export function isContentGenerationRequest(input: string): boolean {
   const text = String(input || '').trim()
   if (!text) return false
   if (GENERATION.test(text)) return true
-  if (ARTIFACT_LABEL_REQUEST.test(text)) return true
+  if (isWritingElementQuestion(text)) return true
   return clausesOf(text).some(clause => GENERATION.test(clause))
+}
+
+// ---------------------------------------------------------------------------------------------
+// Writing-element follow-up questions (2026-08-25).
+//
+// Observed in production: after COS edited an email, the follow-up "what would be the subject
+// line for this email?" carries NO authoring verb, so the exclusion above never fired. The
+// question was routed to live evidence retrieval as if it were a current-world lookup, the
+// synthesis could not prove grounding (there is nothing on the web about the visitor's own
+// email), and the turn failed closed. A request for a subject line, title, greeting, or closing
+// OF a document in the conversation is composition work on supplied material — it must never
+// enter freshness routing, in any of the five platform languages.
+// ---------------------------------------------------------------------------------------------
+
+const WRITING_ELEMENT = [
+  // English
+  'subject\\s+line', 'subject', 'title', 'headline', 'greeting', 'salutation', 'closing', 'sign[\\s-]?off', 'opening\\s+line', 'tagline', 'caption',
+  // Spanish
+  'asunto', 't[ií]tulo', 'encabezado', 'saludo', 'despedida', 'cierre',
+  // Portuguese
+  'assunto', 'cabe[cç]alho', 'sauda[cç][aã]o', 'fechamento',
+  // Polish
+  'temat', 'tytu[lł]', 'nag[lł][oó]wek', 'powitanie', 'zako[nń]czenie', 'podpis',
+  // Russian
+  'тема', 'заголовок', 'приветствие', 'подпись', 'концовка',
+].join('|')
+
+const CONVERSATION_ARTIFACT = [
+  // English
+  'e-?mail', 'letter', 'message', 'draft', 'memo', 'reply', 'note', 'post', 'document', 'text',
+  // Spanish
+  'correo', 'carta', 'mensaje', 'borrador', 'respuesta', 'nota', 'documento', 'texto',
+  // Portuguese
+  'mensagem', 'rascunho', 'resposta', 'documento', 'texto',
+  // Polish
+  'list', 'wiadomo[sś][cć]', 'szkic', 'odpowied[zź]', 'notatka', 'dokument', 'tekst',
+  // Russian
+  'письм[оаеу]', 'сообщени[еяю]', 'черновик[ае]?', 'ответ[ае]?', 'заметк[аеу]', 'документ[ае]?', 'текст[ае]?',
+].join('|')
+
+const ARTIFACT_DETERMINER = 'this|that|the|my|our|este|esta|ese|esa|el|la|mi|nuestro|nuestra|esse|essa|o|a|meu|minha|ten|ta|to|tego|tej|m[oó]j|moja|это|этого|этому|мо[её]|наше'
+
+/**
+ * "subject line for this email", "asunto para este correo", "temat tej wiadomości", …
+ * ASCII \\b does not treat Cyrillic or accented letters as word characters, so Unicode
+ * lookarounds are used instead (same technique as GENERATION above), and artifact nouns accept up
+ * to three trailing letters for Polish/Russian inflection (wiadomość → wiadomości).
+ */
+const WRITING_ELEMENT_QUESTION = new RegExp(
+  `(?<![\\p{L}\\p{N}_])(?:${WRITING_ELEMENT})(?![\\p{L}\\p{N}_])` +
+  `[^.!?\\n]{0,40}?` +
+  `(?:(?<![\\p{L}\\p{N}_])(?:${ARTIFACT_DETERMINER})(?![\\p{L}\\p{N}_])[^.!?\\n]{0,15}?)?` +
+  `(?<![\\p{L}\\p{N}_])(?:${CONVERSATION_ARTIFACT})[\\p{L}]{0,3}(?![\\p{L}\\p{N}_])`,
+  'iu',
+)
+
+/**
+ * True when the message asks for a writing element (subject line, title, greeting, closing, …)
+ * of a document in the conversation. Composition work, never a current-world lookup.
+ */
+export function isWritingElementQuestion(input: string): boolean {
+  const text = String(input || '').trim()
+  if (!text) return false
+  return WRITING_ELEMENT_QUESTION.test(text)
 }

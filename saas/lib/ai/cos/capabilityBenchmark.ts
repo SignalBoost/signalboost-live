@@ -1,4 +1,8 @@
-import { scoreDataCenterCapabilityReply } from './dataCenterCapabilityBenchmark.ts'
+import {
+  dataCenterRequiredTermSatisfied,
+  isDataCenterBenchmarkProfile,
+  scoreDataCenterCapabilityReply,
+} from './dataCenterCapabilityBenchmark.ts'
 
 /**
  * Hermetic capability-benchmark contract. Fixtures are deliberately never acquired by the learning
@@ -20,6 +24,8 @@ export type CapabilityBenchmarkResult = {
   caseId: string
   reply: string
   provenance?: { localReasoning?: boolean; externalAi?: boolean; semanticCache?: boolean }
+  handled?: boolean
+  responseSource?: string
 }
 
 export type CapabilityBenchmarkScore = {
@@ -54,13 +60,22 @@ export const COS_CAPABILITY_SMOKE_BENCHMARK: readonly CapabilityBenchmarkCase[] 
 export function scoreCapabilityBenchmarkCase(test: CapabilityBenchmarkCase, result: CapabilityBenchmarkResult): CapabilityBenchmarkScore {
   const text = String(result.reply ?? '').toLowerCase()
   const reasons: string[] = []
+  const dataCenterProfile = isDataCenterBenchmarkProfile(test.evaluationProfile)
   if (result.caseId !== test.id) reasons.push('case_id_mismatch')
-  for (const term of test.requiredTerms) if (!text.includes(term.toLowerCase())) reasons.push(`missing:${term}`)
+  for (const term of test.requiredTerms) {
+    const satisfied = dataCenterProfile
+      ? dataCenterRequiredTermSatisfied(term, result.reply)
+      : text.includes(term.toLowerCase())
+    if (!satisfied) reasons.push(`missing:${term}`)
+  }
   for (const term of test.forbiddenTerms ?? []) if (text.includes(term.toLowerCase())) reasons.push(`forbidden:${term}`)
   if (test.requiresProvenance && !result.provenance) reasons.push('missing_provenance')
   if (test.requiresLocalReasoning && !result.provenance?.localReasoning) reasons.push('local_reasoning_not_recorded')
   if (result.provenance?.externalAi) reasons.push('external_ai_used')
   if (result.provenance?.semanticCache) reasons.push('semantic_cache_used')
+  if (dataCenterProfile && (result.handled === false || result.responseSource === 'external_fallback_required')) {
+    reasons.push('data_center:not_handled_locally')
+  }
   reasons.push(...scoreDataCenterCapabilityReply(test.evaluationProfile, result.reply))
   return { caseId: test.id, passed: reasons.length === 0, reasons }
 }

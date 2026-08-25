@@ -107,7 +107,7 @@ async function refineProfessionalDraft(input: {
   language?: string
 }) {
   const context = input.referenceContext ? input.referenceContext.slice(0, 12_000) : null
-  const reasoned = await callCosReasoner({
+  let reasoned = await callCosReasoner({
     temperature: 0.05,
     maxTokens: 1800,
     systemPrompt: [
@@ -200,6 +200,26 @@ export async function tryDirectTextTransformation(input: {
       'Produce the finished version now.',
     ].filter(Boolean).join('\n\n'),
   }).catch(() => null)
+
+  // A transient empty response must not turn a normal rewrite into a fail-closed refusal.
+  // Retry once with a compact, equivalent editor request before reporting the reasoner unavailable.
+  if (!reasoned?.text) {
+    reasoned = await callCosReasoner({
+      temperature: 0,
+      maxTokens: 2400,
+      systemPrompt: [
+        'You are COS, a professional copy editor.',
+        'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+        'Rewrite the supplied email or text according to the user instruction. Preserve facts, roles, intent, names, and uncertainty. Fix grammar and clarity only. Do not research, explain, or add facts.',
+        transformationLanguageInstruction(input.language),
+      ].join(' '),
+      prompt: [
+        `USER INSTRUCTION:\\n${request.instruction}`,
+        `EDITABLE SOURCE TEXT:\\n${editableSource}`,
+        referenceContext ? `REFERENCE CONTEXT (do not quote):\\n${referenceContext.slice(0, 8_000)}` : '',
+      ].filter(Boolean).join('\\n\\n'),
+    }).catch(() => null)
+  }
 
   const baseProvenance = provenance(reasoned?.reasoner.label ?? resolved.config.label, Boolean(reasoned?.text))
   if (!reasoned?.text) {

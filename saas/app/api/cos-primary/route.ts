@@ -223,7 +223,12 @@ export async function POST(req:NextRequest){
   // Fresh facts already completed live retrieval plus their one local synthesis attempt above.
   // Re-entering generic COS here caused a second search and a second local call on the same turn.
   if(!requestedAction&&!requiresFreshEvidence){
-    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
+    // Conversation continuity (2026-08-25): pass the preceding assistant answer, exactly as
+    // baseRoute.ts does. Without it a follow-up like "what should the subject line for the email
+    // be?" reaches the reasoner with no email in sight, and it asks the user for context that is
+    // already in the conversation. Also disables the semantic cache for follow-up turns inside
+    // tryCOSFirstAnswer, which is correct: a follow-up is never a standalone cacheable question.
+    try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 

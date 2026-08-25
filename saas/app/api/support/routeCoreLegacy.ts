@@ -10,6 +10,7 @@ import {
   requestsExternalAction,
   authoritativeProvenance,
   formatAuthoritativeProvenance,
+  restrictedProvenanceReply,
   escalationReason,
   logEscalation,
   confidenceThreshold as cosConfidenceThreshold,
@@ -1650,6 +1651,13 @@ export async function POST(req: NextRequest) {
     const isProvenanceQuestion = isProvenanceIntrospection(latestUserMessage)
 
     if (isProvenanceQuestion) {
+      if (!isPrivileged) {
+        return NextResponse.json({
+          reply: restrictedProvenanceReply(languageCode),
+          source: 'cos-provenance-restricted',
+          external_ai_invoked: false,
+        })
+      }
       const priorTurn = [...sanitized].reverse().find(m => m.role === 'assistant')
       if (priorTurn && (priorTurn as any).provenance) {
         const provenance = authoritativeProvenance({ provenance: (priorTurn as any).provenance, confidence: (priorTurn as any).provenanceConfidence ?? null }, { invoked: (priorTurn as any).externalAiInvoked ?? false })

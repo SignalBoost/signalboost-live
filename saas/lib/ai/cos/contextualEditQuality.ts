@@ -41,8 +41,8 @@ function requestsRecipientUnderlyingInfo(value: string): boolean {
   return [
     /\b(?:can|could|would|will)\s+you\b.{0,60}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
     /\bplease\b.{0,40}\b(?:provide|give|send|share|confirm)\b.{0,120}\b(?:status|update|information|info)\b/i,
-    /\b(?:can|could|would|will)\s+you\b.{0,60}\badvise\b(?:\s+(?:me|us))?\s+(?:on|about|of)\s+(?:the\s+)?(?:status|update|information|info)\b/i,
-    /\bplease\b.{0,30}\badvise\b(?:\s+(?:me|us))?\s+(?:on|about|of)\s+(?:the\s+)?(?:status|update|information|info)\b/i,
+    /\b(?:can|could|would|will)\s+you\b.{0,60}\badvise\b(?:\s+(?:me|us))?\s+(?:on|about|of)\s+(?!(?:who|whom|which)\b|the\s+(?:right|correct|appropriate)\s+(?:person|office|contact)\b).{0,80}\b(?:status|update|information|info)\b/i,
+    /\bplease\b.{0,30}\badvise\b(?:\s+(?:me|us))?\s+(?:on|about|of)\s+(?!(?:who|whom|which)\b|the\s+(?:right|correct|appropriate)\s+(?:person|office|contact)\b).{0,80}\b(?:status|update|information|info)\b/i,
     /\b(?:can|could|would|will)\s+you\b.{0,60}\bupdate\s+(?:me|us)\b(?:\s+(?:on|about|with))?/i,
     /\bplease\b.{0,30}\bupdate\s+(?:me|us)\b(?:\s+(?:on|about|with))?/i,
     /\b(?:can|could|would|will)\s+you\b.{0,60}\btell\s+(?:me|us)\b.{0,30}\b(?:the|what)\b.{0,30}\b(?:status|update)\b/i,
@@ -135,8 +135,6 @@ function repairReferralOnlyRoleExpansion(source: string, answer: string): string
     return answer.replace(politeRequest, `$1${REFERRAL_ONLY_REQUEST}`)
   }
 
-  // If the model removed the explicit ask entirely, restore it rather than releasing a polished
-  // email that no longer performs the user's requested action.
   if (!sourceSignalsReferralRequest(answer)) {
     return insertBeforeClosing(answer, REFERRAL_ONLY_REQUEST)
   }

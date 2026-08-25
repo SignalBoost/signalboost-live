@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
-import { authoritativeProvenance, formatAuthoritativeProvenance, isProvenanceIntrospection, requestsExternalAction, restrictedProvenanceReply } from '@/lib/ai/cos/cosOrchestration'
+import { authoritativeProvenance, formatAuthoritativeProvenance, isProvenanceIntrospection, requestsExternalAction, restrictedProvenanceReply, publicProvenanceReply } from '@/lib/ai/cos/cosOrchestration'
 import { isDirectStrategyGenerationRequest, renderDirectStrategyGeneration } from '@/lib/ai/cos/strategyProfileDirectGeneration'
 import { readStrategyProfile } from '@/lib/ai/cos/strategyProfileReport'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
@@ -226,8 +226,8 @@ export async function POST(req: NextRequest) {
   if (prompt && isProvenanceIntrospection(prompt)) {
     if (!isPrivileged) {
       return NextResponse.json({
-        reply: restrictedProvenanceReply(languageCode),
-        source: 'cos-provenance-restricted',
+        reply: publicProvenanceReply(languageCode),
+        source: 'concierge-public-provenance-summary',
         external_ai_invoked: false,
       })
     }

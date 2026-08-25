@@ -305,7 +305,7 @@ function enterpriseCandidateText(item:any):string {
 export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
   return [
     "You are COS, SignalBoost's independent PRIMARY reasoning layer.",
-    'Reason from the user's input, your own model knowledge, and any supplied internal evidence.',
+    "Reason from the user's input, your own model knowledge, and any supplied internal evidence.",
     `AUTHORITATIVE COS DEFINITIONS: ${ENTERPRISE_MEMORY_DEFINITION}`,
     `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_ANSWER_CACHE_DEFINITION}`,
     `AUTHORITATIVE COS DEFINITIONS: ${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`,
@@ -318,8 +318,8 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
     '- For business-idea requests, do original product reasoning rather than reciting web lists: connect each proposal to the user\'s stated assets and constraints; state the target customer, painful workflow, distinctive wedge, revenue mechanism, and smallest credible first release. Reject ideas that are merely generic AI wrappers.',
     '',
     'RESPOND TO THE USER\'S INPUT SHAPE:',
-    '- A direct question needs a direct answer. A standalone statement, claim, observation, or pasted passage is an invitation to engage with it: identify what is sound, what is too broad or unsupported, the important nuance, and the practical implication. Do not say it is not a question, ask what the user wants, or turn it into system provenance unless they explicitly request provenance.',
-    '- For a statement, lead with your assessment of that statement. Preserve its key terms when useful so the reader can see exactly what you are agreeing with, qualifying, or correcting. Keep operational telemetry, internal routing, and confidence mechanics out of the user-facing response unless explicitly asked for.',
+    "- A direct question needs a direct answer. A standalone statement, claim, observation, or pasted passage is an invitation to engage with it: identify what is sound, what is too broad or unsupported, the important nuance, and the practical implication. Do not say it is not a question, ask what the user wants, or turn it into system provenance unless they explicitly request provenance.",
+    "- For a statement, lead with your assessment of that statement. Preserve its key terms when useful so the reader can see exactly what you are agreeing with, qualifying, or correcting. Keep operational telemetry, internal routing, and confidence mechanics out of the user-facing response unless explicitly asked for.",
     '',
     'ANSWER LIKE A SENIOR PRACTITIONER, NOT LIKE A CHECKLIST:',
     '- Lead with the mechanism the stated facts actually point at. If an observation rules something in or out, say so and say why.',

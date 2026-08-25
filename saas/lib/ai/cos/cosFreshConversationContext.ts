@@ -2,7 +2,15 @@
 //
 // The fresh-data path is deliberately fail-closed, but a follow-up like "when did she die?"
 // is not a complete web query by itself. This module carries forward only the user's own
-// immediately preceding message. Assistant text is never trusted as a factual referent.
+// immediately preceding message for factual lookup. Assistant text is never trusted as a factual
+// referent. A separate request-local channel may capture the prior assistant reply only when the
+// new turn is clearly continuing a writing artifact.
+
+import {
+  captureConversationArtifactContext,
+  clearConversationArtifactContext,
+  looksLikeArtifactContinuation,
+} from './cosArtifactConversationContext.ts'
 
 export type FreshConversationResolution = {
   originalInput: string
@@ -36,25 +44,44 @@ function priorUserText(body: any, currentInput: string): string | null {
       skippedCurrent = true
       continue
     }
-    return text.slice(0, 320)
+    return text.slice(0, 12_000)
+  }
+  return null
+}
+
+function priorAssistantText(body: any): string | null {
+  const messages = Array.isArray(body?.messages) ? body.messages : []
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role !== 'assistant') continue
+    const text = textFromContent(messages[index]?.content)
+    if (text) return text.slice(0, 12_000)
   }
   return null
 }
 
 export function resolveFreshConversationContext(body: any, input: string): FreshConversationResolution {
+  clearConversationArtifactContext()
+
   const originalInput = String(input || '').replace(/\s+/g, ' ').trim()
   if (!originalInput) return { originalInput: '', lookupInput: '', contextUsed: false, previousUserText: null }
+
+  const previousUserText = priorUserText(body, originalInput)
+  if (looksLikeArtifactContinuation(originalInput)) {
+    const assistantArtifact = priorAssistantText(body)
+    if (assistantArtifact) {
+      captureConversationArtifactContext({ currentInput: originalInput, previousUserText, assistantArtifact })
+    }
+  }
 
   const dependsOnPriorTurn = THIRD_PERSON_REFERENCE.test(originalInput) || ELLIPTICAL_FOLLOW_UP.test(originalInput)
   if (!dependsOnPriorTurn) {
     return { originalInput, lookupInput: originalInput, contextUsed: false, previousUserText: null }
   }
 
-  const previousUserText = priorUserText(body, originalInput)
   if (!previousUserText) {
     return { originalInput, lookupInput: originalInput, contextUsed: false, previousUserText: null }
   }
 
-  const lookupInput = `Previous user context: ${previousUserText}\nCurrent follow-up question: ${originalInput}`.slice(0, 650)
-  return { originalInput, lookupInput, contextUsed: true, previousUserText }
+  const lookupInput = `Previous user context: ${previousUserText.slice(0, 320)}\nCurrent follow-up question: ${originalInput}`.slice(0, 650)
+  return { originalInput, lookupInput, contextUsed: true, previousUserText: previousUserText.slice(0, 320) }
 }

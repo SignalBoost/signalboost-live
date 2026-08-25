@@ -74,7 +74,7 @@ test('the deterministic selector prefers a materially better repaired draft', ()
 
 test('repair instruction explicitly preserves read-only diagnosis constraints', () => {
   const repairedPrompt = buildDiagnosticRepairPrompt(PROMPT, GENERIC)
-  assert.match(repairedPrompt, /no production mutation/i)
+  assert.match(repairedPrompt, /do not require a production mutation/i)
   assert.match(repairedPrompt, /all asymmetries/i)
   assert.match(repairedPrompt, /falsify/i)
 })

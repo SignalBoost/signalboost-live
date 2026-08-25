@@ -1,6 +1,8 @@
 // saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { createHash } from 'node:crypto'
 import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
+import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
+import { localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { learnedEvidenceUseRequired } from './learnedEvidencePolicy.ts'
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { classifyRunpodFailure, runpodCapacityUnavailableReason } from '@/lib/ai/cos/runpodCapacityError'
@@ -303,6 +305,42 @@ function enterpriseCandidateText(item:any):string {
     safeText(item?.payload, 1800),
   ].filter(Boolean).join(' ')
 }
+/**
+ * Owner-directed (2026-08-25): when the OWNER asks what the platform is, who owns it, or anything
+ * about COS itself, the reply MUST include the live platform technical specification — model,
+ * hosting, configuration. Prompt instructions alone proved unreliable (the reasoner kept answering
+ * identity-only), so this is appended DETERMINISTICALLY server-side, from live configuration, on
+ * every privileged platform self-knowledge turn. Values are resolved at answer time so provider
+ * migrations stay truthful without code changes. Never reaches non-privileged callers: the public
+ * pipeline is diverted to the stateless path before this engine runs, and the append below is
+ * additionally gated on input.privileged.
+ */
+function ownerPlatformTechnicalSpec(): string {
+  const resolved = resolveCosReasoner()
+  const config = 'config' in resolved && resolved.config ? resolved.config : null
+  let endpointHost = 'not configured'
+  let model = process.env.LOCAL_AI_MODEL?.trim() || 'not configured'
+  try {
+    const inference = localInferenceConfigFromEnv()
+    endpointHost = new URL(inference.baseUrl).host
+    model = inference.model || model
+  } catch {}
+  const lines = [
+    'PLATFORM TECHNICAL SPECIFICATION (owner-only):',
+    `- Primary reasoner: ${config ? config.label : 'not configured'}${config ? ` (${config.kind})` : ''}`,
+    `- Model: ${model}`,
+    `- Inference endpoint host: ${endpointHost}`,
+    `- Reasoner token ceiling: ${Number(process.env.COS_REASONER_MAX_TOKENS || '6000')} · temperature: ${process.env.COS_REASONER_TEMPERATURE ?? '0'}`,
+    `- Local confidence threshold: ${threshold().toFixed(2)}`,
+    `- External AI fallback: ${externalFallbackEnabledForSpec() ? 'enabled' : 'disabled (COS answers independently or fails closed)'}`,
+  ]
+  return lines.join('\n')
+}
+
+function externalFallbackEnabledForSpec(): boolean {
+  try { return process.env.COS_EXTERNAL_FALLBACK_ENABLED === 'true' } catch { return false }
+}
+
 export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged?:boolean}):string {
   // OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE (2026-08-25, owner-directed). The owner channel is
   // the only caller that sets privileged; the public pipeline is diverted to the stateless path
@@ -945,7 +983,13 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   // The LIVE return, not only the cached copy: an earlier fix stripped `storedAnswer.reply`
   // (what gets cached) but left this path raw, so fresh answers leaked [OEM1] while replays were
   // clean — backwards. Both paths strip now.
-  return { handled:true, reply:cleanAnswerText(parsed.answer), confidence, provenance:{ responseSource:'local_cos_reasoning', ...citedProvenance } }
+  // Deterministic owner append — see ownerPlatformTechnicalSpec(). Runs after all release gates
+  // and after cache storage (self-knowledge prompts are cache-excluded anyway), so the spec is
+  // guaranteed in the owner's reply without ever entering shared caches.
+  const finalReply = input.privileged === true && isPlatformSelfKnowledgePrompt(input.prompt)
+    ? `${cleanAnswerText(parsed.answer)}\n\n${ownerPlatformTechnicalSpec()}`
+    : cleanAnswerText(parsed.answer)
+  return { handled:true, reply:finalReply, confidence, provenance:{ responseSource:'local_cos_reasoning', ...citedProvenance } }
 }
 
 export function formatCosWorkflowStatement(result:COSFirstAnswerResult, language='en'):string {

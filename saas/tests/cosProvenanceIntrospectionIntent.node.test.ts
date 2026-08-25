@@ -80,6 +80,12 @@ test('content questions that borrow source words stay content questions', () => 
   }
 })
 
+test('declarative claims about answer reliability are not hijacked into provenance', () => {
+  const claim = 'Commercial models almost always attempt to answer even if source ground truth is sparse (fail-open). A custom control plane rejects responses if verification metrics fail (fail-closed).'
+  assert.equal(asksWhereTheAnswerCameFrom(claim), false)
+  assert.equal(isProvenanceIntrospection(claim), false)
+})
+
 test('conditional advice questions are not hijacked', () => {
   for (const query of [
     'how do you know when bread is done?',

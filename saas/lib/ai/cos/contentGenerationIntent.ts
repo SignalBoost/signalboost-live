@@ -105,28 +105,41 @@ const CONVERSATION_ARTIFACT = [
   'письм[оаеу]', 'сообщени[еяю]', 'черновик[ае]?', 'ответ[ае]?', 'заметк[аеу]', 'документ[ае]?', 'текст[ае]?',
 ].join('|')
 
-const ARTIFACT_DETERMINER = 'this|that|the|my|our|este|esta|ese|esa|el|la|mi|nuestro|nuestra|esse|essa|o|a|meu|minha|ten|ta|to|tego|tej|m[oó]j|moja|это|этого|этому|мо[её]|наше'
+// Keep these as two small independently compiled patterns instead of one large dynamically
+// concatenated regex. The previous combined expression produced an invalid bundled RegExp under
+// Turbopack, which broke production page-data collection even though TypeScript compilation passed.
+const WRITING_ELEMENT_TOKEN = new RegExp(
+  `(?<![\\p{L}\\p{N}_])(?:${WRITING_ELEMENT})(?![\\p{L}\\p{N}_])`,
+  'iu',
+)
 
-/**
- * "subject line for this email", "asunto para este correo", "temat tej wiadomości", …
- * ASCII \\b does not treat Cyrillic or accented letters as word characters, so Unicode
- * lookarounds are used instead (same technique as GENERATION above), and artifact nouns accept up
- * to three trailing letters for Polish/Russian inflection (wiadomość → wiadomości).
- */
-const WRITING_ELEMENT_QUESTION = new RegExp(
-  `(?<![\\p{L}\\p{N}_])(?:${WRITING_ELEMENT})(?![\\p{L}\\p{N}_])` +
-  `[^.!?\\n]{0,40}?` +
-  `(?:(?<![\\p{L}\\p{N}_])(?:${ARTIFACT_DETERMINER})(?![\\p{L}\\p{N}_])[^.!?\\n]{0,15}?)?` +
+const CONVERSATION_ARTIFACT_TOKEN = new RegExp(
   `(?<![\\p{L}\\p{N}_])(?:${CONVERSATION_ARTIFACT})[\\p{L}]{0,3}(?![\\p{L}\\p{N}_])`,
   'iu',
 )
 
 /**
  * True when the message asks for a writing element (subject line, title, greeting, closing, …)
- * of a document in the conversation. Composition work, never a current-world lookup.
+ * of a document in the conversation. The two concepts must occur close together, in either order.
+ * This keeps the classifier Unicode-safe and avoids rebuilding one fragile mega-regex at runtime.
  */
 export function isWritingElementQuestion(input: string): boolean {
   const text = String(input || '').trim()
   if (!text) return false
-  return WRITING_ELEMENT_QUESTION.test(text)
+
+  const element = WRITING_ELEMENT_TOKEN.exec(text)
+  const artifact = CONVERSATION_ARTIFACT_TOKEN.exec(text)
+  if (!element || !artifact) return false
+
+  const elementStart = element.index
+  const elementEnd = elementStart + element[0].length
+  const artifactStart = artifact.index
+  const artifactEnd = artifactStart + artifact[0].length
+  const gap = elementEnd <= artifactStart
+    ? artifactStart - elementEnd
+    : elementStart >= artifactEnd
+      ? elementStart - artifactEnd
+      : 0
+
+  return gap <= 96
 }

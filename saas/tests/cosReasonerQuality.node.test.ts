@@ -6,7 +6,7 @@ import {
   preferRepairedDraft,
   promptEchoNonAnswer,
   reasonerDraftNeedsRepair,
-} from '../lib/ai/cos/reasonerQuality'
+} from '../lib/ai/cos/reasonerQuality.ts'
 
 const PROMPT = 'A multi-tenant SaaS has normal DB CPU and memory, but API p95 latency triples only for enterprise tenants. Smaller tenants are unaffected, no deployment occurred, and traffic is unchanged. Diagnose and rank the most likely architectural causes without making production changes.'
 

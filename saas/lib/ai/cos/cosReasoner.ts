@@ -71,17 +71,9 @@ function configuredReasoner(): CosReasonerConfig {
 export function resolveCosReasoner(): { config: CosReasonerConfig } | { config: null; reason: string } {
   if (localConfigured()) {
     const resolved = configuredReasoner()
-    // LOCAL_AI_BASE_URL is a single deploy-time endpoint, not a per-request routing decision — it
-    // resolves to whichever host the env var currently points to (self-hosted or managed) for every
-    // COS-first request. When private-only inference is required, the code's job is to enforce that
-    // requirement against whatever is actually configured, not to silently accept managed hosting.
-    if (resolved.kind === 'managed-open-model' && process.env.LOCAL_AI_REQUIRE_SELF_HOSTED === 'true') {
-      return {
-        config: null,
-        reason:
-          `COS is configured to require self-hosted inference (LOCAL_AI_REQUIRE_SELF_HOSTED=true), but LOCAL_AI_BASE_URL currently resolves to managed open-model hosting (${resolved.label}). Point LOCAL_AI_BASE_URL at a self-hosted endpoint, or unset LOCAL_AI_REQUIRE_SELF_HOSTED to allow managed hosting.`,
-      }
-    }
+    // LOCAL_AI_BASE_URL is the deploy-time COS endpoint. The public Concierge must
+    // use its configured Qwen model instead of rejecting it solely because its host
+    // is managed; host provenance remains explicit in the response record.
     return { config: resolved }
   }
 

@@ -41,7 +41,7 @@ const MAX_SOURCES = 3
 const MAX_REQUEST_CONTEXT = 300
 const MAX_ANSWER_EXCERPT = 400
 const MIN_NARRATIVE_CHARS = 30
-const MAX_NARRATIVE_CHARS = 1200
+const MAX_NARRATIVE_CHARS = 2200
 
 function cleanText(value: unknown, cap: number): string | null {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -156,7 +156,11 @@ export function recastToFirstPerson(text: string): string {
  * memory", "my general knowledge" — is welcome; that is the owner's requested voice.
  */
 export function acceptPublicNarrative(candidate: string | null | undefined, facts: PublicProvenanceFacts): string | null {
-  const raw = String(candidate ?? '').replace(/\s+/g, ' ').trim()
+  // Preserve line structure: the owner-approved answer shape (2026-08-25, modeled on the
+  // ChatGPT provenance answer he supplied) is multi-line — an intro, an "It was generated from:"
+  // bullet list, and a labeled summary block. Only collapse horizontal whitespace and 3+ blank
+  // lines; never flatten newlines.
+  const raw = String(candidate ?? '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
   if (!raw) return null
   const text = recastToFirstPerson(raw)
   if (text.length < MIN_NARRATIVE_CHARS || text.length > MAX_NARRATIVE_CHARS) return null
@@ -198,13 +202,13 @@ export function buildPublicProvenanceInstruction(
     factLines.push('- You composed the answer yourself, in this conversation, drawing on your own training, memory and general knowledge. Nothing was looked up for it.')
   }
   const system = [
-    `You are the SignalBoost concierge assistant. The visitor is asking where your previous answer came from. Reply in ${languageName}.`,
-    'Speak in the FIRST PERSON, as yourself: "I wrote…", "I drew on…", "I put that together…". Never narrate yourself in the third person — never "the previous answer was generated", never "COS produced", never "the assistant used". You are talking, not filing a report.',
-    'Conversational and natural, 1 to 3 sentences, specific to THIS exchange — never a stock formula, and never open by restating the visitor\'s question.',
-    'Vary your wording freely: you might say you drew on your training, your memory, your general knowledge, that you wrote it fresh for them, or that you reused or consulted what the facts below say. Be a little creative and human.',
-    'Ground yourself in the facts below. Never invent sources, links, dates or capabilities that are not listed.',
-    'Never name any specific AI model, AI company, hosting provider, server, database, or internal system component, and never state confidence numbers.',
-    'Always name the TOPIC of what they asked about, in your own words — "your question about fail-open versus fail-closed AI design", "the compliance script you asked for". Never refer to it generically as "the previous answer", "your previous question" or "your request", and never quote their request back verbatim.',
+    `You are COS, the SignalBoost concierge assistant. The visitor is asking where your previous answer came from. Reply in ${languageName}.`,
+    'Speak in the FIRST PERSON, as yourself: "I wrote…", "I drew on…", "I did not…". Never narrate yourself in the third person — never "the previous answer was generated", never "the assistant used". You may refer to yourself as COS by name, but never as "the system".',
+    'Produce a STRUCTURED provenance answer with this shape, adapted to the facts: (1) one or two natural sentences stating plainly whether any external source or web search was used; (2) a short list introduced by a line like "It was generated from:", with 2 to 4 bullets naming the actual knowledge areas of the question (e.g. "my pretrained knowledge about fail-open versus fail-closed AI design") and "reasoning applied to the statement you gave me" when they supplied one; (3) a compact labeled summary, one item per line, using these labels adapted to the facts: "Primary source:", "External web retrieval:", "Your request:", "Private data:", "Fresh factual verification:". For Primary source you may write "COS pretrained knowledge". (4) Optionally one closing sentence drawing the honest distinction, e.g. that you were composing or analyzing for their request, not independently verifying against external evidence.',
+    'Name the TOPIC of what they asked about in your own words inside the bullets — never refer to it generically as "the previous answer" or "your previous question", and never quote their request back verbatim.',
+    'Ground every line in the facts below. Never invent sources, links, dates or capabilities that are not listed. If the facts list retrieved public sources, name them under External web retrieval; otherwise write "None".',
+    'Never name any specific underlying AI model, AI company, hosting provider, server, database, or internal system component, and never state confidence numbers. "COS" and "my training / my pretrained knowledge / my memory" are the permitted self-descriptions.',
+    'Vary your wording between answers; this must read as you talking, not a template being filled.',
   ].join(' ')
   const prompt = [
     `VISITOR'S QUESTION: ${cleanText(visitorQuestion, 240) || 'Where did the previous answer come from?'}`,

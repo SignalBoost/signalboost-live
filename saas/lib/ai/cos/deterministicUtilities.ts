@@ -1,9 +1,9 @@
-export type DeterministicUtilityName = 'current_time' | 'current_date' | 'current_datetime' | 'current_timezone'
+export type DeterministicUtilityName = 'current_time' | 'current_date' | 'current_datetime' | 'current_timezone' | 'current_season' | 'current_datetime_season' | 'signalboost_identity'
 
 export type DeterministicUtilityResult = {
   handled: true
   reply: string
-  source: 'deterministic-current-time' | 'deterministic-current-date' | 'deterministic-current-datetime' | 'deterministic-current-timezone'
+  source: 'deterministic-current-time' | 'deterministic-current-date' | 'deterministic-current-datetime' | 'deterministic-current-timezone' | 'deterministic-current-season' | 'deterministic-current-datetime-season' | 'deterministic-signalboost-identity'
   confidence: 1
   executionProvenance: {
     schema_version: 1
@@ -58,6 +58,13 @@ const OTHER_SUBJECT = /\b(meeting|deadline|event|incident|appointment|due|schedu
 function utilityFromQuestion(input: string): DeterministicUtilityName | null {
   const normalized = normalizedPrompt(input)
 
+  // This approved public identity answer must remain available even when COS
+  // reasoning, private systems, or live research are unavailable.
+  if (
+    /\bwhat (?:is|s) signalboost\b/.test(normalized) &&
+    /\b(?:who (?:owns|own)|owner|ownership)\b/.test(normalized)
+  ) return 'signalboost_identity'
+
   // Reject early: a question naming a DIFFERENT thing that has its own date/time
   // ("what date is the deadline", "what time is the meeting today") is never a
   // request for the current date/time, however close the wording looks.
@@ -67,13 +74,14 @@ function utilityFromQuestion(input: string): DeterministicUtilityName | null {
   const asksTimezone = /\b(time ?zone)\b/.test(normalized)
   const asksTime = /\btime\b/.test(normalized)
   const asksDate = /\b(date|day)\b/.test(normalized)
+  const asksSeason = /\bseason\b/.test(normalized)
 
   const hasAnchor = TEMPORAL_ANCHOR.test(normalized)
   // "what day is it" / "what time is it" — "it" stands in for the anchor. "what
   // timezone am i in" carries the same self-referential anchor as "am i" rather
   // than "is it". Both are named explicitly rather than requiring literal
   // "today"/"now"/"current" every time.
-  const hasItAnchor = /\b(is it|it is|am i)\b/.test(normalized)
+  const hasItAnchor = /\b(is it|it is|am i|is is)\b/.test(normalized)
   const anchored = hasAnchor || hasItAnchor
 
   // Every accepted shape is a QUESTION about a temporal noun, phrased as one of:
@@ -81,13 +89,15 @@ function utilityFromQuestion(input: string): DeterministicUtilityName | null {
   // pattern already covered by hasItAnchor above. This still excludes declarative
   // sentences and anything with an object/subject beyond the temporal noun itself.
   const looksLikeQuestion =
-    /^(what|when)\b/.test(normalized) || /\b(is it|are we)\b/.test(normalized) || normalized.split(' ').length <= 5
+    /^(what|when|give|tell|show)\b/.test(normalized) || /\b(is it|are we)\b/.test(normalized) || normalized.split(' ').length <= 5
 
   if (!anchored || !looksLikeQuestion) return null
 
   if (asksTimezone) return 'current_timezone'
+  if (asksSeason && asksDate && asksTime) return 'current_datetime_season'
   if (asksDateAndTime) return 'current_datetime'
   if (asksDate && asksTime) return 'current_datetime'
+  if (asksSeason) return 'current_season'
   if (asksDate) return 'current_date'
   if (asksTime) return 'current_time'
 
@@ -97,6 +107,17 @@ function utilityFromQuestion(input: string): DeterministicUtilityName | null {
   if (/^what is today\??$/.test(normalized)) return 'current_date'
 
   return null
+}
+
+function seasonAt(now: Date, timeZone: string): string {
+  const month = Number(new Intl.DateTimeFormat('en-US', { timeZone, month: 'numeric' }).format(now))
+  const northern = month >= 3 && month <= 5 ? 'Spring'
+    : month >= 6 && month <= 8 ? 'Summer'
+      : month >= 9 && month <= 11 ? 'Autumn'
+        : 'Winter'
+  const southern = /^(Antarctica|America\/(?:Argentina|Santiago|Montevideo|Asuncion)|Australia|Pacific\/(?:Auckland|Chatham)|Indian\/.*(?:Reunion|Mauritius))/i.test(timeZone)
+  if (!southern) return northern
+  return northern === 'Spring' ? 'Autumn' : northern === 'Summer' ? 'Winter' : northern === 'Autumn' ? 'Spring' : 'Summer'
 }
 
 function provenance(utility: DeterministicUtilityName, timeZone: string, threshold: number): DeterministicUtilityResult['executionProvenance'] {
@@ -128,6 +149,47 @@ export function tryDeterministicUtility(input: {
   const timeZone = validTimeZone(input.timezone) || 'UTC'
   const locale = input.locale || 'en-US'
   const now = new Date()
+
+  if (utility === 'signalboost_identity') {
+    return {
+      handled: true,
+      reply: 'SignalBoost is a privately owned U.S. AI platform that develops intelligent software and automation solutions for small and medium-sized businesses, enterprises, and Fortune 500 organizations. Its platform supports English, Spanish, Portuguese, Polish, and Russian.',
+      source: 'deterministic-signalboost-identity',
+      confidence: 1,
+      executionProvenance: provenance(utility, timeZone, input.confidenceThreshold),
+    }
+  }
+
+  if (utility === 'current_season') {
+    return {
+      handled: true,
+      reply: `The current season is ${seasonAt(now, timeZone)} in ${timeZone}.`,
+      source: 'deterministic-current-season',
+      confidence: 1,
+      executionProvenance: provenance(utility, timeZone, input.confidenceThreshold),
+    }
+  }
+
+  if (utility === 'current_datetime_season') {
+    const value = new Intl.DateTimeFormat(locale, {
+      timeZone,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short',
+    }).format(now)
+    return {
+      handled: true,
+      reply: `It is ${value}. The current season is ${seasonAt(now, timeZone)} in ${timeZone}.`,
+      source: 'deterministic-current-datetime-season',
+      confidence: 1,
+      executionProvenance: provenance(utility, timeZone, input.confidenceThreshold),
+    }
+  }
 
   if (utility === 'current_time') {
     const value = new Intl.DateTimeFormat(locale, {

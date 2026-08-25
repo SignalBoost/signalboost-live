@@ -87,6 +87,26 @@ test('artifact continuation never searches past an intervening user turn for an 
   clearConversationArtifactContext()
 })
 
+test('a new inline draft is never replaced by the preceding assistant artifact', () => {
+  clearConversationArtifactContext()
+  const newEdit = 'edit - Hi John, please send me the updated report by Friday. Thank you.'
+  const body = {
+    messages: [
+      { role: 'user', content: originalRequest },
+      { role: 'assistant', content: editedEmail },
+      { role: 'user', content: newEdit },
+    ],
+  }
+
+  resolveFreshConversationContext(body, newEdit)
+  assert.equal(peekConversationArtifactContext(newEdit), null)
+  const transformation = detectDirectTextTransformation(newEdit)
+  assert.ok(transformation)
+  assert.match(transformation.sourceText, /Hi John/i)
+  assert.doesNotMatch(transformation.sourceText, /Enterprise Wi-Fi/i)
+  clearConversationArtifactContext()
+})
+
 test('explicit factual verification is not converted into artifact editing', () => {
   clearConversationArtifactContext()
   const input = 'verify the current law mentioned in this email'
@@ -108,4 +128,10 @@ test('explicit factual verification is not converted into artifact editing', () 
 test('merely referring to an email does not automatically make the turn an editing request', () => {
   assert.equal(looksLikeArtifactContinuation('what is the current status of this email?'), false)
   assert.equal(looksLikeArtifactContinuation(followup), true)
+})
+
+test('live or current headline lookups remain factual requests', () => {
+  const input = 'what is the latest headline today?'
+  assert.equal(looksLikeArtifactContinuation(input), false)
+  assert.equal(requiresFreshExternalEvidence(input), true)
 })

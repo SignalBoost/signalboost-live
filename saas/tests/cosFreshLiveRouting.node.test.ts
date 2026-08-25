@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import {
+  clearConversationArtifactContext,
+  peekConversationArtifactContext,
+} from '../lib/ai/cos/cosArtifactConversationContext.ts'
+import { resolveFreshConversationContext } from '../lib/ai/cos/cosFreshConversationContext.ts'
+import { detectDirectTextTransformation, splitQuotedEmailThread } from '../lib/ai/cos/textTransformationInput.ts'
 
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
 const route = () => read('../app/api/cos-primary/route.ts')
@@ -25,6 +31,50 @@ test('fresh follow-ups resolve user context before retrieval and never trust ass
   assert.match(source, /freshEvidenceSearchQuery\(lookupInput/)
   assert.match(source, /assistant_text_used_for_resolution:\s*false/)
   assert.match(source, /synthesizeFreshEvidenceExternally\(\{ input: lookupInput/)
+})
+
+test('writing follow-up carries only the adjacent assistant draft into the editor, never fresh evidence', () => {
+  clearConversationArtifactContext()
+  const originalRequest = 'edit - Dear AskISSO, Enterprise Wi Fi was installed in Paramaribo. Please help me ask who can provide the activation status.'
+  const editedEmail = 'Dear AskISSO,\n\nEnterprise Wi-Fi was installed in Paramaribo a few months ago, but it has not yet been activated. Could you please let us know which office or person we should contact for information about its activation status?\n\nThank you.'
+  const followup = 'what would be the subject line for this email?'
+  const body = { messages: [
+    { role: 'user', content: originalRequest },
+    { role: 'assistant', content: editedEmail },
+    { role: 'user', content: followup },
+  ] }
+
+  const resolution = resolveFreshConversationContext(body, followup)
+  assert.equal(resolution.lookupInput, followup)
+  assert.equal(resolution.contextUsed, false)
+
+  const captured = peekConversationArtifactContext(followup)
+  assert.ok(captured)
+  assert.equal(captured.assistantArtifact, editedEmail)
+  assert.equal(captured.previousUserText, originalRequest)
+
+  const transformation = detectDirectTextTransformation(followup)
+  assert.ok(transformation)
+  const split = splitQuotedEmailThread(transformation.sourceText)
+  assert.equal(split.editableSource, editedEmail)
+  assert.match(split.referenceContext || '', /Dear AskISSO/i)
+  clearConversationArtifactContext()
+})
+
+test('artifact continuation cannot scan backward past an intervening turn', () => {
+  clearConversationArtifactContext()
+  const followup = 'what would be the subject line for this email?'
+  const body = { messages: [
+    { role: 'user', content: 'Edit this email.' },
+    { role: 'assistant', content: 'An older draft that must not be reused.' },
+    { role: 'user', content: 'Switch topics to network inventory.' },
+    { role: 'user', content: followup },
+  ] }
+
+  resolveFreshConversationContext(body, followup)
+  assert.equal(peekConversationArtifactContext(followup), null)
+  assert.equal(detectDirectTextTransformation(followup), null)
+  clearConversationArtifactContext()
 })
 
 test('contextual volatile cache key uses resolved lookup input, not ambiguous surface text', () => {

@@ -70,7 +70,35 @@ async function persistTurnExperience(experience: TurnExperience): Promise<void> 
       confidence_threshold: experience.confidenceThreshold,
       draft_survived_unrepaired: experience.draftSurvivedUnrepaired,
     })
-    if (result.error) throw result.error
+    if (result.error) {
+      // Designed write race (2026-08-25, seen on every production turn): the retrieval
+      // self-reflection side may reconcile a stub row for this turn_id first, so the reasoner's
+      // insert loses with 23505. That is the reconciliation contract working, not a failure —
+      // converge by merging our columns into the existing row instead of warning on every turn.
+      const code = (result.error as { code?: string } | null)?.code
+      if (code === '23505') {
+        const merge = await db.from('cos_turn_experience').update({
+          prompt_hash: experience.promptHash,
+          problem_class: experience.problemClass,
+          features: experience.features,
+          surface_difficulty: surfaceDifficulty(experience.features),
+          reasoner_label: experience.reasonerLabel,
+          phases: experience.phases,
+          skipped: experience.skipped,
+          total_ms: experience.totalMs,
+          model_call_ms: experience.modelCallMs,
+          other_ms: experience.otherMs,
+          model_calls: experience.modelCalls,
+          answered: experience.answered,
+          confidence: experience.confidence,
+          confidence_threshold: experience.confidenceThreshold,
+          draft_survived_unrepaired: experience.draftSurvivedUnrepaired,
+        }).eq('turn_id', experience.turnId)
+        if (merge.error) throw merge.error
+        return
+      }
+      throw result.error
+    }
   } catch (error) {
     console.warn('[cos-turn-experience] record failed (non-fatal):', structuredError(error))
   }

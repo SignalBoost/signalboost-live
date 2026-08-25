@@ -70,6 +70,23 @@ test('terse style follow-up works even when the new prompt contains no source te
   clearConversationArtifactContext()
 })
 
+test('artifact continuation never searches past an intervening user turn for an older draft', () => {
+  clearConversationArtifactContext()
+  const body = {
+    messages: [
+      { role: 'user', content: originalRequest },
+      { role: 'assistant', content: editedEmail },
+      { role: 'user', content: 'Let us switch topics and discuss the network inventory.' },
+      { role: 'user', content: followup },
+    ],
+  }
+
+  resolveFreshConversationContext(body, followup)
+  assert.equal(peekConversationArtifactContext(followup), null)
+  assert.equal(detectDirectTextTransformation(followup), null)
+  clearConversationArtifactContext()
+})
+
 test('explicit factual verification is not converted into artifact editing', () => {
   clearConversationArtifactContext()
   const input = 'verify the current law mentioned in this email'

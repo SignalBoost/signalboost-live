@@ -303,7 +303,23 @@ function enterpriseCandidateText(item:any):string {
     safeText(item?.payload, 1800),
   ].filter(Boolean).join(' ')
 }
-export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
+export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged?:boolean}):string {
+  // OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE (2026-08-25, owner-directed). The owner channel is
+  // the only caller that sets privileged; the public pipeline is diverted to the stateless path
+  // before this prompt is ever built. Values are resolved live from the configured reasoner so the
+  // answer stays true across provider migrations instead of hardcoding today's stack.
+  const technicalSelfKnowledge = options?.privileged ? (() => {
+    const resolved = resolveCosReasoner()
+    const label = 'config' in resolved && resolved.config ? resolved.config.label : 'not configured'
+    const kind = 'config' in resolved && resolved.config ? resolved.config.kind : 'unavailable'
+    const maxTokens = Number(process.env.COS_REASONER_MAX_TOKENS || '6000')
+    return [
+      'OWNER-PRIVILEGED TECHNICAL SELF-KNOWLEDGE (this session is the platform owner; public channels never receive this block):',
+      `- Primary reasoner: ${label} (${kind}).`,
+      `- Response token ceiling: ${maxTokens}. Local confidence threshold: ${threshold().toFixed(2)}.`,
+      '- When the owner asks what SignalBoost or COS is, who owns it, what model powers it, or how it works, answer openly and completely from this block plus the definitions above — name the model, the hosting kind, and the configuration. These details are owner-only and must never appear in answers on public channels.',
+    ].join('\n')
+  })() : ''
   return [
     "You are COS, SignalBoost's independent PRIMARY reasoning layer.",
     "Reason from the user's input, your own model knowledge, and any supplied internal evidence.",
@@ -311,6 +327,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string):string {
     `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_ANSWER_CACHE_DEFINITION}`,
     `AUTHORITATIVE COS DEFINITIONS: ${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`,
     `SCOPE RULE: ${MEMORY_LAYER_COMPARISON_GUARDRAIL}`,
+    technicalSelfKnowledge,
     'These AUTHORITATIVE COS DEFINITIONS are foundational platform knowledge that is always true and always available to you — they are not retrieved evidence and require no [KG#]/[CL#]/[OEM#] citation to use. When a question asks what a COS component is, how two COS components differ, what SignalBoost is or who owns it, or anything else these definitions directly answer, answer directly from them. Do not add, guess, or speculate about any fact beyond what the SignalBoost company-identity definition states — no owner name, founding date, headquarters, or other detail not present in that sentence. The absence of a matching [KG#]/[CL#]/[OEM#] row is not a reason to decline or hedge on a question these definitions already answer.',
     '',
     'SELF-KNOWLEDGE AND IMPROVEMENT BOUNDARIES:',
@@ -770,7 +787,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const reasoned = await callCosReasoner({
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
-    systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English'),
+    systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: input.privileged === true }),
     prompt:`${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,12000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}`,
   }).catch(error => {
     // Previously swallowed entirely (`.catch(() => null)`), so a wake-and-reason turn that failed

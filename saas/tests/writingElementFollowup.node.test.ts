@@ -43,6 +43,19 @@ test('all five platform languages route composition follow-ups away from freshne
   }
 })
 
+test('a bare subject-line question with no artifact noun is still composition work', () => {
+  for (const question of [
+    'what the subject line should be?',
+    'what should the subject line be?',
+    'suggest a sign-off',
+    '¿cuál sería la línea de asunto?',
+    'qual seria a linha de assunto?',
+  ]) {
+    assert.equal(isWritingElementQuestion(question), true, question)
+    assert.equal(requiresFreshExternalEvidence(question), false, question)
+  }
+})
+
 test('genuine current-world lookups are untouched by the new exclusion', () => {
   for (const lookup of [
     'what is the population of Poland?',

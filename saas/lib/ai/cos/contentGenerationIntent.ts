@@ -123,9 +123,18 @@ const CONVERSATION_ARTIFACT_TOKEN = new RegExp(
  * of a document in the conversation. The two concepts must occur close together, in either order.
  * This keeps the classifier Unicode-safe and avoids rebuilding one fragile mega-regex at runtime.
  */
+// Elements that are composition concepts on their own, with no real-world reading worth
+// protecting: "what should the subject line be?" (2026-08-25, seen in production without any
+// artifact noun) is a request to compose, never a current-world lookup. Ambiguous words stay
+// out: bare "subject" (a hearing's subject), "title" (a person's title), "temat" (a topic) and
+// "тема" still require a nearby artifact noun below. Static literal pattern on purpose — the
+// Turbopack bundling constraint documented above applies here too.
+const UNAMBIGUOUS_WRITING_ELEMENT = /(?<![\p{L}\p{N}_])(?:subject\s+line|sign[\s-]?off|salutation|opening\s+line|tagline|l[ií]nea\s+de\s+asunto|linha\s+de\s+assunto)(?![\p{L}\p{N}_])/iu
+
 export function isWritingElementQuestion(input: string): boolean {
   const text = String(input || '').trim()
   if (!text) return false
+  if (UNAMBIGUOUS_WRITING_ELEMENT.test(text)) return true
 
   const element = WRITING_ELEMENT_TOKEN.exec(text)
   const artifact = CONVERSATION_ARTIFACT_TOKEN.exec(text)

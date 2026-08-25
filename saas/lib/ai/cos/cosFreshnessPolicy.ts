@@ -18,6 +18,30 @@ const LOOKUP_INTENT = /^\s*(?:who|what|when|where|which|is|are|has|have|did|does
 const HISTORICAL_ANCHOR = /\b(?:yesterday|last\s+(?:week|month|year)|historical(?:ly)?|formerly|previously|in\s+(?:19|20)\d{2}|as\s+of\s+(?:19|20)\d{2})\b/i
 const CONCEPTUAL_OR_CREATIVE = /^\s*(?:explain|describe|define|teach|write|draft|create|design|build|plan|recommend|suggest|how\s+(?:do|does|did|is|are|can|could|would|should)|why\s+(?:do|does|did|is|are|can|could|would|should))\b/i
 
+// A request to validate, endorse, or fact-check a public-world claim is evidence-seeking even when
+// the topic is otherwise timeless/conceptual. Model familiarity is not independent verification.
+const FACT_CHECK_INTENT = /\b(?:fact[- ]?check|verify|validate|is\s+(?:this|that|it)\s+(?:true|correct|accurate)|is\s+the\s+(?:claim|statement)\s+(?:true|correct|accurate)|are\s+these\s+(?:claims|statements)\s+(?:true|correct|accurate)|do\s+you\s+agree\s+that|can\s+you\s+confirm\s+that|check\s+(?:this|that)\s+(?:claim|statement))\b/i
+
+// Short standalone generalizations about how external actors, products, industries, or systems
+// behave are empirical claims, not mere reasoning prompts. Production failure 2026-08-25: COS
+// endorsed "Commercial models almost always attempt to answer..." from pretrained knowledge even
+// though no independent evidence had been retrieved. Such claims must now be verified live before
+// COS agrees/disagrees with them. Personal/internal premises and explicit hypotheticals stay local.
+const GENERALIZATION_QUANTIFIER = /\b(?:all|almost\s+all|almost\s+always|most|many|generally|typically|usually|commonly|often|rarely|tend(?:s)?\s+to|by\s+default)\b/i
+const EXTERNAL_ACTOR_OR_SYSTEM = /\b(?:commercial|public|industry|industries|company|companies|vendor|vendors|provider|providers|model|models|llm|llms|ai\s+systems?|platform|platforms|product|products|service|services|enterprise|enterprises|organization|organizations|business|businesses|market|markets|software|applications?|systems?)\b/i
+const EMPIRICAL_BEHAVIOR = /\b(?:attempt(?:s|ed|ing)?|answer(?:s|ed|ing)?|behav(?:e|es|ed|ing)|prioriti[sz](?:e|es|ed|ing)|reject(?:s|ed|ing)?|allow(?:s|ed|ing)?|use(?:s|d|ing)?|require(?:s|d|ing)?|prefer(?:s|red|ring)?|optimi[sz](?:e|es|ed|ing)|fail(?:s|ed|ing)?|rely|relies|operate(?:s|d|ing)?|respond(?:s|ed|ing)?|produce(?:s|d|ing)?|generate(?:s|d|ing)?|enforce(?:s|d|ing)?|support(?:s|ed|ing)?)\b/i
+const FIRST_PERSON_OR_PRIVATE_PREMISE = /\b(?:i|i'm|i\s+am|my|mine|we|we're|we\s+are|our|ours)\b/i
+const EXPLICIT_HYPOTHETICAL = /\b(?:hypothetical|hypothetically|scenario|suppose|supposing|assume|assuming|imagine|case\s+study|for\s+example|for\s+instance)\b/i
+
+function looksLikeBareExternalEmpiricalAssertion(text: string): boolean {
+  if (!text || text.length > 700) return false
+  if (text.includes('?')) return false
+  if (FIRST_PERSON_OR_PRIVATE_PREMISE.test(text)) return false
+  if (EXPLICIT_HYPOTHETICAL.test(text)) return false
+  if (isContentGenerationRequest(text)) return false
+  return GENERALIZATION_QUANTIFIER.test(text) && EXTERNAL_ACTOR_OR_SYSTEM.test(text) && EMPIRICAL_BEHAVIOR.test(text)
+}
+
 const PRESENT_TENSE_OFFICE_HOLDER = new RegExp(`\\bwho\\s+(?:is|['’]s)\\s+(?:(?:the\\s+)?current(?:ly)?\\s+(?:the\\s+)?|(?:the\\s+)?)${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
 const TERSE_CURRENT_OFFICE_HOLDER = new RegExp(`^\\s*(?:current|currently)\\s+${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
 const CURRENT_LEADER = /\bwho\s+(?:currently\s+)?(?:leads|heads|runs)\b/i
@@ -148,8 +172,13 @@ export function structuredLiveDataKind(input: string): StructuredLiveDataKind | 
  * "What is Poland's population?", "Where is Company X headquartered?", "Who owns Brand Y?", and
  * "Tell me about Person Z" all get current evidence before COS answers.
  *
+ * A short standalone empirical generalization is also live-verify-by-default when COS would
+ * otherwise be implicitly asked to endorse it. This prevents pretrained familiarity from being
+ * presented as independent confirmation of statements about how external models, companies,
+ * industries, platforms, or systems generally behave.
+ *
  * Explicit exclusions remain for historical questions, conceptual/creative reasoning, local
- * deterministic utilities, and private/internal system-of-record state.
+ * deterministic utilities, private/internal system-of-record state, and supplied hypotheticals.
  *
  * Hard rule: a positive result means model pretraining, local reasoning, durable memory,
  * semantic/exact cache, and prior conversation facts are NOT permitted to establish the answer.
@@ -172,6 +201,12 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   // web for the word "verification". Failing to recognize introspection should degrade to a plain
   // answer, never to confidently citing unrelated sources as the origin of its own reasoning.
   if (isProvenanceIntrospection(text)) return false
+
+  // Explicit fact-checking and bare generalized empirical claims require independent evidence even
+  // when they are not volatile. This is about truth-status, not freshness alone: COS may reason
+  // from model knowledge, but it may not present that knowledge as verification.
+  if (FACT_CHECK_INTENT.test(text)) return true
+  if (looksLikeBareExternalEmpiricalAssertion(text)) return true
 
   // High-stakes guidance is never answered from model memory. This occurs before the
   // conceptual/creative exclusion because questions such as "what should I do after changing my name?"

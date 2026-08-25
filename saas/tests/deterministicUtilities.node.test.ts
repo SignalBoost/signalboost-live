@@ -37,3 +37,12 @@ test('season flips for a southern-hemisphere timezone', () => {
   assert.ok(south)
   assert.notEqual(north.reply, south.reply)
 })
+
+test('answers the approved public SignalBoost identity without COS availability', () => {
+  const result = run('what is SignalBoost and who own it?')
+  assert.ok(result)
+  assert.equal(result.source, 'deterministic-signalboost-identity')
+  assert.match(result.reply, /privately owned U\.S\. AI platform/)
+  assert.match(result.reply, /English, Spanish, Portuguese, Polish, and Russian/)
+  assert.equal(result.executionProvenance.model_generated, false)
+})

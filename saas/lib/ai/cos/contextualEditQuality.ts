@@ -80,9 +80,6 @@ export function prepareContextualEdit(editableSource: string, referenceContext?:
   const anchors: string[] = []
 
   if (sourceSignalsOnePersonPost(normalized, context)) {
-    // One idempotent pass. The previous two-step chain rewrote "a person post" to
-    // "a one-person post" and then matched "person post" again inside it, emitting
-    // "a one-one-person post". The optional one- prefix makes re-application a no-op.
     normalized = normalized.replace(/\b(?:one-)?person\s+post\b/gi, 'one-person post')
     anchors.push('The rough phrase "person post" means "one-person post" (a post being covered by one person), NOT "personal post".')
   }
@@ -120,26 +117,28 @@ function insertBeforeClosing(answer: string, sentence: string): string {
   return `${before}\n\n${sentence}\n\n${after}`.trim()
 }
 
-function repairReferralOnlyRoleExpansion(source: string, answer: string): string {
-  if (!sourceSignalsReferralOnly(source) || !answerRequestsRecipientUnderlyingInfo(answer)) return answer
+const REFERRAL_ONLY_REQUEST = 'Could you please let us know who or which office we should contact for more information?'
 
-  // Keep the surrounding edited draft, but replace only the broadened recipient request.
-  // The topic normally remains explicit in the preceding sentence; the safe fallback asks
-  // only for routing and therefore cannot assign the underlying work to the wrong office.
-  const directQuestion = /\b(?:Could|Can|Would|Will)\s+you\b[^?]*(?:\?|$)/i
-  if (directQuestion.test(answer)) {
-    return answer.replace(
-      directQuestion,
-      'Could you please let us know who or which office we should contact for more information?',
-    )
+function repairReferralOnlyRoleExpansion(source: string, answer: string): string {
+  if (!sourceSignalsReferralOnly(source)) return answer
+
+  // Referral-only is a structural intent, not a vocabulary choice. Once the source has been
+  // classified as referral-only, do not rely on an exhaustive list of model paraphrases to spot
+  // drift. Deterministically normalize the released request sentence back to referral-only scope.
+  const modalRequest = /\b(?:Could|Can|Would|Will)\s+you\b[^?]*(?:\?|$)/i
+  if (modalRequest.test(answer)) {
+    return answer.replace(modalRequest, REFERRAL_ONLY_REQUEST)
   }
 
-  const directSentence = /(^|[.!?]\s+|\n+)(?:Please|Kindly)\b[^.!?\n]*(?:[.!?]|$)/i
-  if (directSentence.test(answer)) {
-    return answer.replace(
-      directSentence,
-      '$1Could you please let us know who or which office we should contact for more information?',
-    )
+  const politeRequest = /(^|[.!?]\s+|\n+)(?:Please|Kindly)\b[^.!?\n]*(?:[.!?]|$)/i
+  if (politeRequest.test(answer)) {
+    return answer.replace(politeRequest, `$1${REFERRAL_ONLY_REQUEST}`)
+  }
+
+  // If the model removed the explicit ask entirely, restore it rather than releasing a polished
+  // email that no longer performs the user's requested action.
+  if (!sourceSignalsReferralRequest(answer)) {
+    return insertBeforeClosing(answer, REFERRAL_ONLY_REQUEST)
   }
 
   return answer

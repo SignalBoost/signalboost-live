@@ -81,6 +81,10 @@ export function contentScriptSemanticMismatch(prompt: string, raw: string): bool
  * draft failed the deterministic quality gate.
  */
 export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
+  // Humor is a material user requirement, not a decorative adjective. Give the same COS
+  // reasoner a focused rewrite pass so it produces a real comedic beat rather than merely
+  // restating the requested tone or rules.
+  if (classifyScriptRequest(prompt) === 'content' && /\\b(?:humou?rous|humou?r|funny|comedic)\\b/i.test(prompt)) return true
   if (contentScriptSemanticMismatch(prompt, raw)) return true
   if (executiveDecisionUnsupportedClaims(prompt, raw).length) return true
   const quality = assessReasonerDraft(prompt, raw)
@@ -111,9 +115,10 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, _firstRaw: s
     return [
       originalPrompt,
       '',
-      'QUALITY REPAIR — your previous draft violated the requested meaning of "script".',
+      'QUALITY REPAIR — your previous draft did not fully satisfy the requested written script.',
       scriptDirective,
       '',
+      'If the user asked for humor, the script must contain an actual restrained comic beat: a concrete situational contrast, escalation, or payoff. Do not merely mention humor, professionalism, policy, or compliance.',
       'Produce the requested written script now.',
       '- Keep every unknown attribute unknown; use wording that remains valid whether the named subject is a person, product, company, service, project, or something else.',
       '- Do not explain that the ambiguity prevents writing. The ambiguity is a constraint on wording, not a reason to refuse.',

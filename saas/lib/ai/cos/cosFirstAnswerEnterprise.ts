@@ -1,6 +1,7 @@
 // saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { createHash } from 'node:crypto'
 import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
+import { learnedEvidenceUseRequired } from './learnedEvidencePolicy.ts'
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { classifyRunpodFailure, runpodCapacityUnavailableReason } from '@/lib/ai/cos/runpodCapacityError'
 import { configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
@@ -823,7 +824,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   // claim boundary immediately before evidence accounting, caching, and release.
   // Owner-fed documents, transcripts, papers, and other full-content corpus rows must be
   // demonstrably used when retrieval selected them as relevant. Metadata pointers remain optional.
-  const requiresRelevantLearnedEvidenceUse = context.learned.some(item => item.includes('retrieved content'))
+  // Owner correction (2026-08-25): evidence-use is demanded only for knowledge answers. Artifact
+  // composition (edits, scripts, drafts, translations of the user's own material) is exempt —
+  // forcing [CL#] citations into an edited email rejected perfectly good work and failed the turn
+  // closed. See learnedEvidencePolicy.ts for the recorded production failure.
+  const requiresRelevantLearnedEvidenceUse = learnedEvidenceUseRequired(input.prompt, context.learned)
   const releaseSignals = (raw: string) => [
     ...executiveDecisionUnsupportedClaims(input.prompt, raw),
     ...(requiresRelevantLearnedEvidenceUse && citedEvidence(parseLocalResult(raw)?.answer || '').cl === 0

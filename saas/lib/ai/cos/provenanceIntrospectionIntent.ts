@@ -124,6 +124,9 @@ const WHERE_WORD = bounded('where|d[oó]nde|de\\s+d[oó]nde|onde|de\\s+onde|sk[a
 /** "answers ABOUT visas" is a topic request, not introspection — unless it is "the answer to the question". */
 const TOPICAL_ANSWER = /\b(?:answers?|respuestas?|respostas?|odpowiedzi|ответ\p{L}*)\s+(?:about|on|regarding|to|for|sobre|acerca|para|o|na|про|о|об)\s+(?!the\s+question|my\s+question|this\s+question)/iu
 
+// A statement may legitimately discuss an "answer" and "source ground truth". It is not a request for prior-turn telemetry unless it has an explicit interrogative or imperative cue.
+const EXPLICIT_PROVENANCE_REQUEST = /[?]|\b(?:show|tell|give|list|display|identify|explain|where|what|which|how|cite|citation|citations|reference|references)\b/i
+
 /**
  * STRUCTURAL BACKSTOP — a production miss (2026-08-23) was a TYPO: "show me where did you the
  * answer from?" dropped the verb "get", and every source-language pattern assumes a verb. People
@@ -142,6 +145,7 @@ function whereYouAnswerShape(text: string): boolean {
 export function asksWhereTheAnswerCameFrom(input: string): boolean {
   const text = String(input || '').trim()
   if (!text) return false
+  if (!EXPLICIT_PROVENANCE_REQUEST.test(text)) return false
   if (CONDITIONAL_ADVICE.test(text)) return false
   const aboutThisAssistant = ADDRESSES_ASSISTANT.test(text) || IMPERATIVE_TO_ASSISTANT.test(text) || ANSWER_NOUN.test(text)
   if (PROVENANCE_VOCABULARY.test(text) && aboutThisAssistant && !EXTERNAL_PROVENANCE_SUBJECT.test(text)) return true

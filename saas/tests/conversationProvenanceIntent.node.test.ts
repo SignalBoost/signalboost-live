@@ -1,7 +1,7 @@
 // saas/tests/conversationProvenanceIntent.node.test.ts
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isConversationProvenanceQuestion } from '../lib/ai/cos/conversationProvenanceIntent';
+import { isConversationProvenanceQuestion } from '../lib/ai/cos/conversationProvenanceIntent.ts';
 
 test('pins the exact production miss: "idea" carried no provenance token', () => {
   // This question was served the fresh-evidence restriction message in production,

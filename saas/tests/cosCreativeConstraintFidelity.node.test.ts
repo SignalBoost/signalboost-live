@@ -58,7 +58,7 @@ test('repair instruction binds critique and rewrite to the actual user request o
   const repair = creativeConstraintRepairInstruction(PROMPT, BAD)
   assert.ok(repair)
   assert.match(repair!, /falsely attributed/i)
-  assert.match(repair!, /actual request/i)
+  assert.match(repair!, /ORIGINAL USER REQUEST|real request/i)
   assert.match(repair!, /COS creative choices/i)
   const full = buildDiagnosticRepairPrompt(PROMPT, BAD)
   assert.match(full, /invented requirements/i)

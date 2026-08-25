@@ -20,6 +20,7 @@ const ARTIFACT_REFERENCE = /\b(?:this|that|the|previous|prior|above|same)\s+(?:e
 const SUBJECT_OR_TITLE_FOLLOWUP = /\b(?:subject(?:\s+line)?|title|headline|caption)\b.{0,60}\b(?:this|that|the|previous|prior|above|same|e-?mail|message|draft|letter|memo|text|reply|response)\b|\b(?:what|which)\b.{0,50}\b(?:subject(?:\s+line)?|title|headline|caption)\b/iu
 const EDIT_CONTINUATION = /^\s*(?:(?:can|could|would)\s+you\s+|please\s+)?(?:make|rewrite|rephrase|shorten|tighten|polish|proofread|edit|change|add|remove|include|exclude|translate|turn|convert|use|keep)\b/iu
 const TERSE_STYLE_CONTINUATION = /^\s*(?:(?:make\s+it\s+)?(?:more|less)\s+(?:formal|professional|friendly|direct|concise|diplomatic|firm|warm|polite|casual)|shorter|longer|stronger|friendlier|warmer|firmer|more\s+concise)\s*[.!?]*\s*$/iu
+const EXPLICIT_FACT_VERIFICATION = /\b(?:verify|fact[- ]?check|research|look\s+up|check\s+(?:whether|if)|confirm\s+(?:whether|if)|cite\s+(?:a\s+)?source|current\s+law|latest\s+(?:rule|law|requirement|status)|today(?:'s)?\s+(?:rule|law|requirement|status))\b/iu
 
 function normalizeInput(value: string): string {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -27,7 +28,7 @@ function normalizeInput(value: string): string {
 
 export function looksLikeArtifactContinuation(input: string): boolean {
   const text = normalizeInput(input)
-  if (!text) return false
+  if (!text || EXPLICIT_FACT_VERIFICATION.test(text)) return false
   return ARTIFACT_REFERENCE.test(text)
     || SUBJECT_OR_TITLE_FOLLOWUP.test(text)
     || EDIT_CONTINUATION.test(text)

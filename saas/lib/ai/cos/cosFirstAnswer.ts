@@ -270,6 +270,7 @@ async function tryPublicStatelessAnswer(input: {
 
 async function tryFreshCurrentFact(input: {
   prompt: string
+  previousAssistant?: string | null
   userId?: string | null
   language?: string
   privileged?: boolean

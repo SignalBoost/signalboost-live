@@ -237,16 +237,8 @@ export async function tryDirectTextTransformation(input: {
     language: input.language,
   })
 
-  if (finalConfidence < 0.45) {
-    return {
-      handled: false,
-      confidence: finalConfidence,
-      reason: `Direct COS text-transformation confidence ${finalConfidence.toFixed(2)} was below the 0.45 acceptance floor.`,
-      bestEffortReply: finalAnswer,
-      provenance: baseProvenance as any,
-    }
-  }
-
+  // Editing user-supplied text is not a factual assertion. Once a non-empty, fidelity-checked
+  // draft exists, release it; a generic answer-confidence threshold must not turn it into a refusal.
   return {
     handled: true,
     reply: finalAnswer,

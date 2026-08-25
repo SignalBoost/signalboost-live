@@ -1,10 +1,11 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 import { withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { getAccess } from '@/lib/auth/access'
 import { withPublicAuditIdentity } from '@/lib/auth/publicAuditIdentity'
 import { withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
+import { isProvenanceIntrospection, publicProvenanceReply } from '@/lib/ai/cos/cosOrchestration'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -31,6 +32,23 @@ export const maxDuration = 300
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
+  const messages = Array.isArray(body?.messages) ? body.messages : []
+  const latestUser = [...messages].reverse().find((message: any) => message?.role === 'user')
+  const prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
+  const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
+    ? String(body.context.language).toLowerCase()
+    : 'en'
+
+  // This wrapper is the public Concierge boundary. Answer source questions here,
+  // before COS Primary's private-only provenance policy can intercept them.
+  if (isProvenanceIntrospection(prompt)) {
+    return NextResponse.json({
+      reply: publicProvenanceReply(language),
+      source: 'concierge-public-provenance-summary',
+      external_ai_invoked: false,
+    })
+  }
+
   const permission = evaluateRunpodWakePermission({
     body,
     interactionHeader: req.headers.get('x-signalboost-user-interaction'),

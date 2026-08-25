@@ -7,7 +7,16 @@ import { isContentGenerationRequest } from './contentGenerationIntent'
 export { isProvenanceIntrospection }
 
 export function confidenceThreshold(): number { const value=Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD||'0.72'); return Number.isFinite(value)?Math.max(.5,Math.min(.98,value)):.72 }
-export function externalFallbackEnabled(): boolean { return process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED!=='false' }
+// Owner directive (2026-08-24): COS looks for Qwen and no other provider, at the moment. This
+// gates every non-Qwen path currently reachable — the legacy Anthropic fallback in
+// routeCoreLegacy.ts (and its own downstream Anthropic calls in growthPlans.ts/selfReview.ts,
+// which are only reachable through it) and the Gemini-based fresh-evidence synthesis in
+// cos-primary/route.ts. Previously this defaulted to ENABLED unless explicitly set to 'false' —
+// meaning an unset env var silently allowed Anthropic. It now defaults to DISABLED unless
+// explicitly set to 'true', so a forgotten/absent env var fails toward Qwen-only, not toward
+// silently substituting another provider. Set COS_EXTERNAL_AI_FALLBACK_ENABLED=true to restore
+// external fallback when that's wanted again.
+export function externalFallbackEnabled(): boolean { return process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED==='true' }
 export function requestsExternalAction(input:string):boolean{
   if(isProvenanceIntrospection(input))return false
   // AUTHORING IS NEVER EXECUTION: writing about a system is not a request to alter it.

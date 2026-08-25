@@ -38,6 +38,10 @@ const AUTHORING_VERB = [
 /** Matches an authoring/transformation verb at the start of the string. */
 const GENERATION = new RegExp(`^\\s*(?:${AUTHORING_VERB})(?![\\p{L}\\p{N}_])`, 'iu')
 
+// Requests for the label of a user-authored artifact are writing tasks, even when phrased as
+// a question. They must retain conversation context rather than becoming web lookups.
+const ARTIFACT_LABEL_REQUEST = /\b(?:what|which|suggest|give|need|would|could|should)\b.{0,80}\b(?:subject(?:\s+line)?|email\s+subject|title|headline|caption|tagline|opening\s+line)\b/i
+
 /**
  * Split on sentence terminators and on clause boundaries that commonly precede an instruction
  * ("..., so design a plan", "... — draft the memo", "and then write the summary"). Newlines and
@@ -63,5 +67,6 @@ export function isContentGenerationRequest(input: string): boolean {
   const text = String(input || '').trim()
   if (!text) return false
   if (GENERATION.test(text)) return true
+  if (ARTIFACT_LABEL_REQUEST.test(text)) return true
   return clausesOf(text).some(clause => GENERATION.test(clause))
 }

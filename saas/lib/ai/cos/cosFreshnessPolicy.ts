@@ -83,6 +83,17 @@ const INTERNAL_PLATFORM_SELF_KNOWLEDGE = new RegExp(
   'i',
 )
 
+// Company-identity questions ("what is SignalBoost", "who owns SignalBoost") are self-knowledge
+// too, but they don't mention any SELF_KNOWLEDGE_TOPIC word above (owner-verified 2026-08-24:
+// "what is signalboost and who owns it" fell through this classifier entirely and was sent to
+// external live search, which correctly failed closed rather than guess). The fixed, owner-approved
+// SIGNALBOOST_COMPANY_IDENTITY_DEFINITION in cosMemoryLayerDefinitions.ts is the authoritative
+// answer to this narrow question — not a general license to skip freshness for anything mentioning
+// the company name, so this stays scoped to "what is" / "who owns" identity phrasing specifically.
+// owns?/own — the live phrasing that surfaced this bug used "who own it" (no s); both forms mean
+// the same question and must both be caught.
+const SIGNALBOOST_COMPANY_IDENTITY_QUESTION = /^\s*(?:what\s+is\s+signalboost\b(?:\s*[,.]?\s*(?:and\s+)?who\s+owns?\s+it)?|who\s+owns?\s+signalboost|who\s+is\s+the\s+owner\s+of\s+signalboost|is\s+signalboost\s+(?:privately\s+)?owned)\s*[?.!]*\s*$/i
+
 // Pure arithmetic and local clock/date questions have deterministic utilities. They should never
 // consume a public search merely because they begin with "what".
 const LOCAL_ARITHMETIC = /^\s*(?:what\s+is\s+)?[\d\s()+\-*/%.^=]+[?!.]*\s*$/i
@@ -99,7 +110,7 @@ function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
 }
 
 function looksLikeInternalOperationalState(text: string): boolean {
-  return INTERNAL_OPERATIONAL_STATE.test(text) || COS_SELF_IMPROVEMENT.test(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
+  return INTERNAL_OPERATIONAL_STATE.test(text) || COS_SELF_IMPROVEMENT.test(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text) || SIGNALBOOST_COMPANY_IDENTITY_QUESTION.test(text)
 }
 
 function isLocalDeterministicUtility(text: string): boolean {

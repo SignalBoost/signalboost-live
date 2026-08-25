@@ -7,6 +7,7 @@ const tests = [
   'tests/textTransformationInput.node.test.ts',
   'tests/cosEditIntentFidelity.node.test.ts',
   'tests/writingElementFollowup.node.test.ts',
+  'tests/cosConversationContinuityWiring.node.test.ts',
   'tests/executiveCommunication.node.test.ts',
   'tests/assistantComposerReset.node.test.ts',
   'tests/dataCenterOperations.node.test.ts',

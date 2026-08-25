@@ -1,6 +1,7 @@
 import { assessAnswerSpecificity } from './answerSpecificity.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
 import { classifyScriptRequest, executiveDecisionDirective, scriptRequestDirective } from './scriptRequestIntent.ts'
+import { creativeConstraintRepairInstruction, unsupportedCreativeConstraintClaims } from './creativeConstraintFidelity.ts'
 
 const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
 const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!\/(?:usr\/bin\/env\s+)?(?:bash|sh|python))\b/m
@@ -81,10 +82,13 @@ export function contentScriptSemanticMismatch(prompt: string, raw: string): bool
  * draft failed the deterministic quality gate.
  */
 export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
-  // Humor is a material user requirement, not a decorative adjective. Give the same COS
-  // reasoner a focused rewrite pass so it produces a real comedic beat rather than merely
+  // The answer may invent open creative details, but it may never retroactively claim the user
+  // requested a constraint that is absent from the real prompt.
+  if (unsupportedCreativeConstraintClaims(prompt, raw).length) return true
+  // Humor is a material user requirement when it is actually present in the prompt. Give the same
+  // COS reasoner a focused rewrite pass so it produces a real comedic beat rather than merely
   // restating the requested tone or rules.
-  if (classifyScriptRequest(prompt) === 'content' && /\\b(?:humou?rous|humou?r|funny|comedic)\\b/i.test(prompt)) return true
+  if (classifyScriptRequest(prompt) === 'content' && /\b(?:humou?rous|humou?r|funny|comedic)\b/i.test(prompt)) return true
   if (contentScriptSemanticMismatch(prompt, raw)) return true
   if (executiveDecisionUnsupportedClaims(prompt, raw).length) return true
   const quality = assessReasonerDraft(prompt, raw)
@@ -93,8 +97,20 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
   return quality.genericBuckets >= 2 && quality.mechanisms < 3
 }
 
-export function buildDiagnosticRepairPrompt(originalPrompt: string, _firstRaw: string): string {
+export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: string): string {
   const scriptDirective = scriptRequestDirective(originalPrompt)
+  const creativeConstraintRepair = creativeConstraintRepairInstruction(originalPrompt, firstRaw)
+  if (creativeConstraintRepair) {
+    return [
+      originalPrompt,
+      '',
+      'QUALITY REPAIR — the prior draft attributed one or more invented requirements to the user.',
+      creativeConstraintRepair,
+      scriptDirective || '',
+      '',
+      'Return a complete fresh answer to the ORIGINAL request. Preserve the requested generate/critique/rewrite workflow when present. Do not mention this repair instruction or the rejected draft.',
+    ].filter(Boolean).join('\n')
+  }
   if (executiveDecisionDirective(originalPrompt)) {
     return [
       originalPrompt,
@@ -135,7 +151,7 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, _firstRaw: s
     '',
     'QUALITY REPAIR — solve the incident again from the original facts. Your previous draft was rejected as category-shaped; do not copy it, defend it, or reuse the headings from it.',
     '',
-    'Reason from the asymmetries before naming causes:',
+    'Reason from all asymmetries before naming causes:',
     '- If only one tenant class is affected, prefer mechanisms scoped to that class or to resources it uniquely uses. Demote explanations that should affect all tenants equally.',
     '- If overall traffic is unchanged, prefer state-dependent mechanisms such as queue/pool saturation at a tier boundary, working-set/cache threshold crossing, plan/cardinality changes, shard or routing placement, throttling/quota thresholds, or dependency behavior tied to that tenant class over a generic load explanation.',
     '- If there was no deployment, distinguish mechanisms that can change without code: data growth/skew, statistics or plan changes, cache eviction, pool occupancy, noisy-neighbor placement, routing/config drift, certificate/DNS/dependency state, or provider-side throttling.',
@@ -154,6 +170,11 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, _firstRaw: s
 }
 
 export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRaw: string): boolean {
+  const firstCreativeViolations = unsupportedCreativeConstraintClaims(prompt, firstRaw)
+  const repairedCreativeViolations = unsupportedCreativeConstraintClaims(prompt, repairedRaw)
+  if (firstCreativeViolations.length !== repairedCreativeViolations.length) return repairedCreativeViolations.length < firstCreativeViolations.length
+  if (firstCreativeViolations.length && repairedCreativeViolations.length) return false
+
   const firstScriptMismatch = contentScriptSemanticMismatch(prompt, firstRaw)
   const repairedScriptMismatch = contentScriptSemanticMismatch(prompt, repairedRaw)
   if (firstScriptMismatch !== repairedScriptMismatch) return !repairedScriptMismatch

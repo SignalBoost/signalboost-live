@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
         try {
           const generated = await Promise.race([
             callLocalModel(
-              { prompt: instruction.prompt, systemPrompt: instruction.system, maxTokens: 220, temperature: 0.9 },
+              { prompt: instruction.prompt, systemPrompt: instruction.system, maxTokens: 480, temperature: 0.9 },
               { ...localInferenceConfigFromEnv(), timeoutMs: remainingMs },
             ),
             new Promise<null>(resolve => setTimeout(() => resolve(null), remainingMs + 500)),

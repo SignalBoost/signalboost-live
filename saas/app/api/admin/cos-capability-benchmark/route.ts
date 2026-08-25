@@ -18,6 +18,8 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const MAX_CASES_PER_RUN = 2
+const DATA_CENTER_BENCHMARK_TRACK = 'data_center_operations'
+const DATA_CENTER_MAX_CASES_PER_RUN = 1
 const BENCHMARK_PROBE_TIMEOUT_MS = 90_000
 const STALE_RUN_MS = 10 * 60_000
 const terms = (value: unknown) => Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : []
@@ -25,15 +27,15 @@ const errorText = (value: unknown): string => value instanceof Error ? value.mes
 const cleanTrack = (value: unknown) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, 120)
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-function cleanCaseIds(value: unknown): string[] {
+function cleanCaseIds(value: unknown, maxCases: number): string[] {
   if (!Array.isArray(value)) return []
-  return [...new Set(value.map(item => String(item || '').trim()).filter(item => uuidPattern.test(item)))].slice(0, MAX_CASES_PER_RUN)
+  return [...new Set(value.map(item => String(item || '').trim()).filter(item => uuidPattern.test(item)))].slice(0, maxCases)
 }
 
 async function reconcileStaleRuns(db: NonNullable<ReturnType<typeof cosServiceDb>>) {
   const cutoff = new Date(Date.now() - STALE_RUN_MS).toISOString()
   await db.from('cos_capability_benchmark_runs')
-    .update({ status: 'failed', completed_at: new Date().toISOString(), error: 'Benchmark run expired before completion; retry uses a bounded two-case batch.' })
+    .update({ status: 'failed', completed_at: new Date().toISOString(), error: 'Benchmark run expired before completion; retry uses a bounded benchmark batch.' })
     .eq('status', 'running').lt('started_at', cutoff)
 }
 
@@ -47,16 +49,17 @@ export async function GET() {
   ])
   if (cases.error || runs.error) return NextResponse.json({ error: cases.error?.message ?? runs.error?.message }, { status: 500 })
   const privateCases = (cases.data ?? []).filter(row => isPrivateCapabilityAcceptanceOrigin(row.origin))
-  return NextResponse.json({ ok: true, maxCasesPerRun: MAX_CASES_PER_RUN, cases: privateCases, runs: runs.data ?? [] })
+  return NextResponse.json({ ok: true, maxCasesPerRun: MAX_CASES_PER_RUN, dataCenterMaxCasesPerRun: DATA_CENTER_MAX_CASES_PER_RUN, cases: privateCases, runs: runs.data ?? [] })
 }
 
 export async function POST(request: NextRequest) {
   const guard = await requireOwner(); if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
   const db = cosServiceDb(); if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
   const body = await request.json().catch(() => ({}))
-  const limit = Math.max(1, Math.min(MAX_CASES_PER_RUN, Math.floor(Number(body.limit) || MAX_CASES_PER_RUN)))
   const requestedTrack = cleanTrack(body.track)
-  const requestedCaseIds = cleanCaseIds(body.caseIds)
+  const maxCasesForTrack = requestedTrack === DATA_CENTER_BENCHMARK_TRACK ? DATA_CENTER_MAX_CASES_PER_RUN : MAX_CASES_PER_RUN
+  const limit = Math.max(1, Math.min(maxCasesForTrack, Math.floor(Number(body.limit) || maxCasesForTrack)))
+  const requestedCaseIds = cleanCaseIds(body.caseIds, maxCasesForTrack)
   const cases = await db.from('cos_capability_benchmark_cases').select('id,track,prompt,required_terms,forbidden_terms,requires_local_reasoning,origin,evaluation_profile').eq('active', true).order('created_at', { ascending: true }).limit(200)
   if (cases.error) return NextResponse.json({ error: cases.error.message }, { status: 500 })
   const completedRuns = await db.from('cos_capability_benchmark_runs').select('id').eq('status', 'completed').limit(2000)
@@ -74,6 +77,10 @@ export async function POST(request: NextRequest) {
   } else {
     const start = ((completedRuns.data?.length ?? 0) * limit) % activeCases.length
     selected = [...activeCases.slice(start), ...activeCases.slice(0, start)].slice(0, limit)
+  }
+
+  if (selected.length > DATA_CENTER_MAX_CASES_PER_RUN && selected.some(row => String(row.track) === DATA_CENTER_BENCHMARK_TRACK)) {
+    return NextResponse.json({ ok: false, error: 'Data-center private benchmark requests are limited to one case to stay within the runtime budget.' }, { status: 400 })
   }
 
   const run = await db.from('cos_capability_benchmark_runs').insert({ requested_limit: selected.length }).select('id').single()

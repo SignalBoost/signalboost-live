@@ -68,6 +68,8 @@ async function executePrivateCapabilityCase(
   const score = scoreCapabilityBenchmarkCase(test, {
     caseId: test.id,
     reply,
+    handled: result.handled,
+    responseSource: result.provenance.responseSource,
     provenance: {
       localReasoning: result.provenance.localModelInvoked,
       externalAi: result.provenance.externalAiInvoked,

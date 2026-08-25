@@ -73,7 +73,7 @@ type BenchmarkState = {
 
 const DATA_CENTER_BENCHMARK_TRACK = 'data_center_operations'
 const DATA_CENTER_BENCHMARK_ORIGIN = 'data-center-private-v1'
-const BENCHMARK_BATCH_SIZE = 2
+const BENCHMARK_BATCH_SIZE = 1
 
 export default function DataCenterOperationsPage() {
   const { lang } = useI18n()

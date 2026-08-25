@@ -41,8 +41,6 @@ const EXECUTIVE_DECISION_SCENARIO =
 const EXECUTIVE_DECISION_VERB =
   /\b(?:decide|design|facilitate|triage|cut|reduce|prioriti[sz]e|allocate|restructure|acquire|handle|recommend|approve|protect|extend|save|freeze|cancel)\b/i
 
-// Executive requests may use an unlimited variety of verbs (for example, "outline"), so the
-// gate keys on the request shape rather than an ever-growing verb list.
 const EXECUTIVE_DELIVERABLE =
   /\b(?:roadmap|(?:the|a|an|our|your|my)\s+plan|action\s+plan|playbook|proposal|recommendations?|next\s+steps|course\s+of\s+action|strategy|framework|memo|briefing|agenda|trade[-\s]?offs?|decision\s+(?:process|framework|memo|rights))\b/i
 const EXECUTIVE_DECISION_QUESTION = /\b(?:how|what|which|who|should|would)\b[^?]{0,400}\?/i
@@ -107,7 +105,8 @@ function pureScriptDirective(input: string): string | null {
     'If the user explicitly says not to assume what the named subject is, treat that as a content constraint: use type-neutral wording and do not invent whether the subject is a person, product, company, service, or anything else.',
     'Ambiguity about the subject does not make the writing task impossible; satisfy the request with neutral language instead of refusing or substituting a software template.',
     'Deliver a complete, usable script—not a list of the requested style rules and not a generic reminder about them. Use a clear format appropriate to the request, such as a title, brief setting, speakers, and dialogue.',
-    'When the requested style combines humor with professionalism or compliance, make the humor part of the situation or dialogue: restrained, intelligible, and safe. Do not merely say that humor is allowed, describe the rules, or use vague filler.',
+    'Never claim that the user or prompt requested humor, professionalism, compliance, formality, brevity, a specific tone, a specific length, or any other constraint unless that requirement actually appears in the user request. Creative choices COS adds are COS choices, not user requirements.',
+    'When the requested style actually combines humor with professionalism or compliance, make the humor part of the situation or dialogue: restrained, intelligible, and safe. Do not merely say that humor is allowed, describe the rules, or use vague filler.',
     'Honor explicit length and tone constraints. Short sentences do not mean repetitive fragments or a one-paragraph summary.',
     rationaleRule,
   ].filter(Boolean).join(' ')

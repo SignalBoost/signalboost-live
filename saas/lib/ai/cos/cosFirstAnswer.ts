@@ -507,6 +507,7 @@ export async function tryCOSFirstAnswer(input: {
   language?: string
   privileged?: boolean
   disableCache?: boolean
+  previousAssistant?: string | null
 }): Promise<COSFirstAnswerResult> {
   beginEvidenceSourceUseTurn()
 

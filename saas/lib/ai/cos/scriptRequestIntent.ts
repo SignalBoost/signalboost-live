@@ -102,6 +102,7 @@ function pureScriptDirective(input: string): string | null {
 
   return [
     'SCRIPT MODE: WRITTEN/NARRATIVE CONTENT, NOT SOURCE CODE.',
+    'Honor the requested meaning of "script" as written/narrative content unless the request contains explicit programming or computational signals.',
     'Write the requested script directly. Do not output Python, JavaScript, Bash, classes, functions, or other executable code, and do not ask the user to choose a programming language.',
     'If the user explicitly says not to assume what the named subject is, treat that as a content constraint: use type-neutral wording and do not invent whether the subject is a person, product, company, service, or anything else.',
     'Ambiguity about the subject does not make the writing task impossible; satisfy the request with neutral language instead of refusing or substituting a software template.',

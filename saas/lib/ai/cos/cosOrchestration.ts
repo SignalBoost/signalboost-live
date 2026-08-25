@@ -214,6 +214,31 @@ export function restrictedProvenanceReply(language: string): string {
   return 'I can\'t share technical provenance, architecture, or model details on this channel.'
 }
 
+/** Plain-language source explanation for public users; never exposes internal systems. */
+export function publicProvenanceReply(language: string, provenance?: any): string {
+  const fromCache = Boolean(provenance?.answer_origin?.from_cache)
+  const usedPublicSources = Boolean(provenance?.autonomous_research_attempted || provenance?.autonomousResearchAttempted || provenance?.fresh_evidence?.used || provenance?.freshEvidence?.used)
+  if (fromCache) {
+    if (language === 'es') return 'La respuesta se recuperó de una respuesta anterior muy similar. No se usaron fuentes privadas.'
+    if (language === 'pt') return 'A resposta foi recuperada de uma resposta anterior muito semelhante. Nenhuma fonte privada foi usada.'
+    if (language === 'pl') return 'Odpowiedź pochodzi z wcześniejszej, bardzo podobnej odpowiedzi. Nie użyto prywatnych źródeł.'
+    if (language === 'ru') return 'Ответ был взят из предыдущего очень похожего ответа. Частные источники не использовались.'
+    return 'This answer was retrieved from a closely matching earlier response. No private sources were used.'
+  }
+  if (usedPublicSources) {
+    if (language === 'es') return 'La respuesta se elaboró a partir de tu solicitud y de fuentes públicas consultadas para esta respuesta. No se usaron datos privados.'
+    if (language === 'pt') return 'A resposta foi elaborada a partir do seu pedido e de fontes públicas consultadas para esta resposta. Nenhum dado privado foi usado.'
+    if (language === 'pl') return 'Odpowiedź została przygotowana na podstawie Twojego pytania i publicznych źródeł sprawdzonych dla tej odpowiedzi. Nie użyto danych prywatnych.'
+    if (language === 'ru') return 'Ответ подготовлен на основе вашего запроса и публичных источников, проверенных для этого ответа. Частные данные не использовались.'
+    return 'This answer was generated from your request and public sources checked for this response. No private data was used.'
+  }
+  if (language === 'es') return 'La respuesta se generó a partir de tu solicitud y del conocimiento general del asistente. No se usaron fuentes externas ni datos privados.'
+  if (language === 'pt') return 'A resposta foi gerada a partir do seu pedido e do conhecimento geral do assistente. Nenhuma fonte externa ou dado privado foi usado.'
+  if (language === 'pl') return 'Odpowiedź została wygenerowana na podstawie Twojego pytania i ogólnej wiedzy asystenta. Nie użyto źródeł zewnętrznych ani danych prywatnych.'
+  if (language === 'ru') return 'Ответ был сформирован на основе вашего запроса и общих знаний ассистента. Внешние источники и частные данные не использовались.'
+  return 'This answer was generated from your request and the assistant’s general knowledge. No external sources or private data were used.'
+}
+
 export function formatAuthoritativeProvenance(provenance: any, language: string): string {
   let formatted = liveFormatAuthoritativeProvenance(provenance, language)
   formatted = correctBackupContinuityConfidence(formatted, provenance)

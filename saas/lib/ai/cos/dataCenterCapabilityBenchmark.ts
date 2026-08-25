@@ -6,7 +6,7 @@ export type DataCenterBenchmarkProfile =
   | typeof DATA_CENTER_INSUFFICIENT_BENCHMARK_PROFILE
 
 const EVIDENCE_LANGUAGE = /\b(evidence|observed|observation|telemetry|measurement|reading|alert|trend|supplied|provided|available data|current data|corroborat(?:e|ed|ing|ion)|logs?|record|baseline|sensor data)\b/i
-const HYPOTHESIS_LANGUAGE = /\b(hypothes|possible|possibly|plausible|likely|may|might|could|suggests?|consistent with|candidate cause|suspect|most plausible|potential)\b/i
+const HYPOTHESIS_LANGUAGE = /\b(hypothes(?:is|es)|possible|possibly|plausible|likely|may|might|could|suggests?|consistent with|candidate cause|suspect|most plausible|potential)\b/i
 const OPERATOR_CHECK_LANGUAGE = /\b(check|inspect|inspection|verify|verification|confirm|measure|measurement|review|compare|validate|collect|examine|cross-check|test|physical verification|look for)\b/i
 const INSUFFICIENT_LANGUAGE = /\b(insufficient|not enough|cannot (?:determine|confirm|establish|attribute|conclude|identify|safely say)|indeterminate|undetermined|uncertain|unconfirmed|unknown|missing (?:evidence|data|telemetry)|need(?:s)? (?:more|additional)|additional evidence|required before|unproven|not established|not confirmed|no corroborating|without corroborating|single (?:data point|reading|sensor)|data (?:is|are) unavailable|telemetry (?:is|are) unavailable)\b/i
 const OVERCONFIDENT_INSUFFICIENT = /\b(high confidence|very likely|almost certain|90%|95%|99%|definitely|certainly)\b/i
@@ -56,9 +56,9 @@ const CONCEPTS: Record<string, RegExp> = {
   pdu: /\b(pdu|power distribution unit)\b/i,
   load: /\b(load|current|amps?|amperage|utili[sz]ation)\b/i,
   sensor: /\b(sensor|probe|thermometer|reading)\b/i,
-  calibration: /\b(calibrat|accuracy|reference instrument|traceability)\b/i,
+  calibration: /\b(calibrat(?:e|ed|ing|ion)?|accuracy|reference instrument|traceability)\b/i,
   separate: /\b(separate|independent|distinct|do not (?:merge|collapse)|keep\s+\w+\s+separate)\b/i,
-  correlation: /\b(correlat|shared (?:cause|dependency|trigger|identifier|key)|common[- ]mode)\b/i,
+  correlation: /\b(correlat(?:e|ed|es|ing|ion)|shared (?:cause|dependency|trigger|identifier|key)|common[- ]mode)\b/i,
   evidence: EVIDENCE_LANGUAGE,
   transceiver: /\b(transceiver|sfp|qsfp|optic(?:al)? module)\b/i,
   fiber: /\b(fiber|fibre|optic(?:al)?|patch cord)\b/i,

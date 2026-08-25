@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { detectDirectTextTransformation } from '../lib/ai/cos/directTextTransformation.ts'
+import { detectDirectTextTransformation } from '../lib/ai/cos/textTransformationInput.ts'
 import {
   contextualEditAnchorBlock,
   contextualEditIntentViolation,

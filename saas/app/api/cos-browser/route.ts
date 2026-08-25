@@ -33,8 +33,10 @@ export const maxDuration = 300
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const messages = Array.isArray(body?.messages) ? body.messages : []
-  const latestUser = [...messages].reverse().find((message: any) => message?.role === 'user')
+  const userMessages = messages.filter((message: any) => message?.role === 'user' && typeof message?.content === 'string')
+  const latestUser = userMessages.at(-1)
   const prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
+  const originalRequest = typeof userMessages.at(-2)?.content === 'string' ? userMessages.at(-2).content : ''
   const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
     ? String(body.context.language).toLowerCase()
     : 'en'
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
   // before COS Primary's private-only provenance policy can intercept them.
   if (isProvenanceIntrospection(prompt)) {
     return NextResponse.json({
-      reply: publicProvenanceReply(language),
+      reply: publicProvenanceReply(language, undefined, originalRequest),
       source: 'concierge-public-provenance-summary',
       external_ai_invoked: false,
     })

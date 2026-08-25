@@ -3,6 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  classifyUninstructedTextArtifact,
   detectDirectTextTransformation,
   splitQuotedEmailThread,
   stripQuotedEmailThread,
@@ -30,6 +31,41 @@ test('editing, summarizing and translation are recognized across all five Signal
     assert.equal(isContentGenerationRequest(prompt), true, prompt)
     assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
   }
+})
+
+test('the exact Sarah transportation draft is implicitly edited instead of answered as the recipient', () => {
+  const prompt = 'Hi Sarah, I think thee is a misunderstanding regarding transportation for tomorrow night. My understand is that we are staying at the airport or somewhere around the airpor instead of returning to the embassy about midnight. We are staying at the "airport" all night and returning to the embassy only approximately 9 AM on Thrusday morning. Please make sure to let Motor Pool knows abaout it, therefore, myself and or the coureir will not need transportation at all tomorrow night. I will let you now in case anything changes again. Thank you.'
+
+  assert.equal(classifyUninstructedTextArtifact(prompt), 'edit')
+  const request = detectDirectTextTransformation(prompt)
+  assert.ok(request)
+  assert.equal(request.sourceText, prompt)
+  assert.match(request.instruction, /Edit this pasted draft/i)
+  assert.match(request.instruction, /Do not answer the draft as though you are its recipient/i)
+  assert.match(request.instruction, /Do not claim that you noted, scheduled, informed, contacted, notified, arranged, ensured/i)
+})
+
+test('ambiguous pasted mail metadata asks what the user wants instead of role-playing the message', () => {
+  const prompt = [
+    'From: Sarah <sarah@example.com>',
+    'Sent: Tuesday, August 25, 2026',
+    'To: Luis <luis@example.com>',
+    'Subject: Transportation tomorrow night',
+    '',
+    'The driver is scheduled to return to the Embassy at midnight. Please confirm whether this is still needed.',
+  ].join('\n')
+
+  assert.equal(classifyUninstructedTextArtifact(prompt), 'clarify')
+  const request = detectDirectTextTransformation(prompt)
+  assert.ok(request)
+  assert.match(request.instruction, /clarification question/i)
+  assert.match(request.sourceText, /What would you like me to do with this text/i)
+  assert.doesNotMatch(request.sourceText, /driver is scheduled/i)
+})
+
+test('ordinary conversation addressed to COS is not mistaken for an outbound draft', () => {
+  const prompt = 'Hi COS, can you explain why a semantic cache should never reuse organization-scoped context through an unscoped entry? I want the reasoning, not an email edit.'
+  assert.equal(classifyUninstructedTextArtifact(prompt), null)
 })
 
 test('quoted email history is removed from output but retained as read-only reference context', () => {

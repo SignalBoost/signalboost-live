@@ -24,11 +24,11 @@ const BRIEFING = /\b(?:executive\s+brief(?:ing)?|leadership\s+brief(?:ing)?|deci
 const POLICY = /\b(?:policy|standard\s+operating\s+procedure|\bSOP\b|directive|guideline|compliance\s+notice|procedure|procedural\s+document|operational\s+standard)\b/iu
 const ANNOUNCEMENT = /\b(?:announcement|notice|advisory|bulletin)\b/iu
 const DOCUMENT = /\b(?:document|brief|proposal|plan|paper)\b/iu
-const CORRESPONDENCE_SHAPE = /(?:^|\n)\s*(?:dear|hello|hi|good\s+(?:morning|afternoon|evening))\b[\s\S]{0,5000}(?:\b(?:thank\s+you|regards|sincerely|best|respectfully)\b|$)/iu
+const CORRESPONDENCE_SHAPE = /\b(?:dear|hello|hi|good\s+(?:morning|afternoon|evening))\b[\s\S]{0,5000}(?:\b(?:thank\s+you|regards|sincerely|best|respectfully)\b|$)/iu
 
 const BODY_ONLY = /\b(?:body\s+only|without\s+(?:a\s+)?subject|no\s+subject(?:\s+line)?|do\s+not\s+(?:add|include)\s+(?:a\s+)?subject)\b/iu
 const FULL_LAYOUT = /\b(?:full|complete|ready[- ]to[- ]send|formal\s+format|business[- ]letter\s+format|complete\s+memo)\b/iu
-const ROUTING = /\b(?:to:|cc:|bcc:|copy\s+(?:this|it)\s+to|distribution\s+list|internal\s+circulation|external\s+release|multiple\s+recipients?)\b/iu
+const ROUTING = /\b(?:to:|cc:?|bcc:?|copy\b|distribution\s+list|internal\s+circulation|external\s+release|multiple\s+recipients?)\b/iu
 const BCC = /\bbcc\b/iu
 const VERSIONING = /\b(?:another\s+version|new\s+version|version\s+\d+|all\s+versions|multiple\s+versions|more\s+formal|more\s+concise|shorter|longer|expanded\s+version|executive\s+summary\s+version)\b/iu
 
@@ -67,7 +67,7 @@ export function detectProfessionalDocumentKind(prompt: string): ProfessionalDocu
   if (MEMO.test(input) && writing) return 'memo'
   if (REPORT.test(input) && writing) return 'report'
   if (LETTER.test(input) && writing) return 'formal_letter'
-  if ((EMAIL.test(input) || (MESSAGE.test(input) && writing) || CORRESPONDENCE_SHAPE.test(input)) && (writing || CORRESPONDENCE_SHAPE.test(input) || EMAIL.test(input))) return 'email'
+  if (EMAIL.test(input) || (writing && (MESSAGE.test(input) || CORRESPONDENCE_SHAPE.test(input)))) return 'email'
   if (ANNOUNCEMENT.test(input) && writing) return 'announcement'
   if (DOCUMENT.test(input) && writing) return 'generic_document'
 

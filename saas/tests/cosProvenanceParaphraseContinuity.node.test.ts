@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { isConversationProvenanceQuestion } from '../lib/ai/cos/conversationProvenanceIntent.ts'
 import { isProvenanceIntrospection } from '../lib/ai/cos/provenanceIntrospection.ts'
-import { isCosGeneratedProvenanceReply } from '../lib/ai/cos/cosPrimaryTurnProvenance.ts'
+import { isCosGeneratedProvenanceReply } from '../lib/ai/cos/provenanceReplyContinuity.ts'
 import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 
 test('answer-origin and idea-origin paraphrases resolve to the same provenance intent family', () => {

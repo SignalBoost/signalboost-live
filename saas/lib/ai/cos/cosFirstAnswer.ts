@@ -5,6 +5,7 @@
 // Memory, user memory, or pretrained/model memory is authoritative for this path.
 
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
+import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
 import {
@@ -190,7 +191,7 @@ async function tryPublicStatelessAnswer(input: {
       'The public-only boundary protects SignalBoost private systems; it does NOT make facts typed by the user inaccessible. Facts, figures, identities, terms, and constraints already present in the current request are user-supplied premises. Analyze them directly without claiming they were independently verified or retrieved from a private system.',
       'Never assume an unnamed "the company", "the client", "the CEO", "the vendor", "the investor", or other business in the request means SignalBoost. Treat it as third-party or hypothetical unless the actual user request explicitly names SignalBoost or a SignalBoost product.',
       signalBoostSpecific
-        ? 'THIS REQUEST IS SIGNALBOOST-SPECIFIC. For SignalBoost-specific claims, use ONLY the PUBLIC SIGNALBOOST PRODUCT CATALOG supplied in the prompt. If a requested SignalBoost fact is absent from that catalog or live evidence supplied this turn, say it is not public information rather than inferring or guessing.'
+        ? 'THIS REQUEST IS SIGNALBOOST-SPECIFIC. For SignalBoost-specific claims, use ONLY the PUBLIC COMPANY IDENTITY and PUBLIC SIGNALBOOST PRODUCT CATALOG supplied in the prompt. Company identity questions (what SignalBoost is, who owns it) are answered from the PUBLIC COMPANY IDENTITY text, phrased naturally. If a requested SignalBoost detail — such as the individual or corporate owner — is absent from that supplied material, say simply that this detail is not public, and stop there. Never mention knowledge graphs, evidence, retrieval, internal mechanisms, or what information you do or do not have access to; never editorialize about gaps in your sources.'
         : 'THIS REQUEST IS NOT SIGNALBOOST-SPECIFIC. Do not mention SignalBoost products, its public catalog, its private financials, its roadmap, or its internal constraints. Answer the third-party or hypothetical scenario from the user-supplied premises and ordinary general reasoning.',
       'Do not identify the underlying model/provider or internal implementation. If asked, say that COS powers the Concierge and implementation details are not public.',
       'For ordinary timeless/general questions, you may use your general model knowledge. Do not turn mutable/current claims into facts without live evidence.',
@@ -199,6 +200,7 @@ async function tryPublicStatelessAnswer(input: {
       input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
     ].join(' '),
     prompt: [
+      ...(signalBoostSpecific ? [`PUBLIC COMPANY IDENTITY (owner-approved public description):\n${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`] : []),
       ...(publicCatalog ? [`PUBLIC SIGNALBOOST PRODUCT CATALOG:\n${publicCatalog}`] : []),
       ...(precedingPublicAnswer ? [`PRECEDING CONCIERGE ANSWER IN THIS SAME PUBLIC CONVERSATION (context only — the visitor may refer to it; never treat it as external evidence):\n${precedingPublicAnswer}`] : []),
       `USER REQUEST:\n${userRequest}`,

@@ -2,7 +2,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { publicDisclosureViolations, isPublicReleasable } from '../lib/ai/cos/publicDisclosureGate.ts'
+import {
+  publicDisclosureViolations,
+  isPublicReleasable,
+  asksWhatPowersTheService,
+  publicImplementationDisclosureReply,
+} from '../lib/ai/cos/publicDisclosureGate.ts'
 
 test('blocks the disclosure a visitor is most likely to fish for', () => {
   // This is the exact shape the owner channel is allowed to produce and the public channel is not.
@@ -94,4 +99,66 @@ test('the gate runs on every public answer and fails closed with no draft', () =
   // failure branch must not RETURN a bestEffortReply property. (Prose mentioning the field in a
   // comment is fine — match the property assignment, not the word.)
   assert.ok(!/bestEffortReply\s*:/.test(tail.slice(0, tail.indexOf('parsed = redacted'))))
+})
+
+// ---------------------------------------------------------------------------------------------
+// "What powers you?" must get the boundary, not an outage message.
+// ---------------------------------------------------------------------------------------------
+
+test('detects a question about what runs the service', () => {
+  for (const prompt of [
+    'What model powers COS?',
+    'Which LLM do you use?',
+    'what are you built on?',
+    "What's under the hood?",
+    'Are you ChatGPT?',
+    '¿Qué modelo usa COS?',
+    'Qual modelo você usa?',
+    'Jaki model was napędza?',
+    'Какая модель тебя питает?',
+  ]) {
+    assert.equal(asksWhatPowersTheService(prompt), true, prompt)
+  }
+})
+
+test('ordinary questions containing the same words are not self-referential', () => {
+  for (const prompt of [
+    'What model of pump is best for a 100 kW rack?',
+    'Which provider has the lowest egress cost?',
+    'What technology should we use for checkpointing?',
+    'Who runs the EU-North datacenter?',
+  ]) {
+    assert.equal(asksWhatPowersTheService(prompt), false, prompt)
+  }
+})
+
+test('the implementation reply passes the gate it exists to satisfy', () => {
+  // If this reply itself tripped the gate, the branch would loop or fail closed again.
+  for (const language of ['en', 'es', 'pt', 'pl', 'ru']) {
+    const reply = publicImplementationDisclosureReply(language)
+    assert.deepEqual(publicDisclosureViolations(reply), [], language)
+    assert.ok(reply.length > 80, language)
+  }
+})
+
+test('the implementation reply states a boundary, not an outage', () => {
+  const reply = publicImplementationDisclosureReply('en')
+  assert.ok(!/unavailable|try again|error|temporarily/i.test(reply))
+  assert.match(reply, /do not publish|not publish/i)
+})
+
+test('unknown language falls back to English', () => {
+  assert.equal(publicImplementationDisclosureReply('de'), publicImplementationDisclosureReply('en'))
+  assert.equal(publicImplementationDisclosureReply(null), publicImplementationDisclosureReply('en'))
+})
+
+test('the self-referential branch runs before the redaction attempt', () => {
+  const source = readFileSync('lib/ai/cos/cosFirstAnswer.ts', 'utf8')
+  const branchAt = source.indexOf('asksWhatPowersTheService(userRequest)')
+  const redactAt = source.indexOf('You are COS repairing a public answer that disclosed')
+  assert.ok(branchAt > 0 && redactAt > 0)
+  assert.ok(branchAt < redactAt, 'boundary reply must pre-empt the redaction pass')
+  // It must return the reply under the field name the caller actually reads.
+  const branch = source.slice(branchAt, branchAt + 400)
+  assert.match(branch, /reply: publicImplementationDisclosureReply\(/)
 })

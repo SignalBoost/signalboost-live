@@ -17,7 +17,9 @@
 import { createHash } from 'node:crypto'
 import { answerNeedsFreshnessReflection } from './answerFreshnessSelfReflection.ts'
 
-export const COS_ANSWER_GATE_REVISION = '2026-08-24.cache-replay-output-gate.v9-executive-claim-guard'
+// 2026-08-25: v10 adds general quantitative/engineering integrity. Bump the fingerprint so answers
+// cached before assumption-promotion, entity-count, and distributed-checkpoint guards cannot replay.
+export const COS_ANSWER_GATE_REVISION = '2026-08-25.cache-replay-output-gate.v10-quant-engineering-integrity'
 
 export type CosAnswerPolicyInputs = {
   reasonerSystemPrompt: string

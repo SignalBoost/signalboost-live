@@ -53,6 +53,8 @@ function withComputedArithmetic<T extends { answer: string } | null>(parsed: T):
 
 import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
 import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
+import { executiveDecisionUnsupportedClaims } from './reasonerQuality.ts'
+import { blockingReleaseSignals } from './releaseSignalSeverity.ts'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 import {
   isSignalBoostSpecificPublicRequest,
@@ -265,6 +267,49 @@ async function tryPublicStatelessAnswer(input: {
       reason: 'The public-only COS result was empty, truncated, or unparseable.',
       provenance: provenance as any,
     }
+  }
+
+  // GOVERNANCE PARITY WITH THE OWNER CHANNEL (2026-08-26, owner-directed architecture).
+  //
+  // COS is the only reasoner and the Concierge renders passively, so the same claim gate must run
+  // on both. Until now the public path had no executive release check at all: it answered
+  // questions the owner channel refused, which is not a feature — it is the ungoverned path being
+  // the buyer-facing one. Measured on the same 512-H100 question, Concierge produced an answer
+  // whose own body contradicted its headline while COS failed closed.
+  //
+  // Deliberately NO data-boundary change here. executiveDecisionUnsupportedClaims() is a pure
+  // function of the prompt and the draft; it retrieves nothing. Public scope still fetches no
+  // enterprise memory, no user memory and no knowledge graph, exactly as before.
+  //
+  // The severity split applies as it does on the owner side, so a retrieval-quality advisory could
+  // never fail a public turn closed — though on this path none can arise, since nothing is injected.
+  const publicClaimSignals = blockingReleaseSignals(executiveDecisionUnsupportedClaims(input.prompt, reasoned.text))
+  if (publicClaimSignals.length) {
+    const claimRepair = await callCosReasoner({
+      temperature: 0,
+      maxTokens: 2600,
+      systemPrompt: [
+        'PUBLIC ANSWER RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+        'Rewrite the draft using only the facts supplied in the request. Remove unsupported commercial certainty, invented numeric limits and targets, fabricated timelines, market claims, legal conclusions, forecasts, and security frameworks the request did not state.',
+        'Keep the substantive answer intact and do not mention this repair.',
+        input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
+      ].join(' '),
+      prompt: [`USER REQUEST:\n${userRequest}`, `REJECTED DRAFT:\n${parsed.answer}`, `SIGNALS:\n${publicClaimSignals.join(', ')}`].join('\n\n'),
+    }).catch(() => null)
+    const claimRepaired = withComputedArithmetic(claimRepair?.text ? parseLocalResult(claimRepair.text) : null)
+    const claimRepairUsable = Boolean(claimRepaired && !claimRepaired.truncated && claimRepaired.answer.trim())
+    const remaining = claimRepairUsable
+      ? blockingReleaseSignals(executiveDecisionUnsupportedClaims(input.prompt, claimRepair?.text ?? ''))
+      : publicClaimSignals
+    if (remaining.length) {
+      return {
+        handled: false,
+        confidence: 0,
+        reason: `Public answer release rejected: unsupported claim signals (${remaining.join(', ')}) remained after local repair.`,
+        provenance: provenance as any,
+      }
+    }
+    if (claimRepairUsable && claimRepaired) parsed = claimRepaired
   }
 
   const scopeViolations = publicScenarioScopeViolations(input.prompt, parsed.answer)

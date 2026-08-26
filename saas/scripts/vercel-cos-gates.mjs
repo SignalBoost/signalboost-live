@@ -47,6 +47,14 @@ const tests = [
   'tests/cosFeedbackReasoningGeneralization.node.test.ts',
   'tests/cosCognitiveAutonomousCertification.node.test.ts',
   'tests/cognitiveReasoningImperativeTriggers.node.test.ts',
+  'tests/releaseSignalSeverity.node.test.ts',
+  'tests/cosAnswerPolicyCore.node.test.ts',
+  'tests/cosOperatingCharter.node.test.ts',
+  'tests/publicProvenanceRecast.node.test.ts',
+  'tests/groundingConcepts.node.test.ts',
+  'tests/answerEvidenceAttributionRepair.node.test.ts',
+  'tests/conversationProvenanceIntent.node.test.ts',
+  'tests/localEmbeddingsWindowSafeTransport.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

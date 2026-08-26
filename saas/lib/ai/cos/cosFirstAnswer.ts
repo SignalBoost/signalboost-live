@@ -34,7 +34,7 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
-import { publicDisclosureViolations } from './publicDisclosureGate.ts'
+import { publicDisclosureViolations, asksWhatPowersTheService, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 import {
   isSignalBoostSpecificPublicRequest,
@@ -271,6 +271,16 @@ async function tryPublicStatelessAnswer(input: {
   // this runs on EVERY public answer including SignalBoost-specific ones, because "what model
   // powers COS?" is precisely the question that must not be answered on this surface.
   const disclosures = publicDisclosureViolations(parsed.answer)
+  if (disclosures.length && asksWhatPowersTheService(userRequest)) {
+    // The reader asked what runs this service. The honest public answer is the boundary itself,
+    // not an outage message and not a redaction attempt that will keep tripping the gate.
+    return {
+      handled: true,
+      reply: publicImplementationDisclosureReply(input.language),
+      confidence: 1,
+      provenance: provenance as any,
+    }
+  }
   if (disclosures.length) {
     const redact = await callCosReasoner({
       temperature: 0,

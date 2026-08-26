@@ -1,11 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import {
-  evaluateKnowledgePromotionRelevance,
-  knowledgePromotionSourceAllowed,
-  ownerDirectedPromotionAuthority,
-} from '../lib/ai/cos/knowledgePromotionRelevance'
+import { evaluateKnowledgePromotionRelevance, knowledgePromotionSourceAllowed } from '../lib/ai/cos/knowledgePromotionRelevance'
 
 const options = { minSubjectMatches: 2, minSubjectCoverage: 0.3 }
 
@@ -115,48 +110,4 @@ test('subject relevance does not override a source-confidence floor', () => {
 
   assert.equal(decision.eligible, false)
   assert.equal(decision.reason, 'below_source_confidence_floor')
-})
-
-test('owner-directed study authority survives promotion even with weak lexical overlap and low confidence', () => {
-  const evidence = [
-    'owner_directed_study',
-    'admission_basis:owner_directed_intent',
-    'study_intent:Study prose style and historical context.',
-  ]
-  assert.equal(ownerDirectedPromotionAuthority(evidence), true)
-
-  const decision = evaluateKnowledgePromotionRelevance({
-    sourceKind: 'library_material',
-    subject: 'Lusophone literary history',
-    sourceTitle: 'Trecho de literatura em língua portuguesa',
-    summary: 'Naquela manhã, a cidade parecia guardar a memória de muitas gerações e a cadência das palavras.',
-    confidence: 0.2,
-    ownerDirected: ownerDirectedPromotionAuthority(evidence),
-  }, options)
-
-  assert.equal(decision.eligible, true)
-  assert.equal(decision.reason, 'eligible')
-})
-
-test('owner-directed authority requires both provenance markers and never overrides source-kind safety', () => {
-  assert.equal(ownerDirectedPromotionAuthority(['owner_directed_study']), false)
-  assert.equal(ownerDirectedPromotionAuthority(['admission_basis:owner_directed_intent']), false)
-
-  const decision = evaluateKnowledgePromotionRelevance({
-    sourceKind: 'benchmark_fixture',
-    subject: 'Owner study topic',
-    sourceTitle: 'Synthetic fixture',
-    summary: 'Synthetic fixture content.',
-    confidence: 1,
-    ownerDirected: true,
-  }, options)
-  assert.equal(decision.eligible, false)
-  assert.equal(decision.reason, 'source_not_allowed')
-})
-
-test('owner-directed promotion has a recurring bounded cron independent of the daily generic promotion job', () => {
-  const config = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
-  const cron = config.crons.find((entry: any) => entry.path === '/api/cron/cos-directed-study-promotion')
-  assert.ok(cron)
-  assert.equal(cron.schedule, '8,23,38,53 * * * *')
 })

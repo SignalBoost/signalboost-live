@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
+import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import {
@@ -58,7 +59,7 @@ async function scanRepositoryForOwner():Promise<{ok:boolean;reply:string;error?:
   const failed=[root,app,lib,onboard,rootPackage,saasPackage].find((item:any)=>!item.ok) as any
   if(failed)return{ok:false,reply:'',error:failed?.error||'Read-only repository scan failed.'}
   const routes=[...new Set((app.files||[]).filter((path:string)=>path.includes('/api/')).slice(0,20))]
-  return{ok:true,reply:['Repository scan completed: SignalBoost/signalboost-live@main (read-only).','Verified '+root.files.length+' indexed root files, '+app.files.length+' application files, and '+lib.files.length+' library files in the scanned views.','Inspected canonical files: ONBOARD.md, package.json, saas/package.json.',routes.length?'Representative API routes found: '+routes.join(', ')+'.':'','I can now analyze the existing products, architecture, and improvement opportunities from this verified repository context.'].filter(Boolean).join('\\n')}
+  return{ok:true,reply:['Repository scan completed: SignalBoost/signalboost-live@main (read-only).','Verified '+root.files.length+' indexed root files, '+app.files.length+' application files, and '+lib.files.length+' library files in the scanned views.','Inspected canonical files: ONBOARD.md, package.json, saas/package.json.',routes.length?'Representative API routes found: '+routes.join(', ')+'.':'','I can now analyze the existing products, architecture, and improvement opportunities from this verified repository context.'].filter(Boolean).join('\n')}
 }
 async function assessSelfHealingSupervisor(request:string):Promise<string|null>{
   const paths=['docs/portables/self-healing-evaluation-brief.md','docs/portables/self-healing-technical-walkthrough.md','docs/portables/self-healing-security-and-data-handling.md','saas/lib/portable-products/manifests/selfHealingSupervisor.ts']
@@ -212,12 +213,12 @@ export async function POST(req:NextRequest){
   }
 
   let reasoningPrompt=input
-  const strategyProfileRequest=/\\b(?:generate|write|create|draft)\\b[\\s\\S]{0,100}\\b(?:current )?strategy profile(?: weights?| heuristics?)?\\b/i.test(input)
+  const strategyProfileRequest=/\b(?:generate|write|create|draft)\b[\s\S]{0,100}\b(?:current )?strategy profile(?: weights?| heuristics?)?\b/i.test(input)
   if(strategyProfileRequest){
     const profile=await readStrategyProfile({privileged:isPrivileged,organizationId:body?.context?.organizationId,workspace:body?.context?.workspace})
     if('error' in profile){const reply=`COS could not read the current strategy profile: ${profile.error}`;return NextResponse.json({ok:false,reply,error:reply,source:'cos-strategy-profile-unavailable',external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_allowed:false,external_action_taken:false},{status:503})}
     const overrides=appliedStrategyOverrides(profile.profile)
-    reasoningPrompt=`${input}\\n\\nCURRENT DERIVED STRATEGY PROFILE (internal system of record): ${JSON.stringify(profile.profile)}\\nAPPLIED OVERRIDES: ${JSON.stringify(overrides)}\\nGenerate the requested content. Then add an Evidence Used section: for every learned override, name its dimension, winning value, performance score, measured-campaign count, runner-up comparison, and supporting campaign IDs from the profile. If overrides is empty, state that measured outcomes did not justify changing defaults; do not claim missing configuration.`
+    reasoningPrompt=`${input}\n\nCURRENT DERIVED STRATEGY PROFILE (internal system of record): ${JSON.stringify(profile.profile)}\nAPPLIED OVERRIDES: ${JSON.stringify(overrides)}\nGenerate the requested content. Then add an Evidence Used section: for every learned override, name its dimension, winning value, performance score, measured-campaign count, runner-up comparison, and supporting campaign IDs from the profile. If overrides is empty, state that measured outcomes did not justify changing defaults; do not claim missing configuration.`
   }
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
   // Fresh facts already completed live retrieval plus their one local synthesis attempt above.
@@ -239,7 +240,7 @@ export async function POST(req:NextRequest){
     let baseProvenance=authoritativeProvenance(cos,{invoked:false})
     if(requiresFreshEvidence)baseProvenance=markFreshLocalReasoning(baseProvenance,{invoked:freshLocalAttempted,model:freshLocalModel,accepted:false})
     const executionProvenance=requiresFreshEvidence&&freshRetrievedAt?attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:'External synthesis is disabled.',synthesisAccepted:false}):baseProvenance
-    const reply=requiresFreshEvidence?freshSynthesisRejectedReply(language,input):(lowConfidenceDraftReply(cos,reason)??'COS could not complete this request independently and external AI fallback is disabled.'),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:cos?.confidence??0,provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
+    const reply=requiresFreshEvidence?freshSynthesisRejectedReply(language,input):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:cos?.confidence??0,provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
     await writeCosPrimaryProvenance(userId,reply,executionProvenance,'failed_closed',{prompt:input,answered:false,confidence:0,branch:'failed_closed'})
     return NextResponse.json({ok:false,reply,error:reply,cos_first_attempted:requiresFreshEvidence?freshLocalAttempted:(Boolean(cos)||Boolean(localError)),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry},{status:503})
   }

@@ -9,7 +9,20 @@ export type CognitiveReasoningTrigger = {
   reason: string
 }
 
+// A REQUEST IS NOT ALWAYS A QUESTION (2026-08-26).
+//
+// This gate previously required a '?' or a leading interrogative, which silently excluded every
+// imperative brief — and those are the shape enterprise work actually arrives in: "Calculate the
+// break-even...", "Give the leading hypotheses...", "Identify the root cause...". Measured against
+// real production prompts, the detector returned zero triggers for all of them and fired only on
+// short interrogatives like "Is it safe here?". With no trigger, no procedural skill can ever be
+// selected, which is why the cognitive-skills funnel read "1 retrieved -> 0 relevant" on every
+// technical turn for days.
+//
+// An imperative brief can be exactly as underspecified as a question; the grammar of the request
+// says nothing about whether its referents resolve.
 const QUESTIONISH = /\?|^(?:who|what|when|where|why|how|is|are|am|do|does|did|can|could|should|would|will|which)\b/i
+const IMPERATIVE_TASK = /(?:^|[.;:]\s+)(?:calculate|compute|determine|define|identify|diagnose|explain|describe|compare|contrast|evaluate|assess|estimate|analyse|analyze|outline|summarise|summarize|list|give|tell|show|recommend|suggest|propose|design|draft|write|plan|review|check|verify|rank|prioriti[sz]e)\b/i
 const DEICTIC_LOCATION = /\b(?:here|there|nearby|around here|around there|this place|this area|that place|that area)\b/i
 const DEICTIC_PREDICATE = /^\s*(?:is|are|does|do|can|could|should|would|will)\b[\s\S]{0,140}\b(?:here|there|nearby|around here|around there|this place|this area|that place|that area)\b\s*\??\s*$/i
 // Natural follow-ups commonly have both a question word and an auxiliary: "When did she leave?",
@@ -33,7 +46,7 @@ function compact(value: unknown, max = 1200): string {
  */
 export function detectCognitiveReasoningTriggers(prompt: string): CognitiveReasoningTrigger[] {
   const text = compact(prompt)
-  if (!text || !QUESTIONISH.test(text)) return []
+  if (!text || (!QUESTIONISH.test(text) && !IMPERATIVE_TASK.test(text))) return []
 
   const triggers: CognitiveReasoningTrigger[] = []
   if (DEICTIC_LOCATION.test(text) && DEICTIC_PREDICATE.test(text)) {
@@ -43,7 +56,15 @@ export function detectCognitiveReasoningTriggers(prompt: string): CognitiveReaso
     })
   }
 
-  if (text.length <= 180 && REFERENT_PRONOUN.test(text) && !EXPLICIT_NAMED_REFERENT.test(text)) {
+  // The operative clause of a brief is usually its last sentence ("… Should these alerts be
+  // treated as one incident?"). Test that as well as the whole text, so a scenario that ends in a
+  // question is not excluded merely because it opened with context.
+  const finalClause = (text.split(/(?<=[.?!])\s+/).pop() ?? text).trim()
+  const referentTargets = [text.length <= 180 ? text : '', finalClause].filter(Boolean)
+  const referentHit = referentTargets.some(
+    target => target.length <= 180 && REFERENT_PRONOUN.test(target) && !EXPLICIT_NAMED_REFERENT.test(target),
+  )
+  if (referentHit) {
     triggers.push({
       kind: 'unresolved_referent_followup',
       reason: 'Short follow-up contains a pronoun or demonstrative whose referent may come from conversation context.',

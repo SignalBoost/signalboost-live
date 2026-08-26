@@ -218,7 +218,7 @@ export function resolveCalcMarkers(answer: string): CalcResolution {
     seen += 1
     if (seen > MAX_MARKERS) return String(expression).trim()
     const result = evaluateExpression(expression)
-    if (!result.ok) {
+    if (result.ok === false) {
       failed.push({ expression: String(expression).trim(), error: result.error })
       return String(expression).trim()
     }

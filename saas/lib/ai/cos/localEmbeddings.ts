@@ -191,14 +191,21 @@ function shrinkEmbeddingInput(text: string, body: string): string {
   return `${text.slice(0, headChars)}${marker}${text.slice(-tailChars)}`
 }
 
+/**
+ * A transport that turns texts into vectors. Both the OpenAI-compatible endpoint and the Ollama
+ * native endpoint satisfy this, which is what lets the context-window retry below protect either.
+ */
+type EmbeddingRequester = (texts: string[], config: LocalInferenceConfig, model: string) => Promise<EmbeddingAttempt>
+
 async function requestSingleEmbeddingWindowSafe(
   text: string,
   config: LocalInferenceConfig,
   model: string,
   initial?: EmbeddingAttempt,
+  request: EmbeddingRequester = requestEmbeddings,
 ): Promise<EmbeddingAttempt> {
   let current = text
-  let attempt = initial ?? await requestEmbeddings([current], config, model)
+  let attempt = initial ?? await request([current], config, model)
   for (let retry = 0; retry < MAX_EMBEDDING_WINDOW_RETRIES && embeddingContextWindowError(attempt); retry += 1) {
     const next = shrinkEmbeddingInput(current, attempt.body)
     if (next === current) return attempt
@@ -212,24 +219,29 @@ async function requestSingleEmbeddingWindowSafe(
       reason: 'provider_context_window',
     }))
     current = next
-    attempt = await requestEmbeddings([current], config, model)
+    attempt = await request([current], config, model)
   }
   return attempt
 }
 
-async function requestEmbeddingsWindowSafe(texts: string[], config: LocalInferenceConfig, model: string): Promise<EmbeddingAttempt> {
-  const initial = await requestEmbeddings(texts, config, model)
+async function requestEmbeddingsWindowSafe(
+  texts: string[],
+  config: LocalInferenceConfig,
+  model: string,
+  request: EmbeddingRequester = requestEmbeddings,
+): Promise<EmbeddingAttempt> {
+  const initial = await request(texts, config, model)
   if (!embeddingContextWindowError(initial)) return initial
 
   if (texts.length === 1) {
-    return requestSingleEmbeddingWindowSafe(texts[0], config, model, initial)
+    return requestSingleEmbeddingWindowSafe(texts[0], config, model, initial, request)
   }
 
   // A batch response does not reliably identify which item overflowed. Retry each item separately;
   // only the overlong items are shortened, and vector ordering remains identical to the input order.
   const vectors: number[][] = []
   for (const text of texts) {
-    const single = await requestSingleEmbeddingWindowSafe(text, config, model)
+    const single = await requestSingleEmbeddingWindowSafe(text, config, model, undefined, request)
     if ('status' in single) return single
     const vector = single.vectors[0]
     if (!vector) throw new Error('localEmbeddings: window-safe retry returned no embedding vector')
@@ -334,8 +346,12 @@ async function requestCompatibleEmbeddings(
     to: 'ollama_native_api_embed',
     status: openAiAttempt.status,
   }))
+  // The native transport needs the same context-window protection as the OpenAI one. Before this,
+  // a prompt that overflowed the embedding model's window (nomic-embed-text is 512 tokens; a
+  // substantial question runs past it easily) failed hard here with no truncation retry, because
+  // the retry wrapper was only applied on the OpenAI path above.
   return {
-    attempt: await requestNativeEmbeddings(texts, config, model),
+    attempt: await requestEmbeddingsWindowSafe(texts, config, model, requestNativeEmbeddings),
     transport: 'native',
   }
 }

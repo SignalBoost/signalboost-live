@@ -33,6 +33,7 @@ const tests = [
   'tests/cosCurrentWorldLearning.node.test.ts',
   'tests/cosLearnedCorpusContinuousIndexing.node.test.ts',
   'tests/cosDirectedStudy.node.test.ts',
+  'tests/cosDirectedStudyPromotion.node.test.ts',
   'tests/cosAnswerFreshnessSelfReflection.node.test.ts',
   'tests/cosCacheReplayCurrentPolicy.node.test.ts',
   'tests/cosScenarioPremiseIntegrity.node.test.ts',

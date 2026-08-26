@@ -34,6 +34,23 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
+import { resolveCalcMarkers } from './calcExpressions.ts'
+
+/**
+ * Substitute every [[calc: ...]] marker with its server-computed value, immediately after parsing
+ * and before any gate, cache write or release inspects the text. Downstream logic must never see
+ * marker syntax, and the reader must never see the model's own arithmetic.
+ */
+function withComputedArithmetic<T extends { answer: string } | null>(parsed: T): T {
+  if (!parsed) return parsed
+  const resolved = resolveCalcMarkers(parsed.answer)
+  if (resolved.failed.length) {
+    console.warn('cosFirstAnswer: calc marker could not be evaluated', { failed: resolved.failed })
+  }
+  if (resolved.evaluated === 0 && resolved.failed.length === 0) return parsed
+  return { ...parsed, answer: resolved.text }
+}
+
 import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
 import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
@@ -240,7 +257,7 @@ async function tryPublicStatelessAnswer(input: {
     }
   }
 
-  let parsed = parseLocalResult(reasoned.text)
+  let parsed = withComputedArithmetic(parseLocalResult(reasoned.text))
   if (!parsed || parsed.truncated || !parsed.answer.trim()) {
     return {
       handled: false,
@@ -270,7 +287,7 @@ async function tryPublicStatelessAnswer(input: {
         'Return the corrected answer now.',
       ].join('\n\n'),
     }).catch(() => null)
-    const repaired = repair?.text ? parseLocalResult(repair.text) : null
+    const repaired = withComputedArithmetic(repair?.text ? parseLocalResult(repair.text) : null)
     if (!repaired || repaired.truncated || !repaired.answer.trim() || publicScenarioScopeViolations(input.prompt, repaired.answer).length) {
       return {
         handled: false,
@@ -316,7 +333,7 @@ async function tryPublicStatelessAnswer(input: {
         'Return the corrected answer now.',
       ].join('\n\n'),
     }).catch(() => null)
-    const redacted = redact?.text ? parseLocalResult(redact.text) : null
+    const redacted = withComputedArithmetic(redact?.text ? parseLocalResult(redact.text) : null)
     if (!redacted || redacted.truncated || !redacted.answer.trim() || publicDisclosureViolations(redacted.answer).length) {
       // Fails closed with no best-effort draft. A draft containing internals must never be
       // surfaced to the reader, not even labelled as low confidence.
@@ -466,7 +483,7 @@ async function tryFreshCurrentFact(input: {
     return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_failed', escalationReason: reason } as any }
   }
 
-  const parsed = parseLocalResult(reasoned.text)
+  const parsed = withComputedArithmetic(parseLocalResult(reasoned.text))
   if (!parsed || parsed.truncated) {
     const reason = 'Live evidence was retrieved, but independent local synthesis was incomplete or unparseable.'
     return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_unparseable', escalationReason: reason } as any }
@@ -522,7 +539,7 @@ async function reflectOrdinaryAnswerFreshness(
     ].join('\n\n'),
   }).catch(() => null)
 
-  const parsed = repair?.text ? parseLocalResult(repair.text) : null
+  const parsed = withComputedArithmetic(repair?.text ? parseLocalResult(repair.text) : null)
   const locallyRepaired = parsed && !parsed.truncated && parsed.answer.trim() && !answerNeedsFreshnessReflection(parsed.answer)
     ? parsed.answer.trim()
     : null

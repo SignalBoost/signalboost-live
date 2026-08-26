@@ -1,26 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { groundingConfidenceCap, selectGroundingEvidence } from '../lib/ai/cos/grounding'
+import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '../lib/ai/cos/groundingConfidence.ts'
 
-const QUERY='Explain Postgres query planning for enterprise tenant latency and Kubernetes scaling behavior.'
-
-test('selects relevant evidence across corpus, knowledge graph and memory without forcing irrelevant rows',()=>{
-  const selected=selectGroundingEvidence(QUERY,{
-    kg:['[KG1] Kubernetes scaling behavior depends on pending pods and scheduler capacity.','[KG2] unrelated marketing fact'],
-    cl:['[CL1] Postgres query planning can change after statistics refresh and alter latency.','[CL2] unrelated travel article'],
-    em:['[EM1] Prior enterprise tenant latency incident involved query-plan regression.','[EM2] family preference unrelated to systems'],
-  },5)
-  assert.ok(selected.some(item=>item.system==='kg'))
-  assert.ok(selected.some(item=>item.system==='cl'))
-  assert.ok(selected.some(item=>item.system==='em'))
-  assert.ok(!selected.some(item=>item.text.includes('travel article')))
+test('retrieved context earns no confidence credit until the answer cites durable knowledge', () => {
+  assert.equal(citedKnowledgeEvidenceCount({ kg: 0, cl: 0 }), 0)
+  assert.equal(groundedEvidenceCeiling(0), 0.78)
 })
 
-test('caps confidence below default threshold when selected evidence is ignored',()=>{
-  assert.equal(groundingConfidenceCap({retrieved:12,selected:4,cited:0}),0.70)
+test('grounded evidence preserves the existing confidence-ceiling bands', () => {
+  assert.equal(groundedEvidenceCeiling(1), 0.84)
+  assert.equal(groundedEvidenceCeiling(2), 0.90)
+  assert.equal(groundedEvidenceCeiling(4), 0.90)
+  assert.equal(groundedEvidenceCeiling(5), 0.96)
+  assert.equal(groundedEvidenceCeiling(20), 0.96)
 })
 
-test('does not penalize when relevant evidence is cited or none was selected',()=>{
-  assert.equal(groundingConfidenceCap({retrieved:12,selected:4,cited:1}),1)
-  assert.equal(groundingConfidenceCap({retrieved:12,selected:0,cited:0}),1)
+test('knowledge graph and learned-corpus citations combine for grounding credit', () => {
+  assert.equal(citedKnowledgeEvidenceCount({ kg: 1, cl: 0 }), 1)
+  assert.equal(citedKnowledgeEvidenceCount({ kg: 1, cl: 1 }), 2)
+  assert.equal(citedKnowledgeEvidenceCount({ kg: 2, cl: 3 }), 5)
+})
+
+test('invalid citation counts cannot inflate confidence', () => {
+  assert.equal(citedKnowledgeEvidenceCount({ kg: -3, cl: Number.NaN }), 0)
+  assert.equal(groundedEvidenceCeiling(Number.POSITIVE_INFINITY), 0.78)
 })

@@ -13,18 +13,34 @@ const basePolicy = {
 }
 
 const policyVersion = cosAnswerPolicyVersion(basePolicy)
-const now = Date.parse('2026-08-24T00:30:00.000Z')
+const now = Date.parse('2026-08-25T23:59:00.000Z')
 
 function stamp(reply: string) {
   return {
     policyVersion,
-    storedAt: '2026-08-24T00:01:23.378Z',
+    storedAt: '2026-08-25T23:45:48.469Z',
     reply,
   }
 }
 
-test('cache policy revision includes the executive-claim guard partition', () => {
-  assert.match(COS_ANSWER_GATE_REVISION, /2026-08-24\.cache-replay-output-gate\.v9-executive-claim-guard/)
+test('cache policy revision includes the quantitative engineering integrity partition', () => {
+  assert.match(COS_ANSWER_GATE_REVISION, /2026-08-25\.cache-replay-output-gate\.v10-quant-engineering-integrity/)
+})
+
+test('the previous v9 partition cannot replay after the quantitative integrity gate ships', () => {
+  const oldPolicyVersion = cosAnswerPolicyVersion({
+    ...basePolicy,
+    gateRevision: '2026-08-24.cache-replay-output-gate.v9-executive-claim-guard',
+  })
+  assert.notEqual(oldPolicyVersion, policyVersion)
+  const verdict = cachedAnswerIsCurrent({
+    policyVersion: oldPolicyVersion,
+    storedAt: '2026-08-25T23:45:48.469Z',
+    reply: 'The break-even is immediate. Migrate immediately.',
+  }, policyVersion, 24 * 60 * 60 * 1000, now)
+  assert.equal(verdict.ok, false)
+  if (verdict.ok) return
+  assert.match(verdict.reason, /generated under answer policy/i)
 })
 
 test('cached crisis answer with unsupported GDPR and data-classification claims is refused before replay', () => {

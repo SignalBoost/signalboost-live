@@ -1,5 +1,22 @@
 // saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
+import { resolveCalcMarkers } from './calcExpressions.ts'
+
+/**
+ * Substitute every [[calc: ...]] marker with its server-computed value, immediately after parsing
+ * and before any gate, cache write or release inspects the text. Downstream logic must never see
+ * marker syntax, and the reader must never see the model's own arithmetic.
+ */
+function withComputedArithmetic<T extends { answer: string } | null>(parsed: T): T {
+  if (!parsed) return parsed
+  const resolved = resolveCalcMarkers(parsed.answer)
+  if (resolved.failed.length) {
+    console.warn('cosFirstAnswer: calc marker could not be evaluated', { failed: resolved.failed })
+  }
+  if (resolved.evaluated === 0 && resolved.failed.length === 0) return parsed
+  return { ...parsed, answer: resolved.text }
+}
+
 import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
 import { createHash } from 'node:crypto'
 import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
@@ -868,7 +885,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     return { handled:false, confidence:0, reason, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }
   }
 
-  let parsed = parseLocalResult(reasoned.text)
+  let parsed = withComputedArithmetic(parseLocalResult(reasoned.text))
   if (!parsed) {
     console.error('cosFirstAnswer: unparseable reasoner output', { characters:reasoned.text.length, raw:reasoned.text })
     const reason = `Independent COS inference returned an unparseable result after ${reasoned.text.length} characters. Raw output started: "${safeText(reasoned.text,240)}"`
@@ -905,7 +922,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       prompt: `INTERNAL EVIDENCE:\n${internalContext || 'None'}\n\nORIGINAL QUESTION:\n${input.prompt}\n\nREJECTED DRAFT:\n${parsed.answer}`,
     }).catch(() => null)
     const repairText = repair?.text ?? ''
-    const repaired = repairText ? parseLocalResult(repairText) : null
+    const repaired = withComputedArithmetic(repairText ? parseLocalResult(repairText) : null)
     if (!repaired || repaired.truncated || releaseSignals(repairText).length) {
       const reason = `Executive answer release rejected: unsupported claim signals (${executiveSignals.join(', ')}) remained after local repair.`
       void recordKnowledgeGap(input.prompt, 0, reason)

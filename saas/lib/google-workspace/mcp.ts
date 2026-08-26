@@ -72,6 +72,12 @@ function userIdFor(request: AgentRequest): string | null {
   return userId || null
 }
 
+function asExecutionResult(result: { ok: boolean; reason?: string; [key: string]: unknown }) {
+  return result.ok
+    ? { ok: true as const, result }
+    : { ok: false as const, error: String(result.reason || 'google_sheets_request_failed') }
+}
+
 export function createGoogleSheetsExecutionPort(): ExecutionPort {
   return {
     async perform(request: AgentRequest) {
@@ -81,27 +87,27 @@ export function createGoogleSheetsExecutionPort(): ExecutionPort {
       try {
         switch (request.action.target) {
           case 'google_sheets.list_spreadsheets':
-            return { ok: true, result: await listGoogleSpreadsheets(userId, {
+            return asExecutionResult(await listGoogleSpreadsheets(userId, {
               query: typeof params.query === 'string' ? params.query : undefined,
               limit: typeof params.limit === 'number' ? params.limit : undefined,
-            }) }
+            }))
           case 'google_sheets.get_metadata':
-            return { ok: true, result: await getGoogleSpreadsheetMetadata(userId, String(params.spreadsheetId || '')) }
+            return asExecutionResult(await getGoogleSpreadsheetMetadata(userId, String(params.spreadsheetId || '')))
           case 'google_sheets.read_range':
-            return { ok: true, result: await readGoogleSheetRange(
+            return asExecutionResult(await readGoogleSheetRange(
               userId,
               String(params.spreadsheetId || ''),
               String(params.range || ''),
               { maxRows: typeof params.maxRows === 'number' ? params.maxRows : undefined },
-            ) }
+            ))
           case 'google_sheets.search_rows':
-            return { ok: true, result: await searchGoogleSheetRows(
+            return asExecutionResult(await searchGoogleSheetRows(
               userId,
               String(params.spreadsheetId || ''),
               String(params.range || ''),
               String(params.query || ''),
               { limit: typeof params.limit === 'number' ? params.limit : undefined },
-            ) }
+            ))
           default:
             return { ok: false, error: 'unsupported_google_sheets_tool' }
         }

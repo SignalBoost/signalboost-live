@@ -11,7 +11,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const STATE_COOKIE = 'google_workspace_oauth_state'
-const BACK = '/dashboard/data'
+const BACK = '/dashboard/google-sheets'
 
 function redirectUriFor(req: NextRequest): string {
   const configured = String(process.env.GOOGLE_WORKSPACE_REDIRECT_URI || '').trim()

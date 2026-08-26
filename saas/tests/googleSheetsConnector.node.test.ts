@@ -60,6 +60,7 @@ test('Google Sheets tools are exposed to both COS and MCP as read-only actions',
   assert.match(mcp, /actionKind: 'read'/)
   assert.match(mcp, /verified_user_identity_required/)
   assert.match(mcp, /GOOGLE_SHEETS_MCP_ALLOWLIST/)
+  assert.match(mcp, /return result\.ok[\s\S]*ok: false as const, error:/)
   assert.doesNotMatch(mcp, /append_rows|update_cells|clear_range/)
 })
 
@@ -71,9 +72,18 @@ test('OAuth and data API routes require the signed-in user and OAuth state is bo
   assert.match(oauthRoute, /expectedUser !== user\.id/)
   assert.match(oauthRoute, /httpOnly: true/)
   assert.match(oauthRoute, /sameSite: 'lax'/)
+  assert.match(oauthRoute, /const BACK = '\/dashboard\/google-sheets'/)
   assert.match(statusRoute, /getCurrentUser\(\)/)
   assert.match(dataRoute, /getCurrentUser\(\)/)
   assert.match(statusRoute, /readOnly: true/)
+})
+
+test('Google Sheets page uses centralized five-language copy rather than inline English UI text', () => {
+  const page = read('../app/dashboard/google-sheets/page.tsx')
+  const copy = read('../lib/i18n/googleSheetsCopy.ts')
+  assert.match(page, /googleSheetsCopy\(lang\)/)
+  assert.doesNotMatch(page, /const COPY/)
+  for (const language of ['en:', 'es:', 'pt:', 'pl:', 'ru:']) assert.match(copy, new RegExp(language))
 })
 
 test('Google Sheets connector regression is part of the mandatory COS deployment gate', () => {

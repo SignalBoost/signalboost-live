@@ -3,17 +3,17 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.25  
+**Version:** 1.26  
 **Updated:** 2026-08-26 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Accepted cognitive implementation baseline:** `f1aa33e6bba67f4f26788cc62cf19dfdde673c0f`  
-**Accepted Production deployment:** `dpl_AL68Xr1SVePj1FdXZBB8PNrhFKEL` — READY, `saas.signalboostapp.com` attached  
+**Accepted cognitive implementation baseline:** `440d082ad38b02389c8e4bfc03fe0047c82686e4`  
+**Accepted Production deployment:** `dpl_jCHZHoY3XBbfykwE2N8C2BsyQq11` — READY, `saas.signalboostapp.com` attached  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
-**Procedural-learning state:** autonomous private certification is Production for context ambiguity, performance-regression diagnosis, and architecture discovery; dead-end self-generated practice is guarded; individual skills still earn lifecycle status from evidence  
-**Next learning priority:** observe real certification progression for the three private profile families, then reduce live cognitive-skill retrieval cost and continue Retrieval Self-Reflection / calibration / strategy-selection learning  
+**Procedural-learning state:** autonomous private certification is Production for context ambiguity, performance-regression diagnosis, and architecture discovery; dead-end self-generated practice is guarded; validated cognitive-skill candidate embeddings are reused by exact text + embedding-model identity; prompt-free retrieval-efficiency telemetry is Production; individual skills still earn lifecycle status from evidence  
+**Next learning priority:** observe real certification progression and collect the first real Production cognitive-retrieval telemetry cohort; use measured cache-hit, database, and ranking latency evidence before adding any further live prefilter; continue Retrieval Self-Reflection / calibration / strategy-selection learning  
 **Owner knowledge intake:** Feed COS directed study is LIVE at `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚 entry, owner-only)  
 **Concierge/COS public-assistant state:** public/private execution boundary and five-language text transformation are Production; additional semantic-edit + conversation-handoff hardening is Preview evidence until current `main` is reverified  
 **New product workstream:** `SignalBoost Data Center Operations Intelligence` — Phase 1 read-only/advisory implementation is active on `feat/datacenter-operations-intelligence-20260824`; it is **not yet Production**
@@ -723,6 +723,50 @@ The daily `cos-mining` cron runs at `06:30 UTC`. Its endpoint remains `CRON_SECR
 
 ---
 
+# Cognitive-skill live retrieval efficiency — IMPLEMENTED AND PRODUCTION; RUNTIME SAMPLE PENDING
+
+The live procedural retrieval path has now been hardened in two stages:
+
+- **PR #1528**, merged as `a919df8cac6cc0588240eec6827ed80bbaac11eb`, stopped repeatedly embedding unchanged validated cognitive-skill candidate procedures on every eligible turn. Candidate vectors are reused only for the exact candidate text under the active embedding-model identity; the user/query embedding remains fresh on every semantic attempt.
+- **PR #1529**, merged as `440d082ad38b02389c8e4bfc03fe0047c82686e4`, added prompt-free Production telemetry so the remaining retrieval cost can be measured rather than guessed.
+
+Accepted Production deployment for #1529:
+
+`dpl_jCHZHoY3XBbfykwE2N8C2BsyQq11` — READY, `saas.signalboostapp.com` attached
+
+Exact #1529 Production acceptance:
+
+- mandatory Vercel COS deployment suite: **438/438 tests passed, 0 failed**;
+- route-config guard passed;
+- strip-safety guard passed;
+- EN/ES/PT/PL/RU i18n copy, locale-key and generated-UI completeness guards passed;
+- optimized Next.js compile, TypeScript, static-page generation and Production deployment completed;
+- retrieval selection semantics remain unchanged: only `validated` / `learned` / `mastered` skills are eligible, dependency health is still required, domain compatibility and the existing similarity threshold still apply, structural triggers do not become factual evidence, and semantic failure still falls back conservatively to lexical matching.
+
+Prompt-free telemetry schema:
+
+`cos-cognitive-skill-retrieval-efficiency-v1`
+
+It records only bounded numeric/runtime metadata, including:
+
+- strong skills retrieved and healthy candidates;
+- dependency rejections and domain-candidate count;
+- relevant/selected counts;
+- semantic mode / whether semantic ranking was attempted;
+- cached candidate embeddings;
+- candidate embeddings requested/generated/avoided;
+- total embedding inputs, query-embedding inputs and candidate-embedding inputs;
+- candidate cache-hit rate;
+- strong-skill store latency, dependency-health latency, ranking latency and total cognitive-retrieval latency.
+
+The telemetry contains no prompt/query string, procedure text, skill key/ID, subject, title, description, user content or hidden reasoning. It adds no new per-turn Supabase write.
+
+Runtime evidence boundary: immediately after the exact Production deployment reached READY, an exact-deployment Vercel runtime-log query for `[cos-cognitive-skill-retrieval]` returned **no records**. Therefore the instrumentation is Production, but there is not yet a real post-rollout cohort from which to claim a measured cache-hit rate, latency reduction or cost reduction. Do not manufacture traffic, bypass owner/authentication boundaries, or call the optimization empirically proven until qualifying real turns produce telemetry.
+
+Next decision rule: first collect a real Production cohort, then determine whether remaining cost is dominated by the strong-skill database lookup, runtime readiness/query embedding, dependency checks, or another stage. Add a further “skip retrieval” prefilter only if measured evidence shows it improves cost/latency without reducing validated-skill recall or structural-trigger coverage.
+
+---
+
 # Cognitive lifecycle / retention / quarantine — IMPLEMENTED
 
 Canonical lifecycle:
@@ -772,13 +816,20 @@ No hidden chain-of-thought is stored as a learning artifact. Learn only explicit
 
 Adaptive retrieval shadow validation exists and has passed independent validation. Current live retrieval policy is not automatically replaced merely because a lower-context shadow candidate looked efficient.
 
+Implemented for cognitive-skill cost control:
+
+- exact-text, embedding-model-aware candidate-vector reuse is live;
+- the query embedding remains fresh;
+- prompt-free Production telemetry now measures candidate-vector reuse and stage latency without adding a per-turn database write.
+
 Remaining work:
 
+- collect a real post-#1529 telemetry cohort and determine the actual dominant cost before adding another live prefilter;
 - similarity-threshold calibration;
 - source-mix / reranking learning;
 - explicit bounded live promotion/rollback policy;
 - outcome-linked retrieval self-reflection;
-- cognitive-skill retrieval cost control so a turn does not pay an embedding/retrieval cost when no validated skill is plausibly eligible.
+- only if the telemetry supports it, add a bounded preflight that skips semantic cognitive-skill retrieval when no validated skill is plausibly eligible while preserving structural-trigger coverage.
 
 A shadow recommendation is not a promoted Production policy.
 
@@ -1011,6 +1062,8 @@ Non-negotiable:
 - `87f2549b…` / `6a5cc137…` — current general-reasoning discipline and protected canonical COS brain guidance advanced on `main`.
 - #1525 — cognitive certification moved ahead of long daily-learning work so route budget cannot silently prevent progress; durable cognitive-skill pipeline health added.
 - #1526 — private certification expanded to performance-regression diagnosis and architecture discovery; dead-end local practice execution blocked; unsupported candidates explicitly wait for independent evaluation; current-world facts stay on live routing.
+- #1528 — validated cognitive-skill candidate embeddings are reused by exact text + active embedding-model identity while each query embedding remains fresh; mandatory COS gate was also restored after a concurrent file corruption.
+- #1529 — prompt-free Production telemetry measures cognitive-skill candidate-vector reuse and stage latency; exact merge `440d082a…`, Production `dpl_jCHZHoY3XBbfykwE2N8C2BsyQq11` READY; first exact-deployment log query found no qualifying runtime sample yet.
 - Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
 - Evidence-triggered answer retest — bounded evidence-arrival promotion of failed prompts into budgeted benchmark cases.
 - Owner-directed study (Feed COS) — gated owner intake page/API with URL, paste and `.txt`/`.md`/`.pdf` upload (dependency-free PDF extraction), same grounding/admission gates as autonomous acquisition.
@@ -1027,7 +1080,7 @@ Always query current state; this sequence can advance after this document is mer
 # Immediate next engineering priorities
 
 1. **Observe private cognitive certification progression:** verify the ambiguity, performance-regression and architecture-discovery candidates advance only when their private understanding/practice/holdout evidence passes. Never manually set lifecycle flags or counters.
-2. **Cognitive-skill live retrieval efficiency:** remove the per-turn semantic/embedding cost when no validated skill is plausibly eligible, while preserving deterministic structural triggers and measuring retrieval hit/use quality before changing live policy.
+2. **Measure cognitive-skill live retrieval efficiency:** collect a real Production `cos-cognitive-skill-retrieval-efficiency-v1` cohort and compare candidate cache-hit rate plus `skillStoreMs`, `dependencyHealthMs`, `rankingMs`, and `totalMs`. Do not add another prefilter until the data identifies the actual dominant cost and a held-out check shows recall/trigger coverage is preserved.
 3. **Expand independent certification selectively:** add private/curated profiles only for reusable procedural families with defensible transfer tests. Mutable current-world fact verification should remain on live evidence rather than becoming a timeless learned skill.
 4. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
 5. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.

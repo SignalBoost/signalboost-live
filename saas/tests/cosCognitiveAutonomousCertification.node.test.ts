@@ -162,7 +162,7 @@ test('private certification schema contains no committed held-out prompts and st
   assert.doesNotMatch(migration, /insert into public\.cos_cognitive_certification_cases/i)
 })
 
-test('daily certification shares the route deadline and launches at most one model exercise', () => {
+test('daily certification shares the route deadline, runs before long learning work, and launches at most one model exercise', () => {
   const cron = read('../app/api/cron/cos-mining/route.ts')
   const source = read('../lib/ai/cos/cognitiveCertification.ts')
   assert.match(cron, /const routeStartedAt = Date\.now\(\)/)
@@ -172,6 +172,13 @@ test('daily certification shares the route deadline and launches at most one mod
   assert.match(source, /DEFAULT_MAX_MODEL_CALLS = 1/)
   assert.match(source, /canStartCertificationModelCall/)
   assert.match(source, /progressive_cycle_call_budget_reached/)
+
+  const certificationCall = cron.indexOf('certification = await runCognitiveCertificationCycle')
+  const dailyLearningCall = cron.indexOf('learning = await runDailyAutonomousLearning')
+  const activeLearningCall = cron.indexOf('cognitive = await runCognitiveLearningCycle')
+  assert.ok(certificationCall > 0, 'certification call must exist')
+  assert.ok(dailyLearningCall > certificationCall, 'certification must run before daily autonomous learning consumes route budget')
+  assert.ok(activeLearningCall > certificationCall, 'certification must run before cognitive active learning consumes route budget')
 })
 
 test('certification rotates candidates, recovers interrupted work, and stops exhausted validated skills from starving the queue', () => {
@@ -182,4 +189,17 @@ test('certification rotates candidates, recovers interrupted work, and stops exh
   assert.match(source, /STALE_RUNNING_AFTER_MS/)
   assert.match(source, /certification\.saturated === true/)
   assert.match(source, /private_holdouts_exhausted_without_learned_threshold/)
+})
+
+test('daily mining records cognitive skill pipeline health without persisting request text', () => {
+  const cron = read('../app/api/cron/cos-mining/route.ts')
+  const health = read('../lib/ai/cos/cognitiveSkillPipelineHealth.ts')
+  assert.match(cron, /recordCognitiveSkillPipelineHealth/)
+  assert.match(cron, /cognitiveSkillHealth/)
+  assert.match(health, /queuedPracticeWithoutPromotionPath/)
+  assert.match(health, /awaitingIndependentEvaluation/)
+  assert.match(health, /privateCertificationPending/)
+  assert.match(health, /cos-cognitive-skill-pipeline-health-v1/)
+  assert.doesNotMatch(health, /prompt_hash|prompt\s*:/i)
+  assert.doesNotMatch(health, /\.select\([^)]*prompt/i)
 })

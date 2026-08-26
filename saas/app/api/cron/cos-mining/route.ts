@@ -12,6 +12,7 @@ import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidat
 import { runFactConsolidationCycle } from '@/lib/ai/cos/cognitiveFactConsolidation'
 import { runProbationaryPromotionCycle } from '@/lib/ai/cos/cognitiveProbationaryPromotion'
 import { refreshMetacognitiveCapabilityMap } from '@/lib/ai/cos/cognitiveMetacognition'
+import { recordCognitiveSkillPipelineHealth } from '@/lib/ai/cos/cognitiveSkillPipelineHealth'
 import { runKnowledgeApplicationScan } from '@/lib/ai/cos/knowledgeApplicationStore'
 import { runEvidenceTriggeredRetest } from '@/lib/ai/cos/evidenceTriggeredRetestStore'
 import { recordAutonomousLearningRun } from '@/lib/ai/cos/autonomousLearningHealth.ts'
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest) {
   let knowledgeApplication: Awaited<ReturnType<typeof runKnowledgeApplicationScan>> | { enabled: false; errors: string[] } | null = null
   let evidenceRetest: Awaited<ReturnType<typeof runEvidenceTriggeredRetest>> | { enabled: false; errors: string[] } | null = null
   let metacognition: Awaited<ReturnType<typeof refreshMetacognitiveCapabilityMap>> | { status: 'error'; error: string } | null = null
+  let cognitiveSkillHealth: Awaited<ReturnType<typeof recordCognitiveSkillPipelineHealth>> | null = null
   let corpus: unknown = null
   let automaticLearningHealthRecorded: boolean | null = null
 
@@ -68,6 +70,21 @@ export async function GET(req: NextRequest) {
       await ensureLocalInferenceRuntimeReady()
     } catch (error) {
       console.warn('cron COS local runtime could not be pre-warmed; individual learning stages will fail closed or use their existing fallbacks:', error instanceof Error ? error.message : String(error))
+    }
+
+    // Certification must get first claim on the bounded model-call budget. Previously it ran only
+    // after daily research plus active learning, so the route often had less than the required
+    // model-call estimate + cleanup reserve left. The cycle still updated last_cycle_at, which made
+    // the pipeline look alive while no understanding/practice/holdout call actually ran.
+    try {
+      certification = await runCognitiveCertificationCycle({
+        deadlineAt: routeStartedAt + CERTIFICATION_ROUTE_DEADLINE_MS,
+        maxModelCalls: 1,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Cognitive certification failed'
+      console.error('cron COS cognitive certification failed:', message)
+      certification = { enabled: false, errors: [message] }
     }
 
     try {
@@ -103,17 +120,6 @@ export async function GET(req: NextRequest) {
       const message = error instanceof Error ? error.message : 'Cognitive active learning failed'
       console.error('cron COS cognitive active learning failed:', message)
       cognitive = { enabled: false, errors: [message] }
-    }
-
-    try {
-      certification = await runCognitiveCertificationCycle({
-        deadlineAt: routeStartedAt + CERTIFICATION_ROUTE_DEADLINE_MS,
-        maxModelCalls: 1,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Cognitive certification failed'
-      console.error('cron COS cognitive certification failed:', message)
-      certification = { enabled: false, errors: [message] }
     }
 
     try {
@@ -166,6 +172,10 @@ export async function GET(req: NextRequest) {
       metacognition = { status: 'error', error: message }
     }
 
+    cognitiveSkillHealth = await recordCognitiveSkillPipelineHealth(
+      certification && 'candidate' in certification ? certification : null,
+    )
+
     try {
       const queued = await queueStaleCorpusRecords(250)
       const refreshed = process.env.PROSPECT_LIVE_PROVIDER_EXECUTION === '1'
@@ -186,6 +196,7 @@ export async function GET(req: NextRequest) {
     automaticLearningHealthRecorded,
     cognitive,
     certification,
+    cognitiveSkillHealth,
     composition,
     consolidation,
     factConsolidation,

@@ -1,5 +1,8 @@
 // saas/lib/ai/cos/cosGeneralReasoningDiscipline.ts
+import { COS_BEHAVIORAL_CONTRACT } from './cosBehavioralContract.ts'
+
 export const COS_GENERAL_REASONING_DISCIPLINE = [
+  COS_BEHAVIORAL_CONTRACT,
   'COS GENERAL REASONING SAFETY INVARIANTS.',
   'Do not invent missing context, evidence, tool results, identities, dates, quantities, or user preferences.',
   'Distinguish supplied facts and evidence from inference, judgment, prediction, and preference.',

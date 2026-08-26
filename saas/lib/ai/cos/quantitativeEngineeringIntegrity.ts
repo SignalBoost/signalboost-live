@@ -13,6 +13,10 @@ const DATA_PROGRESS = /\b(?:data[- ]?loader|sampler|sample\s+(?:index|cursor)|sh
 const COMMIT_MANIFEST = /\b(?:manifest|checkpoint\s+generation|generation\s+(?:id|number)|commit(?:ted)?\s+(?:marker|pointer|generation)|publish(?:ed|ing)?\s+(?:the\s+)?manifest)\b/i
 const SOURCE_FENCING = /\b(?:fenc(?:e|ed|ing)|single[- ]writer|active\s+site|source[\s\S]{0,80}(?:drain|stop|inactive|fenc)|destination[\s\S]{0,80}(?:activate|active))\b/i
 const TRANSFER_TIME_RELATION = /\b(?:transfer\s+time|copy\s+time|checkpoint\s+(?:size|bytes)[\s\S]{0,100}(?:bandwidth|throughput)|(?:bandwidth|throughput)[\s\S]{0,100}checkpoint\s+(?:size|bytes))\b|\bC\s*\/\s*B\b/i
+const REPAIR_ONLY_SIGNALS = new Set([
+  'illustrative_assumption_promoted_to_decision',
+  'checkpoint_transfer_overhead_not_parameterized',
+])
 
 function latestUserRequest(prompt: string): string {
   const text = String(prompt ?? '').trim()
@@ -69,15 +73,7 @@ function gpuCountBecameNodeCount(request: string, answer: string): boolean {
   return false
 }
 
-/**
- * Deterministic answer-integrity checks for quantitative engineering work.
- *
- * Derived arithmetic is allowed. Illustrative assumptions are allowed. What is not allowed is to
- * silently turn those assumptions into measured premises or an unconditional operational decision,
- * mutate the entity attached to a supplied count, or describe a distributed checkpoint protocol in
- * a way that can publish mixed/partial state as committed.
- */
-export function quantitativeEngineeringUnsupportedClaims(prompt: string, raw: string): string[] {
+function collectQuantitativeEngineeringSignals(prompt: string, raw: string): string[] {
   const request = latestUserRequest(prompt)
   if (!QUANTITATIVE_ENGINEERING_TASK.test(request)) return []
   const parsed = parseLocalResult(String(raw ?? ''))
@@ -88,33 +84,43 @@ export function quantitativeEngineeringUnsupportedClaims(prompt: string, raw: st
   if (/\bfundamental\s+category\s+error\b/i.test(answer) && /\bbreak[- ]even\b/i.test(request)) {
     signals.push('break_even_mischaracterized')
   }
-
   if (ASSUMPTION_LANGUAGE.test(answer) && unqualifiedStrongDecision(answer)) {
     signals.push('illustrative_assumption_promoted_to_decision')
   }
-
   if (gpuCountBecameNodeCount(request, answer)) {
     signals.push('premise_entity_count_mutation')
   }
-
   if (CHECKPOINT_TASK.test(request)) {
     if (OBJECT_STORE.test(answer) && FALSE_OBJECT_ATOMICITY.test(answer)) {
       signals.push('invalid_multi_object_checkpoint_atomicity')
     }
-
     if (EXACT_CONSISTENCY_TASK.test(request)) {
       if (!COMMITTED_STEP.test(answer)) signals.push('checkpoint_not_at_committed_optimizer_step')
       if (!DATA_PROGRESS.test(answer)) signals.push('checkpoint_missing_data_progress_state')
       if (!COMMIT_MANIFEST.test(answer)) signals.push('checkpoint_missing_generation_manifest')
       if (!SOURCE_FENCING.test(answer)) signals.push('checkpoint_missing_source_fencing')
     }
-
     if (/\b(?:network|synchroni[sz]ation|overhead|bandwidth|throughput)\b/i.test(request) && !TRANSFER_TIME_RELATION.test(answer)) {
       signals.push('checkpoint_transfer_overhead_not_parameterized')
     }
   }
-
   return [...new Set(signals)]
+}
+
+/** All quality findings that should trigger one bounded local repair. */
+export function quantitativeEngineeringRepairSignals(prompt: string, raw: string): string[] {
+  return collectQuantitativeEngineeringSignals(prompt, raw)
+}
+
+/**
+ * Hard release blockers only. Two completeness/calibration findings remain repair targets but do
+ * not discard an otherwise useful answer after a local repair: an over-strong illustrative
+ * recommendation and a missing explicit transfer-time parameterization. Structural correctness
+ * defects (topology mutation, mixed/partial checkpoint semantics, false object-store atomicity,
+ * missing optimizer-step/data-progress/generation/fencing invariants) remain fail-closed.
+ */
+export function quantitativeEngineeringUnsupportedClaims(prompt: string, raw: string): string[] {
+  return collectQuantitativeEngineeringSignals(prompt, raw).filter(signal => !REPAIR_ONLY_SIGNALS.has(signal))
 }
 
 export function quantitativeEngineeringRepairInstruction(prompt: string, signals: readonly string[]): string {

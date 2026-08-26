@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
+import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
 import { createHash } from 'node:crypto'
 import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
@@ -398,6 +399,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     // ONE ANSWER POLICY (2026-08-26). Shared verbatim with the public stateless prompt so the
     // two channels cannot drift apart again. See cosAnswerPolicyCore.ts.
     ...QUANTITATIVE_ANSWER_POLICY,
+    ...COS_OPERATING_CHARTER,
     '',
     'HONESTY:',
     '- Distinguish evidence from inference. Never invent sources, numbers or telemetry.',

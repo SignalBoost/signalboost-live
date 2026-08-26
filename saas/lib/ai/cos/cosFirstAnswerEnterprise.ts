@@ -1,4 +1,5 @@
 // saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
+import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
 import { createHash } from 'node:crypto'
 import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
@@ -393,6 +394,10 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     '- [OEM#], [KG#], and [CL#] may ground factual claims. [EM#] is user context, not independent factual corroboration. [SK#] is HOW-to-reason guidance, not factual corroboration.',
     '- If a supplied [KG#], [CL#], or [OEM#] directly supports a factual claim you make, use and cite it instead of silently restating the same claim only from pretrained knowledge. Selected full-content [CL#] evidence is mandatory: make it materially support a claim and cite it, or state that it does not answer the question; never silently ignore it.',
     '- NEVER cite an item that did not change what you wrote. Related-but-not-supporting evidence must remain uncited. An honest answer with zero factual citations is correct when supplied factual evidence was not useful.',
+    '',
+    // ONE ANSWER POLICY (2026-08-26). Shared verbatim with the public stateless prompt so the
+    // two channels cannot drift apart again. See cosAnswerPolicyCore.ts.
+    ...QUANTITATIVE_ANSWER_POLICY,
     '',
     'HONESTY:',
     '- Distinguish evidence from inference. Never invent sources, numbers or telemetry.',

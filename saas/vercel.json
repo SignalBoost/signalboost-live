@@ -18,6 +18,7 @@
     { "path": "/api/cron/cos-mining", "schedule": "30 6 * * *" },
     { "path": "/api/cron/cos-knowledge-promotion", "schedule": "15 7 * * *" },
     { "path": "/api/cron/cos-learning-indexer", "schedule": "3,18,33,48 * * * *" },
+    { "path": "/api/cron/cos-directed-study-promotion", "schedule": "8,23,38,53 * * * *" },
     { "path": "/api/cron/cos-current-world-learning", "schedule": "14 * * * *" },
     { "path": "/api/cron/cos-mining?job=weekly", "schedule": "0 5 * * 0" },
     { "path": "/api/cron/marketing-sales-director", "schedule": "0 7 * * *" },

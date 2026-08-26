@@ -11,6 +11,11 @@ import {
   knowledgePromotionRelevanceMessage,
   type KnowledgePromotionCandidate,
 } from '@/lib/ai/cos/knowledgePromotionRelevance'
+import {
+  ownerDirectedPromotionAuthority,
+  OWNER_DIRECTED_INTENT_MARKER,
+  OWNER_DIRECTED_STUDY_MARKER,
+} from '@/lib/ai/cos/ownerDirectedPromotionPolicy'
 
 export type AutoPromotionResult = {
   status: 'promoted' | 'skipped' | 'error'
@@ -25,6 +30,10 @@ export type AutoPromotionResult = {
   rejectedMalformed: number
   stoppedForBudget: boolean
   error?: string
+}
+
+export type AutoPromotionOptions = {
+  ownerDirectedOnly?: boolean
 }
 
 const EMPTY: Omit<AutoPromotionResult, 'status'> = {
@@ -43,7 +52,8 @@ const EMPTY: Omit<AutoPromotionResult, 'status'> = {
 const MIN_DOCUMENT_START_BUDGET_MS = 225_000
 const MAX_AUTO_RETRIES = 3
 const MAX_PROMOTION_SCREEN = 50
-const PROMOTION_ROW_FIELDS = 'content_hash,source_kind,subject,summary,source_uri,source_title,confidence,fact_extraction_attempts'
+const PROMOTION_ROW_FIELDS = 'content_hash,source_kind,subject,summary,source_uri,source_title,confidence,fact_extraction_attempts,evidence'
+const OWNER_DIRECTED_EVIDENCE = JSON.stringify([OWNER_DIRECTED_STUDY_MARKER, OWNER_DIRECTED_INTENT_MARKER])
 
 function asDocument(row: any): ExtractionSourceDocument {
   return {
@@ -63,10 +73,37 @@ function asPromotionCandidate(row: any): KnowledgePromotionCandidate {
     summary: String(row.summary ?? ''),
     sourceTitle: row.source_title ? String(row.source_title) : null,
     confidence: Number(row.confidence ?? 0),
+    ownerDirected: ownerDirectedPromotionAuthority(row.evidence),
   }
 }
 
-async function selectPromotionCandidates(limit: number) {
+async function selectOwnerDirectedPromotionCandidates(limit: number) {
+  const db = cosServiceDb()
+  if (!db) return { data: [], error: null }
+
+  const pending = await db.from('cos_continuous_learning')
+    .select(PROMOTION_ROW_FIELDS)
+    .contains('evidence', OWNER_DIRECTED_EVIDENCE)
+    .is('fact_extraction_status', null)
+    .not('summary', 'eq', '')
+    .order('created_at', { ascending: true })
+    .limit(limit)
+  if (pending.error || (pending.data?.length ?? 0) >= limit) return pending
+
+  const remaining = limit - (pending.data?.length ?? 0)
+  const failed = await db.from('cos_continuous_learning')
+    .select(PROMOTION_ROW_FIELDS)
+    .contains('evidence', OWNER_DIRECTED_EVIDENCE)
+    .eq('fact_extraction_status', 'failed')
+    .lt('fact_extraction_attempts', MAX_AUTO_RETRIES)
+    .not('summary', 'eq', '')
+    .order('fact_extraction_attempted_at', { ascending: true })
+    .limit(remaining)
+  if (failed.error) return failed
+  return { data: [...(pending.data ?? []), ...(failed.data ?? [])], error: null }
+}
+
+async function selectGenericPromotionCandidates(limit: number) {
   const db = cosServiceDb()
   if (!db) return { data: [], error: null }
 
@@ -91,14 +128,38 @@ async function selectPromotionCandidates(limit: number) {
   return { data: [...(pending.data ?? []), ...(failed.data ?? [])], error: null }
 }
 
+async function selectPromotionCandidates(limit: number, options: AutoPromotionOptions = {}) {
+  const owner = await selectOwnerDirectedPromotionCandidates(limit)
+  if (owner.error || options.ownerDirectedOnly || (owner.data?.length ?? 0) >= limit) return owner
+
+  const generic = await selectGenericPromotionCandidates(limit)
+  if (generic.error) return generic
+  const combined = [...(owner.data ?? []), ...(generic.data ?? [])]
+  return {
+    data: [...new Map(combined.map((row: any) => [String(row.content_hash), row])).values()].slice(0, limit),
+    error: null,
+  }
+}
+
+export async function countPendingOwnerDirectedKnowledgePromotion(): Promise<number | null> {
+  const db = cosServiceDb()
+  if (!db) return null
+  const base = () => db.from('cos_continuous_learning')
+    .select('content_hash', { count: 'exact', head: true })
+    .contains('evidence', OWNER_DIRECTED_EVIDENCE)
+    .not('summary', 'eq', '')
+
+  const [pending, failed] = await Promise.all([
+    base().is('fact_extraction_status', null),
+    base().eq('fact_extraction_status', 'failed').lt('fact_extraction_attempts', MAX_AUTO_RETRIES),
+  ])
+  if (pending.error || failed.error) return null
+  return Math.max(0, Number(pending.count ?? 0)) + Math.max(0, Number(failed.count ?? 0))
+}
+
 async function markPromotionRejected(row: any, message: string): Promise<void> {
   const db = cosServiceDb()
   if (!db) return
-
-  // The existing schema intentionally has only pending/completed/failed. Relevance rejection is a
-  // terminal, successful PROMOTION REVIEW rather than a retryable extraction failure, so retain the
-  // row and use the terminal completed state while preserving the explicit rejection reason here.
-  // This keeps the historical source auditable without allowing it to starve the candidate queue.
   const { error } = await db.from('cos_continuous_learning').update({
     fact_extraction_status: 'completed',
     fact_extraction_attempted_at: new Date().toISOString(),
@@ -109,19 +170,15 @@ async function markPromotionRejected(row: any, message: string): Promise<void> {
 
 /**
  * Promote learned corpus documents into structured knowledge facts.
- *
- * Two independent integrity gates protect durable KG facts:
- * 1. retained-subject relevance: the stored source must still align with the curriculum subject;
- * 2. source grounding: each extracted claim must be traceable to the source excerpt.
- *
- * Grounding alone is insufficient because a historically irrelevant source can contain perfectly
- * grounded facts about the WRONG topic. The relevance re-check therefore runs before any Qwen call.
- * Rejected documents remain in the learned corpus for provenance/audit but become terminal promotion
- * reviews and never enter the Knowledge Graph.
- *
- * The optional deadline prevents this background task from starting model work it cannot finish.
+ * Owner-directed study is a bounded exception to the document-level autonomous relevance re-check
+ * because the owner already established relevance before retention. Source-kind admission and
+ * claim-level grounding remain mandatory, so unsupported facts still cannot enter durable KG facts.
  */
-export async function autoPromoteLearnedKnowledge(limit = 5, deadlineMs?: number): Promise<AutoPromotionResult> {
+export async function autoPromoteLearnedKnowledge(
+  limit = 5,
+  deadlineMs?: number,
+  options: AutoPromotionOptions = {},
+): Promise<AutoPromotionResult> {
   const db = cosServiceDb()
   const stores = createSupabaseCOSStores()
   if (!db || !stores) {
@@ -143,7 +200,7 @@ export async function autoPromoteLearnedKnowledge(limit = 5, deadlineMs?: number
   try {
     const requested = Math.max(1, Math.min(10, Math.floor(limit)))
     const screenLimit = Math.min(MAX_PROMOTION_SCREEN, Math.max(requested, requested * 8))
-    const candidates = await selectPromotionCandidates(screenLimit)
+    const candidates = await selectPromotionCandidates(screenLimit, options)
     if (candidates.error) throw candidates.error
 
     const eligibleRows: any[] = []
@@ -156,6 +213,7 @@ export async function autoPromoteLearnedKnowledge(limit = 5, deadlineMs?: number
         console.warn('[cos-learning-promotion-relevance-rejected]', JSON.stringify({
           sourceUri: String(row.source_uri ?? ''),
           subject: String(row.subject ?? ''),
+          ownerDirected: ownerDirectedPromotionAuthority(row.evidence),
           reason: relevance.reason,
           matched: relevance.matchedAnchors,
           anchors: relevance.anchors,
@@ -165,8 +223,6 @@ export async function autoPromoteLearnedKnowledge(limit = 5, deadlineMs?: number
       }
 
       if (eligibleRows.length < requested) eligibleRows.push(row)
-      // Continue screening the bounded window after filling today's extraction budget. This drains
-      // historical irrelevant rows quickly while leaving extra eligible rows untouched for next run.
     }
 
     if (eligibleRows.length === 0) {
@@ -252,7 +308,7 @@ export async function autoPromoteLearnedKnowledge(limit = 5, deadlineMs?: number
       stoppedForBudget,
       ...(errors.length ? { error: errors.join(' | ').slice(0, 2000) } : {}),
     }
-    console.info('[cos-learning-auto-promotion]', JSON.stringify(result))
+    console.info('[cos-learning-auto-promotion]', JSON.stringify({ ...result, ownerDirectedOnly: Boolean(options.ownerDirectedOnly) }))
     return result
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

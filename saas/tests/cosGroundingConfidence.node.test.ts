@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '../lib/ai/cos/groundingConfidence'
+import { citedKnowledgeEvidenceCount, groundedEvidenceCeiling } from '../lib/ai/cos/groundingConfidence.ts'
 
 test('retrieved context earns no confidence credit until the answer cites durable knowledge', () => {
   assert.equal(citedKnowledgeEvidenceCount({ kg: 0, cl: 0 }), 0)

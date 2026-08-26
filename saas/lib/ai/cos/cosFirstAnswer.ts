@@ -33,6 +33,7 @@ import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/a
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
+import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 import {
   isSignalBoostSpecificPublicRequest,
@@ -197,6 +198,9 @@ async function tryPublicStatelessAnswer(input: {
       'For ordinary timeless/general questions, you may use your general model knowledge. Do not turn mutable/current claims into facts without live evidence.',
       'You may edit, rewrite, summarize, explain, brainstorm, reason, draft, and help with ordinary public tasks just like a general assistant, subject to the public-only boundary.',
       'For diagnostic, troubleshooting, or root-cause questions, only state a cause as an actual finding when the request identifies a real, specific system or incident. For a generic, hypothetical, or architecture-design question with no real system named, present causes as illustrative reasoning about the class of problem, not as a diagnosis — do not label a cause "primary" or "most likely" as if it were confirmed.',
+      // ONE ANSWER POLICY (2026-08-26). Identical rules to the owner reasoner: quality must not
+      // depend on which surface the reader hit. See cosAnswerPolicyCore.ts.
+      ...QUANTITATIVE_ANSWER_POLICY,
       input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
     ].join(' '),
     prompt: [

@@ -57,6 +57,7 @@ const tests = [
   'tests/answerEvidenceAttributionRepair.node.test.ts',
   'tests/conversationProvenanceIntent.node.test.ts',
   'tests/localEmbeddingsWindowSafeTransport.node.test.ts',
+  'tests/publicCorpusEvidence.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

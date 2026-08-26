@@ -7,6 +7,7 @@ const tests = [
   'tests/cosProvenanceParaphraseContinuity.node.test.ts',
   'tests/cosCreativeConstraintFidelity.node.test.ts',
   'tests/cosReasonerQuality.node.test.ts',
+  'tests/quantitativeEngineeringIntegrity.node.test.ts',
   'tests/learnedEvidencePolicy.node.test.ts',
   'tests/textTransformationInput.node.test.ts',
   'tests/cosEditIntentFidelity.node.test.ts',

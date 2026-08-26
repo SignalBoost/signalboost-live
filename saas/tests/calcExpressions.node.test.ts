@@ -7,6 +7,7 @@ import {
   formatComputed,
   resolveCalcMarkers,
   hasCalcMarker,
+  collapseDuplicatedComputedValues,
 } from '../lib/ai/cos/calcExpressions.ts'
 
 test('the calculations this model got wrong five times now come out right', () => {
@@ -122,4 +123,33 @@ test('the reasoner is instructed to emit markers rather than compute', () => {
   assert.match(policy, /DO NOT COMPUTE ARITHMETIC YOURSELF/)
   assert.match(policy, /\[\[calc: expression\]\]/)
   assert.match(policy, /never write a computed figure outside one/)
+})
+
+// ---------------------------------------------------------------------------------------------
+// The model writes the marker AND its own answer (2026-08-26).
+// ---------------------------------------------------------------------------------------------
+
+test('a duplicated computed value is collapsed, keeping the unit or currency', () => {
+  // Observed three times in one production answer: "Egress Cost = 20 = $20."
+  assert.equal(resolveCalcMarkers('Egress Cost = [[calc: 1000 * 0.02]] = $20.').text, 'Egress Cost = $20.')
+  assert.equal(resolveCalcMarkers('Hourly Savings = [[calc: 1000 * 0.08]] = $80/hour.').text, 'Hourly Savings = $80/hour.')
+  assert.equal(resolveCalcMarkers('Break-even Time = [[calc: 20 / 80]] = 0.25 hours.').text, 'Break-even Time = 0.25 hours.')
+})
+
+test('a DISAGREEMENT between server and model is never hidden', () => {
+  // The whole purpose of the calculator is to expose this. Collapsing it would defeat the point.
+  const out = resolveCalcMarkers('Total = [[calc: 64 * 10.2]] = 700 kW.').text
+  assert.match(out, /652\.8/)
+  assert.match(out, /700/)
+})
+
+test('collapsing never touches text that had no marker', () => {
+  const prose = 'The ratio 20 = 20 appears here with no calculation at all.'
+  assert.equal(resolveCalcMarkers(prose).text, prose)
+  // The helper is only applied when a marker was actually resolved.
+  assert.equal(collapseDuplicatedComputedValues(prose), 'The ratio 20 appears here with no calculation at all.')
+})
+
+test('thousands separators do not defeat the equality check', () => {
+  assert.equal(resolveCalcMarkers('Nodes = [[calc: 1024 * 10]] = 10,240 units.').text, 'Nodes = 10,240 units.')
 })

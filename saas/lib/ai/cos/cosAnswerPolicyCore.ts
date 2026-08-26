@@ -15,13 +15,11 @@
 // of the week, and it currently only works when someone remembers to paste it. Here it is
 // permanent.
 //
-// SCOPE: these are behavioural rules only — how to reason and what not to assert. Domain
-// constants (bytes per parameter, heat-transfer coefficients, the 80% continuous-load rule)
-// deliberately live in the learned corpus, not here. A prompt cannot carry a reference library,
-// and rules that outlive any particular domain belong in the prompt.
-//
-// Kept as a plain string array, dependency-free, so both callers splice it into their own
-// prompt arrays and a test can assert both actually did.
+// SCOPE: behavioural rules live here, together with the deliberately compact stable engineering
+// reference block that both answer channels must always receive. Situational/vendor-priced facts
+// remain in governed retrieval; the pinned reference block is bounded separately and regression-tested.
+
+import { ENGINEERING_CONSTANTS } from './engineeringConstants.ts'
 
 /**
  * Rules governing quantitative work, constraint compliance, and what may be asserted.
@@ -54,6 +52,8 @@ export const QUANTITATIVE_ANSWER_POLICY: readonly string[] = [
   '',
   'ENGAGE WITH WHAT IS SPECIFIC:',
   '- When the request names a specific technology, configuration, standard or failure mode, address what is specific to it. Advice that would read identically if that name were swapped for another in the same family has treated the name as a label rather than as a constraint.',
+  '',
+  ...ENGINEERING_CONSTANTS,
 ]
 
 /** Convenience form for callers that build their prompt as a single string. */

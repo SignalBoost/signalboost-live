@@ -191,6 +191,28 @@ export function formatComputed(value: number): string {
   return rounded.toLocaleString('en-US', { maximumFractionDigits: 6 })
 }
 
+/**
+ * The model frequently writes BOTH the marker and its own answer: "Egress Cost = [[calc: 1000 *
+ * 0.02]] = $20." After substitution that reads "Egress Cost = 20 = $20" — the value twice, with
+ * the arithmetic gone. Observed in production 2026-08-26 three times in one answer.
+ *
+ * Rather than another prompt rule the duplicate is collapsed deterministically, and ONLY when the
+ * two numbers are numerically equal, so a disagreement between the server's value and the model's
+ * is never silently hidden — that disagreement is exactly what the calculator exists to expose.
+ * The second rendering is kept because it carries the currency symbol or unit.
+ */
+export function collapseDuplicatedComputedValues(text: string): string {
+  return String(text ?? '').replace(
+    /(\d[\d,]*(?:\.\d+)?)\s*=\s*([^\s=\d]{0,2})(\d[\d,]*(?:\.\d+)?)/g,
+    (whole, left: string, prefix: string, right: string) => {
+      const a = Number(left.replace(/,/g, ''))
+      const b = Number(right.replace(/,/g, ''))
+      if (!Number.isFinite(a) || !Number.isFinite(b) || a !== b) return whole
+      return `${prefix}${right}`
+    },
+  )
+}
+
 /** `[[calc: 512 * 0.7]]` — the marker the reasoner is instructed to emit for every arithmetic step. */
 const CALC_MARKER = /\[\[\s*calc\s*:\s*([^\]]{1,200}?)\s*\]\]/gi
 
@@ -226,7 +248,7 @@ export function resolveCalcMarkers(answer: string): CalcResolution {
     return formatComputed(result.value)
   })
 
-  return { text, evaluated, failed }
+  return { text: evaluated > 0 ? collapseDuplicatedComputedValues(text) : text, evaluated, failed }
 }
 
 /** True when the answer still contains an unresolved marker — used by tests and callers. */

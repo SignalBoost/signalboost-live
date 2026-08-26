@@ -54,8 +54,12 @@ export type CognitiveSkillRankResult<T> = {
   mode: 'semantic' | 'lexical-fallback'
   retrieved: number
   domainCandidates: number
+  semanticAttempted: boolean
   cachedCandidateEmbeddings: number
+  candidateEmbeddingsRequested: number
   generatedCandidateEmbeddings: number
+  embeddingInputsSent: number
+  durationMs: number
   relevant: RankedContextCandidate<T>[]
 }
 
@@ -71,24 +75,49 @@ export async function rankCognitiveSkillCandidates<T>(
   candidates: ContextCandidate<T>[],
   options: { threshold: number; limit: number },
 ): Promise<CognitiveSkillRankResult<T>> {
+  const startedAt = Date.now()
   if (!candidates.length) {
-    return { mode: 'semantic', retrieved: 0, domainCandidates: 0, cachedCandidateEmbeddings: 0, generatedCandidateEmbeddings: 0, relevant: [] }
+    return {
+      mode: 'semantic',
+      retrieved: 0,
+      domainCandidates: 0,
+      semanticAttempted: false,
+      cachedCandidateEmbeddings: 0,
+      candidateEmbeddingsRequested: 0,
+      generatedCandidateEmbeddings: 0,
+      embeddingInputsSent: 0,
+      durationMs: Date.now() - startedAt,
+      relevant: [],
+    }
   }
 
   const domainCandidates = candidates.filter(candidate => domainCompatibleContext(query, candidate.text))
   if (!domainCandidates.length) {
-    return { mode: 'semantic', retrieved: candidates.length, domainCandidates: 0, cachedCandidateEmbeddings: 0, generatedCandidateEmbeddings: 0, relevant: [] }
+    return {
+      mode: 'semantic',
+      retrieved: candidates.length,
+      domainCandidates: 0,
+      semanticAttempted: false,
+      cachedCandidateEmbeddings: 0,
+      candidateEmbeddingsRequested: 0,
+      generatedCandidateEmbeddings: 0,
+      embeddingInputsSent: 0,
+      durationMs: Date.now() - startedAt,
+      relevant: [],
+    }
   }
 
   const keys = domainCandidates.map(candidate => cacheKey(candidate.text))
   const missingIndexes = keys.flatMap((key, index) => candidateEmbeddingCache.has(key) ? [] : [index])
   const cachedCandidateEmbeddings = domainCandidates.length - missingIndexes.length
+  const embeddingInputs = [query, ...missingIndexes.map(index => domainCandidates[index]!.text)]
+  let embeddingCallAttempted = false
 
   try {
     await touchRunpodActivityLease('cognitive_skill_semantic_ranking')
     await ensureLocalInferenceRuntimeReady()
 
-    const embeddingInputs = [query, ...missingIndexes.map(index => domainCandidates[index]!.text)]
+    embeddingCallAttempted = true
     const vectors = await generateLocalEmbeddings(embeddingInputs)
     const queryVector = vectors[0] ?? []
     if (!queryVector.length) throw new Error('cognitive_skill_query_embedding_missing')
@@ -112,8 +141,12 @@ export async function rankCognitiveSkillCandidates<T>(
       mode: 'semantic',
       retrieved: candidates.length,
       domainCandidates: domainCandidates.length,
+      semanticAttempted: true,
       cachedCandidateEmbeddings,
+      candidateEmbeddingsRequested: missingIndexes.length,
       generatedCandidateEmbeddings: missingIndexes.length,
+      embeddingInputsSent: embeddingInputs.length,
+      durationMs: Date.now() - startedAt,
       relevant,
     }
   } catch (error) {
@@ -122,8 +155,12 @@ export async function rankCognitiveSkillCandidates<T>(
       mode: 'lexical-fallback',
       retrieved: candidates.length,
       domainCandidates: domainCandidates.length,
+      semanticAttempted: true,
       cachedCandidateEmbeddings,
+      candidateEmbeddingsRequested: missingIndexes.length,
       generatedCandidateEmbeddings: 0,
+      embeddingInputsSent: embeddingCallAttempted ? embeddingInputs.length : 0,
+      durationMs: Date.now() - startedAt,
       relevant: lexicalFallback(query, domainCandidates, options.limit),
     }
   }

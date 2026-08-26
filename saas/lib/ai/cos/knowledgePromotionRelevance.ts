@@ -5,12 +5,16 @@ import {
 } from '@/lib/cos-core/layers/learning/index'
 import { minimumConfidenceForKind } from '@/lib/cos-core/layers/learning/sourceCatalog'
 
+export const OWNER_DIRECTED_STUDY_MARKER = 'owner_directed_study'
+export const OWNER_DIRECTED_INTENT_MARKER = 'admission_basis:owner_directed_intent'
+
 export type KnowledgePromotionCandidate = {
   sourceKind: string
   subject: string
   summary: string
   sourceTitle?: string | null
   confidence: number
+  ownerDirected?: boolean
 }
 
 export type KnowledgePromotionRelevanceDecision = {
@@ -48,6 +52,16 @@ export function minimumKnowledgePromotionSubjectCoverage(): number {
 export function knowledgePromotionSourceAllowed(sourceKind: string): boolean {
   const normalized = String(sourceKind ?? '').trim() as ContinuousLearningSourceKind
   return Boolean(normalized) && DEFAULT_CONTINUOUS_LEARNING_POLICY.allowedSourceKinds.has(normalized)
+}
+
+/**
+ * Directed Study writes both markers together. Requiring the pair prevents an unrelated historical
+ * evidence value from accidentally gaining owner-directed promotion authority.
+ */
+export function ownerDirectedPromotionAuthority(evidence: unknown): boolean {
+  if (!Array.isArray(evidence)) return false
+  const markers = new Set(evidence.map(value => String(value ?? '').trim()))
+  return markers.has(OWNER_DIRECTED_STUDY_MARKER) && markers.has(OWNER_DIRECTED_INTENT_MARKER)
 }
 
 function promotionTermMatches(haystack: string, term: string): boolean {
@@ -108,6 +122,14 @@ export function evaluateKnowledgePromotionRelevance(
   if (!knowledgePromotionSourceAllowed(candidate.sourceKind)) return result(false, 'source_not_allowed')
   if (!candidate.subject.trim() || base.anchors.length === 0) return result(false, 'missing_subject')
   if (!candidate.summary.trim() && !String(candidate.sourceTitle ?? '').trim()) return result(false, 'missing_evidence')
+
+  // Directed Study already made an explicit owner-authorized relevance decision before retention.
+  // Re-applying an autonomous-discovery confidence/keyword veto here contradicts that contract and
+  // caused every manually fed chunk to sit indefinitely in the promotion backlog. Owner authority
+  // only bypasses this document-level relevance re-check. Source-kind admission above and the later
+  // claim-level grounding checks remain mandatory, so unsupported facts still cannot reach the KG.
+  if (candidate.ownerDirected) return result(true, 'eligible')
+
   if (base.confidence < base.confidenceFloor) return result(false, 'below_source_confidence_floor')
 
   // Generic curriculum terms are context, not evidence. For a short subject such as

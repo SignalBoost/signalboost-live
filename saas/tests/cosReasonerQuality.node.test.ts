@@ -141,11 +141,12 @@ test('a parameterized H100 answer with a committed checkpoint generation is rele
 })
 
 test('derived arithmetic is allowed when it stays conditional instead of becoming an invented premise', () => {
+  const arithmeticPrompt = 'For a 512-GPU cluster, express power-cost savings from a $0.11/kWh to $0.03/kWh price change and break-even egress volume symbolically when actual cluster power P, remaining runtime T, and egress price E are not provided.'
   const answer = JSON.stringify({
     answer: 'The stated electricity-price delta is $0.08/kWh. If average cluster power is P kW and the job runs another T hours, power savings are 0.08 × P × T dollars. If egress price is E dollars/GB, the maximum break-even transfer volume is (0.08 × P × T) / E GB. Those variables were not supplied, so this is a relation rather than a migrate/no-migrate recommendation.',
     confidence: 0.9,
   })
-  assert.deepEqual(quantitativeEngineeringUnsupportedClaims(H100_PROMPT, answer), [])
+  assert.deepEqual(quantitativeEngineeringUnsupportedClaims(arithmeticPrompt, answer), [])
 })
 
 test('quantitative integrity repair explicitly separates assumptions from decisions and fixes distributed commit semantics', () => {

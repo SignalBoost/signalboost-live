@@ -1,5 +1,3 @@
-import { spawnSync } from 'node:child_process'
-
 const tests = [
   'tests/deterministicUtilities.node.test.ts',
   'tests/engineeringConstants.node.test.ts',
@@ -46,6 +44,7 @@ const tests = [
   'tests/cosGeneralReasoningDiscipline.node.test.ts',
   'tests/cosFeedbackReasoningGeneralization.node.test.ts',
   'tests/cosCognitiveAutonomousCertification.node.test.ts',
+  'tests/cognitiveReasoningImperativeTriggers.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

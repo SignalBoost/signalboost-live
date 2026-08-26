@@ -2,7 +2,7 @@ import { assessAnswerSpecificity } from './answerSpecificity.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
 import { classifyScriptRequest, executiveDecisionDirective, scriptRequestDirective } from './scriptRequestIntent.ts'
 import { creativeConstraintRepairInstruction, unsupportedCreativeConstraintClaims } from './creativeConstraintFidelity.ts'
-import { quantitativeEngineeringRepairInstruction, quantitativeEngineeringUnsupportedClaims } from './quantitativeEngineeringIntegrity.ts'
+import { quantitativeEngineeringRepairInstruction, quantitativeEngineeringRepairSignals, quantitativeEngineeringUnsupportedClaims } from './quantitativeEngineeringIntegrity.ts'
 
 const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
 const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!\/(?:usr\/bin\/env\s+)?(?:bash|sh|python))\b/m
@@ -63,37 +63,23 @@ function ngramOverlap(answerTokens: string[], promptTokens: string[], size = 4):
   return total > 0 ? overlap / total : 0
 }
 
-/**
- * Reject a long answer that is essentially a span/paraphrase copied from the user's own request.
- * This prevents a low-confidence best-effort path from presenting the task itself as though it
- * were a solution. Short factual questions are excluded so concise direct answers remain safe.
- */
 export function promptEchoNonAnswer(prompt: string, raw: string): boolean {
   const parsed = parseLocalResult(String(raw ?? ''))
   if (!parsed) return false
   const request = latestUserRequest(prompt)
   const answer = parsed.answer.trim()
   if (request.length < ECHO_MIN_PROMPT_CHARS || answer.length < ECHO_MIN_ANSWER_CHARS) return false
-
   const requestContent = contentTokens(request)
   const answerContent = contentTokens(answer)
   if (requestContent.length < 12 || answerContent.length < 8) return false
-
   const requestSet = new Set(requestContent)
   const covered = answerContent.filter(token => requestSet.has(token)).length
   const coverage = covered / answerContent.length
   const novel = new Set(answerContent.filter(token => !requestSet.has(token)))
   const phraseOverlap = ngramOverlap(allTokens(answer), allTokens(request), 4)
-
   return coverage >= 0.84 && novel.size <= 5 && phraseOverlap >= 0.42
 }
 
-/**
- * Executive recommendations may state user-supplied facts, but must not turn uncertain outcomes
- * into facts or introduce numeric targets that the scenario never supplied. Quantitative engineering
- * work uses the same release boundary for assumption promotion, premise mutation and checkpoint
- * consistency defects even when the prompt is not an executive memo.
- */
 export function executiveDecisionUnsupportedClaims(prompt: string, raw: string): string[] {
   const quantitativeSignals = quantitativeEngineeringUnsupportedClaims(prompt, raw)
   const securityScenario = SECURITY_SCENARIO.test(prompt)
@@ -110,7 +96,6 @@ export function executiveDecisionUnsupportedClaims(prompt: string, raw: string):
   return [...new Set([...quantitativeSignals, ...signals])]
 }
 
-/** Whether a prompt asks for diagnosis/troubleshooting rather than a conceptual explanation. */
 export function promptAppearsDiagnostic(prompt: string): boolean {
   return DIAGNOSTIC_PROMPT.test(String(prompt ?? ''))
 }
@@ -127,9 +112,7 @@ export type ReasonerDraftQuality = {
 export function assessReasonerDraft(prompt: string, raw: string): ReasonerDraftQuality {
   const parsed = parseLocalResult(String(raw ?? ''))
   const diagnostic = promptAppearsDiagnostic(prompt)
-  if (!parsed) {
-    return { parseable: false, diagnostic, cap: 0, score: 0, genericBuckets: 0, mechanisms: 0 }
-  }
+  if (!parsed) return { parseable: false, diagnostic, cap: 0, score: 0, genericBuckets: 0, mechanisms: 0 }
   const specificity = assessAnswerSpecificity(parsed.answer)
   return {
     parseable: true,
@@ -141,11 +124,6 @@ export function assessReasonerDraft(prompt: string, raw: string): ReasonerDraftQ
   }
 }
 
-/**
- * A written-script request must not silently drift into executable code merely because the named
- * subject is underspecified. The prompt already tells us which sense of "script" the user asked
- * for; this gate checks whether the draft violated that deterministic interpretation.
- */
 export function contentScriptSemanticMismatch(prompt: string, raw: string): boolean {
   if (classifyScriptRequest(prompt) !== 'content') return false
   const parsed = parseLocalResult(String(raw ?? ''))
@@ -155,24 +133,14 @@ export function contentScriptSemanticMismatch(prompt: string, raw: string): bool
   return CODE_SHAPED_ANSWER.test(answer) || PROGRAMMING_REDIRECT.test(opening) || CONTENT_SCRIPT_REFUSAL.test(opening)
 }
 
-/**
- * One local rewrite is allowed when a draft violates a deterministic semantic boundary or when a
- * diagnostic answer is structurally generic. This is not a second opinion and it does not involve
- * an external provider; it is the same independent COS runtime being told exactly why its first
- * draft failed the deterministic quality gate.
- */
 export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
-  // A prompt echo is not a low-confidence answer. It is a non-answer and gets one bounded local
-  // repair before any best-effort release path can expose it.
   if (promptEchoNonAnswer(prompt, raw)) return true
-  // The answer may invent open creative details, but it may never retroactively claim the user
-  // requested a constraint that is absent from the real prompt.
   if (unsupportedCreativeConstraintClaims(prompt, raw).length) return true
-  // Humor is a material user requirement when it is actually present in the prompt. Give the same
-  // COS reasoner a focused rewrite pass so it produces a real comedic beat rather than merely
-  // restating the requested tone or rules.
   if (classifyScriptRequest(prompt) === 'content' && /\b(?:humou?rous|humou?r|funny|comedic)\b/i.test(prompt)) return true
   if (contentScriptSemanticMismatch(prompt, raw)) return true
+  // Quantitative completeness/calibration findings get one local repair even when they are not hard
+  // release blockers. This keeps the system useful instead of turning a near-miss into a refusal.
+  if (quantitativeEngineeringRepairSignals(prompt, raw).length) return true
   if (executiveDecisionUnsupportedClaims(prompt, raw).length) return true
   const quality = assessReasonerDraft(prompt, raw)
   if (!quality.parseable || !quality.diagnostic) return false
@@ -183,7 +151,7 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
 export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: string): string {
   const scriptDirective = scriptRequestDirective(originalPrompt)
   const creativeConstraintRepair = creativeConstraintRepairInstruction(originalPrompt, firstRaw)
-  const quantitativeSignals = quantitativeEngineeringUnsupportedClaims(originalPrompt, firstRaw)
+  const quantitativeSignals = quantitativeEngineeringRepairSignals(originalPrompt, firstRaw)
   if (promptEchoNonAnswer(originalPrompt, firstRaw)) {
     const quantitative = QUANTITATIVE_TASK.test(latestUserRequest(originalPrompt))
     return [
@@ -194,8 +162,8 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: st
       ...(quantitative ? [
         'This is a quantitative/engineering task. Separate what can be computed from what cannot be computed from the supplied premises.',
         'For every calculable quantity, show the equation, units, and substitution from user-supplied values.',
-        'If an exact numeric result requires a missing variable (for example power draw, egress price, checkpoint size, bandwidth, transfer duration, utilization, or efficiency), name the missing input and give the symbolic break-even formula or sensitivity relation instead of inventing a value.',
-        'Complete any non-numeric portion of the request — such as a protocol, consistency rule, algorithm, decision procedure, or validation sequence — when it can be answered from general technical reasoning without those missing values.',
+        'If an exact numeric result requires a missing variable, name the missing input and give the symbolic break-even formula or sensitivity relation instead of inventing a value.',
+        'Complete any non-numeric portion of the request when it can be answered from general technical reasoning without those missing values.',
         'Clearly distinguish assumptions from user-supplied facts. Do not present an illustrative assumption as measured reality.',
         'Preserve entity types exactly: a count of GPUs/accelerators is not a count of nodes/hosts/servers unless the topology was supplied.',
         'For distributed checkpoints, use a completed optimizer-step boundary (or explicitly persist partial accumulation state), immutable generation-scoped shards, checksum verification, a manifest/COMMITTED pointer, data-loader/sampler position, and source fencing before destination activation. Do not call an object-store directory atomic.',
@@ -219,9 +187,7 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: st
       'Return a complete fresh answer to the ORIGINAL request. Preserve the requested generate/critique/rewrite workflow when present. Do not mention this repair instruction or the rejected draft.',
     ].filter(Boolean).join('\n')
   }
-  if (quantitativeSignals.length) {
-    return quantitativeEngineeringRepairInstruction(originalPrompt, quantitativeSignals)
-  }
+  if (quantitativeSignals.length) return quantitativeEngineeringRepairInstruction(originalPrompt, quantitativeSignals)
   if (executiveDecisionDirective(originalPrompt)) {
     return [
       originalPrompt,
@@ -256,7 +222,6 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: st
       'Return a fresh answer. Do not mention this repair instruction or the rejected draft.',
     ].join('\n')
   }
-
   return [
     originalPrompt,
     '',
@@ -296,6 +261,11 @@ export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRa
   if (firstScriptMismatch !== repairedScriptMismatch) return !repairedScriptMismatch
   if (firstScriptMismatch && repairedScriptMismatch) return false
 
+  const firstQuantitativeSignals = quantitativeEngineeringRepairSignals(prompt, firstRaw)
+  const repairedQuantitativeSignals = quantitativeEngineeringRepairSignals(prompt, repairedRaw)
+  if (firstQuantitativeSignals.length !== repairedQuantitativeSignals.length) return repairedQuantitativeSignals.length < firstQuantitativeSignals.length
+  if (firstQuantitativeSignals.length && repairedQuantitativeSignals.length) return false
+
   const firstExecutiveSignals = executiveDecisionUnsupportedClaims(prompt, firstRaw)
   const repairedExecutiveSignals = executiveDecisionUnsupportedClaims(prompt, repairedRaw)
   if (firstExecutiveSignals.length !== repairedExecutiveSignals.length) return repairedExecutiveSignals.length < firstExecutiveSignals.length
@@ -320,12 +290,11 @@ function qualityRepairPersistenceError(error: unknown): string {
     const fields = [value.code, value.message, value.details, value.hint]
       .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     if (fields.length) return fields.join(' | ')
-    try { return JSON.stringify(error) } catch { /* fall through */ }
+    try { return JSON.stringify(error) } catch {}
   }
   return String(error)
 }
 
-/** Best-effort audit persistence; never blocks COS reasoning. */
 export async function recordQualityRepairDecision(input:QualityRepairDecisionInput):Promise<void>{
   try{
     const { cosServiceDb }=await import('@/lib/cos-core/storage/supabase')

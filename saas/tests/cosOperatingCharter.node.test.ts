@@ -79,3 +79,61 @@ test('the charter is a non-empty array of strings', () => {
   assert.ok(COS_OPERATING_CHARTER.length >= 15)
   for (const line of COS_OPERATING_CHARTER) assert.equal(typeof line, 'string')
 })
+
+// ---------------------------------------------------------------------------------------------
+// Policies 5, 12, 14 and 18 (2026-08-26).
+// ---------------------------------------------------------------------------------------------
+
+test('completion means the whole cycle, and unverified is not finished', () => {
+  const text = cosOperatingCharterText()
+  for (const stage of [/implement/i, /test/i, /deploy/i, /verify/i, /record what changed/i]) {
+    assert.match(text, stage)
+  }
+  // The line that makes it enforceable rather than aspirational.
+  assert.match(text, /not verified is not finished/i)
+  assert.match(text, /false report/i)
+})
+
+test('conflicting sources are ranked, and the choice is stated', () => {
+  const text = cosOperatingCharterText()
+  assert.match(text, /primary source over a report of it/i)
+  assert.match(text, /stronger evidence over weaker/i)
+  assert.match(text, /Say which source you preferred/i)
+  // A blended answer hides which source won, which is the failure being prevented.
+  assert.match(text, /belongs to neither/i)
+})
+
+test('documentation and production are both evidence, neither authoritative by default', () => {
+  const text = cosOperatingCharterText()
+  assert.match(text, /neither overrides the other by default/i)
+  assert.match(text, /documentation may be stale, or the system may have drifted/i)
+})
+
+test('verified and assumed are kept distinct', () => {
+  assert.match(cosOperatingCharterText(), /Distinguish what you verified from what you assumed/i)
+})
+
+test('the mission states both halves — automate work, not judgement', () => {
+  const text = cosOperatingCharterText()
+  assert.match(text, /Automate as much human work as can be automated safely/i)
+  // Without the second half this reads as a mandate to take over decisions.
+  assert.match(text, /every consequential decision you take away from them is the job failing/i)
+})
+
+test('the charter still separates its concerns after extension', () => {
+  const text = cosOperatingCharterText()
+  assert.ok(!/decomposition|dimensional|bytes per|0\.0698|invert the problem/i.test(text))
+  assert.ok(!/qwen|deepinfra|supabase|vercel|openai|anthropic|google/i.test(text))
+  assert.ok(!/enterprise memory|learned corpus|release gate|confidence threshold/i.test(text))
+})
+
+test('sections are ordered so disposition precedes decision rights', () => {
+  const headers = COS_OPERATING_CHARTER.filter(line => line.endsWith(':'))
+  assert.deepEqual(headers, [
+    'HOW YOU OPERATE:',
+    'HANDLING EVIDENCE:',
+    'DECISION RIGHTS:',
+    'HOW YOU COMMUNICATE:',
+    'WHAT YOU ARE FOR:',
+  ])
+})

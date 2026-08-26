@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process'
+
 const tests = [
   'tests/deterministicUtilities.node.test.ts',
   'tests/engineeringConstants.node.test.ts',

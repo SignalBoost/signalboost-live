@@ -7,6 +7,7 @@ import {
   promptEchoNonAnswer,
   reasonerDraftNeedsRepair,
 } from '../lib/ai/cos/reasonerQuality.ts'
+import { quantitativeEngineeringUnsupportedClaims } from '../lib/ai/cos/quantitativeEngineeringIntegrity.ts'
 
 const PROMPT = 'A multi-tenant SaaS has normal DB CPU and memory, but API p95 latency triples only for enterprise tenants. Smaller tenants are unaffected, no deployment occurred, and traffic is unchanged. Diagnose and rank the most likely architectural causes without making production changes.'
 
@@ -45,10 +46,23 @@ const H100_SUBSTANTIVE = JSON.stringify({
   answer: [
     'The energy-price delta is $0.08/kWh. Let P be the average electrical draw per H100 in kW and T the post-migration runtime in hours; GPU-only power savings are 512 × P × T × $0.08.',
     'If egress is priced at E dollars per GB and D GB must cross regions, the migration breaks even on egress when D × E <= 512 × P × T × 0.08. A numeric D cannot be determined until P, T, and E are supplied.',
-    'For checkpoint transfer, let C be checkpoint bytes and B effective bytes/s; one copy costs C/B seconds plus barrier and verification time. Compare that pause and any repeated synchronization cost with the remaining training wall-clock savings.',
-    'Use optimizer-step-boundary checkpoints only: finish backward and all-reduce, finish the optimizer update, quiesce async writes, barrier all ranks, persist model weights, optimizer state, scheduler/scaler state, RNG states, global step and data-loader/shard cursor, hash every shard, atomically publish a manifest only after all shards validate, then resume from global_step + 1. Never publish a partial manifest.',
+    'For checkpoint transfer, let C be checkpoint bytes and B effective bytes/s; transfer time is C/B seconds plus quiesce, barrier, verification, and any throughput penalty.',
+    'Use optimizer-step-boundary checkpoints only: finish backward and all-reduce, finish the optimizer update, quiesce async writes, barrier all ranks, persist model weights, optimizer state, scheduler/scaler state, RNG states, global step, data-loader/sampler cursor, and sharding topology. Hash every immutable generation-scoped shard, publish a COMMITTED manifest only after all shards validate, fence the source site, activate the destination as the sole writer, then resume from global_step + 1. Never publish or load a partial generation.',
+    'Any move/no-move recommendation remains conditional on measured cluster power, contracted egress price, bytes to transfer, effective throughput, remaining runtime, and observed training slowdown.',
   ].join(' '),
   confidence: 0.88,
+})
+
+const H100_OVERCONFIDENT = JSON.stringify({
+  answer: [
+    'This request contains a fundamental category error because there is no single break-even data egress cost versus power savings.',
+    'Assumptions: H100 power draw is 700W, egress is $0.05/GB, a 70B model has a 420GB checkpoint, and ten checkpoints are transferred per day.',
+    'The example yields $28.67/hour of savings and $210/day of checkpoint sync cost. Conclusion: the break-even is immediate and the recommendation is to migrate immediately.',
+    'All 512 nodes synchronize before checkpointing. Flush gradient accumulation, snapshot optimizer state and weights, record the global step and RNG state.',
+    'Write all components to a single atomic directory on S3 or GCS and use CompleteMultipartUpload to ensure atomicity. Verify checksums and resume from the recorded step.',
+    'The required daily volume corresponds to about 488 Mbps sustained bandwidth, so the key constraint is bandwidth rather than cost.',
+  ].join(' '),
+  confidence: 0.91,
 })
 
 test('the currently observed generic benchmark draft triggers one local repair', () => {
@@ -91,14 +105,57 @@ test('the exact H100 production failure is rejected as a prompt-echo non-answer'
   assert.equal(preferRepairedDraft(H100_PROMPT, H100_ECHO, H100_SUBSTANTIVE), true)
 })
 
-test('quantitative echo repair requires formulas, missing inputs, and completion of the protocol', () => {
+test('quantitative echo repair requires formulas, missing inputs, entity fidelity and committed checkpoint semantics', () => {
   const repair = buildDiagnosticRepairPrompt(H100_PROMPT, H100_ECHO)
   assert.match(repair, /restated or paraphrased the request instead of answering it/i)
   assert.match(repair, /equation, units/i)
   assert.match(repair, /missing variable/i)
   assert.match(repair, /symbolic break-even formula/i)
-  assert.match(repair, /protocol, consistency rule, algorithm, decision procedure/i)
   assert.match(repair, /Do not present an illustrative assumption as measured reality/i)
+  assert.match(repair, /count of GPUs\/accelerators is not a count of nodes/i)
+  assert.match(repair, /manifest\/COMMITTED pointer/i)
+  assert.match(repair, /object-store directory atomic/i)
+})
+
+test('the observed overconfident H100 answer is blocked for assumption promotion and protocol defects', () => {
+  const signals = quantitativeEngineeringUnsupportedClaims(H100_PROMPT, H100_OVERCONFIDENT)
+  for (const expected of [
+    'break_even_mischaracterized',
+    'illustrative_assumption_promoted_to_decision',
+    'premise_entity_count_mutation',
+    'invalid_multi_object_checkpoint_atomicity',
+    'checkpoint_not_at_committed_optimizer_step',
+    'checkpoint_missing_data_progress_state',
+    'checkpoint_missing_generation_manifest',
+    'checkpoint_missing_source_fencing',
+    'checkpoint_transfer_overhead_not_parameterized',
+  ]) {
+    assert.ok(signals.includes(expected), `${expected}: ${signals.join(', ')}`)
+  }
+  assert.equal(reasonerDraftNeedsRepair(H100_PROMPT, H100_OVERCONFIDENT), true)
+})
+
+test('a parameterized H100 answer with a committed checkpoint generation is releasable', () => {
+  assert.deepEqual(quantitativeEngineeringUnsupportedClaims(H100_PROMPT, H100_SUBSTANTIVE), [])
+  assert.equal(reasonerDraftNeedsRepair(H100_PROMPT, H100_SUBSTANTIVE), false)
+})
+
+test('derived arithmetic is allowed when it stays conditional instead of becoming an invented premise', () => {
+  const answer = JSON.stringify({
+    answer: 'The stated electricity-price delta is $0.08/kWh. If average cluster power is P kW and the job runs another T hours, power savings are 0.08 × P × T dollars. If egress price is E dollars/GB, the maximum break-even transfer volume is (0.08 × P × T) / E GB. Those variables were not supplied, so this is a relation rather than a migrate/no-migrate recommendation.',
+    confidence: 0.9,
+  })
+  assert.deepEqual(quantitativeEngineeringUnsupportedClaims(H100_PROMPT, answer), [])
+})
+
+test('quantitative integrity repair explicitly separates assumptions from decisions and fixes distributed commit semantics', () => {
+  const repair = buildDiagnosticRepairPrompt(H100_PROMPT, H100_OVERCONFIDENT)
+  assert.match(repair, /GIVEN facts, DERIVED values, and ILLUSTRATIVE assumptions/i)
+  assert.match(repair, /unconditional recommendation/i)
+  assert.match(repair, /completed optimizer-step boundary/i)
+  assert.match(repair, /data-loader\/sampler position/i)
+  assert.match(repair, /manifest\/COMMITTED pointer/i)
+  assert.match(repair, /sole active writer/i)
 })
 
 test('long technical answers that reuse domain terms but add real reasoning are not prompt echoes', () => {

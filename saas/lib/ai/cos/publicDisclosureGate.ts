@@ -132,3 +132,41 @@ export function publicDisclosureViolations(answer: string): PublicDisclosureViol
 export function isPublicReleasable(answer: string): boolean {
   return publicDisclosureViolations(answer).length === 0
 }
+
+// ---------------------------------------------------------------------------------------------
+// The reply for "what powers you?"
+// ---------------------------------------------------------------------------------------------
+//
+// When a visitor asks what model, provider or stack runs this service, the honest public answer
+// is a short statement that implementation details are not published — NOT an outage message.
+// Before this existed, the redaction pass could not clear such a draft, the turn failed closed
+// with no reply, and the route surfaced its generic "COS is temporarily unavailable" string
+// (verified in production 2026-08-26). A visitor read "broken" when the truth was "not public",
+// which is both misleading and a worse impression than the honest boundary.
+
+/** Asks what model, provider, or technology runs this service. */
+const ASKS_WHAT_POWERS_IT =
+  /(?<![\p{L}\p{N}_])(?:(?:what|which|who)\s+(?:\w+\s+){0,2}(?:model|llm|ai|engine|reasoner|provider|technology|stack|company)\b[^?.!]{0,40}(?:powers?|runs?|drives?|backs?|behind|built\s+on|based\s+on|do\s+you\s+use|are\s+you\s+(?:using|built))|what\s+are\s+you\s+(?:built|running|based)\s+on|what(?:'s| is)\s+under\s+the\s+hood|how\s+are\s+you\s+built|are\s+you\s+(?:chatgpt|gpt|claude|gemini|llama)|qu[eé]\s+modelo|qu[eé]\s+tecnolog[ií]a\s+(?:usa|impulsa)|que\s+modelo|qual\s+(?:modelo|tecnologia)|jaki\s+model|na\s+czym\s+(?:jesteś|dzia[łl]asz)|как(?:ая|ой)\s+(?:модель|технолог)|на\s+чём\s+(?:ты\s+)?(?:работаешь|построен))(?![\p{L}\p{N}_])/iu
+
+/** True when the request itself is asking what runs this service. */
+export function asksWhatPowersTheService(prompt: string): boolean {
+  return ASKS_WHAT_POWERS_IT.test(String(prompt ?? ''))
+}
+
+const IMPLEMENTATION_REPLY: Record<string, string> = {
+  en: 'COS is SignalBoost\'s own reasoning layer, and it is what answers you here. I do not publish the underlying model, provider, or infrastructure details on this channel. Ask me anything else and I will answer it directly.',
+  es: 'COS es la capa de razonamiento propia de SignalBoost, y es la que te responde aquí. No publico detalles del modelo, del proveedor ni de la infraestructura en este canal. Pregúntame cualquier otra cosa y te respondo directamente.',
+  pt: 'O COS é a camada de raciocínio própria da SignalBoost e é ela que responde aqui. Não divulgo detalhes do modelo, do fornecedor ou da infraestrutura neste canal. Pergunte-me qualquer outra coisa e respondo diretamente.',
+  pl: 'COS to własna warstwa rozumowania SignalBoost i to ona tutaj odpowiada. Nie ujawniam na tym kanale szczegółów modelu, dostawcy ani infrastruktury. Zapytaj o cokolwiek innego, a odpowiem wprost.',
+  ru: 'COS — собственный слой рассуждений SignalBoost, и именно он отвечает вам здесь. Я не раскрываю на этом канале сведения о модели, поставщике или инфраструктуре. Спросите о чём угодно другом, и я отвечу прямо.',
+}
+
+/**
+ * The public answer to "what powers you?". Names nothing, states the boundary plainly, and
+ * invites the reader onward. Passes publicDisclosureViolations() by construction — a test pins
+ * that, because a reply that itself tripped the gate would loop.
+ */
+export function publicImplementationDisclosureReply(language?: string | null): string {
+  const code = String(language ?? 'en').trim().slice(0, 2).toLowerCase()
+  return IMPLEMENTATION_REPLY[code] ?? IMPLEMENTATION_REPLY.en
+}

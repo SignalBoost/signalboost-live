@@ -138,11 +138,11 @@ const RECAST_VERB: Record<string, string> = {
 export function recastToFirstPerson(text: string): string {
   let result = text
   result = result.replace(
-    /^\s*(?:The|That|This)\s+(?:previous|preceding|prior)?\s*(?:answer|response|reply)\s+(?:was|has been|is)\s+(generated|produced|created|written|composed)\s+by\s+(?:me|cos|the\s+assistant|the\s+system|the\s+concierge)\s*,?\s*/i,
+    /^\s*(?:The|That|This)\s+(?:previous|preceding|prior)?\s*(?:answer|response|reply)\s+(?:was|has been|is)\s+(generated|produced|created|written|composed)(?:\s+\w+ly)?\s+by\s+(?:me|cos|the\s+assistant|the\s+system|the\s+concierge)\s*,?\s*/i,
     (_match, verb: string) => `I ${RECAST_VERB[verb.toLowerCase()] || 'wrote'} it `,
   )
   result = result.replace(
-    /^\s*(?:The|That|This)\s+(?:previous|preceding|prior)?\s*(?:answer|response|reply)\s+(?:was|has been|is)\s+(generated|produced|created|written|composed)\s*/i,
+    /^\s*(?:The|That|This)\s+(?:previous|preceding|prior)?\s*(?:answer|response|reply)\s+(?:was|has been|is)\s+(generated|produced|created|written|composed)(?:(?:\s+\w+ly)?\s+by\s+(?:me|cos|the\s+assistant|the\s+system|the\s+concierge))?\s*,?\s*/i,
     (_match, verb: string) => `I ${RECAST_VERB[verb.toLowerCase()] || 'wrote'} it `,
   )
   return result.trim()
@@ -170,7 +170,7 @@ export function acceptPublicNarrative(candidate: string | null | undefined, fact
   // answer". English-pattern check; other languages rely on the instruction.
   if (/\b(the|that|this) (previous|preceding|prior) (answer|question|response|reply)\b/i.test(text)) return null
   if (/\b(the )?(previous|preceding|prior|that|this) (answer|response|reply) (was|is|has been) (generated|produced|created|written|composed)\b/i.test(text)) return null
-  if (/\b(generated|produced|created|written|composed) by (the )?(cos|assistant|system|concierge)\b/i.test(text)) return null
+  if (/\b(generated|produced|created|written|composed)(\s+\w+ly)? by (the )?(cos|assistant|system|concierge)\b/i.test(text)) return null
   const allowed = new Set(facts.liveSources.map(source => source.url))
   for (const url of urlsIn(text)) {
     if (!allowed.has(url)) return null

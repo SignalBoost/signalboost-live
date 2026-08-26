@@ -6,6 +6,7 @@ import {
   publicDisclosureViolations,
   isPublicReleasable,
   asksWhatPowersTheService,
+  asksAboutServiceIdentity,
   publicImplementationDisclosureReply,
 } from '../lib/ai/cos/publicDisclosureGate.ts'
 
@@ -154,11 +155,73 @@ test('unknown language falls back to English', () => {
 
 test('the self-referential branch runs before the redaction attempt', () => {
   const source = readFileSync('lib/ai/cos/cosFirstAnswer.ts', 'utf8')
-  const branchAt = source.indexOf('asksWhatPowersTheService(userRequest)')
+  const branchAt = source.indexOf('asksAboutServiceIdentity(userRequest)')
   const redactAt = source.indexOf('You are COS repairing a public answer that disclosed')
   assert.ok(branchAt > 0 && redactAt > 0)
   assert.ok(branchAt < redactAt, 'boundary reply must pre-empt the redaction pass')
   // It must return the reply under the field name the caller actually reads.
   const branch = source.slice(branchAt, branchAt + 400)
   assert.match(branch, /reply: publicImplementationDisclosureReply\(/)
+})
+
+// ---------------------------------------------------------------------------------------------
+// False self-attribution: "I am a large language model, trained by Google."
+// ---------------------------------------------------------------------------------------------
+
+test('the false-attribution answer that shipped to production is now caught', () => {
+  // Not a leak — a FALSE claim about the product, recited from the base model's identity text.
+  const found = publicDisclosureViolations('I am a large language model, trained by Google.')
+  assert.ok(found.includes('model_self_attribution'))
+})
+
+test('other vendors a base model might name itself after are covered', () => {
+  for (const answer of [
+    'I was trained by OpenAI.',
+    'This assistant is powered by Gemini.',
+    'I am Bard, built by Google DeepMind.',
+    'COS runs on ChatGPT.',
+    'My underlying model comes from Meta AI.',
+  ]) {
+    assert.equal(isPublicReleasable(answer), false, answer)
+  }
+})
+
+test('identity questions are detected across the whole family and five languages', () => {
+  for (const prompt of [
+    'What model powers COS?',
+    'who made you?',
+    'who trained you?',
+    'Are you ChatGPT?',
+    'what kind of AI are you?',
+    'Which company owns this?',
+    '\u00bfQui\u00e9n te cre\u00f3?',
+    'Quem te criou?',
+    'kto ci\u0119 stworzy\u0142?',
+    '\u043a\u0442\u043e \u0442\u0435\u0431\u044f \u0441\u043e\u0437\u0434\u0430\u043b?',
+  ]) {
+    assert.equal(asksAboutServiceIdentity(prompt), true, prompt)
+  }
+})
+
+test('questions about other people building other things are not identity questions', () => {
+  for (const prompt of [
+    'Who built the EU-North datacenter?',
+    'What model of pump should I use?',
+    'Are you sure about the 80% rule?',
+    'Which company owns the most hydro capacity in Norway?',
+    '\u041a\u0442\u043e \u043f\u043e\u0441\u0442\u0440\u043e\u0438\u043b \u0434\u0430\u0442\u0430-\u0446\u0435\u043d\u0442\u0440?',
+  ]) {
+    assert.equal(asksAboutServiceIdentity(prompt), false, prompt)
+  }
+})
+
+test('identity is answered BEFORE the reasoner is called, not after', () => {
+  // The whole point: output inspection cannot be trusted for this, because catching a false
+  // self-attribution would require a complete list of every vendor a model might claim.
+  const source = readFileSync('lib/ai/cos/cosFirstAnswer.ts', 'utf8')
+  const interceptAt = source.indexOf('if (asksAboutServiceIdentity(userRequest)) {')
+  const firstReasonerCall = source.indexOf('await callCosReasoner(')
+  assert.ok(interceptAt > 0, 'intercept must exist')
+  assert.ok(firstReasonerCall > 0)
+  assert.ok(interceptAt < firstReasonerCall, 'intercept must precede any reasoner call')
 })

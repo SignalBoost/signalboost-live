@@ -67,7 +67,7 @@ const H100_OVERCONFIDENT = JSON.stringify({
 
 const H100_NEAR_MISS = JSON.stringify({
   answer: [
-    'The price delta is $0.08/kWh and the example uses explicitly illustrative power and egress assumptions. Under those assumptions, migrate immediately.',
+    'The price delta is $0.08/kWh and the example uses explicitly illustrative power and egress assumptions. Migrate immediately.',
     'After a completed optimizer update, save model, optimizer, scheduler/scaler, RNG, global step, data-loader/sampler cursor, and sharding topology.',
     'Write immutable generation shards, verify checksums, publish a COMMITTED manifest, fence the source, activate the destination as the sole writer, and resume from the next optimizer step.',
   ].join(' '),

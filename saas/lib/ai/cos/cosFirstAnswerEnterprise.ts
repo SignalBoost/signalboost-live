@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
+import { ENGINEERING_CONSTANTS } from './engineeringConstants.ts'
 import { resolveCalcMarkers } from './calcExpressions.ts'
 
 /**
@@ -417,6 +418,11 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     // two channels cannot drift apart again. See cosAnswerPolicyCore.ts.
     ...QUANTITATIVE_ANSWER_POLICY,
     ...COS_OPERATING_CHARTER,
+    '',
+    // Pinned reference figures. Retrieval, ranking and an explicit GIVEN/STANDARD/SITUATIONAL
+    // rule all failed to get the right constant into an answer; see engineeringConstants.ts.
+    // RE-APPLIED 2026-08-26 after this splice was lost from both files while the module stayed.
+    ...ENGINEERING_CONSTANTS,
     '',
     'HONESTY:',
     '- Distinguish evidence from inference. Never invent sources, numbers or telemetry.',

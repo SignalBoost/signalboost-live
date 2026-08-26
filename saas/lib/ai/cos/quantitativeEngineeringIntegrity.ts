@@ -35,12 +35,25 @@ function latestUserRequest(prompt: string): string {
   return (bestIndex >= 0 ? text.slice(bestIndex + bestMarker.length) : text).trim().slice(0, 16_000)
 }
 
+function currentClausePrefix(answer: string, index: number): string {
+  const windowStart = Math.max(0, index - 220)
+  const window = answer.slice(windowStart, index)
+  const boundary = Math.max(
+    window.lastIndexOf('.'),
+    window.lastIndexOf('!'),
+    window.lastIndexOf('?'),
+    window.lastIndexOf(';'),
+    window.lastIndexOf('\n'),
+  )
+  return boundary >= 0 ? window.slice(boundary + 1) : window
+}
+
 function unqualifiedStrongDecision(answer: string): boolean {
   STRONG_DECISION.lastIndex = 0
   for (const match of answer.matchAll(STRONG_DECISION)) {
     const index = match.index ?? 0
-    const prefix = answer.slice(Math.max(0, index - 180), index)
-    if (!CONDITIONAL_QUALIFIER.test(prefix)) return true
+    const clausePrefix = currentClausePrefix(answer, index)
+    if (!CONDITIONAL_QUALIFIER.test(clausePrefix)) return true
   }
   return false
 }

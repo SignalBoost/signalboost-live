@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   quantitativeEngineeringRepairInstruction,
+  quantitativeEngineeringRepairSignals,
   quantitativeEngineeringUnsupportedClaims,
 } from '../lib/ai/cos/quantitativeEngineeringIntegrity.ts'
 
@@ -29,8 +30,8 @@ const safe = JSON.stringify({
   confidence: 0.88,
 })
 
-test('the observed production H100 answer raises every material integrity defect', () => {
-  const signals = quantitativeEngineeringUnsupportedClaims(prompt, unsafe)
+test('the observed production H100 answer raises every repair signal', () => {
+  const signals = quantitativeEngineeringRepairSignals(prompt, unsafe)
   for (const expected of [
     'break_even_mischaracterized',
     'illustrative_assumption_promoted_to_decision',
@@ -44,21 +45,49 @@ test('the observed production H100 answer raises every material integrity defect
   ]) assert.ok(signals.includes(expected), `${expected}: ${signals.join(', ')}`)
 })
 
+test('repair-only completeness findings do not discard an otherwise structurally safe answer', () => {
+  const nearMiss = JSON.stringify({
+    answer: [
+      'Assume illustrative values for a worked example. The break-even is immediate under those illustrative values.',
+      'After a completed optimizer update, save model, optimizer, scheduler/scaler, RNG, global step, data-loader/sampler cursor and topology.',
+      'Write immutable generation shards, verify checksums, publish a COMMITTED manifest, fence the source and activate the destination as sole writer.',
+    ].join(' '),
+    confidence: 0.82,
+  })
+  const repairSignals = quantitativeEngineeringRepairSignals(prompt, nearMiss)
+  assert.ok(repairSignals.includes('checkpoint_transfer_overhead_not_parameterized'))
+  assert.deepEqual(quantitativeEngineeringUnsupportedClaims(prompt, nearMiss), [])
+})
+
+test('structural checkpoint correctness defects remain hard release blockers', () => {
+  const blockers = quantitativeEngineeringUnsupportedClaims(prompt, unsafe)
+  assert.ok(blockers.includes('premise_entity_count_mutation'))
+  assert.ok(blockers.includes('invalid_multi_object_checkpoint_atomicity'))
+  assert.ok(blockers.includes('checkpoint_not_at_committed_optimizer_step'))
+  assert.ok(blockers.includes('checkpoint_missing_data_progress_state'))
+  assert.ok(blockers.includes('checkpoint_missing_generation_manifest'))
+  assert.ok(blockers.includes('checkpoint_missing_source_fencing'))
+  assert.ok(!blockers.includes('illustrative_assumption_promoted_to_decision'))
+  assert.ok(!blockers.includes('checkpoint_transfer_overhead_not_parameterized'))
+})
+
 test('a parameterized break-even answer with committed generation semantics is clean', () => {
+  assert.deepEqual(quantitativeEngineeringRepairSignals(prompt, safe), [])
   assert.deepEqual(quantitativeEngineeringUnsupportedClaims(prompt, safe), [])
 })
 
-test('repair contract keeps assumptions conditional and protects exact continuation', () => {
-  const repair = quantitativeEngineeringRepairInstruction(prompt, quantitativeEngineeringUnsupportedClaims(prompt, unsafe))
+test('repair contract forces convergence toward a usable quantitative answer', () => {
+  const repair = quantitativeEngineeringRepairInstruction(prompt, quantitativeEngineeringRepairSignals(prompt, unsafe))
   assert.match(repair, /GIVEN facts, DERIVED values, and ILLUSTRATIVE assumptions/i)
-  assert.match(repair, /unconditional recommendation/i)
+  assert.match(repair, /transfer time = checkpoint bytes \/ effective transfer throughput \+ quiesce\/barrier\/verification time/i)
+  assert.match(repair, /Do NOT write “migrate immediately”/i)
   assert.match(repair, /count of GPUs\/accelerators is not a count of nodes/i)
-  assert.match(repair, /checkpoint bytes divided by effective transfer throughput/i)
   assert.match(repair, /completed optimizer-step boundary/i)
   assert.match(repair, /data-loader\/sampler position/i)
   assert.match(repair, /manifest\/COMMITTED pointer/i)
   assert.match(repair, /object-store “directory” is not an atomic transaction/i)
   assert.match(repair, /sole active writer/i)
+  assert.match(repair, /what is known from the prompt/i)
 })
 
 test('ordinary derived arithmetic remains allowed when the request is arithmetic-only', () => {
@@ -67,5 +96,6 @@ test('ordinary derived arithmetic remains allowed when the request is arithmetic
     answer: 'The supplied price delta is $0.08/kWh. If power is P kW and runtime is T hours, savings are 0.08 × P × T dollars. If egress costs E dollars/GB, break-even transfer volume is (0.08 × P × T) / E GB. No unconditional migration recommendation follows until P, T and E are measured.',
     confidence: 0.9,
   })
+  assert.deepEqual(quantitativeEngineeringRepairSignals(arithmeticPrompt, answer), [])
   assert.deepEqual(quantitativeEngineeringUnsupportedClaims(arithmeticPrompt, answer), [])
 })

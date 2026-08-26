@@ -77,6 +77,27 @@ export function stripInternalEvidenceIds(answer: string): string {
     const markerIsSubject = /(?:^|[.!?:;]\s*|\n\s*|\b(?:while|because|since|although|though|whereas|and|but|or|as|if|when|per|according\s+to|from|in|of|by|that)\s+)$/iu.test(before)
     return markerIsSubject ? 'the retrieved evidence' : ''
   })
+  // A removed marker can also strand the ATTRIBUTION PHRASE that introduced it. Observed in
+  // production 2026-08-26: "inclusive of CPUs, DRAM, NVSwitch, NICs, fans, and PSU losses as per
+  // [CL2]." became "…as per." and "As noted in [CL3], PUE multiplies facility power…" became
+  // "As noted in, PUE multiplies…". Removing the label without removing the preposition that
+  // pointed at it leaves visible broken grammar in a buyer-facing answer.
+  //
+  // Two shapes, because they need different repairs: a phrase left hanging before punctuation is
+  // deleted outright, while one that OPENED the sentence is deleted and the next word recapitalised
+  // so the sentence still starts properly.
+  const ATTRIBUTION = '(?:as\\s+)?(?:per|according\\s+to|noted\\s+in|shown\\s+in|described\\s+in|stated\\s+in|referenced\\s+in|outlined\\s+in|detailed\\s+in|documented\\s+in|cited\\s+in|reported\\s+in|found\\s+in|based\\s+on)'
+  cleaned = cleaned
+    // Sentence-initial FIRST: "As noted in, PUE multiplies…" → "PUE multiplies…". This must run
+    // before the trailing rule below, which would otherwise eat the phrase and strand the comma.
+    .replace(
+      new RegExp(`(^|[.!?]\\s+)${ATTRIBUTION}(?:\\s+the)?\\s*,\\s*([\\p{L}])`, 'giu'),
+      (_whole, lead: string, letter: string) => `${lead}${letter.toUpperCase()}`,
+    )
+    // Then mid-clause: "…losses as per )." → "…losses)." Closing brackets count as punctuation
+    // here — a marker inside parentheses is the common case.
+    .replace(new RegExp(`[ \\t]*(?:,[ \\t]*)?\\b${ATTRIBUTION}(?:\\s+the)?\\s*(?=[.,;:!?)\\]])`, 'gi'), '')
+
   cleaned = cleaned
     // A removed trailing marker can strand its conjunction: "Point two X and ." → "Point two X."
     .replace(/\s+(?:and|or|y|e|i|и|oraz)\s*([.;,!?])/gi, '$1')

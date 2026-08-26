@@ -34,7 +34,7 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
-import { publicDisclosureViolations, asksWhatPowersTheService, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
+import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 import {
   isSignalBoostSpecificPublicRequest,
@@ -170,6 +170,21 @@ async function tryPublicStatelessAnswer(input: {
   const precedingPublicAnswer = String(input.previousAssistant ?? '').trim().slice(0, 8000)
   const userRequest = publicUserRequestText(input.prompt)
   const signalBoostSpecific = isSignalBoostSpecificPublicRequest(input.prompt)
+
+  // SELF-IDENTITY IS ANSWERED DETERMINISTICALLY, BEFORE INFERENCE (2026-08-26).
+  // Asked "What model powers COS?" this path once replied "I am a large language model, trained
+  // by Google" — a false statement about the product, recited from the base model's own memorized
+  // identity text. No output-inspection gate can be relied on to catch that: it would require a
+  // complete list of every vendor a model might name itself after. The question has exactly one
+  // correct answer, known here at build time, so the model is never asked.
+  if (asksAboutServiceIdentity(userRequest)) {
+    return {
+      handled: true,
+      reply: publicImplementationDisclosureReply(input.language),
+      confidence: 1,
+      provenance: { responseSource: 'cos_local_primary' } as any,
+    }
+  }
   const resolved = resolveCosReasoner()
   if (!resolved.config) {
     return {
@@ -271,7 +286,7 @@ async function tryPublicStatelessAnswer(input: {
   // this runs on EVERY public answer including SignalBoost-specific ones, because "what model
   // powers COS?" is precisely the question that must not be answered on this surface.
   const disclosures = publicDisclosureViolations(parsed.answer)
-  if (disclosures.length && asksWhatPowersTheService(userRequest)) {
+  if (disclosures.length && asksAboutServiceIdentity(userRequest)) {
     // The reader asked what runs this service. The honest public answer is the boundary itself,
     // not an outage message and not a redaction attempt that will keep tripping the gate.
     return {

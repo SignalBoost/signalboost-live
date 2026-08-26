@@ -34,6 +34,7 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
+import { publicDisclosureViolations } from './publicDisclosureGate.ts'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 import {
   isSignalBoostSpecificPublicRequest,
@@ -262,6 +263,44 @@ async function tryPublicStatelessAnswer(input: {
       }
     }
     parsed = repaired
+  }
+
+  // PUBLIC DISCLOSURE GATE (2026-08-26, owner-directed). COS is the only reasoner and the
+  // Concierge renders passively, so the company-information boundary is enforced HERE, before
+  // release — not downstream by a filter that could miss. Unlike the scenario-scope check above,
+  // this runs on EVERY public answer including SignalBoost-specific ones, because "what model
+  // powers COS?" is precisely the question that must not be answered on this surface.
+  const disclosures = publicDisclosureViolations(parsed.answer)
+  if (disclosures.length) {
+    const redact = await callCosReasoner({
+      temperature: 0,
+      maxTokens: 2600,
+      systemPrompt: [
+        'You are COS repairing a public answer that disclosed internal information. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+        'Remove every reference to the underlying model, model family, provider, hosting platform, infrastructure vendor, internal component name, internal metric, confidence value, threshold, evidence label, and retrieval or release machinery.',
+        'If the reader asked what powers this service, say only that COS is SignalBoost\'s own reasoning layer and that implementation details are not public. Do not name anything.',
+        'Keep the substantive answer to the reader\'s actual question intact. Do not mention this repair.',
+        input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
+      ].join(' '),
+      prompt: [
+        `USER REQUEST:\n${userRequest}`,
+        `REJECTED DRAFT:\n${parsed.answer}`,
+        `DISCLOSURES:\n${disclosures.join(', ')}`,
+        'Return the corrected answer now.',
+      ].join('\n\n'),
+    }).catch(() => null)
+    const redacted = redact?.text ? parseLocalResult(redact.text) : null
+    if (!redacted || redacted.truncated || !redacted.answer.trim() || publicDisclosureViolations(redacted.answer).length) {
+      // Fails closed with no best-effort draft. A draft containing internals must never be
+      // surfaced to the reader, not even labelled as low confidence.
+      return {
+        handled: false,
+        confidence: 0,
+        reason: `Public answer disclosed internal information (${disclosures.join(', ')}) and the bounded redaction did not clear it.`,
+        provenance: provenance as any,
+      }
+    }
+    parsed = redacted
   }
 
   const confidence = Math.max(0, Math.min(1, parsed.confidence))

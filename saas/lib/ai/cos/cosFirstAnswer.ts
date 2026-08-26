@@ -34,6 +34,7 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
+import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
 import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 import {
@@ -217,6 +218,7 @@ async function tryPublicStatelessAnswer(input: {
       // ONE ANSWER POLICY (2026-08-26). Identical rules to the owner reasoner: quality must not
       // depend on which surface the reader hit. See cosAnswerPolicyCore.ts.
       ...QUANTITATIVE_ANSWER_POLICY,
+      ...COS_OPERATING_CHARTER,
       input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
     ].join(' '),
     prompt: [

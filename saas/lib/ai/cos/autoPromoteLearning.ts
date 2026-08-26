@@ -9,11 +9,13 @@ import {
 import {
   evaluateKnowledgePromotionRelevance,
   knowledgePromotionRelevanceMessage,
+  type KnowledgePromotionCandidate,
+} from '@/lib/ai/cos/knowledgePromotionRelevance'
+import {
   ownerDirectedPromotionAuthority,
   OWNER_DIRECTED_INTENT_MARKER,
   OWNER_DIRECTED_STUDY_MARKER,
-  type KnowledgePromotionCandidate,
-} from '@/lib/ai/cos/knowledgePromotionRelevance'
+} from '@/lib/ai/cos/ownerDirectedPromotionPolicy'
 
 export type AutoPromotionResult = {
   status: 'promoted' | 'skipped' | 'error'
@@ -130,9 +132,6 @@ async function selectPromotionCandidates(limit: number, options: AutoPromotionOp
   const owner = await selectOwnerDirectedPromotionCandidates(limit)
   if (owner.error || options.ownerDirectedOnly || (owner.data?.length ?? 0) >= limit) return owner
 
-  // Owner-directed study has explicit acquisition intent and must not sit behind years of generic
-  // corpus backlog. Fill any remaining screening slots with the normal queue while preserving the
-  // existing generic ordering and deduplicating rows that appear in both queries.
   const generic = await selectGenericPromotionCandidates(limit)
   if (generic.error) return generic
   const combined = [...(owner.data ?? []), ...(generic.data ?? [])]
@@ -161,11 +160,6 @@ export async function countPendingOwnerDirectedKnowledgePromotion(): Promise<num
 async function markPromotionRejected(row: any, message: string): Promise<void> {
   const db = cosServiceDb()
   if (!db) return
-
-  // The existing schema intentionally has only pending/completed/failed. Relevance rejection is a
-  // terminal, successful PROMOTION REVIEW rather than a retryable extraction failure, so retain the
-  // row and use the terminal completed state while preserving the explicit rejection reason here.
-  // This keeps the historical source auditable without allowing it to starve the candidate queue.
   const { error } = await db.from('cos_continuous_learning').update({
     fact_extraction_status: 'completed',
     fact_extraction_attempted_at: new Date().toISOString(),
@@ -176,21 +170,9 @@ async function markPromotionRejected(row: any, message: string): Promise<void> {
 
 /**
  * Promote learned corpus documents into structured knowledge facts.
- *
- * Two independent integrity gates protect durable KG facts:
- * 1. retained-subject relevance: the stored source must still align with the curriculum subject;
- * 2. source grounding: each extracted claim must be traceable to the source excerpt.
- *
- * Owner-directed study is the bounded exception to gate 1 because relevance was explicitly
- * established by the owner before retention. It is NOT an exception to source-kind admission or
- * claim-level grounding. Generic/autonomously discovered material retains the full relevance gate.
- *
- * Grounding alone is insufficient because a historically irrelevant source can contain perfectly
- * grounded facts about the WRONG topic. The relevance re-check therefore runs before any Qwen call
- * for non-owner material. Rejected documents remain in the learned corpus for provenance/audit but
- * become terminal promotion reviews and never enter the Knowledge Graph.
- *
- * The optional deadline prevents this background task from starting model work it cannot finish.
+ * Owner-directed study is a bounded exception to the document-level autonomous relevance re-check
+ * because the owner already established relevance before retention. Source-kind admission and
+ * claim-level grounding remain mandatory, so unsupported facts still cannot enter durable KG facts.
  */
 export async function autoPromoteLearnedKnowledge(
   limit = 5,
@@ -241,8 +223,6 @@ export async function autoPromoteLearnedKnowledge(
       }
 
       if (eligibleRows.length < requested) eligibleRows.push(row)
-      // Continue screening the bounded window after filling today's extraction budget. This drains
-      // historical irrelevant rows quickly while leaving extra eligible rows untouched for next run.
     }
 
     if (eligibleRows.length === 0) {

@@ -8,7 +8,7 @@ const STRONG_DECISION = /\b(?:migrate\s+immediately|move\s+immediately|proceed\s
 const CONDITIONAL_QUALIFIER = /\b(?:under|using|given|assuming|if|provided|illustrative|example|with\s+these|with\s+those|on\s+these)\b/i
 const OBJECT_STORE = /\b(?:s3|gcs|object[- ]store|object\s+storage)\b/i
 const FALSE_OBJECT_ATOMICITY = /\b(?:single\s+atomic\s+directory|atomic\s+directory|atomic\s+write\s+to\s+(?:s3|gcs)|complete\s*multipart\s*upload[\s\S]{0,120}(?:atomic|entire\s+checkpoint))\b/i
-const COMMITTED_STEP = /\b(?:optimizer\s+(?:step|update)[\s\S]{0,100}(?:complete|completed|committed|finish|finished)|after\s+(?:the\s+)?optimizer\s+(?:step|update)(?:\s+is)?\s+(?:complete|completed|committed|finished))\b/i
+const COMMITTED_STEP = /\b(?:optimizer[- ]step[- ]boundary|completed\s+optimizer\s+(?:step|update)|finish(?:ed)?\s+(?:the\s+)?optimizer\s+(?:step|update)|after\s+(?:the\s+)?optimizer\s+(?:step|update)(?:(?:\s+has|\s+is)?\s+(?:complete|completed|committed|finished))?|optimizer\s+(?:step|update)[\s\S]{0,100}(?:complete|completed|committed|finish|finished))\b/i
 const DATA_PROGRESS = /\b(?:data[- ]?loader|sampler|sample\s+(?:index|cursor)|shard\s+cursor|dataset\s+(?:position|cursor)|data\s+(?:position|cursor))\b/i
 const COMMIT_MANIFEST = /\b(?:manifest|checkpoint\s+generation|generation\s+(?:id|number)|commit(?:ted)?\s+(?:marker|pointer|generation)|publish(?:ed|ing)?\s+(?:the\s+)?manifest)\b/i
 const SOURCE_FENCING = /\b(?:fenc(?:e|ed|ing)|single[- ]writer|active\s+site|source[\s\S]{0,80}(?:drain|stop|inactive|fenc)|destination[\s\S]{0,80}(?:activate|active))\b/i
@@ -48,8 +48,9 @@ function unqualifiedStrongDecision(answer: string): boolean {
 function gpuCountBecameNodeCount(request: string, answer: string): boolean {
   for (const match of request.matchAll(/\b(\d[\d,]*)\s+(?:h100s?|gpus?|accelerators?)\b/gi)) {
     const count = match[1].replace(/,/g, '')
-    const answerNode = new RegExp(`\\b${count.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\s+(?:nodes?|hosts?|servers?)\\b`, 'i')
-    const requestNode = new RegExp(`\\b${count.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\s+(?:nodes?|hosts?|servers?)\\b`, 'i')
+    const escapedCount = count.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const answerNode = new RegExp(`\\b${escapedCount}\\s+(?:nodes?|hosts?|servers?)\\b`, 'i')
+    const requestNode = new RegExp(`\\b${escapedCount}\\s+(?:nodes?|hosts?|servers?)\\b`, 'i')
     if (answerNode.test(answer.replace(/,/g, '')) && !requestNode.test(request.replace(/,/g, ''))) return true
   }
   return false

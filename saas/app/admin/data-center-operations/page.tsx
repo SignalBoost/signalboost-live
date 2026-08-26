@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { dataCenterUiText, type DataCenterUiLang } from '@/lib/data-center/uiCopy'
 
@@ -73,9 +73,7 @@ type BenchmarkState = {
 
 const DATA_CENTER_BENCHMARK_TRACK = 'data_center_operations'
 const DATA_CENTER_BENCHMARK_ORIGIN = 'data-center-private-v1'
-const DATA_CENTER_BENCHMARK_TOTAL = 14
 const BENCHMARK_BATCH_SIZE = 1
-const NATIVE_BENCHMARK_ACTION = '/api/admin/cos-capability-benchmark?nativeSequence=1&step=0&attempted=0&passed=0'
 
 export default function DataCenterOperationsPage() {
   const { lang } = useI18n()
@@ -86,24 +84,6 @@ export default function DataCenterOperationsPage() {
   const [loading, setLoading] = useState(false)
   const [benchmarkLoading, setBenchmarkLoading] = useState(false)
   const [benchmark, setBenchmark] = useState<BenchmarkState | null>(null)
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const nativeStatus = params.get('benchmarkNative')
-    if (!nativeStatus) return
-
-    if (nativeStatus === 'complete') {
-      const attempted = Math.max(0, Number(params.get('benchmarkAttempted')) || 0)
-      const passed = Math.max(0, Number(params.get('benchmarkPassed')) || 0)
-      setBenchmark({ total: DATA_CENTER_BENCHMARK_TOTAL, completed: attempted, attempted, passed, done: attempted >= DATA_CENTER_BENCHMARK_TOTAL, error: '' })
-    } else if (nativeStatus === 'error') {
-      setBenchmark({ total: DATA_CENTER_BENCHMARK_TOTAL, completed: 0, attempted: 0, passed: 0, done: false, error: params.get('benchmarkError') || 'benchmark_request_failed' })
-    }
-
-    for (const key of ['benchmarkNative', 'benchmarkAttempted', 'benchmarkPassed', 'benchmarkError']) params.delete(key)
-    const cleaned = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}${window.location.hash}`
-    window.history.replaceState({}, '', cleaned)
-  }, [])
 
   async function run() {
     if (loading) return
@@ -127,7 +107,7 @@ export default function DataCenterOperationsPage() {
   async function runPrivateBenchmark() {
     if (benchmarkLoading) return
     setBenchmarkLoading(true)
-    setBenchmark({ total: DATA_CENTER_BENCHMARK_TOTAL, completed: 0, attempted: 0, passed: 0, done: false, error: '' })
+    setBenchmark({ total: 0, completed: 0, attempted: 0, passed: 0, done: false, error: '' })
     try {
       const listResponse = await fetch('/api/admin/cos-capability-benchmark', { cache: 'no-store' })
       const listPayload = await listResponse.json().catch(() => null) as BenchmarkList | null
@@ -161,7 +141,7 @@ export default function DataCenterOperationsPage() {
       setBenchmark({ total: caseIds.length, completed, attempted, passed, done: true, error: '' })
     } catch (error) {
       setBenchmark(current => ({
-        total: current?.total || DATA_CENTER_BENCHMARK_TOTAL,
+        total: current?.total || 0,
         completed: current?.completed || 0,
         attempted: current?.attempted || 0,
         passed: current?.passed || 0,
@@ -187,14 +167,10 @@ export default function DataCenterOperationsPage() {
       <div style={{ marginTop: 12, padding: '10px 12px', border: '1px solid rgba(245,196,81,.35)', borderRadius: 10, background: 'rgba(245,196,81,.08)' }}>{c('safety')}</div>
     </header>
 
-    <section style={{ marginBottom: 30, padding: 18, border: '1px solid rgba(92,225,230,.25)', borderRadius: 14, background: 'rgba(8,14,28,.48)' }} aria-live="polite">
+    <section style={{ marginBottom: 30, padding: 18, border: '1px solid rgba(92,225,230,.25)', borderRadius: 14, background: 'rgba(8,14,28,.48)' }}>
       <h2 style={{ marginTop: 0 }}>{c('benchmarkTitle')}</h2>
       <p style={{ opacity: .8, lineHeight: 1.55 }}>{c('benchmarkBody')}</p>
-      <form action={NATIVE_BENCHMARK_ACTION} method="post" onSubmit={event => { event.preventDefault(); void runPrivateBenchmark() }}>
-        <input type="hidden" name="track" value={DATA_CENTER_BENCHMARK_TRACK} />
-        <input type="hidden" name="limit" value="1" />
-        <button type="submit" disabled={benchmarkLoading} style={{ padding: '11px 18px', borderRadius: 10, border: 0, fontWeight: 800, cursor: benchmarkLoading ? 'wait' : 'pointer' }}>{benchmarkLoading ? c('benchmarkRunning') : c('benchmarkRun')}</button>
-      </form>
+      <button type="button" onClick={() => void runPrivateBenchmark()} disabled={benchmarkLoading} style={{ padding: '11px 18px', borderRadius: 10, border: 0, fontWeight: 800, cursor: benchmarkLoading ? 'wait' : 'pointer' }}>{benchmarkLoading ? c('benchmarkRunning') : c('benchmarkRun')}</button>
       {benchmarkLoading ? <p style={{ marginBottom: 0, opacity: .72 }}>{c('benchmarkKeepOpen')}</p> : null}
       {benchmark ? <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', marginTop: 16 }}>
         <div style={{ padding: 12, border: '1px solid rgba(255,255,255,.12)', borderRadius: 10 }}><div style={{ fontSize: 12, opacity: .65 }}>{c('benchmarkCases')}</div><strong style={{ fontSize: 22 }}>{benchmark.total}</strong></div>

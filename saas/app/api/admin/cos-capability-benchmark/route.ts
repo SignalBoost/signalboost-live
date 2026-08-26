@@ -32,37 +32,6 @@ function cleanCaseIds(value: unknown, maxCases: number): string[] {
   return [...new Set(value.map(item => String(item || '').trim()).filter(item => uuidPattern.test(item)))].slice(0, maxCases)
 }
 
-function boundedCount(value: string | null): number {
-  const number = Math.floor(Number(value) || 0)
-  return Math.max(0, Math.min(100, number))
-}
-
-async function readBenchmarkBody(request: NextRequest): Promise<{ body: Record<string, unknown>; nativeForm: boolean }> {
-  const contentType = String(request.headers.get('content-type') || '').toLowerCase()
-  if (contentType.includes('application/json')) {
-    return { body: await request.json().catch(() => ({})) as Record<string, unknown>, nativeForm: false }
-  }
-  if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
-    const form = await request.formData().catch(() => null)
-    if (!form) return { body: {}, nativeForm: true }
-    return {
-      body: {
-        track: form.get('track'),
-        limit: form.get('limit'),
-        caseIds: form.getAll('caseIds').map(item => String(item)),
-      },
-      nativeForm: true,
-    }
-  }
-  return { body: {}, nativeForm: false }
-}
-
-function nativeBenchmarkPage(request: NextRequest, values: Record<string, string>): URL {
-  const target = new URL('/admin/data-center-operations', request.url)
-  for (const [key, value] of Object.entries(values)) target.searchParams.set(key, value)
-  return target
-}
-
 async function reconcileStaleRuns(db: NonNullable<ReturnType<typeof cosServiceDb>>) {
   const cutoff = new Date(Date.now() - STALE_RUN_MS).toISOString()
   await db.from('cos_capability_benchmark_runs')
@@ -86,15 +55,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const guard = await requireOwner(); if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
   const db = cosServiceDb(); if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
-  const parsed = await readBenchmarkBody(request)
-  const body = parsed.body
+  const body = await request.json().catch(() => ({}))
   const requestedTrack = cleanTrack(body.track)
-  const nativeSequence = parsed.nativeForm && request.nextUrl.searchParams.get('nativeSequence') === '1'
-  const nativeStep = boundedCount(request.nextUrl.searchParams.get('step'))
-  if (nativeSequence && requestedTrack !== DATA_CENTER_BENCHMARK_TRACK) {
-    return NextResponse.redirect(nativeBenchmarkPage(request, { benchmarkNative: 'error', benchmarkError: 'invalid_native_track' }), 303)
-  }
-
   const maxCasesForTrack = requestedTrack === DATA_CENTER_BENCHMARK_TRACK ? DATA_CENTER_MAX_CASES_PER_RUN : MAX_CASES_PER_RUN
   const limit = Math.max(1, Math.min(maxCasesForTrack, Math.floor(Number(body.limit) || maxCasesForTrack)))
   const requestedCaseIds = cleanCaseIds(body.caseIds, maxCasesForTrack)
@@ -103,22 +65,10 @@ export async function POST(request: NextRequest) {
   const completedRuns = await db.from('cos_capability_benchmark_runs').select('id').eq('status', 'completed').limit(2000)
   if (completedRuns.error) return NextResponse.json({ error: completedRuns.error.message }, { status: 500 })
   const activeCases = (cases.data ?? []).filter(row => isPrivateCapabilityAcceptanceOrigin(row.origin) && (!requestedTrack || String(row.track) === requestedTrack))
-  if (!activeCases.length) {
-    if (nativeSequence) return NextResponse.redirect(nativeBenchmarkPage(request, { benchmarkNative: 'error', benchmarkError: 'no_active_cases' }), 303)
-    return NextResponse.json({ ok: false, error: requestedTrack ? `No active private benchmark cases for track ${requestedTrack}.` : 'No active private benchmark cases.' }, { status: 404 })
-  }
+  if (!activeCases.length) return NextResponse.json({ ok: false, error: requestedTrack ? `No active private benchmark cases for track ${requestedTrack}.` : 'No active private benchmark cases.' }, { status: 404 })
 
   let selected = [] as typeof activeCases
-  if (nativeSequence) {
-    if (nativeStep >= activeCases.length) {
-      return NextResponse.redirect(nativeBenchmarkPage(request, {
-        benchmarkNative: 'complete',
-        benchmarkAttempted: String(boundedCount(request.nextUrl.searchParams.get('attempted'))),
-        benchmarkPassed: String(boundedCount(request.nextUrl.searchParams.get('passed'))),
-      }), 303)
-    }
-    selected = [activeCases[nativeStep]]
-  } else if (requestedCaseIds.length) {
+  if (requestedCaseIds.length) {
     const requested = new Set(requestedCaseIds)
     selected = activeCases.filter(row => requested.has(String(row.id))).slice(0, limit)
     if (selected.length !== requestedCaseIds.length) {
@@ -161,17 +111,15 @@ export async function POST(request: NextRequest) {
         console.warn('[cos-capability-benchmark] reasoner readiness failed; results will reflect run conditions, not capability:', reasonerError)
       }
 
-      // A data-center benchmark case is itself a direct local-reasoner acceptance call. Skipping the
-      // separate probe for this track preserves the one-case request's runtime budget. Other tracks
-      // keep the explicit preflight probe.
-      if (requestedTrack !== DATA_CENTER_BENCHMARK_TRACK) {
-        const probe = await probeReasoner({ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS })
-        if (probe.verdict !== 'ok') {
-          blockedVerdict = probe.verdict
-          blockedSummary = probe.summary.slice(0, 1200)
-          console.warn('[cos-capability-benchmark] blocked before scoring:', blockedVerdict, blockedSummary)
-          return
-        }
+      // Managed providers can legitimately exceed the general 45-second diagnostic probe while
+      // still completing benchmark answers successfully. Give owner-run acceptance a larger but
+      // bounded preflight window so slow healthy Qwen calls are not mislabeled as 0/0 failures.
+      const probe = await probeReasoner({ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS })
+      if (probe.verdict !== 'ok') {
+        blockedVerdict = probe.verdict
+        blockedSummary = probe.summary.slice(0, 1200)
+        console.warn('[cos-capability-benchmark] blocked before scoring:', blockedVerdict, blockedSummary)
+        return
       }
 
       for (const row of selected) {
@@ -213,35 +161,14 @@ export async function POST(request: NextRequest) {
     if (blockedVerdict) {
       const blockedError = `Reasoner unavailable (${blockedVerdict}) — no cases were scored. ${blockedSummary}`
       await db.from('cos_capability_benchmark_runs').update({ status: 'failed', completed_at: new Date().toISOString(), attempted: 0, passed: 0, error: blockedError.slice(0, 2000) }).eq('id', run.data.id)
-      if (nativeSequence) return NextResponse.redirect(nativeBenchmarkPage(request, { benchmarkNative: 'error', benchmarkError: 'reasoner_unavailable' }), 303)
       return NextResponse.json({ ok: false, runId: run.data.id, blocked: true, verdict: blockedVerdict, error: blockedError, reasonerReady, reasonerError: reasonerError || undefined, next: 'GET /api/admin/cos-reasoner/diagnose for the full probe.' }, { status: 503 })
     }
 
     await db.from('cos_capability_benchmark_runs').update({ status: 'completed', completed_at: new Date().toISOString(), attempted, passed }).eq('id', run.data.id)
-
-    if (nativeSequence) {
-      const totalAttempted = boundedCount(request.nextUrl.searchParams.get('attempted')) + attempted
-      const totalPassed = boundedCount(request.nextUrl.searchParams.get('passed')) + passed
-      const nextStep = nativeStep + 1
-      if (nextStep < activeCases.length) {
-        const next = new URL(request.url)
-        next.searchParams.set('step', String(nextStep))
-        next.searchParams.set('attempted', String(totalAttempted))
-        next.searchParams.set('passed', String(totalPassed))
-        return NextResponse.redirect(next, 307)
-      }
-      return NextResponse.redirect(nativeBenchmarkPage(request, {
-        benchmarkNative: 'complete',
-        benchmarkAttempted: String(totalAttempted),
-        benchmarkPassed: String(totalPassed),
-      }), 303)
-    }
-
     return NextResponse.json({ ok: true, runId: run.data.id, track: requestedTrack || null, caseIds: selected.map(row => String(row.id)), attempted, passed, passRate: attempted ? passed / attempted : 0, reasonerReady, reasonerError: reasonerError || undefined })
   } catch (error) {
     const message = errorText(error).slice(0, 2000)
     await db.from('cos_capability_benchmark_runs').update({ status: 'failed', completed_at: new Date().toISOString(), attempted, passed, error: message }).eq('id', run.data.id)
-    if (nativeSequence) return NextResponse.redirect(nativeBenchmarkPage(request, { benchmarkNative: 'error', benchmarkError: 'benchmark_request_failed' }), 303)
     return NextResponse.json({ ok: false, runId: run.data.id, track: requestedTrack || null, error: message, reasonerReady, reasonerError: reasonerError || undefined }, { status: 500 })
   }
 }

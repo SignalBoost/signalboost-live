@@ -7,7 +7,7 @@ import {
   promptEchoNonAnswer,
   reasonerDraftNeedsRepair,
 } from '../lib/ai/cos/reasonerQuality.ts'
-import { quantitativeEngineeringUnsupportedClaims } from '../lib/ai/cos/quantitativeEngineeringIntegrity.ts'
+import { quantitativeEngineeringRepairSignals, quantitativeEngineeringUnsupportedClaims } from '../lib/ai/cos/quantitativeEngineeringIntegrity.ts'
 
 const PROMPT = 'A multi-tenant SaaS has normal DB CPU and memory, but API p95 latency triples only for enterprise tenants. Smaller tenants are unaffected, no deployment occurred, and traffic is unchanged. Diagnose and rank the most likely architectural causes without making production changes.'
 
@@ -65,6 +65,15 @@ const H100_OVERCONFIDENT = JSON.stringify({
   confidence: 0.91,
 })
 
+const H100_NEAR_MISS = JSON.stringify({
+  answer: [
+    'The price delta is $0.08/kWh and the example uses explicitly illustrative power and egress assumptions. Under those assumptions, migrate immediately.',
+    'After a completed optimizer update, save model, optimizer, scheduler/scaler, RNG, global step, data-loader/sampler cursor, and sharding topology.',
+    'Write immutable generation shards, verify checksums, publish a COMMITTED manifest, fence the source, activate the destination as the sole writer, and resume from the next optimizer step.',
+  ].join(' '),
+  confidence: 0.82,
+})
+
 test('the currently observed generic benchmark draft triggers one local repair', () => {
   const quality = assessReasonerDraft(PROMPT, GENERIC)
   assert.equal(quality.parseable, true)
@@ -117,8 +126,8 @@ test('quantitative echo repair requires formulas, missing inputs, entity fidelit
   assert.match(repair, /object-store directory atomic/i)
 })
 
-test('the observed overconfident H100 answer is blocked for assumption promotion and protocol defects', () => {
-  const signals = quantitativeEngineeringUnsupportedClaims(H100_PROMPT, H100_OVERCONFIDENT)
+test('the observed overconfident H100 answer triggers repair while structural defects remain blocking', () => {
+  const repairSignals = quantitativeEngineeringRepairSignals(H100_PROMPT, H100_OVERCONFIDENT)
   for (const expected of [
     'break_even_mischaracterized',
     'illustrative_assumption_promoted_to_decision',
@@ -129,13 +138,25 @@ test('the observed overconfident H100 answer is blocked for assumption promotion
     'checkpoint_missing_generation_manifest',
     'checkpoint_missing_source_fencing',
     'checkpoint_transfer_overhead_not_parameterized',
-  ]) {
-    assert.ok(signals.includes(expected), `${expected}: ${signals.join(', ')}`)
-  }
+  ]) assert.ok(repairSignals.includes(expected), `${expected}: ${repairSignals.join(', ')}`)
+  const blockers = quantitativeEngineeringUnsupportedClaims(H100_PROMPT, H100_OVERCONFIDENT)
+  assert.ok(blockers.includes('invalid_multi_object_checkpoint_atomicity'))
+  assert.ok(blockers.includes('checkpoint_missing_generation_manifest'))
+  assert.ok(!blockers.includes('illustrative_assumption_promoted_to_decision'))
+  assert.ok(!blockers.includes('checkpoint_transfer_overhead_not_parameterized'))
   assert.equal(reasonerDraftNeedsRepair(H100_PROMPT, H100_OVERCONFIDENT), true)
 })
 
+test('a near-miss remains a repair target but no longer collapses into a hard release refusal', () => {
+  const repairSignals = quantitativeEngineeringRepairSignals(H100_PROMPT, H100_NEAR_MISS)
+  assert.ok(repairSignals.includes('illustrative_assumption_promoted_to_decision'))
+  assert.ok(repairSignals.includes('checkpoint_transfer_overhead_not_parameterized'))
+  assert.deepEqual(quantitativeEngineeringUnsupportedClaims(H100_PROMPT, H100_NEAR_MISS), [])
+  assert.equal(reasonerDraftNeedsRepair(H100_PROMPT, H100_NEAR_MISS), true)
+})
+
 test('a parameterized H100 answer with a committed checkpoint generation is releasable', () => {
+  assert.deepEqual(quantitativeEngineeringRepairSignals(H100_PROMPT, H100_SUBSTANTIVE), [])
   assert.deepEqual(quantitativeEngineeringUnsupportedClaims(H100_PROMPT, H100_SUBSTANTIVE), [])
   assert.equal(reasonerDraftNeedsRepair(H100_PROMPT, H100_SUBSTANTIVE), false)
 })
@@ -146,13 +167,15 @@ test('derived arithmetic is allowed when it stays conditional instead of becomin
     answer: 'The stated electricity-price delta is $0.08/kWh. If average cluster power is P kW and the job runs another T hours, power savings are 0.08 × P × T dollars. If egress price is E dollars/GB, the maximum break-even transfer volume is (0.08 × P × T) / E GB. Those variables were not supplied, so this is a relation rather than a migrate/no-migrate recommendation.',
     confidence: 0.9,
   })
+  assert.deepEqual(quantitativeEngineeringRepairSignals(arithmeticPrompt, answer), [])
   assert.deepEqual(quantitativeEngineeringUnsupportedClaims(arithmeticPrompt, answer), [])
 })
 
 test('quantitative integrity repair explicitly separates assumptions from decisions and fixes distributed commit semantics', () => {
   const repair = buildDiagnosticRepairPrompt(H100_PROMPT, H100_OVERCONFIDENT)
   assert.match(repair, /GIVEN facts, DERIVED values, and ILLUSTRATIVE assumptions/i)
-  assert.match(repair, /unconditional recommendation/i)
+  assert.match(repair, /transfer time = checkpoint bytes \/ effective transfer throughput/i)
+  assert.match(repair, /Do NOT write “migrate immediately”/i)
   assert.match(repair, /completed optimizer-step boundary/i)
   assert.match(repair, /data-loader\/sampler position/i)
   assert.match(repair, /manifest\/COMMITTED pointer/i)

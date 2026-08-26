@@ -13,6 +13,10 @@ const DATA_PROGRESS = /\b(?:data[- ]?loader|sampler|sample\s+(?:index|cursor)|sh
 const COMMIT_MANIFEST = /\b(?:manifest|checkpoint\s+generation|generation\s+(?:id|number)|commit(?:ted)?\s+(?:marker|pointer|generation)|publish(?:ed|ing)?\s+(?:the\s+)?manifest)\b/i
 const SOURCE_FENCING = /\b(?:fenc(?:e|ed|ing)|single[- ]writer|active\s+site|source[\s\S]{0,80}(?:drain|stop|inactive|fenc)|destination[\s\S]{0,80}(?:activate|active))\b/i
 const TRANSFER_TIME_RELATION = /\b(?:transfer\s+time|copy\s+time|checkpoint\s+(?:size|bytes)[\s\S]{0,100}(?:bandwidth|throughput)|(?:bandwidth|throughput)[\s\S]{0,100}checkpoint\s+(?:size|bytes))\b|\bC\s*\/\s*B\b/i
+const REPAIR_ONLY_SIGNALS = new Set([
+  'illustrative_assumption_promoted_to_decision',
+  'checkpoint_transfer_overhead_not_parameterized',
+])
 
 function latestUserRequest(prompt: string): string {
   const text = String(prompt ?? '').trim()
@@ -69,15 +73,7 @@ function gpuCountBecameNodeCount(request: string, answer: string): boolean {
   return false
 }
 
-/**
- * Deterministic answer-integrity checks for quantitative engineering work.
- *
- * Derived arithmetic is allowed. Illustrative assumptions are allowed. What is not allowed is to
- * silently turn those assumptions into measured premises or an unconditional operational decision,
- * mutate the entity attached to a supplied count, or describe a distributed checkpoint protocol in
- * a way that can publish mixed/partial state as committed.
- */
-export function quantitativeEngineeringUnsupportedClaims(prompt: string, raw: string): string[] {
+function collectQuantitativeEngineeringSignals(prompt: string, raw: string): string[] {
   const request = latestUserRequest(prompt)
   if (!QUANTITATIVE_ENGINEERING_TASK.test(request)) return []
   const parsed = parseLocalResult(String(raw ?? ''))
@@ -88,33 +84,43 @@ export function quantitativeEngineeringUnsupportedClaims(prompt: string, raw: st
   if (/\bfundamental\s+category\s+error\b/i.test(answer) && /\bbreak[- ]even\b/i.test(request)) {
     signals.push('break_even_mischaracterized')
   }
-
   if (ASSUMPTION_LANGUAGE.test(answer) && unqualifiedStrongDecision(answer)) {
     signals.push('illustrative_assumption_promoted_to_decision')
   }
-
   if (gpuCountBecameNodeCount(request, answer)) {
     signals.push('premise_entity_count_mutation')
   }
-
   if (CHECKPOINT_TASK.test(request)) {
     if (OBJECT_STORE.test(answer) && FALSE_OBJECT_ATOMICITY.test(answer)) {
       signals.push('invalid_multi_object_checkpoint_atomicity')
     }
-
     if (EXACT_CONSISTENCY_TASK.test(request)) {
       if (!COMMITTED_STEP.test(answer)) signals.push('checkpoint_not_at_committed_optimizer_step')
       if (!DATA_PROGRESS.test(answer)) signals.push('checkpoint_missing_data_progress_state')
       if (!COMMIT_MANIFEST.test(answer)) signals.push('checkpoint_missing_generation_manifest')
       if (!SOURCE_FENCING.test(answer)) signals.push('checkpoint_missing_source_fencing')
     }
-
     if (/\b(?:network|synchroni[sz]ation|overhead|bandwidth|throughput)\b/i.test(request) && !TRANSFER_TIME_RELATION.test(answer)) {
       signals.push('checkpoint_transfer_overhead_not_parameterized')
     }
   }
-
   return [...new Set(signals)]
+}
+
+/** All quality findings that should trigger one bounded local repair. */
+export function quantitativeEngineeringRepairSignals(prompt: string, raw: string): string[] {
+  return collectQuantitativeEngineeringSignals(prompt, raw)
+}
+
+/**
+ * Hard release blockers only. Two completeness/calibration findings remain repair targets but do
+ * not discard an otherwise useful answer after a local repair: an over-strong illustrative
+ * recommendation and a missing explicit transfer-time parameterization. Structural correctness
+ * defects (topology mutation, mixed/partial checkpoint semantics, false object-store atomicity,
+ * missing optimizer-step/data-progress/generation/fencing invariants) remain fail-closed.
+ */
+export function quantitativeEngineeringUnsupportedClaims(prompt: string, raw: string): string[] {
+  return collectQuantitativeEngineeringSignals(prompt, raw).filter(signal => !REPAIR_ONLY_SIGNALS.has(signal))
 }
 
 export function quantitativeEngineeringRepairInstruction(prompt: string, signals: readonly string[]): string {
@@ -123,16 +129,22 @@ export function quantitativeEngineeringRepairInstruction(prompt: string, signals
     '',
     `QUALITY REPAIR — quantitative/engineering integrity checks failed: ${signals.join(', ')}.`,
     'Re-solve the ORIGINAL request from the supplied premises. Keep useful derived arithmetic, but separate GIVEN facts, DERIVED values, and ILLUSTRATIVE assumptions.',
-    '- A missing input lowers numeric precision; it does not make a break-even comparison a category error. Give a symbolic equation or sensitivity relation when an exact number is unavailable.',
-    '- An illustrative assumption may support an illustrative worked example only. Do not turn it into an unconditional recommendation such as “migrate immediately” or “break-even is immediate.” State the actual measurements/contract prices needed for that decision.',
-    '- Preserve entity types exactly. A count of GPUs/accelerators is not a count of nodes/hosts/servers unless the user supplied that topology.',
-    '- Quantify checkpoint transfer overhead as checkpoint bytes divided by effective transfer throughput, plus quiesce/barrier/verification time and any repeated synchronization or training-throughput penalty.',
-    '- For exact training continuation, checkpoint at a completed optimizer-step boundary after required collectives and the optimizer update. If checkpointing mid-accumulation instead, explicitly persist the partial gradient/accumulation state.',
-    '- Persist model/shard state, optimizer state, scheduler/scaler state when used, RNG state, global optimizer step, data-loader/sampler position, and sharding/topology metadata needed to reconstruct the same state.',
-    '- For multi-object/object-store checkpoints, write immutable generation-scoped shards, verify checksums, then publish a manifest/COMMITTED pointer only after every required shard validates. An object-store “directory” is not an atomic transaction, and completing one multipart object does not atomically commit the whole checkpoint.',
-    '- Fence or fully deactivate the source before the destination becomes the sole active writer. Never resume from a mixed or partially committed generation.',
-    '- Keep the final recommendation conditional on the measured egress tariff, total bytes that must cross regions, actual cluster power, effective network throughput, remaining runtime, and any throughput slowdown when those values were not supplied.',
     '',
+    'MANDATORY OUTPUT CONTRACT:',
+    '1. Compute every quantity directly supported by the prompt. For missing inputs, introduce symbols and give the equation instead of refusing or inventing a measurement.',
+    '2. State the electricity-price delta explicitly when it is supplied by the prompt.',
+    '3. For migration economics, give a symbolic total-cost/break-even relation using actual cluster power, transfer bytes, egress tariff, remaining runtime, and any recurring synchronization traffic.',
+    '4. For checkpoint/network overhead, include this relation in equivalent words or notation: transfer time = checkpoint bytes / effective transfer throughput + quiesce/barrier/verification time. Also account for repeated synchronization or training-throughput penalty when relevant.',
+    '5. If you use an illustrative numeric example, label every added number as illustrative. The final recommendation MUST remain conditional on actual measured/contracted values.',
+    '6. Do NOT write “migrate immediately”, “move immediately”, “proceed immediately”, “break-even is immediate”, or an equivalent unconditional operational recommendation unless the user supplied all variables that make it true.',
+    '7. Preserve entity types exactly. A count of GPUs/accelerators is not a count of nodes/hosts/servers unless the user supplied that topology.',
+    '8. For exact training continuation, checkpoint at a completed optimizer-step boundary after required collectives and the optimizer update. If checkpointing mid-accumulation instead, explicitly persist the partial gradient/accumulation state.',
+    '9. Persist model/shard state, optimizer state, scheduler/scaler state when used, RNG state, global optimizer step, data-loader/sampler position, and sharding/topology metadata needed to reconstruct the same state.',
+    '10. For multi-object/object-store checkpoints, write immutable generation-scoped shards, verify checksums, then publish a manifest/COMMITTED pointer only after every required shard validates. An object-store “directory” is not an atomic transaction, and completing one multipart object does not atomically commit the whole checkpoint.',
+    '11. Fence or fully deactivate the source before the destination becomes the sole active writer. Never resume from a mixed or partially committed generation.',
+    '12. Do not call a valid parameterized break-even problem a “fundamental category error” merely because some values are missing.',
+    '',
+    'Your final paragraph must explicitly distinguish: (a) what is known from the prompt, (b) what remains unknown, and (c) what measurements or contract prices decide the real move/no-move decision.',
     'Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Do not mention this repair instruction or the rejected draft.',
   ].join('\n')
 }

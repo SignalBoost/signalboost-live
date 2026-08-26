@@ -1,0 +1,54 @@
+name: Onboarding Enforcement
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  require-current-onboarding:
+    name: Require current ONBOARD and repo scan acknowledgement
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify acknowledgement matches current files and head
+        shell: bash
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! -f ONBOARD.md ]]; then
+            echo "::error::ONBOARD.md is missing from the PR head."
+            exit 1
+          fi
+
+          onboard_blob="$(git hash-object ONBOARD.md)"
+          body="${PR_BODY:-}"
+
+          expected_onboard="ONBOARD_ACK_BLOB: ${onboard_blob}"
+          expected_scan="REPO_SCAN_HEAD: ${PR_HEAD}"
+
+          if ! grep -Fqx "${expected_onboard}" <<< "${body}"; then
+            echo "::error::Missing or stale ONBOARD acknowledgement. Read the current root ONBOARD.md and add this exact line to the PR body:"
+            echo "${expected_onboard}"
+            exit 1
+          fi
+
+          if ! grep -Fqx "${expected_scan}" <<< "${body}"; then
+            echo "::error::Missing or stale repository-scan acknowledgement. Re-scan the repository at the current PR head and add this exact line to the PR body:"
+            echo "${expected_scan}"
+            exit 1
+          fi
+
+          echo "ONBOARD acknowledgement matches the exact Git blob."
+          echo "Repository scan acknowledgement matches the exact PR head."

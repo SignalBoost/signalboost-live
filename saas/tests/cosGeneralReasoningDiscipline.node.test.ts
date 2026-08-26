@@ -2,10 +2,58 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { COS_GENERAL_REASONING_DISCIPLINE } from '../lib/ai/cos/cosGeneralReasoningDiscipline.ts'
+import {
+  COS_BEHAVIORAL_CONTRACT,
+  COS_BEHAVIORAL_CONTRACT_VERSION,
+  COS_DECISION_PRIORITY,
+} from '../lib/ai/cos/cosBehavioralContract.ts'
 
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
 
-test('global reasoning guidance is safety-only and does not smuggle an unvalidated ambiguity skill into live prompts', () => {
+test('COS behavioral contract is versioned and preserves the owner-defined decision priority', () => {
+  assert.equal(COS_BEHAVIORAL_CONTRACT_VERSION, 'cos-behavioral-contract-v1')
+  assert.deepEqual(COS_DECISION_PRIORITY, ['safety', 'accuracy', 'autonomy', 'speed', 'cost', 'convenience'])
+  assert.match(COS_BEHAVIORAL_CONTRACT, /safety first, then accuracy, then autonomy, then speed, then cost, then convenience/i)
+})
+
+test('COS behavioral contract requires challenge, proactive completion, evidence and uncertainty discipline', () => {
+  const rule = COS_BEHAVIORAL_CONTRACT
+  assert.match(rule, /Do not blindly agree/i)
+  assert.match(rule, /at least one concrete example/i)
+  assert.match(rule, /Pursue tasks end-to-end/i)
+  assert.match(rule, /Be proactive rather than merely reactive/i)
+  assert.match(rule, /strongest available current evidence path/i)
+  assert.match(rule, /continue searching or validating/i)
+  assert.match(rule, /best-supported answer available/i)
+  assert.match(rule, /When sources conflict/i)
+})
+
+test('COS behavioral contract governs learning, knowledge lifecycle, privacy and repository awareness', () => {
+  const rule = COS_BEHAVIORAL_CONTRACT
+  assert.match(rule, /Learning must be purpose-driven/i)
+  assert.match(rule, /Knowledge age alone is not a reason to discard it/i)
+  assert.match(rule, /weakened, quarantined, replaced, or forgotten/i)
+  assert.match(rule, /Minimize private or confidential information/i)
+  assert.match(rule, /inspect the current repository and canonical onboarding/i)
+  assert.match(rule, /Do not ask a human for information that the repository, documentation, telemetry, or live evidence can answer/i)
+})
+
+test('COS behavioral contract preserves human control for consequential decisions', () => {
+  const rule = COS_BEHAVIORAL_CONTRACT
+  assert.match(rule, /Consequential actions must remain behind deterministic human-approval governance/i)
+  assert.match(rule, /Never treat model confidence as permission to bypass an approval gate/i)
+  assert.match(rule, /safety, financial, legal, privacy, security, destructive, external-effect, irreversible, or major platform-impact decisions/i)
+
+  const governance = read('../agent-gateway/governance.ts')
+  const types = read('../agent-gateway/types.ts')
+  assert.match(governance, /money \/ safety \/ data \/ external \/ unknown are ALWAYS human-gated/i)
+  assert.match(governance, /reversible_internal action, explicitly listed, with a rollback/i)
+  assert.match(governance, /Default — halt/i)
+  assert.match(types, /'financial', 'safety', 'data_destructive', 'external_effect', 'unknown'/)
+})
+
+test('global reasoning guidance includes the COS behavioral contract and does not smuggle an unvalidated ambiguity skill into live prompts', () => {
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /COS BEHAVIORAL CONTRACT cos-behavioral-contract-v1/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /do not invent missing context/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /validated cognitive-skill path/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /do not expose hidden scratchpad or chain-of-thought/i)
@@ -59,7 +107,7 @@ test('backup brain carries scenario-premise and modeled-outcome boundaries too',
   assert.match(brain, /Never say a prototype or discovery phase is complete or that sufficient insights were extracted/i)
 })
 
-test('every reasoning worker receives only the lifecycle-neutral safety invariants, including primary', () => {
+test('every reasoning worker receives the lifecycle-neutral safety and behavioral invariants, including primary', () => {
   const source = read('../lib/ai/cos/cosReasoningWorkers.ts')
   assert.match(source, /COS_GENERAL_REASONING_DISCIPLINE/)
   assert.match(source, /\[request\.systemPrompt, COS_GENERAL_REASONING_DISCIPLINE, roleGuidance\]/)

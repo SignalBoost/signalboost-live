@@ -191,7 +191,7 @@ test('certification rotates candidates, recovers interrupted work, and stops exh
   assert.match(source, /private_holdouts_exhausted_without_learned_threshold/)
 })
 
-test('daily mining records cognitive skill pipeline health without persisting user prompts', () => {
+test('daily mining records cognitive skill pipeline health without persisting request text', () => {
   const cron = read('../app/api/cron/cos-mining/route.ts')
   const health = read('../lib/ai/cos/cognitiveSkillPipelineHealth.ts')
   assert.match(cron, /recordCognitiveSkillPipelineHealth/)
@@ -200,5 +200,6 @@ test('daily mining records cognitive skill pipeline health without persisting us
   assert.match(health, /awaitingIndependentEvaluation/)
   assert.match(health, /privateCertificationPending/)
   assert.match(health, /cos-cognitive-skill-pipeline-health-v1/)
-  assert.doesNotMatch(health, /prompt_hash|prompt:\s|user prompt/i)
+  assert.doesNotMatch(health, /prompt_hash|prompt\s*:/i)
+  assert.doesNotMatch(health, /\.select\([^)]*prompt/i)
 })

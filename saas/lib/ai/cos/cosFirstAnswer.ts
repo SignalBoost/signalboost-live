@@ -56,7 +56,6 @@ import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementat
 import { executiveDecisionUnsupportedClaims } from './reasonerQuality.ts'
 import { filterPublicCorpusRows, publicCorpusFunnel } from './publicCorpusEvidence.ts'
 import { queryNearestLearnedCorpus } from './learnedCorpusSemantic.ts'
-import { generateLocalEmbedding } from './localEmbeddings.ts'
 import { selectGroundingEvidence, groundingPromptBlock } from './grounding.ts'
 import { blockingReleaseSignals } from './releaseSignalSeverity.ts'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'

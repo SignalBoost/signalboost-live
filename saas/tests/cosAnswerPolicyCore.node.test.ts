@@ -49,11 +49,24 @@ test('the policy itself names no internal component, model or vendor', () => {
   assert.ok(!/COS_REASONER|cos_campaign|process\.env/i.test(text))
 })
 
-test('the policy carries no domain constants — those belong in the corpus', () => {
-  // A prompt cannot hold a reference library. Bytes-per-parameter, heat transfer coefficients and
-  // the 80% continuous-load rule live in learned corpus documents, not here.
+test('the policy carries the pinned constants exactly once', () => {
+  // ORIGINAL INTENT (superseded): this asserted the policy held NO constants, on the theory that a
+  // prompt cannot hold a reference library. Measurement said otherwise — corpus documents,
+  // retrieval ranking and an explicit classification rule all failed to get the right figure into
+  // an answer, so a short constants block is pinned and reaches both prompts THROUGH this policy.
+  // The rule that survives is single-sourcing: the constants live in engineeringConstants.ts and
+  // are spliced in one place, never copied and never injected twice.
   const text = quantitativeAnswerPolicyText()
-  assert.ok(!/bytes per (?:param|element)|4\.19|0\.0698|80%/i.test(text))
+  assert.match(text, /REFERENCE CONSTANTS/)
+  assert.equal(text.split('REFERENCE CONSTANTS').length - 1, 1, 'constants must appear exactly once')
+
+  for (const path of ['lib/ai/cos/cosFirstAnswer.ts', 'lib/ai/cos/cosFirstAnswerEnterprise.ts']) {
+    const source = readFileSync(path, 'utf8')
+    assert.ok(
+      !/\.\.\.ENGINEERING_CONSTANTS,/.test(source),
+      `${path} must not splice the constants directly — they arrive via QUANTITATIVE_ANSWER_POLICY`,
+    )
+  }
 })
 
 test('the policy is a non-empty array of strings and joins cleanly', () => {

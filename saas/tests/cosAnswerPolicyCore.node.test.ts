@@ -62,3 +62,43 @@ test('the policy is a non-empty array of strings and joins cleanly', () => {
   for (const line of QUANTITATIVE_ANSWER_POLICY) assert.equal(typeof line, 'string')
   assert.ok(quantitativeAnswerPolicyText().includes('\n'))
 })
+
+// ---------------------------------------------------------------------------------------------
+// Over-firing refusal (2026-08-26).
+// ---------------------------------------------------------------------------------------------
+
+test('the three quantity classes are defined, each with its own obligation', () => {
+  // Production: asked to compute a migration break-even, COS returned a framework and asked for
+  // "the total power draw of the cluster" — a published device rating it is expected to supply.
+  // It did this twice, including immediately after the owner replied "proceed on standard
+  // assumptions". One line about labelled assumptions lost the argument against several forceful
+  // lines telling it not to assert anything not given, so the rule is now explicit.
+  const text = quantitativeAnswerPolicyText()
+  assert.match(text, /GIVEN — stated in the request/)
+  assert.match(text, /STANDARD — a published specification/)
+  assert.match(text, /SITUATIONAL — knowable only from the reader/)
+})
+
+test('a standard quantity is supplied, never used as grounds to decline', () => {
+  const text = quantitativeAnswerPolicyText()
+  assert.match(text, /SUPPLY IT, label it as an assumption/)
+  assert.match(text, /Never decline because a STANDARD quantity was not stated/)
+})
+
+test('a missing situational quantity yields a formula and a worked example, not a refusal', () => {
+  const text = quantitativeAnswerPolicyText()
+  assert.match(text, /give the result as a formula in that quantity/)
+  assert.match(text, /work a labelled example through/)
+  assert.match(text, /A page of framework with no number in it is a failure/)
+})
+
+test('the classes name the kinds of figure that caused the production failures', () => {
+  const text = quantitativeAnswerPolicyText()
+  // Standard: what it should have supplied.
+  assert.match(text, /device power ratings/)
+  assert.match(text, /specific heat of water/)
+  assert.match(text, /byte widths of numeric formats/)
+  // Situational: what it was right to ask for.
+  assert.match(text, /how long their job runs/)
+  assert.match(text, /negotiated rate/)
+})

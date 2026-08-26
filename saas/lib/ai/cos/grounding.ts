@@ -1,3 +1,4 @@
+import { conceptTokens } from './groundingConcepts.ts'
 export type GroundingSystem = 'kg' | 'cl' | 'em'
 
 export type GroundingEvidence = {
@@ -10,7 +11,12 @@ export type GroundingEvidence = {
 const STOP_WORDS = new Set(['about','after','again','also','because','before','being','could','does','from','have','into','more','most','should','that','their','there','these','they','this','those','through','under','what','when','where','which','while','with','would','your','you','and','the','for','are','how','why'])
 
 function terms(text:string):string[]{
-  return [...new Set(String(text??'').toLowerCase().replace(/[^a-z0-9\s_-]/g,' ').split(/\s+/).filter(t=>t.length>=4&&!STOP_WORDS.has(t)))]
+  const literal=[...new Set(String(text??'').toLowerCase().replace(/[^a-z0-9\s_-]/g,' ').split(/\s+/).filter(t=>t.length>=4&&!STOP_WORDS.has(t)))]
+  // Concept expansion (2026-08-26): exact-token matching cannot connect a reference table to the
+  // question it answers, because they use different vocabulary for the same quantity. Applied to
+  // BOTH sides in relevanceScore, so this sharpens ranking rather than inflating every score.
+  // See groundingConcepts.ts for the measured failure that motivated it.
+  return [...literal,...conceptTokens(literal)]
 }
 
 export function relevanceScore(query:string,evidence:string):number{

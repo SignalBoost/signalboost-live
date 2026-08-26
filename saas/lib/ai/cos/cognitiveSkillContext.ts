@@ -27,6 +27,30 @@ export type CognitiveSkillContextResult = {
   items: CognitiveSkillContextItem[]
 }
 
+type CognitiveSkillRetrievalTelemetry = {
+  schema: 'cos-cognitive-skill-retrieval-efficiency-v1'
+  strongSkillsRetrieved: number
+  healthyCandidates: number
+  dependencyRejected: number
+  domainCandidates: number
+  relevant: number
+  selected: number
+  semanticMode: 'semantic' | 'lexical-fallback'
+  semanticAttempted: boolean
+  cachedCandidateEmbeddings: number
+  candidateEmbeddingsRequested: number
+  generatedCandidateEmbeddings: number
+  candidateEmbeddingsAvoided: number
+  embeddingInputsSent: number
+  queryEmbeddingsSent: number
+  candidateEmbeddingInputsSent: number
+  candidateCacheHitRate: number | null
+  skillStoreMs: number
+  dependencyHealthMs: number
+  rankingMs: number
+  totalMs: number
+}
+
 function safe(value: unknown, max = 1800): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
@@ -63,6 +87,11 @@ async function dependencyHealth(rows: any[]): Promise<Map<string, boolean>> {
   return health
 }
 
+function emitRetrievalTelemetry(telemetry: CognitiveSkillRetrievalTelemetry): void {
+  // Deliberately prompt-free: this exists only to quantify retrieval work and candidate-vector reuse.
+  console.info('[cos-cognitive-skill-retrieval]', JSON.stringify(telemetry))
+}
+
 /**
  * Live procedural retrieval is evidence-aware, not similarity-only. Captured/evaluated/understood/
  * practiced skills never enter a live answer. Composite skills also fail closed if any flattened leaf
@@ -82,10 +111,12 @@ async function dependencyHealth(rows: any[]): Promise<Map<string, boolean>> {
  * changing lifecycle eligibility, domain gating, semantic thresholds, or selection scoring.
  */
 export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<CognitiveSkillContextResult> {
+  const startedAt = Date.now()
   const empty: CognitiveSkillContextResult = { retrieved: 0, relevant: 0, selected: 0, dependencyRejected: 0, items: [] }
   const db = cosServiceDb()
   if (!db) return empty
 
+  const skillStoreStartedAt = Date.now()
   const result = await db
     .from('cos_cognitive_skills')
     .select('id,skill_key,subject,title,description,procedure,status,last_validated_at,updated_at,provenance,metadata,production_attempts,production_successes,retention_attempts,retention_successes,failure_count')
@@ -93,6 +124,7 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
     .order('last_validated_at', { ascending: false, nullsFirst: false })
     .order('updated_at', { ascending: false })
     .limit(32)
+  const skillStoreMs = Date.now() - skillStoreStartedAt
 
   if (result.error) {
     console.warn('[cos-cognitive-skill-context] retrieval failed', result.error)
@@ -100,7 +132,9 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
   }
 
   const rows = result.data ?? []
+  const dependencyStartedAt = Date.now()
   const dependency = await dependencyHealth(rows)
+  const dependencyHealthMs = Date.now() - dependencyStartedAt
   const healthyRows = rows.filter((row: any) => dependency.get(String(row.skill_key)) !== false)
   const dependencyRejected = rows.length - healthyRows.length
   const candidates = healthyRows.map(row => ({
@@ -122,6 +156,7 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
     const triggerMatches = matchingCognitiveReasoningTriggers(detectedTriggers, configuredTriggers)
     if (!semantic && !triggerMatches.length) return []
     const semanticSimilarity = semantic?.similarity ?? 0
+    // Exact structural pattern matches are deterministic relevance signals, not factual confidence.
     const contextRelevance = Math.max(semanticSimilarity, triggerMatches.length ? 1 : 0)
     return [{ row, semanticSimilarity, contextRelevance, triggerMatches }]
   })
@@ -143,6 +178,34 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
   }).filter(entry => entry.selection.eligible)
     .sort((a, b) => b.selection.selectionScore - a.selection.selectionScore)
     .slice(0, 4)
+
+  const queryEmbeddingsSent = ranked.embeddingInputsSent > 0 ? 1 : 0
+  const candidateEmbeddingInputsSent = Math.max(0, ranked.embeddingInputsSent - queryEmbeddingsSent)
+  emitRetrievalTelemetry({
+    schema: 'cos-cognitive-skill-retrieval-efficiency-v1',
+    strongSkillsRetrieved: rows.length,
+    healthyCandidates: healthyRows.length,
+    dependencyRejected,
+    domainCandidates: ranked.domainCandidates,
+    relevant: relevant.length,
+    selected: assessed.length,
+    semanticMode: ranked.mode,
+    semanticAttempted: ranked.semanticAttempted,
+    cachedCandidateEmbeddings: ranked.cachedCandidateEmbeddings,
+    candidateEmbeddingsRequested: ranked.candidateEmbeddingsRequested,
+    generatedCandidateEmbeddings: ranked.generatedCandidateEmbeddings,
+    candidateEmbeddingsAvoided: ranked.cachedCandidateEmbeddings,
+    embeddingInputsSent: ranked.embeddingInputsSent,
+    queryEmbeddingsSent,
+    candidateEmbeddingInputsSent,
+    candidateCacheHitRate: ranked.domainCandidates > 0
+      ? ranked.cachedCandidateEmbeddings / ranked.domainCandidates
+      : null,
+    skillStoreMs,
+    dependencyHealthMs,
+    rankingMs: ranked.durationMs,
+    totalMs: Date.now() - startedAt,
+  })
 
   return {
     retrieved: rows.length,

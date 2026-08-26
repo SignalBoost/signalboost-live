@@ -2,6 +2,7 @@ import { assessAnswerSpecificity } from './answerSpecificity.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
 import { classifyScriptRequest, executiveDecisionDirective, scriptRequestDirective } from './scriptRequestIntent.ts'
 import { creativeConstraintRepairInstruction, unsupportedCreativeConstraintClaims } from './creativeConstraintFidelity.ts'
+import { quantitativeEngineeringRepairInstruction, quantitativeEngineeringUnsupportedClaims } from './quantitativeEngineeringIntegrity.ts'
 
 const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
 const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!\/(?:usr\/bin\/env\s+)?(?:bash|sh|python))\b/m
@@ -89,13 +90,16 @@ export function promptEchoNonAnswer(prompt: string, raw: string): boolean {
 
 /**
  * Executive recommendations may state user-supplied facts, but must not turn uncertain outcomes
- * into facts or introduce numeric targets that the scenario never supplied.
+ * into facts or introduce numeric targets that the scenario never supplied. Quantitative engineering
+ * work uses the same release boundary for assumption promotion, premise mutation and checkpoint
+ * consistency defects even when the prompt is not an executive memo.
  */
 export function executiveDecisionUnsupportedClaims(prompt: string, raw: string): string[] {
+  const quantitativeSignals = quantitativeEngineeringUnsupportedClaims(prompt, raw)
   const securityScenario = SECURITY_SCENARIO.test(prompt)
-  if (!executiveDecisionDirective(prompt) && !securityScenario) return []
+  if (!executiveDecisionDirective(prompt) && !securityScenario) return quantitativeSignals
   const parsed = parseLocalResult(String(raw ?? ''))
-  if (!parsed) return []
+  if (!parsed) return quantitativeSignals
   const answer = parsed.answer
   const signals: string[] = []
   if (EXECUTIVE_UNSUPPORTED_CERTAINTY.test(answer)) signals.push('unsupported_certainty')
@@ -103,7 +107,7 @@ export function executiveDecisionUnsupportedClaims(prompt: string, raw: string):
   const suppliedNumbers = new Set((String(prompt).match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')))
   const novelNumber = (answer.match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')).find(value => !suppliedNumbers.has(value))
   if (novelNumber) signals.push('novel_numeric_target')
-  return signals
+  return [...new Set([...quantitativeSignals, ...signals])]
 }
 
 /** Whether a prompt asks for diagnosis/troubleshooting rather than a conceptual explanation. */
@@ -179,6 +183,7 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
 export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: string): string {
   const scriptDirective = scriptRequestDirective(originalPrompt)
   const creativeConstraintRepair = creativeConstraintRepairInstruction(originalPrompt, firstRaw)
+  const quantitativeSignals = quantitativeEngineeringUnsupportedClaims(originalPrompt, firstRaw)
   if (promptEchoNonAnswer(originalPrompt, firstRaw)) {
     const quantitative = QUANTITATIVE_TASK.test(latestUserRequest(originalPrompt))
     return [
@@ -192,6 +197,9 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: st
         'If an exact numeric result requires a missing variable (for example power draw, egress price, checkpoint size, bandwidth, transfer duration, utilization, or efficiency), name the missing input and give the symbolic break-even formula or sensitivity relation instead of inventing a value.',
         'Complete any non-numeric portion of the request — such as a protocol, consistency rule, algorithm, decision procedure, or validation sequence — when it can be answered from general technical reasoning without those missing values.',
         'Clearly distinguish assumptions from user-supplied facts. Do not present an illustrative assumption as measured reality.',
+        'Preserve entity types exactly: a count of GPUs/accelerators is not a count of nodes/hosts/servers unless the topology was supplied.',
+        'For distributed checkpoints, use a completed optimizer-step boundary (or explicitly persist partial accumulation state), immutable generation-scoped shards, checksum verification, a manifest/COMMITTED pointer, data-loader/sampler position, and source fencing before destination activation. Do not call an object-store directory atomic.',
+        'Keep any operational recommendation conditional on the missing tariff, byte volume, actual cluster power, effective throughput, remaining runtime and slowdown inputs instead of promoting illustrative assumptions into a decision.',
       ] : [
         'Add substantive reasoning, conclusions, or requested deliverables that are not merely copied from the prompt.',
         'If information is genuinely missing, state the missing input and still complete every part of the task that can be answered without it.',
@@ -210,6 +218,9 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: st
       '',
       'Return a complete fresh answer to the ORIGINAL request. Preserve the requested generate/critique/rewrite workflow when present. Do not mention this repair instruction or the rejected draft.',
     ].filter(Boolean).join('\n')
+  }
+  if (quantitativeSignals.length) {
+    return quantitativeEngineeringRepairInstruction(originalPrompt, quantitativeSignals)
   }
   if (executiveDecisionDirective(originalPrompt)) {
     return [

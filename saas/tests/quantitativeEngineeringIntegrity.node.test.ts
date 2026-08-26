@@ -61,10 +61,11 @@ test('repair contract keeps assumptions conditional and protects exact continuat
   assert.match(repair, /sole active writer/i)
 })
 
-test('ordinary derived arithmetic remains allowed', () => {
+test('ordinary derived arithmetic remains allowed when the request is arithmetic-only', () => {
+  const arithmeticPrompt = 'For a 512-GPU cluster, express the power-cost savings from a $0.11/kWh to $0.03/kWh price change and the break-even egress volume symbolically when actual cluster power P, remaining runtime T, and egress price E are not provided.'
   const answer = JSON.stringify({
     answer: 'The supplied price delta is $0.08/kWh. If power is P kW and runtime is T hours, savings are 0.08 × P × T dollars. If egress costs E dollars/GB, break-even transfer volume is (0.08 × P × T) / E GB. No unconditional migration recommendation follows until P, T and E are measured.',
     confidence: 0.9,
   })
-  assert.deepEqual(quantitativeEngineeringUnsupportedClaims(prompt, answer), [])
+  assert.deepEqual(quantitativeEngineeringUnsupportedClaims(arithmeticPrompt, answer), [])
 })

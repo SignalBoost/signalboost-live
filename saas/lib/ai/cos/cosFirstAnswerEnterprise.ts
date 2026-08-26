@@ -1,6 +1,6 @@
 // saas/lib/ai/cos/cosFirstAnswerEnterprise.ts
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
-import { ENGINEERING_CONSTANTS } from './engineeringConstants.ts'
+import { blockingReleaseSignals, advisoryReleaseSignals } from './releaseSignalSeverity.ts'
 import { resolveCalcMarkers } from './calcExpressions.ts'
 
 /**
@@ -418,11 +418,6 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
     // two channels cannot drift apart again. See cosAnswerPolicyCore.ts.
     ...QUANTITATIVE_ANSWER_POLICY,
     ...COS_OPERATING_CHARTER,
-    '',
-    // Pinned reference figures. Retrieval, ranking and an explicit GIVEN/STANDARD/SITUATIONAL
-    // rule all failed to get the right constant into an answer; see engineeringConstants.ts.
-    // RE-APPLIED 2026-08-26 after this splice was lost from both files while the module stayed.
-    ...ENGINEERING_CONSTANTS,
     '',
     'HONESTY:',
     '- Distinguish evidence from inference. Never invent sources, numbers or telemetry.',
@@ -929,12 +924,23 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     }).catch(() => null)
     const repairText = repair?.text ?? ''
     const repaired = withComputedArithmetic(repairText ? parseLocalResult(repairText) : null)
-    if (!repaired || repaired.truncated || releaseSignals(repairText).length) {
-      const reason = `Executive answer release rejected: unsupported claim signals (${executiveSignals.join(', ')}) remained after local repair.`
+    const repairUsable = Boolean(repaired && !repaired.truncated)
+    const remainingSignals = repairUsable ? releaseSignals(repairText) : executiveSignals
+    const remainingBlocking = blockingReleaseSignals(remainingSignals)
+    if (remainingBlocking.length) {
+      const reason = `Executive answer release rejected: unsupported claim signals (${remainingBlocking.join(', ')}) remained after local repair.`
       void recordKnowledgeGap(input.prompt, 0, reason)
       return { handled:false, confidence:0, reason, bestEffortReply:undefined, provenance:{ responseSource:'external_fallback_required', ...reasoningProvenance } }
     }
-    parsed = repaired
+    const remainingAdvisory = advisoryReleaseSignals(remainingSignals)
+    if (remainingAdvisory.length) {
+      // Released deliberately. The evidence funnel in provenance already reports the shortfall as
+      // "N injected -> 0 cited", which is the honest place for a retrieval-quality finding.
+      console.warn('cosFirstAnswer: advisory release signals did not block the answer', {
+        signals: remainingAdvisory, repairAttempted: true, repairUsable,
+      })
+    }
+    if (repairUsable && repaired) parsed = repaired
   }
 
   const cited = citedEvidence(parsed.answer)

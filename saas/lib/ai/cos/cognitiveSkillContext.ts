@@ -1,5 +1,5 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { rankContextCandidates } from '@/lib/ai/cos/contextRelevance'
+import { rankCognitiveSkillCandidates } from '@/lib/ai/cos/cognitiveSkillRanking'
 import { assessSkillSelection } from '@/lib/ai/cos/cognitiveMetacognition'
 import {
   cognitiveSkillReasoningTriggerKinds,
@@ -76,6 +76,10 @@ async function dependencyHealth(rows: any[]): Promise<Map<string, boolean>> {
  * Structural triggers never bypass lifecycle status and never become factual corroboration. They
  * only improve selection among already-validated procedural skills, which lets learned reasoning
  * generalize across different wording without hard-coding every future question.
+ *
+ * Stable candidate procedure embeddings are reused by exact text + embedding-model identity. The
+ * query embedding is always fresh, so this optimization reduces repeated inference cost without
+ * changing lifecycle eligibility, domain gating, semantic thresholds, or selection scoring.
  */
 export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<CognitiveSkillContextResult> {
   const empty: CognitiveSkillContextResult = { retrieved: 0, relevant: 0, selected: 0, dependencyRejected: 0, items: [] }
@@ -108,7 +112,7 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
       safe(JSON.stringify(row.procedure ?? {}), 4000),
     ].filter(Boolean).join(' '),
   }))
-  const ranked = await rankContextCandidates(prompt, candidates, { threshold: threshold(), limit: 8 })
+  const ranked = await rankCognitiveSkillCandidates(prompt, candidates, { threshold: threshold(), limit: 8 })
   const semanticById = new Map(ranked.relevant.map(candidate => [String((candidate.item as any).id), candidate]))
   const detectedTriggers = detectCognitiveReasoningTriggers(prompt)
 
@@ -118,7 +122,6 @@ export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<
     const triggerMatches = matchingCognitiveReasoningTriggers(detectedTriggers, configuredTriggers)
     if (!semantic && !triggerMatches.length) return []
     const semanticSimilarity = semantic?.similarity ?? 0
-    // Exact structural pattern matches are deterministic relevance signals, not factual confidence.
     const contextRelevance = Math.max(semanticSimilarity, triggerMatches.length ? 1 : 0)
     return [{ row, semanticSimilarity, contextRelevance, triggerMatches }]
   })

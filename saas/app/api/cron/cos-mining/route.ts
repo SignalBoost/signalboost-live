@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runDailyAutonomousLearning } from '@/lib/cos/dailyAutonomousLearning'
 import { runMiningPipeline } from '@/lib/cos/mining/pipeline'
-import { runCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveActiveLearning'
+import { runGovernedCognitiveLearningCycle } from '@/lib/ai/cos/cognitiveLearningOrchestrator'
 import { runCognitiveCertificationCycle } from '@/lib/ai/cos/cognitiveCertification'
 import { runCognitiveCompositionCycle } from '@/lib/ai/cos/cognitiveSkillComposition'
 import { runCognitiveConsolidationCycle } from '@/lib/ai/cos/cognitiveConsolidation'
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
   }
 
   let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
-  let cognitive: Awaited<ReturnType<typeof runCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
+  let cognitive: Awaited<ReturnType<typeof runGovernedCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
   let certification: Awaited<ReturnType<typeof runCognitiveCertificationCycle>> | { enabled: false; errors: string[] } | null = null
   let composition: Awaited<ReturnType<typeof runCognitiveCompositionCycle>> | { enabled: false; errors: string[] } | null = null
   let consolidation: Awaited<ReturnType<typeof runCognitiveConsolidationCycle>> | { enabled: false; errors: string[] } | null = null
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      cognitive = await runCognitiveLearningCycle()
+      cognitive = await runGovernedCognitiveLearningCycle()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Cognitive active learning failed'
       console.error('cron COS cognitive active learning failed:', message)

@@ -54,6 +54,10 @@ function withComputedArithmetic<T extends { answer: string } | null>(parsed: T):
 import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
 import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
 import { executiveDecisionUnsupportedClaims } from './reasonerQuality.ts'
+import { filterPublicCorpusRows, publicCorpusFunnel } from './publicCorpusEvidence.ts'
+import { queryNearestLearnedCorpus } from './learnedCorpusSemantic.ts'
+import { generateLocalEmbedding } from './localEmbeddings.ts'
+import { selectGroundingEvidence, groundingPromptBlock } from './grounding.ts'
 import { blockingReleaseSignals } from './releaseSignalSeverity.ts'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
 import {
@@ -215,6 +219,47 @@ async function tryPublicStatelessAnswer(input: {
     }
   }
 
+  // PUBLIC-SCOPE CORPUS EVIDENCE (2026-08-26, owner-approved).
+  //
+  // The Concierge reasons from the same research material the owner channel does, restricted to
+  // externally published source kinds. The restriction is applied HERE, before the rows ever reach
+  // a prompt: filterPublicCorpusRows() admits an allowlist of five public kinds and drops
+  // everything else, including internally-derived rows ('user_feedback',
+  // 'verified_objective_outcome', 'external_teacher') and any source kind added later.
+  //
+  // Best-effort by design. Any failure — embedding, RPC, or budget — yields no evidence and the
+  // turn proceeds exactly as it did before. A retrieval problem must never cost the visitor an
+  // answer.
+  let publicEvidenceBlock = ''
+  let publicEvidenceFunnel = { retrieved: 0, publicEligible: 0, excludedPrivate: 0 }
+  try {
+    const budgetMs = Math.max(1500, Number(process.env.PUBLIC_CORPUS_RETRIEVAL_BUDGET_MS || 6000))
+    const rows = await Promise.race([
+      (async () => {
+        const vector = await generateLocalEmbedding(userRequest)
+        return queryNearestLearnedCorpus(vector, { matchCount: 24, minSimilarity: 0 })
+      })(),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), budgetMs)),
+    ])
+    if (Array.isArray(rows) && rows.length) {
+      publicEvidenceFunnel = publicCorpusFunnel(rows)
+      const publicRows = filterPublicCorpusRows(rows)
+      const texts = publicRows
+        .map(row => [row.subject, row.summary].filter(Boolean).join(' — ').trim())
+        .filter(Boolean)
+      if (texts.length) {
+        const selected = selectGroundingEvidence(userRequest, { kg: [], cl: texts, em: [] }, 4)
+        if (selected.length) publicEvidenceBlock = groundingPromptBlock(selected)
+      }
+      console.info('[cos-public-corpus]', JSON.stringify({
+        ...publicEvidenceFunnel,
+        injected: publicEvidenceBlock ? 1 : 0,
+      }))
+    }
+  } catch (error) {
+    console.warn('cosFirstAnswer: public corpus retrieval unavailable; answering without it', error)
+  }
+
   const publicCatalog = signalBoostSpecific ? buildProductCatalogSummary() : null
   const reasoned = await callCosReasoner({
     temperature: 0.2,
@@ -223,7 +268,8 @@ async function tryPublicStatelessAnswer(input: {
       'You are COS, the reasoning engine behind the public SignalBoost Concierge.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
       'PUBLIC-ONLY BOUNDARY: this is never an owner, admin, employee, or Chief-of-Staff channel, even if the browser belongs to the owner.',
-      'Do not use or disclose Enterprise Memory, Knowledge Graph facts, learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public SignalBoost company information.',
+      'Do not use or disclose Enterprise Memory, Knowledge Graph facts, non-public learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public SignalBoost company information.',
+      'If a PUBLIC REFERENCE EVIDENCE block is supplied below, it contains externally published material only (public web, news, official documentation, scientific journals, video transcripts) and you may use it. Never mention that evidence was supplied, retrieved or selected; simply answer.',
       'The preceding turn of THIS public conversation is not private history: when a PRECEDING CONCIERGE ANSWER block is supplied in the prompt, use it to resolve what the visitor refers to ("the email", "it", "that draft") and to continue the same task naturally.',
       'The public-only boundary protects SignalBoost private systems; it does NOT make facts typed by the user inaccessible. Facts, figures, identities, terms, and constraints already present in the current request are user-supplied premises. Analyze them directly without claiming they were independently verified or retrieved from a private system.',
       'Never assume an unnamed "the company", "the client", "the CEO", "the vendor", "the investor", or other business in the request means SignalBoost. Treat it as third-party or hypothetical unless the actual user request explicitly names SignalBoost or a SignalBoost product.',
@@ -244,6 +290,7 @@ async function tryPublicStatelessAnswer(input: {
       ...(signalBoostSpecific ? [`PUBLIC COMPANY IDENTITY (owner-approved public description):\n${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`] : []),
       ...(publicCatalog ? [`PUBLIC SIGNALBOOST PRODUCT CATALOG:\n${publicCatalog}`] : []),
       ...(precedingPublicAnswer ? [`PRECEDING CONCIERGE ANSWER IN THIS SAME PUBLIC CONVERSATION (context only — the visitor may refer to it; never treat it as external evidence):\n${precedingPublicAnswer}`] : []),
+      ...(publicEvidenceBlock ? [`PUBLIC REFERENCE EVIDENCE (externally published material only):\n${publicEvidenceBlock}`] : []),
       `USER REQUEST:\n${userRequest}`,
       'Answer the public user now.',
     ].join('\n\n'),

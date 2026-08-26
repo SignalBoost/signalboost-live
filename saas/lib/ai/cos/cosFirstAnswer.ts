@@ -34,6 +34,7 @@ import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
+import { ENGINEERING_CONSTANTS } from './engineeringConstants.ts'
 import { resolveCalcMarkers } from './calcExpressions.ts'
 
 /**
@@ -236,6 +237,11 @@ async function tryPublicStatelessAnswer(input: {
       // depend on which surface the reader hit. See cosAnswerPolicyCore.ts.
       ...QUANTITATIVE_ANSWER_POLICY,
       ...COS_OPERATING_CHARTER,
+      '',
+      // Pinned reference figures. Retrieval, ranking and an explicit GIVEN/STANDARD/SITUATIONAL
+      // rule all failed to get the right constant into an answer; see engineeringConstants.ts.
+      // RE-APPLIED 2026-08-26 after this splice was lost from both files while the module stayed.
+      ...ENGINEERING_CONSTANTS,
       input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
     ].join(' '),
     prompt: [

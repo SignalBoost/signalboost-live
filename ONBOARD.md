@@ -3,17 +3,17 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.24  
-**Updated:** 2026-08-24 UTC  
+**Version:** 1.25  
+**Updated:** 2026-08-26 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Baseline `main`:** `6a5cc137ec2bd7f709a26ae55db55553b4a3fb40`  
-**Baseline Production deployment:** `dpl_ALEc7zZvo1R3WnqC9YS4aV3c1saL` — READY, `saas.signalboostapp.com` attached  
+**Accepted cognitive implementation baseline:** `f1aa33e6bba67f4f26788cc62cf19dfdde673c0f`  
+**Accepted Production deployment:** `dpl_AL68Xr1SVePj1FdXZBB8PNrhFKEL` — READY, `saas.signalboostapp.com` attached  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
-**Procedural-learning state:** autonomous certification architecture is Production; individual skills still earn lifecycle status from evidence  
-**Next learning priority:** observe real certification progression, then Retrieval Self-Reflection and calibration / strategy-selection learning  
+**Procedural-learning state:** autonomous private certification is Production for context ambiguity, performance-regression diagnosis, and architecture discovery; dead-end self-generated practice is guarded; individual skills still earn lifecycle status from evidence  
+**Next learning priority:** observe real certification progression for the three private profile families, then reduce live cognitive-skill retrieval cost and continue Retrieval Self-Reflection / calibration / strategy-selection learning  
 **Owner knowledge intake:** Feed COS directed study is LIVE at `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚 entry, owner-only)  
 **Concierge/COS public-assistant state:** public/private execution boundary and five-language text transformation are Production; additional semantic-edit + conversation-handoff hardening is Preview evidence until current `main` is reverified  
 **New product workstream:** `SignalBoost Data Center Operations Intelligence` — Phase 1 read-only/advisory implementation is active on `feat/datacenter-operations-intelligence-20260824`; it is **not yet Production**
@@ -187,7 +187,7 @@ Known acceptance before the latest `main` synchronization:
 - all 9 data-center operations tests passed;
 - route-config guard passed;
 - strip-safety guard passed;
-- i18n page-copy and locale-key guards passed;
+- i18n page-copy and locale-key guards passed across EN/ES/PT/PL/RU;
 - generated UI completeness remained 2,828 keys across EN/ES/PT/PL/RU;
 - optimized Next.js compile and build completed.
 
@@ -392,7 +392,7 @@ Relevant merged sequence on 2026-08-24:
 - **#1478** — executive communication framework across EN/PT-BR/ES/PL/RU;
 - **#1479** — quoted email retained as read-only context, second-pass professional copy editing, and initial composer-reset work.
 
-Historical Production baseline immediately after #1479 plus the first deterministic contextual guard was `main` `3a3dc7a8c0d246f5b6b884b820ddab89e3811947`, deployment `dpl_7RMTmwRwCrSjPkyhVY8F8cpbiYrX` — READY. Always use the current top-of-file baseline for present Production state.
+Historical Production baseline immediately after #1479 plus the first deterministic contextual guard was `main` `3a3dc7a8c0d246f5b6b884b820ddab89e3811947`, deployment `dpl_7RMTmwRwCrSjPkyhVY8F8cpbiYrX` — READY. Always use the current top-of-file accepted baseline for present Production state.
 
 ## Historical hardening branch evidence
 
@@ -572,30 +572,31 @@ Its structural trigger family includes:
 - `underspecified_comparison`;
 - `vague_temporal_reference`.
 
+Current trigger detection also covers the corresponding imperative and final-clause ambiguity forms through deterministic structural tests; do not treat trigger matching as validation or factual evidence.
+
 The candidate includes explicit observables and falsifiers. It is not promoted merely because the procedure looks sensible.
 
 ---
 
 # Autonomous cognitive skill certification — IMPLEMENTED AND PRODUCTION
 
-PR #1376 merged as:
+Initial autonomous-certification architecture landed in PR #1376. The latest accepted expansion is PR #1526, merged as:
 
-`9bf0a5540c6cdbd409c52a20b9f4aa4587f31bd7`
+`f1aa33e6bba67f4f26788cc62cf19dfdde673c0f`
 
-Production deployment:
+Accepted Production deployment:
 
-`dpl_483vcZK87vq9cB4ULw6pich3stua` — READY
+`dpl_AL68Xr1SVePj1FdXZBB8PNrhFKEL` — READY
 
-Exact acceptance before merge:
+Exact #1526 acceptance:
 
-- 10/10 GitHub workflows passed on the exact feature head;
-- Vercel Preview READY on the same head;
-- enforced COS deployment suite: 112/112 tests passed;
-- route config, strip-safety and i18n guards passed;
-- TypeScript and full Next.js build passed;
-- all substantive Codex review findings were fixed and resolved.
+- all exact-head GitHub checks passed, including Onboarding Enforcement, Repo Targeting QA, SaaS CI, Playwright, QA Scan, Pipeline Integrity, Audit Remediation Regression, V1 Red Diagnostics, Relative Import Extensions, and COS Council Deterministic Regression;
+- exact Vercel Preview was READY;
+- mandatory Vercel COS deployment suite: **350/350 tests passed, 0 failed**;
+- route-config, strip-safety, i18n copy/locale-key, TypeScript, optimized Next.js build, and Production deployment all passed;
+- the concurrent imperative-trigger regression was preserved and the accidentally removed `spawnSync` import in `saas/scripts/vercel-cos-gates.mjs` was restored.
 
-Migration applied in Production:
+Migration already applied in Production:
 
 `cos_cognitive_autonomous_certification`
 
@@ -604,17 +605,29 @@ Protected stores:
 - `cos_cognitive_certification_cases` — RLS enabled, no browser policy;
 - `cos_cognitive_certification_events` — RLS enabled, no browser policy.
 
-Private profile currently available:
+Private profiles currently available:
 
-`context_ambiguity_v1`
+- `context_ambiguity_v1`;
+- `performance_regression_diagnosis_v1`;
+- `architecture_discovery_v1`.
 
 Production private suite geometry:
 
 ```text
-understanding: 1
-practice:      2
-holdout:       7
-total:        10
+context_ambiguity_v1:
+  understanding: 1
+  practice:      2
+  holdout:       7
+
+performance_regression_diagnosis_v1:
+  understanding: 1
+  practice:      2
+  holdout:       5
+
+architecture_discovery_v1:
+  understanding: 1
+  practice:      2
+  holdout:       5
 ```
 
 The raw private prompts/rubrics are deliberately not committed to GitHub.
@@ -637,6 +650,7 @@ encountered candidate
 Important safeguards:
 
 - unsupported skill families fail closed until an independent certification profile/evaluator exists;
+- current-world factual verification remains on the deterministic live-evidence path and is intentionally not auto-certified as a reusable timeless skill;
 - the candidate-generating model cannot generate its own holdout evidence;
 - `generation_source='local_generator'` can never count as holdout evidence;
 - no recurring paid closed-model evaluator is automatically enabled;
@@ -646,7 +660,10 @@ Important safeguards:
 - interrupted curated exercises are recovered from stale `running` state;
 - exhausted private evidence can mark a candidate saturated instead of generating endless exercises;
 - daily certification is progressive and allows at most one new model exercise per cycle;
-- the mining route gives certification a shared 210-second deadline inside the 300-second function, reserving the remaining budget for later learning/cleanup stages;
+- the mining route gives certification first claim on its shared 210-second deadline inside the 300-second function;
+- the generic active-learning practice worker is now governed so it cannot consume private curated certification work or spend reasoner calls on queued self-generated practice that has no independent promotion path;
+- no-path candidates are explicitly recorded as `awaiting_independent_evaluation` in promotion-path metadata;
+- existing dead-end queued `local_generator` practice was discarded without altering lifecycle evidence counters;
 - promotion remains deterministic from recorded evidence, never from a model saying it succeeded.
 
 Promotion policy remains evidence-based:
@@ -662,20 +679,45 @@ mastered:   >=20 holdouts, >=10 distinct, >=0.92 holdout rate,
 
 Do not lower these thresholds merely to make a skill appear learned.
 
-Current live candidate state immediately after schema/suite installation remains intentionally unforced:
+Live Production database state verified after #1526:
 
 ```text
-skill: reasoning.context_ambiguity_resolution.v1
-status: encountered
-evaluator_approved: false
-understanding_approved: false
-practice_attempts: 0
-holdout_attempts: 0
-production_attempts: 0
-last_validated_at: null
+reasoning.context_ambiguity_resolution.v1
+  status: evaluated
+  evaluator_approved: true
+  understanding_approved: false
+  practice_attempts: 0
+  holdout_attempts: 0
+  certification_profile: context_ambiguity_v1
+
+performance-regression-analysis-8ee8df89d4
+  status: encountered
+  evaluator_approved: false
+  understanding_approved: false
+  historical practice: 2/2
+  holdout_attempts: 0
+  certification_profile: performance_regression_diagnosis_v1
+
+system-architecture-discovery-16d334b32a
+  status: encountered
+  evaluator_approved: false
+  understanding_approved: false
+  practice_attempts: 0
+  holdout_attempts: 0
+  certification_profile: architecture_discovery_v1
 ```
 
-That zero-evidence state is correct. The architecture is Production; the skill must earn its own status through actual certification cycles.
+The historical 2/2 self-generated performance practice does not bypass evaluator/understanding/holdout requirements. Neither new profile skill is validated, learned, or mastered yet.
+
+Current-officeholder/current-fact candidate procedures remain `encountered`, have no private certification profile, and are explicitly `awaiting_independent_evaluation`; the live current-world evidence route remains the correctness boundary for those facts.
+
+Live queue acceptance after cleanup:
+
+```text
+queued practice rows: 0
+```
+
+That zero is intentional: the system is no longer paying repeated generic practice cost for candidates that cannot currently promote. New private certification cases are scheduled/executed only through the governed certification cycle.
 
 The daily `cos-mining` cron runs at `06:30 UTC`. Its endpoint remains `CRON_SECRET` protected. Do not weaken cron authentication or expose the secret merely to force a demo run.
 
@@ -735,7 +777,8 @@ Remaining work:
 - similarity-threshold calibration;
 - source-mix / reranking learning;
 - explicit bounded live promotion/rollback policy;
-- outcome-linked retrieval self-reflection.
+- outcome-linked retrieval self-reflection;
+- cognitive-skill retrieval cost control so a turn does not pay an embedding/retrieval cost when no validated skill is plausibly eligible.
 
 A shadow recommendation is not a promoted Production policy.
 
@@ -966,6 +1009,8 @@ Non-negotiable:
 - `3a3dc7a8…` — first deterministic contextual edit quality guard landed on `main`; later commits may supersede this historical checkpoint.
 - #1481 / `43061d55…` — owner-directed study relevance authority clarified; owner direction controls relevance, not factual truth/grounding.
 - `87f2549b…` / `6a5cc137…` — current general-reasoning discipline and protected canonical COS brain guidance advanced on `main`.
+- #1525 — cognitive certification moved ahead of long daily-learning work so route budget cannot silently prevent progress; durable cognitive-skill pipeline health added.
+- #1526 — private certification expanded to performance-regression diagnosis and architecture discovery; dead-end local practice execution blocked; unsupported candidates explicitly wait for independent evaluation; current-world facts stay on live routing.
 - Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
 - Evidence-triggered answer retest — bounded evidence-arrival promotion of failed prompts into budgeted benchmark cases.
 - Owner-directed study (Feed COS) — gated owner intake page/API with URL, paste and `.txt`/`.md`/`.pdf` upload (dependency-free PDF extraction), same grounding/admission gates as autonomous acquisition.
@@ -981,17 +1026,17 @@ Always query current state; this sequence can advance after this document is mer
 
 # Immediate next engineering priorities
 
-1. **Data Center Operations Phase 1 acceptance:** revalidate the synchronized branch head against current `main`, create/merge the PR only after exact Preview is green, then verify the exact Production deployment. Do not call the capability Production before this sequence completes.
-2. **Data Center Operations private benchmark:** expand beyond the 9 deterministic regression tests into diverse incident-correlation/root-cause/advisory cases, including false-correlation and insufficient-evidence cases.
-3. **Data Center Operations knowledge path:** add buyer-document/runbook retrieval with exact provenance before attempting real-facility diagnostics.
-4. **First read-only real integration:** after benchmark acceptance, evaluate one monitoring/DCIM source through the existing signed Supervisor incident/intake boundary; no facility writes.
-5. **Re-inspect current Concierge semantic/handoff state** before continuing that older workstream because `main` has advanced beyond the historical green branch documented above.
-6. **Observe the first real #1376 certification cycles** and verify the seeded ambiguity candidate progresses only when private understanding/practice/holdout evidence passes. Do not manually set lifecycle flags/counters.
-7. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
-8. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
-9. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
-10. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
-11. **Add independent certification profiles only where justified** by a private/curated test family; unsupported procedural candidates must continue to fail closed.
+1. **Observe private cognitive certification progression:** verify the ambiguity, performance-regression and architecture-discovery candidates advance only when their private understanding/practice/holdout evidence passes. Never manually set lifecycle flags or counters.
+2. **Cognitive-skill live retrieval efficiency:** remove the per-turn semantic/embedding cost when no validated skill is plausibly eligible, while preserving deterministic structural triggers and measuring retrieval hit/use quality before changing live policy.
+3. **Expand independent certification selectively:** add private/curated profiles only for reusable procedural families with defensible transfer tests. Mutable current-world fact verification should remain on live evidence rather than becoming a timeless learned skill.
+4. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
+5. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
+6. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
+7. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
+8. **Data Center Operations Phase 1 acceptance:** revalidate the synchronized branch head against current `main`, create/merge the PR only after exact Preview is green, then verify the exact Production deployment. Do not call the capability Production before this sequence completes.
+9. **Data Center Operations private benchmark:** expand beyond the 9 deterministic regression tests into diverse incident-correlation/root-cause/advisory cases, including false-correlation and insufficient-evidence cases.
+10. **Data Center Operations knowledge path:** add buyer-document/runbook retrieval with exact provenance before attempting real-facility diagnostics.
+11. **First read-only real integration:** after benchmark acceptance, evaluate one monitoring/DCIM source through the existing signed Supervisor incident/intake boundary; no facility writes.
 12. **Retention continuity / episodic compression / SFT readiness:** continue only with independently supported evidence and separate held-out acceptance.
 
 ---

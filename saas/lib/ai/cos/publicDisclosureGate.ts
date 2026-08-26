@@ -75,7 +75,7 @@ const SELF_REFERENCE =
 
 /** Model families and weight-class descriptors. Ordinary topics until self-attributed. */
 const MODEL_TERM =
-  /(?<![\p{L}\p{N}_])(?:qwen|llama|mistral|mixtral|deepseek|gemma|phi-\d|gpt-[\d.]+|claude|anthropic|openai|open-weight|\d+\s*b\s*[-–]?\s*a\d+\s*b|\d{2,3}b\s+parameter|mixture[-\s]of[-\s]experts|moe)(?![\p{L}\p{N}_])/iu
+  /(?<![\p{L}\p{N}_])(?:qwen|llama|mistral|mixtral|deepseek|gemma|phi-\d|gpt-[\d.]+|chatgpt|claude|anthropic|openai|google|gemini|bard|deepmind|meta\s+ai|microsoft|cohere|xai|grok|open-weight|large\s+language\s+model|trained\s+by|\d+\s*b\s*[-–]?\s*a\d+\s*b|\d{2,3}b\s+parameter|mixture[-\s]of[-\s]experts|moe)(?![\p{L}\p{N}_])/iu
 
 /** Internal subsystem names. "Knowledge graph" is a real general term — hence Tier B. */
 const INTERNAL_COMPONENT =
@@ -169,4 +169,37 @@ const IMPLEMENTATION_REPLY: Record<string, string> = {
 export function publicImplementationDisclosureReply(language?: string | null): string {
   const code = String(language ?? 'en').trim().slice(0, 2).toLowerCase()
   return IMPLEMENTATION_REPLY[code] ?? IMPLEMENTATION_REPLY.en
+}
+
+// ---------------------------------------------------------------------------------------------
+// Self-identity questions are answered deterministically, never by the model
+// ---------------------------------------------------------------------------------------------
+//
+// Production failure, 2026-08-26: asked "What model powers COS?" the public channel replied
+// "I am a large language model, trained by Google." That is not a leak — it is a FALSE statement
+// about the product, recited from the base model's memorized identity text. It is wrong twice
+// (the model is not Google's, and COS is SignalBoost's own layer), and a visitor reading it
+// concludes SignalBoost is a wrapper around someone else's assistant.
+//
+// The post-hoc disclosure gate could not have saved this: catching it depends on a term list
+// being complete, and a list of every AI vendor a base model might name itself after never is.
+// The term list is widened below anyway, as a backstop.
+//
+// The real fix is that this question must not reach the model at all. It has exactly ONE correct
+// answer, known at build time, so the public path answers it deterministically before inference.
+// That also covers the whole family — who made you, who trained you, are you ChatGPT — which the
+// base model would otherwise answer from whatever it remembers about itself.
+
+/** Asks who or what built, trained, owns, or runs this service. */
+const ASKS_SERVICE_IDENTITY =
+  /(?<![\p{L}\p{N}_])(?:who\s+(?:made|built|created|trained|owns|develop(?:ed|s))\s+(?:you|cos|this)|are\s+you\s+(?:chatgpt|gpt|claude|gemini|bard|llama|an?\s+(?:openai|google|anthropic|meta)\b)|what\s+(?:kind\s+of\s+)?(?:ai|assistant|bot|llm|model)\s+are\s+you|which\s+company\s+(?:made|owns|built|runs)\s+(?:you|this|cos|the\s+(?:service|assistant|system))|qui[eé]n\s+(?:te\s+)?(?:cre[oó]|hizo|entren[oó])|quem\s+(?:te\s+)?(?:criou|treinou)|kto\s+(?:ci[ęe]\s+)?(?:stworzy|zbudowa|napisa)\p{L}*|кто\s+(?:тебя\s+)?(?:созда|обучи|сдела|разработа)\p{L}*)(?![\p{L}\p{N}_])/iu
+
+/**
+ * True for any question about what this service is, who built it, or what runs it.
+ * The public path must answer these from publicImplementationDisclosureReply() BEFORE calling
+ * the reasoner — never by inspecting what the reasoner produced.
+ */
+export function asksAboutServiceIdentity(prompt: string): boolean {
+  const value = String(prompt ?? '')
+  return asksWhatPowersTheService(value) || ASKS_SERVICE_IDENTITY.test(value)
 }

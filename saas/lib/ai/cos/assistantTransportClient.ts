@@ -2,7 +2,7 @@ import {
   ASSISTANT_TRANSPORT_TIMEOUT_COPY,
   findRecoveredAssistantReply,
   type StoredAssistantMessage,
-} from '@/lib/ai/cos/assistantTransportRecovery.ts'
+} from './assistantTransportRecovery.ts'
 
 export const ASSISTANT_TRANSPORT_ERROR_MARKERS = [
   'failed to fetch',
@@ -129,8 +129,6 @@ export async function sendAssistantTurnAndRecover(
 
     if (response.ok && live) return { ok: true, source: 'live', content: live, raw: payload }
 
-    // An empty/malformed success or gateway response can still mean the server completed and
-    // persisted the turn before the browser lost the usable response envelope.
     if (response.ok || !parsed || [408, 504, 524].includes(response.status)) {
       const recovered = await recoverFromHistory(userContent, sentAtMs, options, fetchImpl, sleep, attempts, delayMs)
       if (recovered) return recovered

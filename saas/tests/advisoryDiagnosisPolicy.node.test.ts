@@ -11,6 +11,10 @@ import {
 } from '../lib/ai/cos/advisoryDiagnosisPolicy.ts'
 import { buildHonestRefusalReply } from '../lib/ai/cos/honestRefusalReply.ts'
 import { semanticCacheAllowedForPrompt } from '../lib/ai/cos/cacheSafetyPolicy.ts'
+import {
+  consumeAdvisoryDiagnosisResearchForAnswer,
+  recordAdvisoryDiagnosisResearchForAnswer,
+} from '../lib/ai/cos/advisoryDiagnosisResearchTrace.ts'
 
 const METHOD_PROMPT = 'A high-density GPU row sees a 400 ms power transient. What diagnostic methods exist to distinguish synchronized workload bursts, power-cap behavior, PDU limits, and measurement artifacts?'
 
@@ -103,6 +107,35 @@ test('an unrepaired work-first policy violation is blocked rather than released'
   const guardIndex = reasoner.indexOf('const remainingAdvisoryDefects = advisoryDiagnosis')
   const citationIndex = reasoner.indexOf('const allowedSkillTags = skillCitationTags')
   assert.ok(guardIndex >= 0 && citationIndex > guardIndex, 'release block must run before any later release-adjacent citation work')
+})
+
+test('published diagnosis research survives answer cleanup and is consumed exactly once', () => {
+  const raw = 'Observed facts: [KG1] a transient occurred. Candidate hypotheses: workload burst. Distinguishing checks: compare power samples. Missing readings / baselines: synchronized PDU and GPU readings. I still cannot stand behind a single cause yet.'
+  const clean = raw.replace('[KG1] ', '')
+  recordAdvisoryDiagnosisResearchForAnswer(raw, {
+    attempted: true,
+    references: [
+      { kind: 'official_documentation', title: 'Vendor guide', url: 'https://docs.vendor.example/power', snippet: 'Power telemetry methods.' },
+      { kind: 'scientific_journal', title: 'Transient study', url: 'https://doi.org/10.0000/example', snippet: 'Transient measurement methods.' },
+    ],
+    errors: [],
+  })
+  const first = consumeAdvisoryDiagnosisResearchForAnswer(clean)
+  assert.ok(first)
+  assert.equal(first?.references.length, 2)
+  assert.deepEqual(first?.references.map(item => item.url), ['https://docs.vendor.example/power', 'https://doi.org/10.0000/example'])
+  assert.equal(consumeAdvisoryDiagnosisResearchForAnswer(clean), null)
+})
+
+test('server provenance persists exact published diagnosis URLs as reference-only lineage', () => {
+  const reasoner = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
+  const orchestration = readFileSync(new URL('../lib/ai/cos/cosOrchestrationEnterprise.ts', import.meta.url), 'utf8')
+  assert.match(reasoner, /recordAdvisoryDiagnosisResearchForAnswer/)
+  assert.match(orchestration, /consumeAdvisoryDiagnosisResearchForAnswer/)
+  assert.match(orchestration, /published_diagnostic_research/)
+  assert.match(orchestration, /source_urls/)
+  assert.match(orchestration, /reference_only:true/)
+  assert.match(orchestration, /These references describe methods\/mechanisms and are not incident telemetry/)
 })
 
 test('published diagnosis lookup is enterprise-primary policy, not a Concierge dependency', () => {

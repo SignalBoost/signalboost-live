@@ -13,9 +13,10 @@
 // principle and the missing pieces were nameable — training duration, cluster power draw,
 // network bandwidth.
 //
-// This module builds the replacement: a short reply that states no answer was released, names
-// the inputs that would make the question answerable, and offers the standing-assumptions route
-// so the reader is never stuck. It NEVER states a cause, a diagnosis, or a number.
+// This module builds the replacement: a short reply that names the inputs that would make the
+// question answerable and offers the standing-assumptions route so the reader is never stuck.
+// For diagnosis, owner policy is stricter: useful next checks come first and the statement that a
+// single cause cannot yet be supported is the final sentence. It NEVER invents a cause or number.
 //
 // Two hard rules, both learned the expensive way:
 //
@@ -28,7 +29,6 @@
 
 export type RefusalLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
-/** Question shapes that have well-defined standard inputs. */
 type Shape = 'economics' | 'sizing' | 'capacity' | 'diagnosis' | 'unknown'
 
 const SHAPE_ECONOMICS =
@@ -41,12 +41,8 @@ const SHAPE_CAPACITY =
   /(?<![\p{L}\p{N}_])(?:headroom|can\s+(?:we|i|the\s+operator)\s+(?:safely\s+)?add|safe\s+to\s+add|limit|utilization|oversubscri|redundanc)(?![\p{L}\p{N}_])/iu
 
 const SHAPE_DIAGNOSIS =
-  /(?<![\p{L}\p{N}_])(?:diagnos|root\s+cause|troubleshoot|fault|failure|failed|error|alarm|alert|warning|incident|why\s+did|hypothes)(?![\p{L}\p{N}_])/iu
+  /(?:\b(?:diagnos|root\s+cause|troubleshoot|fault|failure|failed|error|alarm|alert|warning|incident|why\s+did|hypothes)\b|(?<![\p{L}\p{N}_])(?:diagn[oó]stico|diagnosticar|causa\s+ra[ií]z|incidente|falla|fallo|falha|alarma|alarme|hip[oó]tesis|hip[oó]teses|diagnoza|diagnozowanie|przyczyna|przyczyny|awaria|awarii|incydent|alarm|hipoteza|hipotezy|диагностика|диагностировать|коренная\s+причина|инцидент|сбой|отказ|авария|гипотеза|гипотезы)(?![\p{L}\p{N}_]))/iu
 
-/**
- * A probe is a candidate missing input. `present` matches text that shows the prompt already
- * supplied it; when it does not match, the input is genuinely absent and may be named.
- */
 interface Probe {
   key: string
   shapes: readonly Shape[]
@@ -87,12 +83,12 @@ const PROBES: readonly Probe[] = [
   {
     key: 'measurements',
     shapes: ['diagnosis'],
-    present: /(?<![\p{L}\p{N}_])(?:measured|reading|telemetry\s+shows|we\s+(?:see|observe)|logged|captured)(?![\p{L}\p{N}_])/iu,
+    present: /(?:\b(?:measured|reading|telemetry\s+shows|we\s+(?:see|observe)|logged|captured)\b|(?<![\p{L}\p{N}_])(?:medici[oó]n|mediciones|lectura|lecturas|telemetr[ií]a|observamos|registrado|registrada|medi[cç][aã]o|medi[cç][oõ]es|leitura|leituras|telemetria|pomiar|pomiary|odczyt|odczyty|telemetria|измерение|измерения|показание|показания|телеметрия)(?![\p{L}\p{N}_]))/iu,
   },
   {
     key: 'baseline',
     shapes: ['diagnosis', 'capacity'],
-    present: /(?<![\p{L}\p{N}_])(?:baseline|normal(?:ly)?|before\s+the|historical|previously|design\s+spec)(?![\p{L}\p{N}_])/iu,
+    present: /(?:\b(?:baseline|normal(?:ly)?|before\s+the|historical|previously|design\s+spec)\b|(?<![\p{L}\p{N}_])(?:l[ií]nea\s+base|valor\s+normal|referencia|linha\s+de\s+base|valor\s+normal|refer[eê]ncia|warto[sś][cć]\s+bazowa|warto[sś]ci\s+bazowe|normalny|normalne|historyczny|historyczne|базовая\s+линия|базовые\s+значения|нормальное\s+значение|исторические\s+значения)(?![\p{L}\p{N}_]))/iu,
   },
 ]
 
@@ -187,6 +183,34 @@ const COPY: Record<RefusalLanguage, {
   },
 }
 
+const DIAGNOSIS_COPY: Record<RefusalLanguage, { next: string; final: string; supplied: string }> = {
+  en: {
+    supplied: 'The request already supplies incident readings and a baseline; use those as the starting comparison.',
+    next: 'Use those readings to compare the candidate hypotheses against the same time window and baseline; the useful next step is discrimination, not guessing a failed part.',
+    final: 'I still cannot stand behind a single cause yet.',
+  },
+  es: {
+    supplied: 'La solicitud ya aporta mediciones del incidente y una referencia; úsalas como punto de partida para la comparación.',
+    next: 'Usa esas mediciones para comparar las hipótesis candidatas en la misma ventana de tiempo y contra la misma referencia; el siguiente paso útil es distinguirlas, no adivinar qué parte falló.',
+    final: 'Todavía no puedo respaldar una causa única.',
+  },
+  pt: {
+    supplied: 'A solicitação já fornece medições do incidente e uma referência; use-as como ponto de partida da comparação.',
+    next: 'Use essas medições para comparar as hipóteses candidatas na mesma janela de tempo e com a mesma referência; o próximo passo útil é distingui-las, não adivinhar qual componente falhou.',
+    final: 'Ainda não posso sustentar uma causa única.',
+  },
+  pl: {
+    supplied: 'W zgłoszeniu są już pomiary z incydentu i wartość bazowa; użyj ich jako punktu wyjścia do porównania.',
+    next: 'Użyj tych pomiarów, aby porównać hipotezy w tym samym oknie czasu i względem tej samej wartości bazowej; kolejnym użytecznym krokiem jest ich rozróżnienie, a nie zgadywanie, który element zawiódł.',
+    final: 'Nadal nie mogę rzetelnie wskazać jednej przyczyny.',
+  },
+  ru: {
+    supplied: 'В запросе уже есть измерения инцидента и базовая линия; используйте их как исходную точку сравнения.',
+    next: 'Сопоставьте эти измерения с кандидатными гипотезами в одном временном окне и относительно одной базовой линии; следующий полезный шаг — различить гипотезы, а не угадывать отказавший компонент.',
+    final: 'Я всё ещё не могу обоснованно назвать единственную причину.',
+  },
+}
+
 const JOIN: Record<RefusalLanguage, { sep: string; last: string }> = {
   en: { sep: ', ', last: ', and ' },
   es: { sep: ', ', last: ' y ' },
@@ -216,10 +240,6 @@ function joinList(items: readonly string[], language: RefusalLanguage): string {
   return `${items.slice(0, -1).join(sep)}${last}${items[items.length - 1]}`
 }
 
-/**
- * Names the inputs this prompt does NOT already supply, for the question shapes it matches.
- * Exported for testing: the probe result is the part that must never be wrong.
- */
 export function missingInputKeys(prompt: string): string[] {
   const text = String(prompt ?? '')
   if (!text.trim()) return []
@@ -231,21 +251,19 @@ export function missingInputKeys(prompt: string): string[] {
     .slice(0, 4)
 }
 
-/**
- * The reply shipped when COS releases nothing.
- *
- * Contains no confidence value, no threshold, no gate or evidence vocabulary, no model or
- * vendor name — it is safe on the public surface as written.
- */
 export function buildHonestRefusalReply(args: { prompt: string; language?: string | null }): string {
   const language = normalizeLanguage(args.language)
   const copy = COPY[language]
+  const shapes = shapesOf(String(args.prompt ?? ''))
   const keys = missingInputKeys(args.prompt)
+  const labels = keys.map(key => LABELS[language][key]).filter(Boolean)
 
-  if (keys.length === 0) {
-    return `${copy.opening} ${copy.generic}`
+  if (shapes.includes('diagnosis')) {
+    const diagnosis = DIAGNOSIS_COPY[language]
+    const needs = labels.length ? `${copy.needsLead} ${joinList(labels, language)}.` : diagnosis.supplied
+    return `${needs} ${diagnosis.next} ${diagnosis.final}`
   }
 
-  const labels = keys.map(key => LABELS[language][key]).filter(Boolean)
+  if (keys.length === 0) return `${copy.opening} ${copy.generic}`
   return `${copy.opening} ${copy.needsLead} ${joinList(labels, language)}. ${copy.assumptions}`
 }

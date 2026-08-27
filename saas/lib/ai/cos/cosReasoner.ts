@@ -27,6 +27,15 @@ import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { confidenceThreshold } from '@/lib/ai/cos/cosOrchestrationEnterprise'
 import { scriptRequestDirective } from './scriptRequestIntent.ts'
 import { classifyInferenceHost } from './reasonerHostingDisclosure.ts'
+import {
+  ADVISORY_DIAGNOSIS_OWNER_POLICY,
+  advisoryDiagnosisBriefDefects,
+  asksForPublishedDiagnosticMethods,
+  buildPublishedDiagnosticReferenceBlock,
+  isAdvisoryDiagnosisPrompt,
+} from './advisoryDiagnosisPolicy.ts'
+import { retrievePublishedDiagnosticReferences, type PublishedDiagnosticLookupResult } from './advisoryDiagnosisPublishedLookup.ts'
+import { recordAdvisoryDiagnosisResearchForAnswer } from './advisoryDiagnosisResearchTrace.ts'
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -62,18 +71,9 @@ function configuredReasoner(): CosReasonerConfig {
   }
 }
 
-/**
- * Which COS-owned reasoner seam would answer right now.
- * Closed-model external-fallback configuration is deliberately ignored here; those providers
- * must never masquerade as the COS primary reasoner. Managed open-model hosting is represented
- * explicitly in provenance while preserving the same COS-owned reasoning/memory boundary.
- */
 export function resolveCosReasoner(): { config: CosReasonerConfig } | { config: null; reason: string } {
   if (localConfigured()) {
     const resolved = configuredReasoner()
-    // LOCAL_AI_BASE_URL is the deploy-time COS endpoint. The public Concierge must
-    // use its configured Qwen model instead of rejecting it solely because its host
-    // is managed; host provenance remains explicit in the response record.
     return { config: resolved }
   }
 
@@ -96,10 +96,6 @@ function normalizeCitationInvariant(text: string): string {
     .trim()
 }
 
-/**
- * A citation repair is accepted only when the model changed nothing except adding citations that
- * were actually supplied in the prompt. The server never infers skill use and never inserts a tag.
- */
 export function validSkillCitationOnlyRepair(originalAnswer: string, repairedAnswer: string, allowedTags: string[]): boolean {
   const allowed = new Set(allowedTags)
   const citations = skillCitationTags(repairedAnswer)
@@ -136,18 +132,15 @@ function buildSkillCitationRepairPrompt(originalPrompt: string, originalAnswer: 
   ].join('\n')
 }
 
-function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
-  if (process.env.COS_COUNCIL_ENABLED === 'false') return false
+function primaryReasonerRequest(args: LocalModelCallArgs): boolean {
   return String(args.systemPrompt ?? '').includes("SignalBoost's independent PRIMARY reasoning layer")
 }
 
-/**
- * Execute the configured open-model worker directly.
- *
- * This is deliberately below the COS reasoning control plane. Production callers should use
- * callCosReasoner(), which preserves the historical API while routing through COS-owned planning
- * and worker selection. Worker adapters use this raw function to avoid recursive re-entry.
- */
+function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
+  if (process.env.COS_COUNCIL_ENABLED === 'false') return false
+  return primaryReasonerRequest(args)
+}
+
 export async function callRawCosReasoner(
   args: LocalModelCallArgs,
 ): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {
@@ -162,6 +155,7 @@ export async function callRawCosReasoner(
   const problemClass = classifyProblemClass(args.prompt)
   let answered = false
   let finalConfidence: number | null = null
+  let publishedDiagnosticResearch: PublishedDiagnosticLookupResult | null = null
 
   try {
     await touchRunpodActivityLease('qwen_reasoning')
@@ -173,6 +167,49 @@ export async function callRawCosReasoner(
         ...effectiveArgs,
         systemPrompt: `${String(effectiveArgs.systemPrompt ?? '').trim()}\n\nREQUEST-SPECIFIC SCRIPT INTERPRETATION:\n${scriptDirective}`.trim(),
       }
+    }
+
+    const enterprisePrimary = primaryReasonerRequest(args)
+    const advisoryDiagnosis = enterprisePrimary && isAdvisoryDiagnosisPrompt(args.prompt)
+    if (advisoryDiagnosis) {
+      effectiveArgs = {
+        ...effectiveArgs,
+        systemPrompt: `${String(effectiveArgs.systemPrompt ?? '').trim()}\n\n${ADVISORY_DIAGNOSIS_OWNER_POLICY}`.trim(),
+      }
+
+      if (asksForPublishedDiagnosticMethods(args.prompt)) {
+        const published = await recorder.time(
+          'published_diagnostic_research',
+          () => retrievePublishedDiagnosticReferences(args.prompt),
+        ).catch(error => {
+          const message = error instanceof Error ? error.message : String(error)
+          console.warn('[cos-advisory-diagnosis-research] lookup failed closed', message)
+          return { attempted: true, references: [], errors: [message] }
+        })
+        publishedDiagnosticResearch = published
+        const referenceBlock = buildPublishedDiagnosticReferenceBlock(published.references)
+        if (referenceBlock) {
+          effectiveArgs = {
+            ...effectiveArgs,
+            prompt: `${effectiveArgs.prompt}\n\n${referenceBlock}`,
+          }
+        }
+        console.info('[cos-advisory-diagnosis-research]', JSON.stringify({
+          at: new Date().toISOString(),
+          attempted: published.attempted,
+          documentsAcquired: published.references.length,
+          officialDocuments: published.references.filter(item => item.kind === 'official_documentation').length,
+          scientificJournals: published.references.filter(item => item.kind === 'scientific_journal').length,
+          sourceUrls: published.references.map(item => item.url),
+          errors: published.errors,
+          referenceOnly: true,
+          incidentTelemetry: false,
+        }))
+      } else {
+        recorder.skip('published_diagnostic_research', 'method_lookup_not_requested')
+      }
+    } else {
+      recorder.skip('published_diagnostic_research', 'not_enterprise_advisory_diagnosis')
     }
 
     if (primaryCouncilEligible(args)) {
@@ -241,7 +278,11 @@ export async function callRawCosReasoner(
     }
 
     let text = first
-    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, first)
+    const firstParsedForPolicy = parseLocalResult(first)
+    const firstAdvisoryDefects = advisoryDiagnosis && firstParsedForPolicy
+      ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, firstParsedForPolicy.answer)
+      : []
+    const qualityRepairNeeded = reasonerDraftNeedsRepair(effectiveArgs.prompt, first) || firstAdvisoryDefects.length > 0
     const qualityRepairAffordable = hasBudgetFor(budget, localCallEstimateMs())
     if (!qualityRepairNeeded) recorder.skip('quality_repair', 'not_needed')
     else if (!qualityRepairAffordable) recorder.skip('quality_repair', 'no_budget')
@@ -251,7 +292,10 @@ export async function callRawCosReasoner(
         {
           ...effectiveArgs,
           temperature: 0,
-          prompt: buildDiagnosticRepairPrompt(effectiveArgs.prompt, first),
+          prompt: [
+            buildDiagnosticRepairPrompt(effectiveArgs.prompt, first),
+            ...(firstAdvisoryDefects.length ? ['', ADVISORY_DIAGNOSIS_OWNER_POLICY, '', `The rejected draft violated: ${firstAdvisoryDefects.join(', ')}.`] : []),
+          ].join('\n'),
         },
         inference,
       ), 'model').catch(error => {
@@ -265,22 +309,47 @@ export async function callRawCosReasoner(
         return null
       })
 
-      if (repaired && preferRepairedDraft(effectiveArgs.prompt, first, repaired)) {
+      const repairedParsedForPolicy = repaired ? parseLocalResult(repaired) : null
+      const repairedAdvisoryDefects = advisoryDiagnosis && repairedParsedForPolicy
+        ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, repairedParsedForPolicy.answer)
+        : []
+      const advisoryPolicyRepairAccepted = firstAdvisoryDefects.length > 0 && repairedAdvisoryDefects.length === 0
+      const generalRepairAccepted = Boolean(repaired && preferRepairedDraft(effectiveArgs.prompt, first, repaired))
+
+      if (repaired && (advisoryPolicyRepairAccepted || (firstAdvisoryDefects.length === 0 && generalRepairAccepted))) {
         console.info('[cos-local-quality-repair]', JSON.stringify({
           at: new Date().toISOString(),
           reasoner: config.label,
           repaired: true,
+          advisoryDiagnosisDefectsBefore: firstAdvisoryDefects,
+          advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
         }))
-        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:true, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:assessReasonerDraft(effectiveArgs.prompt,repaired) } })
+        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:true, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:assessReasonerDraft(effectiveArgs.prompt,repaired), advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
         text = repaired
       } else {
         console.warn('[cos-local-quality-repair]', JSON.stringify({
           at: new Date().toISOString(),
           reasoner: config.label,
           repaired: false,
+          advisoryDiagnosisDefectsBefore: firstAdvisoryDefects,
+          advisoryDiagnosisDefectsAfter: repairedAdvisoryDefects,
         }))
-        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null } })
+        void recordQualityRepairDecision({ repairKind:'quality_repair', reasonerLabel:config.label, accepted:false, details:{ firstDraft:assessReasonerDraft(effectiveArgs.prompt,first), repairedDraft:repaired?assessReasonerDraft(effectiveArgs.prompt,repaired):null, advisoryDiagnosisDefectsBefore:firstAdvisoryDefects, advisoryDiagnosisDefectsAfter:repairedAdvisoryDefects } })
       }
+    }
+
+    const finalParsedForPolicy = parseLocalResult(text)
+    const remainingAdvisoryDefects = advisoryDiagnosis && finalParsedForPolicy
+      ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, finalParsedForPolicy.answer)
+      : []
+    if (remainingAdvisoryDefects.length) {
+      console.warn('[cos-advisory-diagnosis-release-blocked]', JSON.stringify({
+        at: new Date().toISOString(),
+        reasoner: config.label,
+        defects: remainingAdvisoryDefects,
+      }))
+      recorder.skip('skill_citation_repair', 'advisory_diagnosis_policy_failed')
+      return null
     }
 
     const allowedSkillTags = skillCitationTags(effectiveArgs.prompt)
@@ -325,8 +394,13 @@ export async function callRawCosReasoner(
       void recordQualityRepairDecision({ repairKind:'skill_citation_repair', reasonerLabel:config.label, accepted, details:{ allowedTags:allowedSkillTags, citedTags:auditedParsed?skillCitationTags(auditedParsed.answer):[] } })
     }
 
+    const finalParsedForTrace = parseLocalResult(text)
+    if (publishedDiagnosticResearch?.attempted && finalParsedForTrace) {
+      recordAdvisoryDiagnosisResearchForAnswer(finalParsedForTrace.answer, publishedDiagnosticResearch)
+    }
+
     answered = true
-    finalConfidence = parseLocalResult(text)?.confidence ?? null
+    finalConfidence = finalParsedForTrace?.confidence ?? null
     return { text, reasoner: config, turnId }
   } finally {
     const experience = recorder.snapshot({
@@ -354,13 +428,6 @@ export async function callRawCosReasoner(
   }
 }
 
-/**
- * Backward-compatible production entrypoint.
- *
- * Every existing call site now enters the COS reasoning control plane before any model worker is
- * invoked. The default production plan is primary-only and explicitly forbids closed-model
- * escalation; external escalation remains a separate, labelled orchestration decision.
- */
 export async function callCosReasoner(
   args: LocalModelCallArgs,
 ): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {

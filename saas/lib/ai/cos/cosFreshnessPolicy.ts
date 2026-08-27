@@ -10,6 +10,7 @@ import { classifyTemporalSensitivity } from './temporalClaimGuard.ts'
 import { isContentGenerationRequest } from './contentGenerationIntent.ts'
 import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
 import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
+import { detectAdvisoryDiagnosisIntent } from './advisoryDiagnosisIntent.ts'
 
 const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
 
@@ -197,6 +198,9 @@ export function structuredLiveDataKind(input: string): StructuredLiveDataKind | 
 export function requiresFreshExternalEvidence(input: string): boolean {
   const text = normalizedText(input)
   if (!text) return false
+  // Advisory diagnosis / method briefs and "which files were injected?"
+  // are not live current-fact lookups.
+  if (detectAdvisoryDiagnosisIntent(input).suppressFreshnessAbort) return false
   if (HISTORICAL_ANCHOR.test(text)) return false
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false

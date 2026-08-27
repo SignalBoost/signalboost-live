@@ -70,18 +70,9 @@ function configuredReasoner(): CosReasonerConfig {
   }
 }
 
-/**
- * Which COS-owned reasoner seam would answer right now.
- * Closed-model external-fallback configuration is deliberately ignored here; those providers
- * must never masquerade as the COS primary reasoner. Managed open-model hosting is represented
- * explicitly in provenance while preserving the same COS-owned reasoning/memory boundary.
- */
 export function resolveCosReasoner(): { config: CosReasonerConfig } | { config: null; reason: string } {
   if (localConfigured()) {
     const resolved = configuredReasoner()
-    // LOCAL_AI_BASE_URL is the deploy-time COS endpoint. The public Concierge must
-    // use its configured Qwen model instead of rejecting it solely because its host
-    // is managed; host provenance remains explicit in the response record.
     return { config: resolved }
   }
 
@@ -104,10 +95,6 @@ function normalizeCitationInvariant(text: string): string {
     .trim()
 }
 
-/**
- * A citation repair is accepted only when the model changed nothing except adding citations that
- * were actually supplied in the prompt. The server never infers skill use and never inserts a tag.
- */
 export function validSkillCitationOnlyRepair(originalAnswer: string, repairedAnswer: string, allowedTags: string[]): boolean {
   const allowed = new Set(allowedTags)
   const citations = skillCitationTags(repairedAnswer)
@@ -144,18 +131,15 @@ function buildSkillCitationRepairPrompt(originalPrompt: string, originalAnswer: 
   ].join('\n')
 }
 
-function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
-  if (process.env.COS_COUNCIL_ENABLED === 'false') return false
+function primaryReasonerRequest(args: LocalModelCallArgs): boolean {
   return String(args.systemPrompt ?? '').includes("SignalBoost's independent PRIMARY reasoning layer")
 }
 
-/**
- * Execute the configured open-model worker directly.
- *
- * This is deliberately below the COS reasoning control plane. Production callers should use
- * callCosReasoner(), which preserves the historical API while routing through COS-owned planning
- * and worker selection. Worker adapters use this raw function to avoid recursive re-entry.
- */
+function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
+  if (process.env.COS_COUNCIL_ENABLED === 'false') return false
+  return primaryReasonerRequest(args)
+}
+
 export async function callRawCosReasoner(
   args: LocalModelCallArgs,
 ): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {
@@ -183,12 +167,7 @@ export async function callRawCosReasoner(
       }
     }
 
-    // This hook is deliberately inside the PRIMARY reasoner call. The enterprise COS caller has
-    // already retrieved KG/corpus/memory/skills before it invokes this function, so the owner-defined
-    // order is structural: internal retrieval first, then (only for method-seeking diagnosis) bounded
-    // published reference research, then the model draft. Public Concierge uses a different system
-    // prompt and never enters this owner/enterprise policy hook.
-    const enterprisePrimary = primaryCouncilEligible(args)
+    const enterprisePrimary = primaryReasonerRequest(args)
     const advisoryDiagnosis = enterprisePrimary && isAdvisoryDiagnosisPrompt(args.prompt)
     if (advisoryDiagnosis) {
       effectiveArgs = {
@@ -230,7 +209,7 @@ export async function callRawCosReasoner(
       recorder.skip('published_diagnostic_research', 'not_enterprise_advisory_diagnosis')
     }
 
-    if (enterprisePrimary) {
+    if (primaryCouncilEligible(args)) {
       const council = await recorder.time('council', () => maybeBuildCognitiveCouncilAdvisory({
         prompt: args.prompt,
         reasonerLabel: config.label,
@@ -427,13 +406,6 @@ export async function callRawCosReasoner(
   }
 }
 
-/**
- * Backward-compatible production entrypoint.
- *
- * Every existing call site now enters the COS reasoning control plane before any model worker is
- * invoked. The default production plan is primary-only and explicitly forbids closed-model
- * escalation; external escalation remains a separate, labelled orchestration decision.
- */
 export async function callCosReasoner(
   args: LocalModelCallArgs,
 ): Promise<{ text: string; reasoner: CosReasonerConfig; turnId: string } | null> {

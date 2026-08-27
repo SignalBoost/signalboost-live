@@ -1,5 +1,5 @@
-import type { KnowledgeGap } from '@/lib/cos-core/layers/learning/index.ts'
-import type { KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps.ts'
+import type { KnowledgeGap } from '../../cos-core/layers/learning/index.ts'
+import type { KnowledgeGapSignal } from '../../cos-core/layers/learning/gaps.ts'
 
 /**
  * Bounded operational-systems curriculum.
@@ -104,7 +104,6 @@ function dateStamp(now: Date): string {
 }
 
 export function operationalSystemsSlot(now = new Date()): number {
-  // Daily rotation across the 8 foci. Hourly current-world curriculum stays separate.
   const day = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 86_400_000)
   return ((day % FOCI.length) + FOCI.length) % FOCI.length
 }

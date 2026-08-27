@@ -4,13 +4,23 @@ import { getValidGoogleWorkspaceToken } from './token-store.ts'
 
 const SHEETS_API = 'https://sheets.googleapis.com/v4'
 const DRIVE_API = 'https://www.googleapis.com/drive/v3'
+const SPREADSHEET_MIME = 'application/vnd.google-apps.spreadsheet'
 
 function boundedText(value: unknown, max = 240): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
-function validSpreadsheetId(value: string): boolean {
-  return /^[A-Za-z0-9_-]{10,200}$/.test(value)
+export function extractGoogleSpreadsheetId(value: string): string | null {
+  const raw = String(value || '').trim()
+  if (/^[A-Za-z0-9_-]{10,200}$/.test(raw)) return raw
+  try {
+    const url = new URL(raw)
+    if (url.hostname !== 'docs.google.com') return null
+    const match = url.pathname.match(/^\/spreadsheets\/d\/([A-Za-z0-9_-]{10,200})(?:\/|$)/)
+    return match?.[1] || null
+  } catch {
+    return null
+  }
 }
 
 function sanitizeRange(value: string): string {
@@ -36,6 +46,26 @@ async function googleJson(userId: string, url: string, fetchImpl: typeof fetch =
   try { return { ok: true, data: JSON.parse(raw) } } catch { return { ok: false, reason: 'Google API returned non-JSON data.' } }
 }
 
+export type GoogleDriveAccount = {
+  displayName: string
+  emailAddress: string
+  permissionId: string
+}
+
+export async function getGoogleDriveAccount(userId: string) {
+  const fields = 'user(displayName,emailAddress,permissionId)'
+  const result = await googleJson(userId, `${DRIVE_API}/about?fields=${encodeURIComponent(fields)}`)
+  if ('reason' in result) return result
+  return {
+    ok: true as const,
+    account: {
+      displayName: boundedText(result.data?.user?.displayName, 200),
+      emailAddress: boundedText(result.data?.user?.emailAddress, 320),
+      permissionId: boundedText(result.data?.user?.permissionId, 200),
+    } satisfies GoogleDriveAccount,
+  }
+}
+
 export type GoogleSpreadsheetListItem = {
   id: string
   name: string
@@ -43,34 +73,74 @@ export type GoogleSpreadsheetListItem = {
   webViewLink: string | null
 }
 
-export async function listGoogleSpreadsheets(userId: string, options: { query?: string; limit?: number } = {}) {
-  const limit = Math.max(1, Math.min(100, Math.floor(options.limit ?? 25)))
-  const search = boundedText(options.query || '', 100).replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-  const clauses = ["mimeType='application/vnd.google-apps.spreadsheet'", 'trashed=false']
-  if (search) clauses.push(`name contains '${search}'`)
-  const params = new URLSearchParams({
-    q: clauses.join(' and '),
-    pageSize: String(limit),
-    orderBy: 'modifiedTime desc',
-    fields: 'files(id,name,modifiedTime,webViewLink)',
-  })
-  const result = await googleJson(userId, `${DRIVE_API}/files?${params.toString()}`)
-  if ('reason' in result) return result
-  const files = Array.isArray(result.data?.files) ? result.data.files : []
-  return {
-    ok: true as const,
-    spreadsheets: files.slice(0, limit).map((file: any): GoogleSpreadsheetListItem => ({
+function mapSpreadsheetFiles(files: any[], limit: number, search: string): GoogleSpreadsheetListItem[] {
+  const lowerSearch = search.toLowerCase()
+  return files
+    .filter((file: any) => file?.mimeType === SPREADSHEET_MIME && file?.trashed !== true)
+    .filter((file: any) => !lowerSearch || boundedText(file?.name, 300).toLowerCase().includes(lowerSearch))
+    .slice(0, limit)
+    .map((file: any): GoogleSpreadsheetListItem => ({
       id: boundedText(file?.id, 200),
       name: boundedText(file?.name, 300),
       modifiedTime: file?.modifiedTime ? String(file.modifiedTime) : null,
       webViewLink: file?.webViewLink ? String(file.webViewLink) : null,
-    })),
+    }))
+}
+
+function driveListParams(limit: number) {
+  return {
+    pageSize: String(limit),
+    orderBy: 'modifiedTime desc',
+    spaces: 'drive',
+    corpora: 'user',
+    includeItemsFromAllDrives: 'true',
+    supportsAllDrives: 'true',
+    fields: 'files(id,name,mimeType,modifiedTime,webViewLink,trashed)',
   }
 }
 
-export async function getGoogleSpreadsheetMetadata(userId: string, spreadsheetId: string) {
-  const id = String(spreadsheetId || '').trim()
-  if (!validSpreadsheetId(id)) return { ok: false as const, reason: 'invalid_spreadsheet_id' }
+export async function listGoogleSpreadsheets(userId: string, options: { query?: string; limit?: number } = {}) {
+  const limit = Math.max(1, Math.min(100, Math.floor(options.limit ?? 25)))
+  const search = boundedText(options.query || '', 100)
+  const escapedSearch = search.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+  const clauses = [`mimeType = '${SPREADSHEET_MIME}'`, 'trashed = false']
+  if (escapedSearch) clauses.push(`name contains '${escapedSearch}'`)
+
+  const primaryParams = new URLSearchParams({
+    ...driveListParams(limit),
+    q: clauses.join(' and '),
+  })
+  const primary = await googleJson(userId, `${DRIVE_API}/files?${primaryParams.toString()}`)
+  if ('reason' in primary) return primary
+
+  let discoveryMode: 'filtered-query' | 'broad-fallback' = 'filtered-query'
+  let files = Array.isArray(primary.data?.files) ? primary.data.files : []
+  let spreadsheets = mapSpreadsheetFiles(files, limit, search)
+
+  // If Google's filtered query yields no files, do one bounded broad metadata scan and
+  // filter locally. This preserves read-only behavior while recovering from query/provider
+  // edge cases and gives the user a usable connector instead of a silent empty dropdown.
+  if (spreadsheets.length === 0) {
+    const fallbackParams = new URLSearchParams(driveListParams(100))
+    const fallback = await googleJson(userId, `${DRIVE_API}/files?${fallbackParams.toString()}`)
+    if ('reason' in fallback) return fallback
+    discoveryMode = 'broad-fallback'
+    files = Array.isArray(fallback.data?.files) ? fallback.data.files : []
+    spreadsheets = mapSpreadsheetFiles(files, limit, search)
+  }
+
+  const accountResult = await getGoogleDriveAccount(userId)
+  return {
+    ok: true as const,
+    spreadsheets,
+    discoveryMode,
+    account: 'reason' in accountResult ? null : accountResult.account,
+  }
+}
+
+export async function getGoogleSpreadsheetMetadata(userId: string, spreadsheetReference: string) {
+  const id = extractGoogleSpreadsheetId(spreadsheetReference)
+  if (!id) return { ok: false as const, reason: 'invalid_spreadsheet_id_or_url' }
   const fields = 'spreadsheetId,properties(title,locale,timeZone),sheets(properties(sheetId,title,index,gridProperties(rowCount,columnCount)))'
   const result = await googleJson(userId, `${SHEETS_API}/spreadsheets/${encodeURIComponent(id)}?fields=${encodeURIComponent(fields)}`)
   if ('reason' in result) return result
@@ -93,13 +163,13 @@ export async function getGoogleSpreadsheetMetadata(userId: string, spreadsheetId
 
 export async function readGoogleSheetRange(
   userId: string,
-  spreadsheetId: string,
+  spreadsheetReference: string,
   range: string,
   options: { maxRows?: number; maxColumns?: number } = {},
 ) {
-  const id = String(spreadsheetId || '').trim()
+  const id = extractGoogleSpreadsheetId(spreadsheetReference)
   const safeRange = sanitizeRange(range)
-  if (!validSpreadsheetId(id)) return { ok: false as const, reason: 'invalid_spreadsheet_id' }
+  if (!id) return { ok: false as const, reason: 'invalid_spreadsheet_id_or_url' }
   if (!safeRange) return { ok: false as const, reason: 'range_required' }
   const maxRows = Math.max(1, Math.min(500, Math.floor(options.maxRows ?? 200)))
   const maxColumns = Math.max(1, Math.min(100, Math.floor(options.maxColumns ?? 50)))
@@ -126,7 +196,7 @@ export async function readGoogleSheetRange(
 
 export async function searchGoogleSheetRows(
   userId: string,
-  spreadsheetId: string,
+  spreadsheetReference: string,
   range: string,
   query: string,
   options: { limit?: number; maxRows?: number } = {},
@@ -134,7 +204,7 @@ export async function searchGoogleSheetRows(
   const term = boundedText(query, 200).toLowerCase()
   if (!term) return { ok: false as const, reason: 'query_required' }
   const limit = Math.max(1, Math.min(50, Math.floor(options.limit ?? 20)))
-  const read = await readGoogleSheetRange(userId, spreadsheetId, range, { maxRows: options.maxRows ?? 500, maxColumns: 100 })
+  const read = await readGoogleSheetRange(userId, spreadsheetReference, range, { maxRows: options.maxRows ?? 500, maxColumns: 100 })
   if ('reason' in read) return read
   const matches = read.rows.flatMap((row: string[], index: number) =>
     row.some(cell => cell.toLowerCase().includes(term)) ? [{ rowNumber: index + 1, values: row }] : [],

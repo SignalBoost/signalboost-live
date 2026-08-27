@@ -16,6 +16,7 @@ import { recordCognitiveSkillPipelineHealth } from '@/lib/ai/cos/cognitiveSkillP
 import { runKnowledgeApplicationScan } from '@/lib/ai/cos/knowledgeApplicationStore'
 import { runEvidenceTriggeredRetest } from '@/lib/ai/cos/evidenceTriggeredRetestStore'
 import { recordAutonomousLearningRun } from '@/lib/ai/cos/autonomousLearningHealth.ts'
+import { operationalSystemsCurriculumSignals } from '@/lib/ai/cos/operationalSystemsLearning'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
@@ -72,10 +73,6 @@ export async function GET(req: NextRequest) {
       console.warn('cron COS local runtime could not be pre-warmed; individual learning stages will fail closed or use their existing fallbacks:', error instanceof Error ? error.message : String(error))
     }
 
-    // Certification must get first claim on the bounded model-call budget. Previously it ran only
-    // after daily research plus active learning, so the route often had less than the required
-    // model-call estimate + cleanup reserve left. The cycle still updated last_cycle_at, which made
-    // the pipeline look alive while no understanding/practice/holdout call actually ran.
     try {
       certification = await runCognitiveCertificationCycle({
         deadlineAt: routeStartedAt + CERTIFICATION_ROUTE_DEADLINE_MS,
@@ -88,7 +85,10 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      learning = await runDailyAutonomousLearning({ miningSummary: result.summary })
+      learning = await runDailyAutonomousLearning({
+        miningSummary: result.summary,
+        injectedGapSignals: operationalSystemsCurriculumSignals(),
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Daily learning failed'
       console.error('cron cos daily learning failed:', message)

@@ -105,6 +105,32 @@ if (!miningRoute.includes('injectedGapSignals: operationalSystemsCurriculumSigna
 const currentWorldLearning = await readFile(path.join(root, 'lib/ai/cos/currentWorldLearning.ts'), 'utf8')
 if (/operationalSystems/i.test(currentWorldLearning)) failures.push('operational_learning_must_not_run_hourly')
 
+// Owner policy: advisory diagnosis works the problem before it abstains. Enterprise COS already
+// retrieves KG/corpus/memory/skills before entering the reasoner. The primary reasoner may then do
+// a bounded methods lookup, but only authority-ranked official/institutional web results and
+// Crossref scholarly results can enter the reference block. Publications are never incident data.
+const advisoryDiagnosisPolicy = await readFile(path.join(root, 'lib/ai/cos/advisoryDiagnosisPolicy.ts'), 'utf8')
+for (const required of ['ADVISORY_DIAGNOSIS_OWNER_POLICY', 'Observed / established facts', 'Candidate hypotheses', 'Distinguishing checks', 'Missing readings / baselines', 'NEVER INCIDENT TELEMETRY', 'uncertainty_not_last']) {
+  if (!advisoryDiagnosisPolicy.includes(required)) failures.push(`advisory_diagnosis_policy_guard_missing:${required}`)
+}
+const advisoryDiagnosisLookup = await readFile(path.join(root, 'lib/ai/cos/advisoryDiagnosisPublishedLookup.ts'), 'utf8')
+for (const required of ['getExternalInfo(officialQuery, 6', 'crossrefScientificSearch(baseQuery, 3)', 'selectOfficialDiagnosticReferences', 'references.length >= 4']) {
+  if (!advisoryDiagnosisLookup.includes(required)) failures.push(`advisory_diagnosis_lookup_guard_missing:${required}`)
+}
+const cosReasoner = await readFile(path.join(root, 'lib/ai/cos/cosReasoner.ts'), 'utf8')
+for (const required of ['primaryReasonerRequest', 'retrievePublishedDiagnosticReferences(args.prompt)', 'ADVISORY_DIAGNOSIS_OWNER_POLICY', 'advisoryDiagnosisBriefDefects', 'published_diagnostic_research', 'incidentTelemetry: false']) {
+  if (!cosReasoner.includes(required)) failures.push(`advisory_diagnosis_reasoner_guard_missing:${required}`)
+}
+const publishedLookupIndex = cosReasoner.indexOf('retrievePublishedDiagnosticReferences(args.prompt)')
+const reasonerDraftIndex = cosReasoner.indexOf("recorder.time('draft', () => callLocalModel(effectiveArgs, inference)")
+if (publishedLookupIndex < 0 || reasonerDraftIndex < 0 || publishedLookupIndex > reasonerDraftIndex) failures.push('advisory_diagnosis_published_lookup_must_precede_draft')
+const enterpriseFirstAnswer = await readFile(path.join(root, 'lib/ai/cos/cosFirstAnswerEnterprise.ts'), 'utf8')
+const internalRetrievalIndex = enterpriseFirstAnswer.indexOf('const context = await retrieveInternalContext')
+const enterpriseReasonerIndex = enterpriseFirstAnswer.indexOf('const reasoned = await callCosReasoner')
+if (internalRetrievalIndex < 0 || enterpriseReasonerIndex < 0 || internalRetrievalIndex > enterpriseReasonerIndex) failures.push('advisory_diagnosis_internal_retrieval_must_precede_reasoner')
+const honestRefusal = await readFile(path.join(root, 'lib/ai/cos/honestRefusalReply.ts'), 'utf8')
+if (!honestRefusal.includes('I still cannot stand behind a single cause yet.')) failures.push('advisory_diagnosis_uncertainty_last_copy_missing')
+
 const conciergeRoute = await readFile(path.join(root, 'app/api/concierge/route.ts'), 'utf8')
 if (!conciergeRoute.includes('const PRIMARY_TIMEOUT_MS = 150_000')) failures.push('public_concierge_primary_timeout_must_be_150s')
 const vercelCosGates = await readFile(path.join(root, 'scripts/vercel-cos-gates.mjs'), 'utf8')
@@ -112,6 +138,7 @@ if (!vercelCosGates.includes("'tests/conciergeTransportBudget.node.test.ts'")) f
 if (!vercelCosGates.includes("'tests/cosPrimaryDeterministicFreshRouting.node.test.ts'")) failures.push('cos_primary_deterministic_fresh_test_not_mandatory')
 if (!vercelCosGates.includes("'tests/assistantTransportClient.node.test.ts'")) failures.push('assistant_transport_client_test_not_mandatory')
 if (!vercelCosGates.includes("'tests/operationalSystemsLearning.node.test.ts'")) failures.push('operational_learning_test_not_mandatory')
+if (!vercelCosGates.includes("'tests/advisoryDiagnosisPolicy.node.test.ts'")) failures.push('advisory_diagnosis_policy_test_not_mandatory')
 
 console.log(JSON.stringify({ ok: failures.length === 0, schema: 'signalboost-cos-blueprint-v1', failures }, null, 2))
 if (failures.length) process.exit(1)

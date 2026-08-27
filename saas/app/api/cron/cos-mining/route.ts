@@ -16,6 +16,7 @@ import { recordCognitiveSkillPipelineHealth } from '@/lib/ai/cos/cognitiveSkillP
 import { runKnowledgeApplicationScan } from '@/lib/ai/cos/knowledgeApplicationStore'
 import { runEvidenceTriggeredRetest } from '@/lib/ai/cos/evidenceTriggeredRetestStore'
 import { recordAutonomousLearningRun } from '@/lib/ai/cos/autonomousLearningHealth.ts'
+import { operationalSystemsCurriculumSignals } from '@/lib/ai/cos/operationalSystemsLearning'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
@@ -88,7 +89,10 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-      learning = await runDailyAutonomousLearning({ miningSummary: result.summary })
+      learning = await runDailyAutonomousLearning({
+        miningSummary: result.summary,
+        injectedGapSignals: operationalSystemsCurriculumSignals(),
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Daily learning failed'
       console.error('cron cos daily learning failed:', message)

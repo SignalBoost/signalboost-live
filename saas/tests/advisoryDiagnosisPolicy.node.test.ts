@@ -11,6 +11,7 @@ import {
 } from '../lib/ai/cos/advisoryDiagnosisPolicy.ts'
 import { buildHonestRefusalReply } from '../lib/ai/cos/honestRefusalReply.ts'
 import { semanticCacheAllowedForPrompt } from '../lib/ai/cos/cacheSafetyPolicy.ts'
+import { stripInternalEvidenceIds } from '../lib/ai/cos/answerEvidenceIdHygiene.ts'
 import {
   consumeAdvisoryDiagnosisResearchForAnswer,
   recordAdvisoryDiagnosisResearchForAnswer,
@@ -111,7 +112,7 @@ test('an unrepaired work-first policy violation is blocked rather than released'
 
 test('published diagnosis research survives answer cleanup and is consumed exactly once', () => {
   const raw = 'Observed facts: [KG1] a transient occurred. Candidate hypotheses: workload burst. Distinguishing checks: compare power samples. Missing readings / baselines: synchronized PDU and GPU readings. I still cannot stand behind a single cause yet.'
-  const clean = raw.replace('[KG1] ', '')
+  const clean = stripInternalEvidenceIds(raw)
   recordAdvisoryDiagnosisResearchForAnswer(raw, {
     attempted: true,
     references: [

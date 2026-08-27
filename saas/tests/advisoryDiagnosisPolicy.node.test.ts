@@ -10,6 +10,7 @@ import {
   selectOfficialDiagnosticReferences,
 } from '../lib/ai/cos/advisoryDiagnosisPolicy.ts'
 import { buildHonestRefusalReply } from '../lib/ai/cos/honestRefusalReply.ts'
+import { semanticCacheAllowedForPrompt } from '../lib/ai/cos/cacheSafetyPolicy.ts'
 
 const METHOD_PROMPT = 'A high-density GPU row sees a 400 ms power transient. What diagnostic methods exist to distinguish synchronized workload bursts, power-cap behavior, PDU limits, and measurement artifacts?'
 
@@ -18,6 +19,11 @@ test('method-seeking advisory diagnosis is detected without hijacking ordinary c
   assert.equal(asksForPublishedDiagnosticMethods(METHOD_PROMPT), true)
   assert.equal(asksForPublishedDiagnosticMethods('Explain DVFS at a conceptual level.'), false)
   assert.equal(isAdvisoryDiagnosisPrompt('Draft a customer email about a delayed shipment.'), false)
+})
+
+test('method-seeking diagnosis cannot bypass required work through semantic or exact cache replay', () => {
+  assert.equal(semanticCacheAllowedForPrompt(METHOD_PROMPT), false)
+  assert.equal(semanticCacheAllowedForPrompt('Explain DVFS at a conceptual level.'), true)
 })
 
 test('published web references admit only first-party or institutional results', () => {
@@ -81,12 +87,22 @@ test('execution order is internal retrieval first, then bounded published resear
   const publishedIndex = reasoner.indexOf('retrievePublishedDiagnosticReferences(args.prompt)')
   const modelIndex = reasoner.indexOf("recorder.time('draft', () => callLocalModel(effectiveArgs, inference)")
   assert.ok(publishedIndex >= 0 && modelIndex > publishedIndex, 'published reference research must precede the model draft')
-  assert.match(reasoner, /PUBLISHED_DIAGNOSTIC|published_diagnostic_research/)
+  assert.match(reasoner, /published_diagnostic_research/)
   assert.match(reasoner, /incidentTelemetry:\s*false/)
 
   assert.match(lookup, /getExternalInfo\(officialQuery, 6/)
   assert.match(lookup, /crossrefScientificSearch\(baseQuery, 3\)/)
   assert.match(lookup, /references\.length >= 4/)
+})
+
+test('an unrepaired work-first policy violation is blocked rather than released', () => {
+  const reasoner = readFileSync(new URL('../lib/ai/cos/cosReasoner.ts', import.meta.url), 'utf8')
+  assert.match(reasoner, /const remainingAdvisoryDefects = advisoryDiagnosis/)
+  assert.match(reasoner, /cos-advisory-diagnosis-release-blocked/)
+  assert.match(reasoner, /return null/)
+  const guardIndex = reasoner.indexOf('const remainingAdvisoryDefects = advisoryDiagnosis')
+  const citationIndex = reasoner.indexOf('const allowedSkillTags = skillCitationTags')
+  assert.ok(guardIndex >= 0 && citationIndex > guardIndex, 'release block must run before any later release-adjacent citation work')
 })
 
 test('published diagnosis lookup is enterprise-primary policy, not a Concierge dependency', () => {

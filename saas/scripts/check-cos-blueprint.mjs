@@ -71,13 +71,15 @@ for (const required of ['live_external_evidence', 'answer_origin?.live_evidence_
 }
 
 // Current facts that already have usable live evidence must not depend on one 120s model call.
-// Fresh synthesis may retry only transport failures under the same evidence-only contract.
+// Fresh synthesis may retry only transport failures under the same evidence-only contract. The
+// local inference compatibility layer returns null on AbortError, so the fresh path must recognize a
+// null that consumes essentially the full bounded timeout and convert only that case into a retry.
 const freshRetryPolicy = await readFile(path.join(root, 'lib/ai/cos/freshEvidenceRetryPolicy.ts'), 'utf8')
-for (const required of ['FRESH_SYNTHESIS_MAX_ATTEMPTS = 2', 'FRESH_SYNTHESIS_DEFAULT_ATTEMPT_TIMEOUT_MS = 35_000', 'runFreshSynthesisTransportAttempts']) {
+for (const required of ['FRESH_SYNTHESIS_MAX_ATTEMPTS = 2', 'FRESH_SYNTHESIS_DEFAULT_ATTEMPT_TIMEOUT_MS = 35_000', 'FRESH_SYNTHESIS_TIMEOUT_NULL_GRACE_MS', 'freshSynthesisNullIndicatesTimeout', 'runFreshSynthesisTransportAttempts']) {
   if (!freshRetryPolicy.includes(required)) failures.push(`fresh_evidence_retry_guard_missing:${required}`)
 }
 const freshLocalSynthesis = await readFile(path.join(root, 'lib/ai/cos/freshEvidenceLocalSynthesis.ts'), 'utf8')
-for (const required of ['runFreshSynthesisTransportAttempts', 'boundedFreshSynthesisAttemptTimeoutMs', 'cos-fresh-local-synthesis-retry', 'acceptFreshEvidenceSynthesis']) {
+for (const required of ['runFreshSynthesisTransportAttempts', 'boundedFreshSynthesisAttemptTimeoutMs', 'freshSynthesisNullIndicatesTimeout', 'attemptStartedAt = Date.now()', 'cos-fresh-local-synthesis-retry', 'acceptFreshEvidenceSynthesis']) {
   if (!freshLocalSynthesis.includes(required)) failures.push(`fresh_evidence_retry_wiring_missing:${required}`)
 }
 if (!freshLocalSynthesis.includes('if (!accepted) return null')) failures.push('fresh_evidence_grounding_failure_must_not_retry')

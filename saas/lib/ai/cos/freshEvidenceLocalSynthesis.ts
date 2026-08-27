@@ -2,7 +2,7 @@
 // The model selects supporting evidence IDs; the server renders the exact URLs. This avoids
 // rejecting a correct grounded answer merely because a local model copied a URL imperfectly.
 
-import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { callLocalModel, localInferenceConfigFromEnv, type LocalInferenceConfig, type LocalModelCallArgs } from '@/lib/ai/local-inference'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import {
@@ -14,6 +14,11 @@ import {
 export type FreshEvidenceLocalSynthesis = {
   reply: string
   reasonerLabel: string
+}
+
+type FreshEvidenceLocalSynthesisDeps = {
+  callModel?: (args: LocalModelCallArgs, config?: LocalInferenceConfig) => Promise<string | null>
+  config?: LocalInferenceConfig
 }
 
 const MAX_TOKENS = 700
@@ -50,10 +55,11 @@ export async function synthesizeFreshEvidenceLocally(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
   language: string
-}): Promise<FreshEvidenceLocalSynthesis | null> {
+}, deps: FreshEvidenceLocalSynthesisDeps = {}): Promise<FreshEvidenceLocalSynthesis | null> {
   if (!args.sources.length) return null
 
-  const baseConfig = localInferenceConfigFromEnv()
+  const baseConfig = deps.config ?? localInferenceConfigFromEnv()
+  const callModel = deps.callModel ?? callLocalModel
   const attemptTimeoutMs = Math.min(baseConfig.timeoutMs, freshAttemptTimeoutMs())
   const prompt = freshEvidenceSynthesisPrompt(args)
   const systemPrompt = freshEvidenceSynthesisSystemPrompt(args.language)
@@ -61,7 +67,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     let text: string | null = null
     try {
-      text = await callLocalModel({
+      text = await callModel({
         prompt,
         systemPrompt,
         maxTokens: MAX_TOKENS,

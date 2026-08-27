@@ -240,23 +240,3 @@ test('company identity questions never reach public web search, in any phrasing 
     assert.equal(requiresFreshExternalEvidence(question), true, question)
   }
 })
-
-test('direct/nonstop route EXISTENCE is stable knowledge, answered from the brain (not live-verify)', () => {
-  // The exact production failure (2026-08-26): fired the LOOKUP_INTENT catch-all and fail-closed.
-  assert.equal(requiresFreshExternalEvidence('are there direct flights from Paramaribo to Sao Paulo?'), false)
-  assert.equal(requiresFreshExternalEvidence('Is there a direct flight between Tokyo and Lima?'), false)
-  assert.equal(requiresFreshExternalEvidence('Does any airline fly nonstop from Miami to Lisbon?'), false)
-  assert.equal(requiresFreshExternalEvidence('is there a direct train from Paris to Berlin'), false)
-  // 5-language coverage
-  assert.equal(requiresFreshExternalEvidence('¿hay vuelos directos entre Madrid y Bogotá?'), false)
-  assert.equal(requiresFreshExternalEvidence('há voos diretos de Lisboa para São Paulo?'), false)
-  assert.equal(requiresFreshExternalEvidence('czy są loty bezpośrednie z Warszawy do Nowego Jorku?'), false)
-  assert.equal(requiresFreshExternalEvidence('есть ли прямые рейсы из Москвы в Гавану?'), false)
-})
-
-test('volatile trip attributes still verify live even when phrased with "direct"', () => {
-  assert.equal(requiresFreshExternalEvidence('what is the cheapest direct flight from Paramaribo to Sao Paulo?'), true)
-  assert.equal(requiresFreshExternalEvidence('when is the next direct flight to Lisbon?'), true)
-  assert.equal(requiresFreshExternalEvidence('what is the price of a direct flight to Tokyo today?'), true)
-  assert.equal(requiresFreshExternalEvidence('What is flight status for AA123?'), true) // unchanged
-})

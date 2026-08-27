@@ -12,6 +12,7 @@ import {
 } from '@/lib/ai/cos/freshEvidenceSynthesisContract'
 import {
   boundedFreshSynthesisAttemptTimeoutMs,
+  freshSynthesisNullIndicatesTimeout,
   runFreshSynthesisTransportAttempts,
 } from './freshEvidenceRetryPolicy.ts'
 
@@ -31,13 +32,14 @@ function errorText(error: unknown): string {
  * Try to answer a volatile/current-fact question from live evidence using bounded local synthesis.
  *
  * Production evidence on 2026-08-27 showed the live search completing successfully with eight
- * sources while a single DeepInfra completion stalled until the global 120s timeout. That transient
- * provider stall turned usable current evidence into a 503. Fresh synthesis therefore uses a much
- * shorter per-attempt timeout and retries one time locally under the exact same evidence-only
- * contract. No external provider or model-memory fallback is introduced.
+ * sources while a single DeepInfra completion stalled until the global 120s timeout. A later live
+ * run exposed that callLocalModel intentionally converts AbortError into null for compatibility,
+ * which hid the timeout from the retry wrapper. This path therefore recognizes only a null that
+ * consumed essentially the whole bounded attempt timeout as a retryable transport timeout.
  *
- * A completed model response that fails the evidence contract is NOT retried: that is a grounding
- * failure, not a transport failure, and must remain fail-closed.
+ * A fast null or a completed model response that fails the evidence contract is NOT retried: those
+ * remain ordinary failure/grounding outcomes and must stay fail-closed. No external provider or
+ * model-memory fallback is introduced.
  */
 export async function synthesizeFreshEvidenceLocally(args: {
   input: string
@@ -55,15 +57,23 @@ export async function synthesizeFreshEvidenceLocally(args: {
   let text: string | null = null
   try {
     const result = await runFreshSynthesisTransportAttempts(
-      () => callLocalModel({
-        prompt,
-        systemPrompt,
-        maxTokens: MAX_TOKENS,
-        temperature: TEMPERATURE,
-      }, {
-        ...baseConfig,
-        timeoutMs: attemptTimeoutMs,
-      }),
+      async () => {
+        const attemptStartedAt = Date.now()
+        const value = await callLocalModel({
+          prompt,
+          systemPrompt,
+          maxTokens: MAX_TOKENS,
+          temperature: TEMPERATURE,
+        }, {
+          ...baseConfig,
+          timeoutMs: attemptTimeoutMs,
+        })
+        const elapsedMs = Date.now() - attemptStartedAt
+        if (freshSynthesisNullIndicatesTimeout(value, elapsedMs, attemptTimeoutMs)) {
+          throw new Error(`Local inference attempt exhausted its ${attemptTimeoutMs}ms timeout budget`)
+        }
+        return value
+      },
       ({ attempt, nextAttempt, error }) => {
         console.warn('[cos-fresh-local-synthesis-retry]', JSON.stringify({
           at: new Date().toISOString(),

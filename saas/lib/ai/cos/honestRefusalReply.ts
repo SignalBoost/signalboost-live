@@ -13,9 +13,10 @@
 // principle and the missing pieces were nameable — training duration, cluster power draw,
 // network bandwidth.
 //
-// This module builds the replacement: a short reply that states no answer was released, names
-// the inputs that would make the question answerable, and offers the standing-assumptions route
-// so the reader is never stuck. It NEVER states a cause, a diagnosis, or a number.
+// This module builds the replacement: a short reply that names the inputs that would make the
+// question answerable and offers the standing-assumptions route so the reader is never stuck.
+// For diagnosis, owner policy is stricter: useful next checks come first and the statement that a
+// single cause cannot yet be supported is the final sentence. It NEVER invents a cause or number.
 //
 // Two hard rules, both learned the expensive way:
 //
@@ -28,7 +29,6 @@
 
 export type RefusalLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
-/** Question shapes that have well-defined standard inputs. */
 type Shape = 'economics' | 'sizing' | 'capacity' | 'diagnosis' | 'unknown'
 
 const SHAPE_ECONOMICS =
@@ -43,10 +43,6 @@ const SHAPE_CAPACITY =
 const SHAPE_DIAGNOSIS =
   /(?<![\p{L}\p{N}_])(?:diagnos|root\s+cause|troubleshoot|fault|failure|failed|error|alarm|alert|warning|incident|why\s+did|hypothes)(?![\p{L}\p{N}_])/iu
 
-/**
- * A probe is a candidate missing input. `present` matches text that shows the prompt already
- * supplied it; when it does not match, the input is genuinely absent and may be named.
- */
 interface Probe {
   key: string
   shapes: readonly Shape[]
@@ -187,6 +183,29 @@ const COPY: Record<RefusalLanguage, {
   },
 }
 
+const DIAGNOSIS_COPY: Record<RefusalLanguage, { next: string; final: string }> = {
+  en: {
+    next: 'Use those readings to compare the candidate hypotheses against the same time window and baseline; the useful next step is discrimination, not guessing a failed part.',
+    final: 'I still cannot stand behind a single cause yet.',
+  },
+  es: {
+    next: 'Usa esas mediciones para comparar las hipótesis candidatas en la misma ventana de tiempo y contra la misma referencia; el siguiente paso útil es distinguirlas, no adivinar qué parte falló.',
+    final: 'Todavía no puedo respaldar una causa única.',
+  },
+  pt: {
+    next: 'Use essas medições para comparar as hipóteses candidatas na mesma janela de tempo e com a mesma referência; o próximo passo útil é distingui-las, não adivinhar qual componente falhou.',
+    final: 'Ainda não posso sustentar uma causa única.',
+  },
+  pl: {
+    next: 'Użyj tych pomiarów, aby porównać hipotezy w tym samym oknie czasu i względem tej samej wartości bazowej; kolejnym użytecznym krokiem jest ich rozróżnienie, a nie zgadywanie, który element zawiódł.',
+    final: 'Nadal nie mogę rzetelnie wskazać jednej przyczyny.',
+  },
+  ru: {
+    next: 'Сопоставьте эти измерения с кандидатными гипотезами в одном временном окне и относительно одной базовой линии; следующий полезный шаг — различить гипотезы, а не угадывать отказавший компонент.',
+    final: 'Я всё ещё не могу обоснованно назвать единственную причину.',
+  },
+}
+
 const JOIN: Record<RefusalLanguage, { sep: string; last: string }> = {
   en: { sep: ', ', last: ', and ' },
   es: { sep: ', ', last: ' y ' },
@@ -216,10 +235,6 @@ function joinList(items: readonly string[], language: RefusalLanguage): string {
   return `${items.slice(0, -1).join(sep)}${last}${items[items.length - 1]}`
 }
 
-/**
- * Names the inputs this prompt does NOT already supply, for the question shapes it matches.
- * Exported for testing: the probe result is the part that must never be wrong.
- */
 export function missingInputKeys(prompt: string): string[] {
   const text = String(prompt ?? '')
   if (!text.trim()) return []
@@ -231,21 +246,29 @@ export function missingInputKeys(prompt: string): string[] {
     .slice(0, 4)
 }
 
-/**
- * The reply shipped when COS releases nothing.
- *
- * Contains no confidence value, no threshold, no gate or evidence vocabulary, no model or
- * vendor name — it is safe on the public surface as written.
- */
 export function buildHonestRefusalReply(args: { prompt: string; language?: string | null }): string {
   const language = normalizeLanguage(args.language)
   const copy = COPY[language]
+  const shapes = shapesOf(String(args.prompt ?? ''))
   const keys = missingInputKeys(args.prompt)
+  const labels = keys.map(key => LABELS[language][key]).filter(Boolean)
 
-  if (keys.length === 0) {
-    return `${copy.opening} ${copy.generic}`
+  if (shapes.includes('diagnosis')) {
+    const diagnosis = DIAGNOSIS_COPY[language]
+    const needs = labels.length
+      ? `${copy.needsLead} ${joinList(labels, language)}.`
+      : language === 'en'
+        ? 'The next useful input is a synchronized set of incident readings with the normal baseline for the same signals.'
+        : language === 'es'
+          ? 'El siguiente dato útil es un conjunto sincronizado de mediciones del incidente con la referencia normal de esas mismas señales.'
+          : language === 'pt'
+            ? 'O próximo dado útil é um conjunto sincronizado de medições do incidente com a referência normal dos mesmos sinais.'
+            : language === 'pl'
+              ? 'Kolejnym użytecznym wejściem jest zsynchronizowany zestaw pomiarów z incydentu wraz z normalną wartością bazową tych samych sygnałów.'
+              : 'Следующий полезный ввод — синхронизированный набор измерений инцидента вместе с нормальной базовой линией для тех же сигналов.'
+    return `${needs} ${diagnosis.next} ${diagnosis.final}`
   }
 
-  const labels = keys.map(key => LABELS[language][key]).filter(Boolean)
+  if (keys.length === 0) return `${copy.opening} ${copy.generic}`
   return `${copy.opening} ${copy.needsLead} ${joinList(labels, language)}. ${copy.assumptions}`
 }

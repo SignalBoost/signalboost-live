@@ -61,6 +61,33 @@ test('Google Sheets data client is fixed-host, GET-only and bounded', () => {
   assert.match(sheets, /FORMATTED_VALUE/)
 })
 
+test('Google spreadsheet discovery is explicit, bounded, account-aware, and has a broad metadata fallback', () => {
+  const sheets = read('../lib/google-workspace/sheets.ts')
+  const route = read('../app/api/integrations/google-sheets/spreadsheets/route.ts')
+  const statusRoute = read('../app/api/integrations/google-sheets/status/route.ts')
+  assert.match(sheets, /getGoogleDriveAccount/)
+  assert.match(sheets, /\/about\?fields=/)
+  assert.match(sheets, /spaces: 'drive'/)
+  assert.match(sheets, /corpora: 'user'/)
+  assert.match(sheets, /includeItemsFromAllDrives: 'true'/)
+  assert.match(sheets, /supportsAllDrives: 'true'/)
+  assert.match(sheets, /discoveryMode: 'filtered-query' \| 'broad-fallback'/)
+  assert.match(sheets, /fallbackParams = new URLSearchParams\(driveListParams\(100\)\)/)
+  assert.match(route, /\[google-sheets-discovery\]/)
+  assert.match(route, /createHash\('sha256'\)/)
+  assert.match(statusRoute, /googleAccount/)
+  assert.match(statusRoute, /\[google-sheets-account\]/)
+  assert.doesNotMatch(route, /console\.info\([^\n]*emailAddress/)
+})
+
+test('Google Sheets accepts a raw spreadsheet ID or canonical Google Sheets URL', () => {
+  const sheets = read('../lib/google-workspace/sheets.ts')
+  assert.match(sheets, /export function extractGoogleSpreadsheetId/)
+  assert.match(sheets, /url\.hostname !== 'docs\.google\.com'/)
+  assert.match(sheets, /\/spreadsheets\\\/d\\\//)
+  assert.match(sheets, /invalid_spreadsheet_id_or_url/)
+})
+
 test('Google Sheets tools are exposed to both COS and MCP as read-only actions', () => {
   const builtIn = read('../lib/ai/cos/autonomy/builtInTools.ts')
   const mcp = read('../lib/google-workspace/mcp.ts')
@@ -93,6 +120,21 @@ test('OAuth and data API routes require the signed-in user and OAuth state is bo
   assert.match(statusRoute, /getCurrentUser\(\)/)
   assert.match(dataRoute, /getCurrentUser\(\)/)
   assert.match(statusRoute, /readOnly: true/)
+})
+
+test('Google Sheets page auto-loads discovery and never leaves an empty dropdown unexplained', () => {
+  const page = read('../app/dashboard/google-sheets/page.tsx')
+  const copy = read('../lib/i18n/googleSheetsCopy.ts')
+  assert.match(page, /status\?\.connection\.connected && !hasLoaded/)
+  assert.match(page, /void loadSheets\(\)/)
+  assert.match(page, /t\.connectedAccount/)
+  assert.match(page, /t\.noSpreadsheets/)
+  assert.match(page, /directRef/)
+  assert.match(page, /openDirectSheet/)
+  assert.match(page, /t\.directPlaceholder/)
+  assert.match(copy, /connectedAccount:/)
+  assert.match(copy, /noSpreadsheets:/)
+  assert.match(copy, /directPlaceholder:/)
 })
 
 test('Google Sheets page uses centralized five-language copy rather than inline English UI text', () => {

@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
-import { authoritativeProvenance, formatAuthoritativeProvenance, isProvenanceIntrospection, requestsExternalAction, restrictedProvenanceReply, publicProvenanceReply } from '@/lib/ai/cos/cosOrchestration'
+import { authoritativeProvenance, formatAuthoritativeProvenance, isProvenanceIntrospection, requestsExternalAction } from '@/lib/ai/cos/cosOrchestration'
 import { isDirectStrategyGenerationRequest, renderDirectStrategyGeneration } from '@/lib/ai/cos/strategyProfileDirectGeneration'
 import { readStrategyProfile } from '@/lib/ai/cos/strategyProfileReport'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
@@ -16,8 +16,8 @@ import {
   type RecordedTurnProvenance,
 } from '@/lib/ai/cos/supportTurnProvenance'
 import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
-import { callLocalModel, localInferenceConfigFromEnv, withRunpodWakePermission } from '@/lib/ai/local-inference'
-import { acceptPublicNarrative, buildPublicProvenanceInstruction, emergencyPublicProvenance, extractPublicProvenanceFacts } from '@/lib/ai/cos/publicProvenanceNarrative'
+import { withRunpodWakePermission } from '@/lib/ai/local-inference'
+import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance'
 import { POST as legacyPOST } from './routeCoreLegacy.ts'
 
 export { guardConfabulatedAction } from './routeCoreLegacy.ts'
@@ -44,20 +44,6 @@ function previousAssistantMessage(body: any): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const message = messages[i]
     if (message?.role === 'assistant' && typeof message.content === 'string' && message.content.trim()) return message.content.trim()
-  }
-  return ''
-}
-
-// The user message BEFORE the latest one — i.e. the request that produced the answer the visitor
-// is now asking about. Handed to the model as context only; it is instructed not to quote it back.
-function previousUserMessage(body: any): string {
-  const messages = (Array.isArray(body?.messages) ? body.messages : []) as SupportMessage[]
-  let skippedLatest = false
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i]
-    if (message?.role !== 'user' || typeof message.content !== 'string' || !message.content.trim()) continue
-    if (!skippedLatest) { skippedLatest = true; continue }
-    return message.content.trim()
   }
   return ''
 }
@@ -240,48 +226,22 @@ export async function POST(req: NextRequest) {
 
   if (prompt && isProvenanceIntrospection(prompt)) {
     if (!isPrivileged) {
-      // OWNER REQUIREMENT (2026-08-25): NO hardcoded provenance reply on the Concierge — the model
-      // itself answers where the information came from, in its own voice ("my training", "my
-      // memory", …), differently each time. The route supplies verified facts (cache replay /
-      // retrieved public sources, when a record exists) and acceptPublicNarrative() rejects only
-      // hard violations: a named model/vendor/host/internal component, or an invented source URL.
-      // Two attempts; the fixed emergency line ships ONLY if the model is unreachable or both
-      // attempts were rejected — if that line appears regularly in production, the model path is
-      // the defect to fix, not this branch.
+      // Public provenance is a deterministic view of recorded turn history. Never ask a model to
+      // describe its own prior execution: doing so can turn real live citations into fabricated
+      // claims about "training", "memory", or "illustrative" sources.
       let publicRecord: any = null
       try {
-        if (userId) {
-          publicRecord = conversationId ? await latestRecordedTurnProvenance(conversationId, userId) : null
-          if (!publicRecord && precedingAssistant) publicRecord = await recordedTurnProvenanceByContent(userId, precedingAssistant)
-        }
+        if (userId && precedingAssistant) publicRecord = await recordedTurnProvenanceByContent(userId, precedingAssistant)
+        if (!publicRecord && userId && conversationId) publicRecord = await latestRecordedTurnProvenance(conversationId, userId)
       } catch {}
-      const facts = extractPublicProvenanceFacts({ record: publicRecord, originalRequest: previousUserMessage(body), priorAnswer: precedingAssistant })
-      const instruction = buildPublicProvenanceInstruction(facts, prompt, languageCode)
-      const budgetMs = Math.max(5000, Number(process.env.PUBLIC_PROVENANCE_REASONER_BUDGET_MS || 20000))
-      let reply: string | null = null
-      const attemptDeadline = Date.now() + budgetMs
-      for (let attempt = 0; attempt < 2 && !reply; attempt += 1) {
-        const remainingMs = attemptDeadline - Date.now()
-        if (remainingMs < 2000) break
-        try {
-          const generated = await Promise.race([
-            callLocalModel(
-              { prompt: instruction.prompt, systemPrompt: instruction.system, maxTokens: 480, temperature: 0.9 },
-              { ...localInferenceConfigFromEnv(), timeoutMs: remainingMs },
-            ),
-            new Promise<null>(resolve => setTimeout(() => resolve(null), remainingMs + 500)),
-          ])
-          reply = acceptPublicNarrative(generated, facts)
-        } catch {
-          reply = null
-        }
-      }
-      const reasoned = Boolean(reply)
-      if (!reply) reply = emergencyPublicProvenance(languageCode)
+      const provenance = publicRecord?.provenance ?? publicRecord ?? null
+      const reply = renderPublicRecordedProvenance(provenance, languageCode)
       return NextResponse.json({
         reply,
-        source: reasoned ? 'concierge-public-provenance-reasoned' : 'concierge-public-provenance-unavailable',
+        source: provenance ? 'support-public-provenance-recorded' : 'support-public-provenance-unavailable',
         external_ai_invoked: false,
+        local_model_invoked: false,
+        provenance_match_verified: Boolean(provenance),
       })
     }
     if (!userId) {

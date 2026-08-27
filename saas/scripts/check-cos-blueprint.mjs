@@ -45,5 +45,30 @@ if (!learning.includes('ContinuousLearningDirector')) failures.push('continuous_
 const knowledge = await readFile(path.join(root, 'lib/cos-core/layers/knowledge/persistent.ts'), 'utf8')
 if (!knowledge.includes('class KnowledgeGraph')) failures.push('knowledge_graph_missing')
 
+// Public provenance is execution history, never a reasoning task. Both externally reachable model
+// ingress routes must render only recorded turn data and must explicitly report that no model was
+// invoked for provenance introspection. This guard is part of every prebuild, so the old
+// model-narrated provenance pattern cannot be silently reintroduced.
+for (const relative of ['app/api/cos-browser/route.ts', 'app/api/support/route.ts']) {
+  const source = await readFile(path.join(root, relative), 'utf8')
+  if (!source.includes('renderPublicRecordedProvenance')) failures.push(`public_provenance_not_recorded:${relative}`)
+  if (!/local_model_invoked:\s*false/.test(source)) failures.push(`public_provenance_model_flag_missing:${relative}`)
+  for (const forbidden of ['dynamicPublicSourceExplanation', 'acceptPublicNarrative', 'buildPublicProvenanceInstruction', 'emergencyPublicProvenance']) {
+    if (source.includes(forbidden)) failures.push(`model_generated_public_provenance:${relative}:${forbidden}`)
+  }
+}
+
+try {
+  await readFile(path.join(root, 'lib/ai/cos/publicProvenanceNarrative.ts'), 'utf8')
+  failures.push('obsolete_model_generated_public_provenance_module_present')
+} catch {
+  // Expected: the obsolete model-narrated provenance implementation must not exist.
+}
+
+const publicRecordedProvenance = await readFile(path.join(root, 'lib/ai/cos/publicRecordedProvenance.ts'), 'utf8')
+for (const required of ['live_external_evidence', 'answer_origin?.live_evidence_sources', "won't reconstruct or guess", "won't invent"]) {
+  if (!publicRecordedProvenance.includes(required)) failures.push(`recorded_public_provenance_guard_missing:${required}`)
+}
+
 console.log(JSON.stringify({ ok: failures.length === 0, schema: 'signalboost-cos-blueprint-v1', failures }, null, 2))
 if (failures.length) process.exit(1)

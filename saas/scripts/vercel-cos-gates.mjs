@@ -52,7 +52,7 @@ const tests = [
   'tests/releaseSignalSeverity.node.test.ts',
   'tests/cosAnswerPolicyCore.node.test.ts',
   'tests/cosOperatingCharter.node.test.ts',
-  'tests/publicProvenanceRecast.node.test.ts',
+  'tests/publicRecordedProvenance.node.test.ts',
   'tests/groundingConcepts.node.test.ts',
   'tests/answerEvidenceAttributionRepair.node.test.ts',
   'tests/conversationProvenanceIntent.node.test.ts',

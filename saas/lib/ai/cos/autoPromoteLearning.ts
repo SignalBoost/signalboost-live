@@ -1,3 +1,4 @@
+import { describeThrownValue } from './describeThrownValue.ts'
 import { cosServiceDb, createSupabaseCOSStores } from '@/lib/cos-core/storage/supabase'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { persistKnowledgeFactWithEmbedding } from '@/lib/ai/cos/knowledgeFactSemantic'
@@ -311,7 +312,10 @@ export async function autoPromoteLearnedKnowledge(
     console.info('[cos-learning-auto-promotion]', JSON.stringify({ ...result, ownerDirectedOnly: Boolean(options.ownerDirectedOnly) }))
     return result
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
+    // Supabase rejects with a plain object, not an Error, so String(error) printed "[object
+    // Object]" for ~96 consecutive failures before anyone could see the cause. See
+    // describeThrownValue.ts.
+    const message = describeThrownValue(error)
     console.error('[cos-learning-auto-promotion-failed]', message)
     return {
       status: 'error', documentsScreened, documentsProcessed, documentsCompleted, documentsFailed,

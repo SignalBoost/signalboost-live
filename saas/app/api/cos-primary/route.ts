@@ -17,6 +17,7 @@ import {
   attachFreshEvidenceProvenance,
   freshEvidenceSearchQuery,
   prepareFreshEvidence,
+  resolveDeterministicDirectFlight,
   type FreshEvidenceSource,
 } from '@/lib/ai/cos/cosFreshGrounding'
 import { freshEvidenceMeetsQuestionAuthority } from '@/lib/ai/cos/cosFreshAuthority'
@@ -100,10 +101,7 @@ function provenanceReportFollowupReply(language:string):string{
 function emitRequestTelemetry(args:{startedAt:number;input:string;reply?:string|null;source:CosLiveResponseSource;confidence?:number|null;provenance?:any;externalAiInvoked:boolean}){const p=args.provenance??null,observation=buildCosLiveTelemetry({responseSource:args.source,latencyMs:Math.max(0,Date.now()-args.startedAt),confidence:args.confidence??null,reasonerLabel:p?.reasonerLabel??p?.local_reasoning?.model??null,localModelInvoked:p?.localModelInvoked??p?.local_reasoning?.invoked??false,externalAiInvoked:args.externalAiInvoked,knowledgeFactsUsed:p?.knowledgeFactsUsed??p?.knowledge_graph?.evidence_count??0,learnedItemsUsed:p?.learnedItemsUsed??p?.learned_corpus?.evidence_count??0,userMemoriesUsed:p?.userMemoriesUsed??p?.user_memory?.evidence_count??0,similarityScore:p?.similarityScore,promptChars:args.input.length,replyChars:String(args.reply??'').length});emitCosLiveTelemetry(observation);return observation}
 function securityReleaseContinuityReply(input:string):string|null{if(!/\b(?:zero[- ]day|vulnerabilit|infosec|tenant\s+metadata)\b/i.test(input)||!/\b(?:launch|release|go\/no-go|go no-go|conference)\b/i.test(input))return null;return 'GO/NO-GO: NO-GO until the security incident authority documents containment or an accepted risk decision. Preserve evidence; stop release promotion; identify the affected dependency/version and exposure path; determine whether tenant metadata was accessible; apply or isolate the mitigation; assess notification and contractual obligations with Legal/Privacy; and reconvene the launch decision on recorded remediation evidence. Live verification or model synthesis was unavailable, so COS is not asserting exploitability, scope, or legal duties beyond the scenario facts.'}
 function freshEvidenceUnavailableReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;const messages:Record<string,string>={en:'COS requires live authoritative evidence for this current fact, but live verification is unavailable or insufficient right now. No model-memory answer was used.',es:'COS requiere evidencia autorizada en vivo para este hecho actual, pero la verificación en vivo no está disponible o es insuficiente en este momento. No se utilizó una respuesta de memoria del modelo.',pt:'O COS exige evidência autorizada ao vivo para este fato atual, mas a verificação em vivo está indisponível ou insuficiente neste momento. Nenhuma resposta da memória do modelo fue usada.',pl:'COS wymaga aktualnego, wiarygodnego źródła dla tego bieżącego faktu, ale w tej chwili weryfikacja na żywo jest niedostępna lub niewystarczająca. Nie użyto odpowiedzi z pamięci modelu.',ru:'COS требует актуального авторитетного источника для этого текущего факта, но сейчас живая проверка недоступна или недостаточна. Ответ из памяти модели не использовался.'};return messages[language]||messages.en}
-function freshSynthesisRejectedReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;// The decision to withhold is correct; the old wording was not. It reported internal machinery
-  // ("synthesis", "grounded in that evidence", "rejected") to a visitor who asked a simple
-  // question. See freshVerificationUnavailableReply.ts for the production case that forced this.
-  return buildFreshVerificationUnavailableReply({prompt:input,language})}
+function freshSynthesisRejectedReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;return buildFreshVerificationUnavailableReply({prompt:input,language})}
 function securityScenarioEvidenceIsSpecific(input:string,sources:FreshEvidenceSource[]):boolean{if(!/\b(?:zero[- ]day|vulnerabilit|infosec|tenant\s+metadata)\b/i.test(input))return true;const locator=input.match(/\bCVE-\d{4}-\d{4,}\b|\b(?:npm|pypi|maven|cargo|gem|composer)\s*[:/]\s*[@\w./-]+/i)?.[0];if(!locator)return false;return sources.some(source=>new RegExp(locator.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(`${source.title}\n${source.snippet}\n${source.url}`))}
 
 function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { detail: string }): string | null {
@@ -124,15 +122,9 @@ export async function POST(req:NextRequest){
   const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body)
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body),isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
-  // Fresh/current-fact follow-ups ("when did she die?") are not complete queries on their own.
-  // resolveFreshConversationContext carries forward only the user's own prior message — assistant
-  // text is never trusted as a factual referent (verified: it filters to role==='user' only).
-  // lookupInput is the resolved question used for every fresh-evidence lookup and cache key below;
-  // it equals the raw input unless a genuine follow-up pattern was detected.
   const freshConversationContext=resolveFreshConversationContext(body, input)
   const lookupInput=freshConversationContext.lookupInput
 
-  // Repository inspection is an owner-authorized, read-only operation. Execute it here so a model/tool-choice loop cannot skip it.
   if(access?.isOwner&&isOwnerRepoScanRequest(input)){
     const scan=await scanRepositoryForOwner()
     const assessmentRequested=scan.ok&&requestsSelfHealingAssessment(input)
@@ -212,9 +204,19 @@ export async function POST(req:NextRequest){
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-unavailable',confidence_score:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
     }
 
-    // Fresh evidence is a retrieval problem first, then a COS reasoning problem. The local/managed
-    // open-model reasoner may synthesize ONLY from the authoritative evidence selected above; model
-    // memory is still prohibited from supplying current facts. Hosted external AI is not required.
+    const deterministicFresh=resolveDeterministicDirectFlight(lookupInput,freshSources)
+    if(deterministicFresh){
+      const reply=deterministicFresh.reply
+      const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:deterministicFresh.sources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:null})
+      ;Object.assign(executionProvenance as any,{policy:'fresh_live_data_deterministic_first',assistant_text_used_for_resolution:false,deterministic_fresh_fact:{used:true,kind:deterministicFresh.kind??'direct_flight',retrieval_documents_acquired:freshSources.length,evidence_selected:deterministicFresh.sources.length}})
+      ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:null,grounded_at:freshRetrievedAt}
+      logEscalation({event:'fresh_deterministic_resolution_accepted',documents_acquired:freshSources.length,evidence_selected:deterministicFresh.sources.length,kind:deterministicFresh.kind??'direct_flight',external_ai_invoked:false,local_model_invoked:false,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'deterministic',confidence:deterministicFresh.confidence,provenance:freshTelemetryProvenance(false,null),externalAiInvoked:false})
+      const volatileCacheWritten=await writeVolatileAnswerCache({prompt:lookupInput,language,value:{reply,groundedAt:freshRetrievedAt,liveSources:deterministicFresh.sources,externalProvider:null,externalModel:null}})
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-deterministic-grounded',{prompt:lookupInput,answered:true,confidence:deterministicFresh.confidence,branch:'fresh_deterministic_grounded'})
+      return NextResponse.json({ok:true,reply,source:'cos-fresh-deterministic-grounded',confidence_score:deterministicFresh.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:deterministicFresh.sources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+    }
+
     if(!requestedAction){
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
@@ -244,14 +246,7 @@ export async function POST(req:NextRequest){
     reasoningPrompt=`${input}\n\nCURRENT DERIVED STRATEGY PROFILE (internal system of record): ${JSON.stringify(profile.profile)}\nAPPLIED OVERRIDES: ${JSON.stringify(overrides)}\nGenerate the requested content. Then add an Evidence Used section: for every learned override, name its dimension, winning value, performance score, measured-campaign count, runner-up comparison, and supporting campaign IDs from the profile. If overrides is empty, state that measured outcomes did not justify changing defaults; do not claim missing configuration.`
   }
   let cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null=null,localError:string|null=null
-  // Fresh facts already completed live retrieval plus their one local synthesis attempt above.
-  // Re-entering generic COS here caused a second search and a second local call on the same turn.
   if(!requestedAction&&!requiresFreshEvidence){
-    // Conversation continuity (2026-08-25): pass the preceding assistant answer, exactly as
-    // baseRoute.ts does. Without it a follow-up like "what should the subject line for the email
-    // be?" reaches the reasoner with no email in sight, and it asks the user for context that is
-    // already in the conversation. Also disables the semantic cache for follow-up turns inside
-    // tryCOSFirstAnswer, which is correct: a follow-up is never a standalone cacheable question.
     try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
@@ -269,9 +264,6 @@ export async function POST(req:NextRequest){
     return NextResponse.json({ok:false,reply,error:reply,cos_first_attempted:requiresFreshEvidence?freshLocalAttempted:(Boolean(cos)||Boolean(localError)),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry},{status:503})
   }
 
-  // Fresh/current facts never enter the legacy Concierge fallback. The COS-owned local evidence
-  // synthesis attempt above always gets first refusal; only then may this governed compatibility
-  // helper reach a hosted provider, and the same evidence-id contract still applies.
   if(requiresFreshEvidence&&freshRetrievedAt){
     const externalFresh=await synthesizeFreshEvidenceExternally({ input: lookupInput, sources:freshSources,retrievedAt:freshRetrievedAt,language})
     const externalInvoked=externalFresh.source==='provider'||(externalFresh.source===null&&externalFresh.attempted)
@@ -297,9 +289,6 @@ export async function POST(req:NextRequest){
     return NextResponse.json({ok:true,reply,source:externalInvoked?'external_fresh_grounded':'cos-fresh-local-grounded',confidence_score:1,confidence_threshold:confidenceThreshold(),cos_first_attempted:freshLocalAttempted,cos_first_handled:false,cos_first_confidence:null,cos_first_reason:reason.detail,escalation_reason_code:reason.code,execution_provenance:executionProvenance,external_ai_invoked:externalInvoked,external_provider:externalInvoked?externalProvider:null,external_model:externalInvoked?externalFresh.model:null,external_provider_source:externalInvoked?externalFresh.source:null,external_fallback_invoked:externalInvoked,external_fallback_succeeded:externalInvoked,local_model_invoked:freshLocalAttempted||externalFresh.source==='local',isolation_mode:false,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
   }
 
-  // Non-volatile requests retain the legacy continuity/provider path, but final lineage is always
-  // bound to the component that supplied the returned text. A rejected first COS attempt remains
-  // diagnostic only and may never overwrite the second attempt's confidence or provenance.
   const traced=await withCosProviderExecutionTrace(()=>legacyConciergePost(new NextRequest(req.clone()))),response=traced.result
   try{
     const payload=await response.clone().json(),continuityFailed=legacyContinuityFailure(payload),external=externalExecution(payload,traced.trace,isPrivileged),externalInvoked=!continuityFailed&&external.invoked,reasonerHealth=continuityFailed?await independentReasonerHealth():null,rawReply=String(payload?.reply||'')

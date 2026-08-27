@@ -19,7 +19,7 @@ function sanitizeRange(value: string): string {
 
 async function googleJson(userId: string, url: string, fetchImpl: typeof fetch = fetch): Promise<{ ok: true; data: any } | { ok: false; reason: string }> {
   const token = await getValidGoogleWorkspaceToken(userId)
-  if (!token.ok) return { ok: false, reason: token.reason }
+  if ('reason' in token) return { ok: false, reason: token.reason }
   let response: Response
   try {
     response = await fetchImpl(url, {
@@ -55,7 +55,7 @@ export async function listGoogleSpreadsheets(userId: string, options: { query?: 
     fields: 'files(id,name,modifiedTime,webViewLink)',
   })
   const result = await googleJson(userId, `${DRIVE_API}/files?${params.toString()}`)
-  if (!result.ok) return result
+  if ('reason' in result) return result
   const files = Array.isArray(result.data?.files) ? result.data.files : []
   return {
     ok: true as const,
@@ -73,7 +73,7 @@ export async function getGoogleSpreadsheetMetadata(userId: string, spreadsheetId
   if (!validSpreadsheetId(id)) return { ok: false as const, reason: 'invalid_spreadsheet_id' }
   const fields = 'spreadsheetId,properties(title,locale,timeZone),sheets(properties(sheetId,title,index,gridProperties(rowCount,columnCount)))'
   const result = await googleJson(userId, `${SHEETS_API}/spreadsheets/${encodeURIComponent(id)}?fields=${encodeURIComponent(fields)}`)
-  if (!result.ok) return result
+  if ('reason' in result) return result
   const sheets = Array.isArray(result.data?.sheets) ? result.data.sheets : []
   return {
     ok: true as const,
@@ -109,7 +109,7 @@ export async function readGoogleSheetRange(
     dateTimeRenderOption: 'FORMATTED_STRING',
   })
   const result = await googleJson(userId, `${SHEETS_API}/spreadsheets/${encodeURIComponent(id)}/values/${encodeURIComponent(safeRange)}?${params.toString()}`)
-  if (!result.ok) return result
+  if ('reason' in result) return result
   const values = Array.isArray(result.data?.values) ? result.data.values : []
   const rows = values.slice(0, maxRows).map((row: unknown[]) =>
     (Array.isArray(row) ? row : []).slice(0, maxColumns).map(cell => boundedText(cell, 2000)),
@@ -135,7 +135,7 @@ export async function searchGoogleSheetRows(
   if (!term) return { ok: false as const, reason: 'query_required' }
   const limit = Math.max(1, Math.min(50, Math.floor(options.limit ?? 20)))
   const read = await readGoogleSheetRange(userId, spreadsheetId, range, { maxRows: options.maxRows ?? 500, maxColumns: 100 })
-  if (!read.ok) return read
+  if ('reason' in read) return read
   const matches = read.rows.flatMap((row: string[], index: number) =>
     row.some(cell => cell.toLowerCase().includes(term)) ? [{ rowNumber: index + 1, values: row }] : [],
   ).slice(0, limit)

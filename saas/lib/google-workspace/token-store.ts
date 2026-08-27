@@ -144,7 +144,7 @@ export async function getValidGoogleWorkspaceToken(userId: string): Promise<Vali
   }
 
   const refreshed = await refreshGoogleWorkspaceToken(secret.refreshToken)
-  if (!refreshed.ok) {
+  if ('reason' in refreshed) {
     await recordError(id, refreshed.reason)
     return { ok: false, reason: refreshed.reason }
   }
@@ -156,7 +156,7 @@ export async function getValidGoogleWorkspaceToken(userId: string): Promise<Vali
     expiresAt: refreshed.expiresAt,
     scopes: refreshed.scopes.length ? refreshed.scopes : (Array.isArray(row.scopes) ? row.scopes : []),
   })
-  if (!saved.ok) return { ok: false, reason: saved.reason }
+  if ('reason' in saved) return { ok: false, reason: saved.reason }
   return { ok: true, accessToken: refreshed.accessToken, expiresAt: refreshed.expiresAt, renewed: true }
 }
 

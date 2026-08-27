@@ -14,6 +14,11 @@ export interface BuiltInCosToolOptions {
   userId?: string
 }
 
+function googleToolResult(result: { ok: boolean; reason?: string; [key: string]: unknown }) {
+  if ('reason' in result) return { ok: false as const, error: String(result.reason || 'google_sheets_request_failed') }
+  return { ok: true as const, output: JSON.stringify(result) }
+}
+
 export function createBuiltInCosCognitiveTools(options: BuiltInCosToolOptions = {}): CosCognitiveToolRegistry {
   const registry = new CosCognitiveToolRegistry()
 
@@ -93,11 +98,10 @@ export function createBuiltInCosCognitiveTools(options: BuiltInCosToolOptions = 
     inputSchema: { type: 'object', properties: { query: { type: 'string' }, limit: { type: 'number' } } },
     async execute(input) {
       if (!options.userId) return { ok: false, error: 'user_id_not_configured' }
-      const result = await listGoogleSpreadsheets(options.userId, {
+      return googleToolResult(await listGoogleSpreadsheets(options.userId, {
         query: typeof input.query === 'string' ? input.query : undefined,
         limit: typeof input.limit === 'number' ? input.limit : undefined,
-      })
-      return result.ok ? { ok: true, output: JSON.stringify(result) } : { ok: false, error: result.reason }
+      }))
     },
   })
 
@@ -108,8 +112,7 @@ export function createBuiltInCosCognitiveTools(options: BuiltInCosToolOptions = 
     inputSchema: { type: 'object', properties: { spreadsheetId: { type: 'string' } }, required: ['spreadsheetId'] },
     async execute(input) {
       if (!options.userId) return { ok: false, error: 'user_id_not_configured' }
-      const result = await getGoogleSpreadsheetMetadata(options.userId, String(input.spreadsheetId || ''))
-      return result.ok ? { ok: true, output: JSON.stringify(result) } : { ok: false, error: result.reason }
+      return googleToolResult(await getGoogleSpreadsheetMetadata(options.userId, String(input.spreadsheetId || '')))
     },
   })
 
@@ -124,13 +127,12 @@ export function createBuiltInCosCognitiveTools(options: BuiltInCosToolOptions = 
     },
     async execute(input) {
       if (!options.userId) return { ok: false, error: 'user_id_not_configured' }
-      const result = await readGoogleSheetRange(
+      return googleToolResult(await readGoogleSheetRange(
         options.userId,
         String(input.spreadsheetId || ''),
         String(input.range || ''),
         { maxRows: typeof input.maxRows === 'number' ? input.maxRows : undefined },
-      )
-      return result.ok ? { ok: true, output: JSON.stringify(result) } : { ok: false, error: result.reason }
+      ))
     },
   })
 
@@ -150,14 +152,13 @@ export function createBuiltInCosCognitiveTools(options: BuiltInCosToolOptions = 
     },
     async execute(input) {
       if (!options.userId) return { ok: false, error: 'user_id_not_configured' }
-      const result = await searchGoogleSheetRows(
+      return googleToolResult(await searchGoogleSheetRows(
         options.userId,
         String(input.spreadsheetId || ''),
         String(input.range || ''),
         String(input.query || ''),
         { limit: typeof input.limit === 'number' ? input.limit : undefined },
-      )
-      return result.ok ? { ok: true, output: JSON.stringify(result) } : { ok: false, error: result.reason }
+      ))
     },
   })
 

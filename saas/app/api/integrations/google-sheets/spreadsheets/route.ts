@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/utils/supabase/server.ts'
 import {
@@ -10,12 +11,26 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+function safeAccountFingerprint(emailAddress: string, permissionId: string): string {
+  const identity = String(emailAddress || permissionId || '').trim().toLowerCase()
+  return identity ? createHash('sha256').update(identity).digest('hex').slice(0, 12) : ''
+}
+
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser()
   if (!user) return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
   const query = String(req.nextUrl.searchParams.get('q') || '')
   const limit = Number(req.nextUrl.searchParams.get('limit') || 25)
   const result = await listGoogleSpreadsheets(user.id, { query, limit })
+  if (result.ok) {
+    console.info('[google-sheets-discovery]', {
+      count: result.spreadsheets.length,
+      mode: result.discoveryMode,
+      accountFingerprint: result.account
+        ? safeAccountFingerprint(result.account.emailAddress, result.account.permissionId)
+        : '',
+    })
+  }
   return NextResponse.json(result, { status: result.ok ? 200 : 502 })
 }
 

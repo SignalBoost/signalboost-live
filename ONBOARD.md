@@ -3,12 +3,14 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.27  
+**Version:** 1.28  
 **Updated:** 2026-08-27 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
 **Accepted cognitive implementation baseline:** `440d082ad38b02389c8e4bfc03fe0047c82686e4`  
 **Accepted cognitive Production deployment:** `dpl_jCHZHoY3XBbfykwE2N8C2BsyQq11` — READY, `saas.signalboostapp.com` attached  
-**Google Sheets connector state:** Production implementation `e2020fd22102417b181fa0389e194598044127f0`, deployment `dpl_ACnVNqHMdRSkSKziZrD5iqLRu453` — READY; encrypted Production schema applied; live Google OAuth/Sheet acceptance still requires external Google client credentials, registered redirect URI and a real test Sheet  
+**Google Sheets connector state:** Production OAuth and encrypted persistence accepted with both required read-only scopes; live Production spreadsheet discovery found one real native Sheet after PR #1535; one live SignalBoost range-read POST remains to be observed before calling the whole external read path accepted  
+**Provider Hub connector-fabric state:** PR #1536 merged as `99c8d6dddf5937c170138b3abfa332714909d156`; Production `dpl_J9o8sG69kWgHKZH4jRs8VTUyme7p` READY; existing Marketing + Sales social/ad adapters are reusable through deny-by-default capability discovery/authorization; shared mutation execution is deliberately **not** delegated yet  
+**Owner-directed promotion cron:** repaired in Production on 2026-08-27 by applying the already-repo-owned missing `cos_knowledge_fact_revisions` migration; consecutive scheduled runs returned 200 and advanced the real queue without lowering evidence gates  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
@@ -22,6 +24,14 @@
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
 **Candidate Lab:** isolated baseline/candidate evaluation on fixed cohorts; it fails closed on regression or no measured improvement and can only recommend human review. It has no repository-write, merge, deployment, or automatic-promotion authority.
+
+## 2026-08-27 latest accepted operational override
+
+Read `docs/HANDOFF-PROVIDER-HUB-CRON-2026-08-27.md` for exact live evidence. Where older status wording below conflicts with this override, this newer accepted state wins.
+
+- **Owner-directed knowledge promotion:** the scheduler itself was healthy; the 503 was caused by Production schema drift. The repo already contained `20260816_cos_knowledge_fact_revisions.sql`, but Production lacked the table used by fact contradiction/audit persistence. The existing migration was applied with RLS enabled. The next scheduled run completed 1 document / 11 grounded facts / 0 failures; the following scheduled run completed 3 documents / 35 grounded facts / 0 failures. The owner-directed pending queue moved from 264 to 260. No grounding, source-quality, retry, provenance, or promotion threshold was weakened.
+- **Provider Hub / Marketing + Sales reuse:** the platform now projects the existing 8 organic-social adapters and 10 paid-ad network setups as Provider Hub capabilities instead of building duplicate connectors. Another portable receives a capability only through an exact host-side grant. Social publish is `write + approval required`; paid campaign create/pause is `consequential + approval required`; read capabilities remain read-only. The grant table is RLS-protected with zero `anon`/`authenticated` privileges and stores no provider secrets. Actual publishing/spend remains on the existing Marketing + Sales governed execution paths until the generic connector mutation runtime's approval-binding, timeout/idempotency, and post-execution audit semantics are separately hardened and accepted.
+- **Google Sheets:** real Production OAuth completed; both `spreadsheets.readonly` and `drive.metadata.readonly` were observed in encrypted server-side persistence; after PR #1535, live Production discovery automatically found one real native Google Sheet. This proves live OAuth + listing. Do not yet claim SignalBoost's external range-read path accepted until one real SignalBoost `read_range` request is separately observed. Drive authorization remains metadata-only and does not authorize Drive auto-RAG content ingestion.
 
 ---
 
@@ -138,18 +148,20 @@ Accepted facts:
 
 ---
 
-# Google Sheets read-only connector — IMPLEMENTED AND PRODUCTION; LIVE GOOGLE AUTH ACCEPTANCE PENDING
+# Google Sheets read-only connector — IMPLEMENTED AND PRODUCTION; LIVE OAUTH + LISTING ACCEPTED; SIGNALBOOST RANGE-READ ACCEPTANCE PENDING
 
-PR #1531 added the first native Google Workspace data connector without adding LangChain as an internal dependency.
+PR #1531 added the first native Google Workspace data connector without adding LangChain as an internal dependency. PR #1533 hardened partial-scope acceptance, and PR #1535 repaired live spreadsheet discovery/empty-state behavior.
 
-Accepted implementation:
+Accepted implementation baseline plus live progression:
 
-- merge: `e2020fd22102417b181fa0389e194598044127f0`;
-- exact Preview: `dpl_8Bsk8jMZQ5TfCs7a7Gkjr31eqEd2` — READY;
-- Production: `dpl_ACnVNqHMdRSkSKziZrD5iqLRu453` — READY, `saas.signalboostapp.com` attached;
-- mandatory COS deployment suite: **445/445 tests passed, 0 failed** on the exact accepted head and reran successfully on Production;
-- route-config, strip-safety, centralized-copy, EN/ES/PT/PL/RU locale-key/generated-UI, optimized Next.js compile, TypeScript and full build all passed;
-- GitHub SaaS CI, Playwright, Repo Targeting QA, Relative Import Extensions, QA Scan, Pipeline Integrity, Audit Remediation Regression, V1 Red Diagnostics, COS Council regression and latest Onboarding Enforcement passed before merge.
+- initial implementation merge: `e2020fd22102417b181fa0389e194598044127f0`;
+- initial exact Preview: `dpl_8Bsk8jMZQ5TfCs7a7Gkjr31eqEd2` — READY;
+- initial Production: `dpl_ACnVNqHMdRSkSKziZrD5iqLRu453` — READY;
+- partial-scope hardening merge: `0ac7c4f5a84b02a3158433feef7c9ea2d124d9cf`;
+- discovery/UX repair merge: `56e38914ca02788f2e04152e7b31099e5a164797`, Production `dpl_5h39Ros72ANzAurCDXm6Y3ixattd` — READY;
+- live OAuth completed and encrypted Production persistence contained both required read-only scopes;
+- live Production discovery after the repair returned one real spreadsheet automatically;
+- the exact discovery-fix Preview ran **451/451 tests passed, 0 failed** and the merged Production build was green.
 
 Google authorization contract is deliberately read-only:
 
@@ -187,17 +199,42 @@ User surface:
 
 The five-language page shows configuration/connection status, OAuth connect/disconnect, spreadsheet listing/filtering, bounded range reads and row search. No write UI exists.
 
-Live external acceptance still requires all of the following outside the repository:
-
-- `GOOGLE_WORKSPACE_CLIENT_ID`;
-- `GOOGLE_WORKSPACE_CLIENT_SECRET`;
-- existing `VAULT_MASTER_KEY` available in the Production runtime;
-- the exact Production redirect URI registered in Google Cloud (or an explicit `GOOGLE_WORKSPACE_REDIRECT_URI` matching Google configuration);
-- one real Google account/test spreadsheet to complete consent, refresh-token persistence, listing and range-read evidence.
-
-No real Google OAuth flow or Sheet read has been manufactured merely to make acceptance look complete. Until those external credentials are configured and a real test succeeds, status is **Production implementation/schema, live Google authorization acceptance pending**.
+Live external acceptance currently proves OAuth, both read-only scopes, encrypted persistence and real Sheet listing. Still required before calling the full external Sheets read flow accepted: observe one real SignalBoost range-read request and its returned values. Do not substitute a read performed through a separate Google connector as proof of the SignalBoost range-read path.
 
 Google Drive auto-RAG boundary: the current `drive.metadata.readonly` permission is intentionally sufficient only for spreadsheet discovery metadata. A future Google Drive folder watcher that downloads file contents for RAG must be a separate governed extension with an explicitly approved content-read scope, folder/change detection, file export/download handling, deduplication and handoff into the existing COS admission/indexing pipeline. Do not silently broaden the Sheets connector's Drive permission.
+
+---
+
+# Provider Hub — Marketing + Sales adapter reuse — PRODUCTION DISCOVERY/AUTHORIZATION; SHARED WRITE EXECUTION NOT DELEGATED
+
+PR #1536 merged as `99c8d6dddf5937c170138b3abfa332714909d156`.
+
+Accepted Preview: `dpl_CxR4VWLfBeFT3wshhFpEw84v1jP6` — READY.  
+Accepted Production: `dpl_J9o8sG69kWgHKZH4jRs8VTUyme7p` — READY, `saas.signalboostapp.com` attached.
+
+Exact acceptance:
+
+- mandatory Vercel suite: **458/458 tests passed, 0 failed** on Preview and reran successfully on Production;
+- all 8 new capability-reuse regressions passed;
+- route-config, strip-safety, i18n, optimized compile, TypeScript and full build passed;
+- all applicable PR checks were green before merge.
+
+Existing Marketing + Sales provider code is reused rather than duplicated. Organic built-ins: YouTube, TikTok, Instagram Business, LinkedIn Company, LinkedIn Profile, Facebook Pages, X and Reddit. Paid-ad network setups: Meta, LinkedIn, TikTok, Reddit, Pinterest, Snapchat, X, Google, Microsoft and Amazon.
+
+Provider Hub capability examples:
+
+```text
+social.<platform>.destinations.read   -> read
+social.<platform>.publish             -> write + approval required
+ads.<network>.account.read            -> read
+ads.<network>.spend.read              -> read
+ads.<network>.campaign.create         -> consequential + approval required
+ads.<network>.campaign.pause          -> consequential + approval required
+```
+
+Cross-portable visibility is exact and deny-by-default. Production migration `provider_hub_portable_capability_grants` is applied; RLS is enabled; direct `anon`/`authenticated` table privileges are zero; the table stores authorization metadata only and no provider credential/token columns. Admin route: `/api/provider-hub/marketing-sales-capabilities`.
+
+Critical boundary: this phase exposes capability discovery and authorization only. It does not route social publishing or paid-ad mutations through the generic Portable Connector Runtime. Existing Marketing + Sales content approval, spend approval, cap, confirmation, reconciliation, pause and audit paths remain authoritative. Before shared mutation execution is enabled, separately close and accept invocation-bound approval verification, cancellation/idempotency after mutation timeouts, and post-execution audit-failure semantics. Do not weaken existing Marketing + Sales governance to make the connector fabric look more complete.
 
 ---
 
@@ -595,6 +632,20 @@ Intake modes:
 Contract, unchanged from autonomous acquisition: topic, study intent, material kind and a **license declaration** are required; every chunk is scored with the autonomous cycle's own grounding/admission gates and admitted or rejected individually with reasons; the channel is recorded in each record's evidence (`owner_directed_study`, operator, intent) and the material kind maps onto the existing source-kind taxonomy. Owner-directed material is authoritative for **relevance to the owner's stated study intent**, but it is never automatically authoritative for factual truth, grounding, recency, scope or contradiction resolution.
 
 Anything admitted immediately feeds the applied-knowledge loops on the next daily cycle: it can reopen a retired study question and trigger an evidence-arrival benchmark retest — so material fed today is measured tomorrow. First live use (2026-08-22): a video-transcript chunk admitted at 0.88 confidence with license and source provenance recorded.
+
+## Owner-directed promotion cron — REPAIRED AND LIVE
+
+The recurring `/api/cron/cos-directed-study-promotion` schedule remains CRON_SECRET protected and bounded. On 2026-08-27 it was firing but returning 503 because Production lacked the repo-owned `cos_knowledge_fact_revisions` table used by contradiction/audit persistence. The existing migration was applied rather than weakening the promotion path.
+
+Live post-repair evidence:
+
+- 13:38 UTC: HTTP 200; 1 document completed; 11 grounded facts written; 0 document failures;
+- 13:53 UTC: HTTP 200; 3 documents completed; 35 grounded facts written; 0 document failures;
+- pending owner-directed queue: 264 → 260;
+- completed owner-directed records: 25 at the second verification;
+- revision audit rows began accumulating in the repaired table.
+
+A successful cron invocation is not itself evidence of learning; the recorded document/fact/queue outcomes above are the acceptance evidence. Continue using normal grounding, source, contradiction and fact-extraction limits.
 
 ---
 
@@ -1094,6 +1145,7 @@ Non-negotiable:
 - private certification prompts must not be committed to GitHub or returned through public/admin APIs without an explicit protected diagnostic need;
 - public Concierge must never inherit owner/admin/private-company context simply because the requesting browser is authenticated as owner;
 - Google OAuth token material must remain server-only and encrypted at rest; browser roles have no direct `google_workspace_connections` privileges; read-only Google scopes must not be silently widened;
+- Provider Hub cross-portable capability reuse is deny-by-default; grants contain no provider credentials; discovery authorization does not itself authorize execution; existing product-specific approval/spend/publishing gates remain authoritative until shared execution is separately accepted;
 - Data Center Operations Intelligence Phase 1 is advisory/read-only and may not issue facility-control writes.
 
 ---
@@ -1129,7 +1181,11 @@ Non-negotiable:
 - #1526 — private certification expanded to performance-regression diagnosis and architecture discovery; dead-end local practice execution blocked; unsupported candidates explicitly wait for independent evaluation; current-world facts stay on live routing.
 - #1528 — validated cognitive-skill candidate embeddings are reused by exact text + active embedding-model identity while each query embedding remains fresh; mandatory COS gate was also restored after a concurrent file corruption.
 - #1529 — prompt-free Production telemetry measures cognitive-skill candidate-vector reuse and stage latency; exact merge `440d082a…`, Production `dpl_jCHZHoY3XBbfykwE2N8C2BsyQq11` READY; first exact-deployment log query found no qualifying runtime sample yet.
-- #1531 — native read-only Google Sheets connector: encrypted per-user Google Workspace OAuth, Production RLS schema, bounded Sheets/Drive-metadata reads, COS tools, portable governed MCP tools and five-language UI; live external Google authorization acceptance is pending credentials/redirect/test Sheet.
+- #1531 — native read-only Google Sheets connector: encrypted per-user Google Workspace OAuth, Production RLS schema, bounded Sheets/Drive-metadata reads, COS tools, portable governed MCP tools and five-language UI.
+- #1533 — Google OAuth partial-scope grants fail closed; both required read-only scopes must be present before the connection is accepted.
+- #1535 — Google Sheets discovery/empty-state repair; live Production OAuth + listing accepted against one real native Sheet; SignalBoost range-read acceptance still pending one observed live read.
+- #1536 — existing Marketing + Sales social/ad adapters exposed through Provider Hub discovery + exact deny-by-default cross-portable authorization; shared social/financial mutation execution deliberately not delegated.
+- 2026-08-27 owner-directed promotion repair — existing `cos_knowledge_fact_revisions` migration applied to Production; consecutive scheduled promotion runs returned 200 and advanced real documents/facts/queue state without weaker gates.
 - Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
 - Evidence-triggered answer retest — bounded evidence-arrival promotion of failed prompts into budgeted benchmark cases.
 - Owner-directed study (Feed COS) — gated owner intake page/API with URL, paste and `.txt`/`.md`/`.pdf` upload (dependency-free PDF extraction), same grounding/admission gates as autonomous acquisition.
@@ -1147,17 +1203,18 @@ Always query current state; this sequence can advance after this document is mer
 
 1. **Observe private cognitive certification progression:** verify the ambiguity, performance-regression and architecture-discovery candidates advance only when their private understanding/practice/holdout evidence passes. Never manually set lifecycle flags or counters.
 2. **Measure cognitive-skill live retrieval efficiency:** collect a real Production `cos-cognitive-skill-retrieval-efficiency-v1` cohort and compare candidate cache-hit rate plus `skillStoreMs`, `dependencyHealthMs`, `rankingMs`, and `totalMs`. Do not add another prefilter until the data identifies the actual dominant cost and a held-out check shows recall/trigger coverage is preserved.
-3. **Complete live Google Sheets OAuth acceptance when external Google configuration is available:** configure the Google client ID/secret and exact redirect URI outside Git, connect one real account, prove refresh-token persistence/list/read/search against a harmless test Sheet, and record runtime evidence without exposing tokens.
+3. **Close the last Google Sheets live-acceptance gap:** observe one harmless real SignalBoost range read. OAuth, both read-only scopes, encrypted persistence and listing are already live-accepted; do not redo those steps.
 4. **Google Drive auto-RAG extension:** reuse the Google Workspace authorization/token foundation, but add an explicitly approved Drive content-read scope, folder/change detection, export/download, deduplication and handoff into the existing COS admission + embedding/indexing pipeline. Do not treat the current metadata-only scope as file-content authorization.
-5. **Expand independent certification selectively:** add private/curated profiles only for reusable procedural families with defensible transfer tests. Mutable current-world fact verification should remain on live evidence rather than becoming a timeless learned skill.
-6. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
-7. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
-8. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
-9. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
-10. **Data Center Operations Phase 1 acceptance:** revalidate the synchronized branch head against current `main`, create/merge the PR only after exact Preview is green, then verify the exact Production deployment. Do not call the capability Production before this sequence completes.
-11. **Data Center Operations private benchmark:** expand beyond the 9 deterministic regression tests into diverse incident-correlation/root-cause/advisory cases, including false-correlation and insufficient-evidence cases.
-12. **Data Center Operations knowledge path / first read-only real integration:** add buyer-document/runbook retrieval with exact provenance before real-facility diagnostics, then evaluate one monitoring/DCIM source through the existing signed Supervisor boundary; no facility writes.
-13. **Retention continuity / episodic compression / SFT readiness:** continue only with independently supported evidence and separate held-out acceptance.
+5. **Provider Hub shared-execution hardening:** before routing existing Marketing + Sales writes through the generic connector runtime, require authenticated invocation-bound approval verification, mutation-safe idempotency/cancellation semantics, and durable intent/result handling so a timeout or audit failure cannot cause ambiguous duplicate external actions. Preserve current product-specific execution until this is independently accepted.
+6. **Expand independent certification selectively:** add private/curated profiles only for reusable procedural families with defensible transfer tests. Mutable current-world fact verification should remain on live evidence rather than becoming a timeless learned skill.
+7. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
+8. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
+9. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
+10. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
+11. **Data Center Operations Phase 1 acceptance:** revalidate the synchronized branch head against current `main`, create/merge the PR only after exact Preview is green, then verify the exact Production deployment. Do not call the capability Production before this sequence completes.
+12. **Data Center Operations private benchmark:** expand beyond the 9 deterministic regression tests into diverse incident-correlation/root-cause/advisory cases, including false-correlation and insufficient-evidence cases.
+13. **Data Center Operations knowledge path / first read-only real integration:** add buyer-document/runbook retrieval with exact provenance before real-facility diagnostics, then evaluate one monitoring/DCIM source through the existing signed Supervisor boundary; no facility writes.
+14. **Retention continuity / episodic compression / SFT readiness:** continue only with independently supported evidence and separate held-out acceptance.
 
 ---
 
@@ -1184,6 +1241,9 @@ A Preview fix is not a Production fix, even when the exact Preview test gate is 
 Production connector code/schema is not live external-account acceptance.  
 An MCP-compatible tool catalog/execution port is not a hosted MCP endpoint or proof that a live external LangChain client is connected.  
 A metadata-only Google Drive permission is not authorization to read or embed Drive file contents.  
+Capability discovery or an authorization grant is not execution delegation.  
+A reused provider adapter is not permission for every portable to use it.  
+A cron HTTP 200 is not learning proof unless durable document/fact/outcome state also advanced.  
 A synthetic data-center simulator pass is not real-facility proof.  
 A correlated alarm cluster is not a proven physical root cause.  
 An advisory recommendation is not authorization to control facility equipment.
@@ -1199,5 +1259,7 @@ Success means validated experience measurably improves held-out or verified Prod
 For metacognitive learning, COS must prove which retrieval policy, evidence class, procedural skill, tool sequence or explicit reasoning strategy improved outcomes for a problem class, detect when that lesson stops working, and safely weaken, quarantine or roll it back.
 
 For Google Workspace integrations, success means external authorization is explicitly scoped, token material is protected, tenant/user identity is preserved, read/write authority is not silently widened, tool calls fail truthfully, and real external-account acceptance is separately proven from code/schema deployment.
+
+For Provider Hub connector reuse, success means one buyer/provider connection can safely expose exact capabilities to explicitly authorized portables without duplicating adapters or credentials, while discovery/grants never become implicit mutation authority and existing consequential/financial/publishing controls remain intact.
 
 For Data Center Operations Intelligence, success means the software can ingest normalized read-only operational evidence, distinguish related from unrelated events, produce evidence-bounded probable-cause analysis and useful operator checks, recognize when evidence is insufficient, preserve provenance, and remain safely advisory until a separately governed control phase is explicitly approved.

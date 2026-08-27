@@ -3,11 +3,12 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.26  
-**Updated:** 2026-08-26 UTC  
+**Version:** 1.27  
+**Updated:** 2026-08-27 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
 **Accepted cognitive implementation baseline:** `440d082ad38b02389c8e4bfc03fe0047c82686e4`  
-**Accepted Production deployment:** `dpl_jCHZHoY3XBbfykwE2N8C2BsyQq11` — READY, `saas.signalboostapp.com` attached  
+**Accepted cognitive Production deployment:** `dpl_jCHZHoY3XBbfykwE2N8C2BsyQq11` — READY, `saas.signalboostapp.com` attached  
+**Google Sheets connector state:** Production implementation `e2020fd22102417b181fa0389e194598044127f0`, deployment `dpl_ACnVNqHMdRSkSKziZrD5iqLRu453` — READY; encrypted Production schema applied; live Google OAuth/Sheet acceptance still requires external Google client credentials, registered redirect URI and a real test Sheet  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
@@ -134,6 +135,69 @@ Accepted facts:
 - retained learned knowledge is continuously indexed/re-indexed into the active model space.
 - rejected/quarantined corpus rows remain excluded from governed retrieval.
 - RunPod lifecycle is detached while the active reasoner URL is outside RunPod.
+
+---
+
+# Google Sheets read-only connector — IMPLEMENTED AND PRODUCTION; LIVE GOOGLE AUTH ACCEPTANCE PENDING
+
+PR #1531 added the first native Google Workspace data connector without adding LangChain as an internal dependency.
+
+Accepted implementation:
+
+- merge: `e2020fd22102417b181fa0389e194598044127f0`;
+- exact Preview: `dpl_8Bsk8jMZQ5TfCs7a7Gkjr31eqEd2` — READY;
+- Production: `dpl_ACnVNqHMdRSkSKziZrD5iqLRu453` — READY, `saas.signalboostapp.com` attached;
+- mandatory COS deployment suite: **445/445 tests passed, 0 failed** on the exact accepted head and reran successfully on Production;
+- route-config, strip-safety, centralized-copy, EN/ES/PT/PL/RU locale-key/generated-UI, optimized Next.js compile, TypeScript and full build all passed;
+- GitHub SaaS CI, Playwright, Repo Targeting QA, Relative Import Extensions, QA Scan, Pipeline Integrity, Audit Remediation Regression, V1 Red Diagnostics, COS Council regression and latest Onboarding Enforcement passed before merge.
+
+Google authorization contract is deliberately read-only:
+
+```text
+https://www.googleapis.com/auth/spreadsheets.readonly
+https://www.googleapis.com/auth/drive.metadata.readonly
+```
+
+There is no Sheets write scope and no broad Google Drive content scope in this connector. OAuth uses user-bound CSRF state, offline access/refresh consent, server-side token exchange and automatic bounded refresh.
+
+Token/storage boundary:
+
+- Production migration `20260827000802_google_workspace_connections` is applied to Supabase;
+- token material is encrypted before persistence with the existing Vault AES-256-GCM key path and stored only as ciphertext + IV + authentication tag;
+- no plaintext `access_token` or `refresh_token` column exists;
+- table ownership is per authenticated user and provider;
+- RLS is enabled;
+- direct Production privilege inspection returned zero table privileges for `anon` and `authenticated` roles;
+- browser APIs return only safe connection state, never token material.
+
+Read-only Google operations:
+
+- `google_sheets.list_spreadsheets` — Drive metadata listing for Google Sheets visible to the connected account;
+- `google_sheets.get_metadata` — spreadsheet/tab metadata;
+- `google_sheets.read_range` — bounded A1 range read;
+- `google_sheets.search_rows` — bounded row search over an authorized range.
+
+The same operations are registered in COS built-in cognitive tools with `risk='read_only'` and exported as a governed MCP tool catalog + execution port. MCP calls require a verified `actor.userId` and pass through the Agent Gateway consequence/allowlist boundary. Underlying Google failures remain failures rather than being wrapped as successful tool results.
+
+Important MCP boundary: `saas/agent-gateway/mcp-server.ts` is intentionally a portable JSON-RPC/MCP message handler that a buyer mounts behind their own TLS/SSO/API gateway. SignalBoost does **not** currently expose these Google tools through a new public hosted MCP endpoint. Therefore it is accurate to say the Google Sheets connector is COS-native and MCP-compatible for LangChain or any MCP client; it is not accurate to claim that a live external LangChain agent has already been connected and authenticated.
+
+User surface:
+
+`/dashboard/google-sheets`
+
+The five-language page shows configuration/connection status, OAuth connect/disconnect, spreadsheet listing/filtering, bounded range reads and row search. No write UI exists.
+
+Live external acceptance still requires all of the following outside the repository:
+
+- `GOOGLE_WORKSPACE_CLIENT_ID`;
+- `GOOGLE_WORKSPACE_CLIENT_SECRET`;
+- existing `VAULT_MASTER_KEY` available in the Production runtime;
+- the exact Production redirect URI registered in Google Cloud (or an explicit `GOOGLE_WORKSPACE_REDIRECT_URI` matching Google configuration);
+- one real Google account/test spreadsheet to complete consent, refresh-token persistence, listing and range-read evidence.
+
+No real Google OAuth flow or Sheet read has been manufactured merely to make acceptance look complete. Until those external credentials are configured and a real test succeeds, status is **Production implementation/schema, live Google authorization acceptance pending**.
+
+Google Drive auto-RAG boundary: the current `drive.metadata.readonly` permission is intentionally sufficient only for spreadsheet discovery metadata. A future Google Drive folder watcher that downloads file contents for RAG must be a separate governed extension with an explicitly approved content-read scope, folder/change detection, file export/download handling, deduplication and handoff into the existing COS admission/indexing pipeline. Do not silently broaden the Sheets connector's Drive permission.
 
 ---
 
@@ -1029,6 +1093,7 @@ Non-negotiable:
 - no hidden chain-of-thought persistence;
 - private certification prompts must not be committed to GitHub or returned through public/admin APIs without an explicit protected diagnostic need;
 - public Concierge must never inherit owner/admin/private-company context simply because the requesting browser is authenticated as owner;
+- Google OAuth token material must remain server-only and encrypted at rest; browser roles have no direct `google_workspace_connections` privileges; read-only Google scopes must not be silently widened;
 - Data Center Operations Intelligence Phase 1 is advisory/read-only and may not issue facility-control writes.
 
 ---
@@ -1064,6 +1129,7 @@ Non-negotiable:
 - #1526 — private certification expanded to performance-regression diagnosis and architecture discovery; dead-end local practice execution blocked; unsupported candidates explicitly wait for independent evaluation; current-world facts stay on live routing.
 - #1528 — validated cognitive-skill candidate embeddings are reused by exact text + active embedding-model identity while each query embedding remains fresh; mandatory COS gate was also restored after a concurrent file corruption.
 - #1529 — prompt-free Production telemetry measures cognitive-skill candidate-vector reuse and stage latency; exact merge `440d082a…`, Production `dpl_jCHZHoY3XBbfykwE2N8C2BsyQq11` READY; first exact-deployment log query found no qualifying runtime sample yet.
+- #1531 — native read-only Google Sheets connector: encrypted per-user Google Workspace OAuth, Production RLS schema, bounded Sheets/Drive-metadata reads, COS tools, portable governed MCP tools and five-language UI; live external Google authorization acceptance is pending credentials/redirect/test Sheet.
 - Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
 - Evidence-triggered answer retest — bounded evidence-arrival promotion of failed prompts into budgeted benchmark cases.
 - Owner-directed study (Feed COS) — gated owner intake page/API with URL, paste and `.txt`/`.md`/`.pdf` upload (dependency-free PDF extraction), same grounding/admission gates as autonomous acquisition.
@@ -1081,16 +1147,17 @@ Always query current state; this sequence can advance after this document is mer
 
 1. **Observe private cognitive certification progression:** verify the ambiguity, performance-regression and architecture-discovery candidates advance only when their private understanding/practice/holdout evidence passes. Never manually set lifecycle flags or counters.
 2. **Measure cognitive-skill live retrieval efficiency:** collect a real Production `cos-cognitive-skill-retrieval-efficiency-v1` cohort and compare candidate cache-hit rate plus `skillStoreMs`, `dependencyHealthMs`, `rankingMs`, and `totalMs`. Do not add another prefilter until the data identifies the actual dominant cost and a held-out check shows recall/trigger coverage is preserved.
-3. **Expand independent certification selectively:** add private/curated profiles only for reusable procedural families with defensible transfer tests. Mutable current-world fact verification should remain on live evidence rather than becoming a timeless learned skill.
-4. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
-5. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
-6. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
-7. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
-8. **Data Center Operations Phase 1 acceptance:** revalidate the synchronized branch head against current `main`, create/merge the PR only after exact Preview is green, then verify the exact Production deployment. Do not call the capability Production before this sequence completes.
-9. **Data Center Operations private benchmark:** expand beyond the 9 deterministic regression tests into diverse incident-correlation/root-cause/advisory cases, including false-correlation and insufficient-evidence cases.
-10. **Data Center Operations knowledge path:** add buyer-document/runbook retrieval with exact provenance before attempting real-facility diagnostics.
-11. **First read-only real integration:** after benchmark acceptance, evaluate one monitoring/DCIM source through the existing signed Supervisor incident/intake boundary; no facility writes.
-12. **Retention continuity / episodic compression / SFT readiness:** continue only with independently supported evidence and separate held-out acceptance.
+3. **Complete live Google Sheets OAuth acceptance when external Google configuration is available:** configure the Google client ID/secret and exact redirect URI outside Git, connect one real account, prove refresh-token persistence/list/read/search against a harmless test Sheet, and record runtime evidence without exposing tokens.
+4. **Google Drive auto-RAG extension:** reuse the Google Workspace authorization/token foundation, but add an explicitly approved Drive content-read scope, folder/change detection, export/download, deduplication and handoff into the existing COS admission + embedding/indexing pipeline. Do not treat the current metadata-only scope as file-content authorization.
+5. **Expand independent certification selectively:** add private/curated profiles only for reusable procedural families with defensible transfer tests. Mutable current-world fact verification should remain on live evidence rather than becoming a timeless learned skill.
+6. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
+7. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
+8. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
+9. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
+10. **Data Center Operations Phase 1 acceptance:** revalidate the synchronized branch head against current `main`, create/merge the PR only after exact Preview is green, then verify the exact Production deployment. Do not call the capability Production before this sequence completes.
+11. **Data Center Operations private benchmark:** expand beyond the 9 deterministic regression tests into diverse incident-correlation/root-cause/advisory cases, including false-correlation and insufficient-evidence cases.
+12. **Data Center Operations knowledge path / first read-only real integration:** add buyer-document/runbook retrieval with exact provenance before real-facility diagnostics, then evaluate one monitoring/DCIM source through the existing signed Supervisor boundary; no facility writes.
+13. **Retention continuity / episodic compression / SFT readiness:** continue only with independently supported evidence and separate held-out acceptance.
 
 ---
 
@@ -1114,6 +1181,9 @@ A self-generated practice pass is not independent validation.
 A private certification case is evidence only after it is actually executed and recorded.  
 A current-world page retrieved now can itself contain stale content; source date and authority still matter.  
 A Preview fix is not a Production fix, even when the exact Preview test gate is fully green.  
+Production connector code/schema is not live external-account acceptance.  
+An MCP-compatible tool catalog/execution port is not a hosted MCP endpoint or proof that a live external LangChain client is connected.  
+A metadata-only Google Drive permission is not authorization to read or embed Drive file contents.  
 A synthetic data-center simulator pass is not real-facility proof.  
 A correlated alarm cluster is not a proven physical root cause.  
 An advisory recommendation is not authorization to control facility equipment.
@@ -1127,5 +1197,7 @@ The model/provider is replaceable compute. **COS is the learner.**
 Success means validated experience measurably improves held-out or verified Production performance, transfers to materially different variants, retains the improvement, lowers repeated teacher/fallback dependence, and preserves honest confidence, provenance, tenant scope and governance.
 
 For metacognitive learning, COS must prove which retrieval policy, evidence class, procedural skill, tool sequence or explicit reasoning strategy improved outcomes for a problem class, detect when that lesson stops working, and safely weaken, quarantine or roll it back.
+
+For Google Workspace integrations, success means external authorization is explicitly scoped, token material is protected, tenant/user identity is preserved, read/write authority is not silently widened, tool calls fail truthfully, and real external-account acceptance is separately proven from code/schema deployment.
 
 For Data Center Operations Intelligence, success means the software can ingest normalized read-only operational evidence, distinguish related from unrelated events, produce evidence-bounded probable-cause analysis and useful operator checks, recognize when evidence is insufficient, preserve provenance, and remain safely advisory until a separately governed control phase is explicitly approved.

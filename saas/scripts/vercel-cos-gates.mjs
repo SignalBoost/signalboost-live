@@ -59,6 +59,7 @@ const tests = [
   'tests/localEmbeddingsWindowSafeTransport.node.test.ts',
   'tests/publicCorpusEvidence.node.test.ts',
   'tests/googleSheetsConnector.node.test.ts',
+  'tests/providerHubMarketingSalesCapabilities.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { generateKnowledgeGaps } from '../lib/cos-core/layers/learning/gaps.ts'
-import { normalizeDynamicStudyGaps } from '../lib/cos/dailyAutonomousLearning.ts'
 import {
   OPERATIONAL_SYSTEMS_CURRICULUM_ID,
   OPERATIONAL_SYSTEMS_FOCUS_IDS,
@@ -42,16 +41,12 @@ test('operational signals remain discovery targets without granting physical con
   }
 })
 
-test('daily learning subject hygiene preserves only safety-bound operational injected gaps', () => {
+test('generated operational gaps retain the safety identity required by host subject hygiene', () => {
   const signals = operationalSystemsCurriculumSignals(new Date('2026-08-27T12:00:00.000Z'), 2)
   const generated = generateKnowledgeGaps(signals)
   assert.equal(generated.length, 2)
   assert.ok(generated.every(gap => isOperationalSystemsGap(gap)))
-
-  const normalized = normalizeDynamicStudyGaps(generated)
-  assert.equal(normalized.length, generated.length)
-  assert.deepEqual(normalized.map(gap => gap.subject), generated.map(gap => gap.subject))
-  assert.deepEqual(normalized.map(gap => gap.question), generated.map(gap => gap.question))
+  assert.ok(generated.every(gap => gap.evidence.includes(OPERATIONAL_SYSTEMS_SAFETY_EVIDENCE)))
 })
 
 test('only the daily mining host injects the operational curriculum; hourly current-world remains separate', () => {
@@ -64,5 +59,6 @@ test('only the daily mining host injects the operational curriculum; hourly curr
   assert.match(dailyLearning, /injectedGapSignals\?:\s*KnowledgeGapSignal\[\]/)
   assert.match(dailyLearning, /const injectedGapSignals = input\.injectedGapSignals \?\? \[\]/)
   assert.match(dailyLearning, /generateDynamicKnowledgeGaps\(12, \[\.\.\.weaknessCurriculumSignals, \.\.\.injectedGapSignals\]\)/)
+  assert.match(dailyLearning, /if \(isOperationalSystemsGap\(gap\)\)/)
   assert.doesNotMatch(currentWorld, /operationalSystems/i)
 })

@@ -6,6 +6,15 @@ export const GOOGLE_WORKSPACE_SCOPES = [
   'https://www.googleapis.com/auth/drive.metadata.readonly',
 ] as const
 
+export function missingGoogleWorkspaceScopes(scopes: readonly string[]): string[] {
+  const granted = new Set(scopes.map(scope => String(scope || '').trim()).filter(Boolean))
+  return GOOGLE_WORKSPACE_SCOPES.filter(scope => !granted.has(scope))
+}
+
+export function hasRequiredGoogleWorkspaceScopes(scopes: readonly string[]): boolean {
+  return missingGoogleWorkspaceScopes(scopes).length === 0
+}
+
 export type GoogleWorkspaceTokenResult =
   | { ok: true; accessToken: string; refreshToken: string | null; expiresAt: string; scopes: string[] }
   | { ok: false; reason: string }
@@ -81,7 +90,7 @@ async function tokenRequest(
     accessToken,
     refreshToken: payload?.refresh_token ? String(payload.refresh_token) : null,
     expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
-    scopes: String(payload?.scope || GOOGLE_WORKSPACE_SCOPES.join(' ')).split(/\s+/).filter(Boolean),
+    scopes: String(payload?.scope || '').split(/\s+/).filter(Boolean),
   }
 }
 

@@ -10,6 +10,7 @@ export type PublishedDiagnosticReference = {
 const DIAGNOSIS_RE = /(?:\b(?:diagnos\w*|troubleshoot\w*|root\s+cause|incident|fault|fail(?:ure|ed|s)?|alarm|alert|degrad\w*|bottleneck|why\s+.*(?:slow|fail|error)|candidate\s+causes?|hypotheses?)\b|(?<![\p{L}\p{N}_])(?:diagn[oó]stico|diagnosticar|causa\s+ra[ií]z|incidente|falla|fallo|falha|alarma|alarme|hip[oó]tesis|hip[oó]tese|hip[oó]teses|diagnoza|diagnozowanie|przyczyna|przyczyny|awaria|awarii|incydent|alarm|hipoteza|hipotezy|диагностика|диагностировать|коренная\s+причина|инцидент|сбой|отказ|авария|гипотеза|гипотезы)(?![\p{L}\p{N}_]))/iu
 const METHODS_RE = /(?:\b(?:what|which)\s+(?:diagnostic\s+)?(?:methods?|techniques?|approaches?|mechanisms?)\s+(?:exist|are\s+used|can\s+be\s+used)|\b(?:methods?|techniques?|approaches?)\s+(?:exist|for|to)\s+(?:diagnos\w*|troubleshoot\w*|distinguish|investigate)|\bhow\s+(?:would|should|can)\s+(?:you|we|an?\s+operator)\s+(?:diagnos\w*|troubleshoot\w*|distinguish|investigate)\b|(?<![\p{L}\p{N}_])(?:qu[eé]|cu[aá]les|quais|jakie|какие)\s+(?:m[eé]todos?|t[eé]cnicas?|abordagens?|metody|techniki|методы|методики)[\s\S]{0,100}(?:diagnosticar|diagn[oó]stico|distinguir|investigar|diagnozowa[cć]|diagnoza|rozr[oó][żz]ni[cć]|bada[cć]|диагностировать|диагностика|различить|исследовать)|(?<![\p{L}\p{N}_])(?:como|c[oó]mo|jak|как)\s+[\s\S]{0,80}(?:diagnosticar|distinguir|investigar|diagnozowa[cć]|rozr[oó][żz]ni[cć]|bada[cć]|диагностировать|различить|исследовать))/iu
 const REFUSAL_RE = /(?:\b(?:i\s+(?:do\s+not|don't)\s+know|i\s+(?:still\s+)?cannot\s+stand\s+behind|i\s+(?:still\s+)?can't\s+stand\s+behind|(?:still\s+)?cannot\s+(?:determine|identify|name)|(?:still\s+)?can't\s+(?:determine|identify|name)|unable\s+to\s+(?:determine|identify|name)|insufficient\s+(?:evidence|information)|not\s+enough\s+(?:evidence|information))\b|(?<![\p{L}\p{N}_])(?:no\s+(?:puedo|podemos)\s+(?:determinar|identificar|respaldar|afirmar|nombrar)|n[aã]o\s+(?:posso|podemos)\s+(?:determinar|identificar|sustentar|afirmar|nomear)|nie\s+mog[eę]\s+(?:ustali[cć]|wskaza[cć]|potwierdzi[cć]|nazwa[cć])|не\s+могу\s+(?:определить|указать|подтвердить|назвать))(?![\p{L}\p{N}_]))/iu
+const WINNER_RE = /\b(?:primary line of defense|the primary (?:measure|response|lever)|recommendation\s*:\s*|most likely|root cause is|the winner is)\b/i
 
 const LABEL_GROUPS = {
   observations: /(?:\b(?:observed|observations?|established\s+facts?|what\s+we\s+know|facts?\s+in\s+hand|observado|observaciones|fatos?\s+observados|zaobserwowane|obserwacje)\b|(?<![\p{L}\p{N}_])(?:наблюдения|факты)(?![\p{L}\p{N}_]))/iu,
@@ -99,10 +100,12 @@ export const ADVISORY_DIAGNOSIS_OWNER_POLICY = [
   'OWNER POLICY — ADVISORY DIAGNOSIS: WORK FIRST, HUMILITY LAST.',
   '- Do not lead with “I do not know”, “I cannot stand behind a cause”, or a refusal when useful diagnostic work remains possible.',
   '- Use the internal evidence already supplied to you first: Knowledge Graph, learned corpus, authorized memory, and validated procedural skills. Never claim one was used unless it is actually present in the prompt.',
+  '- If retrieved Knowledge Graph or corpus rows are about GPU memory residue, tenant security scrubbing, RAG interviews, game physics, or any other off-domain topic, treat them as irrelevant. Do not reason from them and do not present them as power, cooling, or telemetry evidence.',
   '- If a PUBLISHED DIAGNOSTIC REFERENCES block is present, use it only for methods/mechanisms and read-only discrimination techniques; it is never plant or production telemetry and never proves the incident root cause.',
   '- Return a labeled hypothesis-discrimination brief. Use equivalent labels in the response language for: Observed / established facts; Candidate hypotheses; Distinguishing checks; Missing readings / baselines.',
   '- Every candidate hypothesis must say what observable would support it and what observation would falsify or materially demote it.',
-  '- Do not name a failed component or single winning cause without incident evidence that distinguishes it from the alternatives.',
+  '- Do not name a failed component, a winning lever, or a primary line of defense without incident evidence that distinguishes it from the alternatives.',
+  '- Do not invent sensor periods, trip margins, SKUs, or controller names unless boxed as ASSUMPTION — standard published practice — override if this site differs.',
   '- Ask for the missing readings/baselines after laying out the useful hypotheses and discriminating checks.',
   '- If the available evidence still cannot select a winner, say that only at the END, after the useful diagnostic work. The uncertainty statement must be the last sentence, not the opening.',
   '- Advisory only: recommend inspection, comparison, logs, traces, metrics, captured plans, approved runbooks, or other read-only checks. Do not issue facility-control or production-mutation instructions merely to resolve uncertainty.',
@@ -120,6 +123,7 @@ export function advisoryDiagnosisBriefDefects(prompt: string, answer: string): s
   if (!LABEL_GROUPS.hypotheses.test(text)) defects.push('hypotheses_label_missing')
   if (!LABEL_GROUPS.distinguishers.test(text)) defects.push('distinguishing_checks_label_missing')
   if (!LABEL_GROUPS.missing.test(text)) defects.push('missing_readings_label_missing')
+  if (WINNER_RE.test(text)) defects.push('named_a_winner')
   if (refusal && refusal.index !== undefined && refusal.index < Math.max(0, text.length - 420)) {
     defects.push('uncertainty_not_last')
   }

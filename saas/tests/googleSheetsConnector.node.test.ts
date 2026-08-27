@@ -18,7 +18,7 @@ test('Google Workspace OAuth requests only read-only Sheets and Drive metadata s
 
 test('Google connection tokens are encrypted with the existing Vault key and never stored in plaintext token columns', () => {
   const store = read('../lib/google-workspace/token-store.ts')
-  const migration = read('../supabase/migrations/20260826_google_workspace_connections.sql')
+  const migration = read('../supabase/migrations/20260827000802_google_workspace_connections.sql')
   assert.match(store, /vaultEncrypt\(JSON\.stringify\(secret\)\)/)
   assert.match(store, /vaultDecrypt\(row\.token_ciphertext, row\.token_iv, row\.token_tag\)/)
   assert.match(migration, /token_ciphertext text not null/)

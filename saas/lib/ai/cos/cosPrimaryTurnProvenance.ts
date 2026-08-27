@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { assistantContentMatchesForProvenance, recordLatestUserTurnProvenance } from './supportTurnProvenance.ts'
 import { buildCosLiveSystemState } from './cosLiveSystemState.ts'
 import { responseLineageStrength } from './responseLineage.ts'
@@ -8,9 +9,30 @@ import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { hashPrompt } from './turnExperienceStore.ts'
 import { buildOutOfPipelineExperienceRow, ensureProvenanceTurnId, type OutOfPipelineTurn } from './outOfPipelineTurn.ts'
+import { persistTurn } from '../tools/conversationHistory.ts'
 
 function effectiveProvenanceUserId(userId: string | null): string | null {
   return userId || publicAuditUserId()
+}
+
+function historyConversationId(userId: string): string {
+  const hex = createHash('sha1').update(`cos-primary-history:${userId}`).digest('hex').slice(0, 32)
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`
+}
+
+async function persistAssistantHistory(userId: string, reply: string, provenance: unknown, turn?: OutOfPipelineTurn): Promise<void> {
+  const userMessage = String(turn?.prompt || '').trim() || 'COS turn'
+  try {
+    await persistTurn({
+      conversationId: historyConversationId(userId),
+      userId,
+      userMessage,
+      assistantReply: reply,
+      provenance,
+    })
+  } catch (error) {
+    console.warn('[cos-primary-history] persist failed (non-fatal):', error instanceof Error ? error.message : String(error))
+  }
 }
 
 function publicScopedProvenance(provenance: unknown): unknown {
@@ -124,6 +146,7 @@ export async function writeCosPrimaryProvenance(userId:string|null,reply:string,
       superseded_attempts:[...previous,supersededAttempt(recordedProvenance,source)].slice(-4),
     }
     await recordLatestUserTurnProvenance(effectiveUserId,reply,enriched,existing.source||'cos-response-lineage-preserved')
+    await persistAssistantHistory(effectiveUserId, reply, enriched, turn)
     console.warn('[cos-primary-provenance] preserved stronger response-bound lineage',JSON.stringify({
       existingSource:existing.source,
       existingStrength,
@@ -137,4 +160,5 @@ export async function writeCosPrimaryProvenance(userId:string|null,reply:string,
   }
 
   await recordLatestUserTurnProvenance(effectiveUserId,reply,recordedProvenance,source)
+  await persistAssistantHistory(effectiveUserId, reply, recordedProvenance, turn)
 }

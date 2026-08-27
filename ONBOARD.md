@@ -3,11 +3,11 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.28  
+**Version:** 1.29  
 **Updated:** 2026-08-27 UTC  
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
-**Accepted cognitive implementation baseline:** `440d082ad38b02389c8e4bfc03fe0047c82686e4`  
-**Accepted cognitive Production deployment:** `dpl_jCHZHoY3XBbfykwE2N8C2BsyQq11` — READY, `saas.signalboostapp.com` attached  
+**Accepted cognitive implementation baseline:** `84de50b8e67feea2e27d658e4cc3982e9e97a603`  
+**Accepted cognitive Production deployment:** `dpl_8qetGZ2HumG3Cc5RMh1zcxtaZhLF` — READY, `saas.signalboostapp.com` attached  
 **Google Sheets connector state:** Production OAuth and encrypted persistence accepted with both required read-only scopes; live Production spreadsheet discovery found one real native Sheet after PR #1535; one live SignalBoost range-read POST remains to be observed before calling the whole external read path accepted  
 **Provider Hub connector-fabric state:** PR #1536 merged as `99c8d6dddf5937c170138b3abfa332714909d156`; Production `dpl_J9o8sG69kWgHKZH4jRs8VTUyme7p` READY; existing Marketing + Sales social/ad adapters are reusable through deny-by-default capability discovery/authorization; shared mutation execution is deliberately **not** delegated yet  
 **Owner-directed promotion cron:** repaired in Production on 2026-08-27 by applying the already-repo-owned missing `cos_knowledge_fact_revisions` migration; consecutive scheduled runs returned 200 and advanced the real queue without lowering evidence gates  
@@ -18,7 +18,8 @@
 **Procedural-learning state:** autonomous private certification is Production for context ambiguity, performance-regression diagnosis, and architecture discovery; dead-end self-generated practice is guarded; validated cognitive-skill candidate embeddings are reused by exact text + embedding-model identity; prompt-free retrieval-efficiency telemetry is Production; individual skills still earn lifecycle status from evidence  
 **Next learning priority:** observe real certification progression and collect the first real Production cognitive-retrieval telemetry cohort; use measured cache-hit, database, and ranking latency evidence before adding any further live prefilter; continue Retrieval Self-Reflection / calibration / strategy-selection learning  
 **Owner knowledge intake:** Feed COS directed study is LIVE at `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚 entry, owner-only)  
-**Concierge/COS public-assistant state:** public/private execution boundary and five-language text transformation are Production; additional semantic-edit + conversation-handoff hardening is Preview evidence until current `main` is reverified  
+**Concierge/COS public-assistant state:** public/private execution boundary, five-language text transformation, recorded public provenance, and bounded fresh-current synthesis retry are Production; the first post-#1539 real interactive current-fact turn remains to be observed before claiming runtime acceptance of the new retry behavior  
+**Public provenance / fresh-current reliability:** PR #1538 made public provenance a deterministic view of recorded turn telemetry; PR #1539 bounded transient local fresh-evidence synthesis failures to two local attempts with a 35-second default per-attempt cap, without weakening grounding or enabling external/model-memory fallback. See `docs/HANDOFF-COS-PROVENANCE-TIMEOUT-2026-08-27.md`.  
 **New product workstream:** `SignalBoost Data Center Operations Intelligence` — Phase 1 read-only/advisory implementation is active on `feat/datacenter-operations-intelligence-20260824`; it is **not yet Production**
 
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
@@ -27,8 +28,10 @@
 
 ## 2026-08-27 latest accepted operational override
 
-Read `docs/HANDOFF-PROVIDER-HUB-CRON-2026-08-27.md` for exact live evidence. Where older status wording below conflicts with this override, this newer accepted state wins.
+Read `docs/HANDOFF-COS-PROVENANCE-TIMEOUT-2026-08-27.md` first for the latest public-COS provenance and fresh-synthesis reliability evidence, then `docs/HANDOFF-PROVIDER-HUB-CRON-2026-08-27.md` for Provider Hub / promotion-cron evidence. Where older status wording below conflicts with these newer accepted records, the newer evidence wins.
 
+- **Public provenance integrity:** PR #1538 merged as `32701e60173510cf02d7f316d25b8057cb325bfa`; Production `dpl_AADtkvEwGaX9XoUNm93tGYDjMhMi` READY. Public provenance questions on both `/api/concierge` and `/api/support` now read the recorded preceding-turn provenance and render only public-safe recorded facts/sources. A model is never asked to reconstruct its own execution history. Missing/unverified provenance fails closed instead of inventing an origin. The obsolete model-narrated provenance path was removed and the invariant is enforced by the Vercel prebuild blueprint guard.
+- **Fresh-current synthesis timeout resilience:** PR #1539 merged as `84de50b8e67feea2e27d658e4cc3982e9e97a603`; Preview `dpl_GaKEnAJZThcrx4p2B6AQp2YzC7d9` READY; Production `dpl_8qetGZ2HumG3Cc5RMh1zcxtaZhLF` READY. The motivating Production turn had already acquired 8 live sources with authority satisfied, but one Qwen/DeepInfra call stalled for 120004 ms and aborted, causing a 503 while external fallback was disabled. Fresh evidence-only synthesis now gets at most two local transport attempts, each capped at 35 seconds by default (bounded 5–60 seconds and never above the global timeout). Only thrown transport/timeout errors retry; completed malformed/ungrounded output still fails closed immediately. No external-AI or model-memory fallback was added. Mandatory Preview and Production gate: **461/461 tests passed, 0 failed**. Post-fix interactive runtime observation remains pending the next real current-fact turn; do not manufacture traffic or claim that observation early.
 - **Owner-directed knowledge promotion:** the scheduler itself was healthy; the 503 was caused by Production schema drift. The repo already contained `20260816_cos_knowledge_fact_revisions.sql`, but Production lacked the table used by fact contradiction/audit persistence. The existing migration was applied with RLS enabled. The next scheduled run completed 1 document / 11 grounded facts / 0 failures; the following scheduled run completed 3 documents / 35 grounded facts / 0 failures. The owner-directed pending queue moved from 264 to 260. No grounding, source-quality, retry, provenance, or promotion threshold was weakened.
 - **Provider Hub / Marketing + Sales reuse:** the platform now projects the existing 8 organic-social adapters and 10 paid-ad network setups as Provider Hub capabilities instead of building duplicate connectors. Another portable receives a capability only through an exact host-side grant. Social publish is `write + approval required`; paid campaign create/pause is `consequential + approval required`; read capabilities remain read-only. The grant table is RLS-protected with zero `anon`/`authenticated` privileges and stores no provider secrets. Actual publishing/spend remains on the existing Marketing + Sales governed execution paths until the generic connector mutation runtime's approval-binding, timeout/idempotency, and post-execution audit semantics are separately hardened and accepted.
 - **Google Sheets:** real Production OAuth completed; both `spreadsheets.readonly` and `drive.metadata.readonly` were observed in encrypted server-side persistence; after PR #1535, live Production discovery automatically found one real native Google Sheet. This proves live OAuth + listing. Do not yet claim SignalBoost's external range-read path accepted until one real SignalBoost `read_range` request is separately observed. Drive authorization remains metadata-only and does not authorize Drive auto-RAG content ingestion.
@@ -467,7 +470,9 @@ The public scope is therefore enforced at the real browser ingress, not only in 
 - no Enterprise Memory, learned internal corpus, private Knowledge Graph, user memory, private business metrics, repository/admin tools, internal strategy, provider configuration or secrets may be exposed to the public face;
 - public SignalBoost product answers must come from the canonical public-visible product/catalog surface plus allowed verified public evidence;
 - public failure must fail safe instead of invoking an internal Backup COS brain that can load private operational material;
-- this boundary is server-enforced, not merely a system-prompt request.
+- this boundary is server-enforced, not merely a system-prompt request;
+- public provenance questions are deterministic reads of the recorded preceding public turn; neither the Concierge nor Support public ingress may invoke a model to reconstruct provenance;
+- missing or mismatched public provenance fails closed rather than falling back to claims about training, memory, general knowledge or illustrative sources.
 
 General-assistant transformation capability is Production:
 
@@ -579,10 +584,12 @@ Current contract:
 - contextual follow-ups resolve the referent from user conversation context before retrieval;
 - answer-side freshness self-reflection removes or verifies mutable claims introduced inside otherwise timeless answers;
 - current-world background learning refreshes broad governed reference/news/official material and continuously indexes eligible learned corpus;
-- answer-time live verification remains the correctness boundary for mutable public facts.
+- answer-time live verification remains the correctness boundary for mutable public facts;
+- once usable live evidence is acquired, transient local synthesis transport failures receive at most one bounded local retry under the identical evidence-only contract; they do not authorize model-memory or external-provider fallback.
 
 A model-memory assertion is never sufficient merely because the model sounds confident.
 
+**Fresh-evidence local synthesis resilience — IMPLEMENTED AND PRODUCTION:** PR #1539 replaced the single 120-second local synthesis dependency with a pure bounded retry policy. Maximum local attempts are 2; default per-attempt timeout is 35 seconds, bounded to 5–60 seconds and never above the configured global timeout. Only thrown transport/timeout exceptions retry. A completed answer that is malformed, unsupported, cites invalid evidence IDs, or declares evidence insufficient remains fail-closed without retry. The same server-owned evidence IDs/URLs remain the grounding authority. The mandatory COS deployment suite and prebuild blueprint guard enforce the policy.
 
 **Governed guidance verification — IMPLEMENTED:** Legal, administrative, health, financial and similarly high-consequence public-process questions are routed to the live-evidence path even when phrased conversationally or in a supported non-English language. COS may answer only when the live authority/grounding contract accepts the evidence; otherwise it must state that verification was insufficient. Final answers must show the sources actually used and must never claim a lack of live access when live evidence was used.
 
@@ -594,7 +601,7 @@ For any owner-authoritative topic, secondary web results alone are not sufficien
 
 **Owning-authority evidence policy — IMPLEMENTED:** For authority-owned questions (government procedure, product/API behavior, medical guidance, standards), live-search evidence is ranked and labelled by who owns the fact, recognized structurally with no country or vendor tables: **first-party** (the result's domain names the entity the query is about — `docs.stripe.com` for a Stripe question), **institutional** (state/IGO/standards/health domains by convention — one pattern covers `gov.pl`, `gob.mx`, `gouv.fr`, `who.int` identically), then **secondary** (demoted and labelled, never deleted; dated pages before undated). When an authority-owned question retrieves no first-party or institutional source, the evidence carries an explicit caveat instead of presenting secondary commentary as the rule. Implementation: `lib/ai/cos/officialSourceAuthority.ts` wired into `getExternalInfo`.
 
-**Feedback freshness and evidence application — IMPLEMENTED:** Assistant-feedback matching normalizes server-stored and rendered reply text before correlation, so genuine feedback remains securely bound to the exact server-owned turn. COS-primary branches that bypass the ordinary reasoner mint/preserve the provenance `turnId` and synchronously create a minimal matching experience row before response, so feedback verification and calibration cover live-grounded answers and fail-closed abstains too. Plain-language source follow-ups (for example, “where did you get that answer?”) are prior-turn provenance requests, not fresh factual lookups; they bypass the live-evidence gate and return only recorded server telemetry. An explicit multilingual “outdated” correction files only a bounded, current-state study gap; ordinary disagreement does not become a freshness signal. When verified owning-authority evidence explicitly mentions adjacent obligations, COS may add a short cited “Also worth checking” note. It must omit that note when the retrieved sources do not support it and must never invent related procedures from model memory.
+**Feedback freshness and evidence application — IMPLEMENTED:** Assistant-feedback matching normalizes server-stored and rendered reply text before correlation, so genuine feedback remains securely bound to the exact server-owned turn. COS-primary branches that bypass the ordinary reasoner mint/preserve the provenance `turnId` and synchronously create a minimal matching experience row before response, so feedback verification and calibration cover live-grounded answers and fail-closed abstains too. Plain-language source follow-ups (for example, “where did you get that answer?”) are prior-turn provenance requests, not fresh factual lookups; they bypass the live-evidence gate and return only recorded server telemetry. Public-facing provenance is rendered deterministically from that record and is never model-generated. An explicit multilingual “outdated” correction files only a bounded, current-state study gap; ordinary disagreement does not become a freshness signal. When verified owning-authority evidence explicitly mentions adjacent obligations, COS may add a short cited “Also worth checking” note. It must omit that note when the retrieved sources do not support it and must never invent related procedures from model memory.
 
 ---
 
@@ -1144,6 +1151,8 @@ Non-negotiable:
 - no hidden chain-of-thought persistence;
 - private certification prompts must not be committed to GitHub or returned through public/admin APIs without an explicit protected diagnostic need;
 - public Concierge must never inherit owner/admin/private-company context simply because the requesting browser is authenticated as owner;
+- public provenance must come only from recorded turn provenance and must never be reconstructed by a model;
+- retrying a local reasoner transport failure must never weaken evidence authority, citation, authorization, freshness, or fail-closed rules;
 - Google OAuth token material must remain server-only and encrypted at rest; browser roles have no direct `google_workspace_connections` privileges; read-only Google scopes must not be silently widened;
 - Provider Hub cross-portable capability reuse is deny-by-default; grants contain no provider credentials; discovery authorization does not itself authorize execution; existing product-specific approval/spend/publishing gates remain authoritative until shared execution is separately accepted;
 - Data Center Operations Intelligence Phase 1 is advisory/read-only and may not issue facility-control writes.
@@ -1185,6 +1194,8 @@ Non-negotiable:
 - #1533 — Google OAuth partial-scope grants fail closed; both required read-only scopes must be present before the connection is accepted.
 - #1535 — Google Sheets discovery/empty-state repair; live Production OAuth + listing accepted against one real native Sheet; SignalBoost range-read acceptance still pending one observed live read.
 - #1536 — existing Marketing + Sales social/ad adapters exposed through Provider Hub discovery + exact deny-by-default cross-portable authorization; shared social/financial mutation execution deliberately not delegated.
+- #1538 — public provenance integrity: both public ingress paths render only recorded preceding-turn provenance; model-generated provenance was removed; Production `dpl_AADtkvEwGaX9XoUNm93tGYDjMhMi` READY.
+- #1539 — fresh-evidence local synthesis resilience: maximum two local transport attempts, 35-second default per-attempt timeout, grounding failures still fail closed, no new external/model-memory fallback; merge `84de50b8…`, Production `dpl_8qetGZ2HumG3Cc5RMh1zcxtaZhLF` READY; mandatory gate 461/461.
 - 2026-08-27 owner-directed promotion repair — existing `cos_knowledge_fact_revisions` migration applied to Production; consecutive scheduled promotion runs returned 200 and advanced real documents/facts/queue state without weaker gates.
 - Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
 - Evidence-triggered answer retest — bounded evidence-arrival promotion of failed prompts into budgeted benchmark cases.
@@ -1201,20 +1212,21 @@ Always query current state; this sequence can advance after this document is mer
 
 # Immediate next engineering priorities
 
-1. **Observe private cognitive certification progression:** verify the ambiguity, performance-regression and architecture-discovery candidates advance only when their private understanding/practice/holdout evidence passes. Never manually set lifecycle flags or counters.
-2. **Measure cognitive-skill live retrieval efficiency:** collect a real Production `cos-cognitive-skill-retrieval-efficiency-v1` cohort and compare candidate cache-hit rate plus `skillStoreMs`, `dependencyHealthMs`, `rankingMs`, and `totalMs`. Do not add another prefilter until the data identifies the actual dominant cost and a held-out check shows recall/trigger coverage is preserved.
-3. **Close the last Google Sheets live-acceptance gap:** observe one harmless real SignalBoost range read. OAuth, both read-only scopes, encrypted persistence and listing are already live-accepted; do not redo those steps.
-4. **Google Drive auto-RAG extension:** reuse the Google Workspace authorization/token foundation, but add an explicitly approved Drive content-read scope, folder/change detection, export/download, deduplication and handoff into the existing COS admission + embedding/indexing pipeline. Do not treat the current metadata-only scope as file-content authorization.
-5. **Provider Hub shared-execution hardening:** before routing existing Marketing + Sales writes through the generic connector runtime, require authenticated invocation-bound approval verification, mutation-safe idempotency/cancellation semantics, and durable intent/result handling so a timeout or audit failure cannot cause ambiguous duplicate external actions. Preserve current product-specific execution until this is independently accepted.
-6. **Expand independent certification selectively:** add private/curated profiles only for reusable procedural families with defensible transfer tests. Mutable current-world fact verification should remain on live evidence rather than becoming a timeless learned skill.
-7. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
-8. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
-9. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
-10. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
-11. **Data Center Operations Phase 1 acceptance:** revalidate the synchronized branch head against current `main`, create/merge the PR only after exact Preview is green, then verify the exact Production deployment. Do not call the capability Production before this sequence completes.
-12. **Data Center Operations private benchmark:** expand beyond the 9 deterministic regression tests into diverse incident-correlation/root-cause/advisory cases, including false-correlation and insufficient-evidence cases.
-13. **Data Center Operations knowledge path / first read-only real integration:** add buyer-document/runbook retrieval with exact provenance before real-facility diagnostics, then evaluate one monitoring/DCIM source through the existing signed Supervisor boundary; no facility writes.
-14. **Retention continuity / episodic compression / SFT readiness:** continue only with independently supported evidence and separate held-out acceptance.
+1. **Observe first post-#1539 real current-fact turn:** inspect exact Production telemetry for normal first-attempt success or a bounded `[cos-fresh-local-synthesis-retry]` followed by success. Do not manufacture traffic. If both attempts fail, retain fail-closed behavior and use the evidence to diagnose provider/runtime reliability rather than weakening grounding.
+2. **Observe private cognitive certification progression:** verify the ambiguity, performance-regression and architecture-discovery candidates advance only when their private understanding/practice/holdout evidence passes. Never manually set lifecycle flags or counters.
+3. **Measure cognitive-skill live retrieval efficiency:** collect a real Production `cos-cognitive-skill-retrieval-efficiency-v1` cohort and compare candidate cache-hit rate plus `skillStoreMs`, `dependencyHealthMs`, `rankingMs`, and `totalMs`. Do not add another prefilter until the data identifies the actual dominant cost and a held-out check shows recall/trigger coverage is preserved.
+4. **Close the last Google Sheets live-acceptance gap:** observe one harmless real SignalBoost range read. OAuth, both read-only scopes, encrypted persistence and listing are already live-accepted; do not redo those steps.
+5. **Google Drive auto-RAG extension:** reuse the Google Workspace authorization/token foundation, but add an explicitly approved Drive content-read scope, folder/change detection, export/download, deduplication and handoff into the existing COS admission + embedding/indexing pipeline. Do not treat the current metadata-only scope as file-content authorization.
+6. **Provider Hub shared-execution hardening:** before routing existing Marketing + Sales writes through the generic connector runtime, require authenticated invocation-bound approval verification, mutation-safe idempotency/cancellation semantics, and durable intent/result handling so a timeout or audit failure cannot cause ambiguous duplicate external actions. Preserve current product-specific execution until this is independently accepted.
+7. **Expand independent certification selectively:** add private/curated profiles only for reusable procedural families with defensible transfer tests. Mutable current-world fact verification should remain on live evidence rather than becoming a timeless learned skill.
+8. **Retrieval Self-Reflection:** observe real verified outcomes and prove predictive value before a separate shadow-policy validation.
+9. **Calibration Learning:** empirical confidence calibration by problem/evidence/reasoner cohort, shadow first.
+10. **Strategy-selection learning:** validate worker/Council/challenge/repair choices on like-for-like held-out cohorts.
+11. **Adaptive Retrieval v2:** similarity-threshold calibration, source mix/reranking and explicit bounded promotion/rollback.
+12. **Data Center Operations Phase 1 acceptance:** revalidate the synchronized branch head against current `main`, create/merge the PR only after exact Preview is green, then verify the exact Production deployment. Do not call the capability Production before this sequence completes.
+13. **Data Center Operations private benchmark:** expand beyond the 9 deterministic regression tests into diverse incident-correlation/root-cause/advisory cases, including false-correlation and insufficient-evidence cases.
+14. **Data Center Operations knowledge path / first read-only real integration:** add buyer-document/runbook retrieval with exact provenance before real-facility diagnostics, then evaluate one monitoring/DCIM source through the existing signed Supervisor boundary; no facility writes.
+15. **Retention continuity / episodic compression / SFT readiness:** continue only with independently supported evidence and separate held-out acceptance.
 
 ---
 
@@ -1246,7 +1258,9 @@ A reused provider adapter is not permission for every portable to use it.
 A cron HTTP 200 is not learning proof unless durable document/fact/outcome state also advanced.  
 A synthetic data-center simulator pass is not real-facility proof.  
 A correlated alarm cluster is not a proven physical root cause.  
-An advisory recommendation is not authorization to control facility equipment.
+An advisory recommendation is not authorization to control facility equipment.  
+Successful live retrieval is not the same as successful synthesis; a bounded retry is not permission to weaken evidence or provenance.  
+A recorded provenance report is execution history, not a story a model may reconstruct.
 
 ---
 

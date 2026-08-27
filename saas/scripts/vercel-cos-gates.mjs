@@ -10,6 +10,8 @@ const tests = [
   'tests/conciergeFullTranscript.node.test.ts',
   'tests/conciergeTransportBudget.node.test.ts',
   'tests/cosPrimaryDeterministicFreshRouting.node.test.ts',
+  'tests/assistantTransportClient.node.test.ts',
+  'tests/operationalSystemsLearning.node.test.ts',
   'tests/cosPublicProvenanceAuditIdentity.node.test.ts',
   'tests/cosProvenanceParaphraseContinuity.node.test.ts',
   'tests/cosCreativeConstraintFidelity.node.test.ts',

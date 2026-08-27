@@ -18,7 +18,8 @@ export type AssistantTransportLocale = keyof typeof ASSISTANT_TRANSPORT_TIMEOUT_
 export type AssistantSendResult =
   | { ok: true; source: 'live'; content: string; raw?: unknown }
   | { ok: true; source: 'recovered'; content: string }
-  | { ok: false; source: 'transport'; content: string; retrySafe: false }
+  | { ok: false; source: 'server'; content: string; retrySafe: false; httpStatus: number; raw?: unknown }
+  | { ok: false; source: 'transport'; content: string; retrySafe: false; httpStatus?: number }
 
 export type AssistantTransportClientOptions = {
   sendUrl: string
@@ -28,6 +29,9 @@ export type AssistantTransportClientOptions = {
   historyPollDelayMs?: number
   fetchImpl?: typeof fetch
   sleep?: (ms: number) => Promise<void>
+  signal?: AbortSignal
+  /** Return false for a deliberate user Stop so AbortError remains a Stop, not a transport loss. */
+  shouldRecoverTransportFailure?: (error: unknown) => boolean
 }
 
 function text(value: unknown): string {
@@ -46,7 +50,7 @@ function timeoutCopy(locale: AssistantTransportLocale = 'en'): string {
 function extractLiveContent(payload: unknown): string | null {
   if (!payload || typeof payload !== 'object') return null
   const record = payload as Record<string, unknown>
-  const candidates = [record.content, record.reply, record.message, record.answer]
+  const candidates = [record.content, record.reply, record.error, record.message, record.answer]
   for (const candidate of candidates) {
     const value = text(candidate)
     if (value) return value
@@ -54,13 +58,16 @@ function extractLiveContent(payload: unknown): string | null {
   return null
 }
 
-async function readJson(response: Response): Promise<unknown> {
+type ReadPayload = { payload: unknown; parsed: boolean }
+
+async function readPayload(response: Response): Promise<ReadPayload> {
   const raw = await response.text()
-  if (!raw.trim()) return null
+  if (!raw.trim()) return { payload: null, parsed: true }
   try {
-    return JSON.parse(raw)
+    return { payload: JSON.parse(raw), parsed: true }
   } catch {
-    return { content: raw }
+    // Do not turn a Vercel/gateway HTML error page into an assistant answer.
+    return { payload: null, parsed: false }
   }
 }
 
@@ -71,10 +78,11 @@ async function loadHistory(
   const response = await fetchImpl(historyUrl, {
     method: 'GET',
     credentials: 'include',
+    cache: 'no-store',
     headers: { accept: 'application/json' },
   })
   if (!response.ok) return []
-  const payload = await readJson(response)
+  const { payload } = await readPayload(response)
   if (Array.isArray(payload)) return payload as StoredAssistantMessage[]
   if (payload && typeof payload === 'object') {
     const record = payload as Record<string, unknown>
@@ -87,11 +95,11 @@ async function loadHistory(
 /**
  * Owner-assistant send path.
  *
- * Rules:
- * - POST the user turn once.
- * - If the browser loses the response (`TypeError: Failed to fetch`, abort, timeout),
- *   do NOT POST again. Poll History and recover the persisted assistant reply.
- * - If History has no reply yet, show the existing timeout copy instead of the raw TypeError.
+ * Invariants:
+ * - POST the turn exactly once.
+ * - On browser transport loss, never replay the POST; poll durable History instead.
+ * - A deliberate user Stop can opt out of recovery and remain an AbortError for the caller.
+ * - If History has no matching persisted reply yet, show human timeout copy rather than raw fetch errors.
  */
 export async function sendAssistantTurnAndRecover(
   userContent: string,
@@ -114,22 +122,33 @@ export async function sendAssistantTurnAndRecover(
         'content-type': 'application/json',
       },
       body: JSON.stringify(body),
+      signal: options.signal,
     })
-    const payload = await readJson(response)
+    const { payload, parsed } = await readPayload(response)
     const live = extractLiveContent(payload)
+
     if (response.ok && live) return { ok: true, source: 'live', content: live, raw: payload }
-    if (response.ok) {
+
+    if (response.ok || !parsed || [408, 504, 524].includes(response.status)) {
       const recovered = await recoverFromHistory(userContent, sentAtMs, options, fetchImpl, sleep, attempts, delayMs)
       if (recovered) return recovered
     }
+
+    if (!response.ok && live) {
+      return { ok: false, source: 'server', retrySafe: false, httpStatus: response.status, content: live, raw: payload }
+    }
+
     return {
       ok: false,
       source: 'transport',
       retrySafe: false,
-      content: live || timeoutCopy(locale),
+      httpStatus: response.status,
+      content: timeoutCopy(locale),
     }
   } catch (error) {
     if (!isAssistantTransportFailure(error)) throw error
+    if (options.shouldRecoverTransportFailure && !options.shouldRecoverTransportFailure(error)) throw error
+
     const recovered = await recoverFromHistory(userContent, sentAtMs, options, fetchImpl, sleep, attempts, delayMs)
     if (recovered) return recovered
     return {
@@ -157,7 +176,7 @@ async function recoverFromHistory(
       const reply = findRecoveredAssistantReply(messages, userContent, sentAtMs)
       if (reply) return { ok: true, source: 'recovered', content: reply }
     } catch {
-      // History poll failure must not hide the original transport loss.
+      // A History read failure must not trigger a second POST or hide the original transport loss.
     }
   }
   return null

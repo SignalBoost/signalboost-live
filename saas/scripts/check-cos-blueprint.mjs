@@ -45,10 +45,6 @@ if (!learning.includes('ContinuousLearningDirector')) failures.push('continuous_
 const knowledge = await readFile(path.join(root, 'lib/cos-core/layers/knowledge/persistent.ts'), 'utf8')
 if (!knowledge.includes('class KnowledgeGraph')) failures.push('knowledge_graph_missing')
 
-// Public provenance is execution history, never a reasoning task. Both externally reachable model
-// ingress routes must render only recorded turn data and must explicitly report that no model was
-// invoked for provenance introspection. This guard is part of every prebuild, so the old
-// model-narrated provenance pattern cannot be silently reintroduced.
 for (const relative of ['app/api/cos-browser/route.ts', 'app/api/support/route.ts']) {
   const source = await readFile(path.join(root, relative), 'utf8')
   if (!source.includes('renderPublicRecordedProvenance')) failures.push(`public_provenance_not_recorded:${relative}`)
@@ -61,19 +57,13 @@ for (const relative of ['app/api/cos-browser/route.ts', 'app/api/support/route.t
 try {
   await readFile(path.join(root, 'lib/ai/cos/publicProvenanceNarrative.ts'), 'utf8')
   failures.push('obsolete_model_generated_public_provenance_module_present')
-} catch {
-  // Expected: the obsolete model-narrated provenance implementation must not exist.
-}
+} catch {}
 
 const publicRecordedProvenance = await readFile(path.join(root, 'lib/ai/cos/publicRecordedProvenance.ts'), 'utf8')
 for (const required of ['live_external_evidence', 'answer_origin?.live_evidence_sources', "won't reconstruct or guess", "won't invent"]) {
   if (!publicRecordedProvenance.includes(required)) failures.push(`recorded_public_provenance_guard_missing:${required}`)
 }
 
-// Current facts that already have usable live evidence must not depend on one 120s model call.
-// Fresh synthesis may retry only transport failures under the same evidence-only contract. The
-// local inference compatibility layer returns null on AbortError, so the fresh path must recognize a
-// null that consumes essentially the full bounded timeout and convert only that case into a retry.
 const freshRetryPolicy = await readFile(path.join(root, 'lib/ai/cos/freshEvidenceRetryPolicy.ts'), 'utf8')
 for (const required of ['FRESH_SYNTHESIS_MAX_ATTEMPTS = 2', 'FRESH_SYNTHESIS_DEFAULT_ATTEMPT_TIMEOUT_MS = 35_000', 'FRESH_SYNTHESIS_TIMEOUT_NULL_GRACE_MS', 'freshSynthesisNullIndicatesTimeout', 'runFreshSynthesisTransportAttempts']) {
   if (!freshRetryPolicy.includes(required)) failures.push(`fresh_evidence_retry_guard_missing:${required}`)
@@ -84,9 +74,6 @@ for (const required of ['runFreshSynthesisTransportAttempts', 'boundedFreshSynth
 }
 if (!freshLocalSynthesis.includes('if (!accepted) return null')) failures.push('fresh_evidence_grounding_failure_must_not_retry')
 
-// Explicit fresh facts that can be resolved directly from the already-authoritative live evidence
-// must be answered before Qwen is invoked. This is shared by public Concierge and authorized
-// COS/Assistant through cos-primary, while their authorization/context boundaries remain separate.
 const cosPrimaryRoute = await readFile(path.join(root, 'app/api/cos-primary/route.ts'), 'utf8')
 const deterministicFreshIndex = cosPrimaryRoute.indexOf('resolveDeterministicDirectFlight(lookupInput,freshSources)')
 const localFreshIndex = cosPrimaryRoute.indexOf('const localSynthesis=await synthesizeFreshEvidenceLocally')
@@ -95,13 +82,36 @@ if (localFreshIndex < 0 || deterministicFreshIndex < 0 || deterministicFreshInde
 if (!cosPrimaryRoute.includes("event:'fresh_deterministic_resolution_accepted'")) failures.push('cos_primary_deterministic_fresh_audit_missing')
 if (!cosPrimaryRoute.includes("source:'cos-fresh-deterministic-grounded'")) failures.push('cos_primary_deterministic_fresh_response_source_missing')
 
-// Public Concierge must always keep a material recovery margin inside Vercel's 300s ceiling, and
-// the regression that checks that invariant must itself be part of the mandatory deployment gate.
+const assistantTransportClient = await readFile(path.join(root, 'lib/ai/cos/assistantTransportClient.ts'), 'utf8')
+for (const required of ['sendAssistantTurnAndRecover', 'findRecoveredAssistantReply', 'retrySafe: false', 'shouldRecoverTransportFailure']) {
+  if (!assistantTransportClient.includes(required)) failures.push(`assistant_transport_client_guard_missing:${required}`)
+}
+const assistantTransportBoundary = await readFile(path.join(root, 'components/AssistantTransportBoundary.tsx'), 'utf8')
+for (const required of ["pathname === '/api/cos-primary'", 'fetchImpl: originalFetch', 'historyUrl: `/api/assistant/chats?id=', "error.name === 'AbortError'"]) {
+  if (!assistantTransportBoundary.includes(required)) failures.push(`assistant_transport_boundary_guard_missing:${required}`)
+}
+const assistantLayout = await readFile(path.join(root, 'app/dashboard/assistant/layout.tsx'), 'utf8')
+if (!assistantLayout.includes('AssistantTransportBoundary')) failures.push('owner_assistant_transport_boundary_not_mounted')
+
+const operationalLearning = await readFile(path.join(root, 'lib/ai/cos/operationalSystemsLearning.ts'), 'utf8')
+for (const required of ['MAX_GAPS_PER_RUN = 4', 'OPERATIONAL_SYSTEMS_SAFETY_EVIDENCE', 'advisory only', 'no facility control', 'operationalSystemsCurriculumSignals']) {
+  if (!operationalLearning.includes(required)) failures.push(`operational_learning_guard_missing:${required}`)
+}
+const dailyLearning = await readFile(path.join(root, 'lib/cos/dailyAutonomousLearning.ts'), 'utf8')
+if (!dailyLearning.includes('injectedGapSignals?: KnowledgeGapSignal[]')) failures.push('operational_learning_host_injection_missing')
+if (!dailyLearning.includes('isOperationalSystemsGap')) failures.push('operational_learning_subject_hygiene_exception_missing')
+const miningRoute = await readFile(path.join(root, 'app/api/cron/cos-mining/route.ts'), 'utf8')
+if (!miningRoute.includes('injectedGapSignals: operationalSystemsCurriculumSignals()')) failures.push('operational_learning_daily_mining_wiring_missing')
+const currentWorldLearning = await readFile(path.join(root, 'lib/ai/cos/currentWorldLearning.ts'), 'utf8')
+if (/operationalSystems/i.test(currentWorldLearning)) failures.push('operational_learning_must_not_run_hourly')
+
 const conciergeRoute = await readFile(path.join(root, 'app/api/concierge/route.ts'), 'utf8')
 if (!conciergeRoute.includes('const PRIMARY_TIMEOUT_MS = 150_000')) failures.push('public_concierge_primary_timeout_must_be_150s')
 const vercelCosGates = await readFile(path.join(root, 'scripts/vercel-cos-gates.mjs'), 'utf8')
 if (!vercelCosGates.includes("'tests/conciergeTransportBudget.node.test.ts'")) failures.push('concierge_transport_budget_test_not_mandatory')
 if (!vercelCosGates.includes("'tests/cosPrimaryDeterministicFreshRouting.node.test.ts'")) failures.push('cos_primary_deterministic_fresh_test_not_mandatory')
+if (!vercelCosGates.includes("'tests/assistantTransportClient.node.test.ts'")) failures.push('assistant_transport_client_test_not_mandatory')
+if (!vercelCosGates.includes("'tests/operationalSystemsLearning.node.test.ts'")) failures.push('operational_learning_test_not_mandatory')
 
 console.log(JSON.stringify({ ok: failures.length === 0, schema: 'signalboost-cos-blueprint-v1', failures }, null, 2))
 if (failures.length) process.exit(1)

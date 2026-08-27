@@ -62,6 +62,7 @@ test('only the daily mining host injects the operational curriculum; hourly curr
   assert.match(miningRoute, /operationalSystemsCurriculumSignals/)
   assert.match(miningRoute, /injectedGapSignals:\s*operationalSystemsCurriculumSignals\(\)/)
   assert.match(dailyLearning, /injectedGapSignals\?:\s*KnowledgeGapSignal\[\]/)
-  assert.match(dailyLearning, /\.\.\.\(input\.injectedGapSignals\s*\?\?\s*\[\]\)/)
+  assert.match(dailyLearning, /const injectedGapSignals = input\.injectedGapSignals \?\? \[\]/)
+  assert.match(dailyLearning, /generateDynamicKnowledgeGaps\(12, \[\.\.\.weaknessCurriculumSignals, \.\.\.injectedGapSignals\]\)/)
   assert.doesNotMatch(currentWorld, /operationalSystems/i)
 })

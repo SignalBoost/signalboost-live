@@ -4,10 +4,17 @@ import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { googleSheetsCopy } from '@/lib/i18n/googleSheetsCopy'
 
+type GoogleAccount = {
+  displayName: string
+  emailAddress: string
+  permissionId: string
+}
+
 type Status = {
   configured: boolean
   readOnly: boolean
   connectUrl: string
+  googleAccount: GoogleAccount | null
   connection: {
     connected: boolean
     expiresAt: string | null
@@ -18,6 +25,10 @@ type Status = {
 
 type Sheet = { id: string; name: string; modifiedTime: string | null; webViewLink: string | null }
 
+function a1SheetPrefix(title: string): string {
+  return `'${String(title || 'Sheet1').replace(/'/g, "''")}'`
+}
+
 export default function GoogleSheetsPage() {
   const { lang } = useI18n()
   const t = googleSheetsCopy(lang)
@@ -25,18 +36,18 @@ export default function GoogleSheetsPage() {
   const [sheets, setSheets] = useState<Sheet[]>([])
   const [filter, setFilter] = useState('')
   const [selected, setSelected] = useState('')
+  const [directRef, setDirectRef] = useState('')
   const [range, setRange] = useState('Sheet1!A1:Z100')
   const [rowQuery, setRowQuery] = useState('')
   const [rows, setRows] = useState<string[][]>([])
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [hasLoaded, setHasLoaded] = useState(false)
 
   async function refreshStatus() {
     const res = await fetch('/api/integrations/google-sheets/status', { cache: 'no-store' })
     if (res.ok) setStatus(await res.json())
   }
-
-  useEffect(() => { void refreshStatus() }, [])
 
   async function loadSheets() {
     setBusy(true)
@@ -45,7 +56,45 @@ export default function GoogleSheetsPage() {
       const res = await fetch(`/api/integrations/google-sheets/spreadsheets?q=${encodeURIComponent(filter)}&limit=50`, { cache: 'no-store' })
       const data = await res.json()
       if (!res.ok || !data.ok) throw new Error(data.reason || data.error || 'google_sheets_request_failed')
-      setSheets(Array.isArray(data.spreadsheets) ? data.spreadsheets : [])
+      const loaded = Array.isArray(data.spreadsheets) ? data.spreadsheets as Sheet[] : []
+      setSheets(loaded)
+      setHasLoaded(true)
+      if (data.account) {
+        setStatus(current => current ? { ...current, googleAccount: data.account as GoogleAccount } : current)
+      }
+      if (!loaded.length) {
+        setSelected('')
+        setMessage(t.noSpreadsheets)
+      } else if (!loaded.some(sheet => sheet.id === selected)) {
+        setSelected(loaded[0].id)
+      }
+    } catch (error) {
+      setHasLoaded(true)
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function openDirectSheet() {
+    const reference = directRef.trim()
+    if (!reference) return
+    setBusy(true)
+    setMessage('')
+    try {
+      const res = await fetch('/api/integrations/google-sheets/spreadsheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operation: 'metadata', spreadsheetId: reference }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.ok) throw new Error(data.reason || data.error || 'google_sheets_request_failed')
+      const item: Sheet = { id: data.spreadsheetId, name: data.title || data.spreadsheetId, modifiedTime: null, webViewLink: null }
+      setSheets(current => [item, ...current.filter(sheet => sheet.id !== item.id)])
+      setSelected(item.id)
+      const firstTab = Array.isArray(data.sheets) && data.sheets[0]?.title ? String(data.sheets[0].title) : 'Sheet1'
+      setRange(`${a1SheetPrefix(firstTab)}!A1:Z100`)
+      setMessage(t.spreadsheetReady)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error))
     } finally {
@@ -80,8 +129,17 @@ export default function GoogleSheetsPage() {
     setSheets([])
     setRows([])
     setSelected('')
+    setDirectRef('')
+    setHasLoaded(false)
     await refreshStatus()
   }
+
+  useEffect(() => { void refreshStatus() }, [])
+  useEffect(() => {
+    if (status?.connection.connected && !hasLoaded && !busy) void loadSheets()
+  }, [status?.connection.connected, hasLoaded, busy])
+
+  const accountLabel = status?.googleAccount?.emailAddress || status?.googleAccount?.displayName || ''
 
   return (
     <main style={{ padding: 24, maxWidth: 1100, margin: '0 auto' }}>
@@ -102,6 +160,7 @@ export default function GoogleSheetsPage() {
             <strong>{t.connected}</strong>
             <button className="sb-button-secondary" onClick={disconnect}>{t.disconnect}</button>
           </div>
+          {accountLabel ? <p className="sb-caption">{t.connectedAccount}: {accountLabel}</p> : null}
           {status.connection.lastError ? <p className="sb-caption">{status.connection.lastError}</p> : null}
         </div>
       ) : null}
@@ -117,6 +176,13 @@ export default function GoogleSheetsPage() {
               <option value="">—</option>
               {sheets.map(sheet => <option key={sheet.id} value={sheet.id}>{sheet.name}</option>)}
             </select>
+            {hasLoaded && !sheets.length ? <p className="sb-caption">{t.noSpreadsheets}</p> : null}
+
+            <p className="sb-caption" style={{ marginTop: 16 }}>{t.directHelp}</p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <input className="sb-input" value={directRef} onChange={e => setDirectRef(e.target.value)} placeholder={t.directPlaceholder} style={{ flex: 1, minWidth: 280 }} />
+              <button className="sb-button-secondary" onClick={openDirectSheet} disabled={busy || !directRef.trim()}>{t.openSpreadsheet}</button>
+            </div>
           </div>
 
           <div className="sb-card" style={{ padding: 16, marginTop: 16 }}>

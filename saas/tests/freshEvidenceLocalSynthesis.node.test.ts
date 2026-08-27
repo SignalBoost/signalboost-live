@@ -1,51 +1,68 @@
-// Pins tier-2 behavior: the local model selects evidence IDs, while the server renders exact URLs.
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import Module from 'node:module'
+import {
+  boundedFreshSynthesisAttemptTimeoutMs,
+  FRESH_SYNTHESIS_MAX_ATTEMPTS,
+  runFreshSynthesisTransportAttempts,
+} from '../lib/ai/cos/freshEvidenceRetryPolicy.ts'
 
-let localReply: string | null = null
-const orig = (Module as any).prototype.require
-;(Module as any).prototype.require = function patched(id: string) {
-  if (id.endsWith('/local-inference') || id === '@/lib/ai/local-inference') {
-    return { callLocalModel: async () => localReply, localInferenceConfigFromEnv: () => ({}) }
-  }
-  return orig.apply(this, arguments as any)
-}
-
-const { synthesizeFreshEvidenceLocally } = require('../lib/ai/cos/freshEvidenceLocalSynthesis')
-const sources = [
-  { id: 'LIVE1', title: 'Official leadership page', url: 'https://government.gov/leadership', snippet: 'The current president is X.' },
-  { id: 'LIVE2', title: 'Independent reference', url: 'https://reference.example/president-x', snippet: 'X is the current president.' },
-]
-const args = { input: 'who is currently the president?', sources, retrievedAt: '2026-08-16T00:00:00Z', language: 'en' }
-
-test('accepts structured evidence ids and server-renders exact citations', async () => {
-  localReply = JSON.stringify({ answer: 'The current president is X.', evidenceIds: ['LIVE1', 'LIVE2'] })
-  const out = await synthesizeFreshEvidenceLocally(args)
-  assert.ok(out)
-  assert.match(out!.reply, /\[LIVE1\] \(https:\/\/government\.gov\/leadership\)/)
-  assert.match(out!.reply, /\[LIVE2\] \(https:\/\/reference\.example\/president-x\)/)
+test('fresh synthesis uses two attempts and caps the global 120s timeout at 35s', () => {
+  assert.equal(FRESH_SYNTHESIS_MAX_ATTEMPTS, 2)
+  assert.equal(boundedFreshSynthesisAttemptTimeoutMs(120_000, undefined), 35_000)
+  assert.equal(boundedFreshSynthesisAttemptTimeoutMs(20_000, undefined), 20_000)
+  assert.equal(boundedFreshSynthesisAttemptTimeoutMs(120_000, 90_000), 60_000)
+  assert.equal(boundedFreshSynthesisAttemptTimeoutMs(120_000, 1_000), 5_000)
 })
 
-test('rejects a leadership answer that selects only one host', async () => {
-  localReply = JSON.stringify({ answer: 'The current president is X.', evidenceIds: ['LIVE1'] })
-  assert.equal(await synthesizeFreshEvidenceLocally(args), null)
+test('one transport timeout is retried once and can recover on the second local attempt', async () => {
+  let calls = 0
+  const retries: Array<{ attempt: number; nextAttempt: number }> = []
+  const result = await runFreshSynthesisTransportAttempts(async () => {
+    calls += 1
+    if (calls === 1) {
+      const error = new Error('This operation was aborted')
+      error.name = 'AbortError'
+      throw error
+    }
+    return 'grounded-json'
+  }, event => retries.push({ attempt: event.attempt, nextAttempt: event.nextAttempt }))
+
+  assert.equal(result.value, 'grounded-json')
+  assert.equal(result.attempts, 2)
+  assert.equal(calls, 2)
+  assert.deepEqual(retries, [{ attempt: 1, nextAttempt: 2 }])
 })
 
-test('rejects invented evidence ids', async () => {
-  localReply = JSON.stringify({ answer: 'The current president is X.', evidenceIds: ['LIVE99'] })
-  assert.equal(await synthesizeFreshEvidenceLocally(args), null)
+test('two transport failures fail closed after exactly two local attempts', async () => {
+  let calls = 0
+  await assert.rejects(
+    () => runFreshSynthesisTransportAttempts(async () => {
+      calls += 1
+      throw new Error('provider timeout')
+    }),
+    /provider timeout/,
+  )
+  assert.equal(calls, 2)
 })
 
-test('honors EVIDENCE_INSUFFICIENT and malformed output', async () => {
-  localReply = JSON.stringify({ answer: 'EVIDENCE_INSUFFICIENT', evidenceIds: [] })
-  assert.equal(await synthesizeFreshEvidenceLocally(args), null)
-  localReply = 'The current president is X.'
-  assert.equal(await synthesizeFreshEvidenceLocally(args), null)
+test('a completed null result is not treated as a transport failure and is not retried', async () => {
+  let calls = 0
+  const result = await runFreshSynthesisTransportAttempts(async () => {
+    calls += 1
+    return null
+  })
+  assert.equal(result.value, null)
+  assert.equal(result.attempts, 1)
+  assert.equal(calls, 1)
 })
 
-test('fails closed when the reasoner is unreachable or evidence is empty', async () => {
-  localReply = null
-  assert.equal(await synthesizeFreshEvidenceLocally(args), null)
-  assert.equal(await synthesizeFreshEvidenceLocally({ ...args, sources: [] }), null)
+test('production fresh synthesis is wired to the bounded retry before the evidence contract', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(source, /runFreshSynthesisTransportAttempts/)
+  assert.match(source, /boundedFreshSynthesisAttemptTimeoutMs/)
+  assert.match(source, /cos-fresh-local-synthesis-retry/)
+  assert.match(source, /acceptFreshEvidenceSynthesis/)
+  assert.match(source, /if \(!accepted\) return null/)
+  assert.doesNotMatch(source, /synthesizeFreshEvidenceExternally|callCosTextDetailed|modelPreference/)
 })

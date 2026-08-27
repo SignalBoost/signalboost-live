@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
 const route = () => read('../app/api/cos-primary/route.ts')
@@ -9,38 +10,58 @@ const structuredInfo = () => read('../lib/ai/tools/getStructuredLiveInfo.ts')
 const externalSynthesis = () => read('../lib/ai/cos/freshEvidenceExternalSynthesis.ts')
 const synthesisContract = () => read('../lib/ai/cos/freshEvidenceSynthesisContract.ts')
 
-test('fresh/current facts retrieve live evidence before any model synthesis', () => {
+test('fresh/current facts retrieve live evidence before local synthesis and any hosted fallback', () => {
   const source = route()
   const liveSearch = source.indexOf('await getExternalInfo(')
-  const synthesis = source.indexOf('await synthesizeFreshEvidenceExternally(')
+  const localSynthesis = source.indexOf('await synthesizeFreshEvidenceLocally(')
+  const isolationGate = source.indexOf('if(!externalFallbackEnabled())')
+  const hostedFallback = source.indexOf('await synthesizeFreshEvidenceExternally(')
   assert.ok(liveSearch >= 0, 'fresh route must perform live retrieval')
-  assert.ok(synthesis > liveSearch, 'external synthesis must happen only after live retrieval')
+  assert.ok(localSynthesis > liveSearch, 'local COS synthesis must happen only after live retrieval')
+  assert.ok(isolationGate > localSynthesis, 'external-disabled mode must be checked only after local synthesis gets a chance to answer')
+  assert.ok(hostedFallback > isolationGate, 'governed hosted fallback must remain after the local-first path')
   assert.match(source, /bypassCache:\s*true/)
   assert.match(source, /freshEvidenceMeetsQuestionAuthority\(lookupInput, sources\)/)
 })
 
-test('fresh follow-ups resolve user context before retrieval and never trust assistant text', () => {
+test('fresh follow-ups resolve user context before retrieval and local synthesis never trusts assistant text', () => {
   const source = route()
   assert.match(source, /resolveFreshConversationContext\(body, input\)/)
   assert.match(source, /freshEvidenceSearchQuery\(lookupInput/)
   assert.match(source, /assistant_text_used_for_resolution:\s*false/)
+  assert.match(source, /synthesizeFreshEvidenceLocally\(\{input:lookupInput/)
   assert.match(source, /synthesizeFreshEvidenceExternally\(\{ input: lookupInput/)
 })
 
 test('contextual volatile cache key uses resolved lookup input, not ambiguous surface text', () => {
   const source = route()
-  assert.match(source, /writeVolatileAnswerCache\(\{[\s\S]*?prompt:\s*lookupInput/)
+  assert.match(source, /writeVolatileAnswerCache\(\{prompt:\s*lookupInput/)
   assert.doesNotMatch(source, /writeVolatileAnswerCache\(\{[\s\S]{0,120}?prompt:\s*input,/)
 })
 
-test('fresh/current facts never invoke local Qwen or deterministic model-memory shortcuts', () => {
+test('fresh/current facts use evidence-only local COS synthesis before external AI', () => {
   const source = route()
-  assert.doesNotMatch(source, /freshEvidenceLocalSynthesis/)
-  assert.doesNotMatch(source, /synthesizeFreshEvidenceLocally/)
+  assert.match(source, /freshEvidenceLocalSynthesis/)
+  assert.match(source, /synthesizeFreshEvidenceLocally/)
   assert.doesNotMatch(source, /resolveDeterministicFreshOfficeHolder/)
-  assert.doesNotMatch(source, /callLocalModel/)
-  assert.match(source, /local_model_invoked:\s*false/)
-  assert.match(source, /policy:\s*'fresh_live_data_external_only'/)
+  assert.match(source, /source:'cos-fresh-local-grounded'/)
+  assert.match(source, /policy:'fresh_live_data_local_first'/)
+  assert.doesNotMatch(source, /policy:\s*'fresh_live_data_external_only'/)
+})
+
+test('direct/nonstop route existence is current external state and is live-verified', () => {
+  for (const prompt of [
+    'are there direct flights from Paramaribo to Sao Paulo?',
+    'Is there a direct flight between Tokyo and Lima?',
+    'Does any airline fly nonstop from Miami to Lisbon?',
+    'is there a direct train from Paris to Berlin',
+    '¿hay vuelos directos entre Madrid y Bogotá?',
+    'há voos diretos de Lisboa para São Paulo?',
+    'czy są loty bezpośrednie z Warszawy do Nowego Jorku?',
+    'есть ли прямые рейсы из Москвы в Гавану?',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
+  }
 })
 
 test('high-frequency values require structured real-time data before ordinary web search', () => {
@@ -69,8 +90,12 @@ test('structured real-time adapter uses Brave rich callback and compact timestam
   assert.match(source, /No structured real-time callback was available/)
 })
 
-test('fresh/current evidence synthesis prefers Gemini', () => {
+test('governed external fresh synthesis remains available only as the final provider fallback', () => {
   const source = externalSynthesis()
+  const local = source.indexOf('await callCosReasoner(')
+  const hosted = source.indexOf('await callCosTextDetailed(')
+  assert.ok(local >= 0)
+  assert.ok(hosted > local)
   assert.match(source, /modelPreference:\s*'gemini'/)
 })
 

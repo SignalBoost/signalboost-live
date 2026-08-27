@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     }
 
     const exchanged = await exchangeGoogleWorkspaceCode(code, redirectUriFor(req))
-    if (!exchanged.ok) return back(req, { google_sheets_error: exchanged.reason.slice(0, 200) })
+    if ('reason' in exchanged) return back(req, { google_sheets_error: exchanged.reason.slice(0, 200) })
     const saved = await saveGoogleWorkspaceConnection({
       userId: user.id,
       accessToken: exchanged.accessToken,
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       expiresAt: exchanged.expiresAt,
       scopes: exchanged.scopes,
     })
-    if (!saved.ok) return back(req, { google_sheets_error: saved.reason.slice(0, 200) })
+    if ('reason' in saved) return back(req, { google_sheets_error: saved.reason.slice(0, 200) })
 
     const response = back(req, { google_sheets: 'connected' })
     response.cookies.delete(STATE_COOKIE)
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
 
   const state = crypto.randomUUID()
   const built = buildGoogleWorkspaceOAuthUrl(redirectUriFor(req), state)
-  if (!built.ok) return NextResponse.json({ error: built.reason }, { status: 503 })
+  if ('reason' in built) return NextResponse.json({ error: built.reason }, { status: 503 })
 
   const response = NextResponse.redirect(built.url)
   response.cookies.set(STATE_COOKIE, `${state}:${user.id}`, {

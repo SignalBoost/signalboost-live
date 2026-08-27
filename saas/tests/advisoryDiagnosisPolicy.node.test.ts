@@ -9,7 +9,7 @@ import {
   isAdvisoryDiagnosisPrompt,
   selectOfficialDiagnosticReferences,
 } from '../lib/ai/cos/advisoryDiagnosisPolicy.ts'
-import { buildHonestRefusalReply } from '../lib/ai/cos/honestRefusalReply.ts'
+import { buildHonestRefusalReply, missingInputKeys } from '../lib/ai/cos/honestRefusalReply.ts'
 import { semanticCacheAllowedForPrompt } from '../lib/ai/cos/cacheSafetyPolicy.ts'
 import { stripInternalEvidenceIds } from '../lib/ai/cos/answerEvidenceIdHygiene.ts'
 import {
@@ -24,6 +24,21 @@ test('method-seeking advisory diagnosis is detected without hijacking ordinary c
   assert.equal(asksForPublishedDiagnosticMethods(METHOD_PROMPT), true)
   assert.equal(asksForPublishedDiagnosticMethods('Explain DVFS at a conceptual level.'), false)
   assert.equal(isAdvisoryDiagnosisPrompt('Draft a customer email about a delayed shipment.'), false)
+})
+
+test('method-seeking diagnosis policy is recognized across all five platform languages', () => {
+  const prompts = [
+    METHOD_PROMPT,
+    'Ocurrió una falla de alimentación. ¿Qué métodos de diagnóstico existen para distinguir una falla real de un artefacto de medición?',
+    'Ocorreu uma falha de alimentação. Quais métodos de diagnóstico existem para distinguir uma falha real de um artefato de medição?',
+    'Wystąpił incydent zasilania. Jakie metody istnieją, aby rozróżnić możliwe przyczyny?',
+    'Произошёл сбой питания. Какие методы диагностики существуют, чтобы различить возможные причины?',
+  ]
+  for (const prompt of prompts) {
+    assert.equal(isAdvisoryDiagnosisPrompt(prompt), true, prompt)
+    assert.equal(asksForPublishedDiagnosticMethods(prompt), true, prompt)
+    assert.equal(semanticCacheAllowedForPrompt(prompt), false, prompt)
+  }
 })
 
 test('method-seeking diagnosis cannot bypass required work through semantic or exact cache replay', () => {
@@ -77,6 +92,15 @@ test('hard diagnosis fallback does useful work first and uncertainty is the last
   assert.match(reply, /readings that separate the candidate causes/)
   assert.match(reply, /baseline/)
   assert.match(reply, /discrimination, not guessing a failed part/i)
+  assert.match(reply, /I still cannot stand behind a single cause yet\.$/)
+})
+
+test('diagnosis fallback never asks again for readings and baseline already supplied', () => {
+  const prompt = 'Why did GEN-2 fail? The logged reading was 0 V during the event and the historical baseline was 24 V.'
+  assert.deepEqual(missingInputKeys(prompt), [])
+  const reply = buildHonestRefusalReply({ prompt, language: 'en' })
+  assert.match(reply, /already supplies incident readings and a baseline/i)
+  assert.doesNotMatch(reply, /To answer it properly I need/i)
   assert.match(reply, /I still cannot stand behind a single cause yet\.$/)
 })
 

@@ -8,6 +8,7 @@ const tests = [
   'tests/publicGovernanceParity.node.test.ts',
   'tests/conciergeBrowserIngressRouting.node.test.ts',
   'tests/conciergeFullTranscript.node.test.ts',
+  'tests/conciergeTransportBudget.node.test.ts',
   'tests/cosPublicProvenanceAuditIdentity.node.test.ts',
   'tests/cosProvenanceParaphraseContinuity.node.test.ts',
   'tests/cosCreativeConstraintFidelity.node.test.ts',

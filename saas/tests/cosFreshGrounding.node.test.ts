@@ -6,6 +6,8 @@ import {
   prepareFreshEvidence,
   replyCitesFreshEvidence,
   replyCitesIndependentFreshEvidence,
+  resolveDeterministicDirectFlight,
+  resolveDeterministicFreshOfficeHolder,
 } from '../lib/ai/cos/cosFreshGrounding.ts'
 
 test('government sources are preferred and required for current government office holders', () => {
@@ -77,4 +79,91 @@ test('grounded body carries live evidence and synthesis must cite both evidence 
   assert.equal(replyCitesFreshEvidence('Donald Trump. [LIVE1] https://www.whitehouse.gov/administration/', sources), true)
   assert.equal(replyCitesFreshEvidence('Donald Trump. [LIVE1]', sources), false)
   assert.equal(replyCitesFreshEvidence('Donald Trump. https://www.whitehouse.gov/administration/', sources), false)
+})
+
+test('exact production flight shape is answered deterministically before model synthesis', () => {
+  const sources = prepareFreshEvidence([
+    {
+      title: 'Flights from Paramaribo to São Paulo: PBM to GRU Flights + Flight Schedules',
+      url: 'https://route.example/flights-from-pbm-to-gru',
+      snippet: '3 routes with 1 stop found. At present, there are no direct flights from Paramaribo to São Paulo. However, there are several flights from PBM to GRU with a stopover.',
+      sourceDate: '2026-08-27',
+    },
+    {
+      title: 'Flights from Paramaribo to Sao Paulo',
+      url: 'https://airline.example/flights/paramaribo-sao-paulo',
+      snippet: 'Find fares and schedules between Paramaribo and Sao Paulo.',
+    },
+    {
+      title: 'Cheap flights from Paramaribo to Sao Paulo',
+      url: 'https://booking.example/pbm-sao',
+      snippet: 'Compare available itineraries and prices.',
+    },
+  ])
+
+  const direct = resolveDeterministicDirectFlight('are there direct flights from Paramaribo to Sao Paulo?', sources)
+  assert.ok(direct)
+  assert.equal(direct?.kind, 'direct_flight')
+  assert.equal(direct?.direct, false)
+  assert.equal(direct?.confidence, 0.96)
+  assert.equal(direct?.sources.length, 1)
+  assert.match(direct?.reply || '', /No\. Current live route evidence indicates there are no direct\/nonstop flights/i)
+  assert.match(direct?.reply || '', /\[LIVE1\]/)
+  assert.match(direct?.reply || '', /https:\/\/route\.example\/flights-from-pbm-to-gru/)
+
+  // cosFirstAnswer already calls this compatibility hook before invoking any model.
+  const throughExistingHook = resolveDeterministicFreshOfficeHolder('are there direct flights from Paramaribo to Sao Paulo?', sources)
+  assert.equal(throughExistingHook?.kind, 'direct_flight')
+  assert.equal(throughExistingHook?.direct, false)
+})
+
+test('explicit affirmative direct-flight evidence is accepted and independently corroborated when available', () => {
+  const sources = prepareFreshEvidence([
+    {
+      title: 'Route schedule',
+      url: 'https://airline.example/route',
+      snippet: 'We operate non-stop flights on this route every Monday and Thursday.',
+    },
+    {
+      title: 'Airport route information',
+      url: 'https://airport.example/destination',
+      snippet: 'There are currently 2 direct flights each week on this route.',
+    },
+  ])
+
+  const resolved = resolveDeterministicDirectFlight('Are there nonstop flights from Alpha City to Beta City?', sources)
+  assert.ok(resolved)
+  assert.equal(resolved?.direct, true)
+  assert.equal(resolved?.confidence, 0.99)
+  assert.equal(resolved?.sources.length, 2)
+  assert.match(resolved?.reply || '', /^Yes\./)
+})
+
+test('conflicting explicit direct-flight evidence fails closed instead of choosing a side', () => {
+  const sources = prepareFreshEvidence([
+    {
+      title: 'Route status',
+      url: 'https://one.example/route',
+      snippet: 'At present, there are no direct flights from Alpha City to Beta City.',
+    },
+    {
+      title: 'Airline schedule',
+      url: 'https://two.example/route',
+      snippet: 'Direct flights are currently operating on this route.',
+    },
+  ])
+
+  assert.equal(resolveDeterministicDirectFlight('Are there direct flights from Alpha City to Beta City?', sources), null)
+})
+
+test('a connecting itinerary alone is never converted into a no-direct-flight claim', () => {
+  const sources = prepareFreshEvidence([
+    {
+      title: 'Flight options',
+      url: 'https://booking.example/route',
+      snippet: 'Flights are available with 1 stop via Example Hub.',
+    },
+  ])
+
+  assert.equal(resolveDeterministicDirectFlight('Are there direct flights from Alpha City to Beta City?', sources), null)
 })

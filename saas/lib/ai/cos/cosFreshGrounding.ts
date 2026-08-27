@@ -14,9 +14,11 @@ const NAME_SEQUENCE_SOURCE = `${NAME_TOKEN_SOURCE}(?:\\s+${NAME_TOKEN_SOURCE}){1
 export type DeterministicFreshOfficeHolderResolution = {
   reply: string
   confidence: number
-  name: string
-  descriptor: string
   sources: FreshEvidenceSource[]
+  kind?: 'office_holder' | 'direct_flight'
+  name?: string
+  descriptor?: string
+  direct?: boolean
 }
 
 function normalizedUrl(value: string): string | null {
@@ -124,15 +126,110 @@ function extractCandidates(text: string, role: string): string[] {
   return [...out]
 }
 
+function directFlightQuestionLanguage(input: string): 'en' | 'es' | 'pt' | 'pl' | 'ru' | null {
+  const text = String(input || '').trim()
+  const routeShape = /\bfrom\b[\s\S]+\bto\b/i.test(text)
+  if (routeShape && /\b(?:direct|non[-\s]?stop)\b/i.test(text) && /\bflights?\b/i.test(text)) return 'en'
+  if (/\b(?:vuelos?)\b/i.test(text) && /\b(?:directos?|sin\s+escalas?)\b/i.test(text) && /\b(?:de|desde)\b[\s\S]+\b(?:a|hasta)\b/i.test(text)) return 'es'
+  if (/\b(?:voos?)\b/i.test(text) && /\b(?:diretos?|sem\s+escalas?)\b/i.test(text) && /\bde\b[\s\S]+\bpara\b/i.test(text)) return 'pt'
+  if (/\b(?:bezpośredni(?:e|ch)?|bezposredni(?:e|ch)?)\b/i.test(text) && /\blot(?:y|ów|ow)\b/i.test(text) && /\bz\b[\s\S]+\bdo\b/i.test(text)) return 'pl'
+  if (/\bпрям\w*\b/iu.test(text) && /\bрейс\w*\b/iu.test(text) && /\bиз\b[\s\S]+\bв\b/iu.test(text)) return 'ru'
+  return null
+}
+
+function explicitDirectFlightVerdict(source: FreshEvidenceSource): boolean | null {
+  const text = `${source.title}. ${source.snippet}`.replace(/\s+/g, ' ').trim()
+  const negative = [
+    /\b(?:at\s+present[, ]+)?there\s+(?:are|is)\s+no\s+(?:direct|non[-\s]?stop)\s+flights?\b/i,
+    /\bno\s+(?:direct|non[-\s]?stop)\s+(?:flights?|service)\b/i,
+    /\b(?:direct|non[-\s]?stop)\s+(?:flights?|service)\s+(?:are|is)\s+not\s+(?:available|operating|offered|scheduled)\b/i,
+    /\b(?:currently|currently,)\s+no\s+(?:direct|non[-\s]?stop)\s+flights?\b/i,
+    /\b(?:actualmente[, ]+)?no\s+hay\s+vuelos?\s+(?:directos?|sin\s+escalas?)\b/i,
+    /\b(?:atualmente[, ]+|no\s+momento[, ]+)?n[aã]o\s+h[aá]\s+voos?\s+(?:diretos?|sem\s+escalas?)\b/i,
+    /\bbrak\s+(?:bezpośrednich|bezposrednich)\s+lot(?:ów|ow)\b/i,
+    /\bнет\s+прям\w*\s+рейс\w*\b/iu,
+  ]
+  if (negative.some(pattern => pattern.test(text))) return false
+
+  const positive = [
+    /\bthere\s+(?:are|is)\s+(?:currently\s+)?(?:\d+\s+)?(?:direct|non[-\s]?stop)\s+flights?\b/i,
+    /\b(?:direct|non[-\s]?stop)\s+flights?\s+(?:are\s+)?(?:available|operating|offered|scheduled|running)\b/i,
+    /\b(?:operates?|offers?|flies?)\s+(?:a\s+|\d+\s+)?(?:daily\s+|weekly\s+)?(?:direct|non[-\s]?stop)\s+flights?\b/i,
+    /\bhay\s+vuelos?\s+(?:directos?|sin\s+escalas?)\b/i,
+    /\bh[aá]\s+voos?\s+(?:diretos?|sem\s+escalas?)\b/i,
+    /\bs[aą]\s+(?:bezpośrednie|bezposrednie)\s+loty\b/i,
+    /\bесть\s+прям\w*\s+рейс\w*\b/iu,
+  ]
+  if (positive.some(pattern => pattern.test(text))) return true
+  return null
+}
+
+function directFlightReply(language: 'en' | 'es' | 'pt' | 'pl' | 'ru', direct: boolean, sources: FreshEvidenceSource[]): string {
+  const sourceText = sources.map(source => `[${source.id}] (${source.url})`).join(' and ')
+  if (language === 'es') return `${direct ? 'Sí. La evidencia actual de rutas confirma vuelos directos/sin escalas en esta ruta.' : 'No. La evidencia actual de rutas indica que no hay vuelos directos/sin escalas en esta ruta.'} Fuentes: ${sourceText}.`
+  if (language === 'pt') return `${direct ? 'Sim. A evidência atual de rotas confirma voos diretos/sem escalas nesta rota.' : 'Não. A evidência atual de rotas indica que não há voos diretos/sem escalas nesta rota.'} Fontes: ${sourceText}.`
+  if (language === 'pl') return `${direct ? 'Tak. Aktualne dane tras potwierdzają bezpośrednie loty na tej trasie.' : 'Nie. Aktualne dane tras wskazują, że na tej trasie nie ma bezpośrednich lotów.'} Źródła: ${sourceText}.`
+  if (language === 'ru') return `${direct ? 'Да. Актуальные данные по маршруту подтверждают прямые рейсы по этому направлению.' : 'Нет. Актуальные данные по маршруту показывают, что прямых рейсов по этому направлению нет.'} Источники: ${sourceText}.`
+  return `${direct ? 'Yes. Current live route evidence confirms direct/nonstop flights on this route.' : 'No. Current live route evidence indicates there are no direct/nonstop flights on this route.'} Sources: ${sourceText}.`
+}
+
 /**
- * Resolve a simple current office-holder question without any LLM when independently retrieved
- * live evidence agrees on the same person. Source selection remains runtime/source-agnostic:
- * no domains, office holders, countries, companies, or URLs are encoded here.
+ * Resolve a direct/nonstop route question without an LLM when live search text itself states the
+ * route status explicitly. We never infer "no direct flight" merely because a booking result shows
+ * a connection, and any explicit yes/no conflict fails closed. A single explicit route-status page
+ * may establish an ordinary volatile fact under the existing freshness authority floor; when
+ * multiple independent hosts agree, confidence and material citations increase automatically.
+ */
+export function resolveDeterministicDirectFlight(
+  input: string,
+  sources: FreshEvidenceSource[],
+): DeterministicFreshOfficeHolderResolution | null {
+  const language = directFlightQuestionLanguage(input)
+  if (!language || !freshEvidenceMeetsAuthority(input, sources)) return null
+
+  const positives: FreshEvidenceSource[] = []
+  const negatives: FreshEvidenceSource[] = []
+  for (const source of sources) {
+    const verdict = explicitDirectFlightVerdict(source)
+    if (verdict === true) positives.push(source)
+    if (verdict === false) negatives.push(source)
+  }
+
+  if (positives.length && negatives.length) return null
+  const direct = positives.length > 0 ? true : negatives.length > 0 ? false : null
+  if (direct === null) return null
+
+  const matching = (direct ? positives : negatives)
+    .filter((source, index, all) => {
+      const host = freshEvidenceHost(source.url)
+      if (!host) return false
+      return all.findIndex(candidate => freshEvidenceHost(candidate.url) === host) === index
+    })
+    .slice(0, 2)
+  if (!matching.length) return null
+
+  return {
+    kind: 'direct_flight',
+    direct,
+    reply: directFlightReply(language, direct, matching),
+    confidence: matching.length >= 2 ? 0.99 : 0.96,
+    sources: matching,
+  }
+}
+
+/**
+ * Compatibility deterministic fresh-fact entrypoint. The historical export name is retained because
+ * the live-fact caller already invokes it before any model. It now dispatches both simple current
+ * office-holder facts and explicit direct/nonstop route facts. Every resolver remains source-agnostic
+ * and fail-closed; no city, airline, office holder, company, or URL is encoded here.
  */
 export function resolveDeterministicFreshOfficeHolder(
   input: string,
   sources: FreshEvidenceSource[],
 ): DeterministicFreshOfficeHolderResolution | null {
+  const directFlight = resolveDeterministicDirectFlight(input, sources)
+  if (directFlight) return directFlight
+
   const descriptor = officeHolderDescriptor(input)
   if (!descriptor || !freshEvidenceMeetsAuthority(input, sources)) return null
 
@@ -180,6 +277,7 @@ export function resolveDeterministicFreshOfficeHolder(
 
   const sourceText = materialSources.map(source => `[${source.id}] (${source.url})`).join(' and ')
   return {
+    kind: 'office_holder',
     reply: `The current ${descriptor.descriptor} is ${displayName}. Sources: ${sourceText}.`,
     confidence: 0.99,
     name: displayName,

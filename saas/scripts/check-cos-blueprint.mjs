@@ -84,12 +84,24 @@ for (const required of ['runFreshSynthesisTransportAttempts', 'boundedFreshSynth
 }
 if (!freshLocalSynthesis.includes('if (!accepted) return null')) failures.push('fresh_evidence_grounding_failure_must_not_retry')
 
+// Explicit fresh facts that can be resolved directly from the already-authoritative live evidence
+// must be answered before Qwen is invoked. This is shared by public Concierge and authorized
+// COS/Assistant through cos-primary, while their authorization/context boundaries remain separate.
+const cosPrimaryRoute = await readFile(path.join(root, 'app/api/cos-primary/route.ts'), 'utf8')
+const deterministicFreshIndex = cosPrimaryRoute.indexOf('resolveDeterministicDirectFlight(lookupInput,freshSources)')
+const localFreshIndex = cosPrimaryRoute.indexOf('const localSynthesis=await synthesizeFreshEvidenceLocally')
+if (deterministicFreshIndex < 0) failures.push('cos_primary_deterministic_fresh_resolver_missing')
+if (localFreshIndex < 0 || deterministicFreshIndex < 0 || deterministicFreshIndex > localFreshIndex) failures.push('cos_primary_deterministic_fresh_must_precede_qwen')
+if (!cosPrimaryRoute.includes("event:'fresh_deterministic_resolution_accepted'")) failures.push('cos_primary_deterministic_fresh_audit_missing')
+if (!cosPrimaryRoute.includes("source:'cos-fresh-deterministic-grounded'")) failures.push('cos_primary_deterministic_fresh_response_source_missing')
+
 // Public Concierge must always keep a material recovery margin inside Vercel's 300s ceiling, and
 // the regression that checks that invariant must itself be part of the mandatory deployment gate.
 const conciergeRoute = await readFile(path.join(root, 'app/api/concierge/route.ts'), 'utf8')
 if (!conciergeRoute.includes('const PRIMARY_TIMEOUT_MS = 150_000')) failures.push('public_concierge_primary_timeout_must_be_150s')
 const vercelCosGates = await readFile(path.join(root, 'scripts/vercel-cos-gates.mjs'), 'utf8')
 if (!vercelCosGates.includes("'tests/conciergeTransportBudget.node.test.ts'")) failures.push('concierge_transport_budget_test_not_mandatory')
+if (!vercelCosGates.includes("'tests/cosPrimaryDeterministicFreshRouting.node.test.ts'")) failures.push('cos_primary_deterministic_fresh_test_not_mandatory')
 
 console.log(JSON.stringify({ ok: failures.length === 0, schema: 'signalboost-cos-blueprint-v1', failures }, null, 2))
 if (failures.length) process.exit(1)

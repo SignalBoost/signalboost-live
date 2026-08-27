@@ -117,19 +117,35 @@ const advisoryDiagnosisLookup = await readFile(path.join(root, 'lib/ai/cos/advis
 for (const required of ['getExternalInfo(officialQuery, 6', 'crossrefScientificSearch(baseQuery, 3)', 'selectOfficialDiagnosticReferences', 'references.length >= 4']) {
   if (!advisoryDiagnosisLookup.includes(required)) failures.push(`advisory_diagnosis_lookup_guard_missing:${required}`)
 }
+const diagnosisCachePolicy = await readFile(path.join(root, 'lib/ai/cos/cacheSafetyPolicy.ts'), 'utf8')
+if (!diagnosisCachePolicy.includes('asksForPublishedDiagnosticMethods(prompt)')) failures.push('advisory_diagnosis_method_lookup_must_bypass_cache')
+
 const cosReasoner = await readFile(path.join(root, 'lib/ai/cos/cosReasoner.ts'), 'utf8')
-for (const required of ['primaryReasonerRequest', 'retrievePublishedDiagnosticReferences(args.prompt)', 'ADVISORY_DIAGNOSIS_OWNER_POLICY', 'advisoryDiagnosisBriefDefects', 'published_diagnostic_research', 'incidentTelemetry: false']) {
+for (const required of ['primaryReasonerRequest', 'retrievePublishedDiagnosticReferences(args.prompt)', 'ADVISORY_DIAGNOSIS_OWNER_POLICY', 'advisoryDiagnosisBriefDefects', 'published_diagnostic_research', 'incidentTelemetry: false', 'remainingAdvisoryDefects', 'cos-advisory-diagnosis-release-blocked', 'recordAdvisoryDiagnosisResearchForAnswer']) {
   if (!cosReasoner.includes(required)) failures.push(`advisory_diagnosis_reasoner_guard_missing:${required}`)
 }
 const publishedLookupIndex = cosReasoner.indexOf('retrievePublishedDiagnosticReferences(args.prompt)')
 const reasonerDraftIndex = cosReasoner.indexOf("recorder.time('draft', () => callLocalModel(effectiveArgs, inference)")
 if (publishedLookupIndex < 0 || reasonerDraftIndex < 0 || publishedLookupIndex > reasonerDraftIndex) failures.push('advisory_diagnosis_published_lookup_must_precede_draft')
+const diagnosisReleaseGuardIndex = cosReasoner.indexOf('const remainingAdvisoryDefects = advisoryDiagnosis')
+const diagnosisCitationIndex = cosReasoner.indexOf('const allowedSkillTags = skillCitationTags')
+if (diagnosisReleaseGuardIndex < 0 || diagnosisCitationIndex < 0 || diagnosisReleaseGuardIndex > diagnosisCitationIndex) failures.push('advisory_diagnosis_release_guard_must_precede_release_adjacent_work')
+
 const enterpriseFirstAnswer = await readFile(path.join(root, 'lib/ai/cos/cosFirstAnswerEnterprise.ts'), 'utf8')
 const internalRetrievalIndex = enterpriseFirstAnswer.indexOf('const context = await retrieveInternalContext')
 const enterpriseReasonerIndex = enterpriseFirstAnswer.indexOf('const reasoned = await callCosReasoner')
 if (internalRetrievalIndex < 0 || enterpriseReasonerIndex < 0 || internalRetrievalIndex > enterpriseReasonerIndex) failures.push('advisory_diagnosis_internal_retrieval_must_precede_reasoner')
 const honestRefusal = await readFile(path.join(root, 'lib/ai/cos/honestRefusalReply.ts'), 'utf8')
 if (!honestRefusal.includes('I still cannot stand behind a single cause yet.')) failures.push('advisory_diagnosis_uncertainty_last_copy_missing')
+
+const diagnosisResearchTrace = await readFile(path.join(root, 'lib/ai/cos/advisoryDiagnosisResearchTrace.ts'), 'utf8')
+for (const required of ['recordAdvisoryDiagnosisResearchForAnswer', 'consumeAdvisoryDiagnosisResearchForAnswer', 'TRACE_TTL_MS', 'MAX_TRACES = 128']) {
+  if (!diagnosisResearchTrace.includes(required)) failures.push(`advisory_diagnosis_research_trace_guard_missing:${required}`)
+}
+const orchestration = await readFile(path.join(root, 'lib/ai/cos/cosOrchestrationEnterprise.ts'), 'utf8')
+for (const required of ['consumeAdvisoryDiagnosisResearchForAnswer', 'published_diagnostic_research', 'source_urls', 'reference_only:true', 'Published Diagnosis Refs']) {
+  if (!orchestration.includes(required)) failures.push(`advisory_diagnosis_provenance_guard_missing:${required}`)
+}
 
 const conciergeRoute = await readFile(path.join(root, 'app/api/concierge/route.ts'), 'utf8')
 if (!conciergeRoute.includes('const PRIMARY_TIMEOUT_MS = 150_000')) failures.push('public_concierge_primary_timeout_must_be_150s')

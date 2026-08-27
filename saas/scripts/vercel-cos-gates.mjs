@@ -12,6 +12,7 @@ const tests = [
   'tests/cosPrimaryDeterministicFreshRouting.node.test.ts',
   'tests/assistantTransportClient.node.test.ts',
   'tests/operationalSystemsLearning.node.test.ts',
+  'tests/advisoryDiagnosisPolicy.node.test.ts',
   'tests/cosPublicProvenanceAuditIdentity.node.test.ts',
   'tests/cosProvenanceParaphraseContinuity.node.test.ts',
   'tests/cosCreativeConstraintFidelity.node.test.ts',

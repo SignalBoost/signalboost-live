@@ -8,7 +8,7 @@ import {
   readGoogleSheetRange,
   searchGoogleSheetRows,
 } from '@/lib/google-workspace/sheets'
-import { CosCognitiveToolRegistry } from './cognitiveTools'
+import { CosCognitiveToolRegistry } from './cognitiveTools.ts'
 
 export interface BuiltInCosToolOptions {
   userId?: string

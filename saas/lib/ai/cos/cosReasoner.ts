@@ -335,6 +335,20 @@ export async function callRawCosReasoner(
       }
     }
 
+    const finalParsedForPolicy = parseLocalResult(text)
+    const remainingAdvisoryDefects = advisoryDiagnosis && finalParsedForPolicy
+      ? advisoryDiagnosisBriefDefects(effectiveArgs.prompt, finalParsedForPolicy.answer)
+      : []
+    if (remainingAdvisoryDefects.length) {
+      console.warn('[cos-advisory-diagnosis-release-blocked]', JSON.stringify({
+        at: new Date().toISOString(),
+        reasoner: config.label,
+        defects: remainingAdvisoryDefects,
+      }))
+      recorder.skip('skill_citation_repair', 'advisory_diagnosis_policy_failed')
+      return null
+    }
+
     const allowedSkillTags = skillCitationTags(effectiveArgs.prompt)
     const parsed = parseLocalResult(text)
     const citationRepairNeeded = Boolean(parsed && skillCitationRepairNeeded(effectiveArgs.prompt, parsed.answer))

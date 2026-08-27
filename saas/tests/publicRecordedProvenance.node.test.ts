@@ -65,3 +65,15 @@ test('the real public Concierge boundary reads recorded provenance and does not 
   assert.doesNotMatch(route, /callCosReasoner/)
   assert.doesNotMatch(route, /parseLocalResult/)
 })
+
+test('the public support boundary also renders recorded provenance without a provenance-time model call', () => {
+  const route = readFileSync(new URL('../app/api/support/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /recordedTurnProvenanceByContent/)
+  assert.match(route, /renderPublicRecordedProvenance/)
+  assert.match(route, /support-public-provenance-recorded/)
+  assert.match(route, /local_model_invoked:\s*false/)
+  assert.doesNotMatch(route, /acceptPublicNarrative/)
+  assert.doesNotMatch(route, /buildPublicProvenanceInstruction/)
+  assert.doesNotMatch(route, /emergencyPublicProvenance/)
+  assert.doesNotMatch(route, /callLocalModel/)
+})

@@ -2,7 +2,7 @@
 // The model selects supporting evidence IDs; the server renders the exact URLs. This avoids
 // rejecting a correct grounded answer merely because a local model copied a URL imperfectly.
 
-import { callLocalModel, localInferenceConfigFromEnv, type LocalInferenceConfig, type LocalModelCallArgs } from '@/lib/ai/local-inference'
+import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import {
@@ -10,29 +10,18 @@ import {
   freshEvidenceSynthesisPrompt,
   freshEvidenceSynthesisSystemPrompt,
 } from '@/lib/ai/cos/freshEvidenceSynthesisContract'
+import {
+  boundedFreshSynthesisAttemptTimeoutMs,
+  runFreshSynthesisTransportAttempts,
+} from './freshEvidenceRetryPolicy.ts'
 
 export type FreshEvidenceLocalSynthesis = {
   reply: string
   reasonerLabel: string
 }
 
-type FreshEvidenceLocalSynthesisDeps = {
-  callModel?: (args: LocalModelCallArgs, config?: LocalInferenceConfig) => Promise<string | null>
-  config?: LocalInferenceConfig
-}
-
 const MAX_TOKENS = 700
 const TEMPERATURE = 0.1
-const MAX_ATTEMPTS = 2
-const DEFAULT_ATTEMPT_TIMEOUT_MS = 35_000
-const MIN_ATTEMPT_TIMEOUT_MS = 5_000
-const MAX_ATTEMPT_TIMEOUT_MS = 60_000
-
-function freshAttemptTimeoutMs(): number {
-  const configured = Number(process.env.COS_FRESH_LOCAL_SYNTHESIS_TIMEOUT_MS || DEFAULT_ATTEMPT_TIMEOUT_MS)
-  if (!Number.isFinite(configured)) return DEFAULT_ATTEMPT_TIMEOUT_MS
-  return Math.max(MIN_ATTEMPT_TIMEOUT_MS, Math.min(MAX_ATTEMPT_TIMEOUT_MS, configured))
-}
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -55,19 +44,18 @@ export async function synthesizeFreshEvidenceLocally(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
   language: string
-}, deps: FreshEvidenceLocalSynthesisDeps = {}): Promise<FreshEvidenceLocalSynthesis | null> {
+}): Promise<FreshEvidenceLocalSynthesis | null> {
   if (!args.sources.length) return null
 
-  const baseConfig = deps.config ?? localInferenceConfigFromEnv()
-  const callModel = deps.callModel ?? callLocalModel
-  const attemptTimeoutMs = Math.min(baseConfig.timeoutMs, freshAttemptTimeoutMs())
+  const baseConfig = localInferenceConfigFromEnv()
+  const attemptTimeoutMs = boundedFreshSynthesisAttemptTimeoutMs(baseConfig.timeoutMs)
   const prompt = freshEvidenceSynthesisPrompt(args)
   const systemPrompt = freshEvidenceSynthesisSystemPrompt(args.language)
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    let text: string | null = null
-    try {
-      text = await callModel({
+  let text: string | null = null
+  try {
+    const result = await runFreshSynthesisTransportAttempts(
+      () => callLocalModel({
         prompt,
         systemPrompt,
         maxTokens: MAX_TOKENS,
@@ -75,37 +63,34 @@ export async function synthesizeFreshEvidenceLocally(args: {
       }, {
         ...baseConfig,
         timeoutMs: attemptTimeoutMs,
-      })
-    } catch (error) {
-      if (attempt < MAX_ATTEMPTS) {
+      }),
+      ({ attempt, nextAttempt, error }) => {
         console.warn('[cos-fresh-local-synthesis-retry]', JSON.stringify({
           at: new Date().toISOString(),
           attempt,
-          nextAttempt: attempt + 1,
+          nextAttempt,
           attemptTimeoutMs,
           reason: errorText(error),
         }))
-        continue
-      }
-      console.warn('[cos-fresh-local-synthesis] failed closed after bounded local retry', JSON.stringify({
-        at: new Date().toISOString(),
-        attempts: MAX_ATTEMPTS,
-        attemptTimeoutMs,
-        reason: errorText(error),
-      }))
-      return null
-    }
-
-    if (!text?.trim()) return null
-
-    const accepted = acceptFreshEvidenceSynthesis({ text, input: args.input, sources: args.sources })
-    if (!accepted) return null
-    const reasoner = resolveCosReasoner()
-    return {
-      reply: accepted.reply,
-      reasonerLabel: reasoner.config?.label ?? `independent-local:${(process.env.LOCAL_AI_MODEL || 'local-model').trim()}`,
-    }
+      },
+    )
+    text = result.value
+  } catch (error) {
+    console.warn('[cos-fresh-local-synthesis] failed closed after bounded local retry', JSON.stringify({
+      at: new Date().toISOString(),
+      attemptTimeoutMs,
+      reason: errorText(error),
+    }))
+    return null
   }
 
-  return null
+  if (!text?.trim()) return null
+
+  const accepted = acceptFreshEvidenceSynthesis({ text, input: args.input, sources: args.sources })
+  if (!accepted) return null
+  const reasoner = resolveCosReasoner()
+  return {
+    reply: accepted.reply,
+    reasonerLabel: reasoner.config?.label ?? `independent-local:${(process.env.LOCAL_AI_MODEL || 'local-model').trim()}`,
+  }
 }

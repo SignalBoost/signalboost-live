@@ -34,7 +34,8 @@ import {
   buildPublishedDiagnosticReferenceBlock,
   isAdvisoryDiagnosisPrompt,
 } from './advisoryDiagnosisPolicy.ts'
-import { retrievePublishedDiagnosticReferences } from './advisoryDiagnosisPublishedLookup.ts'
+import { retrievePublishedDiagnosticReferences, type PublishedDiagnosticLookupResult } from './advisoryDiagnosisPublishedLookup.ts'
+import { recordAdvisoryDiagnosisResearchForAnswer } from './advisoryDiagnosisResearchTrace.ts'
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -154,6 +155,7 @@ export async function callRawCosReasoner(
   const problemClass = classifyProblemClass(args.prompt)
   let answered = false
   let finalConfidence: number | null = null
+  let publishedDiagnosticResearch: PublishedDiagnosticLookupResult | null = null
 
   try {
     await touchRunpodActivityLease('qwen_reasoning')
@@ -184,6 +186,7 @@ export async function callRawCosReasoner(
           console.warn('[cos-advisory-diagnosis-research] lookup failed closed', message)
           return { attempted: true, references: [], errors: [message] }
         })
+        publishedDiagnosticResearch = published
         const referenceBlock = buildPublishedDiagnosticReferenceBlock(published.references)
         if (referenceBlock) {
           effectiveArgs = {
@@ -391,8 +394,13 @@ export async function callRawCosReasoner(
       void recordQualityRepairDecision({ repairKind:'skill_citation_repair', reasonerLabel:config.label, accepted, details:{ allowedTags:allowedSkillTags, citedTags:auditedParsed?skillCitationTags(auditedParsed.answer):[] } })
     }
 
+    const finalParsedForTrace = parseLocalResult(text)
+    if (publishedDiagnosticResearch?.attempted && finalParsedForTrace) {
+      recordAdvisoryDiagnosisResearchForAnswer(finalParsedForTrace.answer, publishedDiagnosticResearch)
+    }
+
     answered = true
-    finalConfidence = parseLocalResult(text)?.confidence ?? null
+    finalConfidence = finalParsedForTrace?.confidence ?? null
     return { text, reasoner: config, turnId }
   } finally {
     const experience = recorder.snapshot({

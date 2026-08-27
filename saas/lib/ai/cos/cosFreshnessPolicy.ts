@@ -42,6 +42,19 @@ const TERSE_SPORTS_STATE = /^\s*(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|n
 
 const OUTAGE_STATE = /\b(?:service|network|internet|cloud|website|site|api|platform)\s+(?:status|outage)|\b(?:outage|outages)\b/i
 const TRAVEL_STATE = /\b(?:flight status|departure status|arrival status|live traffic|traffic conditions|road conditions)\b/i
+
+// Whether a NONSTOP/DIRECT transport connection EXISTS between two places is stable structural
+// knowledge, answerable from the model's own knowledge exactly as a general web assistant answers
+// it. It changes on the scale of an airline adding or dropping a route (months), not the per-turn
+// scale of fares, seat availability, or departure times. Owner decision 2026-08-26: route EXISTENCE
+// must be answered from knowledge, never forced onto live-verify-then-fail-closed. Only the volatile
+// attributes of a trip (price, schedule, live status, seat availability on a date) need fresh
+// evidence; those keep their live routes via TRIP_VOLATILITY below, TRAVEL_STATE, and the structured
+// live-data paths. Scope by MEANING across EN/ES/PT/PL/RU: a directness marker + a transport-route
+// noun, with any trip-volatility term vetoing the exclusion.
+const ROUTE_DIRECTNESS = /\b(?:direct|non[- ]?stop|nonstop|directos?|directas?|diretos?|diretas?|bezpo[\u015b\u0073]redni[a-z\u017c\u017a\u0105\u0119]*|\u043f\u0440\u044f\u043c[\u0430-\u044f]+)\b/iu
+const TRANSPORT_ROUTE_NOUN = /\b(?:flights?|routes?|connections?|services?|trains?|ferr(?:y|ies)|buses|coach(?:es)?|rail|airlines?|carriers?|vuelos?|v[o\u00f4]os?|trenes?|comboios?|loty|lot[o\u00f3]w|poci[\u0105a]g[a-z\u00f3\u017c]*|\u0440\u0435\u0439\u0441[\u0430-\u044f]*|\u043f\u043e\u0435\u0437\u0434[\u0430-\u044f]*)\b/iu
+const TRIP_VOLATILITY = /\b(?:prices?|costs?|cheap(?:est|er)?|fares?|when|what\s+time|schedules?|timetables?|status|delay(?:ed|s)?|cancel(?:led|ed|s|lation)?|land(?:ed|s|ing)?|arriv(?:e|ed|al|es)|depart(?:ed|s|ure)?|board(?:ing)?|on\s+time|book(?:ing)?|available|availability|today|tonight|tomorrow|next|this\s+(?:week|weekend|month)|cu[a\u00e1]nto|precios?|barat[oa]s?|horarios?|cu[a\u00e1]ndo|quando|pre[\u00e7c]os?|ile\s+kosztuj|kiedy|ceny?|\u0446\u0435\u043d[\u0430-\u044f]|\u0441\u043a\u043e\u043b\u044c\u043a\u043e|\u043a\u043e\u0433\u0434\u0430|\u0440\u0430\u0441\u043f\u0438\u0441\u0430\u043d\u0438[\u0435\u044f])\b/iu
 const ELECTION_STATE = /\b(?:election result|election results|election returns|vote count|vote counts|polling results?)\b/i
 const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules|visa requirement|visa requirements|entry requirement|entry requirements)\b/i
 const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
@@ -146,6 +159,13 @@ function isGovernedPublicGuidance(text: string): boolean {
   return GOVERNED_GUIDANCE_TOPIC.test(text) && GUIDANCE_REQUEST.test(text)
 }
 
+// True when the question is about whether a DIRECT/NONSTOP transport route EXISTS (a stable fact),
+// and NOT about a volatile trip attribute (price, time, status, date-specific availability).
+function isRouteExistenceQuestion(text: string): boolean {
+  if (TRIP_VOLATILITY.test(text)) return false
+  return ROUTE_DIRECTNESS.test(text) && TRANSPORT_ROUTE_NOUN.test(text)
+}
+
 export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
 
 /**
@@ -196,6 +216,10 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   // web for the word "verification". Failing to recognize introspection should degrade to a plain
   // answer, never to confidently citing unrelated sources as the origin of its own reasoning.
   if (isProvenanceIntrospection(text)) return false
+
+  // Route/service EXISTENCE is stable knowledge, answered from the brain like any web assistant.
+  // Trip fares, schedules, live status, and date availability stay volatile (guarded above).
+  if (isRouteExistenceQuestion(text)) return false
 
   // High-stakes guidance is never answered from model memory. This occurs before the
   // conceptual/creative exclusion because questions such as "what should I do after changing my name?"

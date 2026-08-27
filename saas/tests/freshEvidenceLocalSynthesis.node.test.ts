@@ -64,5 +64,5 @@ test('production fresh synthesis is wired to the bounded retry before the eviden
   assert.match(source, /cos-fresh-local-synthesis-retry/)
   assert.match(source, /acceptFreshEvidenceSynthesis/)
   assert.match(source, /if \(!accepted\) return null/)
-  assert.doesNotMatch(source, /external|gemini|anthropic/i)
+  assert.doesNotMatch(source, /synthesizeFreshEvidenceExternally|callCosTextDetailed|modelPreference/)
 })

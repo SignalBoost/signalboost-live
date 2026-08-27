@@ -32,6 +32,9 @@ const ATTACH_MAX_FILES = 5
 const ATTACH_ALLOWED_RE = /^(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/i
 const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv'
 const ASSET_READY_KEY = 'signalboost.concierge.assetReady'
+// The server primary is bounded at 150 s. Give public recovery/serialization another minute, then
+// stop waiting well before Vercel's 300 s function ceiling so a lost socket can never spin forever.
+const CONCIERGE_CLIENT_DEADLINE_MS = 210_000
 // Credit pack pricing shows only when the activation flag is on (Vercel env:
 // NEXT_PUBLIC_CREDITS_ACTIVATION=1). Mirrors the Studio catalog badge gate.
 const CREDITS_ACTIVATION = process.env.NEXT_PUBLIC_CREDITS_ACTIVATION === '1'
@@ -120,6 +123,12 @@ export default function Concierge() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const conversationIdRef = useRef<string>('')
+  const requestAbortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => () => {
+    requestAbortRef.current?.abort()
+    requestAbortRef.current = null
+  }, [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -244,6 +253,8 @@ export default function Concierge() {
   const visibleMessages = assetNoticeMessage ? [...baseMessages, assetNoticeMessage] : baseMessages
 
   function resetVisibleChat() {
+    requestAbortRef.current?.abort()
+    requestAbortRef.current = null
     setAssetNotice(null)
     setInput('')
     setLoading(false)
@@ -294,10 +305,15 @@ export default function Concierge() {
     setAttachments([])
     setLoading(true)
 
+    const controller = new AbortController()
+    requestAbortRef.current = controller
+    const deadline = window.setTimeout(() => controller.abort(), CONCIERGE_CLIENT_DEADLINE_MS)
+
     try {
       const res = await fetch('/api/concierge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           messages: nextMessages,
           attachments: staged.map(a => ({ name: a.name, type: a.type, dataUrl: a.dataUrl })),
@@ -310,6 +326,7 @@ export default function Concierge() {
         }),
       })
       const data = await res.json()
+      if (requestAbortRef.current !== controller) return
       const reply = data.reply || data.error || t(dict, 'concierge.fallback')
       const turnId = data?.execution_provenance?.turnId
       const feedbackEligible = typeof turnId === 'string' && turnId.trim().length > 0 && Boolean(data?.reply)
@@ -322,9 +339,16 @@ export default function Concierge() {
         },
       ])
     } catch {
+      // Reset/unmount intentionally aborts the old request. Do not let its completion append an
+      // error to a cleared chat or release loading state underneath a newer request.
+      if (controller.signal.aborted && requestAbortRef.current !== controller) return
       setMessages(prev => [...prev, { role: 'assistant', content: t(dict, 'concierge.connectionError') }])
     } finally {
-      setLoading(false)
+      window.clearTimeout(deadline)
+      if (requestAbortRef.current === controller) {
+        requestAbortRef.current = null
+        setLoading(false)
+      }
     }
   }
 

@@ -7,9 +7,9 @@ export type PublishedDiagnosticReference = {
   snippet: string
 }
 
-const DIAGNOSIS_RE = /\b(?:diagnos\w*|troubleshoot\w*|root\s+cause|incident|fault|failure|failed|alarm|alert|degrad\w*|bottleneck|why\s+.*(?:slow|fail|error)|candidate\s+causes?|hypotheses?)\b/i
+const DIAGNOSIS_RE = /\b(?:diagnos\w*|troubleshoot\w*|root\s+cause|incident|fault|fail(?:ure|ed|s)?|alarm|alert|degrad\w*|bottleneck|why\s+.*(?:slow|fail|error)|candidate\s+causes?|hypotheses?)\b/i
 const METHODS_RE = /\b(?:what|which)\s+(?:diagnostic\s+)?(?:methods?|techniques?|approaches?|mechanisms?)\s+(?:exist|are\s+used|can\s+be\s+used)|\b(?:methods?|techniques?|approaches?)\s+(?:exist|for|to)\s+(?:diagnos\w*|troubleshoot\w*|distinguish|investigate)|\bhow\s+(?:would|should|can)\s+(?:you|we|an?\s+operator)\s+(?:diagnos\w*|troubleshoot\w*|distinguish|investigate)\b/i
-const REFUSAL_RE = /\b(?:i\s+(?:do\s+not|don't)\s+know|i\s+cannot\s+stand\s+behind|i\s+can't\s+stand\s+behind|cannot\s+(?:determine|identify|name)|can't\s+(?:determine|identify|name)|unable\s+to\s+(?:determine|identify|name)|insufficient\s+(?:evidence|information)|not\s+enough\s+(?:evidence|information))\b/i
+const REFUSAL_RE = /\b(?:i\s+(?:do\s+not|don't)\s+know|i\s+(?:still\s+)?cannot\s+stand\s+behind|i\s+(?:still\s+)?can't\s+stand\s+behind|(?:still\s+)?cannot\s+(?:determine|identify|name)|(?:still\s+)?can't\s+(?:determine|identify|name)|unable\s+to\s+(?:determine|identify|name)|insufficient\s+(?:evidence|information)|not\s+enough\s+(?:evidence|information))\b/i
 
 const LABEL_GROUPS = {
   observations: /\b(?:observed|observations?|established\s+facts?|what\s+we\s+know|facts?\s+in\s+hand|observado|observaciones|fatos?\s+observados|zaobserwowane|obserwacje|наблюдения|факты)\b/i,

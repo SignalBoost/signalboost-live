@@ -49,7 +49,13 @@ export async function GET(req: NextRequest) {
       .eq('user_id', userId)
       .maybeSingle()
     if (!conv) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+      // Missing id used to 404 and break History / transport recovery.
+      // Return an empty transcript so the UI can open a new thread.
+      return NextResponse.json({
+        conversation: null,
+        messages: [],
+        missing: true,
+      })
     }
 
     const { data: messages, error } = await db

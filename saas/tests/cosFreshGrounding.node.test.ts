@@ -149,7 +149,7 @@ test('conflicting explicit direct-flight evidence fails closed instead of choosi
     {
       title: 'Airline schedule',
       url: 'https://two.example/route',
-      snippet: 'Direct flights are currently operating on this route.',
+      snippet: 'There are currently 2 direct flights each week on this route.',
     },
   ])
 

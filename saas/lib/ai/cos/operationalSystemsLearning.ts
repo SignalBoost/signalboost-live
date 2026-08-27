@@ -162,11 +162,8 @@ export function operationalSystemsCurriculumSignals(
   })
 }
 
-export function isOperationalSystemsGap(gap: { id?: string; evidence?: string[] }): boolean {
-  const id = String(gap.id || '')
-  const operationalId = id.startsWith(`${OPERATIONAL_SYSTEMS_CURRICULUM_ID}:`)
-    || id.startsWith(`auto-gap:${OPERATIONAL_SYSTEMS_CURRICULUM_ID}:`)
-  return operationalId && Array.isArray(gap.evidence) && gap.evidence.includes(OPERATIONAL_SYSTEMS_SAFETY_EVIDENCE)
+export function isOperationalSystemsGap(gap: { id?: string }): boolean {
+  return String(gap.id || '').startsWith(`${OPERATIONAL_SYSTEMS_CURRICULUM_ID}:`)
 }
 
 export const OPERATIONAL_SYSTEMS_FOCUS_IDS = FOCI.map(focus => focus.id)

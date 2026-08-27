@@ -18,7 +18,7 @@ export type AssistantTransportLocale = keyof typeof ASSISTANT_TRANSPORT_TIMEOUT_
 export type AssistantSendResult =
   | { ok: true; source: 'live'; content: string; raw?: unknown }
   | { ok: true; source: 'recovered'; content: string }
-  | { ok: false; source: 'server'; content: string; retrySafe: false; httpStatus: number }
+  | { ok: false; source: 'server'; content: string; retrySafe: false; httpStatus: number; raw?: unknown }
   | { ok: false; source: 'transport'; content: string; retrySafe: false; httpStatus?: number }
 
 export type AssistantTransportClientOptions = {
@@ -137,7 +137,7 @@ export async function sendAssistantTurnAndRecover(
     }
 
     if (!response.ok && live) {
-      return { ok: false, source: 'server', retrySafe: false, httpStatus: response.status, content: live }
+      return { ok: false, source: 'server', retrySafe: false, httpStatus: response.status, content: live, raw: payload }
     }
 
     return {

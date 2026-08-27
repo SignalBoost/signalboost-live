@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   isAssistantTransportFailure,
@@ -126,4 +127,17 @@ test('gateway HTML is never exposed as an assistant answer', async () => {
   assert.equal(result.ok, false)
   assert.match(result.content, /Check History before retrying/)
   assert.doesNotMatch(result.content, /<html>/i)
+})
+
+test('owner Assistant mounts the recovery boundary only on dashboard/assistant and never auto-recovers AbortError', () => {
+  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
+  const layout = readFileSync(new URL('../app/dashboard/assistant/layout.tsx', import.meta.url), 'utf8')
+
+  assert.match(layout, /AssistantTransportBoundary/)
+  assert.match(boundary, /pathname === '\/api\/cos-primary'/)
+  assert.match(boundary, /sendAssistantTurnAndRecover/)
+  assert.match(boundary, /fetchImpl: originalFetch/)
+  assert.match(boundary, /historyUrl: `\/api\/assistant\/chats\?id=/)
+  assert.match(boundary, /shouldRecoverTransportFailure: error => !\(error instanceof DOMException && error\.name === 'AbortError'\)/)
+  assert.doesNotMatch(boundary, /window\.fetch\([^)]*\/api\/cos-primary/)
 })

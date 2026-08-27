@@ -3,6 +3,7 @@
 
 export const FRESH_SYNTHESIS_MAX_ATTEMPTS = 2
 export const FRESH_SYNTHESIS_DEFAULT_ATTEMPT_TIMEOUT_MS = 35_000
+export const FRESH_SYNTHESIS_TIMEOUT_NULL_GRACE_MS = 250
 const MIN_ATTEMPT_TIMEOUT_MS = 5_000
 const MAX_ATTEMPT_TIMEOUT_MS = 60_000
 
@@ -16,6 +17,20 @@ export function boundedFreshSynthesisAttemptTimeoutMs(
   const requested = Number.isFinite(configured) ? configured : FRESH_SYNTHESIS_DEFAULT_ATTEMPT_TIMEOUT_MS
   const bounded = Math.max(MIN_ATTEMPT_TIMEOUT_MS, Math.min(MAX_ATTEMPT_TIMEOUT_MS, requested))
   return Math.min(globalTimeoutMs, bounded)
+}
+
+// callLocalModel deliberately returns null for transport failures so legacy callers can fail softly.
+// Fresh-current synthesis needs one bounded retry on a transport timeout. When a null result consumes
+// essentially the entire per-attempt timeout, treat it as the swallowed AbortError observed in
+// Production rather than as a completed empty/HTTP failure. Fast nulls remain non-retryable.
+export function freshSynthesisNullIndicatesTimeout(
+  value: unknown,
+  elapsedMs: number,
+  attemptTimeoutMs: number,
+): boolean {
+  if (value !== null) return false
+  if (!Number.isFinite(elapsedMs) || !Number.isFinite(attemptTimeoutMs) || attemptTimeoutMs <= 0) return false
+  return elapsedMs >= Math.max(0, attemptTimeoutMs - FRESH_SYNTHESIS_TIMEOUT_NULL_GRACE_MS)
 }
 
 export async function runFreshSynthesisTransportAttempts<T>(

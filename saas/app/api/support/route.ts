@@ -1,5 +1,6 @@
 // saas/app/api/support/route.ts
 // Durable multi-turn provenance wrapper for the production support route.
+import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
@@ -28,6 +29,10 @@ type SupportMessage = { role?: 'user' | 'assistant' | 'system'; content?: string
 function conversationIdFrom(body: any): string | null {
   const value = String(body?.context?.conversationId || '')
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) ? value : null
+}
+
+function conversationIdForPersist(body: any): string {
+  return conversationIdFrom(body) || randomUUID()
 }
 
 function latestUserMessage(body: any): string {
@@ -119,12 +124,11 @@ async function persistResponseTurn(params: {
   source: string
 }) {
   const { conversationId, userId, userMessage, assistantReply, provenance, source } = params
-  if (!provenance) return
   if (source === 'anthropic-chief' || source === 'anthropic-concierge') {
     const attached = await attachRecordedTurnProvenance(conversationId, userId, assistantReply, provenance)
     if (attached) return
   }
-  await persistTurn({ conversationId, userId, userMessage, assistantReply, provenance })
+  await persistTurn({ conversationId, userId, userMessage, assistantReply, provenance: provenance ?? undefined })
 }
 
 async function directStrategyProfileResponse(body: any, prompt: string, isPrivileged: boolean): Promise<NextResponse | null> {
@@ -323,17 +327,15 @@ export async function POST(req: NextRequest) {
     const provenance = provenanceFromResponse(body, prompt, payload, isPrivileged)
     if (provenance) {
       await recordLatestUserTurnProvenance(userId, reply, provenance, source)
-      if (conversationId) {
-        await persistResponseTurn({
-          conversationId,
-          userId,
-          userMessage: prompt,
-          assistantReply: reply,
-          provenance,
-          source,
-        })
-      }
     }
+    await persistResponseTurn({
+      conversationId: conversationIdForPersist(body),
+      userId,
+      userMessage: prompt,
+      assistantReply: reply,
+      provenance,
+      source,
+    })
   } catch (error) {
     console.error('support provenance persistence failed (non-blocking)', error)
   }

@@ -8,7 +8,12 @@ type Status = {
   configured: boolean
   readOnly: boolean
   connectUrl: string
-  connection: { connected: boolean; expiresAt: string | null; lastError: string | null }
+  connection: {
+    connected: boolean
+    expiresAt: string | null
+    lastError: string | null
+    missingScopes: string[]
+  }
 }
 
 type Sheet = { id: string; name: string; modifiedTime: string | null; webViewLink: string | null }
@@ -85,6 +90,11 @@ export default function GoogleSheetsPage() {
 
       {!status ? <p className="sb-body">{t.loading}</p> : null}
       {status && !status.configured ? <div className="sb-card" style={{ padding: 16 }}>{t.notConfigured}</div> : null}
+      {status?.configured && status.connection.missingScopes?.length ? (
+        <div className="sb-card" style={{ padding: 16, marginBottom: 12 }}>
+          <p className="sb-body" style={{ margin: 0 }}>{t.missingPermissions}</p>
+        </div>
+      ) : null}
       {status?.configured && !status.connection.connected ? <a className="sb-button-primary" href={status.connectUrl}>{t.connect}</a> : null}
       {status?.connection.connected ? (
         <div className="sb-card" style={{ padding: 16, marginTop: 16 }}>

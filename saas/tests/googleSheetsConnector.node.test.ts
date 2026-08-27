@@ -16,6 +16,23 @@ test('Google Workspace OAuth requests only read-only Sheets and Drive metadata s
   assert.match(oauth, /https:\/\/oauth2\.googleapis\.com\/token/)
 })
 
+test('Google Workspace OAuth and token storage fail closed when Google grants only a subset of required read-only scopes', () => {
+  const oauth = read('../lib/google-workspace/oauth.ts')
+  const store = read('../lib/google-workspace/token-store.ts')
+  const page = read('../app/dashboard/google-sheets/page.tsx')
+  const copy = read('../lib/i18n/googleSheetsCopy.ts')
+  assert.match(oauth, /missingGoogleWorkspaceScopes/)
+  assert.match(oauth, /scopes: String\(payload\?\.scope \|\| ''\)/)
+  assert.doesNotMatch(oauth, /payload\?\.scope \|\| GOOGLE_WORKSPACE_SCOPES\.join/)
+  assert.match(store, /missingGoogleWorkspaceScopes\(grantedScopes\)/)
+  assert.match(store, /connected: missingScopes\.length === 0/)
+  assert.match(store, /missing required read-only permissions/)
+  assert.match(store, /const refreshedScopes = refreshed\.scopes\.length \? refreshed\.scopes : rowScopes/)
+  assert.match(page, /status\.connection\.missingScopes\?\.length/)
+  assert.match(page, /t\.missingPermissions/)
+  assert.match(copy, /missingPermissions:/)
+})
+
 test('Google connection tokens are encrypted with the existing Vault key and never stored in plaintext token columns', () => {
   const store = read('../lib/google-workspace/token-store.ts')
   const migration = read('../supabase/migrations/20260827000802_google_workspace_connections.sql')

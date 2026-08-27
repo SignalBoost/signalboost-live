@@ -8,6 +8,7 @@ import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/l
 import { generateDynamicKnowledgeGaps } from '@/lib/cos-core/layers/learning/dynamicGaps'
 import { autopsyGaps } from '@/lib/ai/cos/learningGapAutopsy'
 import { loadCosCurriculumSignals, curriculumTrackStudyGaps } from '@/lib/ai/cos/cosCurriculumPriority'
+import { isOperationalSystemsGap } from '@/lib/ai/cos/operationalSystemsLearning'
 import { FOUNDATIONAL_KNOWLEDGE_DOMAINS, nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { roboticsPhysicsCurriculum } from './roboticsPhysicsCurriculum.ts'
 import type { MiningRunSummary } from './mining/types.ts'
@@ -108,14 +109,6 @@ export function recurringTechnologyCurriculum(): KnowledgeGap[] {
     ['distributed-systems', 'Distributed systems architecture', 'What current patterns and failure modes matter for queues, caches, concurrency control, backpressure, rate limiting, sharding, consistency, retries, and tail latency?', 86],
     ['cybersecurity', 'Enterprise cybersecurity', 'What current defensive security, identity, authorization, supply-chain, cloud, container, and AI-agent security practices should enterprise software reason about?', 84],
     ['ai-agent-engineering', 'AI agents and local inference', 'What current techniques improve autonomous agents, retrieval quality, memory, provenance, semantic caching, local open-model inference, evaluation, and safe tool execution?', 83],
-    // BUSINESS AND REVENUE DOMAINS — added 2026-08-23. The curriculum was eight infrastructure
-    // topics with zero business coverage, even though 'business strategy enterprise SaaS economics
-    // operations' and 'B2B enterprise sales marketing revenue operations' are both already
-    // permitted study domains in FOUNDATIONAL_KNOWLEDGE_DOMAINS. The result was a corpus that grew
-    // steadily (155 of 225 items scientific journals) while citing ~0 of it on real questions,
-    // because real questions are about campaigns, positioning, pricing and operations — not
-    // Kubernetes. These are ranked above generic tech news deliberately: acquisition should follow
-    // demand, and demand here is commercial.
     ['saas-business-strategy', 'business strategy enterprise SaaS economics operations', 'What durable principles govern enterprise SaaS pricing, unit economics, retention, procurement, security review, buyer control, ROI demonstration, and adoption — and what current evidence supports them?', 91],
     ['b2b-revenue-operations', 'B2B enterprise sales marketing revenue operations', 'What evidence-based practices improve B2B prospecting, qualification, outreach, positioning, campaign measurement, marketing attribution, lifecycle messaging, pipeline conversion, and retention?', 89],
     ['enterprise-tech-news', 'Enterprise technology developments', 'What recent developments in enterprise software, databases, cloud infrastructure, DevOps, SRE, cybersecurity, and AI materially change engineering practice?', 78],
@@ -189,21 +182,6 @@ async function runLearningCycleWithTelemetry(
   return result
 }
 
-/**
- * Which queued gaps are worth STUDYING.
- *
- * `subject` is the grouping key for the whole learning loop and the search anchor every source
- * adapter uses, so it decides what acquisition goes looking for. Production data on 2026-08-17
- * showed what happens when anything is allowed through: "worse president times",
- * "show components relationships" and "computer vision subfield" were stored as durable corpus
- * subjects and re-studied daily — chat fragments sent to journal APIs as research queries.
- *
- * The bounded problem-class taxonomy (cosProblemClass) is the right key for CAPABILITY tracking —
- * "opinion and judgment", "writing and content", "cos self description" are real classes — but they
- * are not research topics, and searching journals for them returns noise. Only a foundational study
- * domain is a legitimate acquisition target, so that is the bar here. Gaps that fail it still exist
- * as capability signal; they simply are not sent to source adapters.
- */
 const STUDYABLE_GAP_SUBJECTS: ReadonlySet<string> = new Set(
   FOUNDATIONAL_KNOWLEDGE_DOMAINS.map(domain => domain.subject.toLowerCase()),
 )
@@ -212,11 +190,6 @@ export function isStudyableGapSubject(subject: string): boolean {
   return STUDYABLE_GAP_SUBJECTS.has(String(subject ?? '').replace(/\s+/g, ' ').trim().toLowerCase())
 }
 
-/**
- * Re-anchor a queued gap onto a real study domain rather than trusting the stored subject string.
- * Returns null when neither the subject nor its own question maps to a study domain, so the caller
- * drops the gap instead of turning a chat fragment into an acquisition query.
- */
 export function normalizeQueuedGapSubject(subject: string, question: string): string | null {
   const stored = String(subject ?? '').replace(/\s+/g, ' ').trim()
   if (isStudyableGapSubject(stored)) return stored
@@ -226,14 +199,22 @@ export function normalizeQueuedGapSubject(subject: string, question: string): st
 }
 
 /**
- * Dynamic corpus gaps are also acquisition targets.  They must cross the same bounded-subject
- * boundary as queued gaps; otherwise a fragment already present in the corpus can bypass the
- * queue hygiene and become tomorrow's search query and accepted subject.
+ * Dynamic gaps normally cross the same bounded-subject hygiene as queued gaps. The only exception
+ * is the deterministic owner-directed operational curriculum: its ID and safety evidence are both
+ * required, so arbitrary chat fragments cannot use this path to become acquisition queries.
  */
 export function normalizeDynamicStudyGaps(gaps: KnowledgeGap[]): KnowledgeGap[] {
   const seen = new Set<string>()
   const normalized: KnowledgeGap[] = []
   for (const gap of gaps) {
+    if (isOperationalSystemsGap(gap)) {
+      const key = `${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      normalized.push(gap)
+      continue
+    }
+
     const subject = normalizeQueuedGapSubject(gap.subject, gap.question)
     if (!subject) continue
     const key = `${subject.toLowerCase()}::${gap.question.toLowerCase()}`
@@ -242,8 +223,6 @@ export function normalizeDynamicStudyGaps(gaps: KnowledgeGap[]): KnowledgeGap[] 
     normalized.push(subject === gap.subject ? gap : {
       ...gap,
       subject,
-      // Adapters build their external query from subject + question. Do not carry the unbounded
-      // corpus fragment into that query after it has been re-anchored.
       question: `What current, verifiable evidence is relevant to ${subject}?`,
       evidence: [...(gap.evidence ?? []), `reanchored_from_subject=${String(gap.subject).slice(0, 180)}`],
     })
@@ -251,10 +230,6 @@ export function normalizeDynamicStudyGaps(gaps: KnowledgeGap[]): KnowledgeGap[] 
   return normalized
 }
 
-/**
- * A gap is only resolved when its own subject produced admitted evidence. Marking every queued gap
- * resolved because the cycle accepted something somewhere closes gaps that were never answered.
- */
 export function queuedGapResolution(subject: string, acceptedSubjects: string[]): 'resolved' | 'failed' {
   const value = String(subject ?? '').trim().toLowerCase()
   return acceptedSubjects.some(accepted => String(accepted ?? '').trim().toLowerCase() === value) ? 'resolved' : 'failed'
@@ -277,9 +252,6 @@ async function loadQueuedReasoningGaps(): Promise<{ ids: string[]; signals: Know
     }
     if (dropped.length) {
       console.warn('[cos-learning-gap-subject-unstudyable]', JSON.stringify({ dropped: dropped.length, examples: dropped.slice(0, 5) }))
-      // Take them out of the study window so a fragment cannot occupy a slot every cycle forever.
-      // Best-effort: if the 'unstudyable' status migration has not been applied yet the update is
-      // rejected and swallowed, and the gap is still correctly skipped for this cycle.
       try { await db.from('cos_learning_gaps').update({ status: 'unstudyable', last_seen_at: new Date().toISOString() }).in('id', droppedIds) } catch {}
     }
     return {
@@ -301,6 +273,7 @@ async function loadQueuedReasoningGaps(): Promise<{ ids: string[]; signals: Know
     return { ids: [], signals: [] }
   }
 }
+
 async function markQueuedReasoningGaps(
   queued: Array<{ id: string; subject: string }>,
   acceptedSubjects: string[],
@@ -317,20 +290,11 @@ async function markQueuedReasoningGaps(
     }
     if (failedIds.length) {
       await db.from('cos_learning_gaps').update({ status: 'failed', resolved_at: null, last_seen_at: now }).in('id', failedIds)
-      // Record WHY, then decide whether this gap is still worth a study slot. Without this the same
-      // gap is re-selected every cycle forever with no memory of its own history.
       await recordGapFailuresAndAutopsy(db, failedIds, now)
     }
   } catch {}
 }
 
-/**
- * Append this cycle's failure to each gap's history and retire the ones the autopsy calls terminal.
- *
- * Best-effort throughout: if the autopsy migration has not been applied yet, the reads and writes
- * fail and are swallowed, and the gap simply behaves as it did before — retried next cycle. A
- * learning-hygiene improvement must never be able to break the learning cycle itself.
- */
 async function recordGapFailuresAndAutopsy(db: any, failedIds: string[], now: string): Promise<void> {
   try {
     const { data, error } = await db
@@ -356,7 +320,6 @@ async function recordGapFailuresAndAutopsy(db: any, failedIds: string[], now: st
     for (const row of data as any[]) {
       const finding = findings.retry.concat(findings.terminal).find(entry => entry.gapId === String(row.id))
       if (!finding) continue
-      // Bounded history: the dominant reason is what the verdict rests on, not the full transcript.
       const attempts = [
         ...(Array.isArray(row.failure_attempts) ? row.failure_attempts : []),
         { reason: String(row.escalation_reason || 'acquisition produced no accepted evidence').slice(0, 200), at: now },
@@ -368,7 +331,6 @@ async function recordGapFailuresAndAutopsy(db: any, failedIds: string[], now: st
         last_seen_at: now,
       }
       if (finding.terminal) {
-        // Retired, never deleted — the gap stays as capability signal.
         update.status = 'retired'
         update.autopsy_verdict = finding.verdict
         update.autopsy_rationale = finding.rationale.slice(0, 1000)
@@ -401,28 +363,17 @@ export async function runDailyAutonomousLearning(input: {
   telemetry?: ContinuousLearningTelemetrySink
   approvedUrls?: string[]
   gapSignals?: KnowledgeGapSignal[]
+  injectedGapSignals?: KnowledgeGapSignal[]
 }): Promise<DailyLearningResult> {
   const readiness = autonomousLearningReadiness()
   if (!autonomousLearningIsExplicitlyEnabled()) {
     console.warn('[cos-daily-learning-skipped]', JSON.stringify(readiness))
     return {
-      status: 'skipped',
-      skipReason: 'autonomous_learning_disabled',
-      approvedUrls: readiness.approvedUrls,
-      autonomousGaps: 0,
-      curriculumGaps: 0,
-      corpusExpansionGaps: 0,
-      trackStudyGaps: 0,
-      weaknessCurriculumSignals: 0,
-      retainedKnowledge: 0,
-      liveSourceAdapters: readiness.liveAdapters,
-      gapsConsidered: 0,
-      documentsAcquired: 0,
-      accepted: 0,
-      probationary: 0,
-      rejected: {},
-      sourceErrors: {},
-      externalCostUsd: 0,
+      status: 'skipped', skipReason: 'autonomous_learning_disabled', approvedUrls: readiness.approvedUrls,
+      autonomousGaps: 0, curriculumGaps: 0, corpusExpansionGaps: 0, trackStudyGaps: 0,
+      weaknessCurriculumSignals: 0, retainedKnowledge: 0, liveSourceAdapters: readiness.liveAdapters,
+      gapsConsidered: 0, documentsAcquired: 0, accepted: 0, probationary: 0,
+      rejected: {}, sourceErrors: {}, externalCostUsd: 0,
     }
   }
 
@@ -430,48 +381,26 @@ export async function runDailyAutonomousLearning(input: {
   if (!persistentStore) {
     console.warn('[cos-daily-learning-skipped]', JSON.stringify({ ...readiness, reason: 'persistent_store_unavailable' }))
     return {
-      status: 'skipped',
-      skipReason: 'persistent_store_unavailable',
-      approvedUrls: readiness.approvedUrls,
-      autonomousGaps: 0,
-      curriculumGaps: 0,
-      corpusExpansionGaps: 0,
-      trackStudyGaps: 0,
-      weaknessCurriculumSignals: 0,
-      retainedKnowledge: 0,
-      liveSourceAdapters: readiness.liveAdapters,
-      gapsConsidered: 0,
-      documentsAcquired: 0,
-      accepted: 0,
-      probationary: 0,
-      rejected: {},
-      sourceErrors: {},
-      externalCostUsd: 0,
+      status: 'skipped', skipReason: 'persistent_store_unavailable', approvedUrls: readiness.approvedUrls,
+      autonomousGaps: 0, curriculumGaps: 0, corpusExpansionGaps: 0, trackStudyGaps: 0,
+      weaknessCurriculumSignals: 0, retainedKnowledge: 0, liveSourceAdapters: readiness.liveAdapters,
+      gapsConsidered: 0, documentsAcquired: 0, accepted: 0, probationary: 0,
+      rejected: {}, sourceErrors: {}, externalCostUsd: 0,
     }
   }
 
   const queued = input.gapSignals ? { ids: [], signals: input.gapSignals } : await loadQueuedReasoningGaps()
   const approvedUrls = input.approvedUrls ?? parseApprovedLearningUrls()
   const reasoningGaps = generateKnowledgeGaps(queued.signals)
-  // What COS is measurably worst at on real work outranks what its corpus is merely thin about.
   const weaknessCurriculumSignals = await loadCosCurriculumSignals()
-  const dynamic = await generateDynamicKnowledgeGaps(12, weaknessCurriculumSignals)
+  const injectedGapSignals = input.injectedGapSignals ?? []
+  const dynamic = await generateDynamicKnowledgeGaps(12, [...weaknessCurriculumSignals, ...injectedGapSignals])
   const normalizedDynamicGaps = normalizeDynamicStudyGaps(dynamic.gaps)
   const reasoningKeys = new Set(reasoningGaps.map(gap => `${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const corpusExpansionGaps = normalizedDynamicGaps.filter(gap => !reasoningKeys.has(`${gap.subject.toLowerCase()}::${gap.question.toLowerCase()}`))
   const autonomousGaps = [...reasoningGaps, ...corpusExpansionGaps].slice(0, 12)
-  // The declared curriculum tracks are studied too, not merely stored: a bounded, rotating slice of
-  // track topics enters the same acquisition/admission cycle as every other gap, weakest tracks first.
-  const trackStudy = curriculumTrackStudyGaps({
-    prioritySubjects: weaknessCurriculumSignals.map(signal => signal.subject),
-  })
+  const trackStudy = curriculumTrackStudyGaps({ prioritySubjects: weaknessCurriculumSignals.map(signal => signal.subject) })
   const curriculum = [...recurringTechnologyCurriculum(), ...roboticsPhysicsCurriculum(), ...trackStudy]
-  // ORDER IS THE POLICY. Acquisition budget is finite (maxCandidatesPerCycle), and whatever sits
-  // first consumes it. The fixed curriculum used to lead, so a static list of infra topics spent
-  // the budget every cycle while `autonomousGaps` — built from the questions COS actually FAILED
-  // on real work, ranked by how often they repeated — trailed behind and frequently never ran.
-  // That is precisely backwards: demand should outrank a hardcoded syllabus. Real observed gaps
-  // now lead, the curriculum fills whatever budget remains (2026-08-23).
   const gaps = [miningGap(input.miningSummary), ...autonomousGaps, ...curriculum]
   const liveAdapters = createLiveLearningAdapters()
   const adapters = [
@@ -488,6 +417,8 @@ export async function runDailyAutonomousLearning(input: {
     corpusExpansionGaps: corpusExpansionGaps.length,
     weaknessCurriculumSignals: weaknessCurriculumSignals.length,
     weaknessCurriculumSubjects: weaknessCurriculumSignals.map(signal => signal.subject),
+    injectedGapSignals: injectedGapSignals.length,
+    injectedGapSubjects: injectedGapSignals.map(signal => signal.subject),
     retainedKnowledge: dynamic.retained,
     curriculumGaps: curriculum.length,
     trackStudyGaps: trackStudy.length,

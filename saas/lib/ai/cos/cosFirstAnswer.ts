@@ -579,35 +579,48 @@ async function tryLiveNamedCatalog(input: {
   let anySearchOk = false
   let lastError = 'no results'
 
-  // Iterate the query plan, reading pages and harvesting unique names, until we
-  // reach the requested count or exhaust the plan. Never stop at the first
-  // snapshot, and never pad with invented names.
-  for (const query of queryPlan) {
-    if (names.length >= targetCount) break
-    const live = await getExternalInfo(query, 10, { bypassCache: true })
-    if (!live.ok || !live.results.length) {
-      lastError = live.error || lastError
-      continue
+  const sambaCatalog = isPublicPageExtractionCatalogRequest(asked)
+  if (sambaCatalog) {
+    // For this catalog, a search engine only discovers the authority; it must never
+    // become a competing data source. Extract strictly from Liga-SP's own roster page.
+    const canonicalUrl = 'https://ligasp.com.br/ligasp/'
+    const pages = await readPublicPages([canonicalUrl]).catch(() => [])
+    anySearchOk = pages.length > 0
+    if (anySearchOk) {
+      usedSources.push(canonicalUrl)
+      for (const name of extractSambaSchoolNames(pages)) {
+        const key = name.toLowerCase()
+        if (!seen.has(key)) { seen.add(key); names.push(name) }
+      }
+    } else {
+      lastError = 'official Liga-SP roster page could not be read'
     }
-    anySearchOk = true
-    for (const url of live.results.map(r => r.url).filter(Boolean)) {
-      if (!usedSources.includes(url)) usedSources.push(url)
-    }
-    const pageUrls = live.results.map(r => r.url)
-    // The official group roster can occur below general page navigation. Read the
-    // canonical publisher page as source material, not merely a search-result snippet.
-    if (isPublicPageExtractionCatalogRequest(asked)) pageUrls.unshift('https://ligasp.com.br/ligasp/')
-    const pages = await readPublicPages(pageUrls).catch(() => [])
-    const harvested = (isPublicPageExtractionCatalogRequest(asked) ? extractSambaSchoolNames : harvestCatalogNames)([
-      ...live.results,
-      ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
-    ])
-    for (const name of harvested) {
-      const key = name.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      names.push(name)
+  } else {
+    // Iterate the query plan, reading pages and harvesting unique names, until we
+    // reach the requested count or exhaust the plan. Never pad with invented names.
+    for (const query of queryPlan) {
       if (names.length >= targetCount) break
+      const live = await getExternalInfo(query, 10, { bypassCache: true })
+      if (!live.ok || !live.results.length) {
+        lastError = live.error || lastError
+        continue
+      }
+      anySearchOk = true
+      for (const url of live.results.map(r => r.url).filter(Boolean)) {
+        if (!usedSources.includes(url)) usedSources.push(url)
+      }
+      const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
+      const harvested = harvestCatalogNames([
+        ...live.results,
+        ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
+      ])
+      for (const name of harvested) {
+        const key = name.toLowerCase()
+        if (seen.has(key)) continue
+        seen.add(key)
+        names.push(name)
+        if (names.length >= targetCount) break
+      }
     }
   }
 
@@ -650,8 +663,15 @@ async function tryLiveNamedCatalog(input: {
     reply,
     confidence: finalNames.length >= targetCount ? 0.72 : 0.66,
     provenance: {
-      responseSource: 'cos_local_primary',
-      catalogLiveSearch: true,
+      responseSource: sambaCatalog ? 'catalog_public_page_extraction' : 'cos_local_primary',
+      catalogLiveSearch: !sambaCatalog,
+      autonomousResearchAttempted: true,
+      localModelInvoked: false,
+      researchDocumentsAcquired: usedSources.length,
+      liveExternalEvidence: {
+        retrievedAt: new Date().toISOString(),
+        sources: usedSources.map((url, index) => ({ id: `LIVE${index + 1}`, title: sambaCatalog ? 'Liga-SP — Escolas de Samba' : url, url })),
+      },
       liveSources: usedSources.slice(0, 10),
       harvestedNameCount: finalNames.length,
       requestedCount: targetCount,

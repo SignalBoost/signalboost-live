@@ -482,19 +482,32 @@ async function tryPublicStatelessAnswer(input: {
 }
 
 
-function harvestSambaSchoolNames(results: Array<{ title?: string; snippet?: string }>): string[] {
-  const deny = /^(?:grupo especial|grupo de acesso|escolas de samba|carnaval(?: sp)?|liga-?sp|liga independente|são paulo|sao paulo|classificação final|mapa de notas|veja|confira|notícias?|resultados?)$/i
+export function extractSambaSchoolNames(results: Array<{ title?: string; snippet?: string }>): string[] {
+  const deny = /^(?:grupo especial|grupo de acesso|escolas de samba|carnaval(?: sp)?|liga-?sp|liga independente|são paulo|sao paulo|classificação final|mapa de notas|veja|confira|notícias?|resultados?|abertura(?::|$)|sexta-feira|sábado|domingo)$/i
   const found: string[] = []
   const seen = new Set<string>()
-  for (const raw of results.flatMap(result => [result.title, result.snippet]).filter(Boolean).flatMap(text => String(text).split(/\n|[•|]/))) {
-    const name = raw.replace(/\s+/g, ' ').replace(/^[-–—\d.)\s]+/, '').replace(/[.,;:]+$/, '').trim()
-    const words = name.split(' ').filter(Boolean)
-    if (name.length < 5 || name.length > 60 || deny.test(name)) continue
-    if (/\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso)\b/i.test(name)) continue
-    if (words.length < 2 && !/-/.test(name)) continue
-    if (!/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(name)) continue
-    const key = name.toLocaleLowerCase('pt-BR')
-    if (!seen.has(key)) { seen.add(key); found.push(name) }
+
+  for (const result of results) {
+    const lines = [result.title, result.snippet]
+      .filter(Boolean)
+      .flatMap(text => String(text).split(/\n|[•|]/))
+      .map(line => line.replace(/\s+/g, ' ').replace(/^[-–—\d.)\s]+/, '').replace(/[.,;:]+$/, '').trim())
+      .filter(Boolean)
+
+    // A school name is admissible only inside the publisher's explicit Grupo Especial
+    // section. Navigation, date, parade-order, and page-chrome text is never evidence.
+    const sectionStart = lines.findIndex(line => /^grupo especial$/i.test(line))
+    if (sectionStart < 0) continue
+    const sectionEnd = lines.findIndex((line, index) => index > sectionStart && /^grupo de acesso/i.test(line))
+    for (const name of lines.slice(sectionStart + 1, sectionEnd < 0 ? undefined : sectionEnd)) {
+      const words = name.split(' ').filter(Boolean)
+      if (name.length < 5 || name.length > 60 || deny.test(name)) continue
+      if (/\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso|datas?|horários?|sambódromo|conteúdo|facebook|história|trabalho|pode|não pode|desfile)\b/i.test(name)) continue
+      if (words.length < 2 && !/-/.test(name)) continue
+      if (!/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(name)) continue
+      const key = name.toLocaleLowerCase('pt-BR')
+      if (!seen.has(key)) { seen.add(key); found.push(name) }
+    }
   }
   return found
 }
@@ -610,8 +623,12 @@ async function tryLiveNamedCatalog(input: {
     for (const url of live.results.map(r => r.url).filter(Boolean)) {
       if (!usedSources.includes(url)) usedSources.push(url)
     }
-    const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
-    const harvested = (isPublicPageExtractionCatalogRequest(asked) ? harvestSambaSchoolNames : harvestCatalogNames)([
+    const pageUrls = live.results.map(r => r.url)
+    // The official group roster can occur below general page navigation. Read the
+    // canonical publisher page as source material, not merely a search-result snippet.
+    if (isPublicPageExtractionCatalogRequest(asked)) pageUrls.unshift('https://ligasp.com.br/ligasp/')
+    const pages = await readPublicPages(pageUrls).catch(() => [])
+    const harvested = (isPublicPageExtractionCatalogRequest(asked) ? extractSambaSchoolNames : harvestCatalogNames)([
       ...live.results,
       ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
     ])

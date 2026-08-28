@@ -4,6 +4,7 @@ import {
   bodyWithFreshEvidence,
   freshEvidenceMeetsAuthority,
   freshEvidenceSearchQuery,
+  freshEvidenceSearchQueries,
   prepareFreshEvidence,
   replyCitesFreshEvidence,
   replyCitesIndependentFreshEvidence,
@@ -180,4 +181,15 @@ test('compound current-office request searches the current-holder clause before 
   )
   assert.match(query, /current US secretary of State official authoritative current/i)
   assert.doesNotMatch(query, /past 20 years/i)
+})
+
+
+test('compound current-office and history requests receive separate live queries', () => {
+  const queries = freshEvidenceSearchQueries(
+    'who is the current US secretary of State and give me a list of the past secretary of state for the past 20 years',
+    new Date('2026-08-28T00:00:00.000Z'),
+  )
+  assert.equal(queries.length, 2)
+  assert.match(queries[0], /current US secretary of State/i)
+  assert.match(queries[1], /former secretary of State official history list/i)
 })

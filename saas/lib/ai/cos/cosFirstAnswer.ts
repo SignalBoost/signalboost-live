@@ -481,6 +481,25 @@ async function tryPublicStatelessAnswer(input: {
 }
 
 
+function harvestCatalogNames(results: Array<{ title?: string; snippet?: string }>): string[] {
+  const found: string[] = []
+  const seen = new Set<string>()
+  const skip = /^(várzeapédia|varzeapedia|netshoes|appito|wikipédia|wikipedia|futliga|liga|copa|são paulo|sao paulo|conheça|arquivos)$/i
+  const text = results.map(r => `${r.title || ''} ${r.snippet || ''}`).join(' • ')
+  const matches = text.match(/[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{2,}(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{1,}){0,5}/g) || []
+  for (const raw of matches) {
+    const name = raw.replace(/\s+/g, ' ').trim()
+    const key = name.toLowerCase()
+    if (name.length < 5 || name.length > 60) continue
+    if (skip.test(name) || seen.has(key)) continue
+    if (/página|enciclopédia|snapshot|query|https?:/i.test(name)) continue
+    seen.add(key)
+    found.push(name)
+    if (found.length >= 50) break
+  }
+  return found
+}
+
 async function tryLiveNamedCatalog(input: {
   prompt: string
   language?: string
@@ -491,38 +510,51 @@ async function tryLiveNamedCatalog(input: {
     ? 'lista times futebol varzea amador Sao Paulo liga bairro'
     : asked
   const live = await getExternalInfo(searchQuery, 10, { bypassCache: true })
-  if (live.ok && live.results.length) {
-    const lines = live.results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`)
-    const reply = [
-      'Live web snapshot (Brave search). Not an official Prefeitura roll.',
-      `Query: ${searchQuery}`,
-      '',
-      ...lines,
-      '',
-      'COS listed the pages that came back. Names must be taken from those snippets and titles. Pages that do not name 50 clubs cannot be padded from memory.',
-    ].join('\n')
+  if (!live.ok || !live.results.length) {
+    const reason = live.error || 'no results'
     return {
       handled: true,
-      reply,
-      confidence: 0.7,
-      provenance: {
-        responseSource: 'cos_local_primary',
-        catalogLiveSearch: true,
-        liveSources: live.results.map(r => r.url).slice(0, 10),
-      } as any,
+      reply: `Live web search ran and returned nothing usable. Error: ${reason}. COS will not invent club names.`,
+      confidence: 0.55,
+      provenance: { responseSource: 'cos_local_primary', catalogLiveSearchFailed: true, catalogLiveSearchError: reason } as any,
     }
   }
-  const reason = live.error || 'no results'
-  const reply = `Live web search ran and returned nothing usable. Error: ${reason}. COS will not invent club names.`
+
+  const evidence = formatExternalInfoForAI(searchQuery, live.results)
+  const harvested = harvestCatalogNames(live.results)
+  const reasoner = await callCosReasoner({
+    temperature: 0.1,
+    maxTokens: 1800,
+    systemPrompt: 'You extract named amateur/várzea football clubs from the live evidence only. Return a numbered list. One club per line. Use only names that appear in the evidence. If fewer than 50 names appear, list only those and say the count. Never pad with professional first teams. After the list, cite the source URLs.',
+    prompt: `REQUEST:\n${asked}\n\nEVIDENCE:\n${evidence}\n\nNAMES ALREADY SEEN IN SNIPPETS:\n${harvested.join('; ')}`,
+  }).catch(() => null)
+  const parsed = reasoner?.text ? parseLocalResult(reasoner.text) : null
+  const synthesized = parsed?.answer?.trim() || ''
+  const usable = synthesized && !/could not stand behind|did not release an answer|primary source on the subject/i.test(synthesized)
+
+  const fallbackList = harvested.length
+    ? harvested.map((name, i) => `${i + 1}. ${name}`).join('\n')
+    : ''
+  const sources = live.results.map(r => r.url).filter(Boolean)
+  const reply = usable
+    ? synthesized
+    : [
+        `Live web snapshot. ${harvested.length} names appeared in the retrieved snippets (not padded to 50).`,
+        fallbackList,
+        '',
+        'Sources:',
+        ...sources.map(url => `- ${url}`),
+      ].filter(Boolean).join('\n')
+
   return {
     handled: true,
     reply,
-    confidence: 0.55,
+    confidence: usable ? Math.max(0.64, Number(parsed?.confidence || 0.68)) : 0.66,
     provenance: {
       responseSource: 'cos_local_primary',
       catalogLiveSearch: true,
-      catalogLiveSearchFailed: true,
-      catalogLiveSearchError: reason,
+      liveSources: sources.slice(0, 10),
+      harvestedNameCount: harvested.length,
     } as any,
   }
 }

@@ -720,7 +720,22 @@ export async function tryCOSFirstAnswer(input: {
   }
 
   if (isPublicDeliveryScope()) {
-    return learnFromTurn(input, await tryPublicStatelessAnswer(input))
+    // ONE BRAIN. Concierge is a render window. Company-reserved and identity
+    // questions stay on the public-safe prompt. Everything else is the same COS
+    // enterprise answer, with disclosure stripped if internals leaked.
+    if (asksAboutServiceIdentity(input.prompt) || isSignalBoostSpecificPublicRequest(input.prompt)) {
+      return learnFromTurn(input, await tryPublicStatelessAnswer(input))
+    }
+    const brain = await tryEnterpriseCOSFirstAnswer(input)
+    if (brain.handled && 'reply' in brain && brain.reply && publicDisclosureViolations(String(brain.reply)).length) {
+      return learnFromTurn(input, {
+        ...brain,
+        reply: publicImplementationDisclosureReply(input.language),
+        confidence: Math.min(brain.confidence, 0.6),
+        provenance: { ...(brain.provenance as Record<string, unknown>), publicDisclosureStripped: true } as any,
+      })
+    }
+    return learnFromTurn(input, brain)
   }
 
   if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {

@@ -1,3 +1,7 @@
+PATH: saas/lib/ai/cos/cosFreshnessPolicy.ts
+ACTION: REPLACE this file on GitHub. Paste everything BELOW the dashed line. Do not paste the PATH line.
+
+--------------------------------------------------------------------------------
 // saas/lib/ai/cos/cosFreshnessPolicy.ts
 // Policy for deciding when pretrained/local knowledge is not sufficient because
 // the answer can change without a code or model update.
@@ -11,6 +15,7 @@ import { isContentGenerationRequest } from './contentGenerationIntent.ts'
 import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
 import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
 import { detectAdvisoryDiagnosisIntent } from './advisoryDiagnosisIntent.ts'
+import { isNamedCatalogListRequest } from './listCatalogIntent.ts'
 
 const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
 
@@ -201,6 +206,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   // Advisory diagnosis / method briefs and "which files were injected?"
   // are not live current-fact lookups.
   if (detectAdvisoryDiagnosisIntent(input).suppressFreshnessAbort) return false
+  if (isNamedCatalogListRequest(input)) return false
   if (HISTORICAL_ANCHOR.test(text)) return false
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false

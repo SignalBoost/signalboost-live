@@ -48,3 +48,12 @@ test('samba extractor accepts only names under the publisher Grupo Especial sect
   }])
   assert.deepEqual(names, ['Mocidade Alegre', 'Gaviões da Fiel', 'Vai-Vai'])
 })
+
+
+test('samba parade-order page without the next group boundary supplies no catalog names', () => {
+  const names = extractSambaSchoolNames([{
+    title: 'Schedule',
+    snippet: ['Grupo Especial', 'Pérola Negra', 'Vai-Vai', 'Abertura: Afoxé Omo Dadá'].join('\n'),
+  }])
+  assert.deepEqual(names, [])
+})

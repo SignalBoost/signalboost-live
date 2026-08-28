@@ -9,7 +9,7 @@ test.describe('Reviews module responsive SaaS page', () => {
       await page.addInitScript((lang) => localStorage.setItem('signalboost_language', lang as string), locale)
       await page.goto('/dashboard/reviews')
 
-      await expect(page.getByRole('heading', { name: /Review collector|Recolector|Colector|Central|Centrum|Центр/i })).toBeVisible()
+      await expect(page.getByRole('heading', { name: /Review collector|Recolector|Coletor|Kolektor|Сборщик/i })).toBeVisible()
       await expect(page.getByRole('region', { name: /Review filters and sorting/i })).toBeVisible()
       await expect(page.locator('.sb-review-alert').getByText(guestNotice)).toBeVisible()
       await expect(page.getByLabel(/Admin Console reviews telemetry/i)).toHaveCount(0)

@@ -50,7 +50,10 @@ export function extractSambaSchoolNames(results: Array<{ title?: string; snippet
     const sectionStart = lines.findIndex(line => /^grupo especial$/i.test(line))
     if (sectionStart < 0) continue
     const sectionEnd = lines.findIndex((line, index) => index > sectionStart && /^grupo de acesso/i.test(line))
-    for (const name of lines.slice(sectionStart + 1, sectionEnd < 0 ? undefined : sectionEnd)) {
+    // A parade-order page may name one group but does not define its complete roster.
+    // Require the publisher's next group boundary before accepting any catalog names.
+    if (sectionEnd < 0) continue
+    for (const name of lines.slice(sectionStart + 1, sectionEnd)) {
       const words = name.split(' ').filter(Boolean)
       if (name.length < 5 || name.length > 60 || deny.test(name)) continue
       if (/\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso|datas?|horários?|sambódromo|conteúdo|facebook|história|trabalho|pode|não pode|desfile)\b/i.test(name)) continue

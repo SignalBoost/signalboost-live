@@ -590,19 +590,28 @@ async function tryLiveNamedCatalog(input: {
       continue
     }
     anySearchOk = true
-    for (const url of live.results.map(r => r.url).filter(Boolean)) {
-      if (!usedSources.includes(url)) usedSources.push(url)
+    const sambaCatalog = isPublicPageExtractionCatalogRequest(asked)
+    if (!sambaCatalog) {
+      for (const url of live.results.map(r => r.url).filter(Boolean)) {
+        if (!usedSources.includes(url)) usedSources.push(url)
+      }
     }
     // Research each returned public page and admit only pages whose extracted structure
     // proves they contain the complete requested group. No source URL is hard-coded.
     const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
-    const sambaCatalog = isPublicPageExtractionCatalogRequest(asked)
-    const harvested = sambaCatalog
-      ? extractSambaSchoolNames(pages)
-      : harvestCatalogNames([
-          ...live.results,
-          ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
-        ])
+    let harvested: string[]
+    if (sambaCatalog) {
+      const sourcePage = pages.find(page => extractSambaSchoolNames([page]).length > 0)
+      harvested = sourcePage ? extractSambaSchoolNames([sourcePage]) : []
+      // Provenance names the exact page that supplied the answer, not every page
+      // inspected during research.
+      if (sourcePage?.url) usedSources.push(sourcePage.url)
+    } else {
+      harvested = harvestCatalogNames([
+        ...live.results,
+        ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
+      ])
+    }
     for (const name of harvested) {
       const key = name.toLowerCase()
       if (seen.has(key)) continue

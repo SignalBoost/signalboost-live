@@ -593,11 +593,9 @@ async function tryLiveNamedCatalog(input: {
     for (const url of live.results.map(r => r.url).filter(Boolean)) {
       if (!usedSources.includes(url)) usedSources.push(url)
     }
-    const pageUrls = live.results.map(r => r.url)
-    // The official group roster can occur below general page navigation. Read the
-    // canonical publisher page as source material, not merely a search-result snippet.
-    if (isPublicPageExtractionCatalogRequest(asked)) pageUrls.unshift('https://ligasp.com.br/ligasp/')
-    const pages = await readPublicPages(pageUrls).catch(() => [])
+    // Research each returned public page and admit only pages whose extracted structure
+    // proves they contain the complete requested group. No source URL is hard-coded.
+    const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
     const harvested = (isPublicPageExtractionCatalogRequest(asked) ? extractSambaSchoolNames : harvestCatalogNames)([
       ...live.results,
       ...pages.map(page => ({ title: page.title, snippet: page.snippet })),

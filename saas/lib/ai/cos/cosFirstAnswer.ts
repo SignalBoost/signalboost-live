@@ -7,6 +7,7 @@
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
+import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
 import {
   FRESH_SEARCH_RESULT_BUDGET,
@@ -707,6 +708,15 @@ export async function tryCOSFirstAnswer(input: {
 
   if (requiresFreshExternalEvidence(input.prompt)) {
     return learnFromTurn(input, await tryFreshCurrentFact(input))
+  }
+
+  if (classifyKnowledgeAccess(input.prompt).mode === 'search_if_thin') {
+    const looked = await tryFreshCurrentFact(input)
+    const reply = 'reply' in looked ? String(looked.reply || '') : ''
+    const refused = /could not stand behind|did not release an answer|verification unavailable|live verification/i.test(reply)
+    if (looked.handled && reply && !refused) {
+      return learnFromTurn(input, looked)
+    }
   }
 
   if (isPublicDeliveryScope()) {

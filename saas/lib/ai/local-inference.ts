@@ -280,6 +280,19 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     timeout = setTimeout(() => controller.abort(), config.timeoutMs)
     inferenceStartedAt = Date.now()
     const reasoningEffort = configuredReasoningEffort()
+    // Repetition controls. Greedy decoding (temperature 0, used on every reasoning call)
+    // with no penalty lets the model fall into degenerate loops — re-emitting the same
+    // lines until it hits the token ceiling, leaving output that never parses (503) after
+    // a long "thinking" wait. frequency_penalty / presence_penalty are OpenAI-standard
+    // fields, applied to the logits before selection (so they take effect even at
+    // temperature 0) and ignored by servers that don't support them. Env-tunable, clamped
+    // to the valid 0..2 range; set COS_REASONER_FREQUENCY_PENALTY=0 to disable.
+    const parsePenalty = (value: string | undefined, fallback: number): number => {
+      const n = Number(value)
+      return Number.isFinite(n) ? Math.max(0, Math.min(2, n)) : fallback
+    }
+    const frequencyPenalty = parsePenalty(process.env.COS_REASONER_FREQUENCY_PENALTY, 0.4)
+    const presencePenalty = parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
@@ -288,6 +301,8 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
         model: config.model,
         max_tokens: args.maxTokens ?? 2048,
         temperature: args.temperature ?? 0.2,
+        frequency_penalty: frequencyPenalty,
+        presence_penalty: presencePenalty,
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         messages: [
           { role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' },

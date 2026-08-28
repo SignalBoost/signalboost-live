@@ -654,8 +654,15 @@ async function tryLiveNamedCatalog(input: {
     reply,
     confidence: finalNames.length >= targetCount ? 0.72 : 0.66,
     provenance: {
-      responseSource: 'cos_local_primary',
+      responseSource: 'catalog_public_page_extraction',
       catalogLiveSearch: true,
+      autonomousResearchAttempted: true,
+      localModelInvoked: false,
+      researchDocumentsAcquired: usedSources.length,
+      liveExternalEvidence: {
+        retrievedAt: new Date().toISOString(),
+        sources: usedSources.slice(0, 10).map((url, index) => ({ id: `LIVE${index + 1}`, title: url, url })),
+      },
       liveSources: usedSources.slice(0, 10),
       harvestedNameCount: finalNames.length,
       requestedCount: targetCount,

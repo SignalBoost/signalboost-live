@@ -324,10 +324,13 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshE
 export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenceSource[]): boolean {
   if (!sources.length) return false
   const hosts = new Set(sources.map(source => freshEvidenceHost(source.url)).filter(Boolean))
-  if (requiresIndependentCorroboration(input) && hosts.size < 2) return false
+  // The office's own government publisher is primary authority for its current holder. A second
+  // hostname remains preferred corroboration, but must not turn a clear first-party confirmation
+  // into an abstention. Corporate roles still require independent corroboration.
   if (requiresGovernmentAuthority(input)) {
     return sources.some(source => isGovernmentHost(freshEvidenceHost(source.url)))
   }
+  if (requiresIndependentCorroboration(input) && hosts.size < 2) return false
   return true
 }
 
@@ -427,12 +430,13 @@ export function replyCitesIndependentFreshEvidence(reply: string, input: string,
   const text = String(reply || '')
   const citedSources = sources.filter(source => text.includes(`[${source.id}]`) && text.includes(source.url))
   const citedHosts = new Set(citedSources.map(source => freshEvidenceHost(source.url)).filter(Boolean))
+  // A cited first-party government source is enough for the current holder of that public office.
+  // Other office-holder answers still need independent corroboration.
+  if (requiresGovernmentAuthority(input)) {
+    return citedSources.some(source => isGovernmentHost(freshEvidenceHost(source.url)))
+  }
   if (!requiresIndependentCorroboration(input)) return citedHosts.size >= 1
-  if (citedHosts.size < 2) return false
-  // Merely retrieving an authoritative government page is not enough: for public office-holder
-  // answers the accepted final answer must actually cite/materially rely on that source.
-  if (requiresGovernmentAuthority(input) && !citedSources.some(source => isGovernmentHost(freshEvidenceHost(source.url)))) return false
-  return true
+  return citedHosts.size >= 2
 }
 
 export function attachFreshEvidenceProvenance<T extends Record<string, any>>(

@@ -324,10 +324,13 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshE
 export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenceSource[]): boolean {
   if (!sources.length) return false
   const hosts = new Set(sources.map(source => freshEvidenceHost(source.url)).filter(Boolean))
-  if (requiresIndependentCorroboration(input) && hosts.size < 2) return false
+  // The office's own government publisher is primary authority for its current holder. A second
+  // hostname remains preferred corroboration, but must not turn a clear first-party confirmation
+  // into an abstention. Corporate roles still require independent corroboration.
   if (requiresGovernmentAuthority(input)) {
     return sources.some(source => isGovernmentHost(freshEvidenceHost(source.url)))
   }
+  if (requiresIndependentCorroboration(input) && hosts.size < 2) return false
   return true
 }
 

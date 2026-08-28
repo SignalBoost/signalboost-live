@@ -8,7 +8,7 @@ import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
-import { isNamedCatalogListRequest } from './listCatalogIntent.ts'
+import { isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
 import { buildHonestRefusalReply } from './honestRefusalReply.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
@@ -482,6 +482,23 @@ async function tryPublicStatelessAnswer(input: {
 }
 
 
+function harvestSambaSchoolNames(results: Array<{ title?: string; snippet?: string }>): string[] {
+  const deny = /^(?:grupo especial|grupo de acesso|escolas de samba|carnaval(?: sp)?|liga-?sp|liga independente|são paulo|sao paulo|classificação final|mapa de notas|veja|confira|notícias?|resultados?)$/i
+  const found: string[] = []
+  const seen = new Set<string>()
+  for (const raw of results.flatMap(result => [result.title, result.snippet]).filter(Boolean).flatMap(text => String(text).split(/\\n|[•|]/))) {
+    const name = raw.replace(/\\s+/g, ' ').replace(/^[-–—\\d.)\\s]+/, '').replace(/[.,;:]+$/, '').trim()
+    const words = name.split(' ').filter(Boolean)
+    if (name.length < 5 || name.length > 60 || deny.test(name)) continue
+    if (/\\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso)\\b/i.test(name)) continue
+    if (words.length < 2 && !/-/.test(name)) continue
+    if (!/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(name)) continue
+    const key = name.toLocaleLowerCase('pt-BR')
+    if (!seen.has(key)) { seen.add(key); found.push(name) }
+  }
+  return found
+}
+
 function harvestCatalogNames(results: Array<{ title?: string; snippet?: string }>): string[] {
   // Join every field with the bullet so a source TITLE never glues onto the next snippet's name.
   const text = results.flatMap(r => [r.title, r.snippet]).filter(Boolean).join(' • ')
@@ -540,6 +557,13 @@ function parseRequestedListCount(prompt: string, fallback = 20): number {
 
 function buildCatalogQueryPlan(prompt: string): string[] {
   const asked = String(prompt || '').trim()
+  if (isPublicPageExtractionCatalogRequest(asked)) {
+    return [
+      'site:ligasp.com.br "Grupo Especial" "Escolas de Samba" "São Paulo"',
+      'site:ligasp.com.br "Escolas de Samba" "Grupo Especial"',
+      'Liga SP Grupo Especial escolas de samba São Paulo lista oficial',
+    ]
+  }
   // Várzea / amateur football in São Paulo needs facet coverage to reach a large
   // count — a single snapshot only surfaces a handful of names.
   if (/v[aá]rzea|varzea|amador/i.test(asked)) {
@@ -587,7 +611,7 @@ async function tryLiveNamedCatalog(input: {
       if (!usedSources.includes(url)) usedSources.push(url)
     }
     const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
-    const harvested = harvestCatalogNames([
+    const harvested = (isPublicPageExtractionCatalogRequest(asked) ? harvestSambaSchoolNames : harvestCatalogNames)([
       ...live.results,
       ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
     ])
@@ -892,7 +916,7 @@ export async function tryCOSFirstAnswer(input: {
 }): Promise<COSFirstAnswerResult> {
   beginEvidenceSourceUseTurn()
 
-  if (isNamedCatalogListRequest(input.prompt)) {
+  if (isNamedCatalogListRequest(input.prompt) || isPublicPageExtractionCatalogRequest(input.prompt)) {
     return learnFromTurn(input, await tryLiveNamedCatalog(input))
   }
 

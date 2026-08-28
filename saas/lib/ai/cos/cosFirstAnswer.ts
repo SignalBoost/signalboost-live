@@ -483,21 +483,48 @@ async function tryPublicStatelessAnswer(input: {
 
 
 function harvestCatalogNames(results: Array<{ title?: string; snippet?: string }>): string[] {
-  const text = results.map(r => `${r.title || ''} ${r.snippet || ''}`).join(' • ')
+  // Join every field with the bullet so a source TITLE never glues onto the next snippet's name.
+  const text = results.flatMap(r => [r.title, r.snippet]).filter(Boolean).join(' • ')
   const stop = /^(esses|grande s[aã]o paulo|s[aã]o paulo|futebol|futebol amador|varzeap[eé]dia|v[aá]rzeap[eé]dia|netshoes|appito|facebook|vindo|conhecido|prepare-se|come[cç]a|enquanto|divulga[cç][aã]o|organizado|e-mail|telefone|museu|arquivos sp|copa pioneer|super copa pioneer|copa le[oõ]es|copa rebote|campeonato municipal|esp[ií]rito santo|zona leste|santo amaro|mooca|guaianases|graja[uú]|boi mirim|alberto luiz|diego vi|thomaz mazzoni|liga paulistana de futebol amador outros)$/i
   const teamHint = /(?:clube|futebol clube|\bfc\b|\bec\b|gr[eê]mio|associa[cç][aã]o|atl[eé]tico|recreativo|katatumba|piraporinha|ver[oô]nia|cidade tiradentes|dan[uú]bio|liberidade|[aá]guia negra|jardim )/i
+  // Page-chrome / media / ads / structural noise that never belongs in a team name.
+  const junkToken = /\b(uol|ads|newsletters?|v[ií]deos?|mail|confere|confira|wikipedia|wiki|facebook|instagram|netshoes|appito|home|equipes|conte[uú]do|acompanhe|not[ií]cias?|enciclop[eé]dia|p[aá]gina|snapshot|terr[aã]o|enrola|cdc|slogan|programa|jogos de paris|sexo|[uú]ltimas|danon[aá]ticos|maca[eé])\b/i
+  // Label words that get glued to the end of a captured name.
+  const trailingLabel = /\s+(fundaç[aã]o|fundaão|hist[oó]ria|conte[uú]do|equipes|home|slogan|uniforme|sede|campo|presidente|apelido|mascote|fundad[oa])\b[\s\S]*$/i
+  // Bare administrative neighborhoods (not várzea teams).
+  const bareNeighborhood = /^(jardim (?:[aâ]ngela|am[eé]rica|europa|paulista|paulistano|ju|monte(?:\s+se)?|cl[ií]max)|[aá]gua rasa|cidade tiradentes|santo amaro|casa verde|sa[uú]de|ipiranga|mooca|penha|guaianases|graja[uú])$/i
+  const slugArtifact = /sp-sao-paulo|https?:|\.com|\.br|www\./i
+  // Out-of-scope / professional clubs leaking from generic search.
+  const outOfScope = /\b(mogi mirim|mirim esporte clube|atl[eé]tico-?mg|corinthians paulista|palmeiras|s[aã]o paulo futebol clube|cruzeiro|flamengo|santos futebol clube de s)\b/i
   const found: string[] = []
   const seen = new Set<string>()
   const matches = text.match(/[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{2,}(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{1,}){0,6}/g) || []
-  for (const raw of matches) {
-    const name = raw.replace(/\s+/g, ' ').replace(/[.,;:]+$/, '').trim()
-    const key = name.toLowerCase()
-    if (name.length < 6 || name.length > 70) continue
-    if (stop.test(name) || seen.has(key)) continue
-    if (!teamHint.test(name) && !/\b(?:da|do|de)\b/i.test(name)) continue
-    if (/https?:|página|enciclopédia|snapshot|query|e-mail|telefone/i.test(name)) continue
-    seen.add(key)
-    found.push(name)
+  for (const raw0 of matches) {
+    // A captured run can straddle a sentence/bullet boundary and glue the tail of one
+    // name onto the head of the next. Evaluate EVERY segment as its own candidate.
+    for (const seg of raw0.split(/\s+•\s+|\.\s+/)) {
+      const name = seg
+        .replace(trailingLabel, '')
+        .replace(/\s+(?:da|de|do|e)\s*$/i, '') // trim a trailing connector left by truncation
+        .replace(/\s+/g, ' ')
+        .replace(/[.,;:]+$/, '')
+        .trim()
+      const key = name.toLowerCase()
+      if (name.length < 6 || name.length > 70) continue
+      if (stop.test(name) || seen.has(key)) continue
+      if (junkToken.test(name)) continue
+      if (slugArtifact.test(name)) continue
+      if (bareNeighborhood.test(name)) continue
+      if (outOfScope.test(name)) continue
+      // reject neighborhood enumerations like "Jardim América Jardim Europa Jardim Paulista"
+      if ((name.match(/\bjardim\b/gi) || []).length >= 2) continue
+      if (!teamHint.test(name) && !/\b(?:da|do|de)\b/i.test(name)) continue
+      // reject a dangling 1-2 letter tail fragment (e.g. "Jardim Ju", "Monte Se")
+      if (/\s\p{L}{1,2}$/u.test(name) && !/\b(fc|ec|aa|ae)$/i.test(name)) continue
+      if (/https?:|página|enciclopédia|snapshot|query|e-mail|telefone/i.test(name)) continue
+      seen.add(key)
+      found.push(name)
+    }
   }
   return found
 }

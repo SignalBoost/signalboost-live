@@ -4,13 +4,13 @@
  * These requests are often NOT "current fact" questions — a cultural/reference list of
  * neighborhood football clubs is different from "who is entered this Sunday?" — but COS still
  * must not manufacture names from model memory when the requested catalog is thin or absent from
- * retained knowledge. The governed knowledge-access layer classifies these as `search_if_thin` and
- * researches public pages before answering.
+ * retained knowledge.
  *
- * `isNamedCatalogListRequest` is retained only as a compatibility hook for the old direct catalog
- * interceptor in cosFirstAnswer.ts. It intentionally returns false so that brittle regex harvesting
- * cannot bypass COS evidence-grounded synthesis. New code should use
- * `isNamedCatalogResearchRequest`.
+ * Two routes intentionally coexist:
+ * - amateur/neighborhood football club lists use the dedicated public-page catalog researcher in
+ *   cosFirstAnswer.ts, which runs multiple public searches/pages to reach large requested counts
+ *   without padding invented names;
+ * - other named catalogs/directories fall through to knowledgeAccessPolicy as `search_if_thin`.
  *
  * No @/ imports: raw Node tests.
  */
@@ -19,6 +19,10 @@ const LIST_ASK = /(?:\blista\b|\blist(?:a|e)?\b|\blist of\b|\bgive me\b|\bme d[e
 const NAMED_CATALOG_NOUN = /(?:\btimes?\b|\bclubes?\b|\bequipes?\b|\bteams?\b|\bclubs?\b|\besquadras?\b|\bassocia[cç][oõ]es?\b|\bassociations?\b|\bligas?\b|\bleagues?\b|\bbairros?\b|\bneighbou?rhoods?\b|\bruas?\b|\bstreets?\b|\bigrejas?\b|\bchurches?\b|\brestaurantes?\b|\brestaurants?\b|\bmuseus?\b|\bmuseums?\b|\bparques?\b|\bparks?\b|\bescolas?\b|\bschools?\b|\bempresas?\b|\bcompanies?\b|\borganiza[cç][oõ]es?\b|\borganizations?\b)/i
 const REAL_WORLD_SCOPE = /(?:\bamador\b|\bv[aá]rzea\b|\bvarzea\b|\bamateur\b|\bbairro\b|\bmunic[ií]pio\b|\bcidade\b|\bcity\b|\bstate\b|\bestado\b|\bregion\b|\bregi[aã]o\b|\bin\s+[\p{L}]|\bde\s+[\p{L}]|\bdo\s+[\p{L}]|\bda\s+[\p{L}])/iu
 
+const TEAM_NOUN = /(?:\btimes?\b|\bclubes?\b|\bequipes?\b|\bteams?\b|\bclubs?\b|\besquadras?\b)/i
+const AMATEUR_FOOTBALL = /(?:\bfutebol\b|\bfootball\b|\bsoccer\b).{0,80}(?:\bamador\b|\bv[aá]rzea\b|\bvarzea\b|\bamateur\b|\bneighbou?rhood\b)|(?:\bamador\b|\bv[aá]rzea\b|\bvarzea\b|\bamateur\b|\bneighbou?rhood\b).{0,80}(?:\bfutebol\b|\bfootball\b|\bsoccer\b)/i
+const CURRENT_ROSTER_OVERRIDE = /(?:\bhoje\b|\btoday\b|\bagora\b|\bnow\b|\bcurrent\b|\bcurrently\b|\bthis\s+(?:week|weekend|season)\b|\beste\s+fim\s+de\s+semana\b|\binscrit[oa]s?\b|\bentrants?\b|\broster\b|\bstandings?\b|\bscore\b|\bplacar\b)/i
+
 export function isNamedCatalogResearchRequest(prompt: unknown): boolean {
   const text = String(prompt ?? '').replace(/\s+/g, ' ').trim()
   if (!text) return false
@@ -26,11 +30,11 @@ export function isNamedCatalogResearchRequest(prompt: unknown): boolean {
 }
 
 /**
- * Legacy compatibility hook. Returning false is deliberate: the old direct path harvested
- * capitalized phrases with a regex and could misclassify page prose as entity names. Catalogs now
- * fall through to classifyKnowledgeAccess(...).mode === 'search_if_thin', which performs public
- * research and COS evidence-only synthesis instead.
+ * Dedicated public-page researcher for large amateur/neighborhood football lists. It is deliberately
+ * NOT used for current entrants/scores/standings, which belong to the stricter live-current path.
  */
-export function isNamedCatalogListRequest(_prompt: unknown): boolean {
-  return false
+export function isNamedCatalogListRequest(prompt: unknown): boolean {
+  const text = String(prompt ?? '').replace(/\s+/g, ' ').trim()
+  if (!text || CURRENT_ROSTER_OVERRIDE.test(text)) return false
+  return LIST_ASK.test(text) && TEAM_NOUN.test(text) && AMATEUR_FOOTBALL.test(text) && REAL_WORLD_SCOPE.test(text)
 }

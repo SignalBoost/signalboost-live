@@ -37,6 +37,7 @@ const tests = [
   'tests/cosAdaptiveRetrieval.node.test.ts',
   'tests/cosRetrievalSelfReflection.node.test.ts',
   'tests/cosFreshnessPolicy.node.test.ts',
+  'tests/listCatalogIntent.node.test.ts',
   'tests/cosFreshLiveRouting.node.test.ts',
   'tests/freshEvidenceLocalSynthesis.node.test.ts',
   'tests/cosFreshGrounding.node.test.ts',

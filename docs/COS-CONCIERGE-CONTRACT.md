@@ -6,11 +6,11 @@ Read this before any public or assistant change.
 
 - **COS** (dashboard Assistant / owner channel) is the only reasoning engine.
 - **Concierge** is a public render window. It does not think. It does not keep a second model, a second prompt policy, or a second answer.
-- The same ordinary question must use the same COS reasoning path on both surfaces, except the public window must not disclose reserved company information.
+- The same ordinary question must use the same COS reasoning policy on both surfaces, except the public window must not disclose reserved company information.
 
 ```text
 user
- → COS (one reasoner)
+ → COS (one reasoner / one policy)
  → if public surface: enforce reserved-company disclosure boundary
  → render
 ```
@@ -41,7 +41,7 @@ For these requests:
 1. If COS already has adequate admissible evidence, it may use it.
 2. If the catalog is thin or not actually grounded, COS must research public pages before answering.
 3. Names may not be invented merely to satisfy a requested count.
-4. A published/cultural/reference list must be described as such. It must not be presented as an official current roster, registration sheet, or this-weekend entrant list unless the retrieved source establishes that current status.
+4. A published/cultural/reference list must not be presented as an official current roster, registration sheet, or this-weekend entrant list unless the retrieved source establishes that current status.
 5. Public-web findings must not be described as Enterprise Memory, a secret database, or model memory.
 6. Current entrants, schedules, scores, prices, office holders, or other clock-sensitive facts remain on the stricter live-verification path.
 
@@ -55,4 +55,4 @@ For these requests:
 - `live_required` — clock-sensitive external state;
 - `search_if_thin` — externally checkable catalogs/directories that require public research when not adequately grounded.
 
-`saas/lib/ai/cos/listCatalogIntent.ts` must not reintroduce the obsolete capitalized-phrase regex harvesting path. Catalog research must flow through governed retrieval plus COS synthesis.
+`saas/lib/ai/cos/listCatalogIntent.ts` may select the dedicated amateur/neighborhood-football catalog researcher for large club-name lists. That path must search public pages, deduplicate extracted names, stop at the requested count, and report a shortfall rather than pad with invented clubs. It is a retrieval/extraction path under COS policy, not a second brain. Other named catalogs use the governed `search_if_thin` retrieval + COS synthesis path.

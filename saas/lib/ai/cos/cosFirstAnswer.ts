@@ -19,7 +19,6 @@ import {
   freshEvidenceMeetsAuthority,
   freshEvidenceSearchQuery,
   freshEvidenceSearchQueries,
-  prepareFreshEvidence,
   prepareFreshEvidenceAcrossQueries,
   resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,

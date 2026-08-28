@@ -6,6 +6,7 @@ import {
   freshEvidenceSearchQuery,
   freshEvidenceSearchQueries,
   prepareFreshEvidence,
+  prepareFreshEvidenceAcrossQueries,
   replyCitesFreshEvidence,
   replyCitesIndependentFreshEvidence,
   resolveDeterministicDirectFlight,
@@ -192,4 +193,20 @@ test('compound current-office and history requests receive separate live queries
   assert.equal(queries.length, 2)
   assert.match(queries[0], /current US secretary of State/i)
   assert.match(queries[1], /former secretary of State official history list/i)
+})
+
+
+test('compound evidence selection retains a source from each query', () => {
+  const sources = prepareFreshEvidenceAcrossQueries([
+    [
+      { title: 'current official one', url: 'https://agency.gov/current', snippet: 'Current office holder.' },
+      { title: 'current official two', url: 'https://agency.gov/current-2', snippet: 'Current office holder.' },
+      { title: 'current official three', url: 'https://agency.gov/current-3', snippet: 'Current office holder.' },
+    ],
+    [
+      { title: 'official history', url: 'https://history.gov/former', snippet: 'Former office holders.' },
+    ],
+  ], 4)
+  assert.equal(sources.length, 3)
+  assert.ok(sources.some(source => source.url === 'https://history.gov/former'))
 })

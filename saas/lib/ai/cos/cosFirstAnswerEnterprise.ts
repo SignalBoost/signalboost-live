@@ -958,7 +958,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     ...(canonicalSelfKnowledgeUsed.used ? { canonicalSelfKnowledgeUsed:{ enterpriseMemoryDefinition:canonicalSelfKnowledgeUsed.enterpriseMemoryDefinition, semanticCacheDefinition:canonicalSelfKnowledgeUsed.semanticCacheDefinition, companyIdentityDefinition:canonicalSelfKnowledgeUsed.companyIdentityDefinition } } : {}),
   }
   const groundedCount = citedKnowledgeEvidenceCount({ kg:cited.kg, cl:cited.cl, oem:enterpriseCited })
-  const ceiling = groundedEvidenceCeiling(groundedCount)
+  const ceiling = groundedEvidenceCeiling(groundedCount, input.prompt)
   const specificity = assessAnswerSpecificity(parsed.answer)
   const diagnosticQuestion = promptAppearsDiagnostic(input.prompt)
   const specificityCap = diagnosticQuestion ? specificity.cap : 1

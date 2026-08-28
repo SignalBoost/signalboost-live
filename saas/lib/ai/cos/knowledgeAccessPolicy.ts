@@ -21,6 +21,8 @@ export type KnowledgeAccessDecision = {
 
 const THIN_CATALOG = /(?:\blista\b|\blist(?:\s+of)?\b|\bgive me\b|\bme d[eê]\b|\bme passa\b|\benumere\b|\bnomeie\b|\bname\b).{0,160}(?:\btimes?\b|\bclubes?\b|\bequipes?\b|\bteams?\b|\bclubs?\b|\bbairros?\b|\bneighbou?rhoods?\b|\bruas?\b|\bstreets?\b|\bpratos?\b|\bdishes?\b|\bigrejas?\b|\bchurches?\b|\brestaurantes?\b|\brestaurants?\b|\bmuseus?\b|\bmuseums?\b|\bparques?\b|\bparks?\b|\bescolas?\b|\bschools?\b|\bempresas?\b|\bcompanies?\b|\borganiza[cç][oõ]es?\b|\borganizations?\b)/i
 
+const CLOCK_SENSITIVE_CATALOG = /(?:\bcurrent\b|\bcurrently\b|\btoday\b|\btonight\b|\bnow\b|\blatest\b|\bthis\s+(?:week|weekend|month|season)\b|\bnext\s+(?:week|weekend|match|game)\b|\bentered\b|\bentrants?\b|\bregistered\b|\bregistration\b|\broster\b|\bschedule\b|\bscore\b|\bstandings?\b|\bhoje\b|\bagora\b|\besta\s+semana\b|\beste\s+fim\s+de\s+semana\b|\binscrit[oa]s?\b|\bparticipantes?\b|\bclassifica[cç][aã]o\b|\bplacar\b)/i
+
 export function classifyKnowledgeAccess(prompt: unknown): KnowledgeAccessDecision {
   const text = String(prompt ?? '').replace(/\s+/g, ' ').trim()
   const reasons: string[] = []
@@ -31,16 +33,20 @@ export function classifyKnowledgeAccess(prompt: unknown): KnowledgeAccessDecisio
     return { mode: 'internal_first', reasons }
   }
 
-  // Clock-sensitive intent outranks the catalog rule. "Who is entered this weekend?" is live
-  // verification; "give me 50 São Paulo várzea teams" is a public-reference research task.
-  if (requiresFreshExternalEvidence(text)) {
-    reasons.push('freshness-policy')
+  const catalog = isNamedCatalogResearchRequest(text) || THIN_CATALOG.test(text)
+  if (catalog && CLOCK_SENSITIVE_CATALOG.test(text)) {
+    reasons.push('clock-sensitive-catalog')
     return { mode: 'live_required', reasons }
   }
 
-  if (isNamedCatalogResearchRequest(text) || THIN_CATALOG.test(text)) {
+  if (catalog) {
     reasons.push('thin-public-catalog')
     return { mode: 'search_if_thin', reasons }
+  }
+
+  if (requiresFreshExternalEvidence(text)) {
+    reasons.push('freshness-policy')
+    return { mode: 'live_required', reasons }
   }
 
   reasons.push('static-or-conceptual')

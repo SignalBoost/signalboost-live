@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isNamedCatalogListRequest, isNamedCatalogResearchRequest } from '../lib/ai/cos/listCatalogIntent.ts'
+import { isNamedCatalogListRequest, isNamedCatalogResearchRequest, isPublicPageExtractionCatalogRequest } from '../lib/ai/cos/listCatalogIntent.ts'
 import { classifyKnowledgeAccess } from '../lib/ai/cos/knowledgeAccessPolicy.ts'
 import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 
@@ -21,4 +21,12 @@ test('current roster / score requests do not enter the cultural catalog route', 
   assert.equal(isNamedCatalogListRequest('give me the current roster of amateur football teams in Sao Paulo this weekend'), false)
   assert.equal(requiresFreshExternalEvidence("what is today's NBA score"), true)
   assert.equal(classifyKnowledgeAccess("what is today's NBA score").mode, 'live_required')
+})
+
+
+test('São Paulo samba-school catalog reads public pages instead of refusing from model memory', () => {
+  const prompt = 'me de a lista de 20 escolas de samba do primeiro grupo de sao paulo'
+  assert.equal(isPublicPageExtractionCatalogRequest(prompt), true)
+  assert.equal(isNamedCatalogListRequest(prompt), false, 'the dedicated football extractor must remain scoped')
+  assert.equal(requiresFreshExternalEvidence(prompt), false, 'a published group catalog is not automatically a clock-sensitive event roster')
 })

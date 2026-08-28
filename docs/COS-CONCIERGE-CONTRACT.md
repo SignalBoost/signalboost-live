@@ -1,7 +1,3 @@
-PATH: docs/COS-CONCIERGE-CONTRACT.md
-ACTION: CREATE this file. Paste everything BELOW the line. Do not paste the PATH line.
-
---------------------------------------------------------------------------------
 # COS / Concierge contract — MANDATORY
 
 Read this before any public or assistant change.
@@ -10,33 +6,53 @@ Read this before any public or assistant change.
 
 - **COS** (dashboard Assistant / owner channel) is the only reasoning engine.
 - **Concierge** is a public render window. It does not think. It does not keep a second model, a second prompt policy, or a second answer.
-- The same question must produce the same COS answer on both surfaces, except the public window must not show reserved company information.
+- The same ordinary question must use the same COS reasoning path on both surfaces, except the public window must not disclose reserved company information.
 
 ```text
 user
  → COS (one reasoner)
- → if public surface: strip reserved company / stack / policy disclosure
+ → if public surface: enforce reserved-company disclosure boundary
  → render
 ```
 
 Forbidden:
 
 - A Concierge-only reasoner that invents a different list, a different refusal, or a different fact.
-- Teaching Concierge “its own” knowledge path.
-- Using “public/private pipelines” as an excuse for two brains.
+- Teaching Concierge its own knowledge path.
+- Using public/private delivery as an excuse for two brains.
 
-Allowed difference (only this):
+Allowed difference:
 
 | Surface | Company-reserved policy, owner identity, model/provider/stack, internal metrics |
 |---|---|
 | COS / Assistant (owner) | May disclose what the owner is authorized to see |
-| Concierge (public) | Must not disclose. Say the detail is not public. Continue with the rest of the answer when possible |
+| Concierge (public) | Must not disclose reserved information; continue with the ordinary answer when possible |
 
-A football-club list, a flight question, a diagnosis brief — those are not reserved company policy. They must not fork.
+A football-club list, a flight question, a diagnosis brief, or another ordinary factual/reasoning request is not reserved company policy and must not fork merely because it is rendered publicly.
 
-## Code hook
+## Public-world research rule
 
-`saas/lib/ai/cos/cosFirstAnswer.ts` → `tryCOSFirstAnswer`:
+A real-world named catalog or directory is external factual content even when it is not a clock-sensitive "current fact".
 
-- Identity / SignalBoost-product questions: public-safe catalog path.
-- All other questions: `tryEnterpriseCOSFirstAnswer` (the brain), then `publicDisclosureViolations` before render.
+Examples include neighborhood/amateur football clubs, local associations, museums, restaurants, schools, streets, companies, and similar named-entity lists.
+
+For these requests:
+
+1. If COS already has adequate admissible evidence, it may use it.
+2. If the catalog is thin or not actually grounded, COS must research public pages before answering.
+3. Names may not be invented merely to satisfy a requested count.
+4. A published/cultural/reference list must be described as such. It must not be presented as an official current roster, registration sheet, or this-weekend entrant list unless the retrieved source establishes that current status.
+5. Public-web findings must not be described as Enterprise Memory, a secret database, or model memory.
+6. Current entrants, schedules, scores, prices, office holders, or other clock-sensitive facts remain on the stricter live-verification path.
+
+## Code hooks
+
+`saas/lib/ai/cos/cosFirstAnswer.ts` → `tryCOSFirstAnswer` remains the shared COS entrypoint.
+
+`saas/lib/ai/cos/knowledgeAccessPolicy.ts` decides whether a request is:
+
+- `internal_first` — static/historical/method reasoning;
+- `live_required` — clock-sensitive external state;
+- `search_if_thin` — externally checkable catalogs/directories that require public research when not adequately grounded.
+
+`saas/lib/ai/cos/listCatalogIntent.ts` must not reintroduce the obsolete capitalized-phrase regex harvesting path. Catalog research must flow through governed retrieval plus COS synthesis.

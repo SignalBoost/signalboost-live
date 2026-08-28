@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isNamedCatalogListRequest, isNamedCatalogResearchRequest, isPublicPageExtractionCatalogRequest } from '../lib/ai/cos/listCatalogIntent.ts'
+import { extractSambaSchoolNames, isNamedCatalogListRequest, isNamedCatalogResearchRequest, isPublicPageExtractionCatalogRequest } from '../lib/ai/cos/listCatalogIntent.ts'
 import { classifyKnowledgeAccess } from '../lib/ai/cos/knowledgeAccessPolicy.ts'
 import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
-import { extractSambaSchoolNames } from '../lib/ai/cos/cosFirstAnswer.ts'
 
 test('São Paulo várzea study list uses dedicated multi-query public-page research', () => {
   const prompt = 'me de uma lista com 50 times do futebol amador/varzea de Sao Paulo'

@@ -20,6 +20,7 @@ import {
   freshEvidenceSearchQuery,
   freshEvidenceSearchQueries,
   prepareFreshEvidence,
+  prepareFreshEvidenceAcrossQueries,
   resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,
 } from './cosFreshGrounding.ts'
@@ -695,13 +696,11 @@ async function tryFreshCurrentFact(input: {
   )
   const successfulResponses = liveResponses.filter(response => response.ok)
   const documentsAcquired = liveResponses.reduce((count, response) => count + (response.ok ? response.results.length : 0), 0)
-  // Preserve evidence coverage for every part of a compound request. Globally ranking all results
-  // lets the first query consume the full budget and silently drops the second request's evidence.
-  const perQueryBudget = Math.max(1, Math.floor(FRESH_SELECTED_EVIDENCE_BUDGET / queries.length))
-  const sources = liveResponses
-    .flatMap(response => response.ok ? prepareFreshEvidence(response.results, perQueryBudget) : [])
-    .slice(0, FRESH_SELECTED_EVIDENCE_BUDGET)
-    .map((source, index) => ({ ...source, id: `LIVE${index + 1}` }))
+  // Preserve evidence coverage for every part of a compound request.
+  const sources = prepareFreshEvidenceAcrossQueries(
+    liveResponses.flatMap(response => response.ok ? [response.results] : []),
+    FRESH_SELECTED_EVIDENCE_BUDGET,
+  )
   const baseBudget = {
     search_result_limit: FRESH_SEARCH_RESULT_BUDGET,
     queries_run: queries.length,

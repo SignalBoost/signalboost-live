@@ -21,9 +21,11 @@ const REAL_WORLD_SCOPE = /(?:\bamador\b|\bv[aá]rzea\b|\bvarzea\b|\bamateur\b|\b
 
 const TEAM_NOUN = /(?:\btimes?\b|\bclubes?\b|\bequipes?\b|\bteams?\b|\bclubs?\b|\besquadras?\b)/i
 const AMATEUR_FOOTBALL = /(?:\bfutebol\b|\bfootball\b|\bsoccer\b).{0,80}(?:\bamador\b|\bv[aá]rzea\b|\bvarzea\b|\bamateur\b|\bneighbou?rhood\b)|(?:\bamador\b|\bv[aá]rzea\b|\bvarzea\b|\bamateur\b|\bneighbou?rhood\b).{0,80}(?:\bfutebol\b|\bfootball\b|\bsoccer\b)/i
+const SAMBA_SCHOOL_CATALOG = /(?:\bescolas?\s+de\s+samba\b|\bsamba\b).{0,80}(?:\bs[aã]o\s+paulo\b|\bsp\b|\bgrupo\s+(?:especial|1|primeiro)\b)|(?:\bs[aã]o\s+paulo\b|\bsp\b|\bgrupo\s+(?:especial|1|primeiro)\b).{0,80}(?:\bescolas?\s+de\s+samba\b|\bsamba\b)/i
+
 const CURRENT_ROSTER_OVERRIDE = /(?:\bhoje\b|\btoday\b|\bagora\b|\bnow\b|\bcurrent\b|\bcurrently\b|\bthis\s+(?:week|weekend|season)\b|\beste\s+fim\s+de\s+semana\b|\binscrit[oa]s?\b|\bentrants?\b|\broster\b|\bstandings?\b|\bscore\b|\bplacar\b)/i
 
-export function isNamedCatalogResearchRequest(prompt: unknown): boolean {
+/**\n * A catalog whose authoritative pages contain a roster/list that must be read, not guessed from snippets.\n * This is intentionally not a claim that a historical cultural catalog is a live event entry list.\n */\nexport function isPublicPageExtractionCatalogRequest(prompt: unknown): boolean {\n  const text = String(prompt ?? '').replace(/\\s+/g, ' ').trim()\n  if (!text || CURRENT_ROSTER_OVERRIDE.test(text)) return false\n  return LIST_ASK.test(text) && SAMBA_SCHOOL_CATALOG.test(text)\n}\n\nexport function isNamedCatalogResearchRequest(prompt: unknown): boolean {
   const text = String(prompt ?? '').replace(/\s+/g, ' ').trim()
   if (!text) return false
   return LIST_ASK.test(text) && NAMED_CATALOG_NOUN.test(text) && REAL_WORLD_SCOPE.test(text)

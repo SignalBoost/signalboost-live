@@ -321,6 +321,18 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshE
  * two independent hosts. Other volatile facts retain the normal one-source authority floor and are
  * still forced through live retrieval on every request by the caller.
  */
+/** Select from each successful query before applying the total evidence budget. */
+export function prepareFreshEvidenceAcrossQueries(
+  resultGroups: SearchResult[][],
+  totalBudget = FRESH_SELECTED_EVIDENCE_BUDGET,
+): FreshEvidenceSource[] {
+  const perQueryBudget = Math.max(1, Math.floor(totalBudget / Math.max(1, resultGroups.length)))
+  return resultGroups
+    .flatMap(results => prepareFreshEvidence(results, perQueryBudget))
+    .slice(0, totalBudget)
+    .map((source, index) => ({ ...source, id: `LIVE${index + 1}` }))
+}
+
 export function freshEvidenceMeetsAuthority(input: string, sources: FreshEvidenceSource[]): boolean {
   if (!sources.length) return false
   const hosts = new Set(sources.map(source => freshEvidenceHost(source.url)).filter(Boolean))

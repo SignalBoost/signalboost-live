@@ -1,3 +1,5 @@
+import { evidenceMismatchConfidenceCapActive } from './advisoryDiagnosisIntent.ts'
+
 export type CitedKnowledgeEvidence = {
   kg: number
   cl: number
@@ -18,6 +20,9 @@ export function citedKnowledgeEvidenceCount(cited: CitedKnowledgeEvidence): numb
 }
 
 export function groundedEvidenceCeiling(citedEvidenceCount: number): number {
+  // Power / lever vignettes currently retrieve off-domain KG (memory scrubbing).
+  // Those citations must not earn the 0.90 publish ceiling.
+  if (evidenceMismatchConfidenceCapActive()) return 0.30
   const count = Number.isFinite(citedEvidenceCount) ? Math.max(0, Math.floor(citedEvidenceCount)) : 0
   if (count >= 5) return 0.96
   if (count >= 2) return 0.90

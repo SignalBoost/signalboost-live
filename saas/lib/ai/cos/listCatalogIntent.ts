@@ -54,10 +54,17 @@ export function extractSambaSchoolNames(results: Array<{ title?: string; snippet
     // Require the publisher's next group boundary before accepting any catalog names.
     if (sectionEnd < 0) continue
     const section = lines.slice(sectionStart + 1, sectionEnd)
+    // A true roster states its own size. This prevents COS from combining multiple
+    // pages (or treating an event schedule as a roster) to reach the requested count.
+    const declared = section.findIndex(line => /^(\d{1,2})\s+escolas?$/i.test(line))
+    if (declared < 0) continue
+    const declaredCount = Number(section[declared].match(/\d+/)?.[0])
+    if (!Number.isInteger(declaredCount) || declaredCount < 2 || declaredCount > 30) continue
+    const rosterLines = section.slice(declared + 1)
     // Parade orders can contain the same heading and a later group boundary. They
     // are not roster evidence; one opening-act or weekday marker rejects the page.
-    if (section.some(line => /^(?:abertura|sexta-feira|sábado|domingo)\b/i.test(line))) continue
-    for (const name of section) {
+    if (rosterLines.some(line => /^(?:abertura|sexta-feira|sábado|domingo)\b/i.test(line))) continue
+    for (const name of rosterLines) {
       const words = name.split(' ').filter(Boolean)
       if (name.length < 5 || name.length > 60 || deny.test(name)) continue
       if (/\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso|datas?|horários?|sambódromo|conteúdo|facebook|história|trabalho|pode|não pode|desfile)\b/i.test(name)) continue
@@ -65,9 +72,10 @@ export function extractSambaSchoolNames(results: Array<{ title?: string; snippet
       if (!/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(name)) continue
       const key = name.toLocaleLowerCase('pt-BR')
       if (!seen.has(key)) { seen.add(key); found.push(name) }
+      if (found.length === declaredCount) return found
     }
   }
-  return found
+  return []
 }
 
 export function isNamedCatalogResearchRequest(prompt: unknown): boolean {

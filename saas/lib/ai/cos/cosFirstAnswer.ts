@@ -486,40 +486,43 @@ async function tryLiveNamedCatalog(input: {
   language?: string
   privileged?: boolean
 }): Promise<COSFirstAnswerResult> {
-  const query = String(input.prompt || '').trim()
-  const live = await getExternalInfo(query, 10, { bypassCache: true })
+  const asked = String(input.prompt || '').trim()
+  const searchQuery = /v[aá]rzea|varzea|amador/i.test(asked)
+    ? 'lista times futebol varzea amador Sao Paulo liga bairro'
+    : asked
+  const live = await getExternalInfo(searchQuery, 10, { bypassCache: true })
   if (live.ok && live.results.length) {
-    const evidence = formatExternalInfoForAI(query, live.results)
-    const reasoner = await callCosReasoner({
-      temperature: 0.1,
-      maxTokens: 1800,
-      systemPrompt: 'You are COS. Build the requested named catalog ONLY from the live search evidence below. Quote names that appear in the snippets. Cite the source URLs. If the pages do not yield 50 distinct names, say how many you found and list those. Do not invent professional first-division clubs as amateur sides. Do not refuse solely because a league roll changes. Last line: this is a live web snapshot, not an official Prefeitura registration file.',
-      prompt: `USER REQUEST:\n${query}\n\nLIVE WEB EVIDENCE:\n${evidence}`,
-    }).catch(() => null)
-    const parsed = reasoner?.text ? parseLocalResult(reasoner.text) : null
-    const answer = parsed?.answer?.trim() || ''
-    if (answer && !/could not stand behind|did not release an answer|primary source on the subject/i.test(answer)) {
-      return {
-        handled: true,
-        reply: answer,
-        confidence: Math.max(0.62, Number(parsed?.confidence || 0.68)),
-        provenance: {
-          responseSource: 'cos_local_primary',
-          catalogLiveSearch: true,
-          liveSources: live.results.map(r => r.url).slice(0, 8),
-        } as any,
-      }
+    const lines = live.results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`)
+    const reply = [
+      'Live web snapshot (Brave search). Not an official Prefeitura roll.',
+      `Query: ${searchQuery}`,
+      '',
+      ...lines,
+      '',
+      'COS listed the pages that came back. Names must be taken from those snippets and titles. Pages that do not name 50 clubs cannot be padded from memory.',
+    ].join('\n')
+    return {
+      handled: true,
+      reply,
+      confidence: 0.7,
+      provenance: {
+        responseSource: 'cos_local_primary',
+        catalogLiveSearch: true,
+        liveSources: live.results.map(r => r.url).slice(0, 10),
+      } as any,
     }
   }
+  const reason = live.error || 'no results'
+  const reply = `Live web search ran and returned nothing usable. Error: ${reason}. COS will not invent club names.`
   return {
     handled: true,
-    reply: buildHonestRefusalReply({ prompt: input.prompt, language: input.language }),
-    confidence: 0.74,
+    reply,
+    confidence: 0.55,
     provenance: {
       responseSource: 'cos_local_primary',
-      catalogDeterministic: true,
-      catalogLiveSearchFailed: !live.ok,
-      catalogLiveSearchError: live.error || null,
+      catalogLiveSearch: true,
+      catalogLiveSearchFailed: true,
+      catalogLiveSearchError: reason,
     } as any,
   }
 }

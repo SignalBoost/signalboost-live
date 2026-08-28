@@ -520,36 +520,21 @@ async function tryLiveNamedCatalog(input: {
     }
   }
 
-  const evidence = formatExternalInfoForAI(searchQuery, live.results)
   const harvested = harvestCatalogNames(live.results)
-  const reasoner = await callCosReasoner({
-    temperature: 0.1,
-    maxTokens: 1800,
-    systemPrompt: 'You extract named amateur/várzea football clubs from the live evidence only. Return a numbered list. One club per line. Use only names that appear in the evidence. If fewer than 50 names appear, list only those and say the count. Never pad with professional first teams. After the list, cite the source URLs.',
-    prompt: `REQUEST:\n${asked}\n\nEVIDENCE:\n${evidence}\n\nNAMES ALREADY SEEN IN SNIPPETS:\n${harvested.join('; ')}`,
-  }).catch(() => null)
-  const parsed = reasoner?.text ? parseLocalResult(reasoner.text) : null
-  const synthesized = parsed?.answer?.trim() || ''
-  const usable = synthesized && !/could not stand behind|did not release an answer|primary source on the subject/i.test(synthesized)
-
-  const fallbackList = harvested.length
-    ? harvested.map((name, i) => `${i + 1}. ${name}`).join('\n')
-    : ''
   const sources = live.results.map(r => r.url).filter(Boolean)
-  const reply = usable
-    ? synthesized
-    : [
-        `Live web snapshot. ${harvested.length} names appeared in the retrieved snippets (not padded to 50).`,
-        fallbackList,
-        '',
-        'Sources:',
-        ...sources.map(url => `- ${url}`),
-      ].filter(Boolean).join('\n')
+  const list = harvested.map((name, i) => `${i + 1}. ${name}`).join('\n')
+  const reply = [
+    `Live web snapshot. ${harvested.length} names taken from retrieved snippets. Not padded to 50.`,
+    list,
+    '',
+    'Sources:',
+    ...sources.map(url => `- ${url}`),
+  ].filter(Boolean).join('\n')
 
   return {
     handled: true,
     reply,
-    confidence: usable ? Math.max(0.64, Number(parsed?.confidence || 0.68)) : 0.66,
+    confidence: 0.68,
     provenance: {
       responseSource: 'cos_local_primary',
       catalogLiveSearch: true,

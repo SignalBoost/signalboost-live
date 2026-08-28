@@ -35,6 +35,34 @@ export function isPublicPageExtractionCatalogRequest(prompt: unknown): boolean {
   return LIST_ASK.test(text) && SAMBA_SCHOOL_CATALOG.test(text)
 }
 
+/** Extract only school names contained in a publisher's explicit Grupo Especial section. */
+export function extractSambaSchoolNames(results: Array<{ title?: string; snippet?: string }>): string[] {
+  const deny = /^(?:grupo especial|grupo de acesso|escolas de samba|carnaval(?: sp)?|liga-?sp|liga independente|são paulo|sao paulo|classificação final|mapa de notas|veja|confira|notícias?|resultados?|abertura(?::|$)|sexta-feira|sábado|domingo)$/i
+  const found: string[] = []
+  const seen = new Set<string>()
+
+  for (const result of results) {
+    const lines = [result.title, result.snippet]
+      .filter(Boolean)
+      .flatMap(text => String(text).split(/\n|[•|]/))
+      .map(line => line.replace(/\s+/g, ' ').replace(/^[-–—\d.)\s]+/, '').replace(/[.,;:]+$/, '').trim())
+      .filter(Boolean)
+    const sectionStart = lines.findIndex(line => /^grupo especial$/i.test(line))
+    if (sectionStart < 0) continue
+    const sectionEnd = lines.findIndex((line, index) => index > sectionStart && /^grupo de acesso/i.test(line))
+    for (const name of lines.slice(sectionStart + 1, sectionEnd < 0 ? undefined : sectionEnd)) {
+      const words = name.split(' ').filter(Boolean)
+      if (name.length < 5 || name.length > 60 || deny.test(name)) continue
+      if (/\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso|datas?|horários?|sambódromo|conteúdo|facebook|história|trabalho|pode|não pode|desfile)\b/i.test(name)) continue
+      if (words.length < 2 && !/-/.test(name)) continue
+      if (!/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(name)) continue
+      const key = name.toLocaleLowerCase('pt-BR')
+      if (!seen.has(key)) { seen.add(key); found.push(name) }
+    }
+  }
+  return found
+}
+
 export function isNamedCatalogResearchRequest(prompt: unknown): boolean {
   const text = String(prompt ?? '').replace(/\s+/g, ' ').trim()
   if (!text) return false

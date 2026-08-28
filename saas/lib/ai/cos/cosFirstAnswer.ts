@@ -8,7 +8,7 @@ import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
-import { isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
+import { extractSambaSchoolNames, isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
 import { buildHonestRefusalReply } from './honestRefusalReply.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
@@ -482,23 +482,6 @@ async function tryPublicStatelessAnswer(input: {
 }
 
 
-function harvestSambaSchoolNames(results: Array<{ title?: string; snippet?: string }>): string[] {
-  const deny = /^(?:grupo especial|grupo de acesso|escolas de samba|carnaval(?: sp)?|liga-?sp|liga independente|são paulo|sao paulo|classificação final|mapa de notas|veja|confira|notícias?|resultados?)$/i
-  const found: string[] = []
-  const seen = new Set<string>()
-  for (const raw of results.flatMap(result => [result.title, result.snippet]).filter(Boolean).flatMap(text => String(text).split(/\n|[•|]/))) {
-    const name = raw.replace(/\s+/g, ' ').replace(/^[-–—\d.)\s]+/, '').replace(/[.,;:]+$/, '').trim()
-    const words = name.split(' ').filter(Boolean)
-    if (name.length < 5 || name.length > 60 || deny.test(name)) continue
-    if (/\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso)\b/i.test(name)) continue
-    if (words.length < 2 && !/-/.test(name)) continue
-    if (!/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(name)) continue
-    const key = name.toLocaleLowerCase('pt-BR')
-    if (!seen.has(key)) { seen.add(key); found.push(name) }
-  }
-  return found
-}
-
 function harvestCatalogNames(results: Array<{ title?: string; snippet?: string }>): string[] {
   // Join every field with the bullet so a source TITLE never glues onto the next snippet's name.
   const text = results.flatMap(r => [r.title, r.snippet]).filter(Boolean).join(' • ')
@@ -610,8 +593,12 @@ async function tryLiveNamedCatalog(input: {
     for (const url of live.results.map(r => r.url).filter(Boolean)) {
       if (!usedSources.includes(url)) usedSources.push(url)
     }
-    const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
-    const harvested = (isPublicPageExtractionCatalogRequest(asked) ? harvestSambaSchoolNames : harvestCatalogNames)([
+    const pageUrls = live.results.map(r => r.url)
+    // The official group roster can occur below general page navigation. Read the
+    // canonical publisher page as source material, not merely a search-result snippet.
+    if (isPublicPageExtractionCatalogRequest(asked)) pageUrls.unshift('https://ligasp.com.br/ligasp/')
+    const pages = await readPublicPages(pageUrls).catch(() => [])
+    const harvested = (isPublicPageExtractionCatalogRequest(asked) ? extractSambaSchoolNames : harvestCatalogNames)([
       ...live.results,
       ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
     ])

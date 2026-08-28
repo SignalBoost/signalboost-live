@@ -99,7 +99,7 @@ export async function readPublicPages(urls: string[]): Promise<PublicPage[]> {
   const pages = await Promise.all(
     unique.map(async url => {
       const body = await fetchText(url)
-      return { title: url, url, snippet: body.slice(0, 1200) }
+      return { title: url, url, snippet: body.slice(0, 6000) }
     }),
   )
   return pages.filter(page => page.snippet)

@@ -8,6 +8,9 @@ import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
+import { isNamedCatalogListRequest } from './listCatalogIntent.ts'
+import { buildHonestRefusalReply } from './honestRefusalReply.ts'
+import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
 import {
   FRESH_SEARCH_RESULT_BUDGET,
@@ -71,6 +74,25 @@ import {
 } from './cosFirstAnswerEnterprise.ts'
 
 export * from './cosFirstAnswerEnterprise.ts'
+
+
+const PLATFORM_STACK_ASK = /(?:model|modelo|llm|reasoner|engine|provedor|provider).{0,50}(?:platform|plataforma|this service|este servi[cç]o|cos|signalboost|you use|voc[eê] usa)|(?:platform|plataforma|this service|este servi[cç]o|cos).{0,50}(?:model|modelo|llm|reasoner)/i
+
+function isPlatformStackQuestion(prompt: unknown): boolean {
+  const text = String(prompt ?? '')
+  return isPlatformSelfKnowledgePrompt(text) || PLATFORM_STACK_ASK.test(text)
+}
+
+function ownerPlatformStackReply(language?: string | null): string {
+  const model = process.env.LOCAL_AI_MODEL || 'Qwen/Qwen3.6-35B-A3B'
+  const embed = process.env.LOCAL_AI_EMBEDDING_MODEL || 'BAAI/bge-base-en-v1.5'
+  const host = process.env.LOCAL_AI_MANAGED_PROVIDER || 'deepinfra'
+  const code = String(language ?? 'en').slice(0, 2).toLowerCase()
+  if (code === 'pt') {
+    return `Canal do owner: o reasoner do COS nesta plataforma é ${model}, via ${host}. Embeddings: ${embed}. Isso vem da configuração de Production, não de uma busca na web.`
+  }
+  return `Owner channel: this platform's COS reasoner is ${model}, via ${host}. Embeddings: ${embed}. That is Production configuration, not a live web lookup.`
+}
 
 function confidenceThreshold(): number {
   const value = Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72')
@@ -700,6 +722,27 @@ export async function tryCOSFirstAnswer(input: {
   previousAssistant?: string | null
 }): Promise<COSFirstAnswerResult> {
   beginEvidenceSourceUseTurn()
+
+  if (isNamedCatalogListRequest(input.prompt)) {
+    return learnFromTurn(input, {
+      handled: true,
+      reply: buildHonestRefusalReply({ prompt: input.prompt, language: input.language }),
+      confidence: 0.74,
+      provenance: { responseSource: 'cos_local_primary', catalogDeterministic: true } as any,
+    })
+  }
+
+  if (isPlatformStackQuestion(input.prompt)) {
+    const reply = isPublicDeliveryScope()
+      ? publicImplementationDisclosureReply(input.language)
+      : ownerPlatformStackReply(input.language)
+    return learnFromTurn(input, {
+      handled: true,
+      reply,
+      confidence: 1,
+      provenance: { responseSource: 'cos_local_primary', selfKnowledgeDeterministic: true } as any,
+    })
+  }
 
   const directTextTransformation = await tryDirectTextTransformation(input)
   if (directTextTransformation) {

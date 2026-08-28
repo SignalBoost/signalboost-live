@@ -1,10 +1,8 @@
 // saas/lib/ai/tools/conversationHistory.ts
 // Level 2 memory: searchable conversation history for the AI personas.
 // Host-agnostic: every read/write goes through an injected datastore port, and every rolling
-// summary through an injected summarizer port — never Supabase or OpenAI directly. A Fortune-500
-// buyer's Chief of Staff stores THEIR users' conversations in THEIR database and summarizes with
-// THEIR model, by swapping the two adapters below. On SignalBoost's own deployment the default
-// adapters use Supabase + OpenAI and behavior is unchanged.
+// summary through an injected summarizer port. SignalBoost Production must NOT call OpenAI.
+// Default summarizer is local extract only. Buyers may inject their own model.
 
 const CONV_TABLE = 'assistant_conversations'
 const MSG_TABLE = 'assistant_messages'
@@ -194,31 +192,17 @@ function defaultSupabaseHistoryStore(): ConversationHistoryStore {
   }
 }
 
-function defaultOpenAISummarizer(): Summarizer {
+function defaultLocalSummarizer(): Summarizer {
   return async (transcript: string) => {
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) return null
-    const { default: OpenAI } = await import('openai')
-    const openai = new OpenAI({ apiKey })
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      temperature: 0.2,
-      max_tokens: 160,
-      messages: [
-        {
-          role: 'system',
-          content:
-            "Summarize the conversation in 2-3 short sentences: main topics, decisions made, and the user's goals. Write in the same language the user is using. Output only the summary, no preamble.",
-        },
-        { role: 'user', content: transcript },
-      ],
-    })
-    return completion.choices[0]?.message?.content?.trim() || null
+    const text = String(transcript || '').replace(/\s+/g, ' ').trim()
+    if (!text) return null
+    const userLine = text.split('User:').pop()?.trim() || text
+    return userLine.slice(0, 220)
   }
 }
 
 let activeStore: ConversationHistoryStore = defaultSupabaseHistoryStore()
-let activeSummarizer: Summarizer = defaultOpenAISummarizer()
+let activeSummarizer: Summarizer = defaultLocalSummarizer()
 
 export function setConversationHistoryStore(store: ConversationHistoryStore): void {
   activeStore = store || defaultSupabaseHistoryStore()
@@ -227,7 +211,7 @@ export function getConversationHistoryStore(): ConversationHistoryStore {
   return activeStore
 }
 export function setConversationSummarizer(summarizer: Summarizer): void {
-  activeSummarizer = summarizer || defaultOpenAISummarizer()
+  activeSummarizer = summarizer || defaultLocalSummarizer()
 }
 export function getConversationSummarizer(): Summarizer {
   return activeSummarizer
@@ -284,7 +268,7 @@ export async function persistTurn(params: {
     const newCount = (existing?.message_count ?? 0) + 2
     await store.bumpConversation(conversationId, userId, newCount)
 
-    // Rolling summary at a fixed cadence (cheap mini-model call).
+    // Rolling summary at a fixed cadence. Local extract only — never OpenAI.
     if (newCount % SUMMARY_EVERY_N_MESSAGES === 0) {
       await refreshSummary(conversationId, userId)
     }

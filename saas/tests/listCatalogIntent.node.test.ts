@@ -4,20 +4,21 @@ import { isNamedCatalogListRequest, isNamedCatalogResearchRequest } from '../lib
 import { classifyKnowledgeAccess } from '../lib/ai/cos/knowledgeAccessPolicy.ts'
 import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 
-test('São Paulo várzea study list researches public pages without pretending it is a current roster', () => {
+test('São Paulo várzea study list uses dedicated multi-query public-page research', () => {
   const prompt = 'me de uma lista com 50 times do futebol amador/varzea de Sao Paulo'
   assert.equal(isNamedCatalogResearchRequest(prompt), true)
-  assert.equal(isNamedCatalogListRequest(prompt), false, 'legacy regex-harvest interceptor must stay disabled')
+  assert.equal(isNamedCatalogListRequest(prompt), true)
   assert.equal(requiresFreshExternalEvidence(prompt), false, 'cultural/reference catalog is not automatically a clock-sensitive fact')
-  assert.equal(classifyKnowledgeAccess(prompt).mode, 'search_if_thin')
+  assert.equal(classifyKnowledgeAccess(prompt).mode, 'search_if_thin', 'fallback policy remains public research if the dedicated route is bypassed')
 })
 
-test('English real-world named catalogs also research instead of relying on model memory', () => {
-  assert.equal(classifyKnowledgeAccess('Give me a list of 30 neighborhood football clubs in London').mode, 'search_if_thin')
+test('other real-world named catalogs still research instead of relying on model memory', () => {
+  assert.equal(isNamedCatalogListRequest('List 20 independent museums in Chicago'), false)
   assert.equal(classifyKnowledgeAccess('List 20 independent museums in Chicago').mode, 'search_if_thin')
 })
 
-test('today\'s scores stay live', () => {
+test('current roster / score requests do not enter the cultural catalog route', () => {
+  assert.equal(isNamedCatalogListRequest('give me the current roster of amateur football teams in Sao Paulo this weekend'), false)
   assert.equal(requiresFreshExternalEvidence("what is today's NBA score"), true)
   assert.equal(classifyKnowledgeAccess("what is today's NBA score").mode, 'live_required')
 })

@@ -122,10 +122,12 @@ function isSignalboostIdentityQuestion(text: string): boolean {
  * technical self-description shipped, but repeated identity questions kept replaying the
  * pre-change cached answer, so the owner never saw it).
  */
+const PLATFORM_STACK_ASK = /(?:model|modelo|llm|reasoner|engine).{0,50}(?:platform|plataforma|this service|este servi[cç]o|cos|signalboost)|(?:platform|plataforma|this service|este servi[cç]o).{0,50}(?:model|modelo|llm|reasoner)/i
+
 export function isPlatformSelfKnowledgePrompt(input: string): boolean {
   const text = normalizedText(input)
   if (!text) return false
-  return isSignalboostIdentityQuestion(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
+  return isSignalboostIdentityQuestion(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text) || PLATFORM_STACK_ASK.test(text)
 }
 
 // Pure arithmetic and local clock/date questions have deterministic utilities. They should never
@@ -203,6 +205,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   // are not live current-fact lookups.
   if (detectAdvisoryDiagnosisIntent(input).suppressFreshnessAbort) return false
   if (isNamedCatalogListRequest(input)) return false
+  if (isPlatformSelfKnowledgePrompt(input)) return false
   if (HISTORICAL_ANCHOR.test(text)) return false
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false

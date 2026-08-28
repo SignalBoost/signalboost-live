@@ -502,50 +502,122 @@ function harvestCatalogNames(results: Array<{ title?: string; snippet?: string }
   return found
 }
 
+function parseRequestedListCount(prompt: string, fallback = 20): number {
+  // Honour an explicit count in the request ("50 times", "top 30", "lista com 15 ...").
+  const match = String(prompt || '').match(/\b(\d{1,3})\b/)
+  if (!match) return fallback
+  const n = Number(match[1])
+  if (!Number.isFinite(n) || n < 2) return fallback
+  return Math.min(n, 100)
+}
+
+function buildCatalogQueryPlan(prompt: string): string[] {
+  const asked = String(prompt || '').trim()
+  // Várzea / amateur football in São Paulo needs facet coverage to reach a large
+  // count — a single snapshot only surfaces a handful of names.
+  if (/v[aá]rzea|varzea|amador/i.test(asked)) {
+    return [
+      'lista times futebol varzea amador Sao Paulo tradicionais',
+      'times varzea zona sul Sao Paulo futebol amador bairro',
+      'times varzea zona leste Sao Paulo futebol amador Guaianases Itaquera',
+      'times varzea zona norte Sao Paulo futebol amador Casa Verde',
+      'times futebol amador Sao Paulo Capao Redondo Grajau M Boi Mirim',
+      'clube futebol amador varzea Sao Paulo Cidade Tiradentes Sapopemba Mooca',
+      'times futebol amador Grande Sao Paulo Osasco Taboao Cotia',
+    ]
+  }
+  // Generic named-catalog request: widen coverage with a few rephrasings.
+  return [asked, `lista completa ${asked}`, `${asked} nomes`]
+}
+
 async function tryLiveNamedCatalog(input: {
   prompt: string
   language?: string
   privileged?: boolean
 }): Promise<COSFirstAnswerResult> {
   const asked = String(input.prompt || '').trim()
-  const searchQuery = /v[aá]rzea|varzea|amador/i.test(asked)
-    ? 'lista times futebol varzea amador Sao Paulo liga bairro'
-    : asked
-  const live = await getExternalInfo(searchQuery, 10, { bypassCache: true })
-  if (!live.ok || !live.results.length) {
-    const reason = live.error || 'no results'
-    return {
-      handled: true,
-      reply: `Live web search ran and returned nothing usable. Error: ${reason}. COS will not invent club names.`,
-      confidence: 0.55,
-      provenance: { responseSource: 'cos_local_primary', catalogLiveSearchFailed: true, catalogLiveSearchError: reason } as any,
+  const targetCount = parseRequestedListCount(asked)
+  const queryPlan = buildCatalogQueryPlan(asked)
+
+  const seen = new Set<string>()
+  const names: string[] = []
+  const usedSources: string[] = []
+  let anySearchOk = false
+  let lastError = 'no results'
+
+  // Iterate the query plan, reading pages and harvesting unique names, until we
+  // reach the requested count or exhaust the plan. Never stop at the first
+  // snapshot, and never pad with invented names.
+  for (const query of queryPlan) {
+    if (names.length >= targetCount) break
+    const live = await getExternalInfo(query, 10, { bypassCache: true })
+    if (!live.ok || !live.results.length) {
+      lastError = live.error || lastError
+      continue
+    }
+    anySearchOk = true
+    for (const url of live.results.map(r => r.url).filter(Boolean)) {
+      if (!usedSources.includes(url)) usedSources.push(url)
+    }
+    const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
+    const harvested = harvestCatalogNames([
+      ...live.results,
+      ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
+    ])
+    for (const name of harvested) {
+      const key = name.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      names.push(name)
+      if (names.length >= targetCount) break
     }
   }
 
-  const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
-  const harvested = harvestCatalogNames([
-    ...live.results,
-    ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
-  ])
-  const sources = live.results.map(r => r.url).filter(Boolean)
-  const list = harvested.map((name, i) => `${i + 1}. ${name}`).join('\n')
-  const reply = [
-    `Live web snapshot. ${harvested.length} names taken from retrieved snippets. Not padded to 50.`,
-    list,
-    '',
-    'Sources:',
-    ...sources.map(url => `- ${url}`),
-  ].filter(Boolean).join('\n')
+  if (!anySearchOk) {
+    return {
+      handled: true,
+      reply: `Live web search ran and returned nothing usable. Error: ${lastError}. COS will not invent club names.`,
+      confidence: 0.55,
+      provenance: { responseSource: 'cos_local_primary', catalogLiveSearchFailed: true, catalogLiveSearchError: lastError } as any,
+    }
+  }
+
+  if (!names.length) {
+    return {
+      handled: true,
+      reply: 'Live web search ran but no verifiable names could be extracted from the results. COS will not invent names.',
+      confidence: 0.55,
+      provenance: {
+        responseSource: 'cos_local_primary',
+        catalogLiveSearch: true,
+        harvestedNameCount: 0,
+        liveSources: usedSources.slice(0, 10),
+      } as any,
+    }
+  }
+
+  const finalNames = names.slice(0, targetCount)
+  const list = finalNames.map((name, i) => `${i + 1}. ${name}`).join('\n')
+  // Clean answer: just the extracted list. No raw source-URL dump in the body,
+  // and no defensive "not padded" note. If we genuinely came up short, say it
+  // once, plainly — sources stay in provenance, not in the user-facing reply.
+  const shortfallNote =
+    finalNames.length < targetCount
+      ? `\n\nThat is ${finalNames.length} distinct names verified from live sources — fewer than the ${targetCount} requested; the live results did not yield more.`
+      : ''
+  const reply = `${list}${shortfallNote}`
 
   return {
     handled: true,
     reply,
-    confidence: 0.68,
+    confidence: finalNames.length >= targetCount ? 0.72 : 0.66,
     provenance: {
       responseSource: 'cos_local_primary',
       catalogLiveSearch: true,
-      liveSources: sources.slice(0, 10),
-      harvestedNameCount: harvested.length,
+      liveSources: usedSources.slice(0, 10),
+      harvestedNameCount: finalNames.length,
+      requestedCount: targetCount,
+      queriesRun: queryPlan.length,
     } as any,
   }
 }

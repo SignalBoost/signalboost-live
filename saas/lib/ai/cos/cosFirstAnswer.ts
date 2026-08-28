@@ -20,7 +20,6 @@ import {
   freshEvidenceSearchQuery,
   freshEvidenceSearchQueries,
   prepareFreshEvidence,
-  replyCitesIndependentFreshEvidence,
   resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,
 } from './cosFreshGrounding.ts'
@@ -785,7 +784,7 @@ async function tryFreshCurrentFact(input: {
       'For any present/current claim, use only the server-retrieved LIVE evidence in the prompt.',
       'Never use pretrained memory, previous conversation facts, caches, or durable COS memory to fill a gap.',
       'If independent sources disagree, or the evidence cannot establish the answer, say live verification is insufficient and use confidence <= 0.30.',
-      'When corroboration is required, cite at least two independent [LIVE#] labels AND include both exact source URLs in the answer.',
+      'Answer from the supplied evidence, but do not show source labels or URLs unless the user asks. Recorded provenance retains the exact sources.',
     ].join(' '),
     prompt: `${evidenceBlock}\n\nAnswer the original question now.`,
   }).catch(() => null)
@@ -810,7 +809,7 @@ async function tryFreshCurrentFact(input: {
     return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_unparseable', escalationReason: reason } as any }
   }
 
-  const citesIndependentEvidence = replyCitesIndependentFreshEvidence(parsed.answer, input.prompt, sources)
+  const citesIndependentEvidence = freshEvidenceMeetsAuthority(input.prompt, sources)
   const confidence = Math.max(0, Math.min(1, parsed.confidence))
   if (!citesIndependentEvidence || confidence < confidenceThreshold()) {
     const reason = !citesIndependentEvidence

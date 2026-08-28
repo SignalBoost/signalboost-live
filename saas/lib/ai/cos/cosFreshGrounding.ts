@@ -336,6 +336,15 @@ const QUERY_STOP = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'if', 'then', 
 export function freshEvidenceSearchQuery(input: string, now = new Date()): string {
   const date = now.toISOString().slice(0, 10)
   const raw = String(input || '').trim()
+  // A compound request can ask for the current office holder and historical context together.
+  // Search the current-holder clause first; otherwise the historical-list wording can crowd the
+  // official current-role page out of a small result budget. This remains role-driven: no office,
+  // person, organization, or URL is embedded here.
+  const currentHolderClause = raw.split(/\b(?:and|also|plus|then)\b|[?!.;,]/i)[0]?.trim() || raw
+  const currentHolderRole = new RegExp(OFFICE_HOLDER_ROLE_SOURCE, 'i').exec(currentHolderClause)?.[0]
+  if (currentHolderRole && /\b(?:who\s+(?:is|['’]s)|current|present)\b/i.test(currentHolderClause)) {
+    return `${currentHolderClause} official authoritative current as of ${date}`.slice(0, 260)
+  }
   // Short lookups pass through intact — the phrasing IS the query ("who is the president of X").
   // Long analytical questions must be compressed to their content terms: a paragraph-length
   // question plus boilerplate produced 350+ character queries that returned ZERO results from the

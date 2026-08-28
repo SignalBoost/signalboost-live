@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   bodyWithFreshEvidence,
   freshEvidenceMeetsAuthority,
+  freshEvidenceSearchQuery,
   prepareFreshEvidence,
   replyCitesFreshEvidence,
   replyCitesIndependentFreshEvidence,
@@ -166,4 +167,14 @@ test('a connecting itinerary alone is never converted into a no-direct-flight cl
   ])
 
   assert.equal(resolveDeterministicDirectFlight('Are there direct flights from Alpha City to Beta City?', sources), null)
+})
+
+
+test('compound current-office request searches the current-holder clause before history wording', () => {
+  const query = freshEvidenceSearchQuery(
+    'who is the current US secretary of State and give me a list of the past secretary of state for the past 20 years',
+    new Date('2026-08-28T00:00:00.000Z'),
+  )
+  assert.match(query, /current US secretary of State official authoritative current/i)
+  assert.doesNotMatch(query, /past 20 years/i)
 })

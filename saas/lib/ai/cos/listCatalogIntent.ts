@@ -45,7 +45,7 @@ export function extractSambaSchoolNames(results: Array<{ title?: string; snippet
     const lines = [result.title, result.snippet]
       .filter(Boolean)
       .flatMap(text => String(text).split(/\n|[•|]/))
-      .map(line => line.replace(/\s+/g, ' ').replace(/^[-–—\d.)\s]+/, '').replace(/[.,;:]+$/, '').trim())
+      .map(line => line.replace(/\s+/g, ' ').replace(/^(?:[-–—]\s*|\d{1,3}[.)]\s*)/, '').replace(/[.,;:]+$/, '').trim())
       .filter(Boolean)
     const sectionStart = lines.findIndex(line => /^grupo especial$/i.test(line))
     if (sectionStart < 0) continue

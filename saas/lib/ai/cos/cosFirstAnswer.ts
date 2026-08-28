@@ -486,11 +486,11 @@ function harvestSambaSchoolNames(results: Array<{ title?: string; snippet?: stri
   const deny = /^(?:grupo especial|grupo de acesso|escolas de samba|carnaval(?: sp)?|liga-?sp|liga independente|são paulo|sao paulo|classificação final|mapa de notas|veja|confira|notícias?|resultados?)$/i
   const found: string[] = []
   const seen = new Set<string>()
-  for (const raw of results.flatMap(result => [result.title, result.snippet]).filter(Boolean).flatMap(text => String(text).split(/\\n|[•|]/))) {
-    const name = raw.replace(/\\s+/g, ' ').replace(/^[-–—\\d.)\\s]+/, '').replace(/[.,;:]+$/, '').trim()
+  for (const raw of results.flatMap(result => [result.title, result.snippet]).filter(Boolean).flatMap(text => String(text).split(/\n|[•|]/))) {
+    const name = raw.replace(/\s+/g, ' ').replace(/^[-–—\d.)\s]+/, '').replace(/[.,;:]+$/, '').trim()
     const words = name.split(' ').filter(Boolean)
     if (name.length < 5 || name.length > 60 || deny.test(name)) continue
-    if (/\\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso)\\b/i.test(name)) continue
+    if (/\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso)\b/i.test(name)) continue
     if (words.length < 2 && !/-/.test(name)) continue
     if (!/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(name)) continue
     const key = name.toLocaleLowerCase('pt-BR')

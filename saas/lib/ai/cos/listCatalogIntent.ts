@@ -53,7 +53,11 @@ export function extractSambaSchoolNames(results: Array<{ title?: string; snippet
     // A parade-order page may name one group but does not define its complete roster.
     // Require the publisher's next group boundary before accepting any catalog names.
     if (sectionEnd < 0) continue
-    for (const name of lines.slice(sectionStart + 1, sectionEnd)) {
+    const section = lines.slice(sectionStart + 1, sectionEnd)
+    // Parade orders can contain the same heading and a later group boundary. They
+    // are not roster evidence; one opening-act or weekday marker rejects the page.
+    if (section.some(line => /^(?:abertura|sexta-feira|sábado|domingo)\b/i.test(line))) continue
+    for (const name of section) {
       const words = name.split(' ').filter(Boolean)
       if (name.length < 5 || name.length > 60 || deny.test(name)) continue
       if (/\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso|datas?|horários?|sambódromo|conteúdo|facebook|história|trabalho|pode|não pode|desfile)\b/i.test(name)) continue

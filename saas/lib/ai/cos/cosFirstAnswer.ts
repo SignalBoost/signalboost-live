@@ -8,7 +8,7 @@ import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
-import { isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
+import { extractSambaSchoolNames, isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
 import { buildHonestRefusalReply } from './honestRefusalReply.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
@@ -481,36 +481,6 @@ async function tryPublicStatelessAnswer(input: {
   }
 }
 
-
-export function extractSambaSchoolNames(results: Array<{ title?: string; snippet?: string }>): string[] {
-  const deny = /^(?:grupo especial|grupo de acesso|escolas de samba|carnaval(?: sp)?|liga-?sp|liga independente|são paulo|sao paulo|classificação final|mapa de notas|veja|confira|notícias?|resultados?|abertura(?::|$)|sexta-feira|sábado|domingo)$/i
-  const found: string[] = []
-  const seen = new Set<string>()
-
-  for (const result of results) {
-    const lines = [result.title, result.snippet]
-      .filter(Boolean)
-      .flatMap(text => String(text).split(/\n|[•|]/))
-      .map(line => line.replace(/\s+/g, ' ').replace(/^[-–—\d.)\s]+/, '').replace(/[.,;:]+$/, '').trim())
-      .filter(Boolean)
-
-    // A school name is admissible only inside the publisher's explicit Grupo Especial
-    // section. Navigation, date, parade-order, and page-chrome text is never evidence.
-    const sectionStart = lines.findIndex(line => /^grupo especial$/i.test(line))
-    if (sectionStart < 0) continue
-    const sectionEnd = lines.findIndex((line, index) => index > sectionStart && /^grupo de acesso/i.test(line))
-    for (const name of lines.slice(sectionStart + 1, sectionEnd < 0 ? undefined : sectionEnd)) {
-      const words = name.split(' ').filter(Boolean)
-      if (name.length < 5 || name.length > 60 || deny.test(name)) continue
-      if (/\b(?:agenda|ensaio|notas|carnaval|grupo|escolas?|samba|liga|resultado|classificação|acesso|datas?|horários?|sambódromo|conteúdo|facebook|história|trabalho|pode|não pode|desfile)\b/i.test(name)) continue
-      if (words.length < 2 && !/-/.test(name)) continue
-      if (!/^[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/.test(name)) continue
-      const key = name.toLocaleLowerCase('pt-BR')
-      if (!seen.has(key)) { seen.add(key); found.push(name) }
-    }
-  }
-  return found
-}
 
 function harvestCatalogNames(results: Array<{ title?: string; snippet?: string }>): string[] {
   // Join every field with the bullet so a source TITLE never glues onto the next snippet's name.

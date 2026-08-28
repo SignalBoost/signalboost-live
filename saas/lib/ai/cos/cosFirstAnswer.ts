@@ -596,10 +596,13 @@ async function tryLiveNamedCatalog(input: {
     // Research each returned public page and admit only pages whose extracted structure
     // proves they contain the complete requested group. No source URL is hard-coded.
     const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
-    const harvested = (isPublicPageExtractionCatalogRequest(asked) ? extractSambaSchoolNames : harvestCatalogNames)([
-      ...live.results,
-      ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
-    ])
+    const sambaCatalog = isPublicPageExtractionCatalogRequest(asked)
+    const harvested = sambaCatalog
+      ? extractSambaSchoolNames(pages)
+      : harvestCatalogNames([
+          ...live.results,
+          ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
+        ])
     for (const name of harvested) {
       const key = name.toLowerCase()
       if (seen.has(key)) continue
@@ -607,6 +610,9 @@ async function tryLiveNamedCatalog(input: {
       names.push(name)
       if (names.length >= targetCount) break
     }
+    // One self-declared roster page is one answer. Never combine separate sources
+    // merely because the user requested more entries than that roster contains.
+    if (sambaCatalog && harvested.length) break
   }
 
   if (!anySearchOk) {

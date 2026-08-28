@@ -35,6 +35,7 @@ import {
 import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
+import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
@@ -521,7 +522,11 @@ async function tryLiveNamedCatalog(input: {
     }
   }
 
-  const harvested = harvestCatalogNames(live.results)
+  const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
+  const harvested = harvestCatalogNames([
+    ...live.results,
+    ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
+  ])
   const sources = live.results.map(r => r.url).filter(Boolean)
   const list = harvested.map((name, i) => `${i + 1}. ${name}`).join('\n')
   const reply = [

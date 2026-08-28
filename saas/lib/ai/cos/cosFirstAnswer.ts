@@ -34,7 +34,7 @@ import {
 } from './answerFreshnessSelfReflection.ts'
 import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
-import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
+import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
@@ -480,6 +480,50 @@ async function tryPublicStatelessAnswer(input: {
   }
 }
 
+
+async function tryLiveNamedCatalog(input: {
+  prompt: string
+  language?: string
+  privileged?: boolean
+}): Promise<COSFirstAnswerResult> {
+  const query = String(input.prompt || '').trim()
+  const live = await getExternalInfo(query, 10, { bypassCache: true })
+  if (live.ok && live.results.length) {
+    const evidence = formatExternalInfoForAI(query, live.results)
+    const reasoner = await callCosReasoner({
+      temperature: 0.1,
+      maxTokens: 1800,
+      systemPrompt: 'You are COS. Build the requested named catalog ONLY from the live search evidence below. Quote names that appear in the snippets. Cite the source URLs. If the pages do not yield 50 distinct names, say how many you found and list those. Do not invent professional first-division clubs as amateur sides. Do not refuse solely because a league roll changes. Last line: this is a live web snapshot, not an official Prefeitura registration file.',
+      prompt: `USER REQUEST:\n${query}\n\nLIVE WEB EVIDENCE:\n${evidence}`,
+    }).catch(() => null)
+    const parsed = reasoner?.text ? parseLocalResult(reasoner.text) : null
+    const answer = parsed?.answer?.trim() || ''
+    if (answer && !/could not stand behind|did not release an answer|primary source on the subject/i.test(answer)) {
+      return {
+        handled: true,
+        reply: answer,
+        confidence: Math.max(0.62, Number(parsed?.confidence || 0.68)),
+        provenance: {
+          responseSource: 'cos_local_primary',
+          catalogLiveSearch: true,
+          liveSources: live.results.map(r => r.url).slice(0, 8),
+        } as any,
+      }
+    }
+  }
+  return {
+    handled: true,
+    reply: buildHonestRefusalReply({ prompt: input.prompt, language: input.language }),
+    confidence: 0.74,
+    provenance: {
+      responseSource: 'cos_local_primary',
+      catalogDeterministic: true,
+      catalogLiveSearchFailed: !live.ok,
+      catalogLiveSearchError: live.error || null,
+    } as any,
+  }
+}
+
 async function tryFreshCurrentFact(input: {
   prompt: string
   previousAssistant?: string | null
@@ -724,12 +768,7 @@ export async function tryCOSFirstAnswer(input: {
   beginEvidenceSourceUseTurn()
 
   if (isNamedCatalogListRequest(input.prompt)) {
-    return learnFromTurn(input, {
-      handled: true,
-      reply: buildHonestRefusalReply({ prompt: input.prompt, language: input.language }),
-      confidence: 0.74,
-      provenance: { responseSource: 'cos_local_primary', catalogDeterministic: true } as any,
-    })
+    return learnFromTurn(input, await tryLiveNamedCatalog(input))
   }
 
   if (isPlatformStackQuestion(input.prompt)) {

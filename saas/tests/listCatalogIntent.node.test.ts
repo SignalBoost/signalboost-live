@@ -39,6 +39,7 @@ test('samba extractor accepts only names under the publisher Grupo Especial sect
       'Todos os direitos reservados',
       'Ir para o conteúdo',
       'Grupo Especial',
+      '3 escolas',
       'Mocidade Alegre',
       'Gaviões da Fiel',
       'Vai-Vai',
@@ -62,7 +63,16 @@ test('samba parade-order page without the next group boundary supplies no catalo
 test('samba parade order with a later group boundary is not mistaken for a roster', () => {
   const names = extractSambaSchoolNames([{
     title: 'Schedule',
-    snippet: ['Grupo Especial', 'Pérola Negra', 'Abertura: Afoxé Omo Dadá', 'Vai-Vai', 'Grupo de Acesso 1', 'X-9 Paulistana'].join('\n'),
+    snippet: ['Grupo Especial', '3 escolas', 'Pérola Negra', 'Abertura: Afoxé Omo Dadá', 'Vai-Vai', 'Grupo de Acesso 1', 'X-9 Paulistana'].join('\n'),
   }])
   assert.deepEqual(names, [])
+})
+
+
+test('samba extraction never combines two valid-looking roster pages', () => {
+  const names = extractSambaSchoolNames([
+    { title: 'first', snippet: ['Grupo Especial', '2 escolas', 'Mocidade Alegre', 'Vai-Vai', 'Grupo de Acesso 1'].join('\n') },
+    { title: 'second', snippet: ['Grupo Especial', '2 escolas', 'Rosas de Ouro', 'Águia de Ouro', 'Grupo de Acesso 1'].join('\n') },
+  ])
+  assert.deepEqual(names, ['Mocidade Alegre', 'Vai-Vai'])
 })

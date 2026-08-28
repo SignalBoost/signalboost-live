@@ -482,20 +482,21 @@ async function tryPublicStatelessAnswer(input: {
 
 
 function harvestCatalogNames(results: Array<{ title?: string; snippet?: string }>): string[] {
+  const text = results.map(r => `${r.title || ''} ${r.snippet || ''}`).join(' • ')
+  const stop = /^(esses|grande s[aã]o paulo|s[aã]o paulo|futebol|futebol amador|varzeap[eé]dia|v[aá]rzeap[eé]dia|netshoes|appito|facebook|vindo|conhecido|prepare-se|come[cç]a|enquanto|divulga[cç][aã]o|organizado|e-mail|telefone|museu|arquivos sp|copa pioneer|super copa pioneer|copa le[oõ]es|copa rebote|campeonato municipal|esp[ií]rito santo|zona leste|santo amaro|mooca|guaianases|graja[uú]|boi mirim|alberto luiz|diego vi|thomaz mazzoni|liga paulistana de futebol amador outros)$/i
+  const teamHint = /(?:clube|futebol clube|\bfc\b|\bec\b|gr[eê]mio|associa[cç][aã]o|atl[eé]tico|recreativo|katatumba|piraporinha|ver[oô]nia|cidade tiradentes|dan[uú]bio|liberidade|[aá]guia negra|jardim )/i
   const found: string[] = []
   const seen = new Set<string>()
-  const skip = /^(várzeapédia|varzeapedia|netshoes|appito|wikipédia|wikipedia|futliga|liga|copa|são paulo|sao paulo|conheça|arquivos)$/i
-  const text = results.map(r => `${r.title || ''} ${r.snippet || ''}`).join(' • ')
-  const matches = text.match(/[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{2,}(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{1,}){0,5}/g) || []
+  const matches = text.match(/[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{2,}(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{1,}){0,6}/g) || []
   for (const raw of matches) {
-    const name = raw.replace(/\s+/g, ' ').trim()
+    const name = raw.replace(/\s+/g, ' ').replace(/[.,;:]+$/, '').trim()
     const key = name.toLowerCase()
-    if (name.length < 5 || name.length > 60) continue
-    if (skip.test(name) || seen.has(key)) continue
-    if (/página|enciclopédia|snapshot|query|https?:/i.test(name)) continue
+    if (name.length < 6 || name.length > 70) continue
+    if (stop.test(name) || seen.has(key)) continue
+    if (!teamHint.test(name) && !/\b(?:da|do|de)\b/i.test(name)) continue
+    if (/https?:|página|enciclopédia|snapshot|query|e-mail|telefone/i.test(name)) continue
     seen.add(key)
     found.push(name)
-    if (found.length >= 50) break
   }
   return found
 }

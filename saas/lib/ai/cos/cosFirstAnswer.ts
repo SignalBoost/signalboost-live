@@ -694,8 +694,11 @@ async function tryFreshCurrentFact(input: {
     queries.map(query => getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })),
   )
   const successfulResponses = liveResponses.filter(response => response.ok)
-  const documentsAcquired = successfulResponses.reduce((count, response) => count + response.results.length, 0)
-  const sources = prepareFreshEvidence(successfulResponses.flatMap(response => response.results), FRESH_SELECTED_EVIDENCE_BUDGET)
+  const documentsAcquired = liveResponses.reduce((count, response) => count + (response.ok ? response.results.length : 0), 0)
+  const sources = prepareFreshEvidence(
+    liveResponses.flatMap(response => response.ok ? response.results : []),
+    FRESH_SELECTED_EVIDENCE_BUDGET,
+  )
   const baseBudget = {
     search_result_limit: FRESH_SEARCH_RESULT_BUDGET,
     queries_run: queries.length,

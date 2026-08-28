@@ -18,6 +18,7 @@ import {
   freshEvidenceGroundingBlock,
   freshEvidenceMeetsAuthority,
   freshEvidenceSearchQuery,
+  freshEvidenceSearchQueries,
   prepareFreshEvidence,
   replyCitesIndependentFreshEvidence,
   resolveDeterministicFreshOfficeHolder,
@@ -689,20 +690,25 @@ async function tryFreshCurrentFact(input: {
   privileged?: boolean
 }): Promise<COSFirstAnswerResult> {
   const retrievedAt = new Date().toISOString()
-  const query = freshEvidenceSearchQuery(input.prompt, new Date(retrievedAt))
-  const live = await getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })
-  const documentsAcquired = live.ok ? live.results.length : 0
-  const sources = live.ok ? prepareFreshEvidence(live.results, FRESH_SELECTED_EVIDENCE_BUDGET) : []
+  const queries = freshEvidenceSearchQueries(input.prompt, new Date(retrievedAt))
+  const liveResponses = await Promise.all(
+    queries.map(query => getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })),
+  )
+  const successfulResponses = liveResponses.filter(response => response.ok)
+  const documentsAcquired = successfulResponses.reduce((count, response) => count + response.results.length, 0)
+  const sources = prepareFreshEvidence(successfulResponses.flatMap(response => response.results), FRESH_SELECTED_EVIDENCE_BUDGET)
   const baseBudget = {
     search_result_limit: FRESH_SEARCH_RESULT_BUDGET,
+    queries_run: queries.length,
     results_received: documentsAcquired,
     evidence_selected: sources.length,
   }
 
-  if (!live.ok || !freshEvidenceMeetsAuthority(input.prompt, sources)) {
-    const reason = live.error
-      ? `Live current-fact verification failed: ${live.error}`
-      : 'Live current-fact verification did not produce enough independent authoritative evidence.'
+  if (!successfulResponses.length || !freshEvidenceMeetsAuthority(input.prompt, sources)) {
+    const errors = liveResponses.filter(response => !response.ok).map(response => response.error).filter(Boolean)
+    const reason = errors.length
+      ? `Live current-fact verification failed: ${errors.join('; ')}`
+      : 'Live current-fact verification did not produce enough authoritative evidence.'
     return {
       handled: true,
       reply: freshVerificationUnavailable(input.language),

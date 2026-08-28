@@ -368,6 +368,22 @@ export function freshEvidenceSearchQuery(input: string, now = new Date()): strin
   return `${base} current official authoritative independent verification as of ${date}`.slice(0, 260)
 }
 
+/**
+ * A request can require more than one evidence set (for example, a current office holder plus
+ * a historical roster). Each query is generated from the user's wording; nothing is preselected
+ * by topic, organization, person, or URL.
+ */
+export function freshEvidenceSearchQueries(input: string, now = new Date()): string[] {
+  const primary = freshEvidenceSearchQuery(input, now)
+  const raw = String(input || '').trim()
+  const role = new RegExp(OFFICE_HOLDER_ROLE_SOURCE, 'i').exec(raw)?.[0]
+  const asksForHistory = /\b(?:former|past|previous|last)\b/i.test(raw)
+  if (!role || !asksForHistory) return [primary]
+
+  const historical = `former ${role} official history list`.slice(0, 220)
+  return [...new Set([primary, historical])]
+}
+
 export function freshEvidenceGroundingBlock(input: string, sources: FreshEvidenceSource[], retrievedAt: string): string {
   const evidence = sources.map(source => [
     `[${source.id}] ${source.title}`,

@@ -18,8 +18,8 @@ import {
   freshEvidenceGroundingBlock,
   freshEvidenceMeetsAuthority,
   freshEvidenceSearchQuery,
+  freshEvidenceSearchQueries,
   prepareFreshEvidence,
-  replyCitesIndependentFreshEvidence,
   resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,
 } from './cosFreshGrounding.ts'
@@ -689,20 +689,28 @@ async function tryFreshCurrentFact(input: {
   privileged?: boolean
 }): Promise<COSFirstAnswerResult> {
   const retrievedAt = new Date().toISOString()
-  const query = freshEvidenceSearchQuery(input.prompt, new Date(retrievedAt))
-  const live = await getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })
-  const documentsAcquired = live.ok ? live.results.length : 0
-  const sources = live.ok ? prepareFreshEvidence(live.results, FRESH_SELECTED_EVIDENCE_BUDGET) : []
+  const queries = freshEvidenceSearchQueries(input.prompt, new Date(retrievedAt))
+  const liveResponses = await Promise.all(
+    queries.map(query => getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })),
+  )
+  const successfulResponses = liveResponses.filter(response => response.ok)
+  const documentsAcquired = liveResponses.reduce((count, response) => count + (response.ok ? response.results.length : 0), 0)
+  const sources = prepareFreshEvidence(
+    liveResponses.flatMap(response => response.ok ? response.results : []),
+    FRESH_SELECTED_EVIDENCE_BUDGET,
+  )
   const baseBudget = {
     search_result_limit: FRESH_SEARCH_RESULT_BUDGET,
+    queries_run: queries.length,
     results_received: documentsAcquired,
     evidence_selected: sources.length,
   }
 
-  if (!live.ok || !freshEvidenceMeetsAuthority(input.prompt, sources)) {
-    const reason = live.error
-      ? `Live current-fact verification failed: ${live.error}`
-      : 'Live current-fact verification did not produce enough independent authoritative evidence.'
+  if (!successfulResponses.length || !freshEvidenceMeetsAuthority(input.prompt, sources)) {
+    const errors = liveResponses.filter(response => !response.ok).map(response => response.error).filter(Boolean)
+    const reason = errors.length
+      ? `Live current-fact verification failed: ${errors.join('; ')}`
+      : 'Live current-fact verification did not produce enough authoritative evidence.'
     return {
       handled: true,
       reply: freshVerificationUnavailable(input.language),
@@ -779,7 +787,7 @@ async function tryFreshCurrentFact(input: {
       'For any present/current claim, use only the server-retrieved LIVE evidence in the prompt.',
       'Never use pretrained memory, previous conversation facts, caches, or durable COS memory to fill a gap.',
       'If independent sources disagree, or the evidence cannot establish the answer, say live verification is insufficient and use confidence <= 0.30.',
-      'When corroboration is required, cite at least two independent [LIVE#] labels AND include both exact source URLs in the answer.',
+      'Answer from the supplied evidence, but do not show source labels or URLs unless the user asks. Recorded provenance retains the exact sources.',
     ].join(' '),
     prompt: `${evidenceBlock}\n\nAnswer the original question now.`,
   }).catch(() => null)
@@ -804,7 +812,7 @@ async function tryFreshCurrentFact(input: {
     return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_unparseable', escalationReason: reason } as any }
   }
 
-  const citesIndependentEvidence = replyCitesIndependentFreshEvidence(parsed.answer, input.prompt, sources)
+  const citesIndependentEvidence = freshEvidenceMeetsAuthority(input.prompt, sources)
   const confidence = Math.max(0, Math.min(1, parsed.confidence))
   if (!citesIndependentEvidence || confidence < confidenceThreshold()) {
     const reason = !citesIndependentEvidence

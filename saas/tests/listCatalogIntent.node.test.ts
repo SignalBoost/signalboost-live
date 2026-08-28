@@ -57,3 +57,12 @@ test('samba parade-order page without the next group boundary supplies no catalo
   }])
   assert.deepEqual(names, [])
 })
+
+
+test('samba parade order with a later group boundary is not mistaken for a roster', () => {
+  const names = extractSambaSchoolNames([{
+    title: 'Schedule',
+    snippet: ['Grupo Especial', 'Pérola Negra', 'Abertura: Afoxé Omo Dadá', 'Vai-Vai', 'Grupo de Acesso 1', 'X-9 Paulistana'].join('\n'),
+  }])
+  assert.deepEqual(names, [])
+})

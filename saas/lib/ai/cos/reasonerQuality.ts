@@ -2,6 +2,7 @@ import { assessAnswerSpecificity } from './answerSpecificity.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
 import { classifyScriptRequest, executiveDecisionDirective, scriptRequestDirective } from './scriptRequestIntent.ts'
 import { creativeConstraintRepairInstruction, unsupportedCreativeConstraintClaims } from './creativeConstraintFidelity.ts'
+import { isPowerStabilizationPrompt, powerStabilizationDefects, powerStabilizationRepairInstruction } from './powerStabilizationRelease.ts'
 
 const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
 const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!\/(?:usr\/bin\/env\s+)?(?:bash|sh|python))\b/m
@@ -60,6 +61,13 @@ function ngramOverlap(answerTokens: string[], promptTokens: string[], size = 4):
     if (promptNgrams.has(answerTokens.slice(i, i + size).join(' '))) overlap += 1
   }
   return total > 0 ? overlap / total : 0
+}
+
+function powerDefectCount(prompt: string, raw: string): number {
+  if (!isPowerStabilizationPrompt(latestUserRequest(prompt) || prompt)) return 0
+  const parsed = parseLocalResult(String(raw ?? ''))
+  const answer = parsed?.answer || String(raw ?? '')
+  return powerStabilizationDefects(answer).length
 }
 
 /**
@@ -170,6 +178,7 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
   if (classifyScriptRequest(prompt) === 'content' && /\b(?:humou?rous|humou?r|funny|comedic)\b/i.test(prompt)) return true
   if (contentScriptSemanticMismatch(prompt, raw)) return true
   if (executiveDecisionUnsupportedClaims(prompt, raw).length) return true
+  if (powerDefectCount(prompt, raw) > 0) return true
   const quality = assessReasonerDraft(prompt, raw)
   if (!quality.parseable || !quality.diagnostic) return false
   if (quality.cap < 0.72) return true
@@ -179,6 +188,15 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
 export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: string): string {
   const scriptDirective = scriptRequestDirective(originalPrompt)
   const creativeConstraintRepair = creativeConstraintRepairInstruction(originalPrompt, firstRaw)
+  if (powerDefectCount(originalPrompt, firstRaw) > 0) {
+    return [
+      originalPrompt,
+      '',
+      powerStabilizationRepairInstruction(),
+      '',
+      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Do not mention this repair instruction or the rejected draft.',
+    ].join('\n')
+  }
   if (promptEchoNonAnswer(originalPrompt, firstRaw)) {
     const quantitative = QUANTITATIVE_TASK.test(latestUserRequest(originalPrompt))
     return [
@@ -270,6 +288,11 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: st
 }
 
 export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRaw: string): boolean {
+  const firstPower = powerDefectCount(prompt, firstRaw)
+  const repairedPower = powerDefectCount(prompt, repairedRaw)
+  if (firstPower !== repairedPower) return repairedPower < firstPower
+  if (firstPower && repairedPower) return false
+
   const firstEcho = promptEchoNonAnswer(prompt, firstRaw)
   const repairedEcho = promptEchoNonAnswer(prompt, repairedRaw)
   if (firstEcho !== repairedEcho) return !repairedEcho

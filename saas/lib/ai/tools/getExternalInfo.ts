@@ -15,6 +15,7 @@ import {
   type AuthorityTier,
 } from '@/lib/ai/cos/officialSourceAuthority'
 import { getStructuredLiveInfo } from '@/lib/ai/tools/getStructuredLiveInfo'
+import { searchPublicWeb } from '@/lib/ai/tools/publicWebAgent'
 import { hostBrandName } from '@/lib/portable/companyIdentity'
 import { buildCosChatIntelligence } from '@/lib/cos/chat-intelligence'
 import type { ExternalSignalInput } from '@/lib/cos/external-signals'
@@ -107,7 +108,11 @@ function defaultSearchPort(): WebSearchPort {
   return {
     async search(query: string, count: number): Promise<SearchResult[]> {
       const apiKey = process.env.BRAVE_SEARCH_API_KEY
-      if (!apiKey) throw new Error('BRAVE_SEARCH_API_KEY is not configured in environment variables.')
+      if (!apiKey) {
+        const pages = await searchPublicWeb(query, count)
+        if (!pages.length) throw new Error('Public web discovery returned no pages.')
+        return pages.map(page => ({ title: page.title, url: page.url, snippet: page.snippet }))
+      }
 
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 8000)
@@ -121,7 +126,11 @@ function defaultSearchPort(): WebSearchPort {
           },
         })
 
-        if (!res.ok) throw new Error(`Search API returned ${res.status}.`)
+        if (!res.ok) {
+          const pages = await searchPublicWeb(query, count)
+          if (!pages.length) throw new Error(`Search API returned ${res.status}.`)
+          return pages.map(page => ({ title: page.title, url: page.url, snippet: page.snippet }))
+        }
 
         const json = await res.json()
         const raw = json?.web?.results

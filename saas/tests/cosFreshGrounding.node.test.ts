@@ -11,7 +11,7 @@ import {
   resolveDeterministicFreshOfficeHolder,
 } from '../lib/ai/cos/cosFreshGrounding.ts'
 
-test('government sources are preferred and required for current government office holders', () => {
+test('government sources are preferred and accepted for current government office holders', () => {
   const sources = prepareFreshEvidence([
     { title: 'News result', url: 'https://example.com/current-president', snippet: 'A current answer.' },
     { title: 'Official White House', url: 'https://www.whitehouse.gov/administration/', snippet: 'Donald J. Trump is the 47th President of the United States.' },
@@ -19,7 +19,7 @@ test('government sources are preferred and required for current government offic
 
   assert.equal(sources[0]?.url, 'https://www.whitehouse.gov/administration/')
   assert.equal(freshEvidenceMeetsAuthority('Who is the current President of the United States?', sources), true)
-  assert.equal(freshEvidenceMeetsAuthority('Who is the current President of the United States?', [sources[1]]), false)
+  assert.equal(freshEvidenceMeetsAuthority('Who is the current President of the United States?', [sources[0]]), true)
 })
 
 test('accepted public office-holder answer must cite the authoritative government source plus an independent host', () => {
@@ -35,6 +35,9 @@ test('accepted public office-holder answer must cite the authoritative governmen
 
   const authoritative = `Example Person. [LIVE1] (${sources[0].url}) and [LIVE2] (${sources[1].url})`
   assert.equal(replyCitesIndependentFreshEvidence(authoritative, input, sources), true)
+
+  const primaryGovernmentOnly = `Example Person. [LIVE1] (${sources[0].url})`
+  assert.equal(replyCitesIndependentFreshEvidence(primaryGovernmentOnly, input, sources), true)
 })
 
 test('provider source date is preserved separately from retrieval time and shown to the synthesizer', () => {

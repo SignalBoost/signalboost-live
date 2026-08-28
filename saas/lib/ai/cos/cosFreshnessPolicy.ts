@@ -1,7 +1,3 @@
-PATH: saas/lib/ai/cos/cosFreshnessPolicy.ts
-ACTION: REPLACE this file on GitHub. Paste everything BELOW the dashed line. Do not paste the PATH line.
-
---------------------------------------------------------------------------------
 // saas/lib/ai/cos/cosFreshnessPolicy.ts
 // Policy for deciding when pretrained/local knowledge is not sufficient because
 // the answer can change without a code or model update.

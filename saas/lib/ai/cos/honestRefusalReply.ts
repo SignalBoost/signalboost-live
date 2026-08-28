@@ -1,7 +1,3 @@
-PATH: saas/lib/ai/cos/honestRefusalReply.ts
-ACTION: REPLACE this file on GitHub. Paste everything BELOW the dashed line. Do not paste the PATH line.
-
---------------------------------------------------------------------------------
 // saas/lib/ai/cos/honestRefusalReply.ts
 //
 // WHAT COS SAYS WHEN IT RELEASES NOTHING.

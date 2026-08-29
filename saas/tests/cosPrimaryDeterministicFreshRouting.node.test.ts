@@ -19,8 +19,8 @@ test('cos-primary resolves explicit direct-flight evidence before any local mode
 
 
 test('cos-primary executes every planned query, reads selected public list pages, and allocates evidence across a compound request', () => {
-  assert.match(source, /freshEvidenceSearchQueries\\(lookupInput\\)/)
-  assert.match(source, /Promise\\.all\\(queries\\.map\\(query=>getExternalInfo\\(query,8/)
-  assert.match(source, /prepareFreshEvidenceAcrossQueries\\(liveResults\\.filter/)
-  assert.match(source, /readPublicPages\\(listSources\\.map/)
+  assert.match(source, /freshEvidenceSearchQueries\(lookupInput\)/)
+  assert.match(source, /Promise\.all\(queries\.map\(query=>getExternalInfo\(query,8/)
+  assert.match(source, /prepareFreshEvidenceAcrossQueries\(liveResults\.filter/)
+  assert.match(source, /readPublicPages\(listSources\.map/)
 })

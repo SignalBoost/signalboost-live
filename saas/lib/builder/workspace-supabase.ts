@@ -5,7 +5,7 @@ const MAX_FILE_BYTES = 512 * 1024
 const MAX_FILES = 100
 
 function stripNulls(value: string): string {
-  return String(value ?? '').replace(/\u0000|\\\\u0000|\\\\0/g, '')
+  return String(value ?? '').replace(/\u0000/g, '')
 }
 
 function safePath(value: string): string {

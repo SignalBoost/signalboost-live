@@ -39,7 +39,7 @@ import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
-import { deepenClaimResearch } from '@/lib/ai/cos/cosClaimResearch'
+import { constructDatedRoster, deepenClaimResearch } from '@/lib/ai/cos/cosClaimResearch'
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
 import { getAccess } from '@/lib/auth/access'
@@ -234,6 +234,7 @@ export async function POST(req:NextRequest){
     freshSources=prepareFreshEvidenceAcrossQueries(liveResults.filter(live=>live.ok).map(live=>live.results),8)
     const claimResearch=await deepenClaimResearch(lookupInput,freshSources,readPublicPages)
     freshSources=claimResearch.sources
+    const constructedRoster=constructDatedRoster(lookupInput,freshSources)
     const sources=freshSources
     const authoritySatisfied=freshEvidenceMeetsQuestionAuthority(lookupInput, sources)&&securityScenarioEvidenceIsSpecific(lookupInput,freshSources)
     logEscalation({event:'fresh_external_evidence_result',query:queries.join(' | '),documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),claim_research:claimResearch.claims,pages_read:claimResearch.pagesRead,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
@@ -244,6 +245,12 @@ export async function POST(req:NextRequest){
       const reply=freshEvidenceUnavailableReply(language,lookupInput),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
       await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-unavailable',{prompt:lookupInput,answered:false,confidence:0,branch:'fresh_evidence_unavailable'})
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-unavailable',confidence_score:0,confidence_threshold:confidenceThreshold(),escalation_reason_code:'insufficient_live_authority',fresh_failure_class:'insufficient_live_authority',external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:200})
+    }
+    if(constructedRoster){
+      const reply=constructedRoster.reply
+      const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:constructedRoster.sources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:null})
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-dated-roster',{prompt:lookupInput,answered:true,confidence:.99,branch:'fresh_dated_roster'})
+      return NextResponse.json({ok:true,reply,source:'cos-fresh-dated-roster',confidence_score:.99,external_ai_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:constructedRoster.sources.map(source=>({id:source.id,title:source.title,url:source.url})),execution_allowed:false,external_action_taken:false})
     }
 
     const deterministicFresh=resolveDeterministicDirectFlight(lookupInput,freshSources)

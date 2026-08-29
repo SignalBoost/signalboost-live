@@ -55,3 +55,10 @@ The newest portable, and the clearest illustration of the pattern:
    **Read with ONBOARD.md** header pointing back.
 3. Add it to the table above **and** to ONBOARD §12D's documentation map — both
    directions, per the §12D cross-reference rule.
+
+## Specialist agents
+
+The product roadmap for optional portable-specific agents is documented in
+`docs/architecture/PORTABLE-SPECIALIST-AGENT-ROADMAP.md`. A specialist is a bounded
+worker governed by COS; it is not a second COS brain or an automatic grant of execution
+authority.

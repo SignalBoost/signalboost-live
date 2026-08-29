@@ -13,6 +13,7 @@ export type ClaimResearchResult = {
   claims: ClaimResearchClaim[]
   pagesRead: number
 }
+export type DatedRoster = { reply: string; sources: FreshEvidenceSource[] } | null
 
 function requestedWindowStart(input: string, now = new Date()): number | null {
   const match = String(input || '').match(/\b(?:past|last)\s+(\d{1,3})\s+years?\b/i)
@@ -115,4 +116,20 @@ export async function deepenClaimResearch(input: string, sources: FreshEvidenceS
 
 export function claimResearchPrompt(claims: ClaimResearchClaim[]): string {
   return claims.map((claim, index) => `${index + 1}. ${claim.text} — ${claim.status}`).join('\n')
+}
+
+/** Build a bounded answer from dated rows already read from selected sources. */
+export function constructDatedRoster(input: string, sources: FreshEvidenceSource[], now = new Date()): DatedRoster {
+  const start = requestedWindowStart(input, now)
+  if (start === null) return null
+  const rows: Array<{ name: string; start: number; end: number | null; source: FreshEvidenceSource }> = []
+  for (const source of sources) for (const match of String(source.snippet || '').matchAll(/(?:^|\n)\s*(?:\d+[.)]\s*)?([A-Z][A-Za-z.'’-]+(?:\s+[A-Z][A-Za-z.'’-]+){1,5})\s*\(?\s*(\d{4})\s*[–-]\s*(\d{4})?\s*\)?/gm)) {
+    const end = match[3] ? Number(match[3]) : null
+    if ((end ?? now.getUTCFullYear()) >= start) rows.push({ name: match[1].trim(), start: Number(match[2]), end, source })
+  }
+  const unique = rows.filter((row, index, all) => all.findIndex(other => other.name === row.name && other.start === row.start) === index).sort((a, b) => a.start - b.start)
+  if (unique.length < 2) return null
+  const list = unique.map(row => `- ${row.name} — ${row.start}${row.end ? `–${row.end}` : '–present'}`).join('\n')
+  const used = [...new Map(unique.map(row => [row.source.url, row.source] as const)).values()]
+  return { reply: `Verified dated entries for the requested period:\n${list}`, sources: used }
 }

@@ -210,3 +210,18 @@ test('compound evidence selection retains a source from each query', () => {
   assert.equal(sources.length, 3)
   assert.ok(sources.some(source => source.url === 'https://history.gov/former'))
 })
+
+
+test('compound current-office request can deterministically preserve a government-grounded incumbent', () => {
+  const sources = prepareFreshEvidence([
+    { title: 'The Secretary of State', url: 'https://www.state.gov/secretary/', snippet: 'Marco Rubio is the current Secretary of State of the United States.' },
+    { title: 'List of United States secretaries of state', url: 'https://reference.example/list', snippet: 'Historical office-holder list.' },
+  ])
+  const resolved = resolveDeterministicFreshOfficeHolder(
+    'who is the current US secretary of State and give me a list of the past secretary of state for the past 20 years',
+    sources,
+  )
+  assert.ok(resolved)
+  assert.equal(resolved?.name, 'Marco Rubio')
+  assert.match(resolved?.reply || '', /state\.gov\/secretary/)
+})

@@ -76,7 +76,9 @@ export class BuilderToolLoop {
         }
         trace.push({ round, toolId: action.toolId, input: action.input, ok: true, output })
       } catch (error) {
-        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: error instanceof Error ? error.message : 'builder_tool_failed' })
+        const message = error instanceof Error ? error.message : 'builder_tool_failed'
+        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: message })
+        return { ok: false, error: message, trace }
       }
     }
     return { ok: false, error: 'builder_round_budget_exhausted', trace }

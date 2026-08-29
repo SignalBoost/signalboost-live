@@ -114,9 +114,11 @@ function excerptFreshPageBody(body:string,input:string):string{
     const line=lines[index].toLowerCase()
     if(roleTerms.some(term=>line.includes(term))||/\b(?:former|past|previous|history|list of)\b/i.test(lines[index]))anchors.add(index)
   }
-  const selected=new Set<number>()
+  const selected=new Set<number>(),historyRequest=/\b(?:former|past|previous|last)\b/i.test(input)
   for(const index of anchors){
-    const span=/\b(?:former|past|previous|history|list of)\b/i.test(lines[index])?90:4
+    // Official rosters can be headed only by the role (for example, “Secretaries of …”).
+    // In a historical request, retain the bounded section after every semantic anchor.
+    const span=historyRequest?140:/\b(?:former|past|previous|history|list of)\b/i.test(lines[index])?90:4
     for(let cursor=Math.max(0,index-2);cursor<Math.min(lines.length,index+span);cursor+=1)selected.add(cursor)
   }
   const excerpt=[...selected].sort((left,right)=>left-right).map(index=>lines[index]).join('\n')

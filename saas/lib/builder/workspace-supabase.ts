@@ -111,10 +111,10 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
     const existing = await this.readFile(workspaceId, safe)
     if (!existing && Number(count || 0) >= MAX_FILES) throw new Error('builder_file_limit')
     const updatedAt = new Date().toISOString()
-    const { error } = await this.db.from('builder_workspace_files').upsert(
-      { workspace_id: workspaceId, user_id: this.userId, path: safe, content: encodeStoredContent(body), updated_at: updatedAt },
-      { onConflict: 'workspace_id,path' },
-    )
+    const filePayload = { workspace_id: workspaceId, user_id: this.userId, path: safe, content: encodeStoredContent(body), updated_at: updatedAt }
+    const { error } = existing
+      ? await this.db.from('builder_workspace_files').update({ content: filePayload.content, updated_at: updatedAt }).eq('workspace_id', workspaceId).eq('user_id', this.userId).eq('path', safe)
+      : await this.db.from('builder_workspace_files').insert(filePayload)
     if (error) {
       console.error('[builder_file_write_failed]', {
         message: error.message,

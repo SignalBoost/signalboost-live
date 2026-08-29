@@ -43,6 +43,8 @@ import { constructDatedRoster, deepenClaimResearch } from '@/lib/ai/cos/cosClaim
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
 import { getAccess } from '@/lib/auth/access'
+import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
+import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import {
   isProvenanceIntrospection,
   requestsExternalAction,
@@ -156,7 +158,7 @@ function markFreshLocalReasoning(provenance:any,args:{invoked:boolean;model?:str
 }
 function freshTelemetryProvenance(invoked:boolean,reasonerLabel:string|null){return{localModelInvoked:invoked,reasonerLabel}}
 
-export async function POST(req:NextRequest){
+export async function postCosPrimary(req:NextRequest){
   const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body)
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
   const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body),isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
@@ -385,4 +387,31 @@ export async function POST(req:NextRequest){
     if(reply)await writeCosPrimaryProvenance(userId,reply,executionProvenance,responseSource)
     return NextResponse.json({...payload,reply,source:responseSource,confidence_score:finalConfidence,cos_first_attempted:Boolean(cos)||Boolean(localError),cos_first_handled:Boolean(cos?.handled),cos_first_confidence:cos?.confidence??null,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,independent_reasoner:reasonerHealth,cos_first_provenance:cos?.provenance??null,execution_provenance:executionProvenance,external_ai_invoked:externalInvoked,external_provider:externalInvoked?external.provider:null,external_model:externalInvoked?external.model:null,external_provider_source:externalInvoked?external.source:null,external_fallback_invoked:externalInvoked,external_fallback_succeeded:externalInvoked&&!continuityFailed,local_model_invoked:finalLocalModelInvoked,isolation_mode:false,live_telemetry:liveTelemetry},{status:response.status})
   }catch(error){const externalInvoked=Boolean(traced.trace.invoked);logEscalation({event:'external_escalation_result_unparsed',reason_code:reason.code,provider:normalizeProvider(traced.trace.provider),model:traced.trace.model,status:response.status,error:error instanceof Error?error.message:String(error),external_ai_invoked:externalInvoked});emitRequestTelemetry({startedAt,input,source:externalInvoked?'external_fallback':'local_cos_reasoning',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:externalInvoked});return response}
+}
+
+/** API-wide post-answer decorator. It cannot alter COS reasoning, grounding, or provenance. */
+export async function POST(req: NextRequest) {
+  const body = await req.clone().json().catch(() => ({}))
+  const prompt = latestUserText(body)
+  const response = await postCosPrimary(req)
+  const headers = new Headers(response.headers)
+  headers.delete('content-length')
+  try {
+    const payload: any = await response.clone().json()
+    if (!payload || typeof payload !== 'object' || !String(payload.reply || '').trim() || !prompt) return response
+    const successful = response.ok && payload.ok !== false
+    payload.suggested_followups = await suggestFollowups({
+      prompt,
+      reply: String(payload.reply),
+      sources: Array.isArray(payload.live_evidence_sources) ? payload.live_evidence_sources : [],
+      failedClosed: !successful,
+    })
+    const userId = (await getAccess().catch(() => null))?.userId || null
+    if (userId && payload.suggested_followups.length === 2) {
+      await attachSuggestedFollowupsToStoredTurn(userId, String(payload.reply), payload.suggested_followups)
+    }
+    return NextResponse.json(payload, { status: response.status, headers })
+  } catch {
+    return response
+  }
 }

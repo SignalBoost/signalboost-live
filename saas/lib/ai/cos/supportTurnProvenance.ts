@@ -133,3 +133,26 @@ export async function attachRecordedTurnProvenance(conversationId: string,userId
     return false
   }
 }
+
+/** Persists UI-only next-question chips with the exact assistant turn, never in its answer text. */
+export async function attachSuggestedFollowupsToStoredTurn(userId: string, assistantReply: string, followups: string[]): Promise<boolean> {
+  if (!userId || followups.length !== 2) return false
+  const db = cosServiceDb(); if (!db) return false
+  const expectedContent = normalizeAssistantContent(assistantReply); if (!expectedContent) return false
+  try {
+    const { data: rows, error } = await db.from('assistant_messages')
+      .select('id,content,provenance').eq('user_id', userId).eq('role', 'assistant')
+      .order('created_at', { ascending: false }).limit(20)
+    if (error) throw error
+    const row = (rows ?? []).find((item: any) => assistantContentMatchesForProvenance(item?.content, assistantReply))
+    if (!row?.id) return false
+    const provenance = normalize(row.provenance) || {}
+    const updated = { ...provenance, suggested_followups: followups }
+    const { error: updateError } = await db.from('assistant_messages').update({ provenance: updated }).eq('id', row.id).eq('user_id', userId)
+    if (updateError) throw updateError
+    return true
+  } catch (error) {
+    console.error('supportTurnProvenance: suggested followup attach failed', error)
+    return false
+  }
+}

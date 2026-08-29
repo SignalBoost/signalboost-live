@@ -9,12 +9,13 @@ import { isProvenanceIntrospection } from '@/lib/ai/cos/cosOrchestration'
 import { readCosPrimaryPriorProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
+import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-async function withSuggestedFollowups(response: Response, prompt: string): Promise<NextResponse> {
+export async function withSuggestedFollowups(response: Response, prompt: string, userId: string | null = null): Promise<NextResponse> {
   const headers = new Headers(response.headers)
   headers.delete('content-length')
   let payload: any
@@ -24,6 +25,10 @@ async function withSuggestedFollowups(response: Response, prompt: string): Promi
   if (!payload || typeof payload !== 'object' || !String(payload.reply || '').trim()) {
     return NextResponse.json(payload, { status: response.status, headers })
   }
+  if (Array.isArray(payload.suggested_followups) && payload.suggested_followups.length === 2) {
+    if (userId) await attachSuggestedFollowupsToStoredTurn(userId, String(payload.reply), payload.suggested_followups)
+    return NextResponse.json(payload, { status: response.status, headers })
+  }
   const successful = response.ok && payload.ok !== false
   payload.suggested_followups = await suggestFollowups({
     prompt,
@@ -31,6 +36,9 @@ async function withSuggestedFollowups(response: Response, prompt: string): Promi
     sources: Array.isArray(payload.live_evidence_sources) ? payload.live_evidence_sources : [],
     failedClosed: !successful,
   })
+  if (userId && payload.suggested_followups.length === 2) {
+    await attachSuggestedFollowupsToStoredTurn(userId, String(payload.reply), payload.suggested_followups)
+  }
   return NextResponse.json(payload, { status: response.status, headers })
 }
 
@@ -89,7 +97,7 @@ export async function POST(req: NextRequest) {
       external_ai_invoked: false,
       local_model_invoked: false,
       provenance_match_verified: Boolean(recorded),
-    }), prompt)
+    }), prompt, auditUserId)
   }
 
   const permission = evaluateRunpodWakePermission({
@@ -115,5 +123,5 @@ export async function POST(req: NextRequest) {
       withRunpodWakePermission(permission, () => cosPrimaryPost(req)),
     ),
   )
-  return withSuggestedFollowups(response, prompt)
+  return withSuggestedFollowups(response, prompt, auditUserId)
 }

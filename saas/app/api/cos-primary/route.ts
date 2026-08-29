@@ -274,7 +274,7 @@ export async function POST(req:NextRequest){
 
     const deterministicFresh=resolveDeterministicDirectFlight(lookupInput,freshSources)
     const deterministicOfficeHolder=resolveDeterministicFreshOfficeHolder(lookupInput,freshSources)
-    const deterministicOfficeHolderHasRequestedRoster=Boolean(deterministicOfficeHolder&&/\n\nPast .+s for the requested period:\n- .+\n- /s.test(deterministicOfficeHolder.reply))
+    const deterministicOfficeHolderHasRequestedRoster=Boolean(deterministicOfficeHolder&&/\n\nPast[\s\S]+s for the requested period:\n- .+\n- /.test(deterministicOfficeHolder.reply))
     const deterministicAnswer=deterministicFresh??(!asksForHistoricalRoster(lookupInput)||deterministicOfficeHolderHasRequestedRoster?deterministicOfficeHolder:null)
     if (deterministicOfficeHolder && asksForHistoricalRoster(lookupInput) && !deterministicOfficeHolderHasRequestedRoster) {
       partialFreshOfficeHolderReply=partialOfficeHolderReply(deterministicOfficeHolder.reply,language)

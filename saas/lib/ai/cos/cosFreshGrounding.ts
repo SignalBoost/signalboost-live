@@ -80,7 +80,10 @@ function cleanJurisdiction(value: string | undefined): string {
 }
 
 function officeHolderDescriptor(input: string): { role: string; descriptor: string } | null {
-  const match = SIMPLE_CURRENT_OFFICE_HOLDER.exec(String(input || '').trim())
+  // Compound requests may ask for the incumbent and a separate historical list. Extract only
+  // the current-holder clause here; the caller decides whether the second clause is complete.
+  const currentClause = String(input || '').split(/\b(?:and|also|plus|then)\b|[?!.;,]/i)[0]?.trim() || String(input || '').trim()
+  const match = SIMPLE_CURRENT_OFFICE_HOLDER.exec(currentClause)
   if (!match) return null
   const rawRole = String(match[1] || '').trim()
   const jurisdiction = cleanJurisdiction(match[2])
@@ -257,7 +260,9 @@ export function resolveDeterministicFreshOfficeHolder(
   }
 
   const ranked = [...support.entries()]
-    .filter(([, value]) => value.hosts.size >= 2)
+    // A first-party government page is sufficient for the incumbent of a public office.
+    // Other sources still require independent corroboration.
+    .filter(([, value]) => value.hosts.size >= 2 || value.sources.some(source => isGovernmentHost(freshEvidenceHost(source.url))))
     .sort((a, b) => b[1].hosts.size - a[1].hosts.size || b[1].sources.length - a[1].sources.length)
   if (!ranked.length) return null
   if (ranked.length > 1 && ranked[0][1].hosts.size === ranked[1][1].hosts.size) return null
@@ -273,7 +278,7 @@ export function resolveDeterministicFreshOfficeHolder(
     .slice()
     .sort((a, b) => authorityScore(b) - authorityScore(a))
     .slice(0, 2)
-  if (materialSources.length < 2) return null
+  if (!materialSources.length) return null
 
   const sourceText = materialSources.map(source => `[${source.id}] (${source.url})`).join(' and ')
   return {

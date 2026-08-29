@@ -20,6 +20,7 @@ import {
   prepareFreshEvidence,
   prepareFreshEvidenceAcrossQueries,
   resolveDeterministicDirectFlight,
+  resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,
 } from '@/lib/ai/cos/cosFreshGrounding'
 import { freshEvidenceMeetsQuestionAuthority } from '@/lib/ai/cos/cosFreshAuthority'
@@ -103,6 +104,13 @@ function provenanceReportFollowupReply(language:string):string{
   return 'The immediately preceding reply is already the recorded provenance report for the answer before it. Its “Primary Reasoner” and “Material Contributors” sections identify the source; it is not a new substantive answer that needs a second provenance record.'
 }
 function emitRequestTelemetry(args:{startedAt:number;input:string;reply?:string|null;source:CosLiveResponseSource;confidence?:number|null;provenance?:any;externalAiInvoked:boolean}){const p=args.provenance??null,observation=buildCosLiveTelemetry({responseSource:args.source,latencyMs:Math.max(0,Date.now()-args.startedAt),confidence:args.confidence??null,reasonerLabel:p?.reasonerLabel??p?.local_reasoning?.model??null,localModelInvoked:p?.localModelInvoked??p?.local_reasoning?.invoked??false,externalAiInvoked:args.externalAiInvoked,knowledgeFactsUsed:p?.knowledgeFactsUsed??p?.knowledge_graph?.evidence_count??0,learnedItemsUsed:p?.learnedItemsUsed??p?.learned_corpus?.evidence_count??0,userMemoriesUsed:p?.userMemoriesUsed??p?.user_memory?.evidence_count??0,similarityScore:p?.similarityScore,promptChars:args.input.length,replyChars:String(args.reply??'').length});emitCosLiveTelemetry(observation);return observation}
+function asksForHistoricalRoster(input:string):boolean{return /\b(?:former|past|previous|last)\b/i.test(input)&&/\b(?:list|secretar(?:y|ies)|office holder|history)\b/i.test(input)}
+function partialOfficeHolderReply(reply:string,language:string):string{
+  const suffix=language==='pt'?'Não foi possível verificar com segurança a lista histórica solicitada a partir das fontes recuperadas nesta resposta.':
+    language==='es'?'No se pudo verificar con seguridad la lista histórica solicitada a partir de las fuentes recuperadas en esta respuesta.':
+    'I could not verify the requested historical list safely from the retrieved sources in this response.'
+  return `${reply}\n\n${suffix}`
+}
 function securityReleaseContinuityReply(input:string):string|null{if(!/\b(?:zero[- ]day|vulnerabilit|infosec|tenant\s+metadata)\b/i.test(input)||!/\b(?:launch|release|go\/no-go|go no-go|conference)\b/i.test(input))return null;return 'GO/NO-GO: NO-GO until the security incident authority documents containment or an accepted risk decision. Preserve evidence; stop release promotion; identify the affected dependency/version and exposure path; determine whether tenant metadata was accessible; apply or isolate the mitigation; assess notification and contractual obligations with Legal/Privacy; and reconvene the launch decision on recorded remediation evidence. Live verification or model synthesis was unavailable, so COS is not asserting exploitability, scope, or legal duties beyond the scenario facts.'}
 function freshEvidenceUnavailableReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;const messages:Record<string,string>={en:'COS requires live authoritative evidence for this current fact, but live verification is unavailable or insufficient right now. No model-memory answer was used.',es:'COS requiere evidencia autorizada en vivo para este hecho actual, pero la verificación en vivo no está disponible o es insuficiente en este momento. No se utilizó una respuesta de memoria del modelo.',pt:'O COS exige evidência autorizada ao vivo para este fato atual, mas a verificação em vivo está indisponível ou insuficiente neste momento. Nenhuma resposta da memória do modelo fue usada.',pl:'COS wymaga aktualnego, wiarygodnego źródła dla tego bieżącego faktu, ale w tej chwili weryfikacja na żywo jest niedostępna lub niewystarczająca. Nie użyto odpowiedzi z pamięci modelu.',ru:'COS требует актуального авторитетного источника для этого текущего факта, но сейчас живая проверка недоступна или недостаточна. Ответ из памяти модели не использовался.'};return messages[language]||messages.en}
 function freshSynthesisRejectedReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;return buildFreshVerificationUnavailableReply({prompt:input,language})}
@@ -189,6 +197,7 @@ export async function POST(req:NextRequest){
   }
 
   let freshSources:FreshEvidenceSource[]=[],freshRetrievedAt:string|null=null,freshError:string|null=null
+  let partialFreshOfficeHolderReply:string|null=null
   let freshLocalAttempted=false,freshLocalModel:string|null=null
   let freshLocalFailureCode: FreshEvidenceInternalFailureCode | null = null
   if(requiresFreshEvidence){
@@ -221,7 +230,13 @@ export async function POST(req:NextRequest){
     }
 
     const deterministicFresh=resolveDeterministicDirectFlight(lookupInput,freshSources)
-    if(deterministicFresh){
+    const deterministicOfficeHolder=resolveDeterministicFreshOfficeHolder(lookupInput,freshSources)
+    const deterministicAnswer=deterministicFresh??(!asksForHistoricalRoster(lookupInput)?deterministicOfficeHolder:null)
+    if (deterministicOfficeHolder && asksForHistoricalRoster(lookupInput)) {
+      partialFreshOfficeHolderReply=partialOfficeHolderReply(deterministicOfficeHolder.reply,language)
+    }
+    if(deterministicAnswer){
+      const deterministicFresh=deterministicAnswer
       const reply=deterministicFresh.reply
       const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:deterministicFresh.sources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:null})
       ;Object.assign(executionProvenance as any,{policy:'fresh_live_data_deterministic_first',assistant_text_used_for_resolution:false,deterministic_fresh_fact:{used:true,kind:deterministicFresh.kind??'direct_flight',retrieval_documents_acquired:freshSources.length,evidence_selected:deterministicFresh.sources.length}})
@@ -283,9 +298,10 @@ export async function POST(req:NextRequest){
       ? 'Authoritative live evidence was retrieved, but local fresh-evidence synthesis failed after bounded transport retries.'
       : 'Authoritative live evidence was retrieved, but the completed fresh-evidence synthesis did not satisfy the grounding contract.',synthesisAccepted:false}):baseProvenance
     if(requiresFreshEvidence)Object.assign(executionProvenance as any,{policy:'fresh_live_data_local_first',assistant_text_used_for_resolution:false})
-    const reply=requiresFreshEvidence?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:cos?.confidence??0,provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
-    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'failed_closed',{prompt:requiresFreshEvidence?lookupInput:input,answered:false,confidence:0,branch:'failed_closed'})
-    return NextResponse.json({ok:false,reply,error:reply,source:freshFailureCode === 'local_synthesis_failed' ? 'cos-fresh-local-synthesis-failed' : 'cos-fresh-evidence-ungrounded',cos_first_attempted:requiresFreshEvidence?freshLocalAttempted:(Boolean(cos)||Boolean(localError)),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,fresh_failure_class:freshFailureCode,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:requiresFreshEvidence,live_evidence_sources:requiresFreshEvidence?freshSources.map(source=>({id:source.id,title:source.title,url:source.url})):[],live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
+    const partialCompletion=Boolean(requiresFreshEvidence&&partialFreshOfficeHolderReply)
+    const reply=partialCompletion?partialFreshOfficeHolderReply!:(requiresFreshEvidence?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language}))),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:partialCompletion?0.99:(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,partialCompletion?'cos-fresh-partial-grounded':'failed_closed',{prompt:requiresFreshEvidence?lookupInput:input,answered:partialCompletion,confidence:partialCompletion?0.99:0,branch:partialCompletion?'fresh_partial_grounded':'failed_closed'})
+    return NextResponse.json({ok:partialCompletion,reply,error:partialCompletion?undefined:reply,source:partialCompletion?'cos-fresh-partial-grounded':(freshFailureCode === 'local_synthesis_failed' ? 'cos-fresh-local-synthesis-failed' : 'cos-fresh-evidence-ungrounded'),partial_completion:partialCompletion,cos_first_attempted:requiresFreshEvidence?freshLocalAttempted:(Boolean(cos)||Boolean(localError)),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,fresh_failure_class:freshFailureCode,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:requiresFreshEvidence,live_evidence_sources:requiresFreshEvidence?freshSources.map(source=>({id:source.id,title:source.title,url:source.url})):[],live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:partialCompletion?200:503})
   }
 
   if(requiresFreshEvidence&&freshRetrievedAt){

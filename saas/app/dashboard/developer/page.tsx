@@ -6,6 +6,7 @@ type WorkspaceFile = { path: string; content: string }
 type BuilderReply = { workspaceId?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string }> }
 
 const MAX_UPLOAD_BYTES = 512 * 1024
+const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
 function filename(path: string): string { return path.split('/').pop() || 'download.txt' }
 
 export default function DeveloperPage() {
@@ -22,6 +23,13 @@ export default function DeveloperPage() {
   useEffect(() => {
     const suggestedObjective = new URLSearchParams(window.location.search).get('objective')?.trim()
     if (suggestedObjective) setObjective(suggestedObjective.slice(0, 8_000))
+    try {
+      const staged = JSON.parse(sessionStorage.getItem(BUILDER_HANDOFF_FILES_KEY) || '[]')
+      if (Array.isArray(staged)) setFiles(staged
+        .filter(file => typeof file?.path === 'string' && typeof file?.content === 'string')
+        .slice(0, 20))
+      sessionStorage.removeItem(BUILDER_HANDOFF_FILES_KEY)
+    } catch { sessionStorage.removeItem(BUILDER_HANDOFF_FILES_KEY) }
   }, [])
 
   async function addFiles(selected: FileList | null) {

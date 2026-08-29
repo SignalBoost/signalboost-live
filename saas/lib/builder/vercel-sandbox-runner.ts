@@ -26,7 +26,7 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
     try {
       await sandbox.fs.mkdir(ROOT, { recursive: true })
       for (const file of input.files) {
-        const destination = \`\${ROOT}/\${file.path}\`
+        const destination = `\${ROOT}/\${file.path}`
         const directory = parent(destination)
         if (directory && directory !== ROOT) await sandbox.fs.mkdir(directory, { recursive: true })
         await sandbox.fs.writeFile(destination, file.content, 'utf8')

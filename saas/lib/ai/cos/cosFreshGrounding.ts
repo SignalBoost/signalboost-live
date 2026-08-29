@@ -54,7 +54,7 @@ function authorityScore(result: SearchResult): number {
   return score
 }
 
-function isPersonOrOfficeEvaluation(input: string): boolean {
+export function isPersonOrOfficeEvaluation(input: string): boolean {
   // Rankings and "best/worst" are sourced comparisons, not occupancy of a chair.
   // COS still retrieves live pages; it must not demand an official "verdict" host.
   return /\b(?:worst|worse|best|greatest|most successful|least successful|rank(?:ings?)?|overrated|underrated)\b/i.test(input)
@@ -435,6 +435,15 @@ export function freshEvidenceSearchQuery(input: string, now = new Date()): strin
 export function freshEvidenceSearchQueries(input: string, now = new Date()): string[] {
   const primary = freshEvidenceSearchQuery(input, now)
   const raw = String(input || '').trim()
+  if (isPersonOrOfficeEvaluation(raw)) {
+    const topic = raw.replace(/[?!.]+$/g, '').trim()
+    return [...new Set([
+      primary,
+      `${topic} BLS unemployment rate by administration`,
+      `${topic} BLS CPI inflation by administration`,
+      `${topic} BEA real GDP growth by administration`,
+    ])]
+  }
   const role = new RegExp(OFFICE_HOLDER_ROLE_SOURCE, 'i').exec(raw)?.[0]
   const asksForHistory = /\b(?:former|past|previous|last)\b/i.test(raw)
   if (!role || !asksForHistory) return [primary]

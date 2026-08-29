@@ -10,7 +10,7 @@ test.describe('Reviews module responsive SaaS page', () => {
       await page.goto('/dashboard/reviews')
 
       await expect(page.getByRole('heading', { name: /Review collector|Colector|Coletor|Kolektor|Сборщик/i })).toBeVisible()
-      await expect(page.getByRole('region', { name: /Review filters and sorting/i })).toBeVisible()
+      await expect(page.getByRole('region', { name: /Review filters and sorting|Filtros/i })).toBeVisible()
       await expect(page.locator('.sb-review-alert').getByText(guestNotice)).toBeVisible()
       await expect(page.getByLabel(/Admin Console reviews telemetry/i)).toHaveCount(0)
     })

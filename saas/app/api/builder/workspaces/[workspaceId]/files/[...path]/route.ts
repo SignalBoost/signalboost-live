@@ -22,7 +22,7 @@ export async function GET(_: Request, context: { params: Promise<{ workspaceId: 
     return new NextResponse(file.content, {
       headers: {
         'Content-Type': 'application/octet-stream; charset=utf-8',
-        'Content-Disposition': \`attachment; filename="\${name.replace(/["\\r\\n]/g, '_')}"\`,
+        'Content-Disposition': `attachment; filename="\${name.replace(/["\\r\\n]/g, '_')}"`,
         'Cache-Control': 'private, no-store',
       },
     })

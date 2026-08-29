@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 type WorkspaceFile = { path: string; content: string }
 type BuilderReply = { workspaceId?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string }> }
@@ -18,6 +18,11 @@ export default function DeveloperPage() {
   const [error, setError] = useState('')
   const [running, setRunning] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const suggestedObjective = new URLSearchParams(window.location.search).get('objective')?.trim()
+    if (suggestedObjective) setObjective(suggestedObjective.slice(0, 8_000))
+  }, [])
 
   async function addFiles(selected: FileList | null) {
     if (!selected) return

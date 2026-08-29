@@ -6,6 +6,7 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
 import { uiText } from '@/lib/i18n/uiText'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
+import { isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Msg = { role: 'user' | 'assistant'; content: string }
@@ -287,6 +288,11 @@ export default function AssistantPage() {
   async function send(text: string) {
     const content = text.trim()
     if ((!content && stagedFiles.length === 0) || loading) return
+    // Builder is an authenticated product surface. Do not let public Concierge inherit this handoff.
+    if (content && stagedFiles.length === 0 && isCosCodingObjective(content)) {
+      window.location.assign(`/dashboard/developer?objective=${encodeURIComponent(content)}`)
+      return
+    }
     if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
 
     // Build a user-facing label that includes file names

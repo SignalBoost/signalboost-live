@@ -39,6 +39,7 @@ import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
+import { deepenClaimResearch } from '@/lib/ai/cos/cosClaimResearch'
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
 import { getAccess } from '@/lib/auth/access'
@@ -231,38 +232,11 @@ export async function POST(req:NextRequest){
     const liveResults=await Promise.all(queries.map(query=>getExternalInfo(query,8,{bypassCache:true})))
     freshError=liveResults.some(live=>live.ok)?null:liveResults.map(live=>live.ok?'':live.error||'Live search returned no usable evidence.').filter(Boolean).join(' | ')
     freshSources=prepareFreshEvidenceAcrossQueries(liveResults.filter(live=>live.ok).map(live=>live.results),8)
-    // Search snippets can expose a list-page title without its roster. For an explicit
-    // former/past request, read selected public list pages and retain their body as evidence.
-    if (/\b(?:former|past|previous|last)\b/i.test(lookupInput)) {
-      const historySources = freshSources
-        .filter(source => /\b(?:list|former|history|secretar(?:y|ies))\b/i.test(source.title + ' ' + source.url))
-        .sort((left, right) => {
-          const priority = (source: FreshEvidenceSource) => /\b(?:former|history|list)\b/i.test(source.title + ' ' + source.url) ? 1 : 0
-          return priority(right) - priority(left)
-        })
-      // The first selected source comes from the dedicated current-holder query. Read it too:
-      // a valid incumbent must come from page prose, never a result title or navigation label.
-      const listSources = [freshSources[0], ...historySources]
-        .filter((source): source is FreshEvidenceSource => Boolean(source))
-        .filter((source, index, all) => all.findIndex(candidate => candidate.url === source.url) === index)
-        .slice(0, 4)
-      const pageResults = await Promise.allSettled(listSources.map(source => readPublicPages([source.url])))
-      // Public pages may redirect to a canonical URL. Preserve the association with the selected
-      // search result instead of dropping the body merely because its returned URL differs.
-      const bodyByUrl = new Map(listSources.map((source,index) => {
-        const result=pageResults[index]
-        const pages=result.status === 'fulfilled' ? result.value : []
-        const page=pages.find(candidate=>sameFreshSourceUrl(candidate.url,source.url))??pages[0]
-        return [source.url,page?.snippet||''] as const
-      }))
-      freshSources = freshSources.map(source => {
-        const body = bodyByUrl.get(source.url)
-        return body ? { ...source, snippet: excerptFreshPageBody(body, lookupInput) } : source
-      })
-    }
+    const claimResearch=await deepenClaimResearch(lookupInput,freshSources,readPublicPages)
+    freshSources=claimResearch.sources
     const sources=freshSources
     const authoritySatisfied=freshEvidenceMeetsQuestionAuthority(lookupInput, sources)&&securityScenarioEvidenceIsSpecific(lookupInput,freshSources)
-    logEscalation({event:'fresh_external_evidence_result',query:queries.join(' | '),documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
+    logEscalation({event:'fresh_external_evidence_result',query:queries.join(' | '),documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),claim_research:claimResearch.claims,pages_read:claimResearch.pagesRead,assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     if(!authoritySatisfied){
       const detail=freshError||'Live search did not return authoritative evidence required for this current fact.'
       const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:detail,synthesisAccepted:false})

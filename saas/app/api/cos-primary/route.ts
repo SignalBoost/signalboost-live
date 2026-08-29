@@ -37,6 +37,7 @@ import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExt
 import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
+import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
 import { getAccess } from '@/lib/auth/access'
@@ -196,6 +197,17 @@ export async function POST(req:NextRequest){
     const liveResults=await Promise.all(queries.map(query=>getExternalInfo(query,8,{bypassCache:true})))
     freshError=liveResults.some(live=>live.ok)?null:liveResults.map(live=>live.ok?'':live.error||'Live search returned no usable evidence.').filter(Boolean).join(' | ')
     freshSources=prepareFreshEvidenceAcrossQueries(liveResults.filter(live=>live.ok).map(live=>live.results),8)
+    // Search snippets can expose a list-page title without its roster. For an explicit
+    // former/past request, read selected public list pages and retain their body as evidence.
+    if (/\\b(?:former|past|previous|last)\\b/i.test(lookupInput)) {
+      const listSources = freshSources.filter(source => /\\b(?:list|former|history|secretar(?:y|ies))\\b/i.test(source.title + ' ' + source.url)).slice(0, 2)
+      const pages = await readPublicPages(listSources.map(source => source.url)).catch(() => [])
+      const bodyByUrl = new Map(pages.map(page => [page.url, page.snippet] as const))
+      freshSources = freshSources.map(source => {
+        const body = bodyByUrl.get(source.url)
+        return body ? { ...source, snippet: body.slice(0, 6000) } : source
+      })
+    }
     const sources=freshSources
     const authoritySatisfied=freshEvidenceMeetsQuestionAuthority(lookupInput, sources)&&securityScenarioEvidenceIsSpecific(lookupInput,freshSources)
     logEscalation({event:'fresh_external_evidence_result',query:queries.join(' | '),documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})

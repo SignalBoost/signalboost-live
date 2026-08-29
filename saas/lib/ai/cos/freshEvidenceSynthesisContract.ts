@@ -35,6 +35,11 @@ export function freshEvidenceSynthesisSystemPrompt(language: string): string {
     '6. Work claim by claim. Answer each grounded claim. If a distinct claim is not established, say exactly which claim remains unverified; do not discard grounded claims.',
     '7. Return EVIDENCE_INSUFFICIENT only when no claim can be established from the evidence.',
     '8. Be brief, but use a compact numbered list when the question requests a list.',
+    '9. Named people are never excluded. Famous or not, office or not.',
+    '10. State only what the evidence says. Do not add praise, condemnation, protection, or a COS ranking.',
+    '11. Occupancy questions: report the sourced holder and date. If sources disagree on the name, report both.',
+    '12. Evaluative questions (worst, best, rank): present cited metrics and surveys side by side. Do not declare a winner. The user decides.',
+    '13. Do not return EVIDENCE_INSUFFICIENT only because no official page names a best or worst person.',
   ].join('\n')
 }
 

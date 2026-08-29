@@ -2,6 +2,8 @@ import type { BuilderAiPort, BuilderFile, BuilderLoopResult, BuilderRunResult, B
 
 type Action = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> } | { type: 'answer'; answer: string }
 const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'write_file', 'edit_file', 'run'])
+const MAX_WRITES_PER_TURN = 6
+const MAX_RUNS_PER_TURN = 3
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const safeJson = (value: unknown) => { try { return JSON.stringify(value).slice(0, 18_000) } catch { return '"[unserializable]"' } }
 
@@ -30,10 +32,11 @@ export class BuilderToolLoop {
 
   async run(input: { objective: string; workspaceId: string; maxRounds?: number }): Promise<BuilderLoopResult> {
     const trace: BuilderToolTrace[] = [], seen = new Set<string>()
+    let writeCount = 0, runCount = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 12))
     for (let round = 1; round <= maxRounds; round += 1) {
       const response = await this.ai.generate({
-        systemPrompt: 'You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. Never claim a file was changed or code ran unless the tool result in this turn proves it. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.',
+        systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${MAX_WRITES_PER_TURN} file writes/edits and ${MAX_RUNS_PER_TURN} command runs. Never claim a file was changed or code ran unless the tool result in this turn proves it. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
         prompt: [
           `OBJECTIVE:\n${input.objective}`,
           `TOOLS: ${safeJson(tools)}`,
@@ -46,9 +49,13 @@ export class BuilderToolLoop {
       const action = parse(response)
       if (!action) return { ok: false, error: 'builder_invalid_model_control_output', trace }
       if (action.type === 'answer') return { ok: true, answer: action.answer, trace }
+      if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= MAX_WRITES_PER_TURN) return { ok: false, error: 'builder_write_budget_exhausted', trace }
+      if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
       const fingerprint = `${action.toolId}:${safeJson(action.input)}`
       if (seen.has(fingerprint)) return { ok: false, error: `builder_repeated_tool_call:${action.toolId}`, trace }
       seen.add(fingerprint)
+      if (action.toolId === 'write_file' || action.toolId === 'edit_file') writeCount += 1
+      if (action.toolId === 'run') runCount += 1
       try {
         let output: unknown
         if (action.toolId === 'list_files') output = await this.workspace.listFiles(input.workspaceId)

@@ -45,6 +45,15 @@ export function freshEvidenceSynthesisPrompt(args: {
   return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nQUESTION: ${args.input}`
 }
 
+function requiresHistoricalList(input: string): boolean {
+  const text = String(input || '')
+  return /\b(?:list|roster)\b/i.test(text) && /\b(?:former|past|previous|last)\b/i.test(text)
+}
+
+function hasRequestedList(answer: string): boolean {
+  return (String(answer || '').match(/(?:^|\n)\s*\d+[.)]\s+\S/gm) || []).length >= 2
+}
+
 function parseJsonObject(text: string): ModelFreshEvidenceSynthesis | null {
   const raw = String(text || '').trim()
   if (!raw) return null
@@ -67,6 +76,9 @@ export function acceptFreshEvidenceSynthesis(args: {
   const parsed = parseJsonObject(args.text)
   const answer = typeof parsed?.answer === 'string' ? parsed.answer.trim() : ''
   if (!answer || /EVIDENCE_INSUFFICIENT/i.test(answer)) return null
+  // A compound request must not release an incumbent-only response while claiming that
+  // a requested historical roster is absent. The prompt requires a numbered list; enforce it.
+  if (requiresHistoricalList(args.input) && !hasRequestedList(answer)) return null
   if (!Array.isArray(parsed?.evidenceIds)) return null
 
   const byId = new Map(args.sources.map(source => [source.id, source] as const))

@@ -3,6 +3,10 @@ import type { BuilderFile, BuilderWorkspacePort } from './contracts.ts'
 
 const MAX_FILE_BYTES = 512 * 1024
 const MAX_FILES = 100
+const STORAGE_PREFIX = 'base64:'
+
+function encodeStoredContent(value: string): string { return STORAGE_PREFIX + Buffer.from(value, 'utf8').toString('base64') }
+function decodeStoredContent(value: string): string { return value.startsWith(STORAGE_PREFIX) ? Buffer.from(value.slice(STORAGE_PREFIX.length), 'base64').toString('utf8') : value }
 
 function stripNulls(value: string): string {
   return String(value ?? '').replace(/\u0000/g, '')
@@ -28,7 +32,7 @@ function safeContent(value: string): string {
 function toFile(row: any): BuilderFile {
   return Object.freeze({
     path: String(row.path),
-    content: String(row.content),
+    content: decodeStoredContent(String(row.content)),
     updatedAt: Date.parse(String(row.updated_at)) || Date.now(),
   })
 }
@@ -108,7 +112,7 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
     if (!existing && Number(count || 0) >= MAX_FILES) throw new Error('builder_file_limit')
     const updatedAt = new Date().toISOString()
     const { error } = await this.db.from('builder_workspace_files').upsert(
-      { workspace_id: workspaceId, user_id: this.userId, path: safe, content: body, updated_at: updatedAt },
+      { workspace_id: workspaceId, user_id: this.userId, path: safe, content: encodeStoredContent(body), updated_at: updatedAt },
       { onConflict: 'workspace_id,path' },
     )
     if (error) throw new Error(`builder_file_write: ${error.message}`)

@@ -779,7 +779,7 @@ async function tryFreshCurrentFact(input: {
   }
 
   const evidenceBlock = freshEvidenceGroundingBlock(input.prompt, sources, retrievedAt)
-  const reasoned = await callCosReasoner({
+  const synthesisRequest = {
     temperature: 0,
     maxTokens: 1800,
     systemPrompt: [
@@ -791,7 +791,13 @@ async function tryFreshCurrentFact(input: {
       'Answer from the supplied evidence, but do not show source labels or URLs unless the user asks. Recorded provenance retains the exact sources.',
     ].join(' '),
     prompt: `${evidenceBlock}\n\nAnswer the original question now.`,
-  }).catch(() => null)
+  }
+  // Evidence acquisition succeeded. A transient local transport failure must get one bounded
+  // retry before this request can fail closed; it may never fall back to another model.
+  let reasoned: Awaited<ReturnType<typeof callCosReasoner>> | null = null
+  for (let attempt = 0; attempt < 2 && !reasoned?.text; attempt += 1) {
+    reasoned = await callCosReasoner(synthesisRequest).catch(() => null)
+  }
 
   const provenance = freshProvenance({
     reasonerLabel: reasoned?.reasoner.label ?? resolved.config.label,

@@ -34,7 +34,7 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
 
   async listWorkspaces() {
     const { data, error } = await this.db.from('builder_workspaces')
-      .select('id,updated_at')
+      .select('id,objective,updated_at')
       .eq('user_id', this.userId)
       .order('updated_at', { ascending: false })
       .limit(20)

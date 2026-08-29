@@ -97,8 +97,8 @@ export async function deepenClaimResearch(input: string, sources: FreshEvidenceS
   const candidates = [...new Map(claims.flatMap(claim => sources
     .filter(thin)
     .sort((left, right) => scoreSourceForClaim(claim, right) - scoreSourceForClaim(claim, left))
-    .slice(0, 2)
-    .map(source => [source.url, source] as const))).values()].slice(0, 4)
+    .slice(0, 4)
+    .map(source => [source.url, source] as const))).values()].slice(0, 8)
   if (!candidates.length) return { sources, claims: claims.map(text => ({ text, status: statusFor(text, sources, 0) })), pagesRead: 0 }
 
   const settled = await Promise.allSettled(candidates.map(source => readPages([source.url])))
@@ -107,7 +107,10 @@ export async function deepenClaimResearch(input: string, sources: FreshEvidenceS
     const result = settled[index]
     const pages = result.status === 'fulfilled' ? result.value : []
     const page = pages.find(item => sameUrl(item.url, candidates[index].url)) ?? pages[0]
-    if (page?.snippet) bodies.set(candidates[index].url, page.snippet.slice(0, 24_000))
+    const body = page?.snippet?.slice(0, 24_000) || ''
+    // A transport success is not a usable read. Error/interstitial pages never consume the
+    // research budget or block the next nominated source from supplying structured evidence.
+    if (body && !/\b(?:technical difficulties|temporarily unavailable|access denied)\b/i.test(body)) bodies.set(candidates[index].url, body)
   }
   const deepened = bindSourcesToRequestedWindow(input, sources.map(source => bodies.has(source.url) ? { ...source, snippet: bodies.get(source.url)! } : source))
   const pagesRead = bodies.size

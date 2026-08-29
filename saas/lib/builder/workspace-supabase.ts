@@ -32,6 +32,16 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
     if (createError) throw new Error('builder_workspace_not_found_or_unavailable')
   }
 
+  async listWorkspaces() {
+    const { data, error } = await this.db.from('builder_workspaces')
+      .select('id,updated_at')
+      .eq('user_id', this.userId)
+      .order('updated_at', { ascending: false })
+      .limit(20)
+    if (error) throw new Error(`builder_workspace_list: ${error.message}`)
+    return Object.freeze((data ?? []).map(row => Object.freeze({ id: String(row.id), updatedAt: String(row.updated_at) })))
+  }
+
   async listFiles(workspaceId: string) {
     await this.ensureWorkspace(workspaceId)
     const { data, error } = await this.db.from('builder_workspace_files').select('path,updated_at').eq('workspace_id', workspaceId).eq('user_id', this.userId).order('path')

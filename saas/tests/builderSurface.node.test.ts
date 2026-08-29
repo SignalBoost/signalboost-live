@@ -9,6 +9,8 @@ test('Builder is authenticated and does not expose full tool trace content', () 
   assert.match(route, /getAccess\(\)/)
   assert.match(route, /if \(!access\?\.userId\)/)
   assert.match(route, /publicTrace\(result\.trace\)/)
+  assert.match(route, /export async function GET/)
+  assert.match(route, /workspace\.listWorkspaces\(\)/)
   assert.doesNotMatch(route, /trace: result\.trace/)
 })
 

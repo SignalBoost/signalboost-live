@@ -128,3 +128,4 @@ const secondaryButton = { border: '1px solid #334155', borderRadius: 10, backgro
 const fileListStyle = { display: 'flex', flexWrap: 'wrap', gap: 8 } as const
 const fileChipStyle = { display: 'inline-flex', alignItems: 'center', gap: 7, border: '1px solid #334155', borderRadius: 99, padding: '5px 8px 5px 10px', color: '#cbd5e1', fontSize: 13 } as const
 const removeButton = { background: 'transparent', border: 0, color: '#fca5a5', fontSize: 18, lineHeight: 1, cursor: 'pointer' } as const
+const runEvidenceStyle = { margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', border: '1px solid #334155', borderRadius: 10, background: '#020617', color: '#cbd5e1', padding: 10, fontSize: 12, lineHeight: 1.5 } as const

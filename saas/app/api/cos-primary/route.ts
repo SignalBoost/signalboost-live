@@ -16,7 +16,9 @@ import {
 import {
   attachFreshEvidenceProvenance,
   freshEvidenceSearchQuery,
+  freshEvidenceSearchQueries,
   prepareFreshEvidence,
+  prepareFreshEvidenceAcrossQueries,
   resolveDeterministicDirectFlight,
   type FreshEvidenceSource,
 } from '@/lib/ai/cos/cosFreshGrounding'
@@ -190,13 +192,13 @@ export async function POST(req:NextRequest){
   let freshLocalFailureCode: FreshEvidenceInternalFailureCode | null = null
   if(requiresFreshEvidence){
     freshRetrievedAt=new Date().toISOString()
-    const query=freshEvidenceSearchQuery(lookupInput)
-    const live=await getExternalInfo(query,8,{bypassCache:true})
-    freshError=live.ok?null:live.error||'Live search returned no usable evidence.'
-    freshSources=live.ok?prepareFreshEvidence(live.results,8):[]
+    const queries=freshEvidenceSearchQueries(lookupInput)
+    const liveResults=await Promise.all(queries.map(query=>getExternalInfo(query,8,{bypassCache:true})))
+    freshError=liveResults.some(live=>live.ok)?null:liveResults.map(live=>live.ok?'':live.error||'Live search returned no usable evidence.').filter(Boolean).join(' | ')
+    freshSources=prepareFreshEvidenceAcrossQueries(liveResults.filter(live=>live.ok).map(live=>live.results),8)
     const sources=freshSources
     const authoritySatisfied=freshEvidenceMeetsQuestionAuthority(lookupInput, sources)&&securityScenarioEvidenceIsSpecific(lookupInput,freshSources)
-    logEscalation({event:'fresh_external_evidence_result',query,documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
+    logEscalation({event:'fresh_external_evidence_result',query:queries.join(' | '),documents_acquired:freshSources.length,authority_satisfied:authoritySatisfied,error:freshError,source_urls:freshSources.map(source=>source.url),assistant_text_used_for_resolution:false,fresh_context_used:freshConversationContext.contextUsed})
     if(!authoritySatisfied){
       const detail=freshError||'Live search did not return authoritative evidence required for this current fact.'
       const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:detail,synthesisAccepted:false})

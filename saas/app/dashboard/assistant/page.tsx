@@ -303,7 +303,7 @@ export default function AssistantPage() {
     if ((!content && stagedFiles.length === 0) || loading) return
     // Builder is an authenticated product surface. Do not let public Concierge inherit this handoff.
     const builderFiles = builderFilesFromStaged(stagedFiles)
-    if (content && isCosCodingObjective(content) && builderFiles) {
+    if (content && isCosCodingObjective(content)) {
       if (builderFiles.length) sessionStorage.setItem(BUILDER_HANDOFF_FILES_KEY, JSON.stringify(builderFiles))
       window.location.assign(`/dashboard/developer?objective=${encodeURIComponent(content)}`)
       return

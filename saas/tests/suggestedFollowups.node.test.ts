@@ -22,3 +22,10 @@ test('the Concierge renders suggestions separately and sends a chip through the 
   assert.match(source, /onClick=\{\(\) => ask\(followup\)\}/)
   assert.match(source, /homepage\.concierge\.continue/)
 })
+
+test('COS primary decorates successful replies and the public boundary persists its chips with the turn', () => {
+  const primary = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  assert.match(primary, /suggested_followups = await suggestFollowups/)
+  assert.match(browser, /attachSuggestedFollowupsToStoredTurn/)
+})

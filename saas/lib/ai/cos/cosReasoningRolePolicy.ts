@@ -35,7 +35,7 @@ export function cosRoutingObjective(prompt: string): string {
   return clean(text, 2000)
 }
 
-const CODE_SIGNAL = /\b(code|coding|function|script|typescript|javascript|python|sql|query|regex|api call|implement|implementation|refactor|compile|compiler|stack trace|bug|patch|repository|pull request|commit)\b/i
+const CODE_SIGNAL = /\b(code|coding|function|script|typescript|javascript|node(?:\.js)?|npm|pnpm|bun|python|sql|query|regex|api call|implement|implementation|refactor|compile|compiler|stack trace|bug|patch|repository|pull request|commit|create (?:a )?file|run (?:the )?(?:file|code|command))\b/i
 const CURRENT_SIGNAL = /\b(current|currently|today|right now|as of now|latest|most recent|this (?:year|month|week)|live evidence|verify current|office holder)\b/i
 const CRITIC_SIGNAL = /\b(diagnos|root cause|troubleshoot|incident|outage|latency|p9[59]|timeout|regression|failure mode|why (?:is|are|did|does).*(?:slow|fail|error|down|spike)|critique|audit|stress[- ]?test|find (?:the )?(?:flaw|weakness|problem))\b/i
 const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|difference between|what (?:is|are)|define|definition|who (?:is|was|are|were)|company|organization|organisation|architecture|mechanism|explain)\b/i

@@ -31,8 +31,9 @@ export function freshEvidenceSynthesisSystemPrompt(language: string): string {
     '3. Put every evidence label that materially supports the answer in "evidenceIds". Never invent an evidence id.',
     '4. For life/death, current office-holder, or leadership claims, use at least two independent evidence ids when the supplied evidence supports them.',
     '5. Resolve pronouns only from the explicit user context supplied in QUESTION; never infer a different person or entity from model memory.',
-    '6. If the evidence does not establish the answer, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[]}.',
-    '7. Be brief. One to three sentences is enough.',
+    '6. Answer every distinct part of the QUESTION. For a request that combines a current fact with a past/former/history list, provide both; never release only one half.',
+    '7. If the evidence does not establish any required part, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[]}.',
+    '8. Be brief, but use a compact numbered list when the question requests a list.',
   ].join('\n')
 }
 

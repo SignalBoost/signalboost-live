@@ -34,6 +34,7 @@ const ALLOWED_MIME = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10 MB
+const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
 
 // ── Copy ─────────────────────────────────────────────────────────────────────
 const COPY = {
@@ -152,6 +153,18 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error)
     reader.readAsDataURL(file)
   })
+}
+
+function builderFilesFromStaged(files: readonly StagedFile[]): Array<{ path: string; content: string }> | null {
+  const supported = files.filter(file => file.mimeType.startsWith('text/') || file.mimeType === 'application/json')
+  if (supported.length !== files.length || supported.length > 20 || supported.some(file => file.size > 512 * 1024)) return null
+  try {
+    return supported.map(file => {
+      const encoded = file.dataUrl.slice(file.dataUrl.indexOf(',') + 1)
+      const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0))
+      return { path: file.name, content: new TextDecoder().decode(bytes) }
+    })
+  } catch { return null }
 }
 
 function formatBytes(bytes: number): string {
@@ -289,7 +302,9 @@ export default function AssistantPage() {
     const content = text.trim()
     if ((!content && stagedFiles.length === 0) || loading) return
     // Builder is an authenticated product surface. Do not let public Concierge inherit this handoff.
-    if (content && stagedFiles.length === 0 && isCosCodingObjective(content)) {
+    const builderFiles = builderFilesFromStaged(stagedFiles)
+    if (content && isCosCodingObjective(content) && builderFiles) {
+      if (builderFiles.length) sessionStorage.setItem(BUILDER_HANDOFF_FILES_KEY, JSON.stringify(builderFiles))
       window.location.assign(`/dashboard/developer?objective=${encodeURIComponent(content)}`)
       return
     }

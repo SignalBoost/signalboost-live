@@ -46,7 +46,7 @@ export async function POST(request: Request) {
       new VercelSandboxBuilderRunner(),
     ).run({ objective, workspaceId })
 
-    if (!result.ok) return NextResponse.json({ error: result.error, workspaceId, trace: publicTrace(result.trace) }, { status: 422 })
+    if (result.ok === false) return NextResponse.json({ error: result.error, workspaceId, trace: publicTrace(result.trace) }, { status: 422 })
     return NextResponse.json({ workspaceId, reply: result.answer, trace: publicTrace(result.trace) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'builder_request_failed'

@@ -40,10 +40,15 @@ const CURRENT_SIGNAL = /\b(current|currently|today|right now|as of now|latest|mo
 const CRITIC_SIGNAL = /\b(diagnos|root cause|troubleshoot|incident|outage|latency|p9[59]|timeout|regression|failure mode|why (?:is|are|did|does).*(?:slow|fail|error|down|spike)|critique|audit|stress[- ]?test|find (?:the )?(?:flaw|weakness|problem))\b/i
 const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|difference between|what (?:is|are)|define|definition|who (?:is|was|are|were)|company|organization|organisation|architecture|mechanism|explain)\b/i
 
+/** Shared safe handoff check for the authenticated COS UI. Public Concierge never imports this route. */
+export function isCosCodingObjective(prompt: string): boolean {
+  return CODE_SIGNAL.test(cosRoutingObjective(prompt))
+}
+
 /** Deterministic, zero-model-call task routing. */
 export function selectCosReasoningWorkerRole(prompt: string): CosReasoningRoleDecision {
   const objective = cosRoutingObjective(prompt)
-  if (CODE_SIGNAL.test(objective)) return { role: 'coder', reason: 'code_or_implementation_signal', objective }
+  if (isCosCodingObjective(objective)) return { role: 'coder', reason: 'code_or_implementation_signal', objective }
   if (CURRENT_SIGNAL.test(objective)) return { role: 'verifier', reason: 'current_or_live_verification_signal', objective }
   if (CRITIC_SIGNAL.test(objective)) return { role: 'critic', reason: 'diagnostic_or_critical_reasoning_signal', objective }
   if (RESEARCH_SIGNAL.test(objective)) return { role: 'researcher', reason: 'research_or_explanatory_signal', objective }

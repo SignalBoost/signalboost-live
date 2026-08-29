@@ -262,3 +262,28 @@ test('government page chrome cannot outrank a named incumbent in source prose', 
   assert.equal(resolved?.name, 'Marco Rubio')
   assert.match(resolved?.reply || '', /state\.gov\/secretary/)
 })
+
+
+test('official government roster prose answers a compound current-plus-history request without model synthesis', () => {
+  const sources = prepareFreshEvidence([
+    {
+      title: 'Biographies of office holders',
+      url: 'https://history.example.gov/office-holders',
+      snippet: [
+        'Example Alpha (2005–2009)',
+        'Example Beta (2009–2013)',
+        'Example Gamma (2013–2017)',
+        'Example Delta (2017–2021)',
+        'Example Epsilon (2021–2025)',
+        'Example Zeta (2025–)',
+      ].join('\n'),
+    },
+  ])
+  const resolved = resolveDeterministicFreshOfficeHolder(
+    'who is the current Secretary of State and list the past Secretaries of State for the past 20 years',
+    sources,
+  )
+  assert.equal(resolved?.name, 'Example Zeta')
+  assert.match(resolved?.reply || '', /Example Alpha — 2005–2009/)
+  assert.match(resolved?.reply || '', /Example Zeta — 2025–present/)
+})

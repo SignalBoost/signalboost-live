@@ -9,7 +9,7 @@ function encodeStoredContent(value: string): string { return STORAGE_PREFIX + Bu
 function decodeStoredContent(value: string): string { return value.startsWith(STORAGE_PREFIX) ? Buffer.from(value.slice(STORAGE_PREFIX.length), 'base64').toString('utf8') : value }
 
 function stripNulls(value: string): string {
-  return String(value ?? '').replace(/\u0000/g, '')
+  return String(value ?? '').replace(/\u0000|\\\\u0000|\\\\0/g, '')
 }
 
 function safePath(value: string): string {

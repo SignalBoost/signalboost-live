@@ -229,12 +229,45 @@ export function resolveDeterministicDirectFlight(
  * office-holder facts and explicit direct/nonstop route facts. Every resolver remains source-agnostic
  * and fail-closed; no city, airline, office holder, company, or URL is encoded here.
  */
+function resolveDeterministicHistoricalOfficeRoster(
+  input: string,
+  sources: FreshEvidenceSource[],
+): DeterministicFreshOfficeHolderResolution | null {
+  const descriptor = officeHolderDescriptor(input)
+  const years = String(input).match(/\b(?:past|last)\s+(\d{1,3})\s+years?\b/i)
+  if (!descriptor || !years || !freshEvidenceMeetsAuthority(input, sources)) return null
+
+  const fromYear = new Date().getUTCFullYear() - Number(years[1])
+  for (const source of sources) {
+    if (!isGovernmentHost(freshEvidenceHost(source.url))) continue
+    const entries = [...String(source.snippet || '').matchAll(/(?:^|\n)\s*(?:\d+\.\s*)?([\p{Lu}][\p{L}.'’-]*(?:\s+[\p{Lu}][\p{L}.'’-]*){1,5})\s*\(?\s*(\d{4})\s*[–-]\s*(\d{4})?\s*\)?/gmu)]
+      .map(match => ({ name: String(match[1]).trim(), start: Number(match[2]), end: match[3] ? Number(match[3]) : null }))
+      .filter(entry => candidateLooksLikePerson(entry.name) && Number.isFinite(entry.start) && (entry.end === null || entry.end >= fromYear) && entry.start <= new Date().getUTCFullYear())
+    if (entries.length < 2) continue
+
+    const deduped = entries.filter((entry, index, all) => all.findIndex(candidate => candidate.name === entry.name && candidate.start === entry.start) === index)
+    const current = deduped.find(entry => entry.end === null) ?? deduped[deduped.length - 1]
+    const roster = deduped.map(entry => `- ${entry.name} — ${entry.start}${entry.end ? `–${entry.end}` : '–present'}`).join('\n')
+    return {
+      kind: 'office_holder',
+      name: current.name,
+      descriptor: descriptor.descriptor,
+      confidence: 0.99,
+      sources: [source],
+      reply: `The current ${descriptor.descriptor} is ${current.name}.\n\nPast ${descriptor.descriptor}s for the requested period:\n${roster}\n\nSource: [${source.id}] (${source.url}).`,
+    }
+  }
+  return null
+}
+
 export function resolveDeterministicFreshOfficeHolder(
   input: string,
   sources: FreshEvidenceSource[],
 ): DeterministicFreshOfficeHolderResolution | null {
   const directFlight = resolveDeterministicDirectFlight(input, sources)
   if (directFlight) return directFlight
+  const historicalRoster = resolveDeterministicHistoricalOfficeRoster(input, sources)
+  if (historicalRoster) return historicalRoster
 
   const descriptor = officeHolderDescriptor(input)
   if (!descriptor || !freshEvidenceMeetsAuthority(input, sources)) return null

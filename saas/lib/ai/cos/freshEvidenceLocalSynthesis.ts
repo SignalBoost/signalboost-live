@@ -24,7 +24,7 @@ export type FreshEvidenceLocalSynthesis = {
 
 export type FreshEvidenceLocalSynthesisOutcome =
   | FreshEvidenceLocalSynthesis
-  | { kind: 'transport_failed'; error: string }
+  | { kind: 'local_synthesis_failed'; error: string }
   | { kind: 'local_synthesis_unparseable' }
   | { kind: 'citation_grounding_rejected' }
 
@@ -98,7 +98,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
       attemptTimeoutMs,
       reason: errorText(error),
     }))
-    return { kind: 'transport_failed', error: errorText(error) }
+    return { kind: 'local_synthesis_failed', error: errorText(error) }
   }
 
   if (!text?.trim()) return { kind: 'local_synthesis_unparseable' }

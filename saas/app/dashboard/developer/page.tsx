@@ -28,9 +28,9 @@ export default function DeveloperPage() {
     if (!selected) return
     const next: WorkspaceFile[] = []
     for (const file of Array.from(selected).slice(0, 20)) {
-      if (file.size > MAX_UPLOAD_BYTES) { setError(\`\${file.name} is larger than 512 KB.\`); continue }
+      if (file.size > MAX_UPLOAD_BYTES) { setError(`\${file.name} is larger than 512 KB.`); continue }
       try { next.push({ path: file.webkitRelativePath || file.name, content: await file.text() }) }
-      catch { setError(\`Could not read \${file.name}.\`) }
+      catch { setError(`Could not read \${file.name}.`) }
     }
     setFiles(current => [...current.filter(file => !next.some(item => item.path === file.path)), ...next].slice(0, 20))
     if (fileInput.current) fileInput.current.value = ''
@@ -78,14 +78,14 @@ export default function DeveloperPage() {
             <button type="button" onClick={reset} disabled={running} style={secondaryButton}>New workspace</button>
             <button type="button" onClick={run} disabled={!objective.trim() || running} style={{ ...primaryButton, opacity: !objective.trim() || running ? .55 : 1 }}>{running ? 'Builder is working…' : 'Run Builder'}</button>
           </div>
-          {files.length ? <div style={fileListStyle}>{files.map(file => <span key={file.path} style={fileChipStyle}>{file.path}<button type="button" aria-label={\`Remove \${file.path}\`} onClick={() => setFiles(current => current.filter(item => item.path !== file.path))} style={removeButton}>×</button></span>)}</div> : null}
+          {files.length ? <div style={fileListStyle}>{files.map(file => <span key={file.path} style={fileChipStyle}>{file.path}<button type="button" aria-label={`Remove \${file.path}`} onClick={() => setFiles(current => current.filter(item => item.path !== file.path))} style={removeButton}>×</button></span>)}</div> : null}
           {error ? <p role="alert" style={{ margin: 0, color: '#fca5a5' }}>{error}</p> : null}
         </section>
         {reply || trace?.length ? <section style={{ border: '1px solid #1e293b', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 14 }}>
           <h2 style={{ margin: 0, fontSize: 20 }}>Result</h2>
           {reply ? <pre style={{ margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: '#e2e8f0', font: 'inherit', lineHeight: 1.55 }}>{reply}</pre> : null}
-          {workspaceId && workspaceFiles.length ? <div style={{ display: 'grid', gap: 7 }}><strong style={{ fontSize: 13 }}>Workspace files</strong>{workspaceFiles.map(path => <a key={path} href={\`/api/builder/workspaces/\${workspaceId}/files/\${path.split('/').map(encodeURIComponent).join('/')}\`} style={{ color: '#67e8f9' }} download={filename(path)}>{path}</a>)}</div> : null}
-          {trace?.length ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{trace.map(item => <span key={\`\${item.round}-\${item.toolId}\`} style={{ borderRadius: 99, padding: '5px 9px', fontSize: 12, background: item.ok ? '#064e3b' : '#7f1d1d', color: '#fff' }}>{item.toolId}{item.ok ? ' ✓' : ' failed'}</span>)}</div> : null}
+          {workspaceId && workspaceFiles.length ? <div style={{ display: 'grid', gap: 7 }}><strong style={{ fontSize: 13 }}>Workspace files</strong>{workspaceFiles.map(path => <a key={path} href={`/api/builder/workspaces/\${workspaceId}/files/\${path.split('/').map(encodeURIComponent).join('/')}`} style={{ color: '#67e8f9' }} download={filename(path)}>{path}</a>)}</div> : null}
+          {trace?.length ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{trace.map(item => <span key={`\${item.round}-\${item.toolId}`} style={{ borderRadius: 99, padding: '5px 9px', fontSize: 12, background: item.ok ? '#064e3b' : '#7f1d1d', color: '#fff' }}>{item.toolId}{item.ok ? ' ✓' : ' failed'}</span>)}</div> : null}
         </section> : null}
       </section>
     </main>

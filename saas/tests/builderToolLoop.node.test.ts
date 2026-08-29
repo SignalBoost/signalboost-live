@@ -44,3 +44,19 @@ test('Builder rejects traversal and never permits host files', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await assert.rejects(() => workspace.writeFile('user:3', '../.env', 'no'), /builder_invalid_path/)
 })
+
+
+test('Builder stops after the bounded command-run budget', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"run","input":{"command":"echo 1"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"echo 2"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"echo 3"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"echo 4"}}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'run repeatedly', workspaceId: 'user:4', maxRounds: 8 })
+  assert.equal(result.ok, false)
+  if (result.ok === false) assert.equal(result.error, 'builder_run_budget_exhausted')
+  assert.equal(result.trace.length, 3)
+})

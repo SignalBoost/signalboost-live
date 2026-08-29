@@ -33,3 +33,10 @@ test('cos-primary returns a verified clause as a partial result when compound sy
   assert.match(source, /partial_completion:partialCompletion/)
   assert.match(source, /status:partialCompletion\?200:503/)
 })
+
+
+test('compound history extraction ranks roster pages ahead of generic office pages', () => {
+  assert.match(source, /priority\s*=\s*\(source: FreshEvidenceSource\).*former\|history\|list/s)
+  assert.match(source, /\.sort\(\(left, right\)/)
+  assert.match(source, /\.slice\(0, 3\)/)
+})

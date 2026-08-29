@@ -8,10 +8,31 @@ import { withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { isProvenanceIntrospection } from '@/lib/ai/cos/cosOrchestration'
 import { readCosPrimaryPriorProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance'
+import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+async function withSuggestedFollowups(response: Response, prompt: string): Promise<NextResponse> {
+  const headers = new Headers(response.headers)
+  headers.delete('content-length')
+  let payload: any
+  try { payload = await response.clone().json() } catch {
+    return new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers })
+  }
+  if (!payload || typeof payload !== 'object' || !String(payload.reply || '').trim()) {
+    return NextResponse.json(payload, { status: response.status, headers })
+  }
+  const successful = response.ok && payload.ok !== false
+  payload.suggested_followups = await suggestFollowups({
+    prompt,
+    reply: String(payload.reply),
+    sources: Array.isArray(payload.live_evidence_sources) ? payload.live_evidence_sources : [],
+    failedClosed: !successful,
+  })
+  return NextResponse.json(payload, { status: response.status, headers })
+}
 
 /**
  * Browser-only ingress wrapper for COS Primary.
@@ -62,13 +83,13 @@ export async function POST(req: NextRequest) {
       withPublicDeliveryScope(() => readCosPrimaryPriorProvenance(auditUserId, priorAnswer)),
     )
     const reply = renderPublicRecordedProvenance(recorded, language)
-    return NextResponse.json({
+    return withSuggestedFollowups(NextResponse.json({
       reply,
       source: recorded ? 'concierge-public-provenance-recorded' : 'concierge-public-provenance-unavailable',
       external_ai_invoked: false,
       local_model_invoked: false,
       provenance_match_verified: Boolean(recorded),
-    })
+    }), prompt)
   }
 
   const permission = evaluateRunpodWakePermission({
@@ -89,9 +110,10 @@ export async function POST(req: NextRequest) {
     auditIdentityCaptured: Boolean(auditUserId),
   }))
 
-  return withPublicAuditIdentity(auditUserId, () =>
+  const response = await withPublicAuditIdentity(auditUserId, () =>
     withPublicDeliveryScope(() =>
       withRunpodWakePermission(permission, () => cosPrimaryPost(req)),
     ),
   )
+  return withSuggestedFollowups(response, prompt)
 }

@@ -13,6 +13,15 @@ import {
   resolveDeterministicFreshOfficeHolder,
 } from '../lib/ai/cos/cosFreshGrounding.ts'
 
+test('evaluative office questions do not require a government verdict page', () => {
+  const sources = prepareFreshEvidence([
+    { title: 'BLS CPI series', url: 'https://www.bls.gov/cpi/', snippet: 'Consumer prices by year.' },
+    { title: 'Historian survey', url: 'https://www.c-span.org/presidentsurvey2021/', snippet: 'Historians rank administrations.' },
+  ])
+  assert.equal(freshEvidenceMeetsAuthority('who is the worse US President?', sources), true)
+  assert.equal(freshEvidenceMeetsAuthority('Who is the current President of the United States?', sources), true)
+})
+
 test('government sources are preferred and accepted for current government office holders', () => {
   const sources = prepareFreshEvidence([
     { title: 'News result', url: 'https://example.com/current-president', snippet: 'A current answer.' },

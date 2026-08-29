@@ -17,8 +17,20 @@ function cleanObjective(value: unknown): string {
   return objective
 }
 
-function publicTrace(trace: readonly { round: number; toolId: string; ok: boolean; error?: string }[]) {
-  return trace.map(({ round, toolId, ok, error }) => ({ round, toolId, ok, ...(error ? { error } : {}) }))
+function publicTrace(trace: readonly { round: number; toolId: string; ok: boolean; input: Record<string, unknown>; output?: unknown; error?: string }[]) {
+  return trace.map(({ round, toolId, ok, input, output, error }) => {
+    const base = { round, toolId, ok, ...(error ? { error } : {}) }
+    if (toolId !== 'run') return { ...base, ...(typeof input.path === 'string' ? { path: input.path.slice(0, 240) } : {}) }
+    const result = output && typeof output === 'object' ? output as Record<string, unknown> : {}
+    return {
+      ...base,
+      command: typeof input.command === 'string' ? input.command.slice(0, 2_000) : '',
+      ...(typeof result.exitCode === 'number' ? { exitCode: result.exitCode } : {}),
+      ...(typeof result.stdout === 'string' ? { stdout: result.stdout.slice(0, 16_000) } : {}),
+      ...(typeof result.stderr === 'string' ? { stderr: result.stderr.slice(0, 16_000) } : {}),
+      ...(typeof result.timedOut === 'boolean' ? { timedOut: result.timedOut } : {}),
+    }
+  })
 }
 
 export async function GET(request: Request) {

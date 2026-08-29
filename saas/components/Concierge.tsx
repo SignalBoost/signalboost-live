@@ -436,7 +436,7 @@ export default function Concierge() {
                   {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
                   {message.role === 'assistant' && message.suggestedFollowups?.length === 2 ? (
                     <div className="mt-3 border-t border-white/10 pt-2.5">
-                      <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/55">Continue</div>
+                      <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/55">{uiText('assistantFeedback.continueFollowups')}</div>
                       <div className="flex flex-col items-start gap-1.5">
                         {message.suggestedFollowups.map(followup => (
                           <button key={followup} type="button" disabled={loading} onClick={() => ask(followup)} className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1.5 text-left text-[11.5px] leading-snug text-cyan-100 transition hover:bg-cyan-300/20 disabled:opacity-50">

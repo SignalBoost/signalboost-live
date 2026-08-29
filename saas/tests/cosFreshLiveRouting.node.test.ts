@@ -50,16 +50,29 @@ test('fresh/current facts use evidence-only local COS synthesis before external 
   assert.doesNotMatch(source, /policy:\s*'fresh_live_data_external_only'/)
 })
 
+test('a complete deterministic historical roster is returned before model synthesis', () => {
+  const source = route()
+  assert.match(source, /deterministicOfficeHolderHasRequestedRoster/)
+  assert.match(source, /!asksForHistoricalRoster\(lookupInput\)\|\|deterministicOfficeHolderHasRequestedRoster/)
+  assert.match(source, /&& !deterministicOfficeHolderHasRequestedRoster/)
+})
+
+test('historical page evidence survives canonical redirects', () => {
+  const source = route()
+  assert.match(source, /function sameFreshSourceUrl/)
+  assert.match(source, /pages\.find\(candidate=>sameFreshSourceUrl\(candidate\.url,source\.url\)\)\?\?pages\[0\]/)
+})
+
 test('direct/nonstop route existence is current external state and is live-verified', () => {
   for (const prompt of [
     'are there direct flights from Paramaribo to Sao Paulo?',
     'Is there a direct flight between Tokyo and Lima?',
     'Does any airline fly nonstop from Miami to Lisbon?',
     'is there a direct train from Paris to Berlin',
-    '¿hay vuelos directos entre Madrid y Bogotá?',
-    'há voos diretos de Lisboa para São Paulo?',
-    'czy są loty bezpośrednie z Warszawy do Nowego Jorku?',
-    'есть ли прямые рейсы из Москвы в Гавану?',
+    'Â¿hay vuelos directos entre Madrid y BogotÃ¡?',
+    'hÃ¡ voos diretos de Lisboa para SÃ£o Paulo?',
+    'czy sÄ loty bezpoÅrednie z Warszawy do Nowego Jorku?',
+    'ÐµÑÑÑ Ð»Ð¸ Ð¿ÑÑÐ¼ÑÐµ ÑÐµÐ¹ÑÑ Ð¸Ð· ÐÐ¾ÑÐºÐ²Ñ Ð² ÐÐ°Ð²Ð°Ð½Ñ?',
   ]) {
     assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
   }

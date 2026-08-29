@@ -72,7 +72,7 @@ const freshLocalSynthesis = await readFile(path.join(root, 'lib/ai/cos/freshEvid
 for (const required of ['runFreshSynthesisTransportAttempts', 'boundedFreshSynthesisAttemptTimeoutMs', 'freshSynthesisNullIndicatesTimeout', 'attemptStartedAt = Date.now()', 'cos-fresh-local-synthesis-retry', 'acceptFreshEvidenceSynthesis']) {
   if (!freshLocalSynthesis.includes(required)) failures.push(`fresh_evidence_retry_wiring_missing:${required}`)
 }
-if (!freshLocalSynthesis.includes('if (!accepted) return null')) failures.push('fresh_evidence_grounding_failure_must_not_retry')
+if (!freshLocalSynthesis.includes("if (!accepted) return { kind: 'citation_grounding_rejected' }")) failures.push('fresh_evidence_grounding_failure_must_not_retry')
 
 const cosPrimaryRoute = await readFile(path.join(root, 'app/api/cos-primary/route.ts'), 'utf8')
 const deterministicFreshIndex = cosPrimaryRoute.indexOf('resolveDeterministicDirectFlight(lookupInput,freshSources)')

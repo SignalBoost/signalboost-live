@@ -17,9 +17,16 @@ import {
 } from './freshEvidenceRetryPolicy.ts'
 
 export type FreshEvidenceLocalSynthesis = {
+  kind: 'accepted'
   reply: string
   reasonerLabel: string
 }
+
+export type FreshEvidenceLocalSynthesisOutcome =
+  | FreshEvidenceLocalSynthesis
+  | { kind: 'local_synthesis_failed'; error: string }
+  | { kind: 'local_synthesis_unparseable' }
+  | { kind: 'citation_grounding_rejected' }
 
 const MAX_TOKENS = 700
 const TEMPERATURE = 0.1
@@ -46,8 +53,8 @@ export async function synthesizeFreshEvidenceLocally(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
   language: string
-}): Promise<FreshEvidenceLocalSynthesis | null> {
-  if (!args.sources.length) return null
+}): Promise<FreshEvidenceLocalSynthesisOutcome> {
+  if (!args.sources.length) return { kind: 'local_synthesis_unparseable' }
 
   const baseConfig = localInferenceConfigFromEnv()
   const attemptTimeoutMs = boundedFreshSynthesisAttemptTimeoutMs(baseConfig.timeoutMs)
@@ -91,15 +98,16 @@ export async function synthesizeFreshEvidenceLocally(args: {
       attemptTimeoutMs,
       reason: errorText(error),
     }))
-    return null
+    return { kind: 'local_synthesis_failed', error: errorText(error) }
   }
 
-  if (!text?.trim()) return null
+  if (!text?.trim()) return { kind: 'local_synthesis_unparseable' }
 
   const accepted = acceptFreshEvidenceSynthesis({ text, input: args.input, sources: args.sources })
-  if (!accepted) return null
+  if (!accepted) return { kind: 'citation_grounding_rejected' }
   const reasoner = resolveCosReasoner()
   return {
+    kind: 'accepted',
     reply: accepted.reply,
     reasonerLabel: reasoner.config?.label ?? `independent-local:${(process.env.LOCAL_AI_MODEL || 'local-model').trim()}`,
   }

@@ -98,6 +98,6 @@ test('production fresh synthesis is wired to recover swallowed timeouts before t
   assert.match(source, /exhausted its.*timeout budget/)
   assert.match(source, /cos-fresh-local-synthesis-retry/)
   assert.match(source, /acceptFreshEvidenceSynthesis/)
-  assert.match(source, /if \(!accepted\) return null/)
+  assert.match(source, /if \(!accepted\) return \{ kind: 'citation_grounding_rejected' \}/)
   assert.doesNotMatch(source, /synthesizeFreshEvidenceExternally|callCosTextDetailed|modelPreference/)
 })

@@ -159,19 +159,20 @@ async function directProspectCampaign(
   }
 }
 
-async function responseSnapshot(response: Response): Promise<{ reply: string; source: string; errorDetail: string }> {
+async function responseSnapshot(response: Response): Promise<{ reply: string; source: string; errorDetail: string; freshFailureClass: string }> {
   try {
     const payload = await response.clone().json()
     return {
       reply: String(payload?.reply || payload?.message || ''),
       source: String(payload?.source || payload?.telemetry?.source || ''),
       errorDetail: String(payload?.error_detail || payload?.telemetry?.error_detail || ''),
+      freshFailureClass: String(payload?.fresh_failure_class || ''),
     }
   } catch {
     try {
-      return { reply: await response.clone().text(), source: '', errorDetail: '' }
+      return { reply: await response.clone().text(), source: '', errorDetail: '', freshFailureClass: '' }
     } catch {
-      return { reply: '', source: '', errorDetail: '' }
+      return { reply: '', source: '', errorDetail: '', freshFailureClass: '' }
     }
   }
 }
@@ -408,12 +409,23 @@ export async function POST(req: NextRequest): Promise<Response> {
 
   const primarySnapshot = primary
     ? await responseSnapshot(primary)
-    : { reply: '', source: '', errorDetail: '' }
+    : { reply: '', source: '', errorDetail: '', freshFailureClass: '' }
   const immediateReasons = detectPrimaryCorruption({
     status: primary?.status ?? 500,
     reply: primarySnapshot.reply,
     source: primarySnapshot.source,
   })
+
+  // A primary 503 carrying an explicit fresh-evidence class is an honest
+  // fail-closed result, not corruption. Preserve both its copy and recorded
+  // sources instead of replacing it with Concierge's generic outage message.
+  if (primary?.status === 503 && [
+    'insufficient_live_authority',
+    'local_synthesis_failed',
+    'local_synthesis_unparseable',
+    'citation_grounding_rejected',
+    'local_synthesis_below_threshold',
+  ].includes(primarySnapshot.freshFailureClass)) return primary
 
   // A healthy public Primary is returned directly. The ordinary continuity
   // shadow invokes Backup COS with the internal approved brain snapshot, so it

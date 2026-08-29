@@ -12,7 +12,7 @@ const synthesisContract = () => read('../lib/ai/cos/freshEvidenceSynthesisContra
 
 test('fresh/current facts retrieve live evidence before local synthesis and any hosted fallback', () => {
   const source = route()
-  const liveSearch = source.indexOf('await getExternalInfo(')
+  const liveSearch = source.indexOf('getExternalInfo(query,8,{bypassCache:true})')
   const localSynthesis = source.indexOf('await synthesizeFreshEvidenceLocally(')
   const isolationGate = source.indexOf('if(!externalFallbackEnabled())')
   const hostedFallback = source.indexOf('await synthesizeFreshEvidenceExternally(')
@@ -27,7 +27,7 @@ test('fresh/current facts retrieve live evidence before local synthesis and any 
 test('fresh follow-ups resolve user context before retrieval and local synthesis never trusts assistant text', () => {
   const source = route()
   assert.match(source, /resolveFreshConversationContext\(body, input\)/)
-  assert.match(source, /freshEvidenceSearchQuery\(lookupInput/)
+  assert.match(source, /freshEvidenceSearchQueries\(lookupInput/)
   assert.match(source, /assistant_text_used_for_resolution:\s*false/)
   assert.match(source, /synthesizeFreshEvidenceLocally\(\{input:lookupInput/)
   assert.match(source, /synthesizeFreshEvidenceExternally\(\{ input: lookupInput/)

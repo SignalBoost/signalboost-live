@@ -216,7 +216,8 @@ export async function POST(req:NextRequest){
           return priority(right) - priority(left)
         })
         .slice(0, 3)
-      const pages = await readPublicPages(listSources.map(source => source.url)).catch(() => [])
+      const pageResults = await Promise.allSettled(listSources.map(source => readPublicPages([source.url])))
+      const pages = pageResults.flatMap(result => result.status === 'fulfilled' ? result.value : [])
       const bodyByUrl = new Map(pages.map(page => [page.url, page.snippet] as const))
       freshSources = freshSources.map(source => {
         const body = bodyByUrl.get(source.url)

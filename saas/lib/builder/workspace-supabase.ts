@@ -5,30 +5,24 @@ const MAX_FILE_BYTES = 512 * 1024
 const MAX_FILES = 100
 
 function safePath(value: string): string {
-  let path = String(value || '').replace(/\\/g, '/').replace(/^\/+/, '')
-  if (path === 'workspace' || path.startsWith('workspace/')) path = path.replace(/^workspace\/?/, '')
-  if (!path || path.length > 240 || path.split('/').some(part => !part || part === '.' || part === '..')) {
-    throw new Error('builder_invalid_path')
-  }
+  const path = String(value || '').replace(/\u0000/g, '').replace(/\\/g, '/').replace(/^\/+/, '')
+  if (!path || path.length > 240 || path.split('/').some(part => !part || part === '.' || part === '..')) throw new Error('builder_invalid_path')
   return path
 }
 
 function safeContent(value: string): string {
-  const content = String(value ?? '')
-  if (content.includes('\0') || new TextEncoder().encode(content).byteLength > MAX_FILE_BYTES) {
-    throw new Error('builder_file_too_large')
-  }
+  // Some local-model control outputs contain a literal NUL despite valid surrounding JSON.
+  // PostgreSQL cannot store NUL in text; remove that transport artifact before persistence.
+  const content = String(value ?? '').replace(/\u0000/g, '')
+  if (new TextEncoder().encode(content).byteLength > MAX_FILE_BYTES) throw new Error('builder_file_too_large')
   return content
 }
 
 function toFile(row: any): BuilderFile {
-  return Object.freeze({
-    path: String(row.path),
-    content: String(row.content),
-    updatedAt: Date.parse(String(row.updated_at)) || Date.now(),
-  })
+  return Object.freeze({ path: String(row.path), content: String(row.content), updatedAt: Date.parse(String(row.updated_at)) || Date.now() })
 }
 
+/** Service-role persistence, scoped by the authenticated user at construction. */
 export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
   constructor(private readonly db: SupabaseClient, private readonly userId: string) {}
 
@@ -37,7 +31,7 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
     if (error) throw new Error(`builder_workspace_lookup: ${error.message}`)
     if (data) return
     const { error: createError } = await this.db.from('builder_workspaces').insert({ id: workspaceId, user_id: this.userId })
-    if (createError) throw new Error(`builder_workspace_not_found_or_unavailable: ${createError.message}`)
+    if (createError) throw new Error('builder_workspace_not_found_or_unavailable')
   }
 
   async listWorkspaces() {
@@ -47,66 +41,39 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
       .order('updated_at', { ascending: false })
       .limit(20)
     if (error) throw new Error(`builder_workspace_list: ${error.message}`)
-    return Object.freeze((data ?? []).map(row => Object.freeze({
-      id: String(row.id),
-      objective: String(row.objective || ''),
-      updatedAt: String(row.updated_at),
-    })))
+    return Object.freeze((data ?? []).map(row => Object.freeze({ id: String(row.id), objective: String(row.objective || ''), updatedAt: String(row.updated_at) })))
   }
 
   async setObjective(workspaceId: string, objective: string): Promise<void> {
     await this.ensureWorkspace(workspaceId)
     const updatedAt = new Date().toISOString()
-    const { error } = await this.db.from('builder_workspaces')
-      .update({ objective: String(objective).slice(0, 500), updated_at: updatedAt })
-      .eq('id', workspaceId)
-      .eq('user_id', this.userId)
+    const { error } = await this.db.from('builder_workspaces').update({ objective: String(objective).slice(0, 500), updated_at: updatedAt }).eq('id', workspaceId).eq('user_id', this.userId)
     if (error) throw new Error(`builder_workspace_objective: ${error.message}`)
   }
 
   async listFiles(workspaceId: string) {
     await this.ensureWorkspace(workspaceId)
-    const { data, error } = await this.db.from('builder_workspace_files')
-      .select('path,updated_at')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', this.userId)
-      .order('path')
+    const { data, error } = await this.db.from('builder_workspace_files').select('path,updated_at').eq('workspace_id', workspaceId).eq('user_id', this.userId).order('path')
     if (error) throw new Error(`builder_file_list: ${error.message}`)
-    return Object.freeze((data ?? []).map(row => Object.freeze({
-      path: String(row.path),
-      updatedAt: Date.parse(String(row.updated_at)) || Date.now(),
-    })))
+    return Object.freeze((data ?? []).map(row => Object.freeze({ path: String(row.path), updatedAt: Date.parse(String(row.updated_at)) || Date.now() })))
   }
 
   async readFile(workspaceId: string, path: string) {
     await this.ensureWorkspace(workspaceId)
-    const { data, error } = await this.db.from('builder_workspace_files')
-      .select('path,content,updated_at')
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', this.userId)
-      .eq('path', safePath(path))
-      .maybeSingle()
+    const { data, error } = await this.db.from('builder_workspace_files').select('path,content,updated_at').eq('workspace_id', workspaceId).eq('user_id', this.userId).eq('path', safePath(path)).maybeSingle()
     if (error) throw new Error(`builder_file_read: ${error.message}`)
     return data ? toFile(data) : null
   }
 
   async writeFile(workspaceId: string, path: string, content: string) {
     await this.ensureWorkspace(workspaceId)
-    const safe = safePath(path)
-    const body = safeContent(content)
-    const { count, error: countError } = await this.db
-      .from('builder_workspace_files')
-      .select('*', { count: 'exact', head: true })
-      .eq('workspace_id', workspaceId)
-      .eq('user_id', this.userId)
+    const safe = safePath(path), body = safeContent(content)
+    const { count, error: countError } = await this.db.from('builder_workspace_files').select('*', { count: 'exact', head: true }).eq('workspace_id', workspaceId).eq('user_id', this.userId)
     if (countError) throw new Error(`builder_file_count: ${countError.message}`)
     const existing = await this.readFile(workspaceId, safe)
     if (!existing && Number(count || 0) >= MAX_FILES) throw new Error('builder_file_limit')
     const updatedAt = new Date().toISOString()
-    const { error } = await this.db.from('builder_workspace_files').upsert(
-      { workspace_id: workspaceId, user_id: this.userId, path: safe, content: body, updated_at: updatedAt },
-      { onConflict: 'workspace_id,path' },
-    )
+    const { error } = await this.db.from('builder_workspace_files').upsert({ workspace_id: workspaceId, user_id: this.userId, path: safe, content: body, updated_at: updatedAt }, { onConflict: 'workspace_id,path' })
     if (error) throw new Error(`builder_file_write: ${error.message}`)
     await this.db.from('builder_workspaces').update({ updated_at: updatedAt }).eq('id', workspaceId).eq('user_id', this.userId)
     return Object.freeze({ path: safe, content: body, updatedAt: Date.parse(updatedAt) })

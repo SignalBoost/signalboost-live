@@ -3544,7 +3544,25 @@
     "u_ads_expires": "expires",
     "u_ads_lasterror": "Last renewal failed",
     "u_ads_reconnect": "Reconnect",
-    "u_pressdrafts_navlabel": "Press Drafts"
+    "u_pressdrafts_navlabel": "Press Drafts",
+    "u_c3e05e12e11221a9": "COS Builder",
+    "u_90165eec849454bb": "Developer workspace",
+    "u_1397078893f90351": "Give COS a coding task. It can inspect supplied files, edit them, run the workspace, and report what it proved.",
+    "u_4e3bc4a7c1585908": "What should Builder do?",
+    "u_ef182ac605ddecab": "For example: create a small Node script that prints a greeting, run it, and tell me the output.",
+    "u_ed88dac540d4e632": "Add code files",
+    "u_df0caf1b27bd40d1": "New workspace",
+    "u_4b3a69e725c9b59f": "Builder is working…",
+    "u_501d4d62d2e80080": "Run Builder",
+    "u_c5adc03031df3edf": "Saved workspaces ({count})",
+    "u_5579543c543087cd": "Workspace {id}",
+    "u_6f0a17de28a43d16": "Remove {path}",
+    "u_6e7d50e84f4731ef": "Result",
+    "u_bb2e2d0fd34f9c6d": "Workspace files",
+    "u_8d844011c413f415": "(no command)",
+    "u_e596899f114b5162": "exit",
+    "u_3dcd80f1b15f796e": "timed out",
+    "u_5d28a90f4498a814": "failed"
   },
   "lab": {
     "license": {

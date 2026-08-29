@@ -203,7 +203,7 @@ export async function POST(req:NextRequest){
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()
       const localSynthesis=await synthesizeFreshEvidenceLocally({input,sources:freshSources,retrievedAt:freshRetrievedAt,language})
-      if(localSynthesis){
+      if(localSynthesis.kind === 'accepted'){
         freshLocalModel=localSynthesis.reasonerLabel
         const baseProvenance=markFreshLocalReasoning(authoritativeProvenance(null,{invoked:false}),{invoked:true,model:localSynthesis.reasonerLabel,confidence:1,accepted:true})
         const executionProvenance=attachFreshEvidenceProvenance(baseProvenance,{sources:freshSources,retrievedAt:freshRetrievedAt,error:null,synthesisAccepted:true})

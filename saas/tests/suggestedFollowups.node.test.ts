@@ -20,5 +20,5 @@ test('the Concierge renders suggestions separately and sends a chip through the 
   const source = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
   assert.match(source, /suggestedFollowups/)
   assert.match(source, /onClick=\{\(\) => ask\(followup\)\}/)
-  assert.match(source, /Continue/)
+  assert.match(source, /homepage\.concierge\.continue/)
 })

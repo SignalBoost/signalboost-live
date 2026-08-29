@@ -392,8 +392,8 @@ export function freshEvidenceSearchQueries(input: string, now = new Date()): str
   const asksForHistory = /\b(?:former|past|previous|last)\b/i.test(raw)
   if (!role || !asksForHistory) return [primary]
 
-  const jurisdiction = raw.match(/\\b(?:United States|U\\.?S\\.?A?|US)\\b/i)?.[0] || ''
-  const window = raw.match(/\\b(?:last|past)\\s+\\d{1,3}\\s+years?\\b/i)?.[0] || ''
+  const jurisdiction = raw.match(/\b(?:United States|U\.?S\.?A?|US)\b/i)?.[0] || ''
+  const window = raw.match(/\b(?:last|past)\s+\d{1,3}\s+years?\b/i)?.[0] || ''
   const historical = [jurisdiction, jurisdiction ? 'federal' : '', 'former', role, window, 'official history list']
     .filter(Boolean).join(' ').slice(0, 220)
   return [...new Set([primary, historical])]

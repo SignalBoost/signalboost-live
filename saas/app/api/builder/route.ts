@@ -21,6 +21,22 @@ function publicTrace(trace: readonly { round: number; toolId: string; ok: boolea
   return trace.map(({ round, toolId, ok, error }) => ({ round, toolId, ok, ...(error ? { error } : {}) }))
 }
 
+export async function GET(request: Request) {
+  const access = await getAccess().catch(() => null)
+  if (!access?.userId) return NextResponse.json({ error: 'Sign in to use COS Builder.' }, { status: 401 })
+  const workspace = createSupabaseBuilderWorkspace(access.userId)
+  if (!workspace) return NextResponse.json({ error: 'Builder storage is unavailable.' }, { status: 503 })
+  const workspaceId = new URL(request.url).searchParams.get('workspaceId') || ''
+  if (!workspaceId) return NextResponse.json({ workspaces: await workspace.listWorkspaces() })
+  if (!UUID.test(workspaceId)) return NextResponse.json({ error: 'Invalid workspace id.' }, { status: 400 })
+  try {
+    const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
+    return NextResponse.json({ workspaceId, files })
+  } catch {
+    return NextResponse.json({ error: 'Workspace not found.' }, { status: 404 })
+  }
+}
+
 /** Authenticated Builder only. Public Concierge must never route code execution here. */
 export async function POST(request: Request) {
   const access = await getAccess().catch(() => null)

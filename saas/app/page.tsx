@@ -125,9 +125,9 @@ export default function Home() {
     setCopiedTarget('')
   }
 
-  async function ask(event?: FormEvent) {
-    event?.preventDefault()
-    const prompt = question.trim()
+  async function ask(event?: FormEvent | string) {
+    if (typeof event !== 'string') event?.preventDefault()
+    const prompt = typeof event === 'string' ? event.trim() : question.trim()
     const staged = attachments
     if ((!prompt && staged.length === 0) || loading) return
 
@@ -159,23 +159,32 @@ export default function Home() {
       const payload = await response.json().catch(() => null)
       const reply = String(payload?.reply || payload?.error || '').trim()
       if (!reply) throw new Error('concierge_unavailable')
-      return reply
+      const suggestedFollowups = Array.isArray(payload?.suggested_followups)
+        ? payload.suggested_followups.filter((value: unknown): value is string => typeof value === 'string').slice(0, 2)
+        : []
+      return { reply, suggestedFollowups }
     }
 
     try {
       const isScenario = shouldClarifyUserSuppliedScenario(displayContent)
       const transportPrompt = isScenario ? conciergePromptWithScenarioRule(displayContent) : displayContent
-      let reply = await send(transportPrompt)
+      let result = await send(transportPrompt)
+      let reply = result.reply
 
       // Defensive recovery for older/novel refusal wording: if a public answer still treats facts
       // supplied by the user as inaccessible private records, retry once with the explicit premise
       // boundary. This does not grant any private-system access; it only clarifies the origin of the
       // text already present in the current request.
       if (!isScenario && looksLikePrivateDataRefusal(reply)) {
-        reply = await send(conciergePromptWithScenarioRule(displayContent))
+        result = await send(conciergePromptWithScenarioRule(displayContent))
+        reply = result.reply
       }
 
-      setTurns((current) => [...current, { request: displayContent, response: reply }])
+      setTurns((current) => [...current, {
+        request: displayContent,
+        response: reply,
+        ...(result.suggestedFollowups.length === 2 ? { suggestedFollowups: result.suggestedFollowups } : {}),
+      }])
       setPendingRequest('')
       setQuestion('')
       setAttachments([])
@@ -262,6 +271,18 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="assistant-content"><AssistantMessage content={turn.response} /></div>
+                    {turn.suggestedFollowups?.length === 2 ? (
+                      <div className="mt-3 border-t border-white/10 pt-2.5">
+                        <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/55">{c('continue')}</div>
+                        <div className="flex flex-col items-start gap-1.5">
+                          {turn.suggestedFollowups.map((followup) => (
+                            <button key={followup} type="button" disabled={loading} onClick={() => void ask(followup)} className="secondary-button text-left text-xs disabled:cursor-not-allowed disabled:opacity-50">
+                              {followup}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </article>
                 </div>
               </div>

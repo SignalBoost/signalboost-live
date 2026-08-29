@@ -32,7 +32,7 @@ test('COS primary retains evidence and emits a distinct public failure code for 
   assert.match(route, /fresh_failure_class:freshFailureCode/)
   assert.match(route, /live_evidence_sources:requiresFreshEvidence\?freshSources\.map/)
   assert.match(route, /freshFailureReply\(freshFailureCode!,language\)/)
-  assert.doesNotMatch(route, /freshSynthesisRejectedReply/)
+  assert.match(route, /source:'cos-fresh-evidence-ungrounded'/)
 })
 
 test('Concierge returns classified fresh 503s instead of replacing them with a generic outage reply', () => {

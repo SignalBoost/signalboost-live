@@ -199,8 +199,8 @@ export async function POST(req:NextRequest){
     freshSources=prepareFreshEvidenceAcrossQueries(liveResults.filter(live=>live.ok).map(live=>live.results),8)
     // Search snippets can expose a list-page title without its roster. For an explicit
     // former/past request, read selected public list pages and retain their body as evidence.
-    if (/\\b(?:former|past|previous|last)\\b/i.test(lookupInput)) {
-      const listSources = freshSources.filter(source => /\\b(?:list|former|history|secretar(?:y|ies))\\b/i.test(source.title + ' ' + source.url)).slice(0, 2)
+    if (/\b(?:former|past|previous|last)\b/i.test(lookupInput)) {
+      const listSources = freshSources.filter(source => /\b(?:list|former|history|secretar(?:y|ies))\b/i.test(source.title + ' ' + source.url)).slice(0, 2)
       const pages = await readPublicPages(listSources.map(source => source.url)).catch(() => [])
       const bodyByUrl = new Map(pages.map(page => [page.url, page.snippet] as const))
       freshSources = freshSources.map(source => {

@@ -22,7 +22,8 @@ test('cos-primary executes every planned query, reads selected public list pages
   assert.match(source, /freshEvidenceSearchQueries\(lookupInput\)/)
   assert.match(source, /Promise\.all\(queries\.map\(query=>getExternalInfo\(query,8/)
   assert.match(source, /prepareFreshEvidenceAcrossQueries\(liveResults\.filter/)
-  assert.match(source, /readPublicPages\(listSources\.map/)
+  assert.match(source, /Promise\.allSettled\(listSources\.map\(source => readPublicPages\(\[source\.url\]\)\)\)/)
+  assert.match(source, /result\.status === 'fulfilled' \? result\.value : \[\]/)
 })
 
 
@@ -31,5 +32,18 @@ test('cos-primary returns a verified clause as a partial result when compound sy
   assert.match(source, /partialFreshOfficeHolderReply/)
   assert.match(source, /cos-fresh-partial-grounded/)
   assert.match(source, /partial_completion:partialCompletion/)
-  assert.match(source, /status:partialCompletion\?200:503/)
+  assert.match(source, /status:partialCompletion\|\|freshFailureCode!=='local_synthesis_failed'\?200:503/)
+})
+
+
+test('compound history extraction ranks roster pages ahead of generic office pages', () => {
+  assert.match(source, /priority\s*=\s*\(source: FreshEvidenceSource\).*former\|history\|list/s)
+  assert.match(source, /\.sort\(\(left, right\)/)
+  assert.match(source, /\.slice\(0, 3\)/)
+})
+
+
+test('completed evidence-policy refusals are HTTP 200 while transport synthesis failures remain 503', () => {
+  assert.match(source, /freshFailureCode!=='local_synthesis_failed'\?200:503/)
+  assert.match(source, /source:'cos-fresh-evidence-unavailable'[\s\S]{0,800}?status:200/)
 })

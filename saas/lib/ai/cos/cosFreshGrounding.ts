@@ -54,7 +54,14 @@ function authorityScore(result: SearchResult): number {
   return score
 }
 
+function isPersonOrOfficeEvaluation(input: string): boolean {
+  // Rankings and "best/worst" are sourced comparisons, not occupancy of a chair.
+  // COS still retrieves live pages; it must not demand an official "verdict" host.
+  return /\b(?:worst|worse|best|greatest|most successful|least successful|rank(?:ings?)?|overrated|underrated)\b/i.test(input)
+}
+
 function requiresGovernmentAuthority(input: string): boolean {
+  if (isPersonOrOfficeEvaluation(input)) return false
   return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister|monarch|king|queen|pope)\b/i.test(input)
 }
 

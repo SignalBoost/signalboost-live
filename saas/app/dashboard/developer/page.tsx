@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 type WorkspaceFile = { path: string; content: string }
 type BuilderReply = { workspaceId?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string }> }
-type WorkspaceSummary = { id: string; updatedAt: string }
+type WorkspaceSummary = { id: string; objective: string; updatedAt: string }
 
 const MAX_UPLOAD_BYTES = 512 * 1024
 const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
@@ -108,7 +108,7 @@ export default function DeveloperPage() {
             <button type="button" onClick={reset} disabled={running} style={secondaryButton}>New workspace</button>
             <button type="button" onClick={run} disabled={!objective.trim() || running} style={{ ...primaryButton, opacity: !objective.trim() || running ? .55 : 1 }}>{running ? 'Builder is working…' : 'Run Builder'}</button>
           </div>
-          {workspaces.length ? <details><summary style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>Saved workspaces ({workspaces.length})</summary><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>{workspaces.map(workspace => <button type="button" key={workspace.id} onClick={() => openWorkspace(workspace.id)} disabled={running} style={secondaryButton}>{workspace.id.slice(0, 8)} · {new Date(workspace.updatedAt).toLocaleDateString()}</button>)}</div></details> : null}
+          {workspaces.length ? <details><summary style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>Saved workspaces ({workspaces.length})</summary><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>{workspaces.map(workspace => <button type="button" key={workspace.id} onClick={() => openWorkspace(workspace.id)} disabled={running} style={secondaryButton}>{workspace.objective || \`Workspace \${workspace.id.slice(0, 8)}\`} <span style={{ color: '#94a3b8' }}>· {new Date(workspace.updatedAt).toLocaleDateString()}</span></button>)}</div></details> : null}
           {files.length ? <div style={fileListStyle}>{files.map(file => <span key={file.path} style={fileChipStyle}>{file.path}<button type="button" aria-label={`Remove \${file.path}`} onClick={() => setFiles(current => current.filter(item => item.path !== file.path))} style={removeButton}>×</button></span>)}</div> : null}
           {error ? <p role="alert" style={{ margin: 0, color: '#fca5a5' }}>{error}</p> : null}
         </section>

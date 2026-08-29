@@ -115,7 +115,18 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
       { workspace_id: workspaceId, user_id: this.userId, path: safe, content: encodeStoredContent(body), updated_at: updatedAt },
       { onConflict: 'workspace_id,path' },
     )
-    if (error) throw new Error(`builder_file_write: ${error.message}`)
+    if (error) {
+      console.error('[builder_file_write_failed]', {
+        message: error.message,
+        workspaceIdHasNul: workspaceId.includes('\0'),
+        userIdHasNul: this.userId.includes('\0'),
+        pathHasNul: safe.includes('\0'),
+        storedContentHasNul: encodeStoredContent(body).includes('\0'),
+        pathLength: safe.length,
+        storedContentLength: encodeStoredContent(body).length,
+      })
+      throw new Error(`builder_file_write: ${error.message}`)
+    }
     await this.db.from('builder_workspaces').update({ updated_at: updatedAt }).eq('id', workspaceId).eq('user_id', this.userId)
     return Object.freeze({ path: safe, content: body, updatedAt: Date.parse(updatedAt) })
   }

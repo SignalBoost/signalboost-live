@@ -48,3 +48,10 @@ test('completed evidence-policy refusals are HTTP 200 while transport synthesis 
   assert.match(source, /freshFailureCode!=='local_synthesis_failed'\?200:503/)
   assert.match(source, /source:'cos-fresh-evidence-unavailable'[\s\S]{0,800}?status:200/)
 })
+
+
+test('compound page extraction uses relevant body sections instead of the page prefix alone', () => {
+  assert.match(source, /function excerptFreshPageBody\(body:string,input:string\)/)
+  assert.match(source, /snippet: excerptFreshPageBody\(body, lookupInput\)/)
+  assert.match(source, /\?90:4/)
+})

@@ -105,6 +105,23 @@ function provenanceReportFollowupReply(language:string):string{
 }
 function emitRequestTelemetry(args:{startedAt:number;input:string;reply?:string|null;source:CosLiveResponseSource;confidence?:number|null;provenance?:any;externalAiInvoked:boolean}){const p=args.provenance??null,observation=buildCosLiveTelemetry({responseSource:args.source,latencyMs:Math.max(0,Date.now()-args.startedAt),confidence:args.confidence??null,reasonerLabel:p?.reasonerLabel??p?.local_reasoning?.model??null,localModelInvoked:p?.localModelInvoked??p?.local_reasoning?.invoked??false,externalAiInvoked:args.externalAiInvoked,knowledgeFactsUsed:p?.knowledgeFactsUsed??p?.knowledge_graph?.evidence_count??0,learnedItemsUsed:p?.learnedItemsUsed??p?.learned_corpus?.evidence_count??0,userMemoriesUsed:p?.userMemoriesUsed??p?.user_memory?.evidence_count??0,similarityScore:p?.similarityScore,promptChars:args.input.length,replyChars:String(args.reply??'').length});emitCosLiveTelemetry(observation);return observation}
 function asksForHistoricalRoster(input:string):boolean{return /\b(?:former|past|previous|last)\b/i.test(input)&&/\b(?:list|secretar(?:y|ies)|office holder|history)\b/i.test(input)}
+function excerptFreshPageBody(body:string,input:string):string{
+  const lines=String(body||'').split(/\n+/).map(line=>line.trim()).filter(Boolean)
+  if(!lines.length)return ''
+  const roleTerms=(String(input||'').toLowerCase().match(/\b[a-z]{5,}\b/g)||[]).filter(term=>!['current','former','previous','history','official','authoritative','years','past','state','united'].includes(term))
+  const anchors=new Set<number>()
+  for(let index=0;index<lines.length;index+=1){
+    const line=lines[index].toLowerCase()
+    if(roleTerms.some(term=>line.includes(term))||/\b(?:former|past|previous|history|list of)\b/i.test(lines[index]))anchors.add(index)
+  }
+  const selected=new Set<number>()
+  for(const index of anchors){
+    const span=/\b(?:former|past|previous|history|list of)\b/i.test(lines[index])?90:4
+    for(let cursor=Math.max(0,index-2);cursor<Math.min(lines.length,index+span);cursor+=1)selected.add(cursor)
+  }
+  const excerpt=[...selected].sort((left,right)=>left-right).map(index=>lines[index]).join('\n')
+  return (excerpt||lines.slice(0,120).join('\n')).slice(0,16_000)
+}
 function partialOfficeHolderReply(reply:string,language:string):string{
   const suffix=language==='pt'?'Não foi possível verificar com segurança a lista histórica solicitada a partir das fontes recuperadas nesta resposta.':
     language==='es'?'No se pudo verificar con seguridad la lista histórica solicitada a partir de las fuentes recuperadas en esta respuesta.':
@@ -226,7 +243,7 @@ export async function POST(req:NextRequest){
       const bodyByUrl = new Map(pages.map(page => [page.url, page.snippet] as const))
       freshSources = freshSources.map(source => {
         const body = bodyByUrl.get(source.url)
-        return body ? { ...source, snippet: body.slice(0, 6000) } : source
+        return body ? { ...source, snippet: excerptFreshPageBody(body, lookupInput) } : source
       })
     }
     const sources=freshSources

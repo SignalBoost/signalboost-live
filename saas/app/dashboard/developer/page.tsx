@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 type WorkspaceFile = { path: string; content: string }
 type BuilderReply = { workspaceId?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string }> }
+type WorkspaceSummary = { id: string; updatedAt: string }
 
 const MAX_UPLOAD_BYTES = 512 * 1024
 const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
@@ -13,6 +14,7 @@ export default function DeveloperPage() {
   const [objective, setObjective] = useState('')
   const [files, setFiles] = useState<WorkspaceFile[]>([])
   const [workspaceFiles, setWorkspaceFiles] = useState<string[]>([])
+  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([])
   const [workspaceId, setWorkspaceId] = useState('')
   const [reply, setReply] = useState('')
   const [trace, setTrace] = useState<BuilderReply['trace']>([])
@@ -30,7 +32,26 @@ export default function DeveloperPage() {
         .slice(0, 20))
       sessionStorage.removeItem(BUILDER_HANDOFF_FILES_KEY)
     } catch { sessionStorage.removeItem(BUILDER_HANDOFF_FILES_KEY) }
+    void loadWorkspaces()
   }, [])
+
+  async function loadWorkspaces() {
+    try {
+      const response = await fetch('/api/builder', { cache: 'no-store' })
+      const data = await response.json()
+      if (response.ok) setWorkspaces(Array.isArray(data.workspaces) ? data.workspaces : [])
+    } catch { /* workspace history is optional UI state */ }
+  }
+
+  async function openWorkspace(id: string) {
+    setError('')
+    try {
+      const response = await fetch(`/api/builder?workspaceId=${encodeURIComponent(id)}`, { cache: 'no-store' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Workspace could not be opened.')
+      setWorkspaceId(id); setWorkspaceFiles(Array.isArray(data.files) ? data.files : []); setFiles([]); setReply(''); setTrace([])
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Workspace could not be opened.') }
+  }
 
   async function addFiles(selected: FileList | null) {
     if (!selected) return
@@ -61,6 +82,7 @@ export default function DeveloperPage() {
       if (!response.ok) { setError(data.error || 'Builder could not complete this request.'); return }
       setReply(data.reply || 'Builder completed without a final report.')
       setFiles([])
+      void loadWorkspaces()
     } catch { setError('Could not reach Builder.') }
     finally { setRunning(false) }
   }
@@ -86,6 +108,7 @@ export default function DeveloperPage() {
             <button type="button" onClick={reset} disabled={running} style={secondaryButton}>New workspace</button>
             <button type="button" onClick={run} disabled={!objective.trim() || running} style={{ ...primaryButton, opacity: !objective.trim() || running ? .55 : 1 }}>{running ? 'Builder is working…' : 'Run Builder'}</button>
           </div>
+          {workspaces.length ? <details><summary style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 13 }}>Saved workspaces ({workspaces.length})</summary><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>{workspaces.map(workspace => <button type="button" key={workspace.id} onClick={() => openWorkspace(workspace.id)} disabled={running} style={secondaryButton}>{workspace.id.slice(0, 8)} · {new Date(workspace.updatedAt).toLocaleDateString()}</button>)}</div></details> : null}
           {files.length ? <div style={fileListStyle}>{files.map(file => <span key={file.path} style={fileChipStyle}>{file.path}<button type="button" aria-label={`Remove \${file.path}`} onClick={() => setFiles(current => current.filter(item => item.path !== file.path))} style={removeButton}>×</button></span>)}</div> : null}
           {error ? <p role="alert" style={{ margin: 0, color: '#fca5a5' }}>{error}</p> : null}
         </section>

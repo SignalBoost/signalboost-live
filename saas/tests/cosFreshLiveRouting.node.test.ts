@@ -27,7 +27,7 @@ test('fresh/current facts retrieve live evidence before local synthesis and any 
 test('fresh follow-ups resolve user context before retrieval and local synthesis never trusts assistant text', () => {
   const source = route()
   assert.match(source, /resolveFreshConversationContext\(body, input\)/)
-  assert.match(source, /freshEvidenceSearchQuery\(lookupInput/)
+  assert.match(source, /freshEvidenceSearchQueries\(lookupInput/)
   assert.match(source, /assistant_text_used_for_resolution:\s*false/)
   assert.match(source, /synthesizeFreshEvidenceLocally\(\{input:lookupInput/)
   assert.match(source, /synthesizeFreshEvidenceExternally\(\{ input: lookupInput/)

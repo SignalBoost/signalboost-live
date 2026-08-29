@@ -273,6 +273,13 @@ export async function POST(req:NextRequest){
       return NextResponse.json({ok:true,reply,source:'cos-fresh-deterministic-grounded',confidence_score:deterministicFresh.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,volatile_cache_written:volatileCacheWritten,live_evidence_retrieved_this_turn:true,live_evidence_sources:deterministicFresh.sources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
 
+    if(asksForHistoricalRoster(lookupInput)&&claimResearch.pagesRead>0){
+      const reply='COS read the authoritative historical-list page but could not safely parse its dated rows. The list claim remains unverified; no model synthesis was used.'
+      const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:freshSources,retrievedAt:freshRetrievedAt,error:'Structured dated-row parsing did not produce a safe roster.',synthesisAccepted:null})
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-roster-unparsed',{prompt:lookupInput,answered:false,confidence:0,branch:'fresh_roster_unparsed'})
+      return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-roster-unparsed',confidence_score:0,external_ai_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),execution_allowed:false,external_action_taken:false},{status:200})
+    }
+
     if(!requestedAction){
       freshLocalAttempted=true
       freshLocalModel=localReasonerLabel()

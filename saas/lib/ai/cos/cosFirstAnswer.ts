@@ -19,6 +19,7 @@ import {
   freshEvidenceMeetsAuthority,
   freshEvidenceSearchQuery,
   freshEvidenceSearchQueries,
+  constructEconomicFactsReply,
   prepareFreshEvidenceAcrossQueries,
   resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,
@@ -730,6 +731,25 @@ async function tryFreshCurrentFact(input: {
         escalationReasonCode: 'insufficient_live_authority',
         escalationReason: reason,
         evidenceBudget: { ...baseBudget, stopping_reason: 'insufficient_authoritative_evidence_no_cloud_escalation' },
+      }) as any,
+    }
+  }
+
+  const economicFacts = constructEconomicFactsReply(input.prompt, sources)
+  if (economicFacts) {
+    return {
+      handled: true,
+      reply: economicFacts.reply,
+      confidence: 0.99,
+      provenance: freshProvenance({
+        reasonerLabel: null,
+        localModelInvoked: false,
+        retrievedAt,
+        sources: economicFacts.sources,
+        documentsAcquired,
+        responseSource: 'live_economic_facts',
+        externalAiNecessary: false,
+        evidenceBudget: { ...baseBudget, stopping_reason: 'economic_facts_constructed_no_model' },
       }) as any,
     }
   }

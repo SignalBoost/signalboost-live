@@ -16,6 +16,7 @@ type Message = {
   content: string
   feedbackPrompt?: string
   feedbackEligible?: boolean
+  suggestedFollowups?: string[]
 }
 type VideoItem = { title: string; type: string; id: string }
 
@@ -330,12 +331,16 @@ export default function Concierge() {
       const reply = data.reply || data.error || t(dict, 'concierge.fallback')
       const turnId = data?.execution_provenance?.turnId
       const feedbackEligible = typeof turnId === 'string' && turnId.trim().length > 0 && Boolean(data?.reply)
+      const suggestedFollowups = Array.isArray(data?.suggested_followups)
+        ? data.suggested_followups.filter((value: unknown): value is string => typeof value === 'string').slice(0, 2)
+        : []
       setMessages(prev => [
         ...prev,
         {
           role: 'assistant',
           content: reply,
           ...(feedbackEligible ? { feedbackPrompt: content, feedbackEligible: true } : {}),
+          ...(suggestedFollowups.length === 2 ? { suggestedFollowups } : {}),
         },
       ])
     } catch {
@@ -429,6 +434,18 @@ export default function Concierge() {
                     : 'max-w-[88%] self-start rounded-2xl rounded-bl-md border border-white/10 bg-white/10 px-3.5 py-2.5 text-[13px] leading-6 text-white'}
                 >
                   {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
+                  {message.role === 'assistant' && message.suggestedFollowups?.length === 2 ? (
+                    <div className="mt-3 border-t border-white/10 pt-2.5">
+                      <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/55">Continue</div>
+                      <div className="flex flex-col items-start gap-1.5">
+                        {message.suggestedFollowups.map(followup => (
+                          <button key={followup} type="button" disabled={loading} onClick={() => ask(followup)} className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-2.5 py-1.5 text-left text-[11.5px] leading-snug text-cyan-100 transition hover:bg-cyan-300/20 disabled:opacity-50">
+                            {followup}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                   {message.role === 'assistant' && message.feedbackEligible && message.feedbackPrompt ? (
                     <div className="mt-2.5 border-t border-white/10 pt-2">
                       <div className="flex flex-wrap items-center gap-1.5">

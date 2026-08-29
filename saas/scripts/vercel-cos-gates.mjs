@@ -9,6 +9,7 @@ const tests = [
   'tests/conciergeBrowserIngressRouting.node.test.ts',
   'tests/conciergeFullTranscript.node.test.ts',
   'tests/conciergeTransportBudget.node.test.ts',
+  'tests/suggestedFollowups.node.test.ts',
   'tests/cosPrimaryDeterministicFreshRouting.node.test.ts',
   'tests/assistantTransportClient.node.test.ts',
   'tests/operationalSystemsLearning.node.test.ts',

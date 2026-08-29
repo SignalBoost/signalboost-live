@@ -40,6 +40,7 @@ const tests = [
   'tests/listCatalogIntent.node.test.ts',
   'tests/cosFreshLiveRouting.node.test.ts',
   'tests/freshEvidenceLocalSynthesis.node.test.ts',
+  'tests/freshEvidenceFailureRecovery.node.test.ts',
   'tests/cosFreshGrounding.node.test.ts',
   'tests/cosStructuredLiveInfo.node.test.ts',
   'tests/cosTemporalClaimGuard.node.test.ts',

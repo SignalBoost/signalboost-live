@@ -31,7 +31,7 @@ test('cos-primary returns a verified clause as a partial result when compound sy
   assert.match(source, /partialFreshOfficeHolderReply/)
   assert.match(source, /cos-fresh-partial-grounded/)
   assert.match(source, /partial_completion:partialCompletion/)
-  assert.match(source, /status:partialCompletion\?200:503/)
+  assert.match(source, /status:partialCompletion\|\|freshFailureCode!=='local_synthesis_failed'\?200:503/)
 })
 
 

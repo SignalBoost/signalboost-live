@@ -19,7 +19,7 @@ import {
   freshEvidenceMeetsAuthority,
   freshEvidenceSearchQuery,
   freshEvidenceSearchQueries,
-  prepareFreshEvidence,
+  prepareFreshEvidenceAcrossQueries,
   resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,
 } from './cosFreshGrounding.ts'
@@ -695,8 +695,9 @@ async function tryFreshCurrentFact(input: {
   )
   const successfulResponses = liveResponses.filter(response => response.ok)
   const documentsAcquired = liveResponses.reduce((count, response) => count + (response.ok ? response.results.length : 0), 0)
-  const sources = prepareFreshEvidence(
-    liveResponses.flatMap(response => response.ok ? response.results : []),
+  // Preserve evidence coverage for every part of a compound request.
+  const sources = prepareFreshEvidenceAcrossQueries(
+    liveResponses.flatMap(response => response.ok ? [response.results] : []),
     FRESH_SELECTED_EVIDENCE_BUDGET,
   )
   const baseBudget = {

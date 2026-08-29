@@ -52,7 +52,12 @@ export class BuilderToolLoop {
       if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= MAX_WRITES_PER_TURN) return { ok: false, error: 'builder_write_budget_exhausted', trace }
       if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
       const fingerprint = `${action.toolId}:${safeJson(action.input)}`
-      if (seen.has(fingerprint)) return { ok: false, error: `builder_repeated_tool_call:${action.toolId}`, trace }
+      // Local models occasionally replay the immediately previous control object after a
+      // successful tool result. Treat that as recoverable feedback, not a failed workspace.
+      if (seen.has(fingerprint)) {
+        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
+        continue
+      }
       seen.add(fingerprint)
       if (action.toolId === 'write_file' || action.toolId === 'edit_file') writeCount += 1
       if (action.toolId === 'run') runCount += 1

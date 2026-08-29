@@ -16,3 +16,10 @@ test('cos-primary resolves explicit direct-flight evidence before any local mode
   assert.match(source, /source:'cos-fresh-deterministic-grounded'/)
   assert.match(source, /local_model_invoked:false/)
 })
+
+
+test('cos-primary executes every planned query and allocates evidence across a compound request', () => {
+  assert.match(source, /freshEvidenceSearchQueries\(lookupInput\)/)
+  assert.match(source, /Promise\.all\(queries\.map\(query=>getExternalInfo\(query,8/)
+  assert.match(source, /prepareFreshEvidenceAcrossQueries\(liveResults\.filter/)
+})

@@ -60,6 +60,16 @@ function parseJsonObject(text: string): ModelFreshEvidenceSynthesis | null {
   }
 }
 
+function answerRespectsRequestedWindow(answer: string, input: string, now = new Date()): boolean {
+  const match = String(input || '').match(/\b(?:past|last)\s+(\d{1,3})\s+years?\b/i)
+  if (!match) return true
+  const startYear = now.getUTCFullYear() - Number(match[1])
+  const ranges = [...String(answer || '').matchAll(/\b(\d{4})\s*[–-]\s*(\d{4})?\b/g)]
+  // A claimed historical roster must contain dated rows, and no row may end before the window.
+  // This rejects a real but stale archive being narrated as a current last-N-years roster.
+  return ranges.length >= 2 && ranges.every(range => Number(range[2] || range[1]) >= startYear)
+}
+
 export function acceptFreshEvidenceSynthesis(args: {
   text: string
   input: string
@@ -68,6 +78,7 @@ export function acceptFreshEvidenceSynthesis(args: {
   const parsed = parseJsonObject(args.text)
   const answer = typeof parsed?.answer === 'string' ? parsed.answer.trim() : ''
   if (!answer || /EVIDENCE_INSUFFICIENT/i.test(answer)) return null
+  if (!answerRespectsRequestedWindow(answer, args.input)) return null
   if (!Array.isArray(parsed?.evidenceIds)) return null
 
   const byId = new Map(args.sources.map(source => [source.id, source] as const))

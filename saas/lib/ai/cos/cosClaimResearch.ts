@@ -14,6 +14,29 @@ export type ClaimResearchResult = {
   pagesRead: number
 }
 
+function requestedWindowStart(input: string, now = new Date()): number | null {
+  const match = String(input || '').match(/\b(?:past|last)\s+(\d{1,3})\s+years?\b/i)
+  return match ? now.getUTCFullYear() - Number(match[1]) : null
+}
+
+function archiveEndsBefore(source: FreshEvidenceSource, startYear: number, now = new Date()): boolean {
+  const requiredLatestYear = now.getUTCFullYear() - 1
+  const urlWindow = source.url.match(/(?:^|[./-])(\d{4})[-_](\d{4})(?:[./-]|$)/)
+  if (urlWindow && Number(urlWindow[2]) < requiredLatestYear) return true
+  const ranges = [...String(source.snippet || '').matchAll(/\b(\d{4})\s*[–-]\s*(\d{4})?\b/g)]
+    .map(match => Number(match[2] || match[1])).filter(Number.isFinite)
+  return ranges.length >= 2 && Math.max(...ranges) < requiredLatestYear
+}
+
+/** Remove documents that cannot cover the user-requested time window. This is scope binding,
+ * not topic-specific filtering: a dated archive may be authoritative about its own period but
+ * cannot prove a present or last-N-years claim outside that period. */
+export function bindSourcesToRequestedWindow(input: string, sources: FreshEvidenceSource[], now = new Date()): FreshEvidenceSource[] {
+  const startYear = requestedWindowStart(input, now)
+  if (startYear === null) return sources
+  return sources.filter(source => !archiveEndsBefore(source, startYear, now))
+}
+
 function words(value: string): string[] {
   return [...new Set(String(value || '').toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || [])]
 }
@@ -46,6 +69,8 @@ function scoreSourceForClaim(claim: string, source: FreshEvidenceSource): number
   if (host.endsWith('.gov')) score += 100
   if (/\b(?:past|former|previous|history|last)\b/i.test(claim) && /\b(?:former|history|list|biograph|archive)\b/i.test(haystack)) score += 80
   if (/\b(?:current|today|now)\b/i.test(claim) && /\b(?:official|secretary|leadership|administration|profile)\b/i.test(haystack)) score += 45
+  const startYear = requestedWindowStart(claim)
+  if (startYear !== null && archiveEndsBefore(source, startYear)) score -= 1000
   return score
 }
 
@@ -83,7 +108,7 @@ export async function deepenClaimResearch(input: string, sources: FreshEvidenceS
     const page = pages.find(item => sameUrl(item.url, candidates[index].url)) ?? pages[0]
     if (page?.snippet) bodies.set(candidates[index].url, page.snippet.slice(0, 24_000))
   }
-  const deepened = sources.map(source => bodies.has(source.url) ? { ...source, snippet: bodies.get(source.url)! } : source)
+  const deepened = bindSourcesToRequestedWindow(input, sources.map(source => bodies.has(source.url) ? { ...source, snippet: bodies.get(source.url)! } : source))
   const pagesRead = bodies.size
   return { sources: deepened, claims: claims.map(text => ({ text, status: statusFor(text, deepened, pagesRead) })), pagesRead }
 }

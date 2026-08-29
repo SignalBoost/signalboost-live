@@ -46,8 +46,9 @@ export async function POST(request: Request) {
       new VercelSandboxBuilderRunner(),
     ).run({ objective, workspaceId })
 
-    if (result.ok === false) return NextResponse.json({ error: result.error, workspaceId, trace: publicTrace(result.trace) }, { status: 422 })
-    return NextResponse.json({ workspaceId, reply: result.answer, trace: publicTrace(result.trace) })
+    const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
+    if (result.ok === false) return NextResponse.json({ error: result.error, workspaceId, files, trace: publicTrace(result.trace) }, { status: 422 })
+    return NextResponse.json({ workspaceId, reply: result.answer, files, trace: publicTrace(result.trace) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'builder_request_failed'
     const status = /^builder_(invalid|file_limit|file_too_large|invalid_path)/.test(message) ? 400 : 502

@@ -51,6 +51,7 @@ export async function POST(request: Request) {
     const workspace = createSupabaseBuilderWorkspace(access.userId)
     if (!workspace) return NextResponse.json({ error: 'Builder storage is unavailable.' }, { status: 503 })
     await workspace.ensureWorkspace(workspaceId)
+    await workspace.setObjective(workspaceId, objective)
 
     const suppliedFiles = Array.isArray(body?.files) ? body.files : []
     if (suppliedFiles.length > 20) return NextResponse.json({ error: 'Too many files in one request.' }, { status: 400 })

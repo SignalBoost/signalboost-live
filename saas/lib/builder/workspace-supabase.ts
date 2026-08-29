@@ -34,12 +34,19 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
 
   async listWorkspaces() {
     const { data, error } = await this.db.from('builder_workspaces')
-      .select('id,updated_at')
+      .select('id,objective,updated_at')
       .eq('user_id', this.userId)
       .order('updated_at', { ascending: false })
       .limit(20)
     if (error) throw new Error(`builder_workspace_list: ${error.message}`)
-    return Object.freeze((data ?? []).map(row => Object.freeze({ id: String(row.id), updatedAt: String(row.updated_at) })))
+    return Object.freeze((data ?? []).map(row => Object.freeze({ id: String(row.id), objective: String(row.objective || ''), updatedAt: String(row.updated_at) })))
+  }
+
+  async setObjective(workspaceId: string, objective: string): Promise<void> {
+    await this.ensureWorkspace(workspaceId)
+    const updatedAt = new Date().toISOString()
+    const { error } = await this.db.from('builder_workspaces').update({ objective: String(objective).slice(0, 500), updated_at: updatedAt }).eq('id', workspaceId).eq('user_id', this.userId)
+    if (error) throw new Error(`builder_workspace_objective: ${error.message}`)
   }
 
   async listFiles(workspaceId: string) {

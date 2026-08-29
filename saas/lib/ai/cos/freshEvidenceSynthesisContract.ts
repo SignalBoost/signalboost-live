@@ -43,7 +43,7 @@ export function freshEvidenceSynthesisPrompt(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nCLAIM PLAN (control-plane status; do not treat it as factual evidence):\n${claimResearchPrompt(splitResearchClaims(args.input).map(text => ({ text, status: 'needs_deeper_read' })))}\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nCLAIM PLAN (control-plane status; do not treat it as factual evidence):\n${claimResearchPrompt(splitResearchClaims(args.input).map(text => ({ text, status: 'needs_deeper_read' })))}\n\nFor every historical/list claim, use the dated rows from the read document, not its title, navigation, or a different source's summary.\n\nQUESTION: ${args.input}`
 }
 
 function parseJsonObject(text: string): ModelFreshEvidenceSynthesis | null {

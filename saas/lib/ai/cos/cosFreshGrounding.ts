@@ -79,9 +79,11 @@ export function constructEconomicFactsReply(
   const used = [...new Map(rows.map(row => [row.source.url, row.source] as const)).values()]
   return {
     reply: [
-      'There is no official worst-office ranking. Retrieved economic figures only:',
+      'Opinions on who was “worst” change with the source: historian surveys, newspapers, and partisan media do not use the same scoreboard, so COS will not pick a name.',
+      'Feelings and reputations are hard to measure. Unemployment, inflation, and real GDP growth are published series. Those can be compared; a verdict cannot.',
+      'Measurable figures found in this turn’s sources (each number belongs only to that page and its window — they are not one combined ranking):',
       rows.map(row => row.line).join('\n'),
-      'COS is not ranking anyone. The user decides from these cited series.',
+      'Read the series. Different pages cover different presidents and years. COS stops here.',
     ].join('\n'),
     sources: used,
   }

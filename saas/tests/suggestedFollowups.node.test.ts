@@ -23,6 +23,12 @@ test('the Concierge renders suggestions separately and sends a chip through the 
   assert.match(source, /homepage\.concierge\.continue/)
 })
 
+test('the public homepage chat renders followup chips from the API response', () => {
+  const source = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
+  assert.match(source, /payload\?\.suggested_followups/)
+  assert.match(source, /ask\(followup\)/)
+})
+
 test('COS primary decorates successful replies and the public boundary persists its chips with the turn', () => {
   const primary = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
   const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')

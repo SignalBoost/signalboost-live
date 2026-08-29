@@ -1,6 +1,7 @@
 export type ConciergeTranscriptTurn = {
   request: string
   response: string
+  suggestedFollowups?: string[]
 }
 
 export function transcriptMessages(turns: ConciergeTranscriptTurn[], pendingRequest: string) {

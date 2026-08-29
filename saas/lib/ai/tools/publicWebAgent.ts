@@ -35,7 +35,9 @@ async function fetchText(url: string, timeoutMs = 8000): Promise<string> {
     })
     if (!res.ok) throw new Error(`fetch ${res.status}`)
     const raw = await res.text()
-    return stripTags(raw).slice(0, 80_000)
+    const text = stripTags(raw).slice(0, 80_000)
+    if (/\b(?:technical difficulties|temporarily unavailable|access denied)\b/i.test(text)) throw new Error('page did not provide readable content')
+    return text
   } finally {
     clearTimeout(timer)
   }

@@ -96,15 +96,21 @@ function externalExecution(payload:any,trace:ProviderExecutionTrace,isPrivileged
 function embeddedExecutionProvenance(payload:any):Record<string,unknown>|null{const value=payload?.execution_provenance;return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null}
 function finiteNumber(value:unknown):number|null{const parsed=Number(value);return Number.isFinite(parsed)?parsed:null}
 function legacyContinuityFailure(payload:any):boolean{const text=JSON.stringify(payload??{}).toLowerCase();return text.includes('both reasoning providers are temporarily unavailable')||text.includes('continuity protection detected a primary failure')}
-function noPriorReply(language:string):string{return language==='es'?'No tengo un registro de procedencia real para la respuesta inmediatamente anterior. No voy a inventarlo.':language==='pt'?'Não tenho um registro de proveniência real para a resposta imediatamente anterior. Não vou inventá-lo.':"I don't have a real provenance record for the immediately preceding answer. I won't fabricate one."}
+function noPriorReply(language:string):string{return language==='es'?'No tengo un registro de procedencia real para la respuesta inmediatamente anterior. No voy a inventarlo.':language==='pt'?'NÃ£o tenho um registro de proveniÃªncia real para a resposta imediatamente anterior. NÃ£o vou inventÃ¡-lo.':"I don't have a real provenance record for the immediately preceding answer. I won't fabricate one."}
 function isRecordedProvenanceReport(text:string):boolean{return /(?:This is the real, recorded provenance|Recorded Influence Interpretation|LIVE SYSTEM STATE)/i.test(String(text||''))}
 function provenanceReportFollowupReply(language:string):string{
-  if(language==='es')return 'La respuesta inmediatamente anterior ya es el informe de procedencia registrado de la respuesta anterior. Sus secciones “Primary Reasoner” y “Material Contributors” identifican la fuente; no es una nueva respuesta sustantiva que requiera otro registro de procedencia.'
-  if(language==='pt')return 'A resposta imediatamente anterior já é o relatório de proveniência registrado da resposta anterior. As seções “Primary Reasoner” e “Material Contributors” identificam a fonte; ela não é uma nova resposta substantiva que exija outro registro de proveniência.'
-  return 'The immediately preceding reply is already the recorded provenance report for the answer before it. Its “Primary Reasoner” and “Material Contributors” sections identify the source; it is not a new substantive answer that needs a second provenance record.'
+  if(language==='es')return 'La respuesta inmediatamente anterior ya es el informe de procedencia registrado de la respuesta anterior. Sus secciones âPrimary Reasonerâ y âMaterial Contributorsâ identifican la fuente; no es una nueva respuesta sustantiva que requiera otro registro de procedencia.'
+  if(language==='pt')return 'A resposta imediatamente anterior jÃ¡ Ã© o relatÃ³rio de proveniÃªncia registrado da resposta anterior. As seÃ§Ãµes âPrimary Reasonerâ e âMaterial Contributorsâ identificam a fonte; ela nÃ£o Ã© uma nova resposta substantiva que exija outro registro de proveniÃªncia.'
+  return 'The immediately preceding reply is already the recorded provenance report for the answer before it. Its âPrimary Reasonerâ and âMaterial Contributorsâ sections identify the source; it is not a new substantive answer that needs a second provenance record.'
 }
 function emitRequestTelemetry(args:{startedAt:number;input:string;reply?:string|null;source:CosLiveResponseSource;confidence?:number|null;provenance?:any;externalAiInvoked:boolean}){const p=args.provenance??null,observation=buildCosLiveTelemetry({responseSource:args.source,latencyMs:Math.max(0,Date.now()-args.startedAt),confidence:args.confidence??null,reasonerLabel:p?.reasonerLabel??p?.local_reasoning?.model??null,localModelInvoked:p?.localModelInvoked??p?.local_reasoning?.invoked??false,externalAiInvoked:args.externalAiInvoked,knowledgeFactsUsed:p?.knowledgeFactsUsed??p?.knowledge_graph?.evidence_count??0,learnedItemsUsed:p?.learnedItemsUsed??p?.learned_corpus?.evidence_count??0,userMemoriesUsed:p?.userMemoriesUsed??p?.user_memory?.evidence_count??0,similarityScore:p?.similarityScore,promptChars:args.input.length,replyChars:String(args.reply??'').length});emitCosLiveTelemetry(observation);return observation}
 function asksForHistoricalRoster(input:string):boolean{return /\b(?:former|past|previous|last)\b/i.test(input)&&/\b(?:list|secretar(?:y|ies)|office holder|history)\b/i.test(input)}
+function sameFreshSourceUrl(left:string,right:string):boolean{
+  try{
+    const a=new URL(left),b=new URL(right)
+    return a.hostname===b.hostname&&a.pathname.replace(/\/$/,'')===b.pathname.replace(/\/$/,'')
+  }catch{return left===right}
+}
 function excerptFreshPageBody(body:string,input:string):string{
   const lines=String(body||'').split(/\n+/).map(line=>line.trim()).filter(Boolean)
   if(!lines.length)return ''
@@ -116,7 +122,7 @@ function excerptFreshPageBody(body:string,input:string):string{
   }
   const selected=new Set<number>(),historyRequest=/\b(?:former|past|previous|last)\b/i.test(input)
   for(const index of anchors){
-    // Official rosters can be headed only by the role (for example, “Secretaries of …”).
+    // Official rosters can be headed only by the role (for example, âSecretaries of â¦â).
     // In a historical request, retain the bounded section after every semantic anchor.
     const span=historyRequest?140:/\b(?:former|past|previous|history|list of)\b/i.test(lines[index])?90:4
     for(let cursor=Math.max(0,index-2);cursor<Math.min(lines.length,index+span);cursor+=1)selected.add(cursor)
@@ -125,19 +131,19 @@ function excerptFreshPageBody(body:string,input:string):string{
   return (excerpt||lines.slice(0,120).join('\n')).slice(0,16_000)
 }
 function partialOfficeHolderReply(reply:string,language:string):string{
-  const suffix=language==='pt'?'Não foi possível verificar com segurança a lista histórica solicitada a partir das fontes recuperadas nesta resposta.':
-    language==='es'?'No se pudo verificar con seguridad la lista histórica solicitada a partir de las fuentes recuperadas en esta respuesta.':
+  const suffix=language==='pt'?'NÃ£o foi possÃ­vel verificar com seguranÃ§a a lista histÃ³rica solicitada a partir das fontes recuperadas nesta resposta.':
+    language==='es'?'No se pudo verificar con seguridad la lista histÃ³rica solicitada a partir de las fuentes recuperadas en esta respuesta.':
     'I could not verify the requested historical list safely from the retrieved sources in this response.'
   return `${reply}\n\n${suffix}`
 }
 function securityReleaseContinuityReply(input:string):string|null{if(!/\b(?:zero[- ]day|vulnerabilit|infosec|tenant\s+metadata)\b/i.test(input)||!/\b(?:launch|release|go\/no-go|go no-go|conference)\b/i.test(input))return null;return 'GO/NO-GO: NO-GO until the security incident authority documents containment or an accepted risk decision. Preserve evidence; stop release promotion; identify the affected dependency/version and exposure path; determine whether tenant metadata was accessible; apply or isolate the mitigation; assess notification and contractual obligations with Legal/Privacy; and reconvene the launch decision on recorded remediation evidence. Live verification or model synthesis was unavailable, so COS is not asserting exploitability, scope, or legal duties beyond the scenario facts.'}
-function freshEvidenceUnavailableReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;const messages:Record<string,string>={en:'COS requires live authoritative evidence for this current fact, but live verification is unavailable or insufficient right now. No model-memory answer was used.',es:'COS requiere evidencia autorizada en vivo para este hecho actual, pero la verificación en vivo no está disponible o es insuficiente en este momento. No se utilizó una respuesta de memoria del modelo.',pt:'O COS exige evidência autorizada ao vivo para este fato atual, mas a verificação em vivo está indisponível ou insuficiente neste momento. Nenhuma resposta da memória do modelo fue usada.',pl:'COS wymaga aktualnego, wiarygodnego źródła dla tego bieżącego faktu, ale w tej chwili weryfikacja na żywo jest niedostępna lub niewystarczająca. Nie użyto odpowiedzi z pamięci modelu.',ru:'COS требует актуального авторитетного источника для этого текущего факта, но сейчас живая проверка недоступна или недостаточна. Ответ из памяти модели не использовался.'};return messages[language]||messages.en}
+function freshEvidenceUnavailableReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;const messages:Record<string,string>={en:'COS requires live authoritative evidence for this current fact, but live verification is unavailable or insufficient right now. No model-memory answer was used.',es:'COS requiere evidencia autorizada en vivo para este hecho actual, pero la verificaciÃ³n en vivo no estÃ¡ disponible o es insuficiente en este momento. No se utilizÃ³ una respuesta de memoria del modelo.',pt:'O COS exige evidÃªncia autorizada ao vivo para este fato atual, mas a verificaÃ§Ã£o em vivo estÃ¡ indisponÃ­vel ou insuficiente neste momento. Nenhuma resposta da memÃ³ria do modelo fue usada.',pl:'COS wymaga aktualnego, wiarygodnego ÅºrÃ³dÅa dla tego bieÅ¼Äcego faktu, ale w tej chwili weryfikacja na Å¼ywo jest niedostÄpna lub niewystarczajÄca. Nie uÅ¼yto odpowiedzi z pamiÄci modelu.',ru:'COS ÑÑÐµÐ±ÑÐµÑ Ð°ÐºÑÑÐ°Ð»ÑÐ½Ð¾Ð³Ð¾ Ð°Ð²ÑÐ¾ÑÐ¸ÑÐµÑÐ½Ð¾Ð³Ð¾ Ð¸ÑÑÐ¾ÑÐ½Ð¸ÐºÐ° Ð´Ð»Ñ ÑÑÐ¾Ð³Ð¾ ÑÐµÐºÑÑÐµÐ³Ð¾ ÑÐ°ÐºÑÐ°, Ð½Ð¾ ÑÐµÐ¹ÑÐ°Ñ Ð¶Ð¸Ð²Ð°Ñ Ð¿ÑÐ¾Ð²ÐµÑÐºÐ° Ð½ÐµÐ´Ð¾ÑÑÑÐ¿Ð½Ð° Ð¸Ð»Ð¸ Ð½ÐµÐ´Ð¾ÑÑÐ°ÑÐ¾ÑÐ½Ð°. ÐÑÐ²ÐµÑ Ð¸Ð· Ð¿Ð°Ð¼ÑÑÐ¸ Ð¼Ð¾Ð´ÐµÐ»Ð¸ Ð½Ðµ Ð¸ÑÐ¿Ð¾Ð»ÑÐ·Ð¾Ð²Ð°Ð»ÑÑ.'};return messages[language]||messages.en}
 function freshSynthesisRejectedReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;return buildFreshVerificationUnavailableReply({prompt:input,language})}
 function securityScenarioEvidenceIsSpecific(input:string,sources:FreshEvidenceSource[]):boolean{if(!/\b(?:zero[- ]day|vulnerabilit|infosec|tenant\s+metadata)\b/i.test(input))return true;const locator=input.match(/\bCVE-\d{4}-\d{4,}\b|\b(?:npm|pypi|maven|cargo|gem|composer)\s*[:/]\s*[@\w./-]+/i)?.[0];if(!locator)return false;return sources.some(source=>new RegExp(locator.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(`${source.title}\n${source.snippet}\n${source.url}`))}
 
 function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { detail: string }): string | null {
   if (!cos || cos.handled || !('bestEffortReply' in cos) || !cos.bestEffortReply) return null
-  return [`⚠️ Low-confidence draft (COS confidence ${cos.confidence.toFixed(2)}, below the ${confidenceThreshold().toFixed(2)} threshold; no external model was available to do better). ${reason.detail}`,'',cos.bestEffortReply].join('\n')
+  return [`â ï¸ Low-confidence draft (COS confidence ${cos.confidence.toFixed(2)}, below the ${confidenceThreshold().toFixed(2)} threshold; no external model was available to do better). ${reason.detail}`,'',cos.bestEffortReply].join('\n')
 }
 function localDraft(cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null):string|null{if(!cos)return null;if(cos.handled)return cos.reply;return 'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'?cos.bestEffortReply:null}
 function localReasonerLabel():string{const resolved=resolveCosReasoner();return resolved.config?.label??`independent-local:${(process.env.LOCAL_AI_MODEL||'local-model').trim()}`}
@@ -241,8 +247,14 @@ export async function POST(req:NextRequest){
         .filter((source, index, all) => all.findIndex(candidate => candidate.url === source.url) === index)
         .slice(0, 4)
       const pageResults = await Promise.allSettled(listSources.map(source => readPublicPages([source.url])))
-      const pages = pageResults.flatMap(result => result.status === 'fulfilled' ? result.value : [])
-      const bodyByUrl = new Map(pages.map(page => [page.url, page.snippet] as const))
+      // Public pages may redirect to a canonical URL. Preserve the association with the selected
+      // search result instead of dropping the body merely because its returned URL differs.
+      const bodyByUrl = new Map(listSources.map((source,index) => {
+        const result=pageResults[index]
+        const pages=result?.status==='fulfilled'?result.value:[]
+        const page=pages.find(candidate=>sameFreshSourceUrl(candidate.url,source.url))??pages[0]
+        return [source.url,page?.snippet||''] as const
+      }))
       freshSources = freshSources.map(source => {
         const body = bodyByUrl.get(source.url)
         return body ? { ...source, snippet: excerptFreshPageBody(body, lookupInput) } : source
@@ -262,8 +274,9 @@ export async function POST(req:NextRequest){
 
     const deterministicFresh=resolveDeterministicDirectFlight(lookupInput,freshSources)
     const deterministicOfficeHolder=resolveDeterministicFreshOfficeHolder(lookupInput,freshSources)
-    const deterministicAnswer=deterministicFresh??(!asksForHistoricalRoster(lookupInput)?deterministicOfficeHolder:null)
-    if (deterministicOfficeHolder && asksForHistoricalRoster(lookupInput)) {
+    const deterministicOfficeHolderHasRequestedRoster=Boolean(deterministicOfficeHolder&&/\n\nPast .+s for the requested period:\n- .+\n- /s.test(deterministicOfficeHolder.reply))
+    const deterministicAnswer=deterministicFresh??(!asksForHistoricalRoster(lookupInput)||deterministicOfficeHolderHasRequestedRoster?deterministicOfficeHolder:null)
+    if (deterministicOfficeHolder && asksForHistoricalRoster(lookupInput) && !deterministicOfficeHolderHasRequestedRoster) {
       partialFreshOfficeHolderReply=partialOfficeHolderReply(deterministicOfficeHolder.reply,language)
     }
     if(deterministicAnswer){

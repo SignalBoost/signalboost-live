@@ -125,7 +125,7 @@ export function constructDatedRoster(input: string, sources: FreshEvidenceSource
   const rows: Array<{ name: string; start: number; end: number | null; source: FreshEvidenceSource }> = []
   // Public historical pages commonly put the name and tenure on adjacent lines. Accept both
   // that layout and compact same-line tables; page chrome still cannot become a row without dates.
-  for (const source of sources) for (const match of String(source.snippet || '').matchAll(/(?:^|\n)\s*(?:\d+[.)]\s*)?([A-Z][A-Za-z.'’-]+(?:\s+[A-Z][A-Za-z.'’-]+){1,5})[ \t]*(?:\r?\n[ \t]*)?\(?\s*(\d{4})\s*[–-]\s*(\d{4})?\s*\)?/gm)) {
+  for (const source of sources) for (const match of String(source.snippet || '').matchAll(/(?:^|\n)\s*(?:\d+[.)]\s*)?([A-Z][A-Za-z.'’-]+(?:\s+[A-Z][A-Za-z.'’-]+){1,5})[ \t]*(?:\r?\n[ \t]*){0,3}\(?\s*(\d{4})\s*[–-]\s*(\d{4})?\s*\)?/gm)) {
     const end = match[3] ? Number(match[3]) : null
     if ((end ?? now.getUTCFullYear()) >= start) rows.push({ name: match[1].trim(), start: Number(match[2]), end, source })
   }

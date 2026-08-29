@@ -18,12 +18,11 @@ test('cos-primary resolves explicit direct-flight evidence before any local mode
 })
 
 
-test('cos-primary executes every planned query, reads selected public list pages, and allocates evidence across a compound request', () => {
+test('cos-primary executes every planned query and deepens thin evidence for a compound request', () => {
   assert.match(source, /freshEvidenceSearchQueries\(lookupInput\)/)
   assert.match(source, /Promise\.all\(queries\.map\(query=>getExternalInfo\(query,8/)
   assert.match(source, /prepareFreshEvidenceAcrossQueries\(liveResults\.filter/)
-  assert.match(source, /Promise\.allSettled\(listSources\.map\(source => readPublicPages\(\[source\.url\]\)\)\)/)
-  assert.match(source, /result\.status === 'fulfilled' \? result\.value : \[\]/)
+  assert.match(source, /deepenClaimResearch\(lookupInput,freshSources,readPublicPages\)/)
 })
 
 
@@ -36,11 +35,9 @@ test('cos-primary returns a verified clause as a partial result when compound sy
 })
 
 
-test('compound history extraction ranks roster pages ahead of generic office pages', () => {
-  assert.match(source, /priority\s*=\s*\(source: FreshEvidenceSource\).*former\|history\|list/s)
-  assert.match(source, /\.sort\(\(left, right\)/)
-  assert.match(source, /const listSources = \[freshSources\[0\], \.\.\.historySources\]/)
-  assert.match(source, /\.slice\(0, 4\)/)
+test('compound research records claim-level page reading before judgment', () => {
+  assert.match(source, /claim_research:claimResearch\.claims/)
+  assert.match(source, /pages_read:claimResearch\.pagesRead/)
 })
 
 
@@ -50,9 +47,6 @@ test('completed evidence-policy refusals are HTTP 200 while transport synthesis 
 })
 
 
-test('compound page extraction uses relevant body sections instead of the page prefix alone', () => {
-  assert.match(source, /function excerptFreshPageBody\(body:string,input:string\)/)
-  assert.match(source, /snippet: excerptFreshPageBody\(body, lookupInput\)/)
-  assert.match(source, /historyRequest\?140:/)
-  assert.match(source, /Official rosters can be headed only by the role/)
+test('compound page extraction is delegated to shared claim research', () => {
+  assert.match(source, /from '@\/lib\/ai\/cos\/cosClaimResearch'/)
 })

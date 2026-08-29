@@ -57,10 +57,9 @@ test('a complete deterministic historical roster is returned before model synthe
   assert.match(source, /&& !deterministicOfficeHolderHasRequestedRoster/)
 })
 
-test('historical page evidence survives canonical redirects', () => {
+test('thin evidence is deepened through the shared claim-research loop', () => {
   const source = route()
-  assert.match(source, /function sameFreshSourceUrl/)
-  assert.match(source, /pages\.find\(candidate=>sameFreshSourceUrl\(candidate\.url,source\.url\)\)\?\?pages\[0\]/)
+  assert.match(source, /deepenClaimResearch\(lookupInput,freshSources,readPublicPages\)/)
 })
 
 test('direct/nonstop route existence is current external state and is live-verified', () => {

@@ -5,6 +5,7 @@ import {
   sendAssistantTurnAndRecover,
   type AssistantTransportLocale,
 } from '@/lib/ai/cos/assistantTransportClient'
+import { isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 
 type AssistantRequestBody = {
   messages?: Array<{ role?: unknown; content?: unknown }>
@@ -77,6 +78,13 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
       const conversationId = String(body?.context?.conversationId || '').trim()
       const userContent = body ? latestUserContent(body) : ''
       if (!body || !conversationId || !userContent) return originalFetch(input, init)
+
+      // Defense in depth: the private COS transport must never let an executable task fall
+      // through to the normal answer route. The Builder page owns the sandboxed tool loop.
+      if (isCosCodingObjective(userContent)) {
+        window.location.assign(`/dashboard/developer?objective=${encodeURIComponent(userContent)}`)
+        return responseFromPayload({ redirectedToBuilder: true }, 202, 'builder-handoff')
+      }
 
       const result = await sendAssistantTurnAndRecover(userContent, body as Record<string, unknown>, {
         sendUrl: '/api/cos-primary',

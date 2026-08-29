@@ -35,7 +35,7 @@ async function fetchText(url: string, timeoutMs = 8000): Promise<string> {
     })
     if (!res.ok) throw new Error(`fetch ${res.status}`)
     const raw = await res.text()
-    return stripTags(raw).slice(0, 8000)
+    return stripTags(raw).slice(0, 80_000)
   } finally {
     clearTimeout(timer)
   }
@@ -99,7 +99,7 @@ export async function readPublicPages(urls: string[]): Promise<PublicPage[]> {
   const pages = await Promise.all(
     unique.map(async url => {
       const body = await fetchText(url)
-      return { title: url, url, snippet: body.slice(0, 6000) }
+      return { title: url, url, snippet: body.slice(0, 60_000) }
     }),
   )
   return pages.filter(page => page.snippet)

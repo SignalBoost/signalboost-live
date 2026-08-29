@@ -36,6 +36,7 @@ import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
+import { deepenClaimResearch } from './cosClaimResearch.ts'
 import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
@@ -696,15 +697,17 @@ async function tryFreshCurrentFact(input: {
   const successfulResponses = liveResponses.filter(response => response.ok)
   const documentsAcquired = liveResponses.reduce((count, response) => count + (response.ok ? response.results.length : 0), 0)
   // Preserve evidence coverage for every part of a compound request.
-  const sources = prepareFreshEvidenceAcrossQueries(
+  let sources = prepareFreshEvidenceAcrossQueries(
     liveResponses.flatMap(response => response.ok ? [response.results] : []),
     FRESH_SELECTED_EVIDENCE_BUDGET,
   )
+  const claimResearch = await deepenClaimResearch(input.prompt, sources, readPublicPages)
+  sources = claimResearch.sources
   const baseBudget = {
     search_result_limit: FRESH_SEARCH_RESULT_BUDGET,
     queries_run: queries.length,
     results_received: documentsAcquired,
-    evidence_selected: sources.length,
+    evidence_selected: sources.length, pages_read: claimResearch.pagesRead, claims: claimResearch.claims,
   }
 
   if (!successfulResponses.length || !freshEvidenceMeetsAuthority(input.prompt, sources)) {

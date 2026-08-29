@@ -38,16 +38,41 @@ function thin(source: FreshEvidenceSource): boolean {
   return text.length < 1400 || /\b(?:list|history|biograph|profile|report|statistics|results|official)\b/i.test(source.title)
 }
 
+function scoreSourceForClaim(claim: string, source: FreshEvidenceSource): number {
+  const haystack = `${source.title} ${source.url}`.toLowerCase()
+  const claimWords = words(claim)
+  let score = claimWords.reduce((total, word) => total + (haystack.includes(word) ? 12 : 0), 0)
+  const host = (() => { try { return new URL(source.url).hostname } catch { return '' } })()
+  if (host.endsWith('.gov')) score += 100
+  if (/\b(?:past|former|previous|history|last)\b/i.test(claim) && /\b(?:former|history|list|biograph|archive)\b/i.test(haystack)) score += 80
+  if (/\b(?:current|today|now)\b/i.test(claim) && /\b(?:official|secretary|leadership|administration|profile)\b/i.test(haystack)) score += 45
+  return score
+}
+
+function hasDatedRoster(source: FreshEvidenceSource): boolean {
+  return (String(source.snippet || '').match(/\b\d{4}\s*[–-]\s*(?:\d{4})?\b/g) || []).length >= 2
+}
+
 function statusFor(claim: string, sources: FreshEvidenceSource[], pagesRead: number): ClaimResearchStatus {
   const terms = words(claim).filter(term => !['current', 'past', 'last', 'years', 'give', 'list', 'what', 'who'].includes(term))
   const supported = sources.some(source => terms.some(term => `${source.title}\n${source.snippet}`.toLowerCase().includes(term)))
+  if (/\b(?:past|former|previous|history|last)\b/i.test(claim)) {
+    return sources.some(hasDatedRoster) ? 'grounded' : (pagesRead ? 'insufficient' : 'needs_deeper_read')
+  }
   if (supported && pagesRead > 0) return 'grounded'
   return sources.length ? 'needs_deeper_read' : 'insufficient'
 }
 
 export async function deepenClaimResearch(input: string, sources: FreshEvidenceSource[], readPages: PageReader): Promise<ClaimResearchResult> {
   const claims = splitResearchClaims(input)
-  const candidates = sources.filter(thin).slice(0, 4)
+  // Each claim gets a chance to nominate its best authority/document. Selecting only the first
+  // search results lets a current-profile page crowd out the historical table or report needed by
+  // a later claim in the same user request.
+  const candidates = [...new Map(claims.flatMap(claim => sources
+    .filter(thin)
+    .sort((left, right) => scoreSourceForClaim(claim, right) - scoreSourceForClaim(claim, left))
+    .slice(0, 2)
+    .map(source => [source.url, source] as const))).values()].slice(0, 4)
   if (!candidates.length) return { sources, claims: claims.map(text => ({ text, status: statusFor(text, sources, 0) })), pagesRead: 0 }
 
   const settled = await Promise.allSettled(candidates.map(source => readPages([source.url])))

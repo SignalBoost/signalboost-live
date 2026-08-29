@@ -53,5 +53,6 @@ test('completed evidence-policy refusals are HTTP 200 while transport synthesis 
 test('compound page extraction uses relevant body sections instead of the page prefix alone', () => {
   assert.match(source, /function excerptFreshPageBody\(body:string,input:string\)/)
   assert.match(source, /snippet: excerptFreshPageBody\(body, lookupInput\)/)
-  assert.match(source, /\?90:4/)
+  assert.match(source, /historyRequest\?140:/)
+  assert.match(source, /Official rosters can be headed only by the role/)
 })

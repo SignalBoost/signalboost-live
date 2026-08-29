@@ -192,7 +192,7 @@ test('compound current-office and history requests receive separate live queries
   )
   assert.equal(queries.length, 2)
   assert.match(queries[0], /current US secretary of State/i)
-  assert.match(queries[1], /former secretary of State official history list/i)
+  assert.match(queries[1], /US federal former secretary of State past 20 years official history list/i)
 })
 
 

@@ -22,7 +22,8 @@ test('cos-primary executes every planned query, reads selected public list pages
   assert.match(source, /freshEvidenceSearchQueries\(lookupInput\)/)
   assert.match(source, /Promise\.all\(queries\.map\(query=>getExternalInfo\(query,8/)
   assert.match(source, /prepareFreshEvidenceAcrossQueries\(liveResults\.filter/)
-  assert.match(source, /readPublicPages\(listSources\.map/)
+  assert.match(source, /Promise\.allSettled\(listSources\.map\(source => readPublicPages\(\[source\.url\]\)\)\)/)
+  assert.match(source, /result\.status === 'fulfilled' \? result\.value : \[\]/)
 })
 
 

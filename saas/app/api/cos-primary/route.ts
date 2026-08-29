@@ -285,10 +285,11 @@ export async function POST(req:NextRequest){
     logEscalation({event:'fresh_external_synthesis_result',provider:externalProvider,model:externalFresh.model,provider_source:externalFresh.source,external_ai_invoked:externalInvoked,local_model_invoked:freshLocalAttempted,fresh_documents_acquired:freshSources.length,fresh_synthesis_accepted:externalFresh.accepted})
 
     if(!externalFresh.accepted||!externalFresh.reply){
-      const reply=freshSynthesisRejectedReply(language,lookupInput)
+      const freshFailureCode: FreshEvidenceInternalFailureCode = 'citation_grounding_rejected'
+      const reply=freshFailureReply(freshFailureCode,language)!
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,provenance:freshTelemetryProvenance(freshLocalAttempted,freshLocalModel),externalAiInvoked:externalInvoked})
       await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fresh-evidence-synthesis-rejected',{prompt:lookupInput,answered:false,confidence:0,branch:'fresh_evidence_synthesis_rejected'})
-      return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-synthesis-rejected',confidence_score:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:externalInvoked,external_provider:externalProvider,external_model:externalFresh.model,external_provider_source:externalFresh.source,external_fallback_invoked:externalInvoked,external_fallback_succeeded:false,local_model_invoked:freshLocalAttempted,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
+      return NextResponse.json({ok:false,reply,error:reply,source:'cos-fresh-evidence-ungrounded',confidence_score:0,confidence_threshold:confidenceThreshold(),escalation_reason_code:freshFailureCode,fresh_failure_class:freshFailureCode,external_ai_invoked:externalInvoked,external_provider:externalProvider,external_model:externalFresh.model,external_provider_source:externalFresh.source,external_fallback_invoked:externalInvoked,external_fallback_succeeded:false,local_model_invoked:freshLocalAttempted,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,live_evidence_sources:freshSources.map(source=>({id:source.id,title:source.title,url:source.url})),live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
     }
 
     const reply=externalFresh.reply

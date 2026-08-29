@@ -202,6 +202,8 @@ function candidateLooksLikePerson(value: string): boolean {
 function extractCandidates(text: string, role: string): string[] {
   const roleSource = rolePattern(role)
   const patterns = [
+    // Sentence-bound extraction avoids consuming a capitalized office title as part of a name.
+    new RegExp(`(?:^|[.!?]\\s+)(${NAME_SEQUENCE_SOURCE})\\s+(?:is|serves\\s+as|is\\s+serving\\s+as|became|has\\s+been)\\s+(?:the\\s+)?(?:\\d+(?:st|nd|rd|th)\\s+(?:and\\s+current\\s+)?)?(?:current\\s+)?${roleSource}\\b`, 'giu'),
     new RegExp(`\\b(?:the\\s+)?${roleSource}(?:\\s+of\\s+[^.!?;:]{1,100})?\\s+(?:is\\s+currently|is\\s+now|is|:|[-–—])\\s+(${NAME_SEQUENCE_SOURCE})`, 'giu'),
     new RegExp(`\\b${roleSource}\\s+(${NAME_SEQUENCE_SOURCE})`, 'giu'),
     new RegExp(`\\b(${NAME_SEQUENCE_SOURCE})\\s+(?:is|serves\\s+as|is\\s+serving\\s+as|became|has\\s+been)\\s+(?:the\\s+)?(?:\\d+(?:st|nd|rd|th)\\s+(?:and\\s+current\\s+)?)?(?:current\\s+)?${roleSource}\\b`, 'giu'),

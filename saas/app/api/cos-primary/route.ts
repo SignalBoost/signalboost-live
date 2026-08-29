@@ -209,13 +209,18 @@ export async function POST(req:NextRequest){
     // Search snippets can expose a list-page title without its roster. For an explicit
     // former/past request, read selected public list pages and retain their body as evidence.
     if (/\b(?:former|past|previous|last)\b/i.test(lookupInput)) {
-      const listSources = freshSources
+      const historySources = freshSources
         .filter(source => /\b(?:list|former|history|secretar(?:y|ies))\b/i.test(source.title + ' ' + source.url))
         .sort((left, right) => {
           const priority = (source: FreshEvidenceSource) => /\b(?:former|history|list)\b/i.test(source.title + ' ' + source.url) ? 1 : 0
           return priority(right) - priority(left)
         })
-        .slice(0, 3)
+      // The first selected source comes from the dedicated current-holder query. Read it too:
+      // a valid incumbent must come from page prose, never a result title or navigation label.
+      const listSources = [freshSources[0], ...historySources]
+        .filter((source): source is FreshEvidenceSource => Boolean(source))
+        .filter((source, index, all) => all.findIndex(candidate => candidate.url === source.url) === index)
+        .slice(0, 4)
       const pageResults = await Promise.allSettled(listSources.map(source => readPublicPages([source.url])))
       const pages = pageResults.flatMap(result => result.status === 'fulfilled' ? result.value : [])
       const bodyByUrl = new Map(pages.map(page => [page.url, page.snippet] as const))

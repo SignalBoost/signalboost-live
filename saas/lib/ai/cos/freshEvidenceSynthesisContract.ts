@@ -1,5 +1,6 @@
 import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
 import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
+import { claimResearchPrompt, splitResearchClaims } from './cosClaimResearch.ts'
 
 export type AcceptedFreshEvidenceSynthesis = {
   reply: string
@@ -31,8 +32,8 @@ export function freshEvidenceSynthesisSystemPrompt(language: string): string {
     '3. Put every evidence label that materially supports the answer in "evidenceIds". Never invent an evidence id.',
     '4. For life/death, current office-holder, or leadership claims, use at least two independent evidence ids when the supplied evidence supports them.',
     '5. Resolve pronouns only from the explicit user context supplied in QUESTION; never infer a different person or entity from model memory.',
-    '6. Answer every distinct part of the QUESTION. For a request that combines a current fact with a past/former/history list, provide both; never release only one half.',
-    '7. If the evidence does not establish any required part, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[]}.',
+    '6. Work claim by claim. Answer each grounded claim. If a distinct claim is not established, say exactly which claim remains unverified; do not discard grounded claims.',
+    '7. Return EVIDENCE_INSUFFICIENT only when no claim can be established from the evidence.',
     '8. Be brief, but use a compact numbered list when the question requests a list.',
   ].join('\n')
 }
@@ -42,16 +43,7 @@ export function freshEvidenceSynthesisPrompt(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nQUESTION: ${args.input}`
-}
-
-function requiresHistoricalList(input: string): boolean {
-  const text = String(input || '')
-  return /\b(?:list|roster)\b/i.test(text) && /\b(?:former|past|previous|last)\b/i.test(text)
-}
-
-function hasRequestedList(answer: string): boolean {
-  return (String(answer || '').match(/(?:^|\n)\s*\d+[.)]\s+\S/gm) || []).length >= 2
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nCLAIM PLAN (control-plane status; do not treat it as factual evidence):\n${claimResearchPrompt(splitResearchClaims(args.input).map(text => ({ text, status: 'needs_deeper_read' })))}\n\nQUESTION: ${args.input}`
 }
 
 function parseJsonObject(text: string): ModelFreshEvidenceSynthesis | null {
@@ -76,9 +68,6 @@ export function acceptFreshEvidenceSynthesis(args: {
   const parsed = parseJsonObject(args.text)
   const answer = typeof parsed?.answer === 'string' ? parsed.answer.trim() : ''
   if (!answer || /EVIDENCE_INSUFFICIENT/i.test(answer)) return null
-  // A compound request must not release an incumbent-only response while claiming that
-  // a requested historical roster is absent. The prompt requires a numbered list; enforce it.
-  if (requiresHistoricalList(args.input) && !hasRequestedList(answer)) return null
   if (!Array.isArray(parsed?.evidenceIds)) return null
 
   const byId = new Map(args.sources.map(source => [source.id, source] as const))

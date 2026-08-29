@@ -246,7 +246,8 @@ export function resolveDeterministicFreshOfficeHolder(
     const host = freshEvidenceHost(source.url)
     if (!host) continue
     const perSource = new Map<string, string>()
-    // A title can be page chrome or navigation. Never extract a person's name from it.\n    const text = source.snippet
+    // A title can be page chrome or navigation. Never extract a person's name from it.
+    const text = source.snippet
     for (const candidate of extractCandidates(text, descriptor.role)) {
       const key = candidateKey(candidate)
       if (key && !perSource.has(key)) perSource.set(key, candidate)

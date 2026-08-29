@@ -184,6 +184,14 @@ test('a connecting itinerary alone is never converted into a no-direct-flight cl
 })
 
 
+test('evaluative office questions search economic series instead of opinion lists', () => {
+  const queries = freshEvidenceSearchQueries('who is the worse US president?')
+  assert.ok(queries.some(query => /unemployment/i.test(query)))
+  assert.ok(queries.some(query => /CPI|inflation/i.test(query)))
+  assert.ok(queries.some(query => /GDP/i.test(query)))
+  assert.ok(queries.every(query => !/new republic|historian survey academic ranking/i.test(query)))
+})
+
 test('compound current-office request searches the current-holder clause before history wording', () => {
   const query = freshEvidenceSearchQuery(
     'who is the current US secretary of State and give me a list of the past secretary of state for the past 20 years',

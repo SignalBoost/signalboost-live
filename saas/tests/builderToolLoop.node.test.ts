@@ -25,6 +25,21 @@ test('Builder writes a user file, runs it, and returns only after tool evidence'
   assert.equal((await workspace.readFile('user:1', 'hello.js'))?.content, 'console.log("hello")')
 })
 
+test('Builder recovers when the model replays a completed tool call', async () => {
+  const workspace = new InMemoryBuilderWorkspace(() => 3)
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: 'hello\n', stderr: '', timedOut: false } } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"write_file","input":{"path":"hello.js","content":"console.log(\\"hello\\")"}}',
+    '{"type":"tool","toolId":"write_file","input":{"path":"hello.js","content":"console.log(\\"hello\\")"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node hello.js"}}',
+    '{"type":"answer","answer":"Created and ran hello.js."}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Create hello.js and run it.', workspaceId: 'user:replay' })
+  assert.equal(result.ok, true)
+  assert.equal(result.trace.some(item => String(item.error || '').startsWith('builder_repeated_tool_call:write_file')), true)
+  assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
+})
+
 test('Builder fixes a supplied file after inspecting it and runs the corrected workspace', async () => {
   const workspace = new InMemoryBuilderWorkspace(() => 2)
   await workspace.writeFile('user:2', 'app.js', 'throw new Error("broken")')
@@ -44,7 +59,6 @@ test('Builder rejects traversal and never permits host files', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await assert.rejects(() => workspace.writeFile('user:3', '../.env', 'no'), /builder_invalid_path/)
 })
-
 
 test('Builder stops after the bounded command-run budget', async () => {
   const workspace = new InMemoryBuilderWorkspace()

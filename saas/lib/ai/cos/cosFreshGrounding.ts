@@ -80,11 +80,7 @@ function cleanJurisdiction(value: string | undefined): string {
 }
 
 function officeHolderDescriptor(input: string): { role: string; descriptor: string } | null {
-  // Compound requests may ask for the incumbent and a separate historical list. Extract only
-  // the current-holder clause here; the caller decides whether the second clause is complete.
   const currentClause = String(input || '').split(/\b(?:and|also|plus|then)\b|[?!.;,]/i)[0]?.trim() || String(input || '').trim()
-  // Also accept natural phrasing such as "current US secretary of state" by moving
-  // the jurisdiction after the role before applying the canonical role parser.
   const inlineJurisdiction = new RegExp(`^(\\s*who\\s+(?:is|'s)\\s+(?:the\\s+)?(?:current\\s+))([\\p{L}.'’ -]{2,80}?)\\s+(${OFFICE_HOLDER_ROLE_SOURCE})(\\s*[?.!]*\\s*)// saas/lib/ai/cos/cosFreshGrounding.ts
 import type { SearchResult } from '@/lib/ai/tools/getExternalInfo'
 
@@ -166,9 +162,6 @@ function cleanJurisdiction(value: string | undefined): string {
     .trim()
 }
 
-function officeHolderDescriptor(input: string): { role: string; descriptor: string } | null {
-  // Compound requests may ask for the incumbent and a separate historical list. Extract only
-  // the current-holder clause here; the caller decides whether the second clause is complete.
 , 'iu')
   const normalizedClause = currentClause.replace(inlineJurisdiction, '$1$3 of $2$4')
   const match = SIMPLE_CURRENT_OFFICE_HOLDER.exec(normalizedClause)
@@ -202,8 +195,6 @@ function candidateLooksLikePerson(value: string): boolean {
 function extractCandidates(text: string, role: string): string[] {
   const roleSource = rolePattern(role)
   const patterns = [
-    // Sentence-bound extraction avoids consuming a capitalized office title as part of a name.
-    new RegExp(`(?:^|[.!?]\\s+)(${NAME_SEQUENCE_SOURCE})\\s+(?:is|serves\\s+as|is\\s+serving\\s+as|became|has\\s+been)\\s+(?:the\\s+)?(?:\\d+(?:st|nd|rd|th)\\s+(?:and\\s+current\\s+)?)?(?:current\\s+)?${roleSource}\\b`, 'giu'),
     new RegExp(`\\b(?:the\\s+)?${roleSource}(?:\\s+of\\s+[^.!?;:]{1,100})?\\s+(?:is\\s+currently|is\\s+now|is|:|[-–—])\\s+(${NAME_SEQUENCE_SOURCE})`, 'giu'),
     new RegExp(`\\b${roleSource}\\s+(${NAME_SEQUENCE_SOURCE})`, 'giu'),
     new RegExp(`\\b(${NAME_SEQUENCE_SOURCE})\\s+(?:is|serves\\s+as|is\\s+serving\\s+as|became|has\\s+been)\\s+(?:the\\s+)?(?:\\d+(?:st|nd|rd|th)\\s+(?:and\\s+current\\s+)?)?(?:current\\s+)?${roleSource}\\b`, 'giu'),
@@ -350,8 +341,6 @@ export function resolveDeterministicFreshOfficeHolder(
   }
 
   const ranked = [...support.entries()]
-    // A first-party government page is sufficient for the incumbent of a public office.
-    // Other sources still require independent corroboration.
     .filter(([, value]) => value.hosts.size >= 2 || value.sources.some(source => isGovernmentHost(freshEvidenceHost(source.url))))
     .sort((a, b) => b[1].hosts.size - a[1].hosts.size || b[1].sources.length - a[1].sources.length)
   if (!ranked.length) return null

@@ -4,6 +4,8 @@ Status: Mandatory architecture requirement
 
 Related baseline: `docs/architecture/SIGNALBOOST-ARCHITECTURE-1.0.md`
 
+Related roadmap: `docs/architecture/PORTABLE-SPECIALIST-AGENT-ROADMAP.md`
+
 ## 1. Purpose
 
 SignalBoost must remain available and continue safe operations without routine human intervention. Ordinary infrastructure, process, network, provider, adapter, or deployment failures must trigger autonomous containment, failover, reconciliation, and recovery rather than a platform-wide stop.

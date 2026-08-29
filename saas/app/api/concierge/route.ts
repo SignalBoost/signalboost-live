@@ -23,16 +23,15 @@ import {
   prospectCampaignQueuedReply,
   prospectCampaignQueueError,
 } from '@/lib/outreach/prospectCampaignRequest'
+import { createPlatformAiPort } from '@/lib/cos/aiPort'
+import { BuilderToolLoop } from '@/lib/builder/tool-loop'
+import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
+import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-// Keep a large recovery margin inside Vercel's 300 s invocation ceiling. A public request must
-// return control to this route early enough for bounded research/continuity handling and JSON
-// serialization to complete before the platform cuts the socket. 150 s is the enforced ceiling:
-// it preserves at least 150 s of function budget for recovery while still allowing longer
-// content-generation turns than the old 120 s watchdog.
 const PRIMARY_TIMEOUT_MS = 150_000
 const RESEARCH_LIFELINE_START_MS = 90_000
 const RESEARCH_RESULT_LIMIT = 12
@@ -69,6 +68,59 @@ function conversationIdFrom(body: any): string | null {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
     ? value
     : null
+}
+
+function isCodingRequest(text: string): boolean {
+  return /\b(debug|fix|bug|error|traceback|stack trace|nameerror|typeerror|syntaxerror|write (a |me )?(script|function|class|html|css|app)|implement|refactor|unit test|pytest|compile|linter|code review)\b/i.test(text)
+    || /```/.test(text)
+}
+
+async function directBuilder(input: string): Promise<NextResponse | null> {
+  if (!isCodingRequest(input)) return null
+  const access = await getAccess().catch(() => null)
+  if (!access?.userId) {
+    return NextResponse.json({
+      reply: 'I can debug and build that in an isolated sandbox. Sign in so COS Builder can attach a workspace to your account, then send the same request again.',
+      source: 'cos-builder-sign-in-required',
+      execution_allowed: false,
+      external_action_taken: false,
+    })
+  }
+  const workspace = createSupabaseBuilderWorkspace(access.userId)
+  if (!workspace) {
+    return NextResponse.json({
+      reply: 'COS Builder storage is unavailable right now. No code was run.',
+      source: 'cos-builder-storage-unavailable',
+      execution_allowed: false,
+      external_action_taken: false,
+    }, { status: 503 })
+  }
+  const workspaceId = crypto.randomUUID()
+  await workspace.ensureWorkspace(workspaceId)
+  const result = await new BuilderToolLoop(
+    createPlatformAiPort(),
+    workspace,
+    new VercelSandboxBuilderRunner(),
+  ).run({ objective: input, workspaceId })
+  const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
+  if (result.ok === false) {
+    return NextResponse.json({
+      reply: `COS Builder stopped: ${result.error}`,
+      source: 'cos-builder',
+      workspaceId,
+      files,
+      execution_allowed: true,
+      external_action_taken: false,
+    }, { status: 422 })
+  }
+  return NextResponse.json({
+    reply: result.answer,
+    source: 'cos-builder',
+    workspaceId,
+    files,
+    execution_allowed: true,
+    external_action_taken: false,
+  })
 }
 
 async function directProspectCampaign(
@@ -323,10 +375,6 @@ function publicContinuityReply(language: string) {
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
-  // Concierge is the public face of COS. Run the entire request (including
-  // fallbacks and any nested support-route calls) inside a public-only scope so
-  // an owner/admin browser session can never promote this endpoint into an
-  // internal Chief-of-Staff channel.
   if (!isPublicDeliveryScope()) {
     return withPublicDeliveryScope(() => POST(req))
   }
@@ -334,6 +382,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   const language = languageFrom(body)
+
+  const builder = await directBuilder(input)
+  if (builder) return builder
 
   const deterministic = tryDeterministicUtility({
     prompt: input,
@@ -416,9 +467,6 @@ export async function POST(req: NextRequest): Promise<Response> {
     source: primarySnapshot.source,
   })
 
-  // A primary 503 carrying an explicit fresh-evidence class is an honest
-  // fail-closed result, not corruption. Preserve both its copy and recorded
-  // sources instead of replacing it with Concierge's generic outage message.
   if (primary?.status === 503 && [
     'insufficient_live_authority',
     'local_synthesis_failed',
@@ -427,13 +475,8 @@ export async function POST(req: NextRequest): Promise<Response> {
     'local_synthesis_below_threshold',
   ].includes(primarySnapshot.freshFailureClass)) return primary
 
-  // A healthy public Primary is returned directly. The ordinary continuity
-  // shadow invokes Backup COS with the internal approved brain snapshot, so it
-  // is intentionally disabled on the public delivery surface.
   if (primary && immediateReasons.length === 0) return primary
 
-  // Fail safe BEFORE Backup COS. Public Concierge must never load the internal
-  // brain snapshot, even during continuity recovery.
   if (isPublicDeliveryScope()) {
     const reasons = immediateReasons.length ? immediateReasons : ['primary_unavailable']
     await recordCosRecovery({

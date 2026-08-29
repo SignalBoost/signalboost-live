@@ -80,7 +80,10 @@ function cleanJurisdiction(value: string | undefined): string {
 }
 
 function officeHolderDescriptor(input: string): { role: string; descriptor: string } | null {
-  const match = SIMPLE_CURRENT_OFFICE_HOLDER.exec(String(input || '').trim())
+  const currentClause = String(input || '').split(/\b(?:and|also|plus|then)\b|[?!.;,]/i)[0]?.trim() || String(input || '').trim()
+  const inlineJurisdiction = new RegExp(`^(\\s*who\\s+(?:is|'s)\\s+(?:the\\s+)?(?:current\\s+))([\\p{L}.'’ -]{2,80}?)\\s+(${OFFICE_HOLDER_ROLE_SOURCE})(\\s*[?.!]*\\s*)$`, 'iu')
+  const normalizedClause = currentClause.replace(inlineJurisdiction, '$1$3 of $2$4')
+  const match = SIMPLE_CURRENT_OFFICE_HOLDER.exec(normalizedClause)
   if (!match) return null
   const rawRole = String(match[1] || '').trim()
   const jurisdiction = cleanJurisdiction(match[2])
@@ -120,7 +123,8 @@ function extractCandidates(text: string, role: string): string[] {
     let match: RegExpExecArray | null
     while ((match = pattern.exec(text)) !== null) {
       const candidate = String(match[1] || '').trim().replace(/[|,;:.!?]+$/g, '')
-      if (candidateLooksLikePerson(candidate)) out.add(candidate)
+      const person = candidate.replace(new RegExp(`^${roleSource}[.\\s]+`, 'i'), '').trim()
+      if (candidateLooksLikePerson(person)) out.add(person)
     }
   }
   return [...out]
@@ -257,7 +261,7 @@ export function resolveDeterministicFreshOfficeHolder(
   }
 
   const ranked = [...support.entries()]
-    .filter(([, value]) => value.hosts.size >= 2)
+    .filter(([, value]) => value.hosts.size >= 2 || value.sources.some(source => isGovernmentHost(freshEvidenceHost(source.url))))
     .sort((a, b) => b[1].hosts.size - a[1].hosts.size || b[1].sources.length - a[1].sources.length)
   if (!ranked.length) return null
   if (ranked.length > 1 && ranked[0][1].hosts.size === ranked[1][1].hosts.size) return null
@@ -273,7 +277,7 @@ export function resolveDeterministicFreshOfficeHolder(
     .slice()
     .sort((a, b) => authorityScore(b) - authorityScore(a))
     .slice(0, 2)
-  if (materialSources.length < 2) return null
+  if (!materialSources.length) return null
 
   const sourceText = materialSources.map(source => `[${source.id}] (${source.url})`).join(' and ')
   return {

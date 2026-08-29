@@ -24,3 +24,12 @@ test('cos-primary executes every planned query, reads selected public list pages
   assert.match(source, /prepareFreshEvidenceAcrossQueries\(liveResults\.filter/)
   assert.match(source, /readPublicPages\(listSources\.map/)
 })
+
+
+test('cos-primary returns a verified clause as a partial result when compound synthesis is rejected', () => {
+  assert.match(source, /resolveDeterministicFreshOfficeHolder\(lookupInput,freshSources\)/)
+  assert.match(source, /partialFreshOfficeHolderReply/)
+  assert.match(source, /cos-fresh-partial-grounded/)
+  assert.match(source, /partial_completion:partialCompletion/)
+  assert.match(source, /status:partialCompletion\?200:503/)
+})

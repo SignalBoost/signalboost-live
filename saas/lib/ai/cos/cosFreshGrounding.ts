@@ -107,7 +107,9 @@ function candidateLooksLikePerson(value: string): boolean {
   const tokens = value.trim().split(/\s+/).filter(Boolean)
   if (tokens.length < 2 || tokens.length > 5) return false
   const normalized = candidateKey(value)
-  if (!normalized || /\b(?:united states|white house|prime minister|vice president|official website|government|office holder)\b/i.test(normalized)) return false
+  // Search-result and government-site navigation labels often have title case and the same
+  // grammatical shape as a name. They are never office-holder evidence.
+  if (!normalized || /\b(?:united states|white house|prime minister|vice president|official website|government|office holder|travel(?:s)?|visit(?:s)?|president|secretary|department|news|media|archive|history)\b/i.test(normalized)) return false
   return true
 }
 
@@ -244,7 +246,8 @@ export function resolveDeterministicFreshOfficeHolder(
     const host = freshEvidenceHost(source.url)
     if (!host) continue
     const perSource = new Map<string, string>()
-    const text = `${source.title}. ${source.snippet}`
+    // A title can be page chrome or navigation. Never extract a person's name from it.
+    const text = source.snippet
     for (const candidate of extractCandidates(text, descriptor.role)) {
       const key = candidateKey(candidate)
       if (key && !perSource.has(key)) perSource.set(key, candidate)

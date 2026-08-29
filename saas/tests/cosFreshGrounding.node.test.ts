@@ -225,3 +225,40 @@ test('compound current-office request can deterministically preserve a governmen
   assert.equal(resolved?.name, 'Marco Rubio')
   assert.match(resolved?.reply || '', /state\.gov\/secretary/)
 })
+
+
+test('office-holder extraction never turns page chrome into a person', () => {
+  const sources = prepareFreshEvidence([
+    {
+      title: 'Secretary of State — Travels of the President Visits',
+      url: 'https://history.state.gov/about/faq/secretaries-of-state',
+      snippet: 'Frequently asked questions from the Office of the Historian.',
+    },
+  ])
+
+  const resolved = resolveDeterministicFreshOfficeHolder(
+    'who is the current US secretary of State?',
+    sources,
+  )
+  assert.equal(resolved, null)
+})
+
+
+test('government page chrome cannot outrank a named incumbent in source prose', () => {
+  const sources = prepareFreshEvidence([
+    {
+      title: 'Secretary of State — Travels of the President Visits',
+      url: 'https://history.state.gov/about/faq/secretaries-of-state',
+      snippet: 'Frequently asked questions from the Office of the Historian.',
+    },
+    {
+      title: 'The Secretary of State',
+      url: 'https://www.state.gov/secretary/',
+      snippet: 'Marco Rubio is the current Secretary of State of the United States.',
+    },
+  ])
+
+  const resolved = resolveDeterministicFreshOfficeHolder('who is the current US secretary of State?', sources)
+  assert.equal(resolved?.name, 'Marco Rubio')
+  assert.match(resolved?.reply || '', /state\.gov\/secretary/)
+})

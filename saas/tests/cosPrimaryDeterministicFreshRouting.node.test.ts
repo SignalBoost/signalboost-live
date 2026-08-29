@@ -40,3 +40,9 @@ test('compound history extraction ranks roster pages ahead of generic office pag
   assert.match(source, /\.sort\(\(left, right\)/)
   assert.match(source, /\.slice\(0, 3\)/)
 })
+
+
+test('completed evidence-policy refusals are HTTP 200 while transport synthesis failures remain 503', () => {
+  assert.match(source, /freshFailureCode!=='local_synthesis_failed'\?200:503/)
+  assert.match(source, /source:'cos-fresh-evidence-unavailable'[\s\S]{0,800}?status:200/)
+})

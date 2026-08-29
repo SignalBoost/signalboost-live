@@ -69,10 +69,10 @@ test('direct/nonstop route existence is current external state and is live-verif
     'Is there a direct flight between Tokyo and Lima?',
     'Does any airline fly nonstop from Miami to Lisbon?',
     'is there a direct train from Paris to Berlin',
-    'Â¿hay vuelos directos entre Madrid y BogotÃ¡?',
-    'hÃ¡ voos diretos de Lisboa para SÃ£o Paulo?',
-    'czy sÄ loty bezpoÅrednie z Warszawy do Nowego Jorku?',
-    'ÐµÑÑÑ Ð»Ð¸ Ð¿ÑÑÐ¼ÑÐµ ÑÐµÐ¹ÑÑ Ð¸Ð· ÐÐ¾ÑÐºÐ²Ñ Ð² ÐÐ°Ð²Ð°Ð½Ñ?',
+    '¿hay vuelos directos entre Madrid y Bogotá?',
+    'há voos diretos de Lisboa para São Paulo?',
+    'czy są loty bezpośrednie z Warszawy do Nowego Jorku?',
+    'есть ли прямые рейсы из Москвы в Гавану?',
   ]) {
     assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
   }

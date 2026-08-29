@@ -3554,7 +3554,7 @@
     "u_df0caf1b27bd40d1": "Nowa przestrzeń robocza",
     "u_4b3a69e725c9b59f": "Builder pracuje…",
     "u_501d4d62d2e80080": "Uruchom Builder",
-    "u_c5adc03031df3edf": "Zapisane przestrzenie robocze ({count})",
+    "u_c5adc03031df3edf": "Ostatnie {count} przestrzenie robocze",
     "u_5579543c543087cd": "Przestrzeń robocza {id}",
     "u_6f0a17de28a43d16": "Usuń {path}",
     "u_6e7d50e84f4731ef": "Wynik",

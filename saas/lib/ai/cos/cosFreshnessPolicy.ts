@@ -206,7 +206,13 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (detectAdvisoryDiagnosisIntent(input).suppressFreshnessAbort) return false
   if (isNamedCatalogListRequest(input)) return false
   if (isPlatformSelfKnowledgePrompt(input)) return false
-  if (HISTORICAL_ANCHOR.test(text)) return false
+  // A compound request may ask for a current holder and historical context together. The
+  // current-holder portion remains volatile and must route through live research.
+  const asksCurrentOfficeHolder = PRESENT_TENSE_OFFICE_HOLDER.test(text)
+    || TERSE_CURRENT_OFFICE_HOLDER.test(text)
+    || CURRENT_LEADER.test(text)
+    || ROLE_STATUS_CHECK.test(text)
+  if (HISTORICAL_ANCHOR.test(text) && !asksCurrentOfficeHolder) return false
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
   if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true

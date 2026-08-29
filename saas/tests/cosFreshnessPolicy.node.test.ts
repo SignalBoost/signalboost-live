@@ -240,3 +240,11 @@ test('company identity questions never reach public web search, in any phrasing 
     assert.equal(requiresFreshExternalEvidence(question), true, question)
   }
 })
+
+
+test('a current-office request stays live even when it also asks for historical context', () => {
+  assert.equal(
+    requiresFreshExternalEvidence('who is the current US secretary of State and give me a list of the past secretary of state for the past 20 years'),
+    true,
+  )
+})

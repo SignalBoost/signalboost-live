@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { BuilderToolLoop } from '@/lib/builder/tool-loop'
+import { isRepairObjective } from '@/lib/builder/regression-gate'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
 import { verifiedRepairLesson } from '@/lib/builder/verified-lessons'
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
       priorLessons,
       // A new design should complete after its first verified workspace proof, rather than
       // consuming the full repair-oriented control-loop budget.
-      maxRounds: 4,
+      maxRounds: isRepairObjective(objective) ? 8 : 6,
       modelRoundTimeoutMs: 40_000,
     })
 

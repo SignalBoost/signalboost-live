@@ -33,9 +33,10 @@ function summarizeRun(result: BuilderRunResult) { return { exitCode: result.exit
 function diagnose(value: unknown): { failureClass: BuilderFailureClass; remediation: string } {
   const message = String(value || '').toLowerCase()
   if (/supabase|postgres|database|constraint|pgrst|duplicate key|relation .* does not exist/.test(message)) return { failureClass: 'storage', remediation: 'Inspect the exact database error and the storage contract before retrying.' }
+  if (/cannot find package|no module named|unable to resolve|npm err|dependency|lockfile/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
+  if (/cannot find module\\s+['"](?![./])[^'"]+['"]/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
   if (/invalid_path|not found|no such file|module_not_found|cannot find module|enoent|path/.test(message)) return { failureClass: 'path', remediation: 'List or read the workspace files, then use a verified relative path.' }
   if (/node.*not found|command not found|runtime|timed out|timeout|sigkill/.test(message)) return { failureClass: 'runtime', remediation: 'Inspect the runtime evidence and choose an available command; do not guess environment capabilities.' }
-  if (/npm err|cannot find package|module .* not found|dependency|lockfile/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
   if (/assert|expected|test|exit [1-9]|exit code [1-9]|syntaxerror|typeerror|referenceerror/.test(message)) return { failureClass: 'test', remediation: 'Read the failure output, make the smallest targeted change, then rerun the relevant test.' }
   if (/deploy|vercel|build|compile|production|preview/.test(message)) return { failureClass: 'deployment', remediation: 'Inspect the build or deployment evidence; do not treat local success as deployment proof.' }
   return { failureClass: 'unknown', remediation: 'Inspect the exact failure evidence before making another change.' }

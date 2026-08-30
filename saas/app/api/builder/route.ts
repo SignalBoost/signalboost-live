@@ -93,7 +93,7 @@ export async function POST(request: Request) {
       // A new design should complete after its first verified workspace proof, rather than
       // consuming the full repair-oriented control-loop budget.
       maxRounds: 4,
-      modelRoundTimeoutMs: 30_000,
+      modelRoundTimeoutMs: 40_000,
     })
 
     const files = (await workspace.listFiles(workspaceId)).map(file => file.path)

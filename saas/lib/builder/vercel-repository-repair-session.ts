@@ -12,7 +12,7 @@ const MAX_PATCH_BYTES = 480 * 1024
 const COMMAND_TIMEOUT_MS = 60_000
 const SETUP_TIMEOUT_MS = 90_000
 const EXCLUDED_SEGMENTS = new Set(['.git', 'node_modules', '.next', 'dist', 'build', 'coverage', '.vercel'])
-const SECRET_LIKE = /(^|\/)(?:\.env(?:\.[^/]*)?|credentials?|secrets?|tokens?|private[-_.]?key|id_rsa|id_ed25519|service[-_.]?account)(?:$|\/)|\.(?:pem|key|p12|pfx)$/i
+const SECRET_LIKE = /(^|\/)(?:\.env(?:\.[^/]*)?|(?:credentials?|secrets?|tokens?|private[-_.]?key|id_rsa|id_ed25519|service[-_.]?account)(?:\.[^/]*)?)(?:$|\/)|\.(?:pem|key|p12|pfx)$/i
 
 type SandboxInstance = Awaited<ReturnType<typeof Sandbox.create>>
 type CommandResult = Readonly<{ exitCode: number; stdout: string; stderr: string }>

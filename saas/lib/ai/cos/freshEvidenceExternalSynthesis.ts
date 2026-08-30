@@ -1,9 +1,12 @@
-import { callCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { resolveLocalPlaceDiscovery } from '@/lib/ai/cos/cosLocalDiscovery'
+import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalSynthesis'
 import { callCosTextDetailed } from '@/lib/cos/textGateway'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import {
+  acceptFreshEvidenceSemanticPlan,
   acceptFreshEvidenceSynthesis,
+  freshEvidenceScopePlanPrompt,
+  freshEvidenceScopePlanSystemPrompt,
   freshEvidenceSynthesisPrompt,
   freshEvidenceSynthesisSystemPrompt,
 } from '@/lib/ai/cos/freshEvidenceSynthesisContract'
@@ -18,13 +21,9 @@ export type FreshEvidenceExternalSynthesis = {
 }
 
 /**
- * Compatibility name retained for callers, but fresh-evidence synthesis is now COS-first:
- * 1. deterministic local-place discovery when live search already contains the answer;
- * 2. independent COS reasoner constrained to the server-retrieved evidence block;
- * 3. governed external text provider only as a final permitted fallback.
- *
- * This prevents the fresh-data path from depending on hosted external AI while preserving the
- * fail-closed evidence contract: no model may use its own memory to fill a missing current fact.
+ * Compatibility name retained for callers. Every model path uses the same semantic contract:
+ * scope planning first, answer synthesis second. A hosted provider remains only the final governed
+ * fallback after COS-owned local synthesis fails; it cannot bypass the semantic/evidence validator.
  */
 export async function synthesizeFreshEvidenceExternally(args: {
   input: string
@@ -48,54 +47,59 @@ export async function synthesizeFreshEvidenceExternally(args: {
     }
   }
 
-  const prompt = freshEvidenceSynthesisPrompt(args)
-  const systemPrompt = freshEvidenceSynthesisSystemPrompt(args.language)
-
-  // Fresh facts do not require an external model. COS may synthesize from the live evidence block
-  // as long as the same strict JSON/citation contract accepts the result.
-  const local = await callCosReasoner({
-    temperature: 0,
-    maxTokens: 700,
-    systemPrompt,
-    prompt,
-  }).catch(() => null)
-
-  if (local?.text) {
-    const accepted = acceptFreshEvidenceSynthesis({ text: local.text, input: args.input, sources: args.sources })
-    if (accepted) {
-      return {
-        attempted: true,
-        accepted: true,
-        reply: accepted.reply,
-        provider: 'local',
-        model: local.reasoner.label,
-        source: 'local',
-      }
+  const local = await synthesizeFreshEvidenceLocally(args)
+  if (local.kind === 'accepted') {
+    return {
+      attempted: true,
+      accepted: true,
+      reply: local.reply,
+      provider: 'local',
+      model: local.reasonerLabel,
+      source: 'local',
     }
   }
 
-  const result = await callCosTextDetailed({
-    // retrievedAt makes the gateway identity request-specific, preventing cross-request replay of
-    // a volatile answer while still preserving the normal COS gateway/provider boundary.
-    taskId: `cos-fresh-external:${args.retrievedAt}`,
-    prompt,
-    systemPrompt,
-    // External AI remains only a governed fallback after COS-owned evidence synthesis fails.
+  const planned = await callCosTextDetailed({
+    taskId: `cos-fresh-external-scope:${args.retrievedAt}`,
+    prompt: freshEvidenceScopePlanPrompt(args),
+    systemPrompt: freshEvidenceScopePlanSystemPrompt(args.language),
+    modelPreference: 'gemini',
+    maxTokens: 500,
+  }).catch(() => null)
+
+  if (!planned?.text) {
+    return { attempted: true, accepted: false, reply: null, provider: planned?.provider ?? null, model: planned?.model ?? null, source: planned?.source ?? null }
+  }
+
+  const semanticPlan = acceptFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
+  if (!semanticPlan) {
+    return { attempted: true, accepted: false, reply: null, provider: planned.provider ?? null, model: planned.model ?? null, source: planned.source }
+  }
+
+  const answered = await callCosTextDetailed({
+    taskId: `cos-fresh-external-answer:${args.retrievedAt}`,
+    prompt: freshEvidenceSynthesisPrompt({ ...args, semanticPlan }),
+    systemPrompt: freshEvidenceSynthesisSystemPrompt(args.language),
     modelPreference: 'gemini',
     maxTokens: 700,
   }).catch(() => null)
 
-  if (!result?.text) {
-    return { attempted: true, accepted: false, reply: null, provider: result?.provider ?? null, model: result?.model ?? null, source: result?.source ?? null }
+  if (!answered?.text) {
+    return { attempted: true, accepted: false, reply: null, provider: answered?.provider ?? planned.provider ?? null, model: answered?.model ?? planned.model ?? null, source: answered?.source ?? planned.source ?? null }
   }
 
-  const accepted = acceptFreshEvidenceSynthesis({ text: result.text, input: args.input, sources: args.sources })
+  const accepted = acceptFreshEvidenceSynthesis({
+    text: answered.text,
+    input: args.input,
+    sources: args.sources,
+    semanticPlan,
+  })
   return {
     attempted: true,
     accepted: Boolean(accepted),
     reply: accepted?.reply ?? null,
-    provider: result.provider ?? null,
-    model: result.model ?? null,
-    source: result.source,
+    provider: answered.provider ?? null,
+    model: answered.model ?? null,
+    source: answered.source,
   }
 }

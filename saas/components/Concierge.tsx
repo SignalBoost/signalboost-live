@@ -450,7 +450,7 @@ export default function Concierge() {
                           download={path.split('/').pop() || 'download.txt'}
                           className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-300/20"
                         >
-                          Download {path}
+                          {uiText('generatedUi.u_75cf7ab15fa05201')} {path}
                         </a>
                       ))}
                     </div>

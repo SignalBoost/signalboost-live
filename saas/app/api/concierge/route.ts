@@ -39,7 +39,8 @@ const RESEARCH_LIFELINE_START_MS = 90_000
 const RESEARCH_RESULT_LIMIT = 12
 // This is intentionally local to the public ingress. Worker-role routing is allowed to evolve,
 // while Concierge must reliably recognize the concrete deliverables it advertises to visitors.
-const CONCIERGE_DESIGN_ARTIFACT = /\b(?:design|build|create)\b[\s\S]{0,160}\b(?:website|web\s*page|landing(?:\s|-)?page|dashboard|user interface|ui|component|mockup|prototype)\b/i
+const CONCIERGE_DESIGN_ARTIFACT = /\b(?:website|web\s*page|landing(?:\s|-)?page|dashboard|user interface|ui|component|mockup|prototype)\b/i
+const CONCIERGE_DESIGN_REQUEST = /(?:^(?:please\s+)?(?:design|build|create|make)\b|\b(?:can|could)\s+you\b|\b(?:i\s+(?:need|want|would\s+like)|give\s+me|help\s+me)\b)/i
 
 function latestUserText(body: any): string {
   const messages = Array.isArray(body?.messages) ? body.messages : []
@@ -83,7 +84,7 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
   // Builder cannot yet safely stage Concierge image/PDF attachments. Leave an attached request
   // on the ordinary COS attachment path rather than silently omitting its reference material.
   const roleMatched = isConciergeBuilderObjective(input)
-  const designMatched = CONCIERGE_DESIGN_ARTIFACT.test(input)
+  const designMatched = CONCIERGE_DESIGN_ARTIFACT.test(input) && CONCIERGE_DESIGN_REQUEST.test(input)
   if (hasAttachments(body) || !(roleMatched || designMatched)) return null
   console.info('[concierge-builder-routing]', JSON.stringify({
     route: 'builder',

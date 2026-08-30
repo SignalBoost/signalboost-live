@@ -29,6 +29,8 @@ test('Concierge hands off only explicit Builder objectives and never drops attac
   const concierge = hydrateLocalizedSource(readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8'))
   assert.match(conciergeRoute, /isConciergeBuilderObjective\(input\)/)
   assert.match(conciergeRoute, /CONCIERGE_DESIGN_ARTIFACT/)
+  assert.match(conciergeRoute, /CONCIERGE_DESIGN_REQUEST/)
+  assert.match(conciergeRoute, /CONCIERGE_DESIGN_ARTIFACT\.test\(input\) && CONCIERGE_DESIGN_REQUEST\.test\(input\)/)
   assert.match(conciergeRoute, /designMatched/)
   assert.match(conciergeRoute, /directBuilder\(body, input\)/)
   assert.match(conciergeRoute, /hasAttachments\(body\)/)

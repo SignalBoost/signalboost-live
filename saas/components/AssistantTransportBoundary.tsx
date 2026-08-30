@@ -59,6 +59,44 @@ function responseFromPayload(payload: unknown, status = 200, source?: string): R
   })
 }
 
+function builderFilesFromBody(body: AssistantRequestBody): Array<{ path: string; content: string }> {
+  const attachments = Array.isArray(body.attachments) ? body.attachments : []
+  return attachments.slice(0, 20).flatMap((attachment: any) => {
+    const path = typeof attachment?.name === 'string' ? attachment.name : ''
+    const mimeType = String(attachment?.mimeType || attachment?.type || '')
+    const dataUrl = typeof attachment?.dataUrl === 'string' ? attachment.dataUrl : ''
+    if (!path || !dataUrl || !(mimeType.startsWith('text/') || mimeType === 'application/json')) return []
+    try {
+      const encoded = dataUrl.slice(dataUrl.indexOf(',') + 1)
+      const content = new TextDecoder().decode(Uint8Array.from(atob(encoded), char => char.charCodeAt(0)))
+      return content.length <= 512 * 1024 ? [{ path, content }] : []
+    } catch {
+      return []
+    }
+  })
+}
+
+async function executeBuilderFromConcierge(
+  fetchImpl: typeof window.fetch,
+  body: AssistantRequestBody,
+  objective: string,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const response = await fetchImpl('/api/builder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify({ objective, files: builderFilesFromBody(body) }),
+  })
+  const payload = await response.json().catch(() => ({ error: 'builder_response_unavailable' }))
+  return responseFromPayload({
+    ...payload,
+    reply: typeof (payload as any)?.reply === 'string'
+      ? (payload as any).reply
+      : 'COS Builder stopped: ' + String((payload as any)?.error || 'builder_request_failed'),
+  }, response.status, 'builder-backend')
+}
+
 /**
  * Transport continuity boundary for the authorized owner Assistant only.
  *
@@ -79,11 +117,10 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
       const userContent = body ? latestUserContent(body) : ''
       if (!body || !conversationId || !userContent) return originalFetch(input, init)
 
-      // Defense in depth: the private COS transport must never let an executable task fall
-      // through to the normal answer route. The Builder page owns the sandboxed tool loop.
+      // Builder is an internal tool of Concierge: coding requests stay in this chat while
+      // execution happens in the authenticated, network-denied workspace behind /api/builder.
       if (isCosCodingObjective(userContent)) {
-        window.location.assign(`/dashboard/developer?objective=${encodeURIComponent(userContent)}`)
-        return responseFromPayload({ redirectedToBuilder: true }, 202, 'builder-handoff')
+        return executeBuilderFromConcierge(originalFetch, body, userContent, init?.signal ?? undefined)
       }
 
       const result = await sendAssistantTurnAndRecover(userContent, body as Record<string, unknown>, {

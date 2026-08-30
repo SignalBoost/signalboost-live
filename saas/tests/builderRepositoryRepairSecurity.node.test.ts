@@ -36,6 +36,7 @@ test('the host pins and installs the repository before permanently denying netwo
   const source = readFileSync(new URL('../lib/builder/vercel-repository-repair-session.ts', import.meta.url), 'utf8')
   const allow = source.indexOf("networkPolicy: 'allow-all'")
   const exactFetch = source.indexOf("'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', fullCommitSha")
+  const revisionCall = source.indexOf('await session.assertPinnedRevision()', exactFetch)
   const revisionCheck = source.indexOf("revision.stdout.trim().toLowerCase() !== expected")
   const install = source.indexOf("['ci', '--ignore-scripts', '--no-audit', '--no-fund']")
   const deny = source.indexOf("sandbox.update({ networkPolicy: 'deny-all' })")
@@ -43,11 +44,12 @@ test('the host pins and installs the repository before permanently denying netwo
   const modelGuard = source.indexOf("if (!this.networkLocked) throw new Error('builder_repository_network_not_locked')")
   assert.ok(allow >= 0)
   assert.ok(exactFetch > allow)
-  assert.ok(revisionCheck > exactFetch)
-  assert.ok(install > revisionCheck)
+  assert.ok(revisionCall > exactFetch)
+  assert.ok(install > revisionCall)
   assert.ok(deny > install)
   assert.ok(locked > deny)
   assert.ok(modelGuard > locked)
+  assert.ok(revisionCheck >= 0)
 })
 
 test('Builder file writes use argument-safe Node I/O and reject an existing symlink target', () => {

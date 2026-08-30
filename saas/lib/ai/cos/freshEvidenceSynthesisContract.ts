@@ -13,6 +13,12 @@ export type FreshEvidenceSemanticPlan = {
   scopes: FreshEvidenceSemanticScope[]
 }
 
+export type FreshEvidenceFaithfulnessReview = {
+  faithful: boolean
+  missingScopeIds: string[]
+  collapsedScopeIds: string[]
+}
+
 export type AcceptedFreshEvidenceSynthesis = {
   reply: string
   citedSourceIds: string[]
@@ -32,11 +38,17 @@ type ModelFreshEvidenceSemanticPlan = {
   scopes?: unknown
 }
 
+type ModelFreshEvidenceFaithfulnessReview = {
+  faithful?: unknown
+  missingScopeIds?: unknown
+  collapsedScopeIds?: unknown
+}
+
 export const SINGLE_PROPOSITION_SOURCE_LIMIT = 2
 export const SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT = 650
 const MAX_SEMANTIC_SCOPES = 5
 const SCOPE_ID = /^[A-Za-z0-9_-]{1,32}$/
-const BINARY_LEAD = /^\s*(?:yes|no|sí|si|não|nao|tak|nie|да|нет)\b[\s,.:;!?-]*/iu
+const BINARY_LEAD = /^\s*(?:yes|no|sí|si|não|nao|tak|nie|да|нет)(?:\s|[,.!:;?—–-]|$)/iu
 
 function languageLabel(language: string): string {
   const normalized = String(language || 'en').toLowerCase()
@@ -160,7 +172,51 @@ export function freshEvidenceSynthesisPrompt(args: {
   return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (neural conclusion, not factual evidence):\n${JSON.stringify(args.semanticPlan)}\n\nANSWER TASK:\nWrite the smallest well-supported answer that preserves every material scope in the plan.\n\nQUESTION: ${args.input}`
 }
 
-/** Output-density gate only. Semantic ambiguity is handled by the neural scope plan above. */
+/**
+ * Neural answer critic. It does not produce prose or new facts; it checks whether the answer actually
+ * preserves the model-declared scope distinctions rather than merely echoing their IDs.
+ */
+export function freshEvidenceFaithfulnessReviewSystemPrompt(language: string): string {
+  return [
+    `Evaluate the answer written in ${languageLabel(language)}.`,
+    'You are the SCOPE-FAITHFULNESS REVIEWER for a live-evidence answer.',
+    'Return ONLY strict JSON with this exact shape: {"faithful":true,"missingScopeIds":[],"collapsedScopeIds":[]}.',
+    'Do not rewrite the answer and do not expose chain-of-thought.',
+    'Use QUESTION, LIVE EVIDENCE, SEMANTIC SCOPE PLAN, and CANDIDATE ANSWER only.',
+    'Mark faithful=false if a required scope is absent, materially weakened, or merged with another scope so that the answer implies a stronger or different proposition than the plan supports.',
+    'missingScopeIds contains required scopes whose conclusion is not represented in the answer.',
+    'collapsedScopeIds contains the scope ids involved when distinct scopes are blended into one conclusion or one is presented as if it proves the other.',
+    'If faithful=true, both arrays must be empty. If faithful=false, at least one array must contain a real scope id from the plan.',
+    'Do not invent scope ids and do not judge writing style, verbosity, or source count here.',
+  ].join('\n')
+}
+
+export function freshEvidenceFaithfulnessReviewPrompt(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  semanticPlan: FreshEvidenceSemanticPlan
+  answer: string
+}): string {
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN:\n${JSON.stringify(args.semanticPlan)}\n\nCANDIDATE ANSWER:\n${String(args.answer || '').trim()}\n\nREVIEW TASK:\nCheck only whether the candidate faithfully preserves the material scope distinctions and bounded findings in the plan.\n\nQUESTION: ${args.input}`
+}
+
+export function acceptFreshEvidenceFaithfulnessReview(args: {
+  text: string
+  semanticPlan: FreshEvidenceSemanticPlan
+}): FreshEvidenceFaithfulnessReview | null {
+  const parsed = parseJsonObject(args.text) as ModelFreshEvidenceFaithfulnessReview | null
+  if (typeof parsed?.faithful !== 'boolean') return null
+  const validScopeIds = new Set(args.semanticPlan.scopes.map(scope => scope.scopeId))
+  const missingScopeIds = uniqueStrings(parsed.missingScopeIds)
+  const collapsedScopeIds = uniqueStrings(parsed.collapsedScopeIds)
+  if (missingScopeIds.some(id => !validScopeIds.has(id)) || collapsedScopeIds.some(id => !validScopeIds.has(id))) return null
+  if (parsed.faithful && (missingScopeIds.length || collapsedScopeIds.length)) return null
+  if (!parsed.faithful && !missingScopeIds.length && !collapsedScopeIds.length) return null
+  return { faithful: parsed.faithful, missingScopeIds, collapsedScopeIds }
+}
+
+/** Output-density gate only. Semantic ambiguity is handled by the neural scope plan/reviewer. */
 export function freshEvidenceSynthesisNeedsNeuralReview(args: {
   answer: string
   citedSourceIds: string[]
@@ -178,10 +234,11 @@ export function freshEvidenceSynthesisNeedsNeuralReview(args: {
 export function freshEvidenceRevisionSystemPrompt(language: string): string {
   return [
     `Answer in ${languageLabel(language)}.`,
-    'You are the FINAL NEURAL EDIT PASS for a grounded live-evidence answer that failed only the output-density boundary.',
+    'You are the FINAL NEURAL REPAIR/EDIT PASS for a grounded live-evidence answer.',
     'Return ONLY strict JSON with this exact shape: {"answer":"...","evidenceIds":["LIVE1","LIVE2"],"scopeIds":["S1","S2"]}.',
     'Re-reason from QUESTION, LIVE EVIDENCE, and the existing SEMANTIC SCOPE PLAN. The prior DRAFT is not evidence.',
     'Preserve every required scope. Never change directBinaryAnswerSafe or collapse multiple scopes into one conclusion.',
+    'If a SCOPE-FAITHFULNESS REVIEW is supplied, repair every listed missing or collapsed scope while keeping each conclusion within the plan.',
     'If directBinaryAnswerSafe=false, do not open with a standalone yes or no.',
     'Use the minimum representative evidence needed to support the scopes. Remove redundant statistics, examples, and source-by-source narration.',
     'Do not add facts from model memory. Never invent an evidence id or scope id.',
@@ -195,8 +252,12 @@ export function freshEvidenceRevisionPrompt(args: {
   retrievedAt: string
   semanticPlan: FreshEvidenceSemanticPlan
   draftAnswer: string
+  faithfulnessReview?: FreshEvidenceFaithfulnessReview | null
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}\n\nDRAFT THAT FAILED ONLY THE OUTPUT-DENSITY BOUNDARY (not evidence):\n${String(args.draftAnswer || '').trim()}\n\nEDIT TASK:\nRewrite concisely without losing or merging any required scope.\n\nQUESTION: ${args.input}`
+  const reviewBlock = args.faithfulnessReview
+    ? `\n\nSCOPE-FAITHFULNESS REVIEW (neural verdict, not factual evidence):\n${JSON.stringify(args.faithfulnessReview)}`
+    : ''
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}${reviewBlock}\n\nDRAFT TO REPAIR/EDIT (not evidence):\n${String(args.draftAnswer || '').trim()}\n\nREPAIR TASK:\nRewrite concisely while preserving each required scope as a distinct bounded conclusion.\n\nQUESTION: ${args.input}`
 }
 
 function answerRespectsRequestedWindow(answer: string, input: string, now = new Date()): boolean {
@@ -220,8 +281,9 @@ export function acceptFreshEvidenceSynthesis(args: {
   if (!args.semanticPlan.directBinaryAnswerSafe && BINARY_LEAD.test(answer)) return null
 
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
-  const citedSourceIds = uniqueStrings(parsed?.evidenceIds).filter(id => byId.has(id))
-  if (!citedSourceIds.length || citedSourceIds.length !== uniqueStrings(parsed?.evidenceIds).length) return null
+  const rawEvidenceIds = uniqueStrings(parsed?.evidenceIds)
+  const citedSourceIds = rawEvidenceIds.filter(id => byId.has(id))
+  if (!citedSourceIds.length || citedSourceIds.length !== rawEvidenceIds.length) return null
 
   const planScopes = new Map(args.semanticPlan.scopes.map(scope => [scope.scopeId, scope] as const))
   const scopeIds = uniqueStrings(parsed?.scopeIds)

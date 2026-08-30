@@ -5,8 +5,12 @@
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
+import { splitResearchClaims } from '@/lib/ai/cos/cosClaimResearch'
 import {
   acceptFreshEvidenceSynthesis,
+  freshEvidenceRevisionPrompt,
+  freshEvidenceRevisionSystemPrompt,
+  freshEvidenceSynthesisNeedsNeuralReview,
   freshEvidenceSynthesisPrompt,
   freshEvidenceSynthesisSystemPrompt,
 } from '@/lib/ai/cos/freshEvidenceSynthesisContract'
@@ -29,47 +33,34 @@ export type FreshEvidenceLocalSynthesisOutcome =
   | { kind: 'citation_grounding_rejected' }
 
 const MAX_TOKENS = 700
+const REVISION_MAX_TOKENS = 420
 const TEMPERATURE = 0.1
+
+type LocalCompletionOutcome =
+  | { ok: true; text: string | null }
+  | { ok: false; error: string }
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/**
- * Try to answer a volatile/current-fact question from live evidence using bounded local synthesis.
- *
- * Production evidence on 2026-08-27 showed the live search completing successfully with eight
- * sources while a single DeepInfra completion stalled until the global 120s timeout. A later live
- * run exposed that callLocalModel intentionally converts AbortError into null for compatibility,
- * which hid the timeout from the retry wrapper. This path therefore recognizes only a null that
- * consumed essentially the whole bounded attempt timeout as a retryable transport timeout.
- *
- * A fast null or a completed model response that fails the evidence contract is NOT retried: those
- * remain ordinary failure/grounding outcomes and must stay fail-closed. No external provider or
- * model-memory fallback is introduced.
- */
-export async function synthesizeFreshEvidenceLocally(args: {
-  input: string
-  sources: FreshEvidenceSource[]
-  retrievedAt: string
-  language: string
-}): Promise<FreshEvidenceLocalSynthesisOutcome> {
-  if (!args.sources.length) return { kind: 'local_synthesis_unparseable' }
-
+async function boundedLocalCompletion(args: {
+  prompt: string
+  systemPrompt: string
+  maxTokens: number
+  phase: 'initial' | 'neural_review'
+}): Promise<LocalCompletionOutcome> {
   const baseConfig = localInferenceConfigFromEnv()
   const attemptTimeoutMs = boundedFreshSynthesisAttemptTimeoutMs(baseConfig.timeoutMs)
-  const prompt = freshEvidenceSynthesisPrompt(args)
-  const systemPrompt = freshEvidenceSynthesisSystemPrompt(args.language)
 
-  let text: string | null = null
   try {
     const result = await runFreshSynthesisTransportAttempts(
       async () => {
         const attemptStartedAt = Date.now()
         const value = await callLocalModel({
-          prompt,
-          systemPrompt,
-          maxTokens: MAX_TOKENS,
+          prompt: args.prompt,
+          systemPrompt: args.systemPrompt,
+          maxTokens: args.maxTokens,
           temperature: TEMPERATURE,
         }, {
           ...baseConfig,
@@ -84,6 +75,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
       ({ attempt, nextAttempt, error }) => {
         console.warn('[cos-fresh-local-synthesis-retry]', JSON.stringify({
           at: new Date().toISOString(),
+          phase: args.phase,
           attempt,
           nextAttempt,
           attemptTimeoutMs,
@@ -91,20 +83,108 @@ export async function synthesizeFreshEvidenceLocally(args: {
         }))
       },
     )
-    text = result.value
+    return { ok: true, text: result.value }
   } catch (error) {
     console.warn('[cos-fresh-local-synthesis] failed closed after bounded local retry', JSON.stringify({
       at: new Date().toISOString(),
+      phase: args.phase,
       attemptTimeoutMs,
       reason: errorText(error),
     }))
-    return { kind: 'local_synthesis_failed', error: errorText(error) }
+    return { ok: false, error: errorText(error) }
+  }
+}
+
+/**
+ * Try to answer a volatile/current-fact question from live evidence using bounded local synthesis.
+ *
+ * Production evidence on 2026-08-27 showed the live search completing successfully with eight
+ * sources while a single DeepInfra completion stalled until the global 120s timeout. A later live
+ * run exposed that callLocalModel intentionally converts AbortError into null for compatibility,
+ * which hid the timeout from the retry wrapper. This path therefore recognizes only a null that
+ * consumed essentially the whole bounded attempt timeout as a retryable transport timeout.
+ *
+ * A completed model response can still be factually grounded but synthesis-poor. Production on
+ * 2026-08-30 showed a single proposition preserved correctly while Qwen nevertheless narrated four
+ * sources and parallel measurements. Such output now receives a second Qwen pass. Deterministic
+ * code decides only whether review is required and validates the final evidence contract; it never
+ * chooses the semantic conclusion or writes the answer.
+ */
+export async function synthesizeFreshEvidenceLocally(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  language: string
+}): Promise<FreshEvidenceLocalSynthesisOutcome> {
+  if (!args.sources.length) return { kind: 'local_synthesis_unparseable' }
+
+  const initial = await boundedLocalCompletion({
+    prompt: freshEvidenceSynthesisPrompt(args),
+    systemPrompt: freshEvidenceSynthesisSystemPrompt(args.language),
+    maxTokens: MAX_TOKENS,
+    phase: 'initial',
+  })
+  if (initial.ok === false) return { kind: 'local_synthesis_failed', error: initial.error }
+  if (!initial.text?.trim()) return { kind: 'local_synthesis_unparseable' }
+
+  let accepted = acceptFreshEvidenceSynthesis({ text: initial.text, input: args.input, sources: args.sources })
+  if (!accepted) return { kind: 'citation_grounding_rejected' }
+
+  const singleProposition = splitResearchClaims(args.input).length === 1
+  const needsNeuralReview = freshEvidenceSynthesisNeedsNeuralReview({
+    answer: accepted.answer,
+    citedSourceIds: accepted.citedSourceIds,
+    singleProposition,
+  })
+
+  if (needsNeuralReview) {
+    console.info('[cos-fresh-neural-synthesis-review]', JSON.stringify({
+      at: new Date().toISOString(),
+      event: 'review_required',
+      singleProposition,
+      initialEvidenceCount: accepted.citedSourceIds.length,
+      initialAnswerChars: accepted.answer.length,
+    }))
+
+    const revised = await boundedLocalCompletion({
+      prompt: freshEvidenceRevisionPrompt({
+        input: args.input,
+        sources: args.sources,
+        retrievedAt: args.retrievedAt,
+        draftAnswer: accepted.answer,
+      }),
+      systemPrompt: freshEvidenceRevisionSystemPrompt(args.language),
+      maxTokens: REVISION_MAX_TOKENS,
+      phase: 'neural_review',
+    })
+    if (revised.ok === false) return { kind: 'local_synthesis_failed', error: revised.error }
+    if (!revised.text?.trim()) return { kind: 'local_synthesis_unparseable' }
+
+    const reviewed = acceptFreshEvidenceSynthesis({ text: revised.text, input: args.input, sources: args.sources })
+    if (!reviewed) return { kind: 'citation_grounding_rejected' }
+    if (freshEvidenceSynthesisNeedsNeuralReview({
+      answer: reviewed.answer,
+      citedSourceIds: reviewed.citedSourceIds,
+      singleProposition,
+    })) {
+      console.warn('[cos-fresh-neural-synthesis-review]', JSON.stringify({
+        at: new Date().toISOString(),
+        event: 'review_failed_quality_boundary',
+        finalEvidenceCount: reviewed.citedSourceIds.length,
+        finalAnswerChars: reviewed.answer.length,
+      }))
+      return { kind: 'citation_grounding_rejected' }
+    }
+
+    console.info('[cos-fresh-neural-synthesis-review]', JSON.stringify({
+      at: new Date().toISOString(),
+      event: 'review_accepted',
+      finalEvidenceCount: reviewed.citedSourceIds.length,
+      finalAnswerChars: reviewed.answer.length,
+    }))
+    accepted = reviewed
   }
 
-  if (!text?.trim()) return { kind: 'local_synthesis_unparseable' }
-
-  const accepted = acceptFreshEvidenceSynthesis({ text, input: args.input, sources: args.sources })
-  if (!accepted) return { kind: 'citation_grounding_rejected' }
   const reasoner = resolveCosReasoner()
   return {
     kind: 'accepted',

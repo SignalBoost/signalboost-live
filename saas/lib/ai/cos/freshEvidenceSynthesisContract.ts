@@ -4,12 +4,16 @@ import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
 export type AcceptedFreshEvidenceSynthesis = {
   reply: string
   citedSourceIds: string[]
+  answer: string
 }
 
 type ModelFreshEvidenceSynthesis = {
   answer?: unknown
   evidenceIds?: unknown
 }
+
+export const SINGLE_PROPOSITION_SOURCE_LIMIT = 2
+export const SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT = 650
 
 function languageLabel(language: string): string {
   const normalized = String(language || 'en').toLowerCase()
@@ -56,6 +60,46 @@ export function freshEvidenceSynthesisPrompt(args: {
   retrievedAt: string
 }): string {
   return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nREASONING TASK:\nInfer the proposition directly from QUESTION and synthesize the strongest relevant evidence into a conclusion-centered answer. Server-side claim research has already been used only to acquire evidence; it is intentionally not injected here because it must not redefine the user’s semantics.\n\nFor every historical/list claim, use the dated rows from the read document, not its title, navigation, or a different source's summary.\n\nQUESTION: ${args.input}`
+}
+
+/**
+ * This is an output-quality boundary, not a semantic answer rule. It never chooses the conclusion.
+ * A single-proposition answer that still cites a large retrieval set or remains unusually long gets
+ * a second Qwen pass instead of being released as a search-result digest.
+ */
+export function freshEvidenceSynthesisNeedsNeuralReview(args: {
+  answer: string
+  citedSourceIds: string[]
+  singleProposition: boolean
+}): boolean {
+  if (!args.singleProposition) return false
+  return args.citedSourceIds.length > SINGLE_PROPOSITION_SOURCE_LIMIT
+    || String(args.answer || '').trim().length > SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT
+}
+
+export function freshEvidenceRevisionSystemPrompt(language: string): string {
+  return [
+    `Answer in ${languageLabel(language)}.`,
+    'You are the SECOND NEURAL SYNTHESIS PASS for a grounded live-evidence answer.',
+    'Return ONLY strict JSON with this exact shape: {"answer":"...","evidenceIds":["LIVE1","LIVE2"]}.',
+    'The prior DRAFT is not evidence and is not authoritative. Re-reason from QUESTION and LIVE EVIDENCE.',
+    'Use only facts in LIVE EVIDENCE. Never add a fact from model memory or from the draft unless the evidence independently contains it.',
+    'Answer the user’s proposition, not the retrieval set. Abstract across sources before writing.',
+    'For one proposition, select at most two representative evidence ids. If a correct grounded answer cannot be supported with at most two, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[]}.',
+    'Do not repeat parallel measurements, examples, occupations, subgroups, dates, or statistics merely to demonstrate that multiple sources were found.',
+    'Write naturally and concisely: direct conclusion first, then only the scope and the most important limitation needed to prevent overclaiming. Do not label these as fixed sections.',
+    'Distinguish aggregate observation from controlled comparison, individual outcome, explanation, and causation. State only the strongest level the evidence supports.',
+    'Never invent an evidence id. Do not put URLs or evidence labels inside the answer field.',
+  ].join('\n')
+}
+
+export function freshEvidenceRevisionPrompt(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  draftAnswer: string
+}): string {
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nDRAFT THAT FAILED THE SYNTHESIS-QUALITY BOUNDARY (not evidence):\n${String(args.draftAnswer || '').trim()}\n\nREVIEW TASK:\nRe-reason from the original QUESTION and the evidence. Produce the smallest well-supported answer that states the conclusion, its actual evidentiary scope, and the key limitation without narrating the retrieval process.\n\nQUESTION: ${args.input}`
 }
 
 function parseJsonObject(text: string): ModelFreshEvidenceSynthesis | null {
@@ -110,5 +154,5 @@ export function acceptFreshEvidenceSynthesis(args: {
 
   // The server, not the model, owns citation rendering and enforces the evidence threshold.
   if (!replyCitesRequiredFreshEvidence(reply, args.input, args.sources)) return null
-  return { reply, citedSourceIds }
+  return { reply, citedSourceIds, answer }
 }

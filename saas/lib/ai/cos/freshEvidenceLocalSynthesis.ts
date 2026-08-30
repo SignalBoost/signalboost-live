@@ -124,7 +124,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
     maxTokens: MAX_TOKENS,
     phase: 'initial',
   })
-  if (!initial.ok) return { kind: 'local_synthesis_failed', error: initial.error }
+  if (initial.ok === false) return { kind: 'local_synthesis_failed', error: initial.error }
   if (!initial.text?.trim()) return { kind: 'local_synthesis_unparseable' }
 
   let accepted = acceptFreshEvidenceSynthesis({ text: initial.text, input: args.input, sources: args.sources })
@@ -157,7 +157,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
       maxTokens: REVISION_MAX_TOKENS,
       phase: 'neural_review',
     })
-    if (!revised.ok) return { kind: 'local_synthesis_failed', error: revised.error }
+    if (revised.ok === false) return { kind: 'local_synthesis_failed', error: revised.error }
     if (!revised.text?.trim()) return { kind: 'local_synthesis_unparseable' }
 
     const reviewed = acceptFreshEvidenceSynthesis({ text: revised.text, input: args.input, sources: args.sources })

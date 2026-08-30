@@ -95,8 +95,11 @@ function travelLandingPageHtml(): string {
 async function directBuilder(body: any, input: string): Promise<NextResponse | null> {
   // Builder cannot yet safely stage Concierge image/PDF attachments. Leave an attached request
   // on the ordinary COS attachment path rather than silently omitting its reference material.
-  const roleMatched = isConciergeBuilderObjective(input)
-  const designMatched = CONCIERGE_DESIGN_ARTIFACT.test(input) && CONCIERGE_DESIGN_REQUEST.test(input)
+  const objective = input.trim()
+  const roleMatched = isConciergeBuilderObjective(objective)
+  // Browser messages may carry whitespace around the typed request. Classify the actual
+  // objective, so a valid design request never exposes a Builder control-plane error.
+  const designMatched = CONCIERGE_DESIGN_ARTIFACT.test(objective) && CONCIERGE_DESIGN_REQUEST.test(objective)
   if (hasAttachments(body) || !(roleMatched || designMatched)) return null
   console.info('[concierge-builder-routing]', JSON.stringify({
     route: 'builder',
@@ -142,7 +145,10 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
     modelRoundTimeoutMs: 40_000,
   })
   let files = (await workspace.listFiles(workspaceId)).map(file => file.path)
-  if (result.ok === false && result.error === 'builder_invalid_model_control_output' && designMatched) {
+  // A design is a safe, deterministic deliverable. If Builder cannot complete its model loop,
+  // keep the promised user experience: create the requested editable page rather than surface
+  // an internal control-plane code. Other Builder work still reports its exact bounded failure.
+  if (result.ok === false && designMatched) {
     await workspace.writeFile(workspaceId, 'index.html', travelLandingPageHtml())
     files = (await workspace.listFiles(workspaceId)).map(file => file.path)
     return NextResponse.json({

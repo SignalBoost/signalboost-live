@@ -1,15 +1,18 @@
 // TIER 2 OF THE FRESHNESS LADDER — bounded local Qwen reasoning over this-turn live evidence.
-// Semantic interpretation is model-owned: Qwen first plans the materially distinct evidence scopes,
-// then writes the answer under that plan. Deterministic code validates only structure, evidence ids,
-// citation policy and output density; it never chooses the semantic conclusion.
+// Semantic interpretation is model-owned: Qwen plans the materially distinct evidence scopes,
+// writes the answer under that plan, and neurally reviews multi-scope answers for faithfulness.
+// Deterministic code validates structure, evidence ids, citation policy and output density only.
 
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import { splitResearchClaims } from '@/lib/ai/cos/cosClaimResearch'
 import {
+  acceptFreshEvidenceFaithfulnessReview,
   acceptFreshEvidenceSemanticPlan,
   acceptFreshEvidenceSynthesis,
+  freshEvidenceFaithfulnessReviewPrompt,
+  freshEvidenceFaithfulnessReviewSystemPrompt,
   freshEvidenceRevisionPrompt,
   freshEvidenceRevisionSystemPrompt,
   freshEvidenceScopePlanPrompt,
@@ -17,6 +20,8 @@ import {
   freshEvidenceSynthesisNeedsNeuralReview,
   freshEvidenceSynthesisPrompt,
   freshEvidenceSynthesisSystemPrompt,
+  type FreshEvidenceFaithfulnessReview,
+  type FreshEvidenceSemanticPlan,
 } from '@/lib/ai/cos/freshEvidenceSynthesisContract'
 import {
   boundedFreshSynthesisAttemptTimeoutMs,
@@ -38,6 +43,7 @@ export type FreshEvidenceLocalSynthesisOutcome =
 
 const SCOPE_PLAN_MAX_TOKENS = 500
 const ANSWER_MAX_TOKENS = 700
+const FAITHFULNESS_REVIEW_MAX_TOKENS = 220
 const REVISION_MAX_TOKENS = 420
 const TEMPERATURE = 0.1
 
@@ -45,7 +51,7 @@ type LocalCompletionOutcome =
   | { ok: true; text: string | null }
   | { ok: false; error: string }
 
-type SynthesisPhase = 'scope_plan' | 'answer' | 'neural_review'
+type SynthesisPhase = 'scope_plan' | 'answer' | 'faithfulness_review' | 'neural_review'
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -102,15 +108,40 @@ async function boundedLocalCompletion(args: {
   }
 }
 
+async function reviewScopeFaithfulness(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  language: string
+  semanticPlan: FreshEvidenceSemanticPlan
+  answer: string
+}): Promise<
+  | { kind: 'reviewed'; review: FreshEvidenceFaithfulnessReview }
+  | { kind: 'local_synthesis_failed'; error: string }
+  | { kind: 'unparseable' }
+> {
+  const result = await boundedLocalCompletion({
+    prompt: freshEvidenceFaithfulnessReviewPrompt(args),
+    systemPrompt: freshEvidenceFaithfulnessReviewSystemPrompt(args.language),
+    maxTokens: FAITHFULNESS_REVIEW_MAX_TOKENS,
+    phase: 'faithfulness_review',
+  })
+  if (result.ok === false) return { kind: 'local_synthesis_failed', error: result.error }
+  if (!result.text?.trim()) return { kind: 'unparseable' }
+  const review = acceptFreshEvidenceFaithfulnessReview({ text: result.text, semanticPlan: args.semanticPlan })
+  return review ? { kind: 'reviewed', review } : { kind: 'unparseable' }
+}
+
 /**
  * Answer a volatile/current-fact question from live evidence using one semantic reasoner pipeline:
  * 1. Qwen plans the smallest materially distinct semantic scopes required by QUESTION + evidence.
  * 2. Qwen writes the answer under that scope plan.
- * 3. Only if the answer is still source-heavy/overlong, Qwen performs a bounded final edit while
- *    preserving the same scope plan.
+ * 3. When multiple scopes matter, Qwen independently checks that the prose did not drop or merge them.
+ * 4. A bounded Qwen repair runs when scope faithfulness or output density fails, then multi-scope
+ *    answers are reviewed again. Remaining semantic collapse fails closed.
  *
- * The scope plan is a concise model conclusion, not hidden reasoning. No deterministic topic rule
- * decides what the user's predicate means, and no server formatter writes ordinary answer prose.
+ * Scope planning/review are concise model verdicts, not hidden chain-of-thought. No deterministic
+ * topic rule decides what the user's predicate means, and no server formatter writes answer prose.
  */
 export async function synthesizeFreshEvidenceLocally(args: {
   input: string
@@ -157,18 +188,35 @@ export async function synthesizeFreshEvidenceLocally(args: {
   if (!accepted) return { kind: 'citation_grounding_rejected' }
 
   const singleProposition = splitResearchClaims(args.input).length === 1
-  const needsNeuralReview = freshEvidenceSynthesisNeedsNeuralReview({
+  const multiScopeReviewRequired = !semanticPlan.directBinaryAnswerSafe || semanticPlan.scopes.length > 1
+  let faithfulnessReview: FreshEvidenceFaithfulnessReview | null = null
+
+  if (multiScopeReviewRequired) {
+    const reviewed = await reviewScopeFaithfulness({ ...args, semanticPlan, answer: accepted.answer })
+    if (reviewed.kind === 'local_synthesis_failed') return reviewed
+    if (reviewed.kind === 'unparseable') return { kind: 'citation_grounding_rejected' }
+    faithfulnessReview = reviewed.review
+    console.info('[cos-fresh-scope-faithfulness-review]', JSON.stringify({
+      at: new Date().toISOString(),
+      faithful: faithfulnessReview.faithful,
+      missingScopeCount: faithfulnessReview.missingScopeIds.length,
+      collapsedScopeCount: faithfulnessReview.collapsedScopeIds.length,
+    }))
+  }
+
+  const densityReviewRequired = freshEvidenceSynthesisNeedsNeuralReview({
     answer: accepted.answer,
     citedSourceIds: accepted.citedSourceIds,
     singleProposition,
     semanticPlan,
   })
+  const semanticRepairRequired = Boolean(faithfulnessReview && !faithfulnessReview.faithful)
 
-  if (needsNeuralReview) {
+  if (densityReviewRequired || semanticRepairRequired) {
     console.info('[cos-fresh-neural-synthesis-review]', JSON.stringify({
       at: new Date().toISOString(),
       event: 'review_required',
-      reason: accepted.citedSourceIds.length > Math.max(2, semanticPlan.scopes.length) ? 'source_density' : 'answer_length',
+      reason: semanticRepairRequired ? 'scope_faithfulness' : 'output_density',
       singleProposition,
       directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
       scopeCount: semanticPlan.scopes.length,
@@ -183,6 +231,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
         retrievedAt: args.retrievedAt,
         semanticPlan,
         draftAnswer: accepted.answer,
+        faithfulnessReview,
       }),
       systemPrompt: freshEvidenceRevisionSystemPrompt(args.language),
       maxTokens: REVISION_MAX_TOKENS,
@@ -191,28 +240,42 @@ export async function synthesizeFreshEvidenceLocally(args: {
     if (revised.ok === false) return { kind: 'local_synthesis_failed', error: revised.error }
     if (!revised.text?.trim()) return { kind: 'local_synthesis_unparseable' }
 
-    const reviewed = acceptFreshEvidenceSynthesis({
+    const repaired = acceptFreshEvidenceSynthesis({
       text: revised.text,
       input: args.input,
       sources: args.sources,
       semanticPlan,
     })
-    if (!reviewed) return { kind: 'citation_grounding_rejected' }
+    if (!repaired) return { kind: 'citation_grounding_rejected' }
     if (freshEvidenceSynthesisNeedsNeuralReview({
-      answer: reviewed.answer,
-      citedSourceIds: reviewed.citedSourceIds,
+      answer: repaired.answer,
+      citedSourceIds: repaired.citedSourceIds,
       singleProposition,
       semanticPlan,
     })) {
       console.warn('[cos-fresh-neural-synthesis-review]', JSON.stringify({
         at: new Date().toISOString(),
         event: 'review_failed_quality_boundary',
-        directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
-        scopeCount: semanticPlan.scopes.length,
-        finalEvidenceCount: reviewed.citedSourceIds.length,
-        finalAnswerChars: reviewed.answer.length,
+        reason: 'output_density',
+        finalEvidenceCount: repaired.citedSourceIds.length,
+        finalAnswerChars: repaired.answer.length,
       }))
       return { kind: 'citation_grounding_rejected' }
+    }
+
+    if (multiScopeReviewRequired) {
+      const finalReview = await reviewScopeFaithfulness({ ...args, semanticPlan, answer: repaired.answer })
+      if (finalReview.kind === 'local_synthesis_failed') return finalReview
+      if (finalReview.kind === 'unparseable' || !finalReview.review.faithful) {
+        console.warn('[cos-fresh-neural-synthesis-review]', JSON.stringify({
+          at: new Date().toISOString(),
+          event: 'review_failed_quality_boundary',
+          reason: 'scope_faithfulness',
+          finalMissingScopeCount: finalReview.kind === 'reviewed' ? finalReview.review.missingScopeIds.length : null,
+          finalCollapsedScopeCount: finalReview.kind === 'reviewed' ? finalReview.review.collapsedScopeIds.length : null,
+        }))
+        return { kind: 'citation_grounding_rejected' }
+      }
     }
 
     console.info('[cos-fresh-neural-synthesis-review]', JSON.stringify({
@@ -220,10 +283,10 @@ export async function synthesizeFreshEvidenceLocally(args: {
       event: 'review_accepted',
       directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
       scopeCount: semanticPlan.scopes.length,
-      finalEvidenceCount: reviewed.citedSourceIds.length,
-      finalAnswerChars: reviewed.answer.length,
+      finalEvidenceCount: repaired.citedSourceIds.length,
+      finalAnswerChars: repaired.answer.length,
     }))
-    accepted = reviewed
+    accepted = repaired
   }
 
   const reasoner = resolveCosReasoner()

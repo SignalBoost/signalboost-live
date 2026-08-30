@@ -19,7 +19,7 @@ export type SignalBoostRepositoryRepairTarget = Readonly<{
 
 const CLONE_LINE = /Cloning\s+(?:https?:\/\/)?github\.com\/SignalBoost\/signalboost-live(?:\.git)?\s*\(Branch:\s*([^,\r\n]+),\s*Commit:\s*([0-9a-f]{7,40})\)/i
 const SAFE_BRANCH = /^(?![-/])(?!.*(?:\.\.|\/\/))[A-Za-z0-9._/-]{1,180}$/
-const SOURCE_PATH = /(?:\.\/)?(saas\/[A-Za-z0-9_@.+/-]+\.[A-Za-z0-9]+)(?::\d+(?::\d+)?)?/g
+const SOURCE_PATH = /(?:\.\/([A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+)|(saas\/[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+))(?::\d+(?::\d+)?)?/g
 const MAX_FAILURE_EVIDENCE = 40
 
 function unique(values: readonly string[], limit: number): readonly string[] {
@@ -37,7 +37,11 @@ function normalizedLogLines(input: string): string[] {
 
 function sourcePaths(input: string): readonly string[] {
   const paths: string[] = []
-  for (const match of input.matchAll(SOURCE_PATH)) paths.push(match[1])
+  for (const match of input.matchAll(SOURCE_PATH)) {
+    const path = match[1] || match[2]
+    if (!path) continue
+    paths.push(path.startsWith('saas/') ? path : `saas/${path}`)
+  }
   return unique(paths, 32)
 }
 

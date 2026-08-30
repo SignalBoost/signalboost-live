@@ -49,12 +49,25 @@ test('deterministic release code validates the neural plan instead of classifyin
   assert.match(synthesis, /replyCitesRequiredFreshEvidence/)
 })
 
-test('answer synthesis preserves model-declared scopes and a density-only final neural edit', () => {
+test('multi-scope answer prose is neurally reviewed for semantic faithfulness before release', () => {
+  assert.match(synthesis, /SCOPE-FAITHFULNESS REVIEWER/)
+  assert.match(synthesis, /missingScopeIds/)
+  assert.match(synthesis, /collapsedScopeIds/)
+  assert.match(synthesis, /Mark faithful=false if a required scope is absent, materially weakened, or merged with another scope/i)
+  assert.match(synthesis, /acceptFreshEvidenceFaithfulnessReview/)
+  assert.match(localSynthesis, /phase: 'faithfulness_review'/)
+  assert.match(localSynthesis, /reviewScopeFaithfulness/)
+  assert.match(localSynthesis, /cos-fresh-scope-faithfulness-review/)
+  assert.match(localSynthesis, /semanticRepairRequired/)
+  assert.match(localSynthesis, /reason: 'scope_faithfulness'/)
+})
+
+test('answer synthesis preserves model-declared scopes and final repair remains neural', () => {
   assert.match(synthesis, /prior neural scope planner has already identified the semantic scopes/i)
   assert.match(synthesis, /Preserve the scope plan/)
   assert.match(synthesis, /If directBinaryAnswerSafe=false, do not open with a standalone yes or no/i)
-  assert.match(synthesis, /FINAL NEURAL EDIT PASS/i)
-  assert.match(synthesis, /failed only the output-density boundary/i)
+  assert.match(synthesis, /FINAL NEURAL REPAIR\/EDIT PASS/i)
+  assert.match(synthesis, /repair every listed missing or collapsed scope/i)
   assert.match(localSynthesis, /freshEvidenceSynthesisNeedsNeuralReview/)
   assert.match(localSynthesis, /phase: 'neural_review'/)
   assert.match(localSynthesis, /review_failed_quality_boundary/)

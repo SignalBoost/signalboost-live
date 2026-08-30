@@ -179,6 +179,19 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
     })
     if (error) throw new Error(`builder_certification_write: ${error.message}`)
   }
+
+  async certificationSummary() {
+    const { data, error } = await this.db.from('builder_certification_attempts')
+      .select('case_id,passed')
+      .eq('user_id', this.userId)
+      .order('created_at', { ascending: false })
+      .limit(100)
+    if (error) throw new Error(`builder_certification_read: ${error.message}`)
+    const passed = new Set((data ?? []).filter(row => row.passed === true).map(row => String(row.case_id)))
+    const levels = ['create_and_run_javascript_v1', 'inspect_repair_and_run_v1', 'observe_failure_and_recover_v1']
+    const earnedLevel = levels.reduce((level, caseId, index) => passed.has(caseId) ? index + 1 : level, 0)
+    return Object.freeze({ earnedLevel, attempts: (data ?? []).length })
+  }
 }
 
 export function createSupabaseBuilderWorkspace(userId: string): SupabaseBuilderWorkspace | null {

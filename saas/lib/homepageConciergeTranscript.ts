@@ -2,6 +2,8 @@ export type ConciergeTranscriptTurn = {
   request: string
   response: string
   suggestedFollowups?: string[]
+  builderWorkspaceId?: string
+  builderFiles?: string[]
 }
 
 export function transcriptMessages(turns: ConciergeTranscriptTurn[], pendingRequest: string) {

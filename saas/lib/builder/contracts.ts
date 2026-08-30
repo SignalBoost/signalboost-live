@@ -1,4 +1,5 @@
 export type BuilderToolId = 'list_files' | 'read_file' | 'write_file' | 'edit_file' | 'run'
+export type BuilderFailureClass = 'storage' | 'path' | 'runtime' | 'dependency' | 'test' | 'deployment' | 'unknown'
 
 export type BuilderFile = Readonly<{ path: string; content: string; updatedAt: number }>
 
@@ -32,6 +33,8 @@ export type BuilderToolTrace = Readonly<{
   ok: boolean
   output?: unknown
   error?: string
+  failureClass?: BuilderFailureClass
+  remediation?: string
 }>
 
 export type BuilderLoopResult =

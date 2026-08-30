@@ -17,9 +17,9 @@ function cleanObjective(value: unknown): string {
   return objective
 }
 
-function publicTrace(trace: readonly { round: number; toolId: string; ok: boolean; input: Record<string, unknown>; output?: unknown; error?: string }[]) {
-  return trace.map(({ round, toolId, ok, input, output, error }) => {
-    const base = { round, toolId, ok, ...(error ? { error } : {}) }
+function publicTrace(trace: readonly { round: number; toolId: string; ok: boolean; input: Record<string, unknown>; output?: unknown; error?: string; failureClass?: string; remediation?: string }[]) {
+  return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
+    const base = { round, toolId, ok, ...(error ? { error } : {}), ...(failureClass ? { failureClass } : {}), ...(remediation ? { remediation } : {}) }
     if (toolId !== 'run') return { ...base, ...(typeof input.path === 'string' ? { path: input.path.slice(0, 240) } : {}) }
     const result = output && typeof output === 'object' ? output as Record<string, unknown> : {}
     return {

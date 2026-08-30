@@ -40,6 +40,36 @@ test('Builder recovers when the model replays a completed tool call', async () =
   assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
 })
 
+test('Builder observes a failed command, classifies it, and retries without consuming the run budget', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let calls = 0
+  const runner: BuilderRunnerPort = { async run() { calls += 1; return calls === 1 ? { exitCode: 1, stdout: '', stderr: 'Error: Cannot find module hello.js', timedOut: false } : { exitCode: 0, stdout: 'hello\n', stderr: '', timedOut: false } } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"run","input":{"command":"node hello.js"}}',
+    '{"type":"tool","toolId":"list_files","input":{}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node ./hello.js"}}',
+    '{"type":"answer","answer":"Verified the repaired command."}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'fix broken node command', workspaceId: 'user:retry' })
+  assert.equal(result.ok, true)
+  assert.equal(calls, 2)
+  assert.equal(result.trace[0]?.ok, false)
+  assert.equal(result.trace[0]?.failureClass, 'path')
+  assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
+})
+
+test('Builder does not declare a repair complete without successful runtime evidence', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 1, stdout: '', stderr: 'AssertionError: broken', timedOut: false } } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"run","input":{"command":"node test.js"}}',
+    '{"type":"answer","answer":"Fixed."}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'fix broken test', workspaceId: 'user:verify' })
+  assert.equal(result.ok, false)
+  if (!result.ok) assert.equal(result.error, 'builder_verification_required')
+})
+
 test('Builder fixes a supplied file after inspecting it and runs the corrected workspace', async () => {
   const workspace = new InMemoryBuilderWorkspace(() => 2)
   await workspace.writeFile('user:2', 'app.js', 'throw new Error("broken")')

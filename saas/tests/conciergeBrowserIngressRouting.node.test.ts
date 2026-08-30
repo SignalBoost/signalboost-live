@@ -40,3 +40,15 @@ test('the stable public Concierge endpoint actually enters public scope before C
   assert.ok(wake > scope)
   assert.ok(primary > wake)
 })
+
+
+test('the public Concierge browser ingress routes explicit artifacts before normal COS', () => {
+  const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
+  assert.match(browser, /isConciergeArtifactObjective\\(prompt\\)/)
+  assert.match(browser, /artifactPost\\(artifactRequest\\)/)
+  assert.match(browser, /new URL\\('\/api\/artifacts', req\.url\\)/)
+  const artifact = browser.indexOf('isConciergeArtifactObjective(prompt)')
+  const primary = browser.indexOf('cosPrimaryPost(req)')
+  assert.ok(artifact >= 0)
+  assert.ok(primary > artifact)
+})

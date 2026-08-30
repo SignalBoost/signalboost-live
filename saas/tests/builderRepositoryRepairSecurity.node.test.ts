@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { safeRepositoryWorkspacePath } from '../lib/builder/vercel-repository-repair-session.ts'
+import {
+  safeRepositoryChangedPath,
+  safeRepositoryWorkspacePath,
+} from '../lib/builder/vercel-repository-repair-session.ts'
 
 test('repository repair paths stay inside the staged saas project and exclude secrets or dependency trees', () => {
   assert.equal(safeRepositoryWorkspacePath('saas/lib/ai/cos/cosFirstAnswer.ts'), 'lib/ai/cos/cosFirstAnswer.ts')
@@ -16,8 +19,16 @@ test('repository repair paths stay inside the staged saas project and exclude se
     '.env.production',
     'config/service-account.json',
     'certs/private.key',
+    'lib/bad\nname.ts',
   ]) {
     assert.throws(() => safeRepositoryWorkspacePath(value), /builder_invalid_path/)
+  }
+})
+
+test('changed-file certification rejects every path outside the staged saas project', () => {
+  assert.equal(safeRepositoryChangedPath('saas/lib/builder/tool-loop.ts'), 'lib/builder/tool-loop.ts')
+  for (const value of ['ONBOARD.md', 'package.json', 'docs/note.md', '../saas/lib/x.ts', 'saas/.env']) {
+    assert.throws(() => safeRepositoryChangedPath(value), /builder_repository_scope_violation/)
   }
 })
 
@@ -25,7 +36,7 @@ test('the host pins and installs the repository before permanently denying netwo
   const source = readFileSync(new URL('../lib/builder/vercel-repository-repair-session.ts', import.meta.url), 'utf8')
   const allow = source.indexOf("networkPolicy: 'allow-all'")
   const exactFetch = source.indexOf("'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', fullCommitSha")
-  const revisionCheck = source.indexOf("revision.stdout.trim().toLowerCase() !== fullCommitSha")
+  const revisionCheck = source.indexOf("revision.stdout.trim().toLowerCase() !== expected")
   const install = source.indexOf("['ci', '--ignore-scripts', '--no-audit', '--no-fund']")
   const deny = source.indexOf("sandbox.update({ networkPolicy: 'deny-all' })")
   const locked = source.indexOf('session.networkLocked = true', deny)
@@ -37,6 +48,29 @@ test('the host pins and installs the repository before permanently denying netwo
   assert.ok(deny > install)
   assert.ok(locked > deny)
   assert.ok(modelGuard > locked)
+})
+
+test('Builder file writes use argument-safe Node I/O and reject an existing symlink target', () => {
+  const source = readFileSync(new URL('../lib/builder/vercel-repository-repair-session.ts', import.meta.url), 'utf8')
+  const start = source.indexOf('async writeFile(')
+  const end = source.indexOf('async editFile(', start)
+  const block = source.slice(start, end)
+  assert.ok(start >= 0 && end > start)
+  assert.match(block, /exec\('test', \['-L', absolute\]/)
+  assert.match(block, /exec\('node', \['-e', writeScript, absolute, encoded\]/)
+  assert.doesNotMatch(block, /exec\('sh'|\b-lc\b/)
+})
+
+test('patch certification includes staged changes, rejects cross-project changes, and preserves the pinned revision', () => {
+  const source = readFileSync(new URL('../lib/builder/vercel-repository-repair-session.ts', import.meta.url), 'utf8')
+  const start = source.indexOf('async collectChanges(')
+  const end = source.indexOf('async close(', start)
+  const block = source.slice(start, end)
+  assert.ok(start >= 0 && end > start)
+  assert.match(block, /'diff', '--name-only', '-z', '--diff-filter=ACDMRT', 'HEAD'/)
+  assert.match(block, /safeRepositoryChangedPath\(path\)/)
+  assert.match(block, /'diff', '--no-ext-diff', '--unified=3', 'HEAD'/)
+  assert.ok((block.match(/assertPinnedRevision\(\)/g) || []).length >= 2)
 })
 
 test('repository repair cannot commit, push, merge, deploy, or inherit credentials', () => {

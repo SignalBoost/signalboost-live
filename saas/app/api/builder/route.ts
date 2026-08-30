@@ -70,11 +70,16 @@ export async function POST(request: Request) {
     if (suppliedFiles.length > 20) return NextResponse.json({ error: 'Too many files in one request.' }, { status: 400 })
     for (const file of suppliedFiles) await workspace.writeFile(workspaceId, String(file?.path || ''), String(file?.content ?? ''))
 
+    const priorLessons = await workspace.fetchVerifiedRepairLessons().catch(error => {
+      console.error('[builder_verified_lesson_read_failed]', { message: error instanceof Error ? error.message : 'unknown' })
+      return []
+    })
+
     const result = await new BuilderToolLoop(
       createPlatformAiPort(),
       workspace,
       new VercelSandboxBuilderRunner(),
-    ).run({ objective, workspaceId })
+    ).run({ objective, workspaceId, priorLessons })
 
     const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
     if (result.ok === false) return NextResponse.json({ error: result.error, workspaceId, files, trace: publicTrace(result.trace) }, { status: 422 })

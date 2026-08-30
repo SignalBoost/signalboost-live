@@ -29,6 +29,8 @@
 
 **Builder repair-claim boundary:** implementation is active and not yet Production-accepted. The regression gate is required not only when the request says “fix” or “repair,” but also when Builder claims a repair or modifies a file that existed when the turn began. This prevents a wording change from bypassing evidence requirements. Fresh-file creation remains a separate, lower-risk path.
 
+**Builder verified-lesson retrieval:** implemented locally and not yet Production-accepted. Prior lessons are fetched only for the authenticated user and are rendered only after the current turn observes the same classified failure in the same node24/network-denied/ephemeral runtime. The prompt receives only a bounded occurrence hint; it never receives raw prior error output, source code, commands, or model-written repair summaries. Retrieval failure is non-blocking.
+
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
 **Candidate Lab:** isolated baseline/candidate evaluation on fixed cohorts; it fails closed on regression or no measured improvement and can only recommend human review. It has no repository-write, merge, deployment, or automatic-promotion authority.

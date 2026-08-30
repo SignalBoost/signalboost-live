@@ -277,6 +277,13 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="assistant-content"><AssistantMessage content={turn.response} /></div>
+                    {turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.(?:png|jpe?g|webp)$/i.test(path)) ? (
+                      <img
+                        alt={turn.response}
+                        className="mt-3 max-h-[560px] w-full rounded-xl border border-white/15 bg-white object-contain"
+                        src={`/api/builder/workspaces/${encodeURIComponent(turn.builderWorkspaceId)}/files/${turn.builderFiles.find((path) => /\\.(?:png|jpe?g|webp)$/i.test(path))!.split('/').map(encodeURIComponent).join('/')}?preview=1`}
+                      />
+                    ) : null}
                     {turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.html?$/i.test(path)) ? (
                       <iframe
                         title={turn.response}

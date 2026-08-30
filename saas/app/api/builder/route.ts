@@ -4,6 +4,7 @@ import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { BuilderToolLoop } from '@/lib/builder/tool-loop'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
+import { verifiedRepairLesson } from '@/lib/builder/verified-lessons'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -77,6 +78,8 @@ export async function POST(request: Request) {
 
     const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
     if (result.ok === false) return NextResponse.json({ error: result.error, workspaceId, files, trace: publicTrace(result.trace) }, { status: 422 })
+    const lesson = verifiedRepairLesson(result)
+    if (lesson) await workspace.recordVerifiedRepairLesson(workspaceId, lesson)
     return NextResponse.json({ workspaceId, reply: result.answer, files, trace: publicTrace(result.trace) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'builder_request_failed'

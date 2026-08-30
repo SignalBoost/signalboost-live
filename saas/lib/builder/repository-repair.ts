@@ -87,7 +87,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
     for (const file of changes.files) await workspace.writeFile(input.workspaceId, `repository/${file.path}`, file.content)
     const files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
 
-    if (!result.ok) {
+    if (result.ok === false) {
       return failedPayload({
         error: result.error,
         workspaceId: input.workspaceId,

@@ -103,7 +103,7 @@ test('structured real-time adapter uses Brave rich callback and compact timestam
   assert.match(source, /No structured real-time callback was available/)
 })
 
-test('governed external fresh synthesis remains available only after the shared local semantic pipeline', () => {
+test('governed external fresh synthesis keeps the same planner, faithfulness audit and repair standard after local COS', () => {
   const source = externalSynthesis()
   const local = source.indexOf('await synthesizeFreshEvidenceLocally(args)')
   const hosted = source.indexOf('await callCosTextDetailed(')
@@ -111,6 +111,10 @@ test('governed external fresh synthesis remains available only after the shared 
   assert.ok(hosted > local)
   assert.match(source, /freshEvidenceScopePlanPrompt/)
   assert.match(source, /freshEvidenceSynthesisPrompt/)
+  assert.match(source, /freshEvidenceFaithfulnessReviewPrompt/)
+  assert.match(source, /acceptFreshEvidenceFaithfulnessReview/)
+  assert.match(source, /freshEvidenceRevisionPrompt/)
+  assert.match(source, /freshEvidenceSynthesisNeedsNeuralReview/)
   assert.match(source, /modelPreference:\s*'gemini'/)
 })
 

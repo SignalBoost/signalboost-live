@@ -42,10 +42,28 @@ function words(value: string): string[] {
   return [...new Set(String(value || '').toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || [])]
 }
 
+/**
+ * Split only when punctuation or a conjunction actually introduces another clause/request.
+ * Bare "and" is not a claim boundary: it frequently joins entities, categories, criteria, or
+ * values inside one proposition. Over-splitting those noun phrases corrupts the question before
+ * retrieval and can make the reasoner synthesize answers to fragments the user never asked.
+ */
 export function splitResearchClaims(input: string): string[] {
-  const parts = String(input || '').split(/\s*(?:\?|;|\b(?:and|also|plus|then)\b)\s*/i)
-    .map(part => part.trim()).filter(part => words(part).length >= 2)
-  return parts.length ? parts : [String(input || '').trim()].filter(Boolean)
+  const text = String(input || '').trim()
+  if (!text) return []
+
+  const clauseStarter = '(?:please\\s+)?(?:who|what|when|where|why|how|which|is|are|was|were|does|do|did|has|have|had|can|could|should|would|will|give|list|show|tell|compare|explain|identify|find|provide|name)'
+  const marked = text
+    .replace(/\s*[?;]+\s*/g, '\n')
+    .replace(/\s+\b(?:also|plus|then)\b\s+/gi, '\n')
+    .replace(new RegExp(`\\s+\\band\\b\\s+(?=${clauseStarter}\\b)`, 'gi'), '\n')
+
+  const parts = marked
+    .split(/\n+/)
+    .map(part => part.trim())
+    .filter(part => words(part).length >= 2)
+
+  return parts.length ? parts : [text]
 }
 
 function sameUrl(left: string, right: string): boolean {

@@ -1,13 +1,13 @@
 # Builder Control-Output Recovery
 
 **Date:** 2026-08-30  
-**Status:** correction branch; Production acceptance pending
+**Status:** merged and deployed to Production; authenticated owner runtime re-observation pending
 
 ## Production observation
 
 The first authenticated owner repository-repair attempt reached `/api/builder`, resolved the pinned SignalBoost commit, started the isolated repair loop, and invoked the approved COS reasoner successfully. The request nevertheless ended with HTTP 422 and `builder_invalid_model_control_output` before a patch was persisted.
 
-This proves the repository-access route was active. The remaining defects were inside Builder's model-control and proof protocols.
+This proved the repository-access route was active. The remaining defects were inside Builder's model-control and proof protocols.
 
 ## Root causes
 
@@ -45,6 +45,13 @@ This proves the repository-access route was active. The remaining defects were i
 
 The regression is included in `saas/scripts/vercel-cos-gates.mjs` so this path cannot bypass Preview or Production build acceptance.
 
+## Deployment evidence
+
+- PR #1696 merged into `main` as `f22680031abb1ed300490883279aecd573e89914`.
+- Preview `dpl_6SWE4Non8aCJGMd16NbQCNvBv1Hy` reached READY on the final feature head.
+- Production `dpl_JCX5RDSqYJda6oMMQvagqcAxoG4H` reached READY with `saas.signalboostapp.com`, `www.saas.signalboostapp.com`, and `signalboost-live.vercel.app` attached.
+- The merged Production build passed 580 mandatory tests with 0 failures, TypeScript, optimized Next.js build, Playwright, onboarding enforcement, repository targeting, pipeline integrity, and security diagnostics.
+
 ## Acceptance boundary
 
-Merge requires mandatory tests, TypeScript, production build, onboarding enforcement, repository-targeting/security checks, and a READY Preview. Runtime acceptance additionally requires a fresh authenticated owner repository-repair attempt in Production that returns a reviewable patch and passing proof evidence. Do not manufacture that observation.
+The implementation and Production deployment are accepted. End-to-end repository-repair runtime behavior is still **not** accepted until a fresh, real authenticated owner submission returns a reviewable patch and fail-before/edit/pass-after proof from Production. Do not manufacture that observation.

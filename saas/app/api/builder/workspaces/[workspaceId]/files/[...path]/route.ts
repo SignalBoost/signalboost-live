@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
+import { decodeBuilderImageArtifact } from '@/lib/builder/image-artifact'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,21 +21,23 @@ export async function GET(request: Request, context: { params: Promise<{ workspa
     if (!file) return NextResponse.json({ error: 'File not found.' }, { status: 404 })
     const name = file.path.split('/').pop() || 'download.txt'
     const isPdf = name.toLowerCase().endsWith('.pdf') && file.content.startsWith('artifact-pdf-base64:')
-    const imageMatch = /^artifact-image-base64:(image\/(?:png|jpeg|webp)):([\\s\\S]+)$/.exec(file.content)
-    const isImagePreview = new URL(request.url).searchParams.get('preview') === '1' && Boolean(imageMatch)
-    const isHtmlPreview = new URL(request.url).searchParams.get('preview') === '1' && /\.html?$/i.test(name)
+    const imageArtifact = decodeBuilderImageArtifact(file.content)
+    const previewRequested = new URL(request.url).searchParams.get('preview') === '1'
+    const isImagePreview = previewRequested && Boolean(imageArtifact)
+    const isHtmlPreview = previewRequested && /\.html?$/i.test(name)
     const body = isPdf
       ? Buffer.from(file.content.slice('artifact-pdf-base64:'.length), 'base64')
-      : imageMatch
-        ? Buffer.from(imageMatch[2], 'base64')
+      : imageArtifact
+        ? imageArtifact.bytes
         : file.content
     return new NextResponse(body, {
       headers: {
-        'Content-Type': isPdf ? 'application/pdf' : isImagePreview ? imageMatch![1] : isHtmlPreview ? 'text/html; charset=utf-8' : 'application/octet-stream; charset=utf-8',
-        'Content-Disposition': `${isHtmlPreview || isImagePreview ? 'inline' : 'attachment'}; filename="${name.replace(/["\\r\\n]/g, '_')}"`,
+        'Content-Type': isPdf ? 'application/pdf' : imageArtifact ? imageArtifact.mime : isHtmlPreview ? 'text/html; charset=utf-8' : 'application/octet-stream; charset=utf-8',
+        'Content-Disposition': `${isHtmlPreview || isImagePreview ? 'inline' : 'attachment'}; filename="${name.replace(/["\r\n]/g, '_')}"`,
         // Previewed user HTML is isolated: no scripts, forms, frames, network connections, or parent access.
         ...(isHtmlPreview ? { 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src https: data:" } : {}),
         'Cache-Control': 'private, no-store',
+        'X-Content-Type-Options': 'nosniff',
       },
     })
   } catch {

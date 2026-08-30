@@ -14,7 +14,7 @@ export function isPastedOperationalLog(input: string): boolean {
 
 export function analyzeOperationalLog(input: string): OperationalLogAnalysis {
   const text = String(input || '')
-  const testFailures = [...text.matchAll(/^\s*✖\s+([^\r\n]+)/gm)]
+  const testFailures = [...text.matchAll(/^(?:\d{2}:\d{2}:\d{2}\.\d{3}\s+)?✖\s+([^\r\n]+)/gm)]
     .map(match => match[1].trim())
     .filter(Boolean)
     .slice(0, 3)

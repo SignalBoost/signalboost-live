@@ -47,6 +47,23 @@ test('Builder writes a user file, runs it, and returns only after tool evidence'
   assert.equal(inferBuilderCertificationAttempt(result)?.caseId, 'create_and_run_javascript_v1')
 })
 
+test('Builder supplies staged project scripts and the recommended proof command', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('user:project-context', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
+  await workspace.writeFile('user:project-context', 'tests/math.test.js', 'test')
+  let prompt = ''
+  const ai: BuilderAiPort = { async generate(input) {
+    prompt = input.prompt
+    return '{"type":"answer","answer":"Project context inspected."}'
+  } }
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Inspect this project.', workspaceId: 'user:project-context' })
+  assert.equal(result.ok, true)
+  assert.match(prompt, /PROJECT CONTEXT/)
+  assert.match(prompt, /"packageManager":"npm"/)
+  assert.match(prompt, /"recommendedTestCommand":"npm test"/)
+})
+
 test('Builder retries one transient model-round timeout before failing the turn', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   let calls = 0
@@ -166,6 +183,32 @@ test('Builder fixes a supplied file after inspecting it and runs the corrected w
   assert.equal((await workspace.readFile('user:2', 'app.js'))?.content, 'console.log("fixed")')
   assert.equal(evaluateBuilderCertification('inspect_repair_and_run_v1', result).passed, true)
   assert.equal(inferBuilderCertificationAttempt(result)?.caseId, 'observe_failure_and_recover_v1')
+})
+
+test('Builder repairs a multi-file staged project with the discovered test command', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('user:multi-file', 'package.json', JSON.stringify({ scripts: { test: 'node --test tests/math.test.js' } }))
+  await workspace.writeFile('user:multi-file', 'src/math.js', 'exports.add = (a, b) => a - b')
+  await workspace.writeFile('user:multi-file', 'tests/math.test.js', 'require("node:assert/strict").equal(require("../src/math").add(2, 3), 5)')
+  let runs = 0
+  const runner: BuilderRunnerPort = { async run(input) {
+    runs += 1
+    assert.equal(input.command, 'npm test')
+    if (runs === 1) return { exitCode: 1, stdout: '', stderr: 'AssertionError: Expected values to be strictly equal: -1 !== 5', timedOut: false }
+    assert.equal(input.files.find(file => file.path === 'src/math.js')?.content, 'exports.add = (a, b) => a + b')
+    return { exitCode: 0, stdout: '1 passing\\n', stderr: '', timedOut: false }
+  } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"read_file","input":{"path":"src/math.js"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"npm test"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"src/math.js","search":"a - b","replace":"a + b"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"npm test"}}',
+    '{"type":"answer","answer":"Fixed src/math.js and verified npm test."}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Fix the failing add function in this project.', workspaceId: 'user:multi-file' })
+  assert.equal(result.ok, true)
+  assert.equal(runs, 2)
+  assert.equal((await workspace.readFile('user:multi-file', 'src/math.js'))?.content, 'exports.add = (a, b) => a + b')
 })
 
 test('Builder forces a repair to progress after inspecting the supplied source', async () => {

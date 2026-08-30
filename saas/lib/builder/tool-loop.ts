@@ -1,6 +1,8 @@
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
 import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
+import { discoverBuilderProjectContext, formatBuilderProjectContext } from './project-context.ts'
+import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 
 type Action = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> } | { type: 'answer'; answer: string }
 const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'write_file', 'edit_file', 'run'])
@@ -86,7 +88,14 @@ export class BuilderToolLoop {
   async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
     const trace: BuilderToolTrace[] = []
     const inspectedInCurrentWorkspaceState = new Set<string>()
-    const initialPaths = new Set((await this.workspace.listFiles(input.workspaceId)).map(file => file.path))
+    const initialListing = await this.workspace.listFiles(input.workspaceId)
+    const manifest = initialListing.find(file => file.path === 'package.json')
+    const manifestFile = manifest ? await this.workspace.readFile(input.workspaceId, manifest.path) : null
+    const projectContext = discoverBuilderProjectContext(initialListing.map(file => ({
+      path: file.path,
+      ...(file.path === 'package.json' && manifestFile ? { content: manifestFile.content } : {}),
+    })))
+    const initialPaths = new Set(initialListing.map(file => file.path))
     const repairObjective = isRepairObjective(input.objective)
     let writeCount = 0, runCount = 0, gateNudges = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 12))
@@ -99,6 +108,7 @@ export class BuilderToolLoop {
       const blockedTool = lastTrace?.error?.startsWith('builder_repeated_tool_call:')
         ? lastTrace.toolId
         : null
+      const repairPhase = repairObjective ? deriveRepairPhase(trace, initialPaths) : null
       const repairNeedsChange = repairObjective && !trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
       const inspectedSource = repairNeedsChange
         ? [...trace].reverse().find(item => item.ok && item.toolId === 'read_file' && toolPath(item.input))
@@ -112,6 +122,8 @@ export class BuilderToolLoop {
         prompt: [
           formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
           `OBJECTIVE:\n${input.objective}`,
+          formatBuilderProjectContext(projectContext),
+          repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',
           `TOOLS: ${safeJson(availableTools)}`,
           trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
           'For file tools, input MUST be {"path":"relative/file.ext","content":"..."}. Do not use file, filename, filePath, code, or contents keys.',
@@ -123,7 +135,7 @@ export class BuilderToolLoop {
             ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected against unchanged workspace state. It is not available this round. Select a different tool from TOOLS; do not request it again.`
             : '',
           inspectedSource
-            ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Do not list or read again until you make progress. Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.`
+            ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Do not list or read again until you make progress. ${projectContext.recommendedTestCommand ? `Run ${projectContext.recommendedTestCommand} to reproduce the defect, then edit the source and rerun it.` : 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.'}`
             : '',
           'When done: {"type":"answer","answer":"what changed and what ran"}',
         ].filter(Boolean).join('\n\n'),
@@ -148,6 +160,19 @@ export class BuilderToolLoop {
         return { ok: false, error: 'builder_invalid_model_control_output', trace }
       }
       if (action.type === 'answer') {
+        if (repairPhase && repairPhase !== 'complete') {
+          const remediation = formatRepairPhase(repairPhase, projectContext.recommendedTestCommand)
+          trace.push({
+            round,
+            toolId: 'run',
+            input: {},
+            ok: false,
+            error: `builder_repair_phase_required: ${repairPhase}`,
+            failureClass: 'test',
+            remediation,
+          })
+          continue
+        }
         if (inspectedSource) {
           trace.push({
             round,

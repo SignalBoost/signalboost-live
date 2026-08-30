@@ -53,6 +53,8 @@ test('Concierge hands off only explicit Builder objectives and never drops attac
   assert.match(conciergeRoute, /index\.html/)
   assert.match(concierge, /builderWorkspaceId/)
   assert.match(concierge, /\/api\/builder\/workspaces\//)
+  assert.match(concierge, /isConciergeArtifactObjective\\(content\\)/)
+  assert.match(concierge, /artifactRequest \? '\/api\/artifacts' : '\/api\/concierge'/)
   const builderRoute = hydrateLocalizedSource(readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8'))
   const toolLoop = hydrateLocalizedSource(readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8'))
   assert.match(builderRoute, /maxRounds: 4/)

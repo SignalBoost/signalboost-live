@@ -5,6 +5,7 @@ import { BuilderToolLoop } from '@/lib/builder/tool-loop'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
 import { verifiedRepairLesson } from '@/lib/builder/verified-lessons'
+import { inferBuilderCertificationAttempt } from '@/lib/builder/certification'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -87,6 +88,10 @@ export async function POST(request: Request) {
     // Learning persistence must never turn an otherwise verified repair into a failed user task.
     if (lesson) await workspace.recordVerifiedRepairLesson(workspaceId, lesson).catch(error => {
       console.error('[builder_verified_lesson_write_failed]', { message: error instanceof Error ? error.message : 'unknown' })
+    })
+    const certification = inferBuilderCertificationAttempt(result)
+    if (certification) await workspace.recordCertificationAttempt(workspaceId, certification).catch(error => {
+      console.error('[builder_certification_write_failed]', { message: error instanceof Error ? error.message : 'unknown' })
     })
     return NextResponse.json({ workspaceId, reply: result.answer, files, trace: publicTrace(result.trace) })
   } catch (error) {

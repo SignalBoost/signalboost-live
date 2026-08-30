@@ -97,6 +97,7 @@ test('homepage restores a welcome-first front door and retains the assistant-sty
   assert.match(source, /fetch\('\/api\/concierge'/)
   assert.match(source, /builderWorkspaceId/)
   assert.match(source, /\/api\/builder\/workspaces\//)
+  assert.match(source, /builderFiles/)
   assert.doesNotMatch(source, /setSentPrompt/)
   assert.doesNotMatch(source, /Hello — I’m COS/)
 })

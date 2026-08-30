@@ -27,6 +27,8 @@
 
 **Builder repair regression gate:** implemented locally and not yet Production-accepted. A repair objective must show regression evidence in one turn: test failure before the source repair, then a passing rerun after it. It accepts an existing reproducing test or a new one. Ordinary creation tasks are not blocked by this rule; they require only their requested successful proving command. Platform defects outside a user workspace require repository-level regressions, not fabricated workspace tests.
 
+**Builder repair-claim boundary:** implementation is active and not yet Production-accepted. The regression gate is required not only when the request says “fix” or “repair,” but also when Builder claims a repair or modifies a file that existed when the turn began. This prevents a wording change from bypassing evidence requirements. Fresh-file creation remains a separate, lower-risk path.
+
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
 **Candidate Lab:** isolated baseline/candidate evaluation on fixed cohorts; it fails closed on regression or no measured improvement and can only recommend human review. It has no repository-write, merge, deployment, or automatic-promotion authority.

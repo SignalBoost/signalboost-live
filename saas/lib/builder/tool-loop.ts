@@ -1,5 +1,5 @@
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
-import { evaluateRegressionGate } from './regression-gate.ts'
+import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
 
 type Action = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> } | { type: 'answer'; answer: string }
 const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'write_file', 'edit_file', 'run'])
@@ -54,6 +54,7 @@ export class BuilderToolLoop {
   async run(input: { objective: string; workspaceId: string; maxRounds?: number }): Promise<BuilderLoopResult> {
     const trace: BuilderToolTrace[] = []
     let previousFingerprint = ''
+    const initialPaths = new Set((await this.workspace.listFiles(input.workspaceId)).map(file => file.path))
     let writeCount = 0, runCount = 0, gateNudges = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 12))
     for (let round = 1; round <= maxRounds; round += 1) {
@@ -72,7 +73,11 @@ export class BuilderToolLoop {
       const action = parse(response)
       if (!action) return { ok: false, error: 'builder_invalid_model_control_output', trace }
       if (action.type === 'answer') {
-        const verdict = evaluateRegressionGate(input.objective, trace)
+        const modifiedExistingFile = trace.some(item => item.ok
+          && (item.toolId === 'write_file' || item.toolId === 'edit_file')
+          && initialPaths.has(toolPath(item.input)))
+        const repairClaim = isRepairObjective(`${input.objective}\n${action.answer}`)
+        const verdict = evaluateRegressionGate(input.objective, trace, modifiedExistingFile || repairClaim)
         if (verdict.satisfied) return { ok: true, answer: action.answer, trace }
         const reason = 'reason' in verdict ? verdict.reason : 'regression evidence is required'
         gateNudges += 1

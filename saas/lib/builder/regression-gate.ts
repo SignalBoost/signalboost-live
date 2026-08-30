@@ -5,7 +5,7 @@ export type RegressionVerdict = Readonly<{ satisfied: true }> | Readonly<{ satis
 const TEST_COMMAND = /\b(?:test|spec)\b|node\s+--test|vitest|jest|mocha|\btap\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test|\.(?:test|spec)\.[cm]?[jt]sx?\b/i
 
 export function isRepairObjective(objective: string): boolean {
-  return /\b(?:fix|repair|bug|error|failure|broken|regression|crash|failing|defect)\b/i.test(String(objective || ''))
+  return /\b(?:fix(?:ed)?|repair(?:ed)?|correct(?:ed)?|bug|error|failure|broken|regression|crash|failing|defect)\b/i.test(String(objective || ''))
 }
 
 function commandOf(trace: BuilderToolTrace): string {
@@ -17,8 +17,8 @@ function commandOf(trace: BuilderToolTrace): string {
  * and a later passing regression command. Existing test files may be used; Builder
  * writes a new test only when the workspace has no suitable reproducer.
  */
-export function evaluateRegressionGate(objective: string, trace: readonly BuilderToolTrace[]): RegressionVerdict {
-  if (!isRepairObjective(objective)) return { satisfied: true }
+export function evaluateRegressionGate(objective: string, trace: readonly BuilderToolTrace[], forceRepair = false): RegressionVerdict {
+  if (!forceRepair && !isRepairObjective(objective)) return { satisfied: true }
   const testRuns = trace.map((item, index) => ({ item, index })).filter(({ item }) => item.toolId === 'run' && TEST_COMMAND.test(commandOf(item)))
   const failed = testRuns.find(({ item }) => !item.ok)
   if (!failed) return { satisfied: false, reason: 'run an existing or new regression test before the repair and show it fails' }

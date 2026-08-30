@@ -29,6 +29,7 @@ import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase
 import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
+import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -93,7 +94,11 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
     hasAttachments: false,
   }))
   const access = await getAccess().catch(() => null)
-  if (!access?.userId) {
+  // Browser Concierge runs in public-delivery scope, where access is intentionally guest. The
+  // server-captured audit identity is the authenticated workspace owner and carries no broader
+  // private authority into COS.
+  const builderUserId = access?.userId || publicAuditUserId()
+  if (!builderUserId) {
     return NextResponse.json({
       reply: 'I can debug and build that in an isolated sandbox. Sign in so COS Builder can attach a workspace to your account, then send the same request again.',
       source: 'cos-builder-sign-in-required',
@@ -101,7 +106,7 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
       external_action_taken: false,
     })
   }
-  const workspace = createSupabaseBuilderWorkspace(access.userId)
+  const workspace = createSupabaseBuilderWorkspace(builderUserId)
   if (!workspace) {
     return NextResponse.json({
       reply: 'COS Builder storage is unavailable right now. No code was run.',

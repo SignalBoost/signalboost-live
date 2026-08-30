@@ -60,8 +60,16 @@ export function createPlatformImagePort(): CosImagePort {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
           body: JSON.stringify({ prompt, size, n: 1 }),
         })
-        const data = await response.json() as { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } }
-        if (!response.ok) return { ok: false, error: data.error?.message || 'Creative image generation failed.' }
+        const raw = await response.text()
+        let data: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } | string; detail?: string | { message?: string }; message?: string } = {}
+        try { data = JSON.parse(raw) } catch { /* provider returned a non-JSON error */ }
+        if (!response.ok) {
+          const detail = typeof data.error === 'string'
+            ? data.error
+            : data.error?.message || (typeof data.detail === 'string' ? data.detail : data.detail?.message) || data.message || raw.slice(0, 240)
+          console.warn('[concierge-visual-runtime-failure]', JSON.stringify({ status: response.status, detail: detail || 'no_provider_error_detail' }))
+          return { ok: false, error: detail || `Approved visual runtime failed (HTTP ${response.status}).` }
+        }
         const first = data.data?.[0]
         return first?.b64_json ? { ok: true, b64: first.b64_json, url: first.url } : { ok: false, error: 'Creative image provider returned no image.' }
       } catch (e: any) {

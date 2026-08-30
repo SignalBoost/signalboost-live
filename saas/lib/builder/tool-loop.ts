@@ -7,6 +7,7 @@ const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file'
 const MAX_WRITES_PER_TURN = 6
 const MAX_RUNS_PER_TURN = 3
 const MAX_GATE_NUDGES = 3
+const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const safeJson = (value: unknown) => { try { return JSON.stringify(value).slice(0, 18_000) } catch { return '"[unserializable]"' } }
 
@@ -70,11 +71,15 @@ export class BuilderToolLoop {
 
   async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
     const trace: BuilderToolTrace[] = []
-    let previousFingerprint = ''
+    const inspectedInCurrentWorkspaceState = new Set<string>()
     const initialPaths = new Set((await this.workspace.listFiles(input.workspaceId)).map(file => file.path))
     let writeCount = 0, runCount = 0, gateNudges = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 12))
-    for (let round = 1; round <= maxRounds; round += 1) {
+    let workRounds = 0
+    let attempt = 0
+    while (workRounds < maxRounds && attempt < maxRounds + MAX_REPEAT_RECOVERY_ATTEMPTS) {
+      attempt += 1
+      const round = attempt
       let response: string | null
       try {
         response = await within(this.ai.generate({
@@ -86,6 +91,7 @@ export class BuilderToolLoop {
           trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
           'For file tools, input MUST be {"path":"relative/file.ext","content":"..."}. Do not use file, filename, filePath, code, or contents keys.',
           'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}',
+          'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
           'When done: {"type":"answer","answer":"what changed and what ran"}',
         ].filter(Boolean).join('\n\n'),
         maxTokens: 1600,
@@ -111,14 +117,14 @@ export class BuilderToolLoop {
       if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= MAX_WRITES_PER_TURN) return { ok: false, error: 'builder_write_budget_exhausted', trace }
       if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
       const fingerprint = `${action.toolId}:${safeJson(action.input)}`
-      // Local models occasionally replay the immediately previous control object after a
-      // successful tool result. Treat that as recoverable feedback, not a failed workspace.
-      if (fingerprint === previousFingerprint) {
+      const inspection = action.toolId === 'list_files' || action.toolId === 'read_file'
+      // An alternating list/read loop observes unchanged workspace state without progress.
+      if (inspection && inspectedInCurrentWorkspaceState.has(fingerprint)) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
-        previousFingerprint = fingerprint
         continue
       }
-      previousFingerprint = fingerprint
+      if (inspection) inspectedInCurrentWorkspaceState.add(fingerprint)
+      workRounds += 1
       try {
         let output: unknown
         if (action.toolId === 'list_files') output = await this.workspace.listFiles(input.workspaceId)
@@ -138,7 +144,10 @@ export class BuilderToolLoop {
           trace.push({ round, toolId: action.toolId, input: action.input, ok: false, output, error: `builder_command_failed: exit ${(output as ReturnType<typeof summarizeRun>).exitCode}`, ...details })
           continue
         }
-        if (action.toolId === 'write_file' || action.toolId === 'edit_file') writeCount += 1
+        if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
+          writeCount += 1
+          inspectedInCurrentWorkspaceState.clear()
+        }
         if (action.toolId === 'run') runCount += 1
         trace.push({ round, toolId: action.toolId, input: action.input, ok: true, output })
       } catch (error) {
@@ -146,6 +155,6 @@ export class BuilderToolLoop {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: message, ...diagnose(message) })
       }
     }
-    return { ok: false, error: 'builder_round_budget_exhausted', trace }
+    return { ok: false, error: workRounds >= maxRounds ? 'builder_round_budget_exhausted' : 'builder_stalled_repeated_inspection', trace }
   }
 }

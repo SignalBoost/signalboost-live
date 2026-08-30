@@ -166,3 +166,26 @@ test('Builder stops after the bounded command-run budget', async () => {
   if (result.ok === false) assert.equal(result.error, 'builder_run_budget_exhausted')
   assert.equal(result.trace.length, 3)
 })
+
+test('Builder rejects alternating repeated inspection without exhausting work rounds', async () => {
+  const workspace = new InMemoryBuilderWorkspace(() => 4)
+  await workspace.writeFile('user:inspection', 'broken-index.js', 'console.log(2 - 3)')
+  const runner: BuilderRunnerPort = { async run(input) {
+    assert.equal(input.files.some(file => file.path === 'hello.js'), true)
+    return { exitCode: 0, stdout: 'hello\n', stderr: '', timedOut: false }
+  } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"list_files","input":{}}',
+    '{"type":"tool","toolId":"read_file","input":{"path":"broken-index.js"}}',
+    '{"type":"tool","toolId":"list_files","input":{}}',
+    '{"type":"tool","toolId":"read_file","input":{"path":"broken-index.js"}}',
+    '{"type":"tool","toolId":"write_file","input":{"path":"hello.js","content":"console.log(\\\"hello\\\")"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node hello.js"}}',
+    '{"type":"answer","answer":"Created and ran hello.js."}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Create hello.js and run it.', workspaceId: 'user:inspection', maxRounds: 4 })
+  assert.equal(result.ok, true)
+  assert.equal(result.trace.some(item => item.error === 'builder_repeated_tool_call:list_files; choose a different next step'), true)
+  assert.equal(result.trace.some(item => item.error === 'builder_repeated_tool_call:read_file; choose a different next step'), true)
+  assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
+})

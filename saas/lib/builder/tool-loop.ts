@@ -34,11 +34,11 @@ function toolContent(input: Record<string, unknown>): string {
   return text(input.content) || text(input.contents) || text(input.code) || text(input.text)
 }
 
-function parse(value: string | null): Action | null {
+function parse(value: string | null, allowedTools: readonly BuilderToolId[] = tools): Action | null {
   try {
     const parsed = JSON.parse(String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''))
     if (parsed?.type === 'answer' && typeof parsed.answer === 'string') return { type: 'answer', answer: parsed.answer }
-    if (parsed?.type === 'tool' && tools.includes(parsed.toolId) && parsed.input && typeof parsed.input === 'object' && !Array.isArray(parsed.input)) return { type: 'tool', toolId: parsed.toolId, input: parsed.input }
+    if (parsed?.type === 'tool' && allowedTools.includes(parsed.toolId) && parsed.input && typeof parsed.input === 'object' && !Array.isArray(parsed.input)) return { type: 'tool', toolId: parsed.toolId, input: parsed.input }
   } catch {}
   return null
 }
@@ -80,6 +80,11 @@ export class BuilderToolLoop {
     while (workRounds < maxRounds && attempt < maxRounds + MAX_REPEAT_RECOVERY_ATTEMPTS) {
       attempt += 1
       const round = attempt
+      const lastTrace = trace.at(-1)
+      const blockedTool = lastTrace?.error?.startsWith('builder_repeated_tool_call:')
+        ? lastTrace.toolId
+        : null
+      const availableTools = blockedTool ? tools.filter(toolId => toolId !== blockedTool) : tools
       let response: string | null
       try {
         response = await within(this.ai.generate({
@@ -87,11 +92,14 @@ export class BuilderToolLoop {
         prompt: [
           formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
           `OBJECTIVE:\n${input.objective}`,
-          `TOOLS: ${safeJson(tools)}`,
+          `TOOLS: ${safeJson(availableTools)}`,
           trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
           'For file tools, input MUST be {"path":"relative/file.ext","content":"..."}. Do not use file, filename, filePath, code, or contents keys.',
           'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}',
           'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
+          blockedTool
+            ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected against unchanged workspace state. It is not available this round. Select a different tool from TOOLS; do not request it again.`
+            : '',
           'When done: {"type":"answer","answer":"what changed and what ran"}',
         ].filter(Boolean).join('\n\n'),
         maxTokens: 1600,
@@ -99,7 +107,7 @@ export class BuilderToolLoop {
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
       }
-      const action = parse(response)
+      const action = parse(response, availableTools)
       if (!action) return { ok: false, error: 'builder_invalid_model_control_output', trace }
       if (action.type === 'answer') {
         const modifiedExistingFile = trace.some(item => item.ok

@@ -279,7 +279,7 @@ export default function Home() {
                     <div className="assistant-content"><AssistantMessage content={turn.response} /></div>
                     {turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.html?$/i.test(path)) ? (
                       <iframe
-                        title="Generated design preview"
+                        title={turn.response}
                         sandbox=""
                         className="mt-3 h-[460px] w-full rounded-xl border border-white/15 bg-white"
                         src={`/api/builder/workspaces/${encodeURIComponent(turn.builderWorkspaceId)}/files/${turn.builderFiles.find((path) => /\\.html?$/i.test(path))!.split('/').map(encodeURIComponent).join('/')}?preview=1`}

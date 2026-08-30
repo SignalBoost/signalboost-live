@@ -1,15 +1,19 @@
-// TIER 2 OF THE FRESHNESS LADDER — bounded local Qwen synthesis over this-turn live evidence.
-// The model selects supporting evidence IDs; the server renders the exact URLs. This avoids
-// rejecting a correct grounded answer merely because a local model copied a URL imperfectly.
+// TIER 2 OF THE FRESHNESS LADDER — bounded local Qwen reasoning over this-turn live evidence.
+// Semantic interpretation is model-owned: Qwen first plans the materially distinct evidence scopes,
+// then writes the answer under that plan. Deterministic code validates only structure, evidence ids,
+// citation policy and output density; it never chooses the semantic conclusion.
 
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import { splitResearchClaims } from '@/lib/ai/cos/cosClaimResearch'
 import {
+  acceptFreshEvidenceSemanticPlan,
   acceptFreshEvidenceSynthesis,
   freshEvidenceRevisionPrompt,
   freshEvidenceRevisionSystemPrompt,
+  freshEvidenceScopePlanPrompt,
+  freshEvidenceScopePlanSystemPrompt,
   freshEvidenceSynthesisNeedsNeuralReview,
   freshEvidenceSynthesisPrompt,
   freshEvidenceSynthesisSystemPrompt,
@@ -32,13 +36,16 @@ export type FreshEvidenceLocalSynthesisOutcome =
   | { kind: 'local_synthesis_unparseable' }
   | { kind: 'citation_grounding_rejected' }
 
-const MAX_TOKENS = 700
+const SCOPE_PLAN_MAX_TOKENS = 500
+const ANSWER_MAX_TOKENS = 700
 const REVISION_MAX_TOKENS = 420
 const TEMPERATURE = 0.1
 
 type LocalCompletionOutcome =
   | { ok: true; text: string | null }
   | { ok: false; error: string }
+
+type SynthesisPhase = 'scope_plan' | 'answer' | 'neural_review'
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -48,7 +55,7 @@ async function boundedLocalCompletion(args: {
   prompt: string
   systemPrompt: string
   maxTokens: number
-  phase: 'initial' | 'neural_review'
+  phase: SynthesisPhase
 }): Promise<LocalCompletionOutcome> {
   const baseConfig = localInferenceConfigFromEnv()
   const attemptTimeoutMs = boundedFreshSynthesisAttemptTimeoutMs(baseConfig.timeoutMs)
@@ -96,19 +103,14 @@ async function boundedLocalCompletion(args: {
 }
 
 /**
- * Try to answer a volatile/current-fact question from live evidence using bounded local synthesis.
+ * Answer a volatile/current-fact question from live evidence using one semantic reasoner pipeline:
+ * 1. Qwen plans the smallest materially distinct semantic scopes required by QUESTION + evidence.
+ * 2. Qwen writes the answer under that scope plan.
+ * 3. Only if the answer is still source-heavy/overlong, Qwen performs a bounded final edit while
+ *    preserving the same scope plan.
  *
- * Production evidence on 2026-08-27 showed the live search completing successfully with eight
- * sources while a single DeepInfra completion stalled until the global 120s timeout. A later live
- * run exposed that callLocalModel intentionally converts AbortError into null for compatibility,
- * which hid the timeout from the retry wrapper. This path therefore recognizes only a null that
- * consumed essentially the whole bounded attempt timeout as a retryable transport timeout.
- *
- * A completed model response can still be factually grounded but synthesis-poor. Production on
- * 2026-08-30 showed a single proposition preserved correctly while Qwen nevertheless narrated four
- * sources and parallel measurements. Such output now receives a second Qwen pass. Deterministic
- * code decides only whether review is required and validates the final evidence contract; it never
- * chooses the semantic conclusion or writes the answer.
+ * The scope plan is a concise model conclusion, not hidden reasoning. No deterministic topic rule
+ * decides what the user's predicate means, and no server formatter writes ordinary answer prose.
  */
 export async function synthesizeFreshEvidenceLocally(args: {
   input: string
@@ -118,36 +120,58 @@ export async function synthesizeFreshEvidenceLocally(args: {
 }): Promise<FreshEvidenceLocalSynthesisOutcome> {
   if (!args.sources.length) return { kind: 'local_synthesis_unparseable' }
 
-  const initial = await boundedLocalCompletion({
-    prompt: freshEvidenceSynthesisPrompt(args),
-    systemPrompt: freshEvidenceSynthesisSystemPrompt(args.language),
-    maxTokens: MAX_TOKENS,
-    phase: 'initial',
+  const planned = await boundedLocalCompletion({
+    prompt: freshEvidenceScopePlanPrompt(args),
+    systemPrompt: freshEvidenceScopePlanSystemPrompt(args.language),
+    maxTokens: SCOPE_PLAN_MAX_TOKENS,
+    phase: 'scope_plan',
   })
-  if (initial.ok === false) return { kind: 'local_synthesis_failed', error: initial.error }
-  if (!initial.text?.trim()) return { kind: 'local_synthesis_unparseable' }
+  if (planned.ok === false) return { kind: 'local_synthesis_failed', error: planned.error }
+  if (!planned.text?.trim()) return { kind: 'local_synthesis_unparseable' }
+
+  const semanticPlan = acceptFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
+  if (!semanticPlan) return { kind: 'citation_grounding_rejected' }
+
+  console.info('[cos-fresh-semantic-scope-plan]', JSON.stringify({
+    at: new Date().toISOString(),
+    directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
+    scopeCount: semanticPlan.scopes.length,
+    scopeEvidenceCount: new Set(semanticPlan.scopes.flatMap(scope => scope.evidenceIds)).size,
+  }))
+
+  const answered = await boundedLocalCompletion({
+    prompt: freshEvidenceSynthesisPrompt({ ...args, semanticPlan }),
+    systemPrompt: freshEvidenceSynthesisSystemPrompt(args.language),
+    maxTokens: ANSWER_MAX_TOKENS,
+    phase: 'answer',
+  })
+  if (answered.ok === false) return { kind: 'local_synthesis_failed', error: answered.error }
+  if (!answered.text?.trim()) return { kind: 'local_synthesis_unparseable' }
 
   let accepted = acceptFreshEvidenceSynthesis({
-    text: initial.text,
+    text: answered.text,
     input: args.input,
     sources: args.sources,
-    enforceGroupComparisonScope: false,
+    semanticPlan,
   })
   if (!accepted) return { kind: 'citation_grounding_rejected' }
 
   const singleProposition = splitResearchClaims(args.input).length === 1
   const needsNeuralReview = freshEvidenceSynthesisNeedsNeuralReview({
-    input: args.input,
     answer: accepted.answer,
     citedSourceIds: accepted.citedSourceIds,
     singleProposition,
+    semanticPlan,
   })
 
   if (needsNeuralReview) {
     console.info('[cos-fresh-neural-synthesis-review]', JSON.stringify({
       at: new Date().toISOString(),
       event: 'review_required',
+      reason: accepted.citedSourceIds.length > Math.max(2, semanticPlan.scopes.length) ? 'source_density' : 'answer_length',
       singleProposition,
+      directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
+      scopeCount: semanticPlan.scopes.length,
       initialEvidenceCount: accepted.citedSourceIds.length,
       initialAnswerChars: accepted.answer.length,
     }))
@@ -157,6 +181,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
         input: args.input,
         sources: args.sources,
         retrievedAt: args.retrievedAt,
+        semanticPlan,
         draftAnswer: accepted.answer,
       }),
       systemPrompt: freshEvidenceRevisionSystemPrompt(args.language),
@@ -166,17 +191,24 @@ export async function synthesizeFreshEvidenceLocally(args: {
     if (revised.ok === false) return { kind: 'local_synthesis_failed', error: revised.error }
     if (!revised.text?.trim()) return { kind: 'local_synthesis_unparseable' }
 
-    const reviewed = acceptFreshEvidenceSynthesis({ text: revised.text, input: args.input, sources: args.sources })
+    const reviewed = acceptFreshEvidenceSynthesis({
+      text: revised.text,
+      input: args.input,
+      sources: args.sources,
+      semanticPlan,
+    })
     if (!reviewed) return { kind: 'citation_grounding_rejected' }
     if (freshEvidenceSynthesisNeedsNeuralReview({
-      input: args.input,
       answer: reviewed.answer,
       citedSourceIds: reviewed.citedSourceIds,
       singleProposition,
+      semanticPlan,
     })) {
       console.warn('[cos-fresh-neural-synthesis-review]', JSON.stringify({
         at: new Date().toISOString(),
         event: 'review_failed_quality_boundary',
+        directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
+        scopeCount: semanticPlan.scopes.length,
         finalEvidenceCount: reviewed.citedSourceIds.length,
         finalAnswerChars: reviewed.answer.length,
       }))
@@ -186,6 +218,8 @@ export async function synthesizeFreshEvidenceLocally(args: {
     console.info('[cos-fresh-neural-synthesis-review]', JSON.stringify({
       at: new Date().toISOString(),
       event: 'review_accepted',
+      directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
+      scopeCount: semanticPlan.scopes.length,
       finalEvidenceCount: reviewed.citedSourceIds.length,
       finalAnswerChars: reviewed.answer.length,
     }))

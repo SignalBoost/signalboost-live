@@ -3562,7 +3562,8 @@
     "u_8d844011c413f415": "(no command)",
     "u_e596899f114b5162": "exit",
     "u_3dcd80f1b15f796e": "timed out",
-    "u_5d28a90f4498a814": "failed"
+    "u_5d28a90f4498a814": "failed",
+    "u_79a04dc5140b03ef": "Builder certification: level {level}/3 · verified attempts {attempts}"
   },
   "lab": {
     "license": {

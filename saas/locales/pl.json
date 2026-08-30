@@ -3562,7 +3562,8 @@
     "u_8d844011c413f415": "(brak polecenia)",
     "u_e596899f114b5162": "wyjście",
     "u_3dcd80f1b15f796e": "przekroczono czas",
-    "u_5d28a90f4498a814": "nie powiodło się"
+    "u_5d28a90f4498a814": "nie powiodło się",
+    "u_79a04dc5140b03ef": "Certyfikacja Buildera: poziom {level}/3 · zweryfikowane próby {attempts}"
   },
   "lab": {
     "somethingWrong": "Coś poszło nie tak",

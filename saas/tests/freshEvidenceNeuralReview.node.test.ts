@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT,
+  acceptFreshEvidenceSynthesis,
   explainsGroupComparisonScope,
   freshEvidenceSynthesisNeedsNeuralReview,
   requiresGroupComparisonScope,
@@ -45,6 +46,11 @@ test('a population-disparity question cannot release a raw gap as proof of like-
   const observedProductionShape = 'Yes, a gender pay gap exists. Aggregate data show a difference, and an adjusted study reports a small remaining difference.'
   assert.equal(explainsGroupComparisonScope(observedProductionShape), false)
   assert.equal(freshEvidenceSynthesisNeedsNeuralReview({ input, answer: observedProductionShape, citedSourceIds: ['LIVE1', 'LIVE5'], singleProposition: true }), true)
+  assert.equal(acceptFreshEvidenceSynthesis({
+    text: JSON.stringify({ answer: observedProductionShape, evidenceIds: ['LIVE1'] }),
+    input,
+    sources: [],
+  }), null)
 })
 
 test('a population-disparity answer must preserve the aggregate-to-individual boundary', () => {

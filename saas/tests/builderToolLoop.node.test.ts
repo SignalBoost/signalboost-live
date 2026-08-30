@@ -47,6 +47,23 @@ test('Builder writes a user file, runs it, and returns only after tool evidence'
   assert.equal(inferBuilderCertificationAttempt(result)?.caseId, 'create_and_run_javascript_v1')
 })
 
+test('Builder supplies staged project scripts and the recommended proof command', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('user:project-context', 'package.json', JSON.stringify({ scripts: { test: 'node --test' } }))
+  await workspace.writeFile('user:project-context', 'tests/math.test.js', 'test')
+  let prompt = ''
+  const ai: BuilderAiPort = { async generate(input) {
+    prompt = input.prompt
+    return '{"type":"answer","answer":"Project context inspected."}'
+  } }
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Inspect this project.', workspaceId: 'user:project-context' })
+  assert.equal(result.ok, true)
+  assert.match(prompt, /PROJECT CONTEXT/)
+  assert.match(prompt, /"packageManager":"npm"/)
+  assert.match(prompt, /"recommendedTestCommand":"npm test"/)
+})
+
 test('Builder retries one transient model-round timeout before failing the turn', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   let calls = 0

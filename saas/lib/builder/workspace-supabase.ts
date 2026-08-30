@@ -10,12 +10,8 @@ const STORAGE_PREFIX = 'base64:'
 function encodeStoredContent(value: string): string { return STORAGE_PREFIX + Buffer.from(value, 'utf8').toString('base64') }
 function decodeStoredContent(value: string): string { return value.startsWith(STORAGE_PREFIX) ? Buffer.from(value.slice(STORAGE_PREFIX.length), 'base64').toString('utf8') : value }
 
-function stripNulls(value: string): string {
-  return String(value ?? '').replace(/\u0000|\\\\u0000|\\\\0/g, '')
-}
-
 function safePath(value: string): string {
-  let path = stripNulls(value).replace(/\\/g, '/').replace(/^\/+/, '')
+  let path = String(value ?? '').replace(/\\/g, '/').replace(/^\/+/, '')
   if (path === 'workspace' || path.startsWith('workspace/')) path = path.replace(/^workspace\/?/, '')
   if (containsNullByte(path) || !path || path.length > 240 || path.split('/').some(part => !part || part === '.' || part === '..')) {
     throw new Error('builder_invalid_path')

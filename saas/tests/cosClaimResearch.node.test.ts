@@ -13,6 +13,24 @@ test('claim research keeps a single question as one claim', () => {
   assert.deepEqual(splitResearchClaims('What is the current exchange rate?'), ['What is the current exchange rate'])
 })
 
+test('claim research keeps coordinated entities inside one proposition', () => {
+  assert.deepEqual(
+    splitResearchClaims('Is there a current price difference between wholesale buyers and retail buyers?'),
+    ['Is there a current price difference between wholesale buyers and retail buyers'],
+  )
+  assert.deepEqual(
+    splitResearchClaims('is there a pay gap btw men and women in the US?'),
+    ['is there a pay gap btw men and women in the US'],
+  )
+})
+
+test('claim research still splits when and introduces a new clause', () => {
+  assert.deepEqual(
+    splitResearchClaims('Compare the current rates and explain why they changed this month'),
+    ['Compare the current rates', 'explain why they changed this month'],
+  )
+})
+
 test('claim research identifies history wording as its own claim', () => {
   assert.deepEqual(splitResearchClaims('Who leads the agency today and list the past leaders for 20 years'), [
     'Who leads the agency today', 'list the past leaders for 20 years',

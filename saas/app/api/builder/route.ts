@@ -7,7 +7,7 @@ import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase
 import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
 import { verifiedRepairLesson } from '@/lib/builder/verified-lessons'
 import { inferBuilderCertificationAttempt } from '@/lib/builder/certification'
-import { isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
+import { isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,9 +21,6 @@ function cleanObjective(value: unknown): string {
   return objective
 }
 
-function pastedOperationalLogReply(): string {
-  return 'This is a partial Vercel build log, not editable source code. The shown entries are warnings and passing tests; the excerpt ends before the final build error. Paste the final error lines after the failure marker and the affected source file, then COS can repair and verify it.'
-}
 
 function publicTrace(trace: readonly { round: number; toolId: string; ok: boolean; input: Record<string, unknown>; output?: unknown; error?: string; failureClass?: string; remediation?: string }[]) {
   return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
@@ -73,7 +70,7 @@ export async function POST(request: Request) {
     const rawObjective = String(body?.objective || '').trim()
     if (isPastedOperationalLog(rawObjective)) {
       return NextResponse.json({
-        reply: pastedOperationalLogReply(),
+        reply: operationalLogReply(rawObjective),
         source: 'builder-operational-log-analysis',
         files: [],
         trace: [],

@@ -11,6 +11,7 @@ const tests = [
   'tests/conciergeTransportBudget.node.test.ts',
   'tests/pastedOperationalLog.node.test.ts',
   'tests/builderOperationalLogRouting.node.test.ts',
+  'tests/builderControlRecovery.node.test.ts',
   'tests/conciergeOperationalLogRouting.node.test.ts',
   'tests/builderRepositoryRepairTarget.node.test.ts',
   'tests/builderRepositoryRepairSecurity.node.test.ts',

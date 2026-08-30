@@ -103,18 +103,24 @@ test('structured real-time adapter uses Brave rich callback and compact timestam
   assert.match(source, /No structured real-time callback was available/)
 })
 
-test('governed external fresh synthesis remains available only as the final provider fallback', () => {
+test('governed external fresh synthesis keeps the same planner, faithfulness audit and repair standard after local COS', () => {
   const source = externalSynthesis()
-  const local = source.indexOf('await callCosReasoner(')
+  const local = source.indexOf('await synthesizeFreshEvidenceLocally(args)')
   const hosted = source.indexOf('await callCosTextDetailed(')
   assert.ok(local >= 0)
   assert.ok(hosted > local)
+  assert.match(source, /freshEvidenceScopePlanPrompt/)
+  assert.match(source, /freshEvidenceSynthesisPrompt/)
+  assert.match(source, /freshEvidenceFaithfulnessReviewPrompt/)
+  assert.match(source, /acceptFreshEvidenceFaithfulnessReview/)
+  assert.match(source, /freshEvidenceRevisionPrompt/)
+  assert.match(source, /freshEvidenceSynthesisNeedsNeuralReview/)
   assert.match(source, /modelPreference:\s*'gemini'/)
 })
 
-test('fresh/current model memory is explicitly forbidden by the synthesis contract', () => {
+test('fresh/current model memory is explicitly forbidden in both semantic planning and answer synthesis', () => {
   const source = synthesisContract()
-  assert.match(source, /evidence block is your ONLY permitted source of facts/)
-  assert.match(source, /Your own memory is assumed stale and must not contribute facts/)
+  assert.match(source, /Use only facts present in LIVE EVIDENCE\. Your model memory is not a source of current facts\./)
+  assert.match(source, /Use ONLY facts present in LIVE EVIDENCE\. Your own memory is assumed stale and must not contribute facts\./)
   assert.match(source, /EVIDENCE_INSUFFICIENT/)
 })

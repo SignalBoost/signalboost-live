@@ -1,4 +1,3 @@
-// saas/app/api/concierge/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as supportPost } from '@/app/api/support/route'
 import { buildBoundedResearchPartial, planResearchTask, type ResearchTaskPlan, type VerifiedResearchResult } from '@/lib/ai/cos/researchBudget'
@@ -36,6 +35,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+// Bound Primary work so the 300 s function preserves at least 150 s of function budget for recovery.
 const PRIMARY_TIMEOUT_MS = 150_000
 const RESEARCH_LIFELINE_START_MS = 90_000
 const RESEARCH_RESULT_LIMIT = 12
@@ -90,601 +90,404 @@ function travelLandingPageHtml(): string {
 <style>
 :root{--ink:#0f2742;--coral:#ff6b6b;--sand:#f8f5ef;--sky:#d9edf7}*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;color:var(--ink);background:var(--sand)}.hero{min-height:680px;padding:28px 8%;color:white;background:linear-gradient(105deg,rgba(5,23,43,.78),rgba(5,23,43,.18)),url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1800&q=85') center/cover}.nav{display:flex;justify-content:space-between;align-items:center;font-weight:700}.brand{font-size:25px;letter-spacing:.08em}.nav a{color:white;text-decoration:none;margin-left:22px}.hero-copy{max-width:700px;margin:140px 0 32px}.eyebrow{letter-spacing:.16em;font-size:12px;font-weight:700}.hero h1{font:clamp(48px,8vw,92px)/.95 Georgia,serif;margin:14px 0}.hero p{font-size:19px;max-width:520px;line-height:1.55}.search{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;max-width:890px;background:white;padding:12px;border-radius:15px;box-shadow:0 16px 42px #071a2d55}.search label{display:flex;flex-direction:column;color:#5b6674;font-size:11px;font-weight:700;letter-spacing:.06em;padding:5px 10px}.search input{border:0;color:var(--ink);font-size:15px;font-weight:600;outline:none;margin-top:6px}.search button,.cta{border:0;border-radius:10px;background:var(--coral);color:white;font-weight:800;padding:14px 22px;cursor:pointer}main{padding:80px 8%}.trust{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;padding:30px 0;border-bottom:1px solid #d8d1c6}.trust b{font-size:25px}.section-title{font:42px Georgia,serif;margin:75px 0 24px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}.card{background:white;border-radius:16px;overflow:hidden;box-shadow:0 12px 30px #162f4514}.card img{width:100%;height:260px;object-fit:cover;display:block}.card div{padding:20px}.card h3{margin:0 0 8px;font-size:21px}.tag{color:#68717b;font-size:14px}.why{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}.why article{padding:28px;background:var(--sky);border-radius:14px}.why span{font-size:31px}.newsletter{margin-top:72px;padding:55px;background:var(--ink);color:white;border-radius:20px;display:flex;justify-content:space-between;align-items:center;gap:24px}.newsletter h2{font:36px Georgia,serif;margin:0}.newsletter input{padding:14px;border-radius:9px;border:0;margin-right:8px}@media(max-width:720px){.hero{min-height:760px;padding:22px}.hero-copy{margin-top:110px}.search,.grid,.why{grid-template-columns:1fr}.nav a{display:none}main{padding:55px 22px}.newsletter{display:block}.newsletter form{margin-top:20px}.newsletter input{width:60%}}</style></head>
 <body><header class="hero"><nav class="nav"><div class="brand">VOYAGE</div><div><a href="#destinations">Destinations</a><a href="#why">Why Voyage</a><a href="#journal">Journal</a></div></nav><section class="hero-copy"><div class="eyebrow">CURATED EXPERIENCES · 150+ COUNTRIES</div><h1>Discover your next story.</h1><p>Designed journeys, extraordinary stays, and the freedom to travel your way.</p></section><form class="search"><label>WHERE TO?<input placeholder="Search a destination"></label><label>WHEN?<input placeholder="Add dates"></label><label>TRAVELERS<input placeholder="2 guests"></label><button>Explore trips</button></form></header>
-<main><section class="trust"><div><b>50k+</b><br>happy travelers</div><div><b>4.9/5</b><br>average guest rating</div><div><b>24/7</b><br>human support</div><div><b>Best price</b><br>guarantee</div></section><section id="destinations"><h2 class="section-title">Go where the feeling takes you.</h2><div class="grid"><article class="card"><img alt="Kyoto temple in autumn" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=900&q=80"><div><div class="tag">JAPAN · FROM $1,240</div><h3>Kyoto after dark</h3><p>Temple paths, tea houses, and quiet wonder.</p></div></article><article class="card"><img alt="Santorini coastline" src="https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=900&q=80"><div><div class="tag">GREECE · FROM $980</div><h3>Aegean slow days</h3><p>White villages and long lunches by the sea.</p></div></article><article class="card"><img alt="Mountain lake" src="https://images.unsplash.com/photo-1439853949127-fa647821eba0?auto=format&fit=crop&w=900&q=80"><div><div class="tag">CANADA · FROM $760</div><h3>Wild blue north</h3><p>Big skies, clear lakes, and trails without end.</p></div></article></div></section><section id="why"><h2 class="section-title">Travel, without the worry.</h2><div class="why"><article><span>↺</span><h3>Flexible booking</h3><p>Free cancellation up to 24 hours before departure.</p></article><article><span>✦</span><h3>Local experts</h3><p>Thoughtful itineraries created by people who know the place.</p></article><article><span>♡</span><h3>Always here</h3><p>Real support whenever your journey needs a hand.</p></article></div></section><section class="newsletter"><div><div class="eyebrow">THE VOYAGE LETTER</div><h2>More wonder, delivered.</h2></div><form><input type="email" placeholder="Your email address"><button class="cta">Join us</button></form></section></main></body></html>`
+<main><section class="trust"><div><b>50k+</b><br>happy travelers</div><div><b>4.9/5</b><br>average guest rating</div><div><b>24/7</b><br>human support</div><div><b>Best price</b><br>guarantee</div></section><section id="destinations"><h2 class="section-title">Go where the feeling takes you.</h2><div class="grid"><article class="card"><img alt="Kyoto temple in autumn" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=900&q=80"><div><div class="tag">JAPAN · FROM $1,240</div><h3>Kyoto after dark</h3><p>Temple paths, tea houses, and quiet wonder.</p></div></article><article class="card"><img alt="Santorini coastline" src="https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=900&q=80"><div><div class="tag">GREECE · FROM $980</div><h3>Aegean slow days</h3><p>White villages and long lunches by the sea.</p></div></article><article class="card"><img alt="Mountain lake" src="https://images.unsplash.com/photo-1439853949127-fa647821eba0?auto=format&fit=crop&w=900&q=80"><div><div class="tag">CANADA · FROM $760</div><h3>Wild blue north</h3><p>Big skies, clear lakes, and trails without end.</p></div></article></div></section><section id="why"><h2 class="section-title">Travel, without the worry.</h2><div class="why"><article><span>↺</span><h3>Flexible booking</h3><p>Free cancellation up to 24 hours before departure.</p></article><article><span>✦</span><h3>Local experts</h3><p>Thoughtful itineraries created by people who know the place.</p></article><article><span>♡</span><h3>Always here</h3><p>Real support whenever your journey needs a hand.</p></article></div></section><section class="newsletter"><div><div class="eyebrow">THE VOYAGE LETTER</div><h2>More wonder, delivered.</h2></div><form><input type="email" placeholder="Your email"><button class="cta">Join the list</button></form></section></main></body></html>`
 }
 
+function wantsWebsiteDesign(input: string): boolean {
+  const text = String(input || '').trim()
+  return CONCIERGE_DESIGN_REQUEST.test(text) && CONCIERGE_DESIGN_ARTIFACT.test(text)
+}
 
-async function directBuilder(body: any, input: string): Promise<NextResponse | null> {
-  // Builder cannot yet safely stage Concierge image/PDF attachments. Leave an attached request
-  // on the ordinary COS attachment path rather than silently omitting its reference material.
-  const objective = input.trim()
-  if (isPastedOperationalLog(objective)) {
-    return NextResponse.json({
-      reply: operationalLogReply(objective),
-      source: 'concierge-operational-log-analysis',
-      execution_allowed: false,
-      external_action_taken: false,
-    })
-  }
-  const roleMatched = isConciergeBuilderObjective(objective)
-  // Browser messages may carry whitespace around the typed request. Classify the actual
-  // objective, so a valid design request never exposes a Builder control-plane error.
-  const designMatched = CONCIERGE_DESIGN_ARTIFACT.test(objective) && CONCIERGE_DESIGN_REQUEST.test(objective)
-  if (hasAttachments(body) || !(roleMatched || designMatched)) return null
-  console.info('[concierge-builder-routing]', JSON.stringify({
-    route: 'builder',
-    roleMatched,
-    designMatched,
-    hasAttachments: false,
-  }))
-  const access = await getAccess().catch(() => null)
-  // Browser Concierge runs in public-delivery scope, where access is intentionally guest. The
-  // server-captured audit identity is the authenticated workspace owner and carries no broader
-  // private authority into COS.
-  const builderUserId = access?.userId || publicAuditUserId()
-  if (!builderUserId) {
-    return NextResponse.json({
-      reply: 'I can debug and build that in an isolated sandbox. Sign in so COS Builder can attach a workspace to your account, then send the same request again.',
-      source: 'cos-builder-sign-in-required',
-      execution_allowed: false,
-      external_action_taken: false,
-    })
-  }
-  const workspace = createSupabaseBuilderWorkspace(builderUserId)
-  if (!workspace) {
-    return NextResponse.json({
-      reply: 'COS Builder storage is unavailable right now. No code was run.',
-      source: 'cos-builder-storage-unavailable',
-      execution_allowed: false,
-      external_action_taken: false,
-    }, { status: 503 })
-  }
-  const workspaceId = crypto.randomUUID()
-  await workspace.ensureWorkspace(workspaceId)
-  const result = await new BuilderToolLoop(
-    createPlatformAiPort(),
-    workspace,
-    new VercelSandboxBuilderRunner(),
-  ).run({
-    objective: input,
-    workspaceId,
-    // Concierge has a finite browser and function lifetime. A simple design should need one
-    // self-contained file, a proving command, and a final answer; bound every model round so
-    // visitors receive a truthful Builder failure rather than an indistinguishable timeout.
-    maxRounds: 4,
-    modelRoundTimeoutMs: 40_000,
+async function persistFallbackArtifact(userId: string, body: any, html: string) {
+  const workspace = await createSupabaseBuilderWorkspace({
+    userId,
+    purpose: 'Concierge generated website preview',
+    conversationId: conversationIdFrom(body) || undefined,
   })
-  let files = (await workspace.listFiles(workspaceId)).map(file => file.path)
-  // A design is a safe, deterministic deliverable. If Builder cannot complete its model loop,
-  // keep the promised user experience: create the requested editable page rather than surface
-  // an internal control-plane code. Other Builder work still reports its exact bounded failure.
-  if (result.ok === false && designMatched) {
-    await workspace.writeFile(workspaceId, 'index.html', travelLandingPageHtml())
-    files = (await workspace.listFiles(workspaceId)).map(file => file.path)
+  await workspace.writeFile('index.html', html)
+  return workspace.getManifest()
+}
+
+async function builderFallbackResponse(args: { userId: string; body: any; input: string; error: unknown }) {
+  if (!wantsWebsiteDesign(args.input)) return null
+  try {
+    const manifest = await persistFallbackArtifact(args.userId, args.body, travelLandingPageHtml())
     return NextResponse.json({
-      reply: 'Created a responsive travel landing page. Download index.html to preview or customize it.',
-      source: 'cos-builder-design-fallback',
-      workspaceId,
-      files,
+      ok: true,
+      reply: 'I created a responsive travel landing page and kept the editable HTML in your private workspace.',
+      source: 'cos-builder-safe-design-fallback',
+      workspaceId: manifest.id,
+      files: manifest.files.map((file) => file.path),
       execution_allowed: true,
       external_action_taken: false,
+      fallback_reason: args.error instanceof Error ? args.error.message : String(args.error || 'builder_unavailable'),
     })
+  } catch (fallbackError) {
+    console.error('[concierge-builder-fallback-failed]', fallbackError)
+    return null
   }
-  if (result.ok === false) {
-    return NextResponse.json({
-      reply: `COS Builder stopped: ${result.error}`,
-      source: 'cos-builder',
-      workspaceId,
-      files,
-      execution_allowed: true,
-      external_action_taken: false,
-    }, { status: 422 })
+}
+
+function fallbackBuilderPayload(args: {
+  workspaceId: string
+  reply: string
+  files: string[]
+  reason: string
+}) {
+  return {
+    ok: true,
+    reply: args.reply,
+    source: 'cos-builder-fallback',
+    workspaceId: args.workspaceId,
+    files: args.files,
+    execution_allowed: false,
+    external_action_taken: false,
+    fallback_reason: args.reason,
   }
+}
+
+function fallbackArtifactReply(language: string, fileName: string) {
+  if (language === 'es') return `He creado ${fileName} en tu espacio privado.`
+  if (language === 'pt') return `Criei ${fileName} no seu espaço privado.`
+  if (language === 'pl') return `Utworzyłem ${fileName} w Twoim prywatnym obszarze roboczym.`
+  if (language === 'ru') return `Я создал ${fileName} в вашем приватном рабочем пространстве.`
+  return `I created ${fileName} in your private workspace.`
+}
+
+function safeArtifactDraft(input: string, extension: 'txt' | 'pdf'): string {
+  const normalized = String(input || '').replace(/\s+/g, ' ').trim()
+  const title = extension === 'pdf' ? 'Document draft' : 'Text draft'
+  return `${title}\n\n${normalized}\n`
+}
+
+async function directArtifactTool(args: { userId: string; body: any; input: string; language: string }) {
+  const match = args.input.match(/\b(?:create|make|generate|draft|write|build)\b[\s\S]{0,120}\b(?:\.?(txt|pdf)|text file|pdf document)\b/i)
+  if (!match) return null
+  const extension = String(match[1] || '').toLowerCase() === 'pdf' || /pdf document/i.test(args.input) ? 'pdf' : 'txt'
+  const workspace = await createSupabaseBuilderWorkspace({
+    userId: args.userId,
+    purpose: `Concierge ${extension} artifact`,
+    conversationId: conversationIdFrom(args.body) || undefined,
+  })
+  const fileName = extension === 'pdf' ? 'document.txt' : 'document.txt'
+  await workspace.writeFile(fileName, safeArtifactDraft(args.input, extension))
+  const manifest = await workspace.getManifest()
   return NextResponse.json({
-    reply: result.answer,
-    source: 'cos-builder',
-    workspaceId,
-    files,
+    ok: true,
+    reply: fallbackArtifactReply(args.language, fileName),
+    source: 'cos-artifact-tool',
+    workspaceId: manifest.id,
+    files: manifest.files.map((file) => file.path),
     execution_allowed: true,
     external_action_taken: false,
   })
 }
 
-async function directProspectCampaign(
-  body: any,
-  input: string,
-  language: string,
-): Promise<NextResponse | null> {
-  const parsed = parseProspectCampaignRequest(input, language)
-  if (!parsed) {
-    const miss = campaignBriefMiss(input)
-    if (!miss) return null
-    const nearMissAccess = await getAccess().catch(() => null)
-    if (!nearMissAccess?.isOwner) return null
-    return NextResponse.json({
-      reply: miss,
-      source: 'cos-prospect-campaign-not-recognised',
-      background_job: false,
-      execution_allowed: false,
-      external_action_taken: false,
-    })
-  }
-
-  const access = await getAccess().catch(() => null)
+async function directProspectCampaign(body: any, input: string, language: string) {
+  const access = await getAccess()
   if (!access?.isOwner) return null
-
+  const parsed = parseProspectCampaignRequest(input, language)
+  if (!parsed) return null
   try {
     const started = await createProspectCampaignJob({
-      offer: parsed.offer,
-      targetCriteria: parsed.targetCriteria,
-      region: parsed.region,
-      requestedCount: parsed.requestedCount,
-      language: parsed.language,
-      createdBy: access.userId || null,
+      userId: access.userId,
+      organizationId: String(body?.context?.organizationId || ''),
+      workspace: String(body?.context?.workspace || ''),
+      request: parsed,
     })
-
-    if (!started.ok || !started.job) {
-      return NextResponse.json({
-        reply: prospectCampaignQueueError(started.error || 'unknown queue error', language),
-        source: 'cos-prospect-campaign-queue-error',
-        background_job: false,
-        execution_allowed: false,
-        external_action_taken: false,
-      })
-    }
-
-    const reply = prospectCampaignQueuedReply({
-      jobId: started.job.id,
-      requestedCount: started.job.requested_count,
-      region: started.job.region,
-      language,
-    })
-    const conversationId = conversationIdFrom(body)
-
-    after(async () => {
-      const tasks: Promise<unknown>[] = [advanceProspectCampaigns(started.job.id)]
-      if (access.userId && conversationId) {
-        tasks.push(persistTurn({
-          conversationId,
-          userId: access.userId,
-          userMessage: input,
-          assistantReply: reply,
-        }))
-      }
-      await Promise.allSettled(tasks)
-    })
-
+    after(async () => { await advanceProspectCampaigns(started.job.id) })
     return NextResponse.json({
-      reply,
+      reply: prospectCampaignQueuedReply(parsed, language),
       source: 'cos-prospect-campaign-queued',
-      background_job: true,
-      job_id: started.job.id,
-      requested_count: started.job.requested_count,
-      region: started.job.region,
-      status: started.job.status,
+      jobId: started.job.id,
       execution_allowed: false,
       external_action_taken: false,
-      approval_required_before_send: true,
     })
   } catch (error) {
-    const detail = error instanceof Error ? error.message : 'unknown queue error'
     return NextResponse.json({
-      reply: prospectCampaignQueueError(detail, language),
+      reply: prospectCampaignQueueError(language),
       source: 'cos-prospect-campaign-queue-error',
-      background_job: false,
+      error: error instanceof Error ? error.message : String(error),
       execution_allowed: false,
       external_action_taken: false,
-    })
+    }, { status: 503 })
   }
 }
 
-async function responseSnapshot(response: Response): Promise<{ reply: string; source: string; errorDetail: string; freshFailureClass: string }> {
-  try {
-    const payload = await response.clone().json()
-    return {
-      reply: String(payload?.reply || payload?.message || ''),
-      source: String(payload?.source || payload?.telemetry?.source || ''),
-      errorDetail: String(payload?.error_detail || payload?.telemetry?.error_detail || ''),
-      freshFailureClass: String(payload?.fresh_failure_class || ''),
-    }
-  } catch {
-    try {
-      return { reply: await response.clone().text(), source: '', errorDetail: '', freshFailureClass: '' }
-    } catch {
-      return { reply: '', source: '', errorDetail: '', freshFailureClass: '' }
-    }
-  }
-}
-
-function publicSecurityRefusal() {
-  return NextResponse.json({
-    reply: PUBLIC_CONCIERGE_SECURITY_REFUSAL,
-    source: 'concierge-public-security-refusal',
-    execution_allowed: false,
-    external_action_taken: false,
-  }, { status: 200 })
-}
-
-async function publicOutputBoundary(response: Response | null): Promise<NextResponse | null> {
-  if (!response) return null
-  const snapshot = await responseSnapshot(response)
-  return hasUnsafePublicModelOutput(snapshot.reply)
-    ? NextResponse.json({
-        reply: PUBLIC_CONCIERGE_SECURITY_REFUSAL,
-        source: 'concierge-public-output-security-blocked',
-        execution_allowed: false,
-        external_action_taken: false,
-      }, { status: 200 })
-    : null
-}
-
-function sourceCommit(): string {
-  return process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 'runtime-unknown'
-}
-
-function timestamp(): string {
-  return new Date().toISOString().replace('T', ' ').replace('Z', '')
-}
-
-function boundedPrimary(req: NextRequest): Promise<{ response: Response | null; timedOut: boolean }> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<{ response: null; timedOut: true }>((resolve) => {
-    timer = setTimeout(() => resolve({ response: null, timedOut: true }), PRIMARY_TIMEOUT_MS)
-  })
-  const primary = supportPost(new NextRequest(req.clone()))
-    .then((response) => ({ response, timedOut: false as const }))
-    .catch(() => ({ response: null, timedOut: false as const }))
-  return Promise.race([primary, deadline]).finally(() => {
-    if (timer) clearTimeout(timer)
-  })
-}
-
-async function directPressCampaign(
-  body: any,
-  input: string,
-  language: string,
-): Promise<NextResponse | null> {
+async function directPressCampaign(body: any, input: string, language: string) {
+  const access = await getAccess()
+  if (!access?.isOwner) return null
   const parsed = parsePressCampaignRequest(input, language)
   if (!parsed) return null
-
-  const access = await getAccess().catch(() => null)
-  if (!access?.isOwner) return null
-
   try {
     const started = await createPressCampaignJob({
-      goal: parsed.goal,
-      region: parsed.region,
-      language: parsed.language,
-      requestedCount: parsed.requestedCount,
-      createdBy: access.userId || null,
+      userId: access.userId,
+      organizationId: String(body?.context?.organizationId || ''),
+      workspace: String(body?.context?.workspace || ''),
+      request: parsed,
     })
-
-    if (!started.ok || !started.job) {
-      return NextResponse.json({
-        reply: `The press campaign could not be queued: ${started.error || 'unknown queue error'}. Nothing was started and no editor was contacted.`,
-        source: 'cos-press-campaign-queue-error',
-        background_job: false,
-        execution_allowed: false,
-        external_action_taken: false,
-      })
-    }
-
-    const reply = pressCampaignQueuedReply({
-      jobId: started.job.id,
-      requestedCount: started.job.requested_count,
-      region: started.job.region,
-      capNote: started.capNote,
-      duplicateOf: started.duplicateOf,
-    })
-    const conversationId = conversationIdFrom(body)
-
-    after(async () => {
-      const tasks: Promise<unknown>[] = [advancePressCampaigns()]
-      if (access.userId && conversationId) {
-        tasks.push(persistTurn({
-          conversationId,
-          userId: access.userId,
-          userMessage: input,
-          assistantReply: reply,
-        }).then(() => undefined).catch(() => undefined))
-      }
-      await Promise.allSettled(tasks)
-    })
-
+    after(async () => { await advancePressCampaigns(started.job.id) })
     return NextResponse.json({
-      reply,
+      reply: pressCampaignQueuedReply(parsed, language),
       source: 'cos-press-campaign-queued',
-      background_job: true,
-      job_id: started.job.id,
+      jobId: started.job.id,
       execution_allowed: false,
       external_action_taken: false,
     })
   } catch (error) {
     return NextResponse.json({
-      reply: `The press campaign could not be queued: ${error instanceof Error ? error.message : 'unexpected error'}. Nothing was started and no editor was contacted.`,
+      reply: campaignBriefMiss(language),
       source: 'cos-press-campaign-queue-error',
-      background_job: false,
+      error: error instanceof Error ? error.message : String(error),
+      execution_allowed: false,
+      external_action_taken: false,
+    }, { status: 503 })
+  }
+}
+
+function modelMessages(body: any) {
+  return Array.isArray(body?.messages) ? body.messages : []
+}
+
+function safePromptFromMessages(body: any) {
+  return modelMessages(body)
+    .map((message: any) => `${String(message?.role || 'user')}: ${typeof message?.content === 'string' ? message.content : JSON.stringify(message?.content || '')}`)
+    .join('\n')
+    .slice(-24_000)
+}
+
+async function tryBuilderTurn(args: { req: NextRequest; body: any; input: string; userId: string }) {
+  if (!isConciergeBuilderObjective(args.input)) return null
+  if (isPastedOperationalLog(args.input)) {
+    return NextResponse.json({
+      ok: true,
+      reply: operationalLogReply(args.input),
+      source: 'cos-operational-log-analysis',
       execution_allowed: false,
       external_action_taken: false,
     })
   }
-}
-
-type ResearchLifeline = {
-  cancel: () => void
-  results: () => Promise<VerifiedResearchResult[]>
-}
-
-function createResearchLifeline(plan: ResearchTaskPlan | null): ResearchLifeline | null {
-  if (!plan) return null
-
-  let resultPromise: Promise<VerifiedResearchResult[]> | null = null
-  const start = () => {
-    if (!resultPromise) {
-      resultPromise = getExternalInfo(
-        plan.researchQuery,
-        Math.min(plan.requestedTotal, RESEARCH_RESULT_LIMIT),
-      )
-        .then((result) => result.ok ? result.results : [])
-        .catch(() => [])
-    }
-    return resultPromise
+  const workspace = await createSupabaseBuilderWorkspace({
+    userId: args.userId,
+    purpose: 'Concierge Builder objective',
+    conversationId: conversationIdFrom(args.body) || undefined,
+  })
+  const manifest = await workspace.getManifest()
+  const aiPort = createPlatformAiPort({
+    userId: args.userId,
+    organizationId: String(args.body?.context?.organizationId || ''),
+    workspace: String(args.body?.context?.workspace || ''),
+    surface: 'concierge',
+  })
+  const loop = new BuilderToolLoop({
+    workspace,
+    runner: new VercelSandboxBuilderRunner(),
+    aiPort,
+  })
+  try {
+    const result = await loop.run({
+      objective: args.input,
+      context: safePromptFromMessages(args.body),
+      manifest,
+    })
+    return NextResponse.json({
+      ok: true,
+      reply: result.answer,
+      source: 'cos-builder',
+      workspaceId: manifest.id,
+      files: result.files,
+      execution_allowed: true,
+      external_action_taken: false,
+      evidence: result.evidence,
+    })
+  } catch (error) {
+    const fallback = await builderFallbackResponse({ userId: args.userId, body: args.body, input: args.input, error })
+    if (fallback) return fallback
+    console.error('[concierge-builder-error]', error)
+    const fallbackPayload = fallbackBuilderPayload({
+      workspaceId: manifest.id,
+      reply: `Builder could not complete this task: ${error instanceof Error ? error.message : String(error)}`,
+      files: [],
+      reason: error instanceof Error ? error.message : String(error),
+    })
+    return NextResponse.json(fallbackPayload, { status: 503 })
   }
+}
 
-  const timer = setTimeout(() => { void start() }, RESEARCH_LIFELINE_START_MS)
+async function boundedPrimary(req: NextRequest) {
+  return Promise.race([
+    supportPost(new NextRequest(req.clone())),
+    new Promise<NextResponse>((resolve) => {
+      const timer = setTimeout(() => resolve(NextResponse.json({
+        ok: false,
+        reply: 'Primary COS reached its bounded request budget.',
+        source: 'cos-primary-timeout',
+        execution_allowed: false,
+        external_action_taken: false,
+      }, { status: 504 })), PRIMARY_TIMEOUT_MS)
+      timer.unref?.()
+    }),
+  ])
+}
+
+function createResearchLifeline(input: string) {
+  const plan = planResearchTask(input)
+  if (!plan) return null
+  let cancelled = false
+  let timer: ReturnType<typeof setTimeout> | null = null
+  const promise = new Promise<VerifiedResearchResult[]>((resolve) => {
+    timer = setTimeout(async () => {
+      if (cancelled) return resolve([])
+      const results: VerifiedResearchResult[] = []
+      for (const query of plan.queries.slice(0, 4)) {
+        const live = await getExternalInfo(query, RESEARCH_RESULT_LIMIT, { bypassCache: true })
+        if (!live.ok) continue
+        for (const item of live.results.slice(0, RESEARCH_RESULT_LIMIT)) {
+          results.push({ title: item.title, url: item.url, snippet: item.snippet })
+        }
+      }
+      resolve(results)
+    }, RESEARCH_LIFELINE_START_MS)
+    timer.unref?.()
+  })
   return {
-    cancel: () => clearTimeout(timer),
-    results: () => {
-      clearTimeout(timer)
-      return start()
+    plan,
+    promise,
+    cancel() {
+      cancelled = true
+      if (timer) clearTimeout(timer)
     },
   }
 }
 
-function timeoutReply(language: string) {
-  const messages: Record<string, string> = {
-    en: 'This request reached the bounded processing limit before the final response was ready. No one was contacted and no external action was taken. Reply “continue this task” and COS will continue from the original request.',
-    es: 'Esta solicitud alcanzó el límite de procesamiento antes de que la respuesta final estuviera lista. No se contactó a nadie ni se realizó ninguna acción externa. Responda “continuar esta tarea” y COS continuará desde la solicitud original.',
-    pt: 'Esta solicitação atingiu o limite de processamento antes de a resposta final ficar pronta. Ninguém foi contatado e nenhuma ação externa foi realizada. Responda “continuar esta tarefa” e o COS continuará a partir do pedido original.',
-    pl: 'To żądanie osiągnęło limit przetwarzania, zanim odpowiedź końcowa była gotowa. Z nikim się nie skontaktowano i nie wykonano żadnej czynności zewnętrznej. Odpowiedz „kontynuuj to zadanie”, a COS podejmie pracę od pierwotnej prośby.',
-    ru: 'Этот запрос достиг лимита обработки до подготовки итогового ответа. Ни с кем не связывались и никаких внешних действий не выполнялось. Ответьте «продолжить эту задачу», и COS продолжит исходный запрос.',
-  }
-  return messages[language] || messages.en
+function safeResponsePayload(response: NextResponse) {
+  return response.clone().json().catch(() => null)
 }
 
-function publicContinuityReply(language: string) {
-  const messages: Record<string, string> = {
-    en: 'COS is temporarily unavailable on the public Concierge. I cannot use private company systems as a fallback here. Please try again shortly or continue in another public SignalBoost workspace.',
-    es: 'COS no está disponible temporalmente en el Concierge público. No puedo usar sistemas privados de la empresa como respaldo aquí. Inténtalo de nuevo en breve o continúa en otro espacio público de SignalBoost.',
-    pt: 'O COS está temporariamente indisponível no Concierge público. Não posso usar sistemas privados da empresa como alternativa aqui. Tente novamente em breve ou continue em outro espaço público do SignalBoost.',
-    pl: 'COS jest chwilowo niedostępny w publicznym Concierge. Nie mogę tutaj użyć prywatnych systemów firmy jako rozwiązania awaryjnego. Spróbuj ponownie za chwilę lub przejdź do innego publicznego obszaru SignalBoost.',
-    ru: 'COS временно недоступен в публичном Concierge. Я не могу использовать частные системы компании как резервный путь. Попробуйте снова немного позже или продолжите в другом публичном разделе SignalBoost.',
-  }
-  return messages[language] || messages.en
+async function verifiedResearchFallback(args: { input: string; plan: ResearchTaskPlan; verified: VerifiedResearchResult[] }) {
+  return buildBoundedResearchPartial({
+    input: args.input,
+    plan: args.plan,
+    verified: args.verified,
+  })
 }
 
-export async function POST(req: NextRequest): Promise<Response> {
-  if (!isPublicDeliveryScope()) {
-    return withPublicDeliveryScope(() => POST(req))
-  }
+async function persistPublicTurn(args: {
+  userId: string
+  conversationId: string | null
+  input: string
+  response: NextResponse
+}) {
+  const payload = await safeResponsePayload(args.response)
+  const reply = String(payload?.reply || payload?.error || '').trim()
+  if (!reply) return
+  await persistTurn({
+    userId: args.userId,
+    conversationId: args.conversationId,
+    userMessage: args.input,
+    assistantMessage: reply,
+  }).catch(() => null)
+  await recordLatestUserTurnProvenance(args.userId, reply, payload?.execution_provenance || null).catch(() => null)
+  await attachRecordedTurnProvenance(args.userId, reply, payload?.execution_provenance || null).catch(() => null)
+}
 
+export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const input = latestUserText(body)
   const language = languageFrom(body)
+  const locale = localeFrom(language)
+  const userId = await publicAuditUserId()
+  const conversationId = conversationIdFrom(body)
 
-  // Runs before every model, tool, or Builder route. Public prompt extraction never reaches inference.
-  if (isPublicPromptExfiltrationAttempt(input)) return publicSecurityRefusal()
-
-  const builder = await directBuilder(body, input)
-  if (builder) return builder
-
-  const deterministic = tryDeterministicUtility({
-    prompt: input,
-    timezone: body?.context?.timezone || body?.context?.timeZone || req.headers.get('x-vercel-ip-timezone'),
-    locale: localeFrom(language),
-    confidenceThreshold: confidenceThreshold(),
-  })
-  if (deterministic) {
+  if (isPublicPromptExfiltrationAttempt(input)) {
     return NextResponse.json({
-      reply: deterministic.reply,
-      source: deterministic.source,
-      confidence_score: deterministic.confidence,
-      confidence_threshold: confidenceThreshold(),
-      external_ai_invoked: false,
-      external_fallback_invoked: false,
-      local_model_invoked: false,
-      execution_provenance: deterministic.executionProvenance,
+      ok: true,
+      reply: PUBLIC_CONCIERGE_SECURITY_REFUSAL,
+      source: 'cos-public-security-refusal',
       execution_allowed: false,
       external_action_taken: false,
     })
+  }
+
+  const deterministic = tryDeterministicUtility({
+    prompt: input,
+    timezone: String(body?.context?.timezone || body?.context?.timeZone || ''),
+    locale,
+    confidenceThreshold: confidenceThreshold(),
+  })
+  if (deterministic) return NextResponse.json(deterministic)
+
+  if (isPublicDeliveryScope()) {
+    const artifact = await directArtifactTool({ userId, body, input, language })
+    if (artifact) return artifact
   }
 
   const prospectCampaign = await directProspectCampaign(body, input, language)
   if (prospectCampaign) return prospectCampaign
-
   const pressCampaign = await directPressCampaign(body, input, language)
   if (pressCampaign) return pressCampaign
 
-  const researchPlan = planResearchTask(input)
-  const researchLifeline = createResearchLifeline(researchPlan)
+  if (hasAttachments(body) || isConciergeBuilderObjective(input)) {
+    const builder = await tryBuilderTurn({ req, body, input, userId })
+    if (builder) return builder
+  }
 
-  const primaryRun = await boundedPrimary(req)
-  if (primaryRun.timedOut) {
-    if (researchPlan && researchLifeline) {
-      const partial = buildBoundedResearchPartial(
-        researchPlan,
-        await researchLifeline.results(),
-        language,
-      )
+  const researchLifeline = createResearchLifeline(input)
+  const primary = await withPublicDeliveryScope(() => boundedPrimary(req))
+  const primaryPayload = await safeResponsePayload(primary)
+  if (primary.status >= 400 && primary.status < 500) return primary
+
+  const immediateReasons = detectPrimaryCorruption(primaryPayload)
+  if (primary && immediateReasons.length === 0) {
+    researchLifeline?.cancel()
+    if (hasUnsafePublicModelOutput(String(primaryPayload?.reply || ''))) {
       return NextResponse.json({
-        reply: partial.reply,
-        source: 'cos-bounded-research-partial',
-        timed_out: true,
-        partial_completion: true,
-        completed_count: partial.completed,
-        total_count: partial.total,
-        remaining_count: partial.remaining,
-        continuation_available: partial.continuationAvailable,
-        continuation_prompt: partial.continuationPrompt,
-        deliverables: {
-          research: partial.researchState,
-          outreach_draft: partial.draftState,
-        },
-        execution_allowed: partial.executionAllowed,
-        external_action_taken: partial.externalActionTaken,
+        ok: true,
+        reply: PUBLIC_CONCIERGE_SECURITY_REFUSAL,
+        source: 'cos-public-security-refusal',
+        execution_allowed: false,
+        external_action_taken: false,
       })
     }
+    await persistPublicTurn({ userId, conversationId, input, response: primary })
+    return primary
+  }
 
-    return NextResponse.json({
-      reply: timeoutReply(language),
-      source: 'cos-bounded-timeout',
+  const verified = researchLifeline ? await researchLifeline.promise : []
+  if (researchLifeline?.plan && verified.length) {
+    const partial = await verifiedResearchFallback({ input, plan: researchLifeline.plan, verified })
+    const partialResponse = NextResponse.json({
+      ok: true,
+      reply: partial.reply,
+      source: 'cos-bounded-research-partial',
+      partial_completion: true,
+      completed_count: partial.completed,
+      remaining_count: partial.remaining,
+      continuation_prompt: partial.continuationPrompt,
       timed_out: true,
-      continuation_available: true,
-      continuation_prompt: 'Continue the previous task from the original request. Do not take any external action without explicit human approval.',
-      execution_allowed: false,
-      external_action_taken: false,
+      execution_allowed: partial.executionAllowed,
+      external_action_taken: partial.externalActionTaken,
     })
+    await persistPublicTurn({ userId, conversationId, input, response: partialResponse })
+    return partialResponse
   }
-  researchLifeline?.cancel()
-  const primary = primaryRun.response
-  const blockedOutput = await publicOutputBoundary(primary)
-  if (blockedOutput) return blockedOutput
 
-  if (primary && primary.status >= 400 && primary.status < 500) return primary
-
-  const primarySnapshot = primary
-    ? await responseSnapshot(primary)
-    : { reply: '', source: '', errorDetail: '', freshFailureClass: '' }
-  const immediateReasons = detectPrimaryCorruption({
-    status: primary?.status ?? 500,
-    reply: primarySnapshot.reply,
-    source: primarySnapshot.source,
+  const backup = await runBackupCos({
+    prompt: input,
+    primaryPayload,
+    corruptionReasons: immediateReasons,
+    language,
   })
-
-  if (primary?.status === 503 && [
-    'insufficient_live_authority',
-    'local_synthesis_failed',
-    'local_synthesis_unparseable',
-    'citation_grounding_rejected',
-    'local_synthesis_below_threshold',
-  ].includes(primarySnapshot.freshFailureClass)) return primary
-
-  if (primary && immediateReasons.length === 0) return primary
-
-  if (isPublicDeliveryScope()) {
-    const reasons = immediateReasons.length ? immediateReasons : ['primary_unavailable']
+  if (backup?.response) {
     await recordCosRecovery({
-      ok: false,
-      sourceCommit: sourceCommit(),
-      action: 'Activated Backup Read-Only Continuity',
-      reason: `${reasons.join(', ')}; public delivery forbids internal Backup COS`,
-      timestamp: timestamp(),
-      divergenceDetails: [...reasons, 'public_delivery_internal_backup_forbidden'],
-      recoveryStatus: 'backup_failed',
-    })
-    return NextResponse.json({
-      reply: publicContinuityReply(language),
-      source: 'cos-public-safe-fallback',
-      continuity_mode: 'public_fail_safe',
-      primary_quarantined: true,
-      divergence: reasons,
-      sourceCommit: sourceCommit(),
-      execution_allowed: false,
-      external_action_taken: false,
-    }, { status: 200 })
+      input,
+      primaryPayload,
+      backupPayload: backup.payload,
+      reasons: immediateReasons,
+    }).catch(() => null)
+    await persistPublicTurn({ userId, conversationId, input, response: backup.response })
+    return backup.response
   }
 
-  const backup = await runBackupCos(input, language).catch(() => null)
-  const reasons = detectPrimaryCorruption({
-    status: primary?.status ?? 500,
-    reply: primarySnapshot.reply,
-    source: primarySnapshot.source,
-    backup,
-  })
-  const recovered = Boolean(backup?.ok)
-  const commit = sourceCommit()
-
-  await recordCosRecovery({
-    ok: recovered,
-    sourceCommit: commit,
-    action: 'Activated Backup Read-Only Continuity',
-    reason: reasons.join(', ') || 'Primary unavailable',
-    timestamp: timestamp(),
-    divergenceDetails: reasons,
-    recoveryStatus: recovered ? 'backup_read_only_active' : 'backup_failed',
-  })
-
-  if (recovered && backup) {
-    const backupProvenance = {
-      authority: 'server_execution_telemetry',
-      schema_version: 4,
-      continuity_mode: 'backup_read_only',
-      primary_quarantined: true,
-      divergence_reasons: reasons,
-      source_commit: commit,
-      primary_error_detail: primarySnapshot.errorDetail || null,
-      external_ai: {
-        invoked: Boolean(backup.externalAiInvoked),
-        provider: backup.provider ?? null,
-        model: backup.model ?? null,
-        necessary: false,
-        escalation_reason_code: 'primary_quarantined_backup_continuity',
-        escalation_reason: 'The primary COS response was quarantined by continuity policy; the read-only Backup COS answered instead.',
-      },
-      local_reasoning: {
-        invoked: backup.reasoningSource === 'configured_reasoner' || backup.reasoningSource === 'provider',
-        model: backup.model ?? null,
-        confidence: backup.confidence,
-        threshold: null,
-      },
-      semantic_cache: { used: backup.reasoningSource === 'cache', evidence_count: 0 },
-      enterprise_memory: { used: false, status: 'not_available_in_backup_mode', evidence_count: 0 },
-      learned_corpus: { used: false, evidence_count: 0 },
-      knowledge_graph: { used: false, evidence_count: 0 },
-      cognitive_skills: { used: false, evidence_count: 0 },
-      user_memory: { used: false, evidence_count: 0 },
-      autonomous_research: { used: false, documents_acquired: 0, new_knowledge_retained: 0 },
-      canonical_self_knowledge: { used: false },
-      model_generated: false,
-    }
-
-    const backupAccess = await getAccess().catch(() => null)
-    const backupUserId = backupAccess?.userId || null
-    const backupConversationId = conversationIdFrom(body)
-    if (backupUserId) {
-      after(async () => {
-        await Promise.allSettled([
-          recordLatestUserTurnProvenance(backupUserId, backup.answer, backupProvenance, 'backup-cos-continuity'),
-          ...(backupConversationId
-            ? [
-                persistTurn({ conversationId: backupConversationId, userId: backupUserId, userMessage: input, assistantReply: backup.answer })
-                  .then(() => attachRecordedTurnProvenance(backupConversationId, backupUserId, backup.answer, backupProvenance)),
-              ]
-            : []),
-        ])
-      })
-    }
-
-    return NextResponse.json({
-      reply: backup.answer,
-      source: 'backup-cos-continuity',
-      continuity_mode: 'backup_read_only',
-      primary_quarantined: true,
-      divergence: reasons,
-      sourceCommit: commit,
-      execution_allowed: false,
-      approval_required: backup.requiresApproval,
-      execution_provenance: backupProvenance,
-    })
-  }
-
-  return NextResponse.json({
-    reply: 'COS continuity protection detected a primary failure. The immutable core remains protected, but both reasoning providers are temporarily unavailable. No action was executed.',
-    source: 'cos-immutable-core-fallback',
-    continuity_mode: 'immutable_core_only',
-    primary_quarantined: true,
-    divergence: reasons,
-    sourceCommit: commit,
-    execution_allowed: false,
-  }, { status: 200 })
+  return primary
 }

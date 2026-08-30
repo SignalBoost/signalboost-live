@@ -8,6 +8,7 @@ const OUTPUT_LIMIT = 16_000
 
 function bounded(value: string): string { return String(value || '').slice(0, OUTPUT_LIMIT) }
 function parent(path: string): string { return path.slice(0, path.lastIndexOf('/')) }
+function shellQuote(value: string): string { return `'${String(value).replace(/'/g, "'\\\"'\\\"'")}'` }
 
 /** Executes only the supplied user workspace inside an ephemeral, network-denied MicroVM. */
 export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
@@ -20,18 +21,22 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
       resources: { vcpus: 1 },
       networkPolicy: 'deny-all',
       persistent: false,
-      // Preserve the node24 runtime PATH; overriding it hides the Node binary.
+      // runtime: node24 supplies Node on its own runtime PATH. Do not replace PATH here:
+      // doing so hides the runtime binary and makes every `node` command fail.
       env: { HOME: '/tmp' },
       tags: { surface: 'cos-builder' },
     })
     try {
-      await sandbox.fs.mkdir(ROOT, { recursive: true })
       for (const file of input.files) {
-        const destination = `\${ROOT}/\${file.path}`
-        const directory = parent(destination)
-        if (directory && directory !== ROOT) await sandbox.fs.mkdir(directory, { recursive: true })
-        await sandbox.fs.writeFile(destination, file.content, 'utf8')
-        await sandbox.fs.readFile(destination, 'utf8')
+        const destination = `${ROOT}/${file.path}`
+        const encoded = Buffer.from(file.content, 'utf8').toString('base64')
+        const directory = parent(destination) || ROOT
+        const stage = await sandbox.runCommand({
+          cmd: 'sh',
+          args: ['-lc', `mkdir -p -- ${shellQuote(directory)} && printf %s ${shellQuote(encoded)} | base64 -d > ${shellQuote(destination)}`],
+          timeoutMs: COMMAND_TIMEOUT_MS,
+        })
+        if (stage.exitCode !== 0) throw new Error('builder_sandbox_stage_failed')
       }
       try {
         const result = await sandbox.runCommand({ cmd: 'sh', args: ['-lc', `cd ${ROOT} && ${command}`], cwd: ROOT, timeoutMs: COMMAND_TIMEOUT_MS })

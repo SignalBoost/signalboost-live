@@ -277,7 +277,7 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="assistant-content"><AssistantMessage content={turn.response} /></div>
-                    {turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.(?:png|jpe?g|webp)$/i.test(path)) ? (
+                    {!/<IMAGE>[\\s\\S]*?<\\/IMAGE>/.test(turn.response) && turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.(?:png|jpe?g|webp)$/i.test(path)) ? (
                       <img
                         alt={turn.response}
                         className="mt-3 max-h-[560px] w-full rounded-xl border border-white/15 bg-white object-contain"

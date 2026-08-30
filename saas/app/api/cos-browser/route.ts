@@ -56,8 +56,17 @@ function inlineVisualResponse(response: Response): Promise<NextResponse> {
       ? payload.files.find((path: unknown): path is string => typeof path === 'string' && /\.(?:png|jpe?g|webp)$/i.test(path))
       : ''
     if (!workspaceId || !imagePath || typeof payload?.reply !== 'string') return NextResponse.json(payload, { status: response.status })
-    const preview = `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${imagePath.split('/').map(encodeURIComponent).join('/')}?preview=1`
-    return NextResponse.json({ ...payload, reply: `${payload.reply}\n\n<IMAGE>${preview}</IMAGE>` }, { status: response.status })
+    const previewUrl = `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${imagePath.split('/').map(encodeURIComponent).join('/')}?preview=1`
+    // Keep the artifact out of prose. The browser renders this owner-scoped image
+    // from a structured field, so a markdown/parser change cannot turn it into a URL.
+    return NextResponse.json({
+      ...payload,
+      visual: {
+        previewUrl,
+        downloadUrl: previewUrl.replace('?preview=1', ''),
+        alt: 'Generated visual',
+      },
+    }, { status: response.status })
   }).catch(() => new NextResponse(response.body, { status: response.status, headers: response.headers }))
 }
 

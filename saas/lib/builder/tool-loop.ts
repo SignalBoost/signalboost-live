@@ -1,5 +1,6 @@
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
+import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
 
 type Action = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> } | { type: 'answer'; answer: string }
 const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'write_file', 'edit_file', 'run'])
@@ -51,7 +52,7 @@ export class BuilderToolLoop {
     this.runner = runner
   }
 
-  async run(input: { objective: string; workspaceId: string; maxRounds?: number }): Promise<BuilderLoopResult> {
+  async run(input: { objective: string; workspaceId: string; maxRounds?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
     const trace: BuilderToolTrace[] = []
     let previousFingerprint = ''
     const initialPaths = new Set((await this.workspace.listFiles(input.workspaceId)).map(file => file.path))
@@ -61,6 +62,7 @@ export class BuilderToolLoop {
       const response = await this.ai.generate({
         systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${MAX_WRITES_PER_TURN} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. Normal file-creation tasks only require their requested successful proving command. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
         prompt: [
+          formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
           `OBJECTIVE:\n${input.objective}`,
           `TOOLS: ${safeJson(tools)}`,
           trace.length ? `RESULTS:\n${safeJson(trace)}` : '',

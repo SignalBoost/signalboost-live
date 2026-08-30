@@ -7,6 +7,7 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
 import { PreviewProjects } from '@/components/home/PreviewProjects'
 import { t } from '@/lib/i18n/t'
+import { uiText } from '@/lib/i18n/uiText'
 import { getConciergeTranscriptCopy } from '@/lib/i18n/conciergeTranscriptCopy'
 import {
   formatConciergeTranscript,
@@ -280,7 +281,7 @@ export default function Home() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         {turn.builderFiles.map((path) => (
                           <a key={path} href={`/api/builder/workspaces/${encodeURIComponent(turn.builderWorkspaceId!)}/files/${path.split('/').map(encodeURIComponent).join('/')}`} download={path.split('/').pop() || 'download.txt'} className="secondary-button text-xs">
-                            Download {path}
+                            {uiText('generatedUi.u_75cf7ab15fa05201')} {path}
                           </a>
                         ))}
                       </div>

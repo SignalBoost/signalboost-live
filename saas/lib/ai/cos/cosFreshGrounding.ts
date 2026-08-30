@@ -80,6 +80,30 @@ export function constructEconomicFactsReply(
   return null
 }
 
+const RAW_CONSTRUCT = /\b(?:uncontrolled|overall earnings|raw (?:gap|average|ratio)|full[- ]time, year[- ]round|median (?:weekly|hourly|annual) earnings)\b/i
+const MATCHED_CONSTRUCT = /\b(?:controlled (?:gap|for)|equal work|same job|job title and qualifications|comparable roles?|holding (?:job|title|qualifications) constant)\b/i
+const COLLAPSED_YES = /^\s*yes[,.]?\s+(?:there is|a (?:gender )?pay gap exists)\b/i
+
+export function liveEvidenceHasDistinctConstructs(sources: FreshEvidenceSource[]): boolean {
+  const blob = sources.map(source => `${source.title}\n${source.snippet}`).join('\n')
+  return RAW_CONSTRUCT.test(blob) && MATCHED_CONSTRUCT.test(blob)
+}
+
+export function liveDraftCollapsesDistinctConstructs(answer: string, sources: FreshEvidenceSource[]): boolean {
+  if (!liveEvidenceHasDistinctConstructs(sources)) return false
+  const text = String(answer || '')
+  if (COLLAPSED_YES.test(text)) return true
+  return !MATCHED_CONSTRUCT.test(text)
+}
+
+export const LIVE_CONSTRUCT_SPLIT_PROMPT = [
+  'The LIVE evidence contains more than one measured construct.',
+  'A collapsed opening such as "Yes, a pay gap exists" is not an answer.',
+  'Rewrite using only LIVE figures plus the legal rule that paying less because of sex is unlawful in the US (Equal Pay Act / Title VII). That rule is a standard legal constraint, not a LIVE statistic.',
+  'Order: (1) the legal rule; (2) the aggregate/uncontrolled figure and what population it averages; (3) the controlled/equal-work figure if present; (4) what the aggregate does not prove; (5) advocacy last and labelled as advocacy.',
+  'Do not start with Yes/No that treats the constructs as one thing.',
+].join(' ')
+
 function requiresIndependentCorroboration(input: string): boolean {
   return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?)\b/i.test(input)
 }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT,
+  acceptFreshEvidenceFaithfulnessReview,
   acceptFreshEvidenceSemanticPlan,
   acceptFreshEvidenceSynthesis,
   freshEvidenceSynthesisNeedsNeuralReview,
@@ -71,7 +72,7 @@ test('an unsafe binary scope plan cannot release a bare yes/no answer', () => {
   assert.equal(accepted, null)
 })
 
-test('a scoped answer must preserve every material scope and evidence lineage', () => {
+test('a scoped answer must preserve every material scope and evidence lineage structurally', () => {
   const accepted = acceptFreshEvidenceSynthesis({
     text: JSON.stringify({
       answer: 'The broad population measure shows a difference, while the narrower conditioned comparison reports a smaller residual; those are different measurements and neither should be silently substituted for the other.',
@@ -87,7 +88,7 @@ test('a scoped answer must preserve every material scope and evidence lineage', 
   assert.equal(accepted.semanticPlan.directBinaryAnswerSafe, false)
 })
 
-test('dropping one model-declared material scope fails closed', () => {
+test('dropping one model-declared material scope fails closed before neural faithfulness review', () => {
   assert.equal(acceptFreshEvidenceSynthesis({
     text: JSON.stringify({
       answer: 'The broad population measure shows a difference.',
@@ -96,6 +97,36 @@ test('dropping one model-declared material scope fails closed', () => {
     }),
     input: 'Is there a difference between these outcomes?',
     sources,
+    semanticPlan: scopedPlan,
+  }), null)
+})
+
+test('faithfulness reviewer accepts a clean multi-scope verdict only with empty defect arrays', () => {
+  assert.deepEqual(acceptFreshEvidenceFaithfulnessReview({
+    text: JSON.stringify({ faithful: true, missingScopeIds: [], collapsedScopeIds: [] }),
+    semanticPlan: scopedPlan,
+  }), { faithful: true, missingScopeIds: [], collapsedScopeIds: [] })
+
+  assert.equal(acceptFreshEvidenceFaithfulnessReview({
+    text: JSON.stringify({ faithful: true, missingScopeIds: ['S2'], collapsedScopeIds: [] }),
+    semanticPlan: scopedPlan,
+  }), null)
+})
+
+test('faithfulness reviewer can flag missing or collapsed model-declared scopes without semantic topic code', () => {
+  assert.deepEqual(acceptFreshEvidenceFaithfulnessReview({
+    text: JSON.stringify({ faithful: false, missingScopeIds: ['S2'], collapsedScopeIds: ['S1', 'S2'] }),
+    semanticPlan: scopedPlan,
+  }), { faithful: false, missingScopeIds: ['S2'], collapsedScopeIds: ['S1', 'S2'] })
+})
+
+test('faithfulness reviewer fails closed on invented scope ids or an unexplained negative verdict', () => {
+  assert.equal(acceptFreshEvidenceFaithfulnessReview({
+    text: JSON.stringify({ faithful: false, missingScopeIds: ['S99'], collapsedScopeIds: [] }),
+    semanticPlan: scopedPlan,
+  }), null)
+  assert.equal(acceptFreshEvidenceFaithfulnessReview({
+    text: JSON.stringify({ faithful: false, missingScopeIds: [], collapsedScopeIds: [] }),
     semanticPlan: scopedPlan,
   }), null)
 })

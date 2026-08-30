@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
+import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 import { withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { getAccess } from '@/lib/auth/access'
@@ -10,6 +11,7 @@ import { readCosPrimaryPriorProvenance } from '@/lib/ai/cos/cosPrimaryTurnProven
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
+import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -120,7 +122,7 @@ export async function POST(req: NextRequest) {
 
   const response = await withPublicAuditIdentity(auditUserId, () =>
     withPublicDeliveryScope(() =>
-      withRunpodWakePermission(permission, () => cosPrimaryPost(req)),
+      withRunpodWakePermission(permission, () => isConciergeBuilderObjective(prompt) ? legacyConciergePost(req) : cosPrimaryPost(req)),
     ),
   )
   return withSuggestedFollowups(response, prompt, auditUserId)

@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { BuilderFailureClass, BuilderFile, BuilderVerifiedRepairLesson, BuilderWorkspacePort } from './contracts.ts'
 import type { BuilderCertificationAttempt } from './certification.ts'
+import { assertPersistable, containsNullByte } from './storage-contract.ts'
 
 const MAX_FILE_BYTES = 512 * 1024
 const MAX_FILES = 100
@@ -16,14 +17,15 @@ function stripNulls(value: string): string {
 function safePath(value: string): string {
   let path = stripNulls(value).replace(/\\/g, '/').replace(/^\/+/, '')
   if (path === 'workspace' || path.startsWith('workspace/')) path = path.replace(/^workspace\/?/, '')
-  if (!path || path.length > 240 || path.split('/').some(part => !part || part === '.' || part === '..')) {
+  if (containsNullByte(path) || !path || path.length > 240 || path.split('/').some(part => !part || part === '.' || part === '..')) {
     throw new Error('builder_invalid_path')
   }
   return path
 }
 
 function safeContent(value: string): string {
-  const content = stripNulls(value)
+  const content = String(value ?? '')
+  assertPersistable(content)
   if (new TextEncoder().encode(content).byteLength > MAX_FILE_BYTES) {
     throw new Error('builder_file_too_large')
   }

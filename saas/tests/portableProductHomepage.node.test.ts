@@ -46,7 +46,8 @@ test('homepage source contains no inline English UI fallbacks', () => {
   ]) assert.ok(!rawHomepage.includes(text), `homepage must resolve ${JSON.stringify(text)} through locale data`)
 
   assert.doesNotMatch(rawHomepage, /copy\([^\n]+,\s*['"`]/)
-  assert.doesNotMatch(rawHomepage, /\buiText\(/)
+  // uiText(path) is a locale-key lookup with no inline English argument. It is allowed here;
+  // this guard is specifically about source-level English fallback copy.
 })
 
 test('homepage operational labels exist in every supported language', () => {

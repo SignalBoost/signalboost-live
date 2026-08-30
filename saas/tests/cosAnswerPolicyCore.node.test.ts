@@ -116,11 +116,17 @@ test('the classes name the kinds of figure that caused the production failures',
   assert.match(text, /negotiated rate/)
 })
 
-test('contested questions lead with facts and preserve matched-comparison limits', () => {
+test('the shared policy requires domain-general evidence reasoning instead of semantic topic templates', () => {
   const text = quantitativeAnswerPolicyText()
-  assert.match(text, /FACTS, LAW, EVIDENCE, AND VIEWPOINTS/)
-  assert.match(text, /established definitions and measurable facts; applicable law or governing policy/)
-  assert.match(text, /group average is not proof of the cause of any individual outcome/i)
-  assert.match(text, /no matched data found/i)
-  assert.match(text, /yes\/no factual answer belongs in the first two sentences/i)
+  assert.match(text, /EVIDENCE-BASED REASONING/)
+  assert.match(text, /proposition the user actually asked/i)
+  assert.match(text, /construct, population, denominator, time window/i)
+  assert.match(text, /Distinguish observation from explanation/i)
+  assert.match(text, /Synthesize the minimum set of strong, relevant evidence/i)
+  assert.match(text, /yes or no when the evidence supports one/i)
+
+  // Shared runtime policy must teach an epistemic method, not memorize answers or distinctions for
+  // whichever controversy happened to expose the defect. Domain terms belong in the user question
+  // and evidence, not in a canned policy block.
+  assert.doesNotMatch(text, /pay gap|matched-pay|matched-wage|gender identity|biological sex|reproductive sex|racist|equal work/i)
 })

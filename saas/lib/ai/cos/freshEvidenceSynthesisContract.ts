@@ -1,35 +1,54 @@
 import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
 import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
 
+export type FreshEvidenceSemanticScope = {
+  scopeId: string
+  label: string
+  finding: string
+  evidenceIds: string[]
+}
+
+export type FreshEvidenceSemanticPlan = {
+  directBinaryAnswerSafe: boolean
+  scopes: FreshEvidenceSemanticScope[]
+}
+
+export type FreshEvidenceFaithfulnessReview = {
+  faithful: boolean
+  missingScopeIds: string[]
+  collapsedScopeIds: string[]
+}
+
 export type AcceptedFreshEvidenceSynthesis = {
   reply: string
   citedSourceIds: string[]
   answer: string
+  scopeIds: string[]
+  semanticPlan: FreshEvidenceSemanticPlan
 }
 
 type ModelFreshEvidenceSynthesis = {
   answer?: unknown
   evidenceIds?: unknown
+  scopeIds?: unknown
+}
+
+type ModelFreshEvidenceSemanticPlan = {
+  directBinaryAnswerSafe?: unknown
+  scopes?: unknown
+}
+
+type ModelFreshEvidenceFaithfulnessReview = {
+  faithful?: unknown
+  missingScopeIds?: unknown
+  collapsedScopeIds?: unknown
 }
 
 export const SINGLE_PROPOSITION_SOURCE_LIMIT = 2
 export const SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT = 650
-
-const GROUP_COMPARISON_CUE = /\b(?:between|btw|among|versus|vs\.?|compared\s+(?:with|to)|across)\b/i
-const GROUP_DIFFERENCE_CUE = /\b(?:gap|difference|disparity|inequalit(?:y|ies)|inequit(?:y|ies)|discrimination|bias)\b/i
-const GROUP_LEVEL_MEASURE_CUE = /\b(?:aggregate|overall|group[- ]level|median|unadjusted|raw|population)\b/i
-const COMPARISON_BOUNDARY_CUE = /\b(?:does(?:\s+not|n't)|cannot|can't|is\s+not)\b[\s\S]{0,110}\b(?:by\s+itself\s+)?(?:prove|establish|show|demonstrate|determine|settle)\b[\s\S]{0,110}\b(?:individual|like[- ]for[- ]like|same\s+(?:job|work|role)|controlled|causal|legal|discriminat)/i
-
-/** A group-level measurement must not become an individual, causal, controlled, or legal conclusion. */
-export function requiresGroupComparisonScope(input: string): boolean {
-  const text = String(input || '')
-  return GROUP_DIFFERENCE_CUE.test(text) && GROUP_COMPARISON_CUE.test(text)
-}
-
-export function explainsGroupComparisonScope(answer: string): boolean {
-  const text = String(answer || '')
-  return GROUP_LEVEL_MEASURE_CUE.test(text) && COMPARISON_BOUNDARY_CUE.test(text)
-}
+const MAX_SEMANTIC_SCOPES = 5
+const SCOPE_ID = /^[A-Za-z0-9_-]{1,32}$/
+const BINARY_LEAD = /^\s*(?:yes|no|sí|si|não|nao|tak|nie|да|нет)(?:\s|[,.!:;?—–-]|$)/iu
 
 function languageLabel(language: string): string {
   const normalized = String(language || 'en').toLowerCase()
@@ -40,89 +59,7 @@ function languageLabel(language: string): string {
   return 'English'
 }
 
-export function freshEvidenceSynthesisSystemPrompt(language: string): string {
-  return [
-    `Answer in ${languageLabel(language)}.`,
-    'You are reasoning over LIVE EVIDENCE retrieved moments ago. The evidence block is your ONLY permitted source of facts.',
-    'Return ONLY strict JSON with this exact shape: {"answer":"...","evidenceIds":["LIVE1","LIVE2"]}.',
-    'Rules, in order of priority:',
-    '1. Use ONLY facts present in the evidence block. Your own memory is assumed stale and must not contribute facts.',
-    '2. Put only the natural-language answer in "answer". Do NOT place URLs, markdown citations, or evidence labels inside the answer field.',
-    '3. Put every evidence label that materially supports the answer in "evidenceIds". Never invent an evidence id.',
-    '4. When the server-side authority policy requires independent corroboration, use the independent evidence ids supplied for that proposition.',
-    '5. Resolve pronouns only from the explicit user context supplied in QUESTION; never infer a different person or entity from model memory.',
-    '6. Infer the proposition directly from the user’s QUESTION. Do not accept a retrieval label, search query, control-plane fragment, or source headline as a substitute for the user’s meaning.',
-    '7. Identify what each source actually measures or establishes before combining it with another source. Track constructs, populations, denominators, time windows, comparison bases, and controls when they materially affect interpretation.',
-    '8. Keep materially different measurements distinct. Explain a material mismatch instead of presenting unlike measurements as interchangeable evidence.',
-    '9. Distinguish observation from explanation. Do not infer causation, an individual outcome, or a controlled comparison from an aggregate or associative result unless the evidence itself establishes that stronger claim.',
-    '10. For a broad group-comparison or difference question, first identify the level of claim the evidence actually establishes. If it establishes an aggregate difference, say that directly; do not silently upgrade it into a controlled, like-for-like, causal, or individual claim.',
-    '10a. For a question about a disparity between populations, state the group-level measure and explicitly say that it does not by itself establish an individual, like-for-like, causal, controlled, or legal conclusion. Treat an adjusted analysis as a separate measurement whose controls and limits must be named from the evidence.',
-    '11. Weigh evidence by directness, authority, methodological fit, and recency where relevant. Prefer the evidence that most directly establishes the requested proposition rather than the source with the strongest wording.',
-    '12. When several sources play the same evidentiary role, choose the strongest representative one or two. Include additional statistics only when they change the scope, reveal disagreement, or answer a separate part of the question.',
-    '13. Synthesize the answer around the conclusion, not around the retrieval set. Do not enumerate sources, repeat every statistic, or preserve retrieval order merely because the evidence was retrieved that way.',
-    '14. For a yes/no factual question, lead with yes or no when supported, then state the scope of what was established and the most important limitation needed to avoid overclaiming.',
-    '15. If one distinct claim is not established, say exactly which claim remains unverified while preserving any other grounded conclusion. Return EVIDENCE_INSUFFICIENT only when no material claim can be established from the evidence.',
-    '16. When material sources disagree about the same proposition, report the disagreement and its scope instead of silently choosing a side.',
-    '17. When the user asks for an evaluation, comparison, or ranking, identify the criterion actually supported by the evidence. Compare only like-for-like measurements; if the evidence uses incompatible criteria, explain that limitation rather than manufacture a single ranking.',
-    '18. Preserve dates, populations, and measurement windows when they materially change the meaning of a quantitative claim.',
-    '19. Before returning JSON, silently perform a synthesis check. If the draft is effectively one sentence per source, a list of retrieved statistics, or could be recreated by preserving retrieval order, rewrite it as conclusion → scope → limitation.',
-    '20. Be brief, but use a compact numbered list when the question itself requests a list.',
-    '21. State only what the evidence supports. Do not add praise, condemnation, protection, or a verdict that the evidence does not establish.',
-  ].join('\n')
-}
-
-export function freshEvidenceSynthesisPrompt(args: {
-  input: string
-  sources: FreshEvidenceSource[]
-  retrievedAt: string
-}): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nREASONING TASK:\nInfer the proposition directly from QUESTION and synthesize the strongest relevant evidence into a conclusion-centered answer. Server-side claim research has already been used only to acquire evidence; it is intentionally not injected here because it must not redefine the user’s semantics.\n\nFor every historical/list claim, use the dated rows from the read document, not its title, navigation, or a different source's summary.\n\nQUESTION: ${args.input}`
-}
-
-/**
- * This is an output-quality boundary, not a semantic answer rule. It never chooses the conclusion.
- * A single-proposition answer that still cites a large retrieval set or remains unusually long gets
- * a second Qwen pass instead of being released as a search-result digest.
- */
-export function freshEvidenceSynthesisNeedsNeuralReview(args: {
-  input?: string
-  answer: string
-  citedSourceIds: string[]
-  singleProposition: boolean
-}): boolean {
-  if (requiresGroupComparisonScope(args.input || '') && !explainsGroupComparisonScope(args.answer)) return true
-  if (!args.singleProposition) return false
-  return args.citedSourceIds.length > SINGLE_PROPOSITION_SOURCE_LIMIT
-    || String(args.answer || '').trim().length > SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT
-}
-
-export function freshEvidenceRevisionSystemPrompt(language: string): string {
-  return [
-    `Answer in ${languageLabel(language)}.`,
-    'You are the SECOND NEURAL SYNTHESIS PASS for a grounded live-evidence answer.',
-    'Return ONLY strict JSON with this exact shape: {"answer":"...","evidenceIds":["LIVE1","LIVE2"]}.',
-    'The prior DRAFT is not evidence and is not authoritative. Re-reason from QUESTION and LIVE EVIDENCE.',
-    'Use only facts in LIVE EVIDENCE. Never add a fact from model memory or from the draft unless the evidence independently contains it.',
-    'Answer the user’s proposition, not the retrieval set. Abstract across sources before writing.',
-    'For one proposition, select at most two representative evidence ids. If a correct grounded answer cannot be supported with at most two, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[]}.',
-    'Do not repeat parallel measurements, examples, occupations, subgroups, dates, or statistics merely to demonstrate that multiple sources were found.',
-    'Write naturally and concisely: direct conclusion first, then only the scope and the most important limitation needed to prevent overclaiming. Do not label these as fixed sections.',
-    'Distinguish aggregate observation from controlled comparison, individual outcome, explanation, and causation. State only the strongest level the evidence supports.',
-    'For a disparity between populations, include both required parts: the group-level measure and a plain statement that it does not by itself establish an individual, like-for-like, causal, controlled, or legal conclusion. An adjusted result is a separate measurement, not proof of unlawful treatment.',
-    'Never invent an evidence id. Do not put URLs or evidence labels inside the answer field.',
-  ].join('\n')
-}
-
-export function freshEvidenceRevisionPrompt(args: {
-  input: string
-  sources: FreshEvidenceSource[]
-  retrievedAt: string
-  draftAnswer: string
-}): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nDRAFT THAT FAILED THE SYNTHESIS-QUALITY BOUNDARY (not evidence):\n${String(args.draftAnswer || '').trim()}\n\nREVIEW TASK:\nRe-reason from the original QUESTION and the evidence. Produce the smallest well-supported answer that states the conclusion, its actual evidentiary scope, and the key limitation without narrating the retrieval process.\n\nQUESTION: ${args.input}`
-}
-
-function parseJsonObject(text: string): ModelFreshEvidenceSynthesis | null {
+function parseJsonObject(text: string): Record<string, unknown> | null {
   const raw = String(text || '').trim()
   if (!raw) return null
   const start = raw.indexOf('{')
@@ -130,10 +67,197 @@ function parseJsonObject(text: string): ModelFreshEvidenceSynthesis | null {
   if (start < 0 || end <= start) return null
   try {
     const parsed = JSON.parse(raw.slice(start, end + 1))
-    return parsed && typeof parsed === 'object' ? parsed as ModelFreshEvidenceSynthesis : null
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null
   } catch {
     return null
   }
+}
+
+function uniqueStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const out: string[] = []
+  for (const item of value) {
+    const text = String(item || '').trim()
+    if (text && !out.includes(text)) out.push(text)
+  }
+  return out
+}
+
+/**
+ * First neural pass: infer the semantic shape of the user's proposition before writing an answer.
+ * This is a concise model conclusion, not chain-of-thought. Deterministic code validates only the
+ * returned structure and evidence references; it never names or chooses the semantic scopes.
+ */
+export function freshEvidenceScopePlanSystemPrompt(language: string): string {
+  return [
+    `Return labels and findings in ${languageLabel(language)}.`,
+    'You are the SEMANTIC SCOPE PLANNER for LIVE EVIDENCE retrieved moments ago.',
+    'Return ONLY strict JSON with this exact shape: {"directBinaryAnswerSafe":true,"scopes":[{"scopeId":"S1","label":"...","finding":"...","evidenceIds":["LIVE1"]}]}.',
+    'Do not write the user-facing answer and do not expose chain-of-thought. Return only concise scope-level conclusions.',
+    'Use only facts present in LIVE EVIDENCE. Your model memory is not a source of current facts.',
+    'Infer the proposition from QUESTION, not from search wording, source headlines, or retrieval order.',
+    'Determine how the evidence operationalizes the key predicate or quantity the user is asking about.',
+    'Treat materially different constructs, populations, denominators, time windows, comparison bases, controls, or outcome definitions as distinct scopes when combining them would change what a conclusion means.',
+    'If one bare yes/no would collapse two or more materially non-equivalent scopes, set directBinaryAnswerSafe=false and return at least two scopes.',
+    'If the evidence supports one coherent operationalization for the proposition, set directBinaryAnswerSafe=true and return at least one scope.',
+    'Each scope label must describe what is actually being measured or established. Each finding must state the evidence-supported conclusion for that scope, not an explanation of your reasoning process.',
+    'Every scope must cite at least one real LIVE evidence id that supports its finding. Never invent an evidence id.',
+    'Do not manufacture a second scope merely to be cautious. Split only when the evidence makes the distinction material to the answer.',
+  ].join('\n')
+}
+
+export function freshEvidenceScopePlanPrompt(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+}): string {
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSCOPE-PLANNING TASK:\nIdentify the smallest set of materially distinct evidence scopes required to answer the original QUESTION without changing the meaning of what the evidence establishes.\n\nQUESTION: ${args.input}`
+}
+
+export function acceptFreshEvidenceSemanticPlan(args: {
+  text: string
+  sources: FreshEvidenceSource[]
+}): FreshEvidenceSemanticPlan | null {
+  const parsed = parseJsonObject(args.text) as ModelFreshEvidenceSemanticPlan | null
+  if (typeof parsed?.directBinaryAnswerSafe !== 'boolean' || !Array.isArray(parsed?.scopes)) return null
+  if (!parsed.scopes.length || parsed.scopes.length > MAX_SEMANTIC_SCOPES) return null
+
+  const sourceIds = new Set(args.sources.map(source => source.id))
+  const seenScopeIds = new Set<string>()
+  const scopes: FreshEvidenceSemanticScope[] = []
+
+  for (const rawScope of parsed.scopes) {
+    if (!rawScope || typeof rawScope !== 'object' || Array.isArray(rawScope)) return null
+    const scope = rawScope as Record<string, unknown>
+    const scopeId = String(scope.scopeId || '').trim()
+    const label = String(scope.label || '').trim()
+    const finding = String(scope.finding || '').trim()
+    const evidenceIds = uniqueStrings(scope.evidenceIds)
+    if (!SCOPE_ID.test(scopeId) || seenScopeIds.has(scopeId)) return null
+    if (!label || label.length > 180 || !finding || finding.length > 500) return null
+    if (!evidenceIds.length || evidenceIds.some(id => !sourceIds.has(id))) return null
+    seenScopeIds.add(scopeId)
+    scopes.push({ scopeId, label, finding, evidenceIds })
+  }
+
+  if (parsed.directBinaryAnswerSafe === false && scopes.length < 2) return null
+  return { directBinaryAnswerSafe: parsed.directBinaryAnswerSafe, scopes }
+}
+
+export function freshEvidenceSynthesisSystemPrompt(language: string): string {
+  return [
+    `Answer in ${languageLabel(language)}.`,
+    'You are the ANSWER SYNTHESIS PASS for LIVE EVIDENCE. A prior neural scope planner has already identified the semantic scopes that the answer must preserve.',
+    'Return ONLY strict JSON with this exact shape: {"answer":"...","evidenceIds":["LIVE1","LIVE2"],"scopeIds":["S1","S2"]}.',
+    'Use ONLY facts present in LIVE EVIDENCE. Your own memory is assumed stale and must not contribute facts.',
+    'The SEMANTIC SCOPE PLAN is a prior model conclusion about how to keep the evidence meanings distinct; it is not additional factual evidence.',
+    'Answer the user’s proposition, not the retrieval set. Abstract across sources before writing.',
+    'Preserve the scope plan. Do not collapse materially distinct scopes into one stronger claim.',
+    'If directBinaryAnswerSafe=false, do not open with a standalone yes or no. State the scoped conclusions directly so the reader can see which meaning is supported and which stronger or different meaning is not established.',
+    'If directBinaryAnswerSafe=true, a direct yes/no is allowed when supported.',
+    'Use every scope id needed by the plan and cite evidence ids that actually support those scopes. Never invent a scope id or evidence id.',
+    'Distinguish observation from explanation and causation; do not promote an aggregate, associative, modeled, or otherwise bounded result beyond the scope that the evidence supports.',
+    'Prefer the minimum representative evidence needed for each scope. Do not enumerate parallel statistics or sources merely because they were retrieved.',
+    'Be concise and natural. For a single proposition, normally use one short paragraph unless the scoped distinctions are clearer as two compact sentences.',
+    'If the evidence cannot support the required scopes, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[],"scopeIds":[]}.',
+  ].join('\n')
+}
+
+export function freshEvidenceSynthesisPrompt(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  semanticPlan: FreshEvidenceSemanticPlan
+}): string {
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (neural conclusion, not factual evidence):\n${JSON.stringify(args.semanticPlan)}\n\nANSWER TASK:\nWrite the smallest well-supported answer that preserves every material scope in the plan.\n\nQUESTION: ${args.input}`
+}
+
+/**
+ * Neural answer critic. It does not produce prose or new facts; it checks whether the answer actually
+ * preserves the model-declared scope distinctions rather than merely echoing their IDs.
+ */
+export function freshEvidenceFaithfulnessReviewSystemPrompt(language: string): string {
+  return [
+    `Evaluate the answer written in ${languageLabel(language)}.`,
+    'You are the SCOPE-FAITHFULNESS REVIEWER for a live-evidence answer.',
+    'Return ONLY strict JSON with this exact shape: {"faithful":true,"missingScopeIds":[],"collapsedScopeIds":[]}.',
+    'Do not rewrite the answer and do not expose chain-of-thought.',
+    'Use QUESTION, LIVE EVIDENCE, SEMANTIC SCOPE PLAN, and CANDIDATE ANSWER only.',
+    'Mark faithful=false if a required scope is absent, materially weakened, or merged with another scope so that the answer implies a stronger or different proposition than the plan supports.',
+    'missingScopeIds contains required scopes whose conclusion is not represented in the answer.',
+    'collapsedScopeIds contains the scope ids involved when distinct scopes are blended into one conclusion or one is presented as if it proves the other.',
+    'If faithful=true, both arrays must be empty. If faithful=false, at least one array must contain a real scope id from the plan.',
+    'Do not invent scope ids and do not judge writing style, verbosity, or source count here.',
+  ].join('\n')
+}
+
+export function freshEvidenceFaithfulnessReviewPrompt(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  semanticPlan: FreshEvidenceSemanticPlan
+  answer: string
+}): string {
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN:\n${JSON.stringify(args.semanticPlan)}\n\nCANDIDATE ANSWER:\n${String(args.answer || '').trim()}\n\nREVIEW TASK:\nCheck only whether the candidate faithfully preserves the material scope distinctions and bounded findings in the plan.\n\nQUESTION: ${args.input}`
+}
+
+export function acceptFreshEvidenceFaithfulnessReview(args: {
+  text: string
+  semanticPlan: FreshEvidenceSemanticPlan
+}): FreshEvidenceFaithfulnessReview | null {
+  const parsed = parseJsonObject(args.text) as ModelFreshEvidenceFaithfulnessReview | null
+  if (typeof parsed?.faithful !== 'boolean') return null
+  const validScopeIds = new Set(args.semanticPlan.scopes.map(scope => scope.scopeId))
+  const missingScopeIds = uniqueStrings(parsed.missingScopeIds)
+  const collapsedScopeIds = uniqueStrings(parsed.collapsedScopeIds)
+  if (missingScopeIds.some(id => !validScopeIds.has(id)) || collapsedScopeIds.some(id => !validScopeIds.has(id))) return null
+  if (parsed.faithful && (missingScopeIds.length || collapsedScopeIds.length)) return null
+  if (!parsed.faithful && !missingScopeIds.length && !collapsedScopeIds.length) return null
+  return { faithful: parsed.faithful, missingScopeIds, collapsedScopeIds }
+}
+
+/** Output-density gate only. Semantic ambiguity is handled by the neural scope plan/reviewer. */
+export function freshEvidenceSynthesisNeedsNeuralReview(args: {
+  answer: string
+  citedSourceIds: string[]
+  singleProposition: boolean
+  semanticPlan: FreshEvidenceSemanticPlan
+}): boolean {
+  if (!args.singleProposition) return false
+  const sourceLimit = args.semanticPlan.directBinaryAnswerSafe
+    ? SINGLE_PROPOSITION_SOURCE_LIMIT
+    : Math.max(SINGLE_PROPOSITION_SOURCE_LIMIT, args.semanticPlan.scopes.length)
+  return args.citedSourceIds.length > sourceLimit
+    || String(args.answer || '').trim().length > SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT
+}
+
+export function freshEvidenceRevisionSystemPrompt(language: string): string {
+  return [
+    `Answer in ${languageLabel(language)}.`,
+    'You are the FINAL NEURAL REPAIR/EDIT PASS for a grounded live-evidence answer.',
+    'Return ONLY strict JSON with this exact shape: {"answer":"...","evidenceIds":["LIVE1","LIVE2"],"scopeIds":["S1","S2"]}.',
+    'Re-reason from QUESTION, LIVE EVIDENCE, and the existing SEMANTIC SCOPE PLAN. The prior DRAFT is not evidence.',
+    'Preserve every required scope. Never change directBinaryAnswerSafe or collapse multiple scopes into one conclusion.',
+    'If a SCOPE-FAITHFULNESS REVIEW is supplied, repair every listed missing or collapsed scope while keeping each conclusion within the plan.',
+    'If directBinaryAnswerSafe=false, do not open with a standalone yes or no.',
+    'Use the minimum representative evidence needed to support the scopes. Remove redundant statistics, examples, and source-by-source narration.',
+    'Do not add facts from model memory. Never invent an evidence id or scope id.',
+    'If the evidence cannot support the required scopes, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[],"scopeIds":[]}.',
+  ].join('\n')
+}
+
+export function freshEvidenceRevisionPrompt(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  semanticPlan: FreshEvidenceSemanticPlan
+  draftAnswer: string
+  faithfulnessReview?: FreshEvidenceFaithfulnessReview | null
+}): string {
+  const reviewBlock = args.faithfulnessReview
+    ? `\n\nSCOPE-FAITHFULNESS REVIEW (neural verdict, not factual evidence):\n${JSON.stringify(args.faithfulnessReview)}`
+    : ''
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}${reviewBlock}\n\nDRAFT TO REPAIR/EDIT (not evidence):\n${String(args.draftAnswer || '').trim()}\n\nREPAIR TASK:\nRewrite concisely while preserving each required scope as a distinct bounded conclusion.\n\nQUESTION: ${args.input}`
 }
 
 function answerRespectsRequestedWindow(answer: string, input: string, now = new Date()): boolean {
@@ -141,8 +265,6 @@ function answerRespectsRequestedWindow(answer: string, input: string, now = new 
   if (!match) return true
   const startYear = now.getUTCFullYear() - Number(match[1])
   const ranges = [...String(answer || '').matchAll(/\b(\d{4})\s*[–-]\s*(\d{4})?\b/g)]
-  // A claimed historical roster must contain dated rows, and no row may end before the window.
-  // This rejects a real but stale archive being narrated as a current last-N-years roster.
   return ranges.length >= 2 && ranges.every(range => Number(range[2] || range[1]) >= startYear)
 }
 
@@ -150,33 +272,39 @@ export function acceptFreshEvidenceSynthesis(args: {
   text: string
   input: string
   sources: FreshEvidenceSource[]
-  enforceGroupComparisonScope?: boolean
+  semanticPlan: FreshEvidenceSemanticPlan
 }): AcceptedFreshEvidenceSynthesis | null {
-  const parsed = parseJsonObject(args.text)
+  const parsed = parseJsonObject(args.text) as ModelFreshEvidenceSynthesis | null
   const answer = typeof parsed?.answer === 'string' ? parsed.answer.trim() : ''
   if (!answer || /EVIDENCE_INSUFFICIENT/i.test(answer)) return null
   if (!answerRespectsRequestedWindow(answer, args.input)) return null
-  if (args.enforceGroupComparisonScope !== false
-    && requiresGroupComparisonScope(args.input)
-    && !explainsGroupComparisonScope(answer)) return null
-  if (!Array.isArray(parsed?.evidenceIds)) return null
+  if (!args.semanticPlan.directBinaryAnswerSafe && BINARY_LEAD.test(answer)) return null
 
   const byId = new Map(args.sources.map(source => [source.id, source] as const))
-  const citedSourceIds: string[] = []
-  for (const rawId of parsed.evidenceIds) {
-    const id = String(rawId || '').trim()
-    if (!id || citedSourceIds.includes(id) || !byId.has(id)) continue
-    citedSourceIds.push(id)
+  const rawEvidenceIds = uniqueStrings(parsed?.evidenceIds)
+  const citedSourceIds = rawEvidenceIds.filter(id => byId.has(id))
+  if (!citedSourceIds.length || citedSourceIds.length !== rawEvidenceIds.length) return null
+
+  const planScopes = new Map(args.semanticPlan.scopes.map(scope => [scope.scopeId, scope] as const))
+  const scopeIds = uniqueStrings(parsed?.scopeIds)
+  if (!scopeIds.length || scopeIds.some(scopeId => !planScopes.has(scopeId))) return null
+
+  const requiredScopeIds = args.semanticPlan.directBinaryAnswerSafe
+    ? scopeIds
+    : args.semanticPlan.scopes.map(scope => scope.scopeId)
+  if (!args.semanticPlan.directBinaryAnswerSafe
+    && requiredScopeIds.some(scopeId => !scopeIds.includes(scopeId))) return null
+
+  for (const scopeId of scopeIds) {
+    const scope = planScopes.get(scopeId)!
+    if (!scope.evidenceIds.some(id => citedSourceIds.includes(id))) return null
   }
-  if (!citedSourceIds.length) return null
 
   const citations = citedSourceIds.map(id => {
     const source = byId.get(id)!
     return `[${source.id}] (${source.url})`
   })
   const reply = `${answer}\n\nSources: ${citations.join(' and ')}`
-
-  // The server, not the model, owns citation rendering and enforces the evidence threshold.
   if (!replyCitesRequiredFreshEvidence(reply, args.input, args.sources)) return null
-  return { reply, citedSourceIds, answer }
+  return { reply, citedSourceIds, answer, scopeIds, semanticPlan: args.semanticPlan }
 }

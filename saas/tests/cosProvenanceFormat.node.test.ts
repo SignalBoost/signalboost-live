@@ -1,6 +1,6 @@
 // saas/tests/cosProvenanceFormat.node.test.ts
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 import { authoritativeProvenance, formatAuthoritativeProvenance } from '../lib/ai/cos/cosOrchestration.ts'
 
@@ -99,10 +99,11 @@ test('cache-hit provenance separates current retrieval from the turn that genera
 
 test('fresh-evidence provenance delegates provider identity to the canonical reasoner resolver', () => {
   const freshSynthesis = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
-  const primaryRoute = readFileSync(new URL('../app/api/cos-primary/baseRoute.ts', import.meta.url), 'utf8')
+  const primaryRoute = readFileSync(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
 
   assert.match(freshSynthesis, /resolveCosReasoner/)
   assert.doesNotMatch(freshSynthesis, /reasonerLabel:\s*`independent-local:/)
   assert.match(primaryRoute, /function localReasonerLabel\(\):string\{const resolved=resolveCosReasoner\(\)/)
   assert.doesNotMatch(primaryRoute, /function localReasonerLabel\(\):string\{return`independent-local:/)
+  assert.equal(existsSync(new URL('../app/api/cos-primary/baseRoute.ts', import.meta.url)), false)
 })

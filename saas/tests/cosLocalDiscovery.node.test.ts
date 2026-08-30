@@ -47,10 +47,10 @@ test('local place discovery answers only from relevant live result text with ser
   assert.doesNotMatch(resolved.reply, /Manila nightlife/)
 })
 
-test('fresh synthesis is COS-first: deterministic discovery, then local reasoner, then external fallback', () => {
+test('fresh synthesis is COS-first: deterministic discovery, shared local semantic synthesis, then external provider fallback', () => {
   const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceExternalSynthesis.ts', import.meta.url), 'utf8')
   const deterministic = source.indexOf('resolveLocalPlaceDiscovery(')
-  const local = source.indexOf('await callCosReasoner(')
+  const local = source.indexOf('await synthesizeFreshEvidenceLocally(args)')
   const external = source.indexOf('await callCosTextDetailed(')
   assert.ok(deterministic >= 0)
   assert.ok(local > deterministic)

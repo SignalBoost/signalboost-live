@@ -1,7 +1,7 @@
 // saas/tests/cosNeuralEvidenceReasoning.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 
 const policy = readFileSync('lib/ai/cos/cosAnswerPolicyCore.ts', 'utf8')
 const grounding = readFileSync('lib/ai/cos/cosFreshGrounding.ts', 'utf8')
@@ -26,33 +26,51 @@ test('ordinary evidence reasoning is domain-general rather than a semantic looku
   assert.match(policy, /candidate causes, and mitigations/i)
 })
 
-test('fresh synthesis delegates semantic interpretation to the reasoner while keeping evidence gates deterministic', () => {
-  assert.match(synthesis, /reasoning over LIVE EVIDENCE/i)
-  assert.match(synthesis, /Infer the proposition directly from the user’s QUESTION/i)
-  assert.match(synthesis, /what each source actually measures or establishes/i)
-  assert.match(synthesis, /Keep materially different measurements distinct/i)
-  assert.match(synthesis, /Distinguish observation from explanation/i)
-  assert.match(synthesis, /broad group-comparison or difference question/i)
-  assert.match(synthesis, /strongest representative one or two/i)
-  assert.match(synthesis, /conclusion → scope → limitation/i)
-  assert.match(synthesis, /Return ONLY strict JSON/)
-  assert.match(synthesis, /Never invent an evidence id/i)
-  assert.match(synthesis, /replyCitesRequiredFreshEvidence/)
-  assert.doesNotMatch(synthesis, /CLAIM PLAN/)
-  assert.doesNotMatch(synthesis, /splitResearchClaims|claimResearchPrompt/)
-  assert.doesNotMatch(synthesis, semanticTemplateTerms)
-  assert.doesNotMatch(synthesis, /unemployment, inflation, real GDP, real wages, deficit/i)
+test('fresh synthesis plans semantic scopes neurally before it writes answer prose', () => {
+  assert.match(synthesis, /SEMANTIC SCOPE PLANNER/)
+  assert.match(synthesis, /directBinaryAnswerSafe/)
+  assert.match(synthesis, /materially different constructs, populations, denominators, time windows, comparison bases, controls/i)
+  assert.match(synthesis, /Do not write the user-facing answer and do not expose chain-of-thought/i)
+  assert.match(synthesis, /scope label must describe what is actually being measured or established/i)
+  assert.match(synthesis, /acceptFreshEvidenceSemanticPlan/)
+  assert.match(localSynthesis, /phase: 'scope_plan'/)
+  assert.match(localSynthesis, /freshEvidenceScopePlanPrompt/)
+  assert.match(localSynthesis, /freshEvidenceScopePlanSystemPrompt/)
+  assert.match(localSynthesis, /cos-fresh-semantic-scope-plan/)
 })
 
-test('source-heavy grounded output gets another neural pass rather than deterministic prose', () => {
-  assert.match(synthesis, /SECOND NEURAL SYNTHESIS PASS/i)
-  assert.match(synthesis, /prior DRAFT is not evidence and is not authoritative/i)
-  assert.match(synthesis, /select at most two representative evidence ids/i)
-  assert.match(synthesis, /direct conclusion first, then only the scope and the most important limitation/i)
+test('deterministic release code validates the neural plan instead of classifying semantic topics', () => {
+  assert.doesNotMatch(synthesis, /GROUP_COMPARISON_CUE|GROUP_DIFFERENCE_CUE|GROUP_LEVEL_MEASURE_CUE/)
+  assert.doesNotMatch(synthesis, /requiresGroupComparisonScope|explainsGroupComparisonScope/)
+  assert.doesNotMatch(synthesis, semanticTemplateTerms)
+  assert.match(synthesis, /directBinaryAnswerSafe === false/)
+  assert.match(synthesis, /requiredScopeIds/)
+  assert.match(synthesis, /scope\.evidenceIds\.some/)
+  assert.match(synthesis, /replyCitesRequiredFreshEvidence/)
+})
+
+test('multi-scope answer prose is neurally reviewed for semantic faithfulness before release', () => {
+  assert.match(synthesis, /SCOPE-FAITHFULNESS REVIEWER/)
+  assert.match(synthesis, /missingScopeIds/)
+  assert.match(synthesis, /collapsedScopeIds/)
+  assert.match(synthesis, /Mark faithful=false if a required scope is absent, materially weakened, or merged with another scope/i)
+  assert.match(synthesis, /acceptFreshEvidenceFaithfulnessReview/)
+  assert.match(localSynthesis, /phase: 'faithfulness_review'/)
+  assert.match(localSynthesis, /reviewScopeFaithfulness/)
+  assert.match(localSynthesis, /cos-fresh-scope-faithfulness-review/)
+  assert.match(localSynthesis, /semanticRepairRequired/)
+  assert.match(localSynthesis, /reason: 'scope_faithfulness'/)
+})
+
+test('answer synthesis preserves model-declared scopes and final repair remains neural', () => {
+  assert.match(synthesis, /prior neural scope planner has already identified the semantic scopes/i)
+  assert.match(synthesis, /Preserve the scope plan/)
+  assert.match(synthesis, /If directBinaryAnswerSafe=false, do not open with a standalone yes or no/i)
+  assert.match(synthesis, /FINAL NEURAL REPAIR\/EDIT PASS/i)
+  assert.match(synthesis, /repair every listed missing or collapsed scope/i)
   assert.match(localSynthesis, /freshEvidenceSynthesisNeedsNeuralReview/)
   assert.match(localSynthesis, /phase: 'neural_review'/)
   assert.match(localSynthesis, /review_failed_quality_boundary/)
-  assert.match(localSynthesis, /acceptFreshEvidenceSynthesis/)
   assert.doesNotMatch(localSynthesis, semanticTemplateTerms)
   assert.doesNotMatch(localSynthesis, /return `(?:Yes|No)|reply: `(?:Yes|No)/i)
 })
@@ -65,11 +83,9 @@ test('fresh grounding tells the reasoner how to evaluate evidence, not what conc
   assert.doesNotMatch(grounding, semanticTemplateTerms)
 })
 
-test('legacy deterministic economic formatter cannot preempt neural evidence synthesis', () => {
-  const formatter = grounding.match(/export function constructEconomicFactsReply[\s\S]*?\n}\n\nfunction requiresIndependentCorroboration/)?.[0] || ''
-  assert.ok(formatter, 'expected the compatibility seam to remain discoverable')
-  assert.match(formatter, /return null/)
-  assert.doesNotMatch(formatter, /Opinions on who was|Measurable figures found|COS stops here/i)
+test('the dead duplicate COS primary route is gone so there is one Next entrypoint', () => {
+  assert.equal(existsSync('app/api/cos-primary/baseRoute.ts'), false)
+  assert.equal(existsSync('app/api/cos-primary/route.ts'), true)
 })
 
 test('repo reasoning guidance teaches a method, not named-topic answer schemas', () => {

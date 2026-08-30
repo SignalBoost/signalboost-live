@@ -8,6 +8,7 @@ const MAX_WRITES_PER_TURN = 6
 const MAX_RUNS_PER_TURN = 3
 const MAX_GATE_NUDGES = 3
 const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
+const MAX_MODEL_ROUND_ATTEMPTS = 2
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const safeJson = (value: unknown) => { try { return JSON.stringify(value).slice(0, 18_000) } catch { return '"[unserializable]"' } }
 
@@ -24,6 +25,19 @@ async function within<T>(work: Promise<T>, timeoutMs?: number): Promise<T> {
   } finally {
     if (timer) clearTimeout(timer)
   }
+}
+
+async function generateWithRetry(ai: BuilderAiPort, input: Parameters<BuilderAiPort['generate']>[0], timeoutMs?: number): Promise<string | null> {
+  let lastError: unknown
+  for (let modelAttempt = 1; modelAttempt <= MAX_MODEL_ROUND_ATTEMPTS; modelAttempt += 1) {
+    try {
+      return await within(ai.generate(input), timeoutMs)
+    } catch (error) {
+      lastError = error
+      if (!(error instanceof Error && error.message === 'builder_model_round_timeout') || modelAttempt === MAX_MODEL_ROUND_ATTEMPTS) throw error
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('builder_model_call_failed')
 }
 
 function toolPath(input: Record<string, unknown>): string {
@@ -87,7 +101,7 @@ export class BuilderToolLoop {
       const availableTools = blockedTool ? tools.filter(toolId => toolId !== blockedTool) : tools
       let response: string | null
       try {
-        response = await within(this.ai.generate({
+        response = await generateWithRetry(this.ai, {
         systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${MAX_WRITES_PER_TURN} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. Normal file-creation tasks only require their requested successful proving command. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
         prompt: [
           formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -103,7 +117,7 @@ export class BuilderToolLoop {
           'When done: {"type":"answer","answer":"what changed and what ran"}',
         ].filter(Boolean).join('\n\n'),
         maxTokens: 1600,
-      }), input.modelRoundTimeoutMs)
+      }, input.modelRoundTimeoutMs)
       } catch (error) {
         return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
       }

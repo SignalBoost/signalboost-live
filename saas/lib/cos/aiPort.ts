@@ -67,8 +67,6 @@ export function createPlatformImagePort(): CosImagePort {
             prompt,
             size,
             n: 1,
-            // DeepInfra currently rejects response_format even though it returns b64_json.
-            ...(openAiKey ? { response_format: 'b64_json' } : {}),
           }),
         })
         const data = await response.json() as { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } }

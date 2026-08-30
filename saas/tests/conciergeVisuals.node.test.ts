@@ -1,8 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { decodeBuilderImageArtifact } from '../lib/builder/image-artifact.ts'
 import { isConciergeVisualObjective } from '../lib/visuals/intent.ts'
 import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
+
+test('stored visual artifacts decode to real image bytes', () => {
+  const expected = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10])
+  const decoded = decodeBuilderImageArtifact(`artifact-image-base64:image/jpeg:${expected.toString('base64')}`)
+
+  assert.ok(decoded)
+  assert.equal(decoded.mime, 'image/jpeg')
+  assert.deepEqual(decoded.bytes, expected)
+  assert.equal(decodeBuilderImageArtifact('artifact-image-base64:image/gif:AAAA'), null)
+})
 
 test('explicit visual requests are routed to the authenticated visual tool', () => {
   assert.equal(isConciergeVisualObjective('Please sketch two kids playing with a dog in the rain.'), true)
@@ -28,7 +39,8 @@ test('explicit visual requests are routed to the authenticated visual tool', () 
   assert.match(imagePort, /api\\.deepinfra\\.com\\/v1\\/openai\\/images\\/generations/)
   assert.match(imagePort, /model: 'black-forest-labs\\/FLUX-1-schnell'/)
   assert.match(imagePort, /concierge-visual-runtime-failure/)
-  assert.match(fileRoute, /artifact-image-base64:/)
+  assert.match(fileRoute, /decodeBuilderImageArtifact\(file\.content\)/)
+  assert.match(fileRoute, /imageArtifact \? imageArtifact\.mime/)
   assert.match(fileRoute, /isImagePreview/)
   assert.match(home, /\\.\(\?:png\|jpe\?g\|webp\)/)
   assert.match(home, /<img/)

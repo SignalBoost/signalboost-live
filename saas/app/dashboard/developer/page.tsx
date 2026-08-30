@@ -37,7 +37,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   unknown: { en: uiText('generatedUi.u_b23a6a8439c0dde5'), es: 'desconocido', pt: 'desconhecido', pl: 'nieznany', ru: 'неизвестно' },
   timedOut: { en: uiText('generatedUi.u_3dcd80f1b15f796e'), es: 'se agotó el tiempo', pt: 'tempo esgotado', pl: 'przekroczono czas', ru: 'время истекло' },
   failed: { en: uiText('generatedUi.u_5d28a90f4498a814'), es: 'falló', pt: 'falhou', pl: 'nie powiodło się', ru: 'сбой' },
-  certification: { en: 'Builder certification: level {level}/3 · verified attempts {attempts}', es: 'Certificación de Builder: nivel {level}/3 · intentos verificados {attempts}', pt: 'Certificação do Builder: nível {level}/3 · tentativas verificadas {attempts}', pl: 'Certyfikacja Buildera: poziom {level}/3 · zweryfikowane próby {attempts}', ru: 'Сертификация Builder: уровень {level}/3 · проверенные попытки {attempts}' },
+  certification: { en: uiText('generatedUi.u_79a04dc5140b03ef'), es: 'Certificación de Builder: nivel {level}/3 · intentos verificados {attempts}', pt: 'Certificação do Builder: nível {level}/3 · tentativas verificadas {attempts}', pl: 'Certyfikacja Buildera: poziom {level}/3 · zweryfikowane próby {attempts}', ru: 'Сертификация Builder: уровень {level}/3 · проверенные попытки {attempts}' },
 }
 
 export default function DeveloperPage() {

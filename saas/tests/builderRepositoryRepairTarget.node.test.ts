@@ -19,6 +19,14 @@ const failedLog = [
   '17:43:42.178 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
 ].join('\n')
 
+const projectRootRelativeFailedLog = [
+  '18:18:23.246 Cloning github.com/SignalBoost/signalboost-live (Branch: fix/builder-repository-repair-20260830, Commit: db6584d)',
+  '18:20:17.742 Failed to type check.',
+  '18:20:17.742 ./lib/builder/repository-repair.ts:92:23',
+  "18:20:17.743 Type error: Property 'error' does not exist on type 'BuilderLoopResult'.",
+  '18:20:18.068 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+].join('\n')
+
 test('extracts the exact SignalBoost branch, revision, source paths and missing symbols from a failed Vercel log', () => {
   const target = parseSignalBoostRepositoryRepairTarget(failedLog)
   assert.ok(target)
@@ -32,6 +40,14 @@ test('extracts the exact SignalBoost branch, revision, source paths and missing 
   assert.ok(target.symbolHints.includes('LIVE_CONSTRUCT_SPLIT_PROMPT'))
   assert.ok(target.symbolHints.includes('liveDraftCollapsesDistinctConstructs'))
   assert.match(target.failedCommand || '', /vercel-cos-gates/)
+})
+
+test('normalizes Vercel project-root source paths into the mounted saas repository context', () => {
+  const target = parseSignalBoostRepositoryRepairTarget(projectRootRelativeFailedLog)
+  assert.ok(target)
+  assert.ok(target.pathHints.includes('saas/lib/builder/repository-repair.ts'))
+  const objective = signalBoostRepositoryRepairObjective(target)
+  assert.match(objective, /Path hints: lib\/builder\/repository-repair\.ts/)
 })
 
 test('resolves a short revision to one immutable full commit before sandbox setup', async () => {

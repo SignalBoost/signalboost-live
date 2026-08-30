@@ -89,7 +89,7 @@ test('a completed fast null result is not treated as a transport failure and is 
   assert.equal(calls, 1)
 })
 
-test('production fresh synthesis is wired to recover swallowed timeouts before the evidence contract', () => {
+test('production fresh synthesis recovers transport failures and repairable contract failures before failing closed', () => {
   const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
   assert.match(source, /runFreshSynthesisTransportAttempts/)
   assert.match(source, /boundedFreshSynthesisAttemptTimeoutMs/)
@@ -98,6 +98,12 @@ test('production fresh synthesis is wired to recover swallowed timeouts before t
   assert.match(source, /exhausted its.*timeout budget/)
   assert.match(source, /cos-fresh-local-synthesis-retry/)
   assert.match(source, /acceptFreshEvidenceSynthesis/)
-  assert.match(source, /if \(!accepted\) return \{ kind: 'citation_grounding_rejected' \}/)
+  assert.match(source, /diagnoseFreshEvidenceSemanticPlan/)
+  assert.match(source, /diagnoseFreshEvidenceSynthesis/)
+  assert.match(source, /phase: 'scope_plan_repair'/)
+  assert.match(source, /phase: 'contract_repair'/)
+  assert.match(source, /repairAnswerContract/)
+  assert.match(source, /if \(repairedContract\.kind === 'rejected'\) return \{ kind: 'citation_grounding_rejected' \}/)
+  assert.doesNotMatch(source, /if \(!accepted\) return \{ kind: 'citation_grounding_rejected' \}/)
   assert.doesNotMatch(source, /synthesizeFreshEvidenceExternally|callCosTextDetailed|modelPreference/)
 })

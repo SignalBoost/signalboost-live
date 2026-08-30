@@ -41,6 +41,6 @@ test('Concierge hands off only explicit Builder objectives and never drops attac
   const builderRoute = hydrateLocalizedSource(readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8'))
   const toolLoop = hydrateLocalizedSource(readFileSync(new URL('../lib/builder/tool-loop.ts', import.meta.url), 'utf8'))
   assert.match(builderRoute, /maxRounds: 4/)
-  assert.match(builderRoute, /modelRoundTimeoutMs: 30_000/)
-  assert.match(toolLoop, /verified the proving command completed successfully/)
+  assert.match(builderRoute, /modelRoundTimeoutMs: 40_000/)
+  assert.match(toolLoop, /MAX_MODEL_ROUND_ATTEMPTS = 2/)\n  assert.match(toolLoop, /verified the proving command completed successfully/)
 })

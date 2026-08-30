@@ -19,6 +19,13 @@ test('Builder is authenticated and does not expose full tool trace content', () 
   assert.doesNotMatch(route, /trace: result\.trace/)
 })
 
+test('Builder renders the safe failure classification and remediation returned by its API', () => {
+  const page = source('../app/dashboard/developer/page.tsx')
+  assert.match(page, /failureClass\?: string/)
+  assert.match(page, /item\.failureClass/)
+  assert.match(page, /item\.remediation/)
+})
+
 test('Builder runs only in an ephemeral network-denied Vercel Sandbox', () => {
   const runner = source('../lib/builder/vercel-sandbox-runner.ts')
   assert.match(runner, /networkPolicy: 'deny-all'/)

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
-import { verifiedRepairLesson } from '../lib/builder/verified-lessons.ts'
+import { formatVerifiedLessonsForPrompt, verifiedRepairLesson } from '../lib/builder/verified-lessons.ts'
 import { evaluateBuilderCertification } from '../lib/builder/certification.ts'
 
 class ScriptedBuilderAi implements BuilderAiPort {
@@ -63,6 +63,10 @@ test('Builder observes a failed command, classifies it, and retries without cons
   assert.equal(lesson?.failureClass, 'path')
   assert.equal(lesson?.regressionCommand, 'node ./hello.js')
   assert.equal(lesson?.runtime, 'node24-network-denied-ephemeral')
+  const prompt = formatVerifiedLessonsForPrompt(lesson ? [lesson] : [], 'path')
+  assert.match(prompt, /prior path repair lesson/i)
+  assert.doesNotMatch(prompt, /Cannot find module/)
+  assert.doesNotMatch(prompt, /node \.\/hello\.js/)
   assert.equal(evaluateBuilderCertification('observe_failure_and_recover_v1', result).passed, true)
 })
 

@@ -28,6 +28,29 @@ function publicTrace(trace: readonly BuilderToolTrace[]) {
   })
 }
 
+function failedPayload(input: {
+  error: string
+  workspaceId: string
+  files: readonly string[]
+  trace: readonly BuilderToolTrace[]
+  baseCommitSha: string | null
+}): SignalBoostRepositoryRepairExecution {
+  return Object.freeze({
+    status: 422,
+    payload: {
+      error: input.error,
+      source: 'cos-platform-engineer',
+      workspaceId: input.workspaceId,
+      files: input.files,
+      trace: publicTrace(input.trace),
+      execution_allowed: true,
+      repository_write_allowed: false,
+      merge_allowed: false,
+      base_commit_sha: input.baseCommitSha,
+    },
+  })
+}
+
 export async function executeSignalBoostRepositoryRepair(input: {
   userId: string
   rawObjective: string
@@ -58,26 +81,28 @@ export async function executeSignalBoostRepositoryRepair(input: {
       modelRoundTimeoutMs: 35_000,
     })
     const changes = await session.collectChanges()
-    const verified = result.ok && Boolean(changes.patch.trim())
-    const patchPath = verified ? 'repository-repair.patch' : 'repository-repair-unverified.patch'
-    if (changes.patch.trim()) await workspace.writeFile(input.workspaceId, patchPath, changes.patch)
+    const patchPresent = Boolean(changes.patch.trim())
+    const patchPath = result.ok && patchPresent ? 'repository-repair.patch' : 'repository-repair-unverified.patch'
+    if (patchPresent) await workspace.writeFile(input.workspaceId, patchPath, changes.patch)
     for (const file of changes.files) await workspace.writeFile(input.workspaceId, `repository/${file.path}`, file.content)
     const files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
 
-    if (!result.ok || !verified) {
-      return Object.freeze({
-        status: 422,
-        payload: {
-          error: result.ok ? 'builder_repository_repair_produced_no_patch' : result.error,
-          source: 'cos-platform-engineer',
-          workspaceId: input.workspaceId,
-          files,
-          trace: publicTrace(result.trace),
-          execution_allowed: true,
-          repository_write_allowed: false,
-          merge_allowed: false,
-          base_commit_sha: target.fullCommitSha,
-        },
+    if (!result.ok) {
+      return failedPayload({
+        error: result.error,
+        workspaceId: input.workspaceId,
+        files,
+        trace: result.trace,
+        baseCommitSha: target.fullCommitSha,
+      })
+    }
+    if (!patchPresent) {
+      return failedPayload({
+        error: 'builder_repository_repair_produced_no_patch',
+        workspaceId: input.workspaceId,
+        files,
+        trace: result.trace,
+        baseCommitSha: target.fullCommitSha,
       })
     }
 

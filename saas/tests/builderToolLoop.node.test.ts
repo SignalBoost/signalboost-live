@@ -211,6 +211,22 @@ test('Builder rejects alternating repeated inspection without exhausting work ro
   assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
 })
 
+test('Builder recovers when the model requests a tool that was explicitly removed', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"read_file","input":{"path":"app.js"}}',
+    '{"type":"tool","toolId":"read_file","input":{"path":"app.js"}}',
+    '{"type":"tool","toolId":"read_file","input":{"path":"app.js"}}',
+    '{"type":"tool","toolId":"write_file","input":{"path":"hello.js","content":"console.log(1)"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node hello.js"}}',
+  ])
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '1\\n', stderr: '', timedOut: false } } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Create hello.js and run it.', workspaceId: 'user:blocked-tool', maxRounds: 3 })
+  assert.equal(result.ok, true)
+  assert.equal(result.trace.filter(item => item.error === 'builder_repeated_tool_call:read_file; choose a different next step').length, 2)
+  assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
+})
+
 test('Builder removes a repeated inspection tool from the next model call', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const prompts: string[] = []

@@ -86,7 +86,15 @@ export async function POST(request: Request) {
       createPlatformAiPort(),
       workspace,
       new VercelSandboxBuilderRunner(),
-    ).run({ objective, workspaceId, priorLessons })
+    ).run({
+      objective,
+      workspaceId,
+      priorLessons,
+      // A new design should complete after its first verified workspace proof, rather than
+      // consuming the full repair-oriented control-loop budget.
+      maxRounds: 4,
+      modelRoundTimeoutMs: 30_000,
+    })
 
     const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
     if (result.ok === false) return NextResponse.json({ error: result.error, workspaceId, files, trace: publicTrace(result.trace) }, { status: 422 })

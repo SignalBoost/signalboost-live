@@ -127,11 +127,17 @@ export async function synthesizeFreshEvidenceLocally(args: {
   if (initial.ok === false) return { kind: 'local_synthesis_failed', error: initial.error }
   if (!initial.text?.trim()) return { kind: 'local_synthesis_unparseable' }
 
-  let accepted = acceptFreshEvidenceSynthesis({ text: initial.text, input: args.input, sources: args.sources })
+  let accepted = acceptFreshEvidenceSynthesis({
+    text: initial.text,
+    input: args.input,
+    sources: args.sources,
+    enforceGroupComparisonScope: false,
+  })
   if (!accepted) return { kind: 'citation_grounding_rejected' }
 
   const singleProposition = splitResearchClaims(args.input).length === 1
   const needsNeuralReview = freshEvidenceSynthesisNeedsNeuralReview({
+    input: args.input,
     answer: accepted.answer,
     citedSourceIds: accepted.citedSourceIds,
     singleProposition,
@@ -163,6 +169,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
     const reviewed = acceptFreshEvidenceSynthesis({ text: revised.text, input: args.input, sources: args.sources })
     if (!reviewed) return { kind: 'citation_grounding_rejected' }
     if (freshEvidenceSynthesisNeedsNeuralReview({
+      input: args.input,
       answer: reviewed.answer,
       citedSourceIds: reviewed.citedSourceIds,
       singleProposition,

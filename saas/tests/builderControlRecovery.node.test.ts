@@ -2,7 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
-import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
+import { evaluateRegressionGate } from '../lib/builder/regression-gate.ts'
+import { deriveRepairPhase } from '../lib/builder/repair-phase.ts'
+import type { BuilderAiPort, BuilderRunnerPort, BuilderToolTrace } from '../lib/builder/contracts.ts'
 
 type ModelInput = Parameters<BuilderAiPort['generate']>[0]
 
@@ -72,6 +74,25 @@ test('Builder recovers the exact repository-repair control failure with a compac
     ['edit_file', true],
     ['run', true],
   ])
+})
+
+test('compiler proof requires the same command to fail before and pass after the repair', () => {
+  const path = 'lib/builder/repository-repair.ts'
+  const trace: BuilderToolTrace[] = [
+    { round: 1, toolId: 'read_file', input: { path }, ok: true },
+    { round: 2, toolId: 'run', input: { command: 'npm run typecheck' }, ok: false },
+    { round: 3, toolId: 'edit_file', input: { path, search: '!result.ok', replace: 'result.ok === false' }, ok: true },
+    { round: 4, toolId: 'run', input: { command: 'npm run build' }, ok: true },
+  ]
+
+  const wrongProof = evaluateRegressionGate('Fix the TypeScript failure.', trace, true)
+  assert.equal(wrongProof.satisfied, false)
+  if (!wrongProof.satisfied) assert.match(wrongProof.reason, /same proof command/i)
+  assert.equal(deriveRepairPhase(trace, new Set([path])), 'verify')
+
+  trace.push({ round: 5, toolId: 'run', input: { command: 'npm run typecheck' }, ok: true })
+  assert.equal(evaluateRegressionGate('Fix the TypeScript failure.', trace, true).satisfied, true)
+  assert.equal(deriveRepairPhase(trace, new Set([path])), 'complete')
 })
 
 test('Builder retries a truncated control object once with a cache-distinct recovery prompt', async () => {

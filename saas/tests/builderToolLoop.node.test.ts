@@ -317,3 +317,39 @@ test('Builder removes a repeated inspection tool from the next model call', asyn
   assert.match(prompts[2] || '', /RECOVERY CONSTRAINT: read_file was rejected/)
   assert.match(prompts[2] || '', /TOOLS: \["list_files","write_file","edit_file","run"\]/)
 })
+
+
+test('Builder recovers a valid control object wrapped in ordinary model prose', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: 'hello\\n', stderr: '', timedOut: false } } }
+  const ai = new ScriptedBuilderAi([
+    'I will create the file now.\\n\\n```json\\n{"type":"tool","toolId":"write_file","input":{"path":"hello.js","content":"console.log(1)"}}\\n```',
+    'Done. {"type":"tool","toolId":"run","input":{"command":"node hello.js"}}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Create hello.js and run it.', workspaceId: 'user:wrapped-control' })
+  assert.equal(result.ok, true)
+  assert.equal((await workspace.readFile('user:wrapped-control', 'hello.js'))?.content, 'console.log(1)')
+})
+
+test('Builder permits a full five-step complex repair sequence', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('user:complex-repair', 'src/math.js', 'exports.add = (a, b) => a - b')
+  let runs = 0
+  const runner: BuilderRunnerPort = { async run() {
+    runs += 1
+    return runs === 1
+      ? { exitCode: 1, stdout: '', stderr: 'AssertionError: expected 5, got -1', timedOut: false }
+      : { exitCode: 0, stdout: 'pass\\n', stderr: '', timedOut: false }
+  } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"list_files","input":{}}',
+    '{"type":"tool","toolId":"read_file","input":{"path":"src/math.js"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/math.test.js"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"src/math.js","search":"a - b","replace":"a + b"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node --test tests/math.test.js"}}',
+    '{"type":"answer","answer":"Fixed src/math.js and verified the regression test."}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Fix the add function in this staged project.', workspaceId: 'user:complex-repair', maxRounds: 6 })
+  assert.equal(result.ok, true)
+  assert.equal(runs, 2)
+})

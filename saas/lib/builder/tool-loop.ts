@@ -150,6 +150,13 @@ export class BuilderToolLoop {
         }
         if (action.toolId === 'run') runCount += 1
         trace.push({ round, toolId: action.toolId, input: action.input, ok: true, output })
+        // A new-file design/create objective is complete once Builder has both written workspace
+        // output and observed its requested proof command succeed. Do not spend additional model
+        // rounds merely to obtain a prose completion object: that can turn a finished artifact
+        // into a 422 after the model keeps inspecting the same workspace.
+        if (action.toolId === 'run' && writeCount > 0 && !isRepairObjective(input.objective)) {
+          return { ok: true, answer: 'Created the requested workspace files and verified the proving command completed successfully.', trace }
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'builder_tool_failed'
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: message, ...diagnose(message) })

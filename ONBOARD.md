@@ -35,6 +35,8 @@
 
 **Builder verified-lesson retrieval:** implemented locally and not yet Production-accepted. Prior lessons are fetched only for the authenticated user and are rendered only after the current turn observes the same classified failure in the same node24/network-denied/ephemeral runtime. The prompt receives only a bounded occurrence hint; it never receives raw prior error output, source code, commands, or model-written repair summaries. Retrieval failure is non-blocking.
 
+**Builder failure visibility:** implementation is active. The authenticated Developer workspace will render the API-provided failure class and bounded remediation hint alongside each tool-evidence item, so a failed run is actionable without exposing host state or secrets. A regression check protects this rendering contract. It requires deployment READY and a fresh Production failure/recovery observation before acceptance.
+
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
 **Candidate Lab:** isolated baseline/candidate evaluation on fixed cohorts; it fails closed on regression or no measured improvement and can only recommend human review. It has no repository-write, merge, deployment, or automatic-promotion authority.

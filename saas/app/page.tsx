@@ -171,7 +171,11 @@ export default function Home() {
       const builderFiles = Array.isArray(payload?.files)
         ? payload.files.filter((value: unknown): value is string => typeof value === 'string').slice(0, 50)
         : []
-      return { reply, suggestedFollowups, builderWorkspaceId, builderFiles }
+      const visualPreviewUrl = typeof payload?.visual?.previewUrl === 'string'
+        && /^\/api\/builder\/workspaces\/[0-9a-f-]+\/files\/.+\?preview=1$/i.test(payload.visual.previewUrl)
+        ? payload.visual.previewUrl
+        : ''
+      return { reply, suggestedFollowups, builderWorkspaceId, builderFiles, visualPreviewUrl }
     }
 
     try {
@@ -194,6 +198,7 @@ export default function Home() {
         response: reply,
         ...(result.suggestedFollowups.length === 2 ? { suggestedFollowups: result.suggestedFollowups } : {}),
         ...(result.builderWorkspaceId && result.builderFiles.length ? { builderWorkspaceId: result.builderWorkspaceId, builderFiles: result.builderFiles } : {}),
+        ...(result.visualPreviewUrl ? { visualPreviewUrl: result.visualPreviewUrl } : {}),
       }])
       setPendingRequest('')
       setQuestion('')
@@ -281,7 +286,13 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="assistant-content"><AssistantMessage content={turn.response} /></div>
-                    {!hasInlineImage(turn.response) && turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.(?:png|jpe?g|webp)$/i.test(path)) ? (
+                    {turn.visualPreviewUrl ? (
+                      <img
+                        alt={turn.request}
+                        className="mt-3 max-h-[560px] w-full rounded-xl border border-white/15 bg-white object-contain"
+                        src={turn.visualPreviewUrl}
+                      />
+                    ) : !hasInlineImage(turn.response) && turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.(?:png|jpe?g|webp)$/i.test(path)) ? (
                       <img
                         alt={turn.response}
                         className="mt-3 max-h-[560px] w-full rounded-xl border border-white/15 bg-white object-contain"

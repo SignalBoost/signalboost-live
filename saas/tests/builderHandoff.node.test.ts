@@ -30,6 +30,8 @@ test('Concierge hands off only explicit Builder objectives and never drops attac
   assert.match(conciergeRoute, /isConciergeBuilderObjective\(input\)/)
   assert.match(conciergeRoute, /directBuilder\(body, input\)/)
   assert.match(conciergeRoute, /hasAttachments\(body\)/)
+  assert.match(conciergeRoute, /maxRounds: 4/)
+  assert.match(conciergeRoute, /modelRoundTimeoutMs: 30_000/)
   assert.match(concierge, /builderWorkspaceId/)
   assert.match(concierge, /\/api\/builder\/workspaces\//)
 })

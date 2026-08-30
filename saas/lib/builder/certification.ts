@@ -15,6 +15,7 @@ export const BUILDER_CERTIFICATION_CASES: readonly BuilderCertificationCase[] = 
 ])
 
 export type BuilderCertificationOutcome = Readonly<{ passed: boolean; reasons: readonly string[] }>
+export type BuilderCertificationAttempt = Readonly<{ caseId: BuilderCertificationCaseId; outcome: BuilderCertificationOutcome }>
 
 function successfulRun(trace: BuilderToolTrace): boolean {
   return trace.toolId === 'run' && trace.ok && Number((trace.output as { exitCode?: unknown } | undefined)?.exitCode) === 0
@@ -54,4 +55,14 @@ export function evaluateBuilderCertification(caseId: BuilderCertificationCaseId,
   }
 
   return Object.freeze({ passed: reasons.length === 0, reasons: Object.freeze(reasons) })
+}
+
+/** Classifies only an earned level; a lower level never masks a higher one. */
+export function inferBuilderCertificationAttempt(result: BuilderLoopResult): BuilderCertificationAttempt | null {
+  const ordered: readonly BuilderCertificationCaseId[] = ['observe_failure_and_recover_v1', 'inspect_repair_and_run_v1', 'create_and_run_javascript_v1']
+  for (const caseId of ordered) {
+    const outcome = evaluateBuilderCertification(caseId, result)
+    if (outcome.passed) return Object.freeze({ caseId, outcome })
+  }
+  return null
 }

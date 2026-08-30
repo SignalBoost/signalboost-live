@@ -53,7 +53,7 @@ test('Builder observes a failed command, classifies it, and retries without cons
     '{"type":"tool","toolId":"run","input":{"command":"node ./hello.js"}}',
     '{"type":"answer","answer":"Verified the repaired command."}',
   ])
-  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'fix broken node command', workspaceId: 'user:retry' })
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'recover node command', workspaceId: 'user:retry' })
   assert.equal(result.ok, true)
   assert.equal(calls, 2)
   assert.equal(result.trace[0]?.ok, false)
@@ -69,14 +69,27 @@ test('Builder observes a failed command, classifies it, and retries without cons
 test('Builder does not declare a repair complete without successful runtime evidence', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const runner: BuilderRunnerPort = { async run() { return { exitCode: 1, stdout: '', stderr: 'AssertionError: broken', timedOut: false } } }
-  const ai = new ScriptedBuilderAi([
-    '{"type":"tool","toolId":"run","input":{"command":"node test.js"}}',
-    '{"type":"answer","answer":"Fixed."}',
-  ])
+  const ai = new ScriptedBuilderAi(Array(4).fill('{"type":"answer","answer":"Fixed."}'))
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'fix broken test', workspaceId: 'user:verify' })
   assert.equal(result.ok, false)
-  if (!result.ok) assert.equal(result.error, 'builder_verification_required')
+  if (!result.ok) assert.equal(result.error, 'builder_regression_evidence_required')
   assert.equal(verifiedRepairLesson(result), null)
+})
+
+test('Builder requires fail then repair then pass evidence only for repair objectives', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('user:regression', 'app.js', 'throw new Error("broken")')
+  let runs = 0
+  const runner: BuilderRunnerPort = { async run() { runs += 1; return runs === 1 ? { exitCode: 1, stdout: '', stderr: 'AssertionError: broken', timedOut: false } : { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false } } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"run","input":{"command":"node --test app.test.js"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"app.js","search":"throw new Error(\\"broken\\")","replace":"console.log(\\"fixed\\")"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node --test app.test.js"}}',
+    '{"type":"answer","answer":"Fixed and proved by regression test."}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'fix broken app', workspaceId: 'user:regression' })
+  assert.equal(result.ok, true)
+  assert.equal(runs, 2)
 })
 
 test('Builder fixes a supplied file after inspecting it and runs the corrected workspace', async () => {
@@ -89,7 +102,7 @@ test('Builder fixes a supplied file after inspecting it and runs the corrected w
     '{"type":"tool","toolId":"run","input":{"command":"node app.js"}}',
     '{"type":"answer","answer":"Fixed app.js and verified it runs."}',
   ])
-  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'fix traceback', workspaceId: 'user:2' })
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'update supplied file', workspaceId: 'user:2' })
   assert.equal(result.ok, true)
   assert.equal((await workspace.readFile('user:2', 'app.js'))?.content, 'console.log("fixed")')
   assert.equal(evaluateBuilderCertification('inspect_repair_and_run_v1', result).passed, true)

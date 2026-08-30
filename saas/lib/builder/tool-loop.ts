@@ -1,9 +1,11 @@
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
+import { evaluateRegressionGate } from './regression-gate.ts'
 
 type Action = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> } | { type: 'answer'; answer: string }
 const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'write_file', 'edit_file', 'run'])
 const MAX_WRITES_PER_TURN = 6
 const MAX_RUNS_PER_TURN = 3
+const MAX_GATE_NUDGES = 3
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const safeJson = (value: unknown) => { try { return JSON.stringify(value).slice(0, 18_000) } catch { return '"[unserializable]"' } }
 
@@ -38,8 +40,6 @@ function diagnose(value: unknown): { failureClass: BuilderFailureClass; remediat
   return { failureClass: 'unknown', remediation: 'Inspect the exact failure evidence before making another change.' }
 }
 
-function isRepairObjective(objective: string): boolean { return /\b(?:fix|repair|bug|error|failure|broken|regression)\b/i.test(objective) }
-
 export class BuilderToolLoop {
   private readonly ai: BuilderAiPort
   private readonly workspace: BuilderWorkspacePort
@@ -52,12 +52,13 @@ export class BuilderToolLoop {
   }
 
   async run(input: { objective: string; workspaceId: string; maxRounds?: number }): Promise<BuilderLoopResult> {
-    const trace: BuilderToolTrace[] = [], seen = new Set<string>()
-    let writeCount = 0, runCount = 0
+    const trace: BuilderToolTrace[] = []
+    let previousFingerprint = ''
+    let writeCount = 0, runCount = 0, gateNudges = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 12))
     for (let round = 1; round <= maxRounds; round += 1) {
       const response = await this.ai.generate({
-        systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${MAX_WRITES_PER_TURN} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. A repaired bug requires a successful regression command before you declare it fixed. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
+        systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${MAX_WRITES_PER_TURN} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. Normal file-creation tasks only require their requested successful proving command. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
         prompt: [
           `OBJECTIVE:\n${input.objective}`,
           `TOOLS: ${safeJson(tools)}`,
@@ -71,19 +72,25 @@ export class BuilderToolLoop {
       const action = parse(response)
       if (!action) return { ok: false, error: 'builder_invalid_model_control_output', trace }
       if (action.type === 'answer') {
-        if (isRepairObjective(input.objective) && !trace.some(item => item.toolId === 'run' && item.ok)) return { ok: false, error: 'builder_verification_required', trace }
-        return { ok: true, answer: action.answer, trace }
+        const verdict = evaluateRegressionGate(input.objective, trace)
+        if (verdict.satisfied) return { ok: true, answer: action.answer, trace }
+        const reason = 'reason' in verdict ? verdict.reason : 'regression evidence is required'
+        gateNudges += 1
+        if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_regression_evidence_required', trace }
+        trace.push({ round, toolId: 'run', input: {}, ok: false, error: `builder_regression_gate: ${reason}`, failureClass: 'test', remediation: reason })
+        continue
       }
       if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= MAX_WRITES_PER_TURN) return { ok: false, error: 'builder_write_budget_exhausted', trace }
       if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
       const fingerprint = `${action.toolId}:${safeJson(action.input)}`
       // Local models occasionally replay the immediately previous control object after a
       // successful tool result. Treat that as recoverable feedback, not a failed workspace.
-      if (seen.has(fingerprint)) {
+      if (fingerprint === previousFingerprint) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
+        previousFingerprint = fingerprint
         continue
       }
-      seen.add(fingerprint)
+      previousFingerprint = fingerprint
       try {
         let output: unknown
         if (action.toolId === 'list_files') output = await this.workspace.listFiles(input.workspaceId)

@@ -4,6 +4,7 @@ import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
 import { verifiedRepairLesson } from '../lib/builder/verified-lessons.ts'
+import { evaluateBuilderCertification } from '../lib/builder/certification.ts'
 
 class ScriptedBuilderAi implements BuilderAiPort {
   private cursor = 0
@@ -24,6 +25,7 @@ test('Builder writes a user file, runs it, and returns only after tool evidence'
   assert.equal(result.ok, true)
   assert.deepEqual(result.trace.map(item => item.toolId), ['write_file', 'run'])
   assert.equal((await workspace.readFile('user:1', 'hello.js'))?.content, 'console.log("hello")')
+  assert.equal(evaluateBuilderCertification('create_and_run_javascript_v1', result).passed, true)
 })
 
 test('Builder recovers when the model replays a completed tool call', async () => {
@@ -61,6 +63,7 @@ test('Builder observes a failed command, classifies it, and retries without cons
   assert.equal(lesson?.failureClass, 'path')
   assert.equal(lesson?.regressionCommand, 'node ./hello.js')
   assert.equal(lesson?.runtime, 'node24-network-denied-ephemeral')
+  assert.equal(evaluateBuilderCertification('observe_failure_and_recover_v1', result).passed, true)
 })
 
 test('Builder does not declare a repair complete without successful runtime evidence', async () => {
@@ -89,6 +92,7 @@ test('Builder fixes a supplied file after inspecting it and runs the corrected w
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'fix traceback', workspaceId: 'user:2' })
   assert.equal(result.ok, true)
   assert.equal((await workspace.readFile('user:2', 'app.js'))?.content, 'console.log("fixed")')
+  assert.equal(evaluateBuilderCertification('inspect_repair_and_run_v1', result).passed, true)
 })
 
 test('Builder rejects traversal and never permits host files', async () => {

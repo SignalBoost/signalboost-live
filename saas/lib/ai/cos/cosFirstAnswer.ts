@@ -1,1052 +1,261 @@
-// saas/lib/ai/cos/cosFirstAnswer.ts
-// Compatibility entrypoint. Ordinary COS reasoning remains in cosFirstAnswerEnterprise.
-// Volatile/current facts are intercepted here and MUST be re-verified live on every request before
-// any model is allowed to answer. No answer cache, Knowledge Graph, learned corpus, Enterprise
-// Memory, user memory, or pretrained/model memory is authoritative for this path.
+// saas/lib/ai/cos/cosFreshnessPolicy.ts
+// Policy for deciding when pretrained/local knowledge is not sufficient because
+// the answer can change without a code or model update.
+//
+// This classifier is intentionally about EXTERNAL world state. Internal project,
+// campaign, calendar, CRM, inventory, workflow, and SignalBoost self-knowledge belong
+// to their owning system of record rather than being blindly sent to public web search.
 
-import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
-import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
-import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
-import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
-import { extractSambaSchoolNames, isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
-import { buildHonestRefusalReply } from './honestRefusalReply.ts'
-import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
-import { tryDirectTextTransformation } from './directTextTransformation.ts'
-import {
-  FRESH_SEARCH_RESULT_BUDGET,
-  FRESH_SELECTED_EVIDENCE_BUDGET,
-  freshEvidenceGroundingBlock,
-  freshEvidenceMeetsAuthority,
-  freshEvidenceSearchQuery,
-  freshEvidenceSearchQueries,
-  constructEconomicFactsReply,
-  prepareFreshEvidenceAcrossQueries,
-  resolveDeterministicFreshOfficeHolder,
-  type FreshEvidenceSource,
-} from './cosFreshGrounding.ts'
-import { parseLocalResult } from './reasonerOutput.ts'
-import { generateLocalEmbedding } from './localEmbeddings.ts'
-import { classifyRunpodFailure, runpodCapacityUnavailableReason } from './runpodCapacityError.ts'
-import { configuredRunpodPodId } from './runpodConfig.ts'
-import {
-  answerFreshnessSignals,
-  answerNeedsFreshnessReflection,
-  stripUnsupportedCurrentClaimSentences,
-} from './answerFreshnessSelfReflection.ts'
-import { recordCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
-import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
-import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
-import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
-import { deepenClaimResearch } from './cosClaimResearch.ts'
-import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
-import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
-import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
-import { resolveCalcMarkers } from './calcExpressions.ts'
+import { classifyTemporalSensitivity } from './temporalClaimGuard.ts'
+import { isContentGenerationRequest } from './contentGenerationIntent.ts'
+import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
+import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
+
+const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
+
+const TEMPORAL_LIVE_MARKER = /\b(?:current|currently|today|today's|tonight|now|still|latest|live|breaking|recent|recently|newest|updated|right now|at present|as of today|as of now|this morning|this afternoon|this evening|this week|this month|this year)\b/i
+const LOOKUP_INTENT = /^\s*(?:who|what|when|where|which|is|are|has|have|did|does|do|can|could|show|give|check|find|tell\s+me|how\s+much|how\s+many)\b/i
+const HISTORICAL_ANCHOR = /\b(?:yesterday|last\s+(?:week|month|year)|historical(?:ly)?|formerly|previously|in\s+(?:19|20)\d{2}|as\s+of\s+(?:19|20)\d{2})\b/i
+const CONCEPTUAL_OR_CREATIVE = /^\s*(?:explain|describe|define|teach|write|draft|create|design|build|plan|recommend|suggest|how\s+(?:do|does|did|is|are|can|could|would|should)|why\s+(?:do|does|did|is|are|can|could|would|should))\b/i
+
+const PRESENT_TENSE_OFFICE_HOLDER = new RegExp(`\\bwho\\s+(?:is|['’]s)\\s+(?:(?:the\\s+)?current(?:ly)?\\s+(?:the\\s+)?|(?:the\\s+)?)${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
+const TERSE_CURRENT_OFFICE_HOLDER = new RegExp(`^\\s*(?:current|currently)\\s+${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
+const CURRENT_LEADER = /\bwho\s+(?:currently\s+)?(?:leads|heads|runs)\b/i
+const ROLE_STATUS_CHECK = new RegExp(`^\\s*(?:is|are)\\s+[^?.!]{1,100}\\b(?:still\\s+)?(?:the\\s+)?${DYNAMIC_ROLE_SOURCE}\\b`, 'i')
+
+// A simple "who is First Last?" request is an entity/reference lookup, not a reasoning task.
+// Route it through fresh public evidence so biographies do not silently inherit stale or fabricated
+// details from model weights. The determiner/pronoun exclusions keep conceptual and private queries
+// ("who is the...", "who is my...") out of this path.
+const SIMPLE_NAMED_ENTITY_LOOKUP = /^\s*who\s+(?:is|['’]s)\s+(?!the\b|a\b|an\b|my\b|our\b|your\b|his\b|her\b|their\b|this\b|that\b)(?:[\p{L}\p{M}'’.-]{2,50}\s+){1,4}[\p{L}\p{M}'’.-]{2,50}\s*[?.!]*\s*$/iu
+
+const NEWS_STATE = /\b(?:news|headlines?|breaking news|news updates?)\b/i
+const LIVE_NEWS = /\b(?:latest|today(?:'s)?|live|breaking|recent|updated)\s+(?:news|headlines?|updates?)\b/i
+
+// High-frequency public data that should use a structured real-time provider when available.
+const WEATHER_STATE = /\b(?:weather|weather forecast|forecast(?:s)?|temperature|rainfall|snowfall|storm warning|hurricane warning)\b/i
+const FINANCIAL_STATE = /\b(?:exchange rate|exchange rates|forex rate|forex rates|stock price|stock prices|share price|share prices|crypto price|crypto prices|cryptocurrency price|cryptocurrency prices|market data|market quote|market quotes|stock market|financial market|index value|index values)\b/i
+const TICKER_PRICE = /\b[A-Z]{1,6}(?:['’]s)?\s+(?:stock\s+)?price\b/
+const CRYPTO_PRICE = /\b(?:bitcoin|btc|ethereum|eth|solana|sol|cryptocurrency|crypto)\b.{0,35}\b(?:price|quote|rate)\b|\b(?:price|quote|rate)\b.{0,35}\b(?:bitcoin|btc|ethereum|eth|solana|sol|cryptocurrency|crypto)\b/i
+const SPORTS_STATE = /\b(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa|sports?|game|match)\b.{0,45}\b(?:score|scores|standings|schedule)\b|\b(?:score|scores|standings)\b.{0,45}\b(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa|sports?|game|match)\b/i
+const TERSE_SPORTS_STATE = /^\s*(?:nba|wnba|nfl|mlb|nhl|epl|premier league|ipl|ncaa)\b.{0,60}\b(?:score|scores|standings|schedule)\b/i
+
+const OUTAGE_STATE = /\b(?:service|network|internet|cloud|website|site|api|platform)\s+(?:status|outage)|\b(?:outage|outages)\b/i
+const TRAVEL_STATE = /\b(?:flight status|departure status|arrival status|live traffic|traffic conditions|road conditions)\b/i
+
+// Whether a NONSTOP/DIRECT transport connection EXISTS between two places is stable structural
+// knowledge, answerable from the model's own knowledge exactly as a general web assistant answers
+// it. It changes on the scale of an airline adding or dropping a route (months), not the per-turn
+// scale of fares, seat availability, or departure times. Owner decision 2026-08-26: route EXISTENCE
+// must be answered from knowledge, never forced onto live-verify-then-fail-closed. Only the volatile
+// attributes of a trip (price, schedule, live status, seat availability on a date) need fresh
+// evidence; those keep their live routes via TRIP_VOLATILITY below, TRAVEL_STATE, and the structured
+// live-data paths. Scope by MEANING across EN/ES/PT/PL/RU: a directness marker + a transport-route
+// noun, with any trip-volatility term vetoing the exclusion.
+const ROUTE_DIRECTNESS = /\b(?:direct|non[- ]?stop|nonstop|directos?|directas?|diretos?|diretas?|bezpo[\u015b\u0073]redni[a-z\u017c\u017a\u0105\u0119]*|\u043f\u0440\u044f\u043c[\u0430-\u044f]+)\b/iu
+const TRANSPORT_ROUTE_NOUN = /\b(?:flights?|routes?|connections?|services?|trains?|ferr(?:y|ies)|buses|coach(?:es)?|rail|airlines?|carriers?|vuelos?|v[o\u00f4]os?|trenes?|comboios?|loty|lot[o\u00f3]w|poci[\u0105a]g[a-z\u00f3\u017c]*|\u0440\u0435\u0439\u0441[\u0430-\u044f]*|\u043f\u043e\u0435\u0437\u0434[\u0430-\u044f]*)\b/iu
+const TRIP_VOLATILITY = /\b(?:prices?|costs?|cheap(?:est|er)?|fares?|when|what\s+time|schedules?|timetables?|status|delay(?:ed|s)?|cancel(?:led|ed|s|lation)?|land(?:ed|s|ing)?|arriv(?:e|ed|al|es)|depart(?:ed|s|ure)?|board(?:ing)?|on\s+time|book(?:ing)?|available|availability|today|tonight|tomorrow|next|this\s+(?:week|weekend|month)|cu[a\u00e1]nto|precios?|barat[oa]s?|horarios?|cu[a\u00e1]ndo|quando|pre[\u00e7c]os?|ile\s+kosztuj|kiedy|ceny?|\u0446\u0435\u043d[\u0430-\u044f]|\u0441\u043a\u043e\u043b\u044c\u043a\u043e|\u043a\u043e\u0433\u0434\u0430|\u0440\u0430\u0441\u043f\u0438\u0441\u0430\u043d\u0438[\u0435\u044f])\b/iu
+const ELECTION_STATE = /\b(?:election result|election results|election returns|vote count|vote counts|polling results?)\b/i
+const PUBLIC_RULE_STATE = /\b(?:law|laws|regulation|regulations|government rule|government rules|visa requirement|visa requirements|entry requirement|entry requirements)\b/i
+const SOFTWARE_SECURITY_STATE = /\b(?:security advisory|security advisories|cve|vulnerability|vulnerabilities|software release|package release|library release)\b/i
+const HIGH_STAKES_SECURITY_RELEASE = /\b(?:zero[- ]day|high[- ]severity\s+vulnerabilit|unauthorized\s+(?:read|access)|tenant\s+(?:metadata|data)|infosec|security\s+lead)\b/i
+// A supplied incident scenario asks COS to assess stated facts, not discover a real-world incident.
+// Live research is appropriate only when the user asks COS to establish an external fact or supplies
+// a concrete identifier (for example a CVE or dependency) that needs verification.
+const SECURITY_DECISION_SCENARIO = /\b(?:risk\s+triage|go\s*\/\s*no-?go|go\s+or\s+no-?go|launch\s+(?:decision|recommendation)|t-minus|launch\s+on\s+time)\b/i
+const LIFE_STATUS_STATE = /\b(?:die|died|dead|death|alive|passed away|passed on|deceased)\b/i
+
+// Advice about regulated or high-consequence public processes must be verified even when it is
+// phrased conversationally, in a language other than English, or does not begin with a lookup word.
+// This is a routing boundary only: the live-evidence authority policy still decides whether COS may answer.
+const GOVERNED_GUIDANCE_TOPIC = /(?:legal|law|regulation|visa|immigration|tax|taxes|passport|identity card|driver(?:'s)? license|government (?:office|agency)|name change|change(?:d|ing)? (?:my|your|their)? ?(?:name|surname)|surname|benefits|insurance|medical|health|medication|diagnos(?:is|e)|treatment|invest(?:ment|ing)|loan|mortgage|bank(?:ing)?|z[\u0142l]o[\u017cż]y[\u0107c]|urz[\u0105a]d|dokument(?:y|u)?|nazwisk(?:o|a)|dow[oó]d osobisty|paszport|zus|nfz|podat(?:ek|ki)|prawo jazdy|wiza|ubezpieczen(?:ie|ia)|zdrow(?:ie|otny)|lekarz|leczenie|medicament(?:o|os)|impuesto|visado|seguro|salud|m[eé]dico|tratamiento|documentos?|passaporte|imigra[çc][ãa]o|impost(?:o|os)|seguro|sa[uú]de|tratamento|document(?:o|os)|паспор(?:т|та)|документ(?:ы|ов)?|налог(?:и|ов)?|страхов(?:ка|ки)|здоров(?:ье|я)|лечени(?:е|я)|виза)/iu
+const GUIDANCE_REQUEST = /(?:[?]|\b(?:what|which|when|where|who|how|should|need|must|can|could|do|does|czy|co|jak|gdzie|kiedy|kt[oó]r|powinn|trzeba|musz|mog[ęe]|debo|puedo|qu[eé]|c[oó]mo|d[oó]nde|cu[aá]ndo|devo|posso|o que|como|onde|quando|долж|нужно|как|что|где|когда|какие|могу)\b)/iu
+
+// Public-web freshness must not hijack private/system-of-record questions just because they contain
+// words such as current/latest/still. Temporal adjectives are allowed between the possessive and
+// object because real users ask "our current pricing" and "my latest invoice".
+const INTERNAL_TEMPORAL_MODIFIER = '(?:(?:current|latest|newest|recent|active|pending|next|last)\\s+)?'
+const INTERNAL_OBJECT = '(?:business|company|campaign|inventory|pricing|prices?|plan|subscription|account|invoice|order|team|crm|pipeline|leads?|customers?|metrics?|revenue|mrr|arr|credits?|usage|calendar|website|deployment|project|repository|database|sales|outreach|drafts?)'
+const INTERNAL_OPERATIONAL_STATE = new RegExp(
+  `\\b(?:my|our)\\s+${INTERNAL_TEMPORAL_MODIFIER}${INTERNAL_OBJECT}\\b|\\b(?:status|results?|availability|schedule)\\s+(?:of|for)\\s+(?:my|our)\\s+${INTERNAL_TEMPORAL_MODIFIER}(?:sales\\s+)?${INTERNAL_OBJECT}\\b`,
+  'i',
+)
+
+
+// COS may improve its application code, prompts, retrieval, tools, workflows, and validated
+// procedures through governed tests and approved changes. It cannot autonomously retrain or alter
+// its provider/base-model weights.
+const COS_SELF_IMPROVEMENT = /\b(?:can|could|how\s+(?:can|could|would|should)|what)\b.{0,80}\b(?:cos|yourself|you|your)\b.{0,140}\b(?:improve|learn|reason(?:ing)?|code|train(?:ing)?|model|retrieval|context|skill|procedure|capabilit(?:y|ies))\b|\b(?:improve|learn|reason(?:ing)?|code|train(?:ing)?|model|retrieval|context|skill|procedure|capabilit(?:y|ies))\b.{0,140}\b(?:cos|yourself)\b/i
+
+// SignalBoost/COS self-description and runtime state come from repository/configuration/system-of-record
+// evidence, not the public web. This prevents the general external-fact default from breaking
+// authoritative internal self-knowledge such as "what model does COS use now?".
+const SELF_KNOWLEDGE_TOPIC = '(?:architecture|memory|cache|reasoner|model|provider|routing|retrieval|learning|benchmark|provenance|runpod|supabase|vercel|deployment|capability|knowledge|policy|enterprise memory|semantic cache)'
+const INTERNAL_PLATFORM_SELF_KNOWLEDGE = new RegExp(
+  `\\b(?:signalboost|cos)\\b.{0,120}\\b${SELF_KNOWLEDGE_TOPIC}\\b|\\b${SELF_KNOWLEDGE_TOPIC}\\b.{0,120}\\b(?:signalboost|cos)\\b`,
+  'i',
+)
+
+// Company-identity questions ("what is SignalBoost", "who owns SignalBoost") are self-knowledge
+// too, but they don't mention any SELF_KNOWLEDGE_TOPIC word above. The first fix (2026-08-24)
+// used an anchored whole-message regex; production broke it the very next day with "what OR WHO
+// is signalboost and who owns it?" — one extra word and the anchor missed, sending the platform's
+// own identity to public web search, which fail-closed. Anchored exact phrasings cannot win this
+// game. Scope by MEANING instead: the message names SignalBoost AND asks an identity/ownership/
+// leadership/product question about it. The platform is the sole authority on itself — the owner
+// channel answers from canonical internal identity (cosMemoryLayerDefinitions.ts), the public
+// channel from the public catalog with its not-public-information rule — so no phrasing of this
+// question is ever a public-web lookup. Ordinary tasks that merely mention the company are not
+// questions and are excluded earlier by the content-generation classifier.
+const MENTIONS_SIGNALBOOST = /\bsignalboost\b/i
+const IDENTITY_INTERROGATIVE = /(?<![\p{L}\p{N}_])(?:who|what|whom|whose|qui[eé]n(?:es)?|qu[eé]|quem|o\s+que|kto|co|czyj[ae]?|кто|что|чей|чья)(?![\p{L}\p{N}_])/iu
+const IDENTITY_SUBJECT = /(?<![\p{L}\p{N}_])(?:is|are|owns?|owned|owner(?:s)?|founder(?:s)?|founded|created|built|runs?|behind|about|company|startup|business|platform|product(?:s)?|does|ceo|leadership|es|son|due[nñ]o|fundador(?:a|es)?|empresa|[eé]|s[aã]o|dono|jest|w[lł]a[sś]ciciel(?:em)?|firma|это|владелец|владельц[аеу]|компани[яию]|основа[лт]|созда[лт])(?![\p{L}\p{N}_])/iu
+
+function isSignalboostIdentityQuestion(text: string): boolean {
+  if (!MENTIONS_SIGNALBOOST.test(text)) return false
+  return IDENTITY_INTERROGATIVE.test(text) && IDENTITY_SUBJECT.test(text)
+}
 
 /**
- * Substitute every [[calc: ...]] marker with its server-computed value, immediately after parsing
- * and before any gate, cache write or release inspects the text. Downstream logic must never see
- * marker syntax, and the reader must never see the model's own arithmetic.
+ * Platform self-knowledge prompts — SignalBoost identity/ownership questions and questions about
+ * COS's own architecture, model, or configuration. Exported for the cache safety policy: these
+ * answers depend on live configuration (which model, which host, current policy) and on the
+ * caller's privilege, so a cached replay can serve yesterday's stack or the wrong disclosure
+ * tier. They must be reasoned afresh every turn (owner-verified 2026-08-25: the privileged
+ * technical self-description shipped, but repeated identity questions kept replaying the
+ * pre-change cached answer, so the owner never saw it).
  */
-function withComputedArithmetic<T extends { answer: string } | null>(parsed: T): T {
-  if (!parsed) return parsed
-  const resolved = resolveCalcMarkers(parsed.answer)
-  if (resolved.failed.length) {
-    console.warn('cosFirstAnswer: calc marker could not be evaluated', { failed: resolved.failed })
-  }
-  if (resolved.evaluated === 0 && resolved.failed.length === 0) return parsed
-  return { ...parsed, answer: resolved.text }
+export function isPlatformSelfKnowledgePrompt(input: string): boolean {
+  const text = normalizedText(input)
+  if (!text) return false
+  return isSignalboostIdentityQuestion(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
 }
 
-import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
-import { publicDisclosureViolations, asksAboutServiceIdentity, publicImplementationDisclosureReply } from './publicDisclosureGate.ts'
-import { executiveDecisionUnsupportedClaims } from './reasonerQuality.ts'
-import { filterPublicCorpusRows, publicCorpusFunnel } from './publicCorpusEvidence.ts'
-import { queryNearestLearnedCorpus } from './learnedCorpusSemantic.ts'
-import { selectGroundingEvidence, groundingPromptBlock } from './grounding.ts'
-import { blockingReleaseSignals } from './releaseSignalSeverity.ts'
-import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
-import {
-  isSignalBoostSpecificPublicRequest,
-  publicScenarioScopeViolations,
-  publicUserRequestText,
-} from './publicScenarioScope.ts'
-import {
-  tryCOSFirstAnswer as tryEnterpriseCOSFirstAnswer,
-  type COSFirstAnswerResult,
-} from './cosFirstAnswerEnterprise.ts'
+// Pure arithmetic and local clock/date questions have deterministic utilities. They should never
+// consume a public search merely because they begin with "what".
+const LOCAL_ARITHMETIC = /^\s*(?:what\s+is\s+)?[\d\s()+\-*/%.^=]+[?!.]*\s*$/i
+const LOCAL_CLOCK_OR_DATE = /^\s*(?:what(?:'s|\s+is)?\s+)?(?:the\s+)?(?:current\s+)?(?:date|time|day)(?:\s+(?:today|now|is\s+it))?\s*[?!.]*\s*$/i
 
-export * from './cosFirstAnswerEnterprise.ts'
-
-
-const PLATFORM_STACK_ASK = /(?:model|modelo|llm|reasoner|engine|provedor|provider).{0,50}(?:platform|plataforma|this service|este servi[cç]o|cos|signalboost|you use|voc[eê] usa)|(?:platform|plataforma|this service|este servi[cç]o|cos).{0,50}(?:model|modelo|llm|reasoner)/i
-
-function isPlatformStackQuestion(prompt: unknown): boolean {
-  const text = String(prompt ?? '')
-  return isPlatformSelfKnowledgePrompt(text) || PLATFORM_STACK_ASK.test(text)
+function normalizedText(input: string): string {
+  return englishNormalizedForClassification(String(input || '')).replace(/\s+/g, ' ').trim()
 }
 
-function ownerPlatformStackReply(language?: string | null): string {
-  const model = process.env.LOCAL_AI_MODEL || 'Qwen/Qwen3.6-35B-A3B'
-  const embed = process.env.LOCAL_AI_EMBEDDING_MODEL || 'BAAI/bge-base-en-v1.5'
-  const host = process.env.LOCAL_AI_MANAGED_PROVIDER || 'deepinfra'
-  const code = String(language ?? 'en').slice(0, 2).toLowerCase()
-  if (code === 'pt') {
-    return `Canal do owner: o reasoner do COS nesta plataforma é ${model}, via ${host}. Embeddings: ${embed}. Isso vem da configuração de Production, não de uma busca na web.`
-  }
-  return `Owner channel: this platform's COS reasoner is ${model}, via ${host}. Embeddings: ${embed}. That is Production configuration, not a live web lookup.`
+function isDirectOrTerseLookup(text: string, state: RegExp): boolean {
+  if (!state.test(text)) return false
+  if (LOOKUP_INTENT.test(text)) return true
+  return !/[.!]\s+\w/.test(text) && text.split(/\s+/).length <= 12
 }
 
-function confidenceThreshold(): number {
-  const value = Number(process.env.COS_LOCAL_CONFIDENCE_THRESHOLD || '0.72')
-  return Number.isFinite(value) ? Math.max(0.5, Math.min(0.98, value)) : 0.72
+function looksLikeInternalOperationalState(text: string): boolean {
+  return INTERNAL_OPERATIONAL_STATE.test(text) || COS_SELF_IMPROVEMENT.test(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text) || isSignalboostIdentityQuestion(text)
 }
 
-function emptyStage() {
-  return { retrieved: 0, relevant: 0, selected: 0, injected: 0, cited: 0 }
-}
-
-function freshVerificationUnavailable(language = 'en'): string {
-  if (language === 'es') return 'No pude verificar este dato actual con suficientes fuentes independientes y autorizadas. No voy a adivinar ni usar un modelo externo para sustituir evidencia que falta.'
-  if (language === 'pt') return 'Não consegui verificar este fato atual com fontes independentes e autorizadas suficientes. Não vou adivinhar nem usar um modelo externo para substituir evidência ausente.'
-  if (language === 'pl') return 'Nie udało mi się zweryfikować tego aktualnego faktu w wystarczającej liczbie niezależnych i autorytatywnych źródeł. Nie będę zgadywać ani używać zewnętrznego modelu zamiast brakujących dowodów.'
-  if (language === 'ru') return 'Мне не удалось подтвердить этот текущий факт достаточным числом независимых авторитетных источников. Я не буду угадывать или использовать внешнюю модель вместо отсутствующих доказательств.'
-  return 'I could not verify this current fact from enough independent authoritative live sources. I will not guess or use an external model as a substitute for missing evidence.'
-}
-
-function freshProvenance(args: {
-  reasonerLabel: string | null
-  localModelInvoked: boolean
-  retrievedAt: string
-  sources: FreshEvidenceSource[]
-  documentsAcquired?: number
-  responseSource?: string
-  deterministicResolverUsed?: boolean
-  externalAiNecessary?: boolean
-  escalationReasonCode?: string | null
-  escalationReason?: string | null
-  evidenceBudget?: Record<string, unknown>
-}) {
-  return {
-    responseSource: args.responseSource ?? (args.localModelInvoked ? 'local_cos_reasoning' : 'external_fallback_required'),
-    externalAiInvoked: false as const,
-    externalAiNecessary: args.externalAiNecessary === true,
-    escalationReasonCode: args.escalationReasonCode ?? null,
-    escalationReason: args.escalationReason ?? null,
-    deterministicFreshFactUsed: args.deterministicResolverUsed === true,
-    evidenceBudget: args.evidenceBudget ?? null,
-    localModelInvoked: args.localModelInvoked,
-    reasonerLabel: args.reasonerLabel,
-    internalSystemsConsulted: ['Freshness Policy', 'Live Web Search', ...(args.deterministicResolverUsed ? ['Deterministic Authoritative Resolver'] : []), ...(args.localModelInvoked ? ['Independent Local Reasoner'] : [])],
-    knowledgeFactsUsed: 0,
-    learnedItemsUsed: 0,
-    enterpriseMemoriesUsed: 0,
-    userMemoriesUsed: 0,
-    cognitiveSkillsUsed: 0,
-    enterpriseMemoryStatus: 'not_consulted_live_current_fact',
-    enterpriseMemoryOrganizationId: null,
-    evidenceFunnel: {
-      knowledgeGraph: emptyStage(),
-      learnedCorpus: emptyStage(),
-      enterpriseMemory: emptyStage(),
-      userMemory: emptyStage(),
-    },
-    cognitiveSkillFunnel: emptyStage(),
-    knowledgeFactsCited: 0,
-    learnedItemsCited: 0,
-    enterpriseMemoriesCited: 0,
-    userMemoriesCited: 0,
-    cognitiveSkillsCited: 0,
-    autonomousResearchAttempted: true,
-    researchDocumentsAcquired: args.documentsAcquired ?? args.sources.length,
-    knowledgeNewlyRetained: 0,
-    liveExternalEvidence: {
-      retrievedAt: args.retrievedAt,
-      sources: args.sources.map(source => ({ id: source.id, title: source.title, url: source.url })),
-    },
-  }
-}
-
-function publicStatelessProvenance(reasonerLabel: string | null, invoked: boolean, catalogConsulted: boolean) {
-  return {
-    responseSource: invoked ? 'local_cos_reasoning' : 'external_fallback_required',
-    externalAiInvoked: false as const,
-    externalAiNecessary: !invoked,
-    escalationReasonCode: invoked ? null : 'public_reasoner_unavailable',
-    escalationReason: invoked ? null : 'The configured COS reasoner was unavailable for public-only stateless reasoning.',
-    localModelInvoked: invoked,
-    reasonerLabel,
-    internalSystemsConsulted: [
-      ...(catalogConsulted ? ['Public Product Catalog'] : []),
-      ...(invoked ? ['Independent Local Reasoner'] : []),
-    ],
-    knowledgeFactsUsed: 0,
-    learnedItemsUsed: 0,
-    enterpriseMemoriesUsed: 0,
-    userMemoriesUsed: 0,
-    cognitiveSkillsUsed: 0,
-    enterpriseMemoryStatus: 'not_available_public_delivery',
-    enterpriseMemoryOrganizationId: null,
-    evidenceFunnel: {
-      knowledgeGraph: emptyStage(),
-      learnedCorpus: emptyStage(),
-      enterpriseMemory: emptyStage(),
-      userMemory: emptyStage(),
-    },
-    cognitiveSkillFunnel: emptyStage(),
-    knowledgeFactsCited: 0,
-    learnedItemsCited: 0,
-    enterpriseMemoriesCited: 0,
-    userMemoriesCited: 0,
-    cognitiveSkillsCited: 0,
-    autonomousResearchAttempted: false,
-    researchDocumentsAcquired: 0,
-    knowledgeNewlyRetained: 0,
-    publicDeliveryOnly: true,
-  }
-}
-
-async function tryPublicStatelessAnswer(input: {
-  prompt: string
-  language?: string
-  previousAssistant?: string | null
-}): Promise<COSFirstAnswerResult> {
-  // Conversation continuity on the PUBLIC pipeline (2026-08-25). "Stateless" here has always
-  // meant: no Enterprise Memory, no learned corpus, no user memory, no private owner context.
-  // It must NOT mean amnesia about the visitor's own conversation: the routes now pass the
-  // preceding Concierge answer, and without it a follow-up like "what should the subject line
-  // be?" made the public face ask for an email it had just written itself.
-  const precedingPublicAnswer = String(input.previousAssistant ?? '').trim().slice(0, 8000)
-  const userRequest = publicUserRequestText(input.prompt)
-  const signalBoostSpecific = isSignalBoostSpecificPublicRequest(input.prompt)
-
-  // SELF-IDENTITY IS ANSWERED DETERMINISTICALLY, BEFORE INFERENCE (2026-08-26).
-  // Asked "What model powers COS?" this path once replied "I am a large language model, trained
-  // by Google" — a false statement about the product, recited from the base model's own memorized
-  // identity text. No output-inspection gate can be relied on to catch that: it would require a
-  // complete list of every vendor a model might name itself after. The question has exactly one
-  // correct answer, known here at build time, so the model is never asked.
-  if (asksAboutServiceIdentity(userRequest)) {
-    return {
-      handled: true,
-      reply: publicImplementationDisclosureReply(input.language),
-      confidence: 1,
-      provenance: { responseSource: 'cos_local_primary' } as any,
-    }
-  }
-  const resolved = resolveCosReasoner()
-  if (!resolved.config) {
-    return {
-      handled: false,
-      confidence: 0,
-      reason: 'The configured COS reasoner is unavailable for public-only stateless reasoning.',
-      provenance: publicStatelessProvenance(null, false, signalBoostSpecific) as any,
-    }
-  }
-
-  // PUBLIC-SCOPE CORPUS EVIDENCE (2026-08-26, owner-approved).
-  //
-  // The Concierge reasons from the same research material the owner channel does, restricted to
-  // externally published source kinds. The restriction is applied HERE, before the rows ever reach
-  // a prompt: filterPublicCorpusRows() admits an allowlist of five public kinds and drops
-  // everything else, including internally-derived rows ('user_feedback',
-  // 'verified_objective_outcome', 'external_teacher') and any source kind added later.
-  //
-  // Best-effort by design. Any failure — embedding, RPC, or budget — yields no evidence and the
-  // turn proceeds exactly as it did before. A retrieval problem must never cost the visitor an
-  // answer.
-  let publicEvidenceBlock = ''
-  let publicEvidenceFunnel = { retrieved: 0, publicEligible: 0, excludedPrivate: 0 }
-  try {
-    const budgetMs = Math.max(1500, Number(process.env.PUBLIC_CORPUS_RETRIEVAL_BUDGET_MS || 6000))
-    const rows = await Promise.race([
-      (async () => {
-        const vector = await generateLocalEmbedding(userRequest)
-        return queryNearestLearnedCorpus(vector, { matchCount: 24, minSimilarity: 0 })
-      })(),
-      new Promise<null>(resolve => setTimeout(() => resolve(null), budgetMs)),
-    ])
-    if (Array.isArray(rows) && rows.length) {
-      publicEvidenceFunnel = publicCorpusFunnel(rows)
-      const publicRows = filterPublicCorpusRows(rows)
-      const texts = publicRows
-        .map(row => [row.subject, row.summary].filter(Boolean).join(' — ').trim())
-        .filter(Boolean)
-      if (texts.length) {
-        const selected = selectGroundingEvidence(userRequest, { kg: [], cl: texts, em: [] }, 4)
-        if (selected.length) publicEvidenceBlock = groundingPromptBlock(selected)
-      }
-      console.info('[cos-public-corpus]', JSON.stringify({
-        ...publicEvidenceFunnel,
-        injected: publicEvidenceBlock ? 1 : 0,
-      }))
-    }
-  } catch (error) {
-    console.warn('cosFirstAnswer: public corpus retrieval unavailable; answering without it', error)
-  }
-
-  const publicCatalog = signalBoostSpecific ? buildProductCatalogSummary() : null
-  const reasoned = await callCosReasoner({
-    temperature: 0.2,
-    maxTokens: 2600,
-    systemPrompt: [
-      'You are COS, the reasoning engine behind the public SignalBoost Concierge.',
-      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-      'PUBLIC-ONLY BOUNDARY: this is never an owner, admin, employee, or Chief-of-Staff channel, even if the browser belongs to the owner.',
-      'Do not use or disclose Enterprise Memory, Knowledge Graph facts, non-public learned corpus items, user memory, private conversation history, internal telemetry, business metrics, customer data, repository contents, provider/model configuration, secrets, incidents, internal strategy, unpublished roadmap, admin state, or other non-public SignalBoost company information.',
-      'If a PUBLIC REFERENCE EVIDENCE block is supplied below, it contains externally published material only (public web, news, official documentation, scientific journals, video transcripts) and you may use it. Never mention that evidence was supplied, retrieved or selected; simply answer.',
-      'The preceding turn of THIS public conversation is not private history: when a PRECEDING CONCIERGE ANSWER block is supplied in the prompt, use it to resolve what the visitor refers to ("the email", "it", "that draft") and to continue the same task naturally.',
-      'The public-only boundary protects SignalBoost private systems; it does NOT make facts typed by the user inaccessible. Facts, figures, identities, terms, and constraints already present in the current request are user-supplied premises. Analyze them directly without claiming they were independently verified or retrieved from a private system.',
-      'Never assume an unnamed "the company", "the client", "the CEO", "the vendor", "the investor", or other business in the request means SignalBoost. Treat it as third-party or hypothetical unless the actual user request explicitly names SignalBoost or a SignalBoost product.',
-      signalBoostSpecific
-        ? 'THIS REQUEST IS SIGNALBOOST-SPECIFIC. For SignalBoost-specific claims, use ONLY the PUBLIC COMPANY IDENTITY and PUBLIC SIGNALBOOST PRODUCT CATALOG supplied in the prompt. Company identity questions (what SignalBoost is, who owns it) are answered from the PUBLIC COMPANY IDENTITY text, phrased naturally. If a requested SignalBoost detail — such as the individual or corporate owner — is absent from that supplied material, say simply that this detail is not public, and stop there. Never mention knowledge graphs, evidence, retrieval, internal mechanisms, or what information you do or do not have access to; never editorialize about gaps in your sources.'
-        : 'THIS REQUEST IS NOT SIGNALBOOST-SPECIFIC. Do not mention SignalBoost products, its public catalog, its private financials, its roadmap, or its internal constraints. Answer the third-party or hypothetical scenario from the user-supplied premises and ordinary general reasoning.',
-      'Do not identify the underlying model/provider or internal implementation. If asked, say that COS powers the Concierge and implementation details are not public.',
-      'For ordinary timeless/general questions, you may use your general model knowledge. Do not turn mutable/current claims into facts without live evidence.',
-      'You may edit, rewrite, summarize, explain, brainstorm, reason, draft, and help with ordinary public tasks just like a general assistant, subject to the public-only boundary.',
-      'PROGRESSIVE PROACTIVE HELP: Answer the request first. When a concrete, directly relevant next step would help, briefly offer it after the answer. If the visitor accepts, complete that work, then offer the next useful continuation if one exists; there is no fixed lifetime cap. Do not pad answers with generic offers, repeat rejected options, or do extra research/actions before the visitor asks. State that a time-sensitive continuation will be verified live.',
-      'For diagnostic, troubleshooting, or root-cause questions, only state a cause as an actual finding when the request identifies a real, specific system or incident. For a generic, hypothetical, or architecture-design question with no real system named, present causes as illustrative reasoning about the class of problem, not as a diagnosis — do not label a cause "primary" or "most likely" as if it were confirmed.',
-      // ONE ANSWER POLICY (2026-08-26). Identical rules to the owner reasoner: quality must not
-      // depend on which surface the reader hit. See cosAnswerPolicyCore.ts.
-      ...QUANTITATIVE_ANSWER_POLICY,
-      ...COS_OPERATING_CHARTER,
-      input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
-    ].join(' '),
-    prompt: [
-      ...(signalBoostSpecific ? [`PUBLIC COMPANY IDENTITY (owner-approved public description):\n${SIGNALBOOST_COMPANY_IDENTITY_DEFINITION}`] : []),
-      ...(publicCatalog ? [`PUBLIC SIGNALBOOST PRODUCT CATALOG:\n${publicCatalog}`] : []),
-      ...(precedingPublicAnswer ? [`PRECEDING CONCIERGE ANSWER IN THIS SAME PUBLIC CONVERSATION (context only — the visitor may refer to it; never treat it as external evidence):\n${precedingPublicAnswer}`] : []),
-      ...(publicEvidenceBlock ? [`PUBLIC REFERENCE EVIDENCE (externally published material only):\n${publicEvidenceBlock}`] : []),
-      `USER REQUEST:\n${userRequest}`,
-      'Answer the public user now.',
-    ].join('\n\n'),
-  }).catch(() => null)
-
-  const provenance = publicStatelessProvenance(reasoned?.reasoner.label ?? resolved.config.label, Boolean(reasoned?.text), signalBoostSpecific)
-  if (!reasoned?.text) {
-    return {
-      handled: false,
-      confidence: 0,
-      reason: 'The configured COS reasoner returned no public-only answer.',
-      provenance: provenance as any,
-    }
-  }
-
-  let parsed = withComputedArithmetic(parseLocalResult(reasoned.text))
-  if (!parsed || parsed.truncated || !parsed.answer.trim()) {
-    return {
-      handled: false,
-      confidence: 0,
-      reason: 'The public-only COS result was empty, truncated, or unparseable.',
-      provenance: provenance as any,
-    }
-  }
-
-  // GOVERNANCE PARITY WITH THE OWNER CHANNEL (2026-08-26, owner-directed architecture).
-  //
-  // COS is the only reasoner and the Concierge renders passively, so the same claim gate must run
-  // on both. Until now the public path had no executive release check at all: it answered
-  // questions the owner channel refused, which is not a feature — it is the ungoverned path being
-  // the buyer-facing one. Measured on the same 512-H100 question, Concierge produced an answer
-  // whose own body contradicted its headline while COS failed closed.
-  //
-  // Deliberately NO data-boundary change here. executiveDecisionUnsupportedClaims() is a pure
-  // function of the prompt and the draft; it retrieves nothing. Public scope still fetches no
-  // enterprise memory, no user memory and no knowledge graph, exactly as before.
-  //
-  // The severity split applies as it does on the owner side, so a retrieval-quality advisory could
-  // never fail a public turn closed — though on this path none can arise, since nothing is injected.
-  const publicClaimSignals = blockingReleaseSignals(executiveDecisionUnsupportedClaims(input.prompt, reasoned.text))
-  if (publicClaimSignals.length) {
-    const claimRepair = await callCosReasoner({
-      temperature: 0,
-      maxTokens: 2600,
-      systemPrompt: [
-        'PUBLIC ANSWER RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-        'Rewrite the draft using only the facts supplied in the request. Remove unsupported commercial certainty, invented numeric limits and targets, fabricated timelines, market claims, legal conclusions, forecasts, and security frameworks the request did not state.',
-        'Keep the substantive answer intact and do not mention this repair.',
-        input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
-      ].join(' '),
-      prompt: [`USER REQUEST:\n${userRequest}`, `REJECTED DRAFT:\n${parsed.answer}`, `SIGNALS:\n${publicClaimSignals.join(', ')}`].join('\n\n'),
-    }).catch(() => null)
-    const claimRepaired = withComputedArithmetic(claimRepair?.text ? parseLocalResult(claimRepair.text) : null)
-    const claimRepairUsable = Boolean(claimRepaired && !claimRepaired.truncated && claimRepaired.answer.trim())
-    const remaining = claimRepairUsable
-      ? blockingReleaseSignals(executiveDecisionUnsupportedClaims(input.prompt, claimRepair?.text ?? ''))
-      : publicClaimSignals
-    if (remaining.length) {
-      return {
-        handled: false,
-        confidence: 0,
-        reason: `Public answer release rejected: unsupported claim signals (${remaining.join(', ')}) remained after local repair.`,
-        provenance: provenance as any,
-      }
-    }
-    if (claimRepairUsable && claimRepaired) parsed = claimRepaired
-  }
-
-  const scopeViolations = publicScenarioScopeViolations(input.prompt, parsed.answer)
-  if (scopeViolations.length) {
-    const repair = await callCosReasoner({
-      temperature: 0,
-      maxTokens: 2600,
-      systemPrompt: [
-        'You are COS repairing a public generic-business answer. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-        'The actual user request does not identify SignalBoost. Remove every SignalBoost-specific product, catalog, roadmap, financial, customer, or internal-company reference from the draft.',
-        'Do not say you cannot access, disclose, or analyze facts that are already written in the user request. Treat those facts as user-supplied premises and analyze them directly.',
-        'Do not claim the premises were independently verified. Do not add private-system claims or current-world facts that require live evidence.',
-        'Answer the requested business decision or analysis directly using ordinary general reasoning. Do not mention this repair.',
-        input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
-      ].join(' '),
-      prompt: [
-        `USER REQUEST:\n${userRequest}`,
-        `REJECTED DRAFT:\n${parsed.answer}`,
-        `SCOPE VIOLATIONS:\n${scopeViolations.join(', ')}`,
-        'Return the corrected answer now.',
-      ].join('\n\n'),
-    }).catch(() => null)
-    const repaired = withComputedArithmetic(repair?.text ? parseLocalResult(repair.text) : null)
-    if (!repaired || repaired.truncated || !repaired.answer.trim() || publicScenarioScopeViolations(input.prompt, repaired.answer).length) {
-      return {
-        handled: false,
-        confidence: 0,
-        reason: `Public generic-scenario answer violated scope isolation (${scopeViolations.join(', ')}) and the bounded repair did not clear it.`,
-        provenance: provenance as any,
-      }
-    }
-    parsed = repaired
-  }
-
-  // PUBLIC DISCLOSURE GATE (2026-08-26, owner-directed). COS is the only reasoner and the
-  // Concierge renders passively, so the company-information boundary is enforced HERE, before
-  // release — not downstream by a filter that could miss. Unlike the scenario-scope check above,
-  // this runs on EVERY public answer including SignalBoost-specific ones, because "what model
-  // powers COS?" is precisely the question that must not be answered on this surface.
-  const disclosures = publicDisclosureViolations(parsed.answer)
-  if (disclosures.length && asksAboutServiceIdentity(userRequest)) {
-    // The reader asked what runs this service. The honest public answer is the boundary itself,
-    // not an outage message and not a redaction attempt that will keep tripping the gate.
-    return {
-      handled: true,
-      reply: publicImplementationDisclosureReply(input.language),
-      confidence: 1,
-      provenance: provenance as any,
-    }
-  }
-  if (disclosures.length) {
-    const redact = await callCosReasoner({
-      temperature: 0,
-      maxTokens: 2600,
-      systemPrompt: [
-        'You are COS repairing a public answer that disclosed internal information. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-        'Remove every reference to the underlying model, model family, provider, hosting platform, infrastructure vendor, internal component name, internal metric, confidence value, threshold, evidence label, and retrieval or release machinery.',
-        'If the reader asked what powers this service, say only that COS is SignalBoost\'s own reasoning layer and that implementation details are not public. Do not name anything.',
-        'Keep the substantive answer to the reader\'s actual question intact. Do not mention this repair.',
-        input.language ? `Reply in ${input.language}.` : 'Reply in the language of the user.',
-      ].join(' '),
-      prompt: [
-        `USER REQUEST:\n${userRequest}`,
-        `REJECTED DRAFT:\n${parsed.answer}`,
-        `DISCLOSURES:\n${disclosures.join(', ')}`,
-        'Return the corrected answer now.',
-      ].join('\n\n'),
-    }).catch(() => null)
-    const redacted = withComputedArithmetic(redact?.text ? parseLocalResult(redact.text) : null)
-    if (!redacted || redacted.truncated || !redacted.answer.trim() || publicDisclosureViolations(redacted.answer).length) {
-      // Fails closed with no best-effort draft. A draft containing internals must never be
-      // surfaced to the reader, not even labelled as low confidence.
-      return {
-        handled: false,
-        confidence: 0,
-        reason: `Public answer disclosed internal information (${disclosures.join(', ')}) and the bounded redaction did not clear it.`,
-        provenance: provenance as any,
-      }
-    }
-    parsed = redacted
-  }
-
-  const confidence = Math.max(0, Math.min(1, parsed.confidence))
-  if (confidence < confidenceThreshold()) {
-    return {
-      handled: false,
-      confidence,
-      reason: `Public-only COS confidence ${confidence.toFixed(2)} is below threshold ${confidenceThreshold().toFixed(2)}.`,
-      bestEffortReply: parsed.answer.trim(),
-      provenance: provenance as any,
-    }
-  }
-
-  return {
-    handled: true,
-    reply: parsed.answer.trim(),
-    confidence,
-    provenance: provenance as any,
-  }
+function isLocalDeterministicUtility(text: string): boolean {
+  return LOCAL_ARITHMETIC.test(text) || LOCAL_CLOCK_OR_DATE.test(text)
 }
 
 
-function harvestCatalogNames(results: Array<{ title?: string; snippet?: string }>): string[] {
-  // Join every field with the bullet so a source TITLE never glues onto the next snippet's name.
-  const text = results.flatMap(r => [r.title, r.snippet]).filter(Boolean).join(' • ')
-  const stop = /^(esses|grande s[aã]o paulo|s[aã]o paulo|futebol|futebol amador|varzeap[eé]dia|v[aá]rzeap[eé]dia|netshoes|appito|facebook|vindo|conhecido|prepare-se|come[cç]a|enquanto|divulga[cç][aã]o|organizado|e-mail|telefone|museu|arquivos sp|copa pioneer|super copa pioneer|copa le[oõ]es|copa rebote|campeonato municipal|esp[ií]rito santo|zona leste|santo amaro|mooca|guaianases|graja[uú]|boi mirim|alberto luiz|diego vi|thomaz mazzoni|liga paulistana de futebol amador outros)$/i
-  const teamHint = /(?:clube|futebol clube|\bfc\b|\bec\b|gr[eê]mio|associa[cç][aã]o|atl[eé]tico|recreativo|katatumba|piraporinha|ver[oô]nia|cidade tiradentes|dan[uú]bio|liberidade|[aá]guia negra|jardim )/i
-  // Page-chrome / media / ads / structural noise that never belongs in a team name.
-  const junkToken = /\b(uol|ads|newsletters?|v[ií]deos?|mail|confere|confira|wikipedia|wiki|facebook|instagram|netshoes|appito|home|equipes|conte[uú]do|acompanhe|not[ií]cias?|enciclop[eé]dia|p[aá]gina|snapshot|terr[aã]o|enrola|cdc|slogan|programa|jogos de paris|sexo|[uú]ltimas|danon[aá]ticos|maca[eé])\b/i
-  // Label words that get glued to the end of a captured name.
-  const trailingLabel = /\s+(fundaç[aã]o|fundaão|hist[oó]ria|conte[uú]do|equipes|home|slogan|uniforme|sede|campo|presidente|apelido|mascote|fundad[oa])\b[\s\S]*$/i
-  // Bare administrative neighborhoods (not várzea teams).
-  const bareNeighborhood = /^(jardim (?:[aâ]ngela|am[eé]rica|europa|paulista|paulistano|ju|monte(?:\s+se)?|cl[ií]max)|[aá]gua rasa|cidade tiradentes|santo amaro|casa verde|sa[uú]de|ipiranga|mooca|penha|guaianases|graja[uú])$/i
-  const slugArtifact = /sp-sao-paulo|https?:|\.com|\.br|www\./i
-  // Out-of-scope / professional clubs leaking from generic search.
-  const outOfScope = /\b(mogi mirim|mirim esporte clube|atl[eé]tico-?mg|corinthians paulista|palmeiras|s[aã]o paulo futebol clube|cruzeiro|flamengo|santos futebol clube de s)\b/i
-  const found: string[] = []
-  const seen = new Set<string>()
-  const matches = text.match(/[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{2,}(?:\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wÁÉÍÓÚÂÊÔÃÕÇáéíóúâêôãõç'.-]{1,}){0,6}/g) || []
-  for (const raw0 of matches) {
-    // A captured run can straddle a sentence/bullet boundary and glue the tail of one
-    // name onto the head of the next. Evaluate EVERY segment as its own candidate.
-    for (const seg of raw0.split(/\s+•\s+|\.\s+/)) {
-      const name = seg
-        .replace(trailingLabel, '')
-        .replace(/\s+(?:da|de|do|e)\s*$/i, '') // trim a trailing connector left by truncation
-        .replace(/\s+/g, ' ')
-        .replace(/[.,;:]+$/, '')
-        .trim()
-      const key = name.toLowerCase()
-      if (name.length < 6 || name.length > 70) continue
-      if (stop.test(name) || seen.has(key)) continue
-      if (junkToken.test(name)) continue
-      if (slugArtifact.test(name)) continue
-      if (bareNeighborhood.test(name)) continue
-      if (outOfScope.test(name)) continue
-      // reject neighborhood enumerations like "Jardim América Jardim Europa Jardim Paulista"
-      if ((name.match(/\bjardim\b/gi) || []).length >= 2) continue
-      if (!teamHint.test(name) && !/\b(?:da|do|de)\b/i.test(name)) continue
-      // reject a dangling 1-2 letter tail fragment (e.g. "Jardim Ju", "Monte Se")
-      if (/\s\p{L}{1,2}$/u.test(name) && !/\b(fc|ec|aa|ae)$/i.test(name)) continue
-      if (/https?:|página|enciclopédia|snapshot|query|e-mail|telefone/i.test(name)) continue
-      seen.add(key)
-      found.push(name)
-    }
-  }
-  return found
+function isGovernedPublicGuidance(text: string): boolean {
+  return GOVERNED_GUIDANCE_TOPIC.test(text) && GUIDANCE_REQUEST.test(text)
 }
 
-function parseRequestedListCount(prompt: string, fallback = 20): number {
-  // Honour an explicit count in the request ("50 times", "top 30", "lista com 15 ...").
-  const match = String(prompt || '').match(/\b(\d{1,3})\b/)
-  if (!match) return fallback
-  const n = Number(match[1])
-  if (!Number.isFinite(n) || n < 2) return fallback
-  return Math.min(n, 100)
+// True when the question is about whether a DIRECT/NONSTOP transport route EXISTS (a stable fact),
+// and NOT about a volatile trip attribute (price, time, status, date-specific availability).
+function isRouteExistenceQuestion(text: string): boolean {
+  if (TRIP_VOLATILITY.test(text)) return false
+  return ROUTE_DIRECTNESS.test(text) && TRANSPORT_ROUTE_NOUN.test(text)
 }
 
-function buildCatalogQueryPlan(prompt: string): string[] {
-  const asked = String(prompt || '').trim()
-  if (isPublicPageExtractionCatalogRequest(asked)) {
-    return [
-      'site:ligasp.com.br "Grupo Especial" "Escolas de Samba" "São Paulo"',
-      'site:ligasp.com.br "Escolas de Samba" "Grupo Especial"',
-      'Liga SP Grupo Especial escolas de samba São Paulo lista oficial',
-    ]
-  }
-  // Várzea / amateur football in São Paulo needs facet coverage to reach a large
-  // count — a single snapshot only surfaces a handful of names.
-  if (/v[aá]rzea|varzea|amador/i.test(asked)) {
-    return [
-      'lista times futebol varzea amador Sao Paulo tradicionais',
-      'times varzea zona sul Sao Paulo futebol amador bairro',
-      'times varzea zona leste Sao Paulo futebol amador Guaianases Itaquera',
-      'times varzea zona norte Sao Paulo futebol amador Casa Verde',
-      'times futebol amador Sao Paulo Capao Redondo Grajau M Boi Mirim',
-      'clube futebol amador varzea Sao Paulo Cidade Tiradentes Sapopemba Mooca',
-      'times futebol amador Grande Sao Paulo Osasco Taboao Cotia',
-    ]
-  }
-  // Generic named-catalog request: widen coverage with a few rephrasings.
-  return [asked, `lista completa ${asked}`, `${asked} nomes`]
+export type StructuredLiveDataKind = 'weather' | 'financial' | 'sports'
+
+/**
+ * Identifies external high-frequency values for which ordinary web snippets are not an adequate
+ * source of truth. Callers should use a structured real-time provider and fail closed if that
+ * provider cannot return current data; they must not silently fall back to model memory.
+ */
+export function structuredLiveDataKind(input: string): StructuredLiveDataKind | null {
+  const text = normalizedText(input)
+  if (!text || HISTORICAL_ANCHOR.test(text) || CONCEPTUAL_OR_CREATIVE.test(text) || looksLikeInternalOperationalState(text) || isLocalDeterministicUtility(text)) return null
+
+  if (isDirectOrTerseLookup(text, WEATHER_STATE)) return 'weather'
+  if (isDirectOrTerseLookup(text, FINANCIAL_STATE) || TICKER_PRICE.test(text) || isDirectOrTerseLookup(text, CRYPTO_PRICE)) return 'financial'
+  if (TERSE_SPORTS_STATE.test(text) || (LOOKUP_INTENT.test(text) && SPORTS_STATE.test(text))) return 'sports'
+  return null
 }
 
-async function tryLiveNamedCatalog(input: {
-  prompt: string
-  language?: string
-  privileged?: boolean
-}): Promise<COSFirstAnswerResult> {
-  const asked = String(input.prompt || '').trim()
-  const targetCount = parseRequestedListCount(asked)
-  const queryPlan = buildCatalogQueryPlan(asked)
+/**
+ * Returns true when the request depends on EXTERNAL world facts that should be verified against
+ * current evidence rather than assumed from frozen model weights or durable memory.
+ *
+ * GENERAL DEFAULT: a direct factual lookup about the external world is live-verify-by-default even
+ * when the user does not say "current", "latest", or "today". That is the key stale-world guard:
+ * "What is Poland's population?", "Where is Company X headquartered?", "Who owns Brand Y?", and
+ * "Tell me about Person Z" all get current evidence before COS answers.
+ *
+ * Explicit exclusions remain for historical questions, conceptual/creative reasoning, local
+ * deterministic utilities, and private/internal system-of-record state.
+ *
+ * Hard rule: a positive result means model pretraining, local reasoning, durable memory,
+ * semantic/exact cache, and prior conversation facts are NOT permitted to establish the answer.
+ * COS must retrieve fresh external evidence on this turn, or fail closed if it cannot verify it.
+ */
+export function requiresFreshExternalEvidence(input: string): boolean {
+  const text = normalizedText(input)
+  if (!text) return false
+  if (HISTORICAL_ANCHOR.test(text)) return false
+  if (looksLikeInternalOperationalState(text)) return false
+  if (isLocalDeterministicUtility(text)) return false
+  if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true
+  if (isContentGenerationRequest(text)) return false
 
-  const seen = new Set<string>()
-  const names: string[] = []
-  const usedSources: string[] = []
-  let anySearchOk = false
-  let lastError = 'no results'
+  // A question about COS's OWN previous answer is never a public-web lookup. This is a structural
+  // safeguard, not a duplicate of the introspection routing: when the introspection classifier
+  // misses (a typo like "the answert from", a phrasing nobody anticipated), the question used to
+  // fall through to live search — and on 2026-08-23 COS answered "where did you get the answer
+  // from?" using retrieved pages about E-Verify and FAFSA verification, because it searched the
+  // web for the word "verification". Failing to recognize introspection should degrade to a plain
+  // answer, never to confidently citing unrelated sources as the origin of its own reasoning.
+  if (isProvenanceIntrospection(text)) return false
 
-  // Iterate the query plan, reading pages and harvesting unique names, until we
-  // reach the requested count or exhaust the plan. Never stop at the first
-  // snapshot, and never pad with invented names.
-  for (const query of queryPlan) {
-    if (names.length >= targetCount) break
-    const live = await getExternalInfo(query, 10, { bypassCache: true })
-    if (!live.ok || !live.results.length) {
-      lastError = live.error || lastError
-      continue
-    }
-    anySearchOk = true
-    const sambaCatalog = isPublicPageExtractionCatalogRequest(asked)
-    if (!sambaCatalog) {
-      for (const url of live.results.map(r => r.url).filter(Boolean)) {
-        if (!usedSources.includes(url)) usedSources.push(url)
-      }
-    }
-    // Research each returned public page and admit only pages whose extracted structure
-    // proves they contain the complete requested group. No source URL is hard-coded.
-    const pages = await readPublicPages(live.results.map(r => r.url)).catch(() => [])
-    let harvested: string[]
-    if (sambaCatalog) {
-      const sourcePage = pages.find(page => extractSambaSchoolNames([page]).length > 0)
-      harvested = sourcePage ? extractSambaSchoolNames([sourcePage]) : []
-      // Provenance names the exact page that supplied the answer, not every page
-      // inspected during research.
-      if (sourcePage?.url) usedSources.push(sourcePage.url)
-    } else {
-      harvested = harvestCatalogNames([
-        ...live.results,
-        ...pages.map(page => ({ title: page.title, snippet: page.snippet })),
-      ])
-    }
-    for (const name of harvested) {
-      const key = name.toLowerCase()
-      if (seen.has(key)) continue
-      seen.add(key)
-      names.push(name)
-      if (names.length >= targetCount) break
-    }
-    // One self-declared roster page is one answer. Never combine separate sources
-    // merely because the user requested more entries than that roster contains.
-    if (sambaCatalog && harvested.length) break
-  }
+  // Route/service EXISTENCE is stable knowledge, answered from the brain like any web assistant.
+  // Trip fares, schedules, live status, and date availability stay volatile (guarded above).
+  if (isRouteExistenceQuestion(text)) return false
 
-  if (!anySearchOk) {
-    return {
-      handled: true,
-      reply: `Live web search ran and returned nothing usable. Error: ${lastError}. COS will not invent club names.`,
-      confidence: 0.55,
-      provenance: { responseSource: 'cos_local_primary', catalogLiveSearchFailed: true, catalogLiveSearchError: lastError } as any,
-    }
-  }
+  // High-stakes guidance is never answered from model memory. This occurs before the
+  // conceptual/creative exclusion because questions such as "what should I do after changing my name?"
+  // are actionable public-administration guidance, not timeless advice.
+  if (isGovernedPublicGuidance(text)) return true
 
-  if (!names.length) {
-    return {
-      handled: true,
-      reply: 'Live web search ran but no verifiable names could be extracted from the results. COS will not invent names.',
-      confidence: 0.55,
-      provenance: {
-        responseSource: 'cos_local_primary',
-        catalogLiveSearch: true,
-        harvestedNameCount: 0,
-        liveSources: usedSources.slice(0, 10),
-      } as any,
-    }
-  }
+  if (SIMPLE_NAMED_ENTITY_LOOKUP.test(text)) return true
 
-  const finalNames = names.slice(0, targetCount)
-  const list = finalNames.map((name, i) => `${i + 1}. ${name}`).join('\n')
-  // Clean answer: just the extracted list. No raw source-URL dump in the body,
-  // and no defensive "not padded" note. If we genuinely came up short, say it
-  // once, plainly — sources stay in provenance, not in the user-facing reply.
-  const shortfallNote =
-    finalNames.length < targetCount
-      ? `\n\nThat is ${finalNames.length} distinct names verified from live sources — fewer than the ${targetCount} requested; the live results did not yield more.`
-      : ''
-  const reply = `${list}${shortfallNote}`
+  // Shared temporal classifier: life/death, current holders, "still" status, latest/current mutable
+  // state, current rules/security state, and recent events. Domain-specific checks below remain as
+  // additional safeguards for terse lookups without explicit temporal wording.
+  if (classifyTemporalSensitivity(text).sensitive) return true
 
-  return {
-    handled: true,
-    reply,
-    confidence: finalNames.length >= targetCount ? 0.72 : 0.66,
-    provenance: {
-      responseSource: 'catalog_public_page_extraction',
-      catalogLiveSearch: true,
-      autonomousResearchAttempted: true,
-      localModelInvoked: false,
-      researchDocumentsAcquired: usedSources.length,
-      liveExternalEvidence: {
-        retrievedAt: new Date().toISOString(),
-        sources: usedSources.slice(0, 10).map((url, index) => ({ id: `LIVE${index + 1}`, title: url, url })),
-      },
-      liveSources: usedSources.slice(0, 10),
-      harvestedNameCount: finalNames.length,
-      requestedCount: targetCount,
-      queriesRun: queryPlan.length,
-    } as any,
-  }
-}
+  if (PRESENT_TENSE_OFFICE_HOLDER.test(text)) return true
+  if (TERSE_CURRENT_OFFICE_HOLDER.test(text)) return true
+  if (CURRENT_LEADER.test(text)) return true
+  if (ROLE_STATUS_CHECK.test(text)) return true
 
-async function tryFreshCurrentFact(input: {
-  prompt: string
-  previousAssistant?: string | null
-  userId?: string | null
-  language?: string
-  privileged?: boolean
-}): Promise<COSFirstAnswerResult> {
-  const retrievedAt = new Date().toISOString()
-  const queries = freshEvidenceSearchQueries(input.prompt, new Date(retrievedAt))
-  const liveResponses = await Promise.all(
-    queries.map(query => getExternalInfo(query, FRESH_SEARCH_RESULT_BUDGET, { bypassCache: true })),
-  )
-  const successfulResponses = liveResponses.filter(response => response.ok)
-  const documentsAcquired = liveResponses.reduce((count, response) => count + (response.ok ? response.results.length : 0), 0)
-  // Preserve evidence coverage for every part of a compound request.
-  let sources = prepareFreshEvidenceAcrossQueries(
-    liveResponses.flatMap(response => response.ok ? [response.results] : []),
-    FRESH_SELECTED_EVIDENCE_BUDGET,
-  )
-  const claimResearch = await deepenClaimResearch(input.prompt, sources, readPublicPages)
-  sources = claimResearch.sources
-  const baseBudget = {
-    search_result_limit: FRESH_SEARCH_RESULT_BUDGET,
-    queries_run: queries.length,
-    results_received: documentsAcquired,
-    evidence_selected: sources.length, pages_read: claimResearch.pagesRead, claims: claimResearch.claims,
-  }
+  if (LIVE_NEWS.test(text)) return true
+  if (LOOKUP_INTENT.test(text) && NEWS_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
 
-  if (!successfulResponses.length || !freshEvidenceMeetsAuthority(input.prompt, sources)) {
-    const errors = liveResponses.filter(response => !response.ok).map(response => response.error).filter(Boolean)
-    const reason = errors.length
-      ? `Live current-fact verification failed: ${errors.join('; ')}`
-      : 'Live current-fact verification did not produce enough authoritative evidence.'
-    return {
-      handled: true,
-      reply: freshVerificationUnavailable(input.language),
-      confidence: 0,
-      provenance: freshProvenance({
-        reasonerLabel: null,
-        localModelInvoked: false,
-        retrievedAt,
-        sources,
-        documentsAcquired,
-        responseSource: 'live_verification_refusal',
-        externalAiNecessary: false,
-        escalationReasonCode: 'insufficient_live_authority',
-        escalationReason: reason,
-        evidenceBudget: { ...baseBudget, stopping_reason: 'insufficient_authoritative_evidence_no_cloud_escalation' },
-      }) as any,
-    }
-  }
+  if (CONCEPTUAL_OR_CREATIVE.test(text)) return false
 
-  const economicFacts = constructEconomicFactsReply(input.prompt, sources)
-  if (economicFacts) {
-    return {
-      handled: true,
-      reply: economicFacts.reply,
-      confidence: 0.99,
-      provenance: freshProvenance({
-        reasonerLabel: null,
-        localModelInvoked: false,
-        retrievedAt,
-        sources: economicFacts.sources,
-        documentsAcquired,
-        responseSource: 'live_economic_facts',
-        externalAiNecessary: false,
-        evidenceBudget: { ...baseBudget, stopping_reason: 'economic_facts_constructed_no_model' },
-      }) as any,
-    }
-  }
+  if (structuredLiveDataKind(text)) return true
+  if (LOOKUP_INTENT.test(text) && OUTAGE_STATE.test(text)) return true
+  if (isDirectOrTerseLookup(text, TRAVEL_STATE)) return true
+  if (isDirectOrTerseLookup(text, ELECTION_STATE)) return true
 
-  const deterministic = resolveDeterministicFreshOfficeHolder(input.prompt, sources)
-  if (deterministic) {
-    return {
-      handled: true,
-      reply: deterministic.reply,
-      confidence: deterministic.confidence,
-      provenance: freshProvenance({
-        reasonerLabel: null,
-        localModelInvoked: false,
-        retrievedAt,
-        sources: deterministic.sources,
-        documentsAcquired,
-        responseSource: 'deterministic_authoritative_fact',
-        deterministicResolverUsed: true,
-        externalAiNecessary: false,
-        escalationReasonCode: null,
-        escalationReason: null,
-        evidenceBudget: {
-          ...baseBudget,
-          evidence_selected: deterministic.sources.length,
-          stopping_reason: 'authoritative_cross_source_consensus',
-        },
-      }) as any,
-    }
-  }
+  if (LOOKUP_INTENT.test(text) && PUBLIC_RULE_STATE.test(text)) return true
+  if (LOOKUP_INTENT.test(text) && SOFTWARE_SECURITY_STATE.test(text) && TEMPORAL_LIVE_MARKER.test(text)) return true
+  if (LOOKUP_INTENT.test(text) && LIFE_STATUS_STATE.test(text)) return true
 
-  const resolved = resolveCosReasoner()
-  if (!resolved.config) {
-    const reason = 'Live evidence was retrieved, but the independent local reasoner is not configured for grounded synthesis.'
-    return {
-      handled: false,
-      confidence: 0,
-      reason,
-      provenance: freshProvenance({
-        reasonerLabel: null,
-        localModelInvoked: false,
-        retrievedAt,
-        sources,
-        documentsAcquired,
-        externalAiNecessary: true,
-        escalationReasonCode: 'local_reasoner_not_configured',
-        escalationReason: reason,
-        evidenceBudget: { ...baseBudget, stopping_reason: 'authoritative_evidence_ready_local_reasoner_unavailable' },
-      }) as any,
-    }
-  }
+  // General stale-world protection: any remaining direct external factual lookup is verified live by
+  // default. It is intentionally last so internal, historical, conceptual, and deterministic
+  // requests keep their correct specialized routes.
+  if (LOOKUP_INTENT.test(text)) return true
 
-  const evidenceBlock = freshEvidenceGroundingBlock(input.prompt, sources, retrievedAt)
-  const synthesisRequest = {
-    temperature: 0,
-    maxTokens: 1800,
-    systemPrompt: [
-      'You are SignalBoost COS live-fact verifier.',
-      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-      'For any present/current claim, use only the server-retrieved LIVE evidence in the prompt.',
-      'Never use pretrained memory, previous conversation facts, caches, or durable COS memory to fill a gap.',
-      'If independent sources disagree, or the evidence cannot establish the answer, say live verification is insufficient and use confidence <= 0.30.',
-      'Answer from the supplied evidence, but do not show source labels or URLs unless the user asks. Recorded provenance retains the exact sources.',
-    ].join(' '),
-    prompt: `${evidenceBlock}\n\nAnswer the original question now.`,
-  }
-  // Evidence acquisition succeeded. A transient local transport failure must get one bounded
-  // retry before this request can fail closed; it may never fall back to another model.
-  let reasoned: Awaited<ReturnType<typeof callCosReasoner>> | null = null
-  for (let attempt = 0; attempt < 2 && !reasoned?.text; attempt += 1) {
-    reasoned = await callCosReasoner(synthesisRequest).catch(() => null)
-  }
-
-  const provenance = freshProvenance({
-    reasonerLabel: reasoned?.reasoner.label ?? resolved.config.label,
-    localModelInvoked: true,
-    retrievedAt,
-    sources,
-    documentsAcquired,
-    evidenceBudget: { ...baseBudget, stopping_reason: 'bounded_evidence_sent_to_local_reasoner' },
-  })
-
-  if (!reasoned?.text) {
-    const reason = 'Live evidence was retrieved, but independent local synthesis returned no answer.'
-    return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_failed', escalationReason: reason } as any }
-  }
-
-  const parsed = withComputedArithmetic(parseLocalResult(reasoned.text))
-  if (!parsed || parsed.truncated) {
-    const reason = 'Live evidence was retrieved, but independent local synthesis was incomplete or unparseable.'
-    return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_unparseable', escalationReason: reason } as any }
-  }
-
-  const citesIndependentEvidence = freshEvidenceMeetsAuthority(input.prompt, sources)
-  const confidence = Math.max(0, Math.min(1, parsed.confidence))
-  if (!citesIndependentEvidence || confidence < confidenceThreshold()) {
-    const reason = !citesIndependentEvidence
-      ? 'Current-fact synthesis was rejected because it did not cite the required independent live sources.'
-      : `Current-fact synthesis confidence ${confidence.toFixed(2)} is below threshold ${confidenceThreshold().toFixed(2)}.`
-    return {
-      handled: false,
-      confidence,
-      reason,
-      bestEffortReply: parsed.answer,
-      provenance: {
-        ...provenance,
-        externalAiNecessary: true,
-        escalationReasonCode: !citesIndependentEvidence ? 'citation_grounding_rejected' : 'local_synthesis_below_threshold',
-        escalationReason: reason,
-      } as any,
-    }
-  }
-
-  return { handled: true, reply: parsed.answer, confidence, provenance: { ...provenance, externalAiNecessary: false, escalationReasonCode: null, escalationReason: null } as any }
-}
-
-async function reflectOrdinaryAnswerFreshness(
-  input: { prompt: string; language?: string },
-  result: COSFirstAnswerResult,
-): Promise<COSFirstAnswerResult> {
-  if (!result.handled) return result
-  const signals = answerFreshnessSignals(result.reply)
-  if (!signals.length) return result
-
-  const repair = await callCosReasoner({
-    temperature: 0,
-    maxTokens: 1400,
-    systemPrompt: [
-      'You are COS answer-side freshness self-reflection.',
-      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-      'The original question was not a live current-fact lookup, but the draft introduced mutable present-world claims that were not live-verified.',
-      'Rewrite the draft so it answers the timeless, conceptual, normative, or hypothetical question without asserting current industry practice, current law, current regulation, current leadership, current market behavior, or other mutable present-world facts.',
-      'Do not add new factual claims. Do not claim what most companies, regulators, courts, governments, or industries currently do.',
-      'Preserve useful ethical/logical reasoning and clearly separate competing principles when relevant.',
-    ].join(' '),
-    prompt: [
-      `ORIGINAL QUESTION:\n${input.prompt}`,
-      `UNVERIFIED CURRENT-WORLD SIGNALS:\n${signals.map(signal => `${signal.code}: ${signal.excerpt}`).join('\n')}`,
-      `DRAFT ANSWER:\n${result.reply}`,
-      'Rewrite the answer now.',
-    ].join('\n\n'),
-  }).catch(() => null)
-
-  const parsed = withComputedArithmetic(repair?.text ? parseLocalResult(repair.text) : null)
-  const locallyRepaired = parsed && !parsed.truncated && parsed.answer.trim() && !answerNeedsFreshnessReflection(parsed.answer)
-    ? parsed.answer.trim()
-    : null
-  const deterministicRepair = locallyRepaired ? null : stripUnsupportedCurrentClaimSentences(result.reply)
-  const reply = locallyRepaired || deterministicRepair
-
-  if (!reply || answerNeedsFreshnessReflection(reply)) {
-    const reason = 'COS draft introduced unverified mutable current-world claims and the local self-reflection pass could not remove them safely.'
-    return {
-      handled: false,
-      confidence: 0,
-      reason,
-      bestEffortReply: stripUnsupportedCurrentClaimSentences(result.reply) || undefined,
-      provenance: {
-        ...(result.provenance as Record<string, unknown>),
-        answerFreshnessReflection: {
-          triggered: true,
-          repaired: false,
-          signals: signals.map(signal => signal.code),
-        },
-      } as any,
-    }
-  }
-
-  const repairedConfidence = locallyRepaired && parsed
-    ? Math.max(0, Math.min(result.confidence, parsed.confidence))
-    : Math.min(result.confidence, 0.8)
-  return {
-    handled: true,
-    reply,
-    confidence: repairedConfidence,
-    provenance: {
-      ...(result.provenance as Record<string, unknown>),
-      answerFreshnessReflection: {
-        triggered: true,
-        repaired: true,
-        method: locallyRepaired ? 'local_reasoner_rewrite' : 'deterministic_sentence_strip',
-        signals: signals.map(signal => signal.code),
-      },
-    } as any,
-  }
-}
-
-async function learnFromTurn(input: { prompt: string }, result: COSFirstAnswerResult): Promise<COSFirstAnswerResult> {
-  const turnId = peekEvidenceSourceUseTurnId()
-  const enriched = turnId
-    ? ({ ...result, provenance: { ...(result.provenance as Record<string, unknown>), turnId } } as unknown as COSFirstAnswerResult)
-    : result
-  const failureReason = 'reason' in enriched ? enriched.reason : null
-  await recordCosTurnExperience({
-    prompt: input.prompt,
-    handled: enriched.handled,
-    confidence: enriched.confidence,
-    provenance: enriched.provenance,
-    failureReason,
-  })
-  return enriched
-}
-
-export async function tryCOSFirstAnswer(input: {
-  prompt: string
-  userId?: string | null
-  language?: string
-  privileged?: boolean
-  disableCache?: boolean
-  previousAssistant?: string | null
-}): Promise<COSFirstAnswerResult> {
-  beginEvidenceSourceUseTurn()
-
-  if (isNamedCatalogListRequest(input.prompt) || isPublicPageExtractionCatalogRequest(input.prompt)) {
-    return learnFromTurn(input, await tryLiveNamedCatalog(input))
-  }
-
-  if (isPlatformStackQuestion(input.prompt)) {
-    const reply = isPublicDeliveryScope()
-      ? publicImplementationDisclosureReply(input.language)
-      : ownerPlatformStackReply(input.language)
-    return learnFromTurn(input, {
-      handled: true,
-      reply,
-      confidence: 1,
-      provenance: { responseSource: 'cos_local_primary', selfKnowledgeDeterministic: true } as any,
-    })
-  }
-
-  const directTextTransformation = await tryDirectTextTransformation(input)
-  if (directTextTransformation) {
-    return learnFromTurn(input, directTextTransformation)
-  }
-
-  if (requiresFreshExternalEvidence(input.prompt)) {
-    return learnFromTurn(input, await tryFreshCurrentFact(input))
-  }
-
-  if (classifyKnowledgeAccess(input.prompt).mode === 'search_if_thin') {
-    const looked = await tryFreshCurrentFact(input)
-    const reply = 'reply' in looked ? String(looked.reply || '') : ''
-    const refused = /could not stand behind|did not release an answer|verification unavailable|live verification/i.test(reply)
-    if (looked.handled && reply && !refused) {
-      return learnFromTurn(input, looked)
-    }
-  }
-
-  if (isPublicDeliveryScope()) {
-    // ONE BRAIN. Concierge is a render window. Company-reserved and identity
-    // questions stay on the public-safe prompt. Everything else is the same COS
-    // enterprise answer, with disclosure stripped if internals leaked.
-    if (asksAboutServiceIdentity(input.prompt) || isSignalBoostSpecificPublicRequest(input.prompt)) {
-      return learnFromTurn(input, await tryPublicStatelessAnswer(input))
-    }
-    const brain = await tryEnterpriseCOSFirstAnswer(input)
-    if (brain.handled && 'reply' in brain && brain.reply && publicDisclosureViolations(String(brain.reply)).length) {
-      return learnFromTurn(input, {
-        ...brain,
-        reply: publicImplementationDisclosureReply(input.language),
-        confidence: Math.min(brain.confidence, 0.6),
-        provenance: { ...(brain.provenance as Record<string, unknown>), publicDisclosureStripped: true } as any,
-      })
-    }
-    return learnFromTurn(input, brain)
-  }
-
-  if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
-    try {
-      await ensureLocalInferenceRuntimeReady()
-      await generateLocalEmbedding(input.prompt)
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error)
-      console.info('[cos-runtime-preflight-unavailable]', JSON.stringify({ at: new Date().toISOString(), reason }))
-      const result = await withRunpodWakePermission({
-        allowed: false,
-        source: 'background_or_untrusted',
-        interactionId: null,
-        issuedAtMs: null,
-        ageMs: null,
-        reason: 'runtime_preflight_failed_no_retry',
-      }, () => tryEnterpriseCOSFirstAnswer(input))
-
-      const capacity = classifyRunpodFailure(reason)
-      if (capacity.capacityUnavailable && result.handled === false) {
-        const capacityReason = runpodCapacityUnavailableReason({ podId: configuredRunpodPodId(), originalMessage: reason })
-        const failedResult: COSFirstAnswerResult = {
-          handled: false,
-          confidence: result.confidence,
-          reason: capacityReason,
-          ...('bestEffortReply' in result && result.bestEffortReply ? { bestEffortReply: result.bestEffortReply } : {}),
-          provenance: result.provenance,
-        }
-        return learnFromTurn(input, failedResult)
-      }
-      return learnFromTurn(input, await reflectOrdinaryAnswerFreshness(input, result))
-    }
-  }
-
-  const result = await tryEnterpriseCOSFirstAnswer(input)
-  return learnFromTurn(input, await reflectOrdinaryAnswerFreshness(input, result))
+  return false
 }

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { BuilderFile, BuilderVerifiedRepairLesson, BuilderWorkspacePort } from './contracts.ts'
+import type { BuilderFailureClass, BuilderFile, BuilderVerifiedRepairLesson, BuilderWorkspacePort } from './contracts.ts'
 
 const MAX_FILE_BYTES = 512 * 1024
 const MAX_FILES = 100
@@ -150,6 +150,22 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
       runtime: lesson.runtime,
     })
     if (error) throw new Error(`builder_lesson_write: ${error.message}`)
+  }
+
+  async fetchVerifiedRepairLessons(limit = 12): Promise<readonly BuilderVerifiedRepairLesson[]> {
+    const { data, error } = await this.db.from('builder_verified_repair_lessons')
+      .select('failure_class,cause_evidence,fix_summary,regression_command,runtime')
+      .eq('user_id', this.userId)
+      .order('created_at', { ascending: false })
+      .limit(Math.max(1, Math.min(limit, 20)))
+    if (error) throw new Error(`builder_lesson_read: ${error.message}`)
+    return Object.freeze((data ?? []).map(row => Object.freeze({
+      failureClass: String(row.failure_class) as BuilderFailureClass,
+      causeEvidence: String(row.cause_evidence || ''),
+      fixSummary: String(row.fix_summary || ''),
+      regressionCommand: String(row.regression_command || ''),
+      runtime: 'node24-network-denied-ephemeral' as const,
+    })))
   }
 }
 

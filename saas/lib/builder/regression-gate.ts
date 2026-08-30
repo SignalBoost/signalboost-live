@@ -2,7 +2,7 @@ import type { BuilderToolTrace } from './contracts.ts'
 
 export type RegressionVerdict = Readonly<{ satisfied: true }> | Readonly<{ satisfied: false; reason: string }>
 
-const TEST_COMMAND = /\b(?:test|spec)\b|node\s+--test|vitest|jest|mocha|\btap\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test|\.(?:test|spec)\.[cm]?[jt]sx?\b/i
+const PROOF_COMMAND = /\b(?:test|spec)\b|node\s+--test|vitest|jest|mocha|\btap\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test|\.(?:test|spec)\.[cm]?[jt]sx?\b|(?:^|[\s;&|])(?:npx\s+)?tsc(?:\s|$)|\bnext\s+build\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:typecheck|type-check|build|prebuild)\b/i
 
 export function isRepairObjective(objective: string): boolean {
   return /\b(?:fix(?:ed)?|repair(?:ed)?|correct(?:ed)?|bug|error|failure|broken|regression|crash|failing|defect)\b/i.test(String(objective || ''))
@@ -12,19 +12,25 @@ function commandOf(trace: BuilderToolTrace): string {
   return typeof trace.input.command === 'string' ? trace.input.command : ''
 }
 
+function normalizedCommand(trace: BuilderToolTrace): string {
+  return commandOf(trace).trim().replace(/\s+/g, ' ')
+}
+
 /**
- * A repair is accepted only with an observed regression failure, a source change,
- * and a later passing regression command. Existing test files may be used; Builder
- * writes a new test only when the workspace has no suitable reproducer.
+ * A repair is accepted only with an observed proof failure, a later source change,
+ * and a passing rerun of the same proof command. Proof may be a regression test or
+ * the narrow typecheck/build command that reproduced a compiler or deployment failure.
  */
 export function evaluateRegressionGate(objective: string, trace: readonly BuilderToolTrace[], forceRepair = false): RegressionVerdict {
   if (!forceRepair && !isRepairObjective(objective)) return { satisfied: true }
-  const testRuns = trace.map((item, index) => ({ item, index })).filter(({ item }) => item.toolId === 'run' && TEST_COMMAND.test(commandOf(item)))
-  const failed = testRuns.find(({ item }) => !item.ok)
-  if (!failed) return { satisfied: false, reason: 'run an existing or new regression test before the repair and show it fails' }
+  const proofRuns = trace
+    .map((item, index) => ({ item, index, command: normalizedCommand(item) }))
+    .filter(({ item, command }) => item.toolId === 'run' && command && PROOF_COMMAND.test(command))
+  const failed = proofRuns.find(({ item }) => !item.ok)
+  if (!failed) return { satisfied: false, reason: 'run the narrowest relevant test, typecheck, or build proof before the repair and show it fails' }
   const repair = trace.findIndex((item, index) => index > failed.index && item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
-  if (repair < 0) return { satisfied: false, reason: 'make the smallest source repair after the reproduced test failure' }
-  const passed = testRuns.find(({ item, index }) => index > repair && item.ok)
-  if (!passed) return { satisfied: false, reason: 'rerun the regression test after the repair and show it passes' }
+  if (repair < 0) return { satisfied: false, reason: 'make the smallest source repair after the reproduced proof failure' }
+  const passed = proofRuns.find(({ item, index, command }) => index > repair && item.ok && command === failed.command)
+  if (!passed) return { satisfied: false, reason: 'rerun the same proof command after the repair and show it passes' }
   return { satisfied: true }
 }

@@ -8,6 +8,7 @@ import { uiText } from '@/lib/i18n/uiText'
 type WorkspaceFile = { path: string; content: string }
 type BuilderReply = { workspaceId?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
 type WorkspaceSummary = { id: string; objective: string; updatedAt: string }
+type CertificationSummary = { earnedLevel: number; attempts: number }
 
 const MAX_UPLOAD_BYTES = 512 * 1024
 const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
@@ -36,6 +37,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   unknown: { en: uiText('generatedUi.u_b23a6a8439c0dde5'), es: 'desconocido', pt: 'desconhecido', pl: 'nieznany', ru: 'неизвестно' },
   timedOut: { en: uiText('generatedUi.u_3dcd80f1b15f796e'), es: 'se agotó el tiempo', pt: 'tempo esgotado', pl: 'przekroczono czas', ru: 'время истекло' },
   failed: { en: uiText('generatedUi.u_5d28a90f4498a814'), es: 'falló', pt: 'falhou', pl: 'nie powiodło się', ru: 'сбой' },
+  certification: { en: 'Builder certification: level {level}/3 · verified attempts {attempts}', es: 'Certificación de Builder: nivel {level}/3 · intentos verificados {attempts}', pt: 'Certificação do Builder: nível {level}/3 · tentativas verificadas {attempts}', pl: 'Certyfikacja Buildera: poziom {level}/3 · zweryfikowane próby {attempts}', ru: 'Сертификация Builder: уровень {level}/3 · проверенные попытки {attempts}' },
 }
 
 export default function DeveloperPage() {
@@ -50,6 +52,7 @@ export default function DeveloperPage() {
   const [reply, setReply] = useState('')
   const [trace, setTrace] = useState<BuilderReply['trace']>([])
   const [error, setError] = useState('')
+  const [certification, setCertification] = useState<CertificationSummary>({ earnedLevel: 0, attempts: 0 })
   const [running, setRunning] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -70,7 +73,10 @@ export default function DeveloperPage() {
     try {
       const response = await fetch('/api/builder', { cache: 'no-store' })
       const data = await response.json()
-      if (response.ok) setWorkspaces(Array.isArray(data.workspaces) ? data.workspaces : [])
+      if (response.ok) {
+        setWorkspaces(Array.isArray(data.workspaces) ? data.workspaces : [])
+        if (typeof data.certification?.earnedLevel === 'number' && typeof data.certification?.attempts === 'number') setCertification(data.certification)
+      }
     } catch { /* workspace history is optional UI state */ }
   }
 
@@ -127,6 +133,7 @@ export default function DeveloperPage() {
           <p style={{ margin: 0, color: '#67e8f9', fontWeight: 800, fontSize: 12, letterSpacing: '.13em', textTransform: 'uppercase' }}>{c('eyebrow')}</p>
           <h1 style={{ margin: '8px 0', fontSize: 'clamp(28px, 5vw, 44px)' }}>{c('title')}</h1>
           <p style={{ margin: 0, maxWidth: 700, color: '#94a3b8', lineHeight: 1.55 }}>{c('intro')}</p>
+          <p style={{ margin: '8px 0 0', color: '#67e8f9', fontSize: 13 }}>{c('certification').replace('{level}', String(certification.earnedLevel)).replace('{attempts}', String(certification.attempts))}</p>
         </header>
         <section style={{ border: '1px solid #1e293b', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 14 }}>
           <label style={{ display: 'grid', gap: 8, fontWeight: 700 }}>

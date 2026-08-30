@@ -41,7 +41,13 @@ export async function GET(request: Request) {
   const workspace = createSupabaseBuilderWorkspace(access.userId)
   if (!workspace) return NextResponse.json({ error: 'Builder storage is unavailable.' }, { status: 503 })
   const workspaceId = new URL(request.url).searchParams.get('workspaceId') || ''
-  if (!workspaceId) return NextResponse.json({ workspaces: await workspace.listWorkspaces() })
+  if (!workspaceId) {
+    const [workspaces, certification] = await Promise.all([
+      workspace.listWorkspaces(),
+      workspace.certificationSummary().catch(() => ({ earnedLevel: 0, attempts: 0 })),
+    ])
+    return NextResponse.json({ workspaces, certification })
+  }
   if (!UUID.test(workspaceId)) return NextResponse.json({ error: 'Invalid workspace id.' }, { status: 400 })
   try {
     const files = (await workspace.listFiles(workspaceId)).map(file => file.path)

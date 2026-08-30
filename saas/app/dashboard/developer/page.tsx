@@ -6,7 +6,7 @@ import { uiText } from '@/lib/i18n/uiText'
 
 
 type WorkspaceFile = { path: string; content: string }
-type BuilderReply = { workspaceId?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
+type BuilderReply = { workspaceId?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; failureClass?: string; remediation?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
 type WorkspaceSummary = { id: string; objective: string; updatedAt: string }
 type CertificationSummary = { earnedLevel: number; attempts: number }
 
@@ -154,7 +154,7 @@ export default function DeveloperPage() {
           <h2 style={{ margin: 0, fontSize: 20 }}>{c('result')}</h2>
           {reply ? <pre style={{ margin: 0, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', color: '#e2e8f0', font: 'inherit', lineHeight: 1.55 }}>{reply}</pre> : null}
           {workspaceId && workspaceFiles.length ? <div style={{ display: 'grid', gap: 7 }}><strong style={{ fontSize: 13 }}>{c('files')}</strong>{workspaceFiles.map(path => <a key={path} href={`/api/builder/workspaces/${workspaceId}/files/${path.split('/').map(encodeURIComponent).join('/')}`} style={{ color: '#67e8f9' }} download={filename(path)}>{path}</a>)}</div> : null}
-          {trace?.length ? <div style={{ display: 'grid', gap: 8 }}><strong style={{ fontSize: 13 }}>{c('evidence')}</strong>{trace.map(item => item.toolId === 'run' ? <pre key={`${item.round}-${item.toolId}`} style={runEvidenceStyle}>$ {item.command || c('noCommand')}{`\n${c('exit')} ${item.exitCode ?? c('unknown')}${item.timedOut ? ` · ${c('timedOut')}` : ''}`}{item.stdout ? `\n${item.stdout}` : ''}{item.stderr ? `\n${item.stderr}` : ''}{item.error ? `\n${item.error}` : ''}</pre> : <span key={`${item.round}-${item.toolId}`} style={{ borderRadius: 99, padding: '5px 9px', fontSize: 12, background: item.ok ? '#064e3b' : '#7f1d1d', color: '#fff', width: 'fit-content' }}>{item.toolId}{item.path ? ` · ${item.path}` : ''}{item.ok ? ' ✓' : ` ${c('failed')}`}{item.error ? ` · ${item.error}` : ''}</span>)}</div> : null}
+          {trace?.length ? <div style={{ display: 'grid', gap: 8 }}><strong style={{ fontSize: 13 }}>{c('evidence')}</strong>{trace.map(item => item.toolId === 'run' ? <pre key={`${item.round}-${item.toolId}`} style={runEvidenceStyle}>$ {item.command || c('noCommand')}{`\n${c('exit')} ${item.exitCode ?? c('unknown')}${item.timedOut ? ` · ${c('timedOut')}` : ''}`}{item.stdout ? `\n${item.stdout}` : ''}{item.stderr ? `\n${item.stderr}` : ''}{item.error ? `\n${item.error}` : ''}{item.failureClass ? `\n${item.failureClass}` : ''}{item.remediation ? `: ${item.remediation}` : ''}</pre> : <span key={`${item.round}-${item.toolId}`} style={{ borderRadius: 99, padding: '5px 9px', fontSize: 12, background: item.ok ? '#064e3b' : '#7f1d1d', color: '#fff', width: 'fit-content' }}>{item.toolId}{item.path ? ` · ${item.path}` : ''}{item.ok ? ' ✓' : ` ${c('failed')}`}{item.error ? ` · ${item.error}` : ''}{item.failureClass ? ` · ${item.failureClass}` : ''}{item.remediation ? `: ${item.remediation}` : ''}</span>)}</div> : null}
         </section> : null}
       </section>
     </main>

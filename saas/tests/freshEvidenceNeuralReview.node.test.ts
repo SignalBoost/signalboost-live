@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import {
+  diagnoseFreshEvidenceSemanticPlan,
+  diagnoseFreshEvidenceSynthesis,
+  freshEvidenceAnswerContractRepairPrompt,
+} from '../lib/ai/cos/freshEvidenceContractRecovery.ts'
 import {
   SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT,
   acceptFreshEvidenceFaithfulnessReview,
@@ -58,6 +64,21 @@ test('semantic scopes cannot cite invented evidence ids', () => {
   }), null)
 })
 
+test('the observed Production contradiction — two material scopes marked binary-safe — is routed to neural plan repair', () => {
+  const contradictory = {
+    directBinaryAnswerSafe: true,
+    scopes: [
+      { scopeId: 'S1', label: 'broad measure', finding: 'The broad measure establishes one bounded result.', evidenceIds: ['LIVE1'] },
+      { scopeId: 'S2', label: 'narrower measure', finding: 'The narrower measure establishes a different bounded result.', evidenceIds: ['LIVE2'] },
+    ],
+  }
+  assert.ok(acceptFreshEvidenceSemanticPlan({ text: JSON.stringify(contradictory), sources }))
+  assert.deepEqual(diagnoseFreshEvidenceSemanticPlan({ text: JSON.stringify(contradictory), sources }), {
+    code: 'binary_safe_with_multiple_material_scopes',
+    repairable: true,
+  })
+})
+
 test('an unsafe binary scope plan cannot release a bare yes/no answer', () => {
   const accepted = acceptFreshEvidenceSynthesis({
     text: JSON.stringify({
@@ -99,6 +120,44 @@ test('dropping one model-declared material scope fails closed before neural fait
     sources,
     semanticPlan: scopedPlan,
   }), null)
+})
+
+test('a repairable answer-contract mismatch is diagnosed instead of becoming an opaque grounding refusal', () => {
+  const draft = JSON.stringify({
+    answer: 'The broad measure and the narrower measure establish different bounded results.',
+    evidenceIds: ['LIVE1', 'LIVE2'],
+  })
+  assert.deepEqual(diagnoseFreshEvidenceSynthesis({
+    text: draft,
+    input: 'Is there a difference between these outcomes?',
+    sources,
+    semanticPlan: scopedPlan,
+  }), {
+    code: 'missing_scope_ids',
+    repairable: true,
+    draftAnswer: 'The broad measure and the narrower measure establish different bounded results.',
+  })
+  const prompt = freshEvidenceAnswerContractRepairPrompt({
+    input: 'Is there a difference between these outcomes?',
+    sources,
+    retrievedAt: '2026-08-30T23:21:30.000Z',
+    semanticPlan: scopedPlan,
+    failedDraftText: draft,
+    failureCode: 'missing_scope_ids',
+  })
+  assert.match(prompt, /VALIDATION FAILURE: missing_scope_ids/)
+  assert.match(prompt, /answer, evidenceIds, and scopeIds/)
+  assert.match(prompt, /do not weaken or bypass the authority\/citation requirements/i)
+})
+
+test('the live local state machine has bounded plan and answer-contract repair phases before refusal', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceLocalSynthesis.ts', import.meta.url), 'utf8')
+  assert.match(source, /phase: 'scope_plan_repair'/)
+  assert.match(source, /phase: 'contract_repair'/)
+  assert.match(source, /diagnoseFreshEvidenceSemanticPlan/)
+  assert.match(source, /diagnoseFreshEvidenceSynthesis/)
+  assert.match(source, /repairAnswerContract/)
+  assert.match(source, /failureCode: args\.diagnosis\.code/)
 })
 
 test('faithfulness reviewer accepts a clean multi-scope verdict only with empty defect arrays', () => {

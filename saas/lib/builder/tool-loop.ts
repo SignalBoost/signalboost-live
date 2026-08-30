@@ -4,15 +4,51 @@ import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext } from './project-context.ts'
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 
-type Action = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> } | { type: 'answer'; answer: string }
+type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
+type Action = ToolAction | { type: 'answer'; answer: string }
 const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'write_file', 'edit_file', 'run'])
 const MAX_WRITES_PER_TURN = 6
 const MAX_RUNS_PER_TURN = 5
 const MAX_GATE_NUDGES = 3
 const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
 const MAX_MODEL_ROUND_ATTEMPTS = 2
+const MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS = 1
+const MODEL_CONTROL_MAX_TOKENS = 2_400
+const MODEL_REPAIR_CONTROL_MAX_TOKENS = 4_096
+const MODEL_CONTROL_RECOVERY_MAX_TOKENS = 4_096
 const text = (value: unknown) => typeof value === 'string' ? value : ''
-const safeJson = (value: unknown) => { try { return JSON.stringify(value).slice(0, 18_000) } catch { return '"[unserializable]"' } }
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+
+function compactJsonValue(value: unknown, depth = 0): unknown {
+  if (typeof value === 'string') return value.length > 8_000 ? `${value.slice(0, 8_000)}...[truncated]` : value
+  if (depth >= 6) return '[depth-bounded]'
+  if (Array.isArray(value)) return value.slice(-24).map(item => compactJsonValue(item, depth + 1))
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value).slice(0, 48).map(([key, item]) => [key, compactJsonValue(item, depth + 1)]),
+    )
+  }
+  return value
+}
+
+const safeJson = (value: unknown, maximum = 18_000) => {
+  try {
+    const compact = compactJsonValue(value)
+    let encoded = JSON.stringify(compact) ?? 'null'
+    if (encoded.length <= maximum) return encoded
+    if (Array.isArray(compact)) {
+      const tail = [...compact]
+      while (tail.length > 1 && encoded.length > maximum) {
+        tail.shift()
+        encoded = JSON.stringify(tail)
+      }
+      if (encoded.length <= maximum) return encoded
+    }
+    return JSON.stringify({ truncated: true, excerpt: encoded.slice(0, Math.max(0, maximum - 64)) })
+  } catch {
+    return '"[unserializable]"'
+  }
+}
 
 async function within<T>(work: Promise<T>, timeoutMs?: number): Promise<T> {
   if (!timeoutMs || !Number.isFinite(timeoutMs) || timeoutMs <= 0) return work
@@ -50,19 +86,78 @@ function toolContent(input: Record<string, unknown>): string {
   return text(input.content) || text(input.contents) || text(input.code) || text(input.text)
 }
 
-function parse(value: string | null, allowedTools: readonly BuilderToolId[] = tools): Action | null {
+function hasToolContent(input: Record<string, unknown>): boolean {
+  return ['content', 'contents', 'code', 'text'].some(key => typeof input[key] === 'string')
+}
+
+function validToolInput(toolId: BuilderToolId, input: Record<string, unknown>): boolean {
+  if (toolId === 'list_files') return true
+  if (toolId === 'read_file') return Boolean(toolPath(input))
+  if (toolId === 'write_file') return Boolean(toolPath(input)) && hasToolContent(input)
+  if (toolId === 'edit_file') {
+    return Boolean(toolPath(input))
+      && typeof input.search === 'string'
+      && input.search.length > 0
+      && typeof input.replace === 'string'
+  }
+  return toolId === 'run' && typeof input.command === 'string' && input.command.trim().length > 0
+}
+
+function jsonObjectCandidates(value: string | null): readonly string[] {
   const raw = String(value || '').trim()
   const fenced = raw.replace(/^\`\`\`(?:json)?\s*/i, '').replace(/\s*\`\`\`$/, '')
-  // Local models sometimes add prose around a valid control object. Recover only that JSON
-  // object, then enforce the normal exact control schema and allowed-tool boundary.
-  const first = fenced.indexOf('{')
-  const last = fenced.lastIndexOf('}')
-  const candidates = [fenced, ...(first >= 0 && last > first ? [fenced.slice(first, last + 1)] : [])]
-  for (const candidate of candidates) {
+  const candidates = [fenced]
+  let depth = 0
+  let start = -1
+  let inString = false
+  let escaped = false
+
+  for (let index = 0; index < fenced.length; index += 1) {
+    const character = fenced[index]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (character === '\\') {
+        escaped = true
+      } else if (character === '"') {
+        inString = false
+      }
+      continue
+    }
+    if (character === '"') {
+      inString = true
+      continue
+    }
+    if (character === '{') {
+      if (depth === 0) start = index
+      depth += 1
+      continue
+    }
+    if (character === '}' && depth > 0) {
+      depth -= 1
+      if (depth === 0 && start >= 0) {
+        candidates.push(fenced.slice(start, index + 1))
+        start = -1
+      }
+    }
+  }
+
+  return Object.freeze([...new Set(candidates.filter(Boolean))])
+}
+
+function parse(value: string | null, allowedTools: readonly BuilderToolId[] = tools): Action | null {
+  for (const candidate of jsonObjectCandidates(value)) {
     try {
-      const parsed = JSON.parse(candidate)
-      if (parsed?.type === 'answer' && typeof parsed.answer === 'string') return { type: 'answer', answer: parsed.answer }
-      if (parsed?.type === 'tool' && allowedTools.includes(parsed.toolId) && parsed.input && typeof parsed.input === 'object' && !Array.isArray(parsed.input)) return { type: 'tool', toolId: parsed.toolId, input: parsed.input }
+      const decoded = JSON.parse(candidate)
+      const parsed = Array.isArray(decoded) && decoded.length === 1 ? decoded[0] : decoded
+      if (!isRecord(parsed)) continue
+      if (parsed.type === 'answer' && typeof parsed.answer === 'string' && parsed.answer.trim()) {
+        return { type: 'answer', answer: parsed.answer }
+      }
+      if (parsed.type !== 'tool' || typeof parsed.toolId !== 'string' || !isRecord(parsed.input)) continue
+      const toolId = parsed.toolId as BuilderToolId
+      if (!allowedTools.includes(toolId) || !validToolInput(toolId, parsed.input)) continue
+      return { type: 'tool', toolId, input: parsed.input }
     } catch {}
   }
   return null
@@ -71,11 +166,22 @@ function parse(value: string | null, allowedTools: readonly BuilderToolId[] = to
 function summarize(file: { path: string; content: string; updatedAt: number }) { return { path: file.path, bytes: new TextEncoder().encode(file.content).byteLength, updatedAt: file.updatedAt } }
 function summarizeRun(result: BuilderRunResult) { return { exitCode: result.exitCode, stdout: result.stdout.slice(0, 16_000), stderr: result.stderr.slice(0, 16_000), timedOut: result.timedOut } }
 
+function verifiedRepairAnswer(trace: readonly BuilderToolTrace[]): string {
+  const changedPaths = [...new Set(trace
+    .filter(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+    .map(item => toolPath(item.input))
+    .filter(Boolean))]
+  const passingRun = [...trace].reverse().find(item => item.ok && item.toolId === 'run')
+  const command = passingRun ? text(passingRun.input.command) : ''
+  const target = changedPaths.length ? changedPaths.join(', ') : 'the staged project'
+  return `Repaired ${target} and verified ${command || 'the proving command'} completed successfully.`
+}
+
 function diagnose(value: unknown): { failureClass: BuilderFailureClass; remediation: string } {
   const message = String(value || '').toLowerCase()
   if (/supabase|postgres|database|constraint|pgrst|duplicate key|relation .* does not exist/.test(message)) return { failureClass: 'storage', remediation: 'Inspect the exact database error and the storage contract before retrying.' }
   if (/cannot find package|no module named|unable to resolve|npm err|dependency|lockfile/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
-  if (/cannot find module\\s+['"](?![./])[^'"]+['"]/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
+  if (/cannot find module\s+['"](?![./])[^'"]+['"]/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
   if (/invalid_path|not found|no such file|module_not_found|cannot find module|enoent|path/.test(message)) return { failureClass: 'path', remediation: 'List or read the workspace files, then use a verified relative path.' }
   if (/node.*not found|command not found|runtime|timed out|timeout|sigkill/.test(message)) return { failureClass: 'runtime', remediation: 'Inspect the runtime evidence and choose an available command; do not guess environment capabilities.' }
   if (/assert|expected|test|exit [1-9]|exit code [1-9]|syntaxerror|typeerror|referenceerror/.test(message)) return { failureClass: 'test', remediation: 'Read the failure output, make the smallest targeted change, then rerun the relevant test.' }
@@ -124,50 +230,75 @@ export class BuilderToolLoop {
         : undefined
       const availableTools = (blockedTool ? tools.filter(toolId => toolId !== blockedTool) : tools)
         .filter(toolId => !inspectedSource || (toolId !== 'list_files' && toolId !== 'read_file'))
-      let response: string | null
-      try {
-        response = await generateWithRetry(this.ai, {
-        systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${MAX_WRITES_PER_TURN} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. Normal file-creation tasks only require their requested successful proving command. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
-        prompt: [
-          formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
-          `OBJECTIVE:\n${input.objective}`,
-          formatBuilderProjectContext(projectContext),
-          repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',
-          `TOOLS: ${safeJson(availableTools)}`,
-          trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
-          'For file tools, input MUST be {"path":"relative/file.ext","content":"..."}. Do not use file, filename, filePath, code, or contents keys.',
-          availableTools.includes('read_file')
-            ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
-            : 'Do not request read_file in this round; it is unavailable until the workspace changes.',
-          'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
-          blockedTool
-            ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected against unchanged workspace state. It is not available this round. Select a different tool from TOOLS; do not request it again.`
-            : '',
-          inspectedSource
-            ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Do not list or read again until you make progress. ${projectContext.recommendedTestCommand ? `Run ${projectContext.recommendedTestCommand} to reproduce the defect, then edit the source and rerun it.` : 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.'}`
-            : '',
-          'When done: {"type":"answer","answer":"what changed and what ran"}',
-        ].filter(Boolean).join('\n\n'),
-        maxTokens: 1600,
-      }, input.modelRoundTimeoutMs)
-      } catch (error) {
-        return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
-      }
-      const action = parse(response, availableTools)
-      if (!action) {
-        const blockedAction = parse(response)
-        if (blockedAction?.type === 'tool' && !availableTools.includes(blockedAction.toolId)) {
-          trace.push({
-            round,
-            toolId: blockedAction.toolId,
-            input: blockedAction.input,
-            ok: false,
-            error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step`,
-          })
-          continue
+      const promptParts = [
+        formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
+        `OBJECTIVE:\n${input.objective}`,
+        formatBuilderProjectContext(projectContext),
+        repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',
+        `TOOLS: ${safeJson(availableTools)}`,
+        trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
+        'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
+        'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
+        availableTools.includes('read_file')
+          ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
+          : 'Do not request read_file in this round; it is unavailable until the workspace changes.',
+        'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
+        blockedTool
+          ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected against unchanged workspace state. It is not available this round. Select a different tool from TOOLS; do not request it again.`
+          : '',
+        inspectedSource
+          ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Do not list or read again until you make progress. ${projectContext.recommendedTestCommand ? `Run ${projectContext.recommendedTestCommand} to reproduce the defect, then edit the source and rerun it.` : 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.'}`
+          : '',
+        'When done: {"type":"answer","answer":"what changed and what ran"}',
+      ].filter(Boolean)
+
+      let action: Action | null = null
+      let blockedAction: ToolAction | null = null
+      for (let controlAttempt = 0; controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
+        const recoveryInstruction = controlAttempt > 0
+          ? `CONTROL RECOVERY ATTEMPT ${controlAttempt}: The previous response was not one complete valid control object. Return exactly one compact JSON object using one TOOL INPUT SCHEMA above. Emit no prose or Markdown. For an existing file, use edit_file with search and replace instead of rewriting the whole file.`
+          : ''
+        let response: string | null
+        try {
+          response = await generateWithRetry(this.ai, {
+            systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${MAX_WRITES_PER_TURN} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. Normal file-creation tasks only require their requested successful proving command. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
+            prompt: [...promptParts, recoveryInstruction].filter(Boolean).join('\n\n'),
+            maxTokens: controlAttempt > 0
+              ? MODEL_CONTROL_RECOVERY_MAX_TOKENS
+              : repairObjective ? MODEL_REPAIR_CONTROL_MAX_TOKENS : MODEL_CONTROL_MAX_TOKENS,
+          }, input.modelRoundTimeoutMs)
+        } catch (error) {
+          return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
         }
-        return { ok: false, error: 'builder_invalid_model_control_output', trace }
+
+        action = parse(response, availableTools)
+        if (action) break
+        const unrestricted = parse(response)
+        if (unrestricted?.type === 'tool' && !availableTools.includes(unrestricted.toolId)) {
+          blockedAction = unrestricted
+          break
+        }
+        console.warn('[builder_invalid_model_control_output]', {
+          round,
+          controlAttempt,
+          responseLength: String(response || '').length,
+          startsWithObject: String(response || '').trimStart().startsWith('{'),
+          endsWithObject: String(response || '').trimEnd().endsWith('}'),
+        })
       }
+
+      if (blockedAction) {
+        trace.push({
+          round,
+          toolId: blockedAction.toolId,
+          input: blockedAction.input,
+          ok: false,
+          error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step`,
+        })
+        continue
+      }
+      if (!action) return { ok: false, error: 'builder_invalid_model_control_output', trace }
+
       if (action.type === 'answer') {
         if (repairPhase && repairPhase !== 'complete') {
           const remediation = formatRepairPhase(repairPhase, projectContext.recommendedTestCommand)
@@ -242,11 +373,18 @@ export class BuilderToolLoop {
         }
         if (action.toolId === 'run') runCount += 1
         trace.push({ round, toolId: action.toolId, input: action.input, ok: true, output })
+        if (action.toolId === 'run' && repairObjective) {
+          const modifiedExistingFile = trace.some(item => item.ok
+            && (item.toolId === 'write_file' || item.toolId === 'edit_file')
+            && initialPaths.has(toolPath(item.input)))
+          const verdict = evaluateRegressionGate(input.objective, trace, modifiedExistingFile)
+          if (verdict.satisfied) return { ok: true, answer: verifiedRepairAnswer(trace), trace }
+        }
         // A new-file design/create objective is complete once Builder has both written workspace
         // output and observed its requested proof command succeed. Do not spend additional model
         // rounds merely to obtain a prose completion object: that can turn a finished artifact
         // into a 422 after the model keeps inspecting the same workspace.
-        if (action.toolId === 'run' && writeCount > 0 && !isRepairObjective(input.objective)) {
+        if (action.toolId === 'run' && writeCount > 0 && !repairObjective) {
           return { ok: true, answer: 'Created the requested workspace files and verified the proving command completed successfully.', trace }
         }
       } catch (error) {

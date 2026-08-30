@@ -37,6 +37,8 @@
 
 **Builder failure visibility:** deployed to Production on 2026-08-30 as `7501d8e7d7bf2b0ac4de1702f6dd5a346589b286`, deployment `dpl_9WTTXU5tf6LB8YEE5LBQF9WXT2Ph` — READY. The authenticated Developer workspace now renders the API-provided failure class and bounded remediation hint alongside each tool-evidence item, making a failed run actionable without exposing host state or secrets. A regression check protects this contract. A fresh Production failure/recovery observation remains required before acceptance.
 
+**Builder storage contract:** implementation is active. Direct U+0000 content is rejected before any Supabase call with a distinct `builder_file_contains_null_byte` error; Builder never silently removes source bytes. Literal escaped code text such as `\\0` and `\\u0000` is preserved. Dependency failures are also distinguished from missing workspace files. This needs deployment READY and a fresh Production rejection observation before acceptance.
+
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
 **Candidate Lab:** isolated baseline/candidate evaluation on fixed cohorts; it fails closed on regression or no measured improvement and can only recommend human review. It has no repository-write, merge, deployment, or automatic-promotion authority.

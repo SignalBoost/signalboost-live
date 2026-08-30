@@ -42,3 +42,10 @@ test('Builder retains only verified repair lessons in a server-only table', () =
   assert.match(migration, /revoke all on public\.builder_verified_repair_lessons from anon, authenticated/)
   assert.match(migration, /Never stores raw chat history/)
 })
+
+test('Builder certification outcomes are server-only and contain no source artifacts', () => {
+  const migration = source('../supabase/migrations/20260830013000_builder_certification_attempts.sql')
+  assert.match(migration, /enable row level security/)
+  assert.match(migration, /revoke all on public\.builder_certification_attempts from anon, authenticated/)
+  assert.match(migration, /No prompts, source code, commands/)
+})

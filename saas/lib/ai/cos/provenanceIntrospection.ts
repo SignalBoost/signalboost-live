@@ -8,10 +8,7 @@ import { asksWhereTheAnswerCameFrom } from './provenanceIntrospectionIntent.ts'
 import { asksWhichHeuristicsInfluencedPriorAnswer } from './priorAnswerHeuristicIntent.ts'
 import { asksForTechnicalPriorAnswerProvenance } from './technicalProvenanceIntent.ts'
 import { isConversationProvenanceQuestion } from './conversationProvenanceIntent.ts'
-
-// A pasted runtime/build log is user-supplied evidence to analyze, never a question about
-// COS's preceding answer. Its incidental words must not trigger the provenance-only route.
-const PASTED_OPERATIONAL_LOG = /(?:^\d{2}:\d{2}:\d{2}\.\d{3}\s+(?:running|cloning|installing|restored)\b|\b(?:running|cloning|installing|restored build cache)\b[\s\S]{0,160}\b(?:vercel|next\.js|npm|node)\b|\bvercel cli\s+\d)/im
+import { isPastedOperationalLog } from './pastedOperationalLog.ts'
 
 /**
  * True when the message asks about the immediately preceding answer/artifact's origin,
@@ -19,7 +16,7 @@ const PASTED_OPERATIONAL_LOG = /(?:^\d{2}:\d{2}:\d{2}\.\d{3}\s+(?:running|clonin
  * server telemetry, never reconstructed by a model and never sent to live public search.
  */
 export function isProvenanceIntrospection(input: string): boolean {
-  if (PASTED_OPERATIONAL_LOG.test(String(input || ''))) return false
+  if (isPastedOperationalLog(input)) return false
   return asksWhereTheAnswerCameFrom(input)
     || isConversationProvenanceQuestion(input)
     || asksWhichHeuristicsInfluencedPriorAnswer(input)

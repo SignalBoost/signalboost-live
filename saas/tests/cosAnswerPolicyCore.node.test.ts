@@ -115,3 +115,12 @@ test('the classes name the kinds of figure that caused the production failures',
   assert.match(text, /how long their job runs/)
   assert.match(text, /negotiated rate/)
 })
+
+test('contested questions lead with facts and preserve matched-comparison limits', () => {
+  const text = quantitativeAnswerPolicyText()
+  assert.match(text, /FACTS, LAW, EVIDENCE, AND VIEWPOINTS/)
+  assert.match(text, /established definitions and measurable facts; applicable law or governing policy/)
+  assert.match(text, /group average is not proof of the cause of any individual outcome/i)
+  assert.match(text, /no matched data found/i)
+  assert.match(text, /yes\/no factual answer belongs in the first two sentences/i)
+})

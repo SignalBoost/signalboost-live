@@ -109,7 +109,9 @@ export class BuilderToolLoop {
           `TOOLS: ${safeJson(availableTools)}`,
           trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
           'For file tools, input MUST be {"path":"relative/file.ext","content":"..."}. Do not use file, filename, filePath, code, or contents keys.',
-          'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}',
+          availableTools.includes('read_file')
+            ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
+            : 'Do not request read_file in this round; it is unavailable until the workspace changes.',
           'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
           blockedTool
             ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected against unchanged workspace state. It is not available this round. Select a different tool from TOOLS; do not request it again.`
@@ -122,7 +124,20 @@ export class BuilderToolLoop {
         return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
       }
       const action = parse(response, availableTools)
-      if (!action) return { ok: false, error: 'builder_invalid_model_control_output', trace }
+      if (!action) {
+        const blockedAction = parse(response)
+        if (blockedAction?.type === 'tool' && !availableTools.includes(blockedAction.toolId)) {
+          trace.push({
+            round,
+            toolId: blockedAction.toolId,
+            input: blockedAction.input,
+            ok: false,
+            error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step`,
+          })
+          continue
+        }
+        return { ok: false, error: 'builder_invalid_model_control_output', trace }
+      }
       if (action.type === 'answer') {
         const modifiedExistingFile = trace.some(item => item.ok
           && (item.toolId === 'write_file' || item.toolId === 'edit_file')

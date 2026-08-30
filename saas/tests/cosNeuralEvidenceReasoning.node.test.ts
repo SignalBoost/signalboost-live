@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 const policy = readFileSync('lib/ai/cos/cosAnswerPolicyCore.ts', 'utf8')
 const grounding = readFileSync('lib/ai/cos/cosFreshGrounding.ts', 'utf8')
 const synthesis = readFileSync('lib/ai/cos/freshEvidenceSynthesisContract.ts', 'utf8')
+const localSynthesis = readFileSync('lib/ai/cos/freshEvidenceLocalSynthesis.ts', 'utf8')
 const reasoningPrompt = readFileSync('../cos-policy/prompts/constraint-first-reasoner.txt', 'utf8')
 const reasoningDocs = readFileSync('../cos-policy/docs/reason-dont-template.md', 'utf8')
 const reasoningReadme = readFileSync('../cos-policy/README.md', 'utf8')
@@ -41,6 +42,19 @@ test('fresh synthesis delegates semantic interpretation to the reasoner while ke
   assert.doesNotMatch(synthesis, /splitResearchClaims|claimResearchPrompt/)
   assert.doesNotMatch(synthesis, semanticTemplateTerms)
   assert.doesNotMatch(synthesis, /unemployment, inflation, real GDP, real wages, deficit/i)
+})
+
+test('source-heavy grounded output gets another neural pass rather than deterministic prose', () => {
+  assert.match(synthesis, /SECOND NEURAL SYNTHESIS PASS/i)
+  assert.match(synthesis, /prior DRAFT is not evidence and is not authoritative/i)
+  assert.match(synthesis, /select at most two representative evidence ids/i)
+  assert.match(synthesis, /direct conclusion first, then only the scope and the most important limitation/i)
+  assert.match(localSynthesis, /freshEvidenceSynthesisNeedsNeuralReview/)
+  assert.match(localSynthesis, /phase: 'neural_review'/)
+  assert.match(localSynthesis, /review_failed_quality_boundary/)
+  assert.match(localSynthesis, /acceptFreshEvidenceSynthesis/)
+  assert.doesNotMatch(localSynthesis, semanticTemplateTerms)
+  assert.doesNotMatch(localSynthesis, /return `(?:Yes|No)|reply: `(?:Yes|No)/i)
 })
 
 test('fresh grounding tells the reasoner how to evaluate evidence, not what conclusion to reach', () => {

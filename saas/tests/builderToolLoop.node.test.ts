@@ -200,7 +200,8 @@ test('Builder removes a repeated inspection tool from the next model call', asyn
         '{"type":"tool","toolId":"read_file","input":{"path":"app.js"}}',
         '{"type":"tool","toolId":"read_file","input":{"path":"app.js"}}',
         '{"type":"tool","toolId":"write_file","input":{"path":"hello.js","content":"console.log(1)"}}',
-        '{"type":"answer","answer":"Created hello.js."}',
+        '{"type":"tool","toolId":"run","input":{"command":"node hello.js"}}',
+        '{"type":"answer","answer":"Created and ran hello.js."}',
       ][prompts.length - 1] ?? null
     },
   }

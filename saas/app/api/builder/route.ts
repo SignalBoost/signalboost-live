@@ -79,7 +79,10 @@ export async function POST(request: Request) {
     const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
     if (result.ok === false) return NextResponse.json({ error: result.error, workspaceId, files, trace: publicTrace(result.trace) }, { status: 422 })
     const lesson = verifiedRepairLesson(result)
-    if (lesson) await workspace.recordVerifiedRepairLesson(workspaceId, lesson)
+    // Learning persistence must never turn an otherwise verified repair into a failed user task.
+    if (lesson) await workspace.recordVerifiedRepairLesson(workspaceId, lesson).catch(error => {
+      console.error('[builder_verified_lesson_write_failed]', { message: error instanceof Error ? error.message : 'unknown' })
+    })
     return NextResponse.json({ workspaceId, reply: result.answer, files, trace: publicTrace(result.trace) })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'builder_request_failed'

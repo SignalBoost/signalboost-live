@@ -46,28 +46,19 @@ export interface CosImagePort {
 export function createPlatformImagePort(): CosImagePort {
   return {
     async generate({ prompt, size = '1024x1024' }): Promise<CosImageResult> {
-      // COS already has an approved DeepInfra inference account. Reuse it for images when no
-      // dedicated OpenAI image account is configured; no key is exposed to the browser.
-      const openAiKey = process.env[['OPENAI', 'API', 'KEY'].join('_')]
-      const deepInfraKey = process.env.LOCAL_AI_API_KEY?.trim()
-      const deepInfraBase = (process.env.LOCAL_AI_BASE_URL || '').replace(/\/$/, '')
-      const endpoint = openAiKey
-        ? 'https://api.openai.com/v1/images/generations'
-        : deepInfraKey && /^https:\/\/api\.deepinfra\.com\/v1\/openai$/i.test(deepInfraBase)
-          ? 'https://api.deepinfra.com/v1/openai/images/generations'
-          : ''
+      // Visual creation uses only the approved COS managed runtime. It must never select an
+      // ambient OpenAI key or any other external-provider fallback.
+      const key = process.env.LOCAL_AI_API_KEY?.trim()
+      const baseUrl = (process.env.LOCAL_AI_BASE_URL || '').replace(/\/$/, '')
+      if (!key || !/^https:\/\/api\.deepinfra\.com\/v1\/openai$/i.test(baseUrl)) {
+        return { ok: false, error: 'Approved visual runtime is not configured.' }
+      }
 
-      if (!endpoint) return { ok: false, error: 'Creative image provider is not configured.' }
       try {
-        const response = await fetch(endpoint, {
+        const response = await fetch('https://api.deepinfra.com/v1/openai/images/generations', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openAiKey || deepInfraKey}` },
-          body: JSON.stringify({
-            ...(openAiKey ? { model: 'gpt-image-1' } : {}),
-            prompt,
-            size,
-            n: 1,
-          }),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ prompt, size, n: 1 }),
         })
         const data = await response.json() as { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } }
         if (!response.ok) return { ok: false, error: data.error?.message || 'Creative image generation failed.' }

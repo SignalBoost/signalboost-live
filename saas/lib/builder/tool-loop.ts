@@ -87,6 +87,7 @@ export class BuilderToolLoop {
     const trace: BuilderToolTrace[] = []
     const inspectedInCurrentWorkspaceState = new Set<string>()
     const initialPaths = new Set((await this.workspace.listFiles(input.workspaceId)).map(file => file.path))
+    const repairObjective = isRepairObjective(input.objective)
     let writeCount = 0, runCount = 0, gateNudges = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 12))
     let workRounds = 0
@@ -98,7 +99,12 @@ export class BuilderToolLoop {
       const blockedTool = lastTrace?.error?.startsWith('builder_repeated_tool_call:')
         ? lastTrace.toolId
         : null
-      const availableTools = blockedTool ? tools.filter(toolId => toolId !== blockedTool) : tools
+      const repairNeedsChange = repairObjective && !trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+      const inspectedSource = repairNeedsChange
+        ? [...trace].reverse().find(item => item.ok && item.toolId === 'read_file' && toolPath(item.input))
+        : undefined
+      const availableTools = (blockedTool ? tools.filter(toolId => toolId !== blockedTool) : tools)
+        .filter(toolId => !inspectedSource || (toolId !== 'list_files' && toolId !== 'read_file'))
       let response: string | null
       try {
         response = await generateWithRetry(this.ai, {
@@ -115,6 +121,9 @@ export class BuilderToolLoop {
           'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
           blockedTool
             ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected against unchanged workspace state. It is not available this round. Select a different tool from TOOLS; do not request it again.`
+            : '',
+          inspectedSource
+            ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Do not list or read again until you make progress. Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.`
             : '',
           'When done: {"type":"answer","answer":"what changed and what ran"}',
         ].filter(Boolean).join('\n\n'),
@@ -139,6 +148,18 @@ export class BuilderToolLoop {
         return { ok: false, error: 'builder_invalid_model_control_output', trace }
       }
       if (action.type === 'answer') {
+        if (inspectedSource) {
+          trace.push({
+            round,
+            toolId: 'run',
+            input: {},
+            ok: false,
+            error: 'builder_repair_progress_required: write or edit a regression test/source file before answering',
+            failureClass: 'test',
+            remediation: 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.',
+          })
+          continue
+        }
         const modifiedExistingFile = trace.some(item => item.ok
           && (item.toolId === 'write_file' || item.toolId === 'edit_file')
           && initialPaths.has(toolPath(item.input)))

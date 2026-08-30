@@ -80,6 +80,29 @@ export function constructEconomicFactsReply(
   return null
 }
 
+const RAW_CONSTRUCT = /\b(?:uncontrolled|overall earnings|raw (?:gap|average|ratio)|full[- ]time, year[- ]round|median (?:weekly|hourly|annual) earnings)\b/i
+const MATCHED_CONSTRUCT = /\b(?:controlled (?:gap|for)|equal work|same job|job title and qualifications|comparable roles?|holding (?:job|title|qualifications) constant)\b/i
+
+export function liveEvidenceHasDistinctConstructs(sources: FreshEvidenceSource[]): boolean {
+  const blob = sources.map(source => `${source.title}\n${source.snippet}`).join('\n')
+  return RAW_CONSTRUCT.test(blob) && MATCHED_CONSTRUCT.test(blob)
+}
+
+export function liveDraftCollapsesDistinctConstructs(answer: string, sources: FreshEvidenceSource[]): boolean {
+  if (!liveEvidenceHasDistinctConstructs(sources)) return false
+  return !MATCHED_CONSTRUCT.test(String(answer || ''))
+}
+
+export const LIVE_CONSTRUCT_SPLIT_PROMPT = [
+  'The LIVE evidence contains at least two different measured constructs (for example an aggregate/uncontrolled average and a controlled or equal-work comparison).',
+  'Your previous draft treated them as one "yes there is a gap" headline.',
+  'Rewrite. Use only LIVE figures.',
+  'Sentence 1-2: name the constructs separately and attach each cited figure to the construct it actually measures.',
+  'Then state what the aggregate number does not prove.',
+  'Then, if present, what advocates say about the aggregate.',
+  'Do not open with a single yes that collapses the constructs.',
+].join(' ')
+
 function requiresIndependentCorroboration(input: string): boolean {
   return /\b(?:president|vice president|prime minister|premier|chancellor|governor|mayor|secretary of state|attorney general|speaker|minister|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?)\b/i.test(input)
 }

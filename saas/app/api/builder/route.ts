@@ -7,6 +7,7 @@ import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase
 import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
 import { verifiedRepairLesson } from '@/lib/builder/verified-lessons'
 import { inferBuilderCertificationAttempt } from '@/lib/builder/certification'
+import { isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,10 @@ function cleanObjective(value: unknown): string {
   const objective = String(value || '').trim()
   if (!objective || objective.length > 8_000) throw new Error('builder_invalid_objective')
   return objective
+}
+
+function pastedOperationalLogReply(): string {
+  return 'This is a partial Vercel build log, not editable source code. The shown entries are warnings and passing tests; the excerpt ends before the final build error. Paste the final error lines after the failure marker and the affected source file, then COS can repair and verify it.'
 }
 
 function publicTrace(trace: readonly { round: number; toolId: string; ok: boolean; input: Record<string, unknown>; output?: unknown; error?: string; failureClass?: string; remediation?: string }[]) {
@@ -65,7 +70,17 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const objective = cleanObjective(body?.objective)
+    const rawObjective = String(body?.objective || '').trim()
+    if (isPastedOperationalLog(rawObjective)) {
+      return NextResponse.json({
+        reply: pastedOperationalLogReply(),
+        source: 'builder-operational-log-analysis',
+        files: [],
+        trace: [],
+        execution_allowed: false,
+      })
+    }
+    const objective = cleanObjective(rawObjective)
     const requestedWorkspaceId = String(body?.workspaceId || '').trim()
     if (requestedWorkspaceId && !UUID.test(requestedWorkspaceId)) return NextResponse.json({ error: 'Invalid workspace id.' }, { status: 400 })
     const workspaceId = requestedWorkspaceId || crypto.randomUUID()

@@ -25,6 +25,8 @@
 
 **Builder certification gate:** implemented locally and not yet Production-accepted. The first controlled ladder has three evidence-only levels: (1) create a file and prove it runs, (2) inspect a supplied broken file, repair it, then prove it runs, and (3) observe and classify a real failure, then prove recovery. Answer text does not count; each level requires recorded tool evidence. This is evaluation and controlled practice, not model-weight training. Promotion to wider repository repairs requires real successful Production observations for each level.
 
+**Builder repair regression gate:** implemented locally and not yet Production-accepted. A repair objective must show regression evidence in one turn: test failure before the source repair, then a passing rerun after it. It accepts an existing reproducing test or a new one. Ordinary creation tasks are not blocked by this rule; they require only their requested successful proving command. Platform defects outside a user workspace require repository-level regressions, not fabricated workspace tests.
+
 > This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
 **Candidate Lab:** isolated baseline/candidate evaluation on fixed cohorts; it fails closed on regression or no measured improvement and can only recommend human review. It has no repository-write, merge, deployment, or automatic-promotion authority.

@@ -47,6 +47,27 @@ test('Builder writes a user file, runs it, and returns only after tool evidence'
   assert.equal(inferBuilderCertificationAttempt(result)?.caseId, 'create_and_run_javascript_v1')
 })
 
+test('Builder retries one transient model-round timeout before failing the turn', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let calls = 0
+  const ai: BuilderAiPort = {
+    async generate() {
+      calls += 1
+      if (calls === 1) return await new Promise<string>(resolve => setTimeout(() => resolve('{"type":"answer","answer":"late"}'), 20))
+      return '{"type":"answer","answer":"Recovered after the transient model delay."}'
+    },
+  }
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Describe the workspace.',
+    workspaceId: 'user:model-retry',
+    maxRounds: 1,
+    modelRoundTimeoutMs: 1,
+  })
+  assert.equal(result.ok, true)
+  assert.equal(calls, 2)
+})
+
 test('Builder recovers when the model replays a completed tool call', async () => {
   const workspace = new InMemoryBuilderWorkspace(() => 3)
   const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: 'hello\n', stderr: '', timedOut: false } } }

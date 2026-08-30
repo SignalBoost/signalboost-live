@@ -12,6 +12,7 @@ const TEXT = /(?:\.txt\b|\b(?:plain\s+)?text\s+(?:file|document)\b|\btxt\s+(?:fi
 function filenameStem(prompt: string): string {
   const match = /\b(?:named|called|as)\s+[“"'\`]?([a-z0-9][a-z0-9 _-]{0,80})/i.exec(prompt)
   const raw = (match?.[1] || 'document')
+    .replace(/\s+(?:with|for|that|containing|about)\s+.*$/i, '')
     .replace(/\.(?:pdf|txt)\b.*$/i, '')
     .trim()
     .replace(/[^a-z0-9 _-]+/gi, '')

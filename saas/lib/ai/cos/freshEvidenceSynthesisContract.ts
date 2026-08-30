@@ -1,6 +1,5 @@
 import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
 import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
-import { claimResearchPrompt, splitResearchClaims } from './cosClaimResearch.ts'
 
 export type AcceptedFreshEvidenceSynthesis = {
   reply: string
@@ -32,18 +31,22 @@ export function freshEvidenceSynthesisSystemPrompt(language: string): string {
     '3. Put every evidence label that materially supports the answer in "evidenceIds". Never invent an evidence id.',
     '4. When the server-side authority policy requires independent corroboration, use the independent evidence ids supplied for that proposition.',
     '5. Resolve pronouns only from the explicit user context supplied in QUESTION; never infer a different person or entity from model memory.',
-    '6. Reason around the proposition the user actually asked. Identify what each source actually measures or establishes before combining it with another source; do not let a headline or the retrieval order define the answer.',
-    '7. Keep materially different constructs, populations, denominators, time windows, comparison bases, and controls distinct. Explain a material mismatch instead of presenting unlike measurements as interchangeable evidence.',
-    '8. Distinguish observation from explanation. Do not infer causation, an individual outcome, or a controlled comparison from an aggregate or associative result unless the evidence itself establishes that stronger claim.',
-    '9. Weigh evidence by directness, authority, methodological fit, and recency where relevant. Prefer the evidence that most directly establishes the requested proposition rather than the source with the strongest wording.',
-    '10. Synthesize the minimum set of strong, relevant evidence needed to answer. Do not enumerate the retrieval set, repeat every statistic, or include a source merely because it was retrieved.',
-    '11. For a yes/no factual question, lead with yes or no when supported, then add only the qualification needed to state exactly what was established and what was not.',
-    '12. If one distinct claim is not established, say exactly which claim remains unverified while preserving any other grounded conclusion. Return EVIDENCE_INSUFFICIENT only when no material claim can be established from the evidence.',
-    '13. When material sources disagree about the same proposition, report the disagreement and its scope instead of silently choosing a side.',
-    '14. When the user asks for an evaluation, comparison, or ranking, identify the criterion actually supported by the evidence. Compare only like-for-like measurements; if the evidence uses incompatible criteria, explain that limitation rather than manufacture a single ranking.',
-    '15. Preserve dates, populations, and measurement windows when they materially change the meaning of a quantitative claim.',
-    '16. Be brief, but use a compact numbered list when the question itself requests a list.',
-    '17. State only what the evidence supports. Do not add praise, condemnation, protection, or a verdict that the evidence does not establish.',
+    '6. Infer the proposition directly from the user’s QUESTION. Do not accept a retrieval label, search query, control-plane fragment, or source headline as a substitute for the user’s meaning.',
+    '7. Identify what each source actually measures or establishes before combining it with another source. Track constructs, populations, denominators, time windows, comparison bases, and controls when they materially affect interpretation.',
+    '8. Keep materially different measurements distinct. Explain a material mismatch instead of presenting unlike measurements as interchangeable evidence.',
+    '9. Distinguish observation from explanation. Do not infer causation, an individual outcome, or a controlled comparison from an aggregate or associative result unless the evidence itself establishes that stronger claim.',
+    '10. For a broad group-comparison or difference question, first identify the level of claim the evidence actually establishes. If it establishes an aggregate difference, say that directly; do not silently upgrade it into a controlled, like-for-like, causal, or individual claim.',
+    '11. Weigh evidence by directness, authority, methodological fit, and recency where relevant. Prefer the evidence that most directly establishes the requested proposition rather than the source with the strongest wording.',
+    '12. When several sources play the same evidentiary role, choose the strongest representative one or two. Include additional statistics only when they change the scope, reveal disagreement, or answer a separate part of the question.',
+    '13. Synthesize the answer around the conclusion, not around the retrieval set. Do not enumerate sources, repeat every statistic, or preserve retrieval order merely because the evidence was retrieved that way.',
+    '14. For a yes/no factual question, lead with yes or no when supported, then state the scope of what was established and the most important limitation needed to avoid overclaiming.',
+    '15. If one distinct claim is not established, say exactly which claim remains unverified while preserving any other grounded conclusion. Return EVIDENCE_INSUFFICIENT only when no material claim can be established from the evidence.',
+    '16. When material sources disagree about the same proposition, report the disagreement and its scope instead of silently choosing a side.',
+    '17. When the user asks for an evaluation, comparison, or ranking, identify the criterion actually supported by the evidence. Compare only like-for-like measurements; if the evidence uses incompatible criteria, explain that limitation rather than manufacture a single ranking.',
+    '18. Preserve dates, populations, and measurement windows when they materially change the meaning of a quantitative claim.',
+    '19. Before returning JSON, silently perform a synthesis check. If the draft is effectively one sentence per source, a list of retrieved statistics, or could be recreated by preserving retrieval order, rewrite it as conclusion → scope → limitation.',
+    '20. Be brief, but use a compact numbered list when the question itself requests a list.',
+    '21. State only what the evidence supports. Do not add praise, condemnation, protection, or a verdict that the evidence does not establish.',
   ].join('\n')
 }
 
@@ -52,7 +55,7 @@ export function freshEvidenceSynthesisPrompt(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nCLAIM PLAN (control-plane status; do not treat it as factual evidence):\n${claimResearchPrompt(splitResearchClaims(args.input).map(text => ({ text, status: 'needs_deeper_read' })))}\n\nFor every historical/list claim, use the dated rows from the read document, not its title, navigation, or a different source's summary.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nREASONING TASK:\nInfer the proposition directly from QUESTION and synthesize the strongest relevant evidence into a conclusion-centered answer. Server-side claim research has already been used only to acquire evidence; it is intentionally not injected here because it must not redefine the user’s semantics.\n\nFor every historical/list claim, use the dated rows from the read document, not its title, navigation, or a different source's summary.\n\nQUESTION: ${args.input}`
 }
 
 function parseJsonObject(text: string): ModelFreshEvidenceSynthesis | null {

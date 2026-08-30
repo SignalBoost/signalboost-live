@@ -17,7 +17,7 @@ test('recognizes a pasted Vercel build log as operational evidence', () => {
 test('reports a final test failure instead of calling the log incomplete', () => {
   const log = [
     '15:27:17.225 Running "vercel build"',
-    '✖ both answer paths resolve markers before anything else sees the text',
+    '16:07:21.324 ✖ both answer paths resolve markers before anything else sees the text',
     'Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
   ].join('\n')
   const analysis = analyzeOperationalLog(log)

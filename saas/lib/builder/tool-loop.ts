@@ -2,6 +2,7 @@ import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
 import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext } from './project-context.ts'
+import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 
 type Action = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> } | { type: 'answer'; answer: string }
 const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'write_file', 'edit_file', 'run'])
@@ -107,6 +108,7 @@ export class BuilderToolLoop {
       const blockedTool = lastTrace?.error?.startsWith('builder_repeated_tool_call:')
         ? lastTrace.toolId
         : null
+      const repairPhase = repairObjective ? deriveRepairPhase(trace, initialPaths) : null
       const repairNeedsChange = repairObjective && !trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
       const inspectedSource = repairNeedsChange
         ? [...trace].reverse().find(item => item.ok && item.toolId === 'read_file' && toolPath(item.input))
@@ -121,6 +123,7 @@ export class BuilderToolLoop {
           formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
           `OBJECTIVE:\n${input.objective}`,
           formatBuilderProjectContext(projectContext),
+          repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',
           `TOOLS: ${safeJson(availableTools)}`,
           trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
           'For file tools, input MUST be {"path":"relative/file.ext","content":"..."}. Do not use file, filename, filePath, code, or contents keys.',
@@ -157,6 +160,19 @@ export class BuilderToolLoop {
         return { ok: false, error: 'builder_invalid_model_control_output', trace }
       }
       if (action.type === 'answer') {
+        if (repairPhase && repairPhase !== 'complete') {
+          const remediation = formatRepairPhase(repairPhase, projectContext.recommendedTestCommand)
+          trace.push({
+            round,
+            toolId: 'run',
+            input: {},
+            ok: false,
+            error: `builder_repair_phase_required: ${repairPhase}`,
+            failureClass: 'test',
+            remediation,
+          })
+          continue
+        }
         if (inspectedSource) {
           trace.push({
             round,

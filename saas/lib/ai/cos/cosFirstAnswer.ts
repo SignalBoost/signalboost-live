@@ -20,8 +20,6 @@ import {
   freshEvidenceSearchQuery,
   freshEvidenceSearchQueries,
   constructEconomicFactsReply,
-  liveDraftCollapsesDistinctConstructs,
-  LIVE_CONSTRUCT_SPLIT_PROMPT,
   prepareFreshEvidenceAcrossQueries,
   resolveDeterministicFreshOfficeHolder,
   type FreshEvidenceSource,
@@ -808,18 +806,16 @@ async function tryFreshCurrentFact(input: {
     temperature: 0,
     maxTokens: 1800,
     systemPrompt: [
-      'Do not open with "Yes, a gap exists." That collapses different measurements.',
       'You are SignalBoost COS live-fact verifier.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-      'LIVE snippets own dates, quantities, URLs, and quoted findings only.',
-      'For US pay-by-sex questions the legal constraint is prior to any statistic: paying less because of sex is illegal. An average earnings ratio is not that claim.',
-      'If LIVE evidence has both an aggregate/uncontrolled figure and a controlled or equal-work figure, name both before any yes/no.',
-      'Never invent a missing LIVE figure from pretrained memory.',
+      'For any present/current claim, use only the server-retrieved LIVE evidence in the prompt for dates, quantities, URLs, and quoted findings.',
+      'Never use pretrained memory, previous conversation facts, caches, or durable COS memory to invent a missing figure.',
+      'LIVE snippets own measured figures. They do not own the question categories. Split overloaded terms before answering (raw group average vs equal-work comparison, legal rule vs outcome gap, sex vs identity, slogan vs measured residual). Write: constraint or definition first; what the cited number actually counted; what that count does not prove; then advocacy or institutional framing labelled as such. Do not let the first source headline become sentence one.',
       'If independent sources disagree, or the evidence cannot establish the answer, say live verification is insufficient and use confidence <= 0.30.',
-      'Do not show source labels or URLs unless the user asks.',
+      'Answer from the supplied evidence, but do not show source labels or URLs unless the user asks. Recorded provenance retains the exact sources.',
       ...QUANTITATIVE_ANSWER_POLICY,
     ].join(' '),
-    prompt: `${evidenceBlock}\n\nWrite constraint, then each LIVE construct with its figure, then what the aggregate does not prove.`,
+    prompt: `${evidenceBlock}\n\nAnswer the original question now.`,
   }
   // Evidence acquisition succeeded. A transient local transport failure must get one bounded
   // retry before this request can fail closed; it may never fall back to another model.
@@ -842,20 +838,7 @@ async function tryFreshCurrentFact(input: {
     return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_failed', escalationReason: reason } as any }
   }
 
-  let parsed = withComputedArithmetic(parseLocalResult(reasoned.text))
-  if (parsed && !parsed.truncated && liveDraftCollapsesDistinctConstructs(parsed.answer, sources)) {
-    const splitRetry = await callCosReasoner({
-      temperature: 0,
-      maxTokens: 1800,
-      systemPrompt: [
-        'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-        LIVE_CONSTRUCT_SPLIT_PROMPT,
-      ].join(' '),
-      prompt: `${evidenceBlock}\n\nCollapsed draft:\n${parsed.answer}\n\nRewrite now.`,
-    }).catch(() => null)
-    const repaired = withComputedArithmetic(splitRetry?.text ? parseLocalResult(splitRetry.text) : null)
-    if (repaired && !repaired.truncated && repaired.answer.trim()) parsed = repaired
-  }
+  const parsed = withComputedArithmetic(parseLocalResult(reasoned.text))
   if (!parsed || parsed.truncated) {
     const reason = 'Live evidence was retrieved, but independent local synthesis was incomplete or unparseable.'
     return { handled: false, confidence: 0, reason, provenance: { ...provenance, externalAiNecessary: true, escalationReasonCode: 'local_synthesis_unparseable', escalationReason: reason } as any }

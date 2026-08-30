@@ -110,10 +110,9 @@ export async function POST(req: NextRequest) {
     ? String(body.context.language).toLowerCase()
     : 'en'
 
-  // Capture real authorization and correlation identity BEFORE entering public-delivery scope.
-  // Public COS still receives only guest authority after the boundary starts.
-  const access = await getAccess().catch(() => null)
-  const auditUserId = access?.userId ?? null
+  // Capture correlation identity BEFORE entering public-delivery scope. Only the user id is carried
+  // forward. Once publicDeliveryScope starts, getAccess() still resolves to guest by design.
+  const auditUserId = (await getAccess().catch(() => null))?.userId ?? null
 
   // Artifact creation is an authenticated internal Concierge tool. It must run before
   // public-delivery isolation so the private workspace remains owned by the real user.
@@ -144,9 +143,12 @@ export async function POST(req: NextRequest) {
   }
 
   // A failed SignalBoost build log is executable owner repair work, not ordinary public chat.
-  // Builder repeats owner authorization, pins the exact commit, and produces only a reviewable
-  // workspace patch; it cannot commit, merge, or deploy.
-  if (isPastedOperationalLog(prompt) && access?.isOwner) {
+  // Resolve owner authority only for this narrow intent; Builder repeats authorization, pins the
+  // exact commit, and produces only a reviewable workspace patch.
+  const ownerRepairAccess = isPastedOperationalLog(prompt)
+    ? await getAccess().catch(() => null)
+    : null
+  if (ownerRepairAccess?.isOwner) {
     const headers = new Headers(req.headers)
     headers.set('content-type', 'application/json')
     headers.delete('content-length')

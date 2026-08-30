@@ -43,7 +43,7 @@ const COPY = {
   thinking:     { en: uiText('generatedUi.u_a02f1cea3c1d6c6e'),                             es: 'Pensando…',                           pt: 'Pensando…',                            pl: 'Myślę…',                               ru: 'Думаю…' },
   placeholder:  { en: uiText('generatedUi.u_2efcbbb4418f49eb'),                    es: 'Pregunta al concierge…',              pt: 'Pergunte ao concierge…',               pl: 'Zapytaj concierge…',                   ru: 'Спросите консьержа…' },
   send:         { en: uiText('generatedUi.u_f6f4688ff23d50c6'),                                   es: 'Enviar',                              pt: 'Enviar',                               pl: 'Wyślij',                               ru: 'Отправить' },
-  download:     { en: 'Download', es: 'Descargar', pt: 'Baixar', pl: 'Pobierz', ru: 'Скачать' },
+  download:     { en: uiText('generatedUi.u_75cf7ab15fa05201'), es: 'Descargar', pt: 'Baixar', pl: 'Pobierz', ru: 'Скачать' },
   error:        { en: uiText('generatedUi.u_7a8adaf287716b05'), es: 'Lo siento, no pude responder eso ahora mismo.', pt: 'Desculpe, não pude responder isso agora.', pl: 'Przepraszam, nie mogłem teraz odpowiedzieć.', ru: 'Извините, не могу ответить прямо сейчас.' },
   stopped:      { en: uiText('generatedUi.u_dfca6272ec004413'), es: 'Solicitud detenida. No se envió nada ni se realizó ninguna acción externa.', pt: 'Solicitação interrompida. Nada foi enviado e nenhuma ação externa foi realizada.', pl: 'Żądanie zatrzymane. Nic nie zostało wysłane i nie wykonano żadnej czynności zewnętrznej.', ru: 'Запрос остановлен. Ничего не отправлено, внешние действия не выполнялись.' },
   timedOut:     ASSISTANT_TRANSPORT_TIMEOUT_COPY,

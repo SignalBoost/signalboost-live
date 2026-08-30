@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     const rawObjective = String(body?.objective || '').trim()
     if (isPastedOperationalLog(rawObjective)) {
       return NextResponse.json({
-        reply: operationalLogReply(objective),
+        reply: operationalLogReply(rawObjective),
         source: 'builder-operational-log-analysis',
         files: [],
         trace: [],

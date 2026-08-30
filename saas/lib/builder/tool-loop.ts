@@ -120,6 +120,7 @@ export class BuilderToolLoop {
         prompt: [
           formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
           `OBJECTIVE:\n${input.objective}`,
+          formatBuilderProjectContext(projectContext),
           `TOOLS: ${safeJson(availableTools)}`,
           trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
           'For file tools, input MUST be {"path":"relative/file.ext","content":"..."}. Do not use file, filename, filePath, code, or contents keys.',

@@ -24,9 +24,7 @@ create table if not exists public.builder_workspace_files (
   constraint builder_workspace_files_path_check
     check (char_length(path) between 1 and 240 and path !~ '(^|/)\\.{1,2}(/|$)'),
   constraint builder_workspace_files_content_size_check
-    check (octet_length(content) <= 524288),
-  constraint builder_workspace_files_content_nul_check
-    check (position(chr(0) in content) = 0)
+    check (octet_length(content) <= 524288)
 );
 
 create index if not exists builder_workspaces_user_updated_idx

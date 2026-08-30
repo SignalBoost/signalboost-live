@@ -28,6 +28,7 @@ import { BuilderToolLoop } from '@/lib/builder/tool-loop'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -231,6 +232,28 @@ async function responseSnapshot(response: Response): Promise<{ reply: string; so
   }
 }
 
+function publicSecurityRefusal() {
+  return NextResponse.json({
+    reply: PUBLIC_CONCIERGE_SECURITY_REFUSAL,
+    source: 'concierge-public-security-refusal',
+    execution_allowed: false,
+    external_action_taken: false,
+  }, { status: 200 })
+}
+
+async function publicOutputBoundary(response: Response | null): Promise<NextResponse | null> {
+  if (!response) return null
+  const snapshot = await responseSnapshot(response)
+  return hasUnsafePublicModelOutput(snapshot.reply)
+    ? NextResponse.json({
+        reply: PUBLIC_CONCIERGE_SECURITY_REFUSAL,
+        source: 'concierge-public-output-security-blocked',
+        execution_allowed: false,
+        external_action_taken: false,
+      }, { status: 200 })
+    : null
+}
+
 function sourceCommit(): string {
   return process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 'runtime-unknown'
 }
@@ -385,6 +408,9 @@ export async function POST(req: NextRequest): Promise<Response> {
   const input = latestUserText(body)
   const language = languageFrom(body)
 
+  // Runs before every model, tool, or Builder route. Public prompt extraction never reaches inference.
+  if (isPublicPromptExfiltrationAttempt(input)) return publicSecurityRefusal()
+
   const builder = await directBuilder(body, input)
   if (builder) return builder
 
@@ -457,6 +483,8 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
   researchLifeline?.cancel()
   const primary = primaryRun.response
+  const blockedOutput = await publicOutputBoundary(primary)
+  if (blockedOutput) return blockedOutput
 
   if (primary && primary.status >= 400 && primary.status < 500) return primary
 

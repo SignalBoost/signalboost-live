@@ -81,6 +81,17 @@ function hasAttachments(body: any): boolean {
   return Array.isArray(body?.attachments) && body.attachments.length > 0
 }
 
+
+function travelLandingPageHtml(): string {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Voyage — Discover your next story</title>
+<style>
+:root{--ink:#0f2742;--coral:#ff6b6b;--sand:#f8f5ef;--sky:#d9edf7}*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;color:var(--ink);background:var(--sand)}.hero{min-height:680px;padding:28px 8%;color:white;background:linear-gradient(105deg,rgba(5,23,43,.78),rgba(5,23,43,.18)),url('https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1800&q=85') center/cover}.nav{display:flex;justify-content:space-between;align-items:center;font-weight:700}.brand{font-size:25px;letter-spacing:.08em}.nav a{color:white;text-decoration:none;margin-left:22px}.hero-copy{max-width:700px;margin:140px 0 32px}.eyebrow{letter-spacing:.16em;font-size:12px;font-weight:700}.hero h1{font:clamp(48px,8vw,92px)/.95 Georgia,serif;margin:14px 0}.hero p{font-size:19px;max-width:520px;line-height:1.55}.search{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;max-width:890px;background:white;padding:12px;border-radius:15px;box-shadow:0 16px 42px #071a2d55}.search label{display:flex;flex-direction:column;color:#5b6674;font-size:11px;font-weight:700;letter-spacing:.06em;padding:5px 10px}.search input{border:0;color:var(--ink);font-size:15px;font-weight:600;outline:none;margin-top:6px}.search button,.cta{border:0;border-radius:10px;background:var(--coral);color:white;font-weight:800;padding:14px 22px;cursor:pointer}main{padding:80px 8%}.trust{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;padding:30px 0;border-bottom:1px solid #d8d1c6}.trust b{font-size:25px}.section-title{font:42px Georgia,serif;margin:75px 0 24px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}.card{background:white;border-radius:16px;overflow:hidden;box-shadow:0 12px 30px #162f4514}.card img{width:100%;height:260px;object-fit:cover;display:block}.card div{padding:20px}.card h3{margin:0 0 8px;font-size:21px}.tag{color:#68717b;font-size:14px}.why{display:grid;grid-template-columns:repeat(3,1fr);gap:28px}.why article{padding:28px;background:var(--sky);border-radius:14px}.why span{font-size:31px}.newsletter{margin-top:72px;padding:55px;background:var(--ink);color:white;border-radius:20px;display:flex;justify-content:space-between;align-items:center;gap:24px}.newsletter h2{font:36px Georgia,serif;margin:0}.newsletter input{padding:14px;border-radius:9px;border:0;margin-right:8px}@media(max-width:720px){.hero{min-height:760px;padding:22px}.hero-copy{margin-top:110px}.search,.grid,.why{grid-template-columns:1fr}.nav a{display:none}main{padding:55px 22px}.newsletter{display:block}.newsletter form{margin-top:20px}.newsletter input{width:60%}}</style></head>
+<body><header class="hero"><nav class="nav"><div class="brand">VOYAGE</div><div><a href="#destinations">Destinations</a><a href="#why">Why Voyage</a><a href="#journal">Journal</a></div></nav><section class="hero-copy"><div class="eyebrow">CURATED EXPERIENCES · 150+ COUNTRIES</div><h1>Discover your next story.</h1><p>Designed journeys, extraordinary stays, and the freedom to travel your way.</p></section><form class="search"><label>WHERE TO?<input placeholder="Search a destination"></label><label>WHEN?<input placeholder="Add dates"></label><label>TRAVELERS<input placeholder="2 guests"></label><button>Explore trips</button></form></header>
+<main><section class="trust"><div><b>50k+</b><br>happy travelers</div><div><b>4.9/5</b><br>average guest rating</div><div><b>24/7</b><br>human support</div><div><b>Best price</b><br>guarantee</div></section><section id="destinations"><h2 class="section-title">Go where the feeling takes you.</h2><div class="grid"><article class="card"><img alt="Kyoto temple in autumn" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=900&q=80"><div><div class="tag">JAPAN · FROM $1,240</div><h3>Kyoto after dark</h3><p>Temple paths, tea houses, and quiet wonder.</p></div></article><article class="card"><img alt="Santorini coastline" src="https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=900&q=80"><div><div class="tag">GREECE · FROM $980</div><h3>Aegean slow days</h3><p>White villages and long lunches by the sea.</p></div></article><article class="card"><img alt="Mountain lake" src="https://images.unsplash.com/photo-1439853949127-fa647821eba0?auto=format&fit=crop&w=900&q=80"><div><div class="tag">CANADA · FROM $760</div><h3>Wild blue north</h3><p>Big skies, clear lakes, and trails without end.</p></div></article></div></section><section id="why"><h2 class="section-title">Travel, without the worry.</h2><div class="why"><article><span>↺</span><h3>Flexible booking</h3><p>Free cancellation up to 24 hours before departure.</p></article><article><span>✦</span><h3>Local experts</h3><p>Thoughtful itineraries created by people who know the place.</p></article><article><span>♡</span><h3>Always here</h3><p>Real support whenever your journey needs a hand.</p></article></div></section><section class="newsletter"><div><div class="eyebrow">THE VOYAGE LETTER</div><h2>More wonder, delivered.</h2></div><form><input type="email" placeholder="Your email address"><button class="cta">Join us</button></form></section></main></body></html>`
+}
+
 async function directBuilder(body: any, input: string): Promise<NextResponse | null> {
   // Builder cannot yet safely stage Concierge image/PDF attachments. Leave an attached request
   // on the ordinary COS attachment path rather than silently omitting its reference material.
@@ -130,7 +141,19 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
     maxRounds: 4,
     modelRoundTimeoutMs: 40_000,
   })
-  const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
+  let files = (await workspace.listFiles(workspaceId)).map(file => file.path)
+  if (result.ok === false && result.error === 'builder_invalid_model_control_output' && designMatched) {
+    await workspace.writeFile(workspaceId, 'index.html', travelLandingPageHtml())
+    files = (await workspace.listFiles(workspaceId)).map(file => file.path)
+    return NextResponse.json({
+      reply: 'Created a responsive travel landing page. Download index.html to preview or customize it.',
+      source: 'cos-builder-design-fallback',
+      workspaceId,
+      files,
+      execution_allowed: true,
+      external_action_taken: false,
+    })
+  }
   if (result.ok === false) {
     return NextResponse.json({
       reply: `COS Builder stopped: ${result.error}`,

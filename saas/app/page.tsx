@@ -33,9 +33,14 @@ const ATTACH_MAX_BYTES = 10 * 1024 * 1024
 const ATTACH_MAX_FILES = 5
 const ATTACH_ALLOWED_RE = /^(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/i
 const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv'
+const BUILDER_WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const IMAGE_FILE_RE = /\.(?:png|jpe?g|webp)$/i
+const OWNER_SCOPED_PREVIEW_RE = /^\/api\/builder\/workspaces\/[0-9a-f-]+\/files\/.+\?preview=1$/i
 
-function hasInlineImage(content: string): boolean {
-  return /<IMAGE>[\s\S]*?<\/IMAGE>/.test(content)
+function builderPreviewUrl(workspaceId: string, path: string): string {
+  if (!BUILDER_WORKSPACE_ID_RE.test(workspaceId) || !path || !IMAGE_FILE_RE.test(path)) return ''
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/')
+  return `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${encodedPath}?preview=1`
 }
 
 export default function Home() {
@@ -171,10 +176,12 @@ export default function Home() {
       const builderFiles = Array.isArray(payload?.files)
         ? payload.files.filter((value: unknown): value is string => typeof value === 'string').slice(0, 50)
         : []
-      const visualPreviewUrl = typeof payload?.visual?.previewUrl === 'string'
-        && /^\/api\/builder\/workspaces\/[0-9a-f-]+\/files\/.+\?preview=1$/i.test(payload.visual.previewUrl)
+      const structuredVisualPreviewUrl = typeof payload?.visual?.previewUrl === 'string'
+        && OWNER_SCOPED_PREVIEW_RE.test(payload.visual.previewUrl)
         ? payload.visual.previewUrl
         : ''
+      const imagePath = builderFiles.find((path) => IMAGE_FILE_RE.test(path)) || ''
+      const visualPreviewUrl = structuredVisualPreviewUrl || builderPreviewUrl(builderWorkspaceId, imagePath)
       return { reply, suggestedFollowups, builderWorkspaceId, builderFiles, visualPreviewUrl }
     }
 
@@ -278,7 +285,10 @@ export default function Home() {
                 </div>
 
                 <div className="message-row assistant-row">
-                  <article className="message assistant-message">
+                  <article
+                    className="message assistant-message"
+                    style={turn.visualPreviewUrl ? { width: 'min(96%, 1050px)', overflow: 'visible' } : undefined}
+                  >
                     <div className="message-tools assistant-tools">
                       <span>{c('cosLabel')}</span>
                       <button type="button" onClick={() => void copyText(turn.response, `a-${index}`)}>
@@ -287,24 +297,39 @@ export default function Home() {
                     </div>
                     <div className="assistant-content"><AssistantMessage content={turn.response} /></div>
                     {turn.visualPreviewUrl ? (
-                      <img
-                        alt={turn.request}
-                        className="mt-3 max-h-[560px] w-full rounded-xl border border-white/15 bg-white object-contain"
-                        src={turn.visualPreviewUrl}
-                      />
-                    ) : !hasInlineImage(turn.response) && turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.(?:png|jpe?g|webp)$/i.test(path)) ? (
-                      <img
-                        alt={turn.response}
-                        className="mt-3 max-h-[560px] w-full rounded-xl border border-white/15 bg-white object-contain"
-                        src={`/api/builder/workspaces/${encodeURIComponent(turn.builderWorkspaceId)}/files/${turn.builderFiles.find((path) => /\\.(?:png|jpe?g|webp)$/i.test(path))!.split('/').map(encodeURIComponent).join('/')}?preview=1`}
-                      />
+                      <figure
+                        aria-label={turn.request}
+                        data-concierge-visual-preview="true"
+                        style={{
+                          display: 'grid',
+                          placeItems: 'center',
+                          width: 'min(100%, 560px)',
+                          aspectRatio: '1 / 1',
+                          margin: '16px auto 12px',
+                          padding: 12,
+                          boxSizing: 'border-box',
+                          border: '1px solid rgba(255,255,255,.18)',
+                          borderRadius: 14,
+                          background: '#fff',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <img
+                          alt={turn.request}
+                          decoding="async"
+                          height={512}
+                          src={turn.visualPreviewUrl}
+                          width={512}
+                          style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }}
+                        />
+                      </figure>
                     ) : null}
-                    {turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.html?$/i.test(path)) ? (
+                    {turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\.html?$/i.test(path)) ? (
                       <iframe
                         title={turn.response}
                         sandbox=""
                         className="mt-3 h-[460px] w-full rounded-xl border border-white/15 bg-white"
-                        src={`/api/builder/workspaces/${encodeURIComponent(turn.builderWorkspaceId)}/files/${turn.builderFiles.find((path) => /\\.html?$/i.test(path))!.split('/').map(encodeURIComponent).join('/')}?preview=1`}
+                        src={`/api/builder/workspaces/${encodeURIComponent(turn.builderWorkspaceId)}/files/${turn.builderFiles.find((path) => /\.html?$/i.test(path))!.split('/').map(encodeURIComponent).join('/')}?preview=1`}
                       />
                     ) : null}
                     {turn.builderWorkspaceId && turn.builderFiles?.length ? (

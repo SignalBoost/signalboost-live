@@ -34,6 +34,10 @@ const ATTACH_MAX_FILES = 5
 const ATTACH_ALLOWED_RE = /^(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/i
 const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv'
 
+function hasInlineImage(content: string): boolean {
+  return /<IMAGE>[\s\S]*?<\/IMAGE>/.test(content)
+}
+
 export default function Home() {
   const { dict, lang } = useI18n()
   const c = (key: string) => t(dict, `homepage.concierge.${key}`)
@@ -277,7 +281,7 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="assistant-content"><AssistantMessage content={turn.response} /></div>
-                    {!/<IMAGE>[\\s\\S]*?<\\/IMAGE>/.test(turn.response) && turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.(?:png|jpe?g|webp)$/i.test(path)) ? (
+                    {!hasInlineImage(turn.response) && turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\\.(?:png|jpe?g|webp)$/i.test(path)) ? (
                       <img
                         alt={turn.response}
                         className="mt-3 max-h-[560px] w-full rounded-xl border border-white/15 bg-white object-contain"

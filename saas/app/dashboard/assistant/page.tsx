@@ -6,10 +6,9 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
 import { uiText } from '@/lib/i18n/uiText'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
-import { isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
-type Msg = { role: 'user' | 'assistant'; content: string }
+type Msg = { role: 'user' | 'assistant'; content: string; builderWorkspaceId?: string; builderFiles?: string[] }
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string }
 type ConvSummary = { id: string; title: string; summary: string; message_count: number; updated_at: string }
@@ -34,7 +33,6 @@ const ALLOWED_MIME = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]
 const MAX_FILE_BYTES = 10 * 1024 * 1024 // 10 MB
-const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
 
 // ── Copy ─────────────────────────────────────────────────────────────────────
 const COPY = {
@@ -153,18 +151,6 @@ function readFileAsDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(reader.error)
     reader.readAsDataURL(file)
   })
-}
-
-function builderFilesFromStaged(files: readonly StagedFile[]): Array<{ path: string; content: string }> | null {
-  const supported = files.filter(file => file.mimeType.startsWith('text/') || file.mimeType === 'application/json')
-  if (supported.length !== files.length || supported.length > 20 || supported.some(file => file.size > 512 * 1024)) return null
-  try {
-    return supported.map(file => {
-      const encoded = file.dataUrl.slice(file.dataUrl.indexOf(',') + 1)
-      const bytes = Uint8Array.from(atob(encoded), char => char.charCodeAt(0))
-      return { path: file.name, content: new TextDecoder().decode(bytes) }
-    })
-  } catch { return null }
 }
 
 function formatBytes(bytes: number): string {
@@ -301,13 +287,6 @@ export default function AssistantPage() {
   async function send(text: string) {
     const content = text.trim()
     if ((!content && stagedFiles.length === 0) || loading) return
-    // Builder is an authenticated product surface. Do not let public Concierge inherit this handoff.
-    const builderFiles = builderFilesFromStaged(stagedFiles)
-    if (content && isCosCodingObjective(content)) {
-      if (builderFiles.length) sessionStorage.setItem(BUILDER_HANDOFF_FILES_KEY, JSON.stringify(builderFiles))
-      window.location.assign(`/dashboard/developer?objective=${encodeURIComponent(content)}`)
-      return
-    }
     if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
 
     // Build a user-facing label that includes file names
@@ -390,7 +369,15 @@ export default function AssistantPage() {
         const detail = `[${res.status}] ${String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 300)}`.trim()
         const fallback = gateway ? c(COPY.timedOut, l) : `${c(COPY.error, l)} ${detail}`
         const reply = directReply || fallback
-        setMessages([...next, { role: 'assistant', content: reply }])
+        const builderWorkspaceId = typeof data?.workspaceId === 'string' ? data.workspaceId : ''
+        const builderFiles = Array.isArray(data?.files)
+          ? data.files.filter((value: unknown): value is string => typeof value === 'string').slice(0, 50)
+          : []
+        setMessages([...next, {
+          role: 'assistant',
+          content: reply,
+          ...(builderWorkspaceId && builderFiles.length ? { builderWorkspaceId, builderFiles } : {}),
+        }])
       } catch (err: any) {
         const aborted = err?.name === 'AbortError'
 
@@ -577,6 +564,20 @@ export default function AssistantPage() {
                 {msg.role === 'assistant' ? (
                   <>
                     <VideoJsonMessage content={msg.content} />
+                    {msg.builderWorkspaceId && msg.builderFiles?.length ? (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                        {msg.builderFiles.map(path => (
+                          <a
+                            key={path}
+                            href={`/api/builder/workspaces/${encodeURIComponent(msg.builderWorkspaceId!)}/files/${path.split('/').map(encodeURIComponent).join('/')}`}
+                            download={path.split('/').pop() || 'download.txt'}
+                            style={{ borderRadius: 8, border: '1px solid rgba(26,240,255,.35)', background: 'rgba(26,240,255,.08)', color: '#67e8f9', padding: '5px 9px', fontSize: 12, textDecoration: 'none' }}
+                          >
+                            Download {path}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                     {(() => {
                       const feedback = feedbackByMessage[i] || { status: 'idle' as const }
                       const busy = feedback.status === 'saving'

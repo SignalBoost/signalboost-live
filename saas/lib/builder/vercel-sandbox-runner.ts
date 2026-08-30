@@ -20,7 +20,8 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
       resources: { vcpus: 1 },
       networkPolicy: 'deny-all',
       persistent: false,
-      env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/tmp' },
+      // Preserve the node24 runtime PATH; overriding it hides the Node binary.
+      env: { HOME: '/tmp' },
       tags: { surface: 'cos-builder' },
     })
     try {

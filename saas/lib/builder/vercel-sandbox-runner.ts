@@ -1,7 +1,7 @@
 import { Sandbox } from '@vercel/sandbox'
 import type { BuilderRunResult, BuilderRunnerPort } from './contracts.ts'
 
-const ROOT = '/vercel/sandbox/workspace'
+const ROOT = '/tmp/cos-builder'
 const COMMAND_TIMEOUT_MS = 20_000
 const SANDBOX_TIMEOUT_MS = 45_000
 const OUTPUT_LIMIT = 16_000
@@ -31,9 +31,10 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
         const directory = parent(destination)
         if (directory && directory !== ROOT) await sandbox.fs.mkdir(directory, { recursive: true })
         await sandbox.fs.writeFile(destination, file.content, 'utf8')
+        await sandbox.fs.readFile(destination, 'utf8')
       }
       try {
-        const result = await sandbox.runCommand({ cmd: 'sh', args: ['-lc', command], cwd: ROOT, timeoutMs: COMMAND_TIMEOUT_MS })
+        const result = await sandbox.runCommand({ cmd: 'sh', args: ['-lc', `cd ${ROOT} && ${command}`], cwd: ROOT, timeoutMs: COMMAND_TIMEOUT_MS })
         const [stdout, stderr] = await Promise.all([result.stdout(), result.stderr()])
         return { exitCode: result.exitCode, stdout: bounded(stdout), stderr: bounded(stderr), timedOut: false }
       } catch (error) {

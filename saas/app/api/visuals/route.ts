@@ -9,7 +9,16 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 const MAX_OBJECTIVE_CHARS = 4_000
-const PNG_PREFIX = 'artifact-png-base64:'
+function imageMimeType(b64: string): 'image/png' | 'image/jpeg' | 'image/webp' {
+  const bytes = Buffer.from(b64.slice(0, 96), 'base64')
+  if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg'
+  if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') return 'image/webp'
+  return 'image/png'
+}
+
+function extensionFor(mime: string): 'png' | 'jpg' | 'webp' {
+  return mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png'
+}
 
 function objectiveOf(value: unknown): string {
   const objective = String(value || '').replace(/\0/g, '').trim()
@@ -51,13 +60,15 @@ export async function POST(request: Request) {
 
     const workspaceId = crypto.randomUUID()
     await workspace.ensureWorkspace(workspaceId)
-    await workspace.writeFile(workspaceId, intent.filename, PNG_PREFIX + generated.b64)
+    const mime = imageMimeType(generated.b64)
+    const filename = intent.filename.replace(/png$/i, extensionFor(mime))
+    await workspace.writeFile(workspaceId, filename, `artifact-image-base64:${mime}:${generated.b64}`)
 
     return NextResponse.json({
       reply: 'Created your visual. It is shown below and ready to download.',
       source: 'concierge-visual',
       workspaceId,
-      files: [intent.filename],
+      files: [filename],
       execution_allowed: true,
       external_action_taken: false,
     })

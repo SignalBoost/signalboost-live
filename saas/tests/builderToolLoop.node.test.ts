@@ -168,6 +168,32 @@ test('Builder fixes a supplied file after inspecting it and runs the corrected w
   assert.equal(inferBuilderCertificationAttempt(result)?.caseId, 'observe_failure_and_recover_v1')
 })
 
+test('Builder forces a repair to progress after inspecting the supplied source', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('user:repair-progress', 'broken-index.js', 'module.exports = (a, b) => a - b')
+  let runs = 0
+  const runner: BuilderRunnerPort = { async run() {
+    runs += 1
+    return runs === 1
+      ? { exitCode: 1, stdout: '', stderr: 'AssertionError: expected 5, got -1', timedOut: false }
+      : { exitCode: 0, stdout: 'pass\\n', stderr: '', timedOut: false }
+  } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"list_files","input":{}}',
+    '{"type":"tool","toolId":"read_file","input":{"path":"broken-index.js"}}',
+    '{"type":"tool","toolId":"list_files","input":{}}',
+    '{"type":"tool","toolId":"write_file","input":{"path":"broken-index.test.js","content":"test"} }',
+    '{"type":"tool","toolId":"run","input":{"command":"node --test broken-index.test.js"}}',
+    '{"type":"tool","toolId":"edit_file","input":{"path":"broken-index.js","search":"a - b","replace":"a + b"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node --test broken-index.test.js"}}',
+    '{"type":"answer","answer":"Fixed and proved the regression."}',
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Fix broken-index.js so add(2, 3) prints 5.', workspaceId: 'user:repair-progress' })
+  assert.equal(result.ok, true)
+  assert.equal(result.trace.some(item => item.error === 'builder_repeated_tool_call:list_files; choose a different next step'), true)
+  assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
+})
+
 test('Builder rejects traversal and never permits host files', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   await assert.rejects(() => workspace.writeFile('user:3', '../.env', 'no'), /builder_invalid_path/)

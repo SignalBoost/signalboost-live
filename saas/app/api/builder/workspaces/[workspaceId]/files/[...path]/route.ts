@@ -20,7 +20,7 @@ export async function GET(request: Request, context: { params: Promise<{ workspa
     if (!file) return NextResponse.json({ error: 'File not found.' }, { status: 404 })
     const name = file.path.split('/').pop() || 'download.txt'
     const isPdf = name.toLowerCase().endsWith('.pdf') && file.content.startsWith('artifact-pdf-base64:')
-    const imageMatch = /^artifact-image-base64:(image\/(?:png|jpeg|webp)):(.+)$/s.exec(file.content)
+    const imageMatch = /^artifact-image-base64:(image\/(?:png|jpeg|webp)):([\\s\\S]+)$/.exec(file.content)
     const isImagePreview = new URL(request.url).searchParams.get('preview') === '1' && Boolean(imageMatch)
     const isHtmlPreview = new URL(request.url).searchParams.get('preview') === '1' && /\.html?$/i.test(name)
     const body = isPdf

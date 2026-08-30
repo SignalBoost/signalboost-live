@@ -8,6 +8,7 @@ import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import AssistantMessage from '@/components/AssistantMessage'
 import { uiText } from '@/lib/i18n/uiText'
+import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string; error?: string }
@@ -313,20 +314,26 @@ export default function Concierge() {
     const deadline = window.setTimeout(() => controller.abort(), CONCIERGE_CLIENT_DEADLINE_MS)
 
     try {
-      const res = await fetch('/api/concierge', {
+      // Files are created by the authenticated backend tool, while ordinary conversation
+      // stays on public Concierge. An attached prompt remains ordinary conversation so no
+      // reference material is silently omitted from an artifact.
+      const artifactRequest = staged.length === 0 && isConciergeArtifactObjective(content)
+      const res = await fetch(artifactRequest ? '/api/artifacts' : '/api/concierge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({
-          messages: nextMessages,
-          attachments: staged.map(a => ({ name: a.name, type: a.type, dataUrl: a.dataUrl })),
-          // timezone: the visitor's OWN browser zone, read with zero user input.
-          // Missing here meant every "what date is today" from a real visitor near
-          // midnight UTC could land on the wrong calendar day (deterministicUtilities
-          // defaults to UTC when none is supplied) — caught Aug 12 testing from
-          // Nicaragua, UTC-6, where UTC had already rolled to the next day locally.
-          context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current, utilityReport: utilityContext, cosMode: 'silent_background_planning', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-        }),
+        body: JSON.stringify(artifactRequest
+          ? { objective: content }
+          : {
+              messages: nextMessages,
+              attachments: staged.map(a => ({ name: a.name, type: a.type, dataUrl: a.dataUrl })),
+              // timezone: the visitor's OWN browser zone, read with zero user input.
+              // Missing here meant every "what date is today" from a real visitor near
+              // midnight UTC could land on the wrong calendar day (deterministicUtilities
+              // defaults to UTC when none is supplied) — caught Aug 12 testing from
+              // Nicaragua, UTC-6, where UTC had already rolled to the next day locally.
+              context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current, utilityReport: utilityContext, cosMode: 'silent_background_planning', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+            }),
       })
       const data = await res.json()
       if (requestAbortRef.current !== controller) return

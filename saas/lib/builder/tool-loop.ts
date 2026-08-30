@@ -10,6 +10,21 @@ const MAX_GATE_NUDGES = 3
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const safeJson = (value: unknown) => { try { return JSON.stringify(value).slice(0, 18_000) } catch { return '"[unserializable]"' } }
 
+async function within<T>(work: Promise<T>, timeoutMs?: number): Promise<T> {
+  if (!timeoutMs || !Number.isFinite(timeoutMs) || timeoutMs <= 0) return work
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('builder_model_round_timeout')), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 function toolPath(input: Record<string, unknown>): string {
   return text(input.path) || text(input.filePath) || text(input.filename) || text(input.file) || text(input.name)
 }
@@ -53,14 +68,16 @@ export class BuilderToolLoop {
     this.runner = runner
   }
 
-  async run(input: { objective: string; workspaceId: string; maxRounds?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
+  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
     const trace: BuilderToolTrace[] = []
     let previousFingerprint = ''
     const initialPaths = new Set((await this.workspace.listFiles(input.workspaceId)).map(file => file.path))
     let writeCount = 0, runCount = 0, gateNudges = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 12))
     for (let round = 1; round <= maxRounds; round += 1) {
-      const response = await this.ai.generate({
+      let response: string | null
+      try {
+        response = await within(this.ai.generate({
         systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${MAX_WRITES_PER_TURN} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. Normal file-creation tasks only require their requested successful proving command. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
         prompt: [
           formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -72,7 +89,10 @@ export class BuilderToolLoop {
           'When done: {"type":"answer","answer":"what changed and what ran"}',
         ].filter(Boolean).join('\n\n'),
         maxTokens: 1600,
-      })
+      }), input.modelRoundTimeoutMs)
+      } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
+      }
       const action = parse(response)
       if (!action) return { ok: false, error: 'builder_invalid_model_control_output', trace }
       if (action.type === 'answer') {

@@ -162,7 +162,11 @@ export default function Home() {
       const suggestedFollowups = Array.isArray(payload?.suggested_followups)
         ? payload.suggested_followups.filter((value: unknown): value is string => typeof value === 'string').slice(0, 2)
         : []
-      return { reply, suggestedFollowups }
+      const builderWorkspaceId = typeof payload?.workspaceId === 'string' ? payload.workspaceId : ''
+      const builderFiles = Array.isArray(payload?.files)
+        ? payload.files.filter((value: unknown): value is string => typeof value === 'string').slice(0, 50)
+        : []
+      return { reply, suggestedFollowups, builderWorkspaceId, builderFiles }
     }
 
     try {
@@ -184,6 +188,7 @@ export default function Home() {
         request: displayContent,
         response: reply,
         ...(result.suggestedFollowups.length === 2 ? { suggestedFollowups: result.suggestedFollowups } : {}),
+        ...(result.builderWorkspaceId && result.builderFiles.length ? { builderWorkspaceId: result.builderWorkspaceId, builderFiles: result.builderFiles } : {}),
       }])
       setPendingRequest('')
       setQuestion('')
@@ -271,6 +276,15 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="assistant-content"><AssistantMessage content={turn.response} /></div>
+                    {turn.builderWorkspaceId && turn.builderFiles?.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {turn.builderFiles.map((path) => (
+                          <a key={path} href={`/api/builder/workspaces/${encodeURIComponent(turn.builderWorkspaceId!)}/files/${path.split('/').map(encodeURIComponent).join('/')}`} download={path.split('/').pop() || 'download.txt'} className="secondary-button text-xs">
+                            Download {path}
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                     {turn.suggestedFollowups?.length === 2 ? (
                       <div className="mt-3 border-t border-white/10 pt-2.5">
                         <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/55">{c('continue')}</div>

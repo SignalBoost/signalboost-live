@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { BuilderFile, BuilderWorkspacePort } from './contracts.ts'
+import type { BuilderFile, BuilderVerifiedRepairLesson, BuilderWorkspacePort } from './contracts.ts'
 
 const MAX_FILE_BYTES = 512 * 1024
 const MAX_FILES = 100
@@ -137,6 +137,19 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
     if (!search || current.content.indexOf(search) < 0) throw new Error('builder_edit_target_not_found')
     if (current.content.indexOf(search) !== current.content.lastIndexOf(search)) throw new Error('builder_edit_target_ambiguous')
     return this.writeFile(workspaceId, current.path, current.content.replace(search, String(replace ?? '')))
+  }
+
+  async recordVerifiedRepairLesson(workspaceId: string, lesson: BuilderVerifiedRepairLesson): Promise<void> {
+    const { error } = await this.db.from('builder_verified_repair_lessons').insert({
+      workspace_id: workspaceId,
+      user_id: this.userId,
+      failure_class: lesson.failureClass,
+      cause_evidence: lesson.causeEvidence,
+      fix_summary: lesson.fixSummary,
+      regression_command: lesson.regressionCommand,
+      runtime: lesson.runtime,
+    })
+    if (error) throw new Error(`builder_lesson_write: ${error.message}`)
   }
 }
 

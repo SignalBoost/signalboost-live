@@ -40,3 +40,12 @@ export type BuilderToolTrace = Readonly<{
 export type BuilderLoopResult =
   | Readonly<{ ok: true; answer: string; trace: readonly BuilderToolTrace[] }>
   | Readonly<{ ok: false; error: string; trace: readonly BuilderToolTrace[] }>
+
+/** A lesson is admitted only when a failure is followed by a successful proving command. */
+export type BuilderVerifiedRepairLesson = Readonly<{
+  failureClass: BuilderFailureClass
+  causeEvidence: string
+  fixSummary: string
+  regressionCommand: string
+  runtime: 'node24-network-denied-ephemeral'
+}>

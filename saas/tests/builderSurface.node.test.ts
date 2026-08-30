@@ -1,8 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
-const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+
+const source = (path: string) => hydrateLocalizedSource(readFileSync(new URL(path, import.meta.url), 'utf8'))
 
 test('Builder is authenticated and does not expose full tool trace content', () => {
   const route = source('../app/api/builder/route.ts')
@@ -30,4 +32,13 @@ test('Builder workspace tables are server-only and ownership constrained', () =>
   assert.match(migration, /enable row level security/)
   assert.match(migration, /revoke all on public\.builder_workspaces from anon, authenticated/)
   assert.match(migration, /revoke all on public\.builder_workspace_files from anon, authenticated/)
+})
+
+test('Builder retains only verified repair lessons in a server-only table', () => {
+  const migration = source('../supabase/migrations/20260830004500_builder_verified_repair_lessons.sql')
+  assert.match(migration, /create table if not exists public\.builder_verified_repair_lessons/)
+  assert.match(migration, /references public\.builder_workspaces \(id, user_id\)/)
+  assert.match(migration, /enable row level security/)
+  assert.match(migration, /revoke all on public\.builder_verified_repair_lessons from anon, authenticated/)
+  assert.match(migration, /Never stores raw chat history/)
 })

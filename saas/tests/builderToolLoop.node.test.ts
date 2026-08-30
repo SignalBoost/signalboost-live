@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
+import { verifiedRepairLesson } from '../lib/builder/verified-lessons.ts'
 
 class ScriptedBuilderAi implements BuilderAiPort {
   private cursor = 0
@@ -56,6 +57,10 @@ test('Builder observes a failed command, classifies it, and retries without cons
   assert.equal(result.trace[0]?.ok, false)
   assert.equal(result.trace[0]?.failureClass, 'path')
   assert.equal(result.trace.some(item => item.toolId === 'run' && item.ok), true)
+  const lesson = verifiedRepairLesson(result)
+  assert.equal(lesson?.failureClass, 'path')
+  assert.equal(lesson?.regressionCommand, 'node ./hello.js')
+  assert.equal(lesson?.runtime, 'node24-network-denied-ephemeral')
 })
 
 test('Builder does not declare a repair complete without successful runtime evidence', async () => {
@@ -68,6 +73,7 @@ test('Builder does not declare a repair complete without successful runtime evid
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'fix broken test', workspaceId: 'user:verify' })
   assert.equal(result.ok, false)
   if (!result.ok) assert.equal(result.error, 'builder_verification_required')
+  assert.equal(verifiedRepairLesson(result), null)
 })
 
 test('Builder fixes a supplied file after inspecting it and runs the corrected workspace', async () => {

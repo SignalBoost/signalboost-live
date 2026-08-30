@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isPastedOperationalLog } from '../lib/ai/cos/pastedOperationalLog.ts'
+import { analyzeOperationalLog, isPastedOperationalLog, operationalLogReply } from '../lib/ai/cos/pastedOperationalLog.ts'
 
 test('recognizes a pasted Vercel build log as operational evidence', () => {
   const log = [
@@ -11,4 +11,19 @@ test('recognizes a pasted Vercel build log as operational evidence', () => {
   ].join('\n')
   assert.equal(isPastedOperationalLog(log), true)
   assert.equal(isPastedOperationalLog('Fix the add function in src/math.js.'), false)
+})
+
+
+test('reports a final test failure instead of calling the log incomplete', () => {
+  const log = [
+    '15:27:17.225 Running "vercel build"',
+    '✖ both answer paths resolve markers before anything else sees the text',
+    'Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+  ].join('\n')
+  const analysis = analyzeOperationalLog(log)
+  assert.equal(analysis.failed, true)
+  assert.equal(analysis.exitCode, 1)
+  assert.equal(analysis.testFailures.length, 1)
+  assert.match(operationalLogReply(log), /This Vercel build failed/)
+  assert.match(operationalLogReply(log), /both answer paths resolve markers/i)
 })

@@ -17,6 +17,8 @@ type Message = {
   feedbackPrompt?: string
   feedbackEligible?: boolean
   suggestedFollowups?: string[]
+  builderWorkspaceId?: string
+  builderFiles?: string[]
 }
 type VideoItem = { title: string; type: string; id: string }
 
@@ -334,6 +336,10 @@ export default function Concierge() {
       const suggestedFollowups = Array.isArray(data?.suggested_followups)
         ? data.suggested_followups.filter((value: unknown): value is string => typeof value === 'string').slice(0, 2)
         : []
+      const builderWorkspaceId = typeof data?.workspaceId === 'string' ? data.workspaceId : ''
+      const builderFiles = Array.isArray(data?.files)
+        ? data.files.filter((value: unknown): value is string => typeof value === 'string').slice(0, 50)
+        : []
       setMessages(prev => [
         ...prev,
         {
@@ -341,6 +347,7 @@ export default function Concierge() {
           content: reply,
           ...(feedbackEligible ? { feedbackPrompt: content, feedbackEligible: true } : {}),
           ...(suggestedFollowups.length === 2 ? { suggestedFollowups } : {}),
+          ...(builderWorkspaceId && builderFiles.length ? { builderWorkspaceId, builderFiles } : {}),
         },
       ])
     } catch {
@@ -434,6 +441,20 @@ export default function Concierge() {
                     : 'max-w-[88%] self-start rounded-2xl rounded-bl-md border border-white/10 bg-white/10 px-3.5 py-2.5 text-[13px] leading-6 text-white'}
                 >
                   {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
+                  {message.role === 'assistant' && message.builderWorkspaceId && message.builderFiles?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {message.builderFiles.map(path => (
+                        <a
+                          key={path}
+                          href={`/api/builder/workspaces/${encodeURIComponent(message.builderWorkspaceId!)}/files/${path.split('/').map(encodeURIComponent).join('/')}`}
+                          download={path.split('/').pop() || 'download.txt'}
+                          className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-300/20"
+                        >
+                          Download {path}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
                   {message.role === 'assistant' && message.suggestedFollowups?.length === 2 ? (
                     <div className="mt-3 border-t border-white/10 pt-2.5">
                       <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wide text-white/55">{uiText('homepage.concierge.continue')}</div>

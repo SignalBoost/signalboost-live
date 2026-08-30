@@ -6,6 +6,7 @@ import { textPdfBase64 } from '../lib/artifacts/text-pdf.ts'
 test('detects explicit Concierge PDF and TXT file requests', () => {
   assert.deepEqual(detectConciergeArtifactIntent('please make a PDF named status report'), { format: 'pdf', filenameStem: 'status-report' })
   assert.deepEqual(detectConciergeArtifactIntent('I need a .txt file called notes'), { format: 'txt', filenameStem: 'notes' })
+  assert.deepEqual(detectConciergeArtifactIntent('Create a PDF named welcome-letter with a short welcome letter for new customers.'), { format: 'pdf', filenameStem: 'welcome-letter' })
   assert.equal(detectConciergeArtifactIntent('What is a PDF?'), null)
 })
 

@@ -500,6 +500,8 @@ export function freshEvidenceGroundingBlock(input: string, sources: FreshEvidenc
     '5. If occupancy evidence does not establish who holds the office, say live verification is insufficient. Do not guess. For evaluative questions, publish cited economic figures even when they do not produce one name.',
     '6. Cite at least two independent evidence ids when two or more independent sources are required, and include their source URLs. Public office-holder answers must materially rely on the supplied government source when one is required.',
     '7. Do not claim a source says more than its title/snippet supports.',
+    '8. Snippets supply figures and dates only. They do not define the user question. If a word in the question is overloaded (pay gap, man, gender, racist, equal work), split the senses first, then attach each LIVE figure to the sense it actually measures.',
+    '9. An aggregate earnings or outcome ratio is not an equal-work or equal-treatment finding unless the snippet itself is a controlled/matched comparison. Do not file an uncontrolled figure under "equal work." Advocacy pages may be cited as advocacy after the split, not as the opening frame.',
     '',
     evidence,
     '',

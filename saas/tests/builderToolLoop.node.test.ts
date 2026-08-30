@@ -4,7 +4,7 @@ import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
 import { formatVerifiedLessonsForPrompt, verifiedRepairLesson } from '../lib/builder/verified-lessons.ts'
-import { evaluateBuilderCertification } from '../lib/builder/certification.ts'
+import { evaluateBuilderCertification, inferBuilderCertificationAttempt } from '../lib/builder/certification.ts'
 
 class ScriptedBuilderAi implements BuilderAiPort {
   private cursor = 0
@@ -26,6 +26,7 @@ test('Builder writes a user file, runs it, and returns only after tool evidence'
   assert.deepEqual(result.trace.map(item => item.toolId), ['write_file', 'run'])
   assert.equal((await workspace.readFile('user:1', 'hello.js'))?.content, 'console.log("hello")')
   assert.equal(evaluateBuilderCertification('create_and_run_javascript_v1', result).passed, true)
+  assert.equal(inferBuilderCertificationAttempt(result)?.caseId, 'create_and_run_javascript_v1')
 })
 
 test('Builder recovers when the model replays a completed tool call', async () => {
@@ -68,6 +69,7 @@ test('Builder observes a failed command, classifies it, and retries without cons
   assert.doesNotMatch(prompt, /Cannot find module/)
   assert.doesNotMatch(prompt, /node \.\/hello\.js/)
   assert.equal(evaluateBuilderCertification('observe_failure_and_recover_v1', result).passed, true)
+  assert.equal(inferBuilderCertificationAttempt(result)?.caseId, 'observe_failure_and_recover_v1')
 })
 
 test('Builder does not declare a repair complete without successful runtime evidence', async () => {
@@ -124,6 +126,7 @@ test('Builder fixes a supplied file after inspecting it and runs the corrected w
   assert.equal(result.ok, true)
   assert.equal((await workspace.readFile('user:2', 'app.js'))?.content, 'console.log("fixed")')
   assert.equal(evaluateBuilderCertification('inspect_repair_and_run_v1', result).passed, true)
+  assert.equal(inferBuilderCertificationAttempt(result)?.caseId, 'observe_failure_and_recover_v1')
 })
 
 test('Builder rejects traversal and never permits host files', async () => {

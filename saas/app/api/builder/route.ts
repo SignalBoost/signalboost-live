@@ -8,6 +8,7 @@ import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
 import { verifiedRepairLesson } from '@/lib/builder/verified-lessons'
 import { inferBuilderCertificationAttempt } from '@/lib/builder/certification'
 import { isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -60,7 +61,10 @@ export async function GET(request: Request) {
   }
 }
 
-/** Authenticated Builder only. Public Concierge must never route code execution here. */
+/**
+ * Authenticated Builder only. The browser ingress may call this route for an owner before entering
+ * public-delivery isolation; ordinary public Concierge execution never receives Builder authority.
+ */
 export async function POST(request: Request) {
   const access = await getAccess().catch(() => null)
   if (!access?.userId) return NextResponse.json({ error: 'Sign in to use COS Builder.' }, { status: 401 })
@@ -68,7 +72,19 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const rawObjective = String(body?.objective || '').trim()
+    const requestedWorkspaceId = String(body?.workspaceId || '').trim()
+    if (requestedWorkspaceId && !UUID.test(requestedWorkspaceId)) return NextResponse.json({ error: 'Invalid workspace id.' }, { status: 400 })
+    const workspaceId = requestedWorkspaceId || crypto.randomUUID()
+
     if (isPastedOperationalLog(rawObjective)) {
+      if (access.isOwner) {
+        const repair = await executeSignalBoostRepositoryRepair({
+          userId: access.userId,
+          rawObjective,
+          workspaceId,
+        })
+        if (repair) return NextResponse.json(repair.payload, { status: repair.status })
+      }
       return NextResponse.json({
         reply: operationalLogReply(rawObjective),
         source: 'builder-operational-log-analysis',
@@ -77,10 +93,8 @@ export async function POST(request: Request) {
         execution_allowed: false,
       })
     }
+
     const objective = cleanObjective(rawObjective)
-    const requestedWorkspaceId = String(body?.workspaceId || '').trim()
-    if (requestedWorkspaceId && !UUID.test(requestedWorkspaceId)) return NextResponse.json({ error: 'Invalid workspace id.' }, { status: 400 })
-    const workspaceId = requestedWorkspaceId || crypto.randomUUID()
     const workspace = createSupabaseBuilderWorkspace(access.userId)
     if (!workspace) return NextResponse.json({ error: 'Builder storage is unavailable.' }, { status: 503 })
     await workspace.ensureWorkspace(workspaceId)

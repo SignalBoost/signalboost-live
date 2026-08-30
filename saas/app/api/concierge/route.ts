@@ -104,7 +104,15 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
     createPlatformAiPort(),
     workspace,
     new VercelSandboxBuilderRunner(),
-  ).run({ objective: input, workspaceId })
+  ).run({
+    objective: input,
+    workspaceId,
+    // Concierge has a finite browser and function lifetime. A simple design should need one
+    // self-contained file, a proving command, and a final answer; bound every model round so
+    // visitors receive a truthful Builder failure rather than an indistinguishable timeout.
+    maxRounds: 4,
+    modelRoundTimeoutMs: 30_000,
+  })
   const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
   if (result.ok === false) {
     return NextResponse.json({

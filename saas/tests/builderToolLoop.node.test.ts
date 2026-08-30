@@ -2,9 +2,27 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
+import { assertPersistable, containsNullByte } from '../lib/builder/storage-contract.ts'
 import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
 import { formatVerifiedLessonsForPrompt, verifiedRepairLesson } from '../lib/builder/verified-lessons.ts'
 import { evaluateBuilderCertification, inferBuilderCertificationAttempt } from '../lib/builder/certification.ts'
+
+test('Builder storage rejects a real null byte without rewriting escaped source text', () => {
+  assert.equal(containsNullByte('hello\0world'), true)
+  assert.equal(containsNullByte('const nul = "\\\\0"'), false)
+  assert.equal(containsNullByte('const nul = "\\\\u0000"'), false)
+  assert.throws(() => assertPersistable('hello\0world', 'hello.js'), /builder_file_contains_null_byte/)
+  assert.doesNotThrow(() => assertPersistable('const nul = "\\\\0"', 'hello.js'))
+  assert.doesNotThrow(() => assertPersistable('const nul = "\\\\u0000"', 'hello.js'))
+})
+
+test('Builder distinguishes a missing package from a missing workspace file', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 1, stdout: '', stderr: "Error: Cannot find module 'left-pad'", timedOut: false } } }
+  const ai = new ScriptedBuilderAi(['{"type":"tool","toolId":"run","input":{"command":"node app.js"}}'])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'run app', workspaceId: 'user:dependency', maxRounds: 1 })
+  assert.equal(result.trace[0]?.failureClass, 'dependency')
+})
 
 class ScriptedBuilderAi implements BuilderAiPort {
   private cursor = 0

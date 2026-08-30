@@ -19,6 +19,7 @@ import {
 import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 import { withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance'
+import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { POST as legacyPOST } from './routeCoreLegacy.ts'
 
 export { guardConfabulatedAction } from './routeCoreLegacy.ts'
@@ -131,6 +132,26 @@ async function persistResponseTurn(params: {
   await persistTurn({ conversationId, userId, userMessage, assistantReply, provenance: provenance ?? undefined })
 }
 
+function securityRefusal(source: 'support-security-refusal' | 'support-output-security-blocked') {
+  return NextResponse.json({
+    reply: PUBLIC_CONCIERGE_SECURITY_REFUSAL,
+    source,
+    execution_allowed: false,
+    external_action_taken: false,
+  }, { status: 200 })
+}
+
+async function blockedUnsafeOutput(response: Response): Promise<NextResponse | null> {
+  try {
+    const payload = await response.clone().json()
+    return hasUnsafePublicModelOutput(String(payload?.reply || ''))
+      ? securityRefusal('support-output-security-blocked')
+      : null
+  } catch {
+    return null
+  }
+}
+
 async function directStrategyProfileResponse(body: any, prompt: string, isPrivileged: boolean): Promise<NextResponse | null> {
   if (!isDirectStrategyGenerationRequest(prompt)) return null
 
@@ -217,6 +238,7 @@ export async function POST(req: NextRequest) {
   }
 
   const prompt = latestUserMessage(body)
+  if (prompt && isPublicPromptExfiltrationAttempt(prompt)) return securityRefusal('support-security-refusal')
   const precedingAssistant = previousAssistantMessage(body)
   const conversationId = conversationIdFrom(body)
   const languageCode = languageCodeFrom(body)
@@ -316,6 +338,9 @@ export async function POST(req: NextRequest) {
 
     response = await withRunpodWakePermission(wakePermission, () => legacyPOST(req))
   }
+
+  const securityBlocked = await blockedUnsafeOutput(response)
+  if (securityBlocked) return securityBlocked
 
   if (!response.ok || !prompt || !userId) return response
 

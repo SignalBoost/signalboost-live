@@ -45,6 +45,7 @@ import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
 import { withCosProviderExecutionTrace, type ProviderExecutionTrace } from '@/lib/cos/textGateway'
 import { getAccess } from '@/lib/auth/access'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
+import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import {
   isProvenanceIntrospection,
@@ -397,16 +398,29 @@ export async function postCosPrimary(req:NextRequest){
   }catch(error){const externalInvoked=Boolean(traced.trace.invoked);logEscalation({event:'external_escalation_result_unparsed',reason_code:reason.code,provider:normalizeProvider(traced.trace.provider),model:traced.trace.model,status:response.status,error:error instanceof Error?error.message:String(error),external_ai_invoked:externalInvoked});emitRequestTelemetry({startedAt,input,source:externalInvoked?'external_fallback':'local_cos_reasoning',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:externalInvoked});return response}
 }
 
+/** API-wide public prompt-security boundary. It runs before COS reasoning and after its response. */
+function publicSecurityRefusal(source: 'cos-primary-security-refusal' | 'cos-primary-output-security-blocked') {
+  return NextResponse.json({
+    reply: PUBLIC_CONCIERGE_SECURITY_REFUSAL,
+    source,
+    execution_allowed: false,
+    external_action_taken: false,
+  }, { status: 200 })
+}
+
 /** API-wide post-answer decorator. It cannot alter COS reasoning, grounding, or provenance. */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const prompt = latestUserText(body)
+  if (prompt && isPublicPromptExfiltrationAttempt(prompt)) return publicSecurityRefusal('cos-primary-security-refusal')
   const response = await postCosPrimary(req)
   const headers = new Headers(response.headers)
   headers.delete('content-length')
   try {
     const payload: any = await response.clone().json()
-    if (!payload || typeof payload !== 'object' || !String(payload.reply || '').trim() || !prompt) return response
+    if (!payload || typeof payload !== 'object') return response
+    if (hasUnsafePublicModelOutput(String(payload.reply || ''))) return publicSecurityRefusal('cos-primary-output-security-blocked')
+    if (!String(payload.reply || '').trim() || !prompt) return response
     const successful = response.ok && payload.ok !== false
     payload.suggested_followups = await suggestFollowups({
       prompt,

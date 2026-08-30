@@ -37,6 +37,9 @@ export const maxDuration = 300
 const PRIMARY_TIMEOUT_MS = 150_000
 const RESEARCH_LIFELINE_START_MS = 90_000
 const RESEARCH_RESULT_LIMIT = 12
+// This is intentionally local to the public ingress. Worker-role routing is allowed to evolve,
+// while Concierge must reliably recognize the concrete deliverables it advertises to visitors.
+const CONCIERGE_DESIGN_ARTIFACT = /\b(?:design|build|create)\b[\s\S]{0,160}\b(?:website|web\s*page|landing(?:\s|-)?page|dashboard|user interface|ui|component|mockup|prototype)\b/i
 
 function latestUserText(body: any): string {
   const messages = Array.isArray(body?.messages) ? body.messages : []
@@ -79,7 +82,15 @@ function hasAttachments(body: any): boolean {
 async function directBuilder(body: any, input: string): Promise<NextResponse | null> {
   // Builder cannot yet safely stage Concierge image/PDF attachments. Leave an attached request
   // on the ordinary COS attachment path rather than silently omitting its reference material.
-  if (hasAttachments(body) || !isConciergeBuilderObjective(input)) return null
+  const roleMatched = isConciergeBuilderObjective(input)
+  const designMatched = CONCIERGE_DESIGN_ARTIFACT.test(input)
+  if (hasAttachments(body) || !(roleMatched || designMatched)) return null
+  console.info('[concierge-builder-routing]', JSON.stringify({
+    route: 'builder',
+    roleMatched,
+    designMatched,
+    hasAttachments: false,
+  }))
   const access = await getAccess().catch(() => null)
   if (!access?.userId) {
     return NextResponse.json({

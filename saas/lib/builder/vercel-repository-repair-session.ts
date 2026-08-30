@@ -13,6 +13,7 @@ const COMMAND_TIMEOUT_MS = 60_000
 const SETUP_TIMEOUT_MS = 90_000
 const EXCLUDED_SEGMENTS = new Set(['.git', 'node_modules', '.next', 'dist', 'build', 'coverage', '.vercel'])
 const SECRET_LIKE = /(^|\/)(?:\.env(?:\.[^/]*)?|(?:credentials?|secrets?|tokens?|private[-_.]?key|id_rsa|id_ed25519|service[-_.]?account)(?:\.[^/]*)?)(?:$|\/)|\.(?:pem|key|p12|pfx)$/i
+const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/
 
 type SandboxInstance = Awaited<ReturnType<typeof Sandbox.create>>
 type CommandResult = Readonly<{ exitCode: number; stdout: string; stderr: string }>
@@ -27,21 +28,33 @@ function bounded(value: string, maximum = 16_000): string {
 
 export function safeRepositoryWorkspacePath(value: unknown): string {
   const normalized = String(value || '').trim().replace(/\\/g, '/').replace(/^\.\//, '').replace(/^saas\//, '')
-  if (!normalized || normalized.length > 260 || normalized.startsWith('/') || normalized.includes('\0')) throw new Error('builder_invalid_path')
+  if (!normalized || normalized.length > 260 || normalized.startsWith('/') || CONTROL_CHARACTER.test(normalized)) throw new Error('builder_invalid_path')
   const segments = normalized.split('/')
   if (segments.some(segment => !segment || segment === '.' || segment === '..' || EXCLUDED_SEGMENTS.has(segment))) throw new Error('builder_invalid_path')
   if (SECRET_LIKE.test(normalized)) throw new Error('builder_invalid_path')
   return normalized
 }
 
+export function safeRepositoryChangedPath(value: unknown): string {
+  const normalized = String(value || '').replace(/\\/g, '/')
+  if (!normalized.startsWith('saas/')) throw new Error('builder_repository_scope_violation')
+  try {
+    return safeRepositoryWorkspacePath(normalized)
+  } catch {
+    throw new Error('builder_repository_scope_violation')
+  }
+}
+
 function stripProjectPrefix(value: string): string | null {
-  const normalized = value.trim().replace(/\\/g, '/').replace(/^\.\//, '')
-  if (!normalized.startsWith('saas/')) return null
-  try { return safeRepositoryWorkspacePath(normalized) } catch { return null }
+  try { return safeRepositoryChangedPath(value) } catch { return null }
 }
 
 function unique(values: readonly string[], limit = MAX_VISIBLE_FILES): string[] {
   return [...new Set(values.filter(Boolean))].slice(0, limit)
+}
+
+function nulPaths(value: string): string[] {
+  return value.split('\0').filter(Boolean)
 }
 
 async function commandOutput(result: Awaited<ReturnType<SandboxInstance['runCommand']>>, maximum = 16_000): Promise<CommandResult> {
@@ -86,8 +99,7 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
       await session.requireSetupSuccess('git', ['-C', REPOSITORY_ROOT, 'remote', 'add', 'origin', SIGNALBOOST_REPOSITORY_URL], '/tmp')
       await session.requireSetupSuccess('git', ['-C', REPOSITORY_ROOT, 'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', fullCommitSha], '/tmp')
       await session.requireSetupSuccess('git', ['-C', REPOSITORY_ROOT, 'checkout', '--quiet', '--detach', 'FETCH_HEAD'], '/tmp')
-      const revision = await session.exec('git', ['-C', REPOSITORY_ROOT, 'rev-parse', 'HEAD'], '/tmp', 20_000)
-      if (revision.exitCode !== 0 || revision.stdout.trim().toLowerCase() !== fullCommitSha) throw new Error('builder_repository_revision_mismatch')
+      await session.assertPinnedRevision()
 
       // The dependency graph is pinned by package-lock.json. Install scripts are disabled during
       // bootstrap; repair proof should prefer the narrowest relevant test or typecheck command.
@@ -122,6 +134,14 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
     if (this.networkLocked) throw new Error('builder_repository_setup_after_network_lock')
     const result = await this.exec(cmd, args, cwd, timeoutMs)
     if (result.exitCode !== 0) throw new Error(`builder_repository_setup_failed:${bounded(result.stderr || result.stdout, 800)}`)
+  }
+
+  private async assertPinnedRevision(): Promise<void> {
+    const expected = String(this.target.fullCommitSha || '').toLowerCase()
+    const revision = await this.exec('git', ['-C', REPOSITORY_ROOT, 'rev-parse', 'HEAD'], '/tmp', 20_000)
+    if (!expected || revision.exitCode !== 0 || revision.stdout.trim().toLowerCase() !== expected) {
+      throw new Error('builder_repository_revision_mismatch')
+    }
   }
 
   private async initializeVisiblePaths(): Promise<void> {
@@ -189,8 +209,12 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
     const content = String(contentValue ?? '')
     if (bytes(content) > MAX_FILE_BYTES) throw new Error('builder_file_too_large')
     await this.ensureSafeResolvedParent(path)
+    const absolute = this.absolutePath(path)
+    const symlink = await this.exec('test', ['-L', absolute], '/tmp', 10_000)
+    if (symlink.exitCode === 0) throw new Error('builder_invalid_path')
     const encoded = Buffer.from(content, 'utf8').toString('base64')
-    const result = await this.exec('sh', ['-lc', `printf %s ${JSON.stringify(encoded)} | base64 -d > ${JSON.stringify(this.absolutePath(path))}`], '/tmp', 20_000)
+    const writeScript = "require('node:fs').writeFileSync(process.argv[1], Buffer.from(process.argv[2], 'base64'))"
+    const result = await this.exec('node', ['-e', writeScript, absolute, encoded], '/tmp', 20_000)
     if (result.exitCode !== 0) throw new Error('builder_file_write_failed')
     this.visiblePaths.add(path)
     return Object.freeze({ path, content, updatedAt: Date.now() })
@@ -225,22 +249,35 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
   }
 
   async collectChanges(): Promise<Readonly<{ patch: string; files: readonly BuilderFile[] }>> {
-    const untrackedResult = await this.exec('git', ['-C', REPOSITORY_ROOT, 'ls-files', '--others', '--exclude-standard', '--', 'saas'], '/tmp', 15_000, 40_000)
-    const untracked = unique(untrackedResult.stdout.split('\n').map(path => path.trim()).filter(Boolean), MAX_CHANGED_FILES + 1)
-    if (untracked.length > MAX_CHANGED_FILES) throw new Error('builder_repository_change_limit')
+    await this.assertPinnedRevision()
+
+    const untrackedResult = await this.exec('git', ['-C', REPOSITORY_ROOT, 'ls-files', '-z', '--others', '--exclude-standard'], '/tmp', 15_000, 80_000)
+    if (untrackedResult.exitCode !== 0) throw new Error('builder_repository_diff_failed')
+    const untracked = unique(nulPaths(untrackedResult.stdout), MAX_CHANGED_FILES + 1)
+
+    const trackedResult = await this.exec('git', ['-C', REPOSITORY_ROOT, 'diff', '--name-only', '-z', '--diff-filter=ACDMRT', 'HEAD', '--'], '/tmp', 15_000, 80_000)
+    if (trackedResult.exitCode !== 0) throw new Error('builder_repository_diff_failed')
+    const tracked = unique(nulPaths(trackedResult.stdout), MAX_CHANGED_FILES + 1)
+
+    const allChanged = unique([...tracked, ...untracked], MAX_CHANGED_FILES + 1)
+    if (allChanged.length > MAX_CHANGED_FILES) throw new Error('builder_repository_change_limit')
+    for (const path of allChanged) safeRepositoryChangedPath(path)
+
     if (untracked.length) {
       const intent = await this.exec('git', ['-C', REPOSITORY_ROOT, 'add', '-N', '--', ...untracked], '/tmp', 20_000)
       if (intent.exitCode !== 0) throw new Error('builder_repository_diff_failed')
     }
 
-    const names = await this.exec('git', ['-C', REPOSITORY_ROOT, 'diff', '--name-only', '--diff-filter=ACMRT', '--', 'saas'], '/tmp', 15_000, 40_000)
+    const names = await this.exec('git', ['-C', REPOSITORY_ROOT, 'diff', '--name-only', '-z', '--diff-filter=ACDMRT', 'HEAD', '--', 'saas'], '/tmp', 15_000, 80_000)
     if (names.exitCode !== 0) throw new Error('builder_repository_diff_failed')
-    const changedPaths = unique(names.stdout.split('\n').map(path => stripProjectPrefix(path)).filter((path): path is string => Boolean(path)), MAX_CHANGED_FILES + 1)
+    const changedPaths = unique(nulPaths(names.stdout).map(path => safeRepositoryChangedPath(path)), MAX_CHANGED_FILES + 1)
     if (changedPaths.length > MAX_CHANGED_FILES) throw new Error('builder_repository_change_limit')
 
-    const patchResult = await this.exec('git', ['-C', REPOSITORY_ROOT, 'diff', '--no-ext-diff', '--unified=3', '--', 'saas'], '/tmp', 30_000, MAX_PATCH_BYTES + 1)
+    const patchResult = await this.exec('git', ['-C', REPOSITORY_ROOT, 'diff', '--no-ext-diff', '--unified=3', 'HEAD', '--', 'saas'], '/tmp', 30_000, MAX_PATCH_BYTES + 1)
     if (patchResult.exitCode !== 0) throw new Error('builder_repository_diff_failed')
     if (bytes(patchResult.stdout) > MAX_PATCH_BYTES) throw new Error('builder_repository_patch_too_large')
+    await this.assertPinnedRevision()
+
     const files: BuilderFile[] = []
     for (const path of changedPaths) {
       const file = await this.readFile('', path)

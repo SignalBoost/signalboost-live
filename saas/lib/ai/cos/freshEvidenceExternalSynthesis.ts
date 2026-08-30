@@ -4,6 +4,12 @@ import { splitResearchClaims } from '@/lib/ai/cos/cosClaimResearch'
 import { callCosTextDetailed } from '@/lib/cos/textGateway'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import {
+  diagnoseFreshEvidenceSemanticPlan,
+  diagnoseFreshEvidenceSynthesis,
+  freshEvidenceAnswerContractRepairPrompt,
+  freshEvidenceScopePlanRepairPrompt,
+} from '@/lib/ai/cos/freshEvidenceContractRecovery'
+import {
   acceptFreshEvidenceFaithfulnessReview,
   acceptFreshEvidenceSemanticPlan,
   acceptFreshEvidenceSynthesis,
@@ -29,8 +35,9 @@ export type FreshEvidenceExternalSynthesis = {
 
 /**
  * Compatibility name retained for callers. The final governed provider fallback must meet the same
- * semantic scope-plan -> answer -> faithfulness-review -> repair/review contract as local Qwen.
- * It cannot bypass the semantic/evidence validator or release a weaker answer standard.
+ * semantic scope-plan -> structural repair -> answer -> contract repair -> faithfulness review ->
+ * semantic/density repair standard as local Qwen. It cannot bypass the evidence validator or use a
+ * weaker release path.
  */
 export async function synthesizeFreshEvidenceExternally(args: {
   input: string
@@ -73,7 +80,7 @@ export async function synthesizeFreshEvidenceExternally(args: {
     }
   }
 
-  const planned = await callCosTextDetailed({
+  let planned = await callCosTextDetailed({
     taskId: `cos-fresh-external-scope:${args.retrievedAt}`,
     prompt: freshEvidenceScopePlanPrompt(args),
     systemPrompt: freshEvidenceScopePlanSystemPrompt(args.language),
@@ -82,10 +89,31 @@ export async function synthesizeFreshEvidenceExternally(args: {
   }).catch(() => null)
   if (!planned?.text) return rejected(planned)
 
-  const semanticPlan = acceptFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
-  if (!semanticPlan) return rejected(planned)
+  let semanticPlan = acceptFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
+  const planDiagnosis = diagnoseFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
+  if (!semanticPlan || planDiagnosis) {
+    const diagnosis = planDiagnosis ?? { code: 'invalid_scope_shape', repairable: true } as const
+    if (!diagnosis.repairable) return rejected(planned)
+    const replanned = await callCosTextDetailed({
+      taskId: `cos-fresh-external-scope-repair:${args.retrievedAt}`,
+      prompt: freshEvidenceScopePlanRepairPrompt({
+        ...args,
+        failedPlanText: planned.text,
+        failureCode: diagnosis.code,
+      }),
+      systemPrompt: freshEvidenceScopePlanSystemPrompt(args.language),
+      modelPreference: 'gemini',
+      maxTokens: 500,
+    }).catch(() => null)
+    if (!replanned?.text) return rejected(replanned ?? planned)
+    semanticPlan = acceptFreshEvidenceSemanticPlan({ text: replanned.text, sources: args.sources })
+    if (!semanticPlan || diagnoseFreshEvidenceSemanticPlan({ text: replanned.text, sources: args.sources })) {
+      return rejected(replanned)
+    }
+    planned = replanned
+  }
 
-  const answered = await callCosTextDetailed({
+  let answered = await callCosTextDetailed({
     taskId: `cos-fresh-external-answer:${args.retrievedAt}`,
     prompt: freshEvidenceSynthesisPrompt({ ...args, semanticPlan }),
     systemPrompt: freshEvidenceSynthesisSystemPrompt(args.language),
@@ -100,7 +128,36 @@ export async function synthesizeFreshEvidenceExternally(args: {
     sources: args.sources,
     semanticPlan,
   })
-  if (!accepted) return rejected(answered)
+  if (!accepted) {
+    const diagnosis = diagnoseFreshEvidenceSynthesis({
+      text: answered.text,
+      input: args.input,
+      sources: args.sources,
+      semanticPlan,
+    }) ?? { code: 'unknown_contract_rejection', repairable: true, draftAnswer: answered.text }
+    if (!diagnosis.repairable) return rejected(answered)
+    const repairedContract = await callCosTextDetailed({
+      taskId: `cos-fresh-external-contract-repair:${args.retrievedAt}`,
+      prompt: freshEvidenceAnswerContractRepairPrompt({
+        ...args,
+        semanticPlan,
+        failedDraftText: answered.text,
+        failureCode: diagnosis.code,
+      }),
+      systemPrompt: freshEvidenceRevisionSystemPrompt(args.language),
+      modelPreference: 'gemini',
+      maxTokens: 420,
+    }).catch(() => null)
+    if (!repairedContract?.text) return rejected(repairedContract ?? answered)
+    accepted = acceptFreshEvidenceSynthesis({
+      text: repairedContract.text,
+      input: args.input,
+      sources: args.sources,
+      semanticPlan,
+    })
+    if (!accepted) return rejected(repairedContract)
+    answered = repairedContract
+  }
 
   const singleProposition = splitResearchClaims(args.input).length === 1
   const multiScopeReviewRequired = !semanticPlan.directBinaryAnswerSafe || semanticPlan.scopes.length > 1
@@ -169,6 +226,7 @@ export async function synthesizeFreshEvidenceExternally(args: {
     }
 
     accepted = repaired
+    answered = revised
   }
 
   return {

@@ -8,6 +8,14 @@ import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import type { FreshEvidenceSource } from '@/lib/ai/cos/cosFreshGrounding'
 import { splitResearchClaims } from '@/lib/ai/cos/cosClaimResearch'
 import {
+  diagnoseFreshEvidenceSemanticPlan,
+  diagnoseFreshEvidenceSynthesis,
+  freshEvidenceAnswerContractRepairPrompt,
+  freshEvidenceScopePlanRepairPrompt,
+  type FreshEvidenceContractDiagnosis,
+  type FreshEvidencePlanDiagnosis,
+} from '@/lib/ai/cos/freshEvidenceContractRecovery'
+import {
   acceptFreshEvidenceFaithfulnessReview,
   acceptFreshEvidenceSemanticPlan,
   acceptFreshEvidenceSynthesis,
@@ -20,6 +28,7 @@ import {
   freshEvidenceSynthesisNeedsNeuralReview,
   freshEvidenceSynthesisPrompt,
   freshEvidenceSynthesisSystemPrompt,
+  type AcceptedFreshEvidenceSynthesis,
   type FreshEvidenceFaithfulnessReview,
   type FreshEvidenceSemanticPlan,
 } from '@/lib/ai/cos/freshEvidenceSynthesisContract'
@@ -51,7 +60,13 @@ type LocalCompletionOutcome =
   | { ok: true; text: string | null }
   | { ok: false; error: string }
 
-type SynthesisPhase = 'scope_plan' | 'answer' | 'faithfulness_review' | 'neural_review'
+type SynthesisPhase =
+  | 'scope_plan'
+  | 'scope_plan_repair'
+  | 'answer'
+  | 'contract_repair'
+  | 'faithfulness_review'
+  | 'neural_review'
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -108,6 +123,130 @@ async function boundedLocalCompletion(args: {
   }
 }
 
+async function repairSemanticPlan(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  language: string
+  failedPlanText: string
+  diagnosis: FreshEvidencePlanDiagnosis
+}): Promise<
+  | { kind: 'accepted'; semanticPlan: FreshEvidenceSemanticPlan }
+  | { kind: 'local_synthesis_failed'; error: string }
+  | { kind: 'rejected' }
+> {
+  if (!args.diagnosis.repairable) return { kind: 'rejected' }
+  console.info('[cos-fresh-contract-repair]', JSON.stringify({
+    at: new Date().toISOString(),
+    event: 'repair_required',
+    phase: 'scope_plan',
+    failureCode: args.diagnosis.code,
+  }))
+  const repaired = await boundedLocalCompletion({
+    prompt: freshEvidenceScopePlanRepairPrompt({
+      input: args.input,
+      sources: args.sources,
+      retrievedAt: args.retrievedAt,
+      failedPlanText: args.failedPlanText,
+      failureCode: args.diagnosis.code,
+    }),
+    systemPrompt: freshEvidenceScopePlanSystemPrompt(args.language),
+    maxTokens: SCOPE_PLAN_MAX_TOKENS,
+    phase: 'scope_plan_repair',
+  })
+  if (repaired.ok === false) return { kind: 'local_synthesis_failed', error: repaired.error }
+  if (!repaired.text?.trim()) return { kind: 'rejected' }
+
+  const semanticPlan = acceptFreshEvidenceSemanticPlan({ text: repaired.text, sources: args.sources })
+  const finalDiagnosis = diagnoseFreshEvidenceSemanticPlan({ text: repaired.text, sources: args.sources })
+  if (!semanticPlan || finalDiagnosis) {
+    console.warn('[cos-fresh-contract-repair]', JSON.stringify({
+      at: new Date().toISOString(),
+      event: 'repair_rejected',
+      phase: 'scope_plan',
+      failureCode: finalDiagnosis?.code ?? 'unknown_contract_rejection',
+    }))
+    return { kind: 'rejected' }
+  }
+  console.info('[cos-fresh-contract-repair]', JSON.stringify({
+    at: new Date().toISOString(),
+    event: 'repair_accepted',
+    phase: 'scope_plan',
+    scopeCount: semanticPlan.scopes.length,
+    directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
+  }))
+  return { kind: 'accepted', semanticPlan }
+}
+
+async function repairAnswerContract(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  language: string
+  semanticPlan: FreshEvidenceSemanticPlan
+  failedDraftText: string
+  diagnosis: FreshEvidenceContractDiagnosis
+}): Promise<
+  | { kind: 'accepted'; accepted: AcceptedFreshEvidenceSynthesis }
+  | { kind: 'local_synthesis_failed'; error: string }
+  | { kind: 'rejected' }
+> {
+  if (!args.diagnosis.repairable) return { kind: 'rejected' }
+  console.info('[cos-fresh-contract-repair]', JSON.stringify({
+    at: new Date().toISOString(),
+    event: 'repair_required',
+    phase: 'answer_contract',
+    failureCode: args.diagnosis.code,
+    scopeCount: args.semanticPlan.scopes.length,
+  }))
+  const repaired = await boundedLocalCompletion({
+    prompt: freshEvidenceAnswerContractRepairPrompt({
+      input: args.input,
+      sources: args.sources,
+      retrievedAt: args.retrievedAt,
+      semanticPlan: args.semanticPlan,
+      failedDraftText: args.failedDraftText,
+      failureCode: args.diagnosis.code,
+    }),
+    systemPrompt: freshEvidenceRevisionSystemPrompt(args.language),
+    maxTokens: REVISION_MAX_TOKENS,
+    phase: 'contract_repair',
+  })
+  if (repaired.ok === false) return { kind: 'local_synthesis_failed', error: repaired.error }
+  if (!repaired.text?.trim()) return { kind: 'rejected' }
+
+  const accepted = acceptFreshEvidenceSynthesis({
+    text: repaired.text,
+    input: args.input,
+    sources: args.sources,
+    semanticPlan: args.semanticPlan,
+  })
+  if (!accepted) {
+    const finalDiagnosis = diagnoseFreshEvidenceSynthesis({
+      text: repaired.text,
+      input: args.input,
+      sources: args.sources,
+      semanticPlan: args.semanticPlan,
+    })
+    console.warn('[cos-fresh-contract-repair]', JSON.stringify({
+      at: new Date().toISOString(),
+      event: 'repair_rejected',
+      phase: 'answer_contract',
+      failureCode: finalDiagnosis?.code ?? 'unknown_contract_rejection',
+    }))
+    return { kind: 'rejected' }
+  }
+  console.info('[cos-fresh-contract-repair]', JSON.stringify({
+    at: new Date().toISOString(),
+    event: 'repair_accepted',
+    phase: 'answer_contract',
+    evidenceCount: accepted.citedSourceIds.length,
+    scopeCount: accepted.scopeIds.length,
+    answerChars: accepted.answer.length,
+  }))
+  return { kind: 'accepted', accepted }
+}
+
 async function reviewScopeFaithfulness(args: {
   input: string
   sources: FreshEvidenceSource[]
@@ -135,10 +274,12 @@ async function reviewScopeFaithfulness(args: {
 /**
  * Answer a volatile/current-fact question from live evidence using one semantic reasoner pipeline:
  * 1. Qwen plans the smallest materially distinct semantic scopes required by QUESTION + evidence.
- * 2. Qwen writes the answer under that scope plan.
- * 3. When multiple scopes matter, Qwen independently checks that the prose did not drop or merge them.
- * 4. A bounded Qwen repair runs when scope faithfulness or output density fails, then multi-scope
- *    answers are reviewed again. Remaining semantic collapse fails closed.
+ * 2. A contradictory/structurally invalid plan gets one bounded neural repair before refusal.
+ * 3. Qwen writes the answer under that plan. A repairable answer-contract defect gets one bounded
+ *    neural repair with the exact machine-readable failure code instead of an immediate false refusal.
+ * 4. When multiple scopes matter, Qwen independently checks that the prose did not drop or merge them.
+ * 5. A bounded Qwen repair runs when scope faithfulness or output density fails, then multi-scope
+ *    answers are reviewed again. Remaining semantic collapse or grounding defects fail closed.
  *
  * Scope planning/review are concise model verdicts, not hidden chain-of-thought. No deterministic
  * topic rule decides what the user's predicate means, and no server formatter writes answer prose.
@@ -160,8 +301,15 @@ export async function synthesizeFreshEvidenceLocally(args: {
   if (planned.ok === false) return { kind: 'local_synthesis_failed', error: planned.error }
   if (!planned.text?.trim()) return { kind: 'local_synthesis_unparseable' }
 
-  const semanticPlan = acceptFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
-  if (!semanticPlan) return { kind: 'citation_grounding_rejected' }
+  let semanticPlan = acceptFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
+  const planDiagnosis = diagnoseFreshEvidenceSemanticPlan({ text: planned.text, sources: args.sources })
+  if (!semanticPlan || planDiagnosis) {
+    const diagnosis = planDiagnosis ?? { code: 'invalid_scope_shape', repairable: true } as FreshEvidencePlanDiagnosis
+    const repairedPlan = await repairSemanticPlan({ ...args, failedPlanText: planned.text, diagnosis })
+    if (repairedPlan.kind === 'local_synthesis_failed') return repairedPlan
+    if (repairedPlan.kind === 'rejected') return { kind: 'citation_grounding_rejected' }
+    semanticPlan = repairedPlan.semanticPlan
+  }
 
   console.info('[cos-fresh-semantic-scope-plan]', JSON.stringify({
     at: new Date().toISOString(),
@@ -185,7 +333,23 @@ export async function synthesizeFreshEvidenceLocally(args: {
     sources: args.sources,
     semanticPlan,
   })
-  if (!accepted) return { kind: 'citation_grounding_rejected' }
+  if (!accepted) {
+    const diagnosis = diagnoseFreshEvidenceSynthesis({
+      text: answered.text,
+      input: args.input,
+      sources: args.sources,
+      semanticPlan,
+    }) ?? { code: 'unknown_contract_rejection', repairable: true, draftAnswer: answered.text.trim() }
+    const repairedContract = await repairAnswerContract({
+      ...args,
+      semanticPlan,
+      failedDraftText: answered.text,
+      diagnosis,
+    })
+    if (repairedContract.kind === 'local_synthesis_failed') return repairedContract
+    if (repairedContract.kind === 'rejected') return { kind: 'citation_grounding_rejected' }
+    accepted = repairedContract.accepted
+  }
 
   const singleProposition = splitResearchClaims(args.input).length === 1
   const multiScopeReviewRequired = !semanticPlan.directBinaryAnswerSafe || semanticPlan.scopes.length > 1
@@ -246,7 +410,20 @@ export async function synthesizeFreshEvidenceLocally(args: {
       sources: args.sources,
       semanticPlan,
     })
-    if (!repaired) return { kind: 'citation_grounding_rejected' }
+    if (!repaired) {
+      const diagnosis = diagnoseFreshEvidenceSynthesis({
+        text: revised.text,
+        input: args.input,
+        sources: args.sources,
+        semanticPlan,
+      })
+      console.warn('[cos-fresh-neural-synthesis-review]', JSON.stringify({
+        at: new Date().toISOString(),
+        event: 'review_failed_quality_boundary',
+        reason: diagnosis?.code ?? 'unknown_contract_rejection',
+      }))
+      return { kind: 'citation_grounding_rejected' }
+    }
     if (freshEvidenceSynthesisNeedsNeuralReview({
       answer: repaired.answer,
       citedSourceIds: repaired.citedSourceIds,

@@ -19,10 +19,12 @@ export async function GET(_: Request, context: { params: Promise<{ workspaceId: 
     const file = await workspace.readFile(workspaceId, path.join('/'))
     if (!file) return NextResponse.json({ error: 'File not found.' }, { status: 404 })
     const name = file.path.split('/').pop() || 'download.txt'
-    return new NextResponse(file.content, {
+    const isPdf = name.toLowerCase().endsWith('.pdf') && file.content.startsWith('artifact-pdf-base64:')
+    const body = isPdf ? Buffer.from(file.content.slice('artifact-pdf-base64:'.length), 'base64') : file.content
+    return new NextResponse(body, {
       headers: {
-        'Content-Type': 'application/octet-stream; charset=utf-8',
-        'Content-Disposition': `attachment; filename="\${name.replace(/["\\r\\n]/g, '_')}"`,
+        'Content-Type': isPdf ? 'application/pdf' : 'application/octet-stream; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${name.replace(/["\\r\\n]/g, '_')}"`,
         'Cache-Control': 'private, no-store',
       },
     })

@@ -6,6 +6,7 @@ import {
   type AssistantTransportLocale,
 } from '@/lib/ai/cos/assistantTransportClient'
 import { isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 
 type AssistantRequestBody = {
   messages?: Array<{ role?: unknown; content?: unknown }>
@@ -96,6 +97,26 @@ async function executeBuilderFromConcierge(
       : 'COS Builder stopped: ' + String((payload as any)?.error || 'builder_request_failed'),
   }, response.status, 'builder-backend')
 }
+async function executeArtifactFromConcierge(
+  fetchImpl: typeof window.fetch,
+  objective: string,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const response = await fetchImpl('/api/artifacts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify({ objective }),
+  })
+  const payload = await response.json().catch(() => ({ error: 'artifact_response_unavailable' }))
+  return responseFromPayload({
+    ...payload,
+    reply: typeof (payload as any)?.reply === 'string'
+      ? (payload as any).reply
+      : 'COS could not create that file: ' + String((payload as any)?.error || 'artifact_request_failed'),
+  }, response.status, 'artifact-backend')
+}
+
 
 /**
  * Transport continuity boundary for the authorized owner Assistant only.
@@ -117,8 +138,11 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
       const userContent = body ? latestUserContent(body) : ''
       if (!body || !conversationId || !userContent) return originalFetch(input, init)
 
-      // Builder is an internal tool of Concierge: coding requests stay in this chat while
-      // execution happens in the authenticated, network-denied workspace behind /api/builder.
+      // Files are internal Concierge tools. An explicit PDF/TXT request creates a download;
+      // coding tasks invoke Builder. Everything else remains the normal COS answer path.
+      if (isConciergeArtifactObjective(userContent)) {
+        return executeArtifactFromConcierge(originalFetch, userContent, init?.signal ?? undefined)
+      }
       if (isCosCodingObjective(userContent)) {
         return executeBuilderFromConcierge(originalFetch, body, userContent, init?.signal ?? undefined)
       }

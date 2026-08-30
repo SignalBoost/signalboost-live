@@ -35,14 +35,24 @@ export function cosRoutingObjective(prompt: string): string {
   return clean(text, 2000)
 }
 
-const CODE_SIGNAL = /\b(code|coding|function|script|typescript|javascript|node(?:\.js)?|npm|pnpm|bun|python|sql|query|regex|api call|implement|implementation|refactor|compile|compiler|stack trace|bug|patch|repository|pull request|commit|create (?:a )?file|run (?:the )?(?:file|code|command))\b/i
+const CODE_SIGNAL = /\b(code|coding|function|script|typescript|javascript|node(?:\.js)?|npm|pnpm|bun|python|sql|query|regex|api call|implement|implementation|refactor|compile|compiler|stack trace|bug|patch|repository|pull request|commit|create (?:a )?file|run (?:the )?(?:file|code|command))\b|\b(?:design|build|create)\s+(?:a\s+)?(?:website|web\s*page|landing page|dashboard|user interface|ui|component|mockup|prototype)\b/i
+const CONCIERGE_BUILDER_ACTION = /\b(?:debug|fix|repair|refactor|implement|compile|write)\b|\b(?:create|build)\s+(?:a\s+)?(?:file|script|function|class|html|css|app|test)\b|\b(?:design|build|create)\s+(?:(?:a|an|the|my|me|us)\s+){0,2}(?:(?:responsive|modern|simple|full|new|mobile|web|marketing|interactive|custom|professional)\s+){0,3}(?:website|web\s*page|landing page|dashboard|user interface|ui|component|mockup|prototype)\b/i
 const CURRENT_SIGNAL = /\b(current|currently|today|right now|as of now|latest|most recent|this (?:year|month|week)|live evidence|verify current|office holder)\b/i
 const CRITIC_SIGNAL = /\b(diagnos|root cause|troubleshoot|incident|outage|latency|p9[59]|timeout|regression|failure mode|why (?:is|are|did|does).*(?:slow|fail|error|down|spike)|critique|audit|stress[- ]?test|find (?:the )?(?:flaw|weakness|problem))\b/i
 const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|difference between|what (?:is|are)|define|definition|who (?:is|was|are|were)|company|organization|organisation|architecture|mechanism|explain)\b/i
 
-/** Shared safe handoff check for the authenticated COS UI. Public Concierge never imports this route. */
+/** Broad worker selection for the authorized COS UI. */
 export function isCosCodingObjective(prompt: string): boolean {
   return CODE_SIGNAL.test(cosRoutingObjective(prompt))
+}
+
+/**
+ * Public Concierge may start Builder only for an action the user explicitly asked it to perform.
+ * This is intentionally narrower than worker selection: “What is a SQL query?” is a COS answer,
+ * not an authenticated sandbox task.
+ */
+export function isConciergeBuilderObjective(prompt: string): boolean {
+  return CONCIERGE_BUILDER_ACTION.test(cosRoutingObjective(prompt))
 }
 
 /** Deterministic, zero-model-call task routing. */

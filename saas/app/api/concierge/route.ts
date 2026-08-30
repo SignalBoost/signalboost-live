@@ -27,6 +27,7 @@ import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { BuilderToolLoop } from '@/lib/builder/tool-loop'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
+import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -70,13 +71,14 @@ function conversationIdFrom(body: any): string | null {
     : null
 }
 
-function isCodingRequest(text: string): boolean {
-  return /\b(debug|fix|bug|error|traceback|stack trace|nameerror|typeerror|syntaxerror|write (a |me )?(script|function|class|html|css|app)|implement|refactor|unit test|pytest|compile|linter|code review)\b/i.test(text)
-    || /```/.test(text)
+function hasAttachments(body: any): boolean {
+  return Array.isArray(body?.attachments) && body.attachments.length > 0
 }
 
-async function directBuilder(input: string): Promise<NextResponse | null> {
-  if (!isCodingRequest(input)) return null
+async function directBuilder(body: any, input: string): Promise<NextResponse | null> {
+  // Builder cannot yet safely stage Concierge image/PDF attachments. Leave an attached request
+  // on the ordinary COS attachment path rather than silently omitting its reference material.
+  if (hasAttachments(body) || !isConciergeBuilderObjective(input)) return null
   const access = await getAccess().catch(() => null)
   if (!access?.userId) {
     return NextResponse.json({
@@ -383,7 +385,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const input = latestUserText(body)
   const language = languageFrom(body)
 
-  const builder = await directBuilder(input)
+  const builder = await directBuilder(body, input)
   if (builder) return builder
 
   const deterministic = tryDeterministicUtility({

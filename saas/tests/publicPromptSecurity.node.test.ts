@@ -40,3 +40,12 @@ test('shared Support ingress enforces the same boundary before legacy model disp
   assert.ok(guard >= 0 && guard < legacy)
   assert.ok(output >= 0 && output < source.lastIndexOf("return response"))
 })
+
+test('COS primary ingress enforces the same boundary before reasoning and after response assembly', () => {
+  const source = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
+  const guard = source.indexOf("isPublicPromptExfiltrationAttempt(prompt)")
+  const reasoning = source.indexOf("postCosPrimary(req)")
+  const output = source.indexOf("hasUnsafePublicModelOutput(String(payload.reply || ''))")
+  assert.ok(guard >= 0 && guard < reasoning)
+  assert.ok(output >= 0 && output < source.lastIndexOf("suggestFollowups({"))
+})

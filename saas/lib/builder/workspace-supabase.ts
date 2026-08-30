@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { BuilderFailureClass, BuilderFile, BuilderVerifiedRepairLesson, BuilderWorkspacePort } from './contracts.ts'
+import type { BuilderCertificationAttempt } from './certification.ts'
 
 const MAX_FILE_BYTES = 512 * 1024
 const MAX_FILES = 100
@@ -166,6 +167,17 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
       regressionCommand: String(row.regression_command || ''),
       runtime: 'node24-network-denied-ephemeral' as const,
     })))
+  }
+
+  async recordCertificationAttempt(workspaceId: string, attempt: BuilderCertificationAttempt): Promise<void> {
+    const { error } = await this.db.from('builder_certification_attempts').insert({
+      workspace_id: workspaceId,
+      user_id: this.userId,
+      case_id: attempt.caseId,
+      passed: attempt.outcome.passed,
+      reason_codes: attempt.outcome.reasons,
+    })
+    if (error) throw new Error(`builder_certification_write: ${error.message}`)
   }
 }
 

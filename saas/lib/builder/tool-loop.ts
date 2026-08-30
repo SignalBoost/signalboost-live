@@ -7,7 +7,7 @@ import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 type Action = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> } | { type: 'answer'; answer: string }
 const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'write_file', 'edit_file', 'run'])
 const MAX_WRITES_PER_TURN = 6
-const MAX_RUNS_PER_TURN = 3
+const MAX_RUNS_PER_TURN = 5
 const MAX_GATE_NUDGES = 3
 const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
 const MAX_MODEL_ROUND_ATTEMPTS = 2
@@ -51,11 +51,20 @@ function toolContent(input: Record<string, unknown>): string {
 }
 
 function parse(value: string | null, allowedTools: readonly BuilderToolId[] = tools): Action | null {
-  try {
-    const parsed = JSON.parse(String(value || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''))
-    if (parsed?.type === 'answer' && typeof parsed.answer === 'string') return { type: 'answer', answer: parsed.answer }
-    if (parsed?.type === 'tool' && allowedTools.includes(parsed.toolId) && parsed.input && typeof parsed.input === 'object' && !Array.isArray(parsed.input)) return { type: 'tool', toolId: parsed.toolId, input: parsed.input }
-  } catch {}
+  const raw = String(value || '').trim()
+  const fenced = raw.replace(/^\`\`\`(?:json)?\s*/i, '').replace(/\s*\`\`\`$/, '')
+  // Local models sometimes add prose around a valid control object. Recover only that JSON
+  // object, then enforce the normal exact control schema and allowed-tool boundary.
+  const first = fenced.indexOf('{')
+  const last = fenced.lastIndexOf('}')
+  const candidates = [fenced, ...(first >= 0 && last > first ? [fenced.slice(first, last + 1)] : [])]
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate)
+      if (parsed?.type === 'answer' && typeof parsed.answer === 'string') return { type: 'answer', answer: parsed.answer }
+      if (parsed?.type === 'tool' && allowedTools.includes(parsed.toolId) && parsed.input && typeof parsed.input === 'object' && !Array.isArray(parsed.input)) return { type: 'tool', toolId: parsed.toolId, input: parsed.input }
+    } catch {}
+  }
   return null
 }
 

@@ -15,6 +15,22 @@ type ModelFreshEvidenceSynthesis = {
 export const SINGLE_PROPOSITION_SOURCE_LIMIT = 2
 export const SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT = 650
 
+const GROUP_COMPARISON_CUE = /\b(?:between|btw|among|versus|vs\.?|compared\s+(?:with|to)|across)\b/i
+const GROUP_DIFFERENCE_CUE = /\b(?:gap|difference|disparity|inequalit(?:y|ies)|inequit(?:y|ies)|discrimination|bias)\b/i
+const GROUP_LEVEL_MEASURE_CUE = /\b(?:aggregate|overall|group[- ]level|median|unadjusted|raw|population)\b/i
+const COMPARISON_BOUNDARY_CUE = /\b(?:does(?:\s+not|n't)|cannot|can't|is\s+not)\b[\s\S]{0,110}\b(?:by\s+itself\s+)?(?:prove|establish|show|demonstrate|determine|settle)\b[\s\S]{0,110}\b(?:individual|like[- ]for[- ]like|same\s+(?:job|work|role)|controlled|causal|legal|discriminat)/i
+
+/** A group-level measurement must not become an individual, causal, controlled, or legal conclusion. */
+export function requiresGroupComparisonScope(input: string): boolean {
+  const text = String(input || '')
+  return GROUP_DIFFERENCE_CUE.test(text) && GROUP_COMPARISON_CUE.test(text)
+}
+
+export function explainsGroupComparisonScope(answer: string): boolean {
+  const text = String(answer || '')
+  return GROUP_LEVEL_MEASURE_CUE.test(text) && COMPARISON_BOUNDARY_CUE.test(text)
+}
+
 function languageLabel(language: string): string {
   const normalized = String(language || 'en').toLowerCase()
   if (normalized === 'es') return 'Spanish'
@@ -40,6 +56,7 @@ export function freshEvidenceSynthesisSystemPrompt(language: string): string {
     '8. Keep materially different measurements distinct. Explain a material mismatch instead of presenting unlike measurements as interchangeable evidence.',
     '9. Distinguish observation from explanation. Do not infer causation, an individual outcome, or a controlled comparison from an aggregate or associative result unless the evidence itself establishes that stronger claim.',
     '10. For a broad group-comparison or difference question, first identify the level of claim the evidence actually establishes. If it establishes an aggregate difference, say that directly; do not silently upgrade it into a controlled, like-for-like, causal, or individual claim.',
+    '10a. For a question about a disparity between populations, state the group-level measure and explicitly say that it does not by itself establish an individual, like-for-like, causal, controlled, or legal conclusion. Treat an adjusted analysis as a separate measurement whose controls and limits must be named from the evidence.',
     '11. Weigh evidence by directness, authority, methodological fit, and recency where relevant. Prefer the evidence that most directly establishes the requested proposition rather than the source with the strongest wording.',
     '12. When several sources play the same evidentiary role, choose the strongest representative one or two. Include additional statistics only when they change the scope, reveal disagreement, or answer a separate part of the question.',
     '13. Synthesize the answer around the conclusion, not around the retrieval set. Do not enumerate sources, repeat every statistic, or preserve retrieval order merely because the evidence was retrieved that way.',
@@ -68,10 +85,12 @@ export function freshEvidenceSynthesisPrompt(args: {
  * a second Qwen pass instead of being released as a search-result digest.
  */
 export function freshEvidenceSynthesisNeedsNeuralReview(args: {
+  input?: string
   answer: string
   citedSourceIds: string[]
   singleProposition: boolean
 }): boolean {
+  if (requiresGroupComparisonScope(args.input || '') && !explainsGroupComparisonScope(args.answer)) return true
   if (!args.singleProposition) return false
   return args.citedSourceIds.length > SINGLE_PROPOSITION_SOURCE_LIMIT
     || String(args.answer || '').trim().length > SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT
@@ -89,6 +108,7 @@ export function freshEvidenceRevisionSystemPrompt(language: string): string {
     'Do not repeat parallel measurements, examples, occupations, subgroups, dates, or statistics merely to demonstrate that multiple sources were found.',
     'Write naturally and concisely: direct conclusion first, then only the scope and the most important limitation needed to prevent overclaiming. Do not label these as fixed sections.',
     'Distinguish aggregate observation from controlled comparison, individual outcome, explanation, and causation. State only the strongest level the evidence supports.',
+    'For a disparity between populations, include both required parts: the group-level measure and a plain statement that it does not by itself establish an individual, like-for-like, causal, controlled, or legal conclusion. An adjusted result is a separate measurement, not proof of unlawful treatment.',
     'Never invent an evidence id. Do not put URLs or evidence labels inside the answer field.',
   ].join('\n')
 }
@@ -130,11 +150,15 @@ export function acceptFreshEvidenceSynthesis(args: {
   text: string
   input: string
   sources: FreshEvidenceSource[]
+  enforceGroupComparisonScope?: boolean
 }): AcceptedFreshEvidenceSynthesis | null {
   const parsed = parseJsonObject(args.text)
   const answer = typeof parsed?.answer === 'string' ? parsed.answer.trim() : ''
   if (!answer || /EVIDENCE_INSUFFICIENT/i.test(answer)) return null
   if (!answerRespectsRequestedWindow(answer, args.input)) return null
+  if (args.enforceGroupComparisonScope !== false
+    && requiresGroupComparisonScope(args.input)
+    && !explainsGroupComparisonScope(answer)) return null
   if (!Array.isArray(parsed?.evidenceIds)) return null
 
   const byId = new Map(args.sources.map(source => [source.id, source] as const))

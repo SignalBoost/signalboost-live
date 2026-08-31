@@ -51,7 +51,7 @@ const CURATED_REFERENCE_MARKS: readonly CuratedReferenceMark[] = [
 ]
 
 const MARK_WORDS = ['logo', 'logotype', 'crest', 'badge', 'emblem', 'insignia', 'shield', 'escudo', 'distintivo', 'brasao', 'herb', 'эмблема', 'логотип', 'герб']
-const REJECT_WORDS = ['false', 'flag', 'banner', 'mascot', 'jersey', 'shirt', 'kit', 'stadium', 'wallpaper', 'supporter', 'fan art']
+const REJECT_WORDS = ['false', 'flag', 'banner', 'mascot', 'jersey', 'shirt', 'kit', 'stadium', 'wallpaper', 'supporter', 'fan art', 'concept', 'redesign']
 
 function normalize(value: string): string {
   return String(value || '')
@@ -188,24 +188,23 @@ export function selectCommonsCandidate(query: string, pages: readonly CommonsPag
     const description = metadataText(info || {})
     const titleText = normalize(title.replace(/^file\s*/i, ''))
     const haystack = normalize(`${title} ${description}`)
-    if (!queryTokens.every((token) => haystack.includes(token))) continue
+    const titleHasEntity = queryTokens.every((token) => titleText.includes(token))
+    const titleClaimsMark = MARK_WORDS.some((word) => titleText.includes(normalize(word)))
+    if (!titleHasEntity || !titleClaimsMark) continue
     if (REJECT_WORDS.some((word) => haystack.includes(normalize(word)))) continue
 
-    let score = queryTokens.length * 12
-    if (MARK_WORDS.some((word) => titleText.includes(normalize(word)))) score += 24
+    let score = queryTokens.length * 16 + 32
     if (MARK_WORDS.some((word) => haystack.includes(normalize(word)))) score += 8
     if (titleText.startsWith(normalize(query))) score += 8
     if (/\.svg\b/i.test(title)) score += 4
 
-    if (score >= 24) {
-      candidates.push({
-        title: title.replace(/^File:/i, '').trim(),
-        assetUrl,
-        sourcePageUrl: `https://commons.wikimedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`,
-        description,
-        score,
-      })
-    }
+    candidates.push({
+      title: title.replace(/^File:/i, '').trim(),
+      assetUrl,
+      sourcePageUrl: `https://commons.wikimedia.org/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`,
+      description,
+      score,
+    })
   }
 
   return candidates.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))[0] || null
@@ -215,7 +214,7 @@ async function searchCommons(query: string): Promise<CommonsCandidate | null> {
   const endpoint = new URL('https://commons.wikimedia.org/w/api.php')
   endpoint.searchParams.set('action', 'query')
   endpoint.searchParams.set('generator', 'search')
-  endpoint.searchParams.set('gsrsearch', `${query} logo crest emblem`)
+  endpoint.searchParams.set('gsrsearch', `${query} (logo OR crest OR emblem OR escudo)`)
   endpoint.searchParams.set('gsrnamespace', '6')
   endpoint.searchParams.set('gsrlimit', '12')
   endpoint.searchParams.set('prop', 'imageinfo')

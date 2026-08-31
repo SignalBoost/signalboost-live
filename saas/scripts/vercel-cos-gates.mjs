@@ -19,6 +19,7 @@ const tests = [
   'tests/builderDebugFileJob.node.test.ts',
   'tests/builderRoutingStrict.node.test.ts',
   'tests/assistantHistoryOrdering.node.test.ts',
+  'tests/assistantSourceFileBoundary.node.test.ts',
   'tests/conciergeOperationalLogRouting.node.test.ts',
   'tests/builderRepositoryRepairTarget.node.test.ts',
   'tests/builderRepositoryRepairSecurity.node.test.ts',

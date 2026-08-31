@@ -22,7 +22,7 @@ const RULES: readonly Rule[] = Object.freeze([
   Object.freeze({ familyId: 'marketing', skillId: 'marketing.research', domain: /\b(?:marketing|market|audience|competitor|channel|campaign|customer segment)\b/i, action: /\b(?:research|analy[sz]e|compare|investigate|study|find|evaluate|benchmark)\b/i, confidence: .93, reason: 'clear marketing research intent' }),
 
   Object.freeze({ familyId: 'sales', skillId: 'sales.send-outreach', domain: /\b(?:sales|prospect|lead|account|customer|outreach|follow[- ]?up)\b/i, action: /\b(?:send|email|message|contact|reach out|follow up)\b/i, confidence: .97, reason: 'clear sales outreach-send intent' }),
-  Object.freeze({ familyId: 'sales', skillId: 'sales.crm-write', domain: /\b(?:sales|crm|lead|account|opportunity|pipeline|contact)\b/i, action: /\b(?:create|update|edit|log|write|add|change)\b/i, confidence: .96, reason: 'clear CRM mutation intent' }),
+  Object.freeze({ familyId: 'sales', skillId: 'sales.crm-write', domain: /\b(?:crm|opportunity|pipeline|contact record|account record|lead record)\b/i, action: /\b(?:create|update|edit|log|write|add|change)\b/i, confidence: .96, reason: 'clear CRM mutation intent' }),
   Object.freeze({ familyId: 'sales', skillId: 'sales.outreach-plan', domain: /\b(?:sales|prospect|lead|account|outreach|follow[- ]?up)\b/i, action: /\b(?:plan|sequence|cadence|draft strategy|outreach plan|follow[- ]?up plan)\b/i, confidence: .94, reason: 'clear sales outreach-planning intent' }),
   Object.freeze({ familyId: 'sales', skillId: 'sales.account-research', domain: /\b(?:sales|prospect|lead|account|company|opportunity)\b/i, action: /\b(?:research|analy[sz]e|qualify|investigate|find|evaluate|summarize)\b/i, confidence: .93, reason: 'clear sales account-research intent' }),
 

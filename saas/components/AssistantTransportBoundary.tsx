@@ -1,3 +1,4 @@
+// saas/components/AssistantTransportBoundary.tsx
 'use client'
 
 import { useEffect, type ReactNode } from 'react'
@@ -60,6 +61,32 @@ function responseFromPayload(payload: unknown, status = 200, source?: string): R
   })
 }
 
+/**
+ * When Builder stops without a reply, the failing reason lives in the per-round trace the
+ * /api/builder 422 returns (command, exitCode, stderr) — not in the bare error code. Render a
+ * compact tail of that trace so a stopped run is self-diagnosing in chat instead of opaque.
+ */
+function summarizeBuilderTrace(payload: unknown): string {
+  const trace = Array.isArray((payload as any)?.trace) ? (payload as any).trace as any[] : []
+  if (trace.length === 0) return ''
+  const oneLine = (value: unknown): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(-320)
+  const tail = trace.slice(-4).map((entry) => {
+    const round = Number.isFinite(entry?.round) ? `#${entry.round}` : '#?'
+    const tool = String(entry?.toolId || 'tool')
+    const verdict = entry?.ok ? 'ok' : 'fail'
+    const bits: string[] = [`${round} ${tool} ${verdict}`]
+    if (typeof entry?.exitCode === 'number') bits.push(`exit ${entry.exitCode}`)
+    if (entry?.command) bits.push(`$ ${oneLine(entry.command).slice(0, 160)}`)
+    if (entry?.error) bits.push(oneLine(entry.error))
+    const stream = oneLine(entry?.stderr) || oneLine(entry?.stdout)
+    if (stream) bits.push(stream)
+    return '  ' + bits.join(' · ')
+  })
+  const fileCount = Array.isArray((payload as any)?.files) ? (payload as any).files.length : null
+  const header = fileCount === null ? 'Last builder rounds:' : `Last builder rounds (${fileCount} workspace file(s)):`
+  return `\n\n${header}\n${tail.join('\n')}`
+}
+
 function builderFilesFromBody(body: AssistantRequestBody): Array<{ path: string; content: string }> {
   const attachments = Array.isArray(body.attachments) ? body.attachments : []
   return attachments.slice(0, 20).flatMap((attachment: any) => {
@@ -94,7 +121,7 @@ async function executeBuilderFromConcierge(
     ...payload,
     reply: typeof (payload as any)?.reply === 'string'
       ? (payload as any).reply
-      : 'COS Builder stopped: ' + String((payload as any)?.error || 'builder_request_failed'),
+      : 'COS Builder stopped: ' + String((payload as any)?.error || 'builder_request_failed') + summarizeBuilderTrace(payload),
   }, response.status, 'builder-backend')
 }
 async function executeArtifactFromConcierge(

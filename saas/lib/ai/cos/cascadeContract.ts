@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 export type CascadeAnswerability = 'current_evidence' | 'retrievable_source' | 'durable_knowledge'
 export type CascadeAnswerPathType = 'rag_query' | 'durable_knowledge' | 'hybrid'
 export type CascadeStatus = 'candidate' | 'validated' | 'rendered' | 'rejected' | 'invalidated'
@@ -22,6 +24,8 @@ export type CascadeAnswerPath = {
 }
 
 export type CascadeCandidate = {
+  followup_id: string
+  root_topic_id: string
   question: string
   display_text: string
   root_question: string
@@ -40,6 +44,7 @@ export type CascadeCandidate = {
 }
 
 export type CascadePlan = {
+  root_topic_id: string
   root_question: string
   root_topic: string
   candidates: CascadeCandidate[]
@@ -116,6 +121,7 @@ function isExecutablePath(path: CascadeAnswerPath): boolean {
 }
 
 export function validateCascadeCandidate(args: {
+  rootTopicId: string
   rootQuestion: string
   question: string
   sourceTitles?: string[]
@@ -146,6 +152,8 @@ export function validateCascadeCandidate(args: {
   }
 
   return {
+    followup_id: randomUUID(),
+    root_topic_id: args.rootTopicId,
     question,
     display_text: displayText(question),
     root_question: rootQuestion,
@@ -161,14 +169,16 @@ export function validateCascadeCandidate(args: {
 
 export function buildCascadePlan(args: {
   rootQuestion: string
+  rootTopicId?: string
   questions: string[]
   sourceTitles?: string[]
 }): CascadePlan {
   const rootQuestion = clean(args.rootQuestion)
+  const rootTopicId = clean(args.rootTopicId) || randomUUID()
   const candidates = args.questions
-    .map(question => validateCascadeCandidate({ rootQuestion, question, sourceTitles: args.sourceTitles }))
+    .map(question => validateCascadeCandidate({ rootTopicId, rootQuestion, question, sourceTitles: args.sourceTitles }))
     .filter(candidate => candidate.status === 'validated')
     .slice(0, 2)
     .map(candidate => ({ ...candidate, status: 'rendered' as const }))
-  return { root_question: rootQuestion, root_topic: rootTopicFromQuestion(rootQuestion), candidates }
+  return { root_topic_id: rootTopicId, root_question: rootQuestion, root_topic: rootTopicFromQuestion(rootQuestion), candidates }
 }

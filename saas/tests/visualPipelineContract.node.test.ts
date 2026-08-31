@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { classifyVisualRequest } from '../lib/visuals/requestClassifier.ts'
 import {
+  MAX_USER_REFERENCE_IMAGE_BYTES,
   UserReferenceImageError,
   hasUserReferenceImage,
   readUserReferenceImage,
@@ -74,6 +75,19 @@ test('user reference parser accepts bounded PNG/JPEG/WebP data URLs and never fe
   assert.throws(
     () => readUserReferenceImage({ attachments: [{ name: 'source.gif', type: 'image/gif', dataUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAUEBA==' }] }),
     (error: unknown) => error instanceof UserReferenceImageError && error.code === 'visual_reference_image_type_unsupported',
+  )
+  assert.throws(
+    () => readUserReferenceImage({
+      attachments: [{
+        name: 'oversized.png',
+        type: 'image/png',
+        size: MAX_USER_REFERENCE_IMAGE_BYTES + 1,
+        dataUrl: PNG_DATA_URL,
+      }],
+    }),
+    (error: unknown) => error instanceof UserReferenceImageError
+      && error.code === 'visual_reference_image_too_large'
+      && error.observedBytes === MAX_USER_REFERENCE_IMAGE_BYTES + 1,
   )
   assert.throws(
     () => readUserReferenceImage({}),
@@ -198,6 +212,18 @@ test('all live chat ingresses preserve attachments and render the stable preview
   assert.match(specialist, /reply: `\$\{payload\.reply\}\\n\\n<IMAGE>\$\{previewUrl\}<\/IMAGE>`/)
   assert.ok(specialist.indexOf('classifyVisualRequest({') < specialist.indexOf('planCOSSpecialistFromText(prompt)'))
   assert.match(specialist, /export const maxDuration = 300/)
+})
+
+test('visual runtime bounds protect memory and leave room for the required retry', () => {
+  const referenceSource = readFileSync(new URL('../lib/visuals/userReference.ts', import.meta.url), 'utf8')
+  const imagePortSource = readFileSync(new URL('../lib/cos/aiPort.ts', import.meta.url), 'utf8')
+
+  assert.match(referenceSource, /const MAX_REFERENCE_CANDIDATES = 8/)
+  assert.match(referenceSource, /const estimatedBytes = estimatedBase64Bytes\(b64\)/)
+  assert.ok(referenceSource.indexOf('const estimatedBytes = estimatedBase64Bytes(b64)') < referenceSource.indexOf("bytes = Buffer.from(b64, 'base64')"))
+  assert.match(imagePortSource, /const IMAGE_GENERATION_TIMEOUT_MS = 50_000/)
+  assert.match(imagePortSource, /signal: controller\.signal/)
+  assert.match(imagePortSource, /clearTimeout\(timeout\)/)
 })
 
 test('visual route retries once, reports exact failed entities, audits trace stages, and fails closed', () => {

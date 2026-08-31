@@ -3,6 +3,7 @@ import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { getAccess } from '@/lib/auth/access'
 import { getCOSA2ARuntimeHost } from '@/a2a-host/cos-runtime-host'
 import { planCOSSpecialistFromText } from '@/a2a-host/cos-specialist-planner'
+import { selectCOSA2AHostForPlan } from '@/a2a-host/reference-cos-runtime-host'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -42,10 +43,8 @@ function exactScope(body: any): { tenantId: string; environmentId: string; porta
 
 /**
  * COS specialist runtime bridge.
- * - Explicit structured plans remain supported and independently governed.
- * - Ordinary language is conservatively planned; unclear intent stays on COS Primary.
- * - Inferred delegation requires privilege + installed host + exact scope. Missing any of those
- *   returns to COS Primary rather than inventing an agent path.
+ * Buyer-installed hosts take precedence. When none is installed, privileged exact-scope COS
+ * may use the real SignalBoost reference host for canonical advisory self-healing diagnosis only.
  */
 export async function POST(req: NextRequest) {
   const body: any = await req.clone().json().catch(() => ({}))
@@ -59,39 +58,14 @@ export async function POST(req: NextRequest) {
 
   const access = await getAccess().catch(() => null)
   const privileged = Boolean(access?.isOwner || access?.isAdmin)
-  const host = getCOSA2ARuntimeHost()
   const scope = exactScope(body)
 
-  if (!hasSuppliedPlan && (!privileged || !host || !scope)) return cosPrimaryPost(req)
-
+  if (!hasSuppliedPlan && (!privileged || !scope)) return cosPrimaryPost(req)
   if (!privileged) {
-    return NextResponse.json({
-      ok: false,
-      reply: 'Specialist delegation is not authorized for this hosted COS session.',
-      source: 'cos-a2a-unauthorized',
-      execution_allowed: false,
-      external_action_taken: false,
-    }, { status: 403 })
+    return NextResponse.json({ ok: false, reply: 'Specialist delegation is not authorized for this hosted COS session.', source: 'cos-a2a-unauthorized', execution_allowed: false, external_action_taken: false }, { status: 403 })
   }
-
-  if (!host) {
-    return NextResponse.json({
-      ok: false,
-      reply: 'No governed A2A specialist host is installed for this deployment.',
-      source: 'cos-a2a-host-unavailable',
-      execution_allowed: false,
-      external_action_taken: false,
-    }, { status: 503 })
-  }
-
   if (!scope) {
-    return NextResponse.json({
-      ok: false,
-      reply: 'Specialist delegation requires an exact tenant, environment, and portable scope.',
-      source: 'cos-a2a-scope-unavailable',
-      execution_allowed: false,
-      external_action_taken: false,
-    }, { status: 409 })
+    return NextResponse.json({ ok: false, reply: 'Specialist delegation requires an exact tenant, environment, and portable scope.', source: 'cos-a2a-scope-unavailable', execution_allowed: false, external_action_taken: false }, { status: 409 })
   }
 
   const plan = hasSuppliedPlan ? {
@@ -103,7 +77,13 @@ export async function POST(req: NextRequest) {
     skillId: inferredPlan!.skillId,
   }
 
-  const result = await host.orchestrator.orchestrate({
+  const selected = selectCOSA2AHostForPlan({ installedHost: getCOSA2ARuntimeHost(), scope, plan })
+  if (!selected.host) {
+    if (!hasSuppliedPlan) return cosPrimaryPost(req)
+    return NextResponse.json({ ok: false, reply: 'No governed A2A specialist host is available for this specialist plan.', source: 'cos-a2a-host-unavailable', execution_allowed: false, external_action_taken: false }, { status: 503 })
+  }
+
+  const result = await selected.host.orchestrator.orchestrate({
     ...scope,
     messageId: text(body?.context?.messageId) || crypto.randomUUID(),
     text: prompt,
@@ -121,6 +101,7 @@ export async function POST(req: NextRequest) {
     reply,
     source: result.ok ? 'cos-a2a-specialist' : 'cos-a2a-specialist-blocked',
     a2a: result,
+    a2a_host_source: selected.source,
     specialist_plan_source: hasSuppliedPlan ? 'supplied' : 'natural_language',
     specialist_planner: hasSuppliedPlan ? undefined : inferredPlan,
     execution_allowed: result.ok,

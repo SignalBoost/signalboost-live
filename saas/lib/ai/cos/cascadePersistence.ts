@@ -2,6 +2,14 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { assistantContentMatchesForProvenance, normalizeAssistantContent } from './supportTurnProvenance.ts'
 import type { CascadePlan } from './cascadeContract.ts'
 
+function clean(value: unknown): string {
+  return String(value ?? '').replace(/\s+/g, ' ').trim()
+}
+
+function sameQuestion(left: unknown, right: unknown): boolean {
+  return clean(left).toLocaleLowerCase() === clean(right).toLocaleLowerCase()
+}
+
 function safePlan(plan: CascadePlan): CascadePlan | null {
   try {
     const encoded = JSON.stringify(plan)
@@ -12,11 +20,13 @@ function safePlan(plan: CascadePlan): CascadePlan | null {
   }
 }
 
-export async function latestCascadeRootForUser(
+/** Reuses a root only when the current user prompt is one of that plan's rendered chips. */
+export async function cascadeRootForClickedFollowup(
   userId: string,
+  currentPrompt: string,
   currentAssistantReply?: string,
 ): Promise<string | null> {
-  if (!userId) return null
+  if (!userId || !clean(currentPrompt)) return null
   const db = cosServiceDb()
   if (!db) return null
   try {
@@ -28,8 +38,11 @@ export async function latestCascadeRootForUser(
       if (currentAssistantReply && assistantContentMatchesForProvenance(row?.content, currentAssistantReply)) continue
       const provenance = row?.provenance
       if (!provenance || typeof provenance !== 'object' || Array.isArray(provenance)) continue
-      const root = String((provenance as any)?.cascade?.root_question || '').trim()
-      if (root) return root.slice(0, 240)
+      const cascade = (provenance as any)?.cascade
+      const root = clean(cascade?.root_question)
+      const candidates = Array.isArray(cascade?.candidates) ? cascade.candidates : []
+      if (!root) continue
+      if (candidates.some((candidate: any) => sameQuestion(candidate?.question, currentPrompt))) return root.slice(0, 240)
     }
     return null
   } catch (error) {

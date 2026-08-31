@@ -49,7 +49,7 @@ export async function withSuggestedFollowups(response: Response, prompt: string,
   return NextResponse.json(payload, { status: response.status, headers })
 }
 
-function inlineVisualResponse(response: Response): Promise<NextResponse> {
+function inlineVisualResponse(response: Response, appendPreviewToReply = false): Promise<NextResponse> {
   return response.clone().json().then((payload: any) => {
     const workspaceId = typeof payload?.workspaceId === 'string' ? payload.workspaceId : ''
     const imagePath = Array.isArray(payload?.files)
@@ -59,6 +59,7 @@ function inlineVisualResponse(response: Response): Promise<NextResponse> {
     const previewUrl = `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${imagePath.split('/').map(encodeURIComponent).join('/')}?preview=1`
     return NextResponse.json({
       ...payload,
+      reply: appendPreviewToReply ? `${payload.reply}\n\n${previewUrl}` : payload.reply,
       visual: {
         previewUrl,
         downloadUrl: previewUrl.replace('?preview=1', ''),
@@ -127,7 +128,12 @@ export async function POST(req: NextRequest) {
       headers,
       body: JSON.stringify({ ...body, objective: prompt }),
     })
-    return withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
+    const appendPreviewToReply = body?.context?.cosMode === 'silent_background_planning'
+    return withSuggestedFollowups(
+      await inlineVisualResponse(await visualPost(visualRequest), appendPreviewToReply),
+      prompt,
+      auditUserId,
+    )
   }
 
   if (isProvenanceIntrospection(prompt)) {

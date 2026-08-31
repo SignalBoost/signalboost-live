@@ -1,6 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServerClient } from '@supabase/ssr'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
@@ -26,7 +26,8 @@ const PAY_GAP_PROMPT = 'does a pay gap exist?'
 type AcceptanceMode = 'builder' | 'visual'
 type JsonRecord = Record<string, unknown>
 type AcceptanceCheck = Readonly<{ id: string; passed: boolean; detail: string }>
-type HttpJson = Readonly<{ status: number; data: JsonRecord; raw: string; headers: Headers }>
+type HttpJson = Readonly<{ status: number; data: JsonRecord; raw: string }>
+type AdminClient = SupabaseClient<any, 'public', 'public', any, any>
 
 function noStore(payload: unknown, status = 200): NextResponse {
   const response = NextResponse.json(payload, { status })
@@ -64,6 +65,10 @@ function cookieHeader(jar: Map<string, string>): string {
     .join('; ')
 }
 
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 async function httpJson(origin: string, path: string, cookies: string, init: RequestInit = {}): Promise<HttpJson> {
   const headers = new Headers(init.headers)
   headers.set('accept', 'application/json')
@@ -78,7 +83,7 @@ async function httpJson(origin: string, path: string, cookies: string, init: Req
   const raw = await response.text()
   let data: JsonRecord = {}
   try { data = asRecord(JSON.parse(raw)) } catch {}
-  return Object.freeze({ status: response.status, data, raw, headers: response.headers })
+  return Object.freeze({ status: response.status, data, raw })
 }
 
 async function httpBytes(origin: string, path: string, cookies: string): Promise<Readonly<{
@@ -102,11 +107,7 @@ async function httpBytes(origin: string, path: string, cookies: string): Promise
   })
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-async function countRows(admin: ReturnType<typeof createClient>, table: string, userId: string): Promise<number> {
+async function countRows(admin: AdminClient, table: string, userId: string): Promise<number> {
   const { count, error } = await admin
     .from(table)
     .select('*', { count: 'exact', head: true })
@@ -115,13 +116,21 @@ async function countRows(admin: ReturnType<typeof createClient>, table: string, 
   return count ?? 0
 }
 
-async function pollHistory(origin: string, cookies: string, conversationId: string, terminal: boolean): Promise<HttpJson | null> {
+function historyMessages(history: HttpJson): JsonRecord[] {
+  return Array.isArray(history.data.messages) ? history.data.messages.map(asRecord) : []
+}
+
+async function pollHistory(
+  origin: string,
+  cookies: string,
+  conversationId: string,
+  terminal: boolean,
+): Promise<HttpJson | null> {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const history = await httpJson(origin, `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`, cookies)
-    const messages = Array.isArray(history.data.messages) ? history.data.messages.map(asRecord) : []
+    const messages = historyMessages(history)
     const assistant = messages.find(message => message.role === 'assistant')
-    const provenance = asRecord(assistant?.provenance)
-    const status = String(provenance.status || '')
+    const status = String(asRecord(assistant?.provenance).status || '')
     if (history.status === 200 && assistant && (terminal ? ['succeeded', 'failed'].includes(status) : status === 'running')) {
       return history
     }
@@ -140,20 +149,21 @@ async function pollBuilder(origin: string, cookies: string, jobId: string): Prom
   return null
 }
 
-function historyMessages(history: HttpJson): JsonRecord[] {
-  return Array.isArray(history.data.messages) ? history.data.messages.map(asRecord) : []
-}
-
 async function runBuilderAcceptance(input: {
   origin: string
   cookies: string
-  admin: ReturnType<typeof createClient>
+  admin: AdminClient
   userId: string
   checks: AcceptanceCheck[]
 }): Promise<JsonRecord> {
   const { origin, cookies, admin, userId, checks } = input
   const historyList = await httpJson(origin, '/api/assistant/chats', cookies, { method: 'GET' })
-  requiredCheck(checks, 'history-list-200', historyList.status === 200 && Array.isArray(historyList.data.conversations), `status=${historyList.status}`)
+  requiredCheck(
+    checks,
+    'history-list-200',
+    historyList.status === 200 && Array.isArray(historyList.data.conversations),
+    `status=${historyList.status}`,
+  )
 
   const conversationId = randomUUID()
   const jobsBefore = await countRows(admin, 'builder_jobs', userId)
@@ -167,10 +177,20 @@ async function runBuilderAcceptance(input: {
   })
   const jobId = typeof accepted.data.jobId === 'string' ? accepted.data.jobId : ''
   const workspaceId = typeof accepted.data.workspaceId === 'string' ? accepted.data.workspaceId : ''
-  requiredCheck(checks, 'builder-post-202', accepted.status === 202 && Boolean(jobId) && Boolean(workspaceId), `status=${accepted.status} error=${safeText(accepted.data.error)}`)
+  requiredCheck(
+    checks,
+    'builder-post-202',
+    accepted.status === 202 && Boolean(jobId) && Boolean(workspaceId),
+    `status=${accepted.status} error=${safeText(accepted.data.error)}`,
+  )
 
   const runningHistory = await pollHistory(origin, cookies, conversationId, false)
-  requiredCheck(checks, 'history-running-after-202', Boolean(runningHistory), 'one POST returned; independent History GET found the durable running turn')
+  requiredCheck(
+    checks,
+    'history-running-after-202',
+    Boolean(runningHistory),
+    'one POST returned; independent History GET found the durable running turn',
+  )
   const runningMessages = historyMessages(runningHistory!)
   const runningUser = runningMessages.find(message => message.role === 'user') || {}
   const runningAssistant = runningMessages.find(message => message.role === 'assistant') || {}
@@ -183,12 +203,22 @@ async function runBuilderAcceptance(input: {
     `userOrder=${userOrder} assistantOrder=${assistantOrder}`,
   )
 
-  // The simulated page is now gone. No second POST is sent; only authenticated, read-only GET
-  // polling and History reads are used to observe the background job.
+  // Simulate a closed page: do not send another POST. Observe only through read-only status and
+  // History GET requests until the durable worker updates the original turn.
   const terminal = await pollBuilder(origin, cookies, jobId)
-  requiredCheck(checks, 'builder-terminal-without-replay', Boolean(terminal), 'exactly one Builder POST; terminal state observed through GET polling')
+  requiredCheck(
+    checks,
+    'builder-terminal-without-replay',
+    Boolean(terminal),
+    'exactly one Builder POST; terminal state observed through GET polling',
+  )
   const terminalStatus = String(terminal!.data.status || '')
-  requiredCheck(checks, 'builder-succeeded', terminalStatus === 'succeeded', `status=${terminalStatus} error=${safeText(terminal!.data.error)}`)
+  requiredCheck(
+    checks,
+    'builder-succeeded',
+    terminalStatus === 'succeeded',
+    `status=${terminalStatus} error=${safeText(terminal!.data.error)}`,
+  )
 
   const trace = Array.isArray(terminal!.data.trace) ? terminal!.data.trace.map(asRecord) : []
   const runs = trace.filter(entry => entry.toolId === 'run')
@@ -198,7 +228,12 @@ async function runBuilderAcceptance(input: {
   const firstExit = Number(firstRun.exitCode)
   const finalExit = Number(finalRun.exitCode)
   const firstEvidence = `${String(firstRun.stderr || '')}\n${String(firstRun.stdout || '')}`
-  requiredCheck(checks, 'broken-file-stack-visible', firstExit !== 0 && /ReferenceError|result is not defined/i.test(firstEvidence), `firstExit=${firstExit} evidence=${safeText(firstEvidence)}`)
+  requiredCheck(
+    checks,
+    'broken-file-stack-visible',
+    firstExit !== 0 && /ReferenceError|result is not defined/i.test(firstEvidence),
+    `firstExit=${firstExit} evidence=${safeText(firstEvidence)}`,
+  )
   requiredCheck(checks, 'exactly-one-edit', edits.length === 1 && edits[0]?.ok === true, `editCount=${edits.length}`)
   requiredCheck(
     checks,
@@ -209,9 +244,13 @@ async function runBuilderAcceptance(input: {
   requiredCheck(checks, 'verification-exit-zero', finalExit === 0, `finalExit=${finalExit}`)
 
   const terminalHistory = await pollHistory(origin, cookies, conversationId, true)
-  requiredCheck(checks, 'history-terminal-without-send', Boolean(terminalHistory), 'the same History turn became terminal without another Send')
-  const terminalMessages = historyMessages(terminalHistory!)
-  const terminalAssistant = terminalMessages.find(message => message.role === 'assistant') || {}
+  requiredCheck(
+    checks,
+    'history-terminal-without-send',
+    Boolean(terminalHistory),
+    'the same History turn became terminal without another Send',
+  )
+  const terminalAssistant = historyMessages(terminalHistory!).find(message => message.role === 'assistant') || {}
   requiredCheck(
     checks,
     'history-row-updated-in-place',
@@ -228,7 +267,12 @@ async function runBuilderAcceptance(input: {
 
   const jobsAfterDebug = await countRows(admin, 'builder_jobs', userId)
   requiredCheck(checks, 'one-builder-job-created', jobsAfterDebug === jobsBefore + 1, `before=${jobsBefore} after=${jobsAfterDebug}`)
-  requiredCheck(checks, 'pay-gap-classifier-excludes-builder', !isConciergeBuilderObjective(PAY_GAP_PROMPT), 'the production classifier returned false')
+  requiredCheck(
+    checks,
+    'pay-gap-classifier-excludes-builder',
+    !isConciergeBuilderObjective(PAY_GAP_PROMPT),
+    'the production classifier returned false',
+  )
 
   const payGapConversation = randomUUID()
   const payGapController = new AbortController()
@@ -291,7 +335,12 @@ async function runVisualAcceptance(input: {
       && Number(oversized.data.observed_length) === 8_001,
     `status=${oversized.status} error=${safeText(oversized.data.error)} source=${safeText(oversized.data.objective_source)} length=${safeText(oversized.data.observed_length)}`,
   )
-  requiredCheck(checks, 'legacy-visual-error-removed', !oversized.raw.includes('visual_invalid_objective'), safeText(oversized.raw))
+  requiredCheck(
+    checks,
+    'legacy-visual-error-removed',
+    !oversized.raw.includes('visual_invalid_objective'),
+    safeText(oversized.raw),
+  )
 
   const conversationId = randomUUID()
   const generated = await httpJson(origin, '/api/cos-browser', cookies, {
@@ -307,7 +356,10 @@ async function runVisualAcceptance(input: {
   requiredCheck(
     checks,
     'visual-concierge-success',
-    generated.status === 200 && Boolean(previewUrl) && Boolean(downloadUrl) && typeof generated.data.workspaceId === 'string',
+    generated.status === 200
+      && Boolean(previewUrl)
+      && Boolean(downloadUrl)
+      && typeof generated.data.workspaceId === 'string',
     `status=${generated.status} error=${safeText(generated.data.error)} source=${safeText(generated.data.source)}`,
   )
 
@@ -338,9 +390,7 @@ async function runVisualAcceptance(input: {
 export async function GET(request: NextRequest) {
   if (!tokenIsValid(request)) return noStore({ error: 'Not found' }, 404)
   const mode = request.nextUrl.searchParams.get('mode')
-  if (mode !== 'builder' && mode !== 'visual') {
-    return noStore({ error: 'mode must be builder or visual' }, 400)
-  }
+  if (mode !== 'builder' && mode !== 'visual') return noStore({ error: 'mode must be builder or visual' }, 400)
 
   const checks: AcceptanceCheck[] = []
   const startedAt = new Date().toISOString()
@@ -350,7 +400,7 @@ export async function GET(request: NextRequest) {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
   if (!supabaseUrl || !anonKey || !serviceKey) return noStore({ error: 'acceptance_environment_unavailable' }, 503)
 
-  const admin = createClient(supabaseUrl, serviceKey, {
+  const admin: AdminClient = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   const jar = new Map<string, string>()
@@ -381,13 +431,22 @@ export async function GET(request: NextRequest) {
       email_confirm: true,
       user_metadata: { purpose: 'signalboost-runtime-acceptance', mode },
     })
-    if (created.error || !created.data.user?.id) throw new Error(`acceptance_user_create_failed:${created.error?.message || 'missing_user'}`)
+    if (created.error || !created.data.user?.id) {
+      throw new Error(`acceptance_user_create_failed:${created.error?.message || 'missing_user'}`)
+    }
     userId = created.data.user.id
 
     const signedIn = await browserSession.auth.signInWithPassword({ email, password })
-    if (signedIn.error || !signedIn.data.user?.id) throw new Error(`acceptance_sign_in_failed:${signedIn.error?.message || 'missing_user'}`)
+    if (signedIn.error || !signedIn.data.user?.id) {
+      throw new Error(`acceptance_sign_in_failed:${signedIn.error?.message || 'missing_user'}`)
+    }
     const cookies = cookieHeader(jar)
-    requiredCheck(checks, 'temporary-authenticated-session', Boolean(cookies), 'Supabase SSR cookies were issued for the temporary user')
+    requiredCheck(
+      checks,
+      'temporary-authenticated-session',
+      Boolean(cookies),
+      'Supabase SSR cookies were issued for the temporary user',
+    )
 
     result = mode === 'builder'
       ? await runBuilderAcceptance({ origin, cookies, admin, userId, checks })
@@ -396,8 +455,15 @@ export async function GET(request: NextRequest) {
     failure = error instanceof Error ? error.message : 'runtime_acceptance_failed'
   } finally {
     if (userId) {
-      const deleted = await admin.auth.admin.deleteUser(userId).catch(error => ({ error }))
-      if (!(deleted as { error?: unknown }).error) {
+      let deletionFailed = false
+      try {
+        const deleted = await admin.auth.admin.deleteUser(userId)
+        deletionFailed = Boolean(deleted.error)
+      } catch {
+        deletionFailed = true
+      }
+
+      if (!deletionFailed) {
         await wait(300)
         const [jobs, conversations, workspaces] = await Promise.all([
           countRows(admin, 'builder_jobs', userId).catch(() => -1),
@@ -411,7 +477,11 @@ export async function GET(request: NextRequest) {
           detail: `jobs=${jobs} conversations=${conversations} workspaces=${workspaces}`,
         }))
       } else {
-        checks.push(Object.freeze({ id: 'temporary-user-and-data-cleaned', passed: false, detail: 'temporary auth user deletion failed' }))
+        checks.push(Object.freeze({
+          id: 'temporary-user-and-data-cleaned',
+          passed: false,
+          detail: 'temporary auth user deletion failed',
+        }))
       }
     }
   }

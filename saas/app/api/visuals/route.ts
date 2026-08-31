@@ -4,16 +4,21 @@ import { createPlatformImagePort } from '@/lib/cos/aiPort'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { detectConciergeVisualIntent } from '@/lib/visuals/intent'
 import { resolveVerifiedReferenceVisual, type VerifiedReferenceVisual } from '@/lib/visuals/referenceAssets'
+import { resolveVerifiedPersonReference, type VerifiedPersonReference } from '@/lib/visuals/personReferences'
+import { generateReferenceConditionedImage, type ReferenceConditionedImageResult } from '@/lib/visuals/referenceImageGeneration'
+import { verifyReferenceConditionedPeopleImage } from '@/lib/visuals/personImageVerification'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 const MAX_OBJECTIVE_CHARS = 4_000
+const MAX_PEOPLE_GENERATION_ATTEMPTS = 2
 
 type VisualLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+type ImageMime = 'image/png' | 'image/jpeg' | 'image/webp'
 
-function imageMimeType(b64: string): 'image/png' | 'image/jpeg' | 'image/webp' {
+function imageMimeType(b64: string): ImageMime {
   const bytes = Buffer.from(b64.slice(0, 96), 'base64')
   if (bytes[0] === 0xff && bytes[1] === 0xd8) return 'image/jpeg'
   if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') return 'image/webp'
@@ -35,7 +40,7 @@ function visualLanguage(objective: string): VisualLanguage {
   if (/[а-яё]/i.test(value)) return 'ru'
   if (/[ąćęłńóśźż]/i.test(value) || /\b(?:narysuj|stworz|zrob|zaprojektuj|druzyny|pilkarskiej)\b/i.test(value)) return 'pl'
   if (/\b(?:dibuja|dibujar|dibuje|crea|crear|genera|generar|disena|disenar|blason|equipo|futbol)\b/i.test(value)) return 'es'
-  if (/\b(?:desenhe|desenhar|desenha|crie|criar|gere|gerar|distintivo|brasao|futebol|time|equipe)\b/i.test(value)) return 'pt'
+  if (/\b(?:faça|faca|desenhe|desenhar|desenha|crie|criar|gere|gerar|imagem|distintivo|brasao|futebol|time|equipe|presidente)\b/i.test(value)) return 'pt'
   return 'en'
 }
 
@@ -59,6 +64,16 @@ function referenceReply(language: VisualLanguage): string {
   }[language]
 }
 
+function peopleReply(language: VisualLanguage): string {
+  return {
+    en: 'Created a synthetic illustration using verified references for the requested people. It is shown below and ready to download.',
+    es: 'Creé una ilustración sintética usando referencias verificadas de las personas solicitadas. Aparece abajo y está lista para descargar.',
+    pt: 'Criei uma ilustração sintética usando referências verificadas das pessoas solicitadas. Ela aparece abaixo e está pronta para baixar.',
+    pl: 'Utworzyłem syntetyczną ilustrację z użyciem zweryfikowanych wzorców wskazanych osób. Jest pokazana poniżej i gotowa do pobrania.',
+    ru: 'Создана синтетическая иллюстрация с использованием проверенных изображений указанных людей. Она показана ниже и готова к скачиванию.',
+  }[language]
+}
+
 function unverifiedReferenceReply(language: VisualLanguage): string {
   return {
     en: 'I could not verify an authoritative image of that mark, so I did not invent one. Provide a reference image or request an original emblem instead.',
@@ -69,6 +84,26 @@ function unverifiedReferenceReply(language: VisualLanguage): string {
   }[language]
 }
 
+function unverifiedPeopleReply(language: VisualLanguage): string {
+  return {
+    en: 'I could not verify a reliable reference for every named person, so I did not substitute or invent anyone. Use full names or provide reference images.',
+    es: 'No pude verificar una referencia fiable para cada persona nombrada, así que no sustituí ni inventé a nadie. Usa nombres completos o proporciona imágenes de referencia.',
+    pt: 'Não encontrei uma referência verificável para todas as pessoas citadas, então não substituí nem inventei ninguém. Use os nomes completos ou envie imagens de referência.',
+    pl: 'Nie udało się zweryfikować wzorca każdej wskazanej osoby, więc nikogo nie zastąpiłem ani nie wymyśliłem. Podaj pełne imiona i nazwiska lub prześlij zdjęcia wzorcowe.',
+    ru: 'Не удалось проверить эталонное изображение для каждого указанного человека, поэтому я никого не заменял и не выдумывал. Укажите полные имена или пришлите изображения-образцы.',
+  }[language]
+}
+
+function peopleVerificationFailureReply(language: VisualLanguage): string {
+  return {
+    en: 'The generated scene did not preserve every requested identity distinctly, so I blocked it instead of showing a substituted or duplicated person.',
+    es: 'La escena generada no conservó claramente todas las identidades solicitadas, así que la bloqueé en vez de mostrar una persona sustituida o duplicada.',
+    pt: 'A cena gerada não preservou claramente todas as identidades solicitadas, então eu a bloqueei em vez de mostrar uma pessoa substituída ou duplicada.',
+    pl: 'Wygenerowana scena nie zachowała wyraźnie wszystkich wskazanych tożsamości, więc została zablokowana zamiast pokazania osoby zastąpionej lub zduplikowanej.',
+    ru: 'Сгенерированная сцена не сохранила каждую запрошенную личность отдельно, поэтому она была заблокирована, а не показана с заменённым или дублированным человеком.',
+  }[language]
+}
+
 function visualPrompt(objective: string): string {
   return [
     'Create one polished, high-quality original visual for the user request below.',
@@ -76,12 +111,79 @@ function visualPrompt(objective: string): string {
     'For an original logo, badge, emblem, insignia, or icon, use a clean centered graphic-design composition rather than an editorial scene.',
     'Do not reconstruct, imitate, or claim to reproduce an existing named brand or team mark from model memory.',
     'Do not add unrelated logos, UI chrome, or unrelated text.',
-    'For people or animals, use an original, non-identifiable depiction.',
+    'For unnamed people or animals, use an original, non-identifiable depiction.',
     'For a diagram, favor a clean visual layout and simple, legible labels only when essential.',
     '',
     'USER REQUEST:',
     objective,
   ].join('\n')
+}
+
+function peopleVisualPrompt(objective: string, references: readonly VerifiedPersonReference[], retry: boolean): string {
+  const mapping = references.map((reference, index) => `Reference image ${index + 1} is exclusively ${reference.canonicalName}.`).join('\n')
+  const names = references.map((reference) => reference.canonicalName).join(' and ')
+  return [
+    'Create one polished, high-quality synthetic editorial image. It must not be presented as documentary evidence of a real event.',
+    mapping,
+    `The requested principal people are exactly: ${names}.`,
+    `Render exactly ${references.length} distinct principal people, each exactly once.`,
+    'Preserve the recognizable facial structure, hair, age presentation, and stable identity traits from each corresponding reference image.',
+    'Do not duplicate, clone, merge, average, swap, substitute, omit, or invent any requested person.',
+    'Do not use one reference for more than one person. Do not make two principal people look like the same individual.',
+    'Unless the user explicitly specifies another arrangement, place the people from left to right in reference-image order.',
+    'Change clothing, pose, lighting, and background only as needed to satisfy the requested scene.',
+    'Keep all principal faces unobstructed and sufficiently large to remain recognizable. Avoid background faces that resemble the principal people.',
+    retry ? 'STRICT CORRECTION: a prior candidate failed identity/count verification. Prioritize exact one-to-one identity mapping over style or background detail.' : '',
+    '',
+    'USER REQUEST:',
+    objective,
+  ].filter(Boolean).join('\n')
+}
+
+async function createVerifiedPeopleVisual(objective: string, references: readonly VerifiedPersonReference[]): Promise<{
+  generated?: { b64: string; mime: ImageMime }
+  attempts: number
+  reasonCodes: readonly string[]
+  error?: string
+}> {
+  let lastError = 'visual_people_generation_failed'
+  let lastReasons: readonly string[] = []
+  let attempts = 0
+
+  for (let attempt = 0; attempt < MAX_PEOPLE_GENERATION_ATTEMPTS; attempt += 1) {
+    attempts = attempt + 1
+    const generated = await generateReferenceConditionedImage({
+      prompt: peopleVisualPrompt(objective, references, attempt > 0),
+      size: '1024x1024',
+      references,
+    })
+    if (!generated.ok || !generated.b64 || !generated.mime) {
+      lastError = generated.error || 'visual_people_generation_failed'
+      lastReasons = ['reference_generation_failed']
+      if (/not configured/i.test(lastError)) break
+      continue
+    }
+
+    const verification = await verifyReferenceConditionedPeopleImage({
+      generated: { b64: generated.b64, mime: generated.mime },
+      references,
+    })
+    if (verification.ok) {
+      return { generated: { b64: generated.b64, mime: generated.mime }, attempts: attempt + 1, reasonCodes: [] }
+    }
+
+    lastError = verification.error || 'visual_people_identity_verification_failed'
+    lastReasons = verification.reasonCodes
+    if (verification.reasonCodes.some((reason) => [
+      'verification_runtime_unavailable',
+      'verification_transport_failure',
+      'verification_timeout',
+      'verification_invalid_response',
+      'verification_invalid_schema',
+    ].includes(reason))) break
+  }
+
+  return { attempts, reasonCodes: lastReasons, error: lastError }
 }
 
 /** Authenticated Concierge visual tool. It creates or retrieves a downloadable inline visual; it never publishes it. */
@@ -97,8 +199,10 @@ export async function POST(request: Request) {
     if (!intent) return NextResponse.json({ error: 'visual_request_not_recognised' }, { status: 400 })
 
     let b64: string
-    let mime: 'image/png' | 'image/jpeg' | 'image/webp'
+    let mime: ImageMime
     let verifiedReference: VerifiedReferenceVisual | null = null
+    let verifiedPeople: VerifiedPersonReference[] = []
+    let peopleGenerationAttempts = 0
 
     if (intent.mode === 'reference-mark') {
       verifiedReference = await resolveVerifiedReferenceVisual(intent.referenceQuery || '')
@@ -113,8 +217,37 @@ export async function POST(request: Request) {
       }
       b64 = verifiedReference.b64
       mime = verifiedReference.mime
+    } else if (intent.mode === 'reference-people') {
+      const requestedPeople = [...(intent.referencePeople || [])].slice(0, 4)
+      const resolved = await Promise.all(requestedPeople.map((person) => resolveVerifiedPersonReference(person)))
+      if (!requestedPeople.length || resolved.some((reference) => !reference)) {
+        return NextResponse.json({
+          error: 'visual_person_reference_not_verified',
+          reply: unverifiedPeopleReply(language),
+          source: 'concierge-visual-people-reference-unverified',
+          execution_allowed: false,
+          external_action_taken: false,
+          requested_people: requestedPeople,
+        }, { status: 422 })
+      }
+      verifiedPeople = resolved as VerifiedPersonReference[]
+      const generated = await createVerifiedPeopleVisual(objective, verifiedPeople)
+      peopleGenerationAttempts = generated.attempts
+      if (!generated.generated) {
+        return NextResponse.json({
+          error: 'visual_people_identity_verification_failed',
+          reply: peopleVerificationFailureReply(language),
+          source: 'concierge-visual-people-verification-failed',
+          execution_allowed: false,
+          external_action_taken: false,
+          requested_people: requestedPeople,
+          reason_codes: generated.reasonCodes,
+        }, { status: 422 })
+      }
+      b64 = generated.generated.b64
+      mime = generated.generated.mime
     } else {
-      const generated = await createPlatformImagePort().generate({ prompt: visualPrompt(objective), size: '512x512' })
+      const generated: ReferenceConditionedImageResult = await createPlatformImagePort().generate({ prompt: visualPrompt(objective), size: '1024x1024' })
       if (!generated.ok || !generated.b64) {
         return NextResponse.json({ error: generated.error || 'visual_generation_unavailable' }, { status: 503 })
       }
@@ -130,19 +263,30 @@ export async function POST(request: Request) {
     const filename = intent.filename.replace(/png$/i, extensionFor(mime))
     await workspace.writeFile(workspaceId, filename, `artifact-image-base64:${mime}:${b64}`)
 
+    const isPeopleVisual = verifiedPeople.length > 0
     return NextResponse.json({
-      reply: verifiedReference ? referenceReply(language) : generatedReply(language),
-      source: verifiedReference ? 'concierge-visual-reference' : 'concierge-visual',
+      reply: isPeopleVisual ? peopleReply(language) : verifiedReference ? referenceReply(language) : generatedReply(language),
+      source: isPeopleVisual ? 'concierge-visual-reference-people' : verifiedReference ? 'concierge-visual-reference' : 'concierge-visual',
       workspaceId,
       files: [filename],
       execution_allowed: true,
       external_action_taken: false,
-      external_retrieval_used: Boolean(verifiedReference),
+      external_retrieval_used: Boolean(verifiedReference || isPeopleVisual),
+      synthetic_media: isPeopleVisual,
+      identity_reference_used: isPeopleVisual,
+      identity_verification_passed: isPeopleVisual,
+      generation_attempts: isPeopleVisual ? peopleGenerationAttempts : undefined,
       reference: verifiedReference ? {
         title: verifiedReference.title,
         provider: verifiedReference.provider,
         sourcePageUrl: verifiedReference.sourcePageUrl,
       } : undefined,
+      references: isPeopleVisual ? verifiedPeople.map((reference) => ({
+        canonicalName: reference.canonicalName,
+        title: reference.title,
+        provider: reference.provider,
+        sourcePageUrl: reference.sourcePageUrl,
+      })) : undefined,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'visual_request_failed'

@@ -107,6 +107,8 @@ test('neural prompts contain no topic answer schema', () => {
     assert.doesNotMatch(text, /gender pay gap/i)
     assert.match(text, /proposition/i)
   }
+  assert.match(plan, /grouping attribute may be one contributing factor/i)
+  assert.match(synth, /do not write that the grouping attribute is the only reason/i)
 })
 
 test('synthesis validator rejects a yes-lead when the plan is a neutral evidence map', () => {

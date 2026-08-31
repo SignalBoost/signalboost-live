@@ -26,6 +26,22 @@ test('one attached source file makes an explicit debug request eligible', () => 
   assert.equal(isConciergeBuilderObjective('Tell me what this attachment is.', context), false)
 })
 
+test('a dropped source file is enough even when the human writes casually or nothing', () => {
+  const context = {
+    attachmentNames: ['app.py'],
+    attachmentMimeTypes: ['text/x-python'],
+    attachmentSizes: [18],
+  }
+  assert.equal(isConciergeBuilderObjective('fix this', context), true)
+  assert.equal(isConciergeBuilderObjective('Please fix/debug this', context), true)
+  assert.equal(isConciergeBuilderObjective('não funciona', context), true)
+  assert.equal(isConciergeBuilderObjective('help', context), true)
+  assert.equal(isConciergeBuilderObjective('', context), true)
+  assert.equal(isCosCodingObjective('fix this', context), true)
+  assert.equal(isConciergeBuilderObjective('fix this'), false)
+  assert.equal(isConciergeBuilderObjective('Please fix/debug this'), false)
+})
+
 test('broken / not working / not functional plus a source attachment starts Builder', () => {
   const context = {
     attachmentNames: ['app.py'],

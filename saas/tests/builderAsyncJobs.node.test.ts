@@ -21,6 +21,24 @@ test('POST creates a durable job, schedules work after the response, and returns
   assert.doesNotMatch(route, /executeSignalBoostRepositoryRepair/)
 })
 
+test('an attached debug request cannot silently fall back to a broad standard job', () => {
+  assert.match(route, /const DEBUG_OBJECTIVE =/)
+  assert.match(route, /files\.length > 0 && DEBUG_OBJECTIVE\.test\(objective\) && !debugPlan/)
+  assert.match(route, /builder_debug_attachment_required/)
+  assert.match(route, /exactly one supported \.js, \.mjs, \.cjs, \.ts, \.mts, \.cts, or \.py attachment/)
+
+  const files = route.indexOf('const files = cleanFiles(body?.files)')
+  const plan = route.indexOf('const debugPlan = planDebugFileJob(objective, files)', files)
+  const rejected = route.indexOf("error: 'builder_debug_attachment_required'", plan)
+  const workspace = route.indexOf('createSupabaseBuilderWorkspace(access.userId)', rejected)
+  const enqueue = route.indexOf('await enqueueBuilderJob({', workspace)
+  assert.ok(files >= 0)
+  assert.ok(plan > files)
+  assert.ok(rejected > plan)
+  assert.ok(workspace > rejected, 'invalid attached debug must be rejected before workspace creation')
+  assert.ok(enqueue > workspace, 'invalid attached debug must be rejected before job enqueue')
+})
+
 test('GET polling is user-scoped and never executes the job', () => {
   assert.match(route, /url\.searchParams\.get\('jobId'\)/)
   assert.match(route, /getBuilderJobForUser\(jobId, access\.userId\)/)

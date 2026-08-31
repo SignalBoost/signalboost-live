@@ -63,7 +63,7 @@ const REFERENCE_STOP_TOKENS = new Set([
   ...VISUAL_SUBJECT_TOKENS,
   ...ORIGINAL_MARK_TOKENS,
   // English
-  'a', 'an', 'the', 'of', 'for', 'from', 'please', 'current', 'official', 'team', 'football', 'soccer', 'club', 'fc',
+  'a', 'an', 'the', 'of', 'for', 'from', 'please', 'current', 'official', 'team', 'football', 'soccer', 'club', 'fc', 'coat', 'arms',
   // Portuguese
   'o', 'a', 'os', 'as', 'um', 'uma', 'do', 'da', 'dos', 'das', 'de', 'para', 'por', 'favor', 'atual', 'oficial', 'time', 'equipe', 'clube', 'futebol',
   // Spanish

@@ -28,6 +28,9 @@ async function boundedLocalJson(prompt: string, reply: string, titles: string[])
       systemPrompt: [
         'Return ONLY strict JSON: {"followups":["question one?","question two?"]}.',
         'Produce exactly two questions. Use only the user question, answer, and source titles supplied.',
+        'Each question must be answerable from those strings on the next turn.',
+        'Ask what a cited measure includes, or what it does not include.',
+        'Do not ask for causes, motives, discrimination, or legal conclusions the text did not state.',
         'Do not introduce a person, event, date, number, or claim absent from those strings.',
         'Questions only; do not answer them or assert facts.',
       ].join(' '),

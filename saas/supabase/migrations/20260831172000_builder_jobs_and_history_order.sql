@@ -9,9 +9,27 @@ alter table public.assistant_messages
 alter table public.assistant_messages
   alter column message_order set default nextval('public.assistant_messages_message_order_seq'::regclass);
 
-update public.assistant_messages
-set message_order = nextval('public.assistant_messages_message_order_seq'::regclass)
-where message_order is null;
+-- Existing user/assistant pairs can share one timestamp. Backfill deterministically, with the user
+-- record before the assistant record, rather than relying on physical UPDATE order or UUID ordering.
+with existing_max as (
+  select coalesce(max(message_order), 0) as value
+  from public.assistant_messages
+), ordered_missing as (
+  select
+    id,
+    row_number() over (
+      order by
+        created_at asc,
+        case role when 'user' then 0 when 'assistant' then 1 else 2 end asc,
+        id asc
+    ) as ordinal
+  from public.assistant_messages
+  where message_order is null
+)
+update public.assistant_messages as messages
+set message_order = existing_max.value + ordered_missing.ordinal
+from existing_max, ordered_missing
+where messages.id = ordered_missing.id;
 
 select setval(
   'public.assistant_messages_message_order_seq'::regclass,

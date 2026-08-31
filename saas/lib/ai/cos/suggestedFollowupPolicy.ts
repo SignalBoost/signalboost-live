@@ -68,8 +68,8 @@ export function fallbackFollowups(prompt: string, sourceCount = 0): string[] {
   }
   if (sourceCount < 1) {
     return [
-      `What considerations does the answer identify about ${entity}?`,
-      `What does the answer not establish about ${entity}?`,
+      `Explain the considerations already identified about ${entity}?`,
+      `Explain what the answer does not establish about ${entity}?`,
     ]
   }
   if (PERSON_OR_ROLE_PROMPT.test(prompt)) {

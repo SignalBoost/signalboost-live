@@ -1,6 +1,7 @@
 import {
   JSON_RPC,
   createMcpServer,
+  type JsonRpcResponse,
   type McpCallerContext,
   type McpServer,
   type McpToolDefinition,
@@ -70,6 +71,13 @@ function exactReadCapabilities(
   return accepted
 }
 
+function scopedFailure(message: unknown, text: string): JsonRpcResponse | null {
+  const raw = message as { id?: unknown } | null
+  if (!raw || raw.id === undefined) return null
+  const id = typeof raw.id === 'string' || typeof raw.id === 'number' ? raw.id : null
+  return { jsonrpc: '2.0', id, error: { code: JSON_RPC.INVALID_REQUEST, message: text } }
+}
+
 /**
  * Project one exact portable's already-authorized Provider Hub read capabilities through the
  * existing Agent Gateway MCP socket. Discovery remains the authorization source: this layer never
@@ -114,18 +122,8 @@ export async function createProviderHubMcpCompatibilityServer(
     async handle(message: unknown, caller: McpCallerContext) {
       // The buyer/platform edge owns authentication, but this compatibility socket binds that
       // verified identity to the exact tenant for which the portable catalog was constructed.
-      if (!caller?.actor?.userId) {
-        const id = typeof (message as any)?.id === 'string' || typeof (message as any)?.id === 'number'
-          ? (message as any).id
-          : null
-        return { jsonrpc: '2.0', id, error: { code: JSON_RPC.INVALID_REQUEST, message: 'verified actor.userId is required' } }
-      }
-      if (caller.tenantId !== tenantId) {
-        const id = typeof (message as any)?.id === 'string' || typeof (message as any)?.id === 'number'
-          ? (message as any).id
-          : null
-        return { jsonrpc: '2.0', id, error: { code: JSON_RPC.INVALID_REQUEST, message: 'caller tenant does not match MCP capability scope' } }
-      }
+      if (!caller?.actor?.userId) return scopedFailure(message, 'verified actor.userId is required')
+      if (caller.tenantId !== tenantId) return scopedFailure(message, 'caller tenant does not match MCP capability scope')
       return inner.handle(message, caller)
     },
   })

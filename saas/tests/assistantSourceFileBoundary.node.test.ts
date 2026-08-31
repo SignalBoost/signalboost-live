@@ -12,14 +12,13 @@ test('Assistant picker visibly accepts executable source extensions', () => {
   assert.match(boundary, /input\.accept = expanded\.join\(','\)/)
 })
 
-test('source files are normalized before the existing React change handler', () => {
+test('source files are normalized to the existing admitted text MIME before React validation', () => {
   assert.match(boundary, /document\.addEventListener\('change', onChange, true\)/)
-  assert.match(boundary, /new File\(\[file\], file\.name/)
+  assert.match(boundary, /const ADMITTED_TEXT_MIME = 'text\/plain'/)
+  assert.match(boundary, /new File\(\[file\], file\.name, \{ type: ADMITTED_TEXT_MIME/)
   assert.match(boundary, /input\.files = normalized/)
-  assert.match(boundary, /file\.type === expected/)
-  assert.match(boundary, /text\/javascript/)
-  assert.match(boundary, /text\/typescript/)
-  assert.match(boundary, /text\/x-python/)
+  assert.match(boundary, /file\.type === ADMITTED_TEXT_MIME/)
+  assert.doesNotMatch(boundary, /text\/javascript|text\/typescript|text\/x-python/)
 })
 
 test('normalization is scoped to the Assistant layout and leaves server limits intact', () => {

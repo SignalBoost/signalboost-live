@@ -1,4 +1,5 @@
 import { Sandbox } from '@vercel/sandbox'
+import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 import type { BuilderFile, BuilderRunnerPort, BuilderRunResult, BuilderWorkspacePort } from './contracts.ts'
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { SIGNALBOOST_REPOSITORY_URL } from './repository-repair-target.ts'
@@ -11,6 +12,8 @@ const MAX_CHANGED_FILES = 30
 const MAX_PATCH_BYTES = 480 * 1024
 const COMMAND_TIMEOUT_MS = 60_000
 const SETUP_TIMEOUT_MS = 90_000
+const SANDBOX_LIFETIME_MS = 260_000
+const SANDBOX_STOP_TIMEOUT_MS = 5_000
 const EXCLUDED_SEGMENTS = new Set(['.git', 'node_modules', '.next', 'dist', 'build', 'coverage', '.vercel'])
 const SECRET_LIKE = /(^|\/)(?:\.env(?:\.[^/]*)?|(?:credentials?|secrets?|tokens?|private[-_.]?key|id_rsa|id_ed25519|service[-_.]?account)(?:\.[^/]*)?)(?:$|\/)|\.(?:pem|key|p12|pfx)$/i
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/
@@ -24,6 +27,34 @@ function bytes(value: string): number {
 
 function bounded(value: string, maximum = 16_000): string {
   return String(value || '').slice(0, maximum)
+}
+
+function absoluteDeadline(value: unknown): number | null {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+function remainingMs(deadlineAtMs: number | null, requestedMs: number): number {
+  if (deadlineAtMs === null) return requestedMs
+  const remaining = Math.floor(deadlineAtMs - Date.now())
+  if (remaining <= 0) throw new Error(BUILDER_TURN_TIMEOUT_ERROR)
+  return Math.max(1, Math.min(requestedMs, remaining))
+}
+
+async function withinAbsoluteDeadline<T>(work: Promise<T>, deadlineAtMs: number | null): Promise<T> {
+  if (deadlineAtMs === null) return await work
+  const timeoutMs = remainingMs(deadlineAtMs, Number.MAX_SAFE_INTEGER)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(BUILDER_TURN_TIMEOUT_ERROR)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 export function safeRepositoryWorkspacePath(value: unknown): string {
@@ -70,30 +101,37 @@ async function commandOutput(result: Awaited<ReturnType<SandboxInstance['runComm
 export class VercelRepositoryRepairSession implements BuilderWorkspacePort, BuilderRunnerPort {
   private readonly sandbox: SandboxInstance
   private readonly target: SignalBoostRepositoryRepairTarget
+  private readonly deadlineAtMs: number | null
   private readonly visiblePaths = new Set<string>()
   private networkLocked = false
 
-  private constructor(sandbox: SandboxInstance, target: SignalBoostRepositoryRepairTarget) {
+  private constructor(sandbox: SandboxInstance, target: SignalBoostRepositoryRepairTarget, deadlineAtMs: number | null) {
     this.sandbox = sandbox
     this.target = target
+    this.deadlineAtMs = deadlineAtMs
   }
 
-  static async create(target: SignalBoostRepositoryRepairTarget): Promise<VercelRepositoryRepairSession> {
+  static async create(
+    target: SignalBoostRepositoryRepairTarget,
+    options?: { deadlineAtMs?: number },
+  ): Promise<VercelRepositoryRepairSession> {
     const fullCommitSha = String(target.fullCommitSha || '').toLowerCase()
     if (target.repositoryUrl !== SIGNALBOOST_REPOSITORY_URL || !/^[0-9a-f]{40}$/.test(fullCommitSha)) {
       throw new Error('builder_repository_target_not_authorized')
     }
 
-    const sandbox = await Sandbox.create({
+    const deadlineAtMs = absoluteDeadline(options?.deadlineAtMs)
+    const sandboxLifetimeMs = remainingMs(deadlineAtMs, SANDBOX_LIFETIME_MS)
+    const sandbox = await withinAbsoluteDeadline(Sandbox.create({
       runtime: 'node24',
-      timeout: 260_000,
+      timeout: sandboxLifetimeMs,
       resources: { vcpus: 2 },
       persistent: false,
       networkPolicy: 'allow-all',
       env: { CI: '1', npm_config_audit: 'false', npm_config_fund: 'false' },
       tags: { surface: 'cos-platform-engineer', repository: 'signalboost-live' },
-    })
-    const session = new VercelRepositoryRepairSession(sandbox, target)
+    }), deadlineAtMs)
+    const session = new VercelRepositoryRepairSession(sandbox, target, deadlineAtMs)
     try {
       await session.requireSetupSuccess('git', ['init', '--quiet', REPOSITORY_ROOT], '/tmp')
       await session.requireSetupSuccess('git', ['-C', REPOSITORY_ROOT, 'remote', 'add', 'origin', SIGNALBOOST_REPOSITORY_URL], '/tmp')
@@ -110,7 +148,7 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
         SETUP_TIMEOUT_MS,
       )
 
-      await sandbox.update({ networkPolicy: 'deny-all' })
+      await withinAbsoluteDeadline(sandbox.update({ networkPolicy: 'deny-all' }), deadlineAtMs)
       session.networkLocked = true
       await session.initializeVisiblePaths()
       return session
@@ -120,12 +158,21 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
     }
   }
 
+  private commandTimeout(requestedMs: number): number {
+    return remainingMs(this.deadlineAtMs, requestedMs)
+  }
+
   private async exec(cmd: string, args: string[], cwd = PROJECT_ROOT, timeoutMs = COMMAND_TIMEOUT_MS, maximum = 16_000): Promise<CommandResult> {
     try {
-      const result = await this.sandbox.runCommand({ cmd, args, cwd, timeoutMs })
-      return await commandOutput(result, maximum)
+      const commandTimeoutMs = this.commandTimeout(timeoutMs)
+      const result = await withinAbsoluteDeadline(
+        this.sandbox.runCommand({ cmd, args, cwd, timeoutMs: commandTimeoutMs }),
+        this.deadlineAtMs,
+      )
+      return await withinAbsoluteDeadline(commandOutput(result, maximum), this.deadlineAtMs)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'sandbox_command_failed'
+      if (message === BUILDER_TURN_TIMEOUT_ERROR) throw error
       return Object.freeze({ exitCode: 1, stdout: '', stderr: bounded(message, maximum) })
     }
   }
@@ -238,11 +285,19 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
     if (!command || command.length > 2_000 || /[\0\r]/.test(command)) throw new Error('builder_invalid_command')
     const started = Date.now()
     try {
-      const result = await this.sandbox.runCommand({ cmd: 'sh', args: ['-lc', command], cwd: PROJECT_ROOT, timeoutMs: COMMAND_TIMEOUT_MS })
-      const [stdout, stderr] = await Promise.all([result.stdout(), result.stderr()])
+      const commandTimeoutMs = this.commandTimeout(COMMAND_TIMEOUT_MS)
+      const result = await withinAbsoluteDeadline(
+        this.sandbox.runCommand({ cmd: 'sh', args: ['-lc', command], cwd: PROJECT_ROOT, timeoutMs: commandTimeoutMs }),
+        this.deadlineAtMs,
+      )
+      const [stdout, stderr] = await withinAbsoluteDeadline(
+        Promise.all([result.stdout(), result.stderr()]),
+        this.deadlineAtMs,
+      )
       return Object.freeze({ exitCode: result.exitCode, stdout: bounded(stdout), stderr: bounded(stderr), timedOut: false })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'sandbox_command_failed'
+      if (message === BUILDER_TURN_TIMEOUT_ERROR) throw error
       const timedOut = /timed?\s*out|timeout/i.test(message) || Date.now() - started >= COMMAND_TIMEOUT_MS
       return Object.freeze({ exitCode: timedOut ? 124 : 1, stdout: '', stderr: bounded(message), timedOut })
     }
@@ -287,6 +342,14 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
   }
 
   async close(): Promise<void> {
-    try { await this.sandbox.stop() } catch { /* cleanup failure is logged by the caller's primary result */ }
+    try {
+      const stopDeadlineAtMs = Date.now() + SANDBOX_STOP_TIMEOUT_MS
+      await Promise.race([
+        this.sandbox.stop(),
+        new Promise<void>(resolve => setTimeout(resolve, remainingMs(stopDeadlineAtMs, SANDBOX_STOP_TIMEOUT_MS))),
+      ])
+    } catch {
+      // Cleanup remains best-effort; the sandbox lifetime is also bounded by the request deadline.
+    }
   }
 }

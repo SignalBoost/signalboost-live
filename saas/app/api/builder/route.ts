@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { createPlatformAiPort } from '@/lib/cos/aiPort'
+import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from '@/lib/builder/control-adapter'
 import { BuilderToolLoop } from '@/lib/builder/tool-loop'
 import { isRepairObjective } from '@/lib/builder/regression-gate'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
@@ -17,6 +18,8 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const BUILDER_REQUEST_BUDGET_MS = 250_000
+const BUILDER_RESPONSE_RESERVE_MS = 20_000
 
 function cleanObjective(value: unknown): string {
   const objective = String(value || '').trim()
@@ -111,6 +114,7 @@ export async function POST(request: Request) {
   const access = await getAccess().catch(() => null)
   if (!access?.userId) return NextResponse.json({ error: 'Sign in to use COS Builder.' }, { status: 401 })
 
+  const requestDeadlineAtMs = Date.now() + BUILDER_REQUEST_BUDGET_MS
   let conversationId = ''
   let rawObjective = ''
   let workspaceId = ''
@@ -130,6 +134,7 @@ export async function POST(request: Request) {
           userId: access.userId,
           rawObjective,
           workspaceId,
+          deadlineAtMs: requestDeadlineAtMs,
         })
         if (repair) {
           const payload = repair.payload as Record<string, unknown>
@@ -178,7 +183,9 @@ export async function POST(request: Request) {
     })
 
     const result = await new BuilderToolLoop(
-      createPlatformAiPort(),
+      createGovernedBuilderAiPort(createPlatformAiPort(), {
+        deadlineAtMs: requestDeadlineAtMs - BUILDER_RESPONSE_RESERVE_MS,
+      }),
       workspace,
       new VercelSandboxBuilderRunner(),
     ).run({
@@ -196,7 +203,10 @@ export async function POST(request: Request) {
       const trace = publicTrace(result.trace)
       const reply = `COS Builder stopped: ${result.error}`
       await persistBuilderTurn({ conversationId, userId: access.userId, objective, reply, workspaceId, files })
-      return NextResponse.json({ error: result.error, workspaceId, files, trace }, { status: 422 })
+      return NextResponse.json(
+        { error: result.error, workspaceId, files, trace },
+        { status: result.error === BUILDER_TURN_TIMEOUT_ERROR ? 504 : 422 },
+      )
     }
     const lesson = verifiedRepairLesson(result)
     // Learning persistence must never turn an otherwise verified repair into a failed user task.
@@ -212,7 +222,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ workspaceId, reply: result.answer, files, trace })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'builder_request_failed'
-    const status = /^builder_(invalid|file_limit|file_too_large|invalid_path)/.test(message) ? 400 : 502
+    const status = message === BUILDER_TURN_TIMEOUT_ERROR
+      ? 504
+      : /^builder_(invalid|file_limit|file_too_large|invalid_path)/.test(message) ? 400 : 502
     const reply = `COS Builder stopped: ${message}`
     await persistBuilderTurn({ conversationId, userId: access.userId, objective: rawObjective, reply, workspaceId, files: [] })
     return NextResponse.json({ error: message }, { status })

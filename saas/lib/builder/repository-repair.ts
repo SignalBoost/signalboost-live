@@ -1,4 +1,5 @@
 import { createPlatformAiPort } from '../cos/aiPort.ts'
+import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { verifiedRepairLesson } from './verified-lessons.ts'
@@ -11,6 +12,9 @@ export type SignalBoostRepositoryRepairExecution = Readonly<{
   status: number
   payload: Record<string, unknown>
 }>
+
+const DEFAULT_REPOSITORY_REQUEST_BUDGET_MS = 250_000
+const REPOSITORY_RESULT_RESERVE_MS = 45_000
 
 function publicTrace(trace: readonly BuilderToolTrace[]) {
   return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
@@ -36,7 +40,7 @@ function failedPayload(input: {
   baseCommitSha: string | null
 }): SignalBoostRepositoryRepairExecution {
   return Object.freeze({
-    status: 422,
+    status: input.error === BUILDER_TURN_TIMEOUT_ERROR ? 504 : 422,
     payload: {
       error: input.error,
       source: 'cos-platform-engineer',
@@ -51,10 +55,16 @@ function failedPayload(input: {
   })
 }
 
+function requestDeadline(value: unknown): number {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : Date.now() + DEFAULT_REPOSITORY_REQUEST_BUDGET_MS
+}
+
 export async function executeSignalBoostRepositoryRepair(input: {
   userId: string
   rawObjective: string
   workspaceId: string
+  deadlineAtMs?: number
 }): Promise<SignalBoostRepositoryRepairExecution | null> {
   const parsed = parseSignalBoostRepositoryRepairTarget(input.rawObjective)
   if (!parsed) return null
@@ -62,6 +72,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
   const workspace = createSupabaseBuilderWorkspace(input.userId)
   if (!workspace) return Object.freeze({ status: 503, payload: { error: 'Builder storage is unavailable.' } })
 
+  const deadlineAtMs = requestDeadline(input.deadlineAtMs)
   const objective = signalBoostRepositoryRepairObjective(target)
   await workspace.ensureWorkspace(input.workspaceId)
   await workspace.setObjective(input.workspaceId, objective)
@@ -70,16 +81,55 @@ export async function executeSignalBoostRepositoryRepair(input: {
     return []
   })
 
+  if (Date.now() >= deadlineAtMs - REPOSITORY_RESULT_RESERVE_MS) {
+    return failedPayload({
+      error: BUILDER_TURN_TIMEOUT_ERROR,
+      workspaceId: input.workspaceId,
+      files: [],
+      trace: [],
+      baseCommitSha: target.fullCommitSha,
+    })
+  }
+
   let session: VercelRepositoryRepairSession | null = null
   try {
-    session = await VercelRepositoryRepairSession.create(target)
-    const result = await new BuilderToolLoop(createPlatformAiPort(), session, session).run({
+    session = await VercelRepositoryRepairSession.create(target, { deadlineAtMs })
+    const aiDeadlineAtMs = deadlineAtMs - REPOSITORY_RESULT_RESERVE_MS
+    if (Date.now() >= aiDeadlineAtMs) {
+      return failedPayload({
+        error: BUILDER_TURN_TIMEOUT_ERROR,
+        workspaceId: input.workspaceId,
+        files: [],
+        trace: [],
+        baseCommitSha: target.fullCommitSha,
+      })
+    }
+
+    const result = await new BuilderToolLoop(
+      createGovernedBuilderAiPort(createPlatformAiPort(), { deadlineAtMs: aiDeadlineAtMs }),
+      session,
+      session,
+    ).run({
       objective,
       workspaceId: input.workspaceId,
       priorLessons,
       maxRounds: 6,
       modelRoundTimeoutMs: 35_000,
     })
+
+    // A deadline failure must return immediately. Collecting an unverified repository diff can run
+    // several more sandbox commands and recreate the exact Vercel/browser timeout this guard closes.
+    if (result.ok === false && result.error === BUILDER_TURN_TIMEOUT_ERROR) {
+      const files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
+      return failedPayload({
+        error: result.error,
+        workspaceId: input.workspaceId,
+        files,
+        trace: result.trace,
+        baseCommitSha: target.fullCommitSha,
+      })
+    }
+
     const changes = await session.collectChanges()
     const patchPresent = Boolean(changes.patch.trim())
     const patchPath = result.ok && patchPresent ? 'repository-repair.patch' : 'repository-repair-unverified.patch'

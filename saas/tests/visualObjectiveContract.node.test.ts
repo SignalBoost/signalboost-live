@@ -11,17 +11,18 @@ const route = readFileSync(new URL('../app/api/visuals/route.ts', import.meta.ur
 const contract = readFileSync(new URL('../lib/visuals/request-contract.ts', import.meta.url), 'utf8')
 const home = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
 const assistantBoundary = readFileSync(new URL('../components/AssistantSourceFileBoundary.tsx', import.meta.url), 'utf8')
-const assistantLayout = readFileSync(new URL('../app/dashboard/assistant/layout.tsx', import.meta.url), 'utf8')
 const gates = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
 
-test('visual objective limit matches the user-facing 8,000-character composers', () => {
+test('visual objective limit matches the existing 8,000-character public composer', () => {
   assert.equal(MAX_VISUAL_OBJECTIVE_CHARS, 8_000)
   assert.match(home, /maxLength=\{?8000\}?/)
-  assert.match(assistantBoundary, /MAX_ASSISTANT_OBJECTIVE_CHARS = 8_000/)
-  assert.match(assistantBoundary, /textarea\.maxLength = MAX_ASSISTANT_OBJECTIVE_CHARS/)
-  assert.match(assistantLayout, /AssistantSourceFileBoundary/)
   assert.equal(readVisualObjective({ objective: `Create an image. ${'x'.repeat(3_984)}` }).length, 4_001)
   assert.equal(readVisualObjective({ objective: `Create an image. ${'x'.repeat(7_983)}` }).length, 8_000)
+})
+
+test('the visual-tool contract does not impose a global limit on the owner Assistant composer', () => {
+  assert.doesNotMatch(assistantBoundary, /MAX_ASSISTANT_OBJECTIVE_CHARS/)
+  assert.doesNotMatch(assistantBoundary, /textarea\.maxLength\s*=/)
 })
 
 test('visual requests accept supported direct and message envelopes', () => {

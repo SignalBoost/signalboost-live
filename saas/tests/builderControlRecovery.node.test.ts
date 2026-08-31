@@ -174,6 +174,26 @@ test('Builder accepts equivalent OpenAI-style tool controls without weakening to
   assert.equal((await workspace.readFile('user:provider-tool-control', 'hello.js'))?.content, 'console.log(1)')
 })
 
+test('Builder accepts flattened action controls without weakening tool validation', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const ai: BuilderAiPort = {
+    async generate() { return '{"action":"write_file","path":"hello.js","content":"console.log(1)"}' },
+  }
+  const runner: BuilderRunnerPort = {
+    async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } },
+  }
+
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Create hello.js.',
+    workspaceId: 'user:flattened-action-control',
+    maxRounds: 1,
+  })
+
+  assert.equal(result.ok, false)
+  if (result.ok === false) assert.equal(result.error, 'builder_round_budget_exhausted')
+  assert.equal((await workspace.readFile('user:flattened-action-control', 'hello.js'))?.content, 'console.log(1)')
+})
+
 test('Builder bounds malformed-control recovery rather than looping indefinitely', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   let calls = 0

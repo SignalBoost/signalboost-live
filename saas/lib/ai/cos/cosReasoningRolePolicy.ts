@@ -1,3 +1,4 @@
+import { MAX_BUILDER_OBJECTIVE_CHARS } from '../../builder/request-contract.ts'
 import { isPastedOperationalLog } from './pastedOperationalLog.ts'
 
 export type CosSpecialistRole = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher'
@@ -69,7 +70,7 @@ function sourceAttachment(context?: CosCodingRoutingContext): boolean {
 
 function hugeTranscriptOrDump(prompt: string): boolean {
   const raw = String(prompt || '')
-  if (raw.length > 64_000) return true
+  if (raw.length > MAX_BUILDER_OBJECTIVE_CHARS) return true
   const markers = raw.match(TRANSCRIPT_MARKER)?.length ?? 0
   return raw.length > 16_000 && markers >= 12
 }

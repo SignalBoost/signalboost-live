@@ -1,7 +1,11 @@
 # Builder Async Jobs and Durable History Recovery
 
 **Date:** 2026-08-31  
-**Status:** implementation and both Production migrations applied; exact Preview, Production deployment, and authenticated runtime acceptance required
+**Status:** Production-accepted for the authenticated one-file debug lane and asynchronous durable-History recovery  
+**Accepted deployment:** `dpl_F22cDaDNCvTrWMGiHfFPSARRFDXh`  
+**Accepted implementation:** `901f47c8a034f92de8edd7e472e065381eb2aa09`
+
+Full runtime evidence: `docs/HANDOFF-BUILDER-VISUAL-PRODUCTION-ACCEPTANCE-2026-08-31.md`.
 
 ## Production evidence that motivated the change
 
@@ -68,11 +72,11 @@ Migration `20260831180318_builder_job_stale_recovery.sql`:
 - uses `FOR UPDATE SKIP LOCKED` so concurrent status and History reads remain idempotent;
 - has fixed `search_path` and no `anon` or `authenticated` execution privilege.
 
-The History API now validates conversation UUIDs, reports database errors as HTTP 500 instead of silently treating them as missing, returns stale/missing threads as a truthful HTTP 200 empty transcript, disables caching, orders messages by `message_order`, and reconciles expired Builder jobs before returning History.
+The History API validates conversation UUIDs, reports database errors as HTTP 500 instead of silently treating them as missing, returns stale/missing threads as a truthful HTTP 200 empty transcript, disables caching, orders messages by `message_order`, and reconciles expired Builder jobs before returning History.
 
 ## Strict Builder routing
 
-Builder authority now requires an explicit executable coding/design action plus concrete source evidence:
+Builder authority requires an explicit executable coding/design action plus concrete source evidence:
 
 - supported source attachment;
 - source file/path;
@@ -80,7 +84,7 @@ Builder authority now requires an explicit executable coding/design action plus 
 - code fence;
 - programming language tied to a coding action.
 
-The following no longer route to Builder:
+The following do not route to Builder:
 
 - `debug` or `timeout` alone;
 - pasted Vercel/gate/build logs;
@@ -127,20 +131,30 @@ Mandatory deployment tests cover:
 - one malformed-control recovery only;
 - stale worker terminalization through status polling and History;
 - source-file picker admission;
-- service-role/RLS storage boundaries.
+- service-role/RLS storage boundaries;
+- permanent absence of the temporary Production acceptance endpoint.
 
 ## Production database verification
 
 Both migrations are applied. A transactional stale-worker probe exercised enqueue → stale cutoff → terminal job failure → linked History update, then rolled back. Post-probe counts remained at zero Builder jobs and zero probe workspaces. The recovery function has a fixed search path, is not executable by `anon` or `authenticated`, and is executable by `service_role` only.
 
-## Acceptance boundary
+## Authenticated Production acceptance
 
-Do not call the feature runtime-accepted until all of the following are observed on the exact Production deployment:
+The exact accepted Production deployment satisfied all required observations:
 
-1. History panel and `GET /api/assistant/chats?id=...` return 200 with ordered messages.
-2. A signed-in user attaches `broken.js`; Builder shows the failing stack/exit code.
-3. The same durable job applies at most one edit and the same command exits 0.
-4. Closing/aborting the page does not require Send; reopening History shows the running or terminal Builder result.
-5. `does a pay gap exist?` does not call `/api/builder`.
+1. History and `GET /api/assistant/chats` returned HTTP 200.
+2. One `POST /api/builder` returned 202 and immediately persisted the ordered running turn.
+3. Attached `broken.js` ran with `node 'broken.js'`, exited 1, and returned the real `ReferenceError: result is not defined` stack.
+4. Builder applied exactly one edit.
+5. Builder reran the identical command and exited 0.
+6. Read-only polling observed completion without replaying POST.
+7. The same assistant History row changed from running to terminal without another Send.
+8. Reopened History contained both the failing first exit and successful verification exit.
+9. `does a pay gap exist?` was excluded by the production Builder classifier and created no Builder job.
+10. The isolated acceptance identity and every associated job, conversation, and workspace were deleted; final counts were zero.
 
-A green Preview, applied migrations, and READY Production deployment are necessary but not substitutes for these real authenticated observations.
+## Accepted scope
+
+The authenticated one-file debug lane and asynchronous durable-History recovery are Production-accepted as of 2026-08-31.
+
+This acceptance does not grant blanket approval to every complex repository repair, multi-file autonomous change, deployment, merge, credentialed operation, or consequential external action. Those retain their existing approval, evidence, sandbox, and task-specific acceptance requirements.

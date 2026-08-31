@@ -31,10 +31,6 @@ const MUTABLE_STATE_NOUN = '(?:version|release|model|price|pricing|edition|statu
 const ENTITY_TOKEN = "[\\p{L}\\p{N}._+/#()'’:-]+"
 const LATEST_STATE = new RegExp(`\\b(?:latest|newest|most\\s+recent|current)\\s+(?:(?:${ENTITY_TOKEN})\\s+){0,6}${MUTABLE_STATE_NOUN}\\b`, 'iu')
 const CURRENT_RULE = /\b(?:(?:current|latest|new|updated)\s+(?:law|laws|regulation|regulations|rule|rules|requirement|requirements|visa\s+rule|visa\s+requirements?|entry\s+rule|entry\s+requirements?|passport\s+requirements?|tax\s+rate|policy|guidance)|(?:law|laws|regulation|regulations|rule|rules|requirements?|visa\s+requirements?|entry\s+requirements?|passport\s+requirements?)\s+(?:now|today|currently))\b/i
-// Eligibility in organized public categories is mutable policy state even when the user phrases the
-// question normatively ("should X compete in Y?") rather than asking "what is the current rule?".
-// Route the factual/policy basis live; COS may still reason neutrally about values after retrieval.
-const NORMATIVE_PUBLIC_ELIGIBILITY = /\b(?:should|can|could|may|must)\b[^?.!]{0,100}\b(?:compete|play|participate|enter|join|be\s+(?:eligible|allowed))\b[^?.!]{0,100}\b(?:sport|sports|team|teams|league|leagues|category|categories|competition|competitions|division|divisions)\b|\b(?:sport|sports|team|teams|league|leagues|category|categories|competition|competitions|division|divisions)\b[^?.!]{0,100}\b(?:should|can|could|may|must)\b[^?.!]{0,100}\b(?:compete|play|participate|enter|join|be\s+(?:eligible|allowed))\b/i
 const CURRENT_SECURITY = /\b(?:(?:current|latest|new|recent|active|open|patched|unpatched|exploited)\s+(?:cve|vulnerability|vulnerabilities|security\s+advisory|security\s+issue|exploit)|CVE-\d{4}-\d+[^?.!]{0,50}\b(?:still\s+)?(?:open|patched|unpatched|exploited|active))\b/i
 const RECENT_EVENT = /\b(?:today|today's|tonight|right\s+now|as\s+of\s+(?:today|now)|this\s+(?:week|month|year)|recently|newly|just\s+announced|breaking|latest\s+news|recent\s+news|live\s+updates?)\b/i
 
@@ -52,7 +48,6 @@ export function classifyTemporalSensitivity(prompt: string): TemporalClassificat
     [LIFE_STATUS, 'life_status', 'asks about a person’s life/death status, which can change after training and must be freshly verified'],
     [CURRENT_HOLDER, 'current_holder', 'asks who currently holds a role or position, which can change after training'],
     [CURRENT_RULE, 'current_rule', 'asks about a current law, regulation, rule, policy, or requirement'],
-    [NORMATIVE_PUBLIC_ELIGIBILITY, 'current_rule', 'asks who should be eligible for an organized public category whose governing rules and evidence can change'],
     [CURRENT_SECURITY, 'current_security', 'asks about the current state of a vulnerability, advisory, CVE, or exploit'],
     [LATEST_STATE, 'latest_state', 'asks for the latest/current version, release, price, status, availability, or similar mutable value'],
     [ONGOING_STATUS, 'ongoing_status', 'asks whether a state is still true, which can change after training'],

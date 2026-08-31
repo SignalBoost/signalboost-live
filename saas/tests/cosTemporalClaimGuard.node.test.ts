@@ -87,16 +87,17 @@ test('general temporal classes cover roles, ongoing state, releases, rules, secu
   }
 })
 
-test('normative organized-sport eligibility is mutable policy state and requires live evidence', () => {
+test('normative organized-sport questions remain reasoning requests unless the user asks for current rules', () => {
   for (const prompt of [
     "should men play in women' sport?",
     'Should this athlete be allowed to compete in the women’s category?',
     'Can this group participate in the female sports division?',
   ]) {
     const classification = classifyTemporalSensitivity(prompt)
-    assert.equal(classification.sensitive, true, prompt)
-    assert.equal(classification.kind, 'current_rule', prompt)
+    assert.equal(classification.sensitive, false, prompt)
+    assert.equal(classification.kind, null, prompt)
   }
+  assert.equal(classifyTemporalSensitivity("what are the current rules for participation in women's sport?").kind, 'current_rule')
 })
 
 test('ordinary timeless technical and creative questions are never flagged', () => {

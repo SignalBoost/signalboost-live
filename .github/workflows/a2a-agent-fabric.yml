@@ -5,7 +5,7 @@ on:
     paths:
       - 'saas/a2a-core/**'
       - 'saas/a2a-host/**'
-      - 'saas/tests/a2aAgentFabric.node.test.ts'
+      - 'saas/tests/a2a*.node.test.ts'
       - 'ONBOARD-A2A.md'
       - 'docs/HANDOFF-A2A-AGENT-FABRIC-*.md'
       - '.github/workflows/a2a-agent-fabric.yml'
@@ -14,7 +14,7 @@ on:
     paths:
       - 'saas/a2a-core/**'
       - 'saas/a2a-host/**'
-      - 'saas/tests/a2aAgentFabric.node.test.ts'
+      - 'saas/tests/a2a*.node.test.ts'
       - 'ONBOARD-A2A.md'
       - 'docs/HANDOFF-A2A-AGENT-FABRIC-*.md'
       - '.github/workflows/a2a-agent-fabric.yml'
@@ -37,7 +37,7 @@ jobs:
           cache: npm
           cache-dependency-path: saas/package-lock.json
       - run: npm ci --no-audit --no-fund
-      - name: Run A2A Phase 1 regressions
-        run: node --test tests/a2aAgentFabric.node.test.ts
+      - name: Run A2A regressions
+        run: node --test tests/a2aAgentFabric.node.test.ts tests/a2aCosSpecialistOrchestration.node.test.ts
       - name: Typecheck A2A integration
         run: npm run typecheck

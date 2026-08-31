@@ -451,13 +451,22 @@ export function freshEvidenceSearchQuery(input: string, now = new Date()): strin
 
 /**
  * A request can require more than one evidence set (for example, a current office holder plus
- * a historical roster). Each query is generated from the user's wording; nothing is preselected
- * by topic, organization, person, publisher, or URL. Do not append canned statistical series
- * names. The reasoner, not the query farm, decides which retrieved measurements are commensurable.
+ * a historical roster). Evaluative office questions also retrieve official labor/price/output
+ * series so the reasoner is not fed opinion rankings. Those extra queries are evidence intake
+ * only. They must never become a canned answer. constructEconomicFactsReply stays null.
  */
 export function freshEvidenceSearchQueries(input: string, now = new Date()): string[] {
   const primary = freshEvidenceSearchQuery(input, now)
   const raw = String(input || '').trim()
+  if (isPersonOrOfficeEvaluation(raw)) {
+    const topic = raw.replace(/[?!.]+$/g, '').trim()
+    return [...new Set([
+      primary,
+      `${topic} official unemployment rate by administration`,
+      `${topic} official CPI inflation by administration`,
+      `${topic} official real GDP growth by administration`,
+    ])]
+  }
   const role = new RegExp(OFFICE_HOLDER_ROLE_SOURCE, 'i').exec(raw)?.[0]
   const asksForHistory = /\b(?:former|past|previous|last)\b/i.test(raw)
   if (!role || !asksForHistory) return [primary]

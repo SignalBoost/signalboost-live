@@ -318,6 +318,31 @@ test('Builder removes a repeated inspection tool from the next model call', asyn
   assert.match(prompts[2] || '', /TOOLS: \["list_files","write_file","edit_file","run"\]/)
 })
 
+test('Builder blocks both inspection tools after an alternating repeated-inspection loop', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const prompts: string[] = []
+  const ai: BuilderAiPort = {
+    async generate(input) {
+      prompts.push(input.prompt)
+      return [
+        '{"type":"tool","toolId":"list_files","input":{}}',
+        '{"type":"tool","toolId":"read_file","input":{"path":"app.js"}}',
+        '{"type":"tool","toolId":"list_files","input":{}}',
+        '{"type":"tool","toolId":"read_file","input":{"path":"app.js"}}',
+        '{"type":"tool","toolId":"write_file","input":{"path":"hello.js","content":"console.log(1)"}}',
+        '{"type":"tool","toolId":"run","input":{"command":"node hello.js"}}',
+      ][prompts.length - 1] ?? null
+    },
+  }
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '1\\n', stderr: '', timedOut: false } } }
+
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Create hello.js and run it.', workspaceId: 'user:alternating-recovery', maxRounds: 4 })
+
+  assert.equal(result.ok, true)
+  assert.match(prompts[4] || '', /TOOLS: \["write_file","edit_file","run"\]/)
+  assert.match(prompts[4] || '', /list_files, read_file were rejected/)
+})
+
 
 test('Builder recovers a valid control object wrapped in ordinary model prose', async () => {
   const workspace = new InMemoryBuilderWorkspace()

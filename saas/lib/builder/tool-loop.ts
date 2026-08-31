@@ -282,6 +282,8 @@ export class BuilderToolLoop {
   async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
     const trace: BuilderToolTrace[] = []
     const inspectedInCurrentWorkspaceState = new Set<string>()
+    const completedMutations = new Set<string>()
+    const completedRunsInCurrentWorkspaceState = new Set<string>()
     const initialListing = await this.workspace.listFiles(input.workspaceId)
     const manifest = initialListing.find(file => file.path === 'package.json')
     const manifestFile = manifest ? await this.workspace.readFile(input.workspaceId, manifest.path) : null
@@ -299,6 +301,17 @@ export class BuilderToolLoop {
       attempt += 1
       const round = attempt
       const lastTrace = trace.at(-1)
+      // A model can alternate list_files and read_file to evade a last-tool-only
+      // restriction. Keep every repeated inspection unavailable until a write/edit
+      // changes the workspace and resets the inspection state.
+      const lastWorkspaceChange = Math.max(...trace.map((item, index) => (
+        item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file') ? index : -1
+      )))
+      const blockedInspectionTools = new Set(trace
+        .slice(lastWorkspaceChange + 1)
+        .filter(item => (item.toolId === 'list_files' || item.toolId === 'read_file')
+          && item.error?.startsWith('builder_repeated_tool_call:'))
+        .map(item => item.toolId))
       const blockedTool = lastTrace?.error?.startsWith('builder_repeated_tool_call:')
         ? lastTrace.toolId
         : null
@@ -307,7 +320,9 @@ export class BuilderToolLoop {
       const inspectedSource = repairNeedsChange
         ? [...trace].reverse().find(item => item.ok && item.toolId === 'read_file' && toolPath(item.input))
         : undefined
-      const availableTools = (blockedTool ? tools.filter(toolId => toolId !== blockedTool) : tools)
+      const availableTools = tools
+        .filter(toolId => toolId !== blockedTool)
+        .filter(toolId => !blockedInspectionTools.has(toolId))
         .filter(toolId => !inspectedSource || (toolId !== 'list_files' && toolId !== 'read_file'))
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -322,9 +337,11 @@ export class BuilderToolLoop {
           ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
           : 'Do not request read_file in this round; it is unavailable until the workspace changes.',
         'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
-        blockedTool
-          ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected against unchanged workspace state. It is not available this round. Select a different tool from TOOLS; do not request it again.`
-          : '',
+        blockedInspectionTools.size
+          ? `RECOVERY CONSTRAINT: ${[...blockedInspectionTools].join(', ')} ${blockedInspectionTools.size === 1 ? 'was' : 'were'} rejected against unchanged workspace state. ${blockedInspectionTools.size === 1 ? 'It is' : 'They are'} unavailable this round. Select a different tool from TOOLS; do not request ${blockedInspectionTools.size === 1 ? 'it' : 'them'} again.`
+          : blockedTool
+            ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected in the preceding round. It is unavailable this round. Select a different tool from TOOLS; do not request it again.`
+            : '',
         inspectedSource
           ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Do not list or read again until you make progress. ${projectContext.recommendedTestCommand ? `Run ${projectContext.recommendedTestCommand} to reproduce the defect, then edit the source and rerun it.` : 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.'}`
           : '',
@@ -436,8 +453,14 @@ export class BuilderToolLoop {
       if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
       const fingerprint = `${action.toolId}:${safeJson(action.input)}`
       const inspection = action.toolId === 'list_files' || action.toolId === 'read_file'
+      const mutation = action.toolId === 'write_file' || action.toolId === 'edit_file'
       // An alternating list/read loop observes unchanged workspace state without progress.
       if (inspection && inspectedInCurrentWorkspaceState.has(fingerprint)) {
+        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
+        continue
+      }
+      if ((mutation && completedMutations.has(fingerprint))
+        || (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint))) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
         continue
       }
@@ -465,8 +488,13 @@ export class BuilderToolLoop {
         if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
           writeCount += 1
           inspectedInCurrentWorkspaceState.clear()
+          completedMutations.add(fingerprint)
+          completedRunsInCurrentWorkspaceState.clear()
         }
-        if (action.toolId === 'run') runCount += 1
+        if (action.toolId === 'run') {
+          runCount += 1
+          completedRunsInCurrentWorkspaceState.add(fingerprint)
+        }
         trace.push({ round, toolId: action.toolId, input: action.input, ok: true, output })
         if (action.toolId === 'run' && repairObjective) {
           const modifiedExistingFile = trace.some(item => item.ok

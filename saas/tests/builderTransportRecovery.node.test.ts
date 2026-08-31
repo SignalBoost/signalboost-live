@@ -35,14 +35,19 @@ test('Builder persists terminal results before replying so History can recover a
   assert.match(builderRoute, /async function persistBuilderTurn/)
   assert.match(builderRoute, /assistantReply: builderHistoryReply/)
   assert.match(builderRoute, /Builder files:/)
-  assert.match(
-    builderRoute,
-    /await persistBuilderTurn\(\{ conversationId, userId: access\.userId, objective, reply: result\.answer, workspaceId, files \}\)\s*return NextResponse\.json/,
-  )
-  assert.match(
-    builderRoute,
-    /await persistBuilderTurn\(\{ conversationId, userId: access\.userId, objective, reply, workspaceId, files \}\)\s*return NextResponse\.json\(\{ error: result\.error/,
-  )
+
+  const successPersist = builderRoute.indexOf('await persistBuilderTurn({ conversationId, userId: access.userId, objective, reply: result.answer, workspaceId, files })')
+  const successReturn = builderRoute.indexOf('return NextResponse.json({ workspaceId, reply: result.answer, files, trace })', successPersist)
+  assert.ok(successPersist >= 0)
+  assert.ok(successReturn > successPersist)
+
+  const failureBranch = builderRoute.indexOf('if (result.ok === false)')
+  const failurePersist = builderRoute.indexOf('await persistBuilderTurn({ conversationId, userId: access.userId, objective, reply, workspaceId, files })', failureBranch)
+  const failureReturn = builderRoute.indexOf('return NextResponse.json(', failurePersist)
+  assert.ok(failureBranch >= 0)
+  assert.ok(failurePersist > failureBranch)
+  assert.ok(failureReturn > failurePersist)
+
   assert.match(assistantPage, /recoverCompletedTurn\(conversationId, content, sentAtMs\)/)
   assert.equal((assistantPage.match(/fetch\('\/api\/cos-primary'/g) ?? []).length, 1)
 })

@@ -96,12 +96,15 @@ export function freshEvidenceScopePlanSystemPrompt(language: string): string {
     'Do not write the user-facing answer and do not expose chain-of-thought. Return only concise scope-level conclusions.',
     'Use only facts present in LIVE EVIDENCE. Your model memory is not a source of current facts.',
     'Infer the proposition from QUESTION, not from search wording, source headlines, or retrieval order.',
-    'Determine how the evidence operationalizes the key predicate or quantity the user is asking about.',
-    'Treat materially different constructs, populations, denominators, time windows, comparison bases, controls, or outcome definitions as distinct scopes when combining them would change what a conclusion means.',
-    'Set directBinaryAnswerSafe=false whenever a bare yes/no would be misleading or materially overstate what the evidence supports, even if only one evidence scope is needed.',
-    'Set directBinaryAnswerSafe=true only when a direct yes/no is supported and can remain truthful once all material qualifications are stated.',
+    'Determine how each source operationalizes the key predicate or quantity the user is asking about.',
+    'Treat materially different constructs, populations, denominators, units, time windows, comparison bases, controls, outcome definitions, methods, or interpretive claims as distinct scopes when combining them would change what a conclusion means.',
+    'Never treat estimates as one numerical range, average, trend, or pooled finding unless their population, denominator, unit, time basis, and control structure are genuinely commensurable.',
+    'When credible sources materially diverge in method, definition, interpretation, or conclusion, preserve those divergent evidence-backed views as separate scopes. Do not choose a side for the user.',
+    'Do not manufacture false balance: a materially divergent view must have actual evidence in LIVE EVIDENCE, and stronger evidence may be described as stronger without telling the user what to believe.',
+    'Set directBinaryAnswerSafe=false whenever a bare yes/no would hide material divergence, be misleading, or materially overstate what the evidence supports, even if only one evidence scope is needed.',
+    'Set directBinaryAnswerSafe=true only when a direct yes/no is supported and can remain truthful once all material qualifications and genuine divergences are stated.',
     'Choose scope count separately from binary safety: return the smallest set of materially distinct scopes needed to preserve meaning. Scope count alone must never determine directBinaryAnswerSafe.',
-    'Each scope label must describe what is actually being measured or established. Each finding must state the evidence-supported conclusion for that scope, not an explanation of your reasoning process.',
+    'Each scope label must identify what is actually measured, compared, or argued. Each finding must state only the evidence-supported conclusion for that scope.',
     'Every scope must cite at least one real LIVE evidence id that supports its finding. Never invent an evidence id.',
     'Do not manufacture a second scope merely to be cautious. Split only when the evidence makes the distinction material to the answer.',
   ].join('\n')
@@ -112,7 +115,7 @@ export function freshEvidenceScopePlanPrompt(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSCOPE-PLANNING TASK:\nIdentify the smallest set of materially distinct evidence scopes required to answer the original QUESTION without changing the meaning of what the evidence establishes.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSCOPE-PLANNING TASK:\nIdentify the smallest set of materially distinct evidence scopes required to answer the original QUESTION without changing the meaning of what the evidence establishes. Preserve genuine methodological or interpretive divergence rather than forcing it into one conclusion.\n\nQUESTION: ${args.input}`
 }
 
 export function acceptFreshEvidenceSemanticPlan(args: {
@@ -150,15 +153,21 @@ export function freshEvidenceSynthesisSystemPrompt(language: string): string {
     'You are the ANSWER SYNTHESIS PASS for LIVE EVIDENCE. A prior neural scope planner has already identified the semantic scopes that the answer must preserve.',
     'Return ONLY strict JSON with this exact shape: {"answer":"...","evidenceIds":["LIVE1","LIVE2"],"scopeIds":["S1","S2"]}.',
     'Use ONLY facts present in LIVE EVIDENCE. Your own memory is assumed stale and must not contribute facts.',
-    'The SEMANTIC SCOPE PLAN is a prior model conclusion about how to keep the evidence meanings distinct; it is not additional factual evidence.',
-    'Answer the user’s proposition, not the retrieval set. Abstract across sources before writing.',
+    'The SEMANTIC SCOPE PLAN is a prior model conclusion about how to keep evidence meanings distinct; it is not additional factual evidence.',
+    'Be neutral. Describe what the strongest relevant sources measure, find, or argue; do not advocate a side or tell the user what to believe.',
+    'When credible sources materially diverge, present the strongest representative evidence-backed positions or measurements fairly and explain the methodological or definitional reason for the divergence when the evidence supports it.',
+    'Do not create false balance. If a view lacks credible support in LIVE EVIDENCE, do not invent it merely to appear neutral. You may describe evidence quality or source directness without choosing a belief for the user.',
+    'Answer the user’s proposition, not the retrieval set. Abstract across redundant sources before writing.',
     'Preserve the scope plan. Do not collapse materially distinct scopes into one stronger claim.',
-    'If directBinaryAnswerSafe=false, do not open with a standalone yes or no. State the scoped conclusions directly so the reader can see which meaning is supported and which stronger or different meaning is not established.',
-    'If directBinaryAnswerSafe=true, a direct yes/no is allowed when supported.',
+    'Never combine non-commensurable numbers into one range, average, trend, or summary statistic. Keep each number attached to its population, denominator, unit, time period, comparison basis, and control structure.',
+    'If two sources report different numbers because they measure different things, say so explicitly instead of presenting the numbers as disagreement about one identical quantity.',
+    'If directBinaryAnswerSafe=false, do not open with a standalone yes or no. State the scoped evidence so the reader can decide what conclusion to draw.',
+    'If directBinaryAnswerSafe=true, a direct yes/no is allowed only as a narrow factual orientation; it must not erase genuine methodological or interpretive divergence that follows.',
     'Use every scope id needed by the plan and cite evidence ids that actually support those scopes. Never invent a scope id or evidence id.',
     'Distinguish observation from explanation and causation; do not promote an aggregate, associative, modeled, or otherwise bounded result beyond the scope that the evidence supports.',
+    'Prefer direct or primary evidence for a scope when available, plus strong independent corroboration when useful. Do not cite a tertiary summary merely to add another source if stronger sources already support the same point.',
     'Prefer the minimum representative evidence needed for each scope. Do not enumerate parallel statistics or sources merely because they were retrieved.',
-    'Be concise and natural. For a single proposition, normally use one short paragraph unless the scoped distinctions are clearer as two compact sentences.',
+    'Be concise and natural. For genuine divergence, a compact evidence map is better than a verdict: source/view A, source/view B, why they differ, and what each does or does not establish.',
     'If the evidence cannot support the required scopes, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[],"scopeIds":[]}.',
   ].join('\n')
 }
@@ -169,7 +178,7 @@ export function freshEvidenceSynthesisPrompt(args: {
   retrievedAt: string
   semanticPlan: FreshEvidenceSemanticPlan
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (neural conclusion, not factual evidence):\n${JSON.stringify(args.semanticPlan)}\n\nANSWER TASK:\nWrite the smallest well-supported answer that preserves every material scope in the plan.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (neural conclusion, not factual evidence):\n${JSON.stringify(args.semanticPlan)}\n\nANSWER TASK:\nWrite the smallest neutral, well-supported evidence map that preserves every material scope and any genuine divergence in the plan. Keep non-commensurable measurements separate and let the user decide what to believe.\n\nQUESTION: ${args.input}`
 }
 
 /**
@@ -179,15 +188,20 @@ export function freshEvidenceSynthesisPrompt(args: {
 export function freshEvidenceFaithfulnessReviewSystemPrompt(language: string): string {
   return [
     `Evaluate the answer written in ${languageLabel(language)}.`,
-    'You are the SCOPE-FAITHFULNESS REVIEWER for a live-evidence answer.',
+    'You are the SCOPE-FAITHFULNESS AND NEUTRALITY REVIEWER for a live-evidence answer.',
     'Return ONLY strict JSON with this exact shape: {"faithful":true,"missingScopeIds":[],"collapsedScopeIds":[]}.',
     'Do not rewrite the answer and do not expose chain-of-thought.',
     'Use QUESTION, LIVE EVIDENCE, SEMANTIC SCOPE PLAN, and CANDIDATE ANSWER only.',
     'Mark faithful=false if a required scope is absent, materially weakened, or merged with another scope so that the answer implies a stronger or different proposition than the plan supports.',
+    'Mark faithful=false if the answer blends non-commensurable estimates into one range, average, trend, consensus statistic, or other synthetic number.',
+    'Mark faithful=false if a number is detached from a material difference in population, denominator, unit, time basis, comparison basis, controls, or outcome definition.',
+    'Mark faithful=false if genuine evidence-backed divergence is converted into advocacy, a winner/loser verdict, or a statement telling the user what to believe.',
+    'Mark faithful=false if the answer creates false balance by presenting an unsupported position as though it had evidence comparable to a supported one.',
+    'Mark faithful=false if a tertiary summary is used to characterize a scope while stronger direct evidence in LIVE EVIDENCE materially contradicts or supersedes that characterization.',
     'missingScopeIds contains required scopes whose conclusion is not represented in the answer.',
-    'collapsedScopeIds contains the scope ids involved when distinct scopes are blended into one conclusion or one is presented as if it proves the other.',
+    'collapsedScopeIds contains the scope ids involved when distinct scopes are blended, made numerically commensurable without basis, or one is presented as if it proves the other.',
     'If faithful=true, both arrays must be empty. If faithful=false, at least one array must contain a real scope id from the plan.',
-    'Do not invent scope ids and do not judge writing style, verbosity, or source count here.',
+    'Do not invent scope ids and do not judge verbosity or raw citation count here.',
   ].join('\n')
 }
 
@@ -198,7 +212,7 @@ export function freshEvidenceFaithfulnessReviewPrompt(args: {
   semanticPlan: FreshEvidenceSemanticPlan
   answer: string
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN:\n${JSON.stringify(args.semanticPlan)}\n\nCANDIDATE ANSWER:\n${String(args.answer || '').trim()}\n\nREVIEW TASK:\nCheck only whether the candidate faithfully preserves the material scope distinctions and bounded findings in the plan.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN:\n${JSON.stringify(args.semanticPlan)}\n\nCANDIDATE ANSWER:\n${String(args.answer || '').trim()}\n\nREVIEW TASK:\nCheck whether the candidate preserves every material scope, keeps incompatible measurements separate, represents genuine divergence neutrally, avoids false balance, and stays within what the cited evidence establishes.\n\nQUESTION: ${args.input}`
 }
 
 export function acceptFreshEvidenceFaithfulnessReview(args: {
@@ -239,7 +253,11 @@ export function freshEvidenceRevisionSystemPrompt(language: string): string {
     'Re-reason from QUESTION, LIVE EVIDENCE, and the existing SEMANTIC SCOPE PLAN. The prior DRAFT is not evidence.',
     'Preserve every required scope. Never change directBinaryAnswerSafe or collapse multiple scopes into one conclusion.',
     'If a SCOPE-FAITHFULNESS REVIEW is supplied, repair every listed missing or collapsed scope while keeping each conclusion within the plan.',
+    'Remain neutral when credible sources diverge: represent their evidence-backed positions or measurements and let the user decide what to believe.',
+    'Never create a range, average, trend, or pooled number from non-commensurable measurements. Restore the population, denominator, unit, time basis, comparison basis, and controls needed to keep unlike estimates separate.',
+    'Do not create false balance, and do not turn stronger evidence into advocacy. Describe relative evidence quality or source directness without choosing a belief for the user.',
     'If directBinaryAnswerSafe=false, do not open with a standalone yes or no.',
+    'Prefer direct/primary evidence and strong independent corroboration over redundant tertiary summaries.',
     'Use the minimum representative evidence needed to support the scopes. Remove redundant statistics, examples, and source-by-source narration.',
     'Do not add facts from model memory. Never invent an evidence id or scope id.',
     'If the evidence cannot support the required scopes, return {"answer":"EVIDENCE_INSUFFICIENT","evidenceIds":[],"scopeIds":[]}.',
@@ -257,7 +275,7 @@ export function freshEvidenceRevisionPrompt(args: {
   const reviewBlock = args.faithfulnessReview
     ? `\n\nSCOPE-FAITHFULNESS REVIEW (neural verdict, not factual evidence):\n${JSON.stringify(args.faithfulnessReview)}`
     : ''
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}${reviewBlock}\n\nDRAFT TO REPAIR/EDIT (not evidence):\n${String(args.draftAnswer || '').trim()}\n\nREPAIR TASK:\nRewrite concisely while preserving each required scope as a distinct bounded conclusion.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}${reviewBlock}\n\nDRAFT TO REPAIR/EDIT (not evidence):\n${String(args.draftAnswer || '').trim()}\n\nREPAIR TASK:\nRewrite neutrally and concisely while preserving each required scope as a distinct bounded conclusion. Keep incompatible measurements separate and preserve genuine evidence-backed divergence.\n\nQUESTION: ${args.input}`
 }
 
 function answerRespectsRequestedWindow(answer: string, input: string, now = new Date()): boolean {

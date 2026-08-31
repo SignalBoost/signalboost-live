@@ -55,6 +55,7 @@ function inlineVisualResponse(response: Response): Promise<NextResponse> {
     const previewUrl = `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${imagePath.split('/').map(encodeURIComponent).join('/')}?preview=1`
     return NextResponse.json({
       ...payload,
+      reply: `${payload.reply}\n\n${previewUrl}`,
       visual: {
         previewUrl,
         downloadUrl: previewUrl.replace('?preview=1', ''),

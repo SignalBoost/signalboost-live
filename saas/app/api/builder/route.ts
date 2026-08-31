@@ -7,6 +7,11 @@ import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob, getBuilderJobForUser } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
+import {
+  isBuilderObjectiveError,
+  readBuilderObjective,
+  type BuilderObjectiveFailureCode,
+} from '@/lib/builder/request-contract'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 
 export const runtime = 'nodejs'
@@ -16,12 +21,6 @@ export const maxDuration = 300
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_JOB_FILES = 20
 const DEBUG_OBJECTIVE = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
-
-function cleanObjective(value: unknown): string {
-  const objective = String(value || '').trim()
-  if (!objective || objective.length > 8_000) throw new Error('builder_invalid_objective')
-  return objective
-}
 
 function noStore(payload: unknown, init?: ResponseInit): NextResponse {
   const response = NextResponse.json(payload, init)
@@ -40,6 +39,13 @@ function cleanFiles(value: unknown): DebugFileInput[] {
 
 function runningReply(jobId: string): string {
   return `COS Builder is running job ${jobId}. Progress and the final result are durable in History; the action will not be replayed.`
+}
+
+function objectiveFailureReply(code: BuilderObjectiveFailureCode): string {
+  if (code === 'builder_objective_too_large') {
+    return 'The Builder instruction exceeds 64,000 characters. No workspace or job was created. Send the coding objective and source file without a copied History transcript.'
+  }
+  return 'COS Builder did not receive a usable coding instruction. No workspace or job was created. Send the objective again with the source file or concrete code reference.'
 }
 
 async function persistSynchronousReply(input: {
@@ -120,7 +126,7 @@ export async function POST(request: Request) {
   let objective = ''
   try {
     const body = await request.json()
-    objective = cleanObjective(body?.objective)
+    objective = readBuilderObjective(body).objective
     conversationId = String(body?.conversationId || '').trim() || crypto.randomUUID()
     if (!UUID.test(conversationId)) return noStore({ error: 'Invalid conversation id.' }, { status: 400 })
     const requestedWorkspaceId = String(body?.workspaceId || '').trim()
@@ -213,6 +219,24 @@ export async function POST(request: Request) {
       reply,
     }, { status: 202 })
   } catch (error) {
+    if (isBuilderObjectiveError(error)) {
+      console.warn('[builder_objective_rejected]', {
+        code: error.code,
+        source: error.source || 'none',
+        observedLength: error.observedLength,
+        maxLength: error.maxLength,
+      })
+      const reply = objectiveFailureReply(error.code)
+      return noStore({
+        error: error.code,
+        reply,
+        execution_allowed: false,
+        external_action_taken: false,
+        files: [],
+        trace: [],
+      }, { status: 400 })
+    }
+
     const message = error instanceof Error ? error.message : 'builder_request_failed'
     const status = /^builder_(invalid|file_limit|file_too_large|invalid_path|debug_attachment_required|objective_not_coding)/.test(message) ? 400 : 502
     const reply = `COS Builder stopped: ${message}`

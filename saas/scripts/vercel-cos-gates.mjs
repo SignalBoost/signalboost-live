@@ -16,6 +16,7 @@ const tests = [
   'tests/builderRequestDeadline.node.test.ts',
   'tests/builderTransportRecovery.node.test.ts',
   'tests/builderAsyncJobs.node.test.ts',
+  'tests/builderObjectiveContract.node.test.ts',
   'tests/builderDebugFileJob.node.test.ts',
   'tests/builderRoutingStrict.node.test.ts',
   'tests/assistantHistoryOrdering.node.test.ts',

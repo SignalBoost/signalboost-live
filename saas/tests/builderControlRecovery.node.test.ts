@@ -198,4 +198,5 @@ test('Builder bounds malformed-control recovery rather than looping indefinitely
   assert.equal(calls, 2)
   assert.equal(result.trace.length, 1)
   assert.equal(result.trace[0]?.error, 'builder_model_control_unusable')
+  assert.match(result.trace[0]?.remediation || '', /this model control response/i)
 })

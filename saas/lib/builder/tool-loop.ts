@@ -328,7 +328,7 @@ export class BuilderToolLoop {
           ok: false,
           error: 'builder_model_control_unusable',
           failureClass: 'unknown',
-          remediation: 'The Builder could not interpret the model control response after bounded recovery. Retry the task; no files or commands were executed.',
+          remediation: 'The Builder could not interpret this model control response after bounded recovery. No action was taken from the rejected response; see prior trace entries for completed work.',
         })
         return { ok: false, error: 'builder_model_control_unusable', trace }
       }

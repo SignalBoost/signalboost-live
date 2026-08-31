@@ -226,7 +226,7 @@ async function callOpenAiEdits(key: string, prompt: string, size: string, refere
 /**
  * Generates a synthetic scene from verified person references. Multi-person requests stay on the
  * native multi-reference endpoint; the OpenAI-compatible edit endpoint documents only a single
- * image input and therefore cannot safely preserve more than one named identity.
+ * image input and therefore cannot safely preserve more than one named identity. there is no text-only identity fallback.
  */
 export async function generateReferenceConditionedImage(input: {
   prompt: string

@@ -55,12 +55,13 @@ export async function suggestFollowups(args: {
   const prompt = clean(args.prompt)
   if (!prompt) return []
   const origin = clean(args.originPrompt) || prompt
-  const fallback = args.failedClosed ? repairFollowups(origin) : fallbackFollowups(origin)
-  if (args.failedClosed || !clean(args.reply)) return validateSuggestedFollowups([], origin, fallback)
+  const sourceCount = Array.isArray(args.sources) ? args.sources.length : 0
+  const fallback = args.failedClosed ? repairFollowups(origin) : fallbackFollowups(origin, sourceCount)
+  if (args.failedClosed || !clean(args.reply)) return validateSuggestedFollowups([], prompt, fallback)
   try {
     const generated = await boundedLocalJson(origin, clean(args.reply).slice(0, 4_000), sourceTitles(args.sources || []))
-    return validateSuggestedFollowups(generated, origin, fallback)
+    return validateSuggestedFollowups(generated, prompt, fallback)
   } catch {
-    return validateSuggestedFollowups([], origin, fallback)
+    return validateSuggestedFollowups([], prompt, fallback)
   }
 }

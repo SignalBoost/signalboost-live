@@ -4,6 +4,7 @@ import test from 'node:test'
 
 const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
 const repositoryRepair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+const repositorySession = readFileSync(new URL('../lib/builder/vercel-repository-repair-session.ts', import.meta.url), 'utf8')
 const assistantPage = readFileSync(new URL('../app/dashboard/assistant/page.tsx', import.meta.url), 'utf8')
 
 function numericConstant(source: string, name: string): number {
@@ -39,10 +40,24 @@ test('a Builder deadline is persisted and returned as HTTP 504 instead of losing
 test('repository repair reserves cleanup time and skips unverified diff collection on timeout', () => {
   const reserve = numericConstant(repositoryRepair, 'REPOSITORY_RESULT_RESERVE_MS')
   assert.ok(reserve >= 30_000)
+  assert.match(repositoryRepair, /VercelRepositoryRepairSession\.create\(target, \{ deadlineAtMs \}\)/)
   assert.match(repositoryRepair, /createGovernedBuilderAiPort\(createPlatformAiPort\(\), \{ deadlineAtMs: aiDeadlineAtMs \}\)/)
   const timeoutBoundary = repositoryRepair.indexOf("result.error === BUILDER_TURN_TIMEOUT_ERROR")
   const diffCollection = repositoryRepair.indexOf('const changes = await session.collectChanges()')
   assert.ok(timeoutBoundary >= 0)
   assert.ok(diffCollection > timeoutBoundary, 'timeout must return before repository diff collection')
   assert.match(repositoryRepair, /status: input\.error === BUILDER_TURN_TIMEOUT_ERROR \? 504 : 422/)
+})
+
+test('repository setup, commands, output reads, and cleanup share the absolute deadline', () => {
+  const stopTimeout = numericConstant(repositorySession, 'SANDBOX_STOP_TIMEOUT_MS')
+  assert.ok(stopTimeout > 0 && stopTimeout <= 10_000)
+  assert.match(repositorySession, /private readonly deadlineAtMs: number \| null/)
+  assert.match(repositorySession, /withinAbsoluteDeadline\(Sandbox\.create\(/)
+  assert.match(repositorySession, /timeout: sandboxLifetimeMs/)
+  assert.match(repositorySession, /withinAbsoluteDeadline\(sandbox\.update\(\{ networkPolicy: 'deny-all' \}\), deadlineAtMs\)/)
+  assert.match(repositorySession, /const commandTimeoutMs = this\.commandTimeout\(timeoutMs\)/)
+  assert.match(repositorySession, /withinAbsoluteDeadline\(commandOutput\(result, maximum\), this\.deadlineAtMs\)/)
+  assert.match(repositorySession, /if \(message === BUILDER_TURN_TIMEOUT_ERROR\) throw error/)
+  assert.match(repositorySession, /this\.sandbox\.stop\(\)/)
 })

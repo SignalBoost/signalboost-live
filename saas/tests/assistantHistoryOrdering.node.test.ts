@@ -4,7 +4,7 @@ import test from 'node:test'
 import { findRecoveredAssistantReply } from '../lib/ai/cos/assistantTransportRecovery.ts'
 
 const route = readFileSync(new URL('../app/api/assistant/chats/route.ts', import.meta.url), 'utf8')
-const migration = readFileSync(new URL('../supabase/migrations/20260831172000_builder_jobs_and_history_order.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../supabase/migrations/20260831174502_builder_jobs_and_history_order.sql', import.meta.url), 'utf8')
 const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
 
 test('History validates the conversation, reports database failures, and disables caching', () => {

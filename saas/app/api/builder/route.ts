@@ -14,6 +14,7 @@ export const maxDuration = 300
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_JOB_FILES = 20
+const DEBUG_OBJECTIVE = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
 
 function cleanObjective(value: unknown): string {
   const objective = String(value || '').trim()
@@ -142,6 +143,20 @@ export async function POST(request: Request) {
       })
     }
 
+    const files = cleanFiles(body?.files)
+    const debugPlan = planDebugFileJob(objective, files)
+    if (files.length > 0 && DEBUG_OBJECTIVE.test(objective) && !debugPlan) {
+      const reply = 'COS Builder debug jobs require exactly one supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachment no larger than 128 KiB. No code was run.'
+      await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
+      return noStore({
+        error: 'builder_debug_attachment_required',
+        reply,
+        execution_allowed: false,
+        files: [],
+        trace: [],
+      }, { status: 400 })
+    }
+
     const workspace = createSupabaseBuilderWorkspace(access.userId)
     if (!workspace) {
       const reply = 'COS Builder storage is unavailable. No code was run.'
@@ -149,12 +164,10 @@ export async function POST(request: Request) {
       return noStore({ error: 'Builder storage is unavailable.', reply }, { status: 503 })
     }
 
-    const files = cleanFiles(body?.files)
     await workspace.ensureWorkspace(workspaceId)
     await workspace.setObjective(workspaceId, objective)
     for (const file of files) await workspace.writeFile(workspaceId, file.path, file.content)
 
-    const debugPlan = planDebugFileJob(objective, files)
     const jobId = crypto.randomUUID()
     const reply = runningReply(jobId)
     await enqueueBuilderJob({
@@ -187,7 +200,7 @@ export async function POST(request: Request) {
     }, { status: 202 })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'builder_request_failed'
-    const status = /^builder_(invalid|file_limit|file_too_large|invalid_path)/.test(message) ? 400 : 502
+    const status = /^builder_(invalid|file_limit|file_too_large|invalid_path|debug_attachment_required)/.test(message) ? 400 : 502
     const reply = `COS Builder stopped: ${message}`
     await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
     return noStore({ error: message, reply }, { status })

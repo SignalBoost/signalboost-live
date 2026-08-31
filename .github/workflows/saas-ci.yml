@@ -204,6 +204,19 @@ jobs:
       - name: Verify held-out benchmark scoring and provenance gates
         run: npx --yes tsx --test tests/cosCapabilityBenchmark.node.test.ts tests/cognitiveHeldOutCertification.node.test.ts
 
+  concierge-visual-integrity:
+    name: Concierge verified visual references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify named marks use authoritative assets and never generative reconstruction
+        run: npx --yes tsx --test tests/conciergeVisuals.node.test.ts
+
   build:
     name: Production build (next build)
     runs-on: ubuntu-latest

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { referenceDiagnosticAgentCard, referenceDiagnosticEndpoint, resolveReferenceA2AOrigin } from '../a2a-host/reference-a2a-config.ts'
 import {
@@ -51,4 +52,20 @@ test('reference Agent Card contains A2A 0.3 required implementation version and 
   assert.deepEqual(card.capabilities, { streaming: false, pushNotifications: false })
   assert.equal(card.url, 'https://trusted.example.vercel.app/api/a2a/reference-diagnostic')
   assert.equal(card.skills[0]?.id, REFERENCE_DIAGNOSTIC_SKILL_ID)
+})
+
+test('reference acceptance route is owner-only POST and cannot derive authority from request Host', () => {
+  const route = readFileSync(new URL('../app/api/a2a/reference-acceptance/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /export async function POST\(\)/)
+  assert.doesNotMatch(route, /export async function GET/)
+  assert.match(route, /requireOwner\(\)/)
+  assert.match(route, /referenceDiagnosticEndpoint\(\)/)
+  assert.doesNotMatch(route, /request\.nextUrl\.origin|x-forwarded-host|headers\.get\(['"]host/i)
+  assert.match(route, /card\.url !== endpoint/)
+})
+
+test('reference diagnostic task always gets a server-owned context when the caller does not supply one', () => {
+  const route = readFileSync(new URL('../app/api/a2a/reference-diagnostic/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /message\.contextId[^\n]+reference-context-/)
+  assert.match(route, /randomUUID\(\)/)
 })

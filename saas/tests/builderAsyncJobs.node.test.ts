@@ -6,7 +6,7 @@ const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.ur
 const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
 const jobStore = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
 const jobRunner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
-const migration = readFileSync(new URL('../supabase/migrations/20260831172000_builder_jobs_and_history_order.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../supabase/migrations/20260831174502_builder_jobs_and_history_order.sql', import.meta.url), 'utf8')
 
 test('POST creates a durable job, schedules work after the response, and returns 202', () => {
   assert.match(route, /import \{ after, NextResponse \} from 'next\/server'/)

@@ -52,15 +52,31 @@ const REFERENCE_TRANSFORM_ACTION_TOKENS = new Set([
 
 const EDIT_SUBJECT_TOKENS = new Set([
   // English
-  'image', 'photo', 'picture', 'photograph', 'portrait', 'logo', 'badge', 'crest', 'background', 'foreground', 'face', 'faces',
+  'image', 'photo', 'picture', 'photograph', 'portrait', 'logo', 'badge', 'crest', 'background', 'foreground', 'face', 'faces', 'visual',
   // Portuguese
-  'imagem', 'foto', 'fotografia', 'retrato', 'logotipo', 'logo', 'distintivo', 'brasao', 'fundo', 'rosto', 'rostos',
+  'imagem', 'foto', 'fotografia', 'retrato', 'logotipo', 'logo', 'distintivo', 'brasao', 'fundo', 'rosto', 'rostos', 'visual',
   // Spanish
-  'imagen', 'foto', 'fotografia', 'retrato', 'logotipo', 'logo', 'insignia', 'escudo', 'fondo', 'rostro', 'rostros',
+  'imagen', 'foto', 'fotografia', 'retrato', 'logotipo', 'logo', 'insignia', 'escudo', 'fondo', 'rostro', 'rostros', 'visual',
   // Polish
-  'obraz', 'zdjecie', 'fotografia', 'portret', 'logo', 'odznaka', 'herb', 'tlo', 'twarz', 'twarze',
+  'obraz', 'zdjecie', 'fotografia', 'portret', 'logo', 'odznaka', 'herb', 'tlo', 'twarz', 'twarze', 'wizualizacja',
   // Russian
-  'изображение', 'картинка', 'фото', 'фотография', 'портрет', 'логотип', 'эмблема', 'герб', 'фон', 'лицо', 'лица',
+  'изображение', 'картинка', 'фото', 'фотография', 'портрет', 'логотип', 'эмблема', 'герб', 'фон', 'лицо', 'лица', 'визуализация',
+])
+
+const MAINTENANCE_ACTION_TOKENS = new Set([
+  'fix', 'debug', 'test', 'repair', 'update', 'modify', 'change', 'implement', 'refactor', 'patch',
+  'corrija', 'corrigir', 'depure', 'depurar', 'teste', 'testar', 'atualize', 'atualizar', 'modifique', 'modificar', 'implemente', 'implementar', 'refatore', 'refatorar',
+  'corrige', 'corregir', 'depura', 'depurar', 'prueba', 'probar', 'actualiza', 'actualizar', 'modifica', 'modificar', 'implementa', 'implementar', 'refactoriza', 'refactorizar',
+  'napraw', 'debuguj', 'testuj', 'zaktualizuj', 'zmien', 'zaimplementuj', 'refaktoryzuj',
+  'исправь', 'исправьте', 'отладь', 'отладьте', 'протестируй', 'протестируйте', 'обнови', 'обновите', 'измени', 'измените', 'реализуй', 'реализуйте',
+])
+
+const TECHNICAL_CONTEXT_TOKENS = new Set([
+  'bug', 'code', 'pipeline', 'generation', 'generator', 'api', 'route', 'endpoint', 'test', 'tests', 'error', 'upload', 'renderer', 'rendering', 'timeout', 'model', 'component', 'implementation', 'repo', 'repository',
+  'erro', 'codigo', 'pipeline', 'geracao', 'gerador', 'api', 'rota', 'endpoint', 'teste', 'testes', 'upload', 'renderizador', 'timeout', 'modelo', 'componente', 'implementacao', 'repositorio',
+  'error', 'codigo', 'pipeline', 'generacion', 'generador', 'api', 'ruta', 'endpoint', 'prueba', 'pruebas', 'carga', 'renderizador', 'timeout', 'modelo', 'componente', 'implementacion', 'repositorio',
+  'blad', 'kod', 'potok', 'generowanie', 'generator', 'api', 'trasa', 'endpoint', 'test', 'testy', 'upload', 'renderer', 'limit', 'model', 'komponent', 'implementacja', 'repozytorium',
+  'ошибка', 'код', 'конвейер', 'генерация', 'генератор', 'api', 'маршрут', 'эндпоинт', 'тест', 'тесты', 'загрузка', 'рендерер', 'таймаут', 'модель', 'компонент', 'реализация', 'репозиторий',
 ])
 
 const DEICTIC_REFERENCE_PATTERNS = [
@@ -69,6 +85,15 @@ const DEICTIC_REFERENCE_PATTERNS = [
   /\b(?:esta|esa|mi|la imagen adjunta|la foto adjunta)\s+(?:imagen|foto|fotografia|retrato|logo)?\b/i,
   /\b(?:to|zalaczone|moje)\s+(?:zdjecie|obraz|fotografie|portret|logo)\b/i,
   /(?:это|эту|прикрепленное|мо[её])\s+(?:изображение|картинку|фото|фотографию|портрет|логотип)/i,
+]
+
+const LATIN_VISUAL_DISCUSSION_PATTERNS = [
+  /\bhow\s+(?:do|can|should|would)\s+(?:i|we|someone)\s+(?:draw|create|make|generate|edit|modify|design|render)\b/i,
+  /\bhow\s+to\s+(?:draw|create|make|generate|edit|modify|design|render)\b/i,
+  /\b(?:explain|teach|show)\s+(?:me\s+)?how\s+to\s+(?:draw|create|make|generate|edit|modify|design|render)\b/i,
+  /\bcomo\s+(?:eu\s+)?(?:desenhar|criar|fazer|gerar|editar|modificar|projetar|renderizar)\b/i,
+  /\bcomo\s+(?:dibujar|crear|hacer|generar|editar|modificar|disenar|renderizar)\b/i,
+  /\bjak\s+(?:narysowac|stworzyc|zrobic|wygenerowac|edytowac|zmodyfikowac|zaprojektowac|renderowac)\b/i,
 ]
 
 function foldLatinDiacritics(value: string): string {
@@ -102,6 +127,20 @@ function hasDeicticReference(objective: string): boolean {
   return DEICTIC_REFERENCE_PATTERNS.some((pattern) => pattern.test(String(objective || '')))
 }
 
+function isVisualInstructionDiscussion(objective: string): boolean {
+  const folded = foldLatinDiacritics(String(objective || '').toLowerCase())
+  return LATIN_VISUAL_DISCUSSION_PATTERNS.some((pattern) => pattern.test(folded))
+    || /как\s+(?:нарисовать|создать|сгенерировать|редактировать|изменить|спроектировать|отрендерить)/i.test(objective)
+}
+
+function isTechnicalVisualMaintenance(objective: string): boolean {
+  if (hasDeicticReference(objective)) return false
+  const tokens = normalizedTokens(objective)
+  return tokens.some((token) => MAINTENANCE_ACTION_TOKENS.has(token))
+    && tokens.some((token) => EDIT_SUBJECT_TOKENS.has(token))
+    && tokens.some((token) => TECHNICAL_CONTEXT_TOKENS.has(token))
+}
+
 export function isUserReferenceEditObjective(objective: string): boolean {
   const tokens = normalizedTokens(objective)
   const deicticReference = hasDeicticReference(objective)
@@ -123,6 +162,11 @@ export function classifyVisualRequest(input: {
 }): VisualRequestClassification | null {
   const objective = String(input.objective || '').trim()
   const hasUserReferenceImage = input.hasUserReferenceImage === true
+
+  // Tutorials, explanatory questions, and engineering maintenance stay in ordinary COS reasoning.
+  // This prevents keyword-only routing such as “how do I draw a logo?” or “fix image generation bug”.
+  if (isVisualInstructionDiscussion(objective) || isTechnicalVisualMaintenance(objective)) return null
+
   const intent = detectConciergeVisualIntent(objective)
   const referencePeople = Object.freeze(extractNamedPeople(objective))
 

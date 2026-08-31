@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
+import { POST as visualPost } from '@/app/api/visuals/route'
 import { getAccess } from '@/lib/auth/access'
 import { getCOSA2ARuntimeHost } from '@/a2a-host/cos-runtime-host'
 import { planCOSSpecialistFromText } from '@/a2a-host/cos-specialist-planner'
 import { selectCOSA2AHostForPlan } from '@/a2a-host/reference-cos-runtime-host'
+import { classifyVisualRequest } from '@/lib/visuals/requestClassifier'
+import { hasUserReferenceImage } from '@/lib/visuals/userReference'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 function text(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -41,14 +45,51 @@ function exactScope(body: any): { tenantId: string; environmentId: string; porta
   return { tenantId, environmentId, portableId }
 }
 
+function inlineVisualResponse(response: Response): Promise<NextResponse> {
+  return response.clone().json().then((payload: any) => {
+    const workspaceId = typeof payload?.workspaceId === 'string' ? payload.workspaceId : ''
+    const imagePath = Array.isArray(payload?.files)
+      ? payload.files.find((path: unknown): path is string => typeof path === 'string' && /\.(?:png|jpe?g|webp)$/i.test(path))
+      : ''
+    if (!workspaceId || !imagePath || typeof payload?.reply !== 'string') return NextResponse.json(payload, { status: response.status })
+    const previewUrl = `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${imagePath.split('/').map(encodeURIComponent).join('/')}?preview=1`
+    return NextResponse.json({
+      ...payload,
+      visual: {
+        previewUrl,
+        downloadUrl: previewUrl.replace('?preview=1', ''),
+        alt: typeof payload?.generated_visual_label === 'string' ? payload.generated_visual_label : 'Generated visual',
+      },
+    }, { status: response.status })
+  }).catch(() => new NextResponse(response.body, { status: response.status, headers: response.headers }))
+}
+
 /**
  * COS specialist runtime bridge.
  * Buyer-installed hosts take precedence. When none is installed, privileged exact-scope COS
  * may use the real SignalBoost reference host for canonical advisory self-healing diagnosis only.
+ * Visual generation is an authenticated first-party tool and is routed before specialist planning.
  */
 export async function POST(req: NextRequest) {
   const body: any = await req.clone().json().catch(() => ({}))
   const prompt = latestUserPrompt(body)
+
+  const visualClassification = classifyVisualRequest({
+    objective: prompt,
+    hasUserReferenceImage: hasUserReferenceImage(body),
+  })
+  if (visualClassification) {
+    const headers = new Headers(req.headers)
+    headers.set('content-type', 'application/json')
+    headers.delete('content-length')
+    const visualRequest = new NextRequest(new URL('/api/visuals', req.url), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...body, objective: prompt }),
+    })
+    return inlineVisualResponse(await visualPost(visualRequest))
+  }
+
   const supplied = body?.context?.specialistPlan
   const hasSuppliedPlan = Boolean(supplied && typeof supplied === 'object' && !Array.isArray(supplied))
   const inferred = hasSuppliedPlan ? null : planCOSSpecialistFromText(prompt)

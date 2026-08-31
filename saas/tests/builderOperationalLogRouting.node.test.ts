@@ -27,3 +27,13 @@ test('logs never invoke repository repair, sandbox execution, or an asynchronous
   assert.ok(enqueue > fallbackReturn)
   assert.match(route, /await persistSynchronousReply\(\{ conversationId, userId: access\.userId, objective, reply \}\)/)
 })
+
+test('a log plus one attached source file may enter only the fixed debug protocol', () => {
+  const files = route.indexOf('const files = cleanFiles(body?.files)')
+  const plan = route.indexOf('const debugPlan = planDebugFileJob(objective, files)', files)
+  const logGuard = route.indexOf('isPastedOperationalLog(objective) && !debugPlan', plan)
+  assert.ok(files >= 0)
+  assert.ok(plan > files)
+  assert.ok(logGuard > plan)
+  assert.match(route, /if \(!debugPlan && !isConciergeBuilderObjective\(objective, routingContext\)\)/)
+})

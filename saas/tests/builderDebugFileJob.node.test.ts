@@ -78,7 +78,7 @@ test('debug job runs one file, applies one edit, reruns the same command, and st
   assert.equal((await workspace.readFile(workspaceId, 'broken.js'))?.content, "console.log('fixed')\n")
 })
 
-test('debug planning requires exactly one small supported source file and rejects logs', () => {
+test('debug planning requires an explicit action and exactly one small supported source file', () => {
   assert.equal(planDebugFileJob('Debug this.', []), null)
   assert.equal(planDebugFileJob('Debug this.', [
     { path: 'one.js', content: 'x' },

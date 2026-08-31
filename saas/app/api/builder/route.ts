@@ -43,7 +43,7 @@ function runningReply(jobId: string): string {
 
 function objectiveFailureReply(code: BuilderObjectiveFailureCode): string {
   if (code === 'builder_objective_too_large') {
-    return 'The Builder instruction exceeds 64,000 characters. No workspace or job was created. Send the coding objective and source file without a copied History transcript.'
+    return 'The Builder request exceeds the 512,000-character intake safety limit. No workspace or job was created. Attach the source file and send the relevant objective and diagnostic evidence.'
   }
   return 'COS Builder did not receive a usable coding instruction. No workspace or job was created. Send the objective again with the source file or concrete code reference.'
 }
@@ -135,9 +135,13 @@ export async function POST(request: Request) {
     }
     const workspaceId = requestedWorkspaceId || crypto.randomUUID()
 
-    // Build/runtime logs are evidence to analyze, never permission to clone, edit, or execute a
-    // repository. This is the same deterministic gate used by Concierge.
-    if (isPastedOperationalLog(objective)) {
+    const files = cleanFiles(body?.files)
+    const debugPlan = planDebugFileJob(objective, files)
+
+    // Logs alone remain analysis-only. When the user also supplies exactly one supported source
+    // file and explicitly asks for a repair, that file grants only the fixed one-file debug
+    // protocol; pasted text never grants repository or broader sandbox authority.
+    if (isPastedOperationalLog(objective) && !debugPlan) {
       const reply = operationalLogReply(objective)
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({
@@ -150,8 +154,6 @@ export async function POST(request: Request) {
       })
     }
 
-    const files = cleanFiles(body?.files)
-    const debugPlan = planDebugFileJob(objective, files)
     if (files.length > 0 && DEBUG_OBJECTIVE.test(objective) && !debugPlan) {
       const reply = 'COS Builder debug jobs require exactly one supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachment no larger than 128 KiB. No code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
@@ -165,7 +167,7 @@ export async function POST(request: Request) {
     }
 
     const routingContext = { attachmentNames: files.map(file => file.path) }
-    if (!isConciergeBuilderObjective(objective, routingContext)) {
+    if (!debugPlan && !isConciergeBuilderObjective(objective, routingContext)) {
       const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({

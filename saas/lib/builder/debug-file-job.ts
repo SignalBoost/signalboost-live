@@ -1,4 +1,3 @@
-import { isPastedOperationalLog } from '../ai/cos/pastedOperationalLog.ts'
 import { normalizeBuilderControlOutput } from './control-adapter.ts'
 import type {
   BuilderAiPort,
@@ -46,10 +45,12 @@ function debugCommand(path: string): DebugFilePlan | null {
 /**
  * Debug jobs require an explicit repair action and exactly one small executable source attachment.
  * A log dump, History transcript, or the word “debug” by itself can never create a Builder job.
+ * An explicit repair request plus one supported source attachment may include logs as evidence:
+ * the attachment, not the pasted text, supplies the bounded edit/run authority.
  */
 export function planDebugFileJob(objective: string, files: readonly DebugFileInput[]): DebugFilePlan | null {
   const prompt = String(objective || '').trim()
-  if (!prompt || !DEBUG_ACTION.test(prompt) || isPastedOperationalLog(prompt)) return null
+  if (!prompt || !DEBUG_ACTION.test(prompt)) return null
   if (!Array.isArray(files) || files.length !== 1) return null
   const file = files[0]
   const path = String(file?.path || '').trim().replace(/\\/g, '/')

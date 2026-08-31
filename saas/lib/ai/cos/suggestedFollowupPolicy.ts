@@ -44,13 +44,26 @@ function entityFromPrompt(prompt: string): string {
 
 const MEASUREMENT_PROMPT = /\b(?:pay|wage|wages|earnings?|gap|difference|median|rate|ratio|percent|percentage|unemployment|inflation|cpi|gdp|price|how much|how many)\b/i
 const PERSON_OR_ROLE_PROMPT = /\b(?:who is|who was|president|ceo|prime minister|minister|director|holder)\b/i
+const STOPWORDS = new Set(['what','which','who','whom','whose','when','where','why','how','does','do','did','is','are','was','were','the','a','an','and','or','to','of','for','on','in','with','from','about','specific','factors','contribute','between','should','could','would','can'])
+
+function topicTerms(prompt: string): string[] {
+  const matches: string[] = normalized(prompt).match(/[\p{L}\p{N}][\p{L}\p{N}'’.-]{2,}/gu) || []
+  return [...new Set(matches.filter(term => !STOPWORDS.has(term)))].slice(0, 16)
+}
+
+function onTopic(candidate: string, prompt: string): boolean {
+  const terms = topicTerms(prompt)
+  if (!terms.length) return true
+  const text = normalized(candidate)
+  return terms.some(term => text.includes(term))
+}
 
 export function fallbackFollowups(prompt: string, sourceCount = 0): string[] {
   const entity = entityFromPrompt(prompt)
   if (MEASUREMENT_PROMPT.test(prompt)) {
     return [
       `What does the comparison used for ${entity} actually measure?`,
-      `What does that comparison leave uncontrolled or unmeasured?`,
+      `What does that ${entity} comparison leave uncontrolled or unmeasured?`,
     ]
   }
   if (sourceCount < 1) {
@@ -82,7 +95,11 @@ export function repairFollowups(originPrompt: string): string[] {
 
 function valid(candidate: unknown, prompt: string): candidate is string {
   const question = clean(candidate)
-  return question.length >= MIN_LENGTH && question.length <= MAX_LENGTH && question.endsWith('?') && normalized(question) !== normalized(prompt)
+  return question.length >= MIN_LENGTH
+    && question.length <= MAX_LENGTH
+    && question.endsWith('?')
+    && normalized(question) !== normalized(prompt)
+    && onTopic(question, prompt)
 }
 
 export function validateSuggestedFollowups(value: unknown, prompt: string, fallback: string[]): string[] {

@@ -50,6 +50,7 @@ const STOPWORDS = new Set([
   'what','which','who','whom','whose','when','where','why','how','does','do','did','is','are','was','were',
   'the','a','an','and','or','to','of','for','on','in','with','from','about','specific','factors','contribute',
   'between','should','could','would','can','does','that','this','those','these','current','published','answer',
+  'difference','controlled','uncontrolled',
 ])
 
 function clean(value: unknown): string {
@@ -69,7 +70,7 @@ export function cascadeTopicAffinity(rootQuestion: string, candidateQuestion: st
   const rootTerms = terms(rootQuestion)
   const candidateTerms = terms(candidateQuestion)
   const shared = rootTerms.filter(term => candidateTerms.includes(term))
-  const score = rootTerms.length === 0 ? 1 : Math.min(1, shared.length / Math.max(1, Math.min(3, rootTerms.length)))
+  const score = rootTerms.length === 0 ? 1 : Math.min(1, shared.length / Math.max(1, Math.min(2, rootTerms.length)))
   return {
     score,
     threshold: AFFINITY_THRESHOLD,

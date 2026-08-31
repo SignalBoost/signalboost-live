@@ -79,6 +79,15 @@ test('the browser sends Builder POST once and polls read-only status', () => {
   assert.doesNotMatch(boundary, /retry.*POST/i)
 })
 
+test('deliberate Stop aborts page polling but does not cancel or replay the durable job', () => {
+  assert.match(boundary, /function deliberateAbort\(error: unknown, signal\?: AbortSignal\)/)
+  assert.match(boundary, /signal\?\.aborted === true/)
+  assert.match(boundary, /pollBuilderJob\(fetchImpl, jobId, signal\)/)
+  assert.match(boundary, /signal,\n\s*\}\)/)
+  assert.match(boundary, /if \(deliberateAbort\(error, signal\)\) throw error/)
+  assert.match(boundary, /new DOMException\('The operation was aborted\.', 'AbortError'\)/)
+})
+
 test('running and terminal History share one durable assistant message', () => {
   assert.match(migration, /create table if not exists public\.builder_jobs/)
   assert.match(migration, /history_message_id uuid references public\.assistant_messages/)

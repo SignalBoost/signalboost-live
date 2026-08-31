@@ -27,14 +27,15 @@ async function boundedLocalJson(prompt: string, reply: string, titles: string[])
     callLocalModel({
       systemPrompt: [
         'Return ONLY strict JSON: {"followups":["question one?","question two?"]}.',
-        'Produce exactly two questions. Use only the user question, answer, and source titles supplied.',
-        'Each question must be answerable from those strings on the next turn.',
+        'Produce exactly two questions. Use only the original user question, answer, and source titles.',
+        'Each question must stay on that original topic and be answerable from those strings.',
         'Ask what a cited measure includes, or what it does not include.',
         'Do not ask for causes, motives, discrimination, or legal conclusions the text did not state.',
+        'Do not ask what LIVE2 or another citation id defines unless that title is in SOURCE TITLES.',
         'Do not introduce a person, event, date, number, or claim absent from those strings.',
         'Questions only; do not answer them or assert facts.',
       ].join(' '),
-      prompt: `USER QUESTION:\n${prompt}\n\nANSWER:\n${reply}\n\nSOURCE TITLES:\n${titles.join('\n') || '(none)'}`,
+      prompt: `ORIGINAL USER QUESTION:\n${prompt}\n\nANSWER:\n${reply}\n\nSOURCE TITLES:\n${titles.join('\n') || '(none)'}`,
       maxTokens: 120,
       temperature: 0,
     }, { ...localInferenceConfigFromEnv(), timeoutMs: LOCAL_TIMEOUT_MS }),
@@ -49,15 +50,17 @@ export async function suggestFollowups(args: {
   reply: string
   sources?: FollowupSource[]
   failedClosed?: boolean
+  originPrompt?: string
 }): Promise<string[]> {
   const prompt = clean(args.prompt)
   if (!prompt) return []
-  const fallback = args.failedClosed ? repairFollowups(prompt) : fallbackFollowups(prompt)
-  if (args.failedClosed || !clean(args.reply)) return validateSuggestedFollowups([], prompt, fallback)
+  const origin = clean(args.originPrompt) || prompt
+  const fallback = args.failedClosed ? repairFollowups(origin) : fallbackFollowups(origin)
+  if (args.failedClosed || !clean(args.reply)) return validateSuggestedFollowups([], origin, fallback)
   try {
-    const generated = await boundedLocalJson(prompt, clean(args.reply).slice(0, 4_000), sourceTitles(args.sources || []))
-    return validateSuggestedFollowups(generated, prompt, fallback)
+    const generated = await boundedLocalJson(origin, clean(args.reply).slice(0, 4_000), sourceTitles(args.sources || []))
+    return validateSuggestedFollowups(generated, origin, fallback)
   } catch {
-    return validateSuggestedFollowups([], prompt, fallback)
+    return validateSuggestedFollowups([], origin, fallback)
   }
 }

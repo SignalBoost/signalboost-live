@@ -49,6 +49,11 @@ const VISUAL_SUBJECT_TOKENS = new Set([
   'инфографику', 'талисман', 'маскот', 'портрет', 'фото',
 ])
 
+const TYPO_CORRECTABLE_VISUAL_TOKENS = new Set([
+  ...VISUAL_ACTION_TOKENS,
+  ...VISUAL_SUBJECT_TOKENS,
+])
+
 const VISUAL_SUBJECT_PHRASES = ['coat of arms']
 
 const ORIGINAL_MARK_TOKENS = new Set([
@@ -163,6 +168,58 @@ function wordTokens(prompt: string): WordToken[] {
 
 function normalizedTokens(prompt: string): string[] {
   return wordTokens(prompt).map((token) => token.folded)
+}
+
+function isSingleEditOrAdjacentTranspose(value: string, target: string): boolean {
+  if (value === target) return true
+  const source = Array.from(value)
+  const expected = Array.from(target)
+  if (source.length < 4 || expected.length < 4 || Math.abs(source.length - expected.length) > 1) return false
+
+  if (source.length === expected.length) {
+    const mismatches: number[] = []
+    for (let index = 0; index < source.length; index += 1) {
+      if (source[index] !== expected[index]) mismatches.push(index)
+      if (mismatches.length > 2) return false
+    }
+    if (mismatches.length === 1) return true
+    if (mismatches.length !== 2 || mismatches[1] !== mismatches[0] + 1) return false
+    const [first, second] = mismatches
+    return source[first] === expected[second] && source[second] === expected[first]
+  }
+
+  const longer = source.length > expected.length ? source : expected
+  const shorter = source.length > expected.length ? expected : source
+  let longIndex = 0
+  let shortIndex = 0
+  let skipped = false
+
+  while (longIndex < longer.length && shortIndex < shorter.length) {
+    if (longer[longIndex] === shorter[shortIndex]) {
+      longIndex += 1
+      shortIndex += 1
+      continue
+    }
+    if (skipped) return false
+    skipped = true
+    longIndex += 1
+  }
+  return true
+}
+
+function canonicalVisualToken(token: string): string {
+  if (TYPO_CORRECTABLE_VISUAL_TOKENS.has(token) || Array.from(token).length < 4) return token
+  let match = ''
+  for (const target of TYPO_CORRECTABLE_VISUAL_TOKENS) {
+    if (!isSingleEditOrAdjacentTranspose(token, target)) continue
+    if (match && match !== target) return token
+    match = target
+  }
+  return match || token
+}
+
+function normalizedVisualTokens(prompt: string): string[] {
+  return normalizedTokens(prompt).map(canonicalVisualToken)
 }
 
 function isOriginalMarkRequest(tokens: string[]): boolean {
@@ -310,9 +367,13 @@ function filenameForPeople(people: readonly string[]): string {
   return slug ? `${slug}-illustration.png` : 'people-illustration.png'
 }
 
-/** Explicit requests for a new visual, never ordinary questions about a visual subject. */
+/**
+ * Explicit requests for a new visual, never ordinary questions about a visual subject. Core action
+ * and subject words tolerate one insertion, deletion, substitution, or adjacent transposition so a
+ * typo such as "imaage" cannot silently send an image request to the text-only reasoning path.
+ */
 export function isConciergeVisualObjective(prompt: string): boolean {
-  const tokens = normalizedTokens(prompt)
+  const tokens = normalizedVisualTokens(prompt)
   if (!tokens.length || !tokens.some((token) => VISUAL_ACTION_TOKENS.has(token))) return false
   if (tokens.some((token) => VISUAL_SUBJECT_TOKENS.has(token))) return true
 
@@ -323,7 +384,7 @@ export function isConciergeVisualObjective(prompt: string): boolean {
 export function detectConciergeVisualIntent(prompt: string): ConciergeVisualIntent | null {
   if (!isConciergeVisualObjective(prompt)) return null
 
-  const tokens = normalizedTokens(prompt)
+  const tokens = normalizedVisualTokens(prompt)
   const asksForMark = tokens.some((token) => REFERENCE_MARK_TOKENS.has(token))
     || VISUAL_SUBJECT_PHRASES.some((phrase) => ` ${tokens.join(' ')} `.includes(` ${phrase} `))
   const query = asksForMark ? referenceQuery(tokens) : ''

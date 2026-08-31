@@ -48,7 +48,7 @@ const DESIGN_REQUEST_SIGNAL = /(?:^(?:please\s+)?(?:design|build|create|make)\b|
 const CODE_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct|implement|refactor|compile|write|run|execute|test)\b|\b(?:create|build|make)\s+(?:a\s+|an\s+|the\s+)?(?:file|script|function|class|component|api|endpoint|test|app|program|module)\b/i
 const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:not\s+working|does(?:\s+not|n't)\s+work|broken|failing|throws?|crashes?)\b/i
 const CODE_LANGUAGE = /\b(?:javascript|typescript|node(?:\.js)?|python|react|next(?:\.js)?|html|css|sql|bash|shell|java|c\+\+|c#|golang|go|rust|php|ruby|swift|kotlin|tsx|jsx)\b/i
-const FILE_REFERENCE = /(?:^|[\s`'"(])(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)(?=$|[\s`'"),:])/i
+const FILE_REFERENCE = /(?:^|[\s`'"(])(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)(?=$|[\s`'"),:.])/i
 const STACK_TRACE = /\b(?:TypeError|ReferenceError|SyntaxError|RangeError|ModuleNotFoundError|Traceback \(most recent call last\)|npm ERR!|ERR_[A-Z_]+)\b|\bat\s+[^\n]+\([^\n()]+:\d+:\d+\)|\bFile\s+"[^"]+",\s+line\s+\d+/i
 const CODE_FENCE = /```(?:javascript|typescript|js|ts|tsx|jsx|python|py|sql|bash|sh|html|css|json)?\s*[\s\S]{12,}```/i
 const CODE_NOUN = /\b(?:code|function|script|class|component|endpoint|api route|test case|regular expression|regex|query)\b/i

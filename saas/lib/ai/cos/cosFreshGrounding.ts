@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/cosFreshGrounding.ts
 import type { SearchResult } from '@/lib/ai/tools/getExternalInfo'
+import { classifyAuthoritativeSourceNeed, rankByAuthority } from './officialSourceAuthority.ts'
 
 export type FreshEvidenceSource = SearchResult & { id: string }
 
@@ -348,7 +349,7 @@ export function resolveDeterministicFreshOfficeHolder(
   }
 }
 
-export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshEvidenceSource[] {
+export function prepareFreshEvidence(results: SearchResult[], limit = 8, query = ''): FreshEvidenceSource[] {
   const seen = new Set<string>()
   const cleaned = results
     .map((result, index) => {
@@ -370,9 +371,15 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8): FreshE
     })
     .filter(Boolean) as Array<{ result: SearchResult; index: number }>
 
-  cleaned.sort((a, b) => authorityScore(b.result) - authorityScore(a.result) || a.index - b.index)
-  return cleaned.slice(0, Math.max(1, Math.min(limit, 12))).map((entry, index) => ({
-    ...entry.result,
+  const need = classifyAuthoritativeSourceNeed(query)
+  const ranked = need.required
+    ? rankByAuthority(cleaned.map(entry => entry.result), need)
+    : cleaned
+        .sort((a, b) => authorityScore(b.result) - authorityScore(a.result) || a.index - b.index)
+        .map(entry => entry.result)
+
+  return ranked.slice(0, Math.max(1, Math.min(limit, 12))).map((result, index) => ({
+    ...result,
     id: `LIVE${index + 1}`,
   }))
 }
@@ -445,20 +452,12 @@ export function freshEvidenceSearchQuery(input: string, now = new Date()): strin
 /**
  * A request can require more than one evidence set (for example, a current office holder plus
  * a historical roster). Each query is generated from the user's wording; nothing is preselected
- * by topic, organization, person, or URL.
+ * by topic, organization, person, publisher, or URL. Do not append canned statistical series
+ * names. The reasoner, not the query farm, decides which retrieved measurements are commensurable.
  */
 export function freshEvidenceSearchQueries(input: string, now = new Date()): string[] {
   const primary = freshEvidenceSearchQuery(input, now)
   const raw = String(input || '').trim()
-  if (isPersonOrOfficeEvaluation(raw)) {
-    const topic = raw.replace(/[?!.]+$/g, '').trim()
-    return [...new Set([
-      primary,
-      `${topic} BLS unemployment rate by administration`,
-      `${topic} BLS CPI inflation by administration`,
-      `${topic} BEA real GDP growth by administration`,
-    ])]
-  }
   const role = new RegExp(OFFICE_HOLDER_ROLE_SOURCE, 'i').exec(raw)?.[0]
   const asksForHistory = /\b(?:former|past|previous|last)\b/i.test(raw)
   if (!role || !asksForHistory) return [primary]

@@ -6,17 +6,20 @@ import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
 const source = (path: string) => hydrateLocalizedSource(readFileSync(new URL(path, import.meta.url), 'utf8'))
 
-test('Builder is authenticated and does not expose full tool trace content', () => {
+test('Builder is authenticated, asynchronous, and exposes only a bounded public trace', () => {
   const route = source('../app/api/builder/route.ts')
+  const jobRunner = source('../lib/builder/job-runner.ts')
   assert.match(route, /getAccess\(\)/)
   assert.match(route, /if \(!access\?\.userId\)/)
-  assert.match(route, /publicTrace\(result\.trace\)/)
   assert.match(route, /export async function GET/)
   assert.match(route, /workspace\.listWorkspaces\(\)/)
   assert.match(route, /workspace\.certificationSummary\(\)/)
-  assert.match(route, /command: typeof input\.command/)
-  assert.match(route, /stdout: result\.stdout\.slice/)
-  assert.doesNotMatch(route, /trace: result\.trace/)
+  assert.match(route, /await enqueueBuilderJob/)
+  assert.match(route, /after\(async \(\) =>/)
+  assert.match(jobRunner, /publicTrace\(result\.trace\)/)
+  assert.match(jobRunner, /command: typeof input\.command/)
+  assert.match(jobRunner, /result\.stdout\.slice/)
+  assert.doesNotMatch(jobRunner, /trace: result\.trace/)
 })
 
 test('Builder renders the safe failure classification and remediation returned by its API', () => {
@@ -34,12 +37,16 @@ test('Builder runs only in an ephemeral network-denied Vercel Sandbox', () => {
   assert.match(runner, /cwd: ROOT/)
 })
 
-test('Builder workspace tables are server-only and ownership constrained', () => {
-  const migration = source('../supabase/migrations/20260829190749_builder_workspaces.sql')
-  assert.match(migration, /references auth\.users\(id\)/)
-  assert.match(migration, /enable row level security/)
-  assert.match(migration, /revoke all on public\.builder_workspaces from anon, authenticated/)
-  assert.match(migration, /revoke all on public\.builder_workspace_files from anon, authenticated/)
+test('Builder workspace and job tables are server-only and ownership constrained', () => {
+  const workspaceMigration = source('../supabase/migrations/20260829190749_builder_workspaces.sql')
+  const jobMigration = source('../supabase/migrations/20260831172000_builder_jobs_and_history_order.sql')
+  assert.match(workspaceMigration, /references auth\.users\(id\)/)
+  assert.match(workspaceMigration, /enable row level security/)
+  assert.match(workspaceMigration, /revoke all on public\.builder_workspaces from anon, authenticated/)
+  assert.match(workspaceMigration, /revoke all on public\.builder_workspace_files from anon, authenticated/)
+  assert.match(jobMigration, /create table if not exists public\.builder_jobs/)
+  assert.match(jobMigration, /enable row level security/)
+  assert.match(jobMigration, /revoke all on public\.builder_jobs from anon, authenticated/)
 })
 
 test('Builder retains only verified repair lessons in a server-only table', () => {

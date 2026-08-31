@@ -1,5 +1,7 @@
+import { getAccess } from '@/lib/auth/access'
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { buildCascadePlan, type CascadePlan } from './cascadeContract.ts'
+import { attachCascadePlanToStoredTurn, cascadeRootForClickedFollowup } from './cascadePersistence.ts'
 import { fallbackFollowups, repairFollowups, validateSuggestedFollowups } from './suggestedFollowupPolicy.ts'
 
 export type FollowupSource = { title?: unknown }
@@ -51,6 +53,18 @@ async function boundedLocalJson(prompt: string, reply: string, titles: string[])
   return typeof result === 'string' ? parseFollowups(result) : null
 }
 
+async function resolvedRoot(args: { prompt: string; reply: string; originPrompt?: string }): Promise<{ root: string; userId: string | null }> {
+  const explicit = clean(args.originPrompt)
+  const access = await getAccess().catch(() => null)
+  const userId = access?.userId || null
+  if (explicit) return { root: explicit, userId }
+  if (userId) {
+    const persisted = await cascadeRootForClickedFollowup(userId, args.prompt, args.reply)
+    if (persisted) return { root: persisted, userId }
+  }
+  return { root: clean(args.prompt), userId }
+}
+
 export async function suggestFollowupCascade(args: {
   prompt: string
   reply: string
@@ -59,8 +73,9 @@ export async function suggestFollowupCascade(args: {
   originPrompt?: string
 }): Promise<CascadePlan> {
   const prompt = clean(args.prompt)
-  const origin = clean(args.originPrompt) || prompt
-  if (!prompt || !origin) return { root_question: origin, root_topic: '', candidates: [] }
+  if (!prompt) return { root_question: '', root_topic: '', candidates: [] }
+  const { root: origin, userId } = await resolvedRoot({ prompt, reply: clean(args.reply), originPrompt: args.originPrompt })
+  if (!origin) return { root_question: '', root_topic: '', candidates: [] }
   const titles = sourceTitles(args.sources || [])
   const fallback = args.failedClosed ? repairFollowups(origin) : fallbackFollowups(origin, titles.length)
 
@@ -76,7 +91,11 @@ export async function suggestFollowupCascade(args: {
     }
   }
 
-  return buildCascadePlan({ rootQuestion: origin, questions, sourceTitles: titles })
+  const plan = buildCascadePlan({ rootQuestion: origin, questions, sourceTitles: titles })
+  if (userId && plan.candidates.length === 2 && clean(args.reply)) {
+    await attachCascadePlanToStoredTurn(userId, clean(args.reply), plan)
+  }
+  return plan
 }
 
 /** Optional post-answer product surface. The UI still receives only two strings. */

@@ -1,0 +1,43 @@
+name: A2A Agent Fabric
+
+on:
+  pull_request:
+    paths:
+      - 'saas/a2a-core/**'
+      - 'saas/a2a-host/**'
+      - 'saas/tests/a2aAgentFabric.node.test.ts'
+      - 'ONBOARD-A2A.md'
+      - 'docs/HANDOFF-A2A-AGENT-FABRIC-*.md'
+      - '.github/workflows/a2a-agent-fabric.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/a2a-core/**'
+      - 'saas/a2a-host/**'
+      - 'saas/tests/a2aAgentFabric.node.test.ts'
+      - 'ONBOARD-A2A.md'
+      - 'docs/HANDOFF-A2A-AGENT-FABRIC-*.md'
+      - '.github/workflows/a2a-agent-fabric.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Governed A2A compatibility regression
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Run A2A Phase 1 regressions
+        run: node --test tests/a2aAgentFabric.node.test.ts
+      - name: Typecheck A2A integration
+        run: npm run typecheck

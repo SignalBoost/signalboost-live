@@ -22,6 +22,11 @@ function parseFollowups(text: string): unknown {
   }
 }
 
+function removeUnsupportedSourceQuestions(value: unknown, titles: string[]): unknown {
+  if (titles.length || !Array.isArray(value)) return value
+  return value.filter(candidate => !/\b(?:source|sources|retrieved|citation|citations|live\s*\d+)\b/i.test(clean(candidate)))
+}
+
 async function boundedLocalJson(prompt: string, reply: string, titles: string[]): Promise<unknown> {
   const result = await Promise.race([
     callLocalModel({
@@ -29,7 +34,8 @@ async function boundedLocalJson(prompt: string, reply: string, titles: string[])
         'Return ONLY strict JSON: {"followups":["question one?","question two?"]}.',
         'Produce exactly two questions. Use only the original user question, answer, and source titles.',
         'Each question must stay on that original topic and be answerable from those strings.',
-        'Ask what a cited measure includes, or what it does not include.',
+        'If SOURCE TITLES is empty, do not ask which source, citation, or retrieved evidence supports anything.',
+        'Ask what a cited measure includes, or what it does not include, only when the supplied answer or source titles support that wording.',
         'Do not ask for causes, motives, discrimination, or legal conclusions the text did not state.',
         'Do not ask what LIVE2 or another citation id defines unless that title is in SOURCE TITLES.',
         'Do not introduce a person, event, date, number, or claim absent from those strings.',
@@ -55,12 +61,12 @@ export async function suggestFollowups(args: {
   const prompt = clean(args.prompt)
   if (!prompt) return []
   const origin = clean(args.originPrompt) || prompt
-  const sourceCount = Array.isArray(args.sources) ? args.sources.length : 0
-  const fallback = args.failedClosed ? repairFollowups(origin) : fallbackFollowups(origin, sourceCount)
+  const titles = sourceTitles(args.sources || [])
+  const fallback = args.failedClosed ? repairFollowups(origin) : fallbackFollowups(origin, titles.length)
   if (args.failedClosed || !clean(args.reply)) return validateSuggestedFollowups([], prompt, fallback)
   try {
-    const generated = await boundedLocalJson(origin, clean(args.reply).slice(0, 4_000), sourceTitles(args.sources || []))
-    return validateSuggestedFollowups(generated, prompt, fallback)
+    const generated = await boundedLocalJson(origin, clean(args.reply).slice(0, 4_000), titles)
+    return validateSuggestedFollowups(removeUnsupportedSourceQuestions(generated, titles), prompt, fallback)
   } catch {
     return validateSuggestedFollowups([], prompt, fallback)
   }

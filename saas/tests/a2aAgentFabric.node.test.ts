@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { A2A_PROTOCOL_VERSION, createA2AClient, validateA2AAgentCard, type A2ATransport } from '../a2a-core/a2a-client.ts'
 import { createA2AAgentResolver, createInMemoryA2AAgentRegistry } from '../a2a-host/a2a-agent-registry.ts'
+import { createA2ADelegationRuntime, type A2ADelegationAuditEvent } from '../a2a-host/a2a-delegation-runtime.ts'
+import { A2A_SPECIALIST_FAMILIES, getA2ASpecialistFamily } from '../a2a-host/a2a-specialist-catalog.ts'
 
 const tenantId = 'tenant-a'
 const environmentId = 'prod'
@@ -173,4 +175,112 @@ test('registry refuses assignments to skills the agent did not advertise', () =>
       allowedSkills: [{ skillId: 'campaign.publish', risk: 'write' }],
     }],
   }), /a2a_registry_unadvertised_skill/)
+})
+
+function phase2Registry() {
+  return createInMemoryA2AAgentRegistry({
+    agents: [{
+      agentId,
+      displayName: 'Marketing Specialist',
+      description: 'Buyer-pluggable specialist',
+      transportRef,
+      enabled: true,
+      advertisedSkillIds: ['campaign.analyze', 'campaign.publish', 'campaign.spend'],
+    }],
+    assignments: [{
+      assignmentId: 'assignment-phase2',
+      agentId,
+      tenantId,
+      environmentId,
+      portableId,
+      enabled: true,
+      allowedSkills: [
+        { skillId: 'campaign.analyze', risk: 'advisory' },
+        { skillId: 'campaign.publish', risk: 'write' },
+        { skillId: 'campaign.spend', risk: 'consequential' },
+      ],
+    }],
+  })
+}
+
+test('Phase 2 blocks write delegation before transport creation unless approval is present', async () => {
+  let transports = 0
+  const runtime = createA2ADelegationRuntime({
+    registry: phase2Registry(),
+    transportFactory: { create() { transports += 1; return standardTransport() } },
+  })
+  const blocked = await runtime.invoke({ tenantId, environmentId, portableId, agentId, skillId: 'campaign.publish', messageId: 'm-write-1', text: 'Publish approved content.' })
+  assert.equal(blocked.mode, 'approval_required')
+  assert.equal(transports, 0)
+
+  const allowed = await runtime.invoke({
+    tenantId, environmentId, portableId, agentId, skillId: 'campaign.publish', messageId: 'm-write-2', text: 'Publish approved content.',
+    approval: { approvalId: 'approval-1', approvedBy: 'buyer-admin', approvedAt: '2026-08-31T15:00:00Z' },
+  })
+  assert.equal(allowed.ok, true)
+  assert.equal(allowed.risk, 'write')
+  assert.equal(transports, 1)
+})
+
+test('Phase 2 requires buyer audit for consequential delegation and records approved execution identity', async () => {
+  let transports = 0
+  const withoutAudit = createA2ADelegationRuntime({
+    registry: phase2Registry(),
+    transportFactory: { create() { transports += 1; return standardTransport() } },
+  })
+  const blocked = await withoutAudit.invoke({
+    tenantId, environmentId, portableId, agentId, skillId: 'campaign.spend', messageId: 'm-spend-1', text: 'Increase campaign budget.',
+    approval: { approvalId: 'approval-2', approvedBy: 'buyer-admin', approvedAt: '2026-08-31T15:00:00Z' },
+  })
+  assert.equal(blocked.mode, 'audit_required')
+  assert.equal(transports, 0)
+
+  const events: A2ADelegationAuditEvent[] = []
+  const runtime = createA2ADelegationRuntime({
+    registry: phase2Registry(),
+    transportFactory: { create() { transports += 1; return standardTransport() } },
+    audit: { async append(event) { events.push(event) } },
+    createId: () => 'audit-event-1',
+    now: () => new Date('2026-08-31T15:10:00Z'),
+  })
+  const allowed = await runtime.invoke({
+    tenantId, environmentId, portableId, agentId, skillId: 'campaign.spend', messageId: 'm-spend-2', text: 'Increase campaign budget.', traceId: 'trace-1',
+    approval: { approvalId: 'approval-3', approvedBy: 'buyer-admin', approvedAt: '2026-08-31T15:00:00Z' },
+  })
+  assert.equal(allowed.ok, true)
+  assert.equal(transports, 1)
+  assert.equal(events.length, 1)
+  assert.deepEqual({
+    tenantId: events[0]?.tenantId,
+    environmentId: events[0]?.environmentId,
+    portableId: events[0]?.portableId,
+    agentId: events[0]?.agentId,
+    skillId: events[0]?.skillId,
+    risk: events[0]?.risk,
+    approvalId: events[0]?.approvalId,
+    traceId: events[0]?.traceId,
+  }, { tenantId, environmentId, portableId, agentId, skillId: 'campaign.spend', risk: 'consequential', approvalId: 'approval-3', traceId: 'trace-1' })
+})
+
+test('Phase 2 preserves advisory execution and denies unauthorized skill without transport', async () => {
+  let transports = 0
+  const runtime = createA2ADelegationRuntime({
+    registry: phase2Registry(),
+    transportFactory: { create() { transports += 1; return standardTransport() } },
+  })
+  const advisory = await runtime.invoke({ tenantId, environmentId, portableId, agentId, skillId: 'campaign.analyze', messageId: 'm-a', text: 'Analyze campaign.' })
+  assert.equal(advisory.ok, true)
+  assert.equal(advisory.risk, 'advisory')
+  const denied = await runtime.invoke({ tenantId, environmentId, portableId, agentId, skillId: 'sales.crm-write', messageId: 'm-b', text: 'Change CRM.' })
+  assert.equal(denied.mode, 'skill_not_authorized')
+  assert.equal(transports, 1)
+})
+
+test('specialist catalog defines marketing, sales, and separated self-healing roles with explicit risk', () => {
+  assert.equal(A2A_SPECIALIST_FAMILIES.length, 5)
+  assert.equal(getA2ASpecialistFamily('marketing').skills.find(skill => skill.skillId === 'marketing.campaign-mutate')?.risk, 'consequential')
+  assert.equal(getA2ASpecialistFamily('sales').skills.find(skill => skill.skillId === 'sales.crm-write')?.risk, 'write')
+  assert.equal(getA2ASpecialistFamily('self-healing-diagnostic').skills.every(skill => skill.risk === 'advisory'), true)
+  assert.equal(getA2ASpecialistFamily('self-healing-remediation').skills.every(skill => skill.risk === 'consequential'), true)
+  assert.equal(getA2ASpecialistFamily('self-healing-verification').skills.every(skill => skill.risk === 'advisory'), true)
 })

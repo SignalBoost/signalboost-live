@@ -37,6 +37,13 @@ const binarySafeMultiScopePlan: FreshEvidenceSemanticPlan = {
   ],
 }
 
+const binaryUnsafeSingleScopePlan: FreshEvidenceSemanticPlan = {
+  directBinaryAnswerSafe: false,
+  scopes: [
+    { scopeId: 'S1', label: 'bounded current estimate', finding: 'The evidence supports a bounded estimate but not an unqualified binary framing.', evidenceIds: ['LIVE1'] },
+  ],
+}
+
 const directPlan: FreshEvidenceSemanticPlan = {
   directBinaryAnswerSafe: true,
   scopes: [
@@ -52,14 +59,16 @@ test('semantic planning accepts two materially distinct model-declared scopes wi
   assert.deepEqual(accepted, scopedPlan)
 })
 
-test('a model cannot declare binary ambiguity while returning only one scope', () => {
-  assert.equal(acceptFreshEvidenceSemanticPlan({
-    text: JSON.stringify({
-      directBinaryAnswerSafe: false,
-      scopes: [{ scopeId: 'S1', label: 'one measurement', finding: 'One finding.', evidenceIds: ['LIVE1'] }],
-    }),
-    sources,
-  }), null)
+test('binary safety is model-owned even when only one semantic scope is needed', () => {
+  const encoded = JSON.stringify(binaryUnsafeSingleScopePlan)
+  assert.deepEqual(acceptFreshEvidenceSemanticPlan({ text: encoded, sources }), binaryUnsafeSingleScopePlan)
+  assert.equal(diagnoseFreshEvidenceSemanticPlan({ text: encoded, sources }), null)
+})
+
+test('scope-plan contract explicitly keeps scope cardinality independent of binary safety', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceSynthesisContract.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /directBinaryAnswerSafe\s*===\s*false\s*&&\s*scopes\.length\s*<\s*2/)
+  assert.match(source, /Scope count alone must never determine directBinaryAnswerSafe/i)
 })
 
 test('semantic scopes cannot cite invented evidence ids', () => {
@@ -97,6 +106,19 @@ test('an unsafe binary scope plan cannot release a bare yes/no answer', () => {
     semanticPlan: scopedPlan,
   })
   assert.equal(accepted, null)
+})
+
+test('a binary-unsafe single-scope plan also blocks an unsafe bare yes/no answer', () => {
+  assert.equal(acceptFreshEvidenceSynthesis({
+    text: JSON.stringify({
+      answer: 'Yes. The estimate exists.',
+      evidenceIds: ['LIVE1'],
+      scopeIds: ['S1'],
+    }),
+    input: 'Can this be answered with an unqualified yes or no?',
+    sources,
+    semanticPlan: binaryUnsafeSingleScopePlan,
+  }), null)
 })
 
 test('a binary-safe multi-scope plan may release a direct answer while retaining both scopes', () => {

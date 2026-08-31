@@ -5,6 +5,10 @@ import {
   type A2ADelegationRisk,
   type A2ATransportFactory,
 } from './a2a-agent-registry.ts'
+import {
+  A2A_RUNTIME_OBSERVATION_VERSION,
+  type A2ARuntimeObservationPort,
+} from './a2a-runtime-observability.ts'
 
 export const A2A_DELEGATION_RUNTIME_VERSION = 'signalboost-a2a-delegation-runtime-v1' as const
 
@@ -89,6 +93,7 @@ export function createA2ADelegationRuntime(options: {
   registry: A2AAgentRegistryPort
   transportFactory: A2ATransportFactory
   audit?: A2ADelegationAuditPort
+  observe?: A2ARuntimeObservationPort
   requireAuditForConsequential?: boolean
   timeoutMs?: number
   createId?: () => string
@@ -125,7 +130,44 @@ export function createA2ADelegationRuntime(options: {
     }))
   }
 
+  async function appendObservation(input: {
+    invocation: A2ADelegationInvocation
+    startedAtMs: number
+    result: A2ADelegationResult
+    assignmentId?: string
+    transportRef?: string
+    risk?: A2ADelegationRisk
+    approval?: A2AApprovalEvidence | null
+  }): Promise<void> {
+    if (!options.observe) return
+    const endedAt = now()
+    try {
+      await options.observe.append(Object.freeze({
+        schemaVersion: A2A_RUNTIME_OBSERVATION_VERSION,
+        eventId: createId(),
+        occurredAt: endedAt.toISOString(),
+        durationMs: Math.max(0, endedAt.getTime() - input.startedAtMs),
+        tenantId: input.invocation.tenantId,
+        environmentId: input.invocation.environmentId,
+        portableId: input.invocation.portableId,
+        agentId: input.invocation.agentId,
+        skillId: input.invocation.skillId,
+        assignmentId: input.assignmentId,
+        transportRef: input.transportRef,
+        risk: input.risk,
+        approvalId: input.approval?.approvalId,
+        traceId: input.invocation.traceId,
+        ok: input.result.ok,
+        mode: input.result.mode || (input.result.ok ? 'delegated' : 'blocked'),
+        errorCode: input.result.ok ? undefined : (input.result.mode || 'a2a_failed'),
+      }))
+    } catch {
+      // Observability is metadata evidence, never execution authority.
+    }
+  }
+
   async function invoke(raw: A2ADelegationInvocation): Promise<A2ADelegationResult> {
+    const startedAtMs = now().getTime()
     const invocation: A2ADelegationInvocation = Object.freeze({
       ...raw,
       tenantId: required(raw.tenantId, 'tenantId'),
@@ -145,22 +187,27 @@ export function createA2ADelegationRuntime(options: {
       item.environmentId === invocation.environmentId && item.portableId === invocation.portableId,
     )
     if (!agent || !assignment) {
-      return Object.freeze({ ok: false, agentId: invocation.agentId, skillId: invocation.skillId, mode: 'agent_unavailable', error: invocation.agentId })
+      const result = Object.freeze({ ok: false, agentId: invocation.agentId, skillId: invocation.skillId, mode: 'agent_unavailable', error: invocation.agentId })
+      await appendObservation({ invocation, startedAtMs, result, transportRef: agent?.transportRef })
+      return result
     }
 
     const skill = assignment.allowedSkills.find(item => item.skillId === invocation.skillId)
     if (!skill) {
-      return Object.freeze({ ok: false, agentId: invocation.agentId, skillId: invocation.skillId, mode: 'skill_not_authorized', error: invocation.skillId })
+      const result = Object.freeze({ ok: false, agentId: invocation.agentId, skillId: invocation.skillId, mode: 'skill_not_authorized', error: invocation.skillId })
+      await appendObservation({ invocation, startedAtMs, result, assignmentId: assignment.assignmentId, transportRef: agent.transportRef })
+      return result
     }
 
     const approval = validateApproval(invocation.approval)
     if (skill.risk !== 'advisory' && !approval) {
       const result = Object.freeze({ ok: false, agentId: invocation.agentId, skillId: invocation.skillId, risk: skill.risk, mode: 'approval_required', error: invocation.skillId })
+      await appendObservation({ invocation, startedAtMs, result, assignmentId: assignment.assignmentId, transportRef: agent.transportRef, risk: skill.risk, approval })
       await appendAudit({ invocation, assignmentId: assignment.assignmentId, risk: skill.risk, approval, result })
       return result
     }
     if (skill.risk === 'consequential' && requireAuditForConsequential && !options.audit) {
-      return Object.freeze({
+      const result = Object.freeze({
         ok: false,
         agentId: invocation.agentId,
         skillId: invocation.skillId,
@@ -168,6 +215,8 @@ export function createA2ADelegationRuntime(options: {
         mode: 'audit_required',
         error: 'consequential A2A delegation requires a buyer-controlled audit sink',
       })
+      await appendObservation({ invocation, startedAtMs, result, assignmentId: assignment.assignmentId, transportRef: agent.transportRef, risk: skill.risk, approval })
+      return result
     }
 
     const scope: A2AScope = Object.freeze({
@@ -204,6 +253,7 @@ export function createA2ADelegationRuntime(options: {
       })
     }
 
+    await appendObservation({ invocation, startedAtMs, result, assignmentId: assignment.assignmentId, transportRef: agent.transportRef, risk: skill.risk, approval })
     await appendAudit({ invocation, assignmentId: assignment.assignmentId, risk: skill.risk, approval, result })
     return result
   }

@@ -43,14 +43,23 @@ function safeText(value: unknown, maximum = 500): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, maximum)
 }
 
-function tokenIsValid(request: NextRequest): boolean {
-  if (process.env.VERCEL_ENV !== 'production') return false
-  if (request.nextUrl.hostname !== CANONICAL_PRODUCTION_HOST) return false
-  if (Date.now() > ACCEPTANCE_EXPIRES_AT_MS) return false
+function acceptanceToken(request: NextRequest): string | null {
+  if (process.env.VERCEL_ENV !== 'production') return null
+  if (request.nextUrl.hostname !== CANONICAL_PRODUCTION_HOST) return null
+  if (Date.now() > ACCEPTANCE_EXPIRES_AT_MS) return null
   const provided = request.nextUrl.searchParams.get('token') || ''
   const expected = Buffer.from(ACCEPTANCE_TOKEN_SHA256, 'hex')
   const actual = createHash('sha256').update(provided).digest()
-  return actual.length === expected.length && timingSafeEqual(actual, expected)
+  return actual.length === expected.length && timingSafeEqual(actual, expected) ? provided : null
+}
+
+function acceptanceCredentials(token: string): Readonly<{ email: string; password: string }> {
+  const identity = createHash('sha256').update(token).digest('hex').slice(0, 16)
+  const secret = createHash('sha256').update(`${token}:password`).digest('hex')
+  return Object.freeze({
+    email: `runtime-acceptance-${identity}@example.com`,
+    password: `RT-${secret}`,
+  })
 }
 
 function requiredCheck(checks: AcceptanceCheck[], id: string, passed: boolean, detail: string): void {
@@ -114,6 +123,13 @@ async function countRows(admin: AdminClient, table: string, userId: string): Pro
     .eq('user_id', userId)
   if (error) throw new Error(`acceptance_count_failed:${table}:${error.message}`)
   return count ?? 0
+}
+
+async function cleanApplicationData(admin: AdminClient, userId: string): Promise<void> {
+  for (const table of ['builder_jobs', 'assistant_conversations', 'builder_workspaces'] as const) {
+    const { error } = await admin.from(table).delete().eq('user_id', userId)
+    if (error) throw new Error(`acceptance_cleanup_failed:${table}:${error.message}`)
+  }
 }
 
 function historyMessages(history: HttpJson): JsonRecord[] {
@@ -388,7 +404,8 @@ async function runVisualAcceptance(input: {
 }
 
 export async function GET(request: NextRequest) {
-  if (!tokenIsValid(request)) return noStore({ error: 'Not found' }, 404)
+  const token = acceptanceToken(request)
+  if (!token) return noStore({ error: 'Not found' }, 404)
   const mode = request.nextUrl.searchParams.get('mode')
   if (mode !== 'builder' && mode !== 'visual') return noStore({ error: 'mode must be builder or visual' }, 400)
 
@@ -422,32 +439,21 @@ export async function GET(request: NextRequest) {
   let failure = ''
   let cleanupPassed = false
   try {
-    const suffix = randomUUID()
-    const email = `runtime-acceptance-${suffix}@example.com`
-    const password = `${randomUUID()}-${randomUUID()}`
-    const created = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { purpose: 'signalboost-runtime-acceptance', mode },
-    })
-    if (created.error || !created.data.user?.id) {
-      throw new Error(`acceptance_user_create_failed:${created.error?.message || 'missing_user'}`)
-    }
-    userId = created.data.user.id
-
-    const signedIn = await browserSession.auth.signInWithPassword({ email, password })
+    const credentials = acceptanceCredentials(token)
+    const signedIn = await browserSession.auth.signInWithPassword(credentials)
     if (signedIn.error || !signedIn.data.user?.id) {
-      throw new Error(`acceptance_sign_in_failed:${signedIn.error?.message || 'missing_user'}`)
+      throw new Error(`acceptance_sign_in_failed:${safeText(signedIn.error?.message || 'missing_user')}`)
     }
+    userId = signedIn.data.user.id
     const cookies = cookieHeader(jar)
     requiredCheck(
       checks,
       'temporary-authenticated-session',
       Boolean(cookies),
-      'Supabase SSR cookies were issued for the temporary user',
+      'Supabase SSR cookies were issued for the isolated acceptance identity',
     )
 
+    await cleanApplicationData(admin, userId)
     result = mode === 'builder'
       ? await runBuilderAcceptance({ origin, cookies, admin, userId, checks })
       : await runVisualAcceptance({ origin, cookies, checks })
@@ -455,15 +461,8 @@ export async function GET(request: NextRequest) {
     failure = error instanceof Error ? error.message : 'runtime_acceptance_failed'
   } finally {
     if (userId) {
-      let deletionFailed = false
       try {
-        const deleted = await admin.auth.admin.deleteUser(userId)
-        deletionFailed = Boolean(deleted.error)
-      } catch {
-        deletionFailed = true
-      }
-
-      if (!deletionFailed) {
+        await cleanApplicationData(admin, userId)
         await wait(300)
         const [jobs, conversations, workspaces] = await Promise.all([
           countRows(admin, 'builder_jobs', userId).catch(() => -1),
@@ -472,15 +471,15 @@ export async function GET(request: NextRequest) {
         ])
         cleanupPassed = jobs === 0 && conversations === 0 && workspaces === 0
         checks.push(Object.freeze({
-          id: 'temporary-user-and-data-cleaned',
+          id: 'temporary-application-data-cleaned',
           passed: cleanupPassed,
           detail: `jobs=${jobs} conversations=${conversations} workspaces=${workspaces}`,
         }))
-      } else {
+      } catch (error) {
         checks.push(Object.freeze({
-          id: 'temporary-user-and-data-cleaned',
+          id: 'temporary-application-data-cleaned',
           passed: false,
-          detail: 'temporary auth user deletion failed',
+          detail: safeText(error instanceof Error ? error.message : 'application cleanup failed'),
         }))
       }
     }

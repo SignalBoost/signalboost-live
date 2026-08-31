@@ -53,8 +53,9 @@ export async function POST(req: NextRequest) {
   const supplied = body?.context?.specialistPlan
   const hasSuppliedPlan = Boolean(supplied && typeof supplied === 'object' && !Array.isArray(supplied))
   const inferred = hasSuppliedPlan ? null : planCOSSpecialistFromText(prompt)
+  const inferredPlan = inferred?.mode === 'delegate' ? inferred : null
 
-  if (!hasSuppliedPlan && inferred?.mode !== 'delegate') return cosPrimaryPost(req)
+  if (!hasSuppliedPlan && !inferredPlan) return cosPrimaryPost(req)
 
   const access = await getAccess().catch(() => null)
   const privileged = Boolean(access?.isOwner || access?.isAdmin)
@@ -98,8 +99,8 @@ export async function POST(req: NextRequest) {
     skillId: text(supplied.skillId),
     ...(text(supplied.agentId) ? { agentId: text(supplied.agentId) } : {}),
   } : {
-    familyId: inferred!.familyId,
-    skillId: inferred!.skillId,
+    familyId: inferredPlan!.familyId,
+    skillId: inferredPlan!.skillId,
   }
 
   const result = await host.orchestrator.orchestrate({
@@ -121,7 +122,7 @@ export async function POST(req: NextRequest) {
     source: result.ok ? 'cos-a2a-specialist' : 'cos-a2a-specialist-blocked',
     a2a: result,
     specialist_plan_source: hasSuppliedPlan ? 'supplied' : 'natural_language',
-    specialist_planner: hasSuppliedPlan ? undefined : inferred,
+    specialist_planner: hasSuppliedPlan ? undefined : inferredPlan,
     execution_allowed: result.ok,
     external_action_taken: false,
   }, { status: result.ok ? 200 : 409 })

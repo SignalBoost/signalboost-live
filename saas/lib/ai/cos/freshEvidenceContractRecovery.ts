@@ -22,7 +22,6 @@ export type FreshEvidencePlanFailureCode =
   | 'invalid_scope_count'
   | 'invalid_scope_shape'
   | 'unknown_scope_evidence_ids'
-  | 'binary_safe_with_multiple_material_scopes'
 
 export type FreshEvidenceContractDiagnosis = {
   code: FreshEvidenceContractFailureCode
@@ -63,6 +62,11 @@ function uniqueStrings(value: unknown): string[] {
   return out
 }
 
+/**
+ * Validate only the scope-plan structure and evidence lineage. Whether a direct binary answer is
+ * semantically safe is a neural planner decision; deterministic code must not infer that decision
+ * from the number of scopes returned.
+ */
 export function diagnoseFreshEvidenceSemanticPlan(args: {
   text: string
   sources: FreshEvidenceSource[]
@@ -77,6 +81,7 @@ export function diagnoseFreshEvidenceSemanticPlan(args: {
   }
 
   const sourceIds = new Set(args.sources.map(source => source.id))
+  const seenScopeIds = new Set<string>()
   for (const rawScope of parsed.scopes) {
     if (!rawScope || typeof rawScope !== 'object' || Array.isArray(rawScope)) {
       return { code: 'invalid_scope_shape', repairable: true }
@@ -86,20 +91,15 @@ export function diagnoseFreshEvidenceSemanticPlan(args: {
     const label = String(scope.label || '').trim()
     const finding = String(scope.finding || '').trim()
     const evidenceIds = uniqueStrings(scope.evidenceIds)
-    if (!SCOPE_ID.test(scopeId) || !label || !finding || !evidenceIds.length) {
+    if (!SCOPE_ID.test(scopeId) || seenScopeIds.has(scopeId) || !label || !finding || !evidenceIds.length) {
       return { code: 'invalid_scope_shape', repairable: true }
     }
     if (evidenceIds.some(id => !sourceIds.has(id))) {
       return { code: 'unknown_scope_evidence_ids', repairable: true }
     }
+    seenScopeIds.add(scopeId)
   }
 
-  // By contract, every returned scope is materially distinct. More than one material scope means a
-  // bare binary answer would erase that distinction. This is a structural consistency check on the
-  // model's own plan, not a topic classifier or a server-authored semantic conclusion.
-  if (parsed.directBinaryAnswerSafe === true && parsed.scopes.length > 1) {
-    return { code: 'binary_safe_with_multiple_material_scopes', repairable: true }
-  }
   return null
 }
 
@@ -163,7 +163,7 @@ export function freshEvidenceScopePlanRepairPrompt(args: {
   failedPlanText: string
   failureCode: FreshEvidencePlanFailureCode
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nPREVIOUS SCOPE PLAN (invalid; not evidence):\n${String(args.failedPlanText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nReturn a corrected semantic scope plan under the original scope-planning JSON contract. Preserve only materially distinct scopes supported by LIVE EVIDENCE. If there is more than one materially distinct scope, directBinaryAnswerSafe must be false. Do not write the user-facing answer.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nPREVIOUS SCOPE PLAN (invalid; not evidence):\n${String(args.failedPlanText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nReturn a corrected semantic scope plan under the original scope-planning JSON contract. Preserve only materially distinct scopes supported by LIVE EVIDENCE. Decide directBinaryAnswerSafe from the QUESTION and those evidence-backed scopes; the number of scopes alone must not determine that boolean. Do not write the user-facing answer.\n\nQUESTION: ${args.input}`
 }
 
 export function freshEvidenceAnswerContractRepairPrompt(args: {

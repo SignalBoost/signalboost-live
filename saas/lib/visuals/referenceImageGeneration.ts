@@ -10,7 +10,7 @@ export type ReferenceConditionedImageResult = Readonly<{
 const REFERENCE_IMAGE_MODEL = 'black-forest-labs/FLUX-2-klein-4b'
 const NATIVE_ENDPOINT = `https://api.deepinfra.com/v1/inference/${REFERENCE_IMAGE_MODEL}`
 const EDIT_ENDPOINT = 'https://api.deepinfra.com/v1/images/edits'
-const OUTPUT_TIMEOUT_MS = 20_000
+const OUTPUT_TIMEOUT_MS = 45_000
 const OUTPUT_FETCH_TIMEOUT_MS = 15_000
 const MAX_OUTPUT_BYTES = 12_000_000
 
@@ -140,6 +140,20 @@ function providerError(payload: ProviderPayload, raw: string, status: number): s
       || `Approved reference image runtime failed (HTTP ${status}).`
 }
 
+function strengthenMultiPersonPrompt(prompt: string, references: readonly VerifiedPersonReference[]): string {
+  if (references.length < 2) return prompt
+  return [
+    prompt,
+    '',
+    'MULTI-PERSON IDENTITY DELIVERY REQUIREMENTS:',
+    `Show exactly ${references.length} dominant foreground people and no other visible human faces.`,
+    'Use a clean, uncluttered background with no crowd, bystanders, portraits, posters, screens, statues, mirrors, or reflections containing people.',
+    'Use a medium three-quarter composition so every principal face is large, unobstructed, and visually separated from the others.',
+    'Keep one-to-one identity mapping in reference order. Each reference may control only one principal person.',
+    'Prioritize recognizable identity and distinct faces over scenery, dramatic lighting, or stylistic effects.',
+  ].join('\n')
+}
+
 async function callNative(key: string, prompt: string, size: string, references: readonly VerifiedPersonReference[]): Promise<ReferenceConditionedImageResult> {
   const { width, height } = parseSize(size)
   const body: Record<string, unknown> = {
@@ -210,8 +224,9 @@ async function callOpenAiEdits(key: string, prompt: string, size: string, refere
 }
 
 /**
- * Generates a synthetic scene from verified person references. Both attempts stay on the approved
- * DeepInfra runtime; there is no text-only identity fallback and no cross-provider fallback.
+ * Generates a synthetic scene from verified person references. Multi-person requests stay on the
+ * native multi-reference endpoint; the OpenAI-compatible edit endpoint documents only a single
+ * image input and therefore cannot safely preserve more than one named identity.
  */
 export async function generateReferenceConditionedImage(input: {
   prompt: string
@@ -228,7 +243,8 @@ export async function generateReferenceConditionedImage(input: {
   }
 
   const size = input.size || '1024x1024'
-  const native = await callNative(key, input.prompt, size, references)
+  const prompt = strengthenMultiPersonPrompt(input.prompt, references)
+  const native = await callNative(key, prompt, size, references)
   if (native.ok) return native
 
   console.warn('[concierge-reference-image-native-failure]', JSON.stringify({
@@ -236,7 +252,10 @@ export async function generateReferenceConditionedImage(input: {
     referenceCount: references.length,
     error: native.error || 'unknown',
   }))
-  const edits = await callOpenAiEdits(key, input.prompt, size, references)
+
+  if (references.length > 1) return native
+
+  const edits = await callOpenAiEdits(key, prompt, size, references)
   if (!edits.ok) {
     console.warn('[concierge-reference-image-edit-failure]', JSON.stringify({
       model: REFERENCE_IMAGE_MODEL,

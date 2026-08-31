@@ -7,7 +7,6 @@ import {
   freshEvidenceAnswerContractRepairPrompt,
 } from '../lib/ai/cos/freshEvidenceContractRecovery.ts'
 import {
-  SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT,
   acceptFreshEvidenceFaithfulnessReview,
   acceptFreshEvidenceSemanticPlan,
   acceptFreshEvidenceSynthesis,
@@ -248,25 +247,31 @@ test('a genuinely single-scope proposition may still lead with a direct binary a
   assert.ok(accepted)
 })
 
-test('a single proposition citing a retrieval set still requires a final neural edit', () => {
+test('source-count density is presentation quality and never causes a verification refusal', () => {
   assert.equal(freshEvidenceSynthesisNeedsNeuralReview({
-    answer: 'The answer is supported, followed by several redundant measurements from the retrieval set.',
-    citedSourceIds: ['LIVE1', 'LIVE2', 'LIVE3'],
+    answer: 'A concise, grounded answer can cite several supporting sources without becoming factually invalid.',
+    citedSourceIds: ['LIVE1', 'LIVE2', 'LIVE3', 'LIVE4', 'LIVE5', 'LIVE6'],
     singleProposition: true,
-    semanticPlan: directPlan,
-  }), true)
+    semanticPlan: binarySafeMultiScopePlan,
+  }), false)
 })
 
-test('an unusually long single-proposition draft still requires neural compression', () => {
+test('answer length is presentation quality and never causes a verification refusal', () => {
   assert.equal(freshEvidenceSynthesisNeedsNeuralReview({
-    answer: 'x'.repeat(SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT + 1),
+    answer: 'x'.repeat(2000),
     citedSourceIds: ['LIVE1'],
     singleProposition: true,
     semanticPlan: directPlan,
-  }), true)
+  }), false)
 })
 
-test('multi-scope answers may cite one representative source per scope without being mistaken for a retrieval dump', () => {
+test('the compatibility density hook is explicitly non-blocking', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceSynthesisContract.ts', import.meta.url), 'utf8')
+  assert.match(source, /Output density is a presentation-quality preference, never a verification\/release gate/i)
+  assert.match(source, /freshEvidenceSynthesisNeedsNeuralReview\(_args:[\s\S]*?return false/)
+})
+
+test('multi-scope answers remain governed by semantic faithfulness, not citation-count density', () => {
   assert.equal(freshEvidenceSynthesisNeedsNeuralReview({
     answer: 'The two measurements support different bounded conclusions and should remain distinct.',
     citedSourceIds: ['LIVE1', 'LIVE2'],

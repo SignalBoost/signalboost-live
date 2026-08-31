@@ -1,8 +1,8 @@
 # A2A Agent Fabric Onboarding Supplement
 
-Read root `ONBOARD.md` first, then `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE1-2026-08-31.md`, `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE2-2026-08-31.md`, `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE3-2026-08-31.md`, `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE4-2026-08-31.md`, `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE5-2026-08-31.md`, and `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE6-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
+Read root `ONBOARD.md` first, then `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE1-2026-08-31.md`, `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE2-2026-08-31.md`, `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE3-2026-08-31.md`, `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE4-2026-08-31.md`, `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE5-2026-08-31.md`, `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE6-2026-08-31.md`, and `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE7-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
 
-Current workstream: **A2A Agent Fabric — Phase 6 real specialist-host activation + runtime observability active; not Production-accepted.**
+Current workstream: **A2A Agent Fabric — Phase 7 live external-agent acceptance harness active; not Production-accepted.**
 
 Direction:
 
@@ -22,4 +22,6 @@ Direction:
 - Advisory delegation is the lowest-risk path; write delegation requires explicit approval; consequential delegation requires explicit approval plus a buyer-controlled audit sink before any remote call.
 - A2A delegation never grants MCP/Provider Hub/tool authority by implication.
 - Runtime composition must be injected and replaceable. Natural-language delegation requires an installed governed host plus exact tenant/environment/portable scope; otherwise COS answers through its existing generalist path.
-- Phase 6 activation is explicit and must emit only metadata-safe diagnostics/telemetry; prompt text, response payloads, credentials, headers, tokens, and endpoint URLs must never be captured by the A2A observability port.
+- Activation and observability must emit only metadata-safe diagnostics/telemetry; prompt text, response payloads, credentials, headers, tokens, and endpoint URLs must never be captured by the A2A observability port.
+- Phase 7 adds explicit HTTPS JSON-RPC remote transport + Agent Card validation for authorized hosts. Runtime endpoints/auth remain ephemeral host inputs, never registry state.
+- Deterministic loopback proves protocol behavior only. External A2A is Production-accepted only after a real authorized HTTPS remote delegation is observed successfully.

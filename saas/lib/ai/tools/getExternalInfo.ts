@@ -77,6 +77,12 @@ const GENERAL_NEWS_MEDIA_HOST_SUFFIXES = [
   'forbes.com',
 ] as const
 
+// Tertiary reference pages can be useful background, but when direct/institutional evidence is
+// available they should not crowd representative evidence out of a small live-result budget.
+const TERTIARY_REFERENCE_HOST_SUFFIXES = [
+  'wikipedia.org',
+] as const
+
 const PUBLIC_OFFICE_ROLE_RE = /\b(?:president|vice\s+president|prime\s+minister|premier|chancellor|governor|mayor|secretary\s+of\s+state|attorney\s+general|speaker|minister|monarch|king|queen|pope)\b/i
 const CURRENT_OFFICE_MARKER_RE = /\b(?:current|currently|now|today|at\s+present)\b/i
 const MEDIA_STYLE_TITLE_RE = /\b(?:breaking\s+news|latest\s+news|headlines|news\s+and\s+analysis|live\s+updates)\b/i
@@ -94,6 +100,11 @@ export function isGeneralNewsMediaResult(result: Pick<SearchResult, 'title' | 'u
   if (!host) return false
   if (GENERAL_NEWS_MEDIA_HOST_SUFFIXES.some(suffix => host === suffix || host.endsWith(`.${suffix}`))) return true
   return MEDIA_STYLE_TITLE_RE.test(String(result.title || ''))
+}
+
+function isTertiaryReferenceResult(result: Pick<SearchResult, 'url'>): boolean {
+  const host = sourceHost(result.url)
+  return Boolean(host && TERTIARY_REFERENCE_HOST_SUFFIXES.some(suffix => host === suffix || host.endsWith(`.${suffix}`)))
 }
 
 export function isCurrentPublicOfficeQuery(query: string): boolean {
@@ -161,7 +172,7 @@ function isFreshnessQuery(query: string): boolean {
 
 function structuredProviderQuery(query: string): string {
   const stripped = String(query || '').replace(
-    /\s+current\s+latest\s+official\s+authoritative\s+independent\s+verification\s+as\s+of\s+\d{4}-\d{2}-\d{2}\s*$/i,
+    /\s+current\s+(?:latest\s+)?official\s+authoritative\s+independent\s+verification\s+as\s+of\s+\d{4}-\d{2}-\d{2}\s*$/i,
     '',
   ).trim()
   return stripped || String(query || '').trim()
@@ -172,6 +183,25 @@ function clampSearchQuery(query: string): string {
   const words = collapsed.split(' ')
   const bounded = words.length > 45 ? words.slice(0, 45).join(' ') : collapsed
   return bounded.length > 380 ? bounded.slice(0, 380).replace(/\s+\S*$/, '') : bounded
+}
+
+function evidenceDiversitySearchQuery(query: string, authorityRequired: boolean, currentPublicOffice: boolean): string | null {
+  if (!isFreshnessQuery(query) || authorityRequired || currentPublicOffice) return null
+  const base = structuredProviderQuery(query)
+  if (!base || structuredLiveDataKind(base)) return null
+  return clampSearchQuery(`${base} credible disagreement alternative methodology competing interpretation criticism evidence independent analysis`)
+}
+
+function dedupeSearchResults(results: SearchResult[]): SearchResult[] {
+  const seen = new Set<string>()
+  const out: SearchResult[] = []
+  for (const result of results) {
+    const key = String(result.url || '').trim().toLowerCase().replace(/\/$/, '')
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(result)
+  }
+  return out
 }
 
 export async function getExternalInfo(
@@ -220,13 +250,31 @@ export async function getExternalInfo(
     // legal question 422'd, returned zero sources, and made the fail-closed path abstain on a
     // question the open web answers easily). No caller should need to know provider limits.
     const searchQuery = clampSearchQuery(authorityNeed.required ? augmentQueryForOfficialSources(q, authorityNeed) : q)
-
-    const rawResults = await getWebSearchPort().search(searchQuery, count)
     const enforcePrimaryOfficeSources = isCurrentPublicOfficeQuery(q)
+    const diversityQuery = evidenceDiversitySearchQuery(q, authorityNeed.required, enforcePrimaryOfficeSources)
+
+    const primaryRaw = await getWebSearchPort().search(searchQuery, count)
+    let rawResults = primaryRaw
+    if (diversityQuery) {
+      // This second lane is evidence acquisition, not a semantic conclusion. It looks for credible
+      // alternative methods/interpretations so the neural planner can decide whether divergence is
+      // material. Failure of the diversity lane never discards otherwise valid primary evidence.
+      const diversityRaw = await getWebSearchPort().search(diversityQuery, Math.min(4, count)).catch(() => [])
+      const primaryUrls = new Set(primaryRaw.map(result => String(result.url || '').toLowerCase().replace(/\/$/, '')))
+      const novelDiversity = diversityRaw.filter(result => !primaryUrls.has(String(result.url || '').toLowerCase().replace(/\/$/, '')))
+      const reserve = Math.min(2, novelDiversity.length, Math.max(0, count - 1))
+      rawResults = dedupeSearchResults([
+        ...primaryRaw.slice(0, Math.max(1, count - reserve)),
+        ...novelDiversity.slice(0, reserve),
+      ]).slice(0, count)
+    }
+
     const filtered = enforcePrimaryOfficeSources
       ? rawResults.filter(result => !isGeneralNewsMediaResult(result))
       : rawResults
-    const results: SearchResult[] = authorityNeed.required ? rankByAuthority(filtered, authorityNeed) : filtered
+    const results: SearchResult[] = authorityNeed.required
+      ? rankByAuthority(filtered, authorityNeed)
+      : filtered.slice().sort((a, b) => Number(isTertiaryReferenceResult(a)) - Number(isTertiaryReferenceResult(b)))
 
     if (!results.length) {
       return {

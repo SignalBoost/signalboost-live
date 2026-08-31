@@ -29,6 +29,14 @@ const scopedPlan: FreshEvidenceSemanticPlan = {
   ],
 }
 
+const binarySafeMultiScopePlan: FreshEvidenceSemanticPlan = {
+  directBinaryAnswerSafe: true,
+  scopes: [
+    { scopeId: 'S1', label: 'population-level outcome', finding: 'The broad population measure shows a difference.', evidenceIds: ['LIVE1'] },
+    { scopeId: 'S2', label: 'narrower conditioned comparison', finding: 'The narrower comparison also shows a residual difference.', evidenceIds: ['LIVE2'] },
+  ],
+}
+
 const directPlan: FreshEvidenceSemanticPlan = {
   directBinaryAnswerSafe: true,
   scopes: [
@@ -64,19 +72,17 @@ test('semantic scopes cannot cite invented evidence ids', () => {
   }), null)
 })
 
-test('the observed Production contradiction — two material scopes marked binary-safe — is routed to neural plan repair', () => {
-  const contradictory = {
-    directBinaryAnswerSafe: true,
-    scopes: [
-      { scopeId: 'S1', label: 'broad measure', finding: 'The broad measure establishes one bounded result.', evidenceIds: ['LIVE1'] },
-      { scopeId: 'S2', label: 'narrower measure', finding: 'The narrower measure establishes a different bounded result.', evidenceIds: ['LIVE2'] },
-    ],
-  }
-  assert.ok(acceptFreshEvidenceSemanticPlan({ text: JSON.stringify(contradictory), sources }))
-  assert.deepEqual(diagnoseFreshEvidenceSemanticPlan({ text: JSON.stringify(contradictory), sources }), {
-    code: 'binary_safe_with_multiple_material_scopes',
-    repairable: true,
-  })
+test('the observed Production shape — two scopes plus binary-safe — remains a valid neural decision', () => {
+  const encoded = JSON.stringify(binarySafeMultiScopePlan)
+  assert.deepEqual(acceptFreshEvidenceSemanticPlan({ text: encoded, sources }), binarySafeMultiScopePlan)
+  assert.equal(diagnoseFreshEvidenceSemanticPlan({ text: encoded, sources }), null)
+})
+
+test('deterministic recovery never infers binary safety from scope count', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/freshEvidenceContractRecovery.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /binary_safe_with_multiple_material_scopes/)
+  assert.doesNotMatch(source, /directBinaryAnswerSafe\s*===\s*true\s*&&\s*parsed\.scopes\.length\s*>\s*1/)
+  assert.match(source, /number of scopes alone must not determine that boolean/i)
 })
 
 test('an unsafe binary scope plan cannot release a bare yes/no answer', () => {
@@ -91,6 +97,22 @@ test('an unsafe binary scope plan cannot release a bare yes/no answer', () => {
     semanticPlan: scopedPlan,
   })
   assert.equal(accepted, null)
+})
+
+test('a binary-safe multi-scope plan may release a direct answer while retaining both scopes', () => {
+  const accepted = acceptFreshEvidenceSynthesis({
+    text: JSON.stringify({
+      answer: 'Yes. Both the broad population measure and the narrower conditioned comparison report a difference, although they measure different comparison bases and should not be treated as the same magnitude.',
+      evidenceIds: ['LIVE1', 'LIVE2'],
+      scopeIds: ['S1', 'S2'],
+    }),
+    input: 'Is there a difference between these outcomes?',
+    sources,
+    semanticPlan: binarySafeMultiScopePlan,
+  })
+  assert.ok(accepted)
+  assert.deepEqual(accepted.scopeIds, ['S1', 'S2'])
+  assert.equal(accepted.semanticPlan.directBinaryAnswerSafe, true)
 })
 
 test('a scoped answer must preserve every material scope and evidence lineage structurally', () => {

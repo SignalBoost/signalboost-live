@@ -1,17 +1,45 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { validateSuggestedFollowups } from '../lib/ai/cos/suggestedFollowupPolicy.ts'
+import { fallbackFollowups, repairFollowups, validateSuggestedFollowups } from '../lib/ai/cos/suggestedFollowupPolicy.ts'
 
-test('suggested followups are exactly two complete, non-repeated questions', () => {
+test('suggested followups are exactly two complete, non-repeated, on-topic questions', () => {
   assert.deepEqual(
-    validateSuggestedFollowups(['What happened after the Bay of Pigs invasion?', 'How did it lead to the Cuban Missile Crisis?'], 'Explain the Bay of Pigs invasion.', ['What happened next after Bay of Pigs?', 'Who were the main people involved in Bay of Pigs?']),
-    ['What happened after the Bay of Pigs invasion?', 'How did it lead to the Cuban Missile Crisis?'],
+    validateSuggestedFollowups(
+      ['What happened after the Bay of Pigs invasion?', 'How did the Bay of Pigs invasion affect Cuba?'],
+      'Explain the Bay of Pigs invasion.',
+      ['What happened next after the Bay of Pigs invasion?', 'Who was involved in the Bay of Pigs invasion?'],
+    ),
+    ['What happened after the Bay of Pigs invasion?', 'How did the Bay of Pigs invasion affect Cuba?'],
   )
 })
 
+test('off-topic model output is rejected instead of starting a retrieval cascade', () => {
+  const prompt = 'What specific factors contribute to the difference between the uncontrolled and controlled gender pay gap?'
+  const result = validateSuggestedFollowups(
+    [
+      'What does empirical research mean in medicine?',
+      'Which validation framework is used for agent-based simulations?',
+    ],
+    prompt,
+    fallbackFollowups(prompt),
+  )
+  assert.equal(result.length, 2)
+  assert.ok(result.every(item => /(?:uncontrolled|controlled|gender|pay|gap)/i.test(item)))
+  assert.ok(result.every(item => !/medicine|simulation/i.test(item)))
+})
+
+test('failed-closed followups stay about the failed question instead of verification mechanics', () => {
+  const prompt = 'What specific factors contribute to the difference between the uncontrolled and controlled gender pay gap?'
+  const result = validateSuggestedFollowups([], prompt, repairFollowups(prompt))
+  assert.equal(result.length, 2)
+  assert.ok(result.every(item => /(?:uncontrolled|controlled|gender|pay|gap)/i.test(item)))
+  assert.ok(result.every(item => !/required before answering|restated only/i.test(item)))
+})
+
 test('invalid local output falls back to two safe full questions', () => {
-  const result = validateSuggestedFollowups(['not a question', 'Explain the Bay of Pigs invasion.'], 'Explain the Bay of Pigs invasion.', ['What happened next after Bay of Pigs?', 'Who were the main people involved in Bay of Pigs?'])
+  const prompt = 'Explain the Bay of Pigs invasion.'
+  const result = validateSuggestedFollowups(['not a question', prompt], prompt, fallbackFollowups(prompt))
   assert.equal(result.length, 2)
   assert.ok(result.every(item => item.endsWith('?')))
 })

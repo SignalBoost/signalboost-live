@@ -88,8 +88,8 @@ export function fallbackFollowups(prompt: string): string[] {
 export function repairFollowups(originPrompt: string): string[] {
   const topic = topicFromPrompt(originPrompt)
   return [
-    `Using the original question, what do the retrieved sources state about ${topic}?`,
-    `What do those same sources not measure about ${topic}?`,
+    `What do retrieved sources state about ${topic}?`,
+    `What do retrieved sources not measure about ${topic}?`,
   ]
 }
 

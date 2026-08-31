@@ -38,43 +38,15 @@ test('general mutable external facts route live even when the user does not say 
     'What is flight status for AA123?',
     'What are traffic conditions in Warsaw?',
     'What is the election result?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-  }
+  ]) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
 })
 
 test('ordinary external factual lookups are live-verified by default', () => {
-  for (const prompt of [
-    "What is Poland's population?",
-    'Where is OpenAI headquartered?',
-    'Who owns Volvo Cars?',
-    'What is the capital of Kazakhstan?',
-    'Which country has the largest population?',
-    'Tell me about Nvidia.',
-    'How many people live in Warsaw?',
-    'What languages are officially recognized in South Africa?',
-    'When was SpaceX founded?',
-    'Is Lufthansa a member of Star Alliance?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-  }
+  for (const prompt of ["What is Poland's population?",'Where is OpenAI headquartered?','Who owns Volvo Cars?','What is the capital of Kazakhstan?','Which country has the largest population?','Tell me about Nvidia.','How many people live in Warsaw?','What languages are officially recognized in South Africa?','When was SpaceX founded?','Is Lufthansa a member of Star Alliance?']) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
 })
 
 test('explicit freshness wording forces live verification across volatile public domains', () => {
-  for (const prompt of [
-    'Who is the current CEO of Apple?',
-    'What is the exchange rate right now?',
-    "What is today's weather forecast?",
-    'What are the latest NBA standings?',
-    'What is the breaking news from Warsaw?',
-    'What are the recent election results?',
-    'Is there a live service outage?',
-    'What is the current regulation on this issue?',
-    'What is the latest software release?',
-    'What is the current security advisory status?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-  }
+  for (const prompt of ['Who is the current CEO of Apple?','What is the exchange rate right now?',"What is today's weather forecast?",'What are the latest NBA standings?','What is the breaking news from Warsaw?','What are the recent election results?','Is there a live service outage?','What is the current regulation on this issue?','What is the latest software release?','What is the current security advisory status?']) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
 })
 
 test('historical and conceptual questions keep their non-live reasoning route', () => {
@@ -90,103 +62,39 @@ test('historical and conceptual questions keep their non-live reasoning route', 
 })
 
 test('private operational state stays with its system of record instead of public web search', () => {
-  for (const prompt of [
-    'What is our current pricing?',
-    'Is our campaign still running?',
-    'What is my latest invoice?',
-    'What is our current inventory?',
-    'What are the results of our latest campaign?',
-    'What is the availability of our sales team?',
-    'What is our current MRR?',
-    'What is the status of our deployment?',
-    'Can you code yourself with iterative model training, dynamic context integration, and procedural skill refinement?',
-    'How can COS improve its reasoning?',
-    'What are your reasoning capabilities?',
-    'What improvements can COS make to its reasoning and skills?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
-  }
+  for (const prompt of ['What is our current pricing?','Is our campaign still running?','What is my latest invoice?','What is our current inventory?','What are the results of our latest campaign?','What is the availability of our sales team?','What is our current MRR?','What is the status of our deployment?','Can you code yourself with iterative model training, dynamic context integration, and procedural skill refinement?','How can COS improve its reasoning?','What are your reasoning capabilities?','What improvements can COS make to its reasoning and skills?']) assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
 })
 
 test('SignalBoost and COS self-knowledge stays on authoritative internal sources', () => {
-  for (const prompt of [
-    'What model does COS use now?',
-    'What is SignalBoost COS architecture?',
-    'How does COS Enterprise Memory work?',
-    'What is the COS Semantic Cache policy?',
-    'What is the current COS reasoner provider?',
-    'Show me COS execution provenance policy.',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
-  }
+  for (const prompt of ['What model does COS use now?','What is SignalBoost COS architecture?','How does COS Enterprise Memory work?','What is the COS Semantic Cache policy?','What is the current COS reasoner provider?','Show me COS execution provenance policy.']) assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
 })
 
 test('local deterministic utilities do not consume public freshness search', () => {
-  for (const prompt of [
-    'What is 24 * 17?',
-    '2 + 2',
-    'What is the current date?',
-    'What is the time now?',
-    'What day is it?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
-  }
+  for (const prompt of ['What is 24 * 17?','2 + 2','What is the current date?','What is the time now?','What day is it?']) assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
 })
 
 test('a design request that states its situation FIRST is still creation, not a live lookup', () => {
-  // Production failure (2026-08-23): the authoring verb was required to be the first word of the
-  // whole prompt, so an executive brief that gives three sentences of context before "Design a
-  // 90-day..." missed the creation exclusion. The word "current" — describing the company's OWN
-  // premium tier, not a current-world fact — then routed it to live evidence, which was
-  // unavailable, and the user got a refusal instead of a strategy.
   const brief = 'Gross margins have declined from 74% to 61% over the last two quarters due to soaring third-party inference and API costs. The Head of AI wants to maintain the current premium model tier to protect benchmark leadership, while the CFO demands an immediate migration to quantized open-source weights to restore margins to 70%. Design a 90-day phased optimization strategy that balances latency, model performance, and unit economics.'
   assert.equal(isContentGenerationRequest(brief), true)
   assert.equal(requiresFreshExternalEvidence(brief), false)
-
-  for (const trailing of [
-    'Our costs are up. Draft a memo to the board.',
-    'Margins fell this quarter. So write me a recovery plan.',
-    'The board meets Friday — draft the executive summary.',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(trailing), false, trailing)
-  }
+  for (const trailing of ['Our costs are up. Draft a memo to the board.','Margins fell this quarter. So write me a recovery plan.','The board meets Friday — draft the executive summary.']) assert.equal(requiresFreshExternalEvidence(trailing), false, trailing)
 })
 
 test('an authoring verb buried mid-clause does not fake a creation request', () => {
-  // The verb must still LEAD its own clause, or ordinary lookups containing "designed"/"created"
-  // would stop being live-verified.
-  for (const lookup of [
-    'who designed the Eiffel Tower?',
-    'who created Python?',
-    'which company produces the most lithium?',
-  ]) {
-    assert.equal(isContentGenerationRequest(lookup), false, lookup)
-  }
+  for (const lookup of ['who designed the Eiffel Tower?','who created Python?','which company produces the most lithium?']) assert.equal(isContentGenerationRequest(lookup), false, lookup)
 })
 
 test('a question about COS own prior answer can never become a public web search', () => {
-  // Structural safeguard independent of the introspection classifier's accuracy: when that
-  // classifier misses, the failure must degrade to a plain answer, never to searching the web and
-  // citing unrelated sources as the origin of COS's own reasoning (2026-08-23: an introspection
-  // question was answered from E-Verify and FAFSA pages).
-  for (const query of [
-    'show me where did you get the answert from?',
-    'where did you get this answer?',
-    'show me your sources',
-    'which rules shaped your previous answer?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(query), false, query)
-  }
+  for (const query of ['show me where did you get the answert from?','where did you get this answer?','show me your sources','which rules shaped your previous answer?']) assert.equal(requiresFreshExternalEvidence(query), false, query)
+})
+
+test('no-source cascade explanation stays on the prior-answer reasoning path', () => {
+  assert.equal(requiresFreshExternalEvidence("Explain the considerations already identified about should men play in women' sport?"), false)
+  assert.equal(requiresFreshExternalEvidence("Explain what the answer does not establish about should men play in women' sport?"), false)
 })
 
 test('the introspection exclusion does not disable genuine lookups about verification topics', () => {
-  for (const query of [
-    'what are the E-Verify requirements for employers?',
-    'where can I find answers about visas?',
-    'who is the current president of France?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(query), true, query)
-  }
+  for (const query of ['what are the E-Verify requirements for employers?','where can I find answers about visas?','who is the current president of France?']) assert.equal(requiresFreshExternalEvidence(query), true, query)
 })
 
 test('creation/advice requests are not hijacked by public live-data routing', () => {
@@ -198,20 +106,9 @@ test('creation/advice requests are not hijacked by public live-data routing', ()
   assert.equal(structuredLiveDataKind('Build a stock price dashboard component.'), null)
 })
 
-
 test('regulated public guidance is live-verified across supported languages', () => {
-  for (const prompt of [
-    'What documents should I change after changing my surname in Poland?',
-    'I changed my surname. What should I do and which offices must I notify?',
-    'zmieniłam nazwisko, co powinnam zrobić - jakie dokumenty zmienić, jakie instytucje powiadomić?',
-    'Quais documentos devo alterar depois de mudar meu sobrenome?',
-    '¿Qué documentos debo cambiar después de cambiar mi apellido?',
-    'Какие документы нужно изменить после смены фамилии?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
-  }
+  for (const prompt of ['What documents should I change after changing my surname in Poland?','I changed my surname. What should I do and which offices must I notify?','zmieniłam nazwisko, co powinnam zrobić - jakie dokumenty zmienić, jakie instytucje powiadomić?','Quais documentos devo alterar depois de mudar meu sobrenome?','¿Qué documentos debo cambiar después de cambiar mi apellido?','Какие документы нужно изменить после смены фамилии?']) assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
 })
-
 
 test('supplied security launch scenarios stay on the reasoning route', () => {
   const scenario = 'It is T-minus 24 hours before the launch of the company\'s flagship product. The InfoSec lead discovers a high-severity zero-day vulnerability in an open-source dependency that could allow unauthorized read access to tenant metadata. Marketing has spent $250k on non-refundable event sponsorships. The VP of Product wants to launch on time and patch the exploit next week. Deliver your risk triage and go/no-go recommendation.'
@@ -219,32 +116,11 @@ test('supplied security launch scenarios stay on the reasoning route', () => {
   assert.equal(requiresFreshExternalEvidence('Is CVE-2026-12345 still unpatched?'), true)
 })
 
-
 test('company identity questions never reach public web search, in any phrasing or platform language', () => {
-  for (const question of [
-    'what or who is signalboost and who owns it?',   // exact production phrasing 2026-08-25
-    'what is SignalBoost?',
-    'who owns SignalBoost?',
-    'who is the CEO of SignalBoost?',
-    'who founded signalboost and when?',
-    'what does the SignalBoost platform do?',
-    '¿quién es el dueño de SignalBoost?',
-    'quem é o dono da SignalBoost?',
-    'kto jest właścicielem SignalBoost?',
-    'кто владелец SignalBoost?',
-  ]) {
-    assert.equal(requiresFreshExternalEvidence(question), false, question)
-  }
-  // The exclusion is scoped to SignalBoost itself — real-world ownership stays live-verified.
-  for (const question of ['who owns Nike?', 'who is the CEO of Microsoft?']) {
-    assert.equal(requiresFreshExternalEvidence(question), true, question)
-  }
+  for (const question of ['what or who is signalboost and who owns it?','what is SignalBoost?','who owns SignalBoost?','who is the CEO of SignalBoost?','who founded signalboost and when?','what does the SignalBoost platform do?','¿quién es el dueño de SignalBoost?','quem é o dono da SignalBoost?','kto jest właścicielem SignalBoost?','кто владелец SignalBoost?']) assert.equal(requiresFreshExternalEvidence(question), false, question)
+  for (const question of ['who owns Nike?','who is the CEO of Microsoft?']) assert.equal(requiresFreshExternalEvidence(question), true, question)
 })
 
-
 test('a current-office request stays live even when it also asks for historical context', () => {
-  assert.equal(
-    requiresFreshExternalEvidence('who is the current US secretary of State and give me a list of the past secretary of state for the past 20 years'),
-    true,
-  )
+  assert.equal(requiresFreshExternalEvidence('who is the current US secretary of State and give me a list of the past secretary of state for the past 20 years'), true)
 })

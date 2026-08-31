@@ -23,6 +23,12 @@ import {
   freshEvidenceSynthesisPrompt,
   freshEvidenceSynthesisSystemPrompt,
 } from '@/lib/ai/cos/freshEvidenceSynthesisContract'
+import {
+  acceptFreshEvidencePredicateAudit,
+  applyFreshEvidencePredicateAudit,
+  freshEvidencePredicateAuditPrompt,
+  freshEvidencePredicateAuditSystemPrompt,
+} from '@/lib/ai/cos/freshEvidencePredicateAudit'
 
 export type FreshEvidenceExternalSynthesis = {
   attempted: true
@@ -34,10 +40,9 @@ export type FreshEvidenceExternalSynthesis = {
 }
 
 /**
- * Compatibility name retained for callers. The final governed provider fallback must meet the same
- * semantic scope-plan -> structural repair -> answer -> contract repair -> faithfulness review ->
- * semantic/density repair standard as local Qwen. It cannot bypass the evidence validator or use a
- * weaker release path.
+ * Compatibility name retained for callers. The governed provider fallback must meet the same
+ * scope-plan -> independent predicate audit -> answer -> contract repair -> faithfulness review
+ * standard as local COS. A provider cannot bypass the two-key binary-release rule.
  */
 export async function synthesizeFreshEvidenceExternally(args: {
   input: string
@@ -113,6 +118,32 @@ export async function synthesizeFreshEvidenceExternally(args: {
     planned = replanned
   }
 
+  const plannerPresentationMode = semanticPlan.presentationMode
+  const plannerDirectBinaryAnswerSafe = semanticPlan.directBinaryAnswerSafe
+  let predicateAudit = null
+  let auditExecution = null
+  if (plannerPresentationMode === 'direct' && plannerDirectBinaryAnswerSafe) {
+    auditExecution = await callCosTextDetailed({
+      taskId: `cos-fresh-external-predicate-audit:${args.retrievedAt}`,
+      prompt: freshEvidencePredicateAuditPrompt(args),
+      systemPrompt: freshEvidencePredicateAuditSystemPrompt(args.language),
+      modelPreference: 'gemini',
+      maxTokens: 220,
+    }).catch(() => null)
+    predicateAudit = auditExecution?.text ? acceptFreshEvidencePredicateAudit(auditExecution.text) : null
+  }
+  semanticPlan = applyFreshEvidencePredicateAudit(semanticPlan, predicateAudit)
+  console.info('[cos-fresh-external-predicate-audit]', JSON.stringify({
+    at: new Date().toISOString(),
+    auditRequired: plannerPresentationMode === 'direct' && plannerDirectBinaryAnswerSafe,
+    auditParsed: predicateAudit !== null,
+    auditBinaryVerdictSafe: predicateAudit?.binaryVerdictSafe ?? null,
+    auditRequiresNeutralEvidenceMap: predicateAudit?.requiresNeutralEvidenceMap ?? null,
+    ambiguityKinds: predicateAudit?.ambiguityKinds ?? [],
+    presentationMode: semanticPlan.presentationMode,
+    directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
+  }))
+
   let answered = await callCosTextDetailed({
     taskId: `cos-fresh-external-answer:${args.retrievedAt}`,
     prompt: freshEvidenceSynthesisPrompt({ ...args, semanticPlan }),
@@ -120,7 +151,7 @@ export async function synthesizeFreshEvidenceExternally(args: {
     modelPreference: 'gemini',
     maxTokens: 700,
   }).catch(() => null)
-  if (!answered?.text) return rejected(answered ?? planned)
+  if (!answered?.text) return rejected(answered ?? auditExecution ?? planned)
 
   let accepted = acceptFreshEvidenceSynthesis({
     text: answered.text,

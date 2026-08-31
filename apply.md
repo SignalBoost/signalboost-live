@@ -9,6 +9,7 @@ Replace or add these files inside the GitHub repo `SignalBoost/signalboost-live`
 ```
 saas/lib/ai/cos/officialSourceAuthority.ts
 saas/lib/ai/cos/cosFreshGrounding.ts
+saas/lib/ai/cos/freshEvidenceSynthesisContract.ts
 saas/tests/cosNeuralEvidenceArchitecture.node.test.ts
 ```
 
@@ -39,6 +40,9 @@ cp saas/lib/ai/cos/officialSourceAuthority.ts \
 
 cp saas/lib/ai/cos/cosFreshGrounding.ts \
    /path/to/signalboost-live/saas/lib/ai/cos/cosFreshGrounding.ts
+
+cp saas/lib/ai/cos/freshEvidenceSynthesisContract.ts \
+   /path/to/signalboost-live/saas/lib/ai/cos/freshEvidenceSynthesisContract.ts
 
 cp saas/tests/cosNeuralEvidenceArchitecture.node.test.ts \
    /path/to/signalboost-live/saas/tests/cosNeuralEvidenceArchitecture.node.test.ts

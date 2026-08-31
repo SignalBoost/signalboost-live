@@ -1,8 +1,8 @@
 # A2A Agent Fabric Onboarding Supplement
 
-Read root `ONBOARD.md` first, then `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE1-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
+Read root `ONBOARD.md` first, then `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE1-2026-08-31.md` and `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE2-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
 
-Current workstream: **A2A Agent Fabric — Phase 1 governed buyer-pluggable compatibility layer active; not Production-accepted.**
+Current workstream: **A2A Agent Fabric — Phase 2 governed non-advisory delegation + specialist-family catalog active; not Production-accepted.**
 
 Direction:
 
@@ -10,8 +10,9 @@ Direction:
 - A2A is the agent-to-agent interoperability/delegation layer.
 - MCP/Provider Hub remains the agent-to-tools/data compatibility layer.
 - SignalBoost governance remains authoritative above both protocols.
-- Buyer-owned agents, runtimes, endpoints, authentication, databases, models, and tools must remain pluggable through injected host adapters.
+- Buyer-owned agents, runtimes, endpoints, authentication, databases, models, approval systems, audit sinks, and tools must remain pluggable through injected host adapters.
 - Remote Agent Cards and advertised skills are discovery metadata only; they never self-authorize access.
-- Exact tenant/environment/portable assignments are required; no wildcard grants in Phase 1.
+- Exact tenant/environment/portable assignments are required; no wildcard grants.
 - Credentials and raw endpoint secrets remain host-owned and outside A2A core.
-- Consequential work remains subject to existing approval/audit boundaries.
+- Advisory delegation is the lowest-risk path; write delegation requires explicit approval; consequential delegation requires explicit approval plus a buyer-controlled audit sink before any remote call.
+- A2A delegation never grants MCP/Provider Hub/tool authority by implication.

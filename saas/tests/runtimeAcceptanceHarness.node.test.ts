@@ -16,14 +16,18 @@ test('acceptance harness is short-lived, production-only, canonical-host-only, a
   assert.doesNotMatch(route, /console\.(?:log|info|warn|error)\([^\n]*(?:token|password|email)/i)
 })
 
-test('harness creates one isolated authenticated user and always removes its records', () => {
-  assert.match(route, /admin\.auth\.admin\.createUser/)
-  assert.match(route, /browserSession\.auth\.signInWithPassword/)
-  assert.match(route, /admin\.auth\.admin\.deleteUser\(userId\)/)
+test('harness derives an isolated identity only from the valid token and cleans every app record', () => {
+  assert.match(route, /function acceptanceCredentials\(token: string\)/)
+  assert.match(route, /createHash\('sha256'\)\.update\(token\)/)
+  assert.match(route, /createHash\('sha256'\)\.update\(`\$\{token\}:password`\)/)
+  assert.match(route, /runtime-acceptance-\$\{identity\}@example\.com/)
+  assert.match(route, /browserSession\.auth\.signInWithPassword\(credentials\)/)
+  assert.doesNotMatch(route, /auth\.admin\.createUser|auth\.admin\.deleteUser/)
+  assert.match(route, /cleanApplicationData\(admin, userId\)/)
   assert.match(route, /countRows\(admin, 'builder_jobs', userId\)/)
   assert.match(route, /countRows\(admin, 'assistant_conversations', userId\)/)
   assert.match(route, /countRows\(admin, 'builder_workspaces', userId\)/)
-  assert.match(route, /temporary-user-and-data-cleaned/)
+  assert.match(route, /temporary-application-data-cleaned/)
 })
 
 test('Builder acceptance uses one POST, read-only polling, and durable History', () => {

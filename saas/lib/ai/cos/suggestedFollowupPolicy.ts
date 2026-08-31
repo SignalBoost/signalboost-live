@@ -55,8 +55,8 @@ export function fallbackFollowups(prompt: string, sourceCount = 0): string[] {
   }
   if (sourceCount < 1) {
     return [
-      `What do current governing bodies or statutes currently state about ${entity}?`,
-      `Where do those published rules still disagree about ${entity}?`,
+      `What considerations does the answer identify about ${entity}?`,
+      `What does the answer not establish about ${entity}?`,
     ]
   }
   if (PERSON_OR_ROLE_PROMPT.test(prompt)) {

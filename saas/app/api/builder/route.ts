@@ -145,12 +145,12 @@ export async function POST(request: Request) {
     }
 
     const files = cleanFiles(body?.files)
-    const routingContext = { attachmentNames: files.map(file => file.path) }
-    if (!isConciergeBuilderObjective(objective, routingContext)) {
-      const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'
+    const debugPlan = planDebugFileJob(objective, files)
+    if (files.length > 0 && DEBUG_OBJECTIVE.test(objective) && !debugPlan) {
+      const reply = 'COS Builder debug jobs require exactly one supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachment no larger than 128 KiB. No code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({
-        error: 'builder_objective_not_coding',
+        error: 'builder_debug_attachment_required',
         reply,
         execution_allowed: false,
         files: [],
@@ -158,12 +158,12 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    const debugPlan = planDebugFileJob(objective, files)
-    if (files.length > 0 && DEBUG_OBJECTIVE.test(objective) && !debugPlan) {
-      const reply = 'COS Builder debug jobs require exactly one supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachment no larger than 128 KiB. No code was run.'
+    const routingContext = { attachmentNames: files.map(file => file.path) }
+    if (!isConciergeBuilderObjective(objective, routingContext)) {
+      const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({
-        error: 'builder_debug_attachment_required',
+        error: 'builder_objective_not_coding',
         reply,
         execution_allowed: false,
         files: [],

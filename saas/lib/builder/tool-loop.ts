@@ -146,19 +146,27 @@ function jsonObjectCandidates(value: string | null): readonly string[] {
 }
 
 function normalizedToolInput(value: Record<string, unknown>): Record<string, unknown> | null {
-  const candidate = value.input ?? value.arguments ?? value.args ?? value.parameters
+  const candidate = value.input ?? value.tool_input ?? value.toolInput ?? value.arguments ?? value.tool_arguments ?? value.toolArguments ?? value.args ?? value.parameters ?? value.payload ?? value.data
   if (isRecord(candidate)) return candidate
-  if (typeof candidate !== 'string') return null
-  try {
-    const decoded = JSON.parse(candidate)
-    return isRecord(decoded) ? decoded : null
-  } catch {
-    return null
+  if (typeof candidate === 'string') {
+    try {
+      const decoded = JSON.parse(candidate)
+      return isRecord(decoded) ? decoded : null
+    } catch {
+      return null
+    }
   }
+  // Some OpenAI-compatible local servers flatten function arguments beside the action name.
+  // Keep only non-control fields, then apply the same per-tool validation below.
+  const controlKeys = new Set(['type', 'action', 'toolId', 'tool_id', 'tool', 'toolName', 'tool_name', 'name', 'function', 'function_call', 'tool_call', 'tool_calls'])
+  const flat = Object.fromEntries(Object.entries(value).filter(([key]) => !controlKeys.has(key)))
+  return Object.keys(flat).length > 0 ? flat : {}
 }
 
 function controlRecord(value: Record<string, unknown>): Record<string, unknown> {
   if (isRecord(value.function)) return value.function
+  if (isRecord(value.function_call)) return value.function_call
+  if (isRecord(value.tool_call)) return isRecord(value.tool_call.function) ? value.tool_call.function : value.tool_call
   if (Array.isArray(value.tool_calls) && isRecord(value.tool_calls[0])) {
     const first = value.tool_calls[0]
     return isRecord(first.function) ? first.function : first
@@ -173,10 +181,11 @@ function parse(value: string | null, allowedTools: readonly BuilderToolId[] = to
       const parsed = Array.isArray(decoded) && decoded.length === 1 ? decoded[0] : decoded
       if (!isRecord(parsed)) continue
       const control = controlRecord(parsed)
-      if ((control.type === 'answer' || control.action === 'answer') && typeof control.answer === 'string' && control.answer.trim()) {
-        return { type: 'answer', answer: control.answer }
+      if (control.type === 'answer' || control.action === 'answer') {
+        const answer = text(control.answer) || text(control.content) || text(control.message) || text(control.final) || text(control.final_answer)
+        if (answer.trim()) return { type: 'answer', answer }
       }
-      const toolId = text(control.toolId) || text(control.tool) || text(control.name) || (control.type === 'tool' ? text(control.action) : '')
+      const toolId = text(control.toolId) || text(control.tool_id) || text(control.tool) || text(control.toolName) || text(control.tool_name) || text(control.name) || (control.type === 'tool' ? text(control.action) : '') || text(control.action)
       const input = normalizedToolInput(control)
       if (!toolId || !input) continue
       if (!allowedTools.includes(toolId as BuilderToolId) || !validToolInput(toolId as BuilderToolId, input)) continue

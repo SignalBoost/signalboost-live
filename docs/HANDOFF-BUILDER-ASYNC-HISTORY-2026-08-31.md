@@ -1,0 +1,130 @@
+# Builder Async Jobs and Durable History Recovery
+
+**Date:** 2026-08-31  
+**Status:** implementation on feature branch; exact Preview, migration, Production, and authenticated runtime acceptance required
+
+## Production evidence that motivated the change
+
+A real authenticated Builder request reached the server and isolated sandbox, but the Assistant page stopped waiting before it received a terminal response. The existing recovery path then had two weaknesses:
+
+1. `/api/builder` performed the complete list/read/run/edit/rerun loop inside one browser POST.
+2. Assistant message pairs could share the same `created_at`, while History ordered only by that timestamp. A persisted assistant result could therefore be returned before its matching user message, making `findRecoveredAssistantReply` miss it.
+
+Live Production evidence before this change showed:
+
+- authenticated `GET /api/assistant/chats` returned HTTP 200;
+- owner conversations and messages existed in Production;
+- user/assistant rows frequently shared identical timestamps;
+- the prior long Builder request had no durable terminal reply before the page deadline.
+
+Therefore the primary defect was not a missing login or absent History table. It was a synchronous action contract plus nondeterministic History ordering.
+
+## New contract
+
+```text
+Assistant sends one POST /api/builder
+→ server validates auth, objective, files, conversation and workspace
+→ server creates/stages workspace
+→ atomic enqueue RPC writes:
+     user message
+     assistant "running" message
+     queued builder_jobs row linked to that assistant message
+→ POST returns 202 { jobId, workspaceId, status }
+→ Next.js after() claims and runs the job once
+→ UI polls GET /api/builder?jobId=...
+→ terminal worker updates the same assistant History row to succeeded/failed
+```
+
+Invariants:
+
+- the Builder POST is never replayed;
+- GET polling is read-only and user-scoped;
+- duplicate worker invocation cannot execute a claimed job twice;
+- a page abort does not cancel or duplicate the durable job;
+- History contains a running result before the POST returns and a terminal result after completion;
+- ordinary COS retains its short recovery window; Builder alone gets approximately 20–30 seconds of History/status polling;
+- service-role storage remains behind authenticated server routes, with RLS and no `anon`/`authenticated` table privileges.
+
+## History correction
+
+Migration `20260831172000_builder_jobs_and_history_order.sql`:
+
+- adds a durable `assistant_messages.message_order` sequence and orders transcripts by it;
+- backfills all existing rows without deleting or rewriting message content;
+- adds service-role-only `builder_jobs`;
+- atomically enqueues the user/running-assistant/job records;
+- atomically claims queued jobs;
+- atomically writes terminal job state and replaces the same running assistant message;
+- preserves the exact Builder objective and up to 16,000 characters of terminal History output.
+
+The History API now validates conversation UUIDs, reports database errors as HTTP 500 instead of silently treating them as missing, returns stale/missing threads as a truthful HTTP 200 empty transcript, disables caching, and orders messages by `message_order`.
+
+## Strict Builder routing
+
+Builder authority now requires an explicit executable coding/design action plus concrete source evidence:
+
+- supported source attachment;
+- source file/path;
+- stack trace;
+- code fence;
+- programming language tied to a coding action.
+
+The following no longer route to Builder:
+
+- `debug` or `timeout` alone;
+- pasted Vercel/gate/build logs;
+- large Assistant History/chat dumps;
+- pay-gap questions;
+- model-identity questions;
+- sports/football lists;
+- ordinary research or explanation prompts.
+
+Pasted operational logs receive deterministic analysis only and never repository/sandbox execution authority at either Builder or public Concierge ingress.
+
+## Fixed attached-file debug protocol
+
+For exactly one small `.js`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, or `.py` attachment:
+
+```text
+1. list files
+2. read only the attached source file
+3. run exactly one Node/Python command
+4. if it fails, request one minimal edit_file control
+5. recover malformed control JSON once
+6. apply at most one edit
+7. rerun the exact same command
+8. stop
+```
+
+The response records the first exit code and stderr/stack, then the exact verification command and final exit code. Coding jobs receive no cognitive-skill/verified-lesson retrieval and no live search or Knowledge Graph context.
+
+The Assistant source-file boundary exposes source extensions in the native file picker and normalizes browser MIME inconsistencies before the existing file-size and server validation paths run.
+
+## Deterministic regression coverage
+
+Mandatory deployment tests cover:
+
+- History 200/error/stale-thread behavior and deterministic ordering;
+- same-timestamp recovery;
+- atomic running→terminal History state;
+- POST 202 and read-only GET polling;
+- no Builder POST replay;
+- approximately 20–30 seconds of Builder-only recovery polling;
+- strict classifier negatives including pay-gap, model, sports, logs and History dumps;
+- attached broken-file routing;
+- one-file list/read/fail/edit/same-run/pass protocol;
+- one malformed-control recovery only;
+- source-file picker admission;
+- service-role/RLS storage boundaries.
+
+## Acceptance boundary
+
+Do not call the feature runtime-accepted until all of the following are observed on the exact Production deployment:
+
+1. History panel and `GET /api/assistant/chats?id=...` return 200 with ordered messages.
+2. A signed-in user attaches `broken.js`; Builder shows the failing stack/exit code.
+3. The same durable job applies at most one edit and the same command exits 0.
+4. Closing/aborting the page does not require Send; reopening History shows the running or terminal Builder result.
+5. `does a pay gap exist?` does not call `/api/builder`.
+
+A green Preview, applied migration, and READY Production deployment are necessary but not substitutes for these real authenticated observations.

@@ -2,22 +2,24 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { isCosCodingObjective } from '../lib/ai/cos/cosReasoningRolePolicy.ts'
+import { isConciergeBuilderObjective } from '../lib/ai/cos/cosReasoningRolePolicy.ts'
 
 const transport = fs.readFileSync(path.join(process.cwd(), 'components/AssistantTransportBoundary.tsx'), 'utf8')
 const builderRoute = fs.readFileSync(path.join(process.cwd(), 'app/api/builder/route.ts'), 'utf8')
+const migration = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20260831172000_builder_jobs_and_history_order.sql'), 'utf8')
 const assistantPage = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/assistant/page.tsx'), 'utf8')
 
-test('explicit technical repair prompts reach Builder', () => {
-  assert.equal(
-    isCosCodingObjective('Please fix the problem - https://github.com/SignalBoost/signalboost-live/'),
-    true,
-  )
-  assert.equal(isCosCodingObjective('The Builder is not working. Repair it.'), true)
-  assert.equal(isCosCodingObjective('Please fix my email grammar.'), false)
+test('only concrete coding requests reach Builder', () => {
+  assert.equal(isConciergeBuilderObjective('Please fix the problem - https://github.com/SignalBoost/signalboost-live/'), false)
+  assert.equal(isConciergeBuilderObjective('The Builder is not working. Repair it.'), false)
+  assert.equal(isConciergeBuilderObjective('Please fix my email grammar.'), false)
+  assert.equal(isConciergeBuilderObjective('Debug the attached file in Builder.', {
+    attachmentNames: ['broken.js'],
+    attachmentMimeTypes: ['text/javascript'],
+  }), true)
 })
 
-test('Builder handoff preserves the assistant conversation id', () => {
+test('Builder handoff preserves the exact assistant conversation id', () => {
   assert.match(
     transport,
     /body: JSON\.stringify\(\{ objective, files: builderFilesFromBody\(body\), conversationId \}\)/,
@@ -26,28 +28,30 @@ test('Builder handoff preserves the assistant conversation id', () => {
     transport,
     /executeBuilderFromConcierge\(originalFetch, body, userContent, conversationId, init\?\.signal/,
   )
-  assert.match(builderRoute, /conversationId = String\(body\?\.conversationId \|\| ''\)\.trim\(\)/)
+  assert.match(builderRoute, /conversationId = String\(body\?\.conversationId \|\| ''\)\.trim\(\) \|\| crypto\.randomUUID\(\)/)
   assert.match(builderRoute, /Invalid conversation id\./)
+  assert.match(migration, /p_conversation_id uuid/)
 })
 
-test('Builder persists terminal results before replying so History can recover a lost response', () => {
-  assert.match(builderRoute, /import \{ persistTurn \} from '@\/lib\/ai\/tools\/conversationHistory'/)
-  assert.match(builderRoute, /async function persistBuilderTurn/)
-  assert.match(builderRoute, /assistantReply: builderHistoryReply/)
-  assert.match(builderRoute, /Builder files:/)
+test('Builder persists running before 202 and replaces it with the terminal result', () => {
+  const enqueue = builderRoute.indexOf('await enqueueBuilderJob({')
+  const schedule = builderRoute.indexOf('after(async () => {', enqueue)
+  const accepted = builderRoute.indexOf("{ status: 202 }", schedule)
+  assert.ok(enqueue >= 0)
+  assert.ok(schedule > enqueue)
+  assert.ok(accepted > schedule)
 
-  const successPersist = builderRoute.indexOf('await persistBuilderTurn({ conversationId, userId: access.userId, objective, reply: result.answer, workspaceId, files })')
-  const successReturn = builderRoute.indexOf('return NextResponse.json({ workspaceId, reply: result.answer, files, trace })', successPersist)
-  assert.ok(successPersist >= 0)
-  assert.ok(successReturn > successPersist)
-
-  const failureBranch = builderRoute.indexOf('if (result.ok === false)')
-  const failurePersist = builderRoute.indexOf('await persistBuilderTurn({ conversationId, userId: access.userId, objective, reply, workspaceId, files })', failureBranch)
-  const failureReturn = builderRoute.indexOf('return NextResponse.json(', failurePersist)
-  assert.ok(failureBranch >= 0)
-  assert.ok(failurePersist > failureBranch)
-  assert.ok(failureReturn > failurePersist)
-
+  assert.match(migration, /insert into public\.assistant_messages[\s\S]*'running'/)
+  assert.match(migration, /update public\.assistant_messages[\s\S]*where id = v_history_message_id/)
+  assert.match(transport, /recoverAssistantReplyFromHistory/)
+  assert.match(transport, /BUILDER_HISTORY_POLL_ATTEMPTS = 11/)
+  assert.match(transport, /BUILDER_HISTORY_POLL_DELAY_MS = 2_500/)
   assert.match(assistantPage, /recoverCompletedTurn\(conversationId, content, sentAtMs\)/)
   assert.equal((assistantPage.match(/fetch\('\/api\/cos-primary'/g) ?? []).length, 1)
+})
+
+test('transport recovery never sends a second Builder POST', () => {
+  assert.equal((transport.match(/fetchImpl\('\/api\/builder',\s*\{/g) ?? []).length, 1)
+  assert.match(transport, /Polling is read-only/)
+  assert.match(transport, /never replay the action/)
 })

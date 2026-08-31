@@ -1,7 +1,7 @@
 # Builder Async Jobs and Durable History Recovery
 
 **Date:** 2026-08-31  
-**Status:** implementation on feature branch; exact Preview, migration, Production, and authenticated runtime acceptance required
+**Status:** implementation and both Production migrations applied; exact Preview, Production deployment, and authenticated runtime acceptance required
 
 ## Production evidence that motivated the change
 
@@ -33,6 +33,8 @@ Assistant sends one POST /api/builder
 → Next.js after() claims and runs the job once
 → UI polls GET /api/builder?jobId=...
 → terminal worker updates the same assistant History row to succeeded/failed
+→ if the background invocation disappears, the six-minute execution lease expires
+→ the next status or History read atomically records builder_job_worker_lost as terminal failure
 ```
 
 Invariants:
@@ -41,13 +43,14 @@ Invariants:
 - GET polling is read-only and user-scoped;
 - duplicate worker invocation cannot execute a claimed job twice;
 - a page abort does not cancel or duplicate the durable job;
-- History contains a running result before the POST returns and a terminal result after completion;
+- a lost background invocation cannot leave History permanently `running`;
+- History contains a running result before the POST returns and a terminal result after completion or lease expiry;
 - ordinary COS retains its short recovery window; Builder alone gets approximately 20–30 seconds of History/status polling;
-- service-role storage remains behind authenticated server routes, with RLS and no `anon`/`authenticated` table privileges.
+- service-role storage remains behind authenticated server routes, with RLS and no `anon`/`authenticated` table or job-RPC privileges.
 
-## History correction
+## History correction and durable jobs
 
-Migration `20260831172000_builder_jobs_and_history_order.sql`:
+Migration `20260831174502_builder_jobs_and_history_order.sql`:
 
 - adds a durable `assistant_messages.message_order` sequence and orders transcripts by it;
 - backfills all existing rows without deleting or rewriting message content;
@@ -57,7 +60,15 @@ Migration `20260831172000_builder_jobs_and_history_order.sql`:
 - atomically writes terminal job state and replaces the same running assistant message;
 - preserves the exact Builder objective and up to 16,000 characters of terminal History output.
 
-The History API now validates conversation UUIDs, reports database errors as HTTP 500 instead of silently treating them as missing, returns stale/missing threads as a truthful HTTP 200 empty transcript, disables caching, and orders messages by `message_order`.
+Migration `20260831180318_builder_job_stale_recovery.sql`:
+
+- adds a service-role-only execution-lease reconciliation RPC;
+- terminalizes queued/running jobs older than six minutes without retrying or replaying POST;
+- updates the linked assistant History row in the same transaction;
+- uses `FOR UPDATE SKIP LOCKED` so concurrent status and History reads remain idempotent;
+- has fixed `search_path` and no `anon` or `authenticated` execution privilege.
+
+The History API now validates conversation UUIDs, reports database errors as HTTP 500 instead of silently treating them as missing, returns stale/missing threads as a truthful HTTP 200 empty transcript, disables caching, orders messages by `message_order`, and reconciles expired Builder jobs before returning History.
 
 ## Strict Builder routing
 
@@ -114,8 +125,13 @@ Mandatory deployment tests cover:
 - attached broken-file routing;
 - one-file list/read/fail/edit/same-run/pass protocol;
 - one malformed-control recovery only;
+- stale worker terminalization through status polling and History;
 - source-file picker admission;
 - service-role/RLS storage boundaries.
+
+## Production database verification
+
+Both migrations are applied. A transactional stale-worker probe exercised enqueue → stale cutoff → terminal job failure → linked History update, then rolled back. Post-probe counts remained at zero Builder jobs and zero probe workspaces. The recovery function has a fixed search path, is not executable by `anon` or `authenticated`, and is executable by `service_role` only.
 
 ## Acceptance boundary
 
@@ -127,4 +143,4 @@ Do not call the feature runtime-accepted until all of the following are observed
 4. Closing/aborting the page does not require Send; reopening History shows the running or terminal Builder result.
 5. `does a pay gap exist?` does not call `/api/builder`.
 
-A green Preview, applied migration, and READY Production deployment are necessary but not substitutes for these real authenticated observations.
+A green Preview, applied migrations, and READY Production deployment are necessary but not substitutes for these real authenticated observations.

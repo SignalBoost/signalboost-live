@@ -3,17 +3,25 @@
 
 import { useEffect, type ReactNode } from 'react'
 import {
+  recoverAssistantReplyFromHistory,
   sendAssistantTurnAndRecover,
   type AssistantTransportLocale,
 } from '@/lib/ai/cos/assistantTransportClient'
-import { isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 
 type AssistantRequestBody = {
   messages?: Array<{ role?: unknown; content?: unknown }>
   context?: { conversationId?: unknown; language?: unknown }
+  attachments?: Array<{ name?: unknown; mimeType?: unknown; type?: unknown; size?: unknown; dataUrl?: unknown }>
   [key: string]: unknown
 }
+
+const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
+const BUILDER_JOB_POLL_ATTEMPTS = 20
+const BUILDER_JOB_POLL_DELAY_MS = 1_500
+const BUILDER_HISTORY_POLL_ATTEMPTS = 11
+const BUILDER_HISTORY_POLL_DELAY_MS = 2_500
 
 function parseAssistantBody(init?: RequestInit): AssistantRequestBody | null {
   if (typeof init?.body !== 'string') return null
@@ -56,56 +64,93 @@ function responseFromPayload(payload: unknown, status = 200, source?: string): R
     status,
     headers: {
       'content-type': 'application/json',
+      'cache-control': 'no-store, max-age=0',
       ...(source ? { 'x-signalboost-assistant-transport': source } : {}),
     },
   })
 }
 
-/**
- * When Builder stops without a reply, the failing reason lives in the per-round trace the
- * /api/builder 422 returns (command, exitCode, stderr) — not in the bare error code. Render a
- * compact tail of that trace so a stopped run is self-diagnosing in chat instead of opaque.
- */
-function summarizeBuilderTrace(payload: unknown): string {
-  const trace = Array.isArray((payload as any)?.trace) ? (payload as any).trace as any[] : []
-  if (trace.length === 0) return ''
-  const oneLine = (value: unknown): string => String(value ?? '').replace(/\s+/g, ' ').trim().slice(-320)
-  const tail = trace.slice(-4).map((entry) => {
-    const round = Number.isFinite(entry?.round) ? `#${entry.round}` : '#?'
-    const tool = String(entry?.toolId || 'tool')
-    const verdict = entry?.ok ? 'ok' : 'fail'
-    const bits: string[] = [`${round} ${tool} ${verdict}`]
-    if (typeof entry?.exitCode === 'number') bits.push(`exit ${entry.exitCode}`)
-    if (entry?.command) bits.push(`$ ${oneLine(entry.command).slice(0, 160)}`)
-    if (entry?.error) bits.push(oneLine(entry.error))
-    const shapeKeys = ['responseLength', 'startsWithObject', 'endsWithObject', 'hasThinkOpen', 'hasThinkClose', 'hasUnclosedObject', 'anyValidJson'] as const
-    const shape = shapeKeys.filter((key) => typeof entry?.[key] === 'number' || typeof entry?.[key] === 'boolean').map((key) => `${key}=${entry[key]}`)
-    if (shape.length) bits.push(shape.join(' '))
-    if (entry?.remediation) bits.push(oneLine(entry.remediation))
-    const stream = oneLine(entry?.stderr) || oneLine(entry?.stdout)
-    if (stream) bits.push(stream)
-    return '  ' + bits.join(' · ')
-  })
-  const fileCount = Array.isArray((payload as any)?.files) ? (payload as any).files.length : null
-  const header = fileCount === null ? 'Last builder rounds:' : `Last builder rounds (${fileCount} workspace file(s)):`
-  return `\n\n${header}\n${tail.join('\n')}`
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function builderRoutingContext(body: AssistantRequestBody) {
+  const attachments = Array.isArray(body.attachments) ? body.attachments : []
+  return {
+    attachmentNames: attachments.map(item => String(item?.name || '')),
+    attachmentMimeTypes: attachments.map(item => String(item?.mimeType || item?.type || '')),
+    attachmentSizes: attachments.map(item => Number(item?.size || 0)),
+  }
 }
 
 function builderFilesFromBody(body: AssistantRequestBody): Array<{ path: string; content: string }> {
   const attachments = Array.isArray(body.attachments) ? body.attachments : []
-  return attachments.slice(0, 20).flatMap((attachment: any) => {
+  return attachments.slice(0, 20).flatMap(attachment => {
     const path = typeof attachment?.name === 'string' ? attachment.name : ''
     const mimeType = String(attachment?.mimeType || attachment?.type || '')
     const dataUrl = typeof attachment?.dataUrl === 'string' ? attachment.dataUrl : ''
-    if (!path || !dataUrl || !(mimeType.startsWith('text/') || mimeType === 'application/json')) return []
+    const textLike = mimeType.startsWith('text/') || mimeType === 'application/json' || SOURCE_FILE.test(path)
+    if (!path || !dataUrl || !textLike) return []
     try {
-      const encoded = dataUrl.slice(dataUrl.indexOf(',') + 1)
+      const comma = dataUrl.indexOf(',')
+      const encoded = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl
       const content = new TextDecoder().decode(Uint8Array.from(atob(encoded), char => char.charCodeAt(0)))
       return content.length <= 512 * 1024 ? [{ path, content }] : []
     } catch {
       return []
     }
   })
+}
+
+function deliberateAbort(error: unknown, signal?: AbortSignal): boolean {
+  return signal?.aborted === true || (error instanceof DOMException && error.name === 'AbortError')
+}
+
+async function pollBuilderJob(
+  fetchImpl: typeof window.fetch,
+  jobId: string,
+  signal?: AbortSignal,
+): Promise<{ payload: Record<string, unknown>; status: number } | null> {
+  for (let attempt = 0; attempt < BUILDER_JOB_POLL_ATTEMPTS; attempt += 1) {
+    if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+    if (attempt > 0) await sleep(BUILDER_JOB_POLL_DELAY_MS)
+    if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+    try {
+      const response = await fetchImpl(`/api/builder?jobId=${encodeURIComponent(jobId)}`, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { accept: 'application/json' },
+        signal,
+      })
+      const payload = await response.json().catch(() => null)
+      if (!payload || typeof payload !== 'object' || Array.isArray(payload)) continue
+      const record = payload as Record<string, unknown>
+      if (response.status === 202 || record.status === 'queued' || record.status === 'running') continue
+      return { payload: record, status: response.status }
+    } catch (error) {
+      if (deliberateAbort(error, signal)) throw error
+      // Polling is read-only. A transient GET failure never causes a second Builder POST.
+    }
+  }
+  return null
+}
+
+async function recoverBuilderFromHistory(
+  fetchImpl: typeof window.fetch,
+  conversationId: string,
+  objective: string,
+  sentAtMs: number,
+): Promise<Response | null> {
+  const recovered = await recoverAssistantReplyFromHistory(objective, sentAtMs, {
+    historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,
+    historyPollAttempts: BUILDER_HISTORY_POLL_ATTEMPTS,
+    historyPollDelayMs: BUILDER_HISTORY_POLL_DELAY_MS,
+    fetchImpl,
+  })
+  return recovered
+    ? responseFromPayload({ reply: recovered, source: 'builder-history-recovery' }, 200, 'builder-history-recovery')
+    : null
 }
 
 async function executeBuilderFromConcierge(
@@ -115,20 +160,67 @@ async function executeBuilderFromConcierge(
   conversationId: string,
   signal?: AbortSignal,
 ): Promise<Response> {
-  const response = await fetchImpl('/api/builder', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    signal,
-    body: JSON.stringify({ objective, files: builderFilesFromBody(body), conversationId }),
-  })
-  const payload = await response.json().catch(() => ({ error: 'builder_response_unavailable' }))
+  const sentAtMs = Date.now()
+  let response: Response
+  try {
+    response = await fetchImpl('/api/builder', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { accept: 'application/json', 'Content-Type': 'application/json' },
+      signal,
+      body: JSON.stringify({ objective, files: builderFilesFromBody(body), conversationId }),
+    })
+  } catch (error) {
+    if (deliberateAbort(error, signal)) throw error
+    // The server may have accepted the POST before a browser transport loss. Poll durable History
+    // for 20–30 seconds, but never replay the action.
+    const recovered = await recoverBuilderFromHistory(fetchImpl, conversationId, objective, sentAtMs)
+    return recovered || responseFromPayload({
+      reply: 'The Builder request could not be confirmed. History did not show a durable running or completed job, so the action was not replayed.',
+      source: 'builder-transport-unconfirmed',
+    }, 503, 'builder-transport-unconfirmed')
+  }
+
+  const payload = await response.json().catch(() => ({ error: 'builder_response_unavailable' })) as Record<string, unknown>
+  if (response.status !== 202) {
+    return responseFromPayload({
+      ...payload,
+      reply: typeof payload.reply === 'string'
+        ? payload.reply
+        : `COS Builder stopped: ${String(payload.error || 'builder_request_failed')}`,
+    }, response.status, 'builder-backend')
+  }
+
+  const jobId = typeof payload.jobId === 'string' ? payload.jobId : ''
+  if (!jobId) {
+    const recovered = await recoverBuilderFromHistory(fetchImpl, conversationId, objective, sentAtMs)
+    return recovered || responseFromPayload({
+      reply: 'COS Builder did not return a durable job identifier. The action was not replayed.',
+      source: 'builder-job-id-missing',
+    }, 503, 'builder-job-id-missing')
+  }
+
+  const terminal = await pollBuilderJob(fetchImpl, jobId, signal)
+  if (terminal) {
+    return responseFromPayload({
+      ...terminal.payload,
+      reply: typeof terminal.payload.reply === 'string'
+        ? terminal.payload.reply
+        : `COS Builder stopped: ${String(terminal.payload.error || 'builder_job_failed')}`,
+    }, terminal.status, 'builder-job-terminal')
+  }
+
+  // The page does not wait for the entire debug lifecycle. The durable running message already
+  // exists in History and the final worker result will update that same row without another Send.
   return responseFromPayload({
     ...payload,
-    reply: typeof (payload as any)?.reply === 'string'
-      ? (payload as any).reply
-      : 'COS Builder stopped: ' + String((payload as any)?.error || 'builder_request_failed') + summarizeBuilderTrace(payload),
-  }, response.status, 'builder-backend')
+    status: 'running',
+    reply: typeof payload.reply === 'string'
+      ? payload.reply
+      : `COS Builder is running job ${jobId}. The final result will appear in History.`,
+  }, 202, 'builder-job-running')
 }
+
 async function executeArtifactFromConcierge(
   fetchImpl: typeof window.fetch,
   objective: string,
@@ -142,22 +234,14 @@ async function executeArtifactFromConcierge(
   })
   const payload = await response.json().catch(() => ({ error: 'artifact_response_unavailable' }))
   return responseFromPayload({
-    ...payload,
+    ...(payload as Record<string, unknown>),
     reply: typeof (payload as any)?.reply === 'string'
       ? (payload as any).reply
       : 'COS could not create that file: ' + String((payload as any)?.error || 'artifact_request_failed'),
   }, response.status, 'artifact-backend')
 }
 
-
-/**
- * Transport continuity boundary for the authorized owner Assistant only.
- *
- * The existing page keeps its own deadline and Stop button. This wrapper handles the browser-only
- * failure observed in Production (`TypeError: Failed to fetch`) without replaying the POST. It polls
- * the exact conversation History and returns a synthetic response only when the original response
- * was lost. AbortError is deliberately rethrown so the page can still distinguish Stop/deadline.
- */
+/** Transport and internal-tool boundary for the authorized owner Assistant. */
 export default function AssistantTransportBoundary({ children }: { children: ReactNode }) {
   useEffect(() => {
     const originalFetch = window.fetch.bind(window)
@@ -170,15 +254,15 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
       const userContent = body ? latestUserContent(body) : ''
       if (!body || !conversationId || !userContent) return originalFetch(input, init)
 
-      // Files are internal Concierge tools. An explicit PDF/TXT request creates a download;
-      // coding tasks invoke Builder. Everything else remains the normal COS answer path.
       if (isConciergeArtifactObjective(userContent)) {
         return executeArtifactFromConcierge(originalFetch, userContent, init?.signal ?? undefined)
       }
-      if (isCosCodingObjective(userContent)) {
+      if (isConciergeBuilderObjective(userContent, builderRoutingContext(body))) {
         return executeBuilderFromConcierge(originalFetch, body, userContent, conversationId, init?.signal ?? undefined)
       }
 
+      // Ordinary COS remains a short transport-recovery path. The longer 20–30 second History
+      // polling window is reserved only for an accepted Builder action.
       const result = await sendAssistantTurnAndRecover(userContent, body as Record<string, unknown>, {
         sendUrl: '/api/cos-primary',
         historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,

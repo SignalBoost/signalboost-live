@@ -34,6 +34,14 @@ export type AssistantTransportClientOptions = {
   shouldRecoverTransportFailure?: (error: unknown) => boolean
 }
 
+export type AssistantHistoryRecoveryOptions = Readonly<{
+  historyUrl: string
+  historyPollAttempts?: number
+  historyPollDelayMs?: number
+  fetchImpl?: typeof fetch
+  sleep?: (ms: number) => Promise<void>
+}>
+
 function text(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
 }
@@ -71,9 +79,9 @@ async function readPayload(response: Response): Promise<ReadPayload> {
   }
 }
 
-async function loadHistory(
+export async function loadAssistantHistory(
   historyUrl: string,
-  fetchImpl: typeof fetch,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<StoredAssistantMessage[]> {
   const response = await fetchImpl(historyUrl, {
     method: 'GET',
@@ -92,6 +100,30 @@ async function loadHistory(
   return []
 }
 
+/** Read-only polling of one durable conversation. It never sends or replays an action. */
+export async function recoverAssistantReplyFromHistory(
+  userContent: string,
+  sentAtMs: number,
+  options: AssistantHistoryRecoveryOptions,
+): Promise<string | null> {
+  const fetchImpl = options.fetchImpl ?? fetch
+  const sleep = options.sleep ?? ((ms: number) => new Promise(resolve => setTimeout(resolve, ms)))
+  const attempts = Math.max(1, Math.min(20, options.historyPollAttempts ?? 4))
+  const delayMs = Math.max(250, Math.min(5_000, options.historyPollDelayMs ?? 1_200))
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    if (attempt > 0) await sleep(delayMs)
+    try {
+      const messages = await loadAssistantHistory(options.historyUrl, fetchImpl)
+      const reply = findRecoveredAssistantReply(messages, userContent, sentAtMs)
+      if (reply) return reply
+    } catch {
+      // A History read failure must not trigger a POST or hide the original transport loss.
+    }
+  }
+  return null
+}
+
 /**
  * Owner-assistant send path.
  *
@@ -107,10 +139,7 @@ export async function sendAssistantTurnAndRecover(
   options: AssistantTransportClientOptions,
 ): Promise<AssistantSendResult> {
   const fetchImpl = options.fetchImpl ?? fetch
-  const sleep = options.sleep ?? ((ms: number) => new Promise(resolve => setTimeout(resolve, ms)))
   const locale = options.locale ?? 'en'
-  const attempts = Math.max(1, Math.min(8, options.historyPollAttempts ?? 4))
-  const delayMs = Math.max(250, Math.min(5_000, options.historyPollDelayMs ?? 1_200))
   const sentAtMs = Date.now()
 
   try {
@@ -130,8 +159,14 @@ export async function sendAssistantTurnAndRecover(
     if (response.ok && live) return { ok: true, source: 'live', content: live, raw: payload }
 
     if (response.ok || !parsed || [408, 504, 524].includes(response.status)) {
-      const recovered = await recoverFromHistory(userContent, sentAtMs, options, fetchImpl, sleep, attempts, delayMs)
-      if (recovered) return recovered
+      const recovered = await recoverAssistantReplyFromHistory(userContent, sentAtMs, {
+        historyUrl: options.historyUrl,
+        historyPollAttempts: options.historyPollAttempts,
+        historyPollDelayMs: options.historyPollDelayMs,
+        fetchImpl,
+        sleep: options.sleep,
+      })
+      if (recovered) return { ok: true, source: 'recovered', content: recovered }
     }
 
     if (!response.ok && live) {
@@ -149,8 +184,14 @@ export async function sendAssistantTurnAndRecover(
     if (!isAssistantTransportFailure(error)) throw error
     if (options.shouldRecoverTransportFailure && !options.shouldRecoverTransportFailure(error)) throw error
 
-    const recovered = await recoverFromHistory(userContent, sentAtMs, options, fetchImpl, sleep, attempts, delayMs)
-    if (recovered) return recovered
+    const recovered = await recoverAssistantReplyFromHistory(userContent, sentAtMs, {
+      historyUrl: options.historyUrl,
+      historyPollAttempts: options.historyPollAttempts,
+      historyPollDelayMs: options.historyPollDelayMs,
+      fetchImpl,
+      sleep: options.sleep,
+    })
+    if (recovered) return { ok: true, source: 'recovered', content: recovered }
     return {
       ok: false,
       source: 'transport',
@@ -158,26 +199,4 @@ export async function sendAssistantTurnAndRecover(
       content: timeoutCopy(locale),
     }
   }
-}
-
-async function recoverFromHistory(
-  userContent: string,
-  sentAtMs: number,
-  options: AssistantTransportClientOptions,
-  fetchImpl: typeof fetch,
-  sleep: (ms: number) => Promise<void>,
-  attempts: number,
-  delayMs: number,
-): Promise<AssistantSendResult | null> {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    if (attempt > 0) await sleep(delayMs)
-    try {
-      const messages = await loadHistory(options.historyUrl, fetchImpl)
-      const reply = findRecoveredAssistantReply(messages, userContent, sentAtMs)
-      if (reply) return { ok: true, source: 'recovered', content: reply }
-    } catch {
-      // A History read failure must not trigger a second POST or hide the original transport loss.
-    }
-  }
-  return null
 }

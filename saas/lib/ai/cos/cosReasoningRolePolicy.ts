@@ -1,3 +1,5 @@
+import { isPastedOperationalLog } from './pastedOperationalLog.ts'
+
 export type CosSpecialistRole = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher'
 
 export type CosReasoningRoleDecision = {
@@ -5,6 +7,12 @@ export type CosReasoningRoleDecision = {
   reason: string
   objective: string
 }
+
+export type CosCodingRoutingContext = Readonly<{
+  attachmentNames?: readonly string[]
+  attachmentMimeTypes?: readonly string[]
+  attachmentSizes?: readonly number[]
+}>
 
 export const COS_ROLE_TOKEN_CAPS: Readonly<Record<CosSpecialistRole, number>> = {
   primary: 6000,
@@ -35,41 +43,81 @@ export function cosRoutingObjective(prompt: string): string {
   return clean(text, 2000)
 }
 
-const CODE_SIGNAL = /\b(code|coding|function|script|typescript|javascript|node(?:\.js)?|npm|pnpm|bun|python|sql|query|regex|api call|implement|implementation|refactor|compile|compiler|stack trace|bug|patch|repository|pull request|commit|create (?:a )?file|run (?:the )?(?:file|code|command))\b|\b(?:design|build|create)\s+(?:a\s+)?(?:website|web\s*page|landing page|dashboard|user interface|ui|component|mockup|prototype)\b/i
-const CONCIERGE_BUILDER_ACTION = /\b(?:debug|fix|repair|refactor|implement|compile|write)\b|\b(?:create|build)\s+(?:a\s+)?(?:file|script|function|class|html|css|app|test)\b|\b(?:design|build|create)\s+(?:(?:a|an|the|my|me|us)\s+){0,2}(?:(?:responsive|modern|simple|full|new|mobile|web|marketing|interactive|custom|professional)\s+){0,3}(?:website|web\s*page|landing page|dashboard|user interface|ui|component|mockup|prototype)\b/i
 const DESIGN_ARTIFACT_SIGNAL = /\b(?:website|web\s*page|landing(?:\s|-)?page|dashboard|user interface|ui|component|mockup|prototype)\b/i
 const DESIGN_REQUEST_SIGNAL = /(?:^(?:please\s+)?(?:design|build|create|make)\b|\b(?:can|could)\s+you\b|\b(?:i\s+(?:need|want|would\s+like)|give\s+me|help\s+me)\b)/i
-const TECHNICAL_REPAIR_ACTION = /\b(?:debug|fix|repair|troubleshoot|resolve|correct)\b|\b(?:not\s+working|broken|failing)\b/i
-const TECHNICAL_REPAIR_TARGET = /\b(?:builder|code|coding|function|script|typescript|javascript|node(?:\.js)?|npm|pnpm|bun|python|sql|regex|api|endpoint|route|test|build|deployment|repository|repo|github|branch|pull request|commit|website|web\s*page|dashboard|component|app|file)\b|https?:\/\/(?:www\.)?github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[^\s]*)?/i
+const CODE_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct|implement|refactor|compile|write|run|execute|test)\b|\b(?:create|build|make)\s+(?:a\s+|an\s+|the\s+)?(?:file|script|function|class|component|api|endpoint|test|app|program|module)\b/i
+const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:not\s+working|does(?:\s+not|n't)\s+work|broken|failing|throws?|crashes?)\b/i
+const CODE_LANGUAGE = /\b(?:javascript|typescript|node(?:\.js)?|python|react|next(?:\.js)?|html|css|sql|bash|shell|java|c\+\+|c#|golang|go|rust|php|ruby|swift|kotlin|tsx|jsx)\b/i
+const FILE_REFERENCE = /(?:^|[\s`'"(])(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)(?=$|[\s`'"),:.])/i
+const STACK_TRACE = /\b(?:TypeError|ReferenceError|SyntaxError|RangeError|ModuleNotFoundError|Traceback \(most recent call last\)|npm ERR!|ERR_[A-Z_]+)\b|\bat\s+[^\n]+\([^\n()]+:\d+:\d+\)|\bFile\s+"[^"]+",\s+line\s+\d+/i
+const CODE_FENCE = /```(?:javascript|typescript|js|ts|tsx|jsx|python|py|sql|bash|sh|html|css|json)?\s*[\s\S]{12,}```/i
+const CODE_NOUN = /\b(?:code|function|script|class|component|endpoint|api route|test case|regular expression|regex|query)\b/i
+const EXPLICIT_CODE_QUESTION = /\b(?:how do i|how can i|show me how to|write|give me|create|implement)\b[\s\S]{0,100}\b(?:code|function|script|class|component|endpoint|regex|query)\b/i
+const SOURCE_ATTACHMENT = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
+const NON_CODING_TOPIC = /\b(?:pay gap|gender wage|football|soccer|sports? standings?|sports? list|schools? of samba|secretar(?:y|ies) of state|who is the model|what model are you|current president)\b/i
+const TRANSCRIPT_MARKER = /\b(?:assistant|user|system|history|conversation|copy response|copy question)\s*:/gi
 
 function isDesignBuildRequest(prompt: string): boolean {
   const objective = cosRoutingObjective(prompt)
   return DESIGN_ARTIFACT_SIGNAL.test(objective) && DESIGN_REQUEST_SIGNAL.test(objective)
 }
 
-function isTechnicalRepairRequest(prompt: string): boolean {
+function sourceAttachment(context?: CosCodingRoutingContext): boolean {
+  const names = Array.isArray(context?.attachmentNames) ? context.attachmentNames : []
+  return names.some(name => SOURCE_ATTACHMENT.test(String(name || '').trim()))
+}
+
+function hugeTranscriptOrDump(prompt: string): boolean {
+  const raw = String(prompt || '')
+  if (raw.length > 64_000) return true
+  const markers = raw.match(TRANSCRIPT_MARKER)?.length ?? 0
+  return raw.length > 16_000 && markers >= 12
+}
+
+function concreteCodeEvidence(prompt: string, context?: CosCodingRoutingContext): boolean {
   const objective = cosRoutingObjective(prompt)
-  return TECHNICAL_REPAIR_ACTION.test(objective) && TECHNICAL_REPAIR_TARGET.test(objective)
+  return sourceAttachment(context)
+    || FILE_REFERENCE.test(objective)
+    || STACK_TRACE.test(objective)
+    || CODE_FENCE.test(objective)
+    || CODE_LANGUAGE.test(objective)
+}
+
+function excludedFromBuilder(prompt: string): boolean {
+  const raw = String(prompt || '')
+  const objective = cosRoutingObjective(raw)
+  return isPastedOperationalLog(raw)
+    || hugeTranscriptOrDump(raw)
+    || NON_CODING_TOPIC.test(objective)
+}
+
+/** Broad worker selection for the authorized COS UI. */
+export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
+  if (excludedFromBuilder(prompt)) return false
+  const objective = cosRoutingObjective(prompt)
+  if (isDesignBuildRequest(objective)) return true
+  const evidence = concreteCodeEvidence(objective, context)
+  if (DEBUG_ACTION.test(objective)) return evidence
+  if (CODE_ACTION.test(objective)) return evidence || (CODE_NOUN.test(objective) && CODE_LANGUAGE.test(objective))
+  return evidence && EXPLICIT_CODE_QUESTION.test(objective)
+}
+
+/**
+ * Public Concierge starts Builder only for an explicit executable coding/design request with
+ * concrete source evidence. The word “debug”, a timeout report, a log dump, or a general factual
+ * question cannot acquire sandbox authority.
+ */
+export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
+  if (excludedFromBuilder(prompt)) return false
+  const objective = cosRoutingObjective(prompt)
+  if (isDesignBuildRequest(objective)) return true
+  if (!CODE_ACTION.test(objective)) return false
+  return concreteCodeEvidence(objective, context)
 }
 
 const CURRENT_SIGNAL = /\b(current|currently|today|right now|as of now|latest|most recent|this (?:year|month|week)|live evidence|verify current|office holder)\b/i
 const CRITIC_SIGNAL = /\b(diagnos|root cause|troubleshoot|incident|outage|latency|p9[59]|timeout|regression|failure mode|why (?:is|are|did|does).*(?:slow|fail|error|down|spike)|critique|audit|stress[- ]?test|find (?:the )?(?:flaw|weakness|problem))\b/i
 const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|difference between|what (?:is|are)|define|definition|who (?:is|was|are|were)|company|organization|organisation|architecture|mechanism|explain)\b/i
-
-/** Broad worker selection for the authorized COS UI. */
-export function isCosCodingObjective(prompt: string): boolean {
-  const objective = cosRoutingObjective(prompt)
-  return CODE_SIGNAL.test(objective) || isTechnicalRepairRequest(objective) || isDesignBuildRequest(objective)
-}
-
-/**
- * Public Concierge may start Builder only for an action the user explicitly asked it to perform.
- * This is intentionally narrower than worker selection: “What is a SQL query?” is a COS answer,
- * not an authenticated sandbox task.
- */
-export function isConciergeBuilderObjective(prompt: string): boolean {
-  return CONCIERGE_BUILDER_ACTION.test(cosRoutingObjective(prompt)) || isDesignBuildRequest(prompt)
-}
 
 /** Deterministic, zero-model-call task routing. */
 export function selectCosReasoningWorkerRole(prompt: string): CosReasoningRoleDecision {

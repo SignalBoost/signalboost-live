@@ -11,16 +11,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAccess } from '@/lib/auth/access'
+import { reconcileStaleBuilderJobs } from '@/lib/builder/job-store'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function response(payload: unknown, init?: ResponseInit): NextResponse {
+  const result = NextResponse.json(payload, init)
+  result.headers.set('Cache-Control', 'no-store, max-age=0')
+  return result
+}
+
 function supabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false, autoRefreshToken: false } },
-  )
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  if (!url || !key) throw new Error('assistant_history_storage_unavailable')
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 }
 
 async function authedUserId(): Promise<string | null> {
@@ -32,91 +40,110 @@ async function authedUserId(): Promise<string | null> {
   }
 }
 
+async function reconcileBuilderHistory(userId: string, conversationId?: string | null): Promise<void> {
+  try {
+    await reconcileStaleBuilderJobs({ userId, conversationId: conversationId || null })
+  } catch (error) {
+    // History must remain readable during a staggered migration or transient reconciliation failure.
+    console.error('[assistant_history_builder_recovery_failed]', {
+      conversationId: conversationId || null,
+      message: error instanceof Error ? error.message : 'unknown',
+    })
+  }
+}
+
 export async function GET(req: NextRequest) {
   const userId = await authedUserId()
-  if (!userId) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
+  if (!userId) return response({ error: 'Not authenticated' }, { status: 401 })
 
-  const db = supabaseAdmin()
-  const id = req.nextUrl.searchParams.get('id')
+  try {
+    const db = supabaseAdmin()
+    const id = req.nextUrl.searchParams.get('id')
+    if (id && !UUID.test(id)) return response({ error: 'Invalid conversation id' }, { status: 400 })
 
-  if (id) {
-    const { data: conv } = await db
+    // A killed `after()` invocation cannot leave History permanently at "Builder is running".
+    // Reconciliation only terminalizes jobs older than the six-minute execution lease.
+    await reconcileBuilderHistory(userId, id)
+
+    if (id) {
+      const { data: conv, error: conversationError } = await db
+        .from('assistant_conversations')
+        .select('id, title, summary, message_count, created_at, updated_at')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (conversationError) {
+        console.error('[assistant_history_conversation_read_failed]', { message: conversationError.message })
+        return response({ error: 'Could not load conversation' }, { status: 500 })
+      }
+      if (!conv) {
+        // Missing/stale thread IDs remain a truthful 200 empty transcript so New chat can recover.
+        return response({ conversation: null, messages: [], missing: true })
+      }
+
+      const { data: messages, error: messagesError } = await db
+        .from('assistant_messages')
+        .select('id, role, content, created_at, message_order, provenance')
+        .eq('conversation_id', id)
+        .eq('user_id', userId)
+        .order('message_order', { ascending: true })
+      if (messagesError) {
+        console.error('[assistant_history_message_read_failed]', { message: messagesError.message })
+        return response({ error: 'Could not load messages' }, { status: 500 })
+      }
+
+      return response({ conversation: conv, messages: messages ?? [] })
+    }
+
+    const { data: conversations, error } = await db
       .from('assistant_conversations')
       .select('id, title, summary, message_count, created_at, updated_at')
-      .eq('id', id)
       .eq('user_id', userId)
-      .maybeSingle()
-    if (!conv) {
-      // Missing id used to 404 and break History / transport recovery.
-      // Return an empty transcript so the UI can open a new thread.
-      return NextResponse.json({
-        conversation: null,
-        messages: [],
-        missing: true,
-      })
-    }
-
-    const { data: messages, error } = await db
-      .from('assistant_messages')
-      .select('role, content, created_at')
-      .eq('conversation_id', id)
-      .eq('user_id', userId)
-      .order('created_at', { ascending: true })
+      .order('updated_at', { ascending: false })
+      .limit(100)
     if (error) {
-      return NextResponse.json({ error: 'Could not load messages' }, { status: 500 })
+      console.error('[assistant_history_list_failed]', { message: error.message })
+      return response({ error: 'Could not load conversations' }, { status: 500 })
     }
 
-    return NextResponse.json({ conversation: conv, messages: messages ?? [] })
+    return response({ conversations: conversations ?? [] })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'assistant_history_failed'
+    console.error('[assistant_history_failed]', { message })
+    return response({ error: 'Could not load history' }, { status: 500 })
   }
-
-  const { data: conversations, error } = await db
-    .from('assistant_conversations')
-    .select('id, title, summary, message_count, created_at, updated_at')
-    .eq('user_id', userId)
-    .order('updated_at', { ascending: false })
-    .limit(100)
-  if (error) {
-    return NextResponse.json({ error: 'Could not load conversations' }, { status: 500 })
-  }
-
-  return NextResponse.json({ conversations: conversations ?? [] })
 }
 
 export async function DELETE(req: NextRequest) {
   const userId = await authedUserId()
-  if (!userId) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-  }
+  if (!userId) return response({ error: 'Not authenticated' }, { status: 401 })
 
-  const db = supabaseAdmin()
-  const params = req.nextUrl.searchParams
+  try {
+    const db = supabaseAdmin()
+    const params = req.nextUrl.searchParams
 
-  if (params.get('all') === 'true') {
-    const { data, error } = await db
+    if (params.get('all') === 'true') {
+      const { data, error } = await db
+        .from('assistant_conversations')
+        .delete()
+        .eq('user_id', userId)
+        .select('id')
+      if (error) return response({ error: 'Delete failed' }, { status: 500 })
+      return response({ deleted: 'all', count: data?.length ?? 0 })
+    }
+
+    const id = params.get('id')
+    if (!id) return response({ error: 'Provide id or all=true' }, { status: 400 })
+    if (!UUID.test(id)) return response({ error: 'Invalid conversation id' }, { status: 400 })
+
+    const { error } = await db
       .from('assistant_conversations')
       .delete()
+      .eq('id', id)
       .eq('user_id', userId)
-      .select('id')
-    if (error) {
-      return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
-    }
-    return NextResponse.json({ deleted: 'all', count: data?.length ?? 0 })
+    if (error) return response({ error: 'Delete failed' }, { status: 500 })
+    return response({ deleted: id })
+  } catch {
+    return response({ error: 'Delete failed' }, { status: 500 })
   }
-
-  const id = params.get('id')
-  if (!id) {
-    return NextResponse.json({ error: 'Provide id or all=true' }, { status: 400 })
-  }
-
-  const { error } = await db
-    .from('assistant_conversations')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', userId)
-  if (error) {
-    return NextResponse.json({ error: 'Delete failed' }, { status: 500 })
-  }
-  return NextResponse.json({ deleted: id })
 }

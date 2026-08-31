@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAccess } from '@/lib/auth/access'
+import { reconcileStaleBuilderJobs } from '@/lib/builder/job-store'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,6 +40,18 @@ async function authedUserId(): Promise<string | null> {
   }
 }
 
+async function reconcileBuilderHistory(userId: string, conversationId?: string | null): Promise<void> {
+  try {
+    await reconcileStaleBuilderJobs({ userId, conversationId: conversationId || null })
+  } catch (error) {
+    // History must remain readable during a staggered migration or transient reconciliation failure.
+    console.error('[assistant_history_builder_recovery_failed]', {
+      conversationId: conversationId || null,
+      message: error instanceof Error ? error.message : 'unknown',
+    })
+  }
+}
+
 export async function GET(req: NextRequest) {
   const userId = await authedUserId()
   if (!userId) return response({ error: 'Not authenticated' }, { status: 401 })
@@ -46,9 +59,13 @@ export async function GET(req: NextRequest) {
   try {
     const db = supabaseAdmin()
     const id = req.nextUrl.searchParams.get('id')
+    if (id && !UUID.test(id)) return response({ error: 'Invalid conversation id' }, { status: 400 })
+
+    // A killed `after()` invocation cannot leave History permanently at "Builder is running".
+    // Reconciliation only terminalizes jobs older than the six-minute execution lease.
+    await reconcileBuilderHistory(userId, id)
 
     if (id) {
-      if (!UUID.test(id)) return response({ error: 'Invalid conversation id' }, { status: 400 })
       const { data: conv, error: conversationError } = await db
         .from('assistant_conversations')
         .select('id, title, summary, message_count, created_at, updated_at')

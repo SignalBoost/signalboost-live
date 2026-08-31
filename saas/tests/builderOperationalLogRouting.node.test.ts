@@ -18,7 +18,12 @@ test('Builder gives owner build failures an executable repository-repair path be
 
 test('unrecognized or non-owner logs retain a non-executing diagnostic fallback', () => {
   const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /if \(repair\) return NextResponse\.json\(repair\.payload/)
-  assert.match(route, /reply: operationalLogReply\(rawObjective\)/)
+  assert.match(route, /if \(repair\) \{/)
+  assert.match(
+    route,
+    /await persistBuilderTurn\(\{ conversationId, userId: access\.userId, objective: rawObjective, reply, workspaceId, files \}\)/,
+  )
+  assert.match(route, /return NextResponse\.json\(repair\.payload, \{ status: repair\.status \}\)/)
+  assert.match(route, /const reply = operationalLogReply\(rawObjective\)/)
   assert.match(route, /execution_allowed: false/)
 })

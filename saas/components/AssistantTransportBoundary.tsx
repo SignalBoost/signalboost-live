@@ -112,13 +112,14 @@ async function executeBuilderFromConcierge(
   fetchImpl: typeof window.fetch,
   body: AssistantRequestBody,
   objective: string,
+  conversationId: string,
   signal?: AbortSignal,
 ): Promise<Response> {
   const response = await fetchImpl('/api/builder', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal,
-    body: JSON.stringify({ objective, files: builderFilesFromBody(body) }),
+    body: JSON.stringify({ objective, files: builderFilesFromBody(body), conversationId }),
   })
   const payload = await response.json().catch(() => ({ error: 'builder_response_unavailable' }))
   return responseFromPayload({
@@ -175,7 +176,7 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
         return executeArtifactFromConcierge(originalFetch, userContent, init?.signal ?? undefined)
       }
       if (isCosCodingObjective(userContent)) {
-        return executeBuilderFromConcierge(originalFetch, body, userContent, init?.signal ?? undefined)
+        return executeBuilderFromConcierge(originalFetch, body, userContent, conversationId, init?.signal ?? undefined)
       }
 
       const result = await sendAssistantTurnAndRecover(userContent, body as Record<string, unknown>, {

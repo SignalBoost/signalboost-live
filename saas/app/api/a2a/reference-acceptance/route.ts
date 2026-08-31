@@ -1,15 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createInMemoryA2AAgentRegistry } from '@/a2a-host/a2a-agent-registry'
 import { createA2AHttpJsonRpcTransportFactory, fetchA2AAgentCard } from '@/a2a-host/a2a-http-jsonrpc-transport'
 import { runA2ALiveAcceptance } from '@/a2a-host/a2a-live-acceptance'
+import { referenceDiagnosticEndpoint } from '@/a2a-host/reference-a2a-config'
 import { REFERENCE_DIAGNOSTIC_AGENT_ID, REFERENCE_DIAGNOSTIC_SKILL_ID } from '@/a2a-host/reference-self-healing-diagnostic'
+import { requireOwner } from '@/lib/auth/access'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
-  const origin = request.nextUrl.origin
-  const endpoint = new URL('/api/a2a/reference-diagnostic', origin).toString()
+export async function POST() {
+  const guard = await requireOwner()
+  if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
+
+  let endpoint: string
+  try { endpoint = referenceDiagnosticEndpoint() } catch {
+    return NextResponse.json({ ok: false, error: 'a2a_reference_origin_unconfigured' }, { status: 503 })
+  }
   const tenantId = 'signalboost-reference'
   const environmentId = process.env.VERCEL_ENV || process.env.NODE_ENV || 'development'
   const portableId = 'signalboost-reference-acceptance'
@@ -44,7 +51,11 @@ export async function GET(request: NextRequest) {
     const record = await runA2ALiveAcceptance({
       registry,
       transportFactory,
-      fetchAgentCard: () => fetchA2AAgentCard({ url: endpoint }),
+      fetchAgentCard: async () => {
+        const card = await fetchA2AAgentCard({ url: endpoint }) as Record<string, unknown>
+        if (card.url !== endpoint) throw new Error('a2a_reference_agent_card_endpoint_mismatch')
+        return card
+      },
       tenantId,
       environmentId,
       portableId,
@@ -56,12 +67,7 @@ export async function GET(request: NextRequest) {
       traceId: `reference-live-${Date.now()}`,
       timeoutMs: 10_000,
     })
-    return NextResponse.json({
-      ok: true,
-      acceptanceClass: 'signalboost-reference-live',
-      buyerAccepted: false,
-      record,
-    }, { headers: { 'cache-control': 'no-store' } })
+    return NextResponse.json({ ok: true, acceptanceClass: 'signalboost-reference-live', buyerAccepted: false, record }, { headers: { 'cache-control': 'no-store' } })
   } catch (error) {
     return NextResponse.json({
       ok: false,

@@ -87,6 +87,18 @@ test('general temporal classes cover roles, ongoing state, releases, rules, secu
   }
 })
 
+test('normative organized-sport eligibility is mutable policy state and requires live evidence', () => {
+  for (const prompt of [
+    "should men play in women' sport?",
+    'Should this athlete be allowed to compete in the women’s category?',
+    'Can this group participate in the female sports division?',
+  ]) {
+    const classification = classifyTemporalSensitivity(prompt)
+    assert.equal(classification.sensitive, true, prompt)
+    assert.equal(classification.kind, 'current_rule', prompt)
+  }
+})
+
 test('ordinary timeless technical and creative questions are never flagged', () => {
   for (const prompt of [
     'explain how connection pooling works',
@@ -94,6 +106,7 @@ test('ordinary timeless technical and creative questions are never flagged', () 
     'describe the difference between Enterprise Memory and Semantic Cache',
     'write a migration to add an index',
     'how should I market my latest product?',
+    'should children play outside more often?',
   ]) {
     assert.equal(classifyTemporalSensitivity(prompt).sensitive, false, `should not flag: ${prompt}`)
   }

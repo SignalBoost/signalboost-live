@@ -58,7 +58,7 @@ export function createPlatformImagePort(): CosImagePort {
         const response = await fetch('https://api.deepinfra.com/v1/openai/images/generations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-          body: JSON.stringify({ model: 'black-forest-labs/FLUX-1-schnell', prompt, size, n: 1 }),
+          body: JSON.stringify({ model: 'black-forest-labs/FLUX-2-klein-4b', prompt, size, n: 1 }),
         })
         const raw = await response.text()
         let data: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } | string; detail?: string | { message?: string }; message?: string } = {}

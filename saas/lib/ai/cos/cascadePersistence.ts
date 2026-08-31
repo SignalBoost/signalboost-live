@@ -12,6 +12,32 @@ function safePlan(plan: CascadePlan): CascadePlan | null {
   }
 }
 
+export async function latestCascadeRootForUser(
+  userId: string,
+  currentAssistantReply?: string,
+): Promise<string | null> {
+  if (!userId) return null
+  const db = cosServiceDb()
+  if (!db) return null
+  try {
+    const { data: rows, error } = await db.from('assistant_messages')
+      .select('content,provenance').eq('user_id', userId).eq('role', 'assistant')
+      .order('created_at', { ascending: false }).limit(20)
+    if (error) throw error
+    for (const row of rows ?? []) {
+      if (currentAssistantReply && assistantContentMatchesForProvenance(row?.content, currentAssistantReply)) continue
+      const provenance = row?.provenance
+      if (!provenance || typeof provenance !== 'object' || Array.isArray(provenance)) continue
+      const root = String((provenance as any)?.cascade?.root_question || '').trim()
+      if (root) return root.slice(0, 240)
+    }
+    return null
+  } catch (error) {
+    console.error('cascadePersistence: root lookup failed', error)
+    return null
+  }
+}
+
 /**
  * Stores the validated cascade plan beside the exact assistant turn that rendered its chips.
  * This is lineage metadata only; it never upgrades assistant prose into factual evidence.

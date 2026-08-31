@@ -394,10 +394,11 @@ export function prepareFreshEvidence(results: SearchResult[], limit = 8, query =
 export function prepareFreshEvidenceAcrossQueries(
   resultGroups: SearchResult[][],
   totalBudget = FRESH_SELECTED_EVIDENCE_BUDGET,
+  query = '',
 ): FreshEvidenceSource[] {
   const perQueryBudget = Math.max(1, Math.floor(totalBudget / Math.max(1, resultGroups.length)))
   return resultGroups
-    .flatMap(results => prepareFreshEvidence(results, perQueryBudget))
+    .flatMap(results => prepareFreshEvidence(results, perQueryBudget, query))
     .slice(0, totalBudget)
     .map((source, index) => ({ ...source, id: `LIVE${index + 1}` }))
 }

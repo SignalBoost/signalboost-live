@@ -701,6 +701,7 @@ async function tryFreshCurrentFact(input: {
   let sources = prepareFreshEvidenceAcrossQueries(
     liveResponses.flatMap(response => response.ok ? [response.results] : []),
     FRESH_SELECTED_EVIDENCE_BUDGET,
+    input.prompt,
   )
   const claimResearch = await deepenClaimResearch(input.prompt, sources, readPublicPages)
   sources = claimResearch.sources

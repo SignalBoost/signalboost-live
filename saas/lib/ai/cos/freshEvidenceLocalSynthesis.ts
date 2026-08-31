@@ -1,7 +1,7 @@
 // TIER 2 OF THE FRESHNESS LADDER — bounded local Qwen reasoning over this-turn live evidence.
 // Semantic interpretation is model-owned: Qwen plans the materially distinct evidence scopes,
-// writes the answer under that plan, and neurally reviews multi-scope answers for faithfulness.
-// Deterministic code validates structure, evidence ids, citation policy and output density only.
+// an independent neural audit separately certifies whether binary framing is semantically safe,
+// then Qwen writes and reviews the answer. Deterministic code combines verdicts conservatively.
 
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
@@ -33,6 +33,13 @@ import {
   type FreshEvidenceSemanticPlan,
 } from '@/lib/ai/cos/freshEvidenceSynthesisContract'
 import {
+  acceptFreshEvidencePredicateAudit,
+  applyFreshEvidencePredicateAudit,
+  freshEvidencePredicateAuditPrompt,
+  freshEvidencePredicateAuditSystemPrompt,
+  type FreshEvidencePredicateAudit,
+} from '@/lib/ai/cos/freshEvidencePredicateAudit'
+import {
   boundedFreshSynthesisAttemptTimeoutMs,
   freshSynthesisNullIndicatesTimeout,
   runFreshSynthesisTransportAttempts,
@@ -51,6 +58,8 @@ export type FreshEvidenceLocalSynthesisOutcome =
   | { kind: 'citation_grounding_rejected' }
 
 const SCOPE_PLAN_MAX_TOKENS = 500
+const PREDICATE_AUDIT_MAX_TOKENS = 220
+const PREDICATE_AUDIT_TIMEOUT_MS = 12_000
 const ANSWER_MAX_TOKENS = 700
 const FAITHFULNESS_REVIEW_MAX_TOKENS = 220
 const REVISION_MAX_TOKENS = 420
@@ -120,6 +129,49 @@ async function boundedLocalCompletion(args: {
       reason: errorText(error),
     }))
     return { ok: false, error: errorText(error) }
+  }
+}
+
+async function auditBinaryRelease(args: {
+  input: string
+  sources: FreshEvidenceSource[]
+  retrievedAt: string
+  language: string
+}): Promise<FreshEvidencePredicateAudit | null> {
+  const baseConfig = localInferenceConfigFromEnv()
+  const normalAttemptTimeoutMs = boundedFreshSynthesisAttemptTimeoutMs(baseConfig.timeoutMs)
+  const auditTimeoutMs = Math.max(5_000, Math.min(PREDICATE_AUDIT_TIMEOUT_MS, normalAttemptTimeoutMs, baseConfig.timeoutMs))
+  const startedAt = Date.now()
+  try {
+    const text = await callLocalModel({
+      prompt: freshEvidencePredicateAuditPrompt(args),
+      systemPrompt: freshEvidencePredicateAuditSystemPrompt(args.language),
+      maxTokens: PREDICATE_AUDIT_MAX_TOKENS,
+      temperature: 0,
+    }, {
+      ...baseConfig,
+      timeoutMs: auditTimeoutMs,
+    })
+    const audit = text?.trim() ? acceptFreshEvidencePredicateAudit(text) : null
+    console.info('[cos-fresh-predicate-audit]', JSON.stringify({
+      at: new Date().toISOString(),
+      event: audit ? 'audit_parsed' : 'audit_unavailable',
+      latencyMs: Date.now() - startedAt,
+      auditTimeoutMs,
+      binaryVerdictSafe: audit?.binaryVerdictSafe ?? null,
+      requiresNeutralEvidenceMap: audit?.requiresNeutralEvidenceMap ?? null,
+      ambiguityKinds: audit?.ambiguityKinds ?? [],
+    }))
+    return audit
+  } catch (error) {
+    console.warn('[cos-fresh-predicate-audit]', JSON.stringify({
+      at: new Date().toISOString(),
+      event: 'audit_failed_safe_to_neutral',
+      latencyMs: Date.now() - startedAt,
+      auditTimeoutMs,
+      reason: errorText(error),
+    }))
+    return null
   }
 }
 
@@ -272,17 +324,18 @@ async function reviewScopeFaithfulness(args: {
 }
 
 /**
- * Answer a volatile/current-fact question from live evidence using one semantic reasoner pipeline:
+ * Answer a volatile/current-fact question from live evidence using independent neural release checks:
  * 1. Qwen plans the smallest materially distinct semantic scopes required by QUESTION + evidence.
- * 2. A contradictory/structurally invalid plan gets one bounded neural repair before refusal.
- * 3. Qwen writes the answer under that plan. A repairable answer-contract defect gets one bounded
- *    neural repair with the exact machine-readable failure code instead of an immediate false refusal.
- * 4. When multiple scopes matter, Qwen independently checks that the prose did not drop or merge them.
- * 5. A bounded Qwen repair runs when scope faithfulness or output density fails, then multi-scope
- *    answers are reviewed again. Remaining semantic collapse or grounding defects fail closed.
+ * 2. A structurally invalid plan gets one bounded neural repair before refusal.
+ * 3. If the planner wants a binary/direct answer, a separate adversarial neural audit sees only
+ *    QUESTION + LIVE EVIDENCE. Binary framing requires both neural decisions to concur.
+ * 4. Missing, malformed, timed-out, or negative audit never causes a refusal; it removes binary
+ *    permission and forces the existing neutral evidence-map contract.
+ * 5. Qwen writes the answer. Contract defects receive one bounded neural repair.
+ * 6. Qwen reviews multi-scope/neutral answers for scope faithfulness before release.
  *
- * Scope planning/review are concise model verdicts, not hidden chain-of-thought. No deterministic
- * topic rule decides what the user's predicate means, and no server formatter writes answer prose.
+ * No deterministic topic rule decides what the user's predicate means, and no server formatter writes
+ * answer prose. Deterministic code only combines independent model verdicts conservatively.
  */
 export async function synthesizeFreshEvidenceLocally(args: {
   input: string
@@ -311,8 +364,22 @@ export async function synthesizeFreshEvidenceLocally(args: {
     semanticPlan = repairedPlan.semanticPlan
   }
 
+  const plannerPresentationMode = semanticPlan.presentationMode
+  const plannerDirectBinaryAnswerSafe = semanticPlan.directBinaryAnswerSafe
+  const auditRequired = plannerPresentationMode === 'direct' && plannerDirectBinaryAnswerSafe
+  const predicateAudit = auditRequired ? await auditBinaryRelease(args) : null
+  semanticPlan = applyFreshEvidencePredicateAudit(semanticPlan, predicateAudit)
+
   console.info('[cos-fresh-semantic-scope-plan]', JSON.stringify({
     at: new Date().toISOString(),
+    plannerPresentationMode,
+    plannerDirectBinaryAnswerSafe,
+    predicateAuditRequired: auditRequired,
+    predicateAuditParsed: predicateAudit !== null,
+    predicateAuditBinaryVerdictSafe: predicateAudit?.binaryVerdictSafe ?? null,
+    predicateAuditRequiresNeutralEvidenceMap: predicateAudit?.requiresNeutralEvidenceMap ?? null,
+    predicateAuditAmbiguityKinds: predicateAudit?.ambiguityKinds ?? [],
+    presentationMode: semanticPlan.presentationMode,
     directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
     scopeCount: semanticPlan.scopes.length,
     scopeEvidenceCount: new Set(semanticPlan.scopes.flatMap(scope => scope.evidenceIds)).size,
@@ -382,6 +449,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
       event: 'review_required',
       reason: semanticRepairRequired ? 'scope_faithfulness' : 'output_density',
       singleProposition,
+      presentationMode: semanticPlan.presentationMode,
       directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
       scopeCount: semanticPlan.scopes.length,
       initialEvidenceCount: accepted.citedSourceIds.length,
@@ -458,6 +526,7 @@ export async function synthesizeFreshEvidenceLocally(args: {
     console.info('[cos-fresh-neural-synthesis-review]', JSON.stringify({
       at: new Date().toISOString(),
       event: 'review_accepted',
+      presentationMode: semanticPlan.presentationMode,
       directBinaryAnswerSafe: semanticPlan.directBinaryAnswerSafe,
       scopeCount: semanticPlan.scopes.length,
       finalEvidenceCount: repaired.citedSourceIds.length,

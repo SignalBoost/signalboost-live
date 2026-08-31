@@ -48,13 +48,22 @@ export async function proxy(req: NextRequest) {
 
   // COS-FIRST LIVE ROUTING.
   // Keep /api/concierge as the stable browser endpoint. Browser turns first enter
-  // /api/cos-browser, which establishes request-scoped RunPod wake permission and
-  // then invokes COS Primary. Direct/server calls to /api/cos-primary bypass that
-  // browser wrapper and therefore cannot start paid GPU compute.
+  // /api/cos-browser, which establishes request-scoped paid-compute permission and
+  // then invokes COS Primary.
   if (pathname === '/api/concierge' && req.method === 'POST') {
     const cosBrowserUrl = req.nextUrl.clone()
     cosBrowserUrl.pathname = '/api/cos-browser'
     return NextResponse.rewrite(cosBrowserUrl)
+  }
+
+  // Phase 5 A2A routing: HTTP ingress addressed to COS Primary first enters the
+  // conservative specialist bridge. That bridge calls COS Primary directly when
+  // delegation is not clearly useful, so existing COS security/provenance/freshness
+  // behavior remains authoritative without a rewrite loop.
+  if (pathname === '/api/cos-primary' && req.method === 'POST') {
+    const specialistUrl = req.nextUrl.clone()
+    specialistUrl.pathname = '/api/cos-specialist'
+    return NextResponse.rewrite(specialistUrl)
   }
 
   // Only guard the operator path beyond autonomous API ingress and the public spend gate.
@@ -190,11 +199,12 @@ async function autonomousExecutionIsEnabled(): Promise<boolean> {
 
 export const config = {
   // Proxy is not free work: only run it on paths that actually need the global
-  // autonomy gate, public-model spend gate/routing, or operator authentication.
+  // autonomy gate, public-model spend gate/routing, Phase 5 COS routing, or operator authentication.
   matcher: [
     '/dashboard/operator/:path*',
     '/api/concierge',
     '/api/support',
+    '/api/cos-primary',
     '/api/cron/:path*',
     '/api/webhook/:path*',
     '/api/hub/webhooks/:path*',

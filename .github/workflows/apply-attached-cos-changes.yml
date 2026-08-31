@@ -1,0 +1,38 @@
+name: Apply attached COS changes
+
+on:
+  push:
+    branches:
+      - fix/cos-stable-live-miss-fallback-20260831
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Apply and verify attached changes
+        run: node scripts/apply-attached-cos-changes.mjs
+
+      - name: Commit verified source changes
+        run: |
+          rm scripts/apply-attached-cos-changes.mjs
+          rm .github/workflows/apply-attached-cos-changes.yml
+          git config user.name "SignalBoost"
+          git config user.email "cadomos@gmail.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "fix(cos): preserve stable reasoning on empty live search"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

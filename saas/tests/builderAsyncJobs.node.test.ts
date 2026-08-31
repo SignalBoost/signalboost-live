@@ -39,6 +39,23 @@ test('an attached debug request cannot silently fall back to a broad standard jo
   assert.ok(enqueue > workspace, 'invalid attached debug must be rejected before job enqueue')
 })
 
+test('the server repeats strict coding classification before workspace creation or enqueue', () => {
+  assert.match(route, /import \{ isConciergeBuilderObjective \} from '@\/lib\/ai\/cos\/cosReasoningRolePolicy'/)
+  assert.match(route, /const routingContext = \{ attachmentNames: files\.map\(file => file\.path\) \}/)
+  assert.match(route, /!isConciergeBuilderObjective\(objective, routingContext\)/)
+  assert.match(route, /builder_objective_not_coding/)
+  assert.match(route, /No Builder job was created and no code was run/)
+
+  const strictGate = route.indexOf('!isConciergeBuilderObjective(objective, routingContext)')
+  const nonCoding = route.indexOf("error: 'builder_objective_not_coding'", strictGate)
+  const workspace = route.indexOf('createSupabaseBuilderWorkspace(access.userId)', nonCoding)
+  const enqueue = route.indexOf('await enqueueBuilderJob({', workspace)
+  assert.ok(strictGate >= 0)
+  assert.ok(nonCoding > strictGate)
+  assert.ok(workspace > nonCoding, 'non-coding requests must be rejected before workspace creation')
+  assert.ok(enqueue > workspace, 'non-coding requests must be rejected before job enqueue')
+})
+
 test('GET polling is user-scoped and never executes the job', () => {
   assert.match(route, /url\.searchParams\.get\('jobId'\)/)
   assert.match(route, /getBuilderJobForUser\(jobId, access\.userId\)/)

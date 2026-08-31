@@ -39,18 +39,27 @@ const CODE_SIGNAL = /\b(code|coding|function|script|typescript|javascript|node(?
 const CONCIERGE_BUILDER_ACTION = /\b(?:debug|fix|repair|refactor|implement|compile|write)\b|\b(?:create|build)\s+(?:a\s+)?(?:file|script|function|class|html|css|app|test)\b|\b(?:design|build|create)\s+(?:(?:a|an|the|my|me|us)\s+){0,2}(?:(?:responsive|modern|simple|full|new|mobile|web|marketing|interactive|custom|professional)\s+){0,3}(?:website|web\s*page|landing page|dashboard|user interface|ui|component|mockup|prototype)\b/i
 const DESIGN_ARTIFACT_SIGNAL = /\b(?:website|web\s*page|landing(?:\s|-)?page|dashboard|user interface|ui|component|mockup|prototype)\b/i
 const DESIGN_REQUEST_SIGNAL = /(?:^(?:please\s+)?(?:design|build|create|make)\b|\b(?:can|could)\s+you\b|\b(?:i\s+(?:need|want|would\s+like)|give\s+me|help\s+me)\b)/i
+const TECHNICAL_REPAIR_ACTION = /\b(?:debug|fix|repair|troubleshoot|resolve|correct)\b|\b(?:not\s+working|broken|failing)\b/i
+const TECHNICAL_REPAIR_TARGET = /\b(?:builder|code|coding|function|script|typescript|javascript|node(?:\.js)?|npm|pnpm|bun|python|sql|regex|api|endpoint|route|test|build|deployment|repository|repo|github|branch|pull request|commit|website|web\s*page|dashboard|component|app|file)\b|https?:\/\/(?:www\.)?github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/[^\s]*)?/i
 
 function isDesignBuildRequest(prompt: string): boolean {
   const objective = cosRoutingObjective(prompt)
   return DESIGN_ARTIFACT_SIGNAL.test(objective) && DESIGN_REQUEST_SIGNAL.test(objective)
 }
+
+function isTechnicalRepairRequest(prompt: string): boolean {
+  const objective = cosRoutingObjective(prompt)
+  return TECHNICAL_REPAIR_ACTION.test(objective) && TECHNICAL_REPAIR_TARGET.test(objective)
+}
+
 const CURRENT_SIGNAL = /\b(current|currently|today|right now|as of now|latest|most recent|this (?:year|month|week)|live evidence|verify current|office holder)\b/i
 const CRITIC_SIGNAL = /\b(diagnos|root cause|troubleshoot|incident|outage|latency|p9[59]|timeout|regression|failure mode|why (?:is|are|did|does).*(?:slow|fail|error|down|spike)|critique|audit|stress[- ]?test|find (?:the )?(?:flaw|weakness|problem))\b/i
 const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|difference between|what (?:is|are)|define|definition|who (?:is|was|are|were)|company|organization|organisation|architecture|mechanism|explain)\b/i
 
 /** Broad worker selection for the authorized COS UI. */
 export function isCosCodingObjective(prompt: string): boolean {
-  return CODE_SIGNAL.test(cosRoutingObjective(prompt)) || isDesignBuildRequest(prompt)
+  const objective = cosRoutingObjective(prompt)
+  return CODE_SIGNAL.test(objective) || isTechnicalRepairRequest(objective) || isDesignBuildRequest(objective)
 }
 
 /**

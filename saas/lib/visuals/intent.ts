@@ -69,7 +69,7 @@ const REFERENCE_STOP_TOKENS = new Set([
   // Spanish
   'el', 'la', 'los', 'las', 'un', 'una', 'del', 'de', 'para', 'por', 'favor', 'actual', 'oficial', 'equipo', 'club', 'futbol',
   // Polish
-  'proszę', 'prosze', 'aktualny', 'oficjalny', 'druzyny', 'druzyna', 'pilkarskiej', 'pilkarski', 'klubu', 'klub',
+  'prosze', 'aktualny', 'oficjalny', 'druzyny', 'druzyna', 'pilkarskiej', 'pilkarski', 'klubu', 'klub',
   // Russian
   'пожалуйста', 'текущий', 'официальный', 'футбольной', 'футбольный', 'команды', 'команда', 'клуба', 'клуб',
 ])
@@ -88,7 +88,15 @@ function foldLatinDiacritics(value: string): string {
     folded += character
     previousBaseWasLatin = LATIN_CHARACTER.test(character)
   }
-  return folded.normalize('NFC')
+  return folded
+    .normalize('NFC')
+    .replace(/ł/g, 'l')
+    .replace(/đ/g, 'd')
+    .replace(/ð/g, 'd')
+    .replace(/þ/g, 'th')
+    .replace(/æ/g, 'ae')
+    .replace(/œ/g, 'oe')
+    .replace(/ø/g, 'o')
 }
 
 function normalizedTokens(prompt: string): string[] {

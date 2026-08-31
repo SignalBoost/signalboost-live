@@ -93,7 +93,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
 
   let session: VercelRepositoryRepairSession | null = null
   try {
-    session = await VercelRepositoryRepairSession.create(target)
+    session = await VercelRepositoryRepairSession.create(target, { deadlineAtMs })
     const aiDeadlineAtMs = deadlineAtMs - REPOSITORY_RESULT_RESERVE_MS
     if (Date.now() >= aiDeadlineAtMs) {
       return failedPayload({

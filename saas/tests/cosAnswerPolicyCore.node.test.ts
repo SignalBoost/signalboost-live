@@ -123,7 +123,9 @@ test('the shared policy requires domain-general evidence reasoning instead of se
   assert.match(text, /construct, population, denominator, time window/i)
   assert.match(text, /Distinguish observation from explanation/i)
   assert.match(text, /Synthesize the minimum set of strong, relevant evidence/i)
-  assert.match(text, /yes or no when the evidence supports one/i)
+  assert.match(text, /Open with yes or no only when the question names one operationally unambiguous factual proposition/i)
+  assert.match(text, /do not open with yes or no/i)
+  assert.match(text, /may be one candidate factor/i)
 
   // Shared runtime policy must teach an epistemic method, not memorize answers or distinctions for
   // whichever controversy happened to expose the defect. Domain terms belong in the user question

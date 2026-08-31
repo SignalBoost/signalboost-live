@@ -191,10 +191,11 @@ test('all live chat ingresses preserve attachments and render the stable preview
     assert.match(source, /JSON\.stringify\(\{ \.\.\.body, objective: prompt \}\)/)
     assert.match(source, /visualPost\(visualRequest\)/)
     assert.match(source, /previewUrl/)
+    assert.match(source, /<IMAGE>\$\{previewUrl\}<\/IMAGE>/)
   }
   assert.match(browser, /appendPreviewToReply/)
   assert.match(browser, /cosMode === 'silent_background_planning'/)
-  assert.match(specialist, /reply: `\$\{payload\.reply\}\\n\\n\$\{previewUrl\}`/)
+  assert.match(specialist, /reply: `\$\{payload\.reply\}\\n\\n<IMAGE>\$\{previewUrl\}<\/IMAGE>`/)
   assert.ok(specialist.indexOf('classifyVisualRequest({') < specialist.indexOf('planCOSSpecialistFromText(prompt)'))
   assert.match(specialist, /export const maxDuration = 300/)
 })

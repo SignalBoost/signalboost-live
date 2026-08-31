@@ -34,12 +34,13 @@ type CommonsPersonCandidate = Readonly<{
   score: number
 }>
 
-const MAX_IMAGE_BYTES = 5_000_000
+const MAX_IMAGE_BYTES = 6_000_000
 const MAX_JSON_BYTES = 1_000_000
-const FETCH_TIMEOUT_MS = 12_000
-const MAX_REDIRECTS = 3
+const FETCH_TIMEOUT_MS = 20_000
+const MAX_REDIRECTS = 4
 const COMMONS_HOST = 'commons.wikimedia.org'
 const COMMONS_UPLOAD_HOST = 'upload.wikimedia.org'
+const CURATED_THUMB_WIDTH = 768
 
 const CURATED_PEOPLE: readonly CuratedPersonReference[] = [
   {
@@ -50,17 +51,22 @@ const CURATED_PEOPLE: readonly CuratedPersonReference[] = [
   {
     canonicalName: 'Donald Trump',
     aliases: ['donald j trump', 'donald trump', 'presidente trump', 'president trump', 'trump'],
-    commonsFileTitle: 'File:Official Presidential Portrait of President Donald J. Trump (2025).jpg',
+    commonsFileTitle: 'File:January 2025 Official Presidential Portrait of Donald J. Trump.jpg',
   },
 ]
 
-const PERSON_TITLE_WORDS = new Set(['president', 'presidente', 'presidenta', 'prime', 'minister', 'premier', 'chancellor', 'governor', 'senator', 'king', 'queen', 'rei', 'rainha', 'prezydent', 'президент'])
+const PERSON_TITLE_WORDS = new Set([
+  'president', 'presidente', 'presidenta', 'prime', 'minister', 'premier', 'chancellor', 'governor', 'senator',
+  'king', 'queen', 'rei', 'rainha', 'prezydent', 'президент',
+])
 const NAME_CONNECTORS = new Set(['da', 'de', 'do', 'dos', 'das', 'del', 'della', 'di', 'van', 'von', 'bin', 'ibn', 'al', 'j'])
 const PORTRAIT_WORDS = ['portrait', 'official', 'headshot', 'retrato', 'oficial', 'foto', 'portret', 'портрет']
 const REJECT_WORDS = [
   'with', ' and ', 'meeting', 'family', 'group', 'crowd', 'rally', 'speech', 'statue', 'wax', 'painting', 'drawing',
   'caricature', 'cartoon', 'mural', 'impersonator', 'lookalike', 'cosplay', 'poster', 'banner', 'memorial', 'grave', 'signature',
 ]
+
+const referenceCache = new Map<string, Promise<VerifiedPersonReference | null>>()
 
 function normalize(value: string): string {
   return String(value || '')
@@ -114,7 +120,12 @@ async function readBoundedBytes(response: Response, maxBytes: number): Promise<U
   return merged
 }
 
-async function fetchTrustedBytes(input: string, allowedHosts: readonly string[], maxBytes: number, accept: string): Promise<{ bytes: Uint8Array; finalUrl: string; contentType: string }> {
+async function fetchTrustedBytes(
+  input: string,
+  allowedHosts: readonly string[],
+  maxBytes: number,
+  accept: string,
+): Promise<{ bytes: Uint8Array; finalUrl: string; contentType: string }> {
   let current = input
   for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
     if (!isAllowedHost(current, allowedHosts)) throw new Error('person_reference_host_not_allowed')
@@ -128,7 +139,7 @@ async function fetchTrustedBytes(input: string, allowedHosts: readonly string[],
         cache: 'no-store',
         headers: {
           Accept: accept,
-          'User-Agent': 'SignalBoost-Verified-Person-Visual/1.0',
+          'User-Agent': 'SignalBoost-Verified-Person-Visual/2.0',
         },
       })
     } finally {
@@ -154,7 +165,11 @@ async function fetchTrustedBytes(input: string, allowedHosts: readonly string[],
 function sniffImageMime(bytes: Uint8Array): VerifiedPersonReference['mime'] | null {
   if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return 'image/png'
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return 'image/jpeg'
-  if (bytes.length >= 12 && Buffer.from(bytes.subarray(0, 4)).toString('ascii') === 'RIFF' && Buffer.from(bytes.subarray(8, 12)).toString('ascii') === 'WEBP') return 'image/webp'
+  if (
+    bytes.length >= 12
+    && Buffer.from(bytes.subarray(0, 4)).toString('ascii') === 'RIFF'
+    && Buffer.from(bytes.subarray(8, 12)).toString('ascii') === 'WEBP'
+  ) return 'image/webp'
   return null
 }
 
@@ -168,6 +183,11 @@ function sourcePageUrl(title: string): string {
   return `https://${COMMONS_HOST}/wiki/${encodeURIComponent(title.replace(/ /g, '_'))}`
 }
 
+function curatedRedirectUrl(title: string): string {
+  const filename = title.replace(/^File:/i, '')
+  return `https://${COMMONS_HOST}/wiki/Special:Redirect/file/${encodeURIComponent(filename)}?width=${CURATED_THUMB_WIDTH}`
+}
+
 function commonsEndpoint(): URL {
   return new URL(`https://${COMMONS_HOST}/w/api.php`)
 }
@@ -175,7 +195,7 @@ function commonsEndpoint(): URL {
 async function fetchCommonsPages(endpoint: URL): Promise<CommonsPage[]> {
   endpoint.searchParams.set('prop', 'imageinfo')
   endpoint.searchParams.set('iiprop', 'url|mime|extmetadata')
-  endpoint.searchParams.set('iiurlwidth', '512')
+  endpoint.searchParams.set('iiurlwidth', String(CURATED_THUMB_WIDTH))
   endpoint.searchParams.set('format', 'json')
   endpoint.searchParams.set('formatversion', '2')
   endpoint.searchParams.set('origin', '*')
@@ -185,17 +205,43 @@ async function fetchCommonsPages(endpoint: URL): Promise<CommonsPage[]> {
   return Array.isArray(data?.query?.pages) ? data.query.pages : []
 }
 
-async function downloadCandidate(candidate: CommonsPersonCandidate, canonicalName: string): Promise<VerifiedPersonReference> {
-  const downloaded = await fetchTrustedBytes(candidate.assetUrl, [COMMONS_UPLOAD_HOST], MAX_IMAGE_BYTES, 'image/png,image/jpeg,image/webp;q=0.9,*/*;q=0.1')
+async function downloadImage(
+  input: string,
+  allowedHosts: readonly string[],
+): Promise<{ b64: string; mime: VerifiedPersonReference['mime']; finalUrl: string }> {
+  const downloaded = await fetchTrustedBytes(
+    input,
+    allowedHosts,
+    MAX_IMAGE_BYTES,
+    'image/png,image/jpeg,image/webp;q=0.9,*/*;q=0.1',
+  )
   const mime = sniffImageMime(downloaded.bytes)
   if (!mime) throw new Error(`person_reference_invalid_image_${downloaded.contentType || 'unknown'}`)
+  return { b64: Buffer.from(downloaded.bytes).toString('base64'), mime, finalUrl: downloaded.finalUrl }
+}
+
+async function downloadCandidate(candidate: CommonsPersonCandidate, canonicalName: string): Promise<VerifiedPersonReference> {
+  const downloaded = await downloadImage(candidate.assetUrl, [COMMONS_UPLOAD_HOST])
   return {
     canonicalName,
-    b64: Buffer.from(downloaded.bytes).toString('base64'),
-    mime,
+    b64: downloaded.b64,
+    mime: downloaded.mime,
     title: candidate.title,
     provider: 'wikimedia-commons',
     sourcePageUrl: candidate.sourcePageUrl,
+    assetUrl: downloaded.finalUrl,
+  }
+}
+
+async function downloadCurated(entry: CuratedPersonReference): Promise<VerifiedPersonReference> {
+  const downloaded = await downloadImage(curatedRedirectUrl(entry.commonsFileTitle), [COMMONS_HOST, COMMONS_UPLOAD_HOST])
+  return {
+    canonicalName: entry.canonicalName,
+    b64: downloaded.b64,
+    mime: downloaded.mime,
+    title: entry.commonsFileTitle.replace(/^File:/i, ''),
+    provider: 'wikimedia-commons',
+    sourcePageUrl: sourcePageUrl(entry.commonsFileTitle),
     assetUrl: downloaded.finalUrl,
   }
 }
@@ -218,7 +264,9 @@ function findCuratedPerson(query: string): CuratedPersonReference | null {
   const normalizedQuery = normalize(query)
   return CURATED_PEOPLE.find((entry) => entry.aliases.some((alias) => {
     const normalizedAlias = normalize(alias)
-    return normalizedQuery === normalizedAlias || normalizedQuery.includes(normalizedAlias) || normalizedAlias.includes(normalizedQuery)
+    return normalizedQuery === normalizedAlias
+      || normalizedQuery.includes(normalizedAlias)
+      || normalizedAlias.includes(normalizedQuery)
   })) || null
 }
 
@@ -267,22 +315,27 @@ async function searchCommonsPerson(query: string): Promise<CommonsPersonCandidat
   return selectCommonsPersonCandidate(query, await fetchCommonsPages(endpoint))
 }
 
-/**
- * Resolves a named real person to a verified portrait before reference-conditioned generation.
- * A missing or ambiguous portrait returns null so COS never substitutes, duplicates, or invents
- * a different person's identity from text-only model memory.
- */
-export async function resolveVerifiedPersonReference(referenceQuery: string): Promise<VerifiedPersonReference | null> {
+async function resolveUncached(referenceQuery: string): Promise<VerifiedPersonReference | null> {
   const curated = findCuratedPerson(referenceQuery)
   const canonicalName = curated?.canonicalName || referenceQuery.replace(/\s+/g, ' ').trim()
   if (!canonicalName) return null
 
   if (curated) {
     try {
+      return await downloadCurated(curated)
+    } catch (error) {
+      console.warn('[concierge-person-reference-curated-redirect-failure]', JSON.stringify({
+        referenceQuery,
+        canonicalName: curated.canonicalName,
+        error: error instanceof Error ? error.message : 'unknown',
+      }))
+    }
+
+    try {
       const exact = await exactCommonsPerson(curated)
       if (exact) return await downloadCandidate(exact, curated.canonicalName)
     } catch (error) {
-      console.warn('[concierge-person-reference-curated-failure]', JSON.stringify({
+      console.warn('[concierge-person-reference-curated-api-failure]', JSON.stringify({
         referenceQuery,
         canonicalName: curated.canonicalName,
         error: error instanceof Error ? error.message : 'unknown',
@@ -301,4 +354,26 @@ export async function resolveVerifiedPersonReference(referenceQuery: string): Pr
     }))
     return null
   }
+}
+
+/**
+ * Resolves a named real person to a verified portrait before image generation. Curated public
+ * figures use Wikimedia's stable file redirect first, then the Commons API and search fallback.
+ * Missing or ambiguous references return null; COS never substitutes a different identity.
+ */
+export async function resolveVerifiedPersonReference(referenceQuery: string): Promise<VerifiedPersonReference | null> {
+  const key = normalize(referenceQuery)
+  if (!key) return null
+  const existing = referenceCache.get(key)
+  if (existing) return existing
+
+  const pending = resolveUncached(referenceQuery)
+  referenceCache.set(key, pending)
+  const resolved = await pending
+  if (!resolved) referenceCache.delete(key)
+  return resolved
+}
+
+export function clearVerifiedPersonReferenceCacheForTests(): void {
+  referenceCache.clear()
 }

@@ -9,6 +9,33 @@ function normalized(value: string): string {
   return clean(value).toLocaleLowerCase()
 }
 
+export function isFollowupChipEcho(prompt: string): boolean {
+  const text = clean(prompt)
+  return /^(?:did you mean|could you explain|which live source|what part of|what does live\s*\d|which retrieved source|what related claim|what does the comparison|what does that comparison|using the original question)\b/i.test(text)
+}
+
+function textFromContent(content: unknown): string {
+  if (typeof content === 'string') return clean(content)
+  if (!Array.isArray(content)) return ''
+  return clean(content.map((block: any) => String(block?.text || '')).filter(Boolean).join(' '))
+}
+
+/** Last real user question in the thread, never a previous chip. */
+export function originUserPrompt(body: any, currentPrompt: string): string {
+  const current = clean(currentPrompt)
+  const messages = Array.isArray(body?.messages) ? body.messages : []
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role !== 'user') continue
+    const text = textFromContent(messages[index]?.content)
+    if (!text) continue
+    if (isFollowupChipEcho(text)) continue
+    if (normalized(text) === normalized(current) && isFollowupChipEcho(current)) continue
+    return text.slice(0, 240)
+  }
+  if (current && !isFollowupChipEcho(current)) return current.slice(0, 240)
+  return current.slice(0, 240)
+}
+
 const STOPWORDS = new Set([
   'about','after','again','also','answer','before','between','could','does','from','have','include','into','live','more','question','regarding','source','specific','text','than','that','their','these','this','those','what','when','where','which','with','would','your',
 ])
@@ -37,11 +64,6 @@ function hasTopicAffinity(candidate: string, prompt: string): boolean {
 const MEASUREMENT_PROMPT = /\b(?:pay|wage|wages|earnings?|gap|difference|median|rate|ratio|percent|percentage|unemployment|inflation|cpi|gdp|price|how much|how many)\b/i
 const PERSON_OR_ROLE_PROMPT = /\b(?:who is|who was|president|ceo|prime minister|minister|director|holder)\b/i
 
-/**
- * Chips are a continuation surface, not a new search surface. Every chip must
- * preserve explicit lexical affinity with the current topic so a malformed or
- * generic model question cannot start a retrieval cascade into another subject.
- */
 export function fallbackFollowups(prompt: string): string[] {
   const topic = topicFromPrompt(prompt)
   if (MEASUREMENT_PROMPT.test(prompt)) {
@@ -62,11 +84,12 @@ export function fallbackFollowups(prompt: string): string[] {
   ]
 }
 
-export function repairFollowups(prompt: string): string[] {
-  const topic = topicFromPrompt(prompt)
+/** Failed turns must return to the original question, not compound the failed chip. */
+export function repairFollowups(originPrompt: string): string[] {
+  const topic = topicFromPrompt(originPrompt)
   return [
-    `Which retrieved evidence directly addresses ${topic}?`,
-    `What can be verified about ${topic} from the retrieved evidence?`,
+    `Using the original question, what do the retrieved sources state about ${topic}?`,
+    `What do those same sources not measure about ${topic}?`,
   ]
 }
 

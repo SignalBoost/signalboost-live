@@ -78,6 +78,10 @@ function summarizeBuilderTrace(payload: unknown): string {
     if (typeof entry?.exitCode === 'number') bits.push(`exit ${entry.exitCode}`)
     if (entry?.command) bits.push(`$ ${oneLine(entry.command).slice(0, 160)}`)
     if (entry?.error) bits.push(oneLine(entry.error))
+    const shapeKeys = ['responseLength', 'startsWithObject', 'endsWithObject', 'hasThinkOpen', 'hasThinkClose', 'hasUnclosedObject', 'anyValidJson'] as const
+    const shape = shapeKeys.filter((key) => typeof entry?.[key] === 'number' || typeof entry?.[key] === 'boolean').map((key) => `${key}=${entry[key]}`)
+    if (shape.length) bits.push(shape.join(' '))
+    if (entry?.remediation) bits.push(oneLine(entry.remediation))
     const stream = oneLine(entry?.stderr) || oneLine(entry?.stdout)
     if (stream) bits.push(stream)
     return '  ' + bits.join(' · ')

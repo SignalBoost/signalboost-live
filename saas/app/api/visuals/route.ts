@@ -28,11 +28,12 @@ function objectiveOf(value: unknown): string {
 
 function visualPrompt(objective: string): string {
   return [
-    'Create one polished, colorful visual for the user request below.',
-    'Use a clear, modern editorial-illustration style with strong composition, readable visual hierarchy, and no watermarks.',
+    'Create one polished, high-quality visual for the user request below.',
+    'Use a style appropriate to the requested format, with strong composition, clear visual hierarchy, and no watermarks.',
+    'For a requested logo, club crest, badge, emblem, insignia, or icon, use a clean centered graphic-design composition rather than an editorial scene.',
+    'Include a named brand or team mark only when it is the explicit subject of the user request; do not add unrelated logos, UI chrome, or unrelated text.',
     'For people or animals, use an original, non-identifiable depiction.',
     'For a diagram, favor a clean visual layout and simple, legible labels only when essential.',
-    'Do not include brand logos, UI chrome, or unrelated text.',
     '',
     'USER REQUEST:',
     objective,

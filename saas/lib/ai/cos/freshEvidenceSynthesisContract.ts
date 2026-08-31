@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/freshEvidenceSynthesisContract.ts
 import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
 import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
 
@@ -106,6 +107,7 @@ export function freshEvidenceScopePlanSystemPrompt(language: string): string {
     'Never treat estimates as one numerical range, average, trend, or pooled finding unless their population, denominator, unit, time basis, and control structure are genuinely commensurable.',
     'A surface predicate can hide multiple materially different propositions even when sources do not literally disagree. In particular, keep a descriptive difference or association distinct from explanation, causation, intent, discriminatory treatment, or a legal/normative violation.',
     'An observed group-level disparity or adjusted residual does not by itself establish why the difference exists, that group membership caused it, that an actor intended it, or that any conduct was unlawful. Those stronger propositions require their own evidence.',
+    'When LIVE EVIDENCE names both compositional or behavioral factors (occupation, hours, experience, selection, career interruption) and a residual association with the grouping attribute, keep those as distinct scopes. The grouping attribute may be one contributing factor; it is not the whole explanation unless the evidence isolates it.',
     'If the user asks one yes/no question with an umbrella term that reasonably spans both a descriptive proposition and a stronger causal, intentional, discriminatory, or legal proposition, set presentationMode="neutral_evidence_map" and directBinaryAnswerSafe=false even when the descriptive evidence is internally consistent.',
     'If materially different control structures, comparison bases, or operational definitions answer different readings of the user’s wording, a single yes/no verdict is not safe unless the QUESTION itself clearly limits the meaning to one of those readings.',
     'When credible sources materially diverge in method, definition, interpretation, causal attribution, or conclusion, preserve those divergent evidence-backed views as separate scopes. Do not choose a side for the user.',
@@ -179,6 +181,7 @@ export function freshEvidenceSynthesisSystemPrompt(language: string): string {
     'If two sources report different numbers because they measure different things, say so explicitly instead of presenting the numbers as disagreement about one identical quantity.',
     'Keep descriptive evidence separate from explanation, causation, intent, discrimination, and legal conclusions. A statistical disparity, association, or adjusted residual may establish a measured difference; it does not by itself establish why the difference exists or that unlawful treatment occurred.',
     'If the evidence establishes a descriptive difference but does not establish a stronger causal, intentional, discriminatory, or legal interpretation, state that boundary explicitly rather than letting the descriptive result stand in for the stronger claim.',
+    'If LIVE EVIDENCE attributes part of a group disparity to occupation, hours, experience, selection, or similar factors and part to a residual association with the grouping attribute, say both. Do not write that the grouping attribute is the only reason, and do not write that it is irrelevant.',
     'If presentationMode="neutral_evidence_map", NEVER begin with yes/no or a single verdict. Begin with the evidence/meaning split itself: what is measured, what a narrower or adjusted comparison establishes, and what stronger explanation or legal conclusion is not established by those statistics alone.',
     'If presentationMode="direct" and directBinaryAnswerSafe=false, do not open with a standalone yes or no. State the scoped evidence directly.',
     'If presentationMode="direct" and directBinaryAnswerSafe=true, a direct yes/no is allowed only as a narrow factual orientation and must not imply a stronger causal, intentional, discriminatory, or legal conclusion.',

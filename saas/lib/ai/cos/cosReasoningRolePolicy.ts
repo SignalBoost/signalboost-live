@@ -47,7 +47,7 @@ export function cosRoutingObjective(prompt: string): string {
 const DESIGN_ARTIFACT_SIGNAL = /\b(?:website|web\s*page|landing(?:\s|-)?page|dashboard|user interface|ui|component|mockup|prototype)\b/i
 const DESIGN_REQUEST_SIGNAL = /(?:^(?:please\s+)?(?:design|build|create|make)\b|\b(?:can|could)\s+you\b|\b(?:i\s+(?:need|want|would\s+like)|give\s+me|help\s+me)\b)/i
 const CODE_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct|implement|refactor|compile|write|run|execute|test)\b|\b(?:create|build|make)\s+(?:a\s+|an\s+|the\s+)?(?:file|script|function|class|component|api|endpoint|test|app|program|module)\b/i
-const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:not\s+working|does(?:\s+not|n't)\s+work|broken|failing|throws?|crashes?)\b/i
+const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:not\s+working|does(?:\s+not|n't)\s+work|not\s+functional|broken|failing|throws?|crashes?)\b/i
 const CODE_LANGUAGE = /\b(?:javascript|typescript|node(?:\.js)?|python|react|next(?:\.js)?|html|css|sql|bash|shell|java|c\+\+|c#|golang|go|rust|php|ruby|swift|kotlin|tsx|jsx)\b/i
 const FILE_REFERENCE = /(?:^|[\s`'"(])(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)(?=$|[\s`'"),:.])/i
 const STACK_TRACE = /\b(?:TypeError|ReferenceError|SyntaxError|RangeError|ModuleNotFoundError|Traceback \(most recent call last\)|npm ERR!|ERR_[A-Z_]+)\b|\bat\s+[^\n]+\([^\n()]+:\d+:\d+\)|\bFile\s+"[^"]+",\s+line\s+\d+/i
@@ -92,6 +92,10 @@ function excludedFromBuilder(prompt: string): boolean {
     || NON_CODING_TOPIC.test(objective)
 }
 
+function executableBuilderAction(objective: string): boolean {
+  return CODE_ACTION.test(objective) || DEBUG_ACTION.test(objective)
+}
+
 /** Broad worker selection for the authorized COS UI. */
 export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (excludedFromBuilder(prompt)) return false
@@ -107,12 +111,15 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
  * Public Concierge starts Builder only for an explicit executable coding/design request with
  * concrete source evidence. The word “debug”, a timeout report, a log dump, or a general factual
  * question cannot acquire sandbox authority.
+ *
+ * DEBUG_ACTION (“broken”, “not working”, “not functional”, “crashes”) plus an attached source file
+ * or other concrete evidence is enough. Platform self-repair with no source evidence stays closed.
  */
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (excludedFromBuilder(prompt)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true
-  if (!CODE_ACTION.test(objective)) return false
+  if (!executableBuilderAction(objective)) return false
   return concreteCodeEvidence(objective, context)
 }
 
@@ -121,9 +128,9 @@ const CRITIC_SIGNAL = /\b(diagnos|root cause|troubleshoot|incident|outage|latenc
 const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|difference between|what (?:is|are)|define|definition|who (?:is|was|are|were)|company|organization|organisation|architecture|mechanism|explain)\b/i
 
 /** Deterministic, zero-model-call task routing. */
-export function selectCosReasoningWorkerRole(prompt: string): CosReasoningRoleDecision {
+export function selectCosReasoningWorkerRole(prompt: string, context?: CosCodingRoutingContext): CosReasoningRoleDecision {
   const objective = cosRoutingObjective(prompt)
-  if (isCosCodingObjective(objective)) return { role: 'coder', reason: 'code_or_implementation_signal', objective }
+  if (isCosCodingObjective(prompt, context)) return { role: 'coder', reason: 'code_or_implementation_signal', objective }
   if (CURRENT_SIGNAL.test(objective)) return { role: 'verifier', reason: 'current_or_live_verification_signal', objective }
   if (CRITIC_SIGNAL.test(objective)) return { role: 'critic', reason: 'diagnostic_or_critical_reasoning_signal', objective }
   if (RESEARCH_SIGNAL.test(objective)) return { role: 'researcher', reason: 'research_or_explanatory_signal', objective }

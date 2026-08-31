@@ -186,6 +186,47 @@ function parse(value: string | null, allowedTools: readonly BuilderToolId[] = to
   return null
 }
 
+type ModelControlFailure = Readonly<{
+  error: string
+  remediation: string
+  telemetry: Readonly<Record<string, boolean | number>>
+}>
+
+function modelControlFailure(value: string | null): ModelControlFailure {
+  const raw = String(value || '')
+  const trimmed = raw.trim()
+  const hasThinkOpen = /<think(?:\s[^>]*)?>/i.test(raw)
+  const hasThinkClose = /<\/think>/i.test(raw)
+  const hasUnclosedObject = (() => {
+    let depth = 0
+    let inString = false
+    let escaped = false
+    for (const character of trimmed) {
+      if (inString) {
+        if (escaped) escaped = false
+        else if (character === '\\') escaped = true
+        else if (character === '"') inString = false
+      } else if (character === '"') inString = true
+      else if (character === '{') depth += 1
+      else if (character === '}' && depth > 0) depth -= 1
+    }
+    return depth > 0
+  })()
+  const telemetry = Object.freeze({
+    responseLength: raw.length,
+    startsWithObject: trimmed.startsWith('{'),
+    endsWithObject: trimmed.endsWith('}'),
+    hasThinkOpen,
+    hasThinkClose,
+    hasUnclosedObject,
+  })
+  if (!trimmed) return { error: 'builder_model_control_empty_response', remediation: 'The reasoner returned no control content. Inspect local inference telemetry for HTTP status, timeout, or an empty provider message before retrying.', telemetry }
+  if (hasUnclosedObject) return { error: 'builder_model_control_truncated', remediation: 'The reasoner response ended before a complete JSON control object. Inspect the control-token budget and reasoning-output settings before retrying.', telemetry }
+  if (hasThinkOpen && !hasThinkClose) return { error: 'builder_model_control_reasoning_truncated', remediation: 'The reasoner stopped inside a reasoning envelope before emitting a control object. Inspect the control-token budget and reasoning-output settings before retrying.', telemetry }
+  if (hasThinkOpen) return { error: 'builder_model_control_reasoning_only', remediation: 'The reasoner emitted a reasoning envelope but no usable JSON control object. Configure the model to emit its final control message separately, then retry.', telemetry }
+  return { error: 'builder_model_control_unusable', remediation: 'The Builder could not interpret this model control response after bounded recovery. No action was taken from the rejected response; see prior trace entries for completed work.', telemetry }
+}
+
 function summarize(file: { path: string; content: string; updatedAt: number }) { return { path: file.path, bytes: new TextEncoder().encode(file.content).byteLength, updatedAt: file.updatedAt } }
 function summarizeRun(result: BuilderRunResult) { return { exitCode: result.exitCode, stdout: result.stdout.slice(0, 16_000), stderr: result.stderr.slice(0, 16_000), timedOut: result.timedOut } }
 
@@ -277,6 +318,7 @@ export class BuilderToolLoop {
 
       let action: Action | null = null
       let blockedAction: ToolAction | null = null
+      let controlFailure: ModelControlFailure | null = null
       for (let controlAttempt = 0; controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
         const recoveryInstruction = controlAttempt > 0
           ? `CONTROL RECOVERY ATTEMPT ${controlAttempt}: The previous response could not be used. Return exactly one compact JSON object using one TOOL INPUT SCHEMA above. Use only type, toolId, and input; input must be an object, not a JSON string. Emit no prose or Markdown. For an existing file, use edit_file with search and replace instead of rewriting the whole file.`
@@ -301,12 +343,11 @@ export class BuilderToolLoop {
           blockedAction = unrestricted
           break
         }
+        controlFailure = modelControlFailure(response)
         console.warn('[builder_invalid_model_control_output]', {
           round,
           controlAttempt,
-          responseLength: String(response || '').length,
-          startsWithObject: String(response || '').trimStart().startsWith('{'),
-          endsWithObject: String(response || '').trimEnd().endsWith('}'),
+          ...controlFailure.telemetry,
         })
       }
 
@@ -321,16 +362,18 @@ export class BuilderToolLoop {
         continue
       }
       if (!action) {
+        const failure = controlFailure ?? modelControlFailure(null)
         trace.push({
           round,
-          toolId: 'list_files',
+          toolId: 'model_control',
           input: {},
           ok: false,
-          error: 'builder_model_control_unusable',
-          failureClass: 'unknown',
-          remediation: 'The Builder could not interpret this model control response after bounded recovery. No action was taken from the rejected response; see prior trace entries for completed work.',
+          output: failure.telemetry,
+          error: failure.error,
+          failureClass: failure.error === 'builder_model_control_empty_response' ? 'runtime' : 'unknown',
+          remediation: failure.remediation,
         })
-        return { ok: false, error: 'builder_model_control_unusable', trace }
+        return { ok: false, error: failure.error, trace }
       }
 
       if (action.type === 'answer') {

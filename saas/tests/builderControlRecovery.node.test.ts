@@ -198,5 +198,21 @@ test('Builder bounds malformed-control recovery rather than looping indefinitely
   assert.equal(calls, 2)
   assert.equal(result.trace.length, 1)
   assert.equal(result.trace[0]?.error, 'builder_model_control_unusable')
+  assert.equal(result.trace[0]?.toolId, 'model_control')
   assert.match(result.trace[0]?.remediation || '', /this model control response/i)
+})
+
+test('Builder reports an empty model response as a runtime failure without exposing response content', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let calls = 0
+  const ai: BuilderAiPort = { async generate() { calls += 1; return null } }
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }
+
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Describe the staged workspace.', workspaceId: 'user:empty-control', maxRounds: 1 })
+
+  assert.equal(result.ok, false)
+  if (result.ok === false) assert.equal(result.error, 'builder_model_control_empty_response')
+  assert.equal(calls, 2)
+  assert.deepEqual(result.trace[0]?.output, { responseLength: 0, startsWithObject: false, endsWithObject: false, hasThinkOpen: false, hasThinkClose: false, hasUnclosedObject: false })
+  assert.equal(result.trace[0]?.failureClass, 'runtime')
 })

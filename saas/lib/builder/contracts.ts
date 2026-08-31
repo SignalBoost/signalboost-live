@@ -1,4 +1,4 @@
-export type BuilderToolId = 'list_files' | 'read_file' | 'write_file' | 'edit_file' | 'run'
+export type BuilderToolId = 'list_files' | 'read_file' | 'write_file' | 'edit_file' | 'run' | 'model_control'
 export type BuilderFailureClass = 'storage' | 'path' | 'runtime' | 'dependency' | 'test' | 'deployment' | 'unknown'
 
 export type BuilderFile = Readonly<{ path: string; content: string; updatedAt: number }>

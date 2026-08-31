@@ -19,6 +19,8 @@ export type FreshEvidenceContractFailureCode =
 export type FreshEvidencePlanFailureCode =
   | 'invalid_plan_json'
   | 'missing_plan_fields'
+  | 'invalid_presentation_mode'
+  | 'inconsistent_presentation_mode'
   | 'invalid_scope_count'
   | 'invalid_scope_shape'
   | 'unknown_scope_evidence_ids'
@@ -63,9 +65,9 @@ function uniqueStrings(value: unknown): string[] {
 }
 
 /**
- * Validate only the scope-plan structure and evidence lineage. Whether a direct binary answer is
- * semantically safe is a neural planner decision; deterministic code must not infer that decision
- * from the number of scopes returned.
+ * Validate only the scope-plan structure, presentation-mode consistency, and evidence lineage.
+ * Whether evidence is materially divergent is a neural planner decision; deterministic code must
+ * not infer presentation mode or binary safety from the number of scopes returned.
  */
 export function diagnoseFreshEvidenceSemanticPlan(args: {
   text: string
@@ -73,8 +75,14 @@ export function diagnoseFreshEvidenceSemanticPlan(args: {
 }): FreshEvidencePlanDiagnosis | null {
   const parsed = parseObject(args.text)
   if (!parsed) return { code: 'invalid_plan_json', repairable: true }
-  if (typeof parsed.directBinaryAnswerSafe !== 'boolean' || !Array.isArray(parsed.scopes)) {
+  if (typeof parsed.directBinaryAnswerSafe !== 'boolean' || !Array.isArray(parsed.scopes) || parsed.presentationMode === undefined) {
     return { code: 'missing_plan_fields', repairable: true }
+  }
+  if (parsed.presentationMode !== 'direct' && parsed.presentationMode !== 'neutral_evidence_map') {
+    return { code: 'invalid_presentation_mode', repairable: true }
+  }
+  if (parsed.presentationMode === 'neutral_evidence_map' && parsed.directBinaryAnswerSafe) {
+    return { code: 'inconsistent_presentation_mode', repairable: true }
   }
   if (!parsed.scopes.length || parsed.scopes.length > MAX_SEMANTIC_SCOPES) {
     return { code: 'invalid_scope_count', repairable: true }
@@ -116,7 +124,7 @@ export function diagnoseFreshEvidenceSynthesis(args: {
   if (/EVIDENCE_INSUFFICIENT/i.test(answer)) {
     return { code: 'model_declared_insufficient', repairable: false, draftAnswer: answer }
   }
-  if (!args.semanticPlan.directBinaryAnswerSafe && BINARY_LEAD.test(answer)) {
+  if ((args.semanticPlan.presentationMode === 'neutral_evidence_map' || !args.semanticPlan.directBinaryAnswerSafe) && BINARY_LEAD.test(answer)) {
     return { code: 'unsafe_binary_lead', repairable: true, draftAnswer: answer }
   }
 
@@ -163,7 +171,7 @@ export function freshEvidenceScopePlanRepairPrompt(args: {
   failedPlanText: string
   failureCode: FreshEvidencePlanFailureCode
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nPREVIOUS SCOPE PLAN (invalid; not evidence):\n${String(args.failedPlanText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nReturn a corrected semantic scope plan under the original scope-planning JSON contract. Preserve only materially distinct scopes supported by LIVE EVIDENCE. Decide directBinaryAnswerSafe from the QUESTION and those evidence-backed scopes; the number of scopes alone must not determine that boolean. Do not write the user-facing answer.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nPREVIOUS SCOPE PLAN (invalid; not evidence):\n${String(args.failedPlanText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nReturn a corrected semantic scope plan under the original scope-planning JSON contract, including presentationMode, directBinaryAnswerSafe, and scopes. Preserve only materially distinct scopes supported by LIVE EVIDENCE. Decide presentationMode and directBinaryAnswerSafe from the QUESTION and evidence, never from scope count. If presentationMode is neutral_evidence_map, directBinaryAnswerSafe must be false because the user must see the divergent evidence before any verdict. Do not write the user-facing answer.\n\nQUESTION: ${args.input}`
 }
 
 export function freshEvidenceAnswerContractRepairPrompt(args: {
@@ -174,5 +182,5 @@ export function freshEvidenceAnswerContractRepairPrompt(args: {
   failedDraftText: string
   failureCode: FreshEvidenceContractFailureCode
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}\n\nPREVIOUS ANSWER OUTPUT (invalid; not evidence):\n${String(args.failedDraftText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nRe-reason from QUESTION and LIVE EVIDENCE and return the exact answer JSON contract with answer, evidenceIds, and scopeIds. Include every material scope in the plan, use only real evidence ids that support those scopes, and do not weaken or bypass the authority/citation requirements. If directBinaryAnswerSafe is false, do not begin with a standalone yes/no.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}\n\nPREVIOUS ANSWER OUTPUT (invalid; not evidence):\n${String(args.failedDraftText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nRe-reason from QUESTION and LIVE EVIDENCE and return the exact answer JSON contract with answer, evidenceIds, and scopeIds. Include every material scope in the plan, use only real evidence ids that support those scopes, and do not weaken or bypass the authority/citation requirements. If presentationMode is neutral_evidence_map, do not begin with yes/no or a verdict; lead with the evidence split itself. If directBinaryAnswerSafe is false, do not begin with a standalone yes/no.\n\nQUESTION: ${args.input}`
 }

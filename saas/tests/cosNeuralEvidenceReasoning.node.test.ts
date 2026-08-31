@@ -6,7 +6,9 @@ import { existsSync, readFileSync } from 'node:fs'
 const policy = readFileSync('lib/ai/cos/cosAnswerPolicyCore.ts', 'utf8')
 const grounding = readFileSync('lib/ai/cos/cosFreshGrounding.ts', 'utf8')
 const synthesis = readFileSync('lib/ai/cos/freshEvidenceSynthesisContract.ts', 'utf8')
+const recovery = readFileSync('lib/ai/cos/freshEvidenceContractRecovery.ts', 'utf8')
 const localSynthesis = readFileSync('lib/ai/cos/freshEvidenceLocalSynthesis.ts', 'utf8')
+const externalInfo = readFileSync('lib/ai/tools/getExternalInfo.ts', 'utf8')
 const reasoningPrompt = readFileSync('../cos-policy/prompts/constraint-first-reasoner.txt', 'utf8')
 const reasoningDocs = readFileSync('../cos-policy/docs/reason-dont-template.md', 'utf8')
 const reasoningReadme = readFileSync('../cos-policy/README.md', 'utf8')
@@ -18,6 +20,7 @@ test('ordinary evidence reasoning is domain-general rather than a semantic looku
   assert.doesNotMatch(policy, semanticTemplateTerms)
   assert.doesNotMatch(policy, legacyDiagnosticTemplateTerms)
   assert.doesNotMatch(grounding, semanticTemplateTerms)
+  assert.doesNotMatch(externalInfo, semanticTemplateTerms)
 
   assert.match(policy, /proposition the user actually asked/i)
   assert.match(policy, /construct, population, denominator, time window/i)
@@ -26,8 +29,10 @@ test('ordinary evidence reasoning is domain-general rather than a semantic looku
   assert.match(policy, /candidate causes, and mitigations/i)
 })
 
-test('fresh synthesis plans semantic scopes neurally before it writes answer prose', () => {
+test('fresh synthesis plans semantic scopes and presentation mode neurally before it writes answer prose', () => {
   assert.match(synthesis, /SEMANTIC SCOPE PLANNER/)
+  assert.match(synthesis, /presentationMode/)
+  assert.match(synthesis, /neutral_evidence_map/)
   assert.match(synthesis, /directBinaryAnswerSafe/)
   assert.match(synthesis, /materially different constructs, populations, denominators, units, time windows, comparison bases, controls/i)
   assert.match(synthesis, /Do not write the user-facing answer and do not expose chain-of-thought/i)
@@ -37,6 +42,27 @@ test('fresh synthesis plans semantic scopes neurally before it writes answer pro
   assert.match(localSynthesis, /freshEvidenceScopePlanPrompt/)
   assert.match(localSynthesis, /freshEvidenceScopePlanSystemPrompt/)
   assert.match(localSynthesis, /cos-fresh-semantic-scope-plan/)
+})
+
+test('live retrieval deliberately acquires credible disagreement and alternative methodology before neural synthesis', () => {
+  assert.match(externalInfo, /evidenceDiversitySearchQuery/)
+  assert.match(externalInfo, /credible disagreement alternative methodology competing interpretation criticism evidence independent analysis/i)
+  assert.match(externalInfo, /reserve = Math\.min\(2,/)
+  assert.match(externalInfo, /Failure of the diversity lane never discards otherwise valid primary evidence/i)
+  assert.match(externalInfo, /authorityRequired \|\| currentPublicOffice/)
+  assert.match(externalInfo, /structuredLiveDataKind\(base\)/)
+  assert.match(externalInfo, /TERTIARY_REFERENCE_HOST_SUFFIXES/)
+  assert.match(externalInfo, /wikipedia\.org/)
+  assert.match(externalInfo, /isTertiaryReferenceResult/)
+})
+
+test('neutral evidence maps cannot begin with a yes-no verdict', () => {
+  assert.match(synthesis, /For presentationMode="neutral_evidence_map", directBinaryAnswerSafe MUST be false/i)
+  assert.match(synthesis, /A neutral evidence map must never begin with a yes\/no verdict/i)
+  assert.match(synthesis, /If presentationMode="neutral_evidence_map", NEVER begin with yes\/no or a single verdict/i)
+  assert.match(synthesis, /args\.semanticPlan\.presentationMode === 'neutral_evidence_map'.*BINARY_LEAD\.test\(answer\)/s)
+  assert.match(recovery, /inconsistent_presentation_mode/)
+  assert.match(recovery, /neutral_evidence_map.*do not begin with yes\/no or a verdict/is)
 })
 
 test('measurement compatibility is a neural semantic rule rather than a named-topic formatter', () => {
@@ -62,14 +88,16 @@ test('source selection prefers direct evidence over redundant tertiary summaries
   assert.match(synthesis, /Prefer direct or primary evidence for a scope when available/i)
   assert.match(synthesis, /Do not cite a tertiary summary merely to add another source/i)
   assert.match(synthesis, /Prefer direct\/primary evidence and strong independent corroboration over redundant tertiary summaries/i)
+  assert.match(externalInfo, /Tertiary reference pages can be useful background/i)
 })
 
 test('deterministic release code validates the neural plan instead of classifying semantic topics', () => {
   assert.doesNotMatch(synthesis, /GROUP_COMPARISON_CUE|GROUP_DIFFERENCE_CUE|GROUP_LEVEL_MEASURE_CUE/)
   assert.doesNotMatch(synthesis, /requiresGroupComparisonScope|explainsGroupComparisonScope/)
   assert.doesNotMatch(synthesis, semanticTemplateTerms)
-  assert.match(synthesis, /!args\.semanticPlan\.directBinaryAnswerSafe && BINARY_LEAD\.test\(answer\)/)
-  assert.match(synthesis, /Scope count alone must never determine directBinaryAnswerSafe/i)
+  assert.match(synthesis, /presentationMode === 'neutral_evidence_map'/)
+  assert.match(synthesis, /BINARY_LEAD\.test\(answer\)/)
+  assert.match(synthesis, /Do not infer presentationMode from scope count/i)
   assert.doesNotMatch(synthesis, /directBinaryAnswerSafe\s*===\s*false\s*&&\s*scopes\.length\s*<\s*2/)
   assert.match(synthesis, /requiredScopeIds/)
   assert.match(synthesis, /scope\.evidenceIds\.some/)
@@ -90,9 +118,9 @@ test('multi-scope answer prose is neurally reviewed for semantic faithfulness an
 })
 
 test('answer synthesis preserves model-declared scopes and final repair remains neural', () => {
-  assert.match(synthesis, /prior neural scope planner has already identified the semantic scopes/i)
+  assert.match(synthesis, /prior neural scope planner has already identified the semantic scopes and presentation mode/i)
   assert.match(synthesis, /Preserve the scope plan/)
-  assert.match(synthesis, /If directBinaryAnswerSafe=false, do not open with a standalone yes or no/i)
+  assert.match(synthesis, /presentationMode="neutral_evidence_map"/)
   assert.match(synthesis, /FINAL NEURAL REPAIR\/EDIT PASS/i)
   assert.match(synthesis, /repair every listed missing or collapsed scope/i)
   assert.match(localSynthesis, /freshEvidenceSynthesisNeedsNeuralReview/)

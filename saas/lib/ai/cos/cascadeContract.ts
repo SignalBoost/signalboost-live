@@ -121,12 +121,13 @@ function isExecutablePath(path: CascadeAnswerPath): boolean {
 }
 
 export function validateCascadeCandidate(args: {
-  rootTopicId: string
+  rootTopicId?: string
   rootQuestion: string
   question: string
   sourceTitles?: string[]
 }): CascadeCandidate {
   const rootQuestion = clean(args.rootQuestion)
+  const rootTopicId = clean(args.rootTopicId) || randomUUID()
   const question = clean(args.question)
   const sourceTitles = [...new Set((args.sourceTitles || []).map(clean).filter(Boolean))].slice(0, 8)
   const affinity = cascadeTopicAffinity(rootQuestion, question)
@@ -153,7 +154,7 @@ export function validateCascadeCandidate(args: {
 
   return {
     followup_id: randomUUID(),
-    root_topic_id: args.rootTopicId,
+    root_topic_id: rootTopicId,
     question,
     display_text: displayText(question),
     root_question: rootQuestion,

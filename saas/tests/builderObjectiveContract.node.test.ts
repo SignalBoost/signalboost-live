@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   BuilderObjectiveError,
   MAX_BUILDER_OBJECTIVE_CHARS,
+  MAX_BUILDER_RAW_OBJECTIVE_CHARS,
   readBuilderObjective,
 } from '../lib/builder/request-contract.ts'
 
@@ -27,11 +28,17 @@ test('Builder accepts the objective size that Production previously rejected at 
   assert.equal(parsed.source, 'objective')
 })
 
-test('Builder objective extraction shares the 64,000-character routing boundary', () => {
+test('Builder compacts copied context at the 64,000-character durable boundary', () => {
   const objective = 'x'.repeat(MAX_BUILDER_OBJECTIVE_CHARS)
   assert.equal(readBuilderObjective({ objective }).length, MAX_BUILDER_OBJECTIVE_CHARS)
+  const oversized = `Fix broken.js.\n${'middle\n'.repeat(12_000)}ReferenceError: result is not defined`
+  const parsed = readBuilderObjective({ objective: oversized })
+  assert.equal(parsed.length, MAX_BUILDER_OBJECTIVE_CHARS)
+  assert.match(parsed.objective, /^Fix broken\.js\./)
+  assert.match(parsed.objective, /omitted copied middle context/)
+  assert.match(parsed.objective, /ReferenceError: result is not defined$/)
   assert.equal(
-    rejectedCode(() => readBuilderObjective({ objective: objective + 'x' })),
+    rejectedCode(() => readBuilderObjective({ objective: 'x'.repeat(MAX_BUILDER_RAW_OBJECTIVE_CHARS + 1) })),
     'builder_objective_too_large',
   )
 })

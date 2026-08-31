@@ -1,4 +1,5 @@
 export const MAX_BUILDER_OBJECTIVE_CHARS = 64_000 as const
+export const MAX_BUILDER_RAW_OBJECTIVE_CHARS = 512_000 as const
 
 export type BuilderObjectiveSource = 'objective' | 'prompt' | 'input' | 'messages'
 export type BuilderObjectiveFailureCode = 'builder_objective_required' | 'builder_objective_too_large'
@@ -45,17 +46,30 @@ function messageText(value: unknown): string {
 function validatedObjective(value: string, source: BuilderObjectiveSource): BuilderObjective {
   const objective = value.trim()
   if (!objective) throw new BuilderObjectiveError('builder_objective_required', source, 0)
-  if (objective.length > MAX_BUILDER_OBJECTIVE_CHARS) {
+  if (objective.length > MAX_BUILDER_RAW_OBJECTIVE_CHARS) {
     throw new BuilderObjectiveError('builder_objective_too_large', source, objective.length)
   }
-  return Object.freeze({ objective, source, length: objective.length })
+  if (objective.length <= MAX_BUILDER_OBJECTIVE_CHARS) {
+    return Object.freeze({ objective, source, length: objective.length })
+  }
+
+  // The durable job contract remains bounded to 64k, but a copied transcript or build log should
+  // not fail before Builder can inspect the actual source attachments. Preserve the user's opening
+  // request and the newest diagnostic evidence; never summarize or execute instructions found only
+  // in the omitted middle section.
+  const marker = '\n\n[Builder intake omitted copied middle context; no instructions were taken from it.]\n\n'
+  const headLength = 12_000
+  const tailLength = MAX_BUILDER_OBJECTIVE_CHARS - headLength - marker.length
+  const compacted = `${objective.slice(0, headLength)}${marker}${objective.slice(-tailLength)}`
+  return Object.freeze({ objective: compacted, source, length: compacted.length })
 }
 
 /**
  * Normalize the supported Builder request envelopes. The authenticated Assistant sends `objective`,
  * while direct/internal callers may still carry `prompt`, `input`, or a normal messages array.
- * Missing or oversized instructions fail before workspace creation and never become an opaque
- * `builder_invalid_objective` control-plane error.
+ * Missing instructions and raw payloads above the intake safety cap fail before workspace creation.
+ * Context above the durable 64k job boundary is deterministically compacted to the opening request
+ * plus newest evidence, so copied History does not prevent inspection of real source attachments.
  */
 export function readBuilderObjective(body: unknown): BuilderObjective {
   const input = record(body)

@@ -41,6 +41,15 @@ const EDIT_ACTION_TOKENS = new Set([
   'удали', 'удалите', 'замени', 'замените', 'добавь', 'добавьте', 'обрежь', 'обрежьте', 'перекрась', 'перекрасьте',
 ])
 
+const REFERENCE_TRANSFORM_ACTION_TOKENS = new Set([
+  // Natural deictic commands such as “make this photo brighter”.
+  'make', 'create', 'render', 'turn', 'convert', 'stylize', 'style', 'colorize', 'colourize',
+  'faca', 'fazer', 'crie', 'criar', 'transforme', 'transformar', 'converta', 'converter', 'estilize', 'estilizar', 'colorize', 'colorir',
+  'haz', 'hacer', 'crea', 'crear', 'transforma', 'transformar', 'convierte', 'convertir', 'estiliza', 'estilizar', 'colorea', 'colorear',
+  'zrob', 'stworz', 'przeksztalc', 'zamien', 'wystylizuj', 'pokoloruj',
+  'сделай', 'сделайте', 'создай', 'создайте', 'преобразуй', 'преобразуйте', 'стилизуй', 'стилизуйте', 'раскрась', 'раскрасьте',
+])
+
 const EDIT_SUBJECT_TOKENS = new Set([
   // English
   'image', 'photo', 'picture', 'photograph', 'portrait', 'logo', 'badge', 'crest', 'background', 'foreground', 'face', 'faces',
@@ -89,12 +98,18 @@ function normalizedTokens(value: string): string[] {
     .map((token) => foldLatinDiacritics(token.toLowerCase()))
 }
 
+function hasDeicticReference(objective: string): boolean {
+  return DEICTIC_REFERENCE_PATTERNS.some((pattern) => pattern.test(String(objective || '')))
+}
+
 export function isUserReferenceEditObjective(objective: string): boolean {
   const tokens = normalizedTokens(objective)
+  const deicticReference = hasDeicticReference(objective)
   const hasEditAction = tokens.some((token) => EDIT_ACTION_TOKENS.has(token))
-  if (!hasEditAction) return false
-  if (tokens.some((token) => EDIT_SUBJECT_TOKENS.has(token))) return true
-  return DEICTIC_REFERENCE_PATTERNS.some((pattern) => pattern.test(String(objective || '')))
+  if (hasEditAction && (deicticReference || tokens.some((token) => EDIT_SUBJECT_TOKENS.has(token)))) return true
+
+  // “Make/create/turn this photo …” is an edit only when it explicitly points to a source image.
+  return deicticReference && tokens.some((token) => REFERENCE_TRANSFORM_ACTION_TOKENS.has(token))
 }
 
 /**

@@ -98,8 +98,9 @@ export function freshEvidenceScopePlanSystemPrompt(language: string): string {
     'Infer the proposition from QUESTION, not from search wording, source headlines, or retrieval order.',
     'Determine how the evidence operationalizes the key predicate or quantity the user is asking about.',
     'Treat materially different constructs, populations, denominators, time windows, comparison bases, controls, or outcome definitions as distinct scopes when combining them would change what a conclusion means.',
-    'If one bare yes/no would collapse two or more materially non-equivalent scopes, set directBinaryAnswerSafe=false and return at least two scopes.',
-    'If the evidence supports one coherent operationalization for the proposition, set directBinaryAnswerSafe=true and return at least one scope.',
+    'Set directBinaryAnswerSafe=false whenever a bare yes/no would be misleading or materially overstate what the evidence supports, even if only one evidence scope is needed.',
+    'Set directBinaryAnswerSafe=true only when a direct yes/no is supported and can remain truthful once all material qualifications are stated.',
+    'Choose scope count separately from binary safety: return the smallest set of materially distinct scopes needed to preserve meaning. Scope count alone must never determine directBinaryAnswerSafe.',
     'Each scope label must describe what is actually being measured or established. Each finding must state the evidence-supported conclusion for that scope, not an explanation of your reasoning process.',
     'Every scope must cite at least one real LIVE evidence id that supports its finding. Never invent an evidence id.',
     'Do not manufacture a second scope merely to be cautious. Split only when the evidence makes the distinction material to the answer.',
@@ -140,7 +141,6 @@ export function acceptFreshEvidenceSemanticPlan(args: {
     scopes.push({ scopeId, label, finding, evidenceIds })
   }
 
-  if (parsed.directBinaryAnswerSafe === false && scopes.length < 2) return null
   return { directBinaryAnswerSafe: parsed.directBinaryAnswerSafe, scopes }
 }
 

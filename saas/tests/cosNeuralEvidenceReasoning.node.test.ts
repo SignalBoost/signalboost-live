@@ -29,14 +29,39 @@ test('ordinary evidence reasoning is domain-general rather than a semantic looku
 test('fresh synthesis plans semantic scopes neurally before it writes answer prose', () => {
   assert.match(synthesis, /SEMANTIC SCOPE PLANNER/)
   assert.match(synthesis, /directBinaryAnswerSafe/)
-  assert.match(synthesis, /materially different constructs, populations, denominators, time windows, comparison bases, controls/i)
+  assert.match(synthesis, /materially different constructs, populations, denominators, units, time windows, comparison bases, controls/i)
   assert.match(synthesis, /Do not write the user-facing answer and do not expose chain-of-thought/i)
-  assert.match(synthesis, /scope label must describe what is actually being measured or established/i)
+  assert.match(synthesis, /scope label must identify what is actually measured, compared, or argued/i)
   assert.match(synthesis, /acceptFreshEvidenceSemanticPlan/)
   assert.match(localSynthesis, /phase: 'scope_plan'/)
   assert.match(localSynthesis, /freshEvidenceScopePlanPrompt/)
   assert.match(localSynthesis, /freshEvidenceScopePlanSystemPrompt/)
   assert.match(localSynthesis, /cos-fresh-semantic-scope-plan/)
+})
+
+test('measurement compatibility is a neural semantic rule rather than a named-topic formatter', () => {
+  assert.match(synthesis, /Never treat estimates as one numerical range, average, trend, or pooled finding unless their population, denominator, unit, time basis, and control structure are genuinely commensurable/i)
+  assert.match(synthesis, /Never combine non-commensurable numbers into one range, average, trend, or summary statistic/i)
+  assert.match(synthesis, /If two sources report different numbers because they measure different things, say so explicitly/i)
+  assert.match(synthesis, /Mark faithful=false if the answer blends non-commensurable estimates into one range, average, trend, consensus statistic/i)
+  assert.match(synthesis, /made numerically commensurable without basis/i)
+  assert.doesNotMatch(synthesis, semanticTemplateTerms)
+})
+
+test('contested or divergent evidence is presented neutrally without manufactured balance', () => {
+  assert.match(synthesis, /Do not choose a side for the user/i)
+  assert.match(synthesis, /do not advocate a side or tell the user what to believe/i)
+  assert.match(synthesis, /Do not manufacture false balance/i)
+  assert.match(synthesis, /let the user decide what to believe/i)
+  assert.match(synthesis, /Mark faithful=false if genuine evidence-backed divergence is converted into advocacy/i)
+  assert.match(synthesis, /Mark faithful=false if the answer creates false balance/i)
+  assert.match(synthesis, /compact evidence map is better than a verdict/i)
+})
+
+test('source selection prefers direct evidence over redundant tertiary summaries', () => {
+  assert.match(synthesis, /Prefer direct or primary evidence for a scope when available/i)
+  assert.match(synthesis, /Do not cite a tertiary summary merely to add another source/i)
+  assert.match(synthesis, /Prefer direct\/primary evidence and strong independent corroboration over redundant tertiary summaries/i)
 })
 
 test('deterministic release code validates the neural plan instead of classifying semantic topics', () => {
@@ -51,8 +76,8 @@ test('deterministic release code validates the neural plan instead of classifyin
   assert.match(synthesis, /replyCitesRequiredFreshEvidence/)
 })
 
-test('multi-scope answer prose is neurally reviewed for semantic faithfulness before release', () => {
-  assert.match(synthesis, /SCOPE-FAITHFULNESS REVIEWER/)
+test('multi-scope answer prose is neurally reviewed for semantic faithfulness and neutrality before release', () => {
+  assert.match(synthesis, /SCOPE-FAITHFULNESS AND NEUTRALITY REVIEWER/)
   assert.match(synthesis, /missingScopeIds/)
   assert.match(synthesis, /collapsedScopeIds/)
   assert.match(synthesis, /Mark faithful=false if a required scope is absent, materially weakened, or merged with another scope/i)

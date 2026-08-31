@@ -149,6 +149,31 @@ test('Builder extracts the valid balanced control object instead of joining unre
   assert.equal(calls, 1)
 })
 
+test('Builder accepts equivalent OpenAI-style tool controls without weakening tool input validation', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const inputs: ModelInput[] = []
+  const ai: BuilderAiPort = {
+    async generate(input) {
+      inputs.push(input)
+      return '{"tool_calls":[{"function":{"name":"write_file","arguments":"{\\"path\\":\\"hello.js\\",\\"content\\":\\"console.log(1)\\"}"}}]}'
+    },
+  }
+  const runner: BuilderRunnerPort = {
+    async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } },
+  }
+
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Create hello.js.',
+    workspaceId: 'user:provider-tool-control',
+    maxRounds: 1,
+  })
+
+  assert.equal(result.ok, false)
+  if (result.ok === false) assert.equal(result.error, 'builder_round_budget_exhausted')
+  assert.equal(inputs.length, 1)
+  assert.equal((await workspace.readFile('user:provider-tool-control', 'hello.js'))?.content, 'console.log(1)')
+})
+
 test('Builder bounds malformed-control recovery rather than looping indefinitely', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   let calls = 0
@@ -169,7 +194,8 @@ test('Builder bounds malformed-control recovery rather than looping indefinitely
   })
 
   assert.equal(result.ok, false)
-  if (result.ok === false) assert.equal(result.error, 'builder_invalid_model_control_output')
+  if (result.ok === false) assert.equal(result.error, 'builder_model_control_unusable')
   assert.equal(calls, 2)
-  assert.equal(result.trace.length, 0)
+  assert.equal(result.trace.length, 1)
+  assert.equal(result.trace[0]?.error, 'builder_model_control_unusable')
 })

@@ -145,19 +145,42 @@ function jsonObjectCandidates(value: string | null): readonly string[] {
   return Object.freeze([...new Set(candidates.filter(Boolean))])
 }
 
+function normalizedToolInput(value: Record<string, unknown>): Record<string, unknown> | null {
+  const candidate = value.input ?? value.arguments ?? value.args ?? value.parameters
+  if (isRecord(candidate)) return candidate
+  if (typeof candidate !== 'string') return null
+  try {
+    const decoded = JSON.parse(candidate)
+    return isRecord(decoded) ? decoded : null
+  } catch {
+    return null
+  }
+}
+
+function controlRecord(value: Record<string, unknown>): Record<string, unknown> {
+  if (isRecord(value.function)) return value.function
+  if (Array.isArray(value.tool_calls) && isRecord(value.tool_calls[0])) {
+    const first = value.tool_calls[0]
+    return isRecord(first.function) ? first.function : first
+  }
+  return value
+}
+
 function parse(value: string | null, allowedTools: readonly BuilderToolId[] = tools): Action | null {
   for (const candidate of jsonObjectCandidates(value)) {
     try {
       const decoded = JSON.parse(candidate)
       const parsed = Array.isArray(decoded) && decoded.length === 1 ? decoded[0] : decoded
       if (!isRecord(parsed)) continue
-      if (parsed.type === 'answer' && typeof parsed.answer === 'string' && parsed.answer.trim()) {
-        return { type: 'answer', answer: parsed.answer }
+      const control = controlRecord(parsed)
+      if ((control.type === 'answer' || control.action === 'answer') && typeof control.answer === 'string' && control.answer.trim()) {
+        return { type: 'answer', answer: control.answer }
       }
-      if (parsed.type !== 'tool' || typeof parsed.toolId !== 'string' || !isRecord(parsed.input)) continue
-      const toolId = parsed.toolId as BuilderToolId
-      if (!allowedTools.includes(toolId) || !validToolInput(toolId, parsed.input)) continue
-      return { type: 'tool', toolId, input: parsed.input }
+      const toolId = text(control.toolId) || text(control.tool) || text(control.name) || (control.type === 'tool' ? text(control.action) : '')
+      const input = normalizedToolInput(control)
+      if (!toolId || !input) continue
+      if (!allowedTools.includes(toolId as BuilderToolId) || !validToolInput(toolId as BuilderToolId, input)) continue
+      return { type: 'tool', toolId: toolId as BuilderToolId, input }
     } catch {}
   }
   return null
@@ -256,7 +279,7 @@ export class BuilderToolLoop {
       let blockedAction: ToolAction | null = null
       for (let controlAttempt = 0; controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
         const recoveryInstruction = controlAttempt > 0
-          ? `CONTROL RECOVERY ATTEMPT ${controlAttempt}: The previous response was not one complete valid control object. Return exactly one compact JSON object using one TOOL INPUT SCHEMA above. Emit no prose or Markdown. For an existing file, use edit_file with search and replace instead of rewriting the whole file.`
+          ? `CONTROL RECOVERY ATTEMPT ${controlAttempt}: The previous response could not be used. Return exactly one compact JSON object using one TOOL INPUT SCHEMA above. Use only type, toolId, and input; input must be an object, not a JSON string. Emit no prose or Markdown. For an existing file, use edit_file with search and replace instead of rewriting the whole file.`
           : ''
         let response: string | null
         try {
@@ -297,7 +320,18 @@ export class BuilderToolLoop {
         })
         continue
       }
-      if (!action) return { ok: false, error: 'builder_invalid_model_control_output', trace }
+      if (!action) {
+        trace.push({
+          round,
+          toolId: 'list_files',
+          input: {},
+          ok: false,
+          error: 'builder_model_control_unusable',
+          failureClass: 'unknown',
+          remediation: 'The Builder could not interpret the model control response after bounded recovery. Retry the task; no files or commands were executed.',
+        })
+        return { ok: false, error: 'builder_model_control_unusable', trace }
+      }
 
       if (action.type === 'answer') {
         if (repairPhase && repairPhase !== 'complete') {

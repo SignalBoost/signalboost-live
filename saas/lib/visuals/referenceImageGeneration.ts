@@ -304,7 +304,10 @@ export async function generateReferenceConditionedImage(input: {
   size?: string
   references: readonly VerifiedPersonReference[]
 }): Promise<ReferenceConditionedImageResult> {
-  const references = input.references.slice(0, 4)
+  if (input.references.length > 4) {
+    return { ok: false, error: 'Identity-verified generation supports at most four people per image.' }
+  }
+  const references = [...input.references]
   if (!references.length) return { ok: false, error: 'No verified person references were supplied.' }
 
   const key = approvedRuntimeKey()

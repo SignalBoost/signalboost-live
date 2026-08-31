@@ -133,6 +133,16 @@ function unverifiedPeopleReply(language: VisualLanguage, unresolved: readonly st
   }[language]
 }
 
+function unsupportedPeopleCountReply(language: VisualLanguage, count: number): string {
+  return {
+    en: `This visual names ${count} people, but identity-verified generation supports at most four at once. I did not drop or substitute anyone. Request four or fewer people.`,
+    es: `Esta imagen nombra a ${count} personas, pero la generación con identidad verificada admite como máximo cuatro a la vez. No eliminé ni sustituí a nadie. Solicita cuatro personas o menos.`,
+    pt: `Esta imagem nomeia ${count} pessoas, mas a geração com identidade verificada aceita no máximo quatro por vez. Não removi nem substituí ninguém. Peça quatro pessoas ou menos.`,
+    pl: `Ten obraz wymienia ${count} osób, ale generowanie ze zweryfikowaną tożsamością obsługuje najwyżej cztery osoby naraz. Nikogo nie pominąłem ani nie zastąpiłem. Poproś o maksymalnie cztery osoby.`,
+    ru: `В запросе указано ${count} человек, но генерация с проверкой личности поддерживает не более четырёх одновременно. Я никого не удалял и не заменял. Укажите не более четырёх человек.`,
+  }[language]
+}
+
 function verificationFailureReply(language: VisualLanguage, people: boolean): string {
   if (people) {
     return {
@@ -464,7 +474,28 @@ export async function POST(request: Request) {
       b64 = verifiedReference.b64
       mime = verifiedReference.mime
     } else if (classification.requestType === 'named-person' || classification.requestType === 'multiple-named-people') {
-      const requestedPeople = [...classification.referencePeople].slice(0, 4)
+      const requestedPeople = [...classification.referencePeople]
+      if (requestedPeople.length > 4) {
+        trace(traceId, 'final-decision', {
+          decision: 'blocked',
+          reason: 'visual_people_count_unsupported',
+          requestedPeopleCount: requestedPeople.length,
+          maxPeople: 4,
+        })
+        return NextResponse.json({
+          error: 'visual_people_count_unsupported',
+          reply: unsupportedPeopleCountReply(language, requestedPeople.length),
+          source: 'concierge-visual-people-count-unsupported',
+          trace_id: traceId,
+          request_type: classification.requestType,
+          execution_allowed: false,
+          external_action_taken: false,
+          requested_people: requestedPeople,
+          requested_people_count: requestedPeople.length,
+          max_people: 4,
+          failed_entities: requestedPeople,
+        }, { status: 422 })
+      }
       const resolved = await Promise.all(requestedPeople.map((person) => resolveVerifiedPersonReference(person)))
       const unresolvedPeople = requestedPeople.filter((_person, index) => !resolved[index])
       trace(traceId, 'reference-resolution', {

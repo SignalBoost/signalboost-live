@@ -297,7 +297,6 @@ export function extractNamedPeople(prompt: string): string[] {
 
   return [...found.values()]
     .sort((a, b) => a.index - b.index || a.name.localeCompare(b.name))
-    .slice(0, 4)
     .map((candidate) => candidate.name)
 }
 

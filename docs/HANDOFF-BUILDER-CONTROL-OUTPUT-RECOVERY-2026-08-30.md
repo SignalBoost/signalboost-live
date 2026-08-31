@@ -55,3 +55,29 @@ The regression is included in `saas/scripts/vercel-cos-gates.mjs` so this path c
 ## Acceptance boundary
 
 The implementation and Production deployment are accepted. End-to-end repository-repair runtime behavior is still **not** accepted until a fresh, real authenticated owner submission returns a reviewable patch and fail-before/edit/pass-after proof from Production. Do not manufacture that observation.
+
+---
+
+## 2026-08-31 Production follow-up — control aliases and whole-turn deadline
+
+A fresh authenticated owner submission exposed two additional defects after the earlier control-envelope work:
+
+1. The approved Qwen reasoner returned bounded, unambiguous tool intentions in provider shorthand such as `run {"command":"..."}`, `{"type":"run","command":"..."}`, prose followed by that typed JSON object, and `run command: \`...\``. Builder's parser still rejected those shapes even though the tool name and required command were present. The first observed turn ended HTTP 422 after repeated `builder_invalid_model_control_output` events.
+2. A second real retry created the isolated repository-repair workspace but produced no terminal assistant-history row and no workspace file. Builder had per-model and per-command limits but no absolute whole-turn deadline below the Assistant page's 290-second deadline and Vercel's 300-second function limit. The browser therefore stopped waiting before the route could persist a recoverable result.
+
+The active correction:
+
+- adds a provider-control adapter that canonicalizes only bounded, unambiguous executable-tool aliases before the existing Builder allowlist and exact input validation;
+- keeps malformed, ambiguous, unavailable, or input-invalid controls on the existing fail-closed path;
+- gives every Builder turn a server-owned absolute deadline;
+- reserves response/persistence time before the browser deadline;
+- returns `builder_turn_timeout` as HTTP 504 and persists the terminal result instead of allowing the function to be killed silently;
+- skips expensive unverified repository-diff collection after a deadline failure;
+- never replays the Builder POST.
+
+New mandatory regressions:
+
+- `saas/tests/builderControlAdapter.node.test.ts` — exact live Qwen aliases, canonical execution through the existing validation boundary, and one terminal deadline error without model retry;
+- `saas/tests/builderRequestDeadline.node.test.ts` — route budget remains below the client deadline, timeout results are persisted/returned, and repository repair reserves cleanup time before diff collection.
+
+Acceptance boundary remains strict: exact Preview and Production gates must pass, and a subsequent real authenticated owner repair must return either a reviewable verified patch or a truthful terminal Builder error before the page deadline. A deployment alone is not end-to-end runtime acceptance.

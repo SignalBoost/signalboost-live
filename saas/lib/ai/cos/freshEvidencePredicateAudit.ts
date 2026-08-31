@@ -114,23 +114,33 @@ export function acceptFreshEvidencePredicateAudit(text: string): FreshEvidencePr
   }
 }
 
+function neutralEvidenceMap(semanticPlan: FreshEvidenceSemanticPlan): FreshEvidenceSemanticPlan {
+  return {
+    ...semanticPlan,
+    presentationMode: 'neutral_evidence_map',
+    directBinaryAnswerSafe: false,
+  }
+}
+
 /**
- * Two-key release rule: a binary lead survives only when the original neural planner AND this
- * independent neural audit affirm that it is safe. Deterministic code does not infer semantics; it
- * only combines two neural verdicts conservatively. Missing/unparseable audit means "no second key",
- * so the answer remains available but is forced to neutral evidence-first presentation.
+ * Three-key binary-release rule:
+ * 1) the neural planner says binary framing is safe,
+ * 2) the planner declared exactly one material semantic scope, and
+ * 3) an independent neural audit separately affirms binary safety.
+ *
+ * The server does not infer what the scopes mean. It trusts the planner's own declaration that scopes
+ * are materially distinct, then applies a presentation rule: multiple material scopes are evidence-map
+ * territory and cannot be compressed into a yes/no headline. Missing/unparseable audit is likewise no
+ * second neural key, so the answer remains available but is forced to evidence-first presentation.
  */
 export function applyFreshEvidencePredicateAudit(
   semanticPlan: FreshEvidenceSemanticPlan,
   audit: FreshEvidencePredicateAudit | null,
 ): FreshEvidenceSemanticPlan {
   if (semanticPlan.presentationMode === 'neutral_evidence_map' || !semanticPlan.directBinaryAnswerSafe) return semanticPlan
+  if (semanticPlan.scopes.length !== 1) return neutralEvidenceMap(semanticPlan)
   if (audit?.binaryVerdictSafe === true && audit.requiresNeutralEvidenceMap === false && audit.ambiguityKinds.length === 0) {
     return semanticPlan
   }
-  return {
-    ...semanticPlan,
-    presentationMode: 'neutral_evidence_map',
-    directBinaryAnswerSafe: false,
-  }
+  return neutralEvidenceMap(semanticPlan)
 }

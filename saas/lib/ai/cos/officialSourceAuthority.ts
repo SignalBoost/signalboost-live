@@ -5,34 +5,22 @@
 // A careful human answering a factual question first asks "whose fact is this?" and goes there:
 // a state's procedure belongs to that state's portal, a product's behavior belongs to the vendor's
 // docs, a dosage belongs to a health institution, a company fact belongs to the company, a standard
-// belongs to the standards body. Whatever blog ranks first is commentary, not authority.
+// belongs to the standards body. Published national accounts and labor/price series belong to the
+// statistical agency that produces them. Whatever blog ranks first is commentary, not authority.
 //
 // This module gives the live-search layer that judgement AS A GENERAL RULE, deliberately without
-// per-country or per-vendor lookup tables (an early draft had a jurisdiction table; it was the
-// wrong shape — tables cannot enumerate the world, and the owner is recognizable structurally):
+// per-country, per-vendor, or per-controversy lookup tables:
 //
-//   FIRST-PARTY   the result's domain names the entity the query asks about ("stripe webhook
-//                 signature" → stripe.com and docs.stripe.com are the owner, for ANY entity)
+//   FIRST-PARTY   the result's domain names the entity the query asks about
 //   INSTITUTIONAL the domain is a state/IGO/standards/health/academic institution by TLD
-//                 convention — (?:gov|gob|gouv|mil|edu).* , europa.eu, who.int, ietf.org … —
-//                 which covers gov.pl and gob.mx and gouv.fr identically, no country list
+//                 convention — (?:gov|gob|gouv|mil|edu).* , europa.eu, who.int, oecd.org …
 //   SECONDARY     everything else; dated pages outrank undated ones
 //
-// Secondary sources are demoted and labelled, never deleted — official pages lag and omit edge
-// cases, and the reasoner should see all evidence with honest labels. The one hard statement is
-// the caveat when an authority-owned question retrieved no owner at all.
+// Secondary sources are demoted and labelled, never deleted. Deterministic code never writes the
+// semantic answer. The reasoner must see owner evidence first, then commentary, with honest labels.
 //
-// Pure; deterministic; no model calls; no per-jurisdiction data; no imports — self-contained so it
-// can never break the build through a missing sibling, and all five platform languages classify
-// identically through the inline vocabulary below.
+// Pure; deterministic; no model calls; no per-jurisdiction data; no imports.
 
-// SELF-CONTAINED multilingual classification vocabulary. An earlier revision imported a shared
-// cross-language normalizer module; the freshness layer on main solved its multilingual needs with
-// inline patterns instead, so that module does not exist — and this file must never break the
-// build over it again (it did once, 2026-08-22, when it landed without its dependency). The
-// vocabulary below is deliberately minimal: only the words this classifier's own patterns need,
-// mapped to their English tokens, with Unicode-aware boundaries (\\b fails around Cyrillic and
-// accented letters, so lookarounds are used).
 const CLASSIFICATION_VOCABULARY: Array<[string, string]> = [
   ['co powinnam zrobić', 'what should i do'], ['co powinienem zrobić', 'what should i do'],
   ['qué debo hacer', 'what should i do'], ['que debo hacer', 'what should i do'],
@@ -56,6 +44,10 @@ const CLASSIFICATION_VOCABULARY: Array<[string, string]> = [
   ['paszport', 'passport'], ['pasaporte', 'passport'], ['passaporte', 'passport'], ['паспорт', 'passport'],
   ['nazwisko', 'name change'], ['apellido', 'name change'], ['sobrenome', 'name change'], ['фамилии', 'name change'], ['фамилию', 'name change'],
   ['podatek', 'tax'], ['impuesto', 'tax'], ['imposto', 'tax'], ['налог', 'tax'],
+  ['desempleo', 'unemployment'], ['desemprego', 'unemployment'], ['bezrobocie', 'unemployment'], ['безработица', 'unemployment'],
+  ['inflación', 'inflation'], ['inflação', 'inflation'], ['inflacja', 'inflation'], ['инфляция', 'inflation'],
+  ['salarios', 'wages'], ['salários', 'wages'], ['płace', 'wages'], ['зарплаты', 'wages'],
+  ['ganancias', 'earnings'], ['rendimentos', 'earnings'], ['zarobki', 'earnings'], ['заработок', 'earnings'],
 ]
 
 const CLASSIFICATION_RULES: Array<{ pattern: RegExp; english: string }> = [...CLASSIFICATION_VOCABULARY]
@@ -84,10 +76,9 @@ export type AuthoritativeSourceNeed = {
   required: boolean
   /** Entity tokens extracted from the query, used for first-party domain matching. */
   entityTokens: string[]
+  /** True when the owner is a statistical publisher of official series, not a product vendor. */
+  officialStatistics: boolean
 }
-
-// ── Which questions have an owner ─────────────────────────────────────────────────────────────────
-// Classified on the ENGLISH-normalized query so ES/PT/PL/RU behave identically to English.
 
 const GOVERNMENT_RULE_TOPIC = /\b(?:law|laws|regulation|regulations|rule|rules|requirement|requirements|visa|passport|residence\s+permit|work\s+permit|citizenship|naturali[sz]ation|tax(?:es)?|tax\s+(?:rate|return|filing)|pension|social\s+security|benefits?|id\s+card|identity\s+card|driver'?s?\s+licen[cs]e|driving\s+licen[cs]e|voter\s+registration|name\s+change|marriage\s+(?:registration|certificate)|birth\s+certificate|death\s+certificate|civil\s+registry|customs|import\s+dut(?:y|ies)|minimum\s+wage)\b/i
 const PROCEDURE_INTENT = /\b(?:which|what)\s+(?:documents?|forms?|institutions?|offices?|authorit(?:ies|y))\b|\b(?:documents?|forms?)\s+(?:do\s+i|should\s+i|to)\s+(?:change|update|renew|replace|submit|file)\b|\bhow\s+(?:do|can)\s+i\s+(?:register|apply|renew|replace|file|notify|report)\b|\bwhat\s+should\s+i\s+do\b.{0,80}\b(?:documents?|offices?|institutions?|authorit(?:ies|y)|register|notify)\b/i
@@ -95,12 +86,12 @@ const PRODUCT_BEHAVIOR_TOPIC = /\b(?:api|sdk|webhook|endpoint|documentation|docs
 const MEDICAL_TOPIC = /\b(?:dose|dosage|dosing|maximum\s+daily|side\s+effects?|contraindication|drug\s+interaction|vaccine\s+schedule|treatment\s+guidelines?)\b/i
 const STANDARD_TOPIC = /\b(?:rfc\s*\d+|iso\s*\d+|ieee\s*\d+|w3c|http\s+spec|specification)\b/i
 
-// ── Recognizing the owner structurally ────────────────────────────────────────────────────────────
+// Official published series. Construct-agnostic: earnings, prices, output, labor force.
+// Do not name a controversy, a preferred ratio, or a conclusion here.
+const OFFICIAL_STATISTICS_TOPIC = /\b(?:unemployment|inflation|consumer\s+price|producer\s+price|\bcpi\b|\bppi\b|\bgdp\b|gross\s+domestic\s+product|labor\s+force|labour\s+force|labor\s+productivity|labour\s+productivity|employment\s+rate|participation\s+rate|payroll|earnings|wages?|\bpay\b|compensation|poverty\s+rate|median\s+(?:weekly|hourly|annual|monthly))\b/i
 
-// State / IGO / standards / health / academic institutions by domain convention — no country list.
-const INSTITUTIONAL_HOST = /(?:^|\.)(?:gov|gob|gouv|mil|edu)(?:\.[a-z]{2,3})?$|(?:^|\.)(?:europa\.eu|ec\.europa\.eu|un\.org|who\.int|oecd\.org|worldbank\.org|imf\.org|ietf\.org|w3\.org|iso\.org|ieee\.org|nist\.gov|ecb\.europa\.eu)$|(?:^|\.)(?:nhs\.uk|nih\.gov|cdc\.gov|ema\.europa\.eu|fda\.gov)$|(?:^|\.)ac\.[a-z]{2}$/i
+const INSTITUTIONAL_HOST = /(?:^|\.)(?:gov|gob|gouv|mil|edu)(?:\.[a-z]{2,3})?$|(?:^|\.)(?:europa\.eu|ec\.europa\.eu|un\.org|who\.int|oecd\.org|worldbank\.org|imf\.org|ietf\.org|w3\.org|iso\.org|ieee\.org|nist\.gov|ecb\.europa\.eu|stats\.oecd\.org|ilo\.org)$|(?:^|\.)(?:nhs\.uk|nih\.gov|cdc\.gov|ema\.europa\.eu|fda\.gov)$|(?:^|\.)ac\.[a-z]{2}$/i
 
-// Generic words that must never count as an entity for first-party matching.
 const ENTITY_STOP = new Set([
   'what', 'which', 'when', 'where', 'who', 'how', 'does', 'this', 'that', 'with', 'from', 'into',
   'after', 'before', 'change', 'changed', 'update', 'renew', 'notify', 'documents', 'document',
@@ -108,6 +99,7 @@ const ENTITY_STOP = new Set([
   'should', 'need', 'current', 'currently', 'latest', 'official', 'error', 'issue', 'problem',
   'failing', 'fails', 'failed', 'broken', 'working', 'setup', 'install', 'configure', 'price',
   'pricing', 'webhook', 'webhooks', 'signature', 'token', 'docs', 'documentation', 'guide',
+  'exist', 'exists', 'between', 'men', 'women', 'male', 'female',
 ])
 
 function entityTokensOf(text: string): string[] {
@@ -133,32 +125,28 @@ function hostOf(url: string): string {
   }
 }
 
-/** Registrable-ish labels of a host: for docs.stripe.com → ['docs','stripe']; TLD dropped. */
 function hostLabels(host: string): string[] {
   const parts = host.split('.').filter(Boolean)
   return parts.slice(0, Math.max(0, parts.length - 1))
 }
 
-/** Does this question's answer have a recognizable owner? */
 export function classifyAuthoritativeSourceNeed(query: string): AuthoritativeSourceNeed {
   const raw = String(query || '')
   const text = englishNormalizedForClassification(raw)
-  const required = GOVERNMENT_RULE_TOPIC.test(text)
+  const officialStatistics = OFFICIAL_STATISTICS_TOPIC.test(text)
+  const required = officialStatistics
+    || GOVERNMENT_RULE_TOPIC.test(text)
     || PROCEDURE_INTENT.test(text)
     || PRODUCT_BEHAVIOR_TOPIC.test(text)
     || MEDICAL_TOPIC.test(text)
     || STANDARD_TOPIC.test(text)
-  if (!required) return { required: false, entityTokens: [] }
-  return { required: true, entityTokens: entityTokensOf(`${raw} ${text}`) }
+  if (!required) return { required: false, entityTokens: [], officialStatistics: false }
+  return { required: true, entityTokens: entityTokensOf(`${raw} ${text}`), officialStatistics }
 }
 
-/** Which authority tier one result belongs to under a given need. */
 export function authorityTierOf(url: string, need: AuthoritativeSourceNeed): AuthorityTier {
   const host = hostOf(url)
   if (!host) return 'secondary'
-  // FIRST-PARTY: a host label IS one of the query's entity tokens — the domain names the thing the
-  // question is about, whoever that thing is. This is what generalizes: stripe.com for a Stripe
-  // question, supabase.com for a Supabase question, no vendor table anywhere.
   const labels = hostLabels(host)
   if (labels.some(label => need.entityTokens.includes(label))) return 'first_party'
   if (INSTITUTIONAL_HOST.test(host)) return 'institutional'
@@ -167,10 +155,6 @@ export function authorityTierOf(url: string, need: AuthoritativeSourceNeed): Aut
 
 const TIER_RANK: Record<AuthorityTier, number> = { first_party: 0, institutional: 1, secondary: 2 }
 
-/**
- * Authority-first ordering: the owner, then institutions, then secondary — dated secondary pages
- * ahead of undated ones, original relative order preserved inside each band, nothing removed.
- */
 export function rankByAuthority<T extends { url: string; sourceDate?: string }>(
   results: T[],
   need: AuthoritativeSourceNeed,
@@ -189,26 +173,23 @@ export function rankByAuthority<T extends { url: string; sourceDate?: string }>(
     .map(entry => ({ ...entry.result, authorityTier: entry.tier }))
 }
 
-/**
- * Bias the provider toward owner sources, non-destructively: authority-owned questions get an
- * "official" hint token appended (never a hardcoded domain — we do not know the owner's domain in
- * advance; we recognize it in the results).
- */
 export function augmentQueryForOfficialSources(query: string, need: AuthoritativeSourceNeed): string {
   const q = String(query || '').trim()
   if (!need.required) return q
+  // Never embed a publisher domain or a canned series name. Recognize owners in results.
+  if (need.officialStatistics) {
+    return /\b(?:official|statistical|agency|series)\b/i.test(q)
+      ? q
+      : `${q} official statistical agency series`.slice(0, 400)
+  }
   return /\bofficial\b/i.test(q) ? q : `${q} official`.slice(0, 400)
 }
 
-/**
- * The honest caveat: an authority-owned question that retrieved neither the owner nor any
- * institution must say so, instead of quietly presenting blog consensus as the rule.
- */
 export function officialCoverageNote(
   ranked: Array<{ authorityTier: AuthorityTier }>,
   need: AuthoritativeSourceNeed,
 ): string | null {
   if (!need.required) return null
   if (ranked.some(result => result.authorityTier !== 'secondary')) return null
-  return 'No first-party or institutional source was retrieved for this question; the evidence below is secondary commentary, and the specifics should be confirmed against the owning authority (the responsible government portal, vendor documentation, or institution) before acting.'
+  return 'No first-party or institutional source was retrieved for this question; the evidence below is secondary commentary, and the specifics should be confirmed against the owning authority (the responsible government portal, statistical agency, vendor documentation, or institution) before acting.'
 }

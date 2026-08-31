@@ -7,12 +7,12 @@ import { resolveVerifiedReferenceVisual, type VerifiedReferenceVisual } from '@/
 import { resolveVerifiedPersonReference, type VerifiedPersonReference } from '@/lib/visuals/personReferences'
 import { generateReferenceConditionedImage, type ReferenceConditionedImageResult } from '@/lib/visuals/referenceImageGeneration'
 import { verifyReferenceConditionedPeopleImage } from '@/lib/visuals/personImageVerification'
+import { isVisualObjectiveError, readVisualObjective } from '@/lib/visuals/request-contract'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const MAX_OBJECTIVE_CHARS = 4_000
 const MAX_PEOPLE_GENERATION_ATTEMPTS = 2
 
 type VisualLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
@@ -27,12 +27,6 @@ function imageMimeType(b64: string): ImageMime {
 
 function extensionFor(mime: string): 'png' | 'jpg' | 'webp' {
   return mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png'
-}
-
-function objectiveOf(value: unknown): string {
-  const objective = String(value || '').replace(/\0/g, '').trim()
-  if (!objective || objective.length > MAX_OBJECTIVE_CHARS) throw new Error('visual_invalid_objective')
-  return objective
 }
 
 function visualLanguage(objective: string): VisualLanguage {
@@ -192,8 +186,8 @@ export async function POST(request: Request) {
   if (!access?.userId) return NextResponse.json({ error: 'Sign in to create visual files.' }, { status: 401 })
 
   try {
-    const body = await request.json()
-    const objective = objectiveOf(body?.objective)
+    const body = await request.json().catch(() => ({}))
+    const { objective } = readVisualObjective(body)
     const language = visualLanguage(objective)
     const intent = detectConciergeVisualIntent(objective)
     if (!intent) return NextResponse.json({ error: 'visual_request_not_recognised' }, { status: 400 })
@@ -289,8 +283,29 @@ export async function POST(request: Request) {
       })) : undefined,
     })
   } catch (error) {
+    if (isVisualObjectiveError(error)) {
+      console.warn('[visual_objective_rejected]', {
+        code: error.code,
+        source: error.source,
+        observedLength: error.observedLength,
+        maxLength: error.maxLength,
+      })
+      return NextResponse.json({
+        error: error.code,
+        reply: error.code === 'visual_objective_required'
+          ? 'Describe the visual you want to create.'
+          : `Visual instructions can be up to ${error.maxLength.toLocaleString('en-US')} characters. Shorten the request and try again.`,
+        source: 'concierge-visual-objective-rejected',
+        execution_allowed: false,
+        external_action_taken: false,
+        objective_source: error.source,
+        observed_length: error.observedLength,
+        max_length: error.maxLength,
+      }, { status: 400 })
+    }
+
     const message = error instanceof Error ? error.message : 'visual_request_failed'
-    const status = /^visual_(invalid|request)/.test(message) ? 400 : 502
+    const status = /^visual_request/.test(message) ? 400 : 502
     return NextResponse.json({ error: message }, { status })
   }
 }

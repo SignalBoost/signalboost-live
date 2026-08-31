@@ -1,3 +1,4 @@
+// saas/app/api/builder/route.ts
 import { NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { createPlatformAiPort } from '@/lib/cos/aiPort'
@@ -26,7 +27,17 @@ function cleanObjective(value: unknown): string {
 function publicTrace(trace: readonly { round: number; toolId: string; ok: boolean; input: Record<string, unknown>; output?: unknown; error?: string; failureClass?: string; remediation?: string }[]) {
   return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
     const base = { round, toolId, ok, ...(error ? { error } : {}), ...(failureClass ? { failureClass } : {}), ...(remediation ? { remediation } : {}) }
-    if (toolId !== 'run') return { ...base, ...(typeof input.path === 'string' ? { path: input.path.slice(0, 240) } : {}) }
+    if (toolId !== 'run') {
+      const shape = output && typeof output === 'object' ? output as Record<string, unknown> : {}
+      const telemetry = toolId === 'model_control'
+        ? Object.fromEntries(
+            (['responseLength', 'startsWithObject', 'endsWithObject', 'hasThinkOpen', 'hasThinkClose', 'hasUnclosedObject', 'anyValidJson'] as const)
+              .filter((key) => typeof shape[key] === 'number' || typeof shape[key] === 'boolean')
+              .map((key) => [key, shape[key]]),
+          )
+        : {}
+      return { ...base, ...(typeof input.path === 'string' ? { path: input.path.slice(0, 240) } : {}), ...telemetry }
+    }
     const result = output && typeof output === 'object' ? output as Record<string, unknown> : {}
     return {
       ...base,

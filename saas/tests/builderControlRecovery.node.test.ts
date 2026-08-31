@@ -233,6 +233,6 @@ test('Builder reports an empty model response as a runtime failure without expos
   assert.equal(result.ok, false)
   if (result.ok === false) assert.equal(result.error, 'builder_model_control_empty_response')
   assert.equal(calls, 2)
-  assert.deepEqual(result.trace[0]?.output, { responseLength: 0, startsWithObject: false, endsWithObject: false, hasThinkOpen: false, hasThinkClose: false, hasUnclosedObject: false })
+  assert.deepEqual(result.trace[0]?.output, { responseLength: 0, startsWithObject: false, endsWithObject: false, hasThinkOpen: false, hasThinkClose: false, hasUnclosedObject: false, anyValidJson: false })
   assert.equal(result.trace[0]?.failureClass, 'runtime')
 })

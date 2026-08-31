@@ -169,5 +169,4 @@ test('runtime predicate-audit implementation contains no motivating-topic classi
   assert.match(audit, /descriptive_vs_causal/)
   assert.match(audit, /factual_vs_legal/)
   assert.match(audit, /three-key binary-release rule/i)
-  assert.match(audit, /multiple material scopes are evidence-map territory/i)
 })

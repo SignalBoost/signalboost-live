@@ -49,6 +49,7 @@ const tests = [
   'tests/cosFreshLiveRouting.node.test.ts',
   'tests/freshEvidenceLocalSynthesis.node.test.ts',
   'tests/freshEvidenceNeuralReview.node.test.ts',
+  'tests/freshEvidencePredicateAmbiguity.node.test.ts',
   'tests/cosFreshGrounding.node.test.ts',
   'tests/cosStructuredLiveInfo.node.test.ts',
   'tests/cosTemporalClaimGuard.node.test.ts',

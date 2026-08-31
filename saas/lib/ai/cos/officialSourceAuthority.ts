@@ -77,7 +77,7 @@ export type AuthoritativeSourceNeed = {
   /** Entity tokens extracted from the query, used for first-party domain matching. */
   entityTokens: string[]
   /** True when the owner is a statistical publisher of official series, not a product vendor. */
-  officialStatistics: boolean
+  officialStatistics?: boolean
 }
 
 const GOVERNMENT_RULE_TOPIC = /\b(?:law|laws|regulation|regulations|rule|rules|requirement|requirements|visa|passport|residence\s+permit|work\s+permit|citizenship|naturali[sz]ation|tax(?:es)?|tax\s+(?:rate|return|filing)|pension|social\s+security|benefits?|id\s+card|identity\s+card|driver'?s?\s+licen[cs]e|driving\s+licen[cs]e|voter\s+registration|name\s+change|marriage\s+(?:registration|certificate)|birth\s+certificate|death\s+certificate|civil\s+registry|customs|import\s+dut(?:y|ies)|minimum\s+wage)\b/i

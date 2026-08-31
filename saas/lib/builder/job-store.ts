@@ -22,7 +22,10 @@ export type BuilderJobRecord = Readonly<{
   updatedAt: string
 }>
 
+export const BUILDER_JOB_STALE_AFTER_MS = 6 * 60 * 1000
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const JOB_SELECT = 'id,workspace_id,user_id,conversation_id,objective,job_kind,metadata,owner_authorized,status,result,error,history_message_id,created_at,started_at,finished_at,updated_at'
 
 function serviceClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
@@ -58,6 +61,27 @@ function toJob(row: any): BuilderJobRecord {
     finishedAt: typeof row.finished_at === 'string' ? row.finished_at : null,
     updatedAt: String(row.updated_at || ''),
   })
+}
+
+async function readBuilderJob(
+  db: SupabaseClient,
+  jobId: string,
+  userId: string,
+): Promise<BuilderJobRecord | null> {
+  const { data, error } = await db
+    .from('builder_jobs')
+    .select(JOB_SELECT)
+    .eq('id', jobId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error) throw new Error(`builder_job_read: ${error.message}`)
+  return data ? toJob(data) : null
+}
+
+function stale(job: BuilderJobRecord): boolean {
+  if (job.status !== 'queued' && job.status !== 'running') return false
+  const updatedAtMs = Date.parse(job.updatedAt)
+  return Number.isFinite(updatedAtMs) && Date.now() - updatedAtMs >= BUILDER_JOB_STALE_AFTER_MS
 }
 
 export function builderJobStorageAvailable(): boolean {
@@ -112,18 +136,44 @@ export async function claimBuilderJob(jobId: string, userId: string): Promise<Bu
   return row ? toJob(row) : null
 }
 
+export async function reconcileStaleBuilderJobs(input: {
+  userId: string
+  jobId?: string | null
+  conversationId?: string | null
+}): Promise<number> {
+  if (!UUID.test(input.userId)) throw new Error('builder_job_invalid_identity')
+  if (input.jobId && !UUID.test(input.jobId)) throw new Error('builder_job_invalid_identity')
+  if (input.conversationId && !UUID.test(input.conversationId)) throw new Error('builder_job_invalid_identity')
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.rpc('expire_stale_builder_jobs', {
+    p_user_id: input.userId,
+    p_cutoff: new Date(Date.now() - BUILDER_JOB_STALE_AFTER_MS).toISOString(),
+    p_job_id: input.jobId || null,
+    p_conversation_id: input.conversationId || null,
+  })
+  if (error) throw new Error(`builder_job_stale_recovery: ${error.message}`)
+  const count = Number(data ?? 0)
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
+}
+
 export async function getBuilderJobForUser(jobId: string, userId: string): Promise<BuilderJobRecord | null> {
   if (!UUID.test(jobId) || !UUID.test(userId)) return null
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')
-  const { data, error } = await db
-    .from('builder_jobs')
-    .select('id,workspace_id,user_id,conversation_id,objective,job_kind,metadata,owner_authorized,status,result,error,history_message_id,created_at,started_at,finished_at,updated_at')
-    .eq('id', jobId)
-    .eq('user_id', userId)
-    .maybeSingle()
-  if (error) throw new Error(`builder_job_read: ${error.message}`)
-  return data ? toJob(data) : null
+  const job = await readBuilderJob(db, jobId, userId)
+  if (!job || !stale(job)) return job
+
+  try {
+    await reconcileStaleBuilderJobs({ userId, jobId })
+    return await readBuilderJob(db, jobId, userId)
+  } catch (error) {
+    console.error('[builder_job_stale_recovery_failed]', {
+      jobId,
+      message: error instanceof Error ? error.message : 'unknown',
+    })
+    return job
+  }
 }
 
 export async function finishBuilderJob(input: {

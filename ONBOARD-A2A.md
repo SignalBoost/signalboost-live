@@ -1,8 +1,8 @@
 # A2A Agent Fabric Onboarding Supplement
 
-Read root `ONBOARD.md` first, then Phases 1–11 under `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE*-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
+Read root `ONBOARD.md` first, then Phases 1–12 under `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE*-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
 
-Current workstream: **A2A Agent Fabric — Phase 11 buyer specialist onboarding active; buyer-live acceptance still pending.**
+Current workstream: **A2A Agent Fabric — Phase 12 buyer onboarding manifest active; buyer-live acceptance still pending.**
 
 Direction:
 
@@ -24,4 +24,5 @@ Direction:
 - Phase 9 may compose that reference specialist into hosted COS only for canonical `self-healing.diagnose`, owner/admin sessions, and exact scope when no buyer host is installed.
 - Phase 10 adds bounded reference health/availability evidence; health never grants authority and never changes buyer-host precedence.
 - Phase 11 compiles validated buyer Agent Cards + exact scope + explicit skill/risk approvals into existing registry entries only after health proof; it stores no credentials or endpoint secrets.
+- Phase 12 adds a versioned buyer onboarding manifest + dry-run install plan. Dry runs have zero activation/delegation side effects and reject secret-like or unknown fields.
 - `buyer-ready`, `signalboost-reference-live`, and `buyer-live` are distinct labels. Only a future authorized buyer-owned endpoint with observed governed delegation satisfies buyer-live acceptance.

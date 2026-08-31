@@ -216,19 +216,19 @@ export function acceptFreshEvidenceFaithfulnessReview(args: {
   return { faithful: parsed.faithful, missingScopeIds, collapsedScopeIds }
 }
 
-/** Output-density gate only. Semantic ambiguity is handled by the neural scope plan/reviewer. */
-export function freshEvidenceSynthesisNeedsNeuralReview(args: {
+/**
+ * Compatibility hook retained for the existing synthesis state machine.
+ * Output density is a presentation-quality preference, never a verification/release gate.
+ * Concision and representative-source selection remain neural prompt instructions; a grounded,
+ * citation-valid, scope-faithful answer must not fail closed because it is long or cites many sources.
+ */
+export function freshEvidenceSynthesisNeedsNeuralReview(_args: {
   answer: string
   citedSourceIds: string[]
   singleProposition: boolean
   semanticPlan: FreshEvidenceSemanticPlan
 }): boolean {
-  if (!args.singleProposition) return false
-  const sourceLimit = args.semanticPlan.directBinaryAnswerSafe
-    ? SINGLE_PROPOSITION_SOURCE_LIMIT
-    : Math.max(SINGLE_PROPOSITION_SOURCE_LIMIT, args.semanticPlan.scopes.length)
-  return args.citedSourceIds.length > sourceLimit
-    || String(args.answer || '').trim().length > SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT
+  return false
 }
 
 export function freshEvidenceRevisionSystemPrompt(language: string): string {

@@ -4,28 +4,13 @@ import { useEffect, type ReactNode } from 'react'
 
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py)$/i
 const SOURCE_ACCEPT = ['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.tsx', '.jsx', '.py'] as const
-const SOURCE_MIME: Readonly<Record<string, string>> = Object.freeze({
-  js: 'text/javascript',
-  mjs: 'text/javascript',
-  cjs: 'text/javascript',
-  ts: 'text/typescript',
-  mts: 'text/typescript',
-  cts: 'text/typescript',
-  tsx: 'text/typescript',
-  jsx: 'text/javascript',
-  py: 'text/x-python',
-})
-
-function sourceMime(name: string): string {
-  const extension = String(name || '').trim().toLowerCase().split('.').pop() || ''
-  return SOURCE_MIME[extension] || 'text/plain'
-}
+const ADMITTED_TEXT_MIME = 'text/plain'
 
 function normalizedFile(file: File): File {
-  if (!SOURCE_FILE.test(file.name)) return file
-  const expected = sourceMime(file.name)
-  if (file.type === expected) return file
-  return new File([file], file.name, { type: expected, lastModified: file.lastModified })
+  if (!SOURCE_FILE.test(file.name) || file.type === ADMITTED_TEXT_MIME) return file
+  // The existing Assistant file guard already admits text/plain. Preserve the executable source
+  // filename while normalizing only the browser-provided MIME so the same size/content checks run.
+  return new File([file], file.name, { type: ADMITTED_TEXT_MIME, lastModified: file.lastModified })
 }
 
 function normalizedFileList(files: FileList | null): FileList | null {
@@ -46,9 +31,9 @@ function expandAccept(input: HTMLInputElement): void {
 
 /**
  * Chrome/Windows commonly reports .js/.ts/.py with an empty or executable-source MIME type, while
- * the older Assistant picker admitted only document MIME types. Normalize only recognized source
- * extensions before the existing React file handler runs; size limits and all server validation stay
- * unchanged. This boundary also makes the source extensions visible in the native picker.
+ * the older Assistant picker admitted only document MIME types. Normalize recognized source files
+ * to the already-admitted text/plain transport before the existing React file handler runs; the
+ * filename, bytes, size limits, and all server validation remain unchanged.
  */
 export default function AssistantSourceFileBoundary({ children }: { children: ReactNode }) {
   useEffect(() => {

@@ -1,4 +1,5 @@
 import type { VerifiedPersonReference } from './personReferences.ts'
+import type { UserReferenceImage } from './userReference.ts'
 
 export type ReferenceConditionedImageResult = Readonly<{
   ok: boolean
@@ -33,6 +34,16 @@ function parseSize(value: string): { width: number; height: number } {
   if (width === 1024 && height === 1024) height = 1280
 
   if (width < 256 || width > 1440 || height < 256 || height > 1440) return { width: 1024, height: 1280 }
+  width = Math.round(width / 32) * 32
+  height = Math.round(height / 32) * 32
+  return { width, height }
+}
+
+function parseEditSize(value: string): { width: number; height: number } {
+  const match = /^(\d{3,4})x(\d{3,4})$/i.exec(String(value || ''))
+  let width = Number(match?.[1] || 1024)
+  let height = Number(match?.[2] || 1024)
+  if (width < 256 || width > 1440 || height < 256 || height > 1440) return { width: 1024, height: 1024 }
   width = Math.round(width / 32) * 32
   height = Math.round(height / 32) * 32
   return { width, height }
@@ -176,6 +187,19 @@ function strengthenIdentityPrompt(prompt: string, references: readonly VerifiedP
   ].join('\n')
 }
 
+function strengthenEditPrompt(prompt: string): string {
+  return [
+    prompt,
+    '',
+    'REFERENCE-EDIT DELIVERY REQUIREMENTS:',
+    'Input image 1 is the exact user-supplied source image. Apply only the requested edit.',
+    'Preserve every unedited principal subject, recognizable identity, subject count, pose, framing, and composition unless the request explicitly changes it.',
+    'Never substitute, duplicate, clone, merge, omit, or invent a principal person or object.',
+    'Do not introduce extra foreground people, faces, logos, text, watermarks, borders, or interface chrome unless explicitly requested.',
+    'Keep the result visually coherent and high quality while making the requested change clearly visible.',
+  ].join('\n')
+}
+
 async function callNative(
   key: string,
   prompt: string,
@@ -222,6 +246,54 @@ async function callNative(
   }
 }
 
+async function callEditNative(
+  key: string,
+  prompt: string,
+  size: string,
+  reference: UserReferenceImage,
+): Promise<ReferenceConditionedImageResult> {
+  const { width, height } = parseEditSize(size)
+  const body: Record<string, unknown> = {
+    prompt: strengthenEditPrompt(prompt),
+    width,
+    height,
+    output_format: 'jpeg',
+    safety_tolerance: 2,
+    input_image: reference.b64,
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), OUTPUT_TIMEOUT_MS)
+  try {
+    const response = await fetch(NATIVE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
+    const raw = await response.text()
+    let payload: ProviderPayload = {}
+    try { payload = JSON.parse(raw) } catch { /* handled below */ }
+    if (!response.ok) return { ok: false, error: providerError(payload, raw, response.status) }
+    return await parseProviderImage(payload) || { ok: false, error: 'Reference edit provider returned no image.' }
+  } catch (error) {
+    return {
+      ok: false,
+      error: controller.signal.aborted
+        ? 'Reference image editing timed out.'
+        : error instanceof Error ? error.message : 'Reference image editing failed.',
+    }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function approvedRuntimeKey(): string | null {
+  const key = process.env.LOCAL_AI_API_KEY?.trim()
+  const baseUrl = (process.env.LOCAL_AI_BASE_URL || '').replace(/\/$/, '')
+  return key && /^https:\/\/api\.deepinfra\.com\/v1\/openai$/i.test(baseUrl) ? key : null
+}
+
 /**
  * Generates a synthetic scene from one to four verified person references with FLUX.2 Max.
  * Every named-person request stays on the native multi-reference endpoint. There is no
@@ -235,17 +307,35 @@ export async function generateReferenceConditionedImage(input: {
   const references = input.references.slice(0, 4)
   if (!references.length) return { ok: false, error: 'No verified person references were supplied.' }
 
-  const key = process.env.LOCAL_AI_API_KEY?.trim()
-  const baseUrl = (process.env.LOCAL_AI_BASE_URL || '').replace(/\/$/, '')
-  if (!key || !/^https:\/\/api\.deepinfra\.com\/v1\/openai$/i.test(baseUrl)) {
-    return { ok: false, error: 'Approved reference image runtime is not configured.' }
-  }
+  const key = approvedRuntimeKey()
+  if (!key) return { ok: false, error: 'Approved reference image runtime is not configured.' }
 
   const generated = await callNative(key, input.prompt, input.size || '1024x1280', references)
   if (!generated.ok) {
     console.warn('[concierge-reference-image-native-failure]', JSON.stringify({
       model: REFERENCE_IMAGE_MODEL,
       referenceCount: references.length,
+      error: generated.error || 'unknown',
+    }))
+  }
+  return generated
+}
+
+/** Applies an explicit edit to one validated user-supplied image. No remote URL is accepted. */
+export async function generateReferenceEditedImage(input: {
+  prompt: string
+  size?: string
+  reference: UserReferenceImage
+}): Promise<ReferenceConditionedImageResult> {
+  const key = approvedRuntimeKey()
+  if (!key) return { ok: false, error: 'Approved reference image runtime is not configured.' }
+
+  const generated = await callEditNative(key, input.prompt, input.size || '1024x1024', input.reference)
+  if (!generated.ok) {
+    console.warn('[concierge-reference-edit-native-failure]', JSON.stringify({
+      model: REFERENCE_IMAGE_MODEL,
+      inputMime: input.reference.mime,
+      inputBytes: input.reference.size,
       error: generated.error || 'unknown',
     }))
   }

@@ -25,6 +25,7 @@ const tests = [
   'tests/builderRepositoryRepairTarget.node.test.ts',
   'tests/builderRepositoryRepairSecurity.node.test.ts',
   'tests/conciergeVisuals.node.test.ts',
+  'tests/visualObjectiveContract.node.test.ts',
   'tests/conciergeNamedPeopleRecovery.node.test.ts',
   'tests/suggestedFollowups.node.test.ts',
   'tests/cosPrimaryDeterministicFreshRouting.node.test.ts',

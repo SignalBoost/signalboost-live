@@ -12,6 +12,10 @@ function clean(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
 }
 
+function emptyCascadePlan(): CascadePlan {
+  return { root_topic_id: '', root_question: '', root_topic: '', candidates: [] }
+}
+
 function sourceTitles(sources: FollowupSource[]): string[] {
   return [...new Set(sources.map(source => clean(source?.title)).filter(Boolean))].slice(0, 8)
 }
@@ -73,9 +77,9 @@ export async function suggestFollowupCascade(args: {
   originPrompt?: string
 }): Promise<CascadePlan> {
   const prompt = clean(args.prompt)
-  if (!prompt) return { root_question: '', root_topic: '', candidates: [] }
+  if (!prompt) return emptyCascadePlan()
   const { root: origin, userId } = await resolvedRoot({ prompt, reply: clean(args.reply), originPrompt: args.originPrompt })
-  if (!origin) return { root_question: '', root_topic: '', candidates: [] }
+  if (!origin) return emptyCascadePlan()
   const titles = sourceTitles(args.sources || [])
   const fallback = args.failedClosed ? repairFollowups(origin) : fallbackFollowups(origin, titles.length)
 

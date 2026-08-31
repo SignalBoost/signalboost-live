@@ -5,9 +5,23 @@ import { isConciergeVisualObjective } from '../lib/visuals/intent.ts'
 import { hydrateLocalizedSource } from './helpers/hydrateLocalizedSource.ts'
 
 test('explicit visual requests are routed to the authenticated visual tool', () => {
-  assert.equal(isConciergeVisualObjective('Please sketch two kids playing with a dog in the rain.'), true)
-  assert.equal(isConciergeVisualObjective('Create a colorful diagram of my new office.'), true)
+  const explicitVisualRequests = [
+    'Please sketch two kids playing with a dog in the rain.',
+    'Create a colorful diagram of my new office.',
+    'desenhe o distintivo do time do palmeiras',
+    'crie o distintivo do time do palmeiras',
+    'Dibuja el escudo de un club de fútbol.',
+    'Stwórz herb drużyny piłkarskiej.',
+    'Нарисуй эмблему футбольной команды.',
+    'Design a coat of arms for the family.',
+  ]
+  for (const prompt of explicitVisualRequests) {
+    assert.equal(isConciergeVisualObjective(prompt), true, prompt)
+  }
+
   assert.equal(isConciergeVisualObjective('What is a diagram?'), false)
+  assert.equal(isConciergeVisualObjective('Qual é a história do distintivo do Palmeiras?'), false)
+  assert.equal(isConciergeVisualObjective('Descreva o distintivo do Palmeiras.'), false)
 
   const browserRoute = hydrateLocalizedSource(readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8'))
   const visualRoute = hydrateLocalizedSource(readFileSync(new URL('../app/api/visuals/route.ts', import.meta.url), 'utf8'))
@@ -30,6 +44,8 @@ test('explicit visual requests are routed to the authenticated visual tool', () 
   assert.doesNotMatch(home, /hasInlineImage/)
   assert.doesNotMatch(home, /\/\\\\\.\(\?:png\|jpe\?g\|webp\)/)
   assert.match(visualRoute, /createPlatformImagePort\(\)\.generate/)
+  assert.match(visualRoute, /Include a named brand or team mark only when it is the explicit subject/)
+  assert.doesNotMatch(visualRoute, /Do not include brand logos/)
   assert.match(visualRoute, /artifact-image-base64:/)
   assert.doesNotMatch(imagePort, /response_format/)
   assert.doesNotMatch(imagePort, /OPENAI/)

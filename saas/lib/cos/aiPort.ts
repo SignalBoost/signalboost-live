@@ -43,6 +43,8 @@ export interface CosImagePort {
   generate(input: { prompt: string; size?: string }): Promise<CosImageResult>
 }
 
+const IMAGE_GENERATION_TIMEOUT_MS = 50_000
+
 export function createPlatformImagePort(): CosImagePort {
   return {
     async generate({ prompt, size = '1024x1024' }): Promise<CosImageResult> {
@@ -54,10 +56,13 @@ export function createPlatformImagePort(): CosImagePort {
         return { ok: false, error: 'Approved visual runtime is not configured.' }
       }
 
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), IMAGE_GENERATION_TIMEOUT_MS)
       try {
         const response = await fetch('https://api.deepinfra.com/v1/openai/images/generations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          signal: controller.signal,
           body: JSON.stringify({ model: 'black-forest-labs/FLUX-2-klein-4b', prompt, size, n: 1 }),
         })
         const raw = await response.text()
@@ -73,7 +78,14 @@ export function createPlatformImagePort(): CosImagePort {
         const first = data.data?.[0]
         return first?.b64_json ? { ok: true, b64: first.b64_json, url: first.url } : { ok: false, error: 'Creative image provider returned no image.' }
       } catch (e: any) {
-        return { ok: false, error: e?.message || 'Creative image generation failed.' }
+        return {
+          ok: false,
+          error: controller.signal.aborted
+            ? 'Creative image generation timed out.'
+            : e?.message || 'Creative image generation failed.',
+        }
+      } finally {
+        clearTimeout(timeout)
       }
     },
   }

@@ -33,9 +33,9 @@ function objectiveOf(value: unknown): string {
 function visualLanguage(objective: string): VisualLanguage {
   const value = objective.toLowerCase()
   if (/[а-яё]/i.test(value)) return 'ru'
-  if (/[ąćęłńóśźż]/i.test(value) || /\b(?:narysuj|stworz|zrob|herb|druzyny)\b/i.test(value)) return 'pl'
-  if (/\b(?:desenhe|desenhar|crie|criar|distintivo|escudo|brasao|futebol|time)\b/i.test(value)) return 'pt'
-  if (/\b(?:dibuja|dibujar|crea|crear|escudo|blason|equipo|futbol)\b/i.test(value)) return 'es'
+  if (/[ąćęłńóśźż]/i.test(value) || /\b(?:narysuj|stworz|zrob|zaprojektuj|druzyny|pilkarskiej)\b/i.test(value)) return 'pl'
+  if (/\b(?:dibuja|dibujar|dibuje|crea|crear|genera|generar|disena|disenar|blason|equipo|futbol)\b/i.test(value)) return 'es'
+  if (/\b(?:desenhe|desenhar|desenha|crie|criar|gere|gerar|distintivo|brasao|futebol|time|equipe)\b/i.test(value)) return 'pt'
   return 'en'
 }
 

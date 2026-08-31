@@ -40,6 +40,9 @@ select setval(
 alter sequence public.assistant_messages_message_order_seq
   owned by public.assistant_messages.message_order;
 
+revoke all on sequence public.assistant_messages_message_order_seq from public, anon, authenticated;
+grant usage, select on sequence public.assistant_messages_message_order_seq to service_role;
+
 alter table public.assistant_messages
   alter column message_order set not null;
 

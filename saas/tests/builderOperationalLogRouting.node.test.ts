@@ -2,28 +2,28 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-test('Builder gives owner build failures an executable repository-repair path before deterministic diagnosis', () => {
-  const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
-  const guard = route.indexOf('isPastedOperationalLog(rawObjective)')
-  const owner = route.indexOf('access.isOwner', guard)
-  const repair = route.indexOf('executeSignalBoostRepositoryRepair', owner)
-  const fallback = route.indexOf("source: 'builder-operational-log-analysis'", repair)
-  const validation = route.indexOf('cleanObjective(rawObjective)', fallback)
+const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+
+test('pasted build logs are analyzed before any workspace or job execution', () => {
+  const guard = route.indexOf('isPastedOperationalLog(objective)')
+  const workspace = route.indexOf('createSupabaseBuilderWorkspace(access.userId)', guard)
+  const enqueue = route.indexOf('await enqueueBuilderJob({', guard)
   assert.ok(guard >= 0)
-  assert.ok(owner > guard)
-  assert.ok(repair > owner)
-  assert.ok(fallback > repair)
-  assert.ok(validation > fallback)
+  assert.ok(workspace > guard)
+  assert.ok(enqueue > workspace)
+  assert.match(route, /const reply = operationalLogReply\(objective\)/)
+  assert.match(route, /source: 'builder-operational-log-analysis'/)
+  assert.match(route, /execution_allowed: false/)
+  assert.match(route, /external_action_taken: false/)
 })
 
-test('unrecognized or non-owner logs retain a non-executing diagnostic fallback', () => {
-  const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /if \(repair\) \{/)
-  assert.match(
-    route,
-    /await persistBuilderTurn\(\{ conversationId, userId: access\.userId, objective: rawObjective, reply, workspaceId, files \}\)/,
-  )
-  assert.match(route, /return NextResponse\.json\(repair\.payload, \{ status: repair\.status \}\)/)
-  assert.match(route, /const reply = operationalLogReply\(rawObjective\)/)
-  assert.match(route, /execution_allowed: false/)
+test('logs never invoke repository repair, sandbox execution, or an asynchronous job', () => {
+  assert.doesNotMatch(route, /executeSignalBoostRepositoryRepair/)
+  assert.doesNotMatch(route, /VercelRepositoryRepairSession/)
+  const guard = route.indexOf('isPastedOperationalLog(objective)')
+  const fallbackReturn = route.indexOf('execution_allowed: false', guard)
+  const enqueue = route.indexOf('await enqueueBuilderJob({', fallbackReturn)
+  assert.ok(fallbackReturn > guard)
+  assert.ok(enqueue > fallbackReturn)
+  assert.match(route, /await persistSynchronousReply\(\{ conversationId, userId: access\.userId, objective, reply \}\)/)
 })

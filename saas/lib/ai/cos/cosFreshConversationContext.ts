@@ -26,6 +26,8 @@ type ImmediateArtifactTurn = {
 
 const THIRD_PERSON_REFERENCE = /\b(?:he|she|they|him|her|them|his|hers|their|theirs|it|its|that\s+person|this\s+person|that\s+company|that\s+organization|that\s+organisation|él|ella|ellos|ellas|ele|ela|eles|elas|on|ona|oni|one|он|она|они)\b/iu
 const ELLIPTICAL_FOLLOW_UP = /^\s*(?:when|where|what\s+about|and\s+when|and\s+where|quando|cuándo|kiedy|gdzie|когда|где)\s*[?.!]*\s*$/iu
+const CONTINUATION_FOLLOW_UP = /^(?:did you mean|could you explain|what does|what do|what specific|what exactly|what related|which (?:retrieved|live|source)|what would those)\b/i
+const SAME_MEASURE_CONTINUATION = /\b(?:uncontrolled|controlled|that comparison|those sources|the retrieved sources|the cited|equal pay|same job|same role)\b/i
 
 function textFromContent(content: unknown): string {
   if (typeof content === 'string') return content.trim()
@@ -86,6 +88,14 @@ function immediatelyPrecedingArtifactTurn(body: any, currentInput: string): Imme
   }
 }
 
+function dependsOnPriorUserTurn(current: string, previousUserText: string | null): boolean {
+  if (THIRD_PERSON_REFERENCE.test(current) || ELLIPTICAL_FOLLOW_UP.test(current)) return true
+  if (!previousUserText) return false
+  if (CONTINUATION_FOLLOW_UP.test(current)) return true
+  if (SAME_MEASURE_CONTINUATION.test(current)) return true
+  return false
+}
+
 export function resolveFreshConversationContext(body: any, input: string): FreshConversationResolution {
   clearConversationArtifactContext()
 
@@ -104,9 +114,8 @@ export function resolveFreshConversationContext(body: any, input: string): Fresh
     }
   }
 
-  const dependsOnPriorTurn = THIRD_PERSON_REFERENCE.test(originalInput) || ELLIPTICAL_FOLLOW_UP.test(originalInput)
-  if (!dependsOnPriorTurn) {
-    return { originalInput, lookupInput: originalInput, contextUsed: false, previousUserText: null }
+  if (!dependsOnPriorUserTurn(originalInput, previousUserText)) {
+    return { originalInput, lookupInput: originalInput, contextUsed: false, previousUserText: previousUserText }
   }
 
   if (!previousUserText) {

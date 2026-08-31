@@ -25,6 +25,8 @@ test('History uses a durable sequence instead of timestamps to order paired mess
   assert.match(migration, /case role when 'user' then 0 when 'assistant' then 1 else 2 end/)
   assert.match(migration, /existing_max\.value \+ ordered_missing\.ordinal/)
   assert.match(migration, /assistant_messages_conversation_order_idx/)
+  assert.match(migration, /revoke all on sequence public\.assistant_messages_message_order_seq from public, anon, authenticated/)
+  assert.match(migration, /grant usage, select on sequence public\.assistant_messages_message_order_seq to service_role/)
   assert.match(route, /select\('id, role, content, created_at, message_order, provenance'\)/)
   assert.match(route, /\.order\('message_order', \{ ascending: true \}\)/)
 })

@@ -42,6 +42,6 @@ jobs:
           cache-dependency-path: saas/package-lock.json
       - run: npm ci --no-audit --no-fund
       - name: Run A2A regressions
-        run: node --test tests/a2aAgentFabric.node.test.ts tests/a2aCosSpecialistOrchestration.node.test.ts tests/a2aRuntimeHost.node.test.ts tests/a2aNaturalLanguagePlanner.node.test.ts tests/a2aRuntimeActivationObservability.node.test.ts tests/a2aLiveExternalAcceptance.node.test.ts tests/a2aReferenceSpecialist.node.test.ts tests/a2aReferenceCosRouting.node.test.ts tests/a2aAvailability.node.test.ts
+        run: node --test tests/a2aAgentFabric.node.test.ts tests/a2aCosSpecialistOrchestration.node.test.ts tests/a2aRuntimeHost.node.test.ts tests/a2aNaturalLanguagePlanner.node.test.ts tests/a2aRuntimeActivationObservability.node.test.ts tests/a2aLiveExternalAcceptance.node.test.ts tests/a2aReferenceSpecialist.node.test.ts tests/a2aReferenceCosRouting.node.test.ts tests/a2aAvailability.node.test.ts tests/a2aBuyerOnboarding.node.test.ts
       - name: Typecheck A2A integration
         run: npm run typecheck

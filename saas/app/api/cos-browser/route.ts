@@ -15,7 +15,8 @@ import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
-import { isConciergeVisualObjective } from '@/lib/visuals/intent'
+import { classifyVisualRequest } from '@/lib/visuals/requestClassifier'
+import { hasUserReferenceImage } from '@/lib/visuals/userReference'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -61,10 +62,23 @@ function inlineVisualResponse(response: Response): Promise<NextResponse> {
       visual: {
         previewUrl,
         downloadUrl: previewUrl.replace('?preview=1', ''),
-        alt: 'Generated visual',
+        alt: typeof payload?.generated_visual_label === 'string' ? payload.generated_visual_label : 'Generated visual',
       },
     }, { status: response.status })
   }).catch(() => new NextResponse(response.body, { status: response.status, headers: response.headers }))
+}
+
+function latestUserPrompt(messages: any[]): string {
+  const latestUser = [...messages].reverse().find((message: any) => message?.role === 'user')
+  if (typeof latestUser?.content === 'string') return latestUser.content
+  if (Array.isArray(latestUser?.content)) {
+    return latestUser.content
+      .map((part: any) => typeof part?.text === 'string' ? part.text : '')
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+  }
+  return ''
 }
 
 /**
@@ -77,9 +91,7 @@ function inlineVisualResponse(response: Response): Promise<NextResponse> {
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const messages = Array.isArray(body?.messages) ? body.messages : []
-  const userMessages = messages.filter((message: any) => message?.role === 'user' && typeof message?.content === 'string')
-  const latestUser = userMessages.at(-1)
-  const prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
+  const prompt = latestUserPrompt(messages)
   const assistantMessages = messages.filter((message: any) => message?.role === 'assistant' && typeof message?.content === 'string')
   const priorAnswer = typeof assistantMessages.at(-1)?.content === 'string' ? assistantMessages.at(-1).content : ''
   const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
@@ -102,14 +114,18 @@ export async function POST(req: NextRequest) {
     return withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
   }
 
-  if (isConciergeVisualObjective(prompt)) {
+  const visualClassification = classifyVisualRequest({
+    objective: prompt,
+    hasUserReferenceImage: hasUserReferenceImage(body),
+  })
+  if (visualClassification) {
     const headers = new Headers(req.headers)
     headers.set('content-type', 'application/json')
     headers.delete('content-length')
     const visualRequest = new NextRequest(new URL('/api/visuals', req.url), {
       method: 'POST',
       headers,
-      body: JSON.stringify({ objective: prompt }),
+      body: JSON.stringify({ ...body, objective: prompt }),
     })
     return withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
   }

@@ -121,7 +121,7 @@ begin
   end if;
 
   insert into public.assistant_messages (conversation_id, user_id, role, content)
-  values (p_conversation_id, p_user_id, 'user', left(trim(p_objective), 4000));
+  values (p_conversation_id, p_user_id, 'user', trim(p_objective));
 
   insert into public.assistant_messages (conversation_id, user_id, role, content, provenance)
   values (
@@ -232,7 +232,7 @@ begin
   end if;
 
   update public.assistant_messages
-  set content = left(trim(p_reply), 4000),
+  set content = left(trim(p_reply), 16000),
       provenance = jsonb_build_object(
         'schema', 'signalboost-builder-job-v1',
         'jobId', p_job_id,

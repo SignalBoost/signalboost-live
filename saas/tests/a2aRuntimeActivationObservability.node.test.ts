@@ -46,7 +46,17 @@ function successfulTransport(counter: { creates: number; sends: number }) {
           return {
             jsonrpc: '2.0',
             id: (request.request as any).id,
-            result: { text: 'remote specialist result', privatePayload: 'must-not-enter-observation' },
+            result: {
+              kind: 'task',
+              id: 'task-1',
+              contextId: 'ctx-1',
+              status: { state: 'completed' },
+              artifacts: [{
+                artifactId: 'artifact-1',
+                name: 'result',
+                parts: [{ kind: 'text', text: 'remote specialist result' }],
+              }],
+            },
           }
         },
       }
@@ -108,7 +118,6 @@ test('runtime observation proves exact delegated metadata without prompt or resp
   const serialized = JSON.stringify(event)
   assert.ok(!serialized.includes('PRIVATE PROMPT'))
   assert.ok(!serialized.includes('remote specialist result'))
-  assert.ok(!serialized.includes('privatePayload'))
   assert.ok(!serialized.includes('http://') && !serialized.includes('https://'))
 })
 

@@ -28,6 +28,14 @@ const plannerBinaryPlan: FreshEvidenceSemanticPlan = {
   ],
 }
 
+const plannerSingleScopePlan: FreshEvidenceSemanticPlan = {
+  presentationMode: 'direct',
+  directBinaryAnswerSafe: true,
+  scopes: [
+    { scopeId: 'S1', label: 'one current factual status', finding: 'The current factual status is established.', evidenceIds: ['LIVE1'] },
+  ],
+}
+
 const plannerNeutralPlan: FreshEvidenceSemanticPlan = {
   ...plannerBinaryPlan,
   presentationMode: 'neutral_evidence_map',
@@ -76,31 +84,38 @@ test('audit parser accepts only coherent safe or neutral verdicts', () => {
   })), null)
 })
 
-test('two-key release overrides a planner binary verdict when the independent audit finds material ambiguity', () => {
-  const effective = applyFreshEvidencePredicateAudit(plannerBinaryPlan, unsafeAudit as any)
+test('negative independent audit overrides a planner binary verdict', () => {
+  const effective = applyFreshEvidencePredicateAudit(plannerSingleScopePlan, unsafeAudit as any)
+  assert.equal(effective.presentationMode, 'neutral_evidence_map')
+  assert.equal(effective.directBinaryAnswerSafe, false)
+  assert.deepEqual(effective.scopes, plannerSingleScopePlan.scopes)
+})
+
+test('missing or malformed second key fails safe to neutral presentation without losing answer scopes', () => {
+  const missing = applyFreshEvidencePredicateAudit(plannerSingleScopePlan, null)
+  assert.equal(missing.presentationMode, 'neutral_evidence_map')
+  assert.equal(missing.directBinaryAnswerSafe, false)
+  assert.deepEqual(missing.scopes, plannerSingleScopePlan.scopes)
+})
+
+test('binary framing survives only when planner, single-scope declaration, and independent audit all concur', () => {
+  const effective = applyFreshEvidencePredicateAudit(plannerSingleScopePlan, safeAudit as any)
+  assert.deepEqual(effective, plannerSingleScopePlan)
+})
+
+test('multiple model-declared material scopes are always evidence-map presentation even when the audit says safe', () => {
+  const effective = applyFreshEvidencePredicateAudit(plannerBinaryPlan, safeAudit as any)
   assert.equal(effective.presentationMode, 'neutral_evidence_map')
   assert.equal(effective.directBinaryAnswerSafe, false)
   assert.deepEqual(effective.scopes, plannerBinaryPlan.scopes)
-})
-
-test('missing or malformed second key fails safe to neutral presentation without losing the answer scopes', () => {
-  const missing = applyFreshEvidencePredicateAudit(plannerBinaryPlan, null)
-  assert.equal(missing.presentationMode, 'neutral_evidence_map')
-  assert.equal(missing.directBinaryAnswerSafe, false)
-  assert.deepEqual(missing.scopes, plannerBinaryPlan.scopes)
-})
-
-test('binary framing survives only when both neural decisions affirm it', () => {
-  const effective = applyFreshEvidencePredicateAudit(plannerBinaryPlan, safeAudit as any)
-  assert.deepEqual(effective, plannerBinaryPlan)
 })
 
 test('an already-neutral planner can never be made binary-safe by the audit', () => {
   assert.deepEqual(applyFreshEvidencePredicateAudit(plannerNeutralPlan, safeAudit as any), plannerNeutralPlan)
 })
 
-test('the exact runtime failure class cannot release a Yes lead after the independent audit overrides the planner', () => {
-  const effective = applyFreshEvidencePredicateAudit(plannerBinaryPlan, unsafeAudit as any)
+test('the exact Production shape cannot release a Yes lead even if the second neural audit repeats the planner mistake', () => {
+  const effective = applyFreshEvidencePredicateAudit(plannerBinaryPlan, safeAudit as any)
   const rejected = acceptFreshEvidenceSynthesis({
     text: JSON.stringify({
       answer: 'Yes. The broad measure and adjusted comparison both report a difference.',
@@ -138,7 +153,7 @@ test('local Production path requires the audit before an answer is synthesized',
   assert.ok(auditIndex >= 0 && answerIndex > auditIndex, 'binary audit must run before answer synthesis')
 })
 
-test('governed provider fallback uses the same two-key binary-release rule', () => {
+test('governed provider fallback uses the same three-key binary-release rule', () => {
   const external = readFileSync(new URL('../lib/ai/cos/freshEvidenceExternalSynthesis.ts', import.meta.url), 'utf8')
   assert.match(external, /freshEvidencePredicateAuditPrompt/)
   assert.match(external, /acceptFreshEvidencePredicateAudit/)
@@ -153,5 +168,6 @@ test('runtime predicate-audit implementation contains no motivating-topic classi
   assert.doesNotMatch(local, motivatingTopicTerms)
   assert.match(audit, /descriptive_vs_causal/)
   assert.match(audit, /factual_vs_legal/)
-  assert.match(audit, /two-key release rule/i)
+  assert.match(audit, /three-key binary-release rule/i)
+  assert.match(audit, /multiple material scopes are evidence-map territory/i)
 })

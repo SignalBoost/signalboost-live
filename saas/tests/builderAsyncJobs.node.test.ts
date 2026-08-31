@@ -3,10 +3,12 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+const historyRoute = readFileSync(new URL('../app/api/assistant/chats/route.ts', import.meta.url), 'utf8')
 const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
 const jobStore = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
 const jobRunner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../supabase/migrations/20260831174502_builder_jobs_and_history_order.sql', import.meta.url), 'utf8')
+const staleRecoveryMigration = readFileSync(new URL('../supabase/migrations/20260831180318_builder_job_stale_recovery.sql', import.meta.url), 'utf8')
 
 test('POST creates a durable job, schedules work after the response, and returns 202', () => {
   assert.match(route, /import \{ after, NextResponse \} from 'next\/server'/)
@@ -99,6 +101,20 @@ test('running and terminal History share one durable assistant message', () => {
   assert.match(jobStore, /\.rpc\('enqueue_builder_job'/)
   assert.match(jobStore, /\.rpc\('claim_builder_job'/)
   assert.match(jobStore, /\.rpc\('finish_builder_job'/)
+})
+
+test('expired background workers become terminal in both polling and History', () => {
+  assert.match(jobStore, /BUILDER_JOB_STALE_AFTER_MS = 6 \* 60 \* 1000/)
+  assert.match(jobStore, /\.rpc\('expire_stale_builder_jobs'/)
+  assert.match(jobStore, /await reconcileStaleBuilderJobs\(\{ userId, jobId \}\)/)
+  assert.match(historyRoute, /await reconcileBuilderHistory\(userId, id\)/)
+  assert.match(staleRecoveryMigration, /updated_at <= p_cutoff/)
+  assert.match(staleRecoveryMigration, /for update skip locked/)
+  assert.match(staleRecoveryMigration, /status = 'failed'/)
+  assert.match(staleRecoveryMigration, /update public\.assistant_messages/)
+  assert.match(staleRecoveryMigration, /No Builder POST was replayed/)
+  assert.match(staleRecoveryMigration, /revoke all on function public\.expire_stale_builder_jobs/)
+  assert.match(staleRecoveryMigration, /grant execute on function public\.expire_stale_builder_jobs[\s\S]*service_role/)
 })
 
 test('background execution is idempotently claimed and skips cognitive-skill retrieval', () => {

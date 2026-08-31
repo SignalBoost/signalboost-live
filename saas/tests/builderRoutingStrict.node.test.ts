@@ -26,6 +26,20 @@ test('one attached source file makes an explicit debug request eligible', () => 
   assert.equal(isConciergeBuilderObjective('Tell me what this attachment is.', context), false)
 })
 
+test('broken / not working / not functional plus a source attachment starts Builder', () => {
+  const context = {
+    attachmentNames: ['app.py'],
+    attachmentMimeTypes: ['text/x-python'],
+    attachmentSizes: [18],
+  }
+  assert.equal(isConciergeBuilderObjective('This attached file is broken.', context), true)
+  assert.equal(isConciergeBuilderObjective('The attached script is not working.', context), true)
+  assert.equal(isConciergeBuilderObjective('The attached app.py is not functional.', context), true)
+  assert.equal(isConciergeBuilderObjective('This attached file is broken.'), false)
+  assert.equal(isConciergeBuilderObjective('Builder still not functional.'), false)
+  assert.equal(isConciergeBuilderObjective('Builder still not functional.', context), true)
+})
+
 test('file paths, stack traces, code fences, and languages are concrete coding evidence', () => {
   assert.equal(isConciergeBuilderObjective('Fix app/api/route.ts.'), true)
   assert.equal(isConciergeBuilderObjective('Debug this TypeError: boom at main (/tmp/broken.js:1:7).'), true)

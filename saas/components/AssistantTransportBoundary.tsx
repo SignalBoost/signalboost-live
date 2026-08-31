@@ -102,25 +102,34 @@ function builderFilesFromBody(body: AssistantRequestBody): Array<{ path: string;
   })
 }
 
+function deliberateAbort(error: unknown, signal?: AbortSignal): boolean {
+  return signal?.aborted === true || (error instanceof DOMException && error.name === 'AbortError')
+}
+
 async function pollBuilderJob(
   fetchImpl: typeof window.fetch,
   jobId: string,
+  signal?: AbortSignal,
 ): Promise<{ payload: Record<string, unknown>; status: number } | null> {
   for (let attempt = 0; attempt < BUILDER_JOB_POLL_ATTEMPTS; attempt += 1) {
+    if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
     if (attempt > 0) await sleep(BUILDER_JOB_POLL_DELAY_MS)
+    if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
     try {
       const response = await fetchImpl(`/api/builder?jobId=${encodeURIComponent(jobId)}`, {
         method: 'GET',
         credentials: 'include',
         cache: 'no-store',
         headers: { accept: 'application/json' },
+        signal,
       })
       const payload = await response.json().catch(() => null)
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) continue
       const record = payload as Record<string, unknown>
       if (response.status === 202 || record.status === 'queued' || record.status === 'running') continue
       return { payload: record, status: response.status }
-    } catch {
+    } catch (error) {
+      if (deliberateAbort(error, signal)) throw error
       // Polling is read-only. A transient GET failure never causes a second Builder POST.
     }
   }
@@ -161,9 +170,10 @@ async function executeBuilderFromConcierge(
       signal,
       body: JSON.stringify({ objective, files: builderFilesFromBody(body), conversationId }),
     })
-  } catch {
-    // The server may have accepted the POST before the browser aborted or lost the response. Poll
-    // durable History for 20–30 seconds; never replay the action.
+  } catch (error) {
+    if (deliberateAbort(error, signal)) throw error
+    // The server may have accepted the POST before a browser transport loss. Poll durable History
+    // for 20–30 seconds, but never replay the action.
     const recovered = await recoverBuilderFromHistory(fetchImpl, conversationId, objective, sentAtMs)
     return recovered || responseFromPayload({
       reply: 'The Builder request could not be confirmed. History did not show a durable running or completed job, so the action was not replayed.',
@@ -190,7 +200,7 @@ async function executeBuilderFromConcierge(
     }, 503, 'builder-job-id-missing')
   }
 
-  const terminal = await pollBuilderJob(fetchImpl, jobId)
+  const terminal = await pollBuilderJob(fetchImpl, jobId, signal)
   if (terminal) {
     return responseFromPayload({
       ...terminal.payload,

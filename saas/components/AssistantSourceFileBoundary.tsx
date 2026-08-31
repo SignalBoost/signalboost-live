@@ -5,7 +5,6 @@ import { useEffect, type ReactNode } from 'react'
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py)$/i
 const SOURCE_ACCEPT = ['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.tsx', '.jsx', '.py'] as const
 const ADMITTED_TEXT_MIME = 'text/plain'
-export const MAX_ASSISTANT_OBJECTIVE_CHARS = 8_000 as const
 
 function normalizedFile(file: File): File {
   if (!SOURCE_FILE.test(file.name) || file.type === ADMITTED_TEXT_MIME) return file
@@ -30,26 +29,16 @@ function expandAccept(input: HTMLInputElement): void {
   input.accept = expanded.join(',')
 }
 
-function boundComposer(textarea: HTMLTextAreaElement): void {
-  // Preserve stricter fields such as the 4,000-character correction box. Only previously
-  // unbounded or looser Assistant composers are brought to the visible 8,000-character contract.
-  if (textarea.maxLength < 0 || textarea.maxLength > MAX_ASSISTANT_OBJECTIVE_CHARS) {
-    textarea.maxLength = MAX_ASSISTANT_OBJECTIVE_CHARS
-  }
-}
-
 /**
- * Assistant ingress normalization. Chrome/Windows commonly reports .js/.ts/.py with an empty or
- * executable-source MIME type, while the older picker admitted only document MIME types. Recognized
- * source files are normalized to the already-admitted text/plain transport before React validation.
- * The same scoped boundary also makes the Assistant's 8,000-character request limit visible at the
- * composer, preventing an oversized visual/COS request from being submitted and rejected later.
+ * Chrome/Windows commonly reports .js/.ts/.py with an empty or executable-source MIME type, while
+ * the older Assistant picker admitted only document MIME types. Normalize recognized source files
+ * to the already-admitted text/plain transport before the existing React file handler runs; the
+ * filename, bytes, size limits, and all server validation remain unchanged.
  */
 export default function AssistantSourceFileBoundary({ children }: { children: ReactNode }) {
   useEffect(() => {
-    const refreshControls = () => {
+    const refreshInputs = () => {
       document.querySelectorAll<HTMLInputElement>('input[type="file"]').forEach(expandAccept)
-      document.querySelectorAll<HTMLTextAreaElement>('textarea').forEach(boundComposer)
     }
 
     const onChange = (event: Event) => {
@@ -72,8 +61,8 @@ export default function AssistantSourceFileBoundary({ children }: { children: Re
       }
     }
 
-    refreshControls()
-    const observer = new MutationObserver(refreshControls)
+    refreshInputs()
+    const observer = new MutationObserver(refreshInputs)
     observer.observe(document.documentElement, { childList: true, subtree: true })
     document.addEventListener('change', onChange, true)
     document.addEventListener('drop', onDrop, true)

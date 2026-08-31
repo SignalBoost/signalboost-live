@@ -15,14 +15,40 @@ function entityFromPrompt(prompt: string): string {
   return clean(match?.[1] || withoutQuestion).slice(0, 80) || 'this topic'
 }
 
+const MEASUREMENT_PROMPT = /\b(?:pay|wage|wages|earnings?|gap|difference|median|rate|ratio|percent|percentage|unemployment|inflation|cpi|gdp|price|how much|how many)\b/i
+const PERSON_OR_ROLE_PROMPT = /\b(?:who is|who was|president|ceo|prime minister|minister|director|holder)\b/i
+
+/**
+ * Chips must be questions the next turn can answer from the same class of
+ * evidence. Event-biography prompts ("what happened next", "who was involved")
+ * made every topic look like history and then failed grounding.
+ */
 export function fallbackFollowups(prompt: string): string[] {
   const entity = entityFromPrompt(prompt)
-  return [`What happened next after ${entity}?`, `Who were the main people involved in ${entity}?`]
+  if (MEASUREMENT_PROMPT.test(prompt)) {
+    return [
+      `What does the comparison used for ${entity} actually measure?`,
+      `What does that comparison leave uncontrolled or unmeasured?`,
+    ]
+  }
+  if (PERSON_OR_ROLE_PROMPT.test(prompt)) {
+    return [
+      `Which source identifies ${entity}?`,
+      `What would those sources not be enough to conclude about ${entity}?`,
+    ]
+  }
+  return [
+    `Which retrieved source directly supports the answer about ${entity}?`,
+    `What related claim do those sources not establish about ${entity}?`,
+  ]
 }
 
 export function repairFollowups(prompt: string): string[] {
   const topic = entityFromPrompt(prompt)
-  return [`Did you mean “${topic}”?`, `Could you explain ${topic}?`]
+  return [
+    `Which live source is required before answering ${topic}?`,
+    `What part of ${topic} can be restated only from retrieved pages?`,
+  ]
 }
 
 function valid(candidate: unknown, prompt: string): candidate is string {

@@ -11,7 +11,7 @@ function normalized(value: string): string {
 
 export function isFollowupChipEcho(prompt: string): boolean {
   const text = clean(prompt)
-  return /^(?:did you mean|could you explain|which live source|what part of|what does live\s*\d|which retrieved source|what related claim|what does the comparison|what does that comparison|using the original question)\b/i.test(text)
+  return /^(?:did you mean|could you explain|which live source|what part of|what does live\s*\d|which retrieved source|what related claim|what does the comparison|what does that comparison|using the original question|what do current|where do those published|what published rule|what do those same)\b/i.test(text)
 }
 
 function textFromContent(content: unknown): string {
@@ -36,70 +36,53 @@ export function originUserPrompt(body: any, currentPrompt: string): string {
   return current.slice(0, 240)
 }
 
-const STOPWORDS: Set<string> = new Set([
-  'about','after','again','also','answer','before','between','could','does','from','have','include','into','live','more','question','regarding','source','specific','text','than','that','their','these','this','those','what','when','where','which','with','would','your',
-])
-
-function topicTerms(prompt: string): string[] {
-  const matches: string[] = normalized(prompt).match(/[\p{L}\p{N}]+/gu) ?? []
-  return [...new Set<string>(matches.filter((term: string) => term.length >= 4 && !STOPWORDS.has(term)))]
-    .slice(0, 10)
-}
-
-function topicFromPrompt(prompt: string): string {
+function entityFromPrompt(prompt: string): string {
   const withoutQuestion = clean(prompt).replace(/\?+$/, '')
   const match = withoutQuestion.match(/(?:about|of|for|on|explain|describe|who is|who was|what is|what was)\s+(.{3,80})/i)
-  const extracted = clean(match?.[1] || withoutQuestion)
-  return extracted.slice(0, 80) || 'this topic'
-}
-
-function hasTopicAffinity(candidate: string, prompt: string): boolean {
-  const terms = topicTerms(prompt)
-  if (!terms.length) return true
-  const haystack = normalized(candidate)
-  const overlap = terms.filter(term => haystack.includes(term)).length
-  return overlap >= Math.min(2, terms.length)
+  return clean(match?.[1] || withoutQuestion).slice(0, 80) || 'this topic'
 }
 
 const MEASUREMENT_PROMPT = /\b(?:pay|wage|wages|earnings?|gap|difference|median|rate|ratio|percent|percentage|unemployment|inflation|cpi|gdp|price|how much|how many)\b/i
 const PERSON_OR_ROLE_PROMPT = /\b(?:who is|who was|president|ceo|prime minister|minister|director|holder)\b/i
 
-export function fallbackFollowups(prompt: string): string[] {
-  const topic = topicFromPrompt(prompt)
+export function fallbackFollowups(prompt: string, sourceCount = 0): string[] {
+  const entity = entityFromPrompt(prompt)
   if (MEASUREMENT_PROMPT.test(prompt)) {
     return [
-      `What does the evidence for ${topic} actually measure?`,
-      `What does the evidence for ${topic} leave uncontrolled or unmeasured?`,
+      `What does the comparison used for ${entity} actually measure?`,
+      `What does that comparison leave uncontrolled or unmeasured?`,
+    ]
+  }
+  if (sourceCount < 1) {
+    return [
+      `What do current governing bodies or statutes currently state about ${entity}?`,
+      `Where do those published rules still disagree about ${entity}?`,
     ]
   }
   if (PERSON_OR_ROLE_PROMPT.test(prompt)) {
     return [
-      `Which source directly identifies ${topic}?`,
-      `What do the sources not establish about ${topic}?`,
+      `Which source identifies ${entity}?`,
+      `What would those sources not be enough to conclude about ${entity}?`,
     ]
   }
   return [
-    `Which retrieved source directly supports ${topic}?`,
-    `What related claim about ${topic} do those sources not establish?`,
+    `What published rule in the cited sources applies to ${entity}?`,
+    `What do those same sources leave unresolved about ${entity}?`,
   ]
 }
 
 /** Failed turns must return to the original question, not compound the failed chip. */
 export function repairFollowups(originPrompt: string): string[] {
-  const topic = topicFromPrompt(originPrompt)
+  const topic = entityFromPrompt(originPrompt)
   return [
-    `What do retrieved sources state about ${topic}?`,
-    `What do retrieved sources not measure about ${topic}?`,
+    `What do current published rules state about ${topic}?`,
+    `What do those same rules leave unresolved about ${topic}?`,
   ]
 }
 
 function valid(candidate: unknown, prompt: string): candidate is string {
   const question = clean(candidate)
-  return question.length >= MIN_LENGTH
-    && question.length <= MAX_LENGTH
-    && question.endsWith('?')
-    && normalized(question) !== normalized(prompt)
-    && hasTopicAffinity(question, prompt)
+  return question.length >= MIN_LENGTH && question.length <= MAX_LENGTH && question.endsWith('?') && normalized(question) !== normalized(prompt)
 }
 
 export function validateSuggestedFollowups(value: unknown, prompt: string, fallback: string[]): string[] {

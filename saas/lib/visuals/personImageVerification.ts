@@ -6,10 +6,17 @@ export type PersonImageVerification = Readonly<{
   error?: string
 }>
 
-const PRIMARY_VISION_MODEL = 'Qwen/Qwen2.5-VL-7B-Instruct'
-const ADJUDICATOR_VISION_MODEL = 'Qwen/Qwen2.5-VL-32B-Instruct'
+const PRIMARY_VISION_MODEL = 'Qwen/Qwen2.5-VL-32B-Instruct'
+const TECHNICAL_FALLBACK_MODEL = 'Qwen/Qwen2.5-VL-7B-Instruct'
 const VERIFY_ENDPOINT = 'https://api.deepinfra.com/v1/openai/chat/completions'
-const VERIFY_TIMEOUT_MS = 22_000
+const VERIFY_TIMEOUT_MS = 25_000
+const TECHNICAL_REASON_CODES = new Set([
+  'verification_runtime_unavailable',
+  'verification_transport_failure',
+  'verification_timeout',
+  'verification_invalid_response',
+  'verification_invalid_schema',
+])
 
 function dataUri(value: Pick<VerifiedPersonReference, 'b64' | 'mime'> | { b64: string; mime: string }): string {
   return `data:${value.mime};base64,${value.b64}`
@@ -33,25 +40,40 @@ function parseJsonObject(value: string): Record<string, unknown> | null {
   return null
 }
 
-function verificationPrompt(references: readonly VerifiedPersonReference[], adjudication: boolean): string {
-  const mapping = references.map((reference, index) => `Reference image ${index + 2} = ${reference.canonicalName}`).join('\n')
+function expectedPassExample(referenceCount: number): string {
+  return JSON.stringify({
+    pass: true,
+    principal_people: referenceCount,
+    reference_matches: Array.from({ length: referenceCount }, () => true),
+    duplicate_or_substitution: false,
+    reason_codes: [],
+  })
+}
+
+function verificationPrompt(references: readonly VerifiedPersonReference[], technicalFallback: boolean): string {
+  const mapping = references
+    .map((reference, index) => `Reference image ${index + 2} = ${reference.canonicalName}`)
+    .join('\n')
+  const count = references.length
+
   return [
-    adjudication
-      ? 'You are the final strict visual identity adjudicator. A smaller verifier rejected the candidate; override that result only when every requested identity is clearly and independently supported by the supplied references.'
-      : 'You are a strict visual identity and composition QA gate.',
+    technicalFallback
+      ? 'You are a strict backup visual identity verifier. The primary verifier was technically unavailable or returned malformed output. Apply the same strict standard; do not lower it.'
+      : 'You are the final strict visual identity and composition QA gate.',
     'Image 1 is a newly generated synthetic scene. The remaining images are verified identity references.',
     mapping,
     '',
-    `The generated scene must contain exactly ${references.length} distinct principal people, once each, corresponding in order to the verified references.`,
-    'Principal people means the dominant foreground subjects. Do not count tiny, blurred, or incidental background figures as principal people.',
-    'Compare visible facial structure, hair, age presentation, and other stable identity features against the references.',
-    'Reject the scene if any requested person is missing, substituted, duplicated, cloned, merged with another person, or mapped to the wrong reference.',
+    `The generated scene must contain exactly ${count} distinct principal ${count === 1 ? 'person' : 'people'}, once each, corresponding in reference order.`,
+    'Principal people means the dominant foreground subjects. Do not count tiny, blurred, incidental, printed, reflected, or background figures as requested people.',
+    'Compare visible facial structure, hair, age presentation, and other stable identity features against each supplied reference.',
+    'Reject if any requested person is missing, substituted, duplicated, cloned, merged, visually ambiguous, or mapped to the wrong reference.',
+    'Reject if the number of dominant foreground people differs from the requested reference count.',
     'Ignore clothing, pose, lighting, background, and normal artistic variation unless they obscure identity.',
-    'Do not use outside knowledge. Judge only visual correspondence between the generated scene and the supplied references.',
+    'Do not use outside knowledge. Judge only the generated scene against the supplied reference images.',
     '',
-    'Return JSON only with exactly this shape:',
-    '{"pass":true,"principal_people":2,"reference_matches":[true,true],"duplicate_or_substitution":false,"reason_codes":[]}',
-    `Set principal_people to the actual dominant foreground count. reference_matches must contain exactly ${references.length} booleans in reference order.`,
+    'Return JSON only, with exactly these keys and no prose:',
+    expectedPassExample(count),
+    `principal_people must be the actual dominant foreground count. reference_matches must contain exactly ${count} booleans in reference order.`,
   ].join('\n')
 }
 
@@ -76,17 +98,18 @@ function decisionFromParsed(parsed: Record<string, unknown>, references: readonl
   return {
     ok,
     reasonCodes: ok ? [] : reasons.length ? reasons : [
-      !structurallyValid ? 'verification_invalid_schema' :
-        principalPeople !== references.length ? 'wrong_principal_person_count' :
-          duplicate ? 'duplicate_or_substitution' :
-            matches.some((value) => value !== true) ? 'identity_reference_mismatch' : 'verification_rejected',
+      !structurallyValid ? 'verification_invalid_schema'
+        : principalPeople !== references.length ? 'wrong_principal_person_count'
+          : duplicate ? 'duplicate_or_substitution'
+            : matches.some((value) => value !== true) ? 'identity_reference_mismatch'
+              : 'verification_rejected',
     ],
   }
 }
 
 async function invokeVerifier(input: {
   model: string
-  adjudication: boolean
+  technicalFallback: boolean
   generated: { b64: string; mime: 'image/png' | 'image/jpeg' | 'image/webp' }
   references: readonly VerifiedPersonReference[]
   key: string
@@ -94,7 +117,7 @@ async function invokeVerifier(input: {
   const content: Array<Record<string, unknown>> = [
     { type: 'image_url', image_url: { url: dataUri(input.generated) } },
     ...input.references.map((reference) => ({ type: 'image_url', image_url: { url: dataUri(reference) } })),
-    { type: 'text', text: verificationPrompt(input.references, input.adjudication) },
+    { type: 'text', text: verificationPrompt(input.references, input.technicalFallback) },
   ]
 
   const controller = new AbortController()
@@ -108,12 +131,16 @@ async function invokeVerifier(input: {
         model: input.model,
         messages: [{ role: 'user', content }],
         temperature: 0,
-        max_tokens: 240,
+        max_tokens: 260,
       }),
     })
     const raw = await response.text()
     if (!response.ok) {
-      return { ok: false, reasonCodes: ['verification_transport_failure'], error: raw.slice(0, 240) || `HTTP ${response.status}` }
+      return {
+        ok: false,
+        reasonCodes: ['verification_transport_failure'],
+        error: raw.slice(0, 240) || `HTTP ${response.status}`,
+      }
     }
 
     let payload: { choices?: Array<{ message?: { content?: string } }> } = {}
@@ -121,24 +148,31 @@ async function invokeVerifier(input: {
       return { ok: false, reasonCodes: ['verification_invalid_response'], error: 'Vision verifier returned invalid JSON.' }
     }
     const parsed = parseJsonObject(String(payload.choices?.[0]?.message?.content || ''))
-    if (!parsed) return { ok: false, reasonCodes: ['verification_invalid_response'], error: 'Vision verifier returned no decision object.' }
+    if (!parsed) {
+      return { ok: false, reasonCodes: ['verification_invalid_response'], error: 'Vision verifier returned no decision object.' }
+    }
     return decisionFromParsed(parsed, input.references)
   } catch (error) {
     return {
       ok: false,
       reasonCodes: [controller.signal.aborted ? 'verification_timeout' : 'verification_transport_failure'],
-      error: controller.signal.aborted ? 'Visual identity verification timed out.' : error instanceof Error ? error.message : 'Visual identity verification failed.',
+      error: controller.signal.aborted
+        ? 'Visual identity verification timed out.'
+        : error instanceof Error ? error.message : 'Visual identity verification failed.',
     }
   } finally {
     clearTimeout(timeout)
   }
 }
 
+function isTechnicalFailure(result: PersonImageVerification): boolean {
+  return !result.ok && result.reasonCodes.some((code) => TECHNICAL_REASON_CODES.has(code))
+}
+
 /**
- * Uses the approved DeepInfra vision runtime as a fail-closed QA gate. A rejected or technically
- * uncertain 7B decision receives one stricter 32B adjudication before the image is discarded.
- * The larger model must independently prove every reference match; no majority or permissive vote
- * can pass an image that the adjudicator also rejects.
+ * Compares the generated image with the exact authoritative references. The 32B vision model makes
+ * the normal decision. The 7B model is used only after a transport/schema failure, never to override
+ * a valid identity rejection. One-person and multi-person requests use dynamically sized schemas.
  */
 export async function verifyReferenceConditionedPeopleImage(input: {
   generated: { b64: string; mime: 'image/png' | 'image/jpeg' | 'image/webp' }
@@ -150,30 +184,27 @@ export async function verifyReferenceConditionedPeopleImage(input: {
   const key = process.env.LOCAL_AI_API_KEY?.trim()
   const baseUrl = (process.env.LOCAL_AI_BASE_URL || '').replace(/\/$/, '')
   if (!key || !/^https:\/\/api\.deepinfra\.com\/v1\/openai$/i.test(baseUrl)) {
-    return { ok: false, reasonCodes: ['verification_runtime_unavailable'], error: 'Approved visual verification runtime is not configured.' }
+    return {
+      ok: false,
+      reasonCodes: ['verification_runtime_unavailable'],
+      error: 'Approved visual verification runtime is not configured.',
+    }
   }
 
   const primary = await invokeVerifier({
     model: PRIMARY_VISION_MODEL,
-    adjudication: false,
+    technicalFallback: false,
     generated: input.generated,
     references,
     key,
   })
-  if (primary.ok) return primary
+  if (primary.ok || !isTechnicalFailure(primary)) return primary
 
-  const adjudicated = await invokeVerifier({
-    model: ADJUDICATOR_VISION_MODEL,
-    adjudication: true,
+  return invokeVerifier({
+    model: TECHNICAL_FALLBACK_MODEL,
+    technicalFallback: true,
     generated: input.generated,
     references,
     key,
   })
-  if (adjudicated.ok) return adjudicated
-
-  return {
-    ok: false,
-    reasonCodes: [...new Set([...primary.reasonCodes, ...adjudicated.reasonCodes])].slice(0, 8),
-    error: adjudicated.error || primary.error,
-  }
 }

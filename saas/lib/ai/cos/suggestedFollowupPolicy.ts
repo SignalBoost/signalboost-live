@@ -36,13 +36,13 @@ export function originUserPrompt(body: any, currentPrompt: string): string {
   return current.slice(0, 240)
 }
 
-const STOPWORDS = new Set([
+const STOPWORDS: Set<string> = new Set([
   'about','after','again','also','answer','before','between','could','does','from','have','include','into','live','more','question','regarding','source','specific','text','than','that','their','these','this','those','what','when','where','which','with','would','your',
 ])
 
 function topicTerms(prompt: string): string[] {
-  return [...new Set((normalized(prompt).match(/[\p{L}\p{N}]+/gu) || [])
-    .filter(term => term.length >= 4 && !STOPWORDS.has(term)))]
+  const matches: string[] = normalized(prompt).match(/[\p{L}\p{N}]+/gu) ?? []
+  return [...new Set<string>(matches.filter((term: string) => term.length >= 4 && !STOPWORDS.has(term)))]
     .slice(0, 10)
 }
 

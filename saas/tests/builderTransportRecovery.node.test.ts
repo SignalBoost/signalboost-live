@@ -6,7 +6,7 @@ import { isConciergeBuilderObjective } from '../lib/ai/cos/cosReasoningRolePolic
 
 const transport = fs.readFileSync(path.join(process.cwd(), 'components/AssistantTransportBoundary.tsx'), 'utf8')
 const builderRoute = fs.readFileSync(path.join(process.cwd(), 'app/api/builder/route.ts'), 'utf8')
-const migration = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20260831172000_builder_jobs_and_history_order.sql'), 'utf8')
+const migration = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20260831174502_builder_jobs_and_history_order.sql'), 'utf8')
 const assistantPage = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/assistant/page.tsx'), 'utf8')
 
 test('only concrete coding requests reach Builder', () => {

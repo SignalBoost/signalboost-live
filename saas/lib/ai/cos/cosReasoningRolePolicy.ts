@@ -96,11 +96,26 @@ function executableBuilderAction(objective: string): boolean {
   return CODE_ACTION.test(objective) || DEBUG_ACTION.test(objective)
 }
 
+const ASK_ABOUT_ATTACHMENT = /\b(?:what is|what's|whats|tell me what|explain|summarize|describe)\b/i
+
+/**
+ * Humans drop a file and type “fix this”, “help”, “não funciona”, or nothing.
+ * A source attachment is the intent. Only a clear “what is this file?” stays on chat.
+ * Pasted operational logs and huge dumps stay excluded above this helper.
+ */
+function attachedSourceIsTheJob(prompt: string, context?: CosCodingRoutingContext): boolean {
+  if (!sourceAttachment(context)) return false
+  const objective = cosRoutingObjective(prompt)
+  if (ASK_ABOUT_ATTACHMENT.test(objective) && !executableBuilderAction(objective)) return false
+  return true
+}
+
 /** Broad worker selection for the authorized COS UI. */
 export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (excludedFromBuilder(prompt)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true
+  if (attachedSourceIsTheJob(prompt, context)) return true
   const evidence = concreteCodeEvidence(objective, context)
   if (DEBUG_ACTION.test(objective)) return evidence
   if (CODE_ACTION.test(objective)) return evidence || (CODE_NOUN.test(objective) && CODE_LANGUAGE.test(objective))
@@ -108,17 +123,17 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
 }
 
 /**
- * Public Concierge starts Builder only for an explicit executable coding/design request with
- * concrete source evidence. The word “debug”, a timeout report, a log dump, or a general factual
- * question cannot acquire sandbox authority.
+ * Public Concierge starts Builder for a design request, an explicit coding action with
+ * source evidence, or a dropped source file with casual/empty wording.
  *
- * DEBUG_ACTION (“broken”, “not working”, “not functional”, “crashes”) plus an attached source file
- * or other concrete evidence is enough. Platform self-repair with no source evidence stays closed.
+ * A timeout report, a log dump, “what is this file?”, or a general factual question
+ * still cannot acquire sandbox authority. Platform self-repair with no source file stays closed.
  */
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (excludedFromBuilder(prompt)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true
+  if (attachedSourceIsTheJob(prompt, context)) return true
   if (!executableBuilderAction(objective)) return false
   return concreteCodeEvidence(objective, context)
 }

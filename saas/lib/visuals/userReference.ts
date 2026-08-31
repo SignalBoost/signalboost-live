@@ -15,6 +15,7 @@ export type UserReferenceImageErrorCode =
   | 'visual_reference_image_invalid'
 
 export const MAX_USER_REFERENCE_IMAGE_BYTES = 10 * 1024 * 1024
+const MAX_REFERENCE_CANDIDATES = 8
 
 export class UserReferenceImageError extends Error {
   readonly code: UserReferenceImageErrorCode
@@ -40,6 +41,7 @@ type Candidate = Readonly<{
   name: string
   dataUrl: string
   declaredMime: string
+  declaredSize: number
   source: UserReferenceImage['source']
 }>
 
@@ -51,6 +53,11 @@ function record(value: unknown): Record<string, any> | null {
 
 function declaredMime(value: Record<string, any>): string {
   return String(value.mimeType || value.type || value.mime || '').trim().toLowerCase()
+}
+
+function boundedDeclaredSize(value: unknown): number {
+  const size = Number(value)
+  return Number.isFinite(size) && size > 0 ? Math.floor(size) : 0
 }
 
 function candidateFromRecord(value: unknown, source: Candidate['source']): Candidate | null {
@@ -66,6 +73,7 @@ function candidateFromRecord(value: unknown, source: Candidate['source']): Candi
     name: String(item.name || item.filename || 'reference-image').trim() || 'reference-image',
     dataUrl,
     declaredMime: mime,
+    declaredSize: boundedDeclaredSize(item.size || item.byteLength || item.bytes),
     source,
   }
 }
@@ -74,27 +82,29 @@ function candidatesFromBody(body: unknown): Candidate[] {
   const root = record(body)
   if (!root) return []
   const candidates: Candidate[] = []
+  const add = (candidate: Candidate | null) => {
+    if (candidate && candidates.length < MAX_REFERENCE_CANDIDATES) candidates.push(candidate)
+  }
 
-  const explicit = candidateFromRecord(root.referenceImage || root.reference_image, 'reference-image')
-  if (explicit) candidates.push(explicit)
+  add(candidateFromRecord(root.referenceImage || root.reference_image, 'reference-image'))
 
   for (const attachment of Array.isArray(root.attachments) ? root.attachments : []) {
-    const candidate = candidateFromRecord(attachment, 'attachment')
-    if (candidate) candidates.push(candidate)
+    add(candidateFromRecord(attachment, 'attachment'))
+    if (candidates.length >= MAX_REFERENCE_CANDIDATES) return candidates
   }
 
   const messages = Array.isArray(root.messages) ? root.messages : []
   for (const message of [...messages].reverse()) {
     if (String(message?.role || '').toLowerCase() !== 'user') continue
     for (const attachment of Array.isArray(message?.attachments) ? message.attachments : []) {
-      const candidate = candidateFromRecord(attachment, 'attachment')
-      if (candidate) candidates.push(candidate)
+      add(candidateFromRecord(attachment, 'attachment'))
+      if (candidates.length >= MAX_REFERENCE_CANDIDATES) return candidates
     }
     for (const part of Array.isArray(message?.content) ? message.content : []) {
       const type = String(part?.type || '').toLowerCase()
       if (!type.includes('image') && !part?.dataUrl && !part?.data_url) continue
-      const candidate = candidateFromRecord(part, 'message-content')
-      if (candidate) candidates.push(candidate)
+      add(candidateFromRecord(part, 'message-content'))
+      if (candidates.length >= MAX_REFERENCE_CANDIDATES) return candidates
     }
     break
   }
@@ -121,7 +131,20 @@ function sniffMime(bytes: Uint8Array): UserReferenceImageMime | null {
   return null
 }
 
+function estimatedBase64Bytes(value: string): number {
+  const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0
+  return Math.max(0, Math.floor((value.length * 3) / 4) - padding)
+}
+
 function decodeCandidate(candidate: Candidate): UserReferenceImage {
+  if (candidate.declaredSize > MAX_USER_REFERENCE_IMAGE_BYTES) {
+    throw new UserReferenceImageError({
+      code: 'visual_reference_image_too_large',
+      observedBytes: candidate.declaredSize,
+      declaredMime: candidate.declaredMime,
+    })
+  }
+
   const dataMatch = /^data:([^;,]+);base64,([A-Za-z0-9+/=\s]+)$/i.exec(candidate.dataUrl)
   if (!dataMatch) {
     throw new UserReferenceImageError({
@@ -144,6 +167,15 @@ function decodeCandidate(candidate: Candidate): UserReferenceImage {
   const b64 = dataMatch[2].replace(/\s+/g, '')
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64) || b64.length < 16) {
     throw new UserReferenceImageError({ code: 'visual_reference_image_invalid', declaredMime: dataMime })
+  }
+
+  const estimatedBytes = estimatedBase64Bytes(b64)
+  if (estimatedBytes > MAX_USER_REFERENCE_IMAGE_BYTES) {
+    throw new UserReferenceImageError({
+      code: 'visual_reference_image_too_large',
+      observedBytes: estimatedBytes,
+      declaredMime: dataMime,
+    })
   }
 
   let bytes: Buffer

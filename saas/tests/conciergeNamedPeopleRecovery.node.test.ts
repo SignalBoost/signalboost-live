@@ -75,7 +75,8 @@ test('multi-person generation remains on the native multi-reference path and sim
   assert.match(generation, /if \(references\.length > 1\) return native/)
   assert.match(generation, /OpenAI-compatible edit endpoint documents only a single/)
 
-  assert.match(verification, /Qwen\/Qwen2\.5-VL-32B-Instruct/)
+  assert.match(verification, /ADJUDICATOR_VISION_MODEL = 'Qwen\/Qwen2\.5-VL-32B-Instruct'/)
   assert.match(verification, /Principal people means the dominant foreground subjects/)
-  assert.match(verification, /A rejected or technically uncertain 7B decision receives one stricter 32B adjudication/)
+  assert.match(verification, /const adjudicated = await invokeVerifier/)
+  assert.match(verification, /if \(adjudicated\.ok\) return adjudicated/)
 })

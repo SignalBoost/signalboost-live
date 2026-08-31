@@ -146,19 +146,27 @@ function jsonObjectCandidates(value: string | null): readonly string[] {
 }
 
 function normalizedToolInput(value: Record<string, unknown>): Record<string, unknown> | null {
-  const candidate = value.input ?? value.arguments ?? value.args ?? value.parameters
+  const candidate = value.input ?? value.tool_input ?? value.toolInput ?? value.arguments ?? value.tool_arguments ?? value.toolArguments ?? value.args ?? value.parameters ?? value.payload ?? value.data
   if (isRecord(candidate)) return candidate
-  if (typeof candidate !== 'string') return null
-  try {
-    const decoded = JSON.parse(candidate)
-    return isRecord(decoded) ? decoded : null
-  } catch {
-    return null
+  if (typeof candidate === 'string') {
+    try {
+      const decoded = JSON.parse(candidate)
+      return isRecord(decoded) ? decoded : null
+    } catch {
+      return null
+    }
   }
+  // Some OpenAI-compatible local servers flatten function arguments beside the action name.
+  // Keep only non-control fields, then apply the same per-tool validation below.
+  const controlKeys = new Set(['type', 'action', 'toolId', 'tool_id', 'tool', 'toolName', 'tool_name', 'name', 'function', 'function_call', 'tool_call', 'tool_calls'])
+  const flat = Object.fromEntries(Object.entries(value).filter(([key]) => !controlKeys.has(key)))
+  return Object.keys(flat).length > 0 ? flat : {}
 }
 
 function controlRecord(value: Record<string, unknown>): Record<string, unknown> {
   if (isRecord(value.function)) return value.function
+  if (isRecord(value.function_call)) return value.function_call
+  if (isRecord(value.tool_call)) return isRecord(value.tool_call.function) ? value.tool_call.function : value.tool_call
   if (Array.isArray(value.tool_calls) && isRecord(value.tool_calls[0])) {
     const first = value.tool_calls[0]
     return isRecord(first.function) ? first.function : first
@@ -173,10 +181,11 @@ function parse(value: string | null, allowedTools: readonly BuilderToolId[] = to
       const parsed = Array.isArray(decoded) && decoded.length === 1 ? decoded[0] : decoded
       if (!isRecord(parsed)) continue
       const control = controlRecord(parsed)
-      if ((control.type === 'answer' || control.action === 'answer') && typeof control.answer === 'string' && control.answer.trim()) {
-        return { type: 'answer', answer: control.answer }
+      if (control.type === 'answer' || control.action === 'answer') {
+        const answer = text(control.answer) || text(control.content) || text(control.message) || text(control.final) || text(control.final_answer)
+        if (answer.trim()) return { type: 'answer', answer }
       }
-      const toolId = text(control.toolId) || text(control.tool) || text(control.name) || (control.type === 'tool' ? text(control.action) : '')
+      const toolId = text(control.toolId) || text(control.tool_id) || text(control.tool) || text(control.toolName) || text(control.tool_name) || text(control.name) || (control.type === 'tool' ? text(control.action) : '') || text(control.action)
       const input = normalizedToolInput(control)
       if (!toolId || !input) continue
       if (!allowedTools.includes(toolId as BuilderToolId) || !validToolInput(toolId as BuilderToolId, input)) continue
@@ -267,6 +276,8 @@ export class BuilderToolLoop {
   async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
     const trace: BuilderToolTrace[] = []
     const inspectedInCurrentWorkspaceState = new Set<string>()
+    const completedMutations = new Set<string>()
+    const completedRunsInCurrentWorkspaceState = new Set<string>()
     const initialListing = await this.workspace.listFiles(input.workspaceId)
     const manifest = initialListing.find(file => file.path === 'package.json')
     const manifestFile = manifest ? await this.workspace.readFile(input.workspaceId, manifest.path) : null
@@ -284,6 +295,17 @@ export class BuilderToolLoop {
       attempt += 1
       const round = attempt
       const lastTrace = trace.at(-1)
+      // A model can alternate list_files and read_file to evade a last-tool-only
+      // restriction. Keep every repeated inspection unavailable until a write/edit
+      // changes the workspace and resets the inspection state.
+      const lastWorkspaceChange = Math.max(...trace.map((item, index) => (
+        item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file') ? index : -1
+      )))
+      const blockedInspectionTools = new Set(trace
+        .slice(lastWorkspaceChange + 1)
+        .filter(item => (item.toolId === 'list_files' || item.toolId === 'read_file')
+          && item.error?.startsWith('builder_repeated_tool_call:'))
+        .map(item => item.toolId))
       const blockedTool = lastTrace?.error?.startsWith('builder_repeated_tool_call:')
         ? lastTrace.toolId
         : null
@@ -292,7 +314,9 @@ export class BuilderToolLoop {
       const inspectedSource = repairNeedsChange
         ? [...trace].reverse().find(item => item.ok && item.toolId === 'read_file' && toolPath(item.input))
         : undefined
-      const availableTools = (blockedTool ? tools.filter(toolId => toolId !== blockedTool) : tools)
+      const availableTools = tools
+        .filter(toolId => toolId !== blockedTool)
+        .filter(toolId => !blockedInspectionTools.has(toolId))
         .filter(toolId => !inspectedSource || (toolId !== 'list_files' && toolId !== 'read_file'))
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
@@ -307,9 +331,11 @@ export class BuilderToolLoop {
           ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
           : 'Do not request read_file in this round; it is unavailable until the workspace changes.',
         'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
-        blockedTool
-          ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected against unchanged workspace state. It is not available this round. Select a different tool from TOOLS; do not request it again.`
-          : '',
+        blockedInspectionTools.size
+          ? `RECOVERY CONSTRAINT: ${[...blockedInspectionTools].join(', ')} ${blockedInspectionTools.size === 1 ? 'was' : 'were'} rejected against unchanged workspace state. ${blockedInspectionTools.size === 1 ? 'It is' : 'They are'} unavailable this round. Select a different tool from TOOLS; do not request ${blockedInspectionTools.size === 1 ? 'it' : 'them'} again.`
+          : blockedTool
+            ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected in the preceding round. It is unavailable this round. Select a different tool from TOOLS; do not request it again.`
+            : '',
         inspectedSource
           ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Do not list or read again until you make progress. ${projectContext.recommendedTestCommand ? `Run ${projectContext.recommendedTestCommand} to reproduce the defect, then edit the source and rerun it.` : 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.'}`
           : '',
@@ -418,8 +444,14 @@ export class BuilderToolLoop {
       if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
       const fingerprint = `${action.toolId}:${safeJson(action.input)}`
       const inspection = action.toolId === 'list_files' || action.toolId === 'read_file'
+      const mutation = action.toolId === 'write_file' || action.toolId === 'edit_file'
       // An alternating list/read loop observes unchanged workspace state without progress.
       if (inspection && inspectedInCurrentWorkspaceState.has(fingerprint)) {
+        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
+        continue
+      }
+      if ((mutation && completedMutations.has(fingerprint))
+        || (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint))) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
         continue
       }
@@ -447,8 +479,13 @@ export class BuilderToolLoop {
         if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
           writeCount += 1
           inspectedInCurrentWorkspaceState.clear()
+          completedMutations.add(fingerprint)
+          completedRunsInCurrentWorkspaceState.clear()
         }
-        if (action.toolId === 'run') runCount += 1
+        if (action.toolId === 'run') {
+          runCount += 1
+          completedRunsInCurrentWorkspaceState.add(fingerprint)
+        }
         trace.push({ round, toolId: action.toolId, input: action.input, ok: true, output })
         if (action.toolId === 'run' && repairObjective) {
           const modifiedExistingFile = trace.some(item => item.ok

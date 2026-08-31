@@ -41,6 +41,15 @@ test('classifier covers every required visual request type without catching ordi
     classifyVisualRequest({ objective: 'Edite esta imagem e deixe o céu mais claro.' })?.requestType,
     'user-reference-edit',
   )
+  assert.equal(
+    classifyVisualRequest({ objective: 'Make this photo brighter.', hasUserReferenceImage: true })?.requestType,
+    'user-reference-edit',
+  )
+  assert.equal(
+    classifyVisualRequest({ objective: 'Make this photo brighter.' })?.requiresUserReferenceImage,
+    true,
+  )
+  assert.equal(classifyVisualRequest({ objective: 'What do you think of this photo?' }), null)
   assert.equal(classifyVisualRequest({ objective: 'edit Dwight, thank you for letting me know' }), null)
   assert.equal(classifyVisualRequest({ objective: 'change the current policy' }), null)
 })

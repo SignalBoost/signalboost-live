@@ -36,7 +36,7 @@ test('fresh synthesis plans semantic scopes and presentation mode neurally befor
   assert.match(synthesis, /directBinaryAnswerSafe/)
   assert.match(synthesis, /materially different constructs, populations, denominators, units, time windows, comparison bases, controls/i)
   assert.match(synthesis, /Do not write the user-facing answer and do not expose chain-of-thought/i)
-  assert.match(synthesis, /scope label must identify what is actually measured, compared, or argued/i)
+  assert.match(synthesis, /scope label must identify what is actually measured, compared,(?: established,)? or argued/i)
   assert.match(synthesis, /acceptFreshEvidenceSemanticPlan/)
   assert.match(localSynthesis, /phase: 'scope_plan'/)
   assert.match(localSynthesis, /freshEvidenceScopePlanPrompt/)

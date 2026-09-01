@@ -8,6 +8,7 @@ import {
   type AssistantTransportLocale,
 } from '@/lib/ai/cos/assistantTransportClient'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { hasExplicitOperationalLogRepairIntent, isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 
 type AssistantRequestBody = {
@@ -33,14 +34,21 @@ function parseAssistantBody(init?: RequestInit): AssistantRequestBody | null {
   }
 }
 
-function latestUserContent(body: AssistantRequestBody): string {
+function userContents(body: AssistantRequestBody): string[] {
   const messages = Array.isArray(body.messages) ? body.messages : []
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index]
-    if (message?.role !== 'user') continue
-    if (typeof message.content === 'string') return message.content.trim()
-  }
-  return ''
+  return messages.flatMap(message => message?.role === 'user' && typeof message.content === 'string' ? [message.content.trim()] : [])
+}
+
+function latestUserContent(body: AssistantRequestBody): string {
+  return userContents(body).at(-1) || ''
+}
+
+function shouldUseConciergeRepairIngress(body: AssistantRequestBody): boolean {
+  const users = userContents(body)
+  const current = users.at(-1) || ''
+  const previous = users.at(-2) || ''
+  return isPastedOperationalLog(current)
+    && (hasExplicitOperationalLogRepairIntent(current) || hasExplicitOperationalLogRepairIntent(previous))
 }
 
 function localeFromBody(body: AssistantRequestBody): AssistantTransportLocale {
@@ -261,10 +269,11 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
         return executeBuilderFromConcierge(originalFetch, body, userContent, conversationId, init?.signal ?? undefined)
       }
 
-      // Ordinary COS remains a short transport-recovery path. The longer 20–30 second History
-      // polling window is reserved only for an accepted Builder action.
+      const operationalRepair = shouldUseConciergeRepairIngress(body)
+      // Preserve privileged owner COS scope for ordinary turns. Only a pasted operational log
+      // with explicit repair intent (current or immediately preceding user turn) enters Concierge.
       const result = await sendAssistantTurnAndRecover(userContent, body as Record<string, unknown>, {
-        sendUrl: '/api/cos-primary',
+        sendUrl: operationalRepair ? '/api/concierge' : '/api/cos-primary',
         historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,
         locale: localeFromBody(body),
         fetchImpl: originalFetch,

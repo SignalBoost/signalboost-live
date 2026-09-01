@@ -24,6 +24,17 @@ test('standalone immediately preceding debug intent carries into the next pasted
   assert.ok(repair >= 0 && passive > repair)
 })
 
+test('Full Assistant browser requests enter the same Concierge browser ingress before A2A routing', () => {
+  const proxy = readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8')
+  const fullAssistant = proxy.indexOf("pathname === '/api/cos-primary' && req.method === 'POST' && isFullAssistantBrowserRequest(req)")
+  const browserRewrite = proxy.indexOf("cosBrowserUrl.pathname = '/api/cos-browser'", fullAssistant)
+  const specialist = proxy.indexOf("specialistUrl.pathname = '/api/cos-specialist'", browserRewrite)
+  assert.ok(fullAssistant >= 0)
+  assert.ok(browserRewrite > fullAssistant)
+  assert.ok(specialist > browserRewrite)
+  assert.match(proxy, /url\.origin === req\.nextUrl\.origin && url\.pathname\.startsWith\('\/dashboard\/assistant'\)/)
+})
+
 test('explicit failed SignalBoost log repair may reach only the owner-only pinned repository lane', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   const explicitRepair = route.indexOf('if (explicitOperationalRepair && !hasSourceAttachment)')

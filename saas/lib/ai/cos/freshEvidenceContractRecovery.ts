@@ -1,11 +1,6 @@
 import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
 import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
-import {
-  MAX_SEMANTIC_SCOPE_FINDING_CHARS,
-  MAX_SEMANTIC_SCOPE_LABEL_CHARS,
-  type FreshEvidenceSemanticPlan,
-} from './freshEvidenceSynthesisContract.ts'
-import { isNormativePolicyQuestion } from './normativeAnswerPolicy.ts'
+import type { FreshEvidenceSemanticPlan } from './freshEvidenceSynthesisContract.ts'
 
 export type FreshEvidenceContractFailureCode =
   | 'invalid_json'
@@ -18,7 +13,6 @@ export type FreshEvidenceContractFailureCode =
   | 'unknown_scope_ids'
   | 'missing_required_scope_ids'
   | 'scope_evidence_lineage_missing'
-  | 'normative_source_groups_missing'
   | 'citation_authority_rejected'
   | 'unknown_contract_rejection'
 
@@ -105,10 +99,7 @@ export function diagnoseFreshEvidenceSemanticPlan(args: {
     const label = String(scope.label || '').trim()
     const finding = String(scope.finding || '').trim()
     const evidenceIds = uniqueStrings(scope.evidenceIds)
-    if (!SCOPE_ID.test(scopeId) || seenScopeIds.has(scopeId)
-      || !label || label.length > MAX_SEMANTIC_SCOPE_LABEL_CHARS
-      || !finding || finding.length > MAX_SEMANTIC_SCOPE_FINDING_CHARS
-      || !evidenceIds.length) {
+    if (!SCOPE_ID.test(scopeId) || seenScopeIds.has(scopeId) || !label || !finding || !evidenceIds.length) {
       return { code: 'invalid_scope_shape', repairable: true }
     }
     if (evidenceIds.some(id => !sourceIds.has(id))) {
@@ -162,22 +153,6 @@ export function diagnoseFreshEvidenceSynthesis(args: {
     }
   }
 
-  if (isNormativePolicyQuestion(args.input)) {
-    const supportingIds = [...new Set(args.semanticPlan.scopes
-      .filter(scope => scope.position === 'supporting')
-      .flatMap(scope => scope.evidenceIds)
-      .filter(id => evidenceIds.includes(id)))]
-    const opposingIds = [...new Set(args.semanticPlan.scopes
-      .filter(scope => scope.position === 'opposing')
-      .flatMap(scope => scope.evidenceIds)
-      .filter(id => evidenceIds.includes(id)))]
-    if (!supportingIds.length || !opposingIds.length
-      || !supportingIds.some(id => !opposingIds.includes(id))
-      || !opposingIds.some(id => !supportingIds.includes(id))) {
-      return { code: 'normative_source_groups_missing', repairable: true, draftAnswer: answer }
-    }
-  }
-
   const citations = evidenceIds.map(id => {
     const source = byId.get(id)!
     return `[${source.id}] (${source.url})`
@@ -196,7 +171,7 @@ export function freshEvidenceScopePlanRepairPrompt(args: {
   failedPlanText: string
   failureCode: FreshEvidencePlanFailureCode
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nPREVIOUS SCOPE PLAN (invalid; not evidence):\n${String(args.failedPlanText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nReturn a corrected semantic scope plan under the original scope-planning JSON contract, including presentationMode, directBinaryAnswerSafe, and scopes. Keep each label within ${MAX_SEMANTIC_SCOPE_LABEL_CHARS} characters and each finding within ${MAX_SEMANTIC_SCOPE_FINDING_CHARS} characters. Preserve only materially distinct scopes supported by LIVE EVIDENCE. Decide presentationMode and directBinaryAnswerSafe from the QUESTION and evidence, never from scope count. If presentationMode is neutral_evidence_map, directBinaryAnswerSafe must be false because the user must see the divergent evidence before any verdict. Do not write the user-facing answer.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nPREVIOUS SCOPE PLAN (invalid; not evidence):\n${String(args.failedPlanText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nReturn a corrected semantic scope plan under the original scope-planning JSON contract, including presentationMode, directBinaryAnswerSafe, and scopes. Preserve only materially distinct scopes supported by LIVE EVIDENCE. Decide presentationMode and directBinaryAnswerSafe from the QUESTION and evidence, never from scope count. If presentationMode is neutral_evidence_map, directBinaryAnswerSafe must be false because the user must see the divergent evidence before any verdict. Do not write the user-facing answer.\n\nQUESTION: ${args.input}`
 }
 
 export function freshEvidenceAnswerContractRepairPrompt(args: {
@@ -207,5 +182,5 @@ export function freshEvidenceAnswerContractRepairPrompt(args: {
   failedDraftText: string
   failureCode: FreshEvidenceContractFailureCode
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}\n\nPREVIOUS ANSWER OUTPUT (invalid; not evidence):\n${String(args.failedDraftText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nRe-reason from QUESTION and LIVE EVIDENCE and return the exact answer JSON contract with answer, evidenceIds, and scopeIds. Include every material scope in the plan, use only real evidence ids that support those scopes, and do not weaken or bypass the authority/citation requirements. For normative_source_groups_missing, cite at least one source unique to a supporting scope and at least one different source unique to an opposing scope; a source shared by both groups cannot establish balanced provenance by itself. If presentationMode is neutral_evidence_map, do not begin with yes/no or a verdict; lead with the evidence split itself. If directBinaryAnswerSafe is false, do not begin with a standalone yes/no.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}\n\nPREVIOUS ANSWER OUTPUT (invalid; not evidence):\n${String(args.failedDraftText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nRe-reason from QUESTION and LIVE EVIDENCE and return the exact answer JSON contract with answer, evidenceIds, and scopeIds. Include every material scope in the plan, use only real evidence ids that support those scopes, and do not weaken or bypass the authority/citation requirements. If presentationMode is neutral_evidence_map, do not begin with yes/no or a verdict; lead with the evidence split itself. If directBinaryAnswerSafe is false, do not begin with a standalone yes/no.\n\nQUESTION: ${args.input}`
 }

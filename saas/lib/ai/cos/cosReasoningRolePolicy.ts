@@ -84,12 +84,13 @@ function concreteCodeEvidence(prompt: string, context?: CosCodingRoutingContext)
     || CODE_LANGUAGE.test(objective)
 }
 
-function excludedFromBuilder(prompt: string): boolean {
+function excludedFromBuilder(prompt: string, context?: CosCodingRoutingContext): boolean {
   const raw = String(prompt || '')
   const objective = cosRoutingObjective(raw)
-  return isPastedOperationalLog(raw)
-    || hugeTranscriptOrDump(raw)
-    || NON_CODING_TOPIC.test(objective)
+  // A log alone cannot start Builder. A log plus an attached source file is the same
+  // job a human sends here: debug that file. Huge dumps and off-topic prompts stay closed.
+  if (isPastedOperationalLog(raw) && !sourceAttachment(context)) return true
+  return hugeTranscriptOrDump(raw) || NON_CODING_TOPIC.test(objective)
 }
 
 function executableBuilderAction(objective: string): boolean {
@@ -112,7 +113,7 @@ function attachedSourceIsTheJob(prompt: string, context?: CosCodingRoutingContex
 
 /** Broad worker selection for the authorized COS UI. */
 export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
-  if (excludedFromBuilder(prompt)) return false
+  if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true
   if (attachedSourceIsTheJob(prompt, context)) return true
@@ -130,7 +131,7 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
  * still cannot acquire sandbox authority. Platform self-repair with no source file stays closed.
  */
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
-  if (excludedFromBuilder(prompt)) return false
+  if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true
   if (attachedSourceIsTheJob(prompt, context)) return true

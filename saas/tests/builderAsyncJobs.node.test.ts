@@ -20,10 +20,7 @@ test('POST creates a durable job, schedules work after the response, and returns
   assert.ok(accepted > schedule)
   assert.match(route, /await runBuilderJob\(jobId, access\.userId\)/)
   assert.doesNotMatch(route, /new BuilderToolLoop/)
-
-  const repairExecute = route.indexOf('executeSignalBoostRepositoryRepair({')
-  assert.ok(repairExecute >= 0)
-  assert.ok(repairExecute < enqueue, 'owner repository repair must be decided before ordinary async enqueue')
+  assert.doesNotMatch(route, /executeSignalBoostRepositoryRepair/)
 })
 
 test('an attached debug request cannot silently fall back to a broad standard job', () => {

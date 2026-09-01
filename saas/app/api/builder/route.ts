@@ -1,14 +1,12 @@
 // saas/app/api/builder/route.ts
 import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
-import { isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob, getBuilderJobForUser } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
-import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
-import { parseSignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
 import {
   isBuilderObjectiveError,
   readBuilderObjective,
@@ -48,16 +46,6 @@ function objectiveFailureReply(code: BuilderObjectiveFailureCode): string {
     return 'The Builder request exceeds the 512,000-character intake safety limit. No workspace or job was created. Attach the source file and send the relevant objective and diagnostic evidence.'
   }
   return 'COS Builder did not receive a usable coding instruction. No workspace or job was created. Send the objective again with the source file or concrete code reference.'
-}
-
-function isDeveloperWorkspaceRequest(request: Request): boolean {
-  const referrer = request.headers.get('referer')
-  if (!referrer) return false
-  try {
-    return new URL(referrer, request.url).pathname === '/dashboard/developer'
-  } catch {
-    return false
-  }
 }
 
 async function persistSynchronousReply(input: {
@@ -150,41 +138,9 @@ export async function POST(request: Request) {
     const files = cleanFiles(body?.files)
     const debugPlan = planDebugFileJob(objective, files)
 
-    // The dedicated Developer workspace is itself an explicit execution surface. For the owner,
-    // pressing Run Builder with operational evidence may enter only the pinned SignalBoost
-    // repository-repair lane, and only when that evidence resolves an exact repository revision.
-    // The Referer is not authority: owner authentication and exact target parsing remain mandatory.
-    if (isOperationalLogEvidence(objective) && !debugPlan && isDeveloperWorkspaceRequest(request) && access.isOwner === true) {
-      const repositoryTarget = parseSignalBoostRepositoryRepairTarget(objective)
-      if (!repositoryTarget) {
-        const reply = 'COS Builder recognized this as an owner-requested repair from the Developer workspace, but the pasted runtime log does not identify an exact failed SignalBoost repository revision. Include the failed clone/branch/commit line plus the final failing assertion or non-zero build command. No code was run.'
-        await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
-        return noStore({
-          error: 'builder_repository_target_required',
-          reply,
-          source: 'cos-platform-engineer-target-required',
-          execution_allowed: false,
-          external_action_taken: false,
-          files: [],
-          trace: [],
-        }, { status: 400 })
-      }
-
-      const execution = await executeSignalBoostRepositoryRepair({
-        userId: access.userId,
-        rawObjective: objective,
-        workspaceId,
-      })
-      if (execution) {
-        const reply = typeof execution.payload.reply === 'string' ? execution.payload.reply : ''
-        if (reply) await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
-        return noStore(execution.payload, { status: execution.status })
-      }
-    }
-
-    // Outside the owner-only direct repair lane, logs alone remain analysis-only. When the user
-    // also supplies exactly one supported source file and explicitly asks for a repair, that file
-    // grants only the fixed one-file debug protocol; pasted text never grants broader authority.
+    // Logs alone remain analysis-only. When the user also supplies exactly one supported source
+    // file and explicitly asks for a repair, that file grants only the fixed one-file debug
+    // protocol; pasted text never grants repository or broader sandbox authority.
     if (isPastedOperationalLog(objective) && !debugPlan) {
       const reply = operationalLogReply(objective)
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
@@ -284,7 +240,7 @@ export async function POST(request: Request) {
     }
 
     const message = error instanceof Error ? error.message : 'builder_request_failed'
-    const status = /^builder_(invalid|file_limit|file_too_large|invalid_path|debug_attachment_required|objective_not_coding|repository_target_required)/.test(message) ? 400 : 502
+    const status = /^builder_(invalid|file_limit|file_too_large|invalid_path|debug_attachment_required|objective_not_coding)/.test(message) ? 400 : 502
     const reply = `COS Builder stopped: ${message}`
     await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
     return noStore({ error: message, reply }, { status })

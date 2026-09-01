@@ -79,10 +79,15 @@ test('browser repository repair requires explicit repair intent, exact SignalBoo
   assert.match(repair, /merge_allowed: false/)
 })
 
-test('ordinary Builder route still cannot invoke repository repair from pasted logs', () => {
+test('direct Builder invokes Platform Engineer only after exact deployment pinning and owner authority', () => {
   const builder = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
-  assert.doesNotMatch(builder, /executeSignalBoostRepositoryRepair|VercelRepositoryRepairSession/)
-  assert.match(builder, /isPastedOperationalLog\(objective\)/)
-  assert.match(builder, /execution_allowed: false/)
-  assert.match(builder, /external_action_taken: false/)
+  const target = builder.indexOf('signalBoostDeployedRepairTarget(objective')
+  const owner = builder.indexOf('if (!access.isOwner)', target)
+  const execute = builder.indexOf('executeSignalBoostRepositoryRepair({', owner)
+  const passive = builder.indexOf('isPastedOperationalLog(objective)', execute)
+  assert.ok(target >= 0); assert.ok(owner > target); assert.ok(execute > owner); assert.ok(passive > execute)
+  assert.match(builder, /commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA/)
+  assert.match(builder, /target: platformRepairTarget/)
+  assert.match(builder, /builder_repository_repair_owner_required/)
+  assert.doesNotMatch(builder, /VercelRepositoryRepairSession/)
 })

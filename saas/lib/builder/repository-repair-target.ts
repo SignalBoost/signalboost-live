@@ -4,6 +4,7 @@ export const SIGNALBOOST_REPOSITORY = 'SignalBoost/signalboost-live' as const
 export const SIGNALBOOST_REPOSITORY_URL = 'https://github.com/SignalBoost/signalboost-live.git' as const
 
 export type SignalBoostRepositoryRepairTarget = Readonly<{
+  trigger: 'failed_build_log' | 'deployed_platform_objective'
   repository: typeof SIGNALBOOST_REPOSITORY
   repositoryUrl: typeof SIGNALBOOST_REPOSITORY_URL
   branch: string
@@ -21,6 +22,7 @@ const CLONE_LINE = /Cloning\s+(?:https?:\/\/)?github\.com\/SignalBoost\/signalbo
 const SAFE_BRANCH = /^(?![-/])(?!.*(?:\.\.|\/\/))[A-Za-z0-9._/-]{1,180}$/
 const SOURCE_PATH = /(?:\.\/([A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+)|(saas\/[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+))(?::\d+(?::\d+)?)?/g
 const MAX_FAILURE_EVIDENCE = 40
+const EXPLICIT_PLATFORM_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\b|(?:^|[\n.!?]\s*)(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\s+(?:is\s+|keeps?\s+)?(?:broken|failing|not\s+working)\b/i
 
 function unique(values: readonly string[], limit: number): readonly string[] {
   return Object.freeze([...new Set(values.map(value => value.trim()).filter(Boolean))].slice(0, limit))
@@ -82,6 +84,7 @@ export function parseSignalBoostRepositoryRepairTarget(input: string): SignalBoo
   if (!SAFE_BRANCH.test(branch) || !/^[0-9a-f]{7,40}$/.test(commitSha)) return null
 
   return Object.freeze({
+    trigger: 'failed_build_log',
     repository: SIGNALBOOST_REPOSITORY,
     repositoryUrl: SIGNALBOOST_REPOSITORY_URL,
     branch,
@@ -93,6 +96,37 @@ export function parseSignalBoostRepositoryRepairTarget(input: string): SignalBoo
     failedCommand: analysis.command,
     failureEvidence: failureEvidence(rawLog),
     rawLog,
+  })
+}
+
+/**
+ * An authenticated owner can explicitly ask the direct Builder surface to repair the configured
+ * SignalBoost platform. The host, not the model or user text, supplies the immutable deployed
+ * revision. This connects Builder to Platform Engineer without granting a moving branch, arbitrary
+ * repository, commit, merge, deploy, or self-approval authority.
+ */
+export function signalBoostDeployedRepairTarget(
+  input: string,
+  deployment: { commitSha?: unknown; branch?: unknown },
+): SignalBoostRepositoryRepairTarget | null {
+  const objective = String(input || '').trim()
+  const commitSha = String(deployment.commitSha || '').trim().toLowerCase()
+  const branch = String(deployment.branch || 'main').trim()
+  if (!objective || !EXPLICIT_PLATFORM_REPAIR.test(objective)) return null
+  if (!/^[0-9a-f]{40}$/.test(commitSha) || !SAFE_BRANCH.test(branch)) return null
+  return Object.freeze({
+    trigger: 'deployed_platform_objective',
+    repository: SIGNALBOOST_REPOSITORY,
+    repositoryUrl: SIGNALBOOST_REPOSITORY_URL,
+    branch,
+    commitSha,
+    fullCommitSha: commitSha,
+    projectRoot: 'saas',
+    pathHints: sourcePaths(objective),
+    symbolHints: symbolNames(objective),
+    failedCommand: analyzeOperationalLog(objective).command,
+    failureEvidence: failureEvidence(objective),
+    rawLog: objective,
   })
 }
 
@@ -135,9 +169,13 @@ export function signalBoostRepositoryRepairObjective(target: SignalBoostReposito
   const command = target.failedCommand ? `Failed command: ${target.failedCommand}` : 'Failed command: not extracted from the log.'
   const evidence = target.failureEvidence.length
     ? target.failureEvidence.join('\n')
-    : 'The pasted build evidence ended with a non-zero command exit.'
+    : target.trigger === 'failed_build_log'
+      ? 'The pasted build evidence ended with a non-zero command exit.'
+      : 'No failing command was supplied. Inspect the current implementation and existing regressions, reproduce the reported behavior, and do not edit until a proof command fails.'
   return [
-    `Repair the failed ${target.repository} build at exact commit ${target.fullCommitSha || target.commitSha}.`,
+    target.trigger === 'failed_build_log'
+      ? `Repair the failed ${target.repository} build at exact commit ${target.fullCommitSha || target.commitSha}.`
+      : `Diagnose and prepare a verified repair for ${target.repository} at exact deployed commit ${target.fullCommitSha || target.commitSha}.`,
     `The host mounted the pinned repository's ${target.projectRoot}/ directory as this isolated workspace. Tool paths are relative to ${target.projectRoot}/.`,
     'Inspect the implicated source, reproduce the failure with the narrowest relevant command, make the smallest source repair, and rerun the same command until it passes.',
     'Do not weaken tests, access another repository, use the network, commit, push, merge, deploy, or claim success without fail-before/pass-after evidence.',

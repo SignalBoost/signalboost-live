@@ -5,6 +5,8 @@ import { isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pasted
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
+import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
+import { signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueBuilderJob, getBuilderJobForUser } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import {
@@ -137,6 +139,31 @@ export async function POST(request: Request) {
 
     const files = cleanFiles(body?.files)
     const debugPlan = planDebugFileJob(objective, files)
+    const platformRepairTarget = files.length === 0
+      ? signalBoostDeployedRepairTarget(objective, {
+          commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
+          branch: process.env.VERCEL_GIT_COMMIT_REF,
+        })
+      : null
+
+    // The direct Developer surface owns user-workspace jobs, but an explicit owner request to fix
+    // Builder/SignalBoost needs the separate Platform Engineer. Pin it to the immutable deployed
+    // revision supplied by Vercel and keep its output review-only; passive logs grant no authority.
+    if (platformRepairTarget) {
+      if (!access.isOwner) {
+        const reply = 'SignalBoost platform repair is owner-only. No repository was inspected and no code was run.'
+        await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
+        return noStore({ error: 'builder_repository_repair_owner_required', reply, execution_allowed: false }, { status: 403 })
+      }
+      const execution = await executeSignalBoostRepositoryRepair({
+        userId: access.userId,
+        rawObjective: objective,
+        workspaceId,
+        target: platformRepairTarget,
+      })
+      if (!execution) return noStore({ error: 'builder_repository_repair_target_unavailable' }, { status: 422 })
+      return noStore(execution.payload, { status: execution.status })
+    }
 
     // Logs alone remain analysis-only. When the user also supplies exactly one supported source
     // file and explicitly asks for a repair, that file grants only the fixed one-file debug

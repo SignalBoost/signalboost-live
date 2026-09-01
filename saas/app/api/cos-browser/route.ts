@@ -14,6 +14,7 @@ import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProve
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 
@@ -67,12 +68,20 @@ function inlineVisualResponse(response: Response): Promise<NextResponse> {
   }).catch(() => new NextResponse(response.body, { status: response.status, headers: response.headers }))
 }
 
+function builderRoutingContextFromBody(body: any) {
+  const attachments = Array.isArray(body?.attachments) ? body.attachments : []
+  return {
+    attachmentNames: attachments.map((item: any) => String(item?.name || '')),
+    attachmentMimeTypes: attachments.map((item: any) => String(item?.mimeType || item?.type || '')),
+    attachmentSizes: attachments.map((item: any) => Number(item?.size || 0)),
+  }
+}
+
 /**
  * Browser-only ingress wrapper for COS Primary.
  *
- * Public delivery isolation is applied before COS Primary performs auth, freshness routing,
- * reasoning, fallback, or persistence. Authenticated artifact and visual tools execute before that
- * boundary. Build/runtime logs remain ordinary analysis input and never receive Builder authority.
+ * A pasted Vercel/npm log is classified before artifacts, visuals, or Builder. Names inside
+ * test titles must not become Wikimedia likeness lookups.
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
@@ -86,9 +95,18 @@ export async function POST(req: NextRequest) {
     ? String(body.context.language).toLowerCase()
     : 'en'
 
-  // Capture correlation identity before entering public-delivery scope. Only the user id is carried
-  // forward; it does not grant internal tool authority inside public COS execution.
   const auditUserId = (await getAccess().catch(() => null))?.userId ?? null
+
+  if (isPastedOperationalLog(prompt)) {
+    return withSuggestedFollowups(NextResponse.json({
+      reply: operationalLogReply(prompt),
+      source: 'concierge-operational-log-analysis',
+      execution_allowed: false,
+      external_action_taken: false,
+      external_ai_invoked: false,
+      local_model_invoked: false,
+    }), prompt, auditUserId)
+  }
 
   if (isConciergeArtifactObjective(prompt)) {
     const headers = new Headers(req.headers)
@@ -146,9 +164,10 @@ export async function POST(req: NextRequest) {
     auditIdentityCaptured: Boolean(auditUserId),
   }))
 
+  const routingContext = builderRoutingContextFromBody(body)
   const response = await withPublicAuditIdentity(auditUserId, () =>
     withPublicDeliveryScope(() =>
-      withRunpodWakePermission(permission, () => isConciergeBuilderObjective(prompt) ? legacyConciergePost(req) : cosPrimaryPost(req)),
+      withRunpodWakePermission(permission, () => isConciergeBuilderObjective(prompt, routingContext) ? legacyConciergePost(req) : cosPrimaryPost(req)),
     ),
   )
   return withSuggestedFollowups(response, prompt, auditUserId)

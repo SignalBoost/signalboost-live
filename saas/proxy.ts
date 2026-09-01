@@ -56,9 +56,21 @@ export async function proxy(req: NextRequest) {
     return NextResponse.rewrite(cosBrowserUrl)
   }
 
-  // Phase 5 A2A routing: HTTP ingress addressed to COS Primary first enters the
-  // conservative specialist bridge. That bridge calls COS Primary directly when
-  // delegation is not clearly useful, so existing COS security/provenance/freshness
+  // The owner Full Assistant historically posts directly to /api/cos-primary so its
+  // transport boundary can recover durable results. Do not let that browser surface
+  // bypass Concierge routing: once the network request leaves the boundary, route it
+  // through the same /api/cos-browser ingress used by the homepage Concierge. This is
+  // what carries immediate prior-turn repair intent into pasted Vercel-log turns and
+  // keeps owner-only repository repair authoritative in one place.
+  if (pathname === '/api/cos-primary' && req.method === 'POST' && isFullAssistantBrowserRequest(req)) {
+    const cosBrowserUrl = req.nextUrl.clone()
+    cosBrowserUrl.pathname = '/api/cos-browser'
+    return NextResponse.rewrite(cosBrowserUrl)
+  }
+
+  // Phase 5 A2A routing: non-Full-Assistant HTTP ingress addressed to COS Primary first
+  // enters the conservative specialist bridge. The bridge calls COS Primary directly
+  // when delegation is not clearly useful, so existing COS security/provenance/freshness
   // behavior remains authoritative without a rewrite loop.
   if (pathname === '/api/cos-primary' && req.method === 'POST') {
     const specialistUrl = req.nextUrl.clone()
@@ -113,6 +125,17 @@ function isAutonomousIngress(pathname: string) {
 
 function isPublicModelIngress(pathname: string) {
   return pathname === '/api/concierge' || pathname === '/api/support'
+}
+
+function isFullAssistantBrowserRequest(req: NextRequest): boolean {
+  const referer = req.headers.get('referer') || ''
+  if (!referer) return false
+  try {
+    const url = new URL(referer)
+    return url.origin === req.nextUrl.origin && url.pathname.startsWith('/dashboard/assistant')
+  } catch {
+    return false
+  }
 }
 
 function hasSessionCookie(req: NextRequest): boolean {

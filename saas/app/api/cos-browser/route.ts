@@ -14,7 +14,7 @@ import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProve
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { analyzeOperationalLog, hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
@@ -113,9 +113,14 @@ export async function POST(req: NextRequest) {
   const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(prompt)
     || (pastedOperationalLog && hasExplicitOperationalLogRepairIntent(previousUserPrompt))
 
+  const operationalLogAnalysis = analyzeOperationalLog(prompt)
+  const exactFailedLogTarget = operationalLogAnalysis.failed
+    ? parseSignalBoostRepositoryRepairTarget(prompt)
+    : null
   const ownerSignalBoostLogTarget = access?.isOwner && access.userId && !hasSourceAttachment
-    && isOperationalLogEvidence(prompt) && SIGNALBOOST_OPERATIONAL_TARGET.test(prompt)
-    ? signalBoostDeployedRepairTarget(prompt, {
+    && isOperationalLogEvidence(prompt) && operationalLogAnalysis.failed
+    && SIGNALBOOST_OPERATIONAL_TARGET.test(prompt)
+    ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(prompt, {
         commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
         branch: process.env.VERCEL_GIT_COMMIT_REF,
       }, { ownerDeveloperLogSubmission: true })

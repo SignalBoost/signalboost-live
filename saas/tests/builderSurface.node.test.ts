@@ -22,6 +22,19 @@ test('Builder is authenticated, asynchronous, and exposes only a bounded public 
   assert.doesNotMatch(jobRunner, /trace: result\.trace/)
 })
 
+test('direct Developer surface follows an accepted Builder job to its terminal result', () => {
+  const page = source('../app/dashboard/developer/page.tsx')
+  assert.match(page, /jobId\?: string/)
+  assert.match(page, /async function pollBuilderJob\(jobId: string\)/)
+  assert.match(page, /fetch\(`\/api\/builder\?jobId=\$\{encodeURIComponent\(jobId\)\}`/)
+  assert.match(page, /response\.status === 202/)
+  assert.match(page, /data\.status === 'queued'/)
+  assert.match(page, /data\.status === 'running'/)
+  assert.match(page, /const terminal = await pollBuilderJob\(data\.jobId\)/)
+  assert.match(page, /setTrace\(data\.trace \|\| \[\]\)/)
+  assert.match(page, /await loadWorkspaces\(\)/)
+})
+
 test('Builder renders the safe failure classification and remediation returned by its API', () => {
   const page = source('../app/dashboard/developer/page.tsx')
   assert.match(page, /failureClass\?: string/)

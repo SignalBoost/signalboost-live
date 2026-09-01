@@ -99,10 +99,23 @@ test('browser repository repair requires explicit repair intent, exact SignalBoo
   assert.match(repair, /merge_allowed: false/)
 })
 
-test('ordinary Builder route still cannot invoke repository repair from pasted logs', () => {
+test('direct Builder repository repair is owner-only, Developer-only, exact-target gated, and review-only', () => {
   const builder = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
-  assert.doesNotMatch(builder, /executeSignalBoostRepositoryRepair|VercelRepositoryRepairSession/)
-  assert.match(builder, /isPastedOperationalLog\(objective\)/)
-  assert.match(builder, /execution_allowed: false/)
-  assert.match(builder, /external_action_taken: false/)
+  const evidence = builder.indexOf('isOperationalLogEvidence(objective)')
+  const developer = builder.indexOf('isDeveloperWorkspaceRequest(request)', evidence)
+  const owner = builder.indexOf('access.isOwner === true', developer)
+  const parse = builder.indexOf('parseSignalBoostRepositoryRepairTarget(objective)', owner)
+  const execute = builder.indexOf('executeSignalBoostRepositoryRepair({', parse)
+  const passive = builder.indexOf('isPastedOperationalLog(objective)', execute)
+  assert.ok(evidence >= 0)
+  assert.ok(developer > evidence)
+  assert.ok(owner > developer)
+  assert.ok(parse > owner)
+  assert.ok(execute > parse)
+  assert.ok(passive > execute)
+  assert.match(builder, /builder_repository_target_required/)
+
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  assert.match(repair, /repository_write_allowed: false/)
+  assert.match(repair, /merge_allowed: false/)
 })

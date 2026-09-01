@@ -112,4 +112,11 @@ test('passive logs and test titles cannot manufacture platform-repair intent', (
     'Error: Command "npm test" exited with 1',
   ].join('\n')
   assert.equal(signalBoostDeployedRepairTarget(passive, { commitSha: sha, branch: 'main' }), null)
+  const ownerSubmission = signalBoostDeployedRepairTarget(
+    `${passive}\nYOU KEEP DOING THE SAME THING AND EXPECT A DIFFERENT RESULT`,
+    { commitSha: sha, branch: 'main' },
+    { ownerDeveloperLogSubmission: true },
+  )
+  assert.ok(ownerSubmission)
+  assert.equal(ownerSubmission.fullCommitSha, sha)
 })

@@ -6,10 +6,27 @@ test('Full Assistant routes only explicit pasted-log repair through Concierge', 
   const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
   assert.match(boundary, /hasExplicitOperationalLogRepairIntent/)
   assert.match(boundary, /isPastedOperationalLog/)
-  assert.match(boundary, /const operationalRepair = shouldUseConciergeRepairIngress\(body\)/)
+  assert.match(boundary, /let operationalRepair = shouldUseConciergeRepairIngress\(body\)/)
   assert.match(boundary, /sendUrl: operationalRepair \? '\/api\/concierge' : '\/api\/cos-primary'/)
   assert.match(boundary, /const previous = users\.at\(-2\) \|\| ''/)
   assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(previous\)/)
+})
+
+test('Full Assistant recovers missing previous repair intent from durable conversation History', () => {
+  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
+  assert.match(boundary, /async function durablePreviousRepairIntent/)
+  assert.match(boundary, /`\/api\/assistant\/chats\?id=\$\{encodeURIComponent\(conversationId\)\}`/)
+  assert.match(boundary, /if \(!operationalRepair && isPastedOperationalLog\(userContent\)\)/)
+  assert.match(boundary, /const recoveredRepairIntent = await durablePreviousRepairIntent/)
+  assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(content\) \? content : null/)
+})
+
+test('recovered repair intent is forwarded in the server-visible Concierge transcript', () => {
+  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
+  assert.match(boundary, /function bodyWithPreviousUserTurn/)
+  assert.match(boundary, /sendBody = bodyWithPreviousUserTurn\(body, recoveredRepairIntent\)/)
+  assert.match(boundary, /sendAssistantTurnAndRecover\(userContent, sendBody as Record<string, unknown>/)
+  assert.match(boundary, /\{ role: 'user', content: previousUserContent \}/)
 })
 
 test('Full Assistant keeps direct Builder interception for source-backed objectives', () => {

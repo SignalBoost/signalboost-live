@@ -256,18 +256,27 @@ function verifiedRepairAnswer(trace: readonly BuilderToolTrace[]): string {
   return `Repaired ${target} and verified ${command || 'the proving command'} completed successfully.`
 }
 
-function diagnose(value: unknown): { failureClass: BuilderFailureClass; remediation: string } {
+function diagnose(value: unknown, knownPaths: readonly string[] = []): { failureClass: BuilderFailureClass; remediation: string } {
   const message = String(value || '').toLowerCase()
   if (/supabase|postgres|database|constraint|pgrst|duplicate key|relation .* does not exist/.test(message)) return { failureClass: 'storage', remediation: 'Inspect the exact database error and the storage contract before retrying.' }
   if (/cannot find package|no module named|unable to resolve|npm err|dependency|lockfile/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
   if (/cannot find module\s+['"](?![./])[^'"]+['"]/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
-  if (/invalid_path|not found|no such file|module_not_found|cannot find module|enoent|path/.test(message)) return { failureClass: 'path', remediation: 'List or read the workspace files, then use a verified relative path.' }
+  if (/invalid_path|not found|no such file|module_not_found|cannot find module|enoent|path/.test(message)) {
+    // A generic "go list the files" nudge is not enough: the model has already listed them and still
+    // invents a directory prefix. Name the real paths so the next command cannot be a guess.
+    const listing = knownPaths.slice(0, 20).join(', ')
+    return {
+      failureClass: 'path',
+      remediation: listing
+        ? `This workspace contains exactly these paths: ${listing}. Use one of them verbatim, relative to the workspace root, and do not prepend any directory that is not listed here.`
+        : 'List or read the workspace files, then use a verified relative path.',
+    }
+  }
   if (/node.*not found|command not found|runtime|timed out|timeout|sigkill/.test(message)) return { failureClass: 'runtime', remediation: 'Inspect the runtime evidence and choose an available command; do not guess environment capabilities.' }
   if (/assert|expected|test|exit [1-9]|exit code [1-9]|syntaxerror|typeerror|referenceerror/.test(message)) return { failureClass: 'test', remediation: 'Read the failure output, make the smallest targeted change, then rerun the relevant test.' }
   if (/deploy|vercel|build|compile|production|preview/.test(message)) return { failureClass: 'deployment', remediation: 'Inspect the build or deployment evidence; do not treat local success as deployment proof.' }
   return { failureClass: 'unknown', remediation: 'Inspect the exact failure evidence before making another change.' }
 }
-
 export class BuilderToolLoop {
   private readonly ai: BuilderAiPort
   private readonly workspace: BuilderWorkspacePort
@@ -292,6 +301,7 @@ export class BuilderToolLoop {
       ...(file.path === 'package.json' && manifestFile ? { content: manifestFile.content } : {}),
     })))
     const initialPaths = new Set(initialListing.map(file => file.path))
+    let workspacePaths: string[] = [...initialPaths]
     const repairObjective = isRepairObjective(input.objective)
     let writeCount = 0, runCount = 0, gateNudges = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 12))
@@ -484,12 +494,14 @@ export class BuilderToolLoop {
         if (action.toolId === 'write_file') output = summarize(await this.workspace.writeFile(input.workspaceId, toolPath(action.input), toolContent(action.input)))
         if (action.toolId === 'edit_file') output = summarize(await this.workspace.editFile(input.workspaceId, toolPath(action.input), text(action.input.search), text(action.input.replace)))
         if (action.toolId === 'run') {
-          const files = await Promise.all((await this.workspace.listFiles(input.workspaceId)).map(file => this.workspace.readFile(input.workspaceId, file.path)))
+          const listed = await this.workspace.listFiles(input.workspaceId)
+          workspacePaths = listed.map(file => file.path)
+          const files = await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path)))
           output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: text(action.input.command), files: files.filter((file): file is BuilderFile => file !== null) }))
         }
         const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0
         if (runFailed) {
-          const details = diagnose(`${(output as ReturnType<typeof summarizeRun>).stderr}\n${(output as ReturnType<typeof summarizeRun>).stdout}`)
+          const details = diagnose(`${(output as ReturnType<typeof summarizeRun>).stderr}\n${(output as ReturnType<typeof summarizeRun>).stdout}`, workspacePaths)
           trace.push({ round, toolId: action.toolId, input: action.input, ok: false, output, error: `builder_command_failed: exit ${(output as ReturnType<typeof summarizeRun>).exitCode}`, ...details })
           continue
         }
@@ -520,7 +532,7 @@ export class BuilderToolLoop {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'builder_tool_failed'
-        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: message, ...diagnose(message) })
+        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: message, ...diagnose(message, workspacePaths) })
       }
     }
     return { ok: false, error: workRounds >= maxRounds ? 'builder_round_budget_exhausted' : 'builder_stalled_repeated_inspection', trace }

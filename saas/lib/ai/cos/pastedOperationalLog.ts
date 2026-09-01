@@ -19,9 +19,14 @@ export function isOperationalLogEvidence(input: string): boolean {
   return OPERATIONAL_LOG.test(String(input || ''))
 }
 
+/** Intent only; this does not grant authority and does not require log evidence. */
+export function hasExplicitOperationalLogRepairIntent(input: string): boolean {
+  return EXPLICIT_LOG_REPAIR.test(String(input || ''))
+}
+
 export function isExplicitOperationalLogRepairRequest(input: string): boolean {
   const text = String(input || '')
-  return isOperationalLogEvidence(text) && EXPLICIT_LOG_REPAIR.test(text)
+  return isOperationalLogEvidence(text) && hasExplicitOperationalLogRepairIntent(text)
 }
 
 /**

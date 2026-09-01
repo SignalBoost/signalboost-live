@@ -4,17 +4,29 @@ import test from 'node:test'
 
 test('browser ingress keeps passive pasted build logs non-executing', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  const explicitRepair = route.indexOf('isExplicitOperationalLogRepairRequest(prompt)')
-  const passiveGuard = route.indexOf('isPastedOperationalLog(prompt)', explicitRepair)
-  assert.ok(explicitRepair >= 0)
-  assert.ok(passiveGuard > explicitRepair)
+  const repair = route.indexOf('const explicitOperationalRepair =')
+  const passiveGuard = route.indexOf('if (pastedOperationalLog && !hasSourceAttachment)', repair)
+  assert.ok(repair >= 0)
+  assert.ok(passiveGuard > repair)
   assert.match(route.slice(passiveGuard), /concierge-operational-log-analysis/)
   assert.match(route.slice(passiveGuard), /execution_allowed: false/)
 })
 
+test('standalone immediately preceding debug intent carries into the next pasted log turn', () => {
+  const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /hasExplicitOperationalLogRepairIntent/)
+  assert.match(route, /const previousUser = userMessages\.at\(-2\)/)
+  assert.match(route, /const previousUserPrompt = typeof previousUser\?\.content === 'string' \? previousUser\.content : ''/)
+  assert.match(route, /isExplicitOperationalLogRepairRequest\(prompt\)[\s\S]{0,160}pastedOperationalLog && hasExplicitOperationalLogRepairIntent\(previousUserPrompt\)/)
+  assert.doesNotMatch(route, /pastedOperationalLog && isExplicitOperationalLogRepairRequest\(previousUserPrompt\)/)
+  const repair = route.indexOf('if (explicitOperationalRepair && !hasSourceAttachment)')
+  const passive = route.indexOf('if (pastedOperationalLog && !hasSourceAttachment)', repair)
+  assert.ok(repair >= 0 && passive > repair)
+})
+
 test('explicit failed SignalBoost log repair may reach only the owner-only pinned repository lane', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  const explicitRepair = route.indexOf('isExplicitOperationalLogRepairRequest(prompt)')
+  const explicitRepair = route.indexOf('if (explicitOperationalRepair && !hasSourceAttachment)')
   const parse = route.indexOf('parseSignalBoostRepositoryRepairTarget(prompt)', explicitRepair)
   const owner = route.indexOf('access?.isOwner', parse)
   const execute = route.indexOf('executeSignalBoostRepositoryRepair({', owner)
@@ -28,9 +40,9 @@ test('explicit failed SignalBoost log repair may reach only the owner-only pinne
   assert.match(route.slice(execute, publicScope), /rawObjective: prompt/)
 })
 
-test('source-attached explicit log repairs still hand off to the ordinary Concierge Builder lane', () => {
+test('source-attached log repairs still hand off to the ordinary Concierge Builder lane', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  assert.match(route, /isExplicitOperationalLogRepairRequest\(prompt\) && !hasSourceAttachment/)
+  assert.match(route, /if \(explicitOperationalRepair && !hasSourceAttachment\)/)
   assert.match(route, /isConciergeBuilderObjective\(prompt, routingContext\) \? legacyConciergePost\(req\) : cosPrimaryPost\(req\)/)
 })
 

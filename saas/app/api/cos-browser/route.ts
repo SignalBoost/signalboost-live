@@ -14,7 +14,7 @@ import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProve
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { isExplicitOperationalLogRepairRequest, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
 import { parseSignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
@@ -84,15 +84,17 @@ function builderRoutingContextFromBody(body: any) {
  *
  * Passive Vercel/npm logs are classified before artifacts, visuals, or Builder. An explicit
  * owner repair request for an exact failed SignalBoost Vercel snapshot may enter only the
- * pinned, review-only Platform Engineer lane. Names inside test titles must never become
- * Wikimedia likeness lookups or execution authority.
+ * pinned, review-only Platform Engineer lane. Repair intent may carry across exactly one
+ * immediately preceding user turn so “debug this” followed by the log remains one repair job.
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
   const messages = Array.isArray(body?.messages) ? body.messages : []
   const userMessages = messages.filter((message: any) => message?.role === 'user' && typeof message?.content === 'string')
   const latestUser = userMessages.at(-1)
+  const previousUser = userMessages.at(-2)
   const prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
+  const previousUserPrompt = typeof previousUser?.content === 'string' ? previousUser.content : ''
   const assistantMessages = messages.filter((message: any) => message?.role === 'assistant' && typeof message?.content === 'string')
   const priorAnswer = typeof assistantMessages.at(-1)?.content === 'string' ? assistantMessages.at(-1).content : ''
   const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
@@ -106,8 +108,11 @@ export async function POST(req: NextRequest) {
   const hasSourceAttachment = (routingContext.attachmentNames || []).some((name: string) =>
     /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i.test(String(name || '')),
   )
+  const pastedOperationalLog = isPastedOperationalLog(prompt)
+  const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(prompt)
+    || (pastedOperationalLog && hasExplicitOperationalLogRepairIntent(previousUserPrompt))
 
-  if (isExplicitOperationalLogRepairRequest(prompt) && !hasSourceAttachment) {
+  if (explicitOperationalRepair && !hasSourceAttachment) {
     const repositoryTarget = parseSignalBoostRepositoryRepairTarget(prompt)
     if (access?.isOwner && access.userId && repositoryTarget) {
       const execution = await executeSignalBoostRepositoryRepair({
@@ -137,7 +142,7 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId)
   }
 
-  if (isPastedOperationalLog(prompt) && !hasSourceAttachment) {
+  if (pastedOperationalLog && !hasSourceAttachment) {
     return withSuggestedFollowups(NextResponse.json({
       reply: operationalLogReply(prompt),
       source: 'concierge-operational-log-analysis',

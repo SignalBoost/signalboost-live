@@ -10,7 +10,8 @@ const CONTRAST = /\b(?:however|while|whereas|by contrast|on the other hand|suppo
 export function isNormativePolicyQuestion(input: string): boolean {
   const text = String(input || '').replace(/\s+/g, ' ').trim()
   if (!text || PERSONAL_OR_OPERATIONAL_ADVICE.test(text)) return false
-  return EXPLICIT_VALUE_FORM.test(text)\n    || (SHOULD_POLICY_FORM.test(text) && (PUBLIC_CHOICE_FORM.test(text) || PUBLIC_ELIGIBILITY_FORM.test(text)))
+  return EXPLICIT_VALUE_FORM.test(text)
+    || (SHOULD_POLICY_FORM.test(text) && (PUBLIC_CHOICE_FORM.test(text) || PUBLIC_ELIGIBILITY_FORM.test(text)))
 }
 
 /**

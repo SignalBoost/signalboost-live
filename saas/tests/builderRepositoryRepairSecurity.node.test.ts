@@ -87,6 +87,7 @@ test('direct Builder invokes Platform Engineer only after exact deployment pinni
   const passive = builder.indexOf('isPastedOperationalLog(objective)', execute)
   assert.ok(target >= 0); assert.ok(owner > target); assert.ok(execute > owner); assert.ok(passive > execute)
   assert.match(builder, /commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA/)
+  assert.match(builder, /body\?\.platformRepair === true && isOperationalLogEvidence\(objective\)/)
   assert.match(builder, /target: platformRepairTarget/)
   assert.match(builder, /builder_repository_repair_owner_required/)
   assert.doesNotMatch(builder, /VercelRepositoryRepairSession/)

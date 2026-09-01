@@ -4,15 +4,17 @@ import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 
-
 type WorkspaceFile = { path: string; content: string }
-type BuilderReply = { workspaceId?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; failureClass?: string; remediation?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
+type BuilderReply = { jobId?: string; workspaceId?: string; status?: string; reply?: string; error?: string; files?: string[]; trace?: Array<{ round: number; toolId: string; ok: boolean; error?: string; failureClass?: string; remediation?: string; path?: string; command?: string; exitCode?: number; stdout?: string; stderr?: string; timedOut?: boolean }> }
 type WorkspaceSummary = { id: string; objective: string; updatedAt: string }
 type CertificationSummary = { earnedLevel: number; attempts: number }
 
 const MAX_UPLOAD_BYTES = 512 * 1024
 const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
+const BUILDER_JOB_POLL_ATTEMPTS = 20
+const BUILDER_JOB_POLL_DELAY_MS = 1_500
 function filename(path: string): string { return path.split('/').pop() || 'download.txt' }
+function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)) }
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -102,6 +104,21 @@ export default function DeveloperPage() {
     if (fileInput.current) fileInput.current.value = ''
   }
 
+  async function pollBuilderJob(jobId: string): Promise<BuilderReply | null> {
+    for (let attempt = 0; attempt < BUILDER_JOB_POLL_ATTEMPTS; attempt += 1) {
+      if (attempt > 0) await sleep(BUILDER_JOB_POLL_DELAY_MS)
+      const response = await fetch(`/api/builder?jobId=${encodeURIComponent(jobId)}`, { cache: 'no-store' })
+      const data = await response.json().catch(() => ({})) as BuilderReply
+      if (response.status === 202 || data.status === 'queued' || data.status === 'running') {
+        if (data.reply) setReply(data.reply)
+        continue
+      }
+      if (!response.ok) throw new Error(data.error || 'Builder job failed.')
+      return data
+    }
+    return null
+  }
+
   async function run() {
     const task = objective.trim()
     if (!task || running) return
@@ -112,15 +129,29 @@ export default function DeveloperPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ objective: task, workspaceId: workspaceId || undefined, files }),
       })
-      const data = await response.json().catch(() => ({})) as BuilderReply
+      let data = await response.json().catch(() => ({})) as BuilderReply
       if (data.workspaceId) setWorkspaceId(data.workspaceId)
       setWorkspaceFiles(data.files || [])
       setTrace(data.trace || [])
       if (!response.ok) { setError(data.error || 'Builder could not complete this request.'); return }
       setReply(data.reply || 'Builder completed without a final report.')
+
+      if (response.status === 202 && data.jobId) {
+        const terminal = await pollBuilderJob(data.jobId)
+        if (terminal) {
+          data = terminal
+          if (data.workspaceId) setWorkspaceId(data.workspaceId)
+          setWorkspaceFiles(data.files || [])
+          setTrace(data.trace || [])
+          setReply(data.reply || 'Builder completed without a final report.')
+        } else {
+          setReply(current => current || `COS Builder is still running job ${data.jobId}. Refresh this workspace to see the durable result.`)
+        }
+      }
+
       setFiles([])
-      void loadWorkspaces()
-    } catch { setError('Could not reach Builder.') }
+      await loadWorkspaces()
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not reach Builder.') }
     finally { setRunning(false) }
   }
 

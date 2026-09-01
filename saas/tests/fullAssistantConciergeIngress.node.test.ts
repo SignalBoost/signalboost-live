@@ -15,10 +15,23 @@ test('Full Assistant routes only explicit pasted-log repair through Concierge', 
 test('Full Assistant recovers missing previous repair intent from durable conversation History', () => {
   const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
   assert.match(boundary, /async function durablePreviousRepairIntent/)
+  assert.match(boundary, /currentUserContent: string/)
   assert.match(boundary, /`\/api\/assistant\/chats\?id=\$\{encodeURIComponent\(conversationId\)\}`/)
-  assert.match(boundary, /if \(!operationalRepair && isPastedOperationalLog\(userContent\)\)/)
-  assert.match(boundary, /const recoveredRepairIntent = await durablePreviousRepairIntent/)
-  assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(content\) \? content : null/)
+  assert.match(boundary, /let skippedCurrentTurn = false/)
+  assert.match(boundary, /if \(!skippedCurrentTurn && content === currentUserContent\)/)
+  assert.match(boundary, /skippedCurrentTurn = true\s+continue/)
+  assert.match(boundary, /return hasExplicitOperationalLogRepairIntent\(content\) \? content : null/)
+  assert.match(boundary, /durablePreviousRepairIntent\([\s\S]*conversationId,[\s\S]*userContent,/)
+})
+
+test('History recovery inspects only the immediately preceding distinct user turn', () => {
+  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
+  const recovery = boundary.slice(
+    boundary.indexOf('async function durablePreviousRepairIntent'),
+    boundary.indexOf('function bodyWithPreviousUserTurn'),
+  )
+  assert.match(recovery, /return hasExplicitOperationalLogRepairIntent\(content\) \? content : null/)
+  assert.doesNotMatch(recovery, /if \(hasExplicitOperationalLogRepairIntent\(content\)\) return content/)
 })
 
 test('recovered repair intent is forwarded in the server-visible Concierge transcript', () => {

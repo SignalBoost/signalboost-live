@@ -12,11 +12,12 @@ test('browser ingress keeps passive pasted build logs non-executing', () => {
   assert.match(route.slice(passiveGuard), /execution_allowed: false/)
 })
 
-test('immediately preceding debug intent carries into the next pasted log turn', () => {
+test('standalone immediately preceding debug intent carries into the next pasted log turn', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(route, /const previousUser = userMessages\.at\(-2\)/)
   assert.match(route, /const previousUserPrompt = typeof previousUser\?\.content === 'string' \? previousUser\.content : ''/)
-  assert.match(route, /isExplicitOperationalLogRepairRequest\(prompt\)[\s\S]{0,160}pastedOperationalLog && isExplicitOperationalLogRepairRequest\(previousUserPrompt\)/)
+  assert.match(route, /isExplicitOperationalLogRepairRequest\(prompt\)[\s\S]{0,160}pastedOperationalLog && hasExplicitOperationalLogRepairIntent\(previousUserPrompt\)/)
+  assert.doesNotMatch(route, /pastedOperationalLog && isExplicitOperationalLogRepairRequest\(previousUserPrompt\)/)
   const repair = route.indexOf('if (explicitOperationalRepair && !hasSourceAttachment)')
   const passive = route.indexOf('if (pastedOperationalLog && !hasSourceAttachment)', repair)
   assert.ok(repair >= 0 && passive > repair)

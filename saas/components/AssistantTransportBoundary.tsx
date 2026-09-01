@@ -317,7 +317,7 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
         return executeBuilderFromConcierge(originalFetch, body, userContent, conversationId, init?.signal ?? undefined)
       }
 
-      let operationalRepair = shouldUseConciergeRepairIngress(body)
+      let operationalRepair = isPastedOperationalLog(userContent) || shouldUseConciergeRepairIngress(body)
       let sendBody: AssistantRequestBody = body
       if (!operationalRepair && isPastedOperationalLog(userContent)) {
         const recoveredRepairIntent = await durablePreviousRepairIntent(
@@ -330,9 +330,9 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
           sendBody = bodyWithPreviousUserTurn(body, recoveredRepairIntent)
         }
       }
-      // Preserve privileged owner COS scope for ordinary turns. Only a pasted operational log
-      // with explicit repair intent in the request body or durable preceding History enters the
-      // canonical browser ingress, which owns the pinned SignalBoost repository-repair lane.
+      // Preserve privileged owner COS scope for ordinary turns. Every pasted operational log enters
+      // the canonical browser ingress; the server alone decides whether it is owner-bound SignalBoost
+      // repair evidence or a passive analysis-only log.
       const result = await sendAssistantTurnAndRecover(userContent, sendBody as Record<string, unknown>, {
         sendUrl: operationalRepair ? '/api/cos-browser' : '/api/cos-primary',
         historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,

@@ -14,15 +14,16 @@ import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProve
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { analyzeOperationalLog, hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
-import { parseSignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
+import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+const SIGNALBOOST_OPERATIONAL_TARGET = /\b(?:signalboost-live|(?:saas\.)?signalboostapp\.com)\b/i
 
 export async function withSuggestedFollowups(response: Response, prompt: string, userId: string | null = null): Promise<NextResponse> {
   const headers = new Headers(response.headers)
@@ -111,6 +112,34 @@ export async function POST(req: NextRequest) {
   const pastedOperationalLog = isPastedOperationalLog(prompt)
   const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(prompt)
     || (pastedOperationalLog && hasExplicitOperationalLogRepairIntent(previousUserPrompt))
+
+  const operationalLogAnalysis = analyzeOperationalLog(prompt)
+  const exactFailedLogTarget = operationalLogAnalysis.failed
+    ? parseSignalBoostRepositoryRepairTarget(prompt)
+    : null
+  const ownerSignalBoostLogTarget = access?.isOwner && access.userId && !hasSourceAttachment
+    && isOperationalLogEvidence(prompt) && operationalLogAnalysis.failed
+    && SIGNALBOOST_OPERATIONAL_TARGET.test(prompt)
+    ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(prompt, {
+        commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
+        branch: process.env.VERCEL_GIT_COMMIT_REF,
+      }, { ownerDeveloperLogSubmission: true })
+    : null
+  if (ownerSignalBoostLogTarget && access?.userId) {
+    const execution = await executeSignalBoostRepositoryRepair({
+      userId: access.userId,
+      rawObjective: prompt,
+      workspaceId: crypto.randomUUID(),
+      target: ownerSignalBoostLogTarget,
+    })
+    if (execution) {
+      return withSuggestedFollowups(
+        NextResponse.json(execution.payload, { status: execution.status }),
+        prompt,
+        auditUserId,
+      )
+    }
+  }
 
   if (explicitOperationalRepair && !hasSourceAttachment) {
     const repositoryTarget = parseSignalBoostRepositoryRepairTarget(prompt)

@@ -1,5 +1,5 @@
 import { MAX_BUILDER_OBJECTIVE_CHARS } from '../../builder/request-contract.ts'
-import { isPastedOperationalLog } from './pastedOperationalLog.ts'
+import { isOperationalLogEvidence } from './pastedOperationalLog.ts'
 
 export type CosSpecialistRole = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher'
 
@@ -87,9 +87,11 @@ function concreteCodeEvidence(prompt: string, context?: CosCodingRoutingContext)
 function excludedFromBuilder(prompt: string, context?: CosCodingRoutingContext): boolean {
   const raw = String(prompt || '')
   const objective = cosRoutingObjective(raw)
-  // A log alone cannot start Builder. A log plus an attached source file is the same
-  // job a human sends here: debug that file. Huge dumps and off-topic prompts stay closed.
-  if (isPastedOperationalLog(raw) && !sourceAttachment(context)) return true
+  // Raw operational logs never receive ordinary sandbox authority by themselves. Concierge's
+  // authenticated browser ingress may separately promote an explicit repair of an exact failed
+  // SignalBoost snapshot into the pinned repository-repair lane. Source attachments remain the
+  // existing fixed one-file debug lane.
+  if (isOperationalLogEvidence(raw) && !sourceAttachment(context)) return true
   return hugeTranscriptOrDump(raw) || NON_CODING_TOPIC.test(objective)
 }
 
@@ -128,7 +130,8 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
  * source evidence, or a dropped source file with casual/empty wording.
  *
  * A timeout report, a log dump, “what is this file?”, or a general factual question
- * still cannot acquire sandbox authority. Platform self-repair with no source file stays closed.
+ * still cannot acquire sandbox authority. Platform self-repair with no source file stays closed
+ * here and is handled only by the browser ingress's owner-only pinned repository-repair lane.
  */
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (excludedFromBuilder(prompt, context)) return false

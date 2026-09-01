@@ -83,10 +83,24 @@ test('repository repair cannot commit, push, merge, deploy, or inherit credentia
   assert.match(source, /git[^\n]+diff/)
 })
 
-test('pasted logs no longer acquire repository-repair authority at either ingress', () => {
+test('browser repository repair requires explicit repair intent, exact SignalBoost target, and owner authority', () => {
   const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  const explicit = browser.indexOf('isExplicitOperationalLogRepairRequest(prompt)')
+  const parse = browser.indexOf('parseSignalBoostRepositoryRepairTarget(prompt)', explicit)
+  const owner = browser.indexOf('access?.isOwner', parse)
+  const execute = browser.indexOf('executeSignalBoostRepositoryRepair({', owner)
+  assert.ok(explicit >= 0)
+  assert.ok(parse > explicit)
+  assert.ok(owner > parse)
+  assert.ok(execute > owner)
+
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  assert.match(repair, /repository_write_allowed: false/)
+  assert.match(repair, /merge_allowed: false/)
+})
+
+test('ordinary Builder route still cannot invoke repository repair from pasted logs', () => {
   const builder = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
-  assert.doesNotMatch(browser, /ownerRepairAccess|builderPost\(builderRequest\)|executeSignalBoostRepositoryRepair/)
   assert.doesNotMatch(builder, /executeSignalBoostRepositoryRepair|VercelRepositoryRepairSession/)
   assert.match(builder, /isPastedOperationalLog\(objective\)/)
   assert.match(builder, /execution_allowed: false/)

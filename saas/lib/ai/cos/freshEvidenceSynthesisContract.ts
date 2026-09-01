@@ -1,14 +1,12 @@
 // saas/lib/ai/cos/freshEvidenceSynthesisContract.ts
 import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
 import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
-import { isNormativePolicyQuestion } from './normativeAnswerPolicy.ts'
 
 export type FreshEvidenceSemanticScope = {
   scopeId: string
   label: string
   finding: string
   evidenceIds: string[]
-  position?: 'supporting' | 'opposing' | 'descriptive'
 }
 
 export type FreshEvidencePresentationMode = 'direct' | 'neutral_evidence_map'
@@ -99,7 +97,7 @@ export function freshEvidenceScopePlanSystemPrompt(language: string): string {
   return [
     `Return labels and findings in ${languageLabel(language)}.`,
     'You are the SEMANTIC SCOPE PLANNER for LIVE EVIDENCE retrieved moments ago.',
-    'Return ONLY strict JSON with this exact shape: {"presentationMode":"direct","directBinaryAnswerSafe":true,"scopes":[{"scopeId":"S1","label":"...","finding":"...","evidenceIds":["LIVE1"],"position":"descriptive"}]}.',
+    'Return ONLY strict JSON with this exact shape: {"presentationMode":"direct","directBinaryAnswerSafe":true,"scopes":[{"scopeId":"S1","label":"...","finding":"...","evidenceIds":["LIVE1"]}]}.',
     'presentationMode must be exactly "direct" or "neutral_evidence_map".',
     'Do not write the user-facing answer and do not expose chain-of-thought. Return only concise scope-level conclusions.',
     'Use only facts present in LIVE EVIDENCE. Your model memory is not a source of current facts.',
@@ -122,7 +120,6 @@ export function freshEvidenceScopePlanSystemPrompt(language: string): string {
     'Set directBinaryAnswerSafe=true only in presentationMode="direct", when a direct yes/no is supported and can remain truthful without implying a stronger proposition than the evidence establishes.',
     'Choose scope count separately from binary safety and presentation mode: return the smallest set of materially distinct scopes needed to preserve meaning.',
     'Each scope label must identify what is actually measured, compared, established, or argued. Each finding must state only the evidence-supported conclusion for that scope.',
-    'Set each scope position to exactly supporting, opposing, or descriptive. For a normative/public-policy question, include at least one evidence-backed supporting scope and one evidence-backed opposing scope; descriptive context alone is insufficient. Do not manufacture either side when LIVE EVIDENCE cannot support it.',
     'Every scope must cite at least one real LIVE evidence id that supports its finding. Never invent an evidence id.',
     'Do not manufacture a second scope merely to be cautious. Split only when the evidence or the user’s materially different plausible meanings make the distinction necessary.',
   ].join('\n')
@@ -133,10 +130,7 @@ export function freshEvidenceScopePlanPrompt(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
 }): string {
-  const normative = isNormativePolicyQuestion(args.input)
-    ? '\nFor this normative/public-policy question, the plan MUST include distinct evidence-backed supporting and opposing scopes. If the live evidence cannot support both materially, do not invent a side.'
-    : ''
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSCOPE-PLANNING TASK:\nIdentify the smallest set of materially distinct evidence scopes required to answer the original QUESTION without changing the meaning of what the evidence establishes. Preserve genuine methodological or interpretive divergence and distinguish a descriptive observation from any stronger causal, intentional, discriminatory, or legal interpretation. Choose whether the user should receive a direct factual orientation or a neutral evidence map before any verdict.${normative}\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSCOPE-PLANNING TASK:\nIdentify the smallest set of materially distinct evidence scopes required to answer the original QUESTION without changing the meaning of what the evidence establishes. Preserve genuine methodological or interpretive divergence and distinguish a descriptive observation from any stronger causal, intentional, discriminatory, or legal interpretation. Choose whether the user should receive a direct factual orientation or a neutral evidence map before any verdict.\n\nQUESTION: ${args.input}`
 }
 
 export function acceptFreshEvidenceSemanticPlan(args: {
@@ -161,16 +155,11 @@ export function acceptFreshEvidenceSemanticPlan(args: {
     const label = String(scope.label || '').trim()
     const finding = String(scope.finding || '').trim()
     const evidenceIds = uniqueStrings(scope.evidenceIds)
-    const position = scope.position === 'supporting' || scope.position === 'opposing' || scope.position === 'descriptive'
-      ? scope.position
-      : undefined
     if (!SCOPE_ID.test(scopeId) || seenScopeIds.has(scopeId)) return null
     if (!label || label.length > 180 || !finding || finding.length > 500) return null
     if (!evidenceIds.length || evidenceIds.some(id => !sourceIds.has(id))) return null
     seenScopeIds.add(scopeId)
-    scopes.push(position
-      ? { scopeId, label, finding, evidenceIds, position }
-      : { scopeId, label, finding, evidenceIds })
+    scopes.push({ scopeId, label, finding, evidenceIds })
   }
 
   return { presentationMode, directBinaryAnswerSafe: parsed.directBinaryAnswerSafe, scopes }
@@ -197,7 +186,6 @@ export function freshEvidenceSynthesisSystemPrompt(language: string): string {
     'If presentationMode="direct" and directBinaryAnswerSafe=false, do not open with a standalone yes or no. State the scoped evidence directly.',
     'If presentationMode="direct" and directBinaryAnswerSafe=true, a direct yes/no is allowed only as a narrow factual orientation and must not imply a stronger causal, intentional, discriminatory, or legal conclusion.',
     'Use every scope id needed by the plan and cite evidence ids that actually support those scopes. Never invent a scope id or evidence id.',
-    'For normative/public-policy questions, explicitly present the strongest evidence-backed argument supporting the proposition and the strongest evidence-backed argument opposing it. The final source groups are produced from the scope positions, so do not misclassify evidence.',
     'Distinguish observation from explanation and causation; do not promote an aggregate, associative, modeled, or otherwise bounded result beyond the scope that the evidence supports.',
     'Prefer direct or primary evidence for a scope when available, plus strong independent corroboration when useful. Do not cite a tertiary summary merely to add another source if stronger sources already support the same point.',
     'Prefer the minimum representative evidence needed for each scope. Do not enumerate parallel statistics or sources merely because they were retrieved.',
@@ -359,27 +347,11 @@ export function acceptFreshEvidenceSynthesis(args: {
     if (!scope.evidenceIds.some(id => citedSourceIds.includes(id))) return null
   }
 
-  const citation = (id: string) => {
+  const citations = citedSourceIds.map(id => {
     const source = byId.get(id)!
     return `[${source.id}] (${source.url})`
-  }
-  let reply: string
-  if (isNormativePolicyQuestion(args.input)) {
-    const supportingIds = [...new Set(args.semanticPlan.scopes
-      .filter(scope => scope.position === 'supporting')
-      .flatMap(scope => scope.evidenceIds)
-      .filter(id => citedSourceIds.includes(id)))]
-    const opposingIds = [...new Set(args.semanticPlan.scopes
-      .filter(scope => scope.position === 'opposing')
-      .flatMap(scope => scope.evidenceIds)
-      .filter(id => citedSourceIds.includes(id)))]
-    if (!supportingIds.length || !opposingIds.length) return null
-    if (!supportingIds.some(id => !opposingIds.includes(id)) || !opposingIds.some(id => !supportingIds.includes(id))) return null
-    const contextualIds = citedSourceIds.filter(id => !supportingIds.includes(id) && !opposingIds.includes(id))
-    reply = `${answer}\n\nSources supporting the proposition: ${supportingIds.map(citation).join(' and ')}\n\nSources opposing the proposition: ${opposingIds.map(citation).join(' and ')}${contextualIds.length ? `\n\nAdditional context: ${contextualIds.map(citation).join(' and ')}` : ''}`
-  } else {
-    reply = `${answer}\n\nSources: ${citedSourceIds.map(citation).join(' and ')}`
-  }
+  })
+  const reply = `${answer}\n\nSources: ${citations.join(' and ')}`
   if (!replyCitesRequiredFreshEvidence(reply, args.input, args.sources)) return null
   return { reply, citedSourceIds, answer, scopeIds, semanticPlan: args.semanticPlan }
 }

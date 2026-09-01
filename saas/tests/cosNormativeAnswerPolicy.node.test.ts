@@ -13,7 +13,7 @@ const prompts = [
 test('owner acceptance questions share one normative classifier', () => {
   for (const prompt of prompts) {
     assert.equal(isNormativePolicyQuestion(prompt), true, prompt)
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
+    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
   }
 })
 
@@ -27,7 +27,7 @@ test('the policy generalizes beyond the motivating questions', () => {
     'Should sixteen-year-olds be allowed to vote?',
   ]) {
     assert.equal(isNormativePolicyQuestion(prompt), true, prompt)
-    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
+    assert.equal(requiresFreshExternalEvidence(prompt), false, prompt)
   }
 })
 

@@ -7,6 +7,8 @@ import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob, getBuilderJobForUser } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
+import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
+import { signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import {
   isBuilderObjectiveError,
   readBuilderObjective,
@@ -118,9 +120,9 @@ export async function GET(request: Request) {
  * Create one durable Builder job. The request returns after workspace/job persistence; execution is
  * scheduled with Next.js `after()`. GET polling is read-only and a lost response never replays POST.
  *
- * A pasted log is debugging evidence and now produces a real job. The one authority a log never
- * grants is repository scope: this route imports no repository-repair session, so log-derived work
- * can only ever act inside the caller's own workspace sandbox.
+ * A pasted log is debugging evidence and now produces a real job. Repository scope stays in the
+ * separate owner-only Platform Engineer lane below, pinned to the immutable deployed revision;
+ * ordinary log-derived work only ever acts inside the caller's own workspace sandbox.
  */
 export async function POST(request: Request) {
   const access = await getAccess().catch(() => null)
@@ -141,6 +143,32 @@ export async function POST(request: Request) {
 
     const files = cleanFiles(body?.files)
     const debugPlan = planDebugFileJob(objective, files)
+
+    const platformRepairTarget = files.length === 0
+      ? signalBoostDeployedRepairTarget(objective, {
+          commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
+          branch: process.env.VERCEL_GIT_COMMIT_REF,
+        })
+      : null
+
+    // The direct Developer surface owns user-workspace jobs, but an explicit owner request to fix
+    // Builder/SignalBoost needs the separate Platform Engineer. Pin it to the immutable deployed
+    // revision supplied by Vercel and keep its output review-only; passive logs grant no authority.
+    if (platformRepairTarget) {
+      if (!access.isOwner) {
+        const reply = 'SignalBoost platform repair is owner-only. No repository was inspected and no code was run.'
+        await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
+        return noStore({ error: 'builder_repository_repair_owner_required', reply, execution_allowed: false }, { status: 403 })
+      }
+      const execution = await executeSignalBoostRepositoryRepair({
+        userId: access.userId,
+        rawObjective: objective,
+        workspaceId,
+        target: platformRepairTarget,
+      })
+      if (!execution) return noStore({ error: 'builder_repository_repair_target_unavailable' }, { status: 422 })
+      return noStore(execution.payload, { status: execution.status })
+    }
 
     // A log plus exactly one supported source file keeps the fixed one-file debug protocol. A log
     // with no attachment is still a debugging job; it is tagged as log evidence with no repository

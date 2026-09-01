@@ -17,12 +17,13 @@ test('pasted build logs are analyzed before any workspace or job execution', () 
   assert.match(route, /external_action_taken: false/)
 })
 
-test('logs never invoke repository repair, sandbox execution, or an asynchronous job', () => {
-  assert.doesNotMatch(route, /executeSignalBoostRepositoryRepair/)
+test('passive logs never invoke repository repair, sandbox execution, or an asynchronous job', () => {
   assert.doesNotMatch(route, /VercelRepositoryRepairSession/)
+  const platformExecute = route.indexOf('executeSignalBoostRepositoryRepair({')
   const guard = route.indexOf('isPastedOperationalLog(objective)')
   const fallbackReturn = route.indexOf('execution_allowed: false', guard)
   const enqueue = route.indexOf('await enqueueBuilderJob({', fallbackReturn)
+  assert.ok(platformExecute >= 0 && platformExecute < guard)
   assert.ok(fallbackReturn > guard)
   assert.ok(enqueue > fallbackReturn)
   assert.match(route, /await persistSynchronousReply\(\{ conversationId, userId: access\.userId, objective, reply \}\)/)

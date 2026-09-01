@@ -219,10 +219,11 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true
   if (isContentGenerationRequest(text)) return false
 
-  // Normative/public-policy answers must establish their descriptive premises and the strongest
-  // evidence-backed positions on this turn. Uncited cache/model-memory answers cannot satisfy
-  // provenance, and equivalent wording ("legal", "allowed", "play") must route consistently.
-  if (isNormativePolicyQuestion(text)) return true
+  // A moral/civic/public-policy proposition is not itself a request for the current law. Route the
+  // whole class consistently through the normative answer contract instead of letting one keyword
+  // ("legal") force live guidance while an equivalent wording ("allowed") uses general reasoning.
+  // Any mutable present-world facts introduced by the draft remain subject to answer-side freshness.
+  if (isNormativePolicyQuestion(text)) return false
 
   // A question about COS's OWN previous answer is never a public-web lookup. This is a structural
   // safeguard, not a duplicate of the introspection routing: when the introspection classifier

@@ -1,6 +1,5 @@
 // saas/lib/ai/cos/cosFreshGrounding.ts
 import type { SearchResult } from '@/lib/ai/tools/getExternalInfo'
-import { isNormativePolicyQuestion } from './normativeAnswerPolicy.ts'
 import { classifyAuthoritativeSourceNeed, rankByAuthority } from './officialSourceAuthority.ts'
 
 export type FreshEvidenceSource = SearchResult & { id: string }
@@ -460,14 +459,6 @@ export function freshEvidenceSearchQuery(input: string, now = new Date()): strin
 export function freshEvidenceSearchQueries(input: string, now = new Date()): string[] {
   const primary = freshEvidenceSearchQuery(input, now)
   const raw = String(input || '').trim()
-  if (isNormativePolicyQuestion(raw)) {
-    const topic = raw.replace(/[?!.]+$/g, '').trim()
-    return [...new Set([
-      primary,
-      `${topic} strongest evidence arguments supporting policy authoritative research`,
-      `${topic} strongest evidence arguments opposing policy authoritative research`,
-    ])]
-  }
   if (isPersonOrOfficeEvaluation(raw)) {
     const topic = raw.replace(/[?!.]+$/g, '').trim()
     return [...new Set([

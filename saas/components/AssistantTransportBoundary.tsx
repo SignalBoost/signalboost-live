@@ -54,6 +54,7 @@ function shouldUseConciergeRepairIngress(body: AssistantRequestBody): boolean {
 async function durablePreviousRepairIntent(
   fetchImpl: typeof window.fetch,
   conversationId: string,
+  currentUserContent: string,
   signal?: AbortSignal,
 ): Promise<string | null> {
   try {
@@ -67,10 +68,15 @@ async function durablePreviousRepairIntent(
     if (!response.ok) return null
     const payload = await response.json().catch(() => null)
     const messages = Array.isArray(payload?.messages) ? payload.messages : []
+    let skippedCurrentTurn = false
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index]
       if (message?.role !== 'user' || typeof message.content !== 'string') continue
       const content = message.content.trim()
+      if (!skippedCurrentTurn && content === currentUserContent) {
+        skippedCurrentTurn = true
+        continue
+      }
       return hasExplicitOperationalLogRepairIntent(content) ? content : null
     }
   } catch (error) {
@@ -323,6 +329,7 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
         const recoveredRepairIntent = await durablePreviousRepairIntent(
           originalFetch,
           conversationId,
+          userContent,
           init?.signal ?? undefined,
         )
         if (recoveredRepairIntent) {

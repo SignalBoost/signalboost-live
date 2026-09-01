@@ -133,7 +133,10 @@ export function freshEvidenceScopePlanPrompt(args: {
   sources: FreshEvidenceSource[]
   retrievedAt: string
 }): string {
-  const normative = isNormativePolicyQuestion(args.input)\n    ? '\\nFor this normative/public-policy question, the plan MUST include distinct evidence-backed supporting and opposing scopes. If the live evidence cannot support both materially, do not invent a side.'\n    : ''\n  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSCOPE-PLANNING TASK:\nIdentify the smallest set of materially distinct evidence scopes required to answer the original QUESTION without changing the meaning of what the evidence establishes. Preserve genuine methodological or interpretive divergence and distinguish a descriptive observation from any stronger causal, intentional, discriminatory, or legal interpretation. Choose whether the user should receive a direct factual orientation or a neutral evidence map before any verdict.${normative}\n\nQUESTION: ${args.input}`
+  const normative = isNormativePolicyQuestion(args.input)
+    ? '\nFor this normative/public-policy question, the plan MUST include distinct evidence-backed supporting and opposing scopes. If the live evidence cannot support both materially, do not invent a side.'
+    : ''
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSCOPE-PLANNING TASK:\nIdentify the smallest set of materially distinct evidence scopes required to answer the original QUESTION without changing the meaning of what the evidence establishes. Preserve genuine methodological or interpretive divergence and distinguish a descriptive observation from any stronger causal, intentional, discriminatory, or legal interpretation. Choose whether the user should receive a direct factual orientation or a neutral evidence map before any verdict.${normative}\n\nQUESTION: ${args.input}`
 }
 
 export function acceptFreshEvidenceSemanticPlan(args: {
@@ -158,12 +161,16 @@ export function acceptFreshEvidenceSemanticPlan(args: {
     const label = String(scope.label || '').trim()
     const finding = String(scope.finding || '').trim()
     const evidenceIds = uniqueStrings(scope.evidenceIds)
-    const position = scope.position === 'supporting' || scope.position === 'opposing' ? scope.position : 'descriptive'
+    const position = scope.position === 'supporting' || scope.position === 'opposing' || scope.position === 'descriptive'
+      ? scope.position
+      : undefined
     if (!SCOPE_ID.test(scopeId) || seenScopeIds.has(scopeId)) return null
     if (!label || label.length > 180 || !finding || finding.length > 500) return null
     if (!evidenceIds.length || evidenceIds.some(id => !sourceIds.has(id))) return null
     seenScopeIds.add(scopeId)
-    scopes.push({ scopeId, label, finding, evidenceIds, position })
+    scopes.push(position
+      ? { scopeId, label, finding, evidenceIds, position }
+      : { scopeId, label, finding, evidenceIds })
   }
 
   return { presentationMode, directBinaryAnswerSafe: parsed.directBinaryAnswerSafe, scopes }

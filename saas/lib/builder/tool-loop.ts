@@ -414,6 +414,10 @@ export class BuilderToolLoop {
       if (action.type === 'answer') {
         if (repairPhase && repairPhase !== 'complete') {
           const remediation = formatRepairPhase(repairPhase, projectContext.recommendedTestCommand)
+          gateNudges += 1
+          if (gateNudges > MAX_GATE_NUDGES) {
+            return { ok: false, error: 'builder_regression_evidence_required', trace }
+          }
           trace.push({
             round,
             toolId: 'run',
@@ -426,6 +430,10 @@ export class BuilderToolLoop {
           continue
         }
         if (inspectedSource) {
+          gateNudges += 1
+          if (gateNudges > MAX_GATE_NUDGES) {
+            return { ok: false, error: 'builder_regression_evidence_required', trace }
+          }
           trace.push({
             round,
             toolId: 'run',

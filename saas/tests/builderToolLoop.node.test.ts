@@ -250,11 +250,13 @@ test('Builder stops after the bounded command-run budget', async () => {
     '{"type":"tool","toolId":"run","input":{"command":"echo 2"}}',
     '{"type":"tool","toolId":"run","input":{"command":"echo 3"}}',
     '{"type":"tool","toolId":"run","input":{"command":"echo 4"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"echo 5"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"echo 6"}}',
   ])
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'run repeatedly', workspaceId: 'user:4', maxRounds: 8 })
   assert.equal(result.ok, false)
   if (result.ok === false) assert.equal(result.error, 'builder_run_budget_exhausted')
-  assert.equal(result.trace.length, 3)
+  assert.equal(result.trace.length, 5)
 })
 
 test('Builder rejects alternating repeated inspection without exhausting work rounds', async () => {

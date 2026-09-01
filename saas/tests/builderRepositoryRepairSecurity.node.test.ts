@@ -88,7 +88,7 @@ test('direct Builder invokes Platform Engineer only after exact deployment pinni
   assert.ok(target >= 0); assert.ok(owner > target); assert.ok(execute > owner); assert.ok(passive > execute)
   assert.match(builder, /commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA/)
   assert.match(builder, /const ownerDeveloperLogSubmission = access\.isOwner/)
-  assert.match(builder, /body\?\.platformRepair === true/)
+  assert.doesNotMatch(builder, /body\?\.platformRepair/)
   assert.match(builder, /isOperationalLogEvidence\(objective\)/)
   assert.match(builder, /SIGNALBOOST_OPERATIONAL_TARGET\.test\(objective\)/)
   assert.match(builder, /target: platformRepairTarget/)

@@ -24,7 +24,7 @@ test('Builder is authenticated, asynchronous, and exposes only a bounded public 
 
 test('direct Developer surface follows an accepted Builder job to its terminal result', () => {
   const page = source('../app/dashboard/developer/page.tsx')
-  assert.match(page, /platformRepair: true/)
+  assert.doesNotMatch(page, /platformRepair/)
   assert.match(page, /jobId\?: string/)
   assert.match(page, /async function pollBuilderJob\(jobId: string\)/)
   assert.match(page, /fetch\(`\/api\/builder\?jobId=\$\{encodeURIComponent\(jobId\)\}`/)

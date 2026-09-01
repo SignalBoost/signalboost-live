@@ -21,6 +21,7 @@ function withComputedArithmetic<T extends { answer: string } | null>(parsed: T):
 import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
 import { createHash } from 'node:crypto'
 import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
+import { normativeAnswerContractViolations } from './normativeAnswerPolicy.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
 import { localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { learnedEvidenceUseRequired } from './learnedEvidencePolicy.ts'
@@ -804,7 +805,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
       const payload = nearest.responsePayload as CachedCosAnswer|null
       const current = cachedAnswerIsCurrent(payload, policyVersion, cacheMaxAgeMs)
       if (payload?.reply && !current.ok) console.warn('cosFirstAnswer: semantic cache entry refused as stale', { reason:current.reason, similarity:nearest.similarityScore })
-      if (payload?.reply && current.ok && payload.confidence >= threshold()) {
+      if (payload?.reply && current.ok && payload.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, payload.reply).length === 0) {
         recordAvoidedCost('semantic_similarity', input.prompt.length, payload.reply.length, Date.now() - startedAt)
         // Cache replay must be cleaned too: entries written before answer hygiene existed still
         // carry internal markers, and a cached leak is indistinguishable to the reader from a live
@@ -824,7 +825,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const cached = cacheAllowed ? await readCachedAnswer(cacheKey) : null
   const cachedCurrent = cachedAnswerIsCurrent(cached, policyVersion, cacheMaxAgeMs)
   if (cached?.reply && !cachedCurrent.ok) console.warn('cosFirstAnswer: exact cache entry refused as stale', { reason:cachedCurrent.reason })
-  if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold()) {
+  if (cached?.reply && cachedCurrent.ok && cached.confidence >= threshold() && normativeAnswerContractViolations(input.prompt, cached.reply).length === 0) {
     recordAvoidedCost('exact_cache', input.prompt.length, cached.reply.length, Date.now() - startedAt)
     return { handled:true, reply:cleanAnswerText(cached.reply), confidence:cached.confidence, provenance:cacheHitProvenance(cached, base, 'semantic_cache') }
   }
@@ -917,6 +918,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const requiresRelevantLearnedEvidenceUse = learnedEvidenceUseRequired(input.prompt, context.learned)
   const releaseSignals = (raw: string) => [
     ...executiveDecisionUnsupportedClaims(input.prompt, raw),
+    ...normativeAnswerContractViolations(input.prompt, parseLocalResult(raw)?.answer || raw),
     ...(requiresRelevantLearnedEvidenceUse && citedEvidence(parseLocalResult(raw)?.answer || '').cl === 0
       ? ['relevant_learned_evidence_not_used'] : []),
   ]
@@ -925,7 +927,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
     const repair = await callCosReasoner({
       temperature: 0,
       maxTokens: Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
-      systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. If selected full-content learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. This applies to owner-fed documents, videos, scientific articles, and other approved learning. Deliver the complete memo; do not mention this repair.',
+      systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. For a normative or public-policy question, never begin with Yes or No: give at least 100 words of neutral analysis separating descriptive facts from the strongest material supporting and opposing frameworks, then state what evidence establishes and what remains value-dependent. If selected full-content learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. This applies to owner-fed documents, videos, scientific articles, and other approved learning. Deliver the complete memo; do not mention this repair.',
       prompt: `INTERNAL EVIDENCE:\n${internalContext || 'None'}\n\nORIGINAL QUESTION:\n${input.prompt}\n\nREJECTED DRAFT:\n${parsed.answer}`,
     }).catch(() => null)
     const repairText = repair?.text ?? ''

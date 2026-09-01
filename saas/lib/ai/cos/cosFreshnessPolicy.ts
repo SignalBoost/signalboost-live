@@ -12,6 +12,7 @@ import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
 import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
 import { detectAdvisoryDiagnosisIntent } from './advisoryDiagnosisIntent.ts'
 import { isNamedCatalogListRequest } from './listCatalogIntent.ts'
+import { isNormativePolicyQuestion } from './normativeAnswerPolicy.ts'
 
 const DYNAMIC_ROLE_SOURCE = '(?:president|vice president|prime minister|premier|chancellor|governor|mayor|monarch|king|queen|pope|chief executive officer|ceo|chief financial officer|cfo|chief information officer|cio|chief technology officer|cto|chair(?:man|woman)?|secretary of state|attorney general|speaker|minister)'
 
@@ -217,6 +218,12 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (isLocalDeterministicUtility(text)) return false
   if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true
   if (isContentGenerationRequest(text)) return false
+
+  // A moral/civic/public-policy proposition is not itself a request for the current law. Route the
+  // whole class consistently through the normative answer contract instead of letting one keyword
+  // ("legal") force live guidance while an equivalent wording ("allowed") uses general reasoning.
+  // Any mutable present-world facts introduced by the draft remain subject to answer-side freshness.
+  if (isNormativePolicyQuestion(text)) return false
 
   // A question about COS's OWN previous answer is never a public-web lookup. This is a structural
   // safeguard, not a duplicate of the introspection routing: when the introspection classifier

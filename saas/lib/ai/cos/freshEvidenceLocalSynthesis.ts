@@ -44,6 +44,7 @@ import {
   freshSynthesisNullIndicatesTimeout,
   runFreshSynthesisTransportAttempts,
 } from './freshEvidenceRetryPolicy.ts'
+import { isNormativePolicyQuestion } from './normativeAnswerPolicy.ts'
 
 export type FreshEvidenceLocalSynthesis = {
   kind: 'accepted'
@@ -369,6 +370,9 @@ export async function synthesizeFreshEvidenceLocally(args: {
   const auditRequired = plannerPresentationMode === 'direct' && plannerDirectBinaryAnswerSafe
   const predicateAudit = auditRequired ? await auditBinaryRelease(args) : null
   semanticPlan = applyFreshEvidencePredicateAudit(semanticPlan, predicateAudit)
+  if (isNormativePolicyQuestion(args.input)) {
+    semanticPlan = { ...semanticPlan, presentationMode: 'neutral_evidence_map', directBinaryAnswerSafe: false }
+  }
 
   console.info('[cos-fresh-semantic-scope-plan]', JSON.stringify({
     at: new Date().toISOString(),

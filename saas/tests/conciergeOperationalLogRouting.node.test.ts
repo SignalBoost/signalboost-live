@@ -14,7 +14,7 @@ test('browser ingress never promotes a pasted build log into authenticated Build
 test('public operational logs receive deterministic analysis rather than repository authority', () => {
   const legacy = readFileSync(new URL('../app/api/concierge/route.ts', import.meta.url), 'utf8')
   const guard = legacy.indexOf('isPastedOperationalLog(objective)')
-  const builder = legacy.indexOf('isConciergeBuilderObjective(objective)', guard)
+  const builder = legacy.indexOf('isConciergeBuilderObjective(objective', guard)
   assert.ok(guard >= 0)
   assert.ok(builder > guard)
   assert.match(legacy, /concierge-operational-log-analysis/)

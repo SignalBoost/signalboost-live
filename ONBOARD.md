@@ -3,8 +3,8 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.30  
-**Updated:** 2026-08-30 UTC  
+**Version:** 1.31
+**Updated:** 2026-09-01 UTC
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
 **Accepted cognitive implementation baseline:** `84de50b8e67feea2e27d658e4cc3982e9e97a603`  
 **Accepted cognitive Production deployment:** `dpl_8qetGZ2HumG3Cc5RMh1zcxtaZhLF` — READY, `saas.signalboostapp.com` attached  
@@ -15,6 +15,7 @@
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
 **RunPod lifecycle:** detached while the active reasoner points outside RunPod  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
+**Normative/public-policy answer consistency:** implemented locally and not yet Production-accepted. Moral, civic, rights, and public-policy questions now use one wording-independent contract across Public Concierge and owner reasoning: never lead with yes/no, separate descriptive facts from competing normative frameworks, require a developed neutral analysis, reject incompatible exact/semantic cache entries, and repair or fail closed before release. Equivalent wording such as `legal`, `allowed`, and `permitted` no longer selects materially different freshness behavior. The motivating three-question cohort plus broader death-penalty, religious-clothing, assisted-dying, compulsory-vaccination, and voting-age variants are mandatory deployment regressions. The complete Concierge route accidentally truncated by `1d4f2b652` was separately restored on current `main` by `1a94aadea`, preserving its intended source-attachment Builder routing. Local acceptance on that restored baseline: focused regressions 7/7, mandatory COS gate 678/678, TypeScript passed, and optimized Production build passed. A deployed public turn remains required before runtime acceptance.
 **Procedural-learning state:** autonomous private certification is Production for context ambiguity, performance-regression diagnosis, and architecture discovery; dead-end self-generated practice is guarded; validated cognitive-skill candidate embeddings are reused by exact text + embedding-model identity; prompt-free retrieval-efficiency telemetry is Production; individual skills still earn lifecycle status from evidence  
 **Next learning priority:** observe real certification progression and collect the first real Production cognitive-retrieval telemetry cohort; use measured cache-hit, database, and ranking latency evidence before adding any further live prefilter; continue Retrieval Self-Reflection / calibration / strategy-selection learning  
 **Owner knowledge intake:** Feed COS directed study is LIVE at `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚 entry, owner-only)  

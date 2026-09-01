@@ -83,6 +83,7 @@ const tests = [
   'tests/cognitiveReasoningImperativeTriggers.node.test.ts',
   'tests/releaseSignalSeverity.node.test.ts',
   'tests/cosAnswerPolicyCore.node.test.ts',
+  'tests/cosNormativeAnswerPolicy.node.test.ts',
   'tests/cosNeuralEvidenceReasoning.node.test.ts',
   'tests/cosOperatingCharter.node.test.ts',
   'tests/publicRecordedProvenance.node.test.ts',

@@ -5,6 +5,7 @@ import {
   MAX_SEMANTIC_SCOPE_LABEL_CHARS,
   type FreshEvidenceSemanticPlan,
 } from './freshEvidenceSynthesisContract.ts'
+import { isNormativePolicyQuestion } from './normativeAnswerPolicy.ts'
 
 export type FreshEvidenceContractFailureCode =
   | 'invalid_json'
@@ -17,6 +18,7 @@ export type FreshEvidenceContractFailureCode =
   | 'unknown_scope_ids'
   | 'missing_required_scope_ids'
   | 'scope_evidence_lineage_missing'
+  | 'normative_source_groups_missing'
   | 'citation_authority_rejected'
   | 'unknown_contract_rejection'
 
@@ -160,6 +162,22 @@ export function diagnoseFreshEvidenceSynthesis(args: {
     }
   }
 
+  if (isNormativePolicyQuestion(args.input)) {
+    const supportingIds = [...new Set(args.semanticPlan.scopes
+      .filter(scope => scope.position === 'supporting')
+      .flatMap(scope => scope.evidenceIds)
+      .filter(id => evidenceIds.includes(id)))]
+    const opposingIds = [...new Set(args.semanticPlan.scopes
+      .filter(scope => scope.position === 'opposing')
+      .flatMap(scope => scope.evidenceIds)
+      .filter(id => evidenceIds.includes(id)))]
+    if (!supportingIds.length || !opposingIds.length
+      || !supportingIds.some(id => !opposingIds.includes(id))
+      || !opposingIds.some(id => !supportingIds.includes(id))) {
+      return { code: 'normative_source_groups_missing', repairable: true, draftAnswer: answer }
+    }
+  }
+
   const citations = evidenceIds.map(id => {
     const source = byId.get(id)!
     return `[${source.id}] (${source.url})`
@@ -189,5 +207,5 @@ export function freshEvidenceAnswerContractRepairPrompt(args: {
   failedDraftText: string
   failureCode: FreshEvidenceContractFailureCode
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}\n\nPREVIOUS ANSWER OUTPUT (invalid; not evidence):\n${String(args.failedDraftText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nRe-reason from QUESTION and LIVE EVIDENCE and return the exact answer JSON contract with answer, evidenceIds, and scopeIds. Include every material scope in the plan, use only real evidence ids that support those scopes, and do not weaken or bypass the authority/citation requirements. If presentationMode is neutral_evidence_map, do not begin with yes/no or a verdict; lead with the evidence split itself. If directBinaryAnswerSafe is false, do not begin with a standalone yes/no.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nSEMANTIC SCOPE PLAN (must be preserved):\n${JSON.stringify(args.semanticPlan)}\n\nPREVIOUS ANSWER OUTPUT (invalid; not evidence):\n${String(args.failedDraftText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nRe-reason from QUESTION and LIVE EVIDENCE and return the exact answer JSON contract with answer, evidenceIds, and scopeIds. Include every material scope in the plan, use only real evidence ids that support those scopes, and do not weaken or bypass the authority/citation requirements. For normative_source_groups_missing, cite at least one source unique to a supporting scope and at least one different source unique to an opposing scope; a source shared by both groups cannot establish balanced provenance by itself. If presentationMode is neutral_evidence_map, do not begin with yes/no or a verdict; lead with the evidence split itself. If directBinaryAnswerSafe is false, do not begin with a standalone yes/no.\n\nQUESTION: ${args.input}`
 }

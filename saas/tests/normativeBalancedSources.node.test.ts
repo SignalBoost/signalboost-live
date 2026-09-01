@@ -3,7 +3,7 @@ import test from 'node:test'
 import { semanticCacheAllowedForPrompt } from '../lib/ai/cos/cacheSafetyPolicy.ts'
 import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 import { isNormativePolicyQuestion } from '../lib/ai/cos/normativeAnswerPolicy.ts'
-import { diagnoseFreshEvidenceSemanticPlan } from '../lib/ai/cos/freshEvidenceContractRecovery.ts'
+import { diagnoseFreshEvidenceSemanticPlan, diagnoseFreshEvidenceSynthesis } from '../lib/ai/cos/freshEvidenceContractRecovery.ts'
 import { acceptFreshEvidenceSemanticPlan, acceptFreshEvidenceSynthesis, type FreshEvidenceSemanticPlan } from '../lib/ai/cos/freshEvidenceSynthesisContract.ts'
 
 const question = 'should man play in women sports?'
@@ -71,4 +71,21 @@ test('production-length repaired scope plans are accepted and diagnosed consiste
   })
   assert.ok(acceptFreshEvidenceSemanticPlan({ text: repairedPlan, sources }))
   assert.equal(diagnoseFreshEvidenceSemanticPlan({ text: repairedPlan, sources }), null)
+})
+
+test('shared-only citations receive an actionable normative balance diagnosis', () => {
+  const sharedPlan: FreshEvidenceSemanticPlan = {
+    ...balancedPlan,
+    scopes: [
+      { ...balancedPlan.scopes[0], evidenceIds: ['LIVE1', 'LIVE2'] },
+      { ...balancedPlan.scopes[1], evidenceIds: ['LIVE1', 'LIVE2'] },
+    ],
+  }
+  const text = JSON.stringify({
+    answer: 'The supporting and opposing arguments rely on different principles, while the policy choice depends on how those principles are weighted.',
+    evidenceIds: ['LIVE1'],
+    scopeIds: ['S1', 'S2'],
+  })
+  assert.equal(acceptFreshEvidenceSynthesis({ text, input: question, sources, semanticPlan: sharedPlan }), null)
+  assert.equal(diagnoseFreshEvidenceSynthesis({ text, input: question, sources, semanticPlan: sharedPlan })?.code, 'normative_source_groups_missing')
 })

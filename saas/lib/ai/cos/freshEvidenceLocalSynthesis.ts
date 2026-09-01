@@ -372,15 +372,6 @@ export async function synthesizeFreshEvidenceLocally(args: {
   semanticPlan = applyFreshEvidencePredicateAudit(semanticPlan, predicateAudit)
   if (isNormativePolicyQuestion(args.input)) {
     semanticPlan = { ...semanticPlan, presentationMode: 'neutral_evidence_map', directBinaryAnswerSafe: false }
-    const positions = new Set(semanticPlan.scopes.map(scope => scope.position))
-    if (!positions.has('supporting') || !positions.has('opposing')) {
-      console.warn('[cos-fresh-normative-balance]', JSON.stringify({
-        at: new Date().toISOString(),
-        event: 'missing_balanced_evidence_scopes',
-        positions: [...positions],
-      }))
-      return { kind: 'citation_grounding_rejected' }
-    }
   }
 
   console.info('[cos-fresh-semantic-scope-plan]', JSON.stringify({

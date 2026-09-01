@@ -4,8 +4,23 @@ import test from 'node:test'
 
 const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
 
-test('pasted build logs are analyzed before any workspace or job execution', () => {
-  const guard = route.indexOf('isPastedOperationalLog(objective)')
+test('owner Developer workspace may enter pinned repository repair before passive log analysis', () => {
+  const developer = route.indexOf('isDeveloperWorkspaceRequest(request)')
+  const owner = route.indexOf('access.isOwner === true', developer)
+  const parse = route.indexOf('parseSignalBoostRepositoryRepairTarget(objective)', owner)
+  const execute = route.indexOf('executeSignalBoostRepositoryRepair({', parse)
+  const passive = route.indexOf('isPastedOperationalLog(objective) && !debugPlan', execute)
+  assert.ok(developer >= 0)
+  assert.ok(owner > developer)
+  assert.ok(parse > owner)
+  assert.ok(execute > parse)
+  assert.ok(passive > execute)
+  assert.match(route, /builder_repository_target_required/)
+  assert.match(route, /status: 400/)
+})
+
+test('ordinary pasted build logs remain analysis-only outside the direct owner repair lane', () => {
+  const guard = route.indexOf('isPastedOperationalLog(objective) && !debugPlan')
   const workspace = route.indexOf('createSupabaseBuilderWorkspace(access.userId)', guard)
   const enqueue = route.indexOf('await enqueueBuilderJob({', guard)
   assert.ok(guard >= 0)
@@ -17,15 +32,15 @@ test('pasted build logs are analyzed before any workspace or job execution', () 
   assert.match(route, /external_action_taken: false/)
 })
 
-test('logs never invoke repository repair, sandbox execution, or an asynchronous job', () => {
-  assert.doesNotMatch(route, /executeSignalBoostRepositoryRepair/)
+test('direct route does not contain repository session implementation or bypass owner and exact-target gates', () => {
   assert.doesNotMatch(route, /VercelRepositoryRepairSession/)
-  const guard = route.indexOf('isPastedOperationalLog(objective)')
-  const fallbackReturn = route.indexOf('execution_allowed: false', guard)
-  const enqueue = route.indexOf('await enqueueBuilderJob({', fallbackReturn)
-  assert.ok(fallbackReturn > guard)
-  assert.ok(enqueue > fallbackReturn)
-  assert.match(route, /await persistSynchronousReply\(\{ conversationId, userId: access\.userId, objective, reply \}\)/)
+  const developer = route.indexOf('isDeveloperWorkspaceRequest(request)')
+  const owner = route.indexOf('access.isOwner === true', developer)
+  const parse = route.indexOf('parseSignalBoostRepositoryRepairTarget(objective)', owner)
+  const execute = route.indexOf('executeSignalBoostRepositoryRepair({', parse)
+  assert.ok(owner > developer)
+  assert.ok(parse > owner)
+  assert.ok(execute > parse)
 })
 
 test('a log plus one attached source file may enter only the fixed debug protocol', () => {

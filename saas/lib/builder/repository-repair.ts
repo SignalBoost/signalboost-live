@@ -4,7 +4,7 @@ import { BuilderToolLoop } from './tool-loop.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { verifiedRepairLesson } from './verified-lessons.ts'
 import { inferBuilderCertificationAttempt } from './certification.ts'
-import { parseSignalBoostRepositoryRepairTarget, resolveSignalBoostRepositoryCommit, signalBoostRepositoryRepairObjective } from './repository-repair-target.ts'
+import { parseSignalBoostRepositoryRepairTarget, resolveSignalBoostRepositoryCommit, signalBoostRepositoryRepairObjective, type SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
 import type { BuilderToolTrace } from './contracts.ts'
 
@@ -65,8 +65,9 @@ export async function executeSignalBoostRepositoryRepair(input: {
   rawObjective: string
   workspaceId: string
   deadlineAtMs?: number
+  target?: SignalBoostRepositoryRepairTarget
 }): Promise<SignalBoostRepositoryRepairExecution | null> {
-  const parsed = parseSignalBoostRepositoryRepairTarget(input.rawObjective)
+  const parsed = input.target ?? parseSignalBoostRepositoryRepairTarget(input.rawObjective)
   if (!parsed) return null
   const target = await resolveSignalBoostRepositoryCommit(parsed)
   const workspace = createSupabaseBuilderWorkspace(input.userId)

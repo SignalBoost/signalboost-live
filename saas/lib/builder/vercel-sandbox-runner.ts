@@ -1,3 +1,4 @@
+// saas/lib/builder/vercel-sandbox-runner.ts
 import { Sandbox } from '@vercel/sandbox'
 import type { BuilderRunResult, BuilderRunnerPort } from './contracts.ts'
 
@@ -27,6 +28,16 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
       tags: { surface: 'cos-builder' },
     })
     try {
+      // ROOT must exist before anything chdirs into it. It used to be created only as a side effect
+      // of staging a file, so a workspace with no staged files left /tmp/cos-builder absent and every
+      // command died at chdir with exit 124 before it could run.
+      const prepared = await sandbox.runCommand({
+        cmd: 'sh',
+        args: ['-lc', `mkdir -p -- ${shellQuote(ROOT)}`],
+        timeoutMs: COMMAND_TIMEOUT_MS,
+      })
+      if (prepared.exitCode !== 0) throw new Error('builder_sandbox_root_failed')
+
       for (const file of input.files) {
         const destination = `${ROOT}/${file.path}`
         const encoded = Buffer.from(file.content, 'utf8').toString('base64')

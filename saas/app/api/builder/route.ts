@@ -1,12 +1,10 @@
 // saas/app/api/builder/route.ts
 import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
-import { isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
-import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
-import { signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueBuilderJob, getBuilderJobForUser } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import {
@@ -119,6 +117,10 @@ export async function GET(request: Request) {
 /**
  * Create one durable Builder job. The request returns after workspace/job persistence; execution is
  * scheduled with Next.js `after()`. GET polling is read-only and a lost response never replays POST.
+ *
+ * A pasted log is debugging evidence and now produces a real job. The one authority a log never
+ * grants is repository scope: this route imports no repository-repair session, so log-derived work
+ * can only ever act inside the caller's own workspace sandbox.
  */
 export async function POST(request: Request) {
   const access = await getAccess().catch(() => null)
@@ -139,47 +141,12 @@ export async function POST(request: Request) {
 
     const files = cleanFiles(body?.files)
     const debugPlan = planDebugFileJob(objective, files)
-    const platformRepairTarget = files.length === 0
-      ? signalBoostDeployedRepairTarget(objective, {
-          commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
-          branch: process.env.VERCEL_GIT_COMMIT_REF,
-        })
-      : null
 
-    // The direct Developer surface owns user-workspace jobs, but an explicit owner request to fix
-    // Builder/SignalBoost needs the separate Platform Engineer. Pin it to the immutable deployed
-    // revision supplied by Vercel and keep its output review-only; passive logs grant no authority.
-    if (platformRepairTarget) {
-      if (!access.isOwner) {
-        const reply = 'SignalBoost platform repair is owner-only. No repository was inspected and no code was run.'
-        await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
-        return noStore({ error: 'builder_repository_repair_owner_required', reply, execution_allowed: false }, { status: 403 })
-      }
-      const execution = await executeSignalBoostRepositoryRepair({
-        userId: access.userId,
-        rawObjective: objective,
-        workspaceId,
-        target: platformRepairTarget,
-      })
-      if (!execution) return noStore({ error: 'builder_repository_repair_target_unavailable' }, { status: 422 })
-      return noStore(execution.payload, { status: execution.status })
-    }
-
-    // Logs alone remain analysis-only. When the user also supplies exactly one supported source
-    // file and explicitly asks for a repair, that file grants only the fixed one-file debug
-    // protocol; pasted text never grants repository or broader sandbox authority.
-    if (isPastedOperationalLog(objective) && !debugPlan) {
-      const reply = operationalLogReply(objective)
-      await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
-      return noStore({
-        reply,
-        source: 'builder-operational-log-analysis',
-        execution_allowed: false,
-        external_action_taken: false,
-        files: [],
-        trace: [],
-      })
-    }
+    // A log plus exactly one supported source file keeps the fixed one-file debug protocol. A log
+    // with no attachment is still a debugging job; it is tagged as log evidence with no repository
+    // authority so the runner and History record what the paste did and did not grant.
+    const logEvidence = isOperationalLogEvidence(objective)
+    const passiveLogEvidence = isPastedOperationalLog(objective)
 
     if (files.length > 0 && DEBUG_OBJECTIVE.test(objective) && !debugPlan) {
       const reply = 'COS Builder debug jobs require exactly one supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachment no larger than 128 KiB. No code was run.'
@@ -188,19 +155,25 @@ export async function POST(request: Request) {
         error: 'builder_debug_attachment_required',
         reply,
         execution_allowed: false,
+        external_action_taken: false,
         files: [],
         trace: [],
       }, { status: 400 })
     }
 
+    // Shared Concierge routing deliberately refuses pasted build/runtime logs so an ordinary chat
+    // turn never silently starts coding work. On the Builder surface the log IS the submitted job:
+    // the user pasted failure evidence into a developer workspace and asked it to debug. Logs are
+    // admitted here, and only here; every other objective still faces the strict coding gate.
     const routingContext = { attachmentNames: files.map(file => file.path) }
-    if (!debugPlan && !isConciergeBuilderObjective(objective, routingContext)) {
+    if (!debugPlan && !logEvidence && !isConciergeBuilderObjective(objective, routingContext)) {
       const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({
         error: 'builder_objective_not_coding',
         reply,
         execution_allowed: false,
+        external_action_taken: false,
         files: [],
         trace: [],
       }, { status: 400 })
@@ -232,7 +205,13 @@ export async function POST(request: Request) {
             debugCommand: debugPlan.command,
             debugRuntime: debugPlan.runtime,
           }
-        : {},
+        : logEvidence
+          ? {
+              logEvidence: true,
+              passiveLogEvidence,
+              repositoryAuthority: false,
+            }
+          : {},
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })

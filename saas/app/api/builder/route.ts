@@ -145,7 +145,6 @@ export async function POST(request: Request) {
     const files = cleanFiles(body?.files)
     const debugPlan = planDebugFileJob(objective, files)
     const ownerDeveloperLogSubmission = access.isOwner
-      && body?.platformRepair === true
       && isOperationalLogEvidence(objective)
       && SIGNALBOOST_OPERATIONAL_TARGET.test(objective)
     const platformRepairTarget = files.length === 0

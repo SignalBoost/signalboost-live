@@ -2,12 +2,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-test('Full Assistant routes only explicit pasted-log repair through Concierge', () => {
+test('Full Assistant routes only explicit pasted-log repair through the canonical browser ingress', () => {
   const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
   assert.match(boundary, /hasExplicitOperationalLogRepairIntent/)
   assert.match(boundary, /isPastedOperationalLog/)
   assert.match(boundary, /let operationalRepair = shouldUseConciergeRepairIngress\(body\)/)
-  assert.match(boundary, /sendUrl: operationalRepair \? '\/api\/concierge' : '\/api\/cos-primary'/)
+  assert.match(boundary, /sendUrl: operationalRepair \? '\/api\/cos-browser' : '\/api\/cos-primary'/)
+  assert.doesNotMatch(boundary, /sendUrl: operationalRepair \? '\/api\/concierge'/)
   assert.match(boundary, /const previous = users\.at\(-2\) \|\| ''/)
   assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(previous\)/)
 })
@@ -21,7 +22,7 @@ test('Full Assistant recovers missing previous repair intent from durable conver
   assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(content\) \? content : null/)
 })
 
-test('recovered repair intent is forwarded in the server-visible Concierge transcript', () => {
+test('recovered repair intent is forwarded in the server-visible browser-ingress transcript', () => {
   const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
   assert.match(boundary, /function bodyWithPreviousUserTurn/)
   assert.match(boundary, /sendBody = bodyWithPreviousUserTurn\(body, recoveredRepairIntent\)/)

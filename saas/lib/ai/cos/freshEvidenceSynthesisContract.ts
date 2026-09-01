@@ -54,8 +54,6 @@ type ModelFreshEvidenceFaithfulnessReview = {
 export const SINGLE_PROPOSITION_SOURCE_LIMIT = 2
 export const SINGLE_PROPOSITION_ANSWER_CHAR_LIMIT = 650
 const MAX_SEMANTIC_SCOPES = 5
-export const MAX_SEMANTIC_SCOPE_LABEL_CHARS = 240
-export const MAX_SEMANTIC_SCOPE_FINDING_CHARS = 1200
 const SCOPE_ID = /^[A-Za-z0-9_-]{1,32}$/
 const BINARY_LEAD = /^\s*(?:yes|no|sí|si|não|nao|tak|nie|да|нет)(?:\s|[,.!:;?—–-]|$)/iu
 
@@ -123,7 +121,6 @@ export function freshEvidenceScopePlanSystemPrompt(language: string): string {
     'Set directBinaryAnswerSafe=false whenever a bare yes/no would hide material divergence, definitional ambiguity, a descriptive-vs-causal distinction, or materially overstate what the evidence supports, even if only one evidence scope is needed.',
     'Set directBinaryAnswerSafe=true only in presentationMode="direct", when a direct yes/no is supported and can remain truthful without implying a stronger proposition than the evidence establishes.',
     'Choose scope count separately from binary safety and presentation mode: return the smallest set of materially distinct scopes needed to preserve meaning.',
-    `Keep each scope label within ${MAX_SEMANTIC_SCOPE_LABEL_CHARS} characters and each finding within ${MAX_SEMANTIC_SCOPE_FINDING_CHARS} characters.`,
     'Each scope label must identify what is actually measured, compared, established, or argued. Each finding must state only the evidence-supported conclusion for that scope.',
     'Set each scope position to exactly supporting, opposing, or descriptive. For a normative/public-policy question, include at least one evidence-backed supporting scope and one evidence-backed opposing scope; descriptive context alone is insufficient. Do not manufacture either side when LIVE EVIDENCE cannot support it.',
     'Every scope must cite at least one real LIVE evidence id that supports its finding. Never invent an evidence id.',
@@ -168,8 +165,7 @@ export function acceptFreshEvidenceSemanticPlan(args: {
       ? scope.position
       : undefined
     if (!SCOPE_ID.test(scopeId) || seenScopeIds.has(scopeId)) return null
-    if (!label || label.length > MAX_SEMANTIC_SCOPE_LABEL_CHARS
-      || !finding || finding.length > MAX_SEMANTIC_SCOPE_FINDING_CHARS) return null
+    if (!label || label.length > 180 || !finding || finding.length > 500) return null
     if (!evidenceIds.length || evidenceIds.some(id => !sourceIds.has(id))) return null
     seenScopeIds.add(scopeId)
     scopes.push(position

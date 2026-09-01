@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   analyzeOperationalLog,
+  hasExplicitOperationalLogRepairIntent,
   isExplicitOperationalLogRepairRequest,
   isOperationalLogEvidence,
   isPastedOperationalLog,
@@ -18,6 +19,13 @@ test('recognizes a pasted Vercel build log as passive operational evidence', () 
   assert.equal(isOperationalLogEvidence(log), true)
   assert.equal(isPastedOperationalLog(log), true)
   assert.equal(isPastedOperationalLog('Fix the add function in src/math.js.'), false)
+})
+
+test('standalone repair intent is detectable without manufacturing log evidence', () => {
+  assert.equal(hasExplicitOperationalLogRepairIntent('please debug this'), true)
+  assert.equal(hasExplicitOperationalLogRepairIntent('fix it'), true)
+  assert.equal(isOperationalLogEvidence('please debug this'), false)
+  assert.equal(isExplicitOperationalLogRepairRequest('please debug this'), false)
 })
 
 test('explicit debug/fix language is distinguishable from passive pasted log evidence', () => {

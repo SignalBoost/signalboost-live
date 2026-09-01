@@ -14,7 +14,9 @@ import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProve
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { isExplicitOperationalLogRepairRequest, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
+import { parseSignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 
@@ -80,8 +82,10 @@ function builderRoutingContextFromBody(body: any) {
 /**
  * Browser-only ingress wrapper for COS Primary.
  *
- * A pasted Vercel/npm log is classified before artifacts, visuals, or Builder. Names inside
- * test titles must not become Wikimedia likeness lookups.
+ * Passive Vercel/npm logs are classified before artifacts, visuals, or Builder. An explicit
+ * owner repair request for an exact failed SignalBoost Vercel snapshot may enter only the
+ * pinned, review-only Platform Engineer lane. Names inside test titles must never become
+ * Wikimedia likeness lookups or execution authority.
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
@@ -95,12 +99,44 @@ export async function POST(req: NextRequest) {
     ? String(body.context.language).toLowerCase()
     : 'en'
 
-  const auditUserId = (await getAccess().catch(() => null))?.userId ?? null
+  const access = await getAccess().catch(() => null)
+  const auditUserId = access?.userId ?? null
 
   const routingContext = builderRoutingContextFromBody(body)
   const hasSourceAttachment = (routingContext.attachmentNames || []).some((name: string) =>
     /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i.test(String(name || '')),
   )
+
+  if (isExplicitOperationalLogRepairRequest(prompt) && !hasSourceAttachment) {
+    const repositoryTarget = parseSignalBoostRepositoryRepairTarget(prompt)
+    if (access?.isOwner && access.userId && repositoryTarget) {
+      const execution = await executeSignalBoostRepositoryRepair({
+        userId: access.userId,
+        rawObjective: prompt,
+        workspaceId: crypto.randomUUID(),
+      })
+      if (execution) {
+        return withSuggestedFollowups(
+          NextResponse.json(execution.payload, { status: execution.status }),
+          prompt,
+          auditUserId,
+        )
+      }
+    }
+
+    const reply = repositoryTarget
+      ? 'This is an explicit SignalBoost repository-repair request, but repository repair is owner-only. No code was run.'
+      : `${operationalLogReply(prompt)} For repository repair directly from a Vercel log, include the failed SignalBoost clone line with its branch/commit and the final failing assertion or non-zero build command.`
+    return withSuggestedFollowups(NextResponse.json({
+      reply,
+      source: 'concierge-operational-log-repair-not-authorized',
+      execution_allowed: false,
+      external_action_taken: false,
+      external_ai_invoked: false,
+      local_model_invoked: false,
+    }), prompt, auditUserId)
+  }
+
   if (isPastedOperationalLog(prompt) && !hasSourceAttachment) {
     return withSuggestedFollowups(NextResponse.json({
       reply: operationalLogReply(prompt),

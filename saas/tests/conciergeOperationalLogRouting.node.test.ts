@@ -51,6 +51,20 @@ test('explicit failed SignalBoost log repair may reach only the owner-only pinne
   assert.match(route.slice(execute, publicScope), /rawObjective: prompt/)
 })
 
+test('owner SignalBoost logs reach the deployed Platform Engineer before passive analysis', () => {
+  const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  const target = route.indexOf('const ownerSignalBoostLogTarget =')
+  const owner = route.indexOf('access?.isOwner', target)
+  const evidence = route.indexOf('isOperationalLogEvidence(prompt)', owner)
+  const binding = route.indexOf('SIGNALBOOST_OPERATIONAL_TARGET.test(prompt)', evidence)
+  const execute = route.indexOf('executeSignalBoostRepositoryRepair({', binding)
+  const passive = route.indexOf('if (pastedOperationalLog && !hasSourceAttachment)', execute)
+  assert.ok(target >= 0 && owner > target && evidence > owner && binding > evidence)
+  assert.ok(execute > binding && passive > execute)
+  assert.match(route.slice(target, passive), /commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA/)
+  assert.match(route.slice(target, passive), /target: ownerSignalBoostLogTarget/)
+})
+
 test('source-attached log repairs still hand off to the ordinary Concierge Builder lane', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(route, /if \(explicitOperationalRepair && !hasSourceAttachment\)/)

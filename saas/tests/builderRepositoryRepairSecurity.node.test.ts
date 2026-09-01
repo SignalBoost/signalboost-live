@@ -10,19 +10,9 @@ test('repository repair paths stay inside the staged saas project and exclude se
   assert.equal(safeRepositoryWorkspacePath('saas/lib/ai/cos/cosFirstAnswer.ts'), 'lib/ai/cos/cosFirstAnswer.ts')
   assert.equal(safeRepositoryWorkspacePath('./tests/example.node.test.ts'), 'tests/example.node.test.ts')
   for (const value of [
-    '../outside.ts',
-    'lib/../../outside.ts',
-    '/etc/passwd',
-    '.git/config',
-    'node_modules/pkg/index.js',
-    '.env',
-    '.env.production',
-    'config/service-account.json',
-    'certs/private.key',
-    'lib/bad\nname.ts',
-  ]) {
-    assert.throws(() => safeRepositoryWorkspacePath(value), /builder_invalid_path/)
-  }
+    '../outside.ts', 'lib/../../outside.ts', '/etc/passwd', '.git/config', 'node_modules/pkg/index.js',
+    '.env', '.env.production', 'config/service-account.json', 'certs/private.key', 'lib/bad\nname.ts',
+  ]) assert.throws(() => safeRepositoryWorkspacePath(value), /builder_invalid_path/)
 })
 
 test('changed-file certification rejects every path outside the staged saas project', () => {
@@ -42,14 +32,8 @@ test('the host pins and installs the repository before permanently denying netwo
   const deny = source.indexOf("sandbox.update({ networkPolicy: 'deny-all' })")
   const locked = source.indexOf('session.networkLocked = true', deny)
   const modelGuard = source.indexOf("if (!this.networkLocked) throw new Error('builder_repository_network_not_locked')")
-  assert.ok(allow >= 0)
-  assert.ok(exactFetch > allow)
-  assert.ok(revisionCall > exactFetch)
-  assert.ok(install > revisionCall)
-  assert.ok(deny > install)
-  assert.ok(locked > deny)
-  assert.ok(modelGuard > locked)
-  assert.ok(revisionCheck >= 0)
+  assert.ok(allow >= 0); assert.ok(exactFetch > allow); assert.ok(revisionCall > exactFetch); assert.ok(install > revisionCall)
+  assert.ok(deny > install); assert.ok(locked > deny); assert.ok(modelGuard > locked); assert.ok(revisionCheck >= 0)
 })
 
 test('Builder file writes use argument-safe Node I/O and reject an existing symlink target', () => {
@@ -89,33 +73,16 @@ test('browser repository repair requires explicit repair intent, exact SignalBoo
   const parse = browser.indexOf('parseSignalBoostRepositoryRepairTarget(prompt)', explicit)
   const owner = browser.indexOf('access?.isOwner', parse)
   const execute = browser.indexOf('executeSignalBoostRepositoryRepair({', owner)
-  assert.ok(explicit >= 0)
-  assert.ok(parse > explicit)
-  assert.ok(owner > parse)
-  assert.ok(execute > owner)
-
+  assert.ok(explicit >= 0); assert.ok(parse > explicit); assert.ok(owner > parse); assert.ok(execute > owner)
   const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
   assert.match(repair, /repository_write_allowed: false/)
   assert.match(repair, /merge_allowed: false/)
 })
 
-test('direct Builder repository repair is owner-only, Developer-only, exact-target gated, and review-only', () => {
+test('ordinary Builder route still cannot invoke repository repair from pasted logs', () => {
   const builder = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
-  const evidence = builder.indexOf('isOperationalLogEvidence(objective)')
-  const developer = builder.indexOf('isDeveloperWorkspaceRequest(request)', evidence)
-  const owner = builder.indexOf('access.isOwner === true', developer)
-  const parse = builder.indexOf('parseSignalBoostRepositoryRepairTarget(objective)', owner)
-  const execute = builder.indexOf('executeSignalBoostRepositoryRepair({', parse)
-  const passive = builder.indexOf('isPastedOperationalLog(objective)', execute)
-  assert.ok(evidence >= 0)
-  assert.ok(developer > evidence)
-  assert.ok(owner > developer)
-  assert.ok(parse > owner)
-  assert.ok(execute > parse)
-  assert.ok(passive > execute)
-  assert.match(builder, /builder_repository_target_required/)
-
-  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
-  assert.match(repair, /repository_write_allowed: false/)
-  assert.match(repair, /merge_allowed: false/)
+  assert.doesNotMatch(builder, /executeSignalBoostRepositoryRepair|VercelRepositoryRepairSession/)
+  assert.match(builder, /isPastedOperationalLog\(objective\)/)
+  assert.match(builder, /execution_allowed: false/)
+  assert.match(builder, /external_action_taken: false/)
 })

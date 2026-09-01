@@ -93,7 +93,10 @@ test('browser repository repair requires explicit repair intent, exact SignalBoo
   assert.ok(parse > explicit)
   assert.ok(owner > parse)
   assert.ok(execute > owner)
-  assert.match(browser.slice(execute), /repository_write_allowed/)
+
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  assert.match(repair, /repository_write_allowed: false/)
+  assert.match(repair, /merge_allowed: false/)
 })
 
 test('ordinary Builder route still cannot invoke repository repair from pasted logs', () => {

@@ -130,7 +130,6 @@ async function pollBuilderJob(
       return { payload: record, status: response.status }
     } catch (error) {
       if (deliberateAbort(error, signal)) throw error
-      // Polling is read-only. A transient GET failure never causes a second Builder POST.
     }
   }
   return null
@@ -172,8 +171,6 @@ async function executeBuilderFromConcierge(
     })
   } catch (error) {
     if (deliberateAbort(error, signal)) throw error
-    // The server may have accepted the POST before a browser transport loss. Poll durable History
-    // for 20–30 seconds, but never replay the action.
     const recovered = await recoverBuilderFromHistory(fetchImpl, conversationId, objective, sentAtMs)
     return recovered || responseFromPayload({
       reply: 'The Builder request could not be confirmed. History did not show a durable running or completed job, so the action was not replayed.',
@@ -210,8 +207,6 @@ async function executeBuilderFromConcierge(
     }, terminal.status, 'builder-job-terminal')
   }
 
-  // The page does not wait for the entire debug lifecycle. The durable running message already
-  // exists in History and the final worker result will update that same row without another Send.
   return responseFromPayload({
     ...payload,
     status: 'running',
@@ -261,10 +256,8 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
         return executeBuilderFromConcierge(originalFetch, body, userContent, conversationId, init?.signal ?? undefined)
       }
 
-      // Ordinary COS remains a short transport-recovery path. The longer 20–30 second History
-      // polling window is reserved only for an accepted Builder action.
       const result = await sendAssistantTurnAndRecover(userContent, body as Record<string, unknown>, {
-        sendUrl: '/api/cos-primary',
+        sendUrl: '/api/concierge',
         historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,
         locale: localeFromBody(body),
         fetchImpl: originalFetch,

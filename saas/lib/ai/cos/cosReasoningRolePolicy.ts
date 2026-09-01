@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosReasoningRolePolicy.ts
 import { MAX_BUILDER_OBJECTIVE_CHARS } from '../../builder/request-contract.ts'
 import { isOperationalLogEvidence } from './pastedOperationalLog.ts'
 
@@ -54,6 +55,30 @@ const SOURCE_ATTACHMENT = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql
 const NON_CODING_TOPIC = /\b(?:pay gap|gender wage|football|soccer|sports? standings?|sports? list|schools? of samba|secretar(?:y|ies) of state|who is the model|what model are you|current president)\b/i
 const TRANSCRIPT_MARKER = /\b(?:assistant|user|system|history|conversation|copy response|copy question)\s*:/gi
 
+// Real pasted source code, recognized by its shape rather than by a label. The signals above only
+// fire when the human NAMES code (a filename, a language, a fence, a stack trace), so a plain paste
+// of a broken function was invisible to Builder. A paste carrying at least two distinct structural
+// signals, or an explicit fence, is code the workspace can act on directly - the same judgement a
+// human reviewer makes when handed code with no covering note.
+const CODE_SHAPE_SIGNALS: readonly RegExp[] = [
+  // A declaration line, not an English sentence that happens to open with the same word.
+  /^\s*(?:import|export|from|const|let|var|function|class|def|interface|type|enum|struct|fn|public|private|protected)\b[^.\n]*$/m,
+  /=>|\)\s*\{|^\s*[})\]];?\s*$/m,
+  /^\s*(?:if|for|while|switch|catch|elif|foreach|else\s+if)\s*\(/m,
+  /^\s*(?:#include|#define|package\s|using\s|require\s*\(|module\.exports)/m,
+  /<\/?[A-Za-z][\w.-]*(?:\s[^<>]*)?\/?>/,
+  /\bSELECT\b[\s\S]{0,400}\bFROM\b/i,
+  /\b(?:console\.log|printf|println|System\.out)\s*\(|^\s*(?:print|echo)\s*\(/m,
+  /^\s*(?:@[A-Za-z]|\$[A-Za-z_]|--\s|\/\/\s|#\s*[A-Za-z])/m,
+]
+
+function pastedSourceCode(prompt: string): boolean {
+  const text = String(prompt || '')
+  if (CODE_FENCE.test(text)) return true
+  if (text.split(/\n/).filter(line => line.trim()).length < 2) return false
+  return CODE_SHAPE_SIGNALS.reduce((total, pattern) => total + (pattern.test(text) ? 1 : 0), 0) >= 2
+}
+
 function isDesignBuildRequest(prompt: string): boolean {
   const objective = cosRoutingObjective(prompt)
   return DESIGN_ARTIFACT_SIGNAL.test(objective) && DESIGN_REQUEST_SIGNAL.test(objective)
@@ -74,6 +99,7 @@ function hugeTranscriptOrDump(prompt: string): boolean {
 function concreteCodeEvidence(prompt: string, context?: CosCodingRoutingContext): boolean {
   const objective = cosRoutingObjective(prompt)
   return sourceAttachment(context)
+    || pastedSourceCode(objective)
     || FILE_REFERENCE.test(objective)
     || STACK_TRACE.test(objective)
     || CODE_FENCE.test(objective)
@@ -105,6 +131,7 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true
   if (attachedSourceIsTheJob(prompt, context)) return true
+  if (pastedSourceCode(objective)) return true
   const evidence = concreteCodeEvidence(objective, context)
   if (DEBUG_ACTION.test(objective)) return evidence
   if (CODE_ACTION.test(objective) || CREATE_NAMED_FILE.test(objective)) return evidence || (CODE_NOUN.test(objective) && CODE_LANGUAGE.test(objective))
@@ -116,6 +143,7 @@ export function isConciergeBuilderObjective(prompt: string, context?: CosCodingR
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true
   if (attachedSourceIsTheJob(prompt, context)) return true
+  if (pastedSourceCode(objective)) return true
   if (!executableBuilderAction(objective)) return false
   return concreteCodeEvidence(objective, context)
 }

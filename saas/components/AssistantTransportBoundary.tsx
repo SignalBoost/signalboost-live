@@ -331,9 +331,10 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
         }
       }
       // Preserve privileged owner COS scope for ordinary turns. Only a pasted operational log
-      // with explicit repair intent in the request body or durable preceding History enters Concierge.
+      // with explicit repair intent in the request body or durable preceding History enters the
+      // canonical browser ingress, which owns the pinned SignalBoost repository-repair lane.
       const result = await sendAssistantTurnAndRecover(userContent, sendBody as Record<string, unknown>, {
-        sendUrl: operationalRepair ? '/api/concierge' : '/api/cos-primary',
+        sendUrl: operationalRepair ? '/api/cos-browser' : '/api/cos-primary',
         historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,
         locale: localeFromBody(body),
         fetchImpl: originalFetch,

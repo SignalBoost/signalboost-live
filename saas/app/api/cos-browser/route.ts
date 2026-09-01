@@ -14,7 +14,7 @@ import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProve
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { isExplicitOperationalLogRepairRequest, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
 import { parseSignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
   )
   const pastedOperationalLog = isPastedOperationalLog(prompt)
   const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(prompt)
-    || (pastedOperationalLog && isExplicitOperationalLogRepairRequest(previousUserPrompt))
+    || (pastedOperationalLog && hasExplicitOperationalLogRepairIntent(previousUserPrompt))
 
   if (explicitOperationalRepair && !hasSourceAttachment) {
     const repositoryTarget = parseSignalBoostRepositoryRepairTarget(prompt)

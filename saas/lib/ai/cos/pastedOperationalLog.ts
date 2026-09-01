@@ -15,9 +15,13 @@ export type OperationalLogAnalysis = Readonly<{
   exitCode: number | null
 }>
 
+export function isOperationalLogEvidence(input: string): boolean {
+  return OPERATIONAL_LOG.test(String(input || ''))
+}
+
 export function isExplicitOperationalLogRepairRequest(input: string): boolean {
   const text = String(input || '')
-  return OPERATIONAL_LOG.test(text) && EXPLICIT_LOG_REPAIR.test(text)
+  return isOperationalLogEvidence(text) && EXPLICIT_LOG_REPAIR.test(text)
 }
 
 /**
@@ -26,7 +30,7 @@ export function isExplicitOperationalLogRepairRequest(input: string): boolean {
  */
 export function isPastedOperationalLog(input: string): boolean {
   const text = String(input || '')
-  return OPERATIONAL_LOG.test(text) && !isExplicitOperationalLogRepairRequest(text)
+  return isOperationalLogEvidence(text) && !isExplicitOperationalLogRepairRequest(text)
 }
 
 export function analyzeOperationalLog(input: string): OperationalLogAnalysis {

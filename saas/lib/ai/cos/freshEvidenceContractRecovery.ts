@@ -1,6 +1,10 @@
 import { replyCitesRequiredFreshEvidence } from './cosFreshAuthority.ts'
 import { freshEvidenceGroundingBlock, type FreshEvidenceSource } from './cosFreshGrounding.ts'
-import type { FreshEvidenceSemanticPlan } from './freshEvidenceSynthesisContract.ts'
+import {
+  MAX_SEMANTIC_SCOPE_FINDING_CHARS,
+  MAX_SEMANTIC_SCOPE_LABEL_CHARS,
+  type FreshEvidenceSemanticPlan,
+} from './freshEvidenceSynthesisContract.ts'
 
 export type FreshEvidenceContractFailureCode =
   | 'invalid_json'
@@ -99,7 +103,10 @@ export function diagnoseFreshEvidenceSemanticPlan(args: {
     const label = String(scope.label || '').trim()
     const finding = String(scope.finding || '').trim()
     const evidenceIds = uniqueStrings(scope.evidenceIds)
-    if (!SCOPE_ID.test(scopeId) || seenScopeIds.has(scopeId) || !label || !finding || !evidenceIds.length) {
+    if (!SCOPE_ID.test(scopeId) || seenScopeIds.has(scopeId)
+      || !label || label.length > MAX_SEMANTIC_SCOPE_LABEL_CHARS
+      || !finding || finding.length > MAX_SEMANTIC_SCOPE_FINDING_CHARS
+      || !evidenceIds.length) {
       return { code: 'invalid_scope_shape', repairable: true }
     }
     if (evidenceIds.some(id => !sourceIds.has(id))) {
@@ -171,7 +178,7 @@ export function freshEvidenceScopePlanRepairPrompt(args: {
   failedPlanText: string
   failureCode: FreshEvidencePlanFailureCode
 }): string {
-  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nPREVIOUS SCOPE PLAN (invalid; not evidence):\n${String(args.failedPlanText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nReturn a corrected semantic scope plan under the original scope-planning JSON contract, including presentationMode, directBinaryAnswerSafe, and scopes. Preserve only materially distinct scopes supported by LIVE EVIDENCE. Decide presentationMode and directBinaryAnswerSafe from the QUESTION and evidence, never from scope count. If presentationMode is neutral_evidence_map, directBinaryAnswerSafe must be false because the user must see the divergent evidence before any verdict. Do not write the user-facing answer.\n\nQUESTION: ${args.input}`
+  return `${freshEvidenceGroundingBlock(args.input, args.sources, args.retrievedAt)}\n\nPREVIOUS SCOPE PLAN (invalid; not evidence):\n${String(args.failedPlanText || '').trim()}\n\nVALIDATION FAILURE: ${args.failureCode}\n\nREPAIR TASK:\nReturn a corrected semantic scope plan under the original scope-planning JSON contract, including presentationMode, directBinaryAnswerSafe, and scopes. Keep each label within ${MAX_SEMANTIC_SCOPE_LABEL_CHARS} characters and each finding within ${MAX_SEMANTIC_SCOPE_FINDING_CHARS} characters. Preserve only materially distinct scopes supported by LIVE EVIDENCE. Decide presentationMode and directBinaryAnswerSafe from the QUESTION and evidence, never from scope count. If presentationMode is neutral_evidence_map, directBinaryAnswerSafe must be false because the user must see the divergent evidence before any verdict. Do not write the user-facing answer.\n\nQUESTION: ${args.input}`
 }
 
 export function freshEvidenceAnswerContractRepairPrompt(args: {

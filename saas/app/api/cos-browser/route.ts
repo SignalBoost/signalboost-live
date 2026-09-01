@@ -97,7 +97,11 @@ export async function POST(req: NextRequest) {
 
   const auditUserId = (await getAccess().catch(() => null))?.userId ?? null
 
-  if (isPastedOperationalLog(prompt)) {
+  const routingContext = builderRoutingContextFromBody(body)
+  const hasSourceAttachment = (routingContext.attachmentNames || []).some((name: string) =>
+    /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i.test(String(name || '')),
+  )
+  if (isPastedOperationalLog(prompt) && !hasSourceAttachment) {
     return withSuggestedFollowups(NextResponse.json({
       reply: operationalLogReply(prompt),
       source: 'concierge-operational-log-analysis',
@@ -164,7 +168,6 @@ export async function POST(req: NextRequest) {
     auditIdentityCaptured: Boolean(auditUserId),
   }))
 
-  const routingContext = builderRoutingContextFromBody(body)
   const response = await withPublicAuditIdentity(auditUserId, () =>
     withPublicDeliveryScope(() =>
       withRunpodWakePermission(permission, () => isConciergeBuilderObjective(prompt, routingContext) ? legacyConciergePost(req) : cosPrimaryPost(req)),

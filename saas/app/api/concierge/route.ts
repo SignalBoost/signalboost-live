@@ -121,6 +121,7 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
     })
   }
   const routingContext = builderRoutingContextFromBody(body)
+  // isConciergeBuilderObjective(objective)
   const roleMatched = isConciergeBuilderObjective(objective, routingContext)
   // Browser messages may carry whitespace around the typed request. Classify the actual
   // objective, so a valid design request never exposes a Builder control-plane error.

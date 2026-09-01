@@ -24,6 +24,7 @@ test('Builder is authenticated, asynchronous, and exposes only a bounded public 
 
 test('direct Developer surface follows an accepted Builder job to its terminal result', () => {
   const page = source('../app/dashboard/developer/page.tsx')
+  assert.match(page, /platformRepair: true/)
   assert.match(page, /jobId\?: string/)
   assert.match(page, /async function pollBuilderJob\(jobId: string\)/)
   assert.match(page, /fetch\(`\/api\/builder\?jobId=\$\{encodeURIComponent\(jobId\)\}`/)
@@ -52,7 +53,7 @@ test('Builder runs only in an ephemeral network-denied Vercel Sandbox', () => {
 
 test('Builder workspace and job tables are server-only and ownership constrained', () => {
   const workspaceMigration = source('../supabase/migrations/20260829190749_builder_workspaces.sql')
-  const jobMigration = source('../supabase/migrations/20260831172000_builder_jobs_and_history_order.sql')
+  const jobMigration = source('../supabase/migrations/20260831174502_builder_jobs_and_history_order.sql')
   assert.match(workspaceMigration, /references auth\.users\(id\)/)
   assert.match(workspaceMigration, /enable row level security/)
   assert.match(workspaceMigration, /revoke all on public\.builder_workspaces from anon, authenticated/)

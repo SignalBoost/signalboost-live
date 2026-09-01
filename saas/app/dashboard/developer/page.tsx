@@ -127,7 +127,7 @@ export default function DeveloperPage() {
       const response = await fetch('/api/builder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ objective: task, workspaceId: workspaceId || undefined, files }),
+        body: JSON.stringify({ objective: task, workspaceId: workspaceId || undefined, files, platformRepair: true }),
       })
       let data = await response.json().catch(() => ({})) as BuilderReply
       if (data.workspaceId) setWorkspaceId(data.workspaceId)

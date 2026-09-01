@@ -23,6 +23,7 @@ export const maxDuration = 300
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_JOB_FILES = 20
 const DEBUG_OBJECTIVE = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
+const SIGNALBOOST_OPERATIONAL_TARGET = /\b(?:signalboost-live|(?:saas\.)?signalboostapp\.com)\b/i
 
 function noStore(payload: unknown, init?: ResponseInit): NextResponse {
   const response = NextResponse.json(payload, init)
@@ -143,17 +144,20 @@ export async function POST(request: Request) {
 
     const files = cleanFiles(body?.files)
     const debugPlan = planDebugFileJob(objective, files)
-
+    const ownerDeveloperLogSubmission = access.isOwner
+      && body?.platformRepair === true
+      && isOperationalLogEvidence(objective)
+      && SIGNALBOOST_OPERATIONAL_TARGET.test(objective)
     const platformRepairTarget = files.length === 0
       ? signalBoostDeployedRepairTarget(objective, {
           commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
           branch: process.env.VERCEL_GIT_COMMIT_REF,
-        })
+        }, { ownerDeveloperLogSubmission })
       : null
 
-    // The direct Developer surface owns user-workspace jobs, but an explicit owner request to fix
-    // Builder/SignalBoost needs the separate Platform Engineer. Pin it to the immutable deployed
-    // revision supplied by Vercel and keep its output review-only; passive logs grant no authority.
+    // The direct Developer surface owns user-workspace jobs, but an owner-submitted operational
+    // log about Builder needs the separate Platform Engineer. Pin it to the immutable deployed
+    // revision supplied by Vercel and keep its output review-only; other passive logs grant no authority.
     if (platformRepairTarget) {
       if (!access.isOwner) {
         const reply = 'SignalBoost platform repair is owner-only. No repository was inspected and no code was run.'

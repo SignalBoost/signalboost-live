@@ -51,11 +51,11 @@ function shouldUseConciergeRepairIngress(body: AssistantRequestBody): boolean {
     && (hasExplicitOperationalLogRepairIntent(current) || hasExplicitOperationalLogRepairIntent(previous))
 }
 
-async function hasDurablePreviousRepairIntent(
+async function durablePreviousRepairIntent(
   fetchImpl: typeof window.fetch,
   conversationId: string,
   signal?: AbortSignal,
-): Promise<boolean> {
+): Promise<string | null> {
   try {
     const response = await fetchImpl(`/api/assistant/chats?id=${encodeURIComponent(conversationId)}`, {
       method: 'GET',
@@ -64,18 +64,39 @@ async function hasDurablePreviousRepairIntent(
       headers: { accept: 'application/json' },
       signal,
     })
-    if (!response.ok) return false
+    if (!response.ok) return null
     const payload = await response.json().catch(() => null)
     const messages = Array.isArray(payload?.messages) ? payload.messages : []
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index]
       if (message?.role !== 'user' || typeof message.content !== 'string') continue
-      return hasExplicitOperationalLogRepairIntent(message.content)
+      const content = message.content.trim()
+      return hasExplicitOperationalLogRepairIntent(content) ? content : null
     }
   } catch (error) {
     if (deliberateAbort(error, signal)) throw error
   }
-  return false
+  return null
+}
+
+function bodyWithPreviousUserTurn(body: AssistantRequestBody, previousUserContent: string): AssistantRequestBody {
+  const messages = Array.isArray(body.messages) ? body.messages : []
+  let latestUserIndex = -1
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'user') {
+      latestUserIndex = index
+      break
+    }
+  }
+  if (latestUserIndex < 0) return body
+  return {
+    ...body,
+    messages: [
+      ...messages.slice(0, latestUserIndex),
+      { role: 'user', content: previousUserContent },
+      ...messages.slice(latestUserIndex),
+    ],
+  }
 }
 
 function localeFromBody(body: AssistantRequestBody): AssistantTransportLocale {
@@ -297,16 +318,21 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
       }
 
       let operationalRepair = shouldUseConciergeRepairIngress(body)
+      let sendBody: AssistantRequestBody = body
       if (!operationalRepair && isPastedOperationalLog(userContent)) {
-        operationalRepair = await hasDurablePreviousRepairIntent(
+        const recoveredRepairIntent = await durablePreviousRepairIntent(
           originalFetch,
           conversationId,
           init?.signal ?? undefined,
         )
+        if (recoveredRepairIntent) {
+          operationalRepair = true
+          sendBody = bodyWithPreviousUserTurn(body, recoveredRepairIntent)
+        }
       }
       // Preserve privileged owner COS scope for ordinary turns. Only a pasted operational log
       // with explicit repair intent in the request body or durable preceding History enters Concierge.
-      const result = await sendAssistantTurnAndRecover(userContent, body as Record<string, unknown>, {
+      const result = await sendAssistantTurnAndRecover(userContent, sendBody as Record<string, unknown>, {
         sendUrl: operationalRepair ? '/api/concierge' : '/api/cos-primary',
         historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,
         locale: localeFromBody(body),

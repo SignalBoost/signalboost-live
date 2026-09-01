@@ -3,6 +3,7 @@ import { executiveDecisionDirective } from './scriptRequestIntent.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
 import { asksForPublishedDiagnosticMethods } from './advisoryDiagnosisPolicy.ts'
 import { detectAdvisoryDiagnosisIntent } from './advisoryDiagnosisIntent.ts'
+import { isNormativePolicyQuestion } from './normativeAnswerPolicy.ts'
 
 /**
  * Executive arbitration is high-impact, context-dependent reasoning. Replaying a prior memo can
@@ -21,6 +22,7 @@ import { detectAdvisoryDiagnosisIntent } from './advisoryDiagnosisIntent.ts'
  */
 export function semanticCacheAllowedForPrompt(prompt: string): boolean {
   if (executiveDecisionDirective(prompt)) return false
+  if (isNormativePolicyQuestion(prompt)) return false
   if (isPlatformSelfKnowledgePrompt(prompt)) return false
   if (asksForPublishedDiagnosticMethods(prompt)) return false
   if (detectAdvisoryDiagnosisIntent(prompt).isAdvisoryDiagnosis) return false

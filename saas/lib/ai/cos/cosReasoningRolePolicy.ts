@@ -27,11 +27,6 @@ function clean(value: unknown, max = 4000): string {
   return String(value ?? '').replace(/\r/g, '').trim().slice(0, max)
 }
 
-/**
- * Routing must be based on the user's task, not on evidence injected around it. Production COS
- * prompts normally carry USER QUESTION or Original question markers; use those when present and
- * fall back to the raw prompt only for direct/internal callers.
- */
 export function cosRoutingObjective(prompt: string): string {
   const text = clean(prompt)
   const upper = text.toUpperCase()
@@ -50,6 +45,7 @@ const CODE_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct|implement|refact
 const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:not\s+working|does(?:\s+not|n't)\s+work|not\s+functional|broken|failing|throws?|crashes?)\b/i
 const CODE_LANGUAGE = /\b(?:javascript|typescript|node(?:\.js)?|python|react|next(?:\.js)?|html|css|sql|bash|shell|java|c\+\+|c#|golang|go|rust|php|ruby|swift|kotlin|tsx|jsx)\b/i
 const FILE_REFERENCE = /(?:^|[\s`'"(])(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)(?=$|[\s`'"),:.])/i
+const CREATE_NAMED_FILE = /\b(?:create|make|write|build)\s+(?:a\s+|an\s+|the\s+)?(?:\.\.?\/)?[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)\b/i
 const STACK_TRACE = /\b(?:TypeError|ReferenceError|SyntaxError|RangeError|ModuleNotFoundError|Traceback \(most recent call last\)|npm ERR!|ERR_[A-Z_]+)\b|\bat\s+[^\n]+\([^\n()]+:\d+:\d+\)|\bFile\s+"[^"]+",\s+line\s+\d+/i
 const CODE_FENCE = /```(?:javascript|typescript|js|ts|tsx|jsx|python|py|sql|bash|sh|html|css|json)?\s*[\s\S]{12,}```/i
 const CODE_NOUN = /\b(?:code|function|script|class|component|endpoint|api route|test case|regular expression|regex|query)\b/i
@@ -87,25 +83,16 @@ function concreteCodeEvidence(prompt: string, context?: CosCodingRoutingContext)
 function excludedFromBuilder(prompt: string, context?: CosCodingRoutingContext): boolean {
   const raw = String(prompt || '')
   const objective = cosRoutingObjective(raw)
-  // Raw operational logs never receive ordinary sandbox authority by themselves. Concierge's
-  // authenticated browser ingress may separately promote an explicit repair of an exact failed
-  // SignalBoost snapshot into the pinned repository-repair lane. Source attachments remain the
-  // existing fixed one-file debug lane.
   if (isOperationalLogEvidence(raw) && !sourceAttachment(context)) return true
   return hugeTranscriptOrDump(raw) || NON_CODING_TOPIC.test(objective)
 }
 
 function executableBuilderAction(objective: string): boolean {
-  return CODE_ACTION.test(objective) || DEBUG_ACTION.test(objective)
+  return CODE_ACTION.test(objective) || DEBUG_ACTION.test(objective) || CREATE_NAMED_FILE.test(objective)
 }
 
 const ASK_ABOUT_ATTACHMENT = /\b(?:what is|what's|whats|tell me what|explain|summarize|describe)\b/i
 
-/**
- * Humans drop a file and type “fix this”, “help”, “não funciona”, or nothing.
- * A source attachment is the intent. Only a clear “what is this file?” stays on chat.
- * Pasted operational logs and huge dumps stay excluded above this helper.
- */
 function attachedSourceIsTheJob(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (!sourceAttachment(context)) return false
   const objective = cosRoutingObjective(prompt)
@@ -113,7 +100,6 @@ function attachedSourceIsTheJob(prompt: string, context?: CosCodingRoutingContex
   return true
 }
 
-/** Broad worker selection for the authorized COS UI. */
 export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
@@ -121,18 +107,10 @@ export function isCosCodingObjective(prompt: string, context?: CosCodingRoutingC
   if (attachedSourceIsTheJob(prompt, context)) return true
   const evidence = concreteCodeEvidence(objective, context)
   if (DEBUG_ACTION.test(objective)) return evidence
-  if (CODE_ACTION.test(objective)) return evidence || (CODE_NOUN.test(objective) && CODE_LANGUAGE.test(objective))
+  if (CODE_ACTION.test(objective) || CREATE_NAMED_FILE.test(objective)) return evidence || (CODE_NOUN.test(objective) && CODE_LANGUAGE.test(objective))
   return evidence && EXPLICIT_CODE_QUESTION.test(objective)
 }
 
-/**
- * Public Concierge starts Builder for a design request, an explicit coding action with
- * source evidence, or a dropped source file with casual/empty wording.
- *
- * A timeout report, a log dump, “what is this file?”, or a general factual question
- * still cannot acquire sandbox authority. Platform self-repair with no source file stays closed
- * here and is handled only by the browser ingress's owner-only pinned repository-repair lane.
- */
 export function isConciergeBuilderObjective(prompt: string, context?: CosCodingRoutingContext): boolean {
   if (excludedFromBuilder(prompt, context)) return false
   const objective = cosRoutingObjective(prompt)
@@ -146,7 +124,6 @@ const CURRENT_SIGNAL = /\b(current|currently|today|right now|as of now|latest|mo
 const CRITIC_SIGNAL = /\b(diagnos|root cause|troubleshoot|incident|outage|latency|p9[59]|timeout|regression|failure mode|why (?:is|are|did|does).*(?:slow|fail|error|down|spike)|critique|audit|stress[- ]?test|find (?:the )?(?:flaw|weakness|problem))\b/i
 const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|difference between|what (?:is|are)|define|definition|who (?:is|was|are|were)|company|organization|organisation|architecture|mechanism|explain)\b/i
 
-/** Deterministic, zero-model-call task routing. */
 export function selectCosReasoningWorkerRole(prompt: string, context?: CosCodingRoutingContext): CosReasoningRoleDecision {
   const objective = cosRoutingObjective(prompt)
   if (isCosCodingObjective(prompt, context)) return { role: 'coder', reason: 'code_or_implementation_signal', objective }

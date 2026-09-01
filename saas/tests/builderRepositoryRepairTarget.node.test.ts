@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   parseSignalBoostRepositoryRepairTarget,
   resolveSignalBoostRepositoryCommit,
+  signalBoostDeployedRepairTarget,
   signalBoostRepositoryRepairObjective,
 } from '../lib/builder/repository-repair-target.ts'
 
@@ -86,4 +87,29 @@ test('rejects arbitrary repositories, successful logs, missing revisions and mal
   assert.equal(parseSignalBoostRepositoryRepairTarget(failedLog.replace('exited with 1', 'exited with 0').replace(/failed/gi, 'completed')), null)
   assert.equal(parseSignalBoostRepositoryRepairTarget(failedLog.replace(', Commit: 4cf5fdd', '')), null)
   assert.equal(parseSignalBoostRepositoryRepairTarget(failedLog.replace('fix/cos-remove-hardcoded-comparison-formatter-20260830', '../unsafe')), null)
+})
+
+test('owner platform repair intent is pinned only from immutable deployment metadata', () => {
+  const sha = 'a'.repeat(40)
+  const target = signalBoostDeployedRepairTarget('Fix the Builder. It keeps returning analysis instead of using its Engineer.', {
+    commitSha: sha,
+    branch: 'main',
+  })
+  assert.ok(target)
+  assert.equal(target.fullCommitSha, sha)
+  assert.equal(target.branch, 'main')
+  assert.equal(target.repository, 'SignalBoost/signalboost-live')
+  assert.ok(signalBoostDeployedRepairTarget('My Builder is not working. Verify what is missing.', { commitSha: sha, branch: 'main' }))
+  assert.equal(signalBoostDeployedRepairTarget('Fix the Builder.', { commitSha: 'moving-main', branch: 'main' }), null)
+  assert.equal(signalBoostDeployedRepairTarget('Fix the Builder.', { commitSha: sha, branch: '../unsafe' }), null)
+})
+
+test('passive logs and test titles cannot manufacture platform-repair intent', () => {
+  const sha = 'b'.repeat(40)
+  const passive = [
+    '18:00:00.000 Running Vercel build',
+    '✖ direct Builder repository repair is owner-only and review-only',
+    'Error: Command "npm test" exited with 1',
+  ].join('\n')
+  assert.equal(signalBoostDeployedRepairTarget(passive, { commitSha: sha, branch: 'main' }), null)
 })

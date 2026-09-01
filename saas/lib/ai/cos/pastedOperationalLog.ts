@@ -2,6 +2,12 @@
 // a visual job, or a request to portray anyone named inside a test title.
 const OPERATIONAL_LOG = /(?:^\d{2}:\d{2}:\d{2}\.\d{3}\s+(?:running|cloning|installing|restored)\b|\b(?:running|cloning|installing|restored build cache)\b[\s\S]{0,400}\b(?:vercel|next\.js|npm|node)\b|\bvercel cli\s+\d|\b(?:✖\s+failing tests|ℹ\s+fail\s+\d+|error:\s*command\s+")\b)/im
 
+// Explicit repair language is authority intent, not proof of authority. Callers still have to
+// enforce authentication, exact repository/source scope, and the relevant Builder safety lane.
+// Keep this deliberately narrow so words such as "failed", "error", or test names inside the
+// pasted log cannot accidentally turn passive evidence into an execution request.
+const EXPLICIT_LOG_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|the\s+(?:build|failure|error|code|problem)|it)\b|\b(?:can|could|would)\s+you\s+(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|it|the\s+(?:build|failure|error|problem))\b|\bi\s+(?:need|want)\s+(?:you\s+to\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|it|the\s+(?:build|failure|error|problem))\b/i
+
 export type OperationalLogAnalysis = Readonly<{
   failed: boolean
   testFailures: string[]
@@ -9,8 +15,18 @@ export type OperationalLogAnalysis = Readonly<{
   exitCode: number | null
 }>
 
+export function isExplicitOperationalLogRepairRequest(input: string): boolean {
+  const text = String(input || '')
+  return OPERATIONAL_LOG.test(text) && EXPLICIT_LOG_REPAIR.test(text)
+}
+
+/**
+ * "Pasted operational log" here means passive log evidence. An explicit repair request is
+ * intentionally excluded so authenticated Builder/Platform Engineer routing can evaluate it.
+ */
 export function isPastedOperationalLog(input: string): boolean {
-  return OPERATIONAL_LOG.test(String(input || ''))
+  const text = String(input || '')
+  return OPERATIONAL_LOG.test(text) && !isExplicitOperationalLogRepairRequest(text)
 }
 
 export function analyzeOperationalLog(input: string): OperationalLogAnalysis {

@@ -1,7 +1,7 @@
 import { isRepairObjective } from '../../builder/regression-gate.ts'
 
 export type OperatorProgressTarget = 'concierge' | 'cos'
-export type OperatorProgressStage = 'accepted' | 'diagnosing' | 'fixing' | 'verified' | 'blocked' | 'durable'
+export type OperatorProgressStage = 'accepted' | 'diagnosing' | 'fixing' | 'complete' | 'verified' | 'blocked' | 'durable'
 
 function bodyRecord(value: unknown): Record<string, any> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : null
@@ -41,6 +41,7 @@ export function operatorProgressMessage(args: {
       ? 'Fixing — COS Builder is applying a targeted repair and rerunning the same proof. If it still fails, the new failure becomes the next diagnostic input.'
       : `Fixing — ${actor} is carrying the problem to the furthest safe executable or verified next step available.`
   }
+  if (args.stage === 'complete') return 'Resolution ready — the result below states what was fixed or what still needs action; COS does not claim verification without proof.'
   if (args.stage === 'verified') return 'Verified — the repair reached a passing proof. The result below records what changed and what passed.'
   if (args.stage === 'blocked') return 'Verification is not complete yet. The result below identifies the remaining blocker and the next safe action instead of calling the problem fixed.'
   return 'The repair is still running. Its durable result remains in History, and COS will not call it fixed until verification passes.'

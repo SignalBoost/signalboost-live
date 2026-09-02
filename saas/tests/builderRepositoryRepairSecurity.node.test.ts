@@ -69,8 +69,8 @@ test('repository repair cannot commit, push, merge, deploy, or inherit credentia
 
 test('browser repository repair requires explicit repair intent, exact SignalBoost target, and owner authority', () => {
   const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  const explicit = browser.indexOf('isExplicitOperationalLogRepairRequest(prompt)')
-  const parse = browser.indexOf('parseSignalBoostRepositoryRepairTarget(prompt)', explicit)
+  const explicit = browser.indexOf('isExplicitOperationalLogRepairRequest(operationalPrompt)')
+  const parse = browser.indexOf('parseSignalBoostRepositoryRepairTarget(operationalPrompt)', explicit)
   const owner = browser.indexOf('access?.isOwner', parse)
   const execute = browser.indexOf('enqueueSignalBoostRepositoryRepairJob({', owner)
   const schedule = browser.indexOf('runBuilderJob(job.jobId', execute)

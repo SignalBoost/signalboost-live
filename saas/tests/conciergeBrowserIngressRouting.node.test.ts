@@ -35,7 +35,7 @@ test('the stable public Concierge endpoint actually enters public scope before C
 
   const scope = browser.indexOf('withPublicDeliveryScope(() =>')
   const wake = browser.indexOf('withRunpodWakePermission(permission')
-  const primary = browser.indexOf('cosPrimaryPost(req)')
+  const primary = browser.indexOf('cosPrimaryPost(routedRequest)')
   assert.ok(scope >= 0)
   assert.ok(wake > scope)
   assert.ok(primary > wake)
@@ -48,7 +48,7 @@ test('the public Concierge browser ingress routes explicit artifacts before norm
   assert.match(browser, /artifactPost\(artifactRequest\)/)
   assert.match(browser, /new URL\('\/api\/artifacts', req\.url\)/)
   const artifact = browser.indexOf('isConciergeArtifactObjective(prompt)')
-  const primary = browser.indexOf('cosPrimaryPost(req)')
+  const primary = browser.indexOf('cosPrimaryPost(routedRequest)')
   assert.ok(artifact >= 0)
   assert.ok(primary > artifact)
 })

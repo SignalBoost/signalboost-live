@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
   const ownerSignalBoostLogTarget = access?.isOwner && access.userId && !hasSourceAttachment
     && operationalEvidence && operationalLogAnalysis.failed
     && signalBoostProjectBound
-    ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(prompt, {
+    ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(operationalPrompt, {
         commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
         branch: process.env.VERCEL_GIT_COMMIT_REF,
       }, { ownerDeveloperLogSubmission: true })

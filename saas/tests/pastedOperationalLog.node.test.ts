@@ -21,6 +21,19 @@ test('recognizes a pasted Vercel build log as passive operational evidence', () 
   assert.equal(isPastedOperationalLog('Fix the add function in src/math.js.'), false)
 })
 
+test('recognizes a clipped middle section of Vercel test output after the composer loses the build header', () => {
+  const clipped = [
+    '10:52:09.206 ✔ History validates the conversation, reports database failures, and disables caching (1.809029ms)',
+    '10:52:09.206 (node:136) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///vercel/path0/saas/tests/assistantSourceFileBoundary.node.test.ts is not specified',
+    '10:52:09.217 Reparsing as ES Module because module syntax was detected. This incurs a performance overhead.',
+    '10:52:09.218 ✔ gateway HTML is never exposed as an assistant answer (2.242796ms)',
+    '10:52:09.218 ✔ technical provenance copy remains bounded (0.320000ms)',
+  ].join('\n')
+  assert.equal(isOperationalLogEvidence(clipped), true)
+  assert.equal(isPastedOperationalLog(clipped), true)
+  assert.equal(isOperationalLogEvidence('Meeting notes: 10:52:09.206 we discussed technical provenance and PDF exports.'), false)
+})
+
 test('standalone repair intent is detectable without manufacturing log evidence', () => {
   assert.equal(hasExplicitOperationalLogRepairIntent('please debug this'), true)
   assert.equal(hasExplicitOperationalLogRepairIntent('fix it'), true)

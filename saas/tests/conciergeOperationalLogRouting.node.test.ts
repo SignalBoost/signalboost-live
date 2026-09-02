@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { isOperationalLogEvidence } from '../lib/ai/cos/pastedOperationalLog.ts'
+import { isProvenanceIntrospection } from '../lib/ai/cos/provenanceIntrospection.ts'
 
 test('browser ingress sends passive pasted build logs to COS without granting Builder authority', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
@@ -52,9 +54,10 @@ test('explicit failed SignalBoost log repair may reach only the owner-only pinne
 
 test('only failed owner SignalBoost logs reach Platform Engineer before passive analysis', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  const analysis = route.indexOf('const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)')
+  const classification = route.indexOf('const operationalEvidence = isOperationalLogEvidence(operationalPrompt)')
+  const analysis = route.indexOf('const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)', classification)
   const exactTarget = route.indexOf('const exactFailedLogTarget = operationalLogAnalysis.failed', analysis)
-  const target = route.indexOf('const ownerSignalBoostLogTarget =')
+  const target = route.indexOf('const ownerSignalBoostLogTarget =', exactTarget)
   const owner = route.indexOf('access?.isOwner', target)
   const evidence = route.indexOf('operationalEvidence', owner)
   const failed = route.indexOf('operationalLogAnalysis.failed', evidence)
@@ -62,7 +65,7 @@ test('only failed owner SignalBoost logs reach Platform Engineer before passive 
   const preferExact = route.indexOf('exactFailedLogTarget ?? signalBoostDeployedRepairTarget', binding)
   const execute = route.indexOf('enqueueSignalBoostRepositoryRepairJob({', binding)
   const schedule = route.indexOf('runBuilderJob(job.jobId', execute)
-  assert.ok(analysis >= 0 && exactTarget > analysis && target > exactTarget)
+  assert.ok(classification >= 0 && analysis > classification && exactTarget > analysis && target > exactTarget)
   assert.ok(owner > target && evidence > owner && failed > evidence && binding > failed)
   assert.ok(preferExact > binding && execute > preferExact && schedule > execute)
   assert.match(route.slice(exactTarget, target), /parseSignalBoostRepositoryRepairTarget\(operationalPrompt\)/)
@@ -83,8 +86,30 @@ test('attached text logs join the user request before Concierge diagnosis withou
   assert.match(route, /const operationalPrompt = attachedOperationalEvidence/)
   assert.match(route, /messages: messages\.map\([\s\S]{0,180}content: operationalPrompt/)
   assert.match(route, /routedHeaders\.delete\('content-length'\)/)
-  assert.match(route, /if \(isConciergeArtifactObjective\(prompt\)\)/)
-  assert.match(route, /if \(isConciergeVisualObjective\(prompt\)\)/)
+  assert.match(route, /if \(!operationalEvidence\) \{[\s\S]*isConciergeArtifactObjective\(prompt\)[\s\S]*isConciergeVisualObjective\(prompt\)/)
+})
+
+test('artifact and provenance trigger words inside a failed build remain operational evidence', () => {
+  const log = [
+    '10:12:16.287 ✖ create PDF with technical provenance',
+    '10:12:16.302 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+  ].join('\n')
+  assert.equal(isOperationalLogEvidence(log), true)
+  assert.equal(isProvenanceIntrospection(log), false)
+
+  const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  const creativeGate = route.indexOf('if (!operationalEvidence) {')
+  const artifact = route.indexOf('isConciergeArtifactObjective(prompt)', creativeGate)
+  const visual = route.indexOf('isConciergeVisualObjective(prompt)', artifact)
+  const provenance = route.indexOf('if (!operationalEvidence && isProvenanceIntrospection(prompt))', visual)
+  assert.ok(creativeGate >= 0 && artifact > creativeGate && visual > artifact && provenance > visual)
+
+  const artifactRoute = readFileSync(new URL('../app/api/artifacts/route.ts', import.meta.url), 'utf8')
+  const backendGuard = artifactRoute.indexOf('if (isOperationalLogEvidence(rawObjective))')
+  const objectiveValidation = artifactRoute.indexOf('const objective = objectiveOf(rawObjective)', backendGuard)
+  const generation = artifactRoute.indexOf('createPlatformAiPort().generate', objectiveValidation)
+  assert.ok(backendGuard >= 0 && objectiveValidation > backendGuard && generation > objectiveValidation)
+  assert.match(artifactRoute.slice(backendGuard, objectiveValidation), /operationalLogReply\(rawObjective\)/)
 })
 
 test('legacy Concierge sends passive logs to COS instead of returning the obsolete canned reply', () => {

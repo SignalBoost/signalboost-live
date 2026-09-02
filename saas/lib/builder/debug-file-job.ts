@@ -13,6 +13,8 @@ const CODE_EXTENSION = /\.(?:c?js|mjs|cts|mts|ts|py)$/i
 const TEST_PATH = /(?:^|\/)(?:.+[._-](?:test|spec)|(?:test|spec)[._-].+)\.(?:c?js|mjs|cts|mts|ts|py)$/i
 const MAX_DEBUG_FILE_BYTES = 128 * 1024
 const MAX_DEBUG_FILES = 4
+const MAX_REPAIR_ITERATIONS = 3
+const MAX_CONTROL_ATTEMPTS = 2
 const OUTPUT_LIMIT = 6_000
 
 export type DebugFilePlan = Readonly<{
@@ -23,6 +25,8 @@ export type DebugFilePlan = Readonly<{
 }>
 
 export type DebugFileInput = Readonly<{ path: string; content: string }>
+
+type DebugEdit = Readonly<{ path: string; search: string; replace: string }>
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value : ''
@@ -152,10 +156,7 @@ function balancedJsonObjects(value: string): readonly string[] {
   return Object.freeze(candidates)
 }
 
-function parseSingleEdit(
-  value: string | null,
-  allowedPaths: readonly string[],
-): Readonly<{ path: string; search: string; replace: string }> | null {
+function parseSingleEdit(value: string | null, allowedPaths: readonly string[]): DebugEdit | null {
   const normalized = normalizeBuilderControlOutput(value)
   const raw = String(normalized || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
   const allowed = new Set(allowedPaths)
@@ -204,7 +205,7 @@ function runFailureTrace(round: number, command: string, result: Awaited<ReturnT
     },
     error: `builder_command_failed: exit ${result.exitCode}`,
     failureClass: result.timedOut ? 'runtime' : 'test',
-    remediation: 'Apply one minimal edit to the attached file that caused the failure, then rerun the exact same command.',
+    remediation: 'Use the latest failure evidence to make the next smallest targeted edit, then rerun the exact same command.',
   })
 }
 
@@ -237,10 +238,21 @@ async function readPlannedFiles(
   return { files, missing: null }
 }
 
+function sourceBlock(files: readonly BuilderFile[]): string {
+  return files
+    .map(file => `FILE: ${file.path}\nSOURCE:\n${file.content.slice(0, MAX_DEBUG_FILE_BYTES)}`)
+    .join('\n\n')
+}
+
+function editFingerprint(edit: DebugEdit): string {
+  return `${edit.path}\u0000${edit.search}\u0000${edit.replace}`
+}
+
 /**
- * Bounded debug protocol: read the attached source set (≤4 files), run the proof command once,
- * make at most one edit on any attached file, rerun the exact command, then stop.
- * No knowledge retrieval, live search, platform explanation, or extra inspection is available.
+ * Bounded iterative debug protocol: read the attached source set (≤4 files), run the proof command,
+ * then make up to three targeted edits across the admitted files. Every successful edit is followed
+ * by the exact same proof command; a failed verification becomes evidence for the next repair round.
+ * No knowledge retrieval, live search, repository authority, or extra filesystem inspection is available.
  */
 export async function runDebugFileJob(input: {
   objective: string
@@ -264,7 +276,7 @@ export async function runDebugFileJob(input: {
       ok: false,
       error: 'builder_file_not_found',
       failureClass: 'path',
-      remediation: 'Attach one to four supported source files and retry in the same chat.',
+      remediation: 'Use the supplied file set already present in this workspace; if a required file is absent, the caller must add it before Builder can edit it.',
     }))
     return { ok: false, error: 'builder_file_not_found', trace }
   }
@@ -279,10 +291,11 @@ export async function runDebugFileJob(input: {
     }))
   }
 
+  let currentFiles = staged.files
   const firstRun = await input.runner.run({
     workspaceId: input.workspaceId,
     command: input.plan.command,
-    files: staged.files,
+    files: currentFiles,
   })
   if (firstRun.exitCode === 0) {
     trace.push(runSuccessTrace(3, input.plan.command, firstRun))
@@ -294,101 +307,134 @@ export async function runDebugFileJob(input: {
   }
   trace.push(runFailureTrace(3, input.plan.command, firstRun))
 
-  const sourceBlock = staged.files
-    .map(file => `FILE: ${file.path}\nSOURCE:\n${file.content.slice(0, MAX_DEBUG_FILE_BYTES)}`)
-    .join('\n\n')
+  const initialError = bounded(firstRun.stderr || firstRun.stdout)
+  const attemptedEdits = new Set<string>()
+  const changedPaths: string[] = []
+  let latestRun = firstRun
+  let latestEditError = ''
+  let round = 4
+
   const systemPrompt = [
-    'You are COS Builder in a bounded multi-file debug job.',
+    'You are COS Builder in a bounded iterative multi-file debug job.',
     'Return exactly one JSON control object and no prose or Markdown.',
     `The only allowed action is edit_file on one of these paths: ${plannedPaths.join(', ')}.`,
-    'Use the smallest unique search/replace that repairs the observed failure.',
+    'Use the smallest unique search/replace justified by the latest failure evidence.',
+    'The same proof command is rerun after every applied edit. If the previous edit did not fully fix the test, diagnose the new failure and choose the next smallest edit, which may be in a different admitted file.',
     'Schema: {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}.',
     'Do not request another file, command, search, explanation, or platform inspection.',
   ].join(' ')
-  const basePrompt = [
-    `OBJECTIVE:\n${String(input.objective || '').slice(0, 2_000)}`,
-    sourceBlock,
-    `COMMAND: ${input.plan.command}`,
-    `EXIT CODE: ${firstRun.exitCode}`,
-    `STDERR:\n${bounded(firstRun.stderr)}`,
-    `STDOUT:\n${bounded(firstRun.stdout)}`,
-  ].join('\n\n')
 
-  let edit: Readonly<{ path: string; search: string; replace: string }> | null = null
-  let lastResponse: string | null = null
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    lastResponse = await input.ai.generate({
-      systemPrompt,
-      prompt: attempt === 0
-        ? basePrompt
-        : `${basePrompt}\n\nCONTROL RECOVERY: The previous response was unusable. Emit only the exact edit_file JSON schema.`,
-      maxTokens: 2_400,
-    })
-    edit = parseSingleEdit(lastResponse, plannedPaths)
-    if (edit) break
-  }
-  if (!edit) {
-    trace.push(Object.freeze({
-      round: 4,
-      toolId: 'model_control',
-      input: {},
-      ok: false,
-      output: { responseLength: String(lastResponse || '').length },
-      error: 'builder_model_control_schema_mismatch',
-      failureClass: 'unknown',
-      remediation: 'The reasoner did not return one valid edit_file control after the bounded recovery attempt.',
-    }))
-    return { ok: false, error: 'builder_model_control_schema_mismatch', trace }
-  }
+  for (let repairIteration = 1; repairIteration <= MAX_REPAIR_ITERATIONS; repairIteration += 1) {
+    const basePrompt = [
+      `OBJECTIVE:\n${String(input.objective || '').slice(0, 2_000)}`,
+      `REPAIR ITERATION: ${repairIteration} of ${MAX_REPAIR_ITERATIONS}`,
+      sourceBlock(currentFiles),
+      `COMMAND: ${input.plan.command}`,
+      `LATEST EXIT CODE: ${latestRun.exitCode}`,
+      `LATEST STDERR:\n${bounded(latestRun.stderr)}`,
+      `LATEST STDOUT:\n${bounded(latestRun.stdout)}`,
+      changedPaths.length ? `ALREADY CHANGED FILES: ${changedPaths.join(', ')}` : '',
+      latestEditError ? `LATEST EDIT APPLICATION ERROR:\n${bounded(latestEditError)}` : '',
+    ].filter(Boolean).join('\n\n')
 
-  try {
-    const changed = await input.workspace.editFile(input.workspaceId, edit.path, edit.search, edit.replace)
-    trace.push(Object.freeze({
-      round: 4,
-      toolId: 'edit_file',
-      input: { path: edit.path, search: edit.search, replace: edit.replace },
-      ok: true,
-      output: { path: changed.path, updatedAt: changed.updatedAt, bytes: new TextEncoder().encode(changed.content).byteLength },
-    }))
+    let edit: DebugEdit | null = null
+    let lastResponse: string | null = null
+    for (let controlAttempt = 0; controlAttempt < MAX_CONTROL_ATTEMPTS; controlAttempt += 1) {
+      const recovery = controlAttempt === 0
+        ? ''
+        : '\n\nCONTROL RECOVERY: The previous response was unusable, unsafe, or repeated. Emit only a new valid edit_file JSON object using current source text.'
+      lastResponse = await input.ai.generate({
+        systemPrompt,
+        prompt: `${basePrompt}${recovery}`,
+        maxTokens: 2_400,
+      })
+      const candidate = parseSingleEdit(lastResponse, plannedPaths)
+      if (!candidate || attemptedEdits.has(editFingerprint(candidate))) continue
+      edit = candidate
+      break
+    }
 
-    const rerunFiles = staged.files.map(file => file.path === changed.path ? changed : file)
-    const secondRun = await input.runner.run({
+    if (!edit) {
+      trace.push(Object.freeze({
+        round,
+        toolId: 'model_control',
+        input: { repairIteration },
+        ok: false,
+        output: { responseLength: String(lastResponse || '').length },
+        error: 'builder_model_control_schema_mismatch',
+        failureClass: 'unknown',
+        remediation: `Builder attempted bounded control recovery during repair iteration ${repairIteration}; no safe new edit was produced.`,
+      }))
+      return { ok: false, error: 'builder_model_control_schema_mismatch', trace }
+    }
+
+    attemptedEdits.add(editFingerprint(edit))
+    try {
+      const changed = await input.workspace.editFile(input.workspaceId, edit.path, edit.search, edit.replace)
+      trace.push(Object.freeze({
+        round,
+        toolId: 'edit_file',
+        input: { path: edit.path, search: edit.search, replace: edit.replace },
+        ok: true,
+        output: { path: changed.path, updatedAt: changed.updatedAt, bytes: new TextEncoder().encode(changed.content).byteLength },
+      }))
+      round += 1
+      currentFiles = currentFiles.map(file => file.path === changed.path ? changed : file)
+      if (!changedPaths.includes(changed.path)) changedPaths.push(changed.path)
+      latestEditError = ''
+    } catch (error) {
+      latestEditError = error instanceof Error ? error.message : 'builder_edit_failed'
+      trace.push(Object.freeze({
+        round,
+        toolId: 'edit_file',
+        input: { path: edit.path, search: edit.search, replace: edit.replace },
+        ok: false,
+        error: latestEditError,
+        failureClass: 'test',
+        remediation: 'Use the current source text and choose a different minimal edit; do not repeat the failed search/replace.',
+      }))
+      round += 1
+      continue
+    }
+
+    latestRun = await input.runner.run({
       workspaceId: input.workspaceId,
       command: input.plan.command,
-      files: rerunFiles,
+      files: currentFiles,
     })
-    if (secondRun.exitCode !== 0) {
-      trace.push(runFailureTrace(5, input.plan.command, secondRun))
-      return { ok: false, error: 'builder_debug_verification_failed', trace }
+    if (latestRun.exitCode === 0) {
+      trace.push(runSuccessTrace(round, input.plan.command, latestRun))
+      return {
+        ok: true,
+        answer: [
+          `Found and fixed the failure across ${plannedPaths.length} attached file${plannedPaths.length === 1 ? '' : 's'}.`,
+          `Repair iterations: ${repairIteration}`,
+          `Changed files: ${changedPaths.map(path => `\`${path}\``).join(', ')}`,
+          '',
+          `First command: \`${input.plan.command}\``,
+          `First exit code: ${firstRun.exitCode}`,
+          initialError ? `First stderr/output:\n\n\`\`\`\n${initialError}\n\`\`\`` : '',
+          '',
+          `Verification command: \`${input.plan.command}\``,
+          'Verification exit code: 0',
+          latestRun.stdout.trim() ? `Verification stdout:\n\n\`\`\`\n${bounded(latestRun.stdout)}\n\`\`\`` : '',
+        ].filter((part, index, values) => part || (index > 0 && values[index - 1] !== '')).join('\n'),
+        trace,
+      }
     }
-    trace.push(runSuccessTrace(5, input.plan.command, secondRun))
-    const initialError = bounded(firstRun.stderr || firstRun.stdout)
-    return {
-      ok: true,
-      answer: [
-        `Debugged \`${edit.path}\` with one minimal edit across ${plannedPaths.length} attached file${plannedPaths.length === 1 ? '' : 's'}.`,
-        '',
-        `First command: \`${input.plan.command}\``,
-        `First exit code: ${firstRun.exitCode}`,
-        initialError ? `First stderr/output:\n\n\`\`\`\n${initialError}\n\`\`\`` : '',
-        '',
-        `Verification command: \`${input.plan.command}\``,
-        'Verification exit code: 0',
-        secondRun.stdout.trim() ? `Verification stdout:\n\n\`\`\`\n${bounded(secondRun.stdout)}\n\`\`\`` : '',
-      ].filter((part, index, values) => part || (index > 0 && values[index - 1] !== '')).join('\n'),
-      trace,
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'builder_edit_failed'
-    trace.push(Object.freeze({
-      round: 4,
-      toolId: 'edit_file',
-      input: { path: edit.path, search: edit.search, replace: edit.replace },
-      ok: false,
-      error: message,
-      failureClass: 'test',
-      remediation: 'The single permitted edit could not be applied safely; no further edit was attempted.',
-    }))
-    return { ok: false, error: message, trace }
+
+    trace.push(runFailureTrace(round, input.plan.command, latestRun))
+    round += 1
   }
+
+  trace.push(Object.freeze({
+    round,
+    toolId: 'model_control',
+    input: { maxRepairIterations: MAX_REPAIR_ITERATIONS },
+    ok: false,
+    error: 'builder_debug_repair_budget_exhausted',
+    failureClass: latestRun.timedOut ? 'runtime' : 'test',
+    remediation: `Builder used all ${MAX_REPAIR_ITERATIONS} bounded repair iterations and preserved the latest verification evidence instead of claiming success.`,
+  }))
+  return { ok: false, error: 'builder_debug_verification_failed', trace }
 }

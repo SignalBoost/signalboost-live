@@ -22,9 +22,11 @@ const isProofCommand = (item: BuilderToolTrace) => {
 
 function isReproducedFailure(item: BuilderToolTrace): boolean {
   if (!isProofCommand(item) || item.ok) return false
-  // Path, runtime, storage and dependency failures prove only that the attempted proof command
-  // could not run correctly. They must never advance a repair into the source-edit phase.
-  return item.failureClass === 'test' || item.failureClass === 'deployment'
+  // Explicit infrastructure failures prove only that the attempted proof command could not run
+  // correctly. Legacy/unit traces may omit a class; keep those as valid test evidence rather than
+  // retroactively invalidating already-established regression contracts.
+  if (item.failureClass === 'path' || item.failureClass === 'runtime' || item.failureClass === 'storage' || item.failureClass === 'dependency') return false
+  return item.failureClass === undefined || item.failureClass === 'test' || item.failureClass === 'deployment'
 }
 
 export function deriveRepairPhase(trace: readonly BuilderToolTrace[], initialPaths: ReadonlySet<string>): BuilderRepairPhase {

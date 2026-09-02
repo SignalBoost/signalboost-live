@@ -2,7 +2,7 @@
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
 import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
-import { discoverBuilderProjectContext, formatBuilderProjectContext } from './project-context.ts'
+import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBuilderSandboxCommand } from './project-context.ts'
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 
 type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
@@ -496,8 +496,17 @@ export class BuilderToolLoop {
         if (action.toolId === 'run') {
           const listed = await this.workspace.listFiles(input.workspaceId)
           workspacePaths = listed.map(file => file.path)
-          const files = await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path)))
-          output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: text(action.input.command), files: files.filter((file): file is BuilderFile => file !== null) }))
+          const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
+            .filter((file): file is BuilderFile => file !== null)
+          let command = normalizeBuilderSandboxCommand(text(action.input.command), files)
+          if (!command) command = projectContext.recommendedTestCommand || ''
+          if (!command) {
+            const proof = files.find(file => /builderAsyncJobs|builderDebugFileJob|builderRoutingStrict/.test(file.path))
+              || files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
+            command = proof ? `node --experimental-strip-types --test ${proof.path}` : 'node --experimental-strip-types --test'
+          }
+          action.input = { ...action.input, command }
+          output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command, files }))
         }
         const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0
         if (runFailed) {

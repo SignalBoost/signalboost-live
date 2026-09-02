@@ -11,8 +11,9 @@ type CertificationSummary = { earnedLevel: number; attempts: number }
 
 const MAX_UPLOAD_BYTES = 512 * 1024
 const BUILDER_HANDOFF_FILES_KEY = 'cos-builder-handoff-files-v1'
-const BUILDER_JOB_POLL_ATTEMPTS = 20
-const BUILDER_JOB_POLL_DELAY_MS = 1_500
+const BUILDER_LAST_JOB_KEY = 'cos-builder-last-job-v1'
+const BUILDER_JOB_POLL_ATTEMPTS = 90
+const BUILDER_JOB_POLL_DELAY_MS = 2_000
 function filename(path: string): string { return path.split('/').pop() || 'download.txt' }
 function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)) }
 
@@ -69,7 +70,31 @@ export default function DeveloperPage() {
       sessionStorage.removeItem(BUILDER_HANDOFF_FILES_KEY)
     } catch { sessionStorage.removeItem(BUILDER_HANDOFF_FILES_KEY) }
     void loadWorkspaces()
+    try {
+      const saved = JSON.parse(localStorage.getItem(BUILDER_LAST_JOB_KEY) || 'null') as { jobId?: string; workspaceId?: string } | null
+      if (saved?.jobId) {
+        if (saved.workspaceId) setWorkspaceId(saved.workspaceId)
+        void restoreJob(saved.jobId)
+      }
+    } catch { /* last job restore is optional */ }
   }, [])
+
+  async function restoreJob(jobId: string) {
+    setRunning(true)
+    try {
+      const terminal = await pollBuilderJob(jobId)
+      if (terminal) {
+        if (terminal.workspaceId) setWorkspaceId(terminal.workspaceId)
+        setWorkspaceFiles(terminal.files || [])
+        setTrace(terminal.trace || [])
+        setReply(terminal.reply || terminal.error || `Job ${jobId} finished.`)
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not reload the last Builder job.')
+    } finally {
+      setRunning(false)
+    }
+  }
 
   async function loadWorkspaces() {
     try {
@@ -137,6 +162,7 @@ export default function DeveloperPage() {
       setReply(data.reply || 'Builder completed without a final report.')
 
       if (response.status === 202 && data.jobId) {
+        try { localStorage.setItem(BUILDER_LAST_JOB_KEY, JSON.stringify({ jobId: data.jobId, workspaceId: data.workspaceId || workspaceId })) } catch { /* ignore */ }
         const terminal = await pollBuilderJob(data.jobId)
         if (terminal) {
           data = terminal

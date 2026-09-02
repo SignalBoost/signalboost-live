@@ -1,6 +1,7 @@
+// tests/mainWriteDiscipline.node.test.ts
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
@@ -78,4 +79,36 @@ test('the shared token is a conflict surface, not an authority credential', () =
   assert.match(token, /^base_sha=[0-9a-f]{40}$/m)
   assert.match(token, /^branch=\S+$/m)
   assert.doesNotMatch(token, /token=|secret=|password=|api[_-]?key=/i)
+})
+
+test('every gated test file is a real test, not source code pasted into a test path', () => {
+  // Recurring corruption: an agent overwrites a tests/*.node.test.ts with the contents of a
+  // route/lib source file. The pasted file keeps its own first-line path comment (e.g.
+  // "// saas/app/api/builder/route.ts") and imports runtime-only modules like next/server, which
+  // then fail ESM resolution under Node 24 and break the whole gate. Catch it at the gate instead.
+  const testsDir = fileURLToPath(new URL('./', import.meta.url))
+  const files = readdirSync(testsDir).filter(name => name.endsWith('.node.test.ts'))
+  assert.ok(files.length > 0, 'no test files found to verify')
+
+  for (const name of files) {
+    const source = readFileSync(new URL(name, import.meta.url), 'utf8')
+    const firstLine = source.split('\n', 1)[0].trim()
+
+    // A first-line path comment must point at this file's own tests/ location, never at a
+    // route/lib/source path. This is the exact signature of the route-pasted-into-test corruption.
+    const headerPath = firstLine.startsWith('//') ? firstLine.replace(/^\/\/\s*/, '').trim() : ''
+    if (headerPath && /\.(?:ts|tsx|js|mjs|cjs)$/.test(headerPath)) {
+      assert.ok(
+        /(?:^|\/)tests\//.test(headerPath),
+        `${name}: first-line path comment points outside tests/ ("${headerPath}") — a source file was pasted into a test path`,
+      )
+    }
+
+    // A test file must never pull the Next server runtime; that only appears when route.ts was pasted in.
+    assert.doesNotMatch(
+      source,
+      /from ['"]next\/server['"]/,
+      `${name}: imports next/server — route/source code was pasted into this test file`,
+    )
+  }
 })

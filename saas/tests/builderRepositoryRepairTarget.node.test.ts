@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readBuilderObjective } from '../lib/builder/request-contract.ts'
 import {
   parseSignalBoostRepositoryRepairTarget,
   resolveSignalBoostRepositoryCommit,
@@ -80,6 +81,36 @@ test('noisy Vercel output targets the actual failing test instead of passing tes
   assert.match(objective, /Narrow proof command: node --test tests\/builderAsyncJobs\.node\.test\.ts/)
   assert.match(objective, /Do not cd into another directory/)
   assert.match(objective, /do not use npm test -- <file>/i)
+})
+
+test('Builder intake preserves a long Vercel log tail so Platform Engineer keeps the exact failed revision and test', () => {
+  const header = [
+    '15:24:42.495 Running build in Cleveland, USA (East) – cle1',
+    '15:24:42.602 Cloning github.com/SignalBoost/signalboost-live (Branch: main, Commit: 7f189e1)',
+    '15:24:46.897 Running "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build"',
+  ]
+  const noise = Array.from({ length: 2_500 }, (_, index) =>
+    `15:24:47.${String(index % 1000).padStart(3, '0')} ✔ unrelated passing test ${index} completed successfully`,
+  )
+  const tail = [
+    '15:25:06.480 ✖ failing tests:',
+    '15:25:06.480 test at tests/builderAsyncJobs.node.test.ts:27:1',
+    '15:25:06.480 AssertionError [ERR_ASSERTION]: The input did not match the regular expression',
+    '15:25:06.480 // saas/app/api/builder/route.ts',
+    '15:25:06.494 expected: /require 1–4 supported/',
+    '15:25:06.510 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+  ]
+  const raw = [...header, ...noise, ...tail].join('\n')
+  assert.ok(raw.length > 64_000)
+  const compacted = readBuilderObjective({ objective: raw }).objective
+  assert.equal(compacted.length, 64_000)
+  assert.match(compacted, /Cloning github\.com\/SignalBoost\/signalboost-live/)
+  assert.match(compacted, /tests\/builderAsyncJobs\.node\.test\.ts:27:1/)
+  const target = parseSignalBoostRepositoryRepairTarget(compacted)
+  assert.ok(target)
+  assert.equal(target.commitSha, '7f189e1')
+  assert.equal(target.pathHints[0], 'saas/tests/builderAsyncJobs.node.test.ts')
+  assert.ok(target.failureEvidence.some(line => line.includes('ERR_ASSERTION')))
 })
 
 test('resolves a short revision to one immutable full commit before sandbox setup', async () => {

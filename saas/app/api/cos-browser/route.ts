@@ -194,7 +194,12 @@ export async function POST(req: NextRequest) {
       })
     : req
 
-  if (isConciergeArtifactObjective(prompt)) {
+  // Operational evidence must never be reinterpreted as a creative objective. Build output can
+  // contain test titles such as "draw named people" or "create image"; those strings describe
+  // the test suite and do not authorize the visual or artifact tools.
+  const creativeRoutingAllowed = !isOperationalLogEvidence(operationalPrompt)
+
+  if (creativeRoutingAllowed && isConciergeArtifactObjective(prompt)) {
     const headers = new Headers(req.headers)
     headers.set('content-type', 'application/json')
     headers.delete('content-length')
@@ -206,7 +211,7 @@ export async function POST(req: NextRequest) {
     return withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
   }
 
-  if (isConciergeVisualObjective(prompt)) {
+  if (creativeRoutingAllowed && isConciergeVisualObjective(prompt)) {
     const headers = new Headers(req.headers)
     headers.set('content-type', 'application/json')
     headers.delete('content-length')

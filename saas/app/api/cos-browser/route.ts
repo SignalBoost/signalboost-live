@@ -21,6 +21,7 @@ import { runBuilderJob } from '@/lib/builder/job-runner'
 import { readBuilderObjective } from '@/lib/builder/request-contract'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
+import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -109,20 +110,22 @@ export async function POST(req: NextRequest) {
   const auditUserId = access?.userId ?? null
 
   const routingContext = builderRoutingContextFromBody(body)
+  const attachedOperationalEvidence = readAttachedOperationalEvidence(body?.attachments)
+  const operationalPrompt = attachedOperationalEvidence ? `${prompt}\n\n${attachedOperationalEvidence}`.trim() : prompt
   const hasSourceAttachment = (routingContext.attachmentNames || []).some((name: string) =>
     /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i.test(String(name || '')),
   )
-  const pastedOperationalLog = isPastedOperationalLog(prompt)
-  const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(prompt)
+  const pastedOperationalLog = isPastedOperationalLog(operationalPrompt)
+  const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(operationalPrompt)
     || (pastedOperationalLog && hasExplicitOperationalLogRepairIntent(previousUserPrompt))
 
-  const operationalLogAnalysis = analyzeOperationalLog(prompt)
+  const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
   const exactFailedLogTarget = operationalLogAnalysis.failed
-    ? parseSignalBoostRepositoryRepairTarget(prompt)
+    ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
   const ownerSignalBoostLogTarget = access?.isOwner && access.userId && !hasSourceAttachment
-    && isOperationalLogEvidence(prompt) && operationalLogAnalysis.failed
-    && SIGNALBOOST_OPERATIONAL_TARGET.test(prompt)
+    && isOperationalLogEvidence(operationalPrompt) && operationalLogAnalysis.failed
+    && SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt)
     ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(prompt, {
         commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
         branch: process.env.VERCEL_GIT_COMMIT_REF,
@@ -132,7 +135,7 @@ export async function POST(req: NextRequest) {
     const conversationId = UUID.test(String(body?.context?.conversationId || ''))
       ? String(body.context.conversationId)
       : crypto.randomUUID()
-    const objective = readBuilderObjective({ objective: prompt }).objective
+    const objective = readBuilderObjective({ objective: operationalPrompt }).objective
     const job = await enqueueSignalBoostRepositoryRepairJob({
       userId: access.userId,
       conversationId,
@@ -144,12 +147,12 @@ export async function POST(req: NextRequest) {
   }
 
   if (explicitOperationalRepair && !hasSourceAttachment) {
-    const repositoryTarget = parseSignalBoostRepositoryRepairTarget(prompt)
+    const repositoryTarget = parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     if (access?.isOwner && access.userId && repositoryTarget) {
       const conversationId = UUID.test(String(body?.context?.conversationId || ''))
         ? String(body.context.conversationId)
         : crypto.randomUUID()
-      const objective = readBuilderObjective({ objective: prompt }).objective
+      const objective = readBuilderObjective({ objective: operationalPrompt }).objective
       const job = await enqueueSignalBoostRepositoryRepairJob({
         userId: access.userId,
         conversationId,
@@ -162,7 +165,7 @@ export async function POST(req: NextRequest) {
 
     const reply = repositoryTarget
       ? 'This is an explicit SignalBoost repository-repair request, but repository repair is owner-only. No code was run.'
-      : `${operationalLogReply(prompt)} For repository repair directly from a Vercel log, include the failed SignalBoost clone line with its branch/commit and the final failing assertion or non-zero build command.`
+      : `${operationalLogReply(operationalPrompt)} For repository repair directly from a Vercel log, include the failed SignalBoost clone line with its branch/commit and the final failing assertion or non-zero build command.`
     return withSuggestedFollowups(NextResponse.json({
       reply,
       source: 'concierge-operational-log-repair-not-authorized',
@@ -176,6 +179,20 @@ export async function POST(req: NextRequest) {
   // Passive logs carry evidence but no execution authority. Continue through ordinary COS so a
   // diagnostic question receives a useful explanation and dialogue instead of the obsolete canned
   // "not editable source" reply. Builder routing still excludes unattached operational logs.
+
+  const routedHeaders = new Headers(req.headers)
+  routedHeaders.set('content-type', 'application/json')
+  routedHeaders.delete('content-length')
+  const routedRequest = attachedOperationalEvidence
+    ? new NextRequest(req.url, {
+        method: 'POST',
+        headers: routedHeaders,
+        body: JSON.stringify({
+          ...body,
+          messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message),
+        }),
+      })
+    : req
 
   if (isConciergeArtifactObjective(prompt)) {
     const headers = new Headers(req.headers)
@@ -235,7 +252,7 @@ export async function POST(req: NextRequest) {
 
   const response = await withPublicAuditIdentity(auditUserId, () =>
     withPublicDeliveryScope(() =>
-      withRunpodWakePermission(permission, () => isConciergeBuilderObjective(prompt, routingContext) ? legacyConciergePost(req) : cosPrimaryPost(req)),
+      withRunpodWakePermission(permission, () => isConciergeBuilderObjective(operationalPrompt, routingContext) ? legacyConciergePost(routedRequest) : cosPrimaryPost(routedRequest)),
     ),
   )
   return withSuggestedFollowups(response, prompt, auditUserId)

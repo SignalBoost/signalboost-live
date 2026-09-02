@@ -194,28 +194,30 @@ export async function POST(req: NextRequest) {
       })
     : req
 
-  if (!pastedOperationalLog && isConciergeArtifactObjective(prompt)) {
-    const headers = new Headers(req.headers)
-    headers.set('content-type', 'application/json')
-    headers.delete('content-length')
-    const artifactRequest = new NextRequest(new URL('/api/artifacts', req.url), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ objective: prompt }),
-    })
-    return withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
-  }
+  if (!pastedOperationalLog) {
+    if (isConciergeArtifactObjective(prompt)) {
+      const headers = new Headers(req.headers)
+      headers.set('content-type', 'application/json')
+      headers.delete('content-length')
+      const artifactRequest = new NextRequest(new URL('/api/artifacts', req.url), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ objective: prompt }),
+      })
+      return withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
+    }
 
-  if (!pastedOperationalLog && isConciergeVisualObjective(prompt)) {
-    const headers = new Headers(req.headers)
-    headers.set('content-type', 'application/json')
-    headers.delete('content-length')
-    const visualRequest = new NextRequest(new URL('/api/visuals', req.url), {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ objective: prompt }),
-    })
-    return withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
+    if (isConciergeVisualObjective(prompt)) {
+      const headers = new Headers(req.headers)
+      headers.set('content-type', 'application/json')
+      headers.delete('content-length')
+      const visualRequest = new NextRequest(new URL('/api/visuals', req.url), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ objective: prompt }),
+      })
+      return withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
+    }
   }
 
   if (isProvenanceIntrospection(prompt)) {

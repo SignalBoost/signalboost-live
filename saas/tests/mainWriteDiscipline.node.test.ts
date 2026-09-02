@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const root = new URL('../../', import.meta.url)
+const saas = fileURLToPath(new URL('../', import.meta.url))
 const readRoot = (path: string) => readFileSync(new URL(path, root), 'utf8')
 
 test('every PR to main must advance the shared serialization token from its current base', () => {
@@ -44,6 +47,21 @@ test('Vercel refuses an unverified direct-main deployment before the build start
   assert.match(guard, /git\(\['diff', '--quiet', firstParent, 'HEAD', '--', '\.github\/main-write-token'\]\)/)
   assert.match(guard, /skipping main deployment/)
   assert.match(guard, /verified serialized PR merge; continuing deployment/)
+
+  const preview = spawnSync(process.execPath, ['scripts/vercel-main-write-guard.mjs'], {
+    cwd: saas,
+    env: { ...process.env, VERCEL_GIT_COMMIT_REF: 'feature/proof' },
+    encoding: 'utf8',
+  })
+  assert.equal(preview.status, 1, `preview branch must build: ${preview.stderr}`)
+
+  const directMain = spawnSync(process.execPath, ['scripts/vercel-main-write-guard.mjs'], {
+    cwd: saas,
+    env: { ...process.env, VERCEL_GIT_COMMIT_REF: 'main' },
+    encoding: 'utf8',
+  })
+  assert.equal(directMain.status, 0, `unverified main commit must be skipped: ${directMain.stderr}`)
+  assert.match(directMain.stderr, /skipping main deployment/)
 })
 
 test('owner review and no-agent-self-merge are repository policy', () => {

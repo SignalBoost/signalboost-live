@@ -7,6 +7,7 @@ import ResetButton from '@/components/ResetButton'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
 import AssistantMessage from '@/components/AssistantMessage'
+import AgentActivity from '@/components/AgentActivity'
 import { uiText } from '@/lib/i18n/uiText'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 
@@ -504,7 +505,7 @@ export default function Concierge() {
                 </div>
               )
             })}
-            {loading && <div className="px-1 py-1 text-[13px] text-white/45">{t(dict, 'concierge.thinking')}</div>}
+            {loading && <AgentActivity lang={activeLang} compact />}
           </div>
 
           <div className="grid shrink-0 grid-cols-1 gap-2 border-t border-white/10 bg-slate-950/80 px-3.5 py-2 sm:grid-cols-2">

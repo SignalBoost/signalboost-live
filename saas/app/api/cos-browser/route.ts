@@ -29,6 +29,13 @@ export const maxDuration = 300
 const SIGNALBOOST_OPERATIONAL_TARGET = /\b(?:signalboost-live|(?:saas\.)?signalboostapp\.com)\b/i
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+function isSignalBoostDeploymentContext(req: NextRequest): boolean {
+  const owner = String(process.env.VERCEL_GIT_REPO_OWNER || '').trim().toLowerCase()
+  const repo = String(process.env.VERCEL_GIT_REPO_SLUG || '').trim().toLowerCase()
+  const host = String(req.nextUrl.hostname || '').trim().toLowerCase()
+  return (owner === 'signalboost' && repo === 'signalboost-live') || host === 'saas.signalboostapp.com'
+}
+
 export async function withSuggestedFollowups(response: Response, prompt: string, userId: string | null = null): Promise<NextResponse> {
   const headers = new Headers(response.headers)
   headers.delete('content-length')
@@ -124,9 +131,14 @@ export async function POST(req: NextRequest) {
   const exactFailedLogTarget = operationalLogAnalysis.failed
     ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
+  // A clipped log pane may omit the clone line and even the repository name. For an authenticated
+  // owner request already executing inside the verified SignalBoost deployment, the deployment's
+  // immutable Vercel commit/branch is authoritative project binding. If the log still carries an
+  // exact failed clone target, that exact target wins.
+  const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req)
   const ownerSignalBoostLogTarget = access?.isOwner && access.userId && !hasSourceAttachment
     && operationalEvidence && operationalLogAnalysis.failed
-    && SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt)
+    && signalBoostProjectBound
     ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(prompt, {
         commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
         branch: process.env.VERCEL_GIT_COMMIT_REF,

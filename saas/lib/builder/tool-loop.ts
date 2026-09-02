@@ -87,10 +87,6 @@ function toolContent(input: Record<string, unknown>): string {
   return text(input.content) || text(input.contents) || text(input.code) || text(input.text)
 }
 
-function normalizedRunCommand(input: Record<string, unknown>): string {
-  return text(input.command).trim().replace(/\s+/g, ' ')
-}
-
 function hasToolContent(input: Record<string, unknown>): boolean {
   return ['content', 'contents', 'code', 'text'].some(key => typeof input[key] === 'string')
 }
@@ -425,42 +421,16 @@ export class BuilderToolLoop {
         return { ok: false, error: failure.error, trace }
       }
 
-      if (action.type === 'answer' && repairPhase && repairPhase !== 'complete') {
-        const remediation = formatRepairPhase(repairPhase, projectContext.recommendedTestCommand)
-        let forcedCommand = ''
-        if (repairPhase === 'reproduce') {
-          const inspectedPath = inspectedSource ? toolPath(inspectedSource.input) : ''
-          const inspectedTestCommand = /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(inspectedPath)
-            ? `node --experimental-strip-types --test ${inspectedPath}`
-            : ''
-          const candidate = inspectedTestCommand || projectContext.recommendedTestCommand || ''
-          const normalizedCandidate = candidate.trim().replace(/\s+/g, ' ')
-          const matchingRuns = normalizedCandidate
-            ? trace.filter(item => item.toolId === 'run' && normalizedRunCommand(item.input) === normalizedCandidate)
-            : []
-          if (candidate && matchingRuns.length === 0 && runCount < MAX_RUNS_PER_TURN) {
-            forcedCommand = candidate
-          } else if (matchingRuns.some(item => item.ok)) {
-            return { ok: false, error: 'builder_regression_not_reproduced', trace }
-          }
-        } else if (repairPhase === 'verify') {
-          const failedProof = trace.find(item => item.toolId === 'run'
-            && !item.ok
-            && normalizedRunCommand(item.input)
-            && (!item.failureClass || item.failureClass === 'test' || item.failureClass === 'deployment'))
-          if (failedProof && runCount < MAX_RUNS_PER_TURN) forcedCommand = text(failedProof.input.command).trim()
-        }
-
-        if (forcedCommand) {
-          action = { type: 'tool', toolId: 'run', input: { command: forcedCommand } }
-        } else {
+      if (action.type === 'answer') {
+        if (repairPhase && repairPhase !== 'complete') {
+          const remediation = formatRepairPhase(repairPhase, projectContext.recommendedTestCommand)
           gateNudges += 1
           if (gateNudges > MAX_GATE_NUDGES) {
             return { ok: false, error: 'builder_regression_evidence_required', trace }
           }
           trace.push({
             round,
-            toolId: 'model_control',
+            toolId: 'run',
             input: {},
             ok: false,
             error: `builder_repair_phase_required: ${repairPhase}`,
@@ -469,34 +439,28 @@ export class BuilderToolLoop {
           })
           continue
         }
-      }
-      if (action.type === 'answer' && inspectedSource) {
-        gateNudges += 1
-        if (gateNudges > MAX_GATE_NUDGES) {
-          return { ok: false, error: 'builder_regression_evidence_required', trace }
+        if (inspectedSource) {
+          gateNudges += 1
+          if (gateNudges > MAX_GATE_NUDGES) {
+            return { ok: false, error: 'builder_regression_evidence_required', trace }
+          }
+          trace.push({
+            round,
+            toolId: 'run',
+            input: {},
+            ok: false,
+            error: 'builder_repair_progress_required: write or edit a regression test/source file before answering',
+            failureClass: 'test',
+            remediation: 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.',
+          })
+          continue
         }
-        trace.push({
-          round,
-          toolId: 'model_control',
-          input: {},
-          ok: false,
-          error: 'builder_repair_progress_required: write or edit a regression test/source file before answering',
-          failureClass: 'test',
-          remediation: 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.',
-        })
-        continue
-      }
-      if (action.type === 'answer') {
-        const modifiedExistingFile = trace.some(item => item.ok
-          && (item.toolId === 'write_file' || item.toolId === 'edit_file')
-          && initialPaths.has(toolPath(item.input)))
-        const repairClaim = isRepairObjective(`${input.objective}\n${action.answer}`)
-        const verdict = evaluateRegressionGate(input.objective, trace, modifiedExistingFile || repairClaim)
+        const verdict = evaluateRegressionGate(input.objective, trace)
         if (verdict.satisfied) return { ok: true, answer: action.answer, trace }
         const reason = 'reason' in verdict ? verdict.reason : 'regression evidence is required'
         gateNudges += 1
         if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_regression_evidence_required', trace }
-        trace.push({ round, toolId: 'model_control', input: {}, ok: false, error: `builder_regression_gate: ${reason}`, failureClass: 'test', remediation: reason })
+        trace.push({ round, toolId: 'run', input: {}, ok: false, error: `builder_regression_gate: ${reason}`, failureClass: 'test', remediation: reason })
         continue
       }
       if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= MAX_WRITES_PER_TURN) return { ok: false, error: 'builder_write_budget_exhausted', trace }

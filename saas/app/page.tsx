@@ -40,6 +40,14 @@ const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,applicati
 const BUILDER_WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const IMAGE_FILE_RE = /\.(?:png|jpe?g|webp)$/i
 const OWNER_SCOPED_PREVIEW_RE = /^\/api\/builder\/workspaces\/[0-9a-f-]+\/files\/.+\?preview=1$/i
+const GUEST_VISUAL_DATA_URL_RE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i
+const MAX_GUEST_VISUAL_URL_CHARS = 8_000_000
+
+function safeVisualPreviewUrl(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  if (OWNER_SCOPED_PREVIEW_RE.test(value)) return value
+  return value.length <= MAX_GUEST_VISUAL_URL_CHARS && GUEST_VISUAL_DATA_URL_RE.test(value) ? value : ''
+}
 
 function builderPreviewUrl(workspaceId: string, path: string): string {
   if (!BUILDER_WORKSPACE_ID_RE.test(workspaceId) || !path || !IMAGE_FILE_RE.test(path)) return ''
@@ -189,13 +197,13 @@ export default function Home() {
       const builderFiles = Array.isArray(payload?.files)
         ? payload.files.filter((value: unknown): value is string => typeof value === 'string').slice(0, 50)
         : []
-      const structuredVisualPreviewUrl = typeof payload?.visual?.previewUrl === 'string'
-        && OWNER_SCOPED_PREVIEW_RE.test(payload.visual.previewUrl)
-        ? payload.visual.previewUrl
-        : ''
+      const structuredVisualPreviewUrl = safeVisualPreviewUrl(payload?.visual?.previewUrl)
+      const visualFilename = typeof payload?.visual?.filename === 'string' && /^[a-z0-9._-]{1,120}$/i.test(payload.visual.filename)
+        ? payload.visual.filename
+        : 'visual.png'
       const imagePath = builderFiles.find((path) => IMAGE_FILE_RE.test(path)) || ''
       const visualPreviewUrl = structuredVisualPreviewUrl || builderPreviewUrl(builderWorkspaceId, imagePath)
-      return { reply, suggestedFollowups, builderWorkspaceId, builderFiles, visualPreviewUrl }
+      return { reply, suggestedFollowups, builderWorkspaceId, builderFiles, visualPreviewUrl, visualFilename }
     }
 
     try {
@@ -219,6 +227,7 @@ export default function Home() {
         ...(result.suggestedFollowups.length === 2 ? { suggestedFollowups: result.suggestedFollowups } : {}),
         ...(result.builderWorkspaceId && result.builderFiles.length ? { builderWorkspaceId: result.builderWorkspaceId, builderFiles: result.builderFiles } : {}),
         ...(result.visualPreviewUrl ? { visualPreviewUrl: result.visualPreviewUrl } : {}),
+        ...(result.visualPreviewUrl ? { visualFilename: result.visualFilename } : {}),
       }])
       setPendingRequest('')
       setQuestion('')
@@ -336,6 +345,7 @@ export default function Home() {
                           width={512}
                           style={{ display: 'block', width: '100%', height: '100%', objectFit: 'contain' }}
                         />
+                        <a href={turn.visualPreviewUrl} download={turn.visualFilename || 'visual.png'} className="secondary-button text-xs">{t(dict, 'concierge.downloadVisual')}</a>
                       </figure>
                     ) : null}
                     {turn.builderWorkspaceId && turn.builderFiles?.some((path) => /\.html?$/i.test(path)) ? (

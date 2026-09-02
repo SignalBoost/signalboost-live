@@ -4,8 +4,9 @@ export type ConciergeTranscriptTurn = {
   suggestedFollowups?: string[]
   builderWorkspaceId?: string
   builderFiles?: string[]
-  /** Owner-scoped image artifact rendered separately from the assistant prose. */
+  /** Safe owner-scoped URL or same-response anonymous trial data URL. */
   visualPreviewUrl?: string
+  visualFilename?: string
 }
 
 export function transcriptMessages(turns: ConciergeTranscriptTurn[], pendingRequest: string) {

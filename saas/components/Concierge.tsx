@@ -23,6 +23,8 @@ type Message = {
   suggestedFollowups?: string[]
   builderWorkspaceId?: string
   builderFiles?: string[]
+  visualPreviewUrl?: string
+  visualFilename?: string
 }
 type VideoItem = { title: string; type: string; id: string }
 
@@ -42,6 +44,8 @@ const ASSET_READY_KEY = 'signalboost.concierge.assetReady'
 // The server primary is bounded at 150 s. Give public recovery/serialization another minute, then
 // stop waiting well before Vercel's 300 s function ceiling so a lost socket can never spin forever.
 const CONCIERGE_CLIENT_DEADLINE_MS = 210_000
+const SAFE_VISUAL_PREVIEW_RE = /^(?:\/api\/builder\/workspaces\/[0-9a-f-]+\/files\/.+\?preview=1|data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+)$/i
+const MAX_INLINE_VISUAL_URL_CHARS = 8_000_000
 // Credit pack pricing shows only when the activation flag is on (Vercel env:
 // NEXT_PUBLIC_CREDITS_ACTIVATION=1). Mirrors the Studio catalog badge gate.
 const CREDITS_ACTIVATION = process.env.NEXT_PUBLIC_CREDITS_ACTIVATION === '1'
@@ -356,6 +360,14 @@ export default function Concierge() {
       const builderFiles = Array.isArray(data?.files)
         ? data.files.filter((value: unknown): value is string => typeof value === 'string').slice(0, 50)
         : []
+      const visualPreviewUrl = typeof data?.visual?.previewUrl === 'string'
+        && data.visual.previewUrl.length <= MAX_INLINE_VISUAL_URL_CHARS
+        && SAFE_VISUAL_PREVIEW_RE.test(data.visual.previewUrl)
+        ? data.visual.previewUrl
+        : ''
+      const visualFilename = typeof data?.visual?.filename === 'string' && /^[a-z0-9._-]{1,120}$/i.test(data.visual.filename)
+        ? data.visual.filename
+        : 'visual.png'
       setMessages(prev => [
         ...prev,
         {
@@ -364,6 +376,7 @@ export default function Concierge() {
           ...(feedbackEligible ? { feedbackPrompt: content, feedbackEligible: true } : {}),
           ...(suggestedFollowups.length === 2 ? { suggestedFollowups } : {}),
           ...(builderWorkspaceId && builderFiles.length ? { builderWorkspaceId, builderFiles } : {}),
+          ...(visualPreviewUrl ? { visualPreviewUrl, visualFilename } : {}),
         },
       ])
     } catch {
@@ -458,6 +471,12 @@ export default function Concierge() {
                     : 'max-w-[88%] self-start rounded-2xl rounded-bl-md border border-white/10 bg-white/10 px-3.5 py-2.5 text-[13px] leading-6 text-white'}
                 >
                   {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
+                  {message.role === 'assistant' && message.visualPreviewUrl ? (
+                    <figure className="mt-3 grid place-items-center gap-2 overflow-hidden rounded-xl border border-white/15 bg-white p-2">
+                      <img src={message.visualPreviewUrl} alt={message.content} className="max-h-[28rem] w-full object-contain" />
+                      <a href={message.visualPreviewUrl} download={message.visualFilename || 'visual.png'} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-700 hover:bg-cyan-300/20">{t(dict, 'concierge.downloadVisual')}</a>
+                    </figure>
+                  ) : null}
                   {message.role === 'assistant' && message.builderWorkspaceId && message.builderFiles?.length ? (
                     <>
                     <BuilderFilePreviews workspaceId={message.builderWorkspaceId} files={message.builderFiles} />

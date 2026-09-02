@@ -36,7 +36,8 @@ type Attachment = {
 const ATTACH_MAX_BYTES = 10 * 1024 * 1024
 const ATTACH_MAX_FILES = 5
 const ATTACH_ALLOWED_RE = /^(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/i
-const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv'
+const BUILDER_SOURCE_FILE_RE = /\.(?:c?js|mjs|cts|mts|ts|py)$/i
+const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv,.js,.mjs,.cjs,.ts,.mts,.cts,.py'
 const BUILDER_WORKSPACE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const IMAGE_FILE_RE = /\.(?:png|jpe?g|webp)$/i
 const OWNER_SCOPED_PREVIEW_RE = /^\/api\/builder\/workspaces\/[0-9a-f-]+\/files\/.+\?preview=1$/i
@@ -99,7 +100,7 @@ export default function Home() {
     if (!fileList) return
     const staged: Attachment[] = []
     for (const file of Array.from(fileList)) {
-      const allowed = ATTACH_ALLOWED_RE.test(file.type) || /\.(txt|md|csv)$/i.test(file.name)
+      const allowed = ATTACH_ALLOWED_RE.test(file.type) || /\.(txt|md|csv)$/i.test(file.name) || BUILDER_SOURCE_FILE_RE.test(file.name)
       if (!allowed || file.size > ATTACH_MAX_BYTES) continue
       try {
         const dataUrl = await readFileAsDataUrl(file)

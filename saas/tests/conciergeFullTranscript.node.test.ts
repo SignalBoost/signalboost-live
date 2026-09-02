@@ -94,6 +94,7 @@ test('homepage restores a welcome-first front door and retains the assistant-sty
   assert.match(source, /copy\.copyQuestion/)
   assert.match(source, /copy\.copyResponse/)
   assert.match(source, /function startNewChat\(\)/)
+  assert.match(source, /fetch\('\/api\/artifacts'/)
   assert.match(source, /postWithAgentProgress\(\{/)
   assert.match(source, /target: 'concierge'/)
   assert.match(source, /builderWorkspaceId/)

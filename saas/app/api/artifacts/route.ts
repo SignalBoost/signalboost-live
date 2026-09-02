@@ -10,7 +10,9 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 90
 
 const MAX_OBJECTIVE_CHARS = 8_000
+const MAX_SOURCE_CHARS = 120_000
 const PDF_PREFIX = 'artifact-pdf-base64:'
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function objectiveOf(value: unknown): string {
   const objective = String(value || '').replace(/\0/g, '').trim()
@@ -18,17 +20,31 @@ function objectiveOf(value: unknown): string {
   return objective
 }
 
-function documentPrompt(objective: string, format: 'txt' | 'pdf'): string {
+function documentPrompt(objective: string, format: 'txt' | 'pdf', sourceText: string): string {
   return [
     'Write the finished body of a user-requested document.',
-    'Use only details stated by the user. Do not invent dates, names, sources, facts, or contact details.',
+    'Use only details stated by the user or present in the supplied current-conversation source material. Do not invent dates, names, sources, facts, or contact details.',
+    'When source material is supplied, convert that material faithfully into the requested format; do not replace it with a generic explanation.',
     'If the request asks for unprovided factual research, state that the needed facts are missing rather than fabricating them.',
     'Return only the document body, with no preamble, markdown fence, filename, or explanation.',
     `Requested format: ${format}.`,
     '',
     'USER REQUEST:',
     objective,
+    ...(sourceText ? ['', 'SOURCE MATERIAL FROM THE CURRENT CONVERSATION:', sourceText] : []),
   ].join('\n')
+}
+
+async function sourceMaterial(body: any, userId: string): Promise<string> {
+  const workspaceId = String(body?.sourceWorkspaceId || '')
+  const sourcePath = String(body?.sourcePath || '').trim()
+  if (UUID.test(workspaceId) && sourcePath && sourcePath.length <= 500 && !sourcePath.split('/').includes('..')) {
+    const workspace = createSupabaseBuilderWorkspace(userId)
+    const file = workspace ? await workspace.readFile(workspaceId, sourcePath).catch(() => null) : null
+    const content = String(file?.content || '')
+    if (content && !/^artifact-(?:pdf|image)-base64:/.test(content)) return content.slice(0, MAX_SOURCE_CHARS)
+  }
+  return String(body?.sourceText || '').replace(/\0/g, '').trim().slice(0, MAX_SOURCE_CHARS)
 }
 
 /** Authenticated Concierge artifact tool. It creates a downloadable document; it never sends it. */
@@ -41,10 +57,11 @@ export async function POST(request: Request) {
     const objective = objectiveOf(body?.objective)
     const intent = detectConciergeArtifactIntent(objective)
     if (!intent) return NextResponse.json({ error: 'artifact_format_not_recognised' }, { status: 400 })
+    const sourceText = await sourceMaterial(body, access.userId)
 
     const generated = await createPlatformAiPort().generate({
       systemPrompt: 'You create precise, safe document drafts for the authenticated SignalBoost Concierge.',
-      prompt: documentPrompt(objective, intent.format),
+      prompt: documentPrompt(objective, intent.format, sourceText),
       maxTokens: 2_400,
     })
     const documentBody = String(generated || '').replace(/\0/g, '').trim()

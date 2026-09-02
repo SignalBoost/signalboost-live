@@ -66,3 +66,16 @@ test('reports a final test failure instead of calling the log incomplete', () =>
   assert.match(operationalLogReply(log), /This Vercel build failed/)
   assert.match(operationalLogReply(log), /both answer paths resolve markers/i)
 })
+
+test('an incomplete build excerpt gets an actionable diagnostic reply instead of the obsolete canned refusal', () => {
+  const log = [
+    '22:44:23.200 Running vercel build',
+    'Vercel CLI 59.3.0',
+    'GET 202 /api/builder',
+  ].join('\n')
+  const reply = operationalLogReply(log)
+  assert.match(reply, /does not include a failing assertion or a non-zero final command/i)
+  assert.match(reply, /No code was changed/i)
+  assert.match(reply, /attach the affected source file/i)
+  assert.doesNotMatch(reply, /not editable source code|not a request to portray anyone/i)
+})

@@ -21,6 +21,8 @@ import {
   shouldClarifyUserSuppliedScenario,
 } from '@/lib/homepageConciergePolicy'
 import { listPublicPortableProducts } from '@/lib/portable-products'
+import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
+import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 
 type Attachment = {
@@ -157,11 +159,15 @@ export default function Home() {
     const controller = new AbortController()
 
     const send = async (transportPrompt: string) => {
-      const result = await postWithAgentProgress({
-        target: 'concierge',
-        signal: controller.signal,
-        onProgress: setActivity,
-        body: {
+      const artifactRequest = staged.length === 0 && isConciergeArtifactObjective(prompt)
+      const priorTurn = turns.at(-1)
+      const sourcePath = priorTurn?.builderFiles?.find(path => /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt|txt|md|csv)$/i.test(path))
+      const body = artifactRequest ? {
+          objective: prompt,
+          sourceText: priorTurn?.response || '',
+          sourceWorkspaceId: priorTurn?.builderWorkspaceId || '',
+          sourcePath: sourcePath || '',
+        } : {
           messages: transcriptMessages(turns, transportPrompt),
           attachments: staged.map(({ name, type, dataUrl }) => ({ name, type, dataUrl })),
           context: {
@@ -170,9 +176,10 @@ export default function Home() {
             conversationId: conversationIdRef.current,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           },
-        },
-      })
-      const payload = result.data
+        }
+      const payload = artifactRequest
+        ? await fetch('/api/artifacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal, body: JSON.stringify(body) }).then(response => response.json())
+        : (await postWithAgentProgress({ target: 'concierge', signal: controller.signal, onProgress: setActivity, body })).data
       const reply = String(payload?.reply || payload?.error || '').trim()
       if (!reply) throw new Error('concierge_unavailable')
       const suggestedFollowups = Array.isArray(payload?.suggested_followups)
@@ -340,13 +347,18 @@ export default function Home() {
                       />
                     ) : null}
                     {turn.builderWorkspaceId && turn.builderFiles?.length ? (
+                      <>
+                      <BuilderFilePreviews workspaceId={turn.builderWorkspaceId} files={turn.builderFiles} />
                       <div className="mt-3 flex flex-wrap gap-2">
                         {turn.builderFiles.map((path) => (
                           <a key={path} href={`/api/builder/workspaces/${encodeURIComponent(turn.builderWorkspaceId!)}/files/${path.split('/').map(encodeURIComponent).join('/')}`} download={path.split('/').pop() || 'download.txt'} className="secondary-button text-xs">
                             {uiText('generatedUi.u_75cf7ab15fa05201')} {path}
                           </a>
                         ))}
+                        <button type="button" disabled={loading} onClick={() => void ask('Give me that result as a TXT file.')} className="secondary-button text-xs disabled:opacity-50">{t(dict, 'concierge.txtFormat')}</button>
+                        <button type="button" disabled={loading} onClick={() => void ask('Give me that result as a PDF file.')} className="secondary-button text-xs disabled:opacity-50">{t(dict, 'concierge.pdfFormat')}</button>
                       </div>
+                      </>
                     ) : null}
                     {turn.suggestedFollowups?.length === 2 ? (
                       <div className="mt-3 border-t border-white/10 pt-2.5">

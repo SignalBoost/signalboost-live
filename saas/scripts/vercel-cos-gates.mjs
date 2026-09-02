@@ -22,6 +22,7 @@ const tests = [
   'tests/assistantHistoryOrdering.node.test.ts',
   'tests/assistantSourceFileBoundary.node.test.ts',
   'tests/conciergeOperationalLogRouting.node.test.ts',
+  'tests/conciergeResultDelivery.node.test.ts',
   'tests/fullAssistantConciergeIngress.node.test.ts',
   'tests/builderRepositoryRepairTarget.node.test.ts',
   'tests/builderRepositoryRepairSecurity.node.test.ts',

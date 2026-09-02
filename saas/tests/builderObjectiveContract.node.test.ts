@@ -9,6 +9,7 @@ import {
 } from '../lib/builder/request-contract.ts'
 
 const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
+const developer = readFileSync(new URL('../app/dashboard/developer/page.tsx', import.meta.url), 'utf8')
 const policy = readFileSync(new URL('../lib/ai/cos/cosReasoningRolePolicy.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../supabase/migrations/20260831184000_builder_objective_contract_alignment.sql', import.meta.url), 'utf8')
 const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
@@ -41,6 +42,14 @@ test('Builder compacts copied context at the 64,000-character durable boundary',
     rejectedCode(() => readBuilderObjective({ objective: 'x'.repeat(MAX_BUILDER_RAW_OBJECTIVE_CHARS + 1) })),
     'builder_objective_too_large',
   )
+})
+
+test('Developer workspace exposes the same raw intake cap instead of clipping logs at 8,000 characters', () => {
+  assert.match(developer, /MAX_BUILDER_RAW_OBJECTIVE_CHARS/)
+  assert.match(developer, /suggestedObjective\.slice\(0, MAX_BUILDER_RAW_OBJECTIVE_CHARS\)/)
+  assert.match(developer, /maxLength=\{MAX_BUILDER_RAW_OBJECTIVE_CHARS\}/)
+  assert.doesNotMatch(developer, /suggestedObjective\.slice\(0, 8_000\)/)
+  assert.doesNotMatch(developer, /maxLength=\{?8000\}?/)
 })
 
 test('Builder recovers supported request envelopes instead of treating a missing objective field as empty', () => {

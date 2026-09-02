@@ -39,3 +39,9 @@ test('log-only diagnostic questions reach COS while unattached logs remain exclu
   assert.match(browser, /Passive logs carry evidence but no execution authority/)
   assert.match(policy, /isOperationalLogEvidence\(raw\) && !sourceAttachment\(context\)/)
 })
+
+test('public Concierge uses the canonical browser ingress instead of a second routing stack', () => {
+  const progressClient = read('../lib/ai/cos/agentProgressClient.ts')
+  assert.match(progressClient, /args\.target === 'cos' \? '\/api\/cos-primary' : '\/api\/cos-browser'/)
+  assert.doesNotMatch(progressClient, /args\.target === 'cos' \? '\/api\/cos-primary' : '\/api\/concierge'/)
+})

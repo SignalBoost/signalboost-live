@@ -20,6 +20,8 @@ import {
   shouldClarifyUserSuppliedScenario,
 } from '@/lib/homepageConciergePolicy'
 import { listPublicPortableProducts } from '@/lib/portable-products'
+import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
+import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 
 type Attachment = {
   id: string
@@ -152,10 +154,18 @@ export default function Home() {
     setPendingRequest(displayContent)
 
     const send = async (transportPrompt: string) => {
-      const response = await fetch('/api/concierge', {
+      const artifactRequest = staged.length === 0 && isConciergeArtifactObjective(prompt)
+      const priorTurn = turns.at(-1)
+      const sourcePath = priorTurn?.builderFiles?.find(path => /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt|txt|md|csv)$/i.test(path))
+      const response = await fetch(artifactRequest ? '/api/artifacts' : '/api/concierge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(artifactRequest ? {
+          objective: prompt,
+          sourceText: priorTurn?.response || '',
+          sourceWorkspaceId: priorTurn?.builderWorkspaceId || '',
+          sourcePath: sourcePath || '',
+        } : {
           messages: transcriptMessages(turns, transportPrompt),
           attachments: staged.map(({ name, type, dataUrl }) => ({ name, type, dataUrl })),
           context: {
@@ -333,13 +343,18 @@ export default function Home() {
                       />
                     ) : null}
                     {turn.builderWorkspaceId && turn.builderFiles?.length ? (
+                      <>
+                      <BuilderFilePreviews workspaceId={turn.builderWorkspaceId} files={turn.builderFiles} />
                       <div className="mt-3 flex flex-wrap gap-2">
                         {turn.builderFiles.map((path) => (
                           <a key={path} href={`/api/builder/workspaces/${encodeURIComponent(turn.builderWorkspaceId!)}/files/${path.split('/').map(encodeURIComponent).join('/')}`} download={path.split('/').pop() || 'download.txt'} className="secondary-button text-xs">
                             {uiText('generatedUi.u_75cf7ab15fa05201')} {path}
                           </a>
                         ))}
+                        <button type="button" disabled={loading} onClick={() => void ask('Give me that result as a TXT file.')} className="secondary-button text-xs disabled:opacity-50">TXT</button>
+                        <button type="button" disabled={loading} onClick={() => void ask('Give me that result as a PDF file.')} className="secondary-button text-xs disabled:opacity-50">PDF</button>
                       </div>
+                      </>
                     ) : null}
                     {turn.suggestedFollowups?.length === 2 ? (
                       <div className="mt-3 border-t border-white/10 pt-2.5">

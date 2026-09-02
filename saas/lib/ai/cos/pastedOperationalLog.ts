@@ -60,7 +60,7 @@ export function analyzeOperationalLog(input: string): OperationalLogAnalysis {
 export function operationalLogReply(input: string): string {
   const analysis = analyzeOperationalLog(input)
   if (!analysis.failed) {
-    return 'This is a Vercel build log, not editable source code and not a request to portray anyone. The shown entries are setup, warnings, or passing tests. Paste the lines after "failing tests" (the ✖ assertions) and the affected source file if you want a repair.'
+    return 'The excerpt shows a Vercel build in progress, but it does not include a failing assertion or a non-zero final command, so there is not enough evidence yet to identify a defect. No code was changed. Paste the final error or ✖ assertion and, if you want a code repair, attach the affected source file.'
   }
   const failures = analysis.testFailures.length
     ? ` The failing checks shown are: ${analysis.testFailures.join('; ')}.`
@@ -70,5 +70,5 @@ export function operationalLogReply(input: string): string {
     : analysis.exitCode !== null
       ? ` The build command exited ${analysis.exitCode}.`
       : ''
-  return `This Vercel build failed.${command}${failures} Names that appear inside test titles are not people to draw or invent. This is build evidence, not editable source code. Send the affected source file or the final assertion/error block for one failing test, and COS can make and verify the repair.`
+  return `This Vercel build failed.${command}${failures} No code was changed from the log alone. Attach the affected source file and COS can diagnose, repair, and verify it; if the source is not available, paste the final assertion/error block and COS will continue the diagnosis.`
 }

@@ -10,6 +10,7 @@ import AssistantMessage from '@/components/AssistantMessage'
 import AgentActivity from '@/components/AgentActivity'
 import { uiText } from '@/lib/i18n/uiText'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
+import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 
 type FeedbackKind = 'positive' | 'negative' | 'correction'
@@ -322,8 +323,15 @@ export default function Concierge() {
       // stays on public Concierge. An attached prompt remains ordinary conversation so no
       // reference material is silently omitted from an artifact.
       const artifactRequest = staged.length === 0 && isConciergeArtifactObjective(content)
+      const priorAssistant = [...messages].reverse().find(message => message.role === 'assistant')
+      const sourcePath = priorAssistant?.builderFiles?.find(path => /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt|txt|md|csv)$/i.test(path))
       const requestBody = artifactRequest
-        ? { objective: content }
+        ? {
+            objective: content,
+            sourceText: priorAssistant?.content || '',
+            sourceWorkspaceId: priorAssistant?.builderWorkspaceId || '',
+            sourcePath: sourcePath || '',
+          }
         : {
               messages: nextMessages,
               attachments: staged.map(a => ({ name: a.name, type: a.type, dataUrl: a.dataUrl })),
@@ -451,6 +459,8 @@ export default function Concierge() {
                 >
                   {message.role === 'assistant' ? <ConciergeVideoMessage content={message.content} /> : message.content}
                   {message.role === 'assistant' && message.builderWorkspaceId && message.builderFiles?.length ? (
+                    <>
+                    <BuilderFilePreviews workspaceId={message.builderWorkspaceId} files={message.builderFiles} />
                     <div className="mt-3 flex flex-wrap gap-2">
                       {message.builderFiles.map(path => (
                         <a
@@ -462,7 +472,10 @@ export default function Concierge() {
                           {uiText('generatedUi.u_75cf7ab15fa05201')} {path}
                         </a>
                       ))}
+                      <button type="button" disabled={loading} onClick={() => ask('Give me that result as a TXT file.')} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-300/20 disabled:opacity-50">TXT</button>
+                      <button type="button" disabled={loading} onClick={() => ask('Give me that result as a PDF file.')} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-300/20 disabled:opacity-50">PDF</button>
                     </div>
+                    </>
                   ) : null}
                   {message.role === 'assistant' && message.suggestedFollowups?.length === 2 ? (
                     <div className="mt-3 border-t border-white/10 pt-2.5">

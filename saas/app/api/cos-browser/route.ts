@@ -173,16 +173,9 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId)
   }
 
-  if (pastedOperationalLog && !hasSourceAttachment) {
-    return withSuggestedFollowups(NextResponse.json({
-      reply: operationalLogReply(prompt),
-      source: 'concierge-operational-log-analysis',
-      execution_allowed: false,
-      external_action_taken: false,
-      external_ai_invoked: false,
-      local_model_invoked: false,
-    }), prompt, auditUserId)
-  }
+  // Passive logs carry evidence but no execution authority. Continue through ordinary COS so a
+  // diagnostic question receives a useful explanation and dialogue instead of the obsolete canned
+  // "not editable source" reply. Builder routing still excludes unattached operational logs.
 
   if (isConciergeArtifactObjective(prompt)) {
     const headers = new Headers(req.headers)

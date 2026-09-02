@@ -2,14 +2,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-test('browser ingress keeps passive pasted build logs non-executing', () => {
+test('browser ingress sends passive pasted build logs to COS without granting Builder authority', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   const repair = route.indexOf('const explicitOperationalRepair =')
-  const passiveGuard = route.indexOf('if (pastedOperationalLog && !hasSourceAttachment)', repair)
   assert.ok(repair >= 0)
-  assert.ok(passiveGuard > repair)
-  assert.match(route.slice(passiveGuard), /concierge-operational-log-analysis/)
-  assert.match(route.slice(passiveGuard), /execution_allowed: false/)
+  assert.doesNotMatch(route, /if \(pastedOperationalLog && !hasSourceAttachment\)/)
+  assert.match(route, /Passive logs carry evidence but no execution authority/)
+  assert.match(route, /isConciergeBuilderObjective\(prompt, routingContext\) \? legacyConciergePost\(req\) : cosPrimaryPost\(req\)/)
 })
 
 test('standalone immediately preceding debug intent carries into the next pasted log turn', () => {
@@ -20,8 +19,7 @@ test('standalone immediately preceding debug intent carries into the next pasted
   assert.match(route, /isExplicitOperationalLogRepairRequest\(prompt\)[\s\S]{0,160}pastedOperationalLog && hasExplicitOperationalLogRepairIntent\(previousUserPrompt\)/)
   assert.doesNotMatch(route, /pastedOperationalLog && isExplicitOperationalLogRepairRequest\(previousUserPrompt\)/)
   const repair = route.indexOf('if (explicitOperationalRepair && !hasSourceAttachment)')
-  const passive = route.indexOf('if (pastedOperationalLog && !hasSourceAttachment)', repair)
-  assert.ok(repair >= 0 && passive > repair)
+  assert.ok(repair >= 0)
 })
 
 test('Full Assistant browser requests enter the same Concierge browser ingress before A2A routing', () => {
@@ -64,14 +62,13 @@ test('only failed owner SignalBoost logs reach Platform Engineer before passive 
   const preferExact = route.indexOf('exactFailedLogTarget ?? signalBoostDeployedRepairTarget', binding)
   const execute = route.indexOf('enqueueSignalBoostRepositoryRepairJob({', binding)
   const schedule = route.indexOf('runBuilderJob(job.jobId', execute)
-  const passive = route.indexOf('if (pastedOperationalLog && !hasSourceAttachment)', execute)
   assert.ok(analysis >= 0 && exactTarget > analysis && target > exactTarget)
   assert.ok(owner > target && evidence > owner && failed > evidence && binding > failed)
-  assert.ok(preferExact > binding && execute > preferExact && schedule > execute && passive > schedule)
+  assert.ok(preferExact > binding && execute > preferExact && schedule > execute)
   assert.match(route.slice(exactTarget, target), /parseSignalBoostRepositoryRepairTarget\(prompt\)/)
-  assert.match(route.slice(target, passive), /commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA/)
-  assert.match(route.slice(target, passive), /target: ownerSignalBoostLogTarget/)
-  assert.match(route.slice(target, passive), /status: 'queued'/)
+  assert.match(route.slice(target), /commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA/)
+  assert.match(route.slice(target), /target: ownerSignalBoostLogTarget/)
+  assert.match(route.slice(target), /status: 'queued'/)
 })
 
 test('source-attached log repairs still hand off to the ordinary Concierge Builder lane', () => {

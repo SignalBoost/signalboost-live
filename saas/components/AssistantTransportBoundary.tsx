@@ -277,8 +277,64 @@ async function executeBuilderFromConcierge(
   }, 202, 'builder-job-running')
 }
 
+async function executeOperationalRepairFromConcierge(
+  fetchImpl: typeof window.fetch,
+  body: AssistantRequestBody,
+  objective: string,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const sentAtMs = Date.now()
+  let response: Response
+  try {
+    response = await fetchImpl('/api/cos-browser', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { accept: 'application/json', 'Content-Type': 'application/json' },
+      signal,
+      body: JSON.stringify(body),
+    })
+  } catch (error) {
+    if (deliberateAbort(error, signal)) throw error
+    const recovered = await recoverBuilderFromHistory(fetchImpl, conversationId, objective, sentAtMs)
+    return recovered || responseFromPayload({
+      reply: 'The Builder request could not be confirmed. History did not show a durable result, so the action was not replayed.',
+      source: 'operational-repair-transport-unconfirmed',
+    }, 503, 'operational-repair-transport-unconfirmed')
+  }
+  const payload = await response.json().catch(() => ({ error: 'operational_repair_response_unavailable' })) as Record<string, unknown>
+
+  // Passive logs and authorization failures are already terminal. Repository repair uses the
+  // durable Builder job contract, so follow it to completion and return the result/files to the
+  // same Concierge renderer instead of treating the initial 202 running reply as final output.
+  const jobId = typeof payload.jobId === 'string' ? payload.jobId : ''
+  if (response.status !== 202 || !jobId) {
+    return responseFromPayload(payload, response.status, 'operational-repair-backend')
+  }
+
+  const terminal = await pollBuilderJob(fetchImpl, jobId, signal)
+  if (terminal) {
+    return responseFromPayload({
+      ...terminal.payload,
+      reply: typeof terminal.payload.reply === 'string'
+        ? terminal.payload.reply
+        : `COS Builder stopped: ${String(terminal.payload.error || 'builder_job_failed')}`,
+    }, terminal.status, 'operational-repair-terminal')
+  }
+
+  const recovered = await recoverBuilderFromHistory(fetchImpl, conversationId, objective, sentAtMs)
+  return recovered || responseFromPayload({
+    ...payload,
+    status: 'running',
+    reply: typeof payload.reply === 'string'
+      ? payload.reply
+      : `COS Builder is running job ${jobId}. The final result will appear in History.`,
+  }, 202, 'operational-repair-running')
+}
+
 async function executeArtifactFromConcierge(
   fetchImpl: typeof window.fetch,
+  body: AssistantRequestBody,
   objective: string,
   signal?: AbortSignal,
 ): Promise<Response> {
@@ -286,7 +342,11 @@ async function executeArtifactFromConcierge(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     signal,
-    body: JSON.stringify({ objective }),
+    body: JSON.stringify({
+      objective,
+      sourceText: [...(Array.isArray(body.messages) ? body.messages : [])].reverse()
+        .find(message => message?.role === 'assistant' && typeof message.content === 'string')?.content || '',
+    }),
   })
   const payload = await response.json().catch(() => ({ error: 'artifact_response_unavailable' }))
   return responseFromPayload({
@@ -311,7 +371,7 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
       if (!body || !conversationId || !userContent) return originalFetch(input, init)
 
       if (isConciergeArtifactObjective(userContent)) {
-        return executeArtifactFromConcierge(originalFetch, userContent, init?.signal ?? undefined)
+        return executeArtifactFromConcierge(originalFetch, body, userContent, init?.signal ?? undefined)
       }
       if (isConciergeBuilderObjective(userContent, builderRoutingContext(body))) {
         return executeBuilderFromConcierge(originalFetch, body, userContent, conversationId, init?.signal ?? undefined)
@@ -333,8 +393,18 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
       // Preserve privileged owner COS scope for ordinary turns. Every pasted operational log enters
       // the canonical browser ingress; the server alone decides whether it is owner-bound SignalBoost
       // repair evidence or a passive analysis-only log.
+      if (operationalRepair) {
+        return executeOperationalRepairFromConcierge(
+          originalFetch,
+          sendBody,
+          userContent,
+          conversationId,
+          init?.signal ?? undefined,
+        )
+      }
+
       const result = await sendAssistantTurnAndRecover(userContent, sendBody as Record<string, unknown>, {
-        sendUrl: operationalRepair ? '/api/cos-browser' : '/api/cos-primary',
+        sendUrl: '/api/cos-primary',
         historyUrl: `/api/assistant/chats?id=${encodeURIComponent(conversationId)}`,
         locale: localeFromBody(body),
         fetchImpl: originalFetch,

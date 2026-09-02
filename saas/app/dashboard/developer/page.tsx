@@ -33,7 +33,7 @@ const COPY: Record<string, Record<Lang, string>> = {
   workspace: { en: uiText('generatedUi.u_5579543c543087cd'), es: 'Espacio de trabajo {id}', pt: 'Espaço de trabalho {id}', pl: 'Przestrzeń robocza {id}', ru: 'Рабочее пространство {id}' },
   remove: { en: uiText('generatedUi.u_6f0a17de28a43d16'), es: 'Eliminar {path}', pt: 'Remover {path}', pl: 'Usuń {path}', ru: 'Удалить {path}' },
   result: { en: uiText('generatedUi.u_6e7d50e84f4731ef'), es: 'Resultado', pt: 'Resultado', pl: 'Wynik', ru: 'Результат' },
-  files: { en: uiText('generatedUi.u_bb2e2d0fd34f9c6d'), es: 'Archivos del espacio de trabajo', pt: 'Arquivos do espaço de trabalho', pl: 'Pliki przestrzeni roboczej', ru: 'Файлы пространства' },
+  files: { en: uiText('generatedUi.u_bb2e2d0fd34f9c6d'), es: 'Archivos del espacio de trabajo', pt: 'Arquivos do espaço de trabalho', pl: 'Pliki przestrzeni roboczej', ru: 'Файлы рабочего пространства' },
   evidence: { en: uiText('generatedUi.u_03867aea70acaf4c'), es: 'Evidencia', pt: 'Evidência', pl: 'Dowody', ru: 'Доказательства' },
   noCommand: { en: uiText('generatedUi.u_8d844011c413f415'), es: '(sin comando)', pt: '(sem comando)', pl: '(brak polecenia)', ru: '(нет команды)' },
   exit: { en: uiText('generatedUi.u_e596899f114b5162'), es: 'salida', pt: 'saída', pl: 'wyjście', ru: 'выход' },

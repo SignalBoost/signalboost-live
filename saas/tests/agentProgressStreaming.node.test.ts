@@ -27,3 +27,16 @@ test('progress transport follows the durable Builder job to its terminal result'
   assert.match(client, /COS Builder completed the job/)
   assert.doesNotMatch(client, /\/api\/agent-progress/)
 })
+
+test('actual Concierge source attachments are decoded and posted to durable Builder instead of legacy directBuilder', () => {
+  const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+  assert.match(client, /const SOURCE_FILE = \/\\\.\(\?:c\?js\|mjs\|cts\|mts\|ts\|py\)\$\/i/)
+  assert.match(client, /function conciergeBuilderRequest\(body: unknown\)/)
+  assert.match(client, /decodeTextDataUrl\(dataUrl\)/)
+  assert.match(client, /files\.push\(\{ path, content \}\)/)
+  assert.match(client, /endpoint: '\/api\/builder'/)
+  assert.match(client, /body: \{ objective, conversationId, files \}/)
+  assert.match(client, /args\.target === 'concierge' \? conciergeBuilderRequest\(args\.body\) : null/)
+  assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? \(args\.target === 'cos' \? '\/api\/cos-primary' : '\/api\/concierge'\)/)
+  assert.match(client, /credentials: 'include'/)
+})

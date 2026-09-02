@@ -51,6 +51,18 @@ test('actual Concierge source attachments decode into the durable Builder reques
   })
 })
 
+test('read-only source questions keep their existing ordinary Concierge route', () => {
+  const dataUrl = `data:text/plain;base64,${Buffer.from('export const answer = 42').toString('base64')}`
+  for (const content of ['Explain this source file.', 'Summarize the attached code.', 'Describe what this file does.']) {
+    const request = conciergeBuilderRequest({
+      messages: [{ role: 'user', content }],
+      attachments: [{ name: 'answer.ts', type: 'text/typescript', dataUrl }],
+      context: { conversationId: '12345678-1234-1234-1234-123456789abc' },
+    })
+    assert.equal(request, null, content)
+  }
+})
+
 test('real homepage and dock upload handlers admit the Builder source extensions before transport', () => {
   const homepage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
   const dock = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
@@ -77,8 +89,9 @@ test('non-code Concierge attachments stay on ordinary Concierge transport', () =
   assert.equal(image, null)
 })
 
-test('progress client selects durable Builder for Concierge source attachments', () => {
+test('progress client selects durable Builder only after shared Builder-intent classification', () => {
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+  assert.match(client, /isConciergeBuilderObjective\(objective, \{ attachmentNames, attachmentMimeTypes \}\)/)
   assert.match(client, /args\.target === 'concierge' \? conciergeBuilderRequest\(args\.body\) : null/)
   assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? \(args\.target === 'cos' \? '\/api\/cos-primary' : '\/api\/concierge'\)/)
   assert.match(client, /credentials: 'include'/)

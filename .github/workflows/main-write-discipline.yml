@@ -1,0 +1,103 @@
+name: Main Write Discipline
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  serialize-main-pr:
+    if: github.event_name == 'pull_request'
+    name: Serialize every PR targeting main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact PR head with base history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Require the shared main integration token
+        shell: bash
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          token='.github/main-write-token'
+          if [[ ! -f "$token" ]]; then
+            echo "::error::${token} is missing. Every PR targeting main must update the shared serialization token."
+            exit 1
+          fi
+
+          expected_base="base_sha=${PR_BASE}"
+          expected_branch="branch=${PR_BRANCH}"
+          if ! grep -Fqx "$expected_base" "$token"; then
+            echo "::error::Stale main integration base. Refresh from current main and set: ${expected_base}"
+            exit 1
+          fi
+          if ! grep -Fqx "$expected_branch" "$token"; then
+            echo "::error::Main integration token must identify the PR branch exactly: ${expected_branch}"
+            exit 1
+          fi
+
+          if ! git cat-file -e "${PR_BASE}^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "${PR_BASE}"
+          fi
+          if git diff --quiet "${PR_BASE}" "${PR_HEAD}" -- "$token"; then
+            echo "::error::Every PR to main must modify ${token}. This deliberate shared-file write serializes concurrent agents."
+            exit 1
+          fi
+
+          echo "Main integration token matches the current base and PR branch."
+          echo "Concurrent PRs will conflict on the token after any one of them merges."
+
+  audit-main-push:
+    if: github.event_name == 'push'
+    name: Reject direct or non-PR writes to main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main integration commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+
+      - name: Verify main advanced through one PR merge commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          read -r -a commit_line <<< "$(git rev-list --parents -n 1 "$GITHUB_SHA")"
+          parent_count=$(( ${#commit_line[@]} - 1 ))
+          if [[ "$parent_count" -ne 2 ]]; then
+            echo "::error::Direct, squash, or rebase write detected on main. Main accepts only serialized PR merge commits."
+            exit 1
+          fi
+
+          first_parent="${commit_line[1]}"
+          if git diff --quiet "$first_parent" "$GITHUB_SHA" -- .github/main-write-token; then
+            echo "::error::The merged change did not advance .github/main-write-token. It bypassed main serialization."
+            exit 1
+          fi
+
+          merged_prs="$(gh api \
+            -H 'Accept: application/vnd.github+json' \
+            "/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/pulls" \
+            --jq '[.[] | select(.merged_at != null and .base.ref == "main")] | length')"
+          if [[ "$merged_prs" -ne 1 ]]; then
+            echo "::error::Main commit is not attributable to exactly one merged PR targeting main."
+            exit 1
+          fi
+
+          echo "Main advanced through one serialized PR merge commit."

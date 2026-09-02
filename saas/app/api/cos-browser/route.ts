@@ -15,6 +15,7 @@ import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { analyzeOperationalLog, hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { diagnoseOperationalLog } from '@/lib/ai/cos/operationalLogDiagnostic'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget, type SignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import { runBuilderJob } from '@/lib/builder/job-runner'
@@ -117,8 +118,9 @@ function builderRoutingContextFromBody(body: any) {
  * Operational/build logs are a first-class input type. They are resolved here before any artifact,
  * visual, provenance, generic-COS, or ordinary Builder route can reinterpret words inside the log.
  * An authenticated owner failed SignalBoost log enters the pinned Platform Engineer lane; public or
- * incomplete logs receive a bounded diagnosis here. Source-attached repairs remain ordinary Builder
- * work so the supplied file can be inspected, edited, run, and verified in its isolated workspace.
+ * analysis-only logs enter a bounded COS diagnostic lane that has no tools or execution authority.
+ * Source-attached repairs remain ordinary Builder work so the supplied file can be inspected, edited,
+ * run, and verified in its isolated workspace.
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
@@ -191,17 +193,19 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId)
   }
 
-  // Unattached operational evidence is terminal at this boundary. Do not pass it to generic COS:
-  // doing so allowed test titles such as "technical provenance" or "create PDF" to be reinterpreted
-  // by downstream intent classifiers and produced the repeated wrong replies seen in Production.
+  // Unattached operational evidence has a dedicated bounded reasoning lane. It never enters the
+  // generic intent router, so test titles cannot become artifact/visual/provenance requests, but
+  // COS can still explain the observed failure instead of merely echoing the exit code.
   if (operationalEvidence && !hasSourceAttachment) {
+    const diagnostic = await diagnoseOperationalLog({ request: prompt, log: operationalPrompt, language })
     return withSuggestedFollowups(NextResponse.json({
-      reply: operationalLogReply(operationalPrompt),
-      source: 'concierge-operational-log-analysis',
+      reply: diagnostic.reply,
+      source: diagnostic.reasonerInvoked ? 'concierge-operational-log-diagnostic' : 'concierge-operational-log-analysis',
       execution_allowed: false,
       external_action_taken: false,
       external_ai_invoked: false,
-      local_model_invoked: false,
+      local_model_invoked: diagnostic.reasonerInvoked,
+      confidence: diagnostic.confidence,
     }), prompt, auditUserId)
   }
 

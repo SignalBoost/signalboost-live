@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { MAX_BUILDER_RAW_OBJECTIVE_CHARS } from '@/lib/builder/request-contract'
 import { uiText } from '@/lib/i18n/uiText'
 
 type WorkspaceFile = { path: string; content: string }
@@ -61,7 +62,7 @@ export default function DeveloperPage() {
 
   useEffect(() => {
     const suggestedObjective = new URLSearchParams(window.location.search).get('objective')?.trim()
-    if (suggestedObjective) setObjective(suggestedObjective.slice(0, 8_000))
+    if (suggestedObjective) setObjective(suggestedObjective.slice(0, MAX_BUILDER_RAW_OBJECTIVE_CHARS))
     try {
       const staged = JSON.parse(sessionStorage.getItem(BUILDER_HANDOFF_FILES_KEY) || '[]')
       if (Array.isArray(staged)) setFiles(staged
@@ -195,7 +196,7 @@ export default function DeveloperPage() {
         <section style={{ border: '1px solid #1e293b', borderRadius: 18, background: '#0f172a', padding: 20, display: 'grid', gap: 14 }}>
           <label style={{ display: 'grid', gap: 8, fontWeight: 700 }}>
             {c('objective')}
-            <textarea value={objective} onChange={event => setObjective(event.target.value)} placeholder={c('placeholder')} rows={5} maxLength={8000} style={{ resize: 'vertical', borderRadius: 12, border: '1px solid #334155', background: '#020617', color: '#f8fafc', padding: 12, font: 'inherit' }} />
+            <textarea value={objective} onChange={event => setObjective(event.target.value)} placeholder={c('placeholder')} rows={5} maxLength={MAX_BUILDER_RAW_OBJECTIVE_CHARS} style={{ resize: 'vertical', borderRadius: 12, border: '1px solid #334155', background: '#020617', color: '#f8fafc', padding: 12, font: 'inherit' }} />
           </label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             <input ref={fileInput} type="file" multiple onChange={event => addFiles(event.target.files)} style={{ display: 'none' }} />

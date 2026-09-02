@@ -61,6 +61,21 @@ function requestDeadline(value: unknown): number {
   return Number.isFinite(numeric) ? numeric : Date.now() + DEFAULT_REPOSITORY_REQUEST_BUDGET_MS
 }
 
+function targetedRepositoryCommand(command: string, target: SignalBoostRepositoryRepairTarget): string {
+  const normalized = normalizeBuilderSandboxCommand(command)
+  const failingTests = target.pathHints
+    .map(path => path.replace(/^saas\//, ''))
+    .filter(path => /^(?:tests|test)\/.+\.(?:test|spec)\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(path))
+    .slice(0, 4)
+  // The SignalBoost npm test script enumerates the entire suite and can OOM the 2-vCPU repair
+  // sandbox. If the failed build identified exact tests, never allow a broad npm test to replace
+  // that evidence; execute those tests directly even if the model asked for the broad script.
+  if (failingTests.length > 0 && /^npm\s+(?:run\s+)?test(?:\s|$)/i.test(normalized)) {
+    return `node --experimental-strip-types --test ${failingTests.join(' ')}`
+  }
+  return normalized
+}
+
 export async function executeSignalBoostRepositoryRepair(input: {
   userId: string
   rawObjective: string
@@ -108,12 +123,12 @@ export async function executeSignalBoostRepositoryRepair(input: {
     }
 
     // Platform Engineer has its own persistent repository runner rather than the ordinary Builder
-    // sandbox runner. Apply the same command normalization here so a model-supplied foreign cwd or
-    // `npm test -- file` cannot recreate the observed path failure or expand into the entire suite.
+    // sandbox runner. Apply the same command normalization here and force exact failed-test targets
+    // when available so a broad npm test cannot OOM the repository sandbox.
     const repositoryRunner: BuilderRunnerPort = {
       run: runInput => session!.run({
         ...runInput,
-        command: normalizeBuilderSandboxCommand(runInput.command),
+        command: targetedRepositoryCommand(runInput.command, target),
       }),
     }
 

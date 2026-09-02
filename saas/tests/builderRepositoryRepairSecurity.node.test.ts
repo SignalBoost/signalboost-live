@@ -68,13 +68,17 @@ test('repository repair cannot commit, push, merge, deploy, or inherit credentia
   assert.match(source, /git[^\n]+diff/)
 })
 
-test('Platform Engineer normalizes model run commands before repository execution', () => {
+test('Platform Engineer normalizes model run commands and forces exact failed tests over broad npm test', () => {
   const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
-  const importAt = repair.indexOf("normalizeBuilderSandboxCommand")
-  const runnerAt = repair.indexOf('const repositoryRunner: BuilderRunnerPort')
-  const normalizeAt = repair.indexOf('command: normalizeBuilderSandboxCommand(runInput.command)', runnerAt)
+  const importAt = repair.indexOf('normalizeBuilderSandboxCommand')
+  const targetedAt = repair.indexOf('function targetedRepositoryCommand', importAt)
+  const broadAt = repair.indexOf('/^npm\\s+(?:run\\s+)?test', targetedAt)
+  const exactNodeAt = repair.indexOf('node --experimental-strip-types --test', targetedAt)
+  const runnerAt = repair.indexOf('const repositoryRunner: BuilderRunnerPort', exactNodeAt)
+  const normalizeAt = repair.indexOf('command: targetedRepositoryCommand(runInput.command, target)', runnerAt)
   const loopAt = repair.indexOf('repositoryRunner,', normalizeAt)
-  assert.ok(importAt >= 0 && runnerAt > importAt && normalizeAt > runnerAt && loopAt > normalizeAt)
+  assert.ok(importAt >= 0 && targetedAt > importAt && broadAt > targetedAt && exactNodeAt > broadAt)
+  assert.ok(runnerAt > exactNodeAt && normalizeAt > runnerAt && loopAt > normalizeAt)
   assert.match(repair.slice(runnerAt, loopAt + 32), /session!\.run/)
 })
 
@@ -99,14 +103,19 @@ test('browser repository repair is owner-only, SignalBoost-bound, exact-first, i
   assert.match(repair, /merge_allowed: false/)
 })
 
-test('direct Builder invokes Platform Engineer only after exact deployment pinning and owner authority', () => {
+test('direct Builder prefers an exact failed-log revision, rejects clipped pinned logs, then uses deployed fallback', () => {
   const builder = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
-  const target = builder.indexOf('signalBoostDeployedRepairTarget(objective')
-  const owner = builder.indexOf('if (!access.isOwner)', target)
+  const parsed = builder.indexOf('const parsedFailedLogTarget =')
+  const exact = builder.indexOf('const exactFailedLogTarget =', parsed)
+  const pinned = builder.indexOf('const hasPinnedRepositoryLog =', exact)
+  const incomplete = builder.indexOf("error: 'builder_repository_log_incomplete'", pinned)
+  const preference = builder.indexOf('exactFailedLogTarget ?? signalBoostDeployedRepairTarget(objective', incomplete)
+  const owner = builder.indexOf('if (!access.isOwner)', preference)
   const execute = builder.indexOf('enqueueSignalBoostRepositoryRepairJob({', owner)
   const schedule = builder.indexOf('runBuilderJob(job.jobId, access.userId)', execute)
   const passive = builder.indexOf('isPastedOperationalLog(objective)', schedule)
-  assert.ok(target >= 0); assert.ok(owner > target); assert.ok(execute > owner); assert.ok(schedule > execute); assert.ok(passive > schedule)
+  assert.ok(parsed >= 0 && exact > parsed && pinned > exact && incomplete > pinned)
+  assert.ok(preference > incomplete && owner > preference && execute > owner && schedule > execute && passive > schedule)
   assert.match(builder, /commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA/)
   assert.match(builder, /const ownerDeveloperLogSubmission = access\.isOwner/)
   assert.doesNotMatch(builder, /body\?\.platformRepair/)

@@ -20,9 +20,18 @@ const isProofCommand = (item: BuilderToolTrace) => {
   return Boolean(command) && PROOF_COMMAND.test(command)
 }
 
+function isReproducedFailure(item: BuilderToolTrace): boolean {
+  if (!isProofCommand(item) || item.ok) return false
+  // Explicit infrastructure failures prove only that the attempted proof command could not run
+  // correctly. Legacy/unit traces may omit a class; keep those as valid test evidence rather than
+  // retroactively invalidating already-established regression contracts.
+  if (item.failureClass === 'path' || item.failureClass === 'runtime' || item.failureClass === 'storage' || item.failureClass === 'dependency') return false
+  return item.failureClass === undefined || item.failureClass === 'test' || item.failureClass === 'deployment'
+}
+
 export function deriveRepairPhase(trace: readonly BuilderToolTrace[], initialPaths: ReadonlySet<string>): BuilderRepairPhase {
   if (!trace.some(item => item.ok && item.toolId === 'read_file')) return 'inspect'
-  const failedProof = trace.findIndex(item => isProofCommand(item) && !item.ok)
+  const failedProof = trace.findIndex(isReproducedFailure)
   if (failedProof < 0) return 'reproduce'
   const failedCommand = proofCommand(trace[failedProof])
   const repairIndex = trace.findIndex((item, index) => index > failedProof && isChange(item, initialPaths))

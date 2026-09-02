@@ -8,7 +8,7 @@ import { asksWhereTheAnswerCameFrom } from './provenanceIntrospectionIntent.ts'
 import { asksWhichHeuristicsInfluencedPriorAnswer } from './priorAnswerHeuristicIntent.ts'
 import { asksForTechnicalPriorAnswerProvenance } from './technicalProvenanceIntent.ts'
 import { isConversationProvenanceQuestion } from './conversationProvenanceIntent.ts'
-import { isPastedOperationalLog } from './pastedOperationalLog.ts'
+import { isOperationalLogEvidence } from './pastedOperationalLog.ts'
 
 /**
  * True when the message asks about the immediately preceding answer/artifact's origin,
@@ -16,7 +16,9 @@ import { isPastedOperationalLog } from './pastedOperationalLog.ts'
  * server telemetry, never reconstructed by a model and never sent to live public search.
  */
 export function isProvenanceIntrospection(input: string): boolean {
-  if (isPastedOperationalLog(input)) return false
+  // Log text can contain test names such as "technical provenance". Whether passive or paired with
+  // an explicit repair request, operational evidence must stay on the diagnostic/repair path.
+  if (isOperationalLogEvidence(input)) return false
   return asksWhereTheAnswerCameFrom(input)
     || isConversationProvenanceQuestion(input)
     || asksWhichHeuristicsInfluencedPriorAnswer(input)

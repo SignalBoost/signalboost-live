@@ -173,15 +173,14 @@ export async function POST(request: Request) {
       return noStore({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
     }
 
-    // A repair request plus one to four supported source/test/dependency files enters the fixed
-    // bounded multi-file debug protocol. A log with no attachment is still a debugging job; it is
-    // tagged as log evidence with no repository authority so History records what the paste did and
-    // did not grant.
+    // A log plus one to four supported source files keeps the bounded debug protocol. A log
+    // with no attachment is still a debugging job; it is tagged as log evidence with no repository
+    // authority so the runner and History record what the paste did and did not grant.
     const logEvidence = isOperationalLogEvidence(objective)
     const passiveLogEvidence = isPastedOperationalLog(objective)
 
     if (files.length > 0 && DEBUG_OBJECTIVE.test(objective) && !debugPlan) {
-      const reply = 'COS Builder debug jobs require 1–4 supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachments, each no larger than 128 KiB. No code was run.'
+      const reply = 'COS Builder debug jobs require one to four supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachments no larger than 128 KiB each. No code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({
         error: 'builder_debug_attachment_required',
@@ -234,9 +233,9 @@ export async function POST(request: Request) {
       metadata: debugPlan
         ? {
             debugPath: debugPlan.path,
-            debugPaths: debugPlan.paths,
             debugCommand: debugPlan.command,
             debugRuntime: debugPlan.runtime,
+            debugPaths: debugPlan.files,
           }
         : logEvidence
           ? {

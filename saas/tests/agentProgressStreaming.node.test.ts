@@ -18,10 +18,11 @@ test('Concierge and owner COS consume observable request progress instead of tim
   assert.match(activity, /activity\?\.sequence/)
 })
 
-test('progress transport follows the durable Builder job to its terminal result', () => {
+test('progress transport uses canonical browser ingress and follows durable Builder jobs to terminal result', () => {
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
   assert.match(client, /\/api\/cos-primary/)
-  assert.match(client, /\/api\/concierge/)
+  assert.match(client, /\/api\/cos-browser/)
+  assert.doesNotMatch(client, /args\.target === 'cos' \? '\/api\/cos-primary' : '\/api\/concierge'/)
   assert.match(client, /\/api\/builder\?jobId=/)
   assert.match(client, /poll\.status === 202/)
   assert.match(client, /COS Builder completed the job/)

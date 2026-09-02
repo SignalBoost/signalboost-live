@@ -9,9 +9,9 @@ import { spawnSync } from 'node:child_process'
 const branch = String(process.env.VERCEL_GIT_COMMIT_REF || '').trim()
 if (branch !== 'main') process.exit(1)
 
-function git(args) {
+function runGit(args, cwd = process.cwd()) {
   return spawnSync('git', args, {
-    cwd: process.cwd(),
+    cwd,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -20,6 +20,19 @@ function git(args) {
 function skip(reason) {
   console.error(`[main-write-guard] skipping main deployment: ${reason}`)
   process.exit(0)
+}
+
+// Vercel executes this script from the configured project root (`saas/`), while the serialization
+// token lives at the repository root. Resolve the real Git toplevel once, then make every
+// repository-relative check from there. Otherwise `.github/main-write-token` is misread as
+// `saas/.github/main-write-token` and a valid PR merge is falsely rejected.
+const rootProbe = runGit(['rev-parse', '--show-toplevel'])
+if (rootProbe.status !== 0) skip('repository root could not be verified')
+const repoRoot = String(rootProbe.stdout || '').trim()
+if (!repoRoot) skip('repository root could not be verified')
+
+function git(args) {
+  return runGit(args, repoRoot)
 }
 
 const ancestry = git(['rev-list', '--parents', '-n', '1', 'HEAD'])

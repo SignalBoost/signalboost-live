@@ -36,6 +36,15 @@ test('onboarding independently rejects stale main integration tokens', () => {
   assert.match(onboarding, /Every PR to main must modify/)
 })
 
+test('Vercel resolves the Git repository root before checking the root-level main token', () => {
+  const guard = readRoot('saas/scripts/vercel-main-write-guard.mjs')
+  assert.match(guard, /runGit\(\['rev-parse', '--show-toplevel'\]\)/)
+  assert.match(guard, /const repoRoot = String\(rootProbe\.stdout \|\| ''\)\.trim\(\)/)
+  assert.match(guard, /function git\(args\) \{\s*return runGit\(args, repoRoot\)\s*\}/)
+  assert.match(guard, /git\(\['diff', '--quiet', firstParent, 'HEAD', '--', '\.github\/main-write-token'\]\)/)
+  assert.doesNotMatch(guard, /function git\(args\) \{[\s\S]{0,180}cwd: process\.cwd\(\)/)
+})
+
 test('Vercel refuses an unverified direct-main deployment before the build starts', () => {
   const vercel = JSON.parse(readRoot('saas/vercel.json'))
   const guard = readRoot('saas/scripts/vercel-main-write-guard.mjs')
@@ -44,7 +53,6 @@ test('Vercel refuses an unverified direct-main deployment before the build start
   assert.match(guard, /branch !== 'main'\) process\.exit\(1\)/)
   assert.match(guard, /parents\.length !== 2/)
   assert.match(guard, /\^Merge pull request #\\d\+ from /)
-  assert.match(guard, /git\(\['diff', '--quiet', firstParent, 'HEAD', '--', '\.github\/main-write-token'\]\)/)
   assert.match(guard, /skipping main deployment/)
   assert.match(guard, /verified serialized PR merge; continuing deployment/)
 

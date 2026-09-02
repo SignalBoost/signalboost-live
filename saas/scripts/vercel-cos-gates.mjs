@@ -27,6 +27,7 @@ const tests = [
   'tests/fullAssistantConciergeIngress.node.test.ts',
   'tests/builderRepositoryRepairTarget.node.test.ts',
   'tests/builderRepositoryRepairSecurity.node.test.ts',
+  'tests/mainWriteDiscipline.node.test.ts',
   'tests/conciergeVisuals.node.test.ts',
   'tests/conciergeVisualTypoRouting.node.test.ts',
   'tests/visualObjectiveContract.node.test.ts',

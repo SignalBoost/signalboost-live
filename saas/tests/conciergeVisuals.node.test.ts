@@ -379,6 +379,8 @@ test('Concierge keeps verified people on the visual path and renders successful 
   assert.doesNotMatch(visualRoute, /reference-people[\s\S]{0,1400}createPlatformImagePort\(\)\.generate/)
 
   assert.match(personReferences, /Special:Redirect\/file/)
+  assert.match(personReferences, /thumb\.wikimedia\.org/)
+  assert.match(personReferences, /\[COMMONS_UPLOAD_HOST, COMMONS_THUMB_HOST\]/)
   assert.match(personReferences, /January 2025 Official Presidential Portrait of Donald J\. Trump\.jpg/)
   assert.match(personReferences, /Foto oficial de Luiz Inácio Lula da Silva \(2023–2027\)\.jpg/)
   assert.match(referenceGeneration, /black-forest-labs\/FLUX-2-max/)

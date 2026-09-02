@@ -13,7 +13,7 @@
 **Owner-directed promotion cron:** repaired in Production on 2026-08-27 by applying the already-repo-owned missing `cos_knowledge_fact_revisions` migration; consecutive scheduled runs returned 200 and advanced the real queue without lowering evidence gates  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
-**RunPod lifecycle:** detached while the active reasoner points outside RunPod  
+**RunPod:** no longer used — COS inference and embeddings run entirely on DeepInfra. RunPod lifecycle is permanently detached; remaining RunPod code paths are dormant legacy pending removal and must not be reintroduced  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
 **Normative/public-policy answer consistency:** Production behavior was confirmed across owner and unauthenticated Public Concierge sessions after `066811cc`: answers no longer lead with yes/no and preserve the same neutral meaning across wording variants. Follow-up acceptance exposed one remaining defect: the normative route produced uncited legal, historical, scientific, and statistical premises. The current implementation therefore routes the entire normative class through live evidence regardless of whether the prompt says `legal`, `allowed`, or `permitted`, while fresh synthesis enforces the neutral, non-binary evidence-map contract. Material descriptive claims must retain recorded live citations; the final weighting of competing values remains explicitly value-dependent. The motivating three-question cohort plus broader death-penalty, religious-clothing, assisted-dying, compulsory-vaccination, voting-age, and sports-eligibility variants are mandatory deployment regressions. Owner follow-up requires every normative answer to bypass semantic/exact answer cache, retrieve live evidence for the strongest supporting and opposing arguments, and render those source groups separately. The implementation on `fix/normative-balanced-live-sources-20260901` is awaiting CI/Preview acceptance; Production has not yet accepted this balanced-provenance contract.
 **Procedural-learning state:** autonomous private certification is Production for context ambiguity, performance-regression diagnosis, and architecture discovery; dead-end self-generated practice is guarded; validated cognitive-skill candidate embeddings are reused by exact text + embedding-model identity; prompt-free retrieval-efficiency telemetry is Production; individual skills still earn lifecycle status from evidence  
@@ -173,7 +173,7 @@ Accepted facts:
 - historical incompatible vector space was not reused merely because dimensions matched.
 - retained learned knowledge is continuously indexed/re-indexed into the active model space.
 - rejected/quarantined corpus rows remain excluded from governed retrieval.
-- RunPod lifecycle is detached while the active reasoner URL is outside RunPod.
+- RunPod is no longer used. COS inference and embeddings run entirely on DeepInfra; the RunPod lifecycle is permanently detached and its remaining code paths are dormant legacy pending removal. Do not reintroduce RunPod as a reasoner, embedding, or compute dependency.
 
 ---
 
@@ -643,7 +643,7 @@ acquire current evidence
 → retrieve in later COS reasoning
 ```
 
-Normal accepted knowledge is indexed in the learning flow when possible. A recurring indexer drains missing/stale vectors as repair. Empty index cycles do not keep RunPod compute active. Vectors from an old embedding model are eligible for re-embedding.
+Normal accepted knowledge is indexed in the learning flow when possible. A recurring indexer drains missing/stale vectors as repair. Empty index cycles wake no external GPU compute. Vectors from an old embedding model are eligible for re-embedding.
 
 Stored knowledge helps COS reason; it does not replace live verification for mutable external facts.
 

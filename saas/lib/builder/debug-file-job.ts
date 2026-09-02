@@ -10,23 +10,16 @@ import type {
 
 const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
 const CODE_EXTENSION = /\.(?:c?js|mjs|cts|mts|ts|py)$/i
-// JS/TS test files are self-executing through Node in this bounded lane. Pytest-style files are
-// detected separately so they cannot silently fall back to `python3 source.py` and produce a false
-// pass without executing the supplied test functions.
-const TEST_FILE = /\.(?:test|spec)\.(?:c?js|mjs|cts|mts|ts)$/i
-const PYTHON_TEST_FILE = /(?:^|\/)(?:test[_-].+|.+[_-]test)\.py$/i
-const MAX_DEBUG_FILES = 4
+const TEST_PATH = /(?:^|\/)(?:.+[._-](?:test|spec)|(?:test|spec)[._-].+)\.(?:c?js|mjs|cts|mts|ts|py)$/i
 const MAX_DEBUG_FILE_BYTES = 128 * 1024
-const MAX_MODEL_SOURCE_CHARS = 160_000
+const MAX_DEBUG_FILES = 4
 const OUTPUT_LIMIT = 6_000
 
 export type DebugFilePlan = Readonly<{
-  /** Entry/test file used for the fail-before/pass-after proof command. */
   path: string
-  /** Every bounded user file available to the diagnostic model and sandbox. */
-  paths: readonly string[]
   command: string
   runtime: 'node' | 'python3'
+  files: readonly string[]
 }>
 
 export type DebugFileInput = Readonly<{ path: string; content: string }>
@@ -43,7 +36,11 @@ function shellQuote(value: string): string {
   return `'${String(value).replace(/'/g, "'\\\"'\\\"'")}'`
 }
 
-function debugCommand(path: string): Omit<DebugFilePlan, 'paths'> | null {
+function normalizePath(value: unknown): string {
+  return String(value || '').trim().replace(/\\/g, '/')
+}
+
+function debugCommand(path: string): Omit<DebugFilePlan, 'files'> | null {
   if (/\.py$/i.test(path)) return Object.freeze({ path, command: `python3 ${shellQuote(path)}`, runtime: 'python3' })
   if (/\.(?:ts|mts|cts)$/i.test(path)) {
     return Object.freeze({ path, command: `node --experimental-strip-types ${shellQuote(path)}`, runtime: 'node' })
@@ -52,39 +49,73 @@ function debugCommand(path: string): Omit<DebugFilePlan, 'paths'> | null {
   return null
 }
 
+function decodeDataUrl(dataUrl: string): string {
+  const match = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/i.exec(dataUrl)
+  if (!match) return ''
+  const mediaType = String(match[1] || '').toLowerCase()
+  const payload = match[3] || ''
+  const textual = !mediaType
+    || mediaType.startsWith('text/')
+    || /javascript|typescript|json|python|x-python|ecmascript/.test(mediaType)
+    || mediaType === 'application/octet-stream'
+  if (!textual) return ''
+  try {
+    return match[2] ? Buffer.from(payload, 'base64').toString('utf8') : decodeURIComponent(payload)
+  } catch {
+    return ''
+  }
+}
+
+function admissibleFile(file: DebugFileInput | null | undefined): DebugFileInput | null {
+  const path = normalizePath(file?.path)
+  const content = String(file?.content ?? '')
+  if (!CODE_EXTENSION.test(path)) return null
+  if (new TextEncoder().encode(content).byteLength > MAX_DEBUG_FILE_BYTES) return null
+  return Object.freeze({ path, content })
+}
+
 /**
- * Debug jobs require an explicit repair action and a small bounded set of executable source files.
+ * Accept Builder `{path,content}` files and Concierge `{name,dataUrl}` attachments.
+ * Non-code and empty payloads are dropped so logs never become edit authority.
+ */
+export function extractBuilderSourceFiles(raw: unknown): DebugFileInput[] {
+  if (!Array.isArray(raw)) return []
+  const files: DebugFileInput[] = []
+  const seen = new Set<string>()
+  for (const item of raw) {
+    const record = item && typeof item === 'object' ? item as Record<string, unknown> : {}
+    const path = normalizePath(record.path || record.name || record.filename)
+    const content = typeof record.content === 'string' && record.content
+      ? record.content
+      : decodeDataUrl(text(record.dataUrl))
+    const admitted = admissibleFile({ path, content })
+    if (!admitted || seen.has(admitted.path)) continue
+    seen.add(admitted.path)
+    files.push(admitted)
+    if (files.length >= MAX_DEBUG_FILES) break
+  }
+  return files
+}
+
+/**
+ * Debug jobs require an explicit repair action and one to four small executable source attachments.
  * A log dump, History transcript, or the word “debug” by itself can never create a Builder job.
- * Up to four supplied source/test/dependency files may be inspected together; the sandbox remains
- * user-workspace-only and the fixed protocol still permits at most one minimal edit before rerunning
- * the exact same proof command.
+ * An explicit repair request plus supported source attachments may include logs as evidence:
+ * the attachments, not the pasted text, supply the bounded edit/run authority.
  */
 export function planDebugFileJob(objective: string, files: readonly DebugFileInput[]): DebugFilePlan | null {
   const prompt = String(objective || '').trim()
   if (!prompt || !DEBUG_ACTION.test(prompt)) return null
-  if (!Array.isArray(files) || files.length < 1 || files.length > MAX_DEBUG_FILES) return null
-
-  const normalized = files.map(file => ({
-    path: String(file?.path || '').trim().replace(/\\/g, '/'),
-    content: String(file?.content ?? ''),
-  }))
-  if (normalized.some(file => !CODE_EXTENSION.test(file.path))) return null
-  if (normalized.some(file => new TextEncoder().encode(file.content).byteLength > MAX_DEBUG_FILE_BYTES)) return null
-  const paths = normalized.map(file => file.path)
-  if (new Set(paths).size !== paths.length) return null
-
-  const selfExecutingTest = normalized.find(file => TEST_FILE.test(file.path))
-  // A pytest-style bundle needs actual pytest discovery, which this network-denied fixed runner does
-  // not promise. Reject it rather than running the first source module and incorrectly calling a
-  // zero exit code proof. A directly executable standalone Python file remains supported.
-  if (!selfExecutingTest && normalized.some(file => PYTHON_TEST_FILE.test(file.path))) return null
-
-  // When a self-executing JS/TS test/spec is supplied, make it the proof entrypoint. Otherwise keep
-  // the first attached executable as the backwards-compatible command target.
-  const entry = selfExecutingTest ?? normalized[0]
-  const command = debugCommand(entry.path)
-  if (!command) return null
-  return Object.freeze({ ...command, paths: Object.freeze(paths) })
+  if (!Array.isArray(files)) return null
+  const admitted = files.map(file => admissibleFile(file)).filter((file): file is DebugFileInput => file !== null)
+  if (admitted.length < 1 || admitted.length > MAX_DEBUG_FILES) return null
+  const proofSource = admitted.find(file => TEST_PATH.test(file.path)) ?? admitted[0]
+  const proof = debugCommand(proofSource.path)
+  if (!proof) return null
+  return Object.freeze({
+    ...proof,
+    files: Object.freeze(admitted.map(file => file.path)),
+  })
 }
 
 function balancedJsonObjects(value: string): readonly string[] {
@@ -121,7 +152,10 @@ function balancedJsonObjects(value: string): readonly string[] {
   return Object.freeze(candidates)
 }
 
-function parseSingleEdit(value: string | null, allowedPaths: readonly string[]): Readonly<{ path: string; search: string; replace: string }> | null {
+function parseSingleEdit(
+  value: string | null,
+  allowedPaths: readonly string[],
+): Readonly<{ path: string; search: string; replace: string }> | null {
   const normalized = normalizeBuilderControlOutput(value)
   const raw = String(normalized || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
   const allowed = new Set(allowedPaths)
@@ -170,7 +204,7 @@ function runFailureTrace(round: number, command: string, result: Awaited<ReturnT
     },
     error: `builder_command_failed: exit ${result.exitCode}`,
     failureClass: result.timedOut ? 'runtime' : 'test',
-    remediation: 'Apply one minimal edit to one supplied file, then rerun the exact same command.',
+    remediation: 'Apply one minimal edit to the attached file that caused the failure, then rerun the exact same command.',
   })
 }
 
@@ -189,15 +223,24 @@ function runSuccessTrace(round: number, command: string, result: Awaited<ReturnT
   })
 }
 
-function sourcePrompt(files: readonly BuilderFile[]): string {
-  const perFile = Math.max(4_000, Math.floor(MAX_MODEL_SOURCE_CHARS / Math.max(1, files.length)))
-  return files.map(file => `FILE: ${file.path}\nSOURCE:\n${file.content.slice(0, perFile)}`).join('\n\n')
+async function readPlannedFiles(
+  workspace: BuilderWorkspacePort,
+  workspaceId: string,
+  paths: readonly string[],
+): Promise<{ files: BuilderFile[]; missing: string | null }> {
+  const files: BuilderFile[] = []
+  for (const path of paths) {
+    const source = await workspace.readFile(workspaceId, path)
+    if (!source) return { files, missing: path }
+    files.push(source)
+  }
+  return { files, missing: null }
 }
 
 /**
- * Fixed bounded debug protocol: list/read every admitted file, run the chosen proof entry once,
- * make at most one edit to any admitted file, rerun the exact command, then stop. No knowledge
- * retrieval, live search, repository authority, or extra filesystem inspection is available here.
+ * Bounded debug protocol: read the attached source set (≤4 files), run the proof command once,
+ * make at most one edit on any attached file, rerun the exact command, then stop.
+ * No knowledge retrieval, live search, platform explanation, or extra inspection is available.
  */
 export async function runDebugFileJob(input: {
   objective: string
@@ -208,60 +251,64 @@ export async function runDebugFileJob(input: {
   ai: BuilderAiPort
 }): Promise<BuilderLoopResult> {
   const trace: BuilderToolTrace[] = []
+  const plannedPaths = input.plan.files?.length ? input.plan.files : [input.plan.path]
   const listing = await input.workspace.listFiles(input.workspaceId)
   trace.push(Object.freeze({ round: 1, toolId: 'list_files', input: {}, ok: true, output: summarizeFiles(listing) }))
 
-  const sources: BuilderFile[] = []
-  let round = 2
-  for (const path of input.plan.paths) {
-    const source = await input.workspace.readFile(input.workspaceId, path)
-    if (!source) {
-      trace.push(Object.freeze({
-        round,
-        toolId: 'read_file',
-        input: { path },
-        ok: false,
-        error: 'builder_file_not_found',
-        failureClass: 'path',
-        remediation: 'Attach only supported source/test files and retry in a new chat.',
-      }))
-      return { ok: false, error: 'builder_file_not_found', trace }
-    }
-    sources.push(source)
+  const staged = await readPlannedFiles(input.workspace, input.workspaceId, plannedPaths)
+  if (staged.missing) {
     trace.push(Object.freeze({
-      round,
+      round: 2,
       toolId: 'read_file',
-      input: { path },
+      input: { path: staged.missing },
+      ok: false,
+      error: 'builder_file_not_found',
+      failureClass: 'path',
+      remediation: 'Attach one to four supported source files and retry in the same chat.',
+    }))
+    return { ok: false, error: 'builder_file_not_found', trace }
+  }
+
+  for (const source of staged.files) {
+    trace.push(Object.freeze({
+      round: 2,
+      toolId: 'read_file',
+      input: { path: source.path },
       ok: true,
       output: { path: source.path, content: source.content, updatedAt: source.updatedAt },
     }))
-    round += 1
   }
 
-  const firstRun = await input.runner.run({ workspaceId: input.workspaceId, command: input.plan.command, files: sources })
+  const firstRun = await input.runner.run({
+    workspaceId: input.workspaceId,
+    command: input.plan.command,
+    files: staged.files,
+  })
   if (firstRun.exitCode === 0) {
-    trace.push(runSuccessTrace(round, input.plan.command, firstRun))
+    trace.push(runSuccessTrace(3, input.plan.command, firstRun))
     return {
       ok: true,
-      answer: `Debug completed without an edit using ${sources.length} supplied file${sources.length === 1 ? '' : 's'}.\n\nCommand: \`${input.plan.command}\`\nExit code: 0${firstRun.stdout.trim() ? `\nStdout:\n\n\`\`\`\n${bounded(firstRun.stdout)}\n\`\`\`` : ''}`,
+      answer: `Debug completed without an edit.\n\nCommand: \`${input.plan.command}\`\nExit code: 0${firstRun.stdout.trim() ? `\nStdout:\n\n\`\`\`\n${bounded(firstRun.stdout)}\n\`\`\`` : ''}`,
       trace,
     }
   }
-  trace.push(runFailureTrace(round, input.plan.command, firstRun))
-  round += 1
+  trace.push(runFailureTrace(3, input.plan.command, firstRun))
 
+  const sourceBlock = staged.files
+    .map(file => `FILE: ${file.path}\nSOURCE:\n${file.content.slice(0, MAX_DEBUG_FILE_BYTES)}`)
+    .join('\n\n')
   const systemPrompt = [
-    'You are COS Builder in a fixed bounded multi-file debug job.',
+    'You are COS Builder in a bounded multi-file debug job.',
     'Return exactly one JSON control object and no prose or Markdown.',
-    `The only allowed action is edit_file on one of these supplied paths: ${input.plan.paths.join(', ')}.`,
+    `The only allowed action is edit_file on one of these paths: ${plannedPaths.join(', ')}.`,
     'Use the smallest unique search/replace that repairs the observed failure.',
     'Schema: {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}.',
-    'Do not request another file, command, search, explanation, repository access, or platform inspection.',
+    'Do not request another file, command, search, explanation, or platform inspection.',
   ].join(' ')
   const basePrompt = [
     `OBJECTIVE:\n${String(input.objective || '').slice(0, 2_000)}`,
-    sourcePrompt(sources),
-    `PROOF COMMAND: ${input.plan.command}`,
+    sourceBlock,
+    `COMMAND: ${input.plan.command}`,
     `EXIT CODE: ${firstRun.exitCode}`,
     `STDERR:\n${bounded(firstRun.stderr)}`,
     `STDOUT:\n${bounded(firstRun.stdout)}`,
@@ -277,19 +324,19 @@ export async function runDebugFileJob(input: {
         : `${basePrompt}\n\nCONTROL RECOVERY: The previous response was unusable. Emit only the exact edit_file JSON schema.`,
       maxTokens: 2_400,
     })
-    edit = parseSingleEdit(lastResponse, input.plan.paths)
+    edit = parseSingleEdit(lastResponse, plannedPaths)
     if (edit) break
   }
   if (!edit) {
     trace.push(Object.freeze({
-      round,
+      round: 4,
       toolId: 'model_control',
       input: {},
       ok: false,
       output: { responseLength: String(lastResponse || '').length },
       error: 'builder_model_control_schema_mismatch',
       failureClass: 'unknown',
-      remediation: 'The reasoner did not return one valid edit_file control for an admitted path after the bounded recovery attempt.',
+      remediation: 'The reasoner did not return one valid edit_file control after the bounded recovery attempt.',
     }))
     return { ok: false, error: 'builder_model_control_schema_mismatch', trace }
   }
@@ -297,26 +344,29 @@ export async function runDebugFileJob(input: {
   try {
     const changed = await input.workspace.editFile(input.workspaceId, edit.path, edit.search, edit.replace)
     trace.push(Object.freeze({
-      round,
+      round: 4,
       toolId: 'edit_file',
       input: { path: edit.path, search: edit.search, replace: edit.replace },
       ok: true,
       output: { path: changed.path, updatedAt: changed.updatedAt, bytes: new TextEncoder().encode(changed.content).byteLength },
     }))
-    round += 1
 
-    const verificationFiles = sources.map(file => file.path === edit.path ? changed : file)
-    const secondRun = await input.runner.run({ workspaceId: input.workspaceId, command: input.plan.command, files: verificationFiles })
+    const rerunFiles = staged.files.map(file => file.path === changed.path ? changed : file)
+    const secondRun = await input.runner.run({
+      workspaceId: input.workspaceId,
+      command: input.plan.command,
+      files: rerunFiles,
+    })
     if (secondRun.exitCode !== 0) {
-      trace.push(runFailureTrace(round, input.plan.command, secondRun))
+      trace.push(runFailureTrace(5, input.plan.command, secondRun))
       return { ok: false, error: 'builder_debug_verification_failed', trace }
     }
-    trace.push(runSuccessTrace(round, input.plan.command, secondRun))
+    trace.push(runSuccessTrace(5, input.plan.command, secondRun))
     const initialError = bounded(firstRun.stderr || firstRun.stdout)
     return {
       ok: true,
       answer: [
-        `Debugged \`${edit.path}\` using ${sources.length} supplied file${sources.length === 1 ? '' : 's'} with one minimal edit.`,
+        `Debugged \`${edit.path}\` with one minimal edit across ${plannedPaths.length} attached file${plannedPaths.length === 1 ? '' : 's'}.`,
         '',
         `First command: \`${input.plan.command}\``,
         `First exit code: ${firstRun.exitCode}`,
@@ -331,7 +381,7 @@ export async function runDebugFileJob(input: {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'builder_edit_failed'
     trace.push(Object.freeze({
-      round,
+      round: 4,
       toolId: 'edit_file',
       input: { path: edit.path, search: edit.search, replace: edit.replace },
       ok: false,

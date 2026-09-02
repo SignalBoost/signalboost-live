@@ -17,7 +17,13 @@ function packageManager(files: readonly ProjectFile[]): BuilderProjectContext['p
 }
 
 function testCommand(manager: BuilderProjectContext['packageManager'], scripts: Readonly<Record<string, string>>, testFiles: readonly string[]): string | null {
-  if (typeof scripts.test === 'string' && scripts.test.trim()) {
+  const script = typeof scripts.test === 'string' ? scripts.test.trim() : ''
+  // A hardcoded `node --test a.ts b.ts …` suite cannot be aimed with `npm test -- file`.
+  // Point at one staged test file or the model OOMs the sandbox (exit 137).
+  if (/\bnode\s+--test\s+\S+/.test(script) && testFiles.length > 0) {
+    return `node --experimental-strip-types --test ${testFiles[0]}`
+  }
+  if (script) {
     if (manager === 'pnpm') return 'pnpm test'
     if (manager === 'yarn') return 'yarn test'
     if (manager === 'bun') return 'bun test'
@@ -25,6 +31,16 @@ function testCommand(manager: BuilderProjectContext['packageManager'], scripts: 
   }
   if (testFiles.length > 0) return `node --test ${testFiles.slice(0, 8).join(' ')}`
   return null
+}
+
+export function normalizeBuilderSandboxCommand(command: string): string {
+  let next = String(command || '').trim()
+  next = next.replace(/^(?:cd\s+(?:\/home\/user\/repos\/saas|\/vercel\/path0\/saas|\/tmp\/cos-builder)\/?\s*&&\s*)+/i, '')
+  const aimed = next.match(/^npm\s+(?:run\s+)?test\s+--\s+(\S+)/i)
+  if (aimed && /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(aimed[1])) {
+    return `node --experimental-strip-types --test ${aimed[1]}`
+  }
+  return next
 }
 
 export function discoverBuilderProjectContext(files: readonly ProjectFile[]): BuilderProjectContext {

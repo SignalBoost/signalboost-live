@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
@@ -15,8 +15,10 @@ import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { analyzeOperationalLog, hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
-import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
+import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
+import { runBuilderJob } from '@/lib/builder/job-runner'
+import { readBuilderObjective } from '@/lib/builder/request-contract'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 
@@ -24,6 +26,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 const SIGNALBOOST_OPERATIONAL_TARGET = /\b(?:signalboost-live|(?:saas\.)?signalboostapp\.com)\b/i
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function withSuggestedFollowups(response: Response, prompt: string, userId: string | null = null): Promise<NextResponse> {
   const headers = new Headers(response.headers)
@@ -126,36 +129,35 @@ export async function POST(req: NextRequest) {
       }, { ownerDeveloperLogSubmission: true })
     : null
   if (ownerSignalBoostLogTarget && access?.userId) {
-    const execution = await executeSignalBoostRepositoryRepair({
+    const conversationId = UUID.test(String(body?.context?.conversationId || ''))
+      ? String(body.context.conversationId)
+      : crypto.randomUUID()
+    const objective = readBuilderObjective({ objective: prompt }).objective
+    const job = await enqueueSignalBoostRepositoryRepairJob({
       userId: access.userId,
-      rawObjective: prompt,
-      workspaceId: crypto.randomUUID(),
+      conversationId,
+      objective,
       target: ownerSignalBoostLogTarget,
     })
-    if (execution) {
-      return withSuggestedFollowups(
-        NextResponse.json(execution.payload, { status: execution.status }),
-        prompt,
-        auditUserId,
-      )
-    }
+    after(async () => { await runBuilderJob(job.jobId, access.userId!) })
+    return NextResponse.json({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
   }
 
   if (explicitOperationalRepair && !hasSourceAttachment) {
     const repositoryTarget = parseSignalBoostRepositoryRepairTarget(prompt)
     if (access?.isOwner && access.userId && repositoryTarget) {
-      const execution = await executeSignalBoostRepositoryRepair({
+      const conversationId = UUID.test(String(body?.context?.conversationId || ''))
+        ? String(body.context.conversationId)
+        : crypto.randomUUID()
+      const objective = readBuilderObjective({ objective: prompt }).objective
+      const job = await enqueueSignalBoostRepositoryRepairJob({
         userId: access.userId,
-        rawObjective: prompt,
-        workspaceId: crypto.randomUUID(),
+        conversationId,
+        objective,
+        target: repositoryTarget,
       })
-      if (execution) {
-        return withSuggestedFollowups(
-          NextResponse.json(execution.payload, { status: execution.status }),
-          prompt,
-          auditUserId,
-        )
-      }
+      after(async () => { await runBuilderJob(job.jobId, access.userId!) })
+      return NextResponse.json({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
     }
 
     const reply = repositoryTarget

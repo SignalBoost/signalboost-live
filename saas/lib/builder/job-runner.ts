@@ -7,6 +7,8 @@ import { isRepairObjective } from './regression-gate.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
+import { executeSignalBoostRepositoryRepair } from './repository-repair.ts'
+import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -117,6 +119,47 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
   try {
     job = await claimBuilderJob(jobId, userId)
     if (!job) return
+
+    if (job.metadata.platformRepair === true) {
+      if (!job.ownerAuthorized) {
+        await terminalFailure(job, 'builder_repository_repair_owner_required')
+        return
+      }
+      const exactTarget = parseSignalBoostRepositoryRepairTarget(job.objective)
+      const target = exactTarget ?? signalBoostDeployedRepairTarget(job.objective, {
+        commitSha: job.metadata.commitSha,
+        branch: job.metadata.branch,
+      }, { ownerDeveloperLogSubmission: true })
+      if (!target) {
+        await terminalFailure(job, 'builder_repository_repair_target_unavailable')
+        return
+      }
+      const execution = await executeSignalBoostRepositoryRepair({
+        userId: job.userId,
+        rawObjective: job.objective,
+        workspaceId: job.workspaceId,
+        target,
+      })
+      if (!execution) {
+        await terminalFailure(job, 'builder_repository_repair_target_unavailable')
+        return
+      }
+      const payload = execution.payload
+      const error = typeof payload.error === 'string' ? payload.error : null
+      const reply = typeof payload.reply === 'string'
+        ? payload.reply
+        : failureReply(error || 'builder_repository_repair_failed', Array.isArray(payload.trace) ? payload.trace as any : [])
+      await finishBuilderJob({
+        jobId: job.id,
+        userId: job.userId,
+        status: execution.status >= 200 && execution.status < 300 && !error ? 'succeeded' : 'failed',
+        reply,
+        ...(error ? { error } : {}),
+        result: { ...payload, jobId: job.id, workspaceId: job.workspaceId },
+      })
+      return
+    }
+
     const workspace = createSupabaseBuilderWorkspace(job.userId)
     if (!workspace) {
       await terminalFailure(job, 'builder_job_storage_unavailable')

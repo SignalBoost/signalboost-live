@@ -7,8 +7,8 @@ import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob, getBuilderJobForUser } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
-import { executeSignalBoostRepositoryRepair } from '@/lib/builder/repository-repair'
 import { signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
+import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import {
   isBuilderObjectiveError,
   readBuilderObjective,
@@ -163,14 +163,14 @@ export async function POST(request: Request) {
         await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
         return noStore({ error: 'builder_repository_repair_owner_required', reply, execution_allowed: false }, { status: 403 })
       }
-      const execution = await executeSignalBoostRepositoryRepair({
+      const job = await enqueueSignalBoostRepositoryRepairJob({
         userId: access.userId,
-        rawObjective: objective,
-        workspaceId,
+        conversationId,
+        objective,
         target: platformRepairTarget,
       })
-      if (!execution) return noStore({ error: 'builder_repository_repair_target_unavailable' }, { status: 422 })
-      return noStore(execution.payload, { status: execution.status })
+      after(async () => { await runBuilderJob(job.jobId, access.userId) })
+      return noStore({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
     }
 
     // A log plus exactly one supported source file keeps the fixed one-file debug protocol. A log

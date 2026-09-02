@@ -21,6 +21,7 @@ export type SignalBoostRepositoryRepairTarget = Readonly<{
 const CLONE_LINE = /Cloning\s+(?:https?:\/\/)?github\.com\/SignalBoost\/signalboost-live(?:\.git)?\s*\(Branch:\s*([^,\r\n]+),\s*Commit:\s*([0-9a-f]{7,40})\)/i
 const SAFE_BRANCH = /^(?![-/])(?!.*(?:\.\.|\/\/))[A-Za-z0-9._/-]{1,180}$/
 const SOURCE_PATH = /(?:\.\/([A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+)|(saas\/[A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0-9]+))(?::\d+(?::\d+)?)?/g
+const TEST_PATH = /\b((?:tests|test)\/[A-Za-z0-9_@.+/-]+\.test\.(?:ts|tsx|js|mjs|cjs|mts|cts))(?::\d+(?::\d+)?)?/gi
 const MAX_FAILURE_EVIDENCE = 40
 const EXPLICIT_PLATFORM_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\b|(?:^|[\n.!?]\s*)(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\s+(?:is\s+|keeps?\s+)?(?:broken|failing|not\s+working)\b/i
 
@@ -37,12 +38,35 @@ function normalizedLogLines(input: string): string[] {
     .filter(Boolean)
 }
 
-function sourcePaths(input: string): readonly string[] {
+function failingSectionLines(input: string): readonly string[] {
+  const lines = normalizedLogLines(input)
+  const start = lines.findIndex(line => /(?:^|\s)✖\s+failing tests\s*:/i.test(line))
+  if (start >= 0) return lines.slice(start)
+  return lines.filter(line => /\btest at\s+(?:tests|test)\//i.test(line))
+}
+
+function failingTestPaths(input: string): readonly string[] {
   const paths: string[] = []
+  for (const line of failingSectionLines(input)) {
+    for (const match of line.matchAll(TEST_PATH)) {
+      const path = match[1]
+      if (path) paths.push(`saas/${path}`)
+    }
+  }
+  return unique(paths, 12)
+}
+
+function sourcePaths(input: string): readonly string[] {
+  const failingTests = new Set(failingTestPaths(input))
+  const paths: string[] = [...failingTests]
   for (const match of input.matchAll(SOURCE_PATH)) {
     const path = match[1] || match[2]
     if (!path) continue
-    paths.push(path.startsWith('saas/') ? path : `saas/${path}`)
+    const normalized = path.startsWith('saas/') ? path : `saas/${path}`
+    // Vercel prints every executed test path in module warnings. Those are not repair targets.
+    // Keep test paths only when the final failing-test section identifies them explicitly.
+    if (/^saas\/(?:tests|test)\//i.test(normalized) && !failingTests.has(normalized)) continue
+    paths.push(normalized)
   }
   return unique(paths, 32)
 }
@@ -62,8 +86,11 @@ function symbolNames(input: string): readonly string[] {
 }
 
 function failureEvidence(input: string): readonly string[] {
-  const selected = normalizedLogLines(input).filter(line =>
-    /Build error occurred|Turbopack build failed|\bError:|doesn['’]t exist|was not found|Cannot find|has no exported member|Import trace:|Command .* exited with [1-9]|\b(?:fail|failed)\b/i.test(line),
+  const lines = normalizedLogLines(input)
+  const failingStart = lines.findIndex(line => /(?:^|\s)✖\s+failing tests\s*:/i.test(line))
+  const scoped = failingStart >= 0 ? lines.slice(failingStart) : lines
+  const selected = scoped.filter(line =>
+    /(?:^|\s)✖\s|\btest at\s+(?:tests|test)\/|AssertionError|ERR_ASSERTION|Build error occurred|Turbopack build failed|Failed to type check|Type error:|\bError:|doesn['’]t exist|was not found|Cannot find|has no exported member|Import trace:|Command .* exited with [1-9]|\bexpected:|\bactual:|\boperator:/i.test(line),
   )
   return unique(selected.map(line => line.slice(0, 900)), MAX_FAILURE_EVIDENCE)
 }
@@ -167,7 +194,11 @@ export async function resolveSignalBoostRepositoryCommit(
 
 export function signalBoostRepositoryRepairObjective(target: SignalBoostRepositoryRepairTarget): string {
   const paths = target.pathHints.map(path => path.replace(/^saas\//, ''))
+  const failingTests = paths.filter(path => /^(?:tests|test)\/.+\.test\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(path))
   const command = target.failedCommand ? `Failed command: ${target.failedCommand}` : 'Failed command: not extracted from the log.'
+  const narrowProof = failingTests.length
+    ? `Narrow proof command: node --test ${failingTests.join(' ')}. Run this exact command from the mounted workspace root. Do not cd into another directory and do not use npm test -- <file>; this repository's npm test script enumerates the full suite.`
+    : 'Commands already start in the mounted saas workspace root. Do not cd into guessed absolute paths; use workspace-relative paths and the narrowest relevant proof command.'
   const evidence = target.failureEvidence.length
     ? target.failureEvidence.join('\n')
     : target.trigger === 'failed_build_log'
@@ -179,6 +210,7 @@ export function signalBoostRepositoryRepairObjective(target: SignalBoostReposito
       : `Diagnose and prepare a verified repair for ${target.repository} at exact deployed commit ${target.fullCommitSha || target.commitSha}.`,
     `The host mounted the pinned repository's ${target.projectRoot}/ directory as this isolated workspace. Tool paths are relative to ${target.projectRoot}/.`,
     'Inspect the implicated source, reproduce the failure with the narrowest relevant command, make the smallest source repair, and rerun the same command until it passes.',
+    narrowProof,
     'Do not weaken tests, access another repository, use the network, commit, push, merge, deploy, or claim success without fail-before/pass-after evidence.',
     command,
     paths.length ? `Path hints: ${paths.join(', ')}` : '',

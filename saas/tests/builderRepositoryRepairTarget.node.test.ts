@@ -28,6 +28,23 @@ const projectRootRelativeFailedLog = [
   '18:20:18.068 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
 ].join('\n')
 
+const noisyNodeTestFailureLog = [
+  '15:24:42.495 Running build in Cleveland, USA (East) – cle1',
+  '15:24:42.602 Cloning github.com/SignalBoost/signalboost-live (Branch: main, Commit: 7f189e1)',
+  "15:24:47.202 (node:109) Warning: Module type of file:///vercel/path0/saas/tests/advisoryDiagnosisPolicy.node.test.ts is not specified",
+  '15:24:47.419 ✔ hard diagnosis fallback never asks again for readings already supplied',
+  "15:24:58.584 (node:158) Warning: Module type of file:///vercel/path0/saas/tests/builderAsyncJobs.node.test.ts is not specified",
+  '15:24:58.676 ✖ an attached debug request cannot silently fall back to a broad standard job',
+  '15:25:06.467 ℹ fail 1',
+  '15:25:06.480 ✖ failing tests:',
+  '15:25:06.480 test at tests/builderAsyncJobs.node.test.ts:27:1',
+  '15:25:06.480 ✖ an attached debug request cannot silently fall back to a broad standard job',
+  '15:25:06.480 AssertionError [ERR_ASSERTION]: The input did not match the regular expression',
+  '15:25:06.480 // saas/app/api/builder/route.ts',
+  '15:25:06.494 expected: /require 1–4 supported/',
+  '15:25:06.510 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+].join('\n')
+
 test('extracts the exact SignalBoost branch, revision, source paths and missing symbols from a failed Vercel log', () => {
   const target = parseSignalBoostRepositoryRepairTarget(failedLog)
   assert.ok(target)
@@ -49,6 +66,20 @@ test('normalizes Vercel project-root source paths into the mounted saas reposito
   assert.ok(target.pathHints.includes('saas/lib/builder/repository-repair.ts'))
   const objective = signalBoostRepositoryRepairObjective(target)
   assert.match(objective, /Path hints: lib\/builder\/repository-repair\.ts/)
+})
+
+test('noisy Vercel output targets the actual failing test instead of passing test warnings', () => {
+  const target = parseSignalBoostRepositoryRepairTarget(noisyNodeTestFailureLog)
+  assert.ok(target)
+  assert.equal(target.pathHints[0], 'saas/tests/builderAsyncJobs.node.test.ts')
+  assert.ok(target.pathHints.includes('saas/app/api/builder/route.ts'))
+  assert.ok(!target.pathHints.includes('saas/tests/advisoryDiagnosisPolicy.node.test.ts'))
+  assert.ok(target.failureEvidence.some(line => line.includes('tests/builderAsyncJobs.node.test.ts')))
+  assert.ok(!target.failureEvidence.some(line => line.includes('hard diagnosis fallback')))
+  const objective = signalBoostRepositoryRepairObjective(target)
+  assert.match(objective, /Narrow proof command: node --test tests\/builderAsyncJobs\.node\.test\.ts/)
+  assert.match(objective, /Do not cd into another directory/)
+  assert.match(objective, /do not use npm test -- <file>/i)
 })
 
 test('resolves a short revision to one immutable full commit before sandbox setup', async () => {

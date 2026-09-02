@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { detectConciergeArtifactIntent } from '../lib/artifacts/intent.ts'
 import { isOperationalLogEvidence } from '../lib/ai/cos/pastedOperationalLog.ts'
 import { isProvenanceIntrospection } from '../lib/ai/cos/provenanceIntrospection.ts'
 
-test('browser ingress sends passive pasted build logs to COS without granting Builder authority', () => {
+test('browser ingress sends passive pasted build logs to COS without granting ordinary Builder authority', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   const repair = route.indexOf('const explicitOperationalRepair =')
   assert.ok(repair >= 0)
@@ -52,23 +53,29 @@ test('explicit failed SignalBoost log repair may reach only the owner-only pinne
   assert.match(route.slice(execute, publicScope), /status: 'queued'/)
 })
 
-test('only failed owner SignalBoost logs reach Platform Engineer before passive analysis', () => {
+test('failed owner logs can use verified SignalBoost deployment binding when a clipped pane omits the repo clone line', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   const classification = route.indexOf('const operationalEvidence = isOperationalLogEvidence(operationalPrompt)')
   const analysis = route.indexOf('const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)', classification)
   const exactTarget = route.indexOf('const exactFailedLogTarget = operationalLogAnalysis.failed', analysis)
-  const target = route.indexOf('const ownerSignalBoostLogTarget =', exactTarget)
+  const projectBinding = route.indexOf('const signalBoostProjectBound =', exactTarget)
+  const explicitBinding = route.indexOf('SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt)', projectBinding)
+  const deploymentBinding = route.indexOf('isSignalBoostDeploymentContext(req)', explicitBinding)
+  const target = route.indexOf('const ownerSignalBoostLogTarget =', deploymentBinding)
   const owner = route.indexOf('access?.isOwner', target)
   const evidence = route.indexOf('operationalEvidence', owner)
   const failed = route.indexOf('operationalLogAnalysis.failed', evidence)
-  const binding = route.indexOf('SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt)', failed)
-  const preferExact = route.indexOf('exactFailedLogTarget ?? signalBoostDeployedRepairTarget', binding)
-  const execute = route.indexOf('enqueueSignalBoostRepositoryRepairJob({', binding)
+  const bound = route.indexOf('signalBoostProjectBound', failed)
+  const preferExact = route.indexOf('exactFailedLogTarget ?? signalBoostDeployedRepairTarget', bound)
+  const preserveLog = route.indexOf('signalBoostDeployedRepairTarget(operationalPrompt', preferExact)
+  const execute = route.indexOf('enqueueSignalBoostRepositoryRepairJob({', preserveLog)
   const schedule = route.indexOf('runBuilderJob(job.jobId', execute)
-  assert.ok(classification >= 0 && analysis > classification && exactTarget > analysis && target > exactTarget)
-  assert.ok(owner > target && evidence > owner && failed > evidence && binding > failed)
-  assert.ok(preferExact > binding && execute > preferExact && schedule > execute)
-  assert.match(route.slice(exactTarget, target), /parseSignalBoostRepositoryRepairTarget\(operationalPrompt\)/)
+  assert.ok(classification >= 0 && analysis > classification && exactTarget > analysis)
+  assert.ok(projectBinding > exactTarget && explicitBinding > projectBinding && deploymentBinding > explicitBinding && target > deploymentBinding)
+  assert.ok(owner > target && evidence > owner && failed > evidence && bound > failed)
+  assert.ok(preferExact > bound && preserveLog >= preferExact && execute > preserveLog && schedule > execute)
+  assert.match(route, /VERCEL_GIT_REPO_OWNER/)
+  assert.match(route, /VERCEL_GIT_REPO_SLUG/)
   assert.match(route.slice(target), /commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA/)
   assert.match(route.slice(target), /target: ownerSignalBoostLogTarget/)
   assert.match(route.slice(target), /status: 'queued'/)
@@ -89,6 +96,19 @@ test('attached text logs join the user request before Concierge diagnosis withou
   assert.match(route, /if \(!operationalEvidence\) \{[\s\S]*isConciergeArtifactObjective\(prompt\)[\s\S]*isConciergeVisualObjective\(prompt\)/)
 })
 
+test('clipped build output cannot become an artifact or technical-provenance request', () => {
+  const log = [
+    '10:52:09.206 ✔ History validates the conversation, reports database failures, and disables caching (1.809029ms)',
+    '10:52:09.206 (node:136) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///vercel/path0/saas/tests/assistantSourceFileBoundary.node.test.ts is not specified',
+    '10:52:09.217 Reparsing as ES Module because module syntax was detected. This incurs a performance overhead.',
+    '10:52:09.218 ✔ create PDF with technical provenance stays diagnostic (2.242796ms)',
+    '10:52:09.218 ✔ owner Assistant mounts the recovery boundary (2.822960ms)',
+  ].join('\n')
+  assert.equal(isOperationalLogEvidence(log), true)
+  assert.equal(isProvenanceIntrospection(log), false)
+  assert.equal(detectConciergeArtifactIntent(log), null)
+})
+
 test('artifact and provenance trigger words inside a failed build remain operational evidence', () => {
   const log = [
     '10:12:16.287 ✖ create PDF with technical provenance',
@@ -96,6 +116,7 @@ test('artifact and provenance trigger words inside a failed build remain operati
   ].join('\n')
   assert.equal(isOperationalLogEvidence(log), true)
   assert.equal(isProvenanceIntrospection(log), false)
+  assert.equal(detectConciergeArtifactIntent(log), null)
 
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   const creativeGate = route.indexOf('if (!operationalEvidence) {')

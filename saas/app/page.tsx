@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { DragEvent, FormEvent, useEffect, useRef, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
+import AgentActivity from '@/components/AgentActivity'
 import { PreviewProjects } from '@/components/home/PreviewProjects'
 import { t } from '@/lib/i18n/t'
 import { uiText } from '@/lib/i18n/uiText'
@@ -20,6 +21,7 @@ import {
   shouldClarifyUserSuppliedScenario,
 } from '@/lib/homepageConciergePolicy'
 import { listPublicPortableProducts } from '@/lib/portable-products'
+import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 
 type Attachment = {
   id: string
@@ -51,6 +53,7 @@ export default function Home() {
   const [turns, setTurns] = useState<ConciergeTranscriptTurn[]>([])
   const [pendingRequest, setPendingRequest] = useState('')
   const [loading, setLoading] = useState(false)
+  const [activity, setActivity] = useState<AgentProgressEvent | null>(null)
   const [failed, setFailed] = useState(false)
   const [copiedTarget, setCopiedTarget] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -148,14 +151,17 @@ export default function Home() {
 
     if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
     setLoading(true)
+    setActivity(null)
     setFailed(false)
     setPendingRequest(displayContent)
+    const controller = new AbortController()
 
     const send = async (transportPrompt: string) => {
-      const response = await fetch('/api/concierge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const result = await postWithAgentProgress({
+        target: 'concierge',
+        signal: controller.signal,
+        onProgress: setActivity,
+        body: {
           messages: transcriptMessages(turns, transportPrompt),
           attachments: staged.map(({ name, type, dataUrl }) => ({ name, type, dataUrl })),
           context: {
@@ -164,9 +170,9 @@ export default function Home() {
             conversationId: conversationIdRef.current,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           },
-        }),
+        },
       })
-      const payload = await response.json().catch(() => null)
+      const payload = result.data
       const reply = String(payload?.reply || payload?.error || '').trim()
       if (!reply) throw new Error('concierge_unavailable')
       const suggestedFollowups = Array.isArray(payload?.suggested_followups)
@@ -214,6 +220,7 @@ export default function Home() {
       setFailed(true)
     } finally {
       setLoading(false)
+      setActivity(null)
     }
   }
 
@@ -369,7 +376,7 @@ export default function Home() {
                 <div className="message-row assistant-row">
                   <article className={'message assistant-message' + (failed ? ' failed-message' : '')}>
                     <div className="message-tools assistant-tools"><span>{c('cosLabel')}</span></div>
-                    {loading ? <p className="thinking">{c('thinking')}</p> : null}
+                    {loading ? <AgentActivity lang={lang} compact activity={activity} /> : null}
                     {failed ? <p className="error" role="status">{c('error')}</p> : null}
                   </article>
                 </div>

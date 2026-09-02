@@ -15,7 +15,7 @@ function shellQuote(value: string): string { return `'${String(value).replace(/'
 /** Executes only the supplied user workspace inside an ephemeral, network-denied MicroVM. */
 export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
   async run(input: { workspaceId: string; command: string; files: readonly { path: string; content: string }[] }): Promise<BuilderRunResult> {
-    const command = normalizeBuilderSandboxCommand(String(input.command || '').trim())
+    const command = normalizeBuilderSandboxCommand(String(input.command || '').trim(), input.files)
     if (!command || command.length > 2_000) throw new Error('builder_invalid_command')
     const sandbox = await Sandbox.create({
       runtime: 'node24',

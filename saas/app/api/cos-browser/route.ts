@@ -1,3 +1,4 @@
+// app/api/cos-browser/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
@@ -15,7 +16,7 @@ import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { analyzeOperationalLog, hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
-import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
+import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget, type SignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import { readBuilderObjective } from '@/lib/builder/request-contract'
@@ -34,6 +35,26 @@ function isSignalBoostDeploymentContext(req: NextRequest): boolean {
   const repo = String(process.env.VERCEL_GIT_REPO_SLUG || '').trim().toLowerCase()
   const host = String(req.nextUrl.hostname || '').trim().toLowerCase()
   return (owner === 'signalboost' && repo === 'signalboost-live') || host === 'saas.signalboostapp.com'
+}
+
+async function queueOwnerRepositoryRepair(input: {
+  body: any
+  userId: string
+  objective: string
+  target: SignalBoostRepositoryRepairTarget
+}): Promise<NextResponse> {
+  const conversationId = UUID.test(String(input.body?.context?.conversationId || ''))
+    ? String(input.body.context.conversationId)
+    : crypto.randomUUID()
+  const objective = readBuilderObjective({ objective: input.objective }).objective
+  const job = await enqueueSignalBoostRepositoryRepairJob({
+    userId: input.userId,
+    conversationId,
+    objective,
+    target: input.target,
+  })
+  after(async () => { await runBuilderJob(job.jobId, input.userId) })
+  return NextResponse.json({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
 }
 
 export async function withSuggestedFollowups(response: Response, prompt: string, userId: string | null = null): Promise<NextResponse> {
@@ -92,12 +113,13 @@ function builderRoutingContextFromBody(body: any) {
 }
 
 /**
- * Browser-only ingress wrapper for COS Primary.
+ * Canonical browser ingress for both Concierge and owner Assistant.
  *
- * Passive Vercel/npm logs are classified before artifacts, visuals, provenance, or Builder. An explicit
- * owner repair request for an exact failed SignalBoost Vercel snapshot may enter only the
- * pinned, review-only Platform Engineer lane. Repair intent may carry across exactly one
- * immediately preceding user turn so “debug this” followed by the log remains one repair job.
+ * The browser is not the developer. It supplies intent and evidence. Once an authenticated owner
+ * asks to repair the SignalBoost platform, the server binds the task to the immutable deployed
+ * repository revision and Platform Engineer performs the repo-native inspect/reproduce/edit/verify
+ * loop. A copied log can enrich that task, but a clone line or attached source file is not required
+ * to grant context that the server already owns. Public/member traffic never receives this authority.
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
@@ -127,53 +149,54 @@ export async function POST(req: NextRequest) {
   const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(operationalPrompt)
     || (pastedOperationalLog && hasExplicitOperationalLogRepairIntent(previousUserPrompt))
 
+  const deployment = {
+    commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
+    branch: process.env.VERCEL_GIT_COMMIT_REF,
+  }
+  const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req)
+
+  // Intent is sufficient for an authenticated owner to start repository-native diagnosis of this
+  // deployment. Platform Engineer discovers the repo itself and proves a repair before returning a
+  // patch; the owner no longer has to paste source files or reverse-engineer which file is broken.
+  const explicitOwnerPlatformTarget = access?.isOwner && access.userId && !hasSourceAttachment && signalBoostProjectBound
+    ? signalBoostDeployedRepairTarget(prompt, deployment)
+    : null
+  if (explicitOwnerPlatformTarget && access?.userId) {
+    return queueOwnerRepositoryRepair({
+      body,
+      userId: access.userId,
+      objective: operationalPrompt || prompt,
+      target: explicitOwnerPlatformTarget,
+    })
+  }
+
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
   const exactFailedLogTarget = operationalLogAnalysis.failed
     ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
-  // A clipped log pane may omit the clone line and even the repository name. For an authenticated
-  // owner request already executing inside the verified SignalBoost deployment, the deployment's
-  // immutable Vercel commit/branch is authoritative project binding. If the log still carries an
-  // exact failed clone target, that exact target wins.
-  const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req)
   const ownerSignalBoostLogTarget = access?.isOwner && access.userId && !hasSourceAttachment
     && operationalEvidence && operationalLogAnalysis.failed
     && signalBoostProjectBound
-    ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(operationalPrompt, {
-        commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
-        branch: process.env.VERCEL_GIT_COMMIT_REF,
-      }, { ownerDeveloperLogSubmission: true })
+    ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })
     : null
   if (ownerSignalBoostLogTarget && access?.userId) {
-    const conversationId = UUID.test(String(body?.context?.conversationId || ''))
-      ? String(body.context.conversationId)
-      : crypto.randomUUID()
-    const objective = readBuilderObjective({ objective: operationalPrompt }).objective
-    const job = await enqueueSignalBoostRepositoryRepairJob({
+    return queueOwnerRepositoryRepair({
+      body,
       userId: access.userId,
-      conversationId,
-      objective,
+      objective: operationalPrompt,
       target: ownerSignalBoostLogTarget,
     })
-    after(async () => { await runBuilderJob(job.jobId, access.userId!) })
-    return NextResponse.json({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
   }
 
   if (explicitOperationalRepair && !hasSourceAttachment) {
     const repositoryTarget = parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     if (access?.isOwner && access.userId && repositoryTarget) {
-      const conversationId = UUID.test(String(body?.context?.conversationId || ''))
-        ? String(body.context.conversationId)
-        : crypto.randomUUID()
-      const objective = readBuilderObjective({ objective: operationalPrompt }).objective
-      const job = await enqueueSignalBoostRepositoryRepairJob({
+      return queueOwnerRepositoryRepair({
+        body,
         userId: access.userId,
-        conversationId,
-        objective,
+        objective: operationalPrompt,
         target: repositoryTarget,
       })
-      after(async () => { await runBuilderJob(job.jobId, access.userId!) })
-      return NextResponse.json({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
     }
 
     const reply = repositoryTarget
@@ -189,10 +212,9 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId)
   }
 
-  // Passive logs carry evidence but no execution authority. Continue through ordinary COS so a
-  // diagnostic question receives a useful explanation and dialogue instead of the obsolete canned
-  // "not editable source" reply. Builder routing still excludes unattached operational logs.
-
+  // Passive logs carry evidence but no execution authority for public/member traffic. Continue
+  // through ordinary COS so a diagnostic question receives a useful explanation instead of being
+  // misread as a visual, artifact, provenance, or ordinary Builder objective.
   const routedHeaders = new Headers(req.headers)
   routedHeaders.set('content-type', 'application/json')
   routedHeaders.delete('content-length')

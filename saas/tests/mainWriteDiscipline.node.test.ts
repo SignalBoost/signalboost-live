@@ -33,6 +33,19 @@ test('onboarding independently rejects stale main integration tokens', () => {
   assert.match(onboarding, /Every PR to main must modify/)
 })
 
+test('Vercel refuses an unverified direct-main deployment before the build starts', () => {
+  const vercel = JSON.parse(readRoot('saas/vercel.json'))
+  const guard = readRoot('saas/scripts/vercel-main-write-guard.mjs')
+  assert.equal(vercel.ignoreCommand, 'node scripts/vercel-main-write-guard.mjs')
+  assert.match(guard, /VERCEL_GIT_COMMIT_REF/)
+  assert.match(guard, /branch !== 'main'\) process\.exit\(1\)/)
+  assert.match(guard, /parents\.length !== 2/)
+  assert.match(guard, /\^Merge pull request #\\d\+ from /)
+  assert.match(guard, /git\(\['diff', '--quiet', firstParent, 'HEAD', '--', '\.github\/main-write-token'\]\)/)
+  assert.match(guard, /skipping main deployment/)
+  assert.match(guard, /verified serialized PR merge; continuing deployment/)
+})
+
 test('owner review and no-agent-self-merge are repository policy', () => {
   const codeowners = readRoot('.github/CODEOWNERS')
   const policy = readRoot('docs/MAIN-WRITE-DISCIPLINE.md')

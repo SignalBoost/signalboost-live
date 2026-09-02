@@ -35,7 +35,7 @@ function testCommand(manager: BuilderProjectContext['packageManager'], scripts: 
 
 export function normalizeBuilderSandboxCommand(command: string): string {
   let next = String(command || '').trim()
-  next = next.replace(/^(?:cd\s+(?:\/home\/user\/repos\/saas|\/vercel\/path0\/saas|\/tmp\/cos-builder)\/?\s*&&\s*)+/i, '')
+  next = next.replace(/^(?:cd\s+(?:\/home\/user\/repos\/saas|\/vercel\/path0\/saas|\/tmp\/cos-builder|\/tmp\/cos-signalboost-repair\/saas)\/?\s*&&\s*)+/i, '')
   const aimed = next.match(/^npm\s+(?:run\s+)?test\s+--\s+(\S+)/i)
   if (aimed && /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(aimed[1])) {
     return `node --experimental-strip-types --test ${aimed[1]}`

@@ -194,7 +194,7 @@ export async function POST(req: NextRequest) {
       })
     : req
 
-  if (isConciergeArtifactObjective(prompt)) {
+  if (!pastedOperationalLog && isConciergeArtifactObjective(prompt)) {
     const headers = new Headers(req.headers)
     headers.set('content-type', 'application/json')
     headers.delete('content-length')
@@ -206,7 +206,7 @@ export async function POST(req: NextRequest) {
     return withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
   }
 
-  if (isConciergeVisualObjective(prompt)) {
+  if (!pastedOperationalLog && isConciergeVisualObjective(prompt)) {
     const headers = new Headers(req.headers)
     headers.set('content-type', 'application/json')
     headers.delete('content-length')

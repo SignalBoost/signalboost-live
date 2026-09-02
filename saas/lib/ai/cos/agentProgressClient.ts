@@ -1,4 +1,5 @@
 import { isConciergeBuilderObjective } from './cosReasoningRolePolicy.ts'
+import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
 
 export type AgentProgressEvent = {
   phase: 'accepted' | 'running' | 'complete'
@@ -115,16 +116,26 @@ export async function postWithAgentProgress(args: {
   }
 
   const builderRequest = args.target === 'concierge' ? conciergeBuilderRequest(args.body) : null
-  report('accepted', args.target === 'cos' ? 'COS received the request' : 'Concierge received the request')
-  report('running', builderRequest
-    ? 'Concierge sent the supplied source files to COS Builder'
-    : args.target === 'cos' ? 'COS is processing the request' : 'Concierge is consulting COS')
-  const heartbeat = window.setInterval(() => report('running', builderRequest
-    ? 'COS Builder is working in the isolated user workspace'
-    : 'Waiting for the COS response — connection active'), 2_000)
+  const requestBody = builderRequest?.body ?? args.body
+  const repairRequest = isOperatorRepairRequest(requestBody)
+  const progressTarget = args.target
+  const builderActive = Boolean(builderRequest)
+
+  report('accepted', repairRequest
+    ? operatorProgressMessage({ stage: 'accepted', target: progressTarget, builder: builderActive })
+    : args.target === 'cos' ? 'COS received the request' : 'Concierge received the request')
+  report('running', repairRequest
+    ? operatorProgressMessage({ stage: 'diagnosing', target: progressTarget, builder: builderActive })
+    : builderRequest
+      ? 'Concierge sent the supplied source files to COS Builder'
+      : args.target === 'cos' ? 'COS is processing the request' : 'Concierge is consulting COS')
+  const heartbeat = window.setInterval(() => report('running', repairRequest
+    ? operatorProgressMessage({ stage: 'fixing', target: progressTarget, builder: builderActive })
+    : builderRequest
+      ? 'COS Builder is working in the isolated user workspace'
+      : 'Waiting for the COS response — connection active'), 2_000)
 
   const endpoint = builderRequest?.endpoint ?? (args.target === 'cos' ? '/api/cos-primary' : '/api/concierge')
-  const requestBody = builderRequest?.body ?? args.body
   let response: Response
   try {
     response = await fetch(endpoint, {
@@ -141,12 +152,16 @@ export async function postWithAgentProgress(args: {
   const jobId = typeof data?.jobId === 'string' ? data.jobId : ''
 
   if (!jobId || !['queued', 'running'].includes(String(data?.status || ''))) {
-    report('complete', response.ok ? 'Response completed' : 'Request completed with an error')
+    report('complete', repairRequest
+      ? operatorProgressMessage({ stage: response.ok ? 'complete' : 'blocked', target: progressTarget, builder: builderActive })
+      : response.ok ? 'Response completed' : 'Request completed without a verified result')
     return { ok: response.ok, status: response.status, data }
   }
 
   for (let attempt = 0; attempt < JOB_POLL_ATTEMPTS; attempt += 1) {
-    report('running', `COS Builder job ${String(data.status || 'running')} — checking durable progress`)
+    report('running', repairRequest
+      ? operatorProgressMessage({ stage: 'fixing', target: progressTarget, builder: true })
+      : `COS Builder job ${String(data.status || 'running')} — checking durable progress`)
     await wait(JOB_POLL_DELAY_MS, args.signal)
     const poll = await fetch(`/api/builder?jobId=${encodeURIComponent(jobId)}`, {
       method: 'GET', credentials: 'include', cache: 'no-store', signal: args.signal,
@@ -154,10 +169,15 @@ export async function postWithAgentProgress(args: {
     })
     data = await poll.json().catch(() => ({ error: 'builder_job_status_unavailable' }))
     if (poll.status === 202 || ['queued', 'running'].includes(String(data?.status || ''))) continue
-    report('complete', poll.ok ? 'COS Builder completed the job' : 'COS Builder job failed')
-    return { ok: poll.ok, status: poll.status, data }
+    const terminalSucceeded = isVerifiedBuilderTerminal(data, poll.ok)
+    report('complete', repairRequest
+      ? operatorProgressMessage({ stage: terminalSucceeded ? 'verified' : 'blocked', target: progressTarget, builder: true })
+      : terminalSucceeded ? 'COS Builder completed the job' : 'COS Builder completed without a verified result')
+    return { ok: terminalSucceeded, status: poll.status, data }
   }
 
-  report('running', 'COS Builder is still running; the final result remains durable in History')
+  report('running', repairRequest
+    ? operatorProgressMessage({ stage: 'durable', target: progressTarget, builder: true })
+    : 'COS Builder is still running; the final result remains durable in History')
   return { ok: true, status: 202, data }
 }

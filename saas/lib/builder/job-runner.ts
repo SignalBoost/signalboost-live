@@ -3,6 +3,7 @@ import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './contr
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, type BuilderJobRecord } from './job-store.ts'
+import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { isRepairObjective } from './regression-gate.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
@@ -65,7 +66,7 @@ function oneLine(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(-500)
 }
 
-function failureReply(error: string, trace: ReturnType<typeof publicTrace>): string {
+function fallbackFailureReply(error: string, trace: ReturnType<typeof publicTrace>): string {
   const tail = trace.slice(-5).map((entry: any) => {
     const parts = [`#${entry.round ?? '?'} ${entry.toolId || 'tool'} ${entry.ok ? 'ok' : 'failed'}`]
     if (typeof entry.exitCode === 'number') parts.push(`exit ${entry.exitCode}`)
@@ -76,6 +77,12 @@ function failureReply(error: string, trace: ReturnType<typeof publicTrace>): str
     return `  ${parts.join(' · ')}`
   })
   return `COS Builder stopped: ${error}${tail.length ? `\n\nBuilder evidence:\n${tail.join('\n')}` : ''}`
+}
+
+function repairAwareFailureReply(job: BuilderJobRecord, error: string, trace: ReturnType<typeof publicTrace>): string {
+  return isRepairObjective(job.objective)
+    ? formatBuilderOperatorRepairReply({ ok: false, error, trace })
+    : fallbackFailureReply(error, trace)
 }
 
 function historyReply(reply: string, workspaceId: string, files: readonly string[]): string {
@@ -93,7 +100,7 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
   const files = workspace
     ? await workspace.listFiles(job.workspaceId).then(items => items.map(item => item.path)).catch(() => [])
     : []
-  const reply = historyReply(failureReply(error, safeTrace), job.workspaceId, files)
+  const reply = historyReply(repairAwareFailureReply(job, error, safeTrace), job.workspaceId, files)
   await finishBuilderJob({
     jobId: job.id,
     userId: job.userId,
@@ -148,16 +155,21 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       }
       const payload = execution.payload
       const error = typeof payload.error === 'string' ? payload.error : null
-      const reply = typeof payload.reply === 'string'
+      const succeeded = execution.status >= 200 && execution.status < 300 && !error
+      const safeTrace = Array.isArray(payload.trace) ? payload.trace as ReturnType<typeof publicTrace> : []
+      const baseReply = typeof payload.reply === 'string'
         ? payload.reply
-        : failureReply(error || 'builder_repository_repair_failed', Array.isArray(payload.trace) ? payload.trace as any : [])
+        : fallbackFailureReply(error || 'builder_repository_repair_failed', safeTrace)
+      const reply = isRepairObjective(job.objective)
+        ? formatBuilderOperatorRepairReply({ ok: succeeded, answer: succeeded ? baseReply : undefined, error: error || undefined, trace: safeTrace })
+        : baseReply
       await finishBuilderJob({
         jobId: job.id,
         userId: job.userId,
-        status: execution.status >= 200 && execution.status < 300 && !error ? 'succeeded' : 'failed',
+        status: succeeded ? 'succeeded' : 'failed',
         reply,
         ...(error ? { error } : {}),
-        result: { ...payload, jobId: job.id, workspaceId: job.workspaceId },
+        result: { ...payload, jobId: job.id, workspaceId: job.workspaceId, reply },
       })
       return
     }
@@ -186,19 +198,15 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       : await new BuilderToolLoop(ai, workspace, runner).run({
           objective: job.objective,
           workspaceId: job.workspaceId,
-          // Coding turns intentionally skip cognitive-skill / verified-lesson retrieval. The job
-          // is grounded only in its workspace, current tool evidence, and the user's objective.
           priorLessons: [],
           maxRounds: isRepairObjective(job.objective) ? 6 : 5,
-          // Production Qwen control rounds with repository evidence have been observed just above
-          // 35s. Keep the round bounded, but leave enough room for a valid 36–45s completion.
           modelRoundTimeoutMs: 55_000,
         })
 
     const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
     const trace = publicTrace(result.trace)
     if (result.ok === false) {
-      const reply = historyReply(failureReply(result.error, trace), job.workspaceId, files)
+      const reply = historyReply(repairAwareFailureReply(job, result.error, trace), job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id,
         userId: job.userId,
@@ -218,7 +226,10 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       return
     }
 
-    const reply = historyReply(result.answer, job.workspaceId, files)
+    const baseReply = isRepairObjective(job.objective)
+      ? formatBuilderOperatorRepairReply({ ok: true, answer: result.answer, trace })
+      : result.answer
+    const reply = historyReply(baseReply, job.workspaceId, files)
     await finishBuilderJob({
       jobId: job.id,
       userId: job.userId,

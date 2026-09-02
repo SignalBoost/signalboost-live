@@ -28,7 +28,8 @@ test('an attached debug request cannot silently fall back to a broad standard jo
   assert.match(route, /const DEBUG_OBJECTIVE =/)
   assert.match(route, /files\.length > 0 && DEBUG_OBJECTIVE\.test\(objective\) && !debugPlan/)
   assert.match(route, /builder_debug_attachment_required/)
-  assert.match(route, /exactly one supported \.js, \.mjs, \.cjs, \.ts, \.mts, \.cts, or \.py attachment/)
+  assert.match(route, /require 1–4 supported \.js, \.mjs, \.cjs, \.ts, \.mts, \.cts, or \.py attachments/)
+  assert.match(route, /debugPaths: debugPlan\.paths/)
 
   const files = route.indexOf('const files = cleanFiles(body?.files)')
   const plan = route.indexOf('const debugPlan = planDebugFileJob(objective, files)', files)

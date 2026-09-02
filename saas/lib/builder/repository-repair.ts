@@ -1,12 +1,13 @@
 import { createPlatformAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
+import { normalizeBuilderSandboxCommand } from './project-context.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { verifiedRepairLesson } from './verified-lessons.ts'
 import { inferBuilderCertificationAttempt } from './certification.ts'
 import { parseSignalBoostRepositoryRepairTarget, resolveSignalBoostRepositoryCommit, signalBoostRepositoryRepairObjective, type SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
-import type { BuilderToolTrace } from './contracts.ts'
+import type { BuilderRunnerPort, BuilderToolTrace } from './contracts.ts'
 
 export type SignalBoostRepositoryRepairExecution = Readonly<{
   status: number
@@ -106,10 +107,20 @@ export async function executeSignalBoostRepositoryRepair(input: {
       })
     }
 
+    // Platform Engineer has its own persistent repository runner rather than the ordinary Builder
+    // sandbox runner. Apply the same command normalization here so a model-supplied foreign cwd or
+    // `npm test -- file` cannot recreate the observed path failure or expand into the entire suite.
+    const repositoryRunner: BuilderRunnerPort = {
+      run: runInput => session!.run({
+        ...runInput,
+        command: normalizeBuilderSandboxCommand(runInput.command),
+      }),
+    }
+
     const result = await new BuilderToolLoop(
       createGovernedBuilderAiPort(createPlatformAiPort(), { deadlineAtMs: aiDeadlineAtMs }),
       session,
-      session,
+      repositoryRunner,
     ).run({
       objective,
       workspaceId: input.workspaceId,

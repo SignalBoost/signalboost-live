@@ -32,10 +32,14 @@ test('TXT and PDF follow-ups convert the actual preceding Builder file instead o
   assert.match(transport, /sourceText:[\s\S]{0,220}role === 'assistant'/)
 })
 
-test('log-only diagnostic questions reach COS while unattached logs remain excluded from Builder', () => {
+test('unattached operational logs use bounded diagnosis and stay out of ordinary Builder', () => {
   const browser = read('../app/api/cos-browser/route.ts')
+  const diagnostic = read('../lib/ai/cos/operationalLogDiagnostic.ts')
   const policy = read('../lib/ai/cos/cosReasoningRolePolicy.ts')
-  assert.doesNotMatch(browser, /if \(pastedOperationalLog && !hasSourceAttachment\)/)
-  assert.match(browser, /Passive logs carry evidence but no execution authority/)
+  assert.match(browser, /if \(operationalEvidence && !hasSourceAttachment\)/)
+  assert.match(browser, /await diagnoseOperationalLog\(/)
+  assert.match(browser, /concierge-operational-log-diagnostic/)
+  assert.match(diagnostic, /Do not execute tools, edit files/)
+  assert.match(diagnostic, /operationalLogReply\(input\.log\)/)
   assert.match(policy, /isOperationalLogEvidence\(raw\) && !sourceAttachment\(context\)/)
 })

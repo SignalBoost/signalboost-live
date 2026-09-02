@@ -68,14 +68,18 @@ test('repository repair cannot commit, push, merge, deploy, or inherit credentia
   assert.match(source, /git[^\n]+diff/)
 })
 
-test('browser repository repair is owner-only, SignalBoost-bound, immutable-pinned, and durably queued', () => {
+test('browser repository repair is owner-only, SignalBoost-bound, exact-first, immutable-pinned, and durably queued', () => {
   const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(browser, /const deployment = \{[\s\S]*commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA[\s\S]*branch: process\.env\.VERCEL_GIT_COMMIT_REF/)
   assert.match(browser, /const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET\.test\(operationalPrompt\) \|\| isSignalBoostDeploymentContext\(req\)/)
-  assert.match(browser, /const explicitOwnerPlatformTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment && signalBoostProjectBound/)
-  assert.match(browser, /signalBoostDeployedRepairTarget\(prompt, deployment\)/)
-  assert.match(browser, /const ownerSignalBoostLogTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment[\s\S]*operationalEvidence && operationalLogAnalysis\.failed[\s\S]*signalBoostProjectBound/)
-  assert.match(browser, /exactFailedLogTarget \?\? signalBoostDeployedRepairTarget\(operationalPrompt, deployment, \{ ownerDeveloperLogSubmission: true \}\)/)
+  const exact = browser.indexOf('const exactFailedLogTarget =')
+  const ownerTarget = browser.indexOf('const ownerRepositoryRepairTarget =', exact)
+  const exactPreference = browser.indexOf('? exactFailedLogTarget', ownerTarget)
+  const deployedFallback = browser.indexOf('signalBoostDeployedRepairTarget(prompt, deployment)', exactPreference)
+  const clippedFallback = browser.indexOf('signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })', deployedFallback)
+  assert.ok(exact >= 0 && ownerTarget > exact && exactPreference > ownerTarget)
+  assert.ok(deployedFallback > exactPreference && clippedFallback > deployedFallback)
+  assert.match(browser.slice(ownerTarget, clippedFallback + 160), /access\?\.isOwner && access\.userId && !hasSourceAttachment && signalBoostProjectBound/)
   const helper = browser.match(/async function queueOwnerRepositoryRepair[\s\S]*?\n}\n/)?.[0] || ''
   assert.match(helper, /enqueueSignalBoostRepositoryRepairJob/)
   assert.match(helper, /runBuilderJob\(job\.jobId/)

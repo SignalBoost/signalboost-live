@@ -1,4 +1,3 @@
-// app/api/cos-browser/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
@@ -16,6 +15,7 @@ import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { analyzeOperationalLog, hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
+import { diagnoseOperationalLog } from '@/lib/ai/cos/operationalLogDiagnostic'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget, type SignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
 import { runBuilderJob } from '@/lib/builder/job-runner'
@@ -115,11 +115,12 @@ function builderRoutingContextFromBody(body: any) {
 /**
  * Canonical browser ingress for both Concierge and owner Assistant.
  *
- * The browser is not the developer. It supplies intent and evidence. Once an authenticated owner
- * asks to repair the SignalBoost platform, the server binds the task to the immutable deployed
- * repository revision and Platform Engineer performs the repo-native inspect/reproduce/edit/verify
- * loop. A copied log can enrich that task, but a clone line or attached source file is not required
- * to grant context that the server already owns. Public/member traffic never receives this authority.
+ * Operational/build logs are a first-class input type. They are resolved here before any artifact,
+ * visual, provenance, generic-COS, or ordinary Builder route can reinterpret words inside the log.
+ * An authenticated owner failed SignalBoost log enters the pinned Platform Engineer lane; public or
+ * analysis-only logs enter a bounded COS diagnostic lane that has no tools or execution authority.
+ * Source-attached repairs remain ordinary Builder work so the supplied file can be inspected, edited,
+ * run, and verified in its isolated workspace.
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
@@ -154,54 +155,34 @@ export async function POST(req: NextRequest) {
     branch: process.env.VERCEL_GIT_COMMIT_REF,
   }
   const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req)
-
-  // Intent is sufficient for an authenticated owner to start repository-native diagnosis of this
-  // deployment. Platform Engineer discovers the repo itself and proves a repair before returning a
-  // patch; the owner no longer has to paste source files or reverse-engineer which file is broken.
-  const explicitOwnerPlatformTarget = access?.isOwner && access.userId && !hasSourceAttachment && signalBoostProjectBound
-    ? signalBoostDeployedRepairTarget(prompt, deployment)
+  const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
+  const exactFailedLogTarget = operationalEvidence && operationalLogAnalysis.failed
+    ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
-  if (explicitOwnerPlatformTarget && access?.userId) {
+
+  // One owner repository lane. Prefer the exact failed snapshot named by the log; otherwise an
+  // explicit owner repair request may use the immutable deployed revision. A failed owner log whose
+  // clone line was clipped may also fall back to that immutable deployment revision.
+  const ownerRepositoryRepairTarget = access?.isOwner && access.userId && !hasSourceAttachment && signalBoostProjectBound
+    ? exactFailedLogTarget
+      ?? signalBoostDeployedRepairTarget(prompt, deployment)
+      ?? (operationalEvidence && operationalLogAnalysis.failed
+        ? signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })
+        : null)
+    : null
+  if (ownerRepositoryRepairTarget && access?.userId) {
     return queueOwnerRepositoryRepair({
       body,
       userId: access.userId,
       objective: operationalPrompt || prompt,
-      target: explicitOwnerPlatformTarget,
-    })
-  }
-
-  const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
-  const exactFailedLogTarget = operationalLogAnalysis.failed
-    ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
-    : null
-  const ownerSignalBoostLogTarget = access?.isOwner && access.userId && !hasSourceAttachment
-    && operationalEvidence && operationalLogAnalysis.failed
-    && signalBoostProjectBound
-    ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })
-    : null
-  if (ownerSignalBoostLogTarget && access?.userId) {
-    return queueOwnerRepositoryRepair({
-      body,
-      userId: access.userId,
-      objective: operationalPrompt,
-      target: ownerSignalBoostLogTarget,
+      target: ownerRepositoryRepairTarget,
     })
   }
 
   if (explicitOperationalRepair && !hasSourceAttachment) {
-    const repositoryTarget = parseSignalBoostRepositoryRepairTarget(operationalPrompt)
-    if (access?.isOwner && access.userId && repositoryTarget) {
-      return queueOwnerRepositoryRepair({
-        body,
-        userId: access.userId,
-        objective: operationalPrompt,
-        target: repositoryTarget,
-      })
-    }
-
-    const reply = repositoryTarget
+    const reply = exactFailedLogTarget
       ? 'This is an explicit SignalBoost repository-repair request, but repository repair is owner-only. No code was run.'
-      : `${operationalLogReply(operationalPrompt)} For repository repair directly from a Vercel log, include the failed SignalBoost clone line with its branch/commit and the final failing assertion or non-zero build command.`
+      : `${operationalLogReply(operationalPrompt)} For repository repair directly from a Vercel log, an authenticated owner can use the pinned SignalBoost deployment context; other users need to provide editable source in the ordinary Builder lane.`
     return withSuggestedFollowups(NextResponse.json({
       reply,
       source: 'concierge-operational-log-repair-not-authorized',
@@ -212,9 +193,22 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId)
   }
 
-  // Passive logs carry evidence but no execution authority for public/member traffic. Continue
-  // through ordinary COS so a diagnostic question receives a useful explanation instead of being
-  // misread as a visual, artifact, provenance, or ordinary Builder objective.
+  // Unattached operational evidence has a dedicated bounded reasoning lane. It never enters the
+  // generic intent router, so test titles cannot become artifact/visual/provenance requests, but
+  // COS can still explain the observed failure instead of merely echoing the exit code.
+  if (operationalEvidence && !hasSourceAttachment) {
+    const diagnostic = await diagnoseOperationalLog({ request: prompt, log: operationalPrompt, language })
+    return withSuggestedFollowups(NextResponse.json({
+      reply: diagnostic.reply,
+      source: diagnostic.reasonerInvoked ? 'concierge-operational-log-diagnostic' : 'concierge-operational-log-analysis',
+      execution_allowed: false,
+      external_action_taken: false,
+      external_ai_invoked: false,
+      local_model_invoked: diagnostic.reasonerInvoked,
+      confidence: diagnostic.confidence,
+    }), prompt, auditUserId)
+  }
+
   const routedHeaders = new Headers(req.headers)
   routedHeaders.set('content-type', 'application/json')
   routedHeaders.delete('content-length')

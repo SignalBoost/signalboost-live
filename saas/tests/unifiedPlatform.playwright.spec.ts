@@ -80,7 +80,7 @@ test.describe('Unified SignalBoost public shell', () => {
     await page.keyboard.press('Enter')
 
     await expect(page.locator('.thread-wrap')).toContainText(/Verification exit code: 0/, { timeout: 15_000 })
-    expect(postedBody?.objective).toBe('Fix the attached source and test.')
+    expect(postedBody?.objective).toBe('Fix the attached source and test.\n\n📎 src-math.ts, src-math.test.ts')
     expect(postedBody?.files).toEqual([
       { path: 'src-math.ts', content: 'export function add(a:number,b:number){ return a-b }\n' },
       { path: 'src-math.test.ts', content: "import { add } from './src-math.ts'\nif (add(2,3) !== 5) throw new Error('wrong sum')\n" },

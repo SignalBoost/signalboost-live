@@ -504,7 +504,7 @@ export default function AssistantPage() {
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
-      style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 165px)', minHeight: 480, maxWidth: 1280, margin: '0 auto', padding: '24px 28px', width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}
+      style={{ position: 'relative', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 112px)', minHeight: 560, maxWidth: 1600, margin: '0 auto', padding: '16px', width: '100%', boxSizing: 'border-box', color: 'var(--text-primary)' }}
     >
       {/* ── Drag-over overlay ── */}
       {dragOver && (
@@ -516,13 +516,11 @@ export default function AssistantPage() {
         </div>
       )}
 
-      {/* ── Header ── */}
-      <div style={{ background: 'radial-gradient(circle at 20% 10%, rgba(26,240,255,.16), transparent 22rem), linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02))', border: '1px solid rgba(26,240,255,.18)', borderRadius: 24, padding: '20px 24px', marginBottom: 16, flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-          <div style={{ minWidth: 0 }}>
-            <p className="sb-eyebrow">✨ {c(COPY.eyebrow, l)}</p>
-            <h1 style={{ fontSize: 'clamp(20px,3.5vw,30px)', fontWeight: 900, letterSpacing: '-.04em', lineHeight: 1.1, margin: '6px 0 6px' }}>{c(COPY.title, l)}</h1>
-            <p style={{ color: 'rgba(255,255,255,.55)', fontSize: 13, lineHeight: 1.6, margin: 0 }}>{c(COPY.subtitle, l)}</p>
+      {/* ── Unified assistant workspace ── */}
+      <section style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'radial-gradient(circle at 12% 0%, rgba(26,240,255,.11), transparent 28rem), linear-gradient(145deg, rgba(15,23,42,.9), rgba(3,7,18,.82))', border: '1px solid rgba(26,240,255,.2)', borderRadius: 24, boxShadow: '0 22px 70px rgba(0,0,0,.34)' }}>
+        <div style={{ minHeight: 64, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderBottom: '1px solid rgba(255,255,255,.09)', flexShrink: 0 }}>
+          <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+            <span style={{ color: '#facc15', fontSize: 12, fontWeight: 900, letterSpacing: '.08em', textTransform: 'uppercase' }}>✨ {c(COPY.eyebrow, l)}</span>
             {cosStatus && (() => {
               const m = cosStatus.mode
               const ok = m === 'cos'
@@ -530,9 +528,8 @@ export default function AssistantPage() {
               const bg = ok ? 'rgba(34,197,94,.14)' : m === 'degraded' ? 'rgba(239,68,68,.16)' : 'rgba(251,146,60,.16)'
               const label = ok ? '🧠 COS ACTIVE — owner' : m === 'degraded' ? '⚠️ COS DEGRADED — AI key missing' : '⚠️ CONCIERGE MODE — not recognized as owner'
               return (
-                <div style={{ marginTop: 10 }}>
+                <div>
                   <span title={cosStatus.detail} style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 12px', borderRadius: 999, background: bg, border: `1px solid ${accent}`, color: accent, fontSize: 12, fontWeight: 900, letterSpacing: '.02em' }}>{label}</span>
-                  {!ok && <p style={{ color: accent, fontSize: 11.5, margin: '6px 0 0', lineHeight: 1.5, maxWidth: 620 }}>{cosStatus.detail}</p>}
                 </div>
               )
             })()}
@@ -542,11 +539,10 @@ export default function AssistantPage() {
             <button onClick={startNewChat} className="sb-button-secondary" style={{ fontSize: 12, padding: '9px 14px', whiteSpace: 'nowrap' }}>＋ {c(COPY.newChat, l)}</button>
           </div>
         </div>
-      </div>
 
       {/* ── Thread ── */}
       <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex' }}>
-        <div ref={threadRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0, background: 'linear-gradient(145deg, rgba(15,23,42,.78), rgba(3,7,18,.68))', border: '1px solid rgba(255,255,255,.1)', borderRadius: 22, padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div ref={threadRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '20px clamp(14px, 2.5vw, 36px)', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {messages.length === 0 && !loading && (
             <div style={{ margin: 'auto', textAlign: 'center', maxWidth: 520 }}>
               <div style={{ fontSize: 40 }}>✨</div>
@@ -653,7 +649,7 @@ export default function AssistantPage() {
       </div>
 
       {/* ── Input area ── */}
-      <div style={{ marginTop: 12, flexShrink: 0 }}>
+      <div style={{ padding: '12px 16px 16px', flexShrink: 0, borderTop: '1px solid rgba(255,255,255,.09)', background: 'rgba(3,7,18,.48)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}>
 
         {/* File error banner */}
         {fileError && (
@@ -735,6 +731,7 @@ export default function AssistantPage() {
           </button>
         </div>
       </div>
+      </section>
     </div>
   )
 }

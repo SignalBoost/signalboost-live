@@ -1,3 +1,4 @@
+// tests/builderRepositoryRepairSecurity.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -67,14 +68,18 @@ test('repository repair cannot commit, push, merge, deploy, or inherit credentia
   assert.match(source, /git[^\n]+diff/)
 })
 
-test('browser repository repair requires explicit repair intent, exact SignalBoost target, and owner authority', () => {
+test('browser repository repair is owner-only, SignalBoost-bound, immutable-pinned, and durably queued', () => {
   const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  const explicit = browser.indexOf('isExplicitOperationalLogRepairRequest(operationalPrompt)')
-  const parse = browser.indexOf('parseSignalBoostRepositoryRepairTarget(operationalPrompt)', explicit)
-  const owner = browser.indexOf('access?.isOwner', parse)
-  const execute = browser.indexOf('enqueueSignalBoostRepositoryRepairJob({', owner)
-  const schedule = browser.indexOf('runBuilderJob(job.jobId', execute)
-  assert.ok(explicit >= 0); assert.ok(parse > explicit); assert.ok(owner > parse); assert.ok(execute > owner); assert.ok(schedule > execute)
+  assert.match(browser, /const deployment = \{[\s\S]*commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA[\s\S]*branch: process\.env\.VERCEL_GIT_COMMIT_REF/)
+  assert.match(browser, /const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET\.test\(operationalPrompt\) \|\| isSignalBoostDeploymentContext\(req\)/)
+  assert.match(browser, /const explicitOwnerPlatformTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment && signalBoostProjectBound/)
+  assert.match(browser, /signalBoostDeployedRepairTarget\(prompt, deployment\)/)
+  assert.match(browser, /const ownerSignalBoostLogTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment[\s\S]*operationalEvidence && operationalLogAnalysis\.failed[\s\S]*signalBoostProjectBound/)
+  assert.match(browser, /exactFailedLogTarget \?\? signalBoostDeployedRepairTarget\(operationalPrompt, deployment, \{ ownerDeveloperLogSubmission: true \}\)/)
+  const helper = browser.match(/async function queueOwnerRepositoryRepair[\s\S]*?\n}\n/)?.[0] || ''
+  assert.match(helper, /enqueueSignalBoostRepositoryRepairJob/)
+  assert.match(helper, /runBuilderJob\(job\.jobId/)
+  assert.match(helper, /status: 'queued'/)
   const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
   assert.match(repair, /repository_write_allowed: false/)
   assert.match(repair, /merge_allowed: false/)

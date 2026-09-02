@@ -387,3 +387,21 @@ test('Concierge keeps verified people on the visual path and renders successful 
   assert.match(personVerification, /expectedPassExample\(referenceCount/)
   assert.match(personVerification, /Qwen\/Qwen2\.5-VL-32B-Instruct/)
 })
+
+test('public Concierge offers one metered downloadable visual trial before signup', () => {
+  const visualRoute = readFileSync(new URL('../app/api/visuals/route.ts', import.meta.url), 'utf8')
+  const browserRoute = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  const home = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
+  const dock = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(visualRoute, /if \(!access\?\.userId\) return NextResponse\.json\(\{ error: 'Sign in to create visual files\.'/)
+  assert.match(visualRoute, /GUEST_VISUAL_TRIAL_LIMIT = 1/)
+  assert.match(visualRoute, /api_rate_limit_events/)
+  assert.match(visualRoute, /data:\$\{mime\};base64,\$\{b64\}/)
+  assert.match(visualRoute, /signup_required_for_more: true/)
+  assert.match(browserRoute, /if \(!workspaceId \|\| !imagePath[\s\S]*NextResponse\.json\(payload/)
+  assert.match(home, /GUEST_VISUAL_DATA_URL_RE/)
+  assert.match(home, /download=\{turn\.visualFilename/)
+  assert.match(dock, /SAFE_VISUAL_PREVIEW_RE/)
+  assert.match(dock, /download=\{message\.visualFilename/)
+})

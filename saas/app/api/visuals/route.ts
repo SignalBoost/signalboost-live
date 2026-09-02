@@ -8,12 +8,16 @@ import { resolveVerifiedPersonReference, type VerifiedPersonReference } from '@/
 import { generateReferenceConditionedImage, type ReferenceConditionedImageResult } from '@/lib/visuals/referenceImageGeneration'
 import { verifyReferenceConditionedPeopleImage } from '@/lib/visuals/personImageVerification'
 import { isVisualObjectiveError, readVisualObjective } from '@/lib/visuals/request-contract'
+import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 const MAX_PEOPLE_GENERATION_ATTEMPTS = 2
+const GUEST_VISUAL_TRIAL_LIMIT = 1
+const GUEST_VISUAL_TRIAL_WINDOW_HOURS = 24
+const GUEST_VISUAL_TRIAL_ROUTE = 'concierge_visual_guest_trial'
 
 type VisualLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type ImageMime = 'image/png' | 'image/jpeg' | 'image/webp'
@@ -98,6 +102,53 @@ function peopleVerificationFailureReply(language: VisualLanguage): string {
   }[language]
 }
 
+function guestTrialUsedReply(language: VisualLanguage): string {
+  return {
+    en: 'You have used today’s free visual trial. Sign up to create and save more visuals.',
+    es: 'Ya usaste la prueba visual gratuita de hoy. Regístrate para crear y guardar más imágenes.',
+    pt: 'Você já usou o teste visual gratuito de hoje. Cadastre-se para criar e salvar mais imagens.',
+    pl: 'Dzisiejsza bezpłatna próba tworzenia obrazu została już wykorzystana. Zarejestruj się, aby tworzyć i zapisywać kolejne obrazy.',
+    ru: 'Сегодняшняя бесплатная пробная генерация уже использована. Зарегистрируйтесь, чтобы создавать и сохранять другие изображения.',
+  }[language]
+}
+
+function guestTrialLimitResponse(language: VisualLanguage): NextResponse {
+  return NextResponse.json({
+    error: 'guest_visual_trial_used',
+    reply: guestTrialUsedReply(language),
+    source: 'concierge-visual-guest-trial-limit',
+    signup_required: true,
+    execution_allowed: false,
+    external_action_taken: false,
+  }, { status: 429 })
+}
+
+function clientIp(request: Request): string {
+  const forwarded = request.headers.get('x-forwarded-for') || ''
+  return forwarded.split(',')[0].trim() || request.headers.get('x-real-ip') || 'unknown'
+}
+
+async function reserveGuestVisualTrial(request: Request): Promise<boolean> {
+  try {
+    const admin = getAdminSupabase()
+    const identifier = clientIp(request)
+    const since = new Date(Date.now() - GUEST_VISUAL_TRIAL_WINDOW_HOURS * 60 * 60 * 1000).toISOString()
+    const { count, error } = await admin
+      .from('api_rate_limit_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('route_key', GUEST_VISUAL_TRIAL_ROUTE)
+      .eq('identifier', identifier)
+      .gte('created_at', since)
+    if (error || (count || 0) >= GUEST_VISUAL_TRIAL_LIMIT) return false
+    const { error: insertError } = await admin.from('api_rate_limit_events').insert({ route_key: GUEST_VISUAL_TRIAL_ROUTE, identifier })
+    return !insertError
+  } catch {
+    // Guest generation is a paid provider action. If durable metering is unavailable,
+    // fail closed instead of opening an unmetered anonymous path.
+    return false
+  }
+}
+
 function visualPrompt(objective: string): string {
   return [
     'Create one polished, high-quality original visual for the user request below.',
@@ -180,10 +231,9 @@ async function createVerifiedPeopleVisual(objective: string, references: readonl
   return { attempts, reasonCodes: lastReasons, error: lastError }
 }
 
-/** Authenticated Concierge visual tool. It creates or retrieves a downloadable inline visual; it never publishes it. */
+/** Concierge visual tool. Guests receive one metered inline trial; members also receive private durable storage. */
 export async function POST(request: Request) {
   const access = await getAccess().catch(() => null)
-  if (!access?.userId) return NextResponse.json({ error: 'Sign in to create visual files.' }, { status: 401 })
 
   try {
     const body = await request.json().catch(() => ({}))
@@ -191,6 +241,7 @@ export async function POST(request: Request) {
     const language = visualLanguage(objective)
     const intent = detectConciergeVisualIntent(objective)
     if (!intent) return NextResponse.json({ error: 'visual_request_not_recognised' }, { status: 400 })
+    const guestTrial = !access?.userId
 
     let b64: string
     let mime: ImageMime
@@ -209,6 +260,7 @@ export async function POST(request: Request) {
           external_action_taken: false,
         }, { status: 422 })
       }
+      if (guestTrial && !(await reserveGuestVisualTrial(request))) return guestTrialLimitResponse(language)
       b64 = verifiedReference.b64
       mime = verifiedReference.mime
     } else if (intent.mode === 'reference-people') {
@@ -225,6 +277,7 @@ export async function POST(request: Request) {
         }, { status: 422 })
       }
       verifiedPeople = resolved as VerifiedPersonReference[]
+      if (guestTrial && !(await reserveGuestVisualTrial(request))) return guestTrialLimitResponse(language)
       const generated = await createVerifiedPeopleVisual(objective, verifiedPeople)
       peopleGenerationAttempts = generated.attempts
       if (!generated.generated) {
@@ -241,6 +294,7 @@ export async function POST(request: Request) {
       b64 = generated.generated.b64
       mime = generated.generated.mime
     } else {
+      if (guestTrial && !(await reserveGuestVisualTrial(request))) return guestTrialLimitResponse(language)
       const generated: ReferenceConditionedImageResult = await createPlatformImagePort().generate({ prompt: visualPrompt(objective), size: '1024x1024' })
       if (!generated.ok || !generated.b64) {
         return NextResponse.json({ error: generated.error || 'visual_generation_unavailable' }, { status: 503 })
@@ -249,12 +303,30 @@ export async function POST(request: Request) {
       mime = imageMimeType(generated.b64)
     }
 
-    const workspace = createSupabaseBuilderWorkspace(access.userId)
+    const filename = intent.filename.replace(/png$/i, extensionFor(mime))
+    if (guestTrial) {
+      const dataUrl = `data:${mime};base64,${b64}`
+      const isPeopleVisual = verifiedPeople.length > 0
+      return NextResponse.json({
+        reply: isPeopleVisual ? peopleReply(language) : verifiedReference ? referenceReply(language) : generatedReply(language),
+        source: isPeopleVisual ? 'concierge-visual-reference-people-guest-trial' : verifiedReference ? 'concierge-visual-reference-guest-trial' : 'concierge-visual-guest-trial',
+        visual: { previewUrl: dataUrl, downloadUrl: dataUrl, filename, alt: objective },
+        trial: { kind: 'anonymous_visual', remaining: 0, signup_required_for_more: true },
+        execution_allowed: true,
+        external_action_taken: false,
+        external_retrieval_used: Boolean(verifiedReference || isPeopleVisual),
+        synthetic_media: isPeopleVisual,
+        identity_reference_used: isPeopleVisual,
+        identity_verification_passed: isPeopleVisual,
+        generation_attempts: isPeopleVisual ? peopleGenerationAttempts : undefined,
+      })
+    }
+
+    const workspace = createSupabaseBuilderWorkspace(access.userId!)
     if (!workspace) return NextResponse.json({ error: 'visual_storage_unavailable' }, { status: 503 })
 
     const workspaceId = crypto.randomUUID()
     await workspace.ensureWorkspace(workspaceId)
-    const filename = intent.filename.replace(/png$/i, extensionFor(mime))
     await workspace.writeFile(workspaceId, filename, `artifact-image-base64:${mime}:${b64}`)
 
     const isPeopleVisual = verifiedPeople.length > 0

@@ -68,7 +68,7 @@ function decodeTextDataUrl(value: string): string | null {
  * server still authenticates the user and enforces the 1–4 file, size, extension and execution
  * limits. Image/PDF/reference attachments remain on ordinary Concierge.
  */
-function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builder'; body: Record<string, unknown> } | null {
+export function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builder'; body: Record<string, unknown> } | null {
   const record = bodyRecord(body)
   if (!record) return null
   const attachments = Array.isArray(record.attachments) ? record.attachments as ConciergeAttachment[] : []

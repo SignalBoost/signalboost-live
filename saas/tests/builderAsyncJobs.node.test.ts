@@ -20,7 +20,8 @@ test('POST creates a durable job, schedules work after the response, and returns
   assert.ok(accepted > schedule)
   assert.match(route, /await runBuilderJob\(jobId, access\.userId\)/)
   assert.doesNotMatch(route, /new BuilderToolLoop/)
-  assert.match(route, /executeSignalBoostRepositoryRepair/)
+  assert.match(route, /enqueueSignalBoostRepositoryRepairJob/)
+  assert.match(jobRunner, /executeSignalBoostRepositoryRepair/)
 })
 
 test('an attached debug request cannot silently fall back to a broad standard job', () => {

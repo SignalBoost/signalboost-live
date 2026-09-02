@@ -115,7 +115,9 @@ export async function executeSignalBoostRepositoryRepair(input: {
       workspaceId: input.workspaceId,
       priorLessons,
       maxRounds: 6,
-      modelRoundTimeoutMs: 35_000,
+      // Repository-control prompts are larger than ordinary chat prompts. Production telemetry
+      // has shown valid responses slightly above 35s, so retain a bounded 55s round budget.
+      modelRoundTimeoutMs: 55_000,
     })
 
     // A deadline failure must return immediately. Collecting an unverified repository diff can run

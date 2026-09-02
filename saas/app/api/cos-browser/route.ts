@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
   }
   const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req)
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
-  const exactFailedLogTarget = operationalLogAnalysis.failed
+  const exactFailedLogTarget = operationalEvidence && operationalLogAnalysis.failed
     ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
 

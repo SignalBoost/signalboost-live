@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { assertPersistable, containsNullByte } from '../lib/builder/storage-contract.ts'
@@ -83,6 +84,15 @@ test('Builder retries one transient model-round timeout before failing the turn'
   })
   assert.equal(result.ok, true)
   assert.equal(calls, 2)
+})
+
+test('Production Builder lanes allow a valid slow local control round without becoming unbounded', () => {
+  const jobRunner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  const repositoryRepair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  const conciergeRoute = readFileSync(new URL('../app/api/concierge/route.ts', import.meta.url), 'utf8')
+  for (const source of [jobRunner, repositoryRepair, conciergeRoute]) {
+    assert.match(source, /modelRoundTimeoutMs: 55_000/)
+  }
 })
 
 test('Builder recovers when the model replays a completed tool call', async () => {

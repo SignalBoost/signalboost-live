@@ -4,9 +4,14 @@ import test from 'node:test'
 
 test('Concierge and owner COS consume observable request progress instead of timer-only stages', () => {
   const concierge = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
+  const homepage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
   const assistant = readFileSync(new URL('../app/dashboard/assistant/page.tsx', import.meta.url), 'utf8')
   const activity = readFileSync(new URL('../components/AgentActivity.tsx', import.meta.url), 'utf8')
   assert.match(concierge, /postWithAgentProgress\(\{ target: 'concierge'/)
+  assert.match(homepage, /postWithAgentProgress\(\{/)
+  assert.match(homepage, /target: 'concierge'/)
+  assert.match(homepage, /<AgentActivity lang=\{lang\} compact activity=\{activity\}/)
+  assert.doesNotMatch(homepage, /loading \? <p className="thinking"/)
   assert.match(assistant, /target: 'cos'/)
   assert.match(concierge, /activity=\{activity\}/)
   assert.match(assistant, /activity=\{activity\}/)

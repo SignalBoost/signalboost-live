@@ -28,7 +28,6 @@ import { BuilderToolLoop } from '@/lib/builder/tool-loop'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
 
@@ -112,14 +111,6 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
   // Image/PDF attachments still stay on the ordinary COS path. Source-code attachments are
   // Builder evidence and must not block the sandbox route.
   const objective = input.trim()
-  if (isPastedOperationalLog(objective)) {
-    return NextResponse.json({
-      reply: operationalLogReply(objective),
-      source: 'concierge-operational-log-analysis',
-      execution_allowed: false,
-      external_action_taken: false,
-    })
-  }
   const routingContext = builderRoutingContextFromBody(body)
   // isConciergeBuilderObjective(objective)
   const roleMatched = isConciergeBuilderObjective(objective, routingContext)

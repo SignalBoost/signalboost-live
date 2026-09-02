@@ -80,12 +80,9 @@ test('source-attached log repairs still hand off to the ordinary Concierge Build
   assert.match(route, /isConciergeBuilderObjective\(prompt, routingContext\) \? legacyConciergePost\(req\) : cosPrimaryPost\(req\)/)
 })
 
-test('legacy Concierge passive-log guard remains before its ordinary Builder tool loop', () => {
+test('legacy Concierge sends passive logs to COS instead of returning the obsolete canned reply', () => {
   const legacy = readFileSync(new URL('../app/api/concierge/route.ts', import.meta.url), 'utf8')
-  const guard = legacy.indexOf('isPastedOperationalLog(objective)')
-  const builder = legacy.indexOf('isConciergeBuilderObjective(objective', guard)
-  assert.ok(guard >= 0)
-  assert.ok(builder > guard)
-  assert.match(legacy, /concierge-operational-log-analysis/)
-  assert.match(legacy.slice(guard, builder), /execution_allowed: false/)
+  assert.doesNotMatch(legacy, /isPastedOperationalLog\(objective\)/)
+  assert.doesNotMatch(legacy, /source: 'concierge-operational-log-analysis'/)
+  assert.match(legacy, /const primaryRun = await boundedPrimary\(req\)/)
 })

@@ -8,7 +8,7 @@ import {
 } from '../lib/builder/debug-file-job.ts'
 import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.ts'
 
-test('debug job runs one file, applies one edit, reruns the same command, and stops', async () => {
+test('debug job runs one file, applies one edit, reruns the same command, and stops after verification passes', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const workspaceId = 'user:debug-one-file'
   await workspace.writeFile(workspaceId, 'broken.js', "throw new Error('boom')\n")
@@ -175,6 +175,74 @@ test('debug job can repair source while proving with its attached test', async (
   })
   if (!result.ok) assert.fail(result.error)
   assert.equal((await workspace.readFile(workspaceId, 'add.js'))?.content, 'export function add(a, b) { return a + b }\n')
+  assert.match(result.answer, /Verification exit code: 0/)
+})
+
+test('multi-file debug keeps iterating after a failed verification and can repair a second file', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const workspaceId = 'user:debug-multi-file-iterate'
+  await workspace.writeFile(workspaceId, 'left.js', 'export const left = 1\n')
+  await workspace.writeFile(workspaceId, 'right.js', 'export const right = 2\n')
+  await workspace.writeFile(workspaceId, 'sum.test.js', "import { left } from './left.js'\nimport { right } from './right.js'\nif (left + right !== 5) throw new Error(`sum=${left + right}`)\n")
+
+  const plan = planDebugFileJob('Fix the attached files until the test passes.', [
+    { path: 'left.js', content: 'export const left = 1\n' },
+    { path: 'right.js', content: 'export const right = 2\n' },
+    { path: 'sum.test.js', content: "import { left } from './left.js'\nimport { right } from './right.js'\nif (left + right !== 5) throw new Error(`sum=${left + right}`)\n" },
+  ])
+  assert.ok(plan)
+  assert.equal(plan.path, 'sum.test.js')
+
+  const commands: string[] = []
+  const runner: BuilderRunnerPort = {
+    async run(input) {
+      commands.push(input.command)
+      const left = input.files.find(file => file.path === 'left.js')?.content || ''
+      const right = input.files.find(file => file.path === 'right.js')?.content || ''
+      if (left.includes('left = 1')) return { exitCode: 1, stdout: '', stderr: 'Error: sum=3', timedOut: false }
+      if (right.includes('right = 2')) return { exitCode: 1, stdout: '', stderr: 'Error: sum=4', timedOut: false }
+      return { exitCode: 0, stdout: 'sum=5\n', stderr: '', timedOut: false }
+    },
+  }
+
+  let calls = 0
+  const ai: BuilderAiPort = {
+    async generate(input) {
+      calls += 1
+      if (calls === 1) {
+        assert.match(input.prompt, /LATEST STDERR:\nError: sum=3/)
+        return JSON.stringify({
+          type: 'tool', toolId: 'edit_file',
+          input: { path: 'left.js', search: 'left = 1', replace: 'left = 2' },
+        })
+      }
+      assert.match(input.prompt, /LATEST STDERR:\nError: sum=4/)
+      assert.match(input.prompt, /ALREADY CHANGED FILES: left\.js/)
+      return JSON.stringify({
+        type: 'tool', toolId: 'edit_file',
+        input: { path: 'right.js', search: 'right = 2', replace: 'right = 3' },
+      })
+    },
+  }
+
+  const result = await runDebugFileJob({
+    objective: 'Fix the attached files until the test passes.',
+    workspaceId,
+    plan,
+    workspace,
+    runner,
+    ai,
+  })
+  if (!result.ok) assert.fail(result.error)
+
+  assert.equal(calls, 2)
+  assert.deepEqual(commands, ["node 'sum.test.js'", "node 'sum.test.js'", "node 'sum.test.js'"])
+  assert.deepEqual(result.trace.filter(item => item.toolId === 'edit_file').map(item => [item.input.path, item.ok]), [
+    ['left.js', true],
+    ['right.js', true],
+  ])
+  assert.match(result.answer, /Repair iterations: 2/)
+  assert.match(result.answer, /Changed files: `left\.js`, `right\.js`/)
   assert.match(result.answer, /Verification exit code: 0/)
 })
 

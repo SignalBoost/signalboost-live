@@ -26,9 +26,9 @@ export async function proxy(req: NextRequest) {
     return NextResponse.json({ error: BLOCKED_ERROR }, { status: 503 })
   }
 
-  // Preserve the former middleware.ts anonymous spend gate inside the single
-  // Next.js 16 proxy entrypoint. Signed-in users continue to use the existing
-  // plan/credit gates inside the routes themselves.
+  // Preserve the anonymous spend gate at every public model entry, including the canonical
+  // browser ingress used directly by Concierge. Signed-in users continue through route-level
+  // plan/credit gates; anonymous users retain the eight-request/10-minute preview boundary.
   if (isPublicModelIngress(pathname) && req.method === 'POST' && !hasSessionCookie(req)) {
     if (overLimit(`anonymous-concierge:${clientIpKey(req)}`)) {
       const language = languageFrom(req)
@@ -47,9 +47,8 @@ export async function proxy(req: NextRequest) {
   }
 
   // COS-FIRST LIVE ROUTING.
-  // Keep /api/concierge as the stable browser endpoint. Browser turns first enter
-  // /api/cos-browser, which establishes request-scoped paid-compute permission and
-  // then invokes COS Primary.
+  // Legacy callers may still use /api/concierge; rewrite them into the same canonical browser
+  // ingress now used directly by the public Concierge UI.
   if (pathname === '/api/concierge' && req.method === 'POST') {
     const cosBrowserUrl = req.nextUrl.clone()
     cosBrowserUrl.pathname = '/api/cos-browser'
@@ -124,7 +123,7 @@ function isAutonomousIngress(pathname: string) {
 }
 
 function isPublicModelIngress(pathname: string) {
-  return pathname === '/api/concierge' || pathname === '/api/support'
+  return pathname === '/api/concierge' || pathname === '/api/cos-browser' || pathname === '/api/support'
 }
 
 function isFullAssistantBrowserRequest(req: NextRequest): boolean {
@@ -226,6 +225,7 @@ export const config = {
   matcher: [
     '/dashboard/operator/:path*',
     '/api/concierge',
+    '/api/cos-browser',
     '/api/support',
     '/api/cos-primary',
     '/api/cron/:path*',

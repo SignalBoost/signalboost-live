@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState, DragEvent, ChangeEvent } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import AssistantMessage from '@/components/AssistantMessage'
+import AgentActivity from '@/components/AgentActivity'
 import { uiText } from '@/lib/i18n/uiText'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
 
@@ -607,10 +608,8 @@ export default function AssistantPage() {
           ))}
 
           {loading && (
-            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-              <div style={{ padding: '12px 16px', borderRadius: 16, borderTopLeftRadius: 4, background: 'rgba(26,240,255,.07)', border: '1px solid rgba(26,240,255,.2)', color: 'rgba(255,255,255,.5)', fontSize: 14 }}>
-                {c(COPY.thinking, l)}
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', width: '100%' }}>
+              <div style={{ width: 'min(560px, 100%)' }}><AgentActivity lang={l} /></div>
               <button
                 type="button"
                 onClick={stopRequest}

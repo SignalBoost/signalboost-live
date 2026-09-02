@@ -112,6 +112,11 @@ test('artifact and provenance trigger words inside a failed build remain operati
   assert.match(artifactRoute.slice(backendGuard, objectiveValidation), /operationalLogReply\(rawObjective\)/)
 })
 
+test('the operational creative-routing regression remains in the mandatory Vercel gate', () => {
+  const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
+  assert.match(gate, /tests\/conciergeOperationalLogRouting\.node\.test\.ts/)
+})
+
 test('legacy Concierge sends passive logs to COS instead of returning the obsolete canned reply', () => {
   const legacy = readFileSync(new URL('../app/api/concierge/route.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(legacy, /isPastedOperationalLog\(objective\)/)

@@ -27,6 +27,13 @@ test('Full Assistant browser requests enter the canonical browser ingress before
   assert.ok(fullAssistant >= 0 && browserRewrite > fullAssistant && specialist > browserRewrite)
 })
 
+test('public canonical browser ingress remains behind the anonymous spend gate', () => {
+  const proxy = readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8')
+  assert.match(proxy, /function isPublicModelIngress\(pathname: string\)[\s\S]*pathname === '\/api\/cos-browser'/)
+  assert.match(proxy, /matcher:[\s\S]*'\/api\/cos-browser'/)
+  assert.match(proxy, /isPublicModelIngress\(pathname\) && req\.method === 'POST' && !hasSessionCookie\(req\)/)
+})
+
 test('repository repair is one durable server helper rather than duplicated routing code', () => {
   const helperStart = route.indexOf('async function queueOwnerRepositoryRepair')
   const helperEnd = route.indexOf('export async function withSuggestedFollowups', helperStart)
@@ -39,30 +46,22 @@ test('repository repair is one durable server helper rather than duplicated rout
   assert.match(route.slice(helperStart, helperEnd), /source: 'cos-platform-engineer'/)
 })
 
-test('authenticated owner platform repair is intent-driven and does not require a pasted log or source file', () => {
-  const explicit = route.match(/const explicitOwnerPlatformTarget =[\s\S]*?if \(explicitOwnerPlatformTarget && access\?\.userId\) \{[\s\S]*?\n  }/)
-  assert.ok(explicit)
-  const text = explicit?.[0] || ''
-  assert.match(text, /access\?\.isOwner && access\.userId && !hasSourceAttachment && signalBoostProjectBound/)
-  assert.match(text, /signalBoostDeployedRepairTarget\(prompt, deployment\)/)
-  assert.match(text, /queueOwnerRepositoryRepair/)
-  assert.doesNotMatch(text, /operationalEvidence/)
-  assert.doesNotMatch(text, /parseSignalBoostRepositoryRepairTarget/)
-})
-
-test('failed owner logs prefer an exact target but can use verified SignalBoost deployment binding when clipped', () => {
-  assert.match(route, /const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET\.test\(operationalPrompt\) \|\| isSignalBoostDeploymentContext\(req\)/)
-  assert.match(route, /const ownerSignalBoostLogTarget =[\s\S]*operationalEvidence && operationalLogAnalysis\.failed[\s\S]*signalBoostProjectBound/)
-  assert.match(route, /exactFailedLogTarget \?\? signalBoostDeployedRepairTarget\(operationalPrompt, deployment, \{ ownerDeveloperLogSubmission: true \}\)/)
-  assert.match(route, /if \(ownerSignalBoostLogTarget && access\?\.userId\)[\s\S]*queueOwnerRepositoryRepair/)
-  assert.match(route, /VERCEL_GIT_REPO_OWNER/)
-  assert.match(route, /VERCEL_GIT_REPO_SLUG/)
+test('owner repository repair is repo-native and exact failed revision wins over deployed fallback', () => {
+  const analysis = route.indexOf('const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)')
+  const exact = route.indexOf('const exactFailedLogTarget =', analysis)
+  const ownerTarget = route.indexOf('const ownerRepositoryRepairTarget =', exact)
+  const exactPreference = route.indexOf('? exactFailedLogTarget', ownerTarget)
+  const intentFallback = route.indexOf('signalBoostDeployedRepairTarget(prompt, deployment)', exactPreference)
+  const clippedFallback = route.indexOf('signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })', intentFallback)
+  const queue = route.indexOf('queueOwnerRepositoryRepair({', clippedFallback)
+  assert.ok(analysis >= 0 && exact > analysis && ownerTarget > exact)
+  assert.ok(exactPreference > ownerTarget && intentFallback > exactPreference && clippedFallback > intentFallback && queue > clippedFallback)
+  assert.match(route.slice(ownerTarget, queue), /access\?\.isOwner && access\.userId && !hasSourceAttachment && signalBoostProjectBound/)
 })
 
 test('source-attached repair stays in the isolated workspace lane rather than gaining repository authority', () => {
   assert.match(route, /const hasSourceAttachment =/)
-  assert.match(route, /explicitOwnerPlatformTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment/)
-  assert.match(route, /ownerSignalBoostLogTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment/)
+  assert.match(route, /ownerRepositoryRepairTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment/)
   assert.match(route, /isConciergeBuilderObjective\(operationalPrompt, routingContext\) \? legacyConciergePost/)
 })
 

@@ -56,7 +56,7 @@ test('only failed owner SignalBoost logs reach Platform Engineer before passive 
   const exactTarget = route.indexOf('const exactFailedLogTarget = operationalLogAnalysis.failed', analysis)
   const target = route.indexOf('const ownerSignalBoostLogTarget =')
   const owner = route.indexOf('access?.isOwner', target)
-  const evidence = route.indexOf('isOperationalLogEvidence(operationalPrompt)', owner)
+  const evidence = route.indexOf('operationalEvidence', owner)
   const failed = route.indexOf('operationalLogAnalysis.failed', evidence)
   const binding = route.indexOf('SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt)', failed)
   const preferExact = route.indexOf('exactFailedLogTarget ?? signalBoostDeployedRepairTarget', binding)

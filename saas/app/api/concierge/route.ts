@@ -23,10 +23,10 @@ import {
   prospectCampaignQueuedReply,
   prospectCampaignQueueError,
 } from '@/lib/outreach/prospectCampaignRequest'
-import { createPlatformAiPort } from '@/lib/cos/aiPort'
-import { BuilderToolLoop } from '@/lib/builder/tool-loop'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
-import { VercelSandboxBuilderRunner } from '@/lib/builder/vercel-sandbox-runner'
+import { extractBuilderSourceFiles, planDebugFileJob } from '@/lib/builder/debug-file-job'
+import { enqueueBuilderJob } from '@/lib/builder/job-store'
+import { runBuilderJob } from '@/lib/builder/job-runner'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
@@ -130,7 +130,7 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
   // server-captured audit identity is the authenticated workspace owner and carries no broader
   // private authority into COS.
   const builderUserId = access?.userId || publicAuditUserId()
-  if (!builderUserId) {
+  if (!builderUserId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(builderUserId)) {
     return NextResponse.json({
       reply: 'I can debug and build that in an isolated sandbox. Sign in so COS Builder can attach a workspace to your account, then send the same request again.',
       source: 'cos-builder-sign-in-required',
@@ -147,28 +147,24 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
       external_action_taken: false,
     }, { status: 503 })
   }
-  const workspaceId = crypto.randomUUID()
+  const requestedWorkspaceId = String(body?.workspaceId || body?.context?.workspaceId || '').trim()
+  const workspaceId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestedWorkspaceId)
+    ? requestedWorkspaceId
+    : crypto.randomUUID()
   await workspace.ensureWorkspace(workspaceId)
-  const result = await new BuilderToolLoop(
-    createPlatformAiPort(),
-    workspace,
-    new VercelSandboxBuilderRunner(),
-  ).run({
-    objective: input,
-    workspaceId,
-    // Concierge has a finite browser and function lifetime. A simple design should need one
-    // self-contained file, a proving command, and a final answer; bound every model round so
-    // visitors receive a truthful Builder failure rather than an indistinguishable timeout.
-    maxRounds: 4,
-    modelRoundTimeoutMs: 55_000,
-  })
-  let files = (await workspace.listFiles(workspaceId)).map(file => file.path)
-  // A design is a safe, deterministic deliverable. If Builder cannot complete its model loop,
-  // keep the promised user experience: create the requested editable page rather than surface
-  // an internal control-plane code. Other Builder work still reports its exact bounded failure.
-  if (result.ok === false && designMatched) {
+  const stagedFiles = extractBuilderSourceFiles([
+    ...(Array.isArray(body?.files) ? body.files : []),
+    ...(Array.isArray(body?.attachments) ? body.attachments : []),
+  ])
+  for (const file of stagedFiles) {
+    await workspace.writeFile(workspaceId, file.path, file.content)
+  }
+
+  // Design with no source stays an instant, deterministic page. Coding work uses the same
+  // durable /api/builder job COS and the Developer workspace already poll.
+  if (designMatched && stagedFiles.length === 0) {
     await workspace.writeFile(workspaceId, 'index.html', travelLandingPageHtml())
-    files = (await workspace.listFiles(workspaceId)).map(file => file.path)
+    const files = (await workspace.listFiles(workspaceId)).map(file => file.path)
     return NextResponse.json({
       reply: 'Created a responsive travel landing page. Download index.html to preview or customize it.',
       source: 'cos-builder-design-fallback',
@@ -178,24 +174,56 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
       external_action_taken: false,
     })
   }
-  if (result.ok === false) {
+
+  const conversationId = conversationIdFrom(body) || crypto.randomUUID()
+  const jobId = crypto.randomUUID()
+  const debugPlan = planDebugFileJob(input, stagedFiles)
+  const reply = `COS Builder is running job ${jobId}. Progress and the final result are durable in History; the action will not be replayed.`
+  try {
+    await enqueueBuilderJob({
+      jobId,
+      workspaceId,
+      userId: builderUserId,
+      conversationId,
+      objective: input,
+      jobKind: debugPlan ? 'debug_file' : 'standard',
+      metadata: debugPlan
+        ? {
+            debugPath: debugPlan.path,
+            debugCommand: debugPlan.command,
+            debugRuntime: debugPlan.runtime,
+            debugPaths: debugPlan.files,
+          }
+        : {},
+      ownerAuthorized: access?.isOwner === true,
+      runningReply: reply,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'builder_job_enqueue_failed'
     return NextResponse.json({
-      reply: `COS Builder stopped: ${result.error}`,
+      reply: `COS Builder stopped: ${message}`,
       source: 'cos-builder',
       workspaceId,
-      files,
+      files: stagedFiles.map(file => file.path),
       execution_allowed: true,
       external_action_taken: false,
     }, { status: 422 })
   }
+
+  after(async () => {
+    await runBuilderJob(jobId, builderUserId)
+  })
+
   return NextResponse.json({
-    reply: result.answer,
+    reply,
     source: 'cos-builder',
+    jobId,
     workspaceId,
-    files,
+    status: 'queued',
+    files: stagedFiles.map(file => file.path),
     execution_allowed: true,
     external_action_taken: false,
-  })
+  }, { status: 202 })
 }
 
 async function directProspectCampaign(

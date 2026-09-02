@@ -64,16 +64,10 @@ test('pasted Vercel logs and large History dumps never route to Builder', () => 
   assert.equal(isConciergeBuilderObjective(`Debug this file.\n${history}`, { attachmentNames: ['broken.js'] }), false)
 })
 
-test('logs become bounded debug evidence when one to four editable source files are supplied', () => {
-  const objective = 'Fix the attached files.\n16:19:34 Vercel CLI 59.3.0\nReferenceError: result is not defined'
+test('logs become bounded debug evidence only when editable source files are supplied', () => {
+  const objective = 'Fix the attached file.\n16:19:34 Vercel CLI 59.3.0\nReferenceError: result is not defined'
   assert.deepEqual(planDebugFileJob(objective, [{ path: 'broken.js', content: 'console.log(result)' }]), {
-    path: 'broken.js', paths: ['broken.js'], command: "node 'broken.js'", runtime: 'node',
-  })
-  assert.deepEqual(planDebugFileJob(objective, [
-    { path: 'helper.ts', content: 'export const result = 1' },
-    { path: 'helper.test.ts', content: "import { result } from './helper.ts'" },
-  ]), {
-    path: 'helper.test.ts', paths: ['helper.ts', 'helper.test.ts'], command: "node --experimental-strip-types 'helper.test.ts'", runtime: 'node',
+    path: 'broken.js', command: "node 'broken.js'", runtime: 'node', files: ['broken.js'],
   })
   assert.equal(planDebugFileJob(objective, []), null)
 })

@@ -2,6 +2,13 @@
 // a visual job, or a request to portray anyone named inside a test title.
 const OPERATIONAL_LOG = /(?:^\d{2}:\d{2}:\d{2}\.\d{3}\s+(?:running|cloning|installing|restored)\b|\b(?:running|cloning|installing|restored build cache)\b[\s\S]{0,400}\b(?:vercel|next\.js|npm|node)\b|\bvercel cli\s+\d|\b(?:✖\s+failing tests|ℹ\s+fail\s+\d+|error:\s*command\s+")\b)/im
 
+// Browser textareas and copied log panes can clip off both the beginning and the final error block.
+// Dense timestamped Vercel/test-runner output is still operational evidence even when those classic
+// anchors are gone. Requiring several timestamped lines plus a build/runtime marker avoids turning
+// ordinary prose containing one time stamp into log authority.
+const CLIPPED_LOG_TIMESTAMP = /(?:^|\n)\d{2}:\d{2}:\d{2}\.\d{3}\s+/g
+const CLIPPED_LOG_MARKER = /(?:file:\/\/\/vercel\/path0|\/vercel\/path0\/saas\/tests\/|MODULE_TYPELESS_PACKAGE_JSON|Reparsing as ES Module|node:internal\/test_runner|\bVercel CLI\b|\bnext build\b|(?:^|\s)[✔✓✖]\s|ℹ\s+(?:tests|pass|fail)\b)/im
+
 // Explicit repair language is authority intent, not proof of authority. Callers still have to
 // enforce authentication, exact repository/source scope, and the relevant Builder safety lane.
 // Keep this deliberately narrow so words such as "failed", "error", or test names inside the
@@ -16,7 +23,10 @@ export type OperationalLogAnalysis = Readonly<{
 }>
 
 export function isOperationalLogEvidence(input: string): boolean {
-  return OPERATIONAL_LOG.test(String(input || ''))
+  const text = String(input || '')
+  if (OPERATIONAL_LOG.test(text)) return true
+  const timestampCount = text.match(CLIPPED_LOG_TIMESTAMP)?.length ?? 0
+  return timestampCount >= 3 && CLIPPED_LOG_MARKER.test(text)
 }
 
 /** Intent only; this does not grant authority and does not require log evidence. */

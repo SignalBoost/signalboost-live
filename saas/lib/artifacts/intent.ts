@@ -1,3 +1,5 @@
+import { isOperationalLogEvidence } from '../ai/cos/pastedOperationalLog.ts'
+
 export type ConciergeArtifactFormat = 'txt' | 'pdf'
 
 export type ConciergeArtifactIntent = Readonly<{
@@ -25,7 +27,10 @@ function filenameStem(prompt: string): string {
 /** Deterministic artifact detection for authenticated Concierge tool routing. */
 export function detectConciergeArtifactIntent(prompt: string): ConciergeArtifactIntent | null {
   const value = String(prompt || '').trim()
-  if (!value || !ACTION.test(value)) return null
+  // A failed test title such as "create PDF" is evidence, never authority to invoke the artifact
+  // tool. This shared guard protects homepage Concierge, dock Concierge, Full Assistant, and direct
+  // server callers before any client-side shortcut can reinterpret clipped build output.
+  if (!value || isOperationalLogEvidence(value) || !ACTION.test(value)) return null
   const format: ConciergeArtifactFormat | null = PDF.test(value) ? 'pdf' : TEXT.test(value) ? 'txt' : null
   return format ? Object.freeze({ format, filenameStem: filenameStem(value) }) : null
 }

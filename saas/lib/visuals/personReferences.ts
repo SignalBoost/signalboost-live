@@ -250,7 +250,9 @@ async function downloadCurated(entry: CuratedPersonReference): Promise<VerifiedP
 function candidateFromPage(page: CommonsPage): CommonsPersonCandidate | null {
   const info = page.imageinfo?.[0]
   const title = String(page.title || '')
-  const assetUrl = String(info?.thumburl || info?.url || '')
+  // Prefer Commons' canonical upload URL. The thumbnail service and Special:Redirect endpoint
+  // have both changed behavior independently of the verified file metadata.
+  const assetUrl = String(info?.url || info?.thumburl || '')
   if (!title || !assetUrl || !isAllowedHost(assetUrl, [COMMONS_UPLOAD_HOST, COMMONS_THUMB_HOST])) return null
   return {
     title: title.replace(/^File:/i, '').trim(),
@@ -323,9 +325,10 @@ async function resolveUncached(referenceQuery: string): Promise<VerifiedPersonRe
 
   if (curated) {
     try {
-      return await downloadCurated(curated)
+      const exact = await exactCommonsPerson(curated)
+      if (exact) return await downloadCandidate(exact, curated.canonicalName)
     } catch (error) {
-      console.warn('[concierge-person-reference-curated-redirect-failure]', JSON.stringify({
+      console.warn('[concierge-person-reference-curated-api-failure]', JSON.stringify({
         referenceQuery,
         canonicalName: curated.canonicalName,
         error: error instanceof Error ? error.message : 'unknown',
@@ -333,10 +336,9 @@ async function resolveUncached(referenceQuery: string): Promise<VerifiedPersonRe
     }
 
     try {
-      const exact = await exactCommonsPerson(curated)
-      if (exact) return await downloadCandidate(exact, curated.canonicalName)
+      return await downloadCurated(curated)
     } catch (error) {
-      console.warn('[concierge-person-reference-curated-api-failure]', JSON.stringify({
+      console.warn('[concierge-person-reference-curated-redirect-failure]', JSON.stringify({
         referenceQuery,
         canonicalName: curated.canonicalName,
         error: error instanceof Error ? error.message : 'unknown',
@@ -359,7 +361,7 @@ async function resolveUncached(referenceQuery: string): Promise<VerifiedPersonRe
 
 /**
  * Resolves a named real person to a verified portrait before image generation. Curated public
- * figures use Wikimedia's stable file redirect first, then the Commons API and search fallback.
+ * figures use exact Commons metadata first, then the file redirect and search fallback.
  * Missing or ambiguous references return null; COS never substitutes a different identity.
  */
 export async function resolveVerifiedPersonReference(referenceQuery: string): Promise<VerifiedPersonReference | null> {

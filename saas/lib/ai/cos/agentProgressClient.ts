@@ -1,3 +1,5 @@
+import { isConciergeBuilderObjective } from './cosReasoningRolePolicy.ts'
+
 export type AgentProgressEvent = {
   phase: 'accepted' | 'running' | 'complete'
   message: string
@@ -63,10 +65,12 @@ function decodeTextDataUrl(value: string): string | null {
 }
 
 /**
- * The public Concierge transports source attachments directly into the same durable Builder job
- * contract used by the authenticated Developer surface. This is transport selection only: the
- * server still authenticates the user and enforces the 1–4 file, size, extension and execution
- * limits. Image/PDF/reference attachments remain on ordinary Concierge.
+ * The public Concierge transports executable source-file requests directly into the same durable
+ * Builder job contract used by the authenticated Developer surface. Source attachments alone are
+ * not enough to override read-only questions such as “explain” or “summarize”; those remain on
+ * ordinary Concierge. This is transport selection only: the server still authenticates the user
+ * and enforces the 1–4 file, size, extension and execution limits. Image/PDF/reference attachments
+ * also remain on ordinary Concierge.
  */
 export function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builder'; body: Record<string, unknown> } | null {
   const record = bodyRecord(body)
@@ -74,9 +78,15 @@ export function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builde
   const attachments = Array.isArray(record.attachments) ? record.attachments as ConciergeAttachment[] : []
   if (!attachments.length) return null
 
+  const attachmentNames = attachments.map(attachment => typeof attachment?.name === 'string' ? attachment.name.trim().replace(/\\/g, '/') : '')
+  const attachmentMimeTypes = attachments.map(attachment => String(attachment?.mimeType || attachment?.type || ''))
+  const objective = latestUserText(record)
+  if (!objective || !isConciergeBuilderObjective(objective, { attachmentNames, attachmentMimeTypes })) return null
+
   const files: Array<{ path: string; content: string }> = []
-  for (const attachment of attachments) {
-    const path = typeof attachment?.name === 'string' ? attachment.name.trim().replace(/\\/g, '/') : ''
+  for (let index = 0; index < attachments.length; index += 1) {
+    const attachment = attachments[index]
+    const path = attachmentNames[index]
     const dataUrl = typeof attachment?.dataUrl === 'string' ? attachment.dataUrl : ''
     if (!path || !SOURCE_FILE.test(path) || !dataUrl) return null
     const content = decodeTextDataUrl(dataUrl)
@@ -84,9 +94,8 @@ export function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builde
     files.push({ path, content })
   }
 
-  const objective = latestUserText(record)
   const conversationId = typeof record.context?.conversationId === 'string' ? record.context.conversationId : ''
-  if (!objective || !conversationId) return null
+  if (!conversationId) return null
   return {
     endpoint: '/api/builder',
     body: { objective, conversationId, files },

@@ -32,11 +32,14 @@ test('TXT and PDF follow-ups convert the actual preceding Builder file instead o
   assert.match(transport, /sourceText:[\s\S]{0,220}role === 'assistant'/)
 })
 
-test('unattached operational logs terminate at the canonical browser boundary and stay out of ordinary Builder', () => {
+test('unattached operational logs use bounded diagnosis and stay out of ordinary Builder', () => {
   const browser = read('../app/api/cos-browser/route.ts')
+  const diagnostic = read('../lib/ai/cos/operationalLogDiagnostic.ts')
   const policy = read('../lib/ai/cos/cosReasoningRolePolicy.ts')
   assert.match(browser, /if \(operationalEvidence && !hasSourceAttachment\)/)
-  assert.match(browser, /source: 'concierge-operational-log-analysis'/)
-  assert.match(browser, /reply: operationalLogReply\(operationalPrompt\)/)
+  assert.match(browser, /await diagnoseOperationalLog\(/)
+  assert.match(browser, /concierge-operational-log-diagnostic/)
+  assert.match(diagnostic, /Do not execute tools, edit files/)
+  assert.match(diagnostic, /operationalLogReply\(input\.log\)/)
   assert.match(policy, /isOperationalLogEvidence\(raw\) && !sourceAttachment\(context\)/)
 })

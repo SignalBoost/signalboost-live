@@ -24,7 +24,6 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_JOB_FILES = 20
 const DEBUG_OBJECTIVE = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
 const SIGNALBOOST_OPERATIONAL_TARGET = /\b(?:signalboost-live|(?:saas\.)?signalboostapp\.com)\b/i
-const SIGNALBOOST_REPOSITORY_REVISION = /Cloning\s+(?:https?:\/\/)?github\.com\/SignalBoost\/signalboost-live(?:\.git)?\s*\(Branch:\s*[^,\r\n]+,\s*Commit:\s*[0-9a-f]{7,40}\)/i
 
 function noStore(payload: unknown, init?: ResponseInit): NextResponse {
   const response = NextResponse.json(payload, init)
@@ -154,24 +153,12 @@ export async function POST(request: Request) {
     const exactFailedLogTarget = parsedFailedLogTarget?.failureEvidence.length
       ? parsedFailedLogTarget
       : null
-    const hasPinnedRepositoryLog = files.length === 0 && SIGNALBOOST_REPOSITORY_REVISION.test(objective)
-
-    // A Vercel repository log that names an immutable revision must carry its actual failure tail.
-    // Never silently reinterpret a clipped or incomplete historical build as a broad repair of the
-    // currently deployed revision; that loses the failing test and points Engineer at the wrong code.
-    if (ownerDeveloperLogSubmission && hasPinnedRepositoryLog && !exactFailedLogTarget) {
-      const reply = 'The submitted SignalBoost build log names a repository revision but does not include concrete terminal failure evidence. No repository job was started. Paste the complete log including the failing-test/error tail.'
-      await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
-      return noStore({
-        error: 'builder_repository_log_incomplete',
-        reply,
-        execution_allowed: false,
-        external_action_taken: false,
-        files: [],
-        trace: [],
-      }, { status: 400 })
-    }
-
+    // No dead-end for an owner's failed-log paste. An exact failed-log revision (clone line +
+    // evidence) is always preferred and repaired at its own commit. A clipped or evidence-thin
+    // pinned log is NOT refused: it falls through to a repair of the currently deployed commit.
+    // The repair job reproduces the failure before it edits anything, so a log that does not
+    // reproduce on the deployed revision yields an honest "could not reproduce" result rather than
+    // a wrong-revision repair — the safety the old clone-line requirement was reaching for.
     const platformRepairTarget = files.length === 0
       ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(objective, {
           commitSha: process.env.VERCEL_GIT_COMMIT_SHA,

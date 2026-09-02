@@ -39,7 +39,8 @@ type Attachment = {
 const ATTACH_MAX_BYTES = 10 * 1024 * 1024
 const ATTACH_MAX_FILES = 5
 const ATTACH_ALLOWED_RE = /^(image\/(png|jpe?g|gif|webp)|application\/pdf|text\/(plain|csv|markdown))$/i
-const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv'
+const BUILDER_SOURCE_FILE_RE = /\.(?:c?js|mjs|cts|mts|ts|py)$/i
+const ATTACH_INPUT_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,application/pdf,text/plain,.txt,.md,.csv,.js,.mjs,.cjs,.ts,.mts,.cts,.py'
 const ASSET_READY_KEY = 'signalboost.concierge.assetReady'
 // The server primary is bounded at 150 s. Give public recovery/serialization another minute, then
 // stop waiting well before Vercel's 300 s function ceiling so a lost socket can never spin forever.
@@ -179,7 +180,7 @@ export default function Concierge() {
     const incoming = Array.from(fileList)
     const staged: Attachment[] = []
     for (const file of incoming) {
-      const okType = ATTACH_ALLOWED_RE.test(file.type) || /\.(txt|md|csv)$/i.test(file.name)
+      const okType = ATTACH_ALLOWED_RE.test(file.type) || /\.(txt|md|csv)$/i.test(file.name) || BUILDER_SOURCE_FILE_RE.test(file.name)
       if (!okType || file.size > ATTACH_MAX_BYTES) continue
       try {
         const dataUrl = await readFileAsDataUrl(file)

@@ -188,7 +188,9 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           // is grounded only in its workspace, current tool evidence, and the user's objective.
           priorLessons: [],
           maxRounds: isRepairObjective(job.objective) ? 6 : 5,
-          modelRoundTimeoutMs: 35_000,
+          // Production Qwen control rounds with repository evidence have been observed just above
+          // 35s. Keep the round bounded, but leave enough room for a valid 36–45s completion.
+          modelRoundTimeoutMs: 55_000,
         })
 
     const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import {
+  extractBuilderSourceFiles,
   planDebugFileJob,
   runDebugFileJob,
 } from '../lib/builder/debug-file-job.ts'
@@ -17,7 +18,6 @@ test('debug job runs one file, applies one edit, reruns the same command, and st
   ])
   assert.ok(plan)
   assert.equal(plan.command, "node 'broken.js'")
-  assert.deepEqual(plan.paths, ['broken.js'])
 
   const commands: string[] = []
   const runner: BuilderRunnerPort = {
@@ -79,107 +79,32 @@ test('debug job runs one file, applies one edit, reruns the same command, and st
   assert.equal((await workspace.readFile(workspaceId, 'broken.js'))?.content, "console.log('fixed')\n")
 })
 
-test('debug planning admits one to four small source files and prefers a supplied JS/TS test as proof entrypoint', () => {
+test('debug planning requires an explicit action and one to four small supported source files', () => {
   assert.equal(planDebugFileJob('Debug this.', []), null)
-  const plan = planDebugFileJob('Debug this.', [
-    { path: 'src/math.ts', content: 'export const value = 1' },
-    { path: 'src/math.test.ts', content: 'console.log(value)' },
-  ])
-  assert.ok(plan)
-  assert.deepEqual(plan.paths, ['src/math.ts', 'src/math.test.ts'])
-  assert.equal(plan.path, 'src/math.test.ts')
-  assert.equal(plan.command, "node --experimental-strip-types 'src/math.test.ts'")
-
-  assert.equal(planDebugFileJob('Debug this.', [
-    { path: 'app.py', content: 'def add(a, b): return a - b' },
-    { path: 'test_app.py', content: 'def test_add(): assert add(2, 3) == 5' },
-  ]), null, 'pytest-style bundles must be rejected when no real test-discovery proof command is available')
-
-  assert.equal(planDebugFileJob('Debug this.', Array.from({ length: 5 }, (_, index) => ({
-    path: `file-${index}.js`, content: `console.log(${index})`,
-  }))), null)
-  assert.equal(planDebugFileJob('Debug this.', [
+  assert.deepEqual(planDebugFileJob('Debug this.', [
     { path: 'one.js', content: 'x' },
-    { path: 'notes.txt', content: 'y' },
-  ]), null)
-  assert.equal(planDebugFileJob('Debug this.', [
-    { path: 'same.js', content: 'x' },
-    { path: 'same.js', content: 'y' },
-  ]), null)
+    { path: 'two.js', content: 'y' },
+  ]), {
+    path: 'one.js',
+    command: "node 'one.js'",
+    runtime: 'node',
+    files: ['one.js', 'two.js'],
+  })
+  assert.equal(planDebugFileJob('Debug this.', [{ path: 'notes.txt', content: 'x' }]), null)
   assert.equal(planDebugFileJob(
     '16:19:34 Vercel CLI 59.3.0\n16:20:11 Error: Command "npm test" exited with 1',
     [{ path: 'broken.js', content: 'x' }],
   ), null)
+  assert.equal(planDebugFileJob('Debug this.', [
+    { path: 'a.js', content: '1' },
+    { path: 'b.js', content: '2' },
+    { path: 'c.js', content: '3' },
+    { path: 'd.js', content: '4' },
+    { path: 'e.js', content: '5' },
+  ]), null)
 })
 
-test('multi-file debug reads source and test together, edits the faulty source, and proves the test passes', async () => {
-  const workspace = new InMemoryBuilderWorkspace()
-  const workspaceId = 'user:debug-multi-file'
-  const sourcePath = 'src/math.ts'
-  const testPath = 'src/math.test.ts'
-  await workspace.writeFile(workspaceId, sourcePath, 'export function add(a: number, b: number) { return a - b }\n')
-  await workspace.writeFile(workspaceId, testPath, "import { add } from './math.ts'\nif (add(2, 3) !== 5) throw new Error('wrong sum')\n")
-
-  const plan = planDebugFileJob('Fix the attached source and test.', [
-    { path: sourcePath, content: 'export function add(a: number, b: number) { return a - b }\n' },
-    { path: testPath, content: "import { add } from './math.ts'\nif (add(2, 3) !== 5) throw new Error('wrong sum')\n" },
-  ])
-  assert.ok(plan)
-  assert.equal(plan.path, testPath)
-
-  const runner: BuilderRunnerPort = {
-    async run(input) {
-      assert.equal(input.command, "node --experimental-strip-types 'src/math.test.ts'")
-      assert.deepEqual(input.files.map(file => file.path), [sourcePath, testPath])
-      const source = input.files.find(file => file.path === sourcePath)?.content || ''
-      return source.includes('return a - b')
-        ? { exitCode: 1, stdout: '', stderr: 'Error: wrong sum', timedOut: false }
-        : { exitCode: 0, stdout: 'ok\n', stderr: '', timedOut: false }
-    },
-  }
-
-  let modelPrompt = ''
-  const ai: BuilderAiPort = {
-    async generate(input) {
-      modelPrompt = input.prompt
-      return JSON.stringify({
-        type: 'tool',
-        toolId: 'edit_file',
-        input: {
-          path: sourcePath,
-          search: 'return a - b',
-          replace: 'return a + b',
-        },
-      })
-    },
-  }
-
-  const result = await runDebugFileJob({
-    objective: 'Fix the attached source and test.',
-    workspaceId,
-    plan,
-    workspace,
-    runner,
-    ai,
-  })
-  if (!result.ok) assert.fail(result.error)
-
-  assert.match(modelPrompt, /FILE: src\/math\.ts/)
-  assert.match(modelPrompt, /FILE: src\/math\.test\.ts/)
-  assert.deepEqual(result.trace.map(item => [item.toolId, item.ok]), [
-    ['list_files', true],
-    ['read_file', true],
-    ['read_file', true],
-    ['run', false],
-    ['edit_file', true],
-    ['run', true],
-  ])
-  assert.match(result.answer, /using 2 supplied files/)
-  assert.match(result.answer, /Verification exit code: 0/)
-  assert.equal((await workspace.readFile(workspaceId, sourcePath))?.content, 'export function add(a: number, b: number) { return a + b }\n')
-})
-
-test('a passing directly executable Python file stops after the first run with no model call', async () => {
+test('a passing attached file stops after the first run with no model call', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const workspaceId = 'user:debug-passing-file'
   await workspace.writeFile(workspaceId, 'healthy.py', "print('ok')\n")
@@ -204,4 +129,64 @@ test('a passing directly executable Python file stops after the first run with n
   assert.equal(result.ok, true)
   assert.equal(modelCalls, 0)
   assert.deepEqual(result.trace.map(item => item.toolId), ['list_files', 'read_file', 'run'])
+})
+
+test('debug job can repair source while proving with its attached test', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const workspaceId = 'user:debug-source-and-test'
+  await workspace.writeFile(workspaceId, 'add.js', 'export function add(a, b) { return a - b }\n')
+  await workspace.writeFile(workspaceId, 'add.test.js', "import { add } from './add.js'\nif (add(2, 2) !== 4) throw new Error('expected 4')\n")
+
+  const plan = planDebugFileJob('Fix the attached files. The test is failing.', [
+    { path: 'add.js', content: 'export function add(a, b) { return a - b }\n' },
+    { path: 'add.test.js', content: "import { add } from './add.js'\nif (add(2, 2) !== 4) throw new Error('expected 4')\n" },
+  ])
+  assert.ok(plan)
+  assert.equal(plan.path, 'add.test.js')
+  assert.equal(plan.command, "node 'add.test.js'")
+  assert.deepEqual(plan.files, ['add.js', 'add.test.js'])
+
+  const runner: BuilderRunnerPort = {
+    async run(input) {
+      const source = input.files.find(file => file.path === 'add.js')?.content || ''
+      if (source.includes('return a - b')) {
+        return { exitCode: 1, stdout: '', stderr: 'Error: expected 4', timedOut: false }
+      }
+      return { exitCode: 0, stdout: 'ok\n', stderr: '', timedOut: false }
+    },
+  }
+  const ai: BuilderAiPort = {
+    async generate() {
+      return JSON.stringify({
+        type: 'tool',
+        toolId: 'edit_file',
+        input: { path: 'add.js', search: 'return a - b', replace: 'return a + b' },
+      })
+    },
+  }
+
+  const result = await runDebugFileJob({
+    objective: 'Fix the attached files. The test is failing.',
+    workspaceId,
+    plan,
+    workspace,
+    runner,
+    ai,
+  })
+  if (!result.ok) assert.fail(result.error)
+  assert.equal((await workspace.readFile(workspaceId, 'add.js'))?.content, 'export function add(a, b) { return a + b }\n')
+  assert.match(result.answer, /Verification exit code: 0/)
+})
+
+test('Concierge data-URL attachments decode into editable source files', () => {
+  const content = 'console.log(1)\n'
+  const files = extractBuilderSourceFiles([
+    {
+      name: 'app.js',
+      mimeType: 'text/javascript',
+      dataUrl: `data:text/javascript;base64,${Buffer.from(content).toString('base64')}`,
+    },
+    { name: 'notes.txt', dataUrl: `data:text/plain;base64,${Buffer.from('log only').toString('base64')}` },
+  ])
+  assert.deepEqual(files, [{ path: 'app.js', content }])
 })

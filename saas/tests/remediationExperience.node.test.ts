@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { nativeRemediationClass, remediationExperiencePrompt, summarizeRemediationExperience } from '../self-healing-host/remediation-experience-pure.ts'
 import { formatBuilderOperatorRepairReply } from '../lib/builder/operator-narration.ts'
 import { isOperatorRepairRequest, operatorProgressMessage } from '../lib/ai/cos/operator-progress.ts'
 
 const match = { provider: 'signalboost-platform', environment: 'production', incidentClass: nativeRemediationClass({ source: 'cron', nativeProbe: 'api' }) }
+const builderJobRunner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+const progressClient = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
 
 test('only repeated clean objective outcomes become remediation suggestions', () => {
   const experience = summarizeRemediationExperience([
@@ -70,4 +73,13 @@ test('Concierge and COS repair progress use the shared operator arc without prem
   assert.match(operatorProgressMessage({ stage: 'fixing', target: 'concierge', builder: true }), /^Fixing —/)
   assert.match(operatorProgressMessage({ stage: 'verified', target: 'cos', builder: true }), /^Verified —/)
   assert.match(operatorProgressMessage({ stage: 'blocked', target: 'cos', builder: true }), /Verification is not complete yet/)
+})
+
+test('runtime repair paths are wired to operator narration instead of raw Builder failure copy', () => {
+  assert.match(builderJobRunner, /formatBuilderOperatorRepairReply/)
+  assert.match(builderJobRunner, /repairAwareFailureReply/)
+  assert.match(builderJobRunner, /isRepairObjective\(job\.objective\)/)
+  assert.match(progressClient, /isOperatorRepairRequest\(requestBody\)/)
+  assert.match(progressClient, /stage: poll\.ok \? 'verified' : 'blocked'/)
+  assert.doesNotMatch(progressClient, /COS Builder job failed/)
 })

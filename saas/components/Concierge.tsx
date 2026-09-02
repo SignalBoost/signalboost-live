@@ -472,8 +472,8 @@ export default function Concierge() {
                           {uiText('generatedUi.u_75cf7ab15fa05201')} {path}
                         </a>
                       ))}
-                      <button type="button" disabled={loading} onClick={() => ask('Give me that result as a TXT file.')} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-300/20 disabled:opacity-50">TXT</button>
-                      <button type="button" disabled={loading} onClick={() => ask('Give me that result as a PDF file.')} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-300/20 disabled:opacity-50">PDF</button>
+                      <button type="button" disabled={loading} onClick={() => ask('Give me that result as a TXT file.')} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-300/20 disabled:opacity-50">{t(dict, 'concierge.txtFormat')}</button>
+                      <button type="button" disabled={loading} onClick={() => ask('Give me that result as a PDF file.')} className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-2 py-1 text-[11px] text-cyan-200 hover:bg-cyan-300/20 disabled:opacity-50">{t(dict, 'concierge.pdfFormat')}</button>
                     </div>
                     </>
                   ) : null}

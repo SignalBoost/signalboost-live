@@ -351,8 +351,8 @@ export default function Home() {
                             {uiText('generatedUi.u_75cf7ab15fa05201')} {path}
                           </a>
                         ))}
-                        <button type="button" disabled={loading} onClick={() => void ask('Give me that result as a TXT file.')} className="secondary-button text-xs disabled:opacity-50">TXT</button>
-                        <button type="button" disabled={loading} onClick={() => void ask('Give me that result as a PDF file.')} className="secondary-button text-xs disabled:opacity-50">PDF</button>
+                        <button type="button" disabled={loading} onClick={() => void ask('Give me that result as a TXT file.')} className="secondary-button text-xs disabled:opacity-50">{t(dict, 'concierge.txtFormat')}</button>
+                        <button type="button" disabled={loading} onClick={() => void ask('Give me that result as a PDF file.')} className="secondary-button text-xs disabled:opacity-50">{t(dict, 'concierge.pdfFormat')}</button>
                       </div>
                       </>
                     ) : null}

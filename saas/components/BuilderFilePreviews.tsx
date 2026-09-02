@@ -2,24 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
+import { t } from '@/lib/i18n/t'
 
 const TEXT_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt|txt|md|csv|xml|ya?ml)$/i
 const MAX_INLINE_CHARS = 120_000
-const COPY: Record<string, { copy: string; copied: string; unavailable: string }> = {
-  en: { copy: 'Copy file', copied: 'Copied', unavailable: 'Preview unavailable' },
-  es: { copy: 'Copiar archivo', copied: 'Copiado', unavailable: 'Vista previa no disponible' },
-  pt: { copy: 'Copiar arquivo', copied: 'Copiado', unavailable: 'Prévia indisponível' },
-  pl: { copy: 'Kopiuj plik', copied: 'Skopiowano', unavailable: 'Podgląd niedostępny' },
-  ru: { copy: 'Копировать файл', copied: 'Скопировано', unavailable: 'Предпросмотр недоступен' },
-}
-
 function fileUrl(workspaceId: string, path: string): string {
   return `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${path.split('/').map(encodeURIComponent).join('/')}`
 }
 
 function TextFilePreview({ workspaceId, path }: { workspaceId: string; path: string }) {
-  const { lang } = useI18n()
-  const labels = COPY[lang] || COPY.en
+  const { dict } = useI18n()
   const [content, setContent] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -38,7 +30,7 @@ function TextFilePreview({ workspaceId, path }: { workspaceId: string; path: str
     return () => controller.abort()
   }, [workspaceId, path])
 
-  if (failed) return <div className="mt-2 text-xs text-white/55">{path}: {labels.unavailable}</div>
+  if (failed) return <div className="mt-2 text-xs text-white/55">{path}: {t(dict, 'concierge.previewUnavailable')}</div>
   if (content === null) return null
   return (
     <section className="mt-3 overflow-hidden rounded-xl border border-cyan-300/20 bg-slate-950/80">
@@ -53,7 +45,7 @@ function TextFilePreview({ workspaceId, path }: { workspaceId: string; path: str
             window.setTimeout(() => setCopied(false), 1800)
           }}
         >
-          {copied ? labels.copied : labels.copy}
+          {copied ? t(dict, 'concierge.copied') : t(dict, 'concierge.copyFile')}
         </button>
       </div>
       <pre className="max-h-[34rem] overflow-auto whitespace-pre p-3 text-left font-mono text-xs leading-5 text-slate-100"><code>{content}</code></pre>

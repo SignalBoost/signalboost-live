@@ -40,7 +40,10 @@ export async function postWithAgentProgress(args: {
 
   let response: Response
   try {
-    response = await fetch(args.target === 'cos' ? '/api/cos-primary' : '/api/concierge', {
+    // Concierge and the owner Assistant must share one server routing authority. Concierge no
+    // longer posts into a parallel /api/concierge classifier first; canonical browser ingress owns
+    // intent, operational evidence, artifact/visual/provenance exclusions, and Builder handoff.
+    response = await fetch(args.target === 'cos' ? '/api/cos-primary' : '/api/cos-browser', {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify(args.body),

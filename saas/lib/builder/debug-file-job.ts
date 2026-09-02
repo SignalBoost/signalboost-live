@@ -10,7 +10,10 @@ import type {
 
 const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
 const CODE_EXTENSION = /\.(?:c?js|mjs|cts|mts|ts|py)$/i
-const TEST_FILE = /(?:\.(?:test|spec)\.(?:c?js|mjs|cts|mts|ts)$|(?:^|\/)(?:test[_-].+|.+[_-]test)\.py$)/i
+// JS/TS test files are self-executing through Node in this bounded lane. Do not automatically
+// select pytest-style `test_*.py` files: `python3 test_file.py` does not discover/invoke bare
+// test functions and could falsely report a broken source as passing.
+const TEST_FILE = /\.(?:test|spec)\.(?:c?js|mjs|cts|mts|ts)$/i
 const MAX_DEBUG_FILES = 4
 const MAX_DEBUG_FILE_BYTES = 128 * 1024
 const MAX_MODEL_SOURCE_CHARS = 160_000
@@ -69,8 +72,8 @@ export function planDebugFileJob(objective: string, files: readonly DebugFileInp
   const paths = normalized.map(file => file.path)
   if (new Set(paths).size !== paths.length) return null
 
-  // When a test/spec is supplied, make it the proof entrypoint. Otherwise keep the first attached
-  // executable as the backwards-compatible command target.
+  // When a self-executing JS/TS test/spec is supplied, make it the proof entrypoint. Otherwise keep
+  // the first attached executable as the backwards-compatible command target.
   const entry = normalized.find(file => TEST_FILE.test(file.path)) ?? normalized[0]
   const command = debugCommand(entry.path)
   if (!command) return null

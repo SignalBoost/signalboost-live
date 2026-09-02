@@ -87,7 +87,7 @@ function builderRoutingContextFromBody(body: any) {
 /**
  * Browser-only ingress wrapper for COS Primary.
  *
- * Passive Vercel/npm logs are classified before artifacts, visuals, or Builder. An explicit
+ * Passive Vercel/npm logs are classified before artifacts, visuals, provenance, or Builder. An explicit
  * owner repair request for an exact failed SignalBoost Vercel snapshot may enter only the
  * pinned, review-only Platform Engineer lane. Repair intent may carry across exactly one
  * immediately preceding user turn so “debug this” followed by the log remains one repair job.
@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
   const hasSourceAttachment = (routingContext.attachmentNames || []).some((name: string) =>
     /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i.test(String(name || '')),
   )
+  const operationalEvidence = isOperationalLogEvidence(operationalPrompt)
   const pastedOperationalLog = isPastedOperationalLog(operationalPrompt)
   const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(operationalPrompt)
     || (pastedOperationalLog && hasExplicitOperationalLogRepairIntent(previousUserPrompt))
@@ -124,7 +125,7 @@ export async function POST(req: NextRequest) {
     ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
   const ownerSignalBoostLogTarget = access?.isOwner && access.userId && !hasSourceAttachment
-    && isOperationalLogEvidence(operationalPrompt) && operationalLogAnalysis.failed
+    && operationalEvidence && operationalLogAnalysis.failed
     && SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt)
     ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(prompt, {
         commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
@@ -194,7 +195,7 @@ export async function POST(req: NextRequest) {
       })
     : req
 
-  if (!pastedOperationalLog) {
+  if (!operationalEvidence) {
     if (isConciergeArtifactObjective(prompt)) {
       const headers = new Headers(req.headers)
       headers.set('content-type', 'application/json')
@@ -220,7 +221,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (isProvenanceIntrospection(prompt)) {
+  if (!operationalEvidence && isProvenanceIntrospection(prompt)) {
     const recorded = await withPublicAuditIdentity(auditUserId, () =>
       withPublicDeliveryScope(() => readCosPrimaryPriorProvenance(auditUserId, priorAnswer)),
     )

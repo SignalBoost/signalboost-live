@@ -28,7 +28,7 @@ test('repository repair is one durable server helper rather than duplicated rout
   assert.match(text, /source: 'cos-platform-engineer'/)
 })
 
-test('owner repository repair prefers the exact failed snapshot before deployed fallbacks', () => {
+test('owner repository repair requires recognized operational evidence for an exact failed snapshot and prefers it before deployed fallbacks', () => {
   const analysis = route.indexOf('const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)')
   const exact = route.indexOf('const exactFailedLogTarget =', analysis)
   const ownerTarget = route.indexOf('const ownerRepositoryRepairTarget =', exact)
@@ -37,8 +37,18 @@ test('owner repository repair prefers the exact failed snapshot before deployed 
   const clippedFallback = route.indexOf('signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })', intentFallback)
   const queue = route.indexOf('queueOwnerRepositoryRepair({', clippedFallback)
   assert.ok(analysis >= 0 && exact > analysis && ownerTarget > exact)
+  assert.match(route.slice(exact, ownerTarget), /operationalEvidence && operationalLogAnalysis\.failed/)
+  assert.match(route.slice(exact, ownerTarget), /parseSignalBoostRepositoryRepairTarget\(operationalPrompt\)/)
   assert.ok(exactPreference > ownerTarget && intentFallback > exactPreference && clippedFallback > intentFallback && queue > clippedFallback)
   assert.match(route.slice(ownerTarget, queue), /access\?\.isOwner && access\.userId && !hasSourceAttachment && signalBoostProjectBound/)
+})
+
+test('quoted clone and failure lines alone do not satisfy operational-log evidence', () => {
+  const quoted = [
+    'Cloning github.com/SignalBoost/signalboost-live (Branch: main, Commit: abcdef1)',
+    '✖ example test name',
+  ].join('\n')
+  assert.equal(isOperationalLogEvidence(quoted), false)
 })
 
 test('unattached operational evidence terminates before generic COS can reinterpret log text', () => {

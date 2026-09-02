@@ -160,7 +160,7 @@ async function directBuilder(body: any, input: string): Promise<NextResponse | n
     // self-contained file, a proving command, and a final answer; bound every model round so
     // visitors receive a truthful Builder failure rather than an indistinguishable timeout.
     maxRounds: 4,
-    modelRoundTimeoutMs: 40_000,
+    modelRoundTimeoutMs: 55_000,
   })
   let files = (await workspace.listFiles(workspaceId)).map(file => file.path)
   // A design is a safe, deterministic deliverable. If Builder cannot complete its model loop,

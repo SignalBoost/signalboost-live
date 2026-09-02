@@ -28,13 +28,15 @@ test('Full Assistant browser requests enter the canonical browser ingress before
 })
 
 test('repository repair is one durable server helper rather than duplicated routing code', () => {
-  const helper = route.match(/async function queueOwnerRepositoryRepair[\s\S]*?\n}\n\nexport async function withSuggestedFollowups/)
-  assert.ok(helper)
-  const text = helper?.[0] || ''
-  assert.match(text, /enqueueSignalBoostRepositoryRepairJob/)
-  assert.match(text, /runBuilderJob\(job\.jobId/)
-  assert.match(text, /status: 'queued'/)
-  assert.match(text, /source: 'cos-platform-engineer'/)
+  const helperStart = route.indexOf('async function queueOwnerRepositoryRepair')
+  const helperEnd = route.indexOf('export async function withSuggestedFollowups', helperStart)
+  const enqueue = route.indexOf('enqueueSignalBoostRepositoryRepairJob({', helperStart)
+  const schedule = route.indexOf('runBuilderJob(job.jobId', enqueue)
+  assert.ok(helperStart >= 0 && helperEnd > helperStart)
+  assert.ok(enqueue > helperStart && enqueue < helperEnd)
+  assert.ok(schedule > enqueue && schedule < helperEnd)
+  assert.match(route.slice(helperStart, helperEnd), /status: 'queued'/)
+  assert.match(route.slice(helperStart, helperEnd), /source: 'cos-platform-engineer'/)
 })
 
 test('authenticated owner platform repair is intent-driven and does not require a pasted log or source file', () => {

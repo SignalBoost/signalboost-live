@@ -32,10 +32,15 @@ test('TXT and PDF follow-ups convert the actual preceding Builder file instead o
   assert.match(transport, /sourceText:[\s\S]{0,220}role === 'assistant'/)
 })
 
-test('log-only diagnostic questions reach COS while unattached logs remain excluded from Builder', () => {
+test('log-only diagnostic questions reach COS while unattached logs remain excluded from ordinary Builder', () => {
   const browser = read('../app/api/cos-browser/route.ts')
   const policy = read('../lib/ai/cos/cosReasoningRolePolicy.ts')
-  assert.doesNotMatch(browser, /if \(pastedOperationalLog && !hasSourceAttachment\)/)
-  assert.match(browser, /Passive logs carry evidence but no execution authority/)
+  assert.match(browser, /Passive logs carry evidence but no execution authority for public\/member traffic/)
   assert.match(policy, /isOperationalLogEvidence\(raw\) && !sourceAttachment\(context\)/)
+})
+
+test('public Concierge enters the same canonical browser ingress as owner Assistant routing', () => {
+  const progress = read('../lib/ai/cos/agentProgressClient.ts')
+  assert.match(progress, /args\.target === 'cos' \? '\/api\/cos-primary' : '\/api\/cos-browser'/)
+  assert.doesNotMatch(progress, /args\.target === 'cos' \? '\/api\/cos-primary' : '\/api\/concierge'/)
 })

@@ -115,10 +115,10 @@ function builderRoutingContextFromBody(body: any) {
  * Canonical browser ingress for both Concierge and owner Assistant.
  *
  * The browser is not the developer. It supplies intent and evidence. Once an authenticated owner
- * asks to repair the SignalBoost platform, the server binds the task to the immutable deployed
- * repository revision and Platform Engineer performs the repo-native inspect/reproduce/edit/verify
- * loop. A copied log can enrich that task, but a clone line or attached source file is not required
- * to grant context that the server already owns. Public/member traffic never receives this authority.
+ * asks to repair the SignalBoost platform, the server binds the task to an immutable repository
+ * revision and Platform Engineer performs the repo-native inspect/reproduce/edit/verify loop. Exact
+ * failed-log revision evidence always wins over the currently deployed revision. Public/member
+ * traffic never receives repository authority.
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
@@ -153,51 +153,33 @@ export async function POST(req: NextRequest) {
     branch: process.env.VERCEL_GIT_COMMIT_REF,
   }
   const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req)
-
-  // Intent is sufficient for an authenticated owner to start repository-native diagnosis of this
-  // deployment. Platform Engineer discovers the repo itself and proves a repair before returning a
-  // patch; the owner no longer has to paste source files or reverse-engineer which file is broken.
-  const explicitOwnerPlatformTarget = access?.isOwner && access.userId && !hasSourceAttachment && signalBoostProjectBound
-    ? signalBoostDeployedRepairTarget(prompt, deployment)
-    : null
-  if (explicitOwnerPlatformTarget && access?.userId) {
-    return queueOwnerRepositoryRepair({
-      body,
-      userId: access.userId,
-      objective: operationalPrompt || prompt,
-      target: explicitOwnerPlatformTarget,
-    })
-  }
-
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
   const exactFailedLogTarget = operationalLogAnalysis.failed
     ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
-  const ownerSignalBoostLogTarget = access?.isOwner && access.userId && !hasSourceAttachment
-    && operationalEvidence && operationalLogAnalysis.failed
-    && signalBoostProjectBound
-    ? exactFailedLogTarget ?? signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })
+
+  // One owner repository lane. Prefer the exact failed snapshot named by the log; otherwise an
+  // explicit owner repair request may use the immutable deployed revision. A failed owner log whose
+  // clone line was clipped may also fall back to that immutable deployment revision. This keeps the
+  // developer loop repo-native without allowing arbitrary/moving repositories or public execution.
+  const ownerRepositoryRepairTarget = access?.isOwner && access.userId && !hasSourceAttachment && signalBoostProjectBound
+    ? exactFailedLogTarget
+      ?? signalBoostDeployedRepairTarget(prompt, deployment)
+      ?? (operationalEvidence && operationalLogAnalysis.failed
+        ? signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })
+        : null)
     : null
-  if (ownerSignalBoostLogTarget && access?.userId) {
+  if (ownerRepositoryRepairTarget && access?.userId) {
     return queueOwnerRepositoryRepair({
       body,
       userId: access.userId,
-      objective: operationalPrompt,
-      target: ownerSignalBoostLogTarget,
+      objective: operationalPrompt || prompt,
+      target: ownerRepositoryRepairTarget,
     })
   }
 
   if (explicitOperationalRepair && !hasSourceAttachment) {
-    const repositoryTarget = parseSignalBoostRepositoryRepairTarget(operationalPrompt)
-    if (access?.isOwner && access.userId && repositoryTarget) {
-      return queueOwnerRepositoryRepair({
-        body,
-        userId: access.userId,
-        objective: operationalPrompt,
-        target: repositoryTarget,
-      })
-    }
-
+    const repositoryTarget = exactFailedLogTarget
     const reply = repositoryTarget
       ? 'This is an explicit SignalBoost repository-repair request, but repository repair is owner-only. No code was run.'
       : `${operationalLogReply(operationalPrompt)} For repository repair directly from a Vercel log, include the failed SignalBoost clone line with its branch/commit and the final failing assertion or non-zero build command.`

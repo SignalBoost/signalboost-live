@@ -51,6 +51,17 @@ test('actual Concierge source attachments decode into the durable Builder reques
   })
 })
 
+test('real homepage and dock upload handlers admit the Builder source extensions before transport', () => {
+  const homepage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
+  const dock = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
+  for (const source of [homepage, dock]) {
+    assert.match(source, /const BUILDER_SOURCE_FILE_RE = \/\\\.\(\?:c\?js\|mjs\|cts\|mts\|ts\|py\)\$\/i/)
+    assert.match(source, /\.js,\.mjs,\.cjs,\.ts,\.mts,\.cts,\.py/)
+    assert.match(source, /BUILDER_SOURCE_FILE_RE\.test\(file\.name\)/)
+    assert.match(source, /accept=\{ATTACH_INPUT_ACCEPT\}/)
+  }
+})
+
 test('non-code Concierge attachments stay on ordinary Concierge transport', () => {
   const pdf = conciergeBuilderRequest({
     messages: [{ role: 'user', content: 'Explain this PDF.' }],

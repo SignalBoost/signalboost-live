@@ -154,7 +154,7 @@ export async function postWithAgentProgress(args: {
   if (!jobId || !['queued', 'running'].includes(String(data?.status || ''))) {
     report('complete', repairRequest
       ? operatorProgressMessage({ stage: response.ok ? 'complete' : 'blocked', target: progressTarget, builder: builderActive })
-      : response.ok ? 'Response completed' : 'Request completed with an error')
+      : response.ok ? 'Response completed' : 'Request completed without a verified result')
     return { ok: response.ok, status: response.status, data }
   }
 
@@ -171,7 +171,7 @@ export async function postWithAgentProgress(args: {
     if (poll.status === 202 || ['queued', 'running'].includes(String(data?.status || ''))) continue
     report('complete', repairRequest
       ? operatorProgressMessage({ stage: poll.ok ? 'verified' : 'blocked', target: progressTarget, builder: true })
-      : poll.ok ? 'COS Builder completed the job' : 'COS Builder job failed')
+      : poll.ok ? 'COS Builder completed the job' : 'COS Builder completed without a verified result')
     return { ok: poll.ok, status: poll.status, data }
   }
 

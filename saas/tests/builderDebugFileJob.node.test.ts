@@ -79,7 +79,7 @@ test('debug job runs one file, applies one edit, reruns the same command, and st
   assert.equal((await workspace.readFile(workspaceId, 'broken.js'))?.content, "console.log('fixed')\n")
 })
 
-test('debug planning admits one to four small source files and prefers a supplied test as proof entrypoint', () => {
+test('debug planning admits one to four small source files and prefers a supplied JS/TS test as proof entrypoint', () => {
   assert.equal(planDebugFileJob('Debug this.', []), null)
   const plan = planDebugFileJob('Debug this.', [
     { path: 'src/math.ts', content: 'export const value = 1' },
@@ -89,6 +89,14 @@ test('debug planning admits one to four small source files and prefers a supplie
   assert.deepEqual(plan.paths, ['src/math.ts', 'src/math.test.ts'])
   assert.equal(plan.path, 'src/math.test.ts')
   assert.equal(plan.command, "node --experimental-strip-types 'src/math.test.ts'")
+
+  const pythonPlan = planDebugFileJob('Debug this.', [
+    { path: 'app.py', content: 'def add(a, b): return a - b' },
+    { path: 'test_app.py', content: 'def test_add(): assert add(2, 3) == 5' },
+  ])
+  assert.ok(pythonPlan)
+  assert.equal(pythonPlan.path, 'app.py', 'pytest-style test files must not be falsely treated as self-executing proof entrypoints')
+  assert.equal(pythonPlan.command, "python3 'app.py'")
 
   assert.equal(planDebugFileJob('Debug this.', Array.from({ length: 5 }, (_, index) => ({
     path: `file-${index}.js`, content: `console.log(${index})`,

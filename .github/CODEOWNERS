@@ -1,6 +1,8 @@
-# Sensitive areas require owner/code-owner review when branch protection enables
-# "Require review from Code Owners".
+# Every repository change requires owner/code-owner review when branch protection enables
+# "Require review from Code Owners". Agents may prepare branches/PRs; they do not own main.
+* @SignalBoost
 
+# Sensitive areas remain explicitly owner-reviewed as defense in depth.
 ONBOARD.md @SignalBoost
 .github/ @SignalBoost
 

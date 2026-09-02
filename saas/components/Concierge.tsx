@@ -10,6 +10,7 @@ import AssistantMessage from '@/components/AssistantMessage'
 import AgentActivity from '@/components/AgentActivity'
 import { uiText } from '@/lib/i18n/uiText'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
+import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string; error?: string }
@@ -120,6 +121,7 @@ export default function Concierge() {
   const [feedbackByMessage, setFeedbackByMessage] = useState<Record<number, FeedbackUiState>>({})
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [activity, setActivity] = useState<AgentProgressEvent | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [dragOver, setDragOver] = useState(false)
   const [utilityContext, setUtilityContext] = useState<string>('')
@@ -309,6 +311,7 @@ export default function Concierge() {
     setInput('')
     setAttachments([])
     setLoading(true)
+    setActivity(null)
 
     const controller = new AbortController()
     requestAbortRef.current = controller
@@ -319,13 +322,9 @@ export default function Concierge() {
       // stays on public Concierge. An attached prompt remains ordinary conversation so no
       // reference material is silently omitted from an artifact.
       const artifactRequest = staged.length === 0 && isConciergeArtifactObjective(content)
-      const res = await fetch(artifactRequest ? '/api/artifacts' : '/api/concierge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify(artifactRequest
-          ? { objective: content }
-          : {
+      const requestBody = artifactRequest
+        ? { objective: content }
+        : {
               messages: nextMessages,
               attachments: staged.map(a => ({ name: a.name, type: a.type, dataUrl: a.dataUrl })),
               // timezone: the visitor's OWN browser zone, read with zero user input.
@@ -334,9 +333,10 @@ export default function Concierge() {
               // defaults to UTC when none is supplied) — caught Aug 12 testing from
               // Nicaragua, UTC-6, where UTC had already rolled to the next day locally.
               context: { currentPage: pathname, language: activeLang, conversationId: conversationIdRef.current, utilityReport: utilityContext, cosMode: 'silent_background_planning', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-            }),
-      })
-      const data = await res.json()
+            }
+      const data = artifactRequest
+        ? await fetch('/api/artifacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal, body: JSON.stringify(requestBody) }).then(res => res.json())
+        : (await postWithAgentProgress({ target: 'concierge', body: requestBody, signal: controller.signal, onProgress: setActivity })).data
       if (requestAbortRef.current !== controller) return
       const reply = data.reply || data.error || t(dict, 'concierge.fallback')
       const turnId = data?.execution_provenance?.turnId
@@ -368,6 +368,7 @@ export default function Concierge() {
       if (requestAbortRef.current === controller) {
         requestAbortRef.current = null
         setLoading(false)
+        setActivity(null)
       }
     }
   }
@@ -505,7 +506,7 @@ export default function Concierge() {
                 </div>
               )
             })}
-            {loading && <AgentActivity lang={activeLang} compact />}
+            {loading && <AgentActivity lang={activeLang} compact activity={activity} />}
           </div>
 
           <div className="grid shrink-0 grid-cols-1 gap-2 border-t border-white/10 bg-slate-950/80 px-3.5 py-2 sm:grid-cols-2">

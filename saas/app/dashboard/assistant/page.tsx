@@ -7,6 +7,7 @@ import AssistantMessage from '@/components/AssistantMessage'
 import AgentActivity from '@/components/AgentActivity'
 import { uiText } from '@/lib/i18n/uiText'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
+import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Msg = { role: 'user' | 'assistant'; content: string; builderWorkspaceId?: string; builderFiles?: string[] }
@@ -174,6 +175,7 @@ export default function AssistantPage() {
     if (prompt) setInput(prompt.slice(0, 8000))
   }, [])
   const [loading, setLoading] = useState(false)
+  const [activity, setActivity] = useState<AgentProgressEvent | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
   const conversationIdRef = useRef<string>('')
   // The page keeps a hard upper bound so a genuinely lost request cannot spin forever.
@@ -304,6 +306,7 @@ export default function AssistantPage() {
     setStagedFiles([])
     setFileError('')
     setLoading(true)
+    setActivity(null)
 
     try {
       // Build the message history without the file-label suffix for the API
@@ -335,22 +338,18 @@ export default function AssistantPage() {
         // session can never promote this endpoint") — so getAccess() returned GUEST for the owner
         // too, and the personal assistant was architecturally identical to the public Concierge.
         // /api/cos-primary performs real access detection, so the owner is answered as the owner.
-        const res = await fetch('/api/cos-primary', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        const streamed = await postWithAgentProgress({
+          target: 'cos',
           signal: controller.signal,
-          body: JSON.stringify({
+          onProgress: setActivity,
+          body: {
             messages: apiMessages,
             attachments: attachments.length ? attachments : undefined,
             context: { language: lang, currentPage: '/dashboard/assistant', conversationId },
-          }),
+          },
         })
-
-        // A gateway timeout or crash returns HTML, not JSON. Parsing it blindly
-        // threw and produced a generic error with no explanation of what happened.
-        const raw = await res.text()
-        let data: any = null
-        try { data = JSON.parse(raw) } catch { data = null }
+        const data: any = streamed.data
+        const raw = JSON.stringify(data ?? {})
 
         // If the response envelope itself is missing, first try the durable turn that
         // the server may already have persisted. Never resend the POST: owner requests
@@ -367,8 +366,8 @@ export default function AssistantPage() {
         // Surface WHY it failed. The bare generic message told the owner nothing —
         // a 500, a 200 with an empty body, and a dropped connection all looked
         // identical, so a failing request could not be diagnosed without server logs.
-        const gateway = res.status === 504 || res.status === 408 || res.status === 524
-        const detail = `[${res.status}] ${String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 300)}`.trim()
+        const gateway = streamed.status === 504 || streamed.status === 408 || streamed.status === 524
+        const detail = `[${streamed.status}] ${String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 300)}`.trim()
         const fallback = gateway ? c(COPY.timedOut, l) : `${c(COPY.error, l)} ${detail}`
         const reply = directReply || fallback
         const builderWorkspaceId = typeof data?.workspaceId === 'string' ? data.workspaceId : ''
@@ -404,6 +403,7 @@ export default function AssistantPage() {
       setMessages([...next, { role: 'assistant', content: c(COPY.error, l) }])
     } finally {
       setLoading(false)
+      setActivity(null)
     }
   }
 
@@ -609,7 +609,7 @@ export default function AssistantPage() {
 
           {loading && (
             <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', width: '100%' }}>
-              <div style={{ width: 'min(560px, 100%)' }}><AgentActivity lang={l} /></div>
+              <div style={{ width: 'min(560px, 100%)' }}><AgentActivity lang={l} activity={activity} /></div>
               <button
                 type="button"
                 onClick={stopRequest}

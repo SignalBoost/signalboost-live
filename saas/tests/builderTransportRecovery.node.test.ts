@@ -8,6 +8,7 @@ const transport = fs.readFileSync(path.join(process.cwd(), 'components/Assistant
 const builderRoute = fs.readFileSync(path.join(process.cwd(), 'app/api/builder/route.ts'), 'utf8')
 const migration = fs.readFileSync(path.join(process.cwd(), 'supabase/migrations/20260831174502_builder_jobs_and_history_order.sql'), 'utf8')
 const assistantPage = fs.readFileSync(path.join(process.cwd(), 'app/dashboard/assistant/page.tsx'), 'utf8')
+const progressClient = fs.readFileSync(path.join(process.cwd(), 'lib/ai/cos/agentProgressClient.ts'), 'utf8')
 
 test('only concrete coding requests reach Builder', () => {
   assert.equal(isConciergeBuilderObjective('Please fix the problem - https://github.com/SignalBoost/signalboost-live/'), false)
@@ -47,7 +48,12 @@ test('Builder persists running before 202 and replaces it with the terminal resu
   assert.match(transport, /BUILDER_HISTORY_POLL_ATTEMPTS = 11/)
   assert.match(transport, /BUILDER_HISTORY_POLL_DELAY_MS = 2_500/)
   assert.match(assistantPage, /recoverCompletedTurn\(conversationId, content, sentAtMs\)/)
-  assert.equal((assistantPage.match(/fetch\('\/api\/cos-primary'/g) ?? []).length, 1)
+  // The page delegates its single send to the progress client. That client still POSTs once;
+  // subsequent durable Builder observations are read-only GETs by job id.
+  assert.equal((assistantPage.match(/postWithAgentProgress\(/g) ?? []).length, 1)
+  assert.equal((progressClient.match(/\/api\/cos-primary/g) ?? []).length, 1)
+  assert.equal((progressClient.match(/method: 'POST'/g) ?? []).length, 1)
+  assert.match(progressClient, /method: 'GET'/)
 })
 
 test('transport recovery never sends a second Builder POST', () => {

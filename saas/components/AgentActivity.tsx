@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import type { AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import { uiText } from '@/lib/i18n/uiText'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
@@ -13,7 +14,7 @@ const COPY: Record<Lang, { active: string; elapsed: string; stages: string[]; no
   ru: { active: 'Работаю над запросом', elapsed: 'прошло', stages: ['Изучаю запрос', 'Проверяю контекст и доступные данные', 'Формирую лучший ответ', 'Готовлю результат'], note: 'Сводка активности в реальном времени; внутренние рассуждения не раскрываются.' },
 }
 
-export default function AgentActivity({ lang = 'en', compact = false }: { lang?: string; compact?: boolean }) {
+export default function AgentActivity({ lang = 'en', compact = false, activity }: { lang?: string; compact?: boolean; activity?: AgentProgressEvent | null }) {
   const selected = (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang
   const copy = COPY[selected]
   const [seconds, setSeconds] = useState(0)
@@ -24,7 +25,7 @@ export default function AgentActivity({ lang = 'en', compact = false }: { lang?:
     return () => window.clearInterval(timer)
   }, [])
 
-  const stageIndex = seconds < 3 ? 0 : seconds < 10 ? 1 : seconds < 25 ? 2 : 3
+  const liveSeconds = activity ? Math.max(seconds, Math.floor(activity.elapsedMs / 1000)) : seconds
 
   return (
     <div
@@ -37,16 +38,12 @@ export default function AgentActivity({ lang = 'en', compact = false }: { lang?:
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-300 opacity-60" />
           <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-cyan-300" />
         </span>
-        <span className="text-[13px] font-extrabold text-cyan-100">{copy.active}</span>
-        <span className="ml-auto font-mono text-[11px] tabular-nums text-white/45">{seconds}s {copy.elapsed}</span>
+        <span className="text-[13px] font-extrabold text-cyan-100">{activity?.message || copy.active}</span>
+        <span className="ml-auto font-mono text-[11px] tabular-nums text-white/45">{liveSeconds}s {copy.elapsed}</span>
       </div>
-      <div className={`${compact ? 'mt-2' : 'mt-3'} grid gap-1.5`}>
-        {copy.stages.map((stage, index) => (
-          <div key={stage} className={`flex items-center gap-2 text-[11.5px] ${index === stageIndex ? 'text-white' : index < stageIndex ? 'text-emerald-300/70' : 'text-white/30'}`}>
-            <span className="w-3 text-center">{index < stageIndex ? '✓' : index === stageIndex ? '●' : '·'}</span>
-            <span>{stage}{index === stageIndex ? '…' : ''}</span>
-          </div>
-        ))}
+      <div className={`${compact ? 'mt-2' : 'mt-3'} flex items-center gap-2 text-[11.5px] text-white/55`}>
+        <span className="font-mono text-cyan-300">#{activity?.sequence || 1}</span>
+        <span>{activity ? copy.note : copy.stages[0]}</span>
       </div>
       {!compact ? <div className="mt-2.5 border-t border-white/10 pt-2 text-[10.5px] text-white/35">{copy.note}</div> : null}
     </div>

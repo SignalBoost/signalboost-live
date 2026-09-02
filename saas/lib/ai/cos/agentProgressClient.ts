@@ -7,6 +7,15 @@ export type AgentProgressEvent = {
 
 const JOB_POLL_DELAY_MS = 1_500
 const JOB_POLL_ATTEMPTS = 180
+const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|py)$/i
+const MAX_CLIENT_FILE_BYTES = 512 * 1024
+
+type ConciergeAttachment = Readonly<{
+  name?: unknown
+  type?: unknown
+  mimeType?: unknown
+  dataUrl?: unknown
+}>
 
 function wait(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -22,6 +31,68 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
   })
 }
 
+function bodyRecord(value: unknown): Record<string, any> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : null
+}
+
+function latestUserText(body: Record<string, any>): string {
+  const messages = Array.isArray(body.messages) ? body.messages : []
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message?.role === 'user' && typeof message?.content === 'string') return message.content.trim()
+  }
+  return ''
+}
+
+function decodeTextDataUrl(value: string): string | null {
+  const comma = value.indexOf(',')
+  if (comma < 0) return null
+  const header = value.slice(0, comma)
+  const payload = value.slice(comma + 1)
+  try {
+    if (/;base64(?:;|$)/i.test(header)) {
+      const bytes = Uint8Array.from(atob(payload), character => character.charCodeAt(0))
+      if (bytes.byteLength > MAX_CLIENT_FILE_BYTES) return null
+      return new TextDecoder().decode(bytes)
+    }
+    const decoded = decodeURIComponent(payload)
+    return new TextEncoder().encode(decoded).byteLength <= MAX_CLIENT_FILE_BYTES ? decoded : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The public Concierge transports source attachments directly into the same durable Builder job
+ * contract used by the authenticated Developer surface. This is transport selection only: the
+ * server still authenticates the user and enforces the 1–4 file, size, extension and execution
+ * limits. Image/PDF/reference attachments remain on ordinary Concierge.
+ */
+function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builder'; body: Record<string, unknown> } | null {
+  const record = bodyRecord(body)
+  if (!record) return null
+  const attachments = Array.isArray(record.attachments) ? record.attachments as ConciergeAttachment[] : []
+  if (!attachments.length) return null
+
+  const files: Array<{ path: string; content: string }> = []
+  for (const attachment of attachments) {
+    const path = typeof attachment?.name === 'string' ? attachment.name.trim().replace(/\\/g, '/') : ''
+    const dataUrl = typeof attachment?.dataUrl === 'string' ? attachment.dataUrl : ''
+    if (!path || !SOURCE_FILE.test(path) || !dataUrl) return null
+    const content = decodeTextDataUrl(dataUrl)
+    if (content === null) return null
+    files.push({ path, content })
+  }
+
+  const objective = latestUserText(record)
+  const conversationId = typeof record.context?.conversationId === 'string' ? record.context.conversationId : ''
+  if (!objective || !conversationId) return null
+  return {
+    endpoint: '/api/builder',
+    body: { objective, conversationId, files },
+  }
+}
+
 export async function postWithAgentProgress(args: {
   target: 'concierge' | 'cos'
   body: unknown
@@ -34,16 +105,24 @@ export async function postWithAgentProgress(args: {
     args.onProgress({ phase, message, sequence: ++sequence, elapsedMs: Date.now() - startedAt })
   }
 
+  const builderRequest = args.target === 'concierge' ? conciergeBuilderRequest(args.body) : null
   report('accepted', args.target === 'cos' ? 'COS received the request' : 'Concierge received the request')
-  report('running', args.target === 'cos' ? 'COS is processing the request' : 'Concierge is consulting COS')
-  const heartbeat = window.setInterval(() => report('running', 'Waiting for the COS response — connection active'), 2_000)
+  report('running', builderRequest
+    ? 'Concierge sent the supplied source files to COS Builder'
+    : args.target === 'cos' ? 'COS is processing the request' : 'Concierge is consulting COS')
+  const heartbeat = window.setInterval(() => report('running', builderRequest
+    ? 'COS Builder is working in the isolated user workspace'
+    : 'Waiting for the COS response — connection active'), 2_000)
 
+  const endpoint = builderRequest?.endpoint ?? (args.target === 'cos' ? '/api/cos-primary' : '/api/concierge')
+  const requestBody = builderRequest?.body ?? args.body
   let response: Response
   try {
-    response = await fetch(args.target === 'cos' ? '/api/cos-primary' : '/api/concierge', {
+    response = await fetch(endpoint, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify(args.body),
+      body: JSON.stringify(requestBody),
       signal: args.signal,
     })
   } finally {

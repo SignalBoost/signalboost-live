@@ -236,3 +236,92 @@ test('Builder reports an empty model response as a runtime failure without expos
   assert.deepEqual(result.trace[0]?.output, { responseLength: 0, startsWithObject: false, endsWithObject: false, hasThinkOpen: false, hasThinkClose: false, hasUnclosedObject: false, anyValidJson: false })
   assert.equal(result.trace[0]?.failureClass, 'runtime')
 })
+
+test('Builder executes real reproduce and verify commands when the model answers too early', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const workspaceId = 'user:deterministic-regression-proof'
+  const testPath = 'tests/builderAsyncJobs.node.test.ts'
+  const sourcePath = 'lib/builder/fix.ts'
+  await workspace.writeFile(workspaceId, testPath, 'assert.equal(flag, true)')
+  await workspace.writeFile(workspaceId, sourcePath, 'const flag = false')
+
+  let runs = 0
+  const expectedCommand = `node --experimental-strip-types --test ${testPath}`
+  const runner: BuilderRunnerPort = {
+    async run(input) {
+      runs += 1
+      assert.equal(input.command, expectedCommand)
+      if (runs === 1) {
+        return { exitCode: 1, stdout: '', stderr: 'AssertionError: expected true', timedOut: false }
+      }
+      assert.equal(input.files.find(file => file.path === sourcePath)?.content, 'const flag = true')
+      return { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false }
+    },
+  }
+
+  const responses = [
+    `{"type":"tool","toolId":"read_file","input":{"path":"${testPath}"}}`,
+    '{"type":"answer","answer":"I inspected the failing test."}',
+    `{"type":"tool","toolId":"edit_file","input":{"path":"${sourcePath}","search":"const flag = false","replace":"const flag = true"}}`,
+    '{"type":"answer","answer":"The source is repaired."}',
+  ]
+  let calls = 0
+  const ai: BuilderAiPort = { async generate() { return responses[calls++] ?? null } }
+
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Fix the failing Builder regression and prove the repair.',
+    workspaceId,
+    maxRounds: 4,
+  })
+
+  if (!result.ok) assert.fail(result.error)
+  assert.equal(calls, 4)
+  assert.equal(runs, 2)
+  assert.deepEqual(result.trace.map(item => [item.toolId, item.ok]), [
+    ['read_file', true],
+    ['run', false],
+    ['edit_file', true],
+    ['run', true],
+  ])
+  assert.ok(result.trace.filter(item => item.toolId === 'run').every(item => Boolean(item.input.command)))
+})
+
+test('Builder stops truthfully when the discovered regression proof passes and no defect is reproduced', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const workspaceId = 'user:regression-not-reproduced'
+  const testPath = 'tests/builderAsyncJobs.node.test.ts'
+  await workspace.writeFile(workspaceId, testPath, 'assert.equal(true, true)')
+
+  const expectedCommand = `node --experimental-strip-types --test ${testPath}`
+  let runs = 0
+  const runner: BuilderRunnerPort = {
+    async run(input) {
+      runs += 1
+      assert.equal(input.command, expectedCommand)
+      return { exitCode: 0, stdout: 'pass\n', stderr: '', timedOut: false }
+    },
+  }
+  const responses = [
+    `{"type":"tool","toolId":"read_file","input":{"path":"${testPath}"}}`,
+    '{"type":"answer","answer":"Looks fixed."}',
+    '{"type":"answer","answer":"Looks fixed."}',
+  ]
+  let calls = 0
+  const ai: BuilderAiPort = { async generate() { return responses[calls++] ?? null } }
+
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({
+    objective: 'Fix the reported Builder regression.',
+    workspaceId,
+    maxRounds: 3,
+  })
+
+  assert.equal(result.ok, false)
+  if (result.ok === false) assert.equal(result.error, 'builder_regression_not_reproduced')
+  assert.equal(calls, 3)
+  assert.equal(runs, 1)
+  assert.deepEqual(result.trace.map(item => [item.toolId, item.ok]), [
+    ['read_file', true],
+    ['run', true],
+  ])
+  assert.ok(result.trace.filter(item => item.toolId === 'run').every(item => Boolean(item.input.command)))
+})

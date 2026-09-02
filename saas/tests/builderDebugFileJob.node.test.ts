@@ -90,13 +90,10 @@ test('debug planning admits one to four small source files and prefers a supplie
   assert.equal(plan.path, 'src/math.test.ts')
   assert.equal(plan.command, "node --experimental-strip-types 'src/math.test.ts'")
 
-  const pythonPlan = planDebugFileJob('Debug this.', [
+  assert.equal(planDebugFileJob('Debug this.', [
     { path: 'app.py', content: 'def add(a, b): return a - b' },
     { path: 'test_app.py', content: 'def test_add(): assert add(2, 3) == 5' },
-  ])
-  assert.ok(pythonPlan)
-  assert.equal(pythonPlan.path, 'app.py', 'pytest-style test files must not be falsely treated as self-executing proof entrypoints')
-  assert.equal(pythonPlan.command, "python3 'app.py'")
+  ]), null, 'pytest-style bundles must be rejected when no real test-discovery proof command is available')
 
   assert.equal(planDebugFileJob('Debug this.', Array.from({ length: 5 }, (_, index) => ({
     path: `file-${index}.js`, content: `console.log(${index})`,
@@ -182,7 +179,7 @@ test('multi-file debug reads source and test together, edits the faulty source, 
   assert.equal((await workspace.readFile(workspaceId, sourcePath))?.content, 'export function add(a: number, b: number) { return a + b }\n')
 })
 
-test('a passing attached file stops after the first run with no model call', async () => {
+test('a passing directly executable Python file stops after the first run with no model call', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const workspaceId = 'user:debug-passing-file'
   await workspace.writeFile(workspaceId, 'healthy.py', "print('ok')\n")

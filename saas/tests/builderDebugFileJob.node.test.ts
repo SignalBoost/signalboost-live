@@ -17,6 +17,7 @@ test('debug job runs one file, applies one edit, reruns the same command, and st
   ])
   assert.ok(plan)
   assert.equal(plan.command, "node 'broken.js'")
+  assert.deepEqual(plan.paths, ['broken.js'])
 
   const commands: string[] = []
   const runner: BuilderRunnerPort = {
@@ -78,17 +79,99 @@ test('debug job runs one file, applies one edit, reruns the same command, and st
   assert.equal((await workspace.readFile(workspaceId, 'broken.js'))?.content, "console.log('fixed')\n")
 })
 
-test('debug planning requires an explicit action and exactly one small supported source file', () => {
+test('debug planning admits one to four small source files and prefers a supplied test as proof entrypoint', () => {
   assert.equal(planDebugFileJob('Debug this.', []), null)
+  const plan = planDebugFileJob('Debug this.', [
+    { path: 'src/math.ts', content: 'export const value = 1' },
+    { path: 'src/math.test.ts', content: 'console.log(value)' },
+  ])
+  assert.ok(plan)
+  assert.deepEqual(plan.paths, ['src/math.ts', 'src/math.test.ts'])
+  assert.equal(plan.path, 'src/math.test.ts')
+  assert.equal(plan.command, "node --experimental-strip-types 'src/math.test.ts'")
+
+  assert.equal(planDebugFileJob('Debug this.', Array.from({ length: 5 }, (_, index) => ({
+    path: `file-${index}.js`, content: `console.log(${index})`,
+  }))), null)
   assert.equal(planDebugFileJob('Debug this.', [
     { path: 'one.js', content: 'x' },
-    { path: 'two.js', content: 'y' },
+    { path: 'notes.txt', content: 'y' },
   ]), null)
-  assert.equal(planDebugFileJob('Debug this.', [{ path: 'notes.txt', content: 'x' }]), null)
+  assert.equal(planDebugFileJob('Debug this.', [
+    { path: 'same.js', content: 'x' },
+    { path: 'same.js', content: 'y' },
+  ]), null)
   assert.equal(planDebugFileJob(
     '16:19:34 Vercel CLI 59.3.0\n16:20:11 Error: Command "npm test" exited with 1',
     [{ path: 'broken.js', content: 'x' }],
   ), null)
+})
+
+test('multi-file debug reads source and test together, edits the faulty source, and proves the test passes', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const workspaceId = 'user:debug-multi-file'
+  const sourcePath = 'src/math.ts'
+  const testPath = 'src/math.test.ts'
+  await workspace.writeFile(workspaceId, sourcePath, 'export function add(a: number, b: number) { return a - b }\n')
+  await workspace.writeFile(workspaceId, testPath, "import { add } from './math.ts'\nif (add(2, 3) !== 5) throw new Error('wrong sum')\n")
+
+  const plan = planDebugFileJob('Fix the attached source and test.', [
+    { path: sourcePath, content: 'export function add(a: number, b: number) { return a - b }\n' },
+    { path: testPath, content: "import { add } from './math.ts'\nif (add(2, 3) !== 5) throw new Error('wrong sum')\n" },
+  ])
+  assert.ok(plan)
+  assert.equal(plan.path, testPath)
+
+  const runner: BuilderRunnerPort = {
+    async run(input) {
+      assert.equal(input.command, "node --experimental-strip-types 'src/math.test.ts'")
+      assert.deepEqual(input.files.map(file => file.path), [sourcePath, testPath])
+      const source = input.files.find(file => file.path === sourcePath)?.content || ''
+      return source.includes('return a - b')
+        ? { exitCode: 1, stdout: '', stderr: 'Error: wrong sum', timedOut: false }
+        : { exitCode: 0, stdout: 'ok\n', stderr: '', timedOut: false }
+    },
+  }
+
+  let modelPrompt = ''
+  const ai: BuilderAiPort = {
+    async generate(input) {
+      modelPrompt = input.prompt
+      return JSON.stringify({
+        type: 'tool',
+        toolId: 'edit_file',
+        input: {
+          path: sourcePath,
+          search: 'return a - b',
+          replace: 'return a + b',
+        },
+      })
+    },
+  }
+
+  const result = await runDebugFileJob({
+    objective: 'Fix the attached source and test.',
+    workspaceId,
+    plan,
+    workspace,
+    runner,
+    ai,
+  })
+  if (!result.ok) assert.fail(result.error)
+
+  assert.match(modelPrompt, /FILE: src\/math\.ts/)
+  assert.match(modelPrompt, /FILE: src\/math\.test\.ts/)
+  assert.deepEqual(result.trace.map(item => [item.toolId, item.ok]), [
+    ['list_files', true],
+    ['read_file', true],
+    ['read_file', true],
+    ['run', false],
+    ['edit_file', true],
+    ['run', true],
+  ])
+  assert.match(result.answer, /using 2 supplied files/)
+  assert.match(result.answer, /Verification exit code: 0/)
+  assert.equal((await workspace.readFile(workspaceId, sourcePath))?.content, 'export function add(a: number, b: number) { return a + b }\n')
 })
 
 test('a passing attached file stops after the first run with no model call', async () => {

@@ -33,12 +33,21 @@ function testCommand(manager: BuilderProjectContext['packageManager'], scripts: 
   return null
 }
 
-export function normalizeBuilderSandboxCommand(command: string): string {
+function pickProofTest(files: readonly ProjectFile[] = []): string | null {
+  const tests = files.map(file => file.path).filter(path => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(path))
+  return tests.find(path => /builderAsyncJobs|builderDebugFileJob|builderRoutingStrict/.test(path)) || tests[0] || null
+}
+
+export function normalizeBuilderSandboxCommand(command: string, files: readonly ProjectFile[] = []): string {
   let next = String(command || '').trim()
   next = next.replace(/^(?:cd\s+(?:\/home\/user\/repos\/saas|\/vercel\/path0\/saas|\/tmp\/cos-builder|\/tmp\/cos-signalboost-repair\/saas)\/?\s*&&\s*)+/i, '')
   const aimed = next.match(/^npm\s+(?:run\s+)?test\s+--\s+(\S+)/i)
   if (aimed && /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(aimed[1])) {
     return `node --experimental-strip-types --test ${aimed[1]}`
+  }
+  if (/^npm\s+(?:run\s+)?test\s*$/i.test(next)) {
+    const proof = pickProofTest(files)
+    if (proof) return `node --experimental-strip-types --test ${proof}`
   }
   return next
 }

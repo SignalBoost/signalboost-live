@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { isOperationalLogEvidence } from '../lib/ai/cos/pastedOperationalLog.ts'
+import { isConciergeVisualObjective } from '../lib/visuals/intent.ts'
 
 test('browser ingress sends passive pasted build logs to COS without granting Builder authority', () => {
   const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
@@ -83,8 +85,27 @@ test('attached text logs join the user request before Concierge diagnosis withou
   assert.match(route, /const operationalPrompt = attachedOperationalEvidence/)
   assert.match(route, /messages: messages\.map\([\s\S]{0,180}content: operationalPrompt/)
   assert.match(route, /routedHeaders\.delete\('content-length'\)/)
-  assert.match(route, /if \(isConciergeArtifactObjective\(prompt\)\)/)
-  assert.match(route, /if \(isConciergeVisualObjective\(prompt\)\)/)
+  assert.match(route, /const creativeRoutingAllowed = !isOperationalLogEvidence\(operationalPrompt\)/)
+  assert.match(route, /if \(creativeRoutingAllowed && isConciergeArtifactObjective\(prompt\)\)/)
+  assert.match(route, /if \(creativeRoutingAllowed && isConciergeVisualObjective\(prompt\)\)/)
+})
+
+test('visual words inside a failed Vercel test title cannot divert the log to Wikimedia', () => {
+  const log = [
+    '22:56:02.374 Running build in Cleveland, USA',
+    'Cloning github.com/SignalBoost/signalboost-live (Branch: main, Commit: abc1234)',
+    '✖ create image with every named person only after exact reference verification',
+    'Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+  ].join('\n')
+  assert.equal(isOperationalLogEvidence(log), true)
+  assert.equal(isConciergeVisualObjective(log), true, 'the fixture must exercise the former routing collision')
+
+  const route = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  const guard = route.indexOf('const creativeRoutingAllowed = !isOperationalLogEvidence(operationalPrompt)')
+  const artifact = route.indexOf('creativeRoutingAllowed && isConciergeArtifactObjective(prompt)', guard)
+  const visual = route.indexOf('creativeRoutingAllowed && isConciergeVisualObjective(prompt)', artifact)
+  const primary = route.indexOf('cosPrimaryPost(routedRequest)', visual)
+  assert.ok(guard >= 0 && artifact > guard && visual > artifact && primary > visual)
 })
 
 test('legacy Concierge sends passive logs to COS instead of returning the obsolete canned reply', () => {

@@ -40,7 +40,12 @@ export async function postWithAgentProgress(args: {
 
   let response: Response
   try {
-    response = await fetch(args.target === 'cos' ? '/api/cos-primary' : '/api/concierge', {
+    // Public Concierge must enter the same canonical browser ingress used to classify operational
+    // logs, artifacts, visuals, provenance, and Builder work. Posting directly to /api/concierge
+    // recreated a second routing stack and allowed clipped build logs to bypass cos-browser guards.
+    // Owner COS remains on /api/cos-primary so its private authority is preserved; the owner
+    // Assistant transport boundary sends operational-repair turns to cos-browser explicitly.
+    response = await fetch(args.target === 'cos' ? '/api/cos-primary' : '/api/cos-browser', {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify(args.body),

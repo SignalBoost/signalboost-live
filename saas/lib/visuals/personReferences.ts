@@ -40,6 +40,7 @@ const FETCH_TIMEOUT_MS = 20_000
 const MAX_REDIRECTS = 4
 const COMMONS_HOST = 'commons.wikimedia.org'
 const COMMONS_UPLOAD_HOST = 'upload.wikimedia.org'
+const COMMONS_THUMB_HOST = 'thumb.wikimedia.org'
 const CURATED_THUMB_WIDTH = 768
 
 const CURATED_PEOPLE: readonly CuratedPersonReference[] = [
@@ -221,7 +222,7 @@ async function downloadImage(
 }
 
 async function downloadCandidate(candidate: CommonsPersonCandidate, canonicalName: string): Promise<VerifiedPersonReference> {
-  const downloaded = await downloadImage(candidate.assetUrl, [COMMONS_UPLOAD_HOST])
+  const downloaded = await downloadImage(candidate.assetUrl, [COMMONS_UPLOAD_HOST, COMMONS_THUMB_HOST])
   return {
     canonicalName,
     b64: downloaded.b64,
@@ -234,7 +235,7 @@ async function downloadCandidate(candidate: CommonsPersonCandidate, canonicalNam
 }
 
 async function downloadCurated(entry: CuratedPersonReference): Promise<VerifiedPersonReference> {
-  const downloaded = await downloadImage(curatedRedirectUrl(entry.commonsFileTitle), [COMMONS_HOST, COMMONS_UPLOAD_HOST])
+  const downloaded = await downloadImage(curatedRedirectUrl(entry.commonsFileTitle), [COMMONS_HOST, COMMONS_UPLOAD_HOST, COMMONS_THUMB_HOST])
   return {
     canonicalName: entry.canonicalName,
     b64: downloaded.b64,
@@ -250,7 +251,7 @@ function candidateFromPage(page: CommonsPage): CommonsPersonCandidate | null {
   const info = page.imageinfo?.[0]
   const title = String(page.title || '')
   const assetUrl = String(info?.thumburl || info?.url || '')
-  if (!title || !assetUrl || !isAllowedHost(assetUrl, [COMMONS_UPLOAD_HOST])) return null
+  if (!title || !assetUrl || !isAllowedHost(assetUrl, [COMMONS_UPLOAD_HOST, COMMONS_THUMB_HOST])) return null
   return {
     title: title.replace(/^File:/i, '').trim(),
     assetUrl,

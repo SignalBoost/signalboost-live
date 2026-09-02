@@ -10,20 +10,23 @@ permissions:
 
 jobs:
   require-current-onboarding:
-    name: Require current ONBOARD and repo scan acknowledgement
+    name: Require current ONBOARD, repo scan, and main integration token
     runs-on: ubuntu-latest
     steps:
       - name: Check out exact PR head
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Verify acknowledgement matches current files and head
         shell: bash
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
 
@@ -50,5 +53,31 @@ jobs:
             exit 1
           fi
 
+          if [[ "$PR_BASE_REF" == "main" ]]; then
+            token='.github/main-write-token'
+            if [[ ! -f "$token" ]]; then
+              echo "::error::${token} is missing. Every PR targeting main must update the shared serialization token."
+              exit 1
+            fi
+
+            expected_base="base_sha=${PR_BASE}"
+            expected_branch="branch=${PR_HEAD_REF}"
+            if ! grep -Fqx "$expected_base" "$token"; then
+              echo "::error::Stale main integration base. Refresh from current main and set: ${expected_base}"
+              exit 1
+            fi
+            if ! grep -Fqx "$expected_branch" "$token"; then
+              echo "::error::Main integration token must identify the PR branch exactly: ${expected_branch}"
+              exit 1
+            fi
+            if git diff --quiet "$PR_BASE" "$PR_HEAD" -- "$token"; then
+              echo "::error::Every PR to main must modify ${token}. This shared write serializes concurrent agents."
+              exit 1
+            fi
+          fi
+
           echo "ONBOARD acknowledgement matches the exact Git blob."
           echo "Repository scan acknowledgement matches the exact PR head."
+          if [[ "$PR_BASE_REF" == "main" ]]; then
+            echo "Main integration token matches the current base and PR branch."
+          fi

@@ -103,7 +103,7 @@ test('existing named marks use verified assets while original marks remain creat
   assert.equal(detectConciergeVisualIntent('Crie um distintivo original para meu time')?.mode, 'generate')
 })
 
-test('curated Trump reference resolves through the stable Wikimedia file redirect without search', { concurrency: false }, async () => {
+test('curated Trump reference resolves from exact Commons metadata and canonical upload without redirect or search', { concurrency: false }, async () => {
   const originalFetch = globalThis.fetch
   const calls: string[] = []
   clearVerifiedPersonReferenceCacheForTests()
@@ -111,14 +111,17 @@ test('curated Trump reference resolves through the stable Wikimedia file redirec
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input)
     calls.push(url)
-    if (url.startsWith('https://commons.wikimedia.org/wiki/Special:Redirect/file/')) {
-      assert.match(decodeURIComponent(url), /January 2025 Official Presidential Portrait of Donald J\. Trump\.jpg/)
-      return new Response(null, {
-        status: 302,
-        headers: { location: 'https://upload.wikimedia.org/wikipedia/commons/trump-portrait-768.jpg' },
-      })
+    if (url.startsWith('https://commons.wikimedia.org/w/api.php')) {
+      return new Response(JSON.stringify({ query: { pages: [{
+        title: 'File:January 2025 Official Presidential Portrait of Donald J. Trump.jpg',
+        imageinfo: [{
+          url: 'https://upload.wikimedia.org/wikipedia/commons/trump-portrait-original.jpg',
+          thumburl: 'https://thumb.wikimedia.org/wikipedia/commons/trump-portrait-768.jpg',
+          mime: 'image/jpeg',
+        }],
+      }] } }), { status: 200, headers: { 'content-type': 'application/json' } })
     }
-    if (url === 'https://upload.wikimedia.org/wikipedia/commons/trump-portrait-768.jpg') {
+    if (url === 'https://upload.wikimedia.org/wikipedia/commons/trump-portrait-original.jpg') {
       return new Response(fakeJpegBytes(5), {
         status: 200,
         headers: { 'content-type': 'image/jpeg', 'content-length': String(fakeJpegBytes(5).byteLength) },
@@ -133,7 +136,8 @@ test('curated Trump reference resolves through the stable Wikimedia file redirec
     assert.equal(reference?.mime, 'image/jpeg')
     assert.match(String(reference?.sourcePageUrl), /January_2025_Official_Presidential_Portrait/)
     assert.equal(calls.length, 2)
-    assert.equal(calls.some((url) => url.includes('/w/api.php')), false)
+    assert.equal(calls.some((url) => url.includes('/Special:Redirect/')), false)
+    assert.equal(calls.some((url) => url.includes('thumb.wikimedia.org')), false)
   } finally {
     globalThis.fetch = originalFetch
     clearVerifiedPersonReferenceCacheForTests()

@@ -12,7 +12,6 @@ import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
-const MAX_DEBUG_FILES = 4
 
 function publicTrace(trace: readonly BuilderToolTrace[]) {
   return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
@@ -56,13 +55,10 @@ function debugPlan(job: BuilderJobRecord): DebugFilePlan | null {
   const path = typeof job.metadata.debugPath === 'string' ? job.metadata.debugPath : ''
   const command = typeof job.metadata.debugCommand === 'string' ? job.metadata.debugCommand : ''
   const runtime = job.metadata.debugRuntime === 'python3' ? 'python3' : 'node'
-  const storedPaths = Array.isArray(job.metadata.debugPaths)
-    ? job.metadata.debugPaths.filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
-    : []
-  const paths = storedPaths.length ? storedPaths : path ? [path] : []
-  if (!path || !command || paths.length < 1 || paths.length > MAX_DEBUG_FILES || !paths.includes(path)) return null
-  if (new Set(paths).size !== paths.length) return null
-  return Object.freeze({ path, paths: Object.freeze(paths), command, runtime })
+  const rawPaths = Array.isArray(job.metadata.debugPaths) ? job.metadata.debugPaths : []
+  const files = rawPaths.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+  if (!path || !command) return null
+  return Object.freeze({ path, command, runtime, files: files.length ? files : [path] })
 }
 
 function oneLine(value: unknown): string {

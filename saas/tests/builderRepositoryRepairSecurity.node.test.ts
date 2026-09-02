@@ -67,14 +67,18 @@ test('repository repair cannot commit, push, merge, deploy, or inherit credentia
   assert.match(source, /git[^\n]+diff/)
 })
 
-test('browser repository repair is owner-only, SignalBoost-bound, immutable-pinned, and durably queued', () => {
+test('browser repository repair is owner-only, SignalBoost-bound, exact-first, immutable-pinned, and durably queued', () => {
   const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(browser, /const deployment = \{[\s\S]*commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA[\s\S]*branch: process\.env\.VERCEL_GIT_COMMIT_REF/)
   assert.match(browser, /const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET\.test\(operationalPrompt\) \|\| isSignalBoostDeploymentContext\(req\)/)
-  assert.match(browser, /const explicitOwnerPlatformTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment && signalBoostProjectBound/)
-  assert.match(browser, /signalBoostDeployedRepairTarget\(prompt, deployment\)/)
-  assert.match(browser, /const ownerSignalBoostLogTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment[\s\S]*operationalEvidence && operationalLogAnalysis\.failed[\s\S]*signalBoostProjectBound/)
-  assert.match(browser, /exactFailedLogTarget \?\? signalBoostDeployedRepairTarget\(operationalPrompt, deployment, \{ ownerDeveloperLogSubmission: true \}\)/)
+  const exact = browser.indexOf('const exactFailedLogTarget =')
+  const ownerTarget = browser.indexOf('const ownerRepositoryRepairTarget =', exact)
+  const exactPreference = browser.indexOf('? exactFailedLogTarget', ownerTarget)
+  const deployedFallback = browser.indexOf('signalBoostDeployedRepairTarget(prompt, deployment)', exactPreference)
+  const clippedFallback = browser.indexOf('signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })', deployedFallback)
+  assert.ok(exact >= 0 && ownerTarget > exact && exactPreference > ownerTarget)
+  assert.ok(deployedFallback > exactPreference && clippedFallback > deployedFallback)
+  assert.match(browser.slice(ownerTarget, clippedFallback + 160), /access\?\.isOwner && access\.userId && !hasSourceAttachment && signalBoostProjectBound/)
   const helperStart = browser.indexOf('async function queueOwnerRepositoryRepair')
   const helperEnd = browser.indexOf('export async function withSuggestedFollowups', helperStart)
   const enqueue = browser.indexOf('enqueueSignalBoostRepositoryRepairJob({', helperStart)
@@ -86,6 +90,13 @@ test('browser repository repair is owner-only, SignalBoost-bound, immutable-pinn
   const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
   assert.match(repair, /repository_write_allowed: false/)
   assert.match(repair, /merge_allowed: false/)
+})
+
+test('canonical public browser ingress retains the anonymous model-spend gate', () => {
+  const proxy = readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8')
+  assert.match(proxy, /function isPublicModelIngress\(pathname: string\)[\s\S]*pathname === '\/api\/cos-browser'/)
+  assert.match(proxy, /matcher:[\s\S]*'\/api\/cos-browser'/)
+  assert.match(proxy, /isPublicModelIngress\(pathname\) && req\.method === 'POST' && !hasSessionCookie\(req\)/)
 })
 
 test('direct Builder invokes Platform Engineer only after exact deployment pinning and owner authority', () => {

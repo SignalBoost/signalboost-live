@@ -180,7 +180,7 @@ export async function POST(request: Request) {
     const passiveLogEvidence = isPastedOperationalLog(objective)
 
     if (files.length > 0 && DEBUG_OBJECTIVE.test(objective) && !debugPlan) {
-      const reply = 'COS Builder debug jobs require one to four supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachments no larger than 128 KiB each. No code was run.'
+      const reply = 'COS Builder debug jobs require 1–4 supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachments no larger than 128 KiB each. No code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({
         error: 'builder_debug_attachment_required',

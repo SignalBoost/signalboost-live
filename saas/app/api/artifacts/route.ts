@@ -4,6 +4,7 @@ import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { detectConciergeArtifactIntent } from '@/lib/artifacts/intent'
 import { textPdfBase64 } from '@/lib/artifacts/text-pdf'
+import { isOperationalLogEvidence, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -54,7 +55,22 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const objective = objectiveOf(body?.objective)
+    const rawObjective = String(body?.objective || '').replace(/\0/g, '').trim()
+    // Client surfaces may recognize words such as "create PDF" inside pasted build output before
+    // they reach the guarded COS browser ingress. Keep the artifact backend authoritative too:
+    // operational evidence is diagnostic input, never artifact authority.
+    if (isOperationalLogEvidence(rawObjective)) {
+      return NextResponse.json({
+        reply: operationalLogReply(rawObjective),
+        source: 'concierge-operational-log-analysis',
+        execution_allowed: false,
+        external_action_taken: false,
+        external_ai_invoked: false,
+        local_model_invoked: false,
+      })
+    }
+
+    const objective = objectiveOf(rawObjective)
     const intent = detectConciergeArtifactIntent(objective)
     if (!intent) return NextResponse.json({ error: 'artifact_format_not_recognised' }, { status: 400 })
     const sourceText = await sourceMaterial(body, access.userId)

@@ -68,6 +68,16 @@ test('repository repair cannot commit, push, merge, deploy, or inherit credentia
   assert.match(source, /git[^\n]+diff/)
 })
 
+test('Platform Engineer normalizes model run commands before repository execution', () => {
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  const importAt = repair.indexOf("normalizeBuilderSandboxCommand")
+  const runnerAt = repair.indexOf('const repositoryRunner: BuilderRunnerPort')
+  const normalizeAt = repair.indexOf('command: normalizeBuilderSandboxCommand(runInput.command)', runnerAt)
+  const loopAt = repair.indexOf('repositoryRunner,', normalizeAt)
+  assert.ok(importAt >= 0 && runnerAt > importAt && normalizeAt > runnerAt && loopAt > normalizeAt)
+  assert.match(repair.slice(runnerAt, loopAt + 32), /session!\.run/)
+})
+
 test('browser repository repair is owner-only, SignalBoost-bound, exact-first, immutable-pinned, and durably queued', () => {
   const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(browser, /const deployment = \{[\s\S]*commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA[\s\S]*branch: process\.env\.VERCEL_GIT_COMMIT_REF/)

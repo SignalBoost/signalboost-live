@@ -32,11 +32,18 @@ test('a hardcoded node --test suite recommends one staged file, not npm test', (
   assert.equal(context.recommendedTestCommand, 'node --experimental-strip-types --test tests/advisoryDiagnosisPolicy.node.test.ts')
 })
 
-test('rewrites aimed npm test and foreign cd prefixes for the sandbox', () => {
-  assert.equal(
-    normalizeBuilderSandboxCommand('cd /home/user/repos/saas && npm test -- tests/advisoryDiagnosisPolicy.node.test.ts'),
-    'node --experimental-strip-types --test tests/advisoryDiagnosisPolicy.node.test.ts',
-  )
+test('rewrites aimed npm test and foreign cd prefixes for every Builder sandbox', () => {
+  for (const root of [
+    '/home/user/repos/saas',
+    '/vercel/path0/saas',
+    '/tmp/cos-builder',
+    '/tmp/cos-signalboost-repair/saas',
+  ]) {
+    assert.equal(
+      normalizeBuilderSandboxCommand(`cd ${root} && npm test -- tests/advisoryDiagnosisPolicy.node.test.ts`),
+      'node --experimental-strip-types --test tests/advisoryDiagnosisPolicy.node.test.ts',
+    )
+  }
 })
 
 test('does not invent a command for a malformed manifest', () => {

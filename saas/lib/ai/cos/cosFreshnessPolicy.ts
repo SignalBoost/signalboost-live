@@ -126,10 +126,33 @@ function isSignalboostIdentityQuestion(text: string): boolean {
 const PLATFORM_STACK_ASK = /(?:model|modelo|llm|reasoner|engine).{0,50}(?:platform|plataforma|this service|este servi[cç]o|cos|signalboost)|(?:platform|plataforma|this service|este servi[cç]o).{0,50}(?:model|modelo|llm|reasoner)/i
 const DIRECT_MODEL_IDENTITY_ASK = /^\s*(?:(?:what(?:'s|\s+is)?|which)\s+(?:is\s+)?(?:your|the)\s+(?:model|llm|reasoner|engine)|what\s+(?:model|llm|reasoner|engine)\s+(?:are\s+you|do\s+you\s+use)|which\s+(?:model|llm|reasoner|engine)\s+do\s+you\s+use)\s*[?!.]*\s*$/i
 
+// Owner-verified 2026-09-03: the production message was "what is your model/specs?" and it was
+// NOT recognised here. DIRECT_MODEL_IDENTITY_ASK anchors on end-of-string immediately after the
+// noun, so the single extra token "/specs" broke the anchor; the platform's own configuration
+// question then skipped the deterministic owner stack reply in cosFirstAnswer.ts and fell into
+// the full reasoner pipeline, where the page gave up waiting. Same failure family as the anchored
+// "what OR WHO is SignalBoost" and bare "subject line" regressions: literal matching where the
+// question needed meaning-scoping.
+//
+// Scope by MEANING: a possessive self-reference next to a specification noun ("your model",
+// "your specs", "tus especificaciones") is always a question about THIS platform, never a public
+// lookup — the platform is the sole authority on itself. Same for "what hardware do you run on".
+const SELF_SPEC_ASK = /(?<![\p{L}\p{N}_])(?:your|yours|tu|tus|seu|seus|sua|suas|tw[oó]j|twoje|twoja|twoich|twojej|ваш|ваша|ваше|ваши|вашей|вашего|вас|тебя)(?![\p{L}\p{N}_])[^?!.]{0,25}(?<![\p{L}\p{N}_])(?:model|models|llm|llms|reasoner|engine|spec|specs|specification|specifications|stack|hardware|gpu|gpus|architecture|configuration|config|provider|host|parameters|context\s+window|modelo|modelos|especificaci[oó]n|especificaciones|especifica[cç][oõ]es|arquitectura|arquitetura|configuraci[oó]n|configura[cç][ãa]o|proveedor|provedor|specyfikacj\p{L}*|architektur\p{L}*|konfiguracj\p{L}*|sprz[eę]t\p{L}*|модел\p{L}*|характеристик\p{L}*|архитектур\p{L}*|конфигурац\p{L}*|оборудован\p{L}*)(?![\p{L}\p{N}_])/iu
+const RUNS_ON_ASK = /(?<![\p{L}\p{N}_])(?:hardware|gpu|gpus|infrastructure|model|llm|engine|reasoner|provider)(?![\p{L}\p{N}_])[^?!.]{0,30}(?<![\p{L}\p{N}_])(?:(?:do|does)\s+(?:you|cos)\s+(?:run|running|use|using|host|hosted|operate|execute)|(?:hosts?|powers?|runs?|serves?)\s+(?:you|cos))(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])(?:are\s+)?(?:you|cos)\s+(?:run|runs|running|operate|operating)\s+on(?![\p{L}\p{N}_])/iu
+
 export function isPlatformSelfKnowledgePrompt(input: string): boolean {
   const text = normalizedText(input)
   if (!text) return false
-  return isSignalboostIdentityQuestion(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text) || PLATFORM_STACK_ASK.test(text) || DIRECT_MODEL_IDENTITY_ASK.test(text)
+  if (
+    isSignalboostIdentityQuestion(text)
+    || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
+    || PLATFORM_STACK_ASK.test(text)
+    || DIRECT_MODEL_IDENTITY_ASK.test(text)
+  ) return true
+  // An authoring request that merely mentions the stack ("write a post about your model") is not
+  // a self-knowledge question and must keep its ordinary generation path.
+  if (isContentGenerationRequest(input)) return false
+  return SELF_SPEC_ASK.test(text) || RUNS_ON_ASK.test(text)
 }
 
 // Pure arithmetic and local clock/date questions have deterministic utilities. They should never

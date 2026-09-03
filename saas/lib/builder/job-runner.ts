@@ -1,3 +1,4 @@
+// lib/builder/job-runner.ts
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
@@ -199,7 +200,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons: [],
-          maxRounds: isRepairObjective(job.objective) ? 6 : 5,
+          maxRounds: isRepairObjective(job.objective) ? 20 : 8,
           modelRoundTimeoutMs: 55_000,
         })
 

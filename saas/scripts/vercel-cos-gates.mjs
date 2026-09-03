@@ -91,6 +91,7 @@ const tests = [
   'tests/cosNormativeAnswerPolicy.node.test.ts',
   'tests/normativeFreshEvidenceFallback.node.test.ts',
   'tests/cosNeuralEvidenceReasoning.node.test.ts',
+  'tests/cosPragmaticIntentCore.node.test.ts',
   'tests/cosOperatingCharter.node.test.ts',
   'tests/publicRecordedProvenance.node.test.ts',
   'tests/groundingConcepts.node.test.ts',

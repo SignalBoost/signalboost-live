@@ -304,7 +304,7 @@ export class BuilderToolLoop {
     let workspacePaths: string[] = [...initialPaths]
     const repairObjective = isRepairObjective(input.objective)
     let writeCount = 0, runCount = 0, gateNudges = 0
-    const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 12))
+    const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 24))
     let workRounds = 0
     let attempt = 0
     while (workRounds < maxRounds && attempt < maxRounds + MAX_REPEAT_RECOVERY_ATTEMPTS) {

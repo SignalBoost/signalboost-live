@@ -1,4 +1,5 @@
 import { Sandbox } from '@vercel/sandbox'
+import { posix as pathPosix } from 'node:path'
 import { BUILDER_TURN_TIMEOUT_ERROR } from './control-adapter.ts'
 import type { BuilderFile, BuilderRunnerPort, BuilderRunResult, BuilderWorkspacePort } from './contracts.ts'
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
@@ -17,6 +18,8 @@ const SANDBOX_STOP_TIMEOUT_MS = 5_000
 const EXCLUDED_SEGMENTS = new Set(['.git', 'node_modules', '.next', 'dist', 'build', 'coverage', '.vercel'])
 const SECRET_LIKE = /(^|\/)(?:\.env(?:\.[^/]*)?|(?:credentials?|secrets?|tokens?|private[-_.]?key|id_rsa|id_ed25519|service[-_.]?account)(?:\.[^/]*)?)(?:$|\/)|\.(?:pem|key|p12|pfx)$/i
 const CONTROL_CHARACTER = /[\u0000-\u001f\u007f]/
+const RELATIVE_MODULE_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\()\s*['"](\.{1,2}\/[^'"\r\n]+)['"]/g
+const MODULE_CANDIDATE_EXTENSIONS = ['.ts', '.tsx', '.js', '.mjs', '.cjs', '.mts', '.cts'] as const
 
 type SandboxInstance = Awaited<ReturnType<typeof Sandbox.create>>
 type CommandResult = Readonly<{ exitCode: number; stdout: string; stderr: string }>
@@ -86,6 +89,37 @@ function unique(values: readonly string[], limit = MAX_VISIBLE_FILES): string[] 
 
 function nulPaths(value: string): string[] {
   return value.split('\0').filter(Boolean)
+}
+
+/**
+ * Discover only one-hop relative module neighbors from an already-authorized visible source file.
+ * This gives Platform Engineer enough architectural context to follow a wrapper/re-export after a
+ * refactor without exposing the whole repository listing. Aliases, packages, traversal outside the
+ * staged `saas/` project, secret-like paths, dependency trees, and build output remain excluded.
+ */
+export function repositoryDependencyCandidates(importerValue: unknown, sourceValue: unknown): readonly string[] {
+  let importer: string
+  try { importer = safeRepositoryWorkspacePath(importerValue) } catch { return Object.freeze([]) }
+  const source = String(sourceValue || '')
+  if (!source || source.includes('\0')) return Object.freeze([])
+  const directory = pathPosix.dirname(importer)
+  const candidates: string[] = []
+  for (const match of source.matchAll(RELATIVE_MODULE_SPECIFIER)) {
+    const specifier = String(match[1] || '').trim()
+    if (!specifier) continue
+    const resolved = pathPosix.normalize(pathPosix.join(directory, specifier))
+    if (!resolved || resolved === '..' || resolved.startsWith('../') || pathPosix.isAbsolute(resolved)) continue
+    const variants = pathPosix.extname(resolved)
+      ? [resolved]
+      : [
+          ...MODULE_CANDIDATE_EXTENSIONS.map(extension => `${resolved}${extension}`),
+          ...MODULE_CANDIDATE_EXTENSIONS.map(extension => `${resolved}/index${extension}`),
+        ]
+    for (const variant of variants) {
+      try { candidates.push(safeRepositoryWorkspacePath(variant)) } catch { /* keep discovery fail-closed */ }
+    }
+  }
+  return Object.freeze(unique(candidates, 32))
 }
 
 async function commandOutput(result: Awaited<ReturnType<SandboxInstance['runCommand']>>, maximum = 16_000): Promise<CommandResult> {
@@ -204,9 +238,25 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
         if (path) symbolMatches.push(path)
       }
     }
-    for (const path of unique([...requested, ...symbolMatches, ...defaults])) {
+
+    const initial = unique([...requested, ...symbolMatches, ...defaults])
+    for (const path of initial) {
       if (await this.isRegularProjectFile(path)) this.visiblePaths.add(path)
     }
+
+    // The model sees only a bounded dependency neighborhood, not a repo-wide file list. Follow one
+    // relative import/re-export hop from implicated files so refactors such as a thin wrapper moving
+    // implementation to a sibling module do not strand Platform Engineer on the obsolete surface.
+    for (const path of unique([...requested, ...symbolMatches], 32)) {
+      if (!this.visiblePaths.has(path) || this.visiblePaths.size >= MAX_VISIBLE_FILES) continue
+      const file = await this.readFile('', path).catch(() => null)
+      if (!file) continue
+      for (const dependency of repositoryDependencyCandidates(path, file.content)) {
+        if (this.visiblePaths.size >= MAX_VISIBLE_FILES) break
+        if (await this.isRegularProjectFile(dependency)) this.visiblePaths.add(dependency)
+      }
+    }
+
     if (this.visiblePaths.size === 0) throw new Error('builder_repository_context_empty')
   }
 

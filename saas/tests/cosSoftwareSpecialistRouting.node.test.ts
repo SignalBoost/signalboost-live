@@ -35,6 +35,12 @@ test('Concierge delegates coding to COS Software Specialist without repository a
   assert.doesNotMatch(source, /const builder = await directBuilder\(body, input\)/)
 })
 
+test('owner Assistant enters the canonical COS browser dispatcher before specialist selection', () => {
+  const client = read('../lib/ai/cos/agentProgressClient.ts')
+  assert.match(client, /args\.target === 'cos' \? '\/api\/cos-browser' : '\/api\/concierge'/)
+  assert.doesNotMatch(client, /args\.target === 'cos' \? '\/api\/cos-primary' : '\/api\/concierge'/)
+})
+
 test('owner Assistant uses the same Software Specialist and no longer jumps to Concierge for coding', () => {
   const source = read('../app/api/cos-browser/route.ts')
   assert.match(source, /tryCosSoftwareSpecialist/)

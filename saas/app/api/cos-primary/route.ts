@@ -8,6 +8,7 @@ import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
 import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerificationUnavailableReply'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
+import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import {
   classifyAuthoritativeVolatileFact,
   groundAuthoritativeVolatileFact,
@@ -200,7 +201,15 @@ export async function postCosPrimary(req:NextRequest){
   const deterministic=tryDeterministicUtility({prompt:input,timezone:body?.context?.timezone||body?.context?.timeZone,locale:language==='pt'?'pt-BR':language==='es'?'es':language==='pl'?'pl':language==='ru'?'ru':'en-US',confidenceThreshold:confidenceThreshold()})
   if(deterministic){const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:deterministic.reply,source:'deterministic',confidence:deterministic.confidence,externalAiInvoked:false});await writeCosPrimaryProvenance(userId,deterministic.reply,deterministic.executionProvenance,deterministic.source,{prompt:input,answered:true,confidence:deterministic.confidence,branch:'deterministic'});return NextResponse.json({reply:deterministic.reply,source:deterministic.source,confidence_score:deterministic.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:deterministic.executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
-  const requiresFreshEvidence=requiresFreshExternalEvidence(input),requestedAction=requestsExternalAction(input)
+  const requestedAction=requestsExternalAction(input)
+  const baselineRequiresFreshEvidence=requiresFreshExternalEvidence(input)
+  const semanticTaskIntent=baselineRequiresFreshEvidence&&!requestedAction
+    ? await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
+    : null
+  const requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness(semanticTaskIntent)
+  if(baselineRequiresFreshEvidence&&!requiresFreshEvidence){
+    logEscalation({event:'freshness_semantic_intent_suppressed',semantic_task_mode:semanticTaskIntent?.mode??null,semantic_task_confidence:semanticTaskIntent?.confidence??null,supplied_context_primary:semanticTaskIntent?.suppliedContextPrimary??null,external_facts_required:semanticTaskIntent?.externalFactsRequired??null,external_ai_invoked:false,local_model_invoked:true})
+  }
 
   const directCategory=requiresFreshEvidence?classifyAuthoritativeVolatileFact(input):null
   if(directCategory){
@@ -220,7 +229,7 @@ export async function postCosPrimary(req:NextRequest){
     const reply=renderAuthoritativeGroundedReply(grounded)
     const executionProvenance=attachFreshEvidenceProvenance(authoritativeProvenance(null,{invoked:false}),{sources:[directSource],retrievedAt:grounded.fetchedAt,error:null,synthesisAccepted:null})
     ;(executionProvenance as any).authoritative_source={used:true,attempted:true,category:grounded.categoryId,id:grounded.sourceId,label:grounded.sourceLabel,url:grounded.sourceUrl,fetched_at:grounded.fetchedAt}
-    ;(executionProvenance as any).answer_origin={from_cache:false,provider:null,model:null,authoritative_source:grounded.sourceId,grounded_at:grounded.fetchedAt}
+    ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,from_cache:false,provider:null,model:null,authoritative_source:grounded.sourceId,grounded_at:grounded.fetchedAt}
     const volatileCacheWritten=await writeVolatileAnswerCache({prompt:lookupInput,language,value:{reply,groundedAt:grounded.fetchedAt,liveSources:[directSource],externalProvider:null,externalModel:null}})
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'authoritative_source',confidence:1,externalAiInvoked:false})
     logEscalation({event:'authoritative_direct_fact_hit',category:grounded.categoryId,provider:'authoritative_source',model:grounded.sourceId,status:200,source_url:grounded.sourceUrl,external_ai_invoked:false,local_model_invoked:false})
@@ -322,6 +331,9 @@ export async function postCosPrimary(req:NextRequest){
   }
 
   let reasoningPrompt=input
+  if(semanticTaskIntent?.mode==='contextual_interpretation'&&freshConversationContext.contextUsed&&freshConversationContext.previousUserText){
+    reasoningPrompt=`PREVIOUS USER CONTEXT:\n${freshConversationContext.previousUserText}\n\nCURRENT USER REQUEST:\n${input}`
+  }
   const strategyProfileRequest=/\b(?:generate|write|create|draft)\b[\s\S]{0,100}\b(?:current )?strategy profile(?: weights?| heuristics?)?\b/i.test(input)
   if(strategyProfileRequest){
     const profile=await readStrategyProfile({privileged:isPrivileged,organizationId:body?.context?.organizationId,workspace:body?.context?.workspace})

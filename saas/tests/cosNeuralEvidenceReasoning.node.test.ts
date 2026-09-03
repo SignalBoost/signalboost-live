@@ -9,6 +9,9 @@ const synthesis = readFileSync('lib/ai/cos/freshEvidenceSynthesisContract.ts', '
 const recovery = readFileSync('lib/ai/cos/freshEvidenceContractRecovery.ts', 'utf8')
 const localSynthesis = readFileSync('lib/ai/cos/freshEvidenceLocalSynthesis.ts', 'utf8')
 const externalInfo = readFileSync('lib/ai/tools/getExternalInfo.ts', 'utf8')
+const semanticTaskIntent = readFileSync('lib/ai/cos/cosSemanticTaskIntent.ts', 'utf8')
+const primaryRoute = readFileSync('app/api/cos-primary/route.ts', 'utf8')
+const operatingCharter = readFileSync('lib/ai/cos/cosOperatingCharter.ts', 'utf8')
 const reasoningPrompt = readFileSync('../cos-policy/prompts/constraint-first-reasoner.txt', 'utf8')
 const reasoningDocs = readFileSync('../cos-policy/docs/reason-dont-template.md', 'utf8')
 const reasoningReadme = readFileSync('../cos-policy/README.md', 'utf8')
@@ -157,4 +160,46 @@ test('repo reasoning guidance teaches a method, not named-topic answer schemas',
   assert.match(reasoningPrompt, /Deterministic code may enforce source authority, freshness, citation validity, arithmetic, safety/i)
   assert.match(reasoningDocs, /The control plane may reject an unsupported semantic answer\. It should not choose the ordinary semantic conclusion in advance/i)
   assert.match(reasoningReadme, /evidence supplies facts and Qwen\/COS supplies the semantic inference/i)
+})
+
+test('semantic task intent is neural, multilingual, and classifies the requested task rather than quoted subject matter', () => {
+  assert.match(semanticTaskIntent, /semantic task-intent judge/i)
+  assert.match(semanticTaskIntent, /Use neural semantic understanding of the whole request and conversation context/i)
+  assert.match(semanticTaskIntent, /Do not classify by keywords, regex patterns, named entities, dates, or isolated topical words/i)
+  assert.match(semanticTaskIntent, /meaning, tone, implication, subtext, social intent/i)
+  assert.match(semanticTaskIntent, /The passage may mention real people, dates, offices, events, or current facts/i)
+  assert.match(semanticTaskIntent, /Infer intent equivalently in every language/i)
+  assert.match(semanticTaskIntent, /When ambiguous between interpretation and verification, prefer external_fact_verification/i)
+})
+
+test('only confident supplied-context interpretation may suppress freshness', () => {
+  assert.match(semanticTaskIntent, /intent\.mode === 'contextual_interpretation'/)
+  assert.match(semanticTaskIntent, /intent\.suppliedContextPrimary/)
+  assert.match(semanticTaskIntent, /!intent\.externalFactsRequired/)
+  assert.match(semanticTaskIntent, /intent\.confidence >= 0\.72/)
+})
+
+test('semantic task intent fails safe when classification is missing, malformed, or ambiguous', () => {
+  assert.match(semanticTaskIntent, /if \(start < 0 \|\| end <= start\) return null/)
+  assert.match(semanticTaskIntent, /catch \{\s*return null\s*\}/s)
+  assert.match(semanticTaskIntent, /prefer external_fact_verification so freshness protection fails safe/i)
+})
+
+test('primary routing lets semantic task intent decide whether a baseline freshness hit is really a verification task', () => {
+  const baseline = primaryRoute.indexOf('baselineRequiresFreshEvidence=requiresFreshExternalEvidence(input)')
+  const semantic = primaryRoute.indexOf('? await classifyCosSemanticTaskIntent')
+  const finalGate = primaryRoute.indexOf('requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness')
+  assert.ok(baseline >= 0)
+  assert.ok(semantic > baseline)
+  assert.ok(finalGate > semantic)
+  assert.match(primaryRoute, /event:'freshness_semantic_intent_suppressed'/)
+})
+
+test('COS charter treats pragmatic interpretation as reasoning, not a proof hunt, across languages', () => {
+  assert.match(operatingCharter, /Evidence discipline must not erase ordinary language understanding/i)
+  assert.match(operatingCharter, /wording, tone, implication, subtext, social intent/i)
+  assert.match(operatingCharter, /“Not explicitly stated” is a nuance, not an automatic refusal to interpret/i)
+  assert.match(operatingCharter, /Polish, Portuguese, Spanish, Russian, or English/i)
+  assert.match(operatingCharter, /answer the human question first/i)
+  assert.match(operatingCharter, /do not lead with evidence boilerplate/i)
 })

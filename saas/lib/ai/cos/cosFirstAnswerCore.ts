@@ -7,6 +7,7 @@
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { SIGNALBOOST_COMPANY_IDENTITY_DEFINITION } from './cosMemoryLayerDefinitions.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
+import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
 import { classifyKnowledgeAccess } from './knowledgeAccessPolicy.ts'
 import { extractSambaSchoolNames, isNamedCatalogListRequest, isPublicPageExtractionCatalogRequest } from './listCatalogIntent.ts'
 import { buildHonestRefusalReply } from './honestRefusalReply.ts'
@@ -173,7 +174,7 @@ function publicStatelessProvenance(reasonerLabel: string | null, invoked: boolea
     externalAiInvoked: false as const,
     externalAiNecessary: !invoked,
     escalationReasonCode: invoked ? null : 'public_reasoner_unavailable',
-    escalationReason: invoked ? null : 'The configured COS reasoner was unavailable for public-only stateless reasoning.',
+    escalationReason: invoked ? null : 'The configured COS reasoner is unavailable for public-only stateless reasoning.',
     localModelInvoked: invoked,
     reasonerLabel,
     internalSystemsConsulted: [
@@ -990,11 +991,35 @@ export async function tryCOSFirstAnswer(input: {
     return learnFromTurn(input, directTextTransformation)
   }
 
-  if (requiresFreshExternalEvidence(input.prompt)) {
+  // The outer /api/cos-primary route already performs a neural semantic task-intent check before
+  // freshness. The core must independently honor the same semantic distinction, because it is a
+  // shared entrypoint used by other callers too. A second deterministic freshness classifier must
+  // never override a high-confidence neural finding that the task is interpretation of supplied
+  // language/context rather than verification of the outside world.
+  const baselineRequiresFreshEvidence = requiresFreshExternalEvidence(input.prompt)
+  const semanticTaskIntent = baselineRequiresFreshEvidence
+    ? await classifyCosSemanticTaskIntent({
+        input: input.prompt,
+        language: input.language,
+        previousAssistant: input.previousAssistant,
+      })
+    : null
+  const suppressFreshnessForInterpretation = semanticIntentSuppressesFreshness(semanticTaskIntent)
+  if (suppressFreshnessForInterpretation) {
+    console.info('[cos-core-contextual-freshness-suppressed]', JSON.stringify({
+      at: new Date().toISOString(),
+      mode: semanticTaskIntent?.mode ?? null,
+      confidence: semanticTaskIntent?.confidence ?? null,
+      suppliedContextPrimary: semanticTaskIntent?.suppliedContextPrimary ?? null,
+      externalFactsRequired: semanticTaskIntent?.externalFactsRequired ?? null,
+    }))
+  }
+
+  if (baselineRequiresFreshEvidence && !suppressFreshnessForInterpretation) {
     return learnFromTurn(input, await tryFreshCurrentFact(input))
   }
 
-  if (classifyKnowledgeAccess(input.prompt).mode === 'search_if_thin') {
+  if (!suppressFreshnessForInterpretation && classifyKnowledgeAccess(input.prompt).mode === 'search_if_thin') {
     const looked = await tryFreshCurrentFact(input)
     const reply = 'reply' in looked ? String(looked.reply || '') : ''
     const refused = /could not stand behind|did not release an answer|verification unavailable|live verification/i.test(reply)

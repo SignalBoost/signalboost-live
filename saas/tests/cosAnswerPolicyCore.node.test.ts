@@ -4,11 +4,12 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { QUANTITATIVE_ANSWER_POLICY, quantitativeAnswerPolicyText } from '../lib/ai/cos/cosAnswerPolicyCore.ts'
 
+const PUBLIC_PIPELINE = 'lib/ai/cos/cosFirstAnswerCore.ts'
+const OWNER_PIPELINE = 'lib/ai/cos/cosFirstAnswerEnterprise.ts'
+
 test('both reasoner prompts include the shared policy', () => {
-  // The whole point of the module: one policy, both channels. If a future edit removes it from
-  // either prompt, the two surfaces silently drift apart again — which is the defect this fixes.
-  const publicPath = readFileSync('lib/ai/cos/cosFirstAnswer.ts', 'utf8')
-  const ownerPath = readFileSync('lib/ai/cos/cosFirstAnswerEnterprise.ts', 'utf8')
+  const publicPath = readFileSync(PUBLIC_PIPELINE, 'utf8')
+  const ownerPath = readFileSync(OWNER_PIPELINE, 'utf8')
   for (const [name, source] of [['public', publicPath], ['owner', ownerPath]] as const) {
     assert.match(source, /import \{ QUANTITATIVE_ANSWER_POLICY \}/, `${name} import`)
     assert.match(source, /\.\.\.QUANTITATIVE_ANSWER_POLICY,/, `${name} splice`)
@@ -16,7 +17,7 @@ test('both reasoner prompts include the shared policy', () => {
 })
 
 test('the policy is spliced into the public ANSWER prompt, not only the repair prompt', () => {
-  const source = readFileSync('lib/ai/cos/cosFirstAnswer.ts', 'utf8')
+  const source = readFileSync(PUBLIC_PIPELINE, 'utf8')
   const spliceAt = source.indexOf('...QUANTITATIVE_ANSWER_POLICY,')
   const repairAt = source.indexOf('You are COS repairing a public generic-business answer')
   assert.ok(spliceAt > 0 && repairAt > 0)
@@ -25,13 +26,13 @@ test('the policy is spliced into the public ANSWER prompt, not only the repair p
 
 test('the rules that were validated in production are present', () => {
   const text = quantitativeAnswerPolicyText()
-  assert.match(text, /labelled assumptions/i)          // fill gaps, do not refuse
-  assert.match(text, /decomposition before the total/i) // show the components
-  assert.match(text, /reconcile/i)                      // derived vs supplied disagreement
-  assert.match(text, /invert the problem/i)             // solve for the required ratio
-  assert.match(text, /reachable at all/i)               // feasibility floor
-  assert.match(text, /scope it was written/i)           // constraint scope discipline
-  assert.match(text, /one-time cost/i)                  // dimensional check
+  assert.match(text, /labelled assumptions/i)
+  assert.match(text, /decomposition before the total/i)
+  assert.match(text, /reconcile/i)
+  assert.match(text, /invert the problem/i)
+  assert.match(text, /reachable at all/i)
+  assert.match(text, /scope it was written/i)
+  assert.match(text, /one-time cost/i)
 })
 
 test('the policy forbids narrating internal machinery to the reader', () => {
@@ -42,30 +43,19 @@ test('the policy forbids narrating internal machinery to the reader', () => {
 })
 
 test('the policy itself names no internal component, model or vendor', () => {
-  // It ships inside a prompt used on the public surface. It must not teach the model any
-  // internal vocabulary it could then repeat.
   const text = quantitativeAnswerPolicyText()
   assert.ok(!/qwen|deepinfra|runpod|supabase|vercel|openai|anthropic/i.test(text))
   assert.ok(!/COS_REASONER|cos_campaign|process\.env/i.test(text))
 })
 
 test('the policy carries the pinned constants exactly once', () => {
-  // ORIGINAL INTENT (superseded): this asserted the policy held NO constants, on the theory that a
-  // prompt cannot hold a reference library. Measurement said otherwise — corpus documents,
-  // retrieval ranking and an explicit classification rule all failed to get the right figure into
-  // an answer, so a short constants block is pinned and reaches both prompts THROUGH this policy.
-  // The rule that survives is single-sourcing: the constants live in engineeringConstants.ts and
-  // are spliced in one place, never copied and never injected twice.
   const text = quantitativeAnswerPolicyText()
   assert.match(text, /REFERENCE CONSTANTS/)
   assert.equal(text.split('REFERENCE CONSTANTS').length - 1, 1, 'constants must appear exactly once')
 
-  for (const path of ['lib/ai/cos/cosFirstAnswer.ts', 'lib/ai/cos/cosFirstAnswerEnterprise.ts']) {
+  for (const path of [PUBLIC_PIPELINE, OWNER_PIPELINE]) {
     const source = readFileSync(path, 'utf8')
-    assert.ok(
-      !/\.\.\.ENGINEERING_CONSTANTS,/.test(source),
-      `${path} must not splice the constants directly — they arrive via QUANTITATIVE_ANSWER_POLICY`,
-    )
+    assert.ok(!/\.\.\.ENGINEERING_CONSTANTS,/.test(source), `${path} must not splice the constants directly — they arrive via QUANTITATIVE_ANSWER_POLICY`)
   }
 })
 
@@ -76,16 +66,7 @@ test('the policy is a non-empty array of strings and joins cleanly', () => {
   assert.ok(quantitativeAnswerPolicyText().includes('\n'))
 })
 
-// ---------------------------------------------------------------------------------------------
-// Over-firing refusal (2026-08-26).
-// ---------------------------------------------------------------------------------------------
-
 test('the three quantity classes are defined, each with its own obligation', () => {
-  // Production: asked to compute a migration break-even, COS returned a framework and asked for
-  // "the total power draw of the cluster" — a published device rating it is expected to supply.
-  // It did this twice, including immediately after the owner replied "proceed on standard
-  // assumptions". One line about labelled assumptions lost the argument against several forceful
-  // lines telling it not to assert anything not given, so the rule is now explicit.
   const text = quantitativeAnswerPolicyText()
   assert.match(text, /GIVEN — stated in the request/)
   assert.match(text, /STANDARD — a published specification/)
@@ -107,11 +88,9 @@ test('a missing situational quantity yields a formula and a worked example, not 
 
 test('the classes name the kinds of figure that caused the production failures', () => {
   const text = quantitativeAnswerPolicyText()
-  // Standard: what it should have supplied.
   assert.match(text, /device power ratings/)
   assert.match(text, /specific heat of water/)
   assert.match(text, /byte widths of numeric formats/)
-  // Situational: what it was right to ask for.
   assert.match(text, /how long their job runs/)
   assert.match(text, /negotiated rate/)
 })
@@ -126,9 +105,5 @@ test('the shared policy requires domain-general evidence reasoning instead of se
   assert.match(text, /Open with yes or no only when the question names one operationally unambiguous factual proposition/i)
   assert.match(text, /do not open with yes or no/i)
   assert.match(text, /may be one candidate factor/i)
-
-  // Shared runtime policy must teach an epistemic method, not memorize answers or distinctions for
-  // whichever controversy happened to expose the defect. Domain terms belong in the user question
-  // and evidence, not in a canned policy block.
   assert.doesNotMatch(text, /pay gap|matched-pay|matched-wage|gender identity|biological sex|reproductive sex|racist|equal work/i)
 })

@@ -1305,3 +1305,19 @@ For Google Workspace integrations, success means external authorization is expli
 For Provider Hub connector reuse, success means one buyer/provider connection can safely expose exact capabilities to explicitly authorized portables without duplicating adapters or credentials, while discovery/grants never become implicit mutation authority and existing consequential/financial/publishing controls remain intact.
 
 For Data Center Operations Intelligence, success means the software can ingest normalized read-only operational evidence, distinguish related from unrelated events, produce evidence-bounded probable-cause analysis and useful operator checks, recognize when evidence is insufficient, preserve provenance, and remain safely advisory until a separately governed control phase is explicitly approved.
+**COS is the brain. Concierge is the mouth.**
+
+- COS is the owner's internal assistant. Asked by the owner (signed in), it answers — stack,
+  model, internal company context, anything. No deflection on the owner's own channel.
+- Concierge is the public face. It has no brain of its own: it runs the same COS engine in
+  public scope. It never repeats company-internal information.
+- The only thing separating the two is `isPublicDeliveryScope()`, an AsyncLocalStorage flag
+  that defaults to OFF. It can be switched on in exactly two places, both public entrances:
+  `app/api/concierge/route.ts` and `app/api/cos-browser/route.ts`. No browser, header, or
+  config can set it. The owner Assistant therefore never runs in public scope.
+- In public scope: `getAccess()` is forced to guest, identity/company questions divert to the
+  public-safe reply, and any answer leaking internals is replaced before release.
+- Do NOT "make it safer" by moving owner disclosure into `cosFirstAnswerEnterprise.ts`.
+  Concierge runs that same file. The public does reach it. And the shared identity check has
+  already answered and returned before it runs, so the moved code would never execute.
+- `saas/tests/cosIdentityDisclosureBoundary.node.test.ts` fails the build if this changes.

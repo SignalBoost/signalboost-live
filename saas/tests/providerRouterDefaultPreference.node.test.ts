@@ -1,3 +1,4 @@
+// tests/providerRouterDefaultPreference.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { resolveProviderPreference } from '../lib/ai/providerRouter.ts'
@@ -51,7 +52,7 @@ test('Builder coding port selects DeepSeek Flash without mutating the general CO
     assert.equal(builderCodingModelFromEnv(), DEFAULT_BUILDER_CODING_MODEL)
     const response = await createBuilderCodingAiPort().generate({ prompt: 'Repair this code and return the control object.' })
     assert.equal(response, '{"type":"final","answer":"ok"}')
-    assert.equal(requestBody?.model, 'deepseek-ai/DeepSeek-V4-Flash-0731')
+    assert.equal(requestBody?.model, DEFAULT_BUILDER_CODING_MODEL)
     assert.equal(process.env.LOCAL_AI_MODEL, 'Qwen/Qwen3.6-35B-A3B')
   } finally {
     globalThis.fetch = originalFetch

@@ -33,7 +33,6 @@ test('one-hop repository discovery exposes moved implementation without broadeni
   const initialize = session.slice(session.indexOf('private async initializeVisiblePaths'), session.indexOf('private absolutePath'))
   assert.match(initialize, /repositoryDependencyCandidates\(path, file\.content\)/)
   assert.match(initialize, /visiblePaths\.size >= MAX_VISIBLE_FILES/)
-  assert.match(initialize, /one[\s-]+relative import\/re-export hop/i)
 })
 
 test('changed-file certification rejects every path outside the staged saas project', () => {

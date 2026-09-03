@@ -54,6 +54,11 @@ const EXPLICIT_CODE_QUESTION = /\b(?:how do i|how can i|show me how to|write|giv
 const SOURCE_ATTACHMENT = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
 const NON_CODING_TOPIC = /\b(?:pay gap|gender wage|football|soccer|sports? standings?|sports? list|schools? of samba|secretar(?:y|ies) of state|who is the model|what model are you|current president)\b/i
 const TRANSCRIPT_MARKER = /\b(?:assistant|user|system|history|conversation|copy response|copy question)\s*:/gi
+const BUILDER_EXECUTION_VERB = '(?:debug|fix|repair|troubleshoot|correct|implement|refactor|compile|write|run|execute|test|create|build|make)'
+const DIRECT_BUILDER_EXECUTION = new RegExp(`^(?:please\\s+)?${BUILDER_EXECUTION_VERB}\\b`, 'i')
+const ASSISTANT_BUILDER_EXECUTION = new RegExp(`\\b(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?${BUILDER_EXECUTION_VERB}\\b|\\bi\\s+(?:need|want|would\\s+like)\\s+you\\s+to\\s+${BUILDER_EXECUTION_VERB}\\b`, 'i')
+const BROKEN_CODE_EXECUTION = /\b(?:this|the|following|attached)\s+(?:code|file|script|function|component|test|app)\b[^.!?\n]{0,120}\b(?:not\s+working|does(?:\s+not|n't)\s+work|not\s+functional|broken|failing|throws?|crashes?)\b/i
+const EXPLANATION_ONLY = /\b(?:what\s+does|what\s+is|explain|summarize|describe|review|analy[sz]e)\b/i
 
 // Real pasted source code, recognized by its shape rather than by a label. The signals above only
 // fire when the human NAMES code (a filename, a language, a fence, a stack trace), so a plain paste
@@ -77,6 +82,26 @@ function pastedSourceCode(prompt: string): boolean {
   if (CODE_FENCE.test(text)) return true
   if (text.split(/\n/).filter(line => line.trim()).length < 2) return false
   return CODE_SHAPE_SIGNALS.reduce((total, pattern) => total + (pattern.test(text) ? 1 : 0), 0) >= 2
+}
+
+function sourceDominantPaste(prompt: string): boolean {
+  const head = String(prompt || '').trimStart().split(/\n/).slice(0, 6).join('\n')
+  if (/^```(?:javascript|typescript|js|ts|tsx|jsx|python|py|sql|bash|sh|html|css|json)?\b/i.test(head)) return true
+  return CODE_SHAPE_SIGNALS.reduce((total, pattern) => total + (pattern.test(head) ? 1 : 0), 0) >= 2
+}
+
+function explicitBuilderExecutionRequest(prompt: string): boolean {
+  const lead = String(prompt || '').trim().slice(0, 600)
+  return DIRECT_BUILDER_EXECUTION.test(lead)
+    || ASSISTANT_BUILDER_EXECUTION.test(lead)
+    || BROKEN_CODE_EXECUTION.test(lead)
+}
+
+function pastedSourceExecutionAuthorized(prompt: string): boolean {
+  if (explicitBuilderExecutionRequest(prompt)) return true
+  const lead = String(prompt || '').trim().slice(0, 600)
+  if (EXPLANATION_ONLY.test(lead)) return false
+  return sourceDominantPaste(prompt)
 }
 
 function isDesignBuildRequest(prompt: string): boolean {
@@ -143,7 +168,7 @@ export function isConciergeBuilderObjective(prompt: string, context?: CosCodingR
   const objective = cosRoutingObjective(prompt)
   if (isDesignBuildRequest(objective)) return true
   if (attachedSourceIsTheJob(prompt, context)) return true
-  if (pastedSourceCode(objective)) return true
+  if (pastedSourceCode(objective)) return pastedSourceExecutionAuthorized(objective)
   if (!executableBuilderAction(objective)) return false
   return concreteCodeEvidence(objective, context)
 }

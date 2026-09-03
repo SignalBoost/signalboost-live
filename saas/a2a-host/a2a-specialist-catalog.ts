@@ -1,6 +1,7 @@
 import type { A2ADelegationRisk } from './a2a-agent-registry.ts'
 
 export type A2ASpecialistFamilyId =
+  | 'software'
   | 'marketing'
   | 'sales'
   | 'self-healing-diagnostic'
@@ -21,6 +22,18 @@ export interface A2ASpecialistFamily {
 }
 
 export const A2A_SPECIALIST_FAMILIES: readonly A2ASpecialistFamily[] = Object.freeze([
+  Object.freeze({
+    familyId: 'software',
+    displayName: 'Software Specialist',
+    purpose: 'Broadly proficient software-engineering specialist with deeper architecture, implementation, debugging, testing, security-aware development, repository repair, and verification expertise under COS governance.',
+    skills: Object.freeze([
+      Object.freeze({ skillId: 'software.analyze', risk: 'advisory', purpose: 'Analyze code, architecture, failures, and engineering trade-offs without mutation.' }),
+      Object.freeze({ skillId: 'software.build', risk: 'write', purpose: 'Create or edit code inside an authorized isolated workspace and prove the requested result.' }),
+      Object.freeze({ skillId: 'software.repair', risk: 'write', purpose: 'Reproduce, repair, and verify supplied or explicitly authorized software failures.' }),
+      Object.freeze({ skillId: 'software.platform-repair', risk: 'write', purpose: 'Prepare owner-authorized pinned SignalBoost repository repairs in the network-denied staging environment; never merge or deploy.' }),
+      Object.freeze({ skillId: 'software.verify', risk: 'advisory', purpose: 'Verify code, tests, build evidence, and repair claims independently of mutation authority.' }),
+    ]),
+  }),
   Object.freeze({
     familyId: 'marketing',
     displayName: 'Marketing Specialist',

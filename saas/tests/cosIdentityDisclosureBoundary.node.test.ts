@@ -29,8 +29,16 @@ test('trusted runtime context describes the multi-model topology instead of one 
   assert.match(topology, /General COS reasoning model:/)
   assert.match(topology, /Builder \/ Platform Engineer coding-specialist model:/)
   assert.match(topology, /DEEPINFRA_BUILDER_MODEL/)
-  assert.match(topology, /deepseek-ai\/DeepSeek-V4-Pro/)
-  assert.match(topology, /Qwen\/Qwen3\.6-35B-A3B/)
+  assert.match(topology, /LOCAL_AI_MODEL/)
+  // Owner rule 2026-09-03: no hard-coded configuration. Model and provider identifiers are read
+  // from the live runtime, never carried as literals in source, so a misconfiguration can never be
+  // reported to the owner as fact.
+  assert.doesNotMatch(topology, /deepseek-ai\//)
+  assert.doesNotMatch(topology, /Qwen\//)
+  assert.doesNotMatch(topology, /BAAI\//)
+  assert.match(topology, /VERBATIM FACTUAL ATOMS/)
+  assert.match(topology, /version-complete/)
+  assert.match(topology, /NOT CONFIGURED/)
   assert.match(topology, /it does not replace the/)
   assert.match(topology, /general COS reasoner/)
 })

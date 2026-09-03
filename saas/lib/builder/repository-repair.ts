@@ -1,3 +1,4 @@
+// lib/builder/repository-repair.ts
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
@@ -140,7 +141,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
       objective,
       workspaceId: input.workspaceId,
       priorLessons,
-      maxRounds: 6,
+      maxRounds: 20,
       // Repository-control prompts are larger than ordinary chat prompts. Production telemetry
       // has shown valid responses slightly above 35s, so retain a bounded 55s round budget.
       modelRoundTimeoutMs: 55_000,

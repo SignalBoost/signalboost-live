@@ -54,6 +54,41 @@ test('file paths, stack traces, code fences, languages, and named-file creation 
   assert.equal(isCosCodingObjective('Create hello.js that prints Hello from COS Builder. Run it with Node.'), true)
 })
 
+test('pasted source code executes only when it is source-dominant or the user explicitly requests execution', () => {
+  const sourceOnly = [
+    'function broken() {',
+    '  console.log(missing)',
+    '}',
+    'broken()',
+  ].join('\n')
+  assert.equal(isConciergeBuilderObjective(sourceOnly), true)
+
+  const explainOnly = `Explain what this code does.\n${sourceOnly}`
+  assert.equal(isConciergeBuilderObjective(explainOnly), false)
+
+  const explicitRepair = `Please fix this code and run it.\n${sourceOnly}`
+  assert.equal(isConciergeBuilderObjective(explicitRepair), true)
+})
+
+test('a COS/Builder meta-discussion with embedded example code stays in COS until execution is explicit', () => {
+  const metaDiscussion = [
+    'when i prompted the builder directly to debug something it works, but when i place the same code to be debugged via COS it does not work. how to fix it?',
+    '',
+    'This looks like an integration gap between Builder and COS. The routing layer may be treating the example as execution instead of discussion.',
+    '',
+    '## Patch outline',
+    'The example below illustrates the proposed router behavior; it is not source supplied for execution.',
+    '',
+    'function routeInput(input: string) {',
+    '  if (input.includes("Error:")) return "execution"',
+    '  return "interpretation"',
+    '}',
+  ].join('\n')
+
+  assert.equal(isConciergeBuilderObjective(metaDiscussion), false)
+  assert.equal(isConciergeBuilderObjective(`Fix the COS-to-Builder routing bug described below.\n${metaDiscussion}`), true)
+})
+
 test('pasted Vercel logs and large History dumps never route to Builder', () => {
   const log = ['16:19:34 Vercel CLI 59.3.0', '16:20:11 Error: Command "npm test" exited with 1'].join('\n')
   assert.equal(isConciergeBuilderObjective(`Debug this timeout.\n${log}`), false)

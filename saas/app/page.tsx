@@ -24,6 +24,7 @@ import { listPublicPortableProducts } from '@/lib/portable-products'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
+import { boundComposerIntake } from '@/lib/ai/cos/composerIntakeBound'
 
 type Attachment = {
   id: string
@@ -151,7 +152,10 @@ export default function Home() {
 
   async function ask(event?: FormEvent | string) {
     if (typeof event !== 'string') event?.preventDefault()
-    const prompt = typeof event === 'string' ? event.trim() : question.trim()
+    // Bounded WITHOUT dropping the end of the paste. A build log's ✖ assertions and its
+    // `exited with 1` line are the last thing printed; the old textarea maxLength cut them off,
+    // so the log lane saw a build "in progress" and reported no defect.
+    const prompt = boundComposerIntake(typeof event === 'string' ? event.trim() : question.trim())
     const staged = attachments
     if ((!prompt && staged.length === 0) || loading) return
 
@@ -457,7 +461,6 @@ export default function Home() {
               }
             }}
             rows={2}
-            maxLength={8000}
             placeholder={c('placeholder')}
             aria-label={c('placeholder')}
           />

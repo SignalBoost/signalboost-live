@@ -4,10 +4,7 @@
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { callProviderModel, type ModelProvider } from '@/lib/ai/providerRouter'
 import { callCosText } from '@/lib/cos/textGateway'
-import {
-  DEFAULT_BUILDER_CODING_MODEL,
-  currentPlatformModelTopology,
-} from '@/lib/ai/cos/platformIdentityContext'
+import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 
 export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
@@ -15,10 +12,12 @@ export interface CosAiPort {
 
 export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
 
-export { DEFAULT_BUILDER_CODING_MODEL }
-
+/**
+ * Execution path: no default, no substitution. An unset DEEPINFRA_BUILDER_MODEL throws
+ * `builder_model_not_configured` rather than quietly sending a guessed model to the provider.
+ */
 export function builderCodingModelFromEnv(): string {
-  return currentPlatformModelTopology().builderCodingModel
+  return requireBuilderCodingModel()
 }
 
 function requireText(result: string | null, provider: string): string {

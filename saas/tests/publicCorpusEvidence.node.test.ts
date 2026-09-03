@@ -76,7 +76,7 @@ test('the allowlist stays narrow and deliberate', () => {
 // Wiring
 // ---------------------------------------------------------------------------------------------
 
-const PUBLIC = readFileSync('lib/ai/cos/cosFirstAnswer.ts', 'utf8')
+const PUBLIC = readFileSync('lib/ai/cos/cosFirstAnswerCore.ts', 'utf8')
 
 test('the public path filters before anything reaches a prompt', () => {
   assert.match(PUBLIC, /filterPublicCorpusRows\(rows\)/)

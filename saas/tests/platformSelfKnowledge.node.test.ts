@@ -75,8 +75,10 @@ test('versioned self-knowledge claims remain mechanically aligned with implement
   assert.ok(passive.includes('generateLocalEmbeddings([text])'))
   assert.equal(passive.includes('ensureLocalInferenceRuntimeReady'), false)
 
-  const firstAnswer = source('../lib/ai/cos/cosFirstAnswer.ts')
-  const entry = firstAnswer.slice(firstAnswer.indexOf('export async function tryCOSFirstAnswer'))
+  // The mature fresh/current-fact ordering remains in the compatibility core. The thin
+  // authenticated owner entrypoint may run its neural self-knowledge pass before entering it.
+  const firstAnswerCore = source('../lib/ai/cos/cosFirstAnswerCore.ts')
+  const entry = firstAnswerCore.slice(firstAnswerCore.indexOf('export async function tryCOSFirstAnswer'))
   assert.ok(entry.indexOf('requiresFreshExternalEvidence(input.prompt)') < entry.indexOf('await ensureLocalInferenceRuntimeReady()'))
 
   const localInference = source('../lib/ai/local-inference.ts')

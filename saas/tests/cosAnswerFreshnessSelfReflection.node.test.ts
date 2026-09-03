@@ -38,8 +38,7 @@ test('explicit legal uncertainty and applicability gates are not rejected as cur
 })
 
 test('direct current legal mandates still trigger freshness reflection', () => {
-  const answer = 'Current GDPR requirements mandate customer notification within 72 hours.'
-  assert.equal(answerNeedsFreshnessReflection(answer), true)
+  assert.equal(answerNeedsFreshnessReflection('Current GDPR requirements mandate customer notification within 72 hours.'), true)
 })
 
 test('named-regime applicability, legal consequences, and unsupplied data classifications are rejected', () => {
@@ -65,8 +64,7 @@ test('explicitly modelled churn arithmetic and proposed targets remain allowed',
 })
 
 test('mutable topic and assertion in separate sentences do not combine into a phantom freshness signal', () => {
-  const answer = 'The applicable jurisdictions are not yet established. The remediation plan should require peer review before execution.'
-  assert.equal(answerNeedsFreshnessReflection(answer), false)
+  assert.equal(answerNeedsFreshnessReflection('The applicable jurisdictions are not yet established. The remediation plan should require peer review before execution.'), false)
 })
 
 test('deterministic fallback removes unsupported current-practice sentences without inventing replacements', () => {
@@ -98,7 +96,7 @@ test('deterministic fallback removes CEO scenario overreach but preserves action
 })
 
 test('ordinary COS answers are freshness-reflected before turn learning and release', () => {
-  const source = readFileSync(new URL('../lib/ai/cos/cosFirstAnswer.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerCore.ts', import.meta.url), 'utf8')
   assert.match(source, /async function reflectOrdinaryAnswerFreshness/)
   assert.match(source, /answerFreshnessSignals\(result\.reply\)/)
   assert.match(source, /await callCosReasoner\(/)

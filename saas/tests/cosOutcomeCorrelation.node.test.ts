@@ -55,7 +55,7 @@ test('controlled evidence-utilization suite has 36 unique local-only cases acros
 })
 
 test('ordinary COS answers enrich server-stored provenance with the request-local turn id', () => {
-  const source = file('../lib/ai/cos/cosFirstAnswer.ts')
+  const source = file('../lib/ai/cos/cosFirstAnswerCore.ts')
   assert.match(source, /peekEvidenceSourceUseTurnId\(\)/)
   assert.match(source, /provenance:\s*\{[\s\S]*turnId/)
   assert.match(source, /beginEvidenceSourceUseTurn\(\)/)

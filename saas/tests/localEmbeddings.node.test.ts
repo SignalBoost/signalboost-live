@@ -103,14 +103,14 @@ test('identical foreground query embeddings share one in-flight request and shor
 })
 
 test('ordinary COS primes the shared query embedding before enterprise semantic budgets begin', () => {
-  const source = readFileSync(new URL('../lib/ai/cos/cosFirstAnswer.ts', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerCore.ts', import.meta.url), 'utf8')
   const exported = source.slice(source.indexOf('export async function tryCOSFirstAnswer'))
   const fresh = exported.indexOf('requiresFreshExternalEvidence(input.prompt)')
   const readiness = exported.indexOf('await ensureLocalInferenceRuntimeReady()')
   const prime = exported.indexOf('await generateLocalEmbedding(input.prompt)')
   const enterprise = exported.lastIndexOf('tryEnterpriseCOSFirstAnswer(input)')
 
-  assert.ok(fresh >= 0, 'fresh/current-fact policy must remain first')
+  assert.ok(fresh >= 0, 'fresh/current-fact policy must remain first inside the mature core pipeline')
   assert.ok(readiness > fresh, 'ordinary runtime readiness must remain after fresh routing')
   assert.ok(prime > readiness, 'query embedding must be primed only after governed runtime readiness')
   assert.ok(enterprise > prime, 'enterprise semantic retrieval must start only after the shared query embedding is ready')

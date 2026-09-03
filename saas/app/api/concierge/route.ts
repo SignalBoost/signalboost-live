@@ -29,6 +29,7 @@ import { enqueueBuilderJob } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
+import { tryCosSoftwareSpecialist } from '@/lib/ai/cos/softwareSpecialist'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
 
 export const runtime = 'nodejs'
@@ -107,6 +108,9 @@ function hasImageOrPdfAttachment(body: any): boolean {
   return attachments.some((item: any) => /image\/|application\/pdf/i.test(String(item?.mimeType || item?.type || '')))
 }
 
+// Legacy implementation retained temporarily during the Software Specialist migration. The active
+// Concierge path below no longer calls this function; it remains only as a rollback reference until
+// the shared specialist path has been Production-observed.
 async function directBuilder(body: any, input: string): Promise<NextResponse | null> {
   // Image/PDF attachments still stay on the ordinary COS path. Source-code attachments are
   // Builder evidence and must not block the sandbox route.
@@ -511,7 +515,14 @@ export async function POST(req: NextRequest): Promise<Response> {
   // Runs before every model, tool, or Builder route. Public prompt extraction never reaches inference.
   if (isPublicPromptExfiltrationAttempt(input)) return publicSecurityRefusal()
 
-  const builder = await directBuilder(body, input)
+  // Concierge is a delivery surface, not a second coding brain. COS owns the specialist decision;
+  // public delivery can use the Software Specialist sandbox but cannot grant repository-repair authority.
+  const builder = await tryCosSoftwareSpecialist({
+    body,
+    objective: input,
+    surface: 'concierge',
+    allowRepositoryRepair: false,
+  })
   if (builder) return builder
 
   const deterministic = tryDeterministicUtility({

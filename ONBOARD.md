@@ -3,7 +3,7 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.33
+**Version:** 1.34
 **Updated:** 2026-09-03 UTC
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
 **Accepted cognitive implementation baseline:** `84de50b8e67feea2e27d658e4cc3982e9e97a603`  
@@ -15,13 +15,14 @@
 **Observed Builder runtime evidence — 2026-09-03:** real accepted Production Builder/Platform Engineer inference telemetry on deployment `dpl_7USjZVXb4GwMBUJxSH2ASEGv8h8H` recorded `deepseek-ai/DeepSeek-V4-Pro-0813`. This is an observed runtime fact for those calls, **not** a source-code default and **not** authority for future deployments; future current-state answers must read the live runtime again.  
 **RunPod:** no longer used — COS inference and embeddings run entirely on DeepInfra. RunPod lifecycle is permanently detached; remaining RunPod code paths are dormant legacy pending removal and must not be reintroduced  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
+**COS specialist architecture / learning contract:** COS remains the sole continuously-learning brain/orchestrator and the default learning intake. Specialists are broadly proficient workers whose specialization adds deeper domain study, tools, practice, memory and evidence-gated certification; specialization never removes general professional competence. Default learning flow is Feed COS once → COS studies the broadly relevant material → a learning router assigns deeper curricula to relevant specialists → independently verified specialist lessons/outcomes flow back to COS and may be redistributed as shared organizational learning. Direct specialist teaching remains allowed, but generalizable verified lessons must not remain trapped inside a specialist. Merely consuming material is not mastery: specialist capability must move through understanding, practice, independent holdouts, real-task outcomes, retention and quarantine/weaken rules just as COS learning does. This is the canonical architecture; specialist-scoped learning persistence/routing is being implemented incrementally and is **not yet Production-accepted**. The first implementation is the **Software Specialist**, with Builder and owner-only Platform Engineer execution as governed capabilities under COS rather than a second user-facing brain.  
 **Normative/public-policy answer consistency:** Production behavior was confirmed across owner and unauthenticated Public Concierge sessions after `066811cc`: answers no longer lead with yes/no and preserve the same neutral meaning across wording variants. Follow-up acceptance exposed one remaining defect: the normative route produced uncited legal, historical, scientific, and statistical premises. The current implementation therefore routes the entire normative class through live evidence regardless of whether the prompt says `legal`, `allowed`, or `permitted`, while fresh synthesis enforces the neutral, non-binary evidence-map contract. Material descriptive claims must retain recorded live citations; the final weighting of competing values remains explicitly value-dependent. The motivating three-question cohort plus broader death-penalty, religious-clothing, assisted-dying, compulsory-vaccination, voting-age, and sports-eligibility variants are mandatory deployment regressions. Owner follow-up requires every normative answer to bypass semantic/exact answer cache, retrieve live evidence for the strongest supporting and opposing arguments, and render those source groups separately. The implementation on `fix/normative-balanced-live-sources-20260901` is awaiting CI/Preview acceptance; Production has not yet accepted this balanced-provenance contract.
 **Procedural-learning state:** autonomous private certification is Production for context ambiguity, performance-regression diagnosis, and architecture discovery; dead-end self-generated practice is guarded; validated cognitive-skill candidate embeddings are reused by exact text + embedding-model identity; prompt-free retrieval-efficiency telemetry is Production; individual skills still earn lifecycle status from evidence  
 **Next learning priority:** observe real certification progression and collect the first real Production cognitive-retrieval telemetry cohort; use measured cache-hit, database, and ranking latency evidence before adding any further live prefilter; continue Retrieval Self-Reflection / calibration / strategy-selection learning  
 **Owner knowledge intake:** Feed COS directed study is LIVE at `https://saas.signalboostapp.com/dashboard/cos-directed-study` (navbar: Admin ▸ 📚 entry, owner-only)  
 **Concierge public prompt-exfiltration boundary:** shared-ingress correction deployed to Production on 2026-08-30 as `e15439d372d1352173d8bc8481fcdb5ea2f62ce8`, deployment `dpl_B912K4bAqsGs9z84Dwsw5uv7yv4F` — READY with `saas.signalboostapp.com` attached. Both Concierge and `/api/support` now block system/developer/private-context extraction, encoding, fictional framing, and contextual replay before legacy model dispatch; unsafe raw or Base64-wrapped internal reference-context output is also blocked. Original attacks must still be re-observed through the real Concierge UI before runtime acceptance. **Production red-team evidence:** after the `/api/cos-primary` correction, the real dashboard returned only the static refusal for both a direct system/developer-prompt extraction request and a fictional customer-support-AI/exact-instructions request. This accepts those two attack classes at the real ingress. Encoded and contextual-replay variants remain separately regression-covered and should be re-observed before claiming the complete boundary runtime-accepted.    
 **Concierge/COS public-assistant state:** public/private execution boundary, five-language text transformation, recorded public provenance, and bounded fresh-current synthesis retry are Production; pasted operational/build logs are explicitly excluded from provenance-introspection routing and from both Concierge and direct Builder execution; they distinguish an incomplete excerpt from a real failed build (bounded failed-test names (including timestamped Vercel lines) and exit code) and return a deterministic diagnosis instead of invoking Builder or failing objective validation; the first post-#1539 real interactive current-fact turn remains to be observed before claiming runtime acceptance of the new retry behavior  
-**Concierge internal Builder:** implementation is active and not Production-accepted. Concierge is the only user-facing surface: explicit coding, repair, and design objectives invoke the authenticated Builder tool loop in the backend and return its answer, evidence, and file-download links in the same conversation. The public homepage Concierge, secondary dock Concierge, and owner COS render accepted/running/completed request events and elapsed time while waiting. Durable Builder work is followed by job id through the authoritative read-only `/api/builder` status endpoint to terminal output instead of treating the initial running response as final. Text/code results render inline with localized copy and download controls. Passive logs retain no execution authority, but diagnostic questions containing pasted logs or bounded `.txt`, `.log`, and `.md` log attachments continue through ordinary COS with the attachment evidence joined to the user's request instead of ending at the obsolete canned “not editable source” reply. Concierge must explain the observed failure and request only the specific source or context genuinely missing for repair. Ordinary questions remain on normal COS. The legacy redirect to `/dashboard/developer` is removed from the authenticated Assistant; supported text/code attachments are staged into the isolated network-denied workspace. This is operational progress visibility, not disclosure of private chain-of-thought. The Developer workspace may remain an internal diagnostics surface, not a required customer journey. A fresh authenticated Concierge code-repair observation, including inline copy rendering, is required before runtime acceptance.
+**COS Software Specialist / Builder routing:** implementation is active on `fix/cos-builder-shared-controller-20260903` and is **not Production-accepted**. Concierge and the owner Assistant now use the same COS-owned `tryCosSoftwareSpecialist()` execution seam for coding/build/repair selection instead of letting `/api/cos-browser` jump directly to the Concierge route for Builder-looking prompts. Concierge calls the shared specialist with repository-repair authority disabled; the authenticated owner Assistant may grant the existing pinned SignalBoost repository-repair capability after the existing owner/project/deployment checks. The Software Specialist returns `specialist_family=software`, a bounded skill (`software.build`, `software.repair`, or `software.platform-repair`) and `orchestrator=cos`. The old local Concierge `directBuilder()` implementation and the prior owner repair branch are retained temporarily as inactive/defense-in-depth rollback references until the shared path is Preview/Production-observed; they are not the canonical orchestration contract. Durable Builder jobs, History polling, sandbox isolation, source staging and proof requirements remain unchanged. The Developer workspace may remain an internal diagnostics/test surface; it is not a competing user-facing brain.  
 **Concierge artifacts:** implementation is active and not Production-accepted. Every authenticated public Concierge request that explicitly asks for a `.txt` or text-based `.pdf` is routed to the backend artifact tool before normal COS/public-delivery isolation; it persists the file in the private workspace and returns a same-chat download link. A format follow-up after Builder is bound to the actual user-scoped Builder file (or, when no file exists, the preceding assistant result) so “give me that as TXT/PDF” does not lose conversation context or regenerate a generic substitute. It never sends the document or treats a request for research as permission to invent factual content. A fresh authenticated PDF and TXT conversion/download observation is required before runtime acceptance.
 **Concierge web-design delivery:** repaired and deployed to Production on 2026-08-30 as `2f0740cea9a0367974d866649469ccc99630fdf5`, deployment `dpl_GagFpdiv5dV1hjW36iMrGXvEbXiB` — READY. A recognized website, page, dashboard, or UI-design request is trimmed before intent matching and, if the bounded Builder loop fails for any reason, receives a safe editable `index.html` travel landing page instead of an internal `builder_invalid_model_control_output`. The homepage renders generated HTML in a sandboxed inline preview and keeps the file download. A fresh signed-in Production design observation remains required before runtime acceptance.
 **Concierge visual designer:** image generation was observed in signed-in Production on 2026-08-30: it created the private downloadable visual file, but the homepage did not render it inline. The earlier reply-marker correction at `58ef1adf32524a5d15be4dbfc1e3bfbe9d7adb2b` was insufficient: it still depended on parsing a hidden `<IMAGE>` block in assistant prose. The active correction instead makes the response carry a structured owner-scoped `visual.previewUrl`, persists it on the chat turn, and renders that URL in an image element independently of prose/Markdown, while retaining the download link. Named-person generation verifies curated portraits through exact Wikimedia Commons metadata and prefers its canonical upload asset before bounded redirect/search fallbacks; Commons, upload, and thumbnail hosts remain HTTPS allowlisted. Visual generation remains pinned to the approved DeepInfra managed COS runtime; OpenAI keys and all other provider fallbacks are prohibited. A fresh signed-in Production visual observation is required before runtime acceptance.
@@ -31,7 +32,7 @@
 **COS Builder developer loop:** the authenticated one-file debug lane and asynchronous durable-History recovery are Production-accepted; broader Builder capability remains evidence-gated. The authenticated Builder has a sandboxed file/edit/run loop; its first end-to-end `hello.js` creation, download, and Node execution was observed successfully in Production. Current intake hardening is implemented locally and not yet Production-accepted: raw requests up to 512,000 characters are accepted, deterministically compacted to the opening user request plus newest diagnostic evidence for the 64,000-character durable-job boundary, and may enter the fixed one-file debug protocol when an explicit repair action plus exactly one supported source attachment is present. Logs or copied History alone still grant no workspace, repository, edit, or execution authority. Failures are observed rather than ending the turn, classified (storage/path/runtime/dependency/test/deployment), and returned with exact safe evidence plus a remediation hint; repeated inspection of unchanged files is rejected without exhausting a work round and removed from both the next model tool list and prompt examples, forcing an edit/run/different diagnostic; a transient Builder model-round timeout gets one bounded retry before the turn fails; after a supplied source file is inspected for a repair, Builder must write/edit/run before it can inspect again or answer; a repair cannot be reported complete without a successful proving command. The server-only `builder_verified_repair_lessons` migration was applied to Production on 2026-08-30 and verified with RLS enabled and zero `anon`/`authenticated` read privilege. It records only a failure followed by a successful proving command: cause evidence, repair summary, regression command, and the fixed node24/network-denied/ephemeral environment. Master-developer program, Phase 1 remains progressively certified on small real tasks before wider repository repairs. Never use raw chat history as training material.
 **Builder model specialization — historical rollout evidence:** PR #1809 introduced a Builder-only coding port and evaluated `deepseek-ai/DeepSeek-V4-Flash-0731`. That exact model string is historical rollout evidence only; it is not a current default and does not select the runtime. Current Builder and Platform Engineer model selection is exclusively the live `DEEPINFRA_BUILDER_MODEL` value, with no automatic escalation, aliasing, or source-code fallback. Later accepted Production telemetry on 2026-09-03 observed `deepseek-ai/DeepSeek-V4-Pro-0813`; that later observation likewise remains evidence for those calls rather than configuration authority. Documentation never selects the Builder model.
 
-**COS Platform Engineer:** implementation is active and not Production-accepted. This is a separate, sandboxed agent for preparing verified SignalBoost repository repairs—not a self-modifying or self-deploying COS. Its foundation discovers staged manifests, package manager, scripts, test files, and a recommended proof command; it then enforces inspect → reproduce → minimal repair → rerun the same proof command → approval-ready diff and evidence. Both the direct Developer surface and authenticated owner COS connect verified SignalBoost operational logs to this Engineer without requiring magic repair wording. The canonical server ingress verifies owner identity, SignalBoost project/domain evidence, and the immutable deployed commit/branch before granting repository authority. Repository repair now enters the same durable Builder job/History contract as ordinary Builder work: the request returns after enqueue, background execution is atomically claimed, and success or timeout updates the same History entry instead of holding `/api/cos-primary` open until the page disconnects. The Assistant UI is being consolidated into one full-width workspace card so conversation, long technical output, Builder files, History, and the composer share the available page instead of competing with a separate promotional Concierge header. Public Concierge, members, attachments, incomplete logs, and unrelated-repository logs remain analysis-only or ordinary network-denied workspace jobs with no repository authority. This durable correction and workspace redesign are not yet Production-accepted. Authority remains read/edit/run only inside an ephemeral, network-denied staged repository; secrets, production data, deployment, merge, and self-approval are prohibited. See `docs/COS-PLATFORM-ENGINEER-2026-08-30.md`.
+**COS Platform Engineer:** canonical architecture now treats Platform Engineer as the owner-authorized repository-repair capability of the Software Specialist, not as a competing brain. The current implementation remains active and not Production-accepted. Its foundation discovers staged manifests, package manager, scripts, test files, and a recommended proof command; it then enforces inspect → reproduce → minimal repair → rerun the same proof command → approval-ready diff and evidence. Both the direct Developer diagnostics surface and authenticated owner COS may connect verified SignalBoost operational logs to this capability without requiring magic repair wording. The canonical server ingress verifies owner identity, SignalBoost project/domain evidence, and the immutable deployed commit/branch before granting repository authority. Repository repair enters the same durable Builder job/History contract as ordinary Builder work: the request returns after enqueue, background execution is atomically claimed, and success or timeout updates the same History entry instead of holding `/api/cos-primary` open until the page disconnects. Public Concierge, members, attachments, incomplete logs, and unrelated-repository logs remain analysis-only or ordinary network-denied workspace jobs with no repository authority. Authority remains read/edit/run only inside an ephemeral, network-denied staged repository; secrets, production data, deployment, merge, and self-approval are prohibited. See `docs/COS-PLATFORM-ENGINEER-2026-08-30.md`.
 
 **Builder certification gate:** implemented locally and not yet Production-accepted. The first controlled ladder has three evidence-only levels: (1) create a file and prove it runs, (2) inspect a supplied broken file, repair it, then prove it runs, and (3) observe and classify a real failure, then prove recovery. Answer text does not count; each level requires recorded tool evidence. This is evaluation and controlled practice, not model-weight training. Promotion to wider repository repairs requires real successful Production observations for each level.
 
@@ -484,18 +485,11 @@ Architectural role is explicit:
 - **COS is the engine / brain.**
 - **Concierge is the public face / delivery layer.**
 - Public Concierge may use COS reasoning and general-assistant capabilities, but it must never inherit or disclose private SignalBoost owner/admin/company context merely because the browser session belongs to the owner.
+- No HTTP route is itself a brain. User-facing specialist work must enter a shared COS specialist service/registry rather than giving Concierge or the owner Assistant an independent specialist-selection controller.
 
-Actual browser ingress matters. The stable public path is:
+Actual browser ingress matters. Different UI surfaces may enter `/api/concierge` or `/api/cos-browser`; both must preserve the same COS brain contract and public/private authority boundary. Do not infer orchestration authority from the route name. The public scope is enforced at the real browser ingress and the Software Specialist migration additionally ensures that coding delegation is shared rather than surface-owned.
 
-```text
-browser POST /api/concierge
-→ proxy
-→ /api/cos-browser
-→ /api/cos-primary
-→ COS
-```
-
-The public scope is therefore enforced at the real browser ingress, not only in a homepage route or prompt. Production rules include:
+Production rules include:
 
 - public Concierge execution is downgraded to public/guest AI context even when the signed-in user is the owner;
 - no Enterprise Memory, learned internal corpus, private Knowledge Graph, user memory, private business metrics, repository/admin tools, internal strategy, provider configuration or secrets may be exposed to the public face;
@@ -670,6 +664,34 @@ Intake modes:
 Contract, unchanged from autonomous acquisition: topic, study intent, material kind and a **license declaration** are required; every chunk is scored with the autonomous cycle's own grounding/admission gates and admitted or rejected individually with reasons; the channel is recorded in each record's evidence (`owner_directed_study`, operator, intent) and the material kind maps onto the existing source-kind taxonomy. Owner-directed material is authoritative for **relevance to the owner's stated study intent**, but it is never automatically authoritative for factual truth, grounding, recency, scope or contradiction resolution.
 
 Anything admitted immediately feeds the applied-knowledge loops on the next daily cycle: it can reopen a retired study question and trigger an evidence-arrival benchmark retest — so material fed today is measured tomorrow. First live use (2026-08-22): a video-transcript chunk admitted at 0.88 confidence with license and source provenance recorded.
+
+## Specialist distribution contract — CANONICAL, IMPLEMENTATION PENDING
+
+Feed COS remains the default owner workflow. Material should be ingested once, then distributed by learning scope rather than pasted separately into every specialist:
+
+```text
+owner / autonomous evidence
+→ COS intake and broad study
+→ learning-scope router
+   → shared organizational knowledge when justified
+   → COS-specific reasoning/strategy knowledge
+   → specialist:<family> deeper curriculum
+   → portable:<id> project-specific knowledge
+→ specialist practice + independent certification
+→ verified specialist lesson / Production outcome
+→ COS generalization + relevant cross-specialist redistribution
+```
+
+Rules:
+
+- COS continues learning independently and remains the broadest learner; specialist learning never replaces COS learning.
+- Every specialist remains broadly proficient; specialist curriculum adds depth rather than narrowing basic competence.
+- Automatic distribution is the default. The owner may explicitly target COS, one specialist, several specialists, or a portable.
+- A specialist may retain deep procedural/domain detail that COS does not need at equal retrieval priority, but COS must know the capability, important principles, verified lessons, weaknesses and when to delegate.
+- Direct specialist intake may exist, but verified generalizable lessons must flow back to COS.
+- A source being admitted or read does not make the specialist “trained” or “mastered.” Domain skills must earn lifecycle state from practice, independent holdouts, real outcomes and retention evidence.
+- Cross-specialist sharing is evidence-gated: do not copy raw chat history, unverified model prose, secrets or domain noise into shared memory.
+- Specialist-scoped curricula, competency maps and learning telemetry are the next learning-system implementation after the Software Specialist routing/Builder convergence is accepted.
 
 ## Owner-directed promotion cron — REPAIRED AND LIVE
 
@@ -965,6 +987,89 @@ No hidden chain-of-thought is stored as a learning artifact. Learn only explicit
 
 ---
 
+# COS specialist architecture and learning contract — CANONICAL; SOFTWARE SPECIALIST IMPLEMENTATION ACTIVE, NOT PRODUCTION-ACCEPTED
+
+COS is the single generalist brain and chief orchestrator. A specialist is **not** a narrow assistant that only knows one subject. Every specialist must retain broad professional proficiency; specialization adds extra domain education, deeper tools, domain memory, deliberate practice, independent certification and outcome learning.
+
+Canonical topology:
+
+```text
+User / system goal
+      ↓
+Concierge / Owner Assistant / other delivery surface
+      ↓
+COS — sole brain, intent owner and final judgment
+      ↓
+COS specialist selection / team assembly
+      ↓
+Software | Security | Marketing & Sales | Design | Finance | Operations | Research | ...
+      ↓
+structured result + proof + confidence + failure reason
+      ↓
+COS cross-domain review / challenge / synthesis
+      ↓
+User / governed action
+```
+
+Non-negotiable specialist rules:
+
+1. **One brain.** Delivery surfaces and specialists do not compete with COS for final orchestration authority.
+2. **Proficient first, specialized second.** A Software Specialist still understands business, UX, security, communication and operational consequences; Marketing still understands product/software constraints, and so on. “Not my department” is not the desired behavior when cross-domain risk is evident.
+3. **COS owns what/why/final judgment; specialists own deep how within their authorized domain.** COS may challenge, reject, combine or independently verify a specialist result.
+4. **All arrows return through COS.** Specialists normally return structured evidence/results to COS rather than becoming independent user-facing brains.
+5. **Authority never follows expertise.** A more capable specialist does not gain broader credentials, tenant access, repository authority, spending authority, deployment authority or approval rights.
+6. **Complex tasks may assemble temporary specialist teams.** Multiple specialists may analyze the same goal; COS resolves conflicts and owns the final decision.
+7. **The direct Developer/diagnostic surface may remain for testing and engineering, but it is not the customer orchestration architecture.**
+
+Canonical specialist learning model:
+
+```text
+shared professional foundation
+       ↓
+COS broad continuous learning
+       ↓
+relevant specialist deep curriculum
+       ↓
+domain tools + practice + independent holdouts
+       ↓
+real-task / Production outcome evidence
+       ↓
+validated / learned / mastered specialist skill
+       ↓
+verified generalizable lesson promoted back to COS
+       ↓
+relevant cross-specialist / portable redistribution
+```
+
+Learning principles:
+
+- **COS learning never stops.** Specialists increase organizational depth; they do not replace the brain's own learning.
+- **Feed COS is the normal intake.** The owner should normally feed material once. COS studies it at the appropriate general level and routes deeper study to relevant specialists automatically.
+- **Direct specialist teaching is optional, not required.** When the owner explicitly targets a specialist, that worker studies the material deeply while COS still receives the important/generalizable verified learning.
+- **Learning depth is not uniform.** The same source can produce general COS understanding, deep Software practice, Security-specific implications and no training at all for an irrelevant specialist.
+- **Garbage in, garbage out.** Material that does not benefit COS, a specialist or a current portable should not be admitted merely to increase corpus size.
+- **Reading is not mastery.** Knowledge retention and skill competence are distinct. Specialist lifecycle status must be earned from evidence, not source count or model self-report.
+- **Specialists need competency maps.** COS should know what each specialist has encountered/understood/practiced/validated/learned/mastered, current curriculum gaps, freshness and verified Production outcomes so delegation is evidence-aware.
+- **Shared organizational learning is promoted, not blindly copied.** Verified cross-domain principles may be shared; deep implementation details can remain specialist-weighted unless another specialist needs them.
+- **Portable/project knowledge is an additional layer, not a new foundation model by default.** A portable may add project-specific knowledge/tools/evals to one or more specialists.
+- **Model specialization is evidence-driven.** Start with specialist profiles/knowledge/tools/evals; use a distinct model/fine-tune/adapter only when measured outcomes justify it. Builder already has an independent runtime model seam, but the live environment remains the sole model-identity authority.
+
+First specialist — Software:
+
+- canonical family: `software`;
+- initial skills: `software.analyze`, `software.build`, `software.repair`, `software.platform-repair`, `software.verify`;
+- Builder is the Software Specialist's sandboxed build/debug/repair capability;
+- Platform Engineer is the Software Specialist's owner-only pinned SignalBoost repository-repair capability;
+- Concierge invokes the shared Software Specialist with repository repair disabled;
+- owner Assistant invokes the same Software Specialist with the existing owner/project/deployed-target checks able to grant repository repair;
+- non-specialist requests continue through COS rather than a route-level “looks like Builder” jump to Concierge;
+- mandatory regression must fail if `/api/cos-browser` reintroduces `legacyConciergePost` as the coding decision path;
+- current branch: `fix/cos-builder-shared-controller-20260903`; no Production claim until exact Preview, merge, Production READY and live owner/Concierge observations pass.
+
+Next after Software routing acceptance: add specialist-scoped learning identity/curriculum/competency telemetry to the existing Directed Study + cognitive lifecycle instead of creating a separate learning platform.
+
+---
+
 # Adaptive Retrieval / Agentic RAG — SHADOW V1 VALIDATED; OVERALL LAYER PARTIAL
 
 Adaptive retrieval shadow validation exists and has passed independent validation. Current live retrieval policy is not automatically replaced merely because a lower-context shadow candidate looked efficient.
@@ -1180,6 +1285,7 @@ Non-negotiable:
 - external/managed providers never become governance authority;
 - unknown/consequential/destructive/financial/security actions fail closed or require the applicable approval boundary;
 - learned retrieval/worker/tool/skill preference cannot widen authorization;
+- specialist expertise or specialist learning state cannot widen authorization, tenant scope, repository authority, spending authority or approval rights;
 - no hidden chain-of-thought persistence;
 - private certification prompts must not be committed to GitHub or returned through public/admin APIs without an explicit protected diagnostic need;
 - public Concierge must never inherit owner/admin/private-company context simply because the requesting browser is authenticated as owner;
@@ -1246,6 +1352,8 @@ Always query current state; this sequence can advance after this document is mer
 
 # Immediate next engineering priorities
 
+**Current top priority:** complete the Software Specialist convergence on `fix/cos-builder-shared-controller-20260903`: exact Preview gate/build, compare Concierge and owner Assistant coding behavior through the shared specialist seam, then—only after acceptance—remove the inactive legacy Concierge `directBuilder()` implementation and transitional owner repair fallback. After routing acceptance, implement specialist-scoped learning identity/curriculum/competency telemetry on top of the existing Directed Study and cognitive lifecycle.
+
 1. **Observe first post-#1539 real current-fact turn:** inspect exact Production telemetry for normal first-attempt success or a bounded `[cos-fresh-local-synthesis-retry]` followed by success. Do not manufacture traffic. If both attempts fail, retain fail-closed behavior and use the evidence to diagnose provider/runtime reliability rather than weakening grounding.
 2. **Observe private cognitive certification progression:** verify the ambiguity, performance-regression and architecture-discovery candidates advance only when their private understanding/practice/holdout evidence passes. Never manually set lifecycle flags or counters.
 3. **Measure cognitive-skill live retrieval efficiency:** collect a real Production `cos-cognitive-skill-retrieval-efficiency-v1` cohort and compare candidate cache-hit rate plus `skillStoreMs`, `dependencyHealthMs`, `rankingMs`, and `totalMs`. Do not add another prefilter until the data identifies the actual dominant cost and a held-out check shows recall/trigger coverage is preserved.
@@ -1295,7 +1403,10 @@ A correlated alarm cluster is not a proven physical root cause.
 An advisory recommendation is not authorization to control facility equipment.  
 Successful live retrieval is not the same as successful synthesis; a bounded retry is not permission to weaken evidence or provenance.  
 A recorded provenance report is execution history, not a story a model may reconstruct.  
-A model/provider name written in source code or documentation is not current runtime truth. Current model/provider identity comes only from verified runtime configuration and telemetry.
+A model/provider name written in source code or documentation is not current runtime truth. Current model/provider identity comes only from verified runtime configuration and telemetry.  
+A specialist reading a source is not specialist mastery.  
+A specialist capability is not independent orchestration authority.  
+A specialist's expertise is not permission to widen access or action authority.
 
 ---
 
@@ -1307,24 +1418,20 @@ Success means validated experience measurably improves held-out or verified Prod
 
 For metacognitive learning, COS must prove which retrieval policy, evidence class, procedural skill, tool sequence or explicit reasoning strategy improved outcomes for a problem class, detect when that lesson stops working, and safely weaken, quarantine or roll it back.
 
+For specialist learning, success means COS continues to improve broadly while each specialist develops deeper evidence-backed competence in its domain, COS knows the specialist's actual competency/freshness state, verified lessons move across the organization without raw-memory pollution, and no specialist or interface becomes an independent competing brain.
+
 For Google Workspace integrations, success means external authorization is explicitly scoped, token material is protected, tenant/user identity is preserved, read/write authority is not silently widened, tool calls fail truthfully, and real external-account acceptance is separately proven from code/schema deployment.
 
 For Provider Hub connector reuse, success means one buyer/provider connection can safely expose exact capabilities to explicitly authorized portables without duplicating adapters or credentials, while discovery/grants never become implicit mutation authority and existing consequential/financial/publishing controls remain intact.
 
 For Data Center Operations Intelligence, success means the software can ingest normalized read-only operational evidence, distinguish related from unrelated events, produce evidence-bounded probable-cause analysis and useful operator checks, recognize when evidence is insufficient, preserve provenance, and remain safely advisory until a separately governed control phase is explicitly approved.
-**COS is the brain. Concierge is the mouth.**
 
-- COS is the owner's internal assistant. Asked by the owner (signed in), it answers — stack,
-  model, internal company context, anything. No deflection on the owner's own channel.
-- Concierge is the public face. It has no brain of its own: it runs the same COS engine in
-  public scope. It never repeats company-internal information.
-- The only thing separating the two is `isPublicDeliveryScope()`, an AsyncLocalStorage flag
-  that defaults to OFF. It can be switched on in exactly two places, both public entrances:
-  `app/api/concierge/route.ts` and `app/api/cos-browser/route.ts`. No browser, header, or
-  config can set it. The owner Assistant therefore never runs in public scope.
-- In public scope: `getAccess()` is forced to guest, identity/company questions divert to the
-  public-safe reply, and any answer leaking internals is replaced before release.
-- Do NOT "make it safer" by moving owner disclosure into `cosFirstAnswerEnterprise.ts`.
-  Concierge runs that same file. The public does reach it. And the shared identity check has
-  already answered and returned before it runs, so the moved code would never execute.
-- `saas/tests/cosIdentityDisclosureBoundary.node.test.ts` fails the build if this changes.
+**COS is the brain. Concierge is the mouth. Specialists are expert workers.**
+
+- COS is the owner's internal assistant and the sole orchestration/learning brain. Asked by the owner (signed in), it answers — stack, model, internal company context, anything permitted by the owner's channel and evidence policy. No deflection on the owner's own channel.
+- Concierge is the public face. It has no brain of its own: it uses COS in public scope and delegates specialist execution only through COS-owned specialist services. It never repeats company-internal information.
+- Specialists are broadly proficient workers with deeper domain training. They do not own final user judgment; results, evidence and uncertainty return to COS.
+- The public/private boundary is server-enforced through `isPublicDeliveryScope()` and associated ingress rules. Specialist delegation never widens it. Public Software Specialist work is isolated sandbox work; owner repository repair remains separately owner/project/deployment gated.
+- In public scope: `getAccess()` is forced to guest, identity/company questions divert to the public-safe reply, and any answer leaking internals is replaced before release.
+- Do NOT "make it safer" by moving owner disclosure into `cosFirstAnswerEnterprise.ts`. Concierge can run shared COS reasoning code. The public boundary must stay deterministic and server-enforced rather than relying on where a model prompt happens to live.
+- `saas/tests/cosIdentityDisclosureBoundary.node.test.ts` protects the identity boundary; `saas/tests/cosSoftwareSpecialistRouting.node.test.ts` protects the shared Software Specialist routing boundary.

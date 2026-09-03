@@ -1,3 +1,4 @@
+// app/api/cos-browser/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
@@ -249,7 +250,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!operationalEvidence && isProvenanceIntrospection(prompt)) {
+  // Public/guest callers get the recorded-provenance disclosure posture. The owner Assistant must
+  // NOT be intercepted here — it falls through to cos-primary, whose privileged branch returns the
+  // authoritative provenance instead of the visitor-facing "no live sources" reply.
+  if (!operationalEvidence && !access?.isOwner && isProvenanceIntrospection(prompt)) {
     const recorded = await withPublicAuditIdentity(auditUserId, () =>
       withPublicDeliveryScope(() => readCosPrimaryPriorProvenance(auditUserId, priorAnswer)),
     )

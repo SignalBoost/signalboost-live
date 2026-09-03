@@ -1,4 +1,4 @@
-// tests/conciergeOperationalLogRouting.node.test.ts
+// saas/tests/conciergeOperationalLogRouting.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -28,19 +28,36 @@ test('repository repair is one durable server helper rather than duplicated rout
   assert.match(text, /source: 'cos-platform-engineer'/)
 })
 
-test('owner repository repair requires recognized operational evidence for an exact failed snapshot and prefers it before deployed fallbacks', () => {
+// 2026-09-03: this ingress must not be stricter than the direct Developer surface. The same owner
+// paste previously reached the repository lane through /api/builder but not here, because this
+// route gated the whole branch on signalBoostProjectBound and required the log to already parse as
+// failed. Owner/log/project evidence now enters as the option on the deployed fallback, exactly
+// where app/api/builder/route.ts puts it.
+test('owner repository repair matches the direct Developer surface and prefers the exact failed snapshot', () => {
   const analysis = route.indexOf('const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)')
   const exact = route.indexOf('const exactFailedLogTarget =', analysis)
   const ownerTarget = route.indexOf('const ownerRepositoryRepairTarget =', exact)
   const exactPreference = route.indexOf('? exactFailedLogTarget', ownerTarget)
   const intentFallback = route.indexOf('signalBoostDeployedRepairTarget(prompt, deployment)', exactPreference)
-  const clippedFallback = route.indexOf('signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })', intentFallback)
+  const clippedFallback = route.indexOf('signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission })', intentFallback)
   const queue = route.indexOf('queueOwnerRepositoryRepair({', clippedFallback)
   assert.ok(analysis >= 0 && exact > analysis && ownerTarget > exact)
-  assert.match(route.slice(exact, ownerTarget), /operationalEvidence && operationalLogAnalysis\.failed/)
   assert.match(route.slice(exact, ownerTarget), /parseSignalBoostRepositoryRepairTarget\(operationalPrompt\)/)
   assert.ok(exactPreference > ownerTarget && intentFallback > exactPreference && clippedFallback > intentFallback && queue > clippedFallback)
-  assert.match(route.slice(ownerTarget, queue), /access\?\.isOwner && access\.userId && !hasSourceAttachment && signalBoostProjectBound/)
+  // Owner + no source attachment remain mandatory; the extra project-bound AND is gone.
+  assert.match(route.slice(ownerTarget, queue), /access\?\.isOwner && access\.userId && !hasSourceAttachment\n/)
+  assert.doesNotMatch(route.slice(ownerTarget, queue), /signalBoostProjectBound/)
+  // A clipped log that does not parse as failed can still reach the lane, as it does directly.
+  assert.doesNotMatch(route.slice(ownerTarget, queue), /operationalLogAnalysis\.failed/)
+})
+
+test('repository authority still requires owner plus project evidence, never the branch gate alone', () => {
+  const flag = route.indexOf('const ownerDeveloperLogSubmission =')
+  assert.ok(flag >= 0)
+  const block = route.slice(flag, flag + 400)
+  assert.match(block, /access\?\.isOwner === true/)
+  assert.match(block, /operationalEvidence/)
+  assert.match(block, /SIGNALBOOST_OPERATIONAL_TARGET\.test\(operationalPrompt\) \|\| isSignalBoostDeploymentContext\(req\)/)
 })
 
 test('quoted clone and failure lines alone do not satisfy operational-log evidence', () => {

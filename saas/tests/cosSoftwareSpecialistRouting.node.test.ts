@@ -1,0 +1,56 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+import { getA2ASpecialistFamily } from '../a2a-host/a2a-specialist-catalog.ts'
+
+const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
+
+test('Software Specialist is a canonical proficient specialist family with governed engineering skills', () => {
+  const family = getA2ASpecialistFamily('software')
+  assert.equal(family.displayName, 'Software Specialist')
+  assert.match(family.purpose, /Broadly proficient/i)
+  assert.deepEqual(
+    family.skills.map(skill => skill.skillId),
+    ['software.analyze', 'software.build', 'software.repair', 'software.platform-repair', 'software.verify'],
+  )
+  assert.equal(family.skills.find(skill => skill.skillId === 'software.platform-repair')?.risk, 'write')
+})
+
+test('COS Software Specialist owns Builder and owner Platform Engineer execution seams', () => {
+  const source = read('../lib/ai/cos/softwareSpecialist.ts')
+  assert.match(source, /export async function tryCosSoftwareSpecialist/)
+  assert.match(source, /isConciergeBuilderObjective/)
+  assert.match(source, /enqueueBuilderJob/)
+  assert.match(source, /enqueueSignalBoostRepositoryRepairJob/)
+  assert.match(source, /input\.allowRepositoryRepair && access\?\.isOwner && access\.userId && !sourceAttached/)
+  assert.match(source, /specialist_family: 'software'/)
+  assert.match(source, /orchestrator: 'cos'/)
+})
+
+test('Concierge delegates coding to COS Software Specialist without repository authority', () => {
+  const source = read('../app/api/concierge/route.ts')
+  assert.match(source, /tryCosSoftwareSpecialist/)
+  assert.match(source, /surface: 'concierge'/)
+  assert.match(source, /allowRepositoryRepair: false/)
+  assert.doesNotMatch(source, /const builder = await directBuilder\(body, input\)/)
+})
+
+test('owner Assistant uses the same Software Specialist and no longer jumps to Concierge for coding', () => {
+  const source = read('../app/api/cos-browser/route.ts')
+  assert.match(source, /tryCosSoftwareSpecialist/)
+  assert.match(source, /surface: 'assistant'/)
+  assert.match(source, /allowRepositoryRepair: true/)
+  assert.match(source, /withRunpodWakePermission\(permission, \(\) => cosPrimaryPost\(routedRequest\)\)/)
+  assert.doesNotMatch(source, /legacyConciergePost/)
+})
+
+test('surface authority remains asymmetric even though the software execution path is shared', () => {
+  const concierge = read('../app/api/concierge/route.ts')
+  const assistant = read('../app/api/cos-browser/route.ts')
+  const specialist = read('../lib/ai/cos/softwareSpecialist.ts')
+
+  assert.match(concierge, /allowRepositoryRepair: false/)
+  assert.match(assistant, /allowRepositoryRepair: true/)
+  assert.match(specialist, /ownerAuthorized: access\?\.isOwner === true/)
+  assert.match(specialist, /Public Concierge intentionally receives guest access under public-delivery scope/)
+})

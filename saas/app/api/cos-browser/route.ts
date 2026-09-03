@@ -1,7 +1,6 @@
 // saas/app/api/cos-browser/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
-import { POST as legacyConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
 import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
@@ -14,7 +13,7 @@ import { readCosPrimaryPriorProvenance } from '@/lib/ai/cos/cosPrimaryTurnProven
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
-import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { tryCosSoftwareSpecialist } from '@/lib/ai/cos/softwareSpecialist'
 import { analyzeOperationalLog, hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { diagnoseOperationalLog } from '@/lib/ai/cos/operationalLogDiagnostic'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget, type SignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
@@ -38,6 +37,9 @@ function isSignalBoostDeploymentContext(req: NextRequest): boolean {
   return (owner === 'signalboost' && repo === 'signalboost-live') || host === 'saas.signalboostapp.com'
 }
 
+// Transitional fallback while the first Software Specialist slice is being accepted. The shared
+// specialist resolves this same owner-only target first; keeping this exact lane temporarily means a
+// specialist-classification regression cannot silently remove already-proven Platform Engineer authority.
 async function queueOwnerRepositoryRepair(input: {
   body: any
   userId: string
@@ -118,10 +120,10 @@ function builderRoutingContextFromBody(body: any) {
  *
  * Operational/build logs are a first-class input type. They are resolved here before any artifact,
  * visual, provenance, generic-COS, or ordinary Builder route can reinterpret words inside the log.
- * An authenticated owner failed SignalBoost log enters the pinned Platform Engineer lane; public or
- * analysis-only logs enter a bounded COS diagnostic lane that has no tools or execution authority.
- * Source-attached repairs remain ordinary Builder work so the supplied file can be inspected, edited,
- * run, and verified in its isolated workspace.
+ * An authenticated owner failed SignalBoost log enters the pinned Software Specialist / Platform
+ * Engineer lane; public or analysis-only logs enter a bounded COS diagnostic lane that has no tools
+ * or execution authority. Source-attached repairs enter the Software Specialist sandbox so the
+ * supplied file can be inspected, edited, run, and verified.
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
@@ -155,25 +157,27 @@ export async function POST(req: NextRequest) {
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
     branch: process.env.VERCEL_GIT_COMMIT_REF,
   }
+
+  // COS owns specialist selection. Both ordinary code work and the owner-only pinned repository
+  // repair capability enter the Software Specialist before any surface-specific fallback can decide
+  // to act as a second coding brain.
+  const softwareSpecialist = await tryCosSoftwareSpecialist({
+    body,
+    objective: operationalPrompt || prompt,
+    surface: 'assistant',
+    allowRepositoryRepair: true,
+    signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
+    deployment,
+  })
+  if (softwareSpecialist) return softwareSpecialist
+
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
   const exactFailedLogTarget = operationalEvidence
     ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
 
-  // ONE OWNER REPOSITORY LANE, AND IT MUST MATCH THE DIRECT DEVELOPER SURFACE.
-  // 2026-09-03: the same owner paste reached the repository lane through /api/builder but not
-  // through this ingress, because this route added two preconditions the direct route does not
-  // have: a hard `signalBoostProjectBound` AND on the whole branch, and a requirement that the
-  // pasted log already parse as FAILED. A log pasted from below its Cloning line, or one whose
-  // failure block was clipped, silently dropped out of the repository lane here and landed in the
-  // staged-workspace lane whose workspace holds only the paths the log happens to name — which is
-  // why Builder "worked directly but not through COS or Concierge".
-  //
-  // Authority is NOT widened by removing them. signalBoostDeployedRepairTarget() still returns null
-  // unless the objective is an explicit platform-repair objective or ownerDeveloperLogSubmission is
-  // true, and this branch still requires an authenticated owner with no source attachment. The
-  // owner/log/project evidence now enters exactly where the direct route puts it: as the option on
-  // the deployed fallback, not as a gate on the branch.
+  // Transitional defense-in-depth fallback. The Software Specialist above owns the active decision;
+  // this branch preserves the previously accepted owner lane until the shared path is Production-observed.
   const ownerDeveloperLogSubmission = access?.isOwner === true
     && operationalEvidence
     && (SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req))
@@ -297,7 +301,9 @@ export async function POST(req: NextRequest) {
     auditIdentityCaptured: Boolean(auditUserId),
   }))
 
-  const executeRoutedRequest = () => withRunpodWakePermission(permission, () => isConciergeBuilderObjective(operationalPrompt, routingContext) ? legacyConciergePost(routedRequest) : cosPrimaryPost(routedRequest))
+  // Non-specialist work always continues through the COS brain. The browser surface no longer
+  // decides that a coding-looking prompt should jump directly into the Concierge route.
+  const executeRoutedRequest = () => withRunpodWakePermission(permission, () => cosPrimaryPost(routedRequest))
 
   // Public-delivery scope is a data-isolation boundary for Concierge/guest traffic. It must never
   // wrap the authenticated owner Assistant: privileged COS needs owner-scoped memory/provenance and

@@ -276,8 +276,15 @@ test('Phase 2 preserves advisory execution and denies unauthorized skill without
   assert.equal(transports, 1)
 })
 
-test('specialist catalog defines marketing, sales, and separated self-healing roles with explicit risk', () => {
-  assert.equal(A2A_SPECIALIST_FAMILIES.length, 5)
+test('specialist catalog defines Software, marketing, sales, and separated self-healing roles with explicit risk', () => {
+  assert.equal(A2A_SPECIALIST_FAMILIES.length, 6)
+  const software = getA2ASpecialistFamily('software')
+  assert.match(software.purpose, /Broadly proficient/i)
+  assert.equal(software.skills.find(skill => skill.skillId === 'software.analyze')?.risk, 'advisory')
+  assert.equal(software.skills.find(skill => skill.skillId === 'software.build')?.risk, 'write')
+  assert.equal(software.skills.find(skill => skill.skillId === 'software.repair')?.risk, 'write')
+  assert.equal(software.skills.find(skill => skill.skillId === 'software.platform-repair')?.risk, 'write')
+  assert.equal(software.skills.find(skill => skill.skillId === 'software.verify')?.risk, 'advisory')
   assert.equal(getA2ASpecialistFamily('marketing').skills.find(skill => skill.skillId === 'marketing.campaign-mutate')?.risk, 'consequential')
   assert.equal(getA2ASpecialistFamily('sales').skills.find(skill => skill.skillId === 'sales.crm-write')?.risk, 'write')
   assert.equal(getA2ASpecialistFamily('self-healing-diagnostic').skills.every(skill => skill.risk === 'advisory'), true)

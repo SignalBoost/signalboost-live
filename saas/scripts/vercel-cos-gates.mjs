@@ -20,6 +20,7 @@ const tests = [
   'tests/builderObjectiveContract.node.test.ts',
   'tests/builderDebugFileJob.node.test.ts',
   'tests/builderRoutingStrict.node.test.ts',
+  'tests/builderModelRouting.node.test.ts',
   'tests/assistantHistoryOrdering.node.test.ts',
   'tests/assistantSourceFileBoundary.node.test.ts',
   'tests/conciergeOperationalLogRouting.node.test.ts',

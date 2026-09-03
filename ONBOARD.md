@@ -3,8 +3,8 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.31
-**Updated:** 2026-09-01 UTC
+**Version:** 1.32
+**Updated:** 2026-09-02 UTC
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
 **Accepted cognitive implementation baseline:** `84de50b8e67feea2e27d658e4cc3982e9e97a603`  
 **Accepted cognitive Production deployment:** `dpl_8qetGZ2HumG3Cc5RMh1zcxtaZhLF` — READY, `saas.signalboostapp.com` attached  
@@ -13,6 +13,7 @@
 **Owner-directed promotion cron:** repaired in Production on 2026-08-27 by applying the already-repo-owned missing `cos_knowledge_fact_revisions` migration; consecutive scheduled runs returned 200 and advanced the real queue without lowering evidence gates  
 **COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
 **COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
+**Builder coding-specialist routing:** workstream active on `feat/cos-deepseek-coding-router-20260902` and **not Production-accepted**. Ordinary COS / Concierge remains on `Qwen/Qwen3.6-35B-A3B`; authenticated coding, debugging, Builder and owner-authorized COS Platform Engineer model-control work is being routed through a dedicated DeepInfra coding port using `deepseek-ai/DeepSeek-V4-Flash-0731`. This changes model compute only: existing intent, sandbox, repository, approval, secret, deployment and merge authority boundaries remain unchanged. The specialist shares the existing approved DeepInfra base URL/API-key boundary and is selected only by server-owned `BUILDER_AI_MODEL`; arbitrary browser/user model selection is prohibited. Builder control turns bypass the general COS exact-answer cache so stale Qwen control output cannot be reused as DeepSeek output over mutable workspace state. Automatic DeepSeek V4 Pro escalation is deliberately disabled until measured Builder quality/cost evidence justifies a separate promotion. Required acceptance: deterministic routing regressions, existing Builder/security regressions green, exact Preview TypeScript/build/Vercel gates green, current-main serialization discipline, Production READY, and a fresh authenticated verified Builder coding observation with truthful model telemetry. See `docs/HANDOFF-COS-DEEPSEEK-CODING-ROUTER-2026-09-02.md`.  
 **RunPod:** no longer used — COS inference and embeddings run entirely on DeepInfra. RunPod lifecycle is permanently detached; remaining RunPod code paths are dormant legacy pending removal and must not be reintroduced  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
 **Normative/public-policy answer consistency:** Production behavior was confirmed across owner and unauthenticated Public Concierge sessions after `066811cc`: answers no longer lead with yes/no and preserve the same neutral meaning across wording variants. Follow-up acceptance exposed one remaining defect: the normative route produced uncited legal, historical, scientific, and statistical premises. The current implementation therefore routes the entire normative class through live evidence regardless of whether the prompt says `legal`, `allowed`, or `permitted`, while fresh synthesis enforces the neutral, non-binary evidence-map contract. Material descriptive claims must retain recorded live citations; the final weighting of competing values remains explicitly value-dependent. The motivating three-question cohort plus broader death-penalty, religious-clothing, assisted-dying, compulsory-vaccination, voting-age, and sports-eligibility variants are mandatory deployment regressions. Owner follow-up requires every normative answer to bypass semantic/exact answer cache, retrieve live evidence for the strongest supporting and opposing arguments, and render those source groups separately. The implementation on `fix/normative-balanced-live-sources-20260901` is awaiting CI/Preview acceptance; Production has not yet accepted this balanced-provenance contract.
@@ -36,7 +37,7 @@
 
 **Builder certification outcome records:** implementation is merged; the Production migration was applied on 2026-08-30 and verified with RLS enabled and zero `anon`/`authenticated` read privilege. A completed Builder turn is classified from tool evidence at its highest earned level and records only case ID, pass/fail, reason codes, owner/workspace identity, and timestamp. It stores no source, command, output, prompt, or answer. Deployment READY and real Production observations remain required before certification can guide authority expansion.
 
-**Builder certification visibility:** repaired and deployed to Production on 2026-08-30 as `38da6dbb53463e5e39f1c75d06872457a06aaa7e`, deployment `dpl_CBrp1Tmammuy3xmHDzZCFFsiaGJL` — READY with `saas.signalboostapp.com` attached. The certification label is now in `generatedUi` and complete across English, Spanish, Portuguese, Polish, and Russian. A fresh authenticated Builder observation remains required before calling the display runtime-accepted.
+**Builder certification visibility:** repaired and deployed to Production on 2026-08-30 as `38da6dbb53463e5e39f1c75d06872457a06aaa7e`, deployment `dpl_CBrp1Tmammuy3xmHDzZCFFsiaGJL` — READY with `saas.signalboostapp.com` attached. A fresh authenticated Builder observation remains required before calling the display runtime-accepted.
 
 **Builder repair regression gate:** implemented locally and not yet Production-accepted. A repair objective must show regression evidence in one turn: test failure before the source repair, then a passing rerun after it. It accepts an existing reproducing test or a new one. Ordinary creation tasks are not blocked by this rule; they require only their requested successful proving command. Platform defects outside a user workspace require repository-level regressions, not fabricated workspace tests.
 
@@ -129,6 +130,17 @@ COS
 → Qwen/Qwen3.6-35B-A3B
 ```
 
+Builder coding-specialist candidate transport on `feat/cos-deepseek-coding-router-20260902` (**branch only; not current Production truth**):
+
+```text
+Concierge / COS coding intent
+→ existing Builder / Platform Engineer authorization boundary
+→ server-owned BUILDER_AI_MODEL selector
+→ existing LOCAL_AI_* DeepInfra transport + credential boundary
+→ deepseek-ai/DeepSeek-V4-Flash-0731
+→ existing inspect / edit / run / verify loop
+```
+
 Embedding path:
 
 ```text
@@ -156,6 +168,8 @@ LOCAL_AI_REASONING_EFFORT=none
 LOCAL_AI_MANAGED_PROVIDER=deepinfra
 LOCAL_AI_API_KEY=<server-side secret>
 ```
+
+Candidate branch adds server-owned `BUILDER_AI_MODEL=deepseek-ai/DeepSeek-V4-Flash-0731`; do not describe that setting as current Production until the workstream completes the acceptance gate above.
 
 Never commit, print or expose provider secrets.
 
@@ -261,7 +275,7 @@ ads.<network>.campaign.create         -> consequential + approval required
 ads.<network>.campaign.pause          -> consequential + approval required
 ```
 
-Cross-portable visibility is exact and deny-by-default. Production migration `provider_hub_portable_capability_grants` is applied; RLS is enabled; direct `anon`/`authenticated` table privileges are zero; the table stores authorization metadata only and no provider credential/token columns. Admin route: `/api/provider-hub/marketing-sales-capabilities`.
+Cross-portable visibility is exact and deny-by-default. Production migration `provider_hub_portable_capability_grants` is applied; RLS is enabled; direct `anon`/`authenticated` table privileges are zero; the table stores authorization metadata only and no provider secret/token columns. Admin route: `/api/provider-hub/marketing-sales-capabilities`.
 
 Critical boundary: this phase exposes capability discovery and authorization only. It does not route social publishing or paid-ad mutations through the generic Portable Connector Runtime. Existing Marketing + Sales content approval, spend approval, cap, confirmation, reconciliation, pause and audit paths remain authoritative. Before shared mutation execution is enabled, separately close and accept invocation-bound approval verification, cancellation/idempotency after mutation timeouts, and post-execution audit-failure semantics. Do not weaken existing Marketing + Sales governance to make the connector fabric look more complete.
 
@@ -521,8 +535,8 @@ Relevant merged sequence on 2026-08-24:
 - **#1474** — permanent homepage response card and broader edit-request recognition;
 - **#1475** — real browser-ingress routing fix so text transformations run before freshness and public scope begins at `/api/cos-browser`;
 - **#1476** — businesslike editing, quoted-thread exclusion, five-locale transformation contract;
-- **#1478** — executive communication framework across EN/PT-BR/ES/PL/RU;
-- **#1479** — quoted email retained as read-only context, second-pass professional copy editing, and initial composer-reset work.
+- **#1478** — five-language executive communication framework across EN/PT-BR/ES/PL/RU;
+- **#1479** — context-aware quoted-mail editing, second-pass professional copy editing and first composer-reset implementation.
 
 Historical Production baseline immediately after #1479 plus the first deterministic contextual guard was `main` `3a3dc7a8c0d246f5b6b884b820ddab89e3811947`, deployment `dpl_7RMTmwRwCrSjPkyhVY8F8cpbiYrX` — READY. Always use the current top-of-file accepted baseline for present Production state.
 
@@ -1073,7 +1087,7 @@ Already present:
 
 Implemented: prompt-free deterministic post-turn assessments of explicit retrieval artifacts; exact-turn outcome reconciliation; owner-only read report; predictive gates (12 distinct outcomes, both labels, accuracy, Brier score and failure-risk separation). The reflection records a shadow-only recommendation and cannot change live retrieval policy.
 
-Migration `cos_retrieval_self_reflection_20260822` is applied and Production is READY. Completion criterion: real verified outcomes must show sufficient predictive value before a separate controlled shadow-policy validation; no live policy change is permitted before then.
+Migration `cos_retrieval_self_reflection_20260822` is applied and Production is READY. Completion criterion: real verified outcomes must show sufficient predictive value before a separate shadow-policy validation; no live policy change is permitted before then.
 
 ---
 

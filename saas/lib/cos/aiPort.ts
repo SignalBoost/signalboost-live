@@ -1,6 +1,7 @@
 // saas/lib/cos/aiPort.ts
 // Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
 // existing Portables gain durable reuse and single-flight protection without owning provider logic.
+import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { callProviderModel, type ModelProvider } from '@/lib/ai/providerRouter'
 import { callCosText } from '@/lib/cos/textGateway'
 
@@ -10,6 +11,12 @@ export interface CosAiPort {
 
 export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
 
+export const DEFAULT_BUILDER_CODING_MODEL = 'deepseek-ai/DeepSeek-V4-Flash-0731'
+
+export function builderCodingModelFromEnv(): string {
+  return process.env.DEEPINFRA_BUILDER_MODEL?.trim() || DEFAULT_BUILDER_CODING_MODEL
+}
+
 function requireText(result: string | null, provider: string): string {
   if (!result) throw new Error(`${provider} AI provider returned no text`)
   return result
@@ -18,6 +25,31 @@ function requireText(result: string | null, provider: string): string {
 export function createPlatformAiPort(): CosAiPort {
   return {
     generate: async (input) => requireText(await callCosText({ ...input, taskId: 'cos-portable-text' }), 'platform'),
+  }
+}
+
+/**
+ * Coding-specialist port for Builder and Platform Engineer.
+ *
+ * Keep coding work on the approved local/DeepInfra inference boundary, but select the coding model
+ * independently from the general COS reasoner. This intentionally bypasses shared answer caching and
+ * external-provider fallback: Builder must reason from the current workspace/repository evidence and
+ * prove its result with tools rather than reuse a prior prose answer. The local inference layer still
+ * records the exact selected model in its telemetry.
+ */
+export function createBuilderCodingAiPort(): CosAiPort {
+  return {
+    generate: async (input) => {
+      const config = localInferenceConfigFromEnv()
+      return requireText(await callLocalModel({
+        prompt: input.prompt,
+        systemPrompt: input.systemPrompt,
+        maxTokens: input.maxTokens,
+      }, {
+        ...config,
+        model: builderCodingModelFromEnv(),
+      }), 'builder coding')
+    },
   }
 }
 

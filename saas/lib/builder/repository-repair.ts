@@ -1,4 +1,4 @@
-import { createPlatformAiPort } from '../cos/aiPort.ts'
+import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
 import { normalizeBuilderSandboxCommand } from './project-context.ts'
@@ -133,7 +133,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
     }
 
     const result = await new BuilderToolLoop(
-      createGovernedBuilderAiPort(createPlatformAiPort(), { deadlineAtMs: aiDeadlineAtMs }),
+      createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: aiDeadlineAtMs }),
       session,
       repositoryRunner,
     ).run({

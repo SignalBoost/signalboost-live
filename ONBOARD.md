@@ -3,7 +3,7 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.32
+**Version:** 1.33
 **Updated:** 2026-09-03 UTC
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
 **Accepted cognitive implementation baseline:** `84de50b8e67feea2e27d658e4cc3982e9e97a603`  
@@ -11,9 +11,8 @@
 **Google Sheets connector state:** Production OAuth and encrypted persistence accepted with both required read-only scopes; live Production spreadsheet discovery found one real native Sheet after PR #1535; one live SignalBoost range-read POST remains to be observed before calling the whole external read path accepted  
 **Provider Hub connector-fabric state:** PR #1536 merged as `99c8d6dddf5937c170138b3abfa332714909d156`; Production `dpl_J9o8sG69kWgHKZH4jRs8VTUyme7p` READY; existing Marketing + Sales social/ad adapters are reusable through deny-by-default capability discovery/authorization; shared mutation execution is deliberately **not** delegated yet  
 **Owner-directed promotion cron:** repaired in Production on 2026-08-27 by applying the already-repo-owned missing `cos_knowledge_fact_revisions` migration; consecutive scheduled runs returned 200 and advanced the real queue without lowering evidence gates  
-**COS primary reasoner:** DeepInfra managed open-model runtime → `Qwen/Qwen3.6-35B-A3B`  
-**Builder coding reasoner — PR #1809 implementation / runtime acceptance pending:** DeepInfra managed open-model runtime → `deepseek-ai/DeepSeek-V4-Flash-0731`. This coding model is selected only after a request has entered authenticated COS Builder or COS Platform Engineer; ordinary COS and Concierge reasoning remains on `Qwen/Qwen3.6-35B-A3B`. Builder uses the existing DeepInfra endpoint and credentials through a dedicated coding port, bypassing shared answer-cache reuse and external-provider fallback while preserving all existing workspace/repository authority, sandbox, approval, and proving-command gates. `DEEPINFRA_BUILDER_MODEL` is an independent controlled-evaluation override; no automatic DeepSeek V4 Pro escalation is enabled.
-**COS embedding model:** DeepInfra → `BAAI/bge-base-en-v1.5` → 768 dimensions  
+**Runtime model topology source of truth:** current model/provider identifiers are read only from the live runtime variables `LOCAL_AI_MODEL`, `DEEPINFRA_BUILDER_MODEL`, `LOCAL_AI_EMBEDDING_MODEL`, and `LOCAL_AI_MANAGED_PROVIDER`. Source code and this document do **not** supply model/provider fallbacks. Owner self-knowledge receives configured identifiers as verbatim factual atoms; if a value is absent it must report `NOT CONFIGURED` rather than infer a likely value. Builder/Platform Engineer execution fails closed with `builder_model_not_configured` when `DEEPINFRA_BUILDER_MODEL` is absent or blank.  
+**Observed Builder runtime evidence — 2026-09-03:** real accepted Production Builder/Platform Engineer inference telemetry on deployment `dpl_7USjZVXb4GwMBUJxSH2ASEGv8h8H` recorded `deepseek-ai/DeepSeek-V4-Pro-0813`. This is an observed runtime fact for those calls, **not** a source-code default and **not** authority for future deployments; future current-state answers must read the live runtime again.  
 **RunPod:** no longer used — COS inference and embeddings run entirely on DeepInfra. RunPod lifecycle is permanently detached; remaining RunPod code paths are dormant legacy pending removal and must not be reintroduced  
 **COS learning:** COS-owned memory, knowledge, skills, telemetry and verified outcomes; not provider-weight fine-tuning  
 **Normative/public-policy answer consistency:** Production behavior was confirmed across owner and unauthenticated Public Concierge sessions after `066811cc`: answers no longer lead with yes/no and preserve the same neutral meaning across wording variants. Follow-up acceptance exposed one remaining defect: the normative route produced uncited legal, historical, scientific, and statistical premises. The current implementation therefore routes the entire normative class through live evidence regardless of whether the prompt says `legal`, `allowed`, or `permitted`, while fresh synthesis enforces the neutral, non-binary evidence-map contract. Material descriptive claims must retain recorded live citations; the final weighting of competing values remains explicitly value-dependent. The motivating three-question cohort plus broader death-penalty, religious-clothing, assisted-dying, compulsory-vaccination, voting-age, and sports-eligibility variants are mandatory deployment regressions. Owner follow-up requires every normative answer to bypass semantic/exact answer cache, retrieve live evidence for the strongest supporting and opposing arguments, and render those source groups separately. The implementation on `fix/normative-balanced-live-sources-20260901` is awaiting CI/Preview acceptance; Production has not yet accepted this balanced-provenance contract.
@@ -30,7 +29,7 @@
 **Public provenance / fresh-current reliability:** PR #1538 made public provenance a deterministic view of recorded turn telemetry; PR #1539 bounded transient local fresh-evidence synthesis failures to two local attempts with a 35-second default per-attempt cap, without weakening grounding or enabling external/model-memory fallback. See `docs/HANDOFF-COS-PROVENANCE-TIMEOUT-2026-08-27.md`.  
 **New product workstream:** `SignalBoost Data Center Operations Intelligence` — Phase 1 read-only/advisory implementation is active on `feat/datacenter-operations-intelligence-20260824`; it is **not yet Production**
 **COS Builder developer loop:** the authenticated one-file debug lane and asynchronous durable-History recovery are Production-accepted; broader Builder capability remains evidence-gated. The authenticated Builder has a sandboxed file/edit/run loop; its first end-to-end `hello.js` creation, download, and Node execution was observed successfully in Production. Current intake hardening is implemented locally and not yet Production-accepted: raw requests up to 512,000 characters are accepted, deterministically compacted to the opening user request plus newest diagnostic evidence for the 64,000-character durable-job boundary, and may enter the fixed one-file debug protocol when an explicit repair action plus exactly one supported source attachment is present. Logs or copied History alone still grant no workspace, repository, edit, or execution authority. Failures are observed rather than ending the turn, classified (storage/path/runtime/dependency/test/deployment), and returned with exact safe evidence plus a remediation hint; repeated inspection of unchanged files is rejected without exhausting a work round and removed from both the next model tool list and prompt examples, forcing an edit/run/different diagnostic; a transient Builder model-round timeout gets one bounded retry before the turn fails; after a supplied source file is inspected for a repair, Builder must write/edit/run before it can inspect again or answer; a repair cannot be reported complete without a successful proving command. The server-only `builder_verified_repair_lessons` migration was applied to Production on 2026-08-30 and verified with RLS enabled and zero `anon`/`authenticated` read privilege. It records only a failure followed by a successful proving command: cause evidence, repair summary, regression command, and the fixed node24/network-denied/ephemeral environment. Master-developer program, Phase 1 remains progressively certified on small real tasks before wider repository repairs. Never use raw chat history as training material.
-**Builder model specialization — PR #1809:** implementation routes both ordinary Builder workspace jobs and SignalBoost repository-repair/Platform Engineer jobs through the Builder-only DeepSeek V4 Flash coding port. The mandatory routing regression proves the actual `/chat/completions` request selects `deepseek-ai/DeepSeek-V4-Flash-0731` while `LOCAL_AI_MODEL` remains `Qwen/Qwen3.6-35B-A3B`; TypeScript, full unit tests, Next production build, Playwright, Repo Targeting QA, Main Write Discipline, Onboarding Enforcement, Pipeline Integrity, and other triggered GitHub checks were green on the first PR head before this documentation update. Do not call this Production-accepted until the merged deployment and a real authenticated Builder coding/repair turn show model telemetry for DeepSeek plus successful tool proof. No Pro escalation is part of this change.
+**Builder model specialization — historical rollout evidence:** PR #1809 introduced a Builder-only coding port and evaluated `deepseek-ai/DeepSeek-V4-Flash-0731`. That exact model string is historical rollout evidence only; it is not a current default and does not select the runtime. Current Builder and Platform Engineer model selection is exclusively the live `DEEPINFRA_BUILDER_MODEL` value, with no automatic escalation, aliasing, or source-code fallback. Later accepted Production telemetry on 2026-09-03 observed `deepseek-ai/DeepSeek-V4-Pro-0813`; that later observation likewise remains evidence for those calls rather than configuration authority. Documentation never selects the Builder model.
 
 **COS Platform Engineer:** implementation is active and not Production-accepted. This is a separate, sandboxed agent for preparing verified SignalBoost repository repairs—not a self-modifying or self-deploying COS. Its foundation discovers staged manifests, package manager, scripts, test files, and a recommended proof command; it then enforces inspect → reproduce → minimal repair → rerun the same proof command → approval-ready diff and evidence. Both the direct Developer surface and authenticated owner COS connect verified SignalBoost operational logs to this Engineer without requiring magic repair wording. The canonical server ingress verifies owner identity, SignalBoost project/domain evidence, and the immutable deployed commit/branch before granting repository authority. Repository repair now enters the same durable Builder job/History contract as ordinary Builder work: the request returns after enqueue, background execution is atomically claimed, and success or timeout updates the same History entry instead of holding `/api/cos-primary` open until the page disconnects. The Assistant UI is being consolidated into one full-width workspace card so conversation, long technical output, Builder files, History, and the composer share the available page instead of competing with a separate promotional Concierge header. Public Concierge, members, attachments, incomplete logs, and unrelated-repository logs remain analysis-only or ordinary network-denied workspace jobs with no repository authority. This durable correction and workspace redesign are not yet Production-accepted. Authority remains read/edit/run only inside an ephemeral, network-denied staged repository; secrets, production data, deployment, merge, and self-approval are prohibited. See `docs/COS-PLATFORM-ENGINEER-2026-08-30.md`.
 
@@ -50,7 +49,7 @@
 
 **Builder storage contract:** corrective release deployed to Production on 2026-08-30 as `782347b14bb9a274f97b657d5006fe29dae1d664`, deployment `dpl_DzyRFNoNjEWy3WZMztAhbNA8JCVv` — READY with `saas.signalboostapp.com` attached. The prior release at `b633b84` was blocked before Production because the imported source file was absent. Direct U+0000 content is now rejected before any Supabase call with a distinct `builder_file_contains_null_byte` error; literal `\\0` and `\\u0000` code text is preserved. A fresh authenticated Production rejection observation remains required before runtime acceptance.
 
-> This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
+> This file records current operational truth and acceptance evidence. Historical detail remains in Git history and dated files under `docs/`. **Runtime model/provider configuration is never defined by this file:** where an exact model/provider literal appears as historical or acceptance evidence, the live environment wins for current-state truth. Always re-query GitHub, Vercel and Supabase before acting because concurrent work lands frequently.
 
 **Candidate Lab:** isolated baseline/candidate evaluation on fixed cohorts; it fails closed on regression or no measured improvement and can only recommend human review. It has no repository-write, merge, deployment, or automatic-promotion authority.
 
@@ -127,21 +126,20 @@ Primary reasoner transport:
 COS
 → provider-neutral LOCAL_AI_* seam
 → OpenAI-compatible transport protocol
-→ DeepInfra
-→ Qwen/Qwen3.6-35B-A3B
+→ runtime-selected managed provider
+→ $LOCAL_AI_MODEL (runtime fact; no source-code model default)
 ```
 
 Embedding path:
 
 ```text
 COS semantic retrieval
-→ DeepInfra
-→ BAAI/bge-base-en-v1.5
-→ 768 dimensions
+→ runtime-selected managed provider
+→ $LOCAL_AI_EMBEDDING_MODEL (runtime fact; no source-code model default)
 → model-aware pgvector stores
 ```
 
-The `/v1/openai` path is protocol compatibility only. OpenAI is not the provider for this reasoner path.
+The `/v1/openai` path is protocol compatibility only. It does not by itself identify the provider or model.
 
 ---
 
@@ -152,12 +150,15 @@ Expected Production settings:
 ```dotenv
 LOCAL_AI_BASE_URL=https://api.deepinfra.com/v1/openai
 LOCAL_AI_ALLOWED_HOSTS=api.deepinfra.com
-LOCAL_AI_MODEL=Qwen/Qwen3.6-35B-A3B
-LOCAL_AI_EMBEDDING_MODEL=BAAI/bge-base-en-v1.5
+LOCAL_AI_MODEL=<required runtime-selected general reasoner model id>
+DEEPINFRA_BUILDER_MODEL=<required runtime-selected Builder / Platform Engineer model id>
+LOCAL_AI_EMBEDDING_MODEL=<required runtime-selected embedding model id>
 LOCAL_AI_REASONING_EFFORT=none
-LOCAL_AI_MANAGED_PROVIDER=deepinfra
+LOCAL_AI_MANAGED_PROVIDER=<required runtime-selected managed provider id>
 LOCAL_AI_API_KEY=<server-side secret>
 ```
+
+`DEEPINFRA_BUILDER_MODEL` is required for Builder/Platform Engineer execution. Missing or blank means configuration failure; it must never silently select a model from source code, documentation, model memory, or an old deployment observation.
 
 Never commit, print or expose provider secrets.
 
@@ -167,15 +168,17 @@ Never commit, print or expose provider secrets.
 
 DeepInfra production cutover and model-space repair are complete.
 
+Accepted historical evidence includes successful managed reasoner completions and 768-dimensional embedding responses under the then-configured runtime. These observations document accepted migrations; they do not define the model/provider identifiers a future runtime must use.
+
 Accepted facts:
 
-- DeepInfra/Qwen reasoner health and real completions passed.
-- BGE embeddings return exactly 768 dimensions.
-- embedding model identity is part of the semantic schema; equal dimensions do not imply compatible vector spaces.
-- historical incompatible vector space was not reused merely because dimensions matched.
-- retained learned knowledge is continuously indexed/re-indexed into the active model space.
-- rejected/quarantined corpus rows remain excluded from governed retrieval.
-- RunPod is no longer used. COS inference and embeddings run entirely on DeepInfra; the RunPod lifecycle is permanently detached and its remaining code paths are dormant legacy pending removal. Do not reintroduce RunPod as a reasoner, embedding, or compute dependency.
+- the managed reasoner health and real completions passed during the accepted migration;
+- the accepted embedding runtime returned exactly 768 dimensions;
+- embedding model identity is part of the semantic schema; equal dimensions do not imply compatible vector spaces;
+- historical incompatible vector space was not reused merely because dimensions matched;
+- retained learned knowledge is continuously indexed/re-indexed into the active model space;
+- rejected/quarantined corpus rows remain excluded from governed retrieval;
+- RunPod is no longer used. COS inference and embeddings run entirely on the approved managed runtime; the RunPod lifecycle is permanently detached and its remaining code paths are dormant legacy pending removal. Do not reintroduce RunPod as a reasoner, embedding, or compute dependency.
 
 ---
 
@@ -1039,7 +1042,7 @@ The trigger is model-free and never answers, scores, resolves, or modifies confi
 
 # Local discovery — IMPLEMENTED AND LIVE
 
-Real-world place queries use live discovery evidence rather than stale model memory. The route prefers deterministic grounded answers when evidence is sufficient, otherwise COS/Qwen evidence-only synthesis, with external fallback optional rather than required.
+Real-world place queries use live discovery evidence rather than stale model memory. The route prefers deterministic grounded answers when evidence is sufficient, otherwise COS evidence-only synthesis, with external fallback optional rather than required.
 
 Conceptual questions must not be hijacked by local-place discovery.
 
@@ -1075,7 +1078,7 @@ Already present:
 
 Implemented: prompt-free deterministic post-turn assessments of explicit retrieval artifacts; exact-turn outcome reconciliation; owner-only read report; predictive gates (12 distinct outcomes, both labels, accuracy, Brier score and failure-risk separation). The reflection records a shadow-only recommendation and cannot change live retrieval policy.
 
-Migration `cos_retrieval_self_reflection_20260822` is applied and Production is READY. Completion criterion: real verified outcomes must show sufficient predictive value before a separate controlled shadow-policy validation; no live policy change is permitted before then.
+Migration `cos_retrieval_self_reflection_20260822` is applied and Production is READY. Completion criterion: real verified outcomes must show sufficient predictive value before a separate shadow-policy validation; no live policy change is permitted before then.
 
 ---
 
@@ -1169,6 +1172,7 @@ Still required before calling it production-runtime-proven: a safe controlled an
 Non-negotiable:
 
 - never hard-code or expose provider secrets;
+- **never hard-code current model/provider identities as runtime truth; live environment configuration is authoritative and missing values fail closed or report NOT CONFIGURED as appropriate;**
 - owner/admin routes remain server-gated;
 - cron routes remain protected;
 - preserve tenant/org scoping and RLS/service-role assumptions;
@@ -1224,6 +1228,8 @@ Non-negotiable:
 - #1536 — existing Marketing + Sales social/ad adapters exposed through Provider Hub discovery + exact deny-by-default cross-portable authorization; shared social/financial mutation execution deliberately not delegated.
 - #1538 — public provenance integrity: both public ingress paths render only recorded preceding-turn provenance; model-generated provenance was removed; Production `dpl_AADtkvEwGaX9XoUNm93tGYDjMhMi` READY.
 - #1539 — fresh-evidence local synthesis resilience: maximum two local transport attempts, 35-second default per-attempt timeout, grounding failures still fail closed, no new external/model-memory fallback; merge `84de50b8…`, Production `dpl_8qetGZ2HumG3Cc5RMh1zcxtaZhLF` READY; mandatory gate 461/461.
+- #1809 — historical introduction of the independent Builder coding port and its then-selected evaluation model; current model identity is not inherited from this PR and must be read from the live runtime.
+- #1820 — DeepSeek-compatible Builder control-envelope normalization; merge `d2ef42ff…`, accepted Production `dpl_7USjZVXb4GwMBUJxSH2ASEGv8h8H`; real Production Builder telemetry on 2026-09-03 recorded the exact model identifier used for those calls. That observation is evidence, not a default.
 - 2026-08-27 owner-directed promotion repair — existing `cos_knowledge_fact_revisions` migration applied to Production; consecutive scheduled promotion runs returned 200 and advanced real documents/facts/queue state without weaker gates.
 - Retrieval Self-Reflection — deterministic prompt-free retrieval assessment, exact-outcome correlation and shadow-only predictive gates.
 - Evidence-triggered answer retest — bounded evidence-arrival promotion of failed prompts into budgeted benchmark cases.
@@ -1288,7 +1294,8 @@ A synthetic data-center simulator pass is not real-facility proof.
 A correlated alarm cluster is not a proven physical root cause.  
 An advisory recommendation is not authorization to control facility equipment.  
 Successful live retrieval is not the same as successful synthesis; a bounded retry is not permission to weaken evidence or provenance.  
-A recorded provenance report is execution history, not a story a model may reconstruct.
+A recorded provenance report is execution history, not a story a model may reconstruct.  
+A model/provider name written in source code or documentation is not current runtime truth. Current model/provider identity comes only from verified runtime configuration and telemetry.
 
 ---
 

@@ -4,6 +4,10 @@
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { callProviderModel, type ModelProvider } from '@/lib/ai/providerRouter'
 import { callCosText } from '@/lib/cos/textGateway'
+import {
+  DEFAULT_BUILDER_CODING_MODEL,
+  currentPlatformModelTopology,
+} from '@/lib/ai/cos/platformIdentityContext'
 
 export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
@@ -11,10 +15,10 @@ export interface CosAiPort {
 
 export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
 
-export const DEFAULT_BUILDER_CODING_MODEL = 'deepseek-ai/DeepSeek-V4-Pro'
+export { DEFAULT_BUILDER_CODING_MODEL }
 
 export function builderCodingModelFromEnv(): string {
-  return process.env.DEEPINFRA_BUILDER_MODEL?.trim() || DEFAULT_BUILDER_CODING_MODEL
+  return currentPlatformModelTopology().builderCodingModel
 }
 
 function requireText(result: string | null, provider: string): string {

@@ -1,4 +1,4 @@
-import { createPlatformAiPort } from '../cos/aiPort.ts'
+import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
@@ -181,7 +181,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     }
 
     const deadlineAtMs = Date.now() + BUILDER_JOB_BUDGET_MS
-    const ai = createGovernedBuilderAiPort(createPlatformAiPort(), {
+    const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), {
       deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
     })
     const runner = new VercelSandboxBuilderRunner()

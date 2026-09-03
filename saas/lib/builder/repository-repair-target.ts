@@ -24,6 +24,19 @@ const SOURCE_PATH = /(?:\.\/([A-Za-z0-9_@.+-]+(?:\/[A-Za-z0-9_@.+-]+)*\.[A-Za-z0
 const TEST_PATH = /\b((?:tests|test)\/[A-Za-z0-9_@.+/-]+\.test\.(?:ts|tsx|js|mjs|cjs|mts|cts))(?::\d+(?::\d+)?)?/gi
 const MAX_FAILURE_EVIDENCE = 40
 const EXPLICIT_PLATFORM_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\b|(?:^|[\n.!?]\s*)(?:(?:my|the)\s+)?(?:builder|signalboost(?:\s+platform)?|repository|repo|platform)\s+(?:is\s+|keeps?\s+)?(?:broken|failing|not\s+working)\b/i
+const PLATFORM_REPAIR_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct|diagnose|resolve)\b/i
+const PLATFORM_REPAIR_SUBJECT = /\b(?:builder|cos|signalboost(?:\s+platform)?|repository|repo|platform)\b/i
+const PLATFORM_REPAIR_FAILURE = /\b(?:broken|failed|failing|stuck|not\s+working|did\s+not\s+(?:arrive|complete|produce|return)|finished\s+without|still\s+running|job\s+status|final\s+result|verifiable\s+(?:result|success|failure|outcome)|clear\s+(?:success|completion)|underlying\s+platform\s+issue)\b/i
+
+function isExplicitPlatformRepairObjective(input: string): boolean {
+  const objective = String(input || '').trim()
+  return EXPLICIT_PLATFORM_REPAIR.test(objective)
+    || (
+      PLATFORM_REPAIR_ACTION.test(objective)
+      && PLATFORM_REPAIR_SUBJECT.test(objective)
+      && PLATFORM_REPAIR_FAILURE.test(objective)
+    )
+}
 
 function unique(values: readonly string[], limit: number): readonly string[] {
   return Object.freeze([...new Set(values.map(value => value.trim()).filter(Boolean))].slice(0, limit))
@@ -140,7 +153,7 @@ export function signalBoostDeployedRepairTarget(
   const objective = String(input || '').trim()
   const commitSha = String(deployment.commitSha || '').trim().toLowerCase()
   const branch = String(deployment.branch || 'main').trim()
-  if (!objective || (!EXPLICIT_PLATFORM_REPAIR.test(objective) && options.ownerDeveloperLogSubmission !== true)) return null
+  if (!objective || (!isExplicitPlatformRepairObjective(objective) && options.ownerDeveloperLogSubmission !== true)) return null
   if (!/^[0-9a-f]{40}$/.test(commitSha) || !SAFE_BRANCH.test(branch)) return null
   return Object.freeze({
     trigger: 'deployed_platform_objective',

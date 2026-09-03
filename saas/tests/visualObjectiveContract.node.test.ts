@@ -13,9 +13,10 @@ const home = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
 const assistantBoundary = readFileSync(new URL('../components/AssistantSourceFileBoundary.tsx', import.meta.url), 'utf8')
 const gates = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
 
-test('visual objective limit matches the existing 8,000-character public composer', () => {
+test('visual objective remains capped at 8,000 even when Concierge transport accepts longer context', () => {
   assert.equal(MAX_VISUAL_OBJECTIVE_CHARS, 8_000)
-  assert.match(home, /maxLength=\{?8000\}?/)
+  assert.match(home, /maxLength=\{MAX_BUILDER_RAW_OBJECTIVE_CHARS\}/)
+  assert.doesNotMatch(home, /maxLength=\{?8000\}?/)
   assert.equal(readVisualObjective({ objective: `Create an image. ${'x'.repeat(3_984)}` }).length, 4_001)
   assert.equal(readVisualObjective({ objective: `Create an image. ${'x'.repeat(7_983)}` }).length, 8_000)
 })

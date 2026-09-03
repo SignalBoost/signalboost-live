@@ -11,7 +11,7 @@ export interface CosAiPort {
 
 export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
 
-export const DEFAULT_BUILDER_CODING_MODEL = 'deepseek-ai/DeepSeek-V4-Flash-0731'
+export const DEFAULT_BUILDER_CODING_MODEL = 'deepseek-ai/DeepSeek-V4-Pro'
 
 export function builderCodingModelFromEnv(): string {
   return process.env.DEEPINFRA_BUILDER_MODEL?.trim() || DEFAULT_BUILDER_CODING_MODEL

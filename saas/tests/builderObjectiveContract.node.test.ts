@@ -10,6 +10,7 @@ import {
 
 const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
 const developer = readFileSync(new URL('../app/dashboard/developer/page.tsx', import.meta.url), 'utf8')
+const homepage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
 const policy = readFileSync(new URL('../lib/ai/cos/cosReasoningRolePolicy.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../supabase/migrations/20260831184000_builder_objective_contract_alignment.sql', import.meta.url), 'utf8')
 const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
@@ -50,6 +51,25 @@ test('Developer workspace exposes the same raw intake cap instead of clipping lo
   assert.match(developer, /maxLength=\{MAX_BUILDER_RAW_OBJECTIVE_CHARS\}/)
   assert.doesNotMatch(developer, /suggestedObjective\.slice\(0, 8_000\)/)
   assert.doesNotMatch(developer, /maxLength=\{?8000\}?/)
+})
+
+test('Homepage Concierge preserves long pasted diagnostics through the same raw intake cap', () => {
+  assert.match(homepage, /import \{ MAX_BUILDER_RAW_OBJECTIVE_CHARS \} from '@\/lib\/builder\/request-contract'/)
+  assert.match(homepage, /maxLength=\{MAX_BUILDER_RAW_OBJECTIVE_CHARS\}/)
+  assert.doesNotMatch(homepage, /maxLength=\{?8000\}?/)
+  const representativeLog = [
+    'Running Vercel build',
+    ...Array.from({ length: 3_500 }, (_, index) => `✔ unrelated passing test ${index}`),
+    '✖ failing tests:',
+    'test at tests/calcExpressions.node.test.ts:113:1',
+    'AssertionError [ERR_ASSERTION]: lib/ai/cos/cosFirstAnswer.ts',
+    'Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+  ].join('\n')
+  assert.ok(representativeLog.length > 8_000)
+  assert.ok(representativeLog.length < MAX_BUILDER_RAW_OBJECTIVE_CHARS)
+  const parsed = readBuilderObjective({ objective: representativeLog })
+  assert.match(parsed.objective, /tests\/calcExpressions\.node\.test\.ts:113:1/)
+  assert.match(parsed.objective, /exited with 1$/)
 })
 
 test('Builder recovers supported request envelopes instead of treating a missing objective field as empty', () => {

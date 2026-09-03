@@ -1,5 +1,5 @@
 # SignalBoost main integration serialization token
 # Every pull request targeting main must replace BOTH values below.
 # This shared-file write intentionally makes concurrent PRs conflict after one merges.
-base_sha=779f0fbfaeae2fc2c615f9afca08398ba7859cd7
-branch=fix/deepseek-builder-control-protocol-20260903
+base_sha=226be3c5a6771eb76d1af3f34d5267163021cab3
+branch=fix/runtime-model-source-of-truth-final-20260903

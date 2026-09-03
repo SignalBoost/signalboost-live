@@ -24,6 +24,7 @@ import { listPublicPortableProducts } from '@/lib/portable-products'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
+import { MAX_BUILDER_RAW_OBJECTIVE_CHARS } from '@/lib/builder/request-contract'
 
 type Attachment = {
   id: string
@@ -457,7 +458,7 @@ export default function Home() {
               }
             }}
             rows={2}
-            maxLength={8000}
+            maxLength={MAX_BUILDER_RAW_OBJECTIVE_CHARS}
             placeholder={c('placeholder')}
             aria-label={c('placeholder')}
           />

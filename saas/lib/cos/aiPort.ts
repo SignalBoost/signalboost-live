@@ -4,10 +4,7 @@
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { callProviderModel, type ModelProvider } from '@/lib/ai/providerRouter'
 import { callCosText } from '@/lib/cos/textGateway'
-import {
-  DEFAULT_BUILDER_CODING_MODEL,
-  currentPlatformModelTopology,
-} from '@/lib/ai/cos/platformIdentityContext'
+import { currentPlatformModelTopology } from '@/lib/ai/cos/platformIdentityContext'
 
 export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
@@ -15,10 +12,10 @@ export interface CosAiPort {
 
 export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
 
-export { DEFAULT_BUILDER_CODING_MODEL }
-
 export function builderCodingModelFromEnv(): string {
-  return currentPlatformModelTopology().builderCodingModel
+  const model = currentPlatformModelTopology().builderCodingModel
+  if (!model) throw new Error('DEEPINFRA_BUILDER_MODEL is required for Builder coding inference')
+  return model
 }
 
 function requireText(result: string | null, provider: string): string {
@@ -36,10 +33,11 @@ export function createPlatformAiPort(): CosAiPort {
  * Coding-specialist port for Builder and Platform Engineer.
  *
  * Keep coding work on the approved local/DeepInfra inference boundary, but select the coding model
- * independently from the general COS reasoner. This intentionally bypasses shared answer caching and
- * external-provider fallback: Builder must reason from the current workspace/repository evidence and
- * prove its result with tools rather than reuse a prior prose answer. The local inference layer still
- * records the exact selected model in its telemetry.
+ * independently from the general COS reasoner. The exact model identifier is runtime configuration,
+ * not a source-code fallback: missing DEEPINFRA_BUILDER_MODEL fails closed before inference.
+ * This intentionally bypasses shared answer caching and external-provider fallback: Builder must
+ * reason from the current workspace/repository evidence and prove its result with tools rather than
+ * reuse a prior prose answer. The local inference layer records the exact selected model in telemetry.
  */
 export function createBuilderCodingAiPort(): CosAiPort {
   return {

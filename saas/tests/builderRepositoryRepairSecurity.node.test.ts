@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
+  repositoryDependencyCandidates,
   safeRepositoryChangedPath,
   safeRepositoryWorkspacePath,
 } from '../lib/builder/vercel-repository-repair-session.ts'
@@ -14,6 +15,24 @@ test('repository repair paths stay inside the staged saas project and exclude se
     '../outside.ts', 'lib/../../outside.ts', '/etc/passwd', '.git/config', 'node_modules/pkg/index.js',
     '.env', '.env.production', 'config/service-account.json', 'certs/private.key', 'lib/bad\nname.ts',
   ]) assert.throws(() => safeRepositoryWorkspacePath(value), /builder_invalid_path/)
+})
+
+test('one-hop repository discovery exposes moved implementation without broadening the security boundary', () => {
+  const wrapper = readFileSync(new URL('../lib/ai/cos/cosFirstAnswer.ts', import.meta.url), 'utf8')
+  const candidates = repositoryDependencyCandidates('lib/ai/cos/cosFirstAnswer.ts', wrapper)
+  assert.ok(candidates.includes('lib/ai/cos/cosFirstAnswerCore.ts'))
+  assert.equal(candidates.some(path => path.startsWith('../') || path.startsWith('/') || path.includes('node_modules')), false)
+  assert.deepEqual(
+    repositoryDependencyCandidates('lib/example.ts', "import x from '@/private'\nexport * from '../../../outside.ts'\nimport('./child')"),
+    [
+      'lib/child.ts', 'lib/child.tsx', 'lib/child.js', 'lib/child.mjs', 'lib/child.cjs', 'lib/child.mts', 'lib/child.cts',
+      'lib/child/index.ts', 'lib/child/index.tsx', 'lib/child/index.js', 'lib/child/index.mjs', 'lib/child/index.cjs', 'lib/child/index.mts', 'lib/child/index.cts',
+    ],
+  )
+  const session = readFileSync(new URL('../lib/builder/vercel-repository-repair-session.ts', import.meta.url), 'utf8')
+  const initialize = session.slice(session.indexOf('private async initializeVisiblePaths'), session.indexOf('private absolutePath'))
+  assert.match(initialize, /repositoryDependencyCandidates\(path, file\.content\)/)
+  assert.match(initialize, /visiblePaths\.size >= MAX_VISIBLE_FILES/)
 })
 
 test('changed-file certification rejects every path outside the staged saas project', () => {

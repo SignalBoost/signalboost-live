@@ -135,7 +135,10 @@ export async function postWithAgentProgress(args: {
       ? 'COS Builder is working in the isolated user workspace'
       : 'Waiting for the COS response — connection active'), 2_000)
 
-  const endpoint = builderRequest?.endpoint ?? (args.target === 'cos' ? '/api/cos-primary' : '/api/concierge')
+  // The owner Assistant must enter through the canonical browser COS dispatcher. That ingress owns
+  // specialist selection (including Software Specialist) and falls through to cos-primary for
+  // ordinary reasoning. Posting owner turns directly to cos-primary would bypass specialist routing.
+  const endpoint = builderRequest?.endpoint ?? (args.target === 'cos' ? '/api/cos-browser' : '/api/concierge')
   let response: Response
   try {
     response = await fetch(endpoint, {

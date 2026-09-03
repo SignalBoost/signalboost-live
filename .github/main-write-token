@@ -1,5 +1,5 @@
 # SignalBoost main integration serialization token
 # Every pull request targeting main must replace BOTH values below.
 # This shared-file write intentionally makes concurrent PRs conflict after one merges.
-base_sha=136d881380aeb618d0515c01eb4ecfa9b33a06d6
-branch=fix/recover-vercel-production-20260903
+base_sha=8b59d5f3ea6e077175be34e5c8d244e82ff85021
+branch=fix/cos-neural-self-knowledge-20260903

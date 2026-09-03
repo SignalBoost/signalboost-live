@@ -18,7 +18,7 @@ test('public Concierge and owner Assistant both enter the canonical browser ingr
   assert.ok(fullAssistant >= 0 && assistantRewrite > fullAssistant)
 })
 
-test('repository repair is one durable server helper rather than duplicated routing code', () => {
+test('transitional owner repository fallback remains durable while Software Specialist is canonical', () => {
   const helper = route.match(/async function queueOwnerRepositoryRepair[\s\S]*?\n}\n\nexport async function withSuggestedFollowups/)
   assert.ok(helper)
   const text = helper?.[0] || ''
@@ -26,6 +26,7 @@ test('repository repair is one durable server helper rather than duplicated rout
   assert.match(text, /runBuilderJob\(job\.jobId/)
   assert.match(text, /status: 'queued'/)
   assert.match(text, /source: 'cos-platform-engineer'/)
+  assert.match(route, /const softwareSpecialist = await tryCosSoftwareSpecialist/)
 })
 
 // 2026-09-03: this ingress must not be stricter than the direct Developer surface. The same owner
@@ -95,11 +96,15 @@ test('bounded diagnostic lane treats log text as untrusted data and has no tool 
   assert.doesNotMatch(diagnostic, /getExternalInfo|publicWebAgent|fetch\(/)
 })
 
-test('source-attached repair remains in the isolated ordinary Builder lane', () => {
+test('source-attached repair remains in the shared isolated Software Specialist lane', () => {
   assert.match(route, /const hasSourceAttachment =/)
+  assert.match(route, /const softwareSpecialist = await tryCosSoftwareSpecialist/)
+  assert.match(route, /surface: 'assistant'/)
+  assert.match(route, /allowRepositoryRepair: true/)
   assert.match(route, /ownerRepositoryRepairTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment/)
   assert.match(route, /if \(operationalEvidence && !hasSourceAttachment\)/)
-  assert.match(route, /isConciergeBuilderObjective\(operationalPrompt, routingContext\) \? legacyConciergePost/)
+  assert.match(route, /cosPrimaryPost\(routedRequest\)/)
+  assert.doesNotMatch(route, /legacyConciergePost/)
 })
 
 test('clipped build output cannot become an artifact or technical-provenance request', () => {

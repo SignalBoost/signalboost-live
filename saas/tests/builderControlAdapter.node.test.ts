@@ -28,6 +28,30 @@ test('Builder normalizes the exact live Qwen run-control aliases', () => {
   assert.deepEqual(decodedControl(`run command: \`${command}\``), expected)
 })
 
+test('Builder normalizes the exact live DeepSeek XML and native tool-call envelopes', () => {
+  assert.deepEqual(
+    decodedControl("I'll start by inspecting the implicated files. <tool> <toolId>read_file</toolId> <input> <path>package.json</path> </input> </tool>"),
+    { type: 'tool', toolId: 'read_file', input: { path: 'package.json' } },
+  )
+  assert.deepEqual(
+    decodedControl('I will run the narrow check. <tool_calls> <run command="npm run validate:next-routes" /> </tool_calls>'),
+    { type: 'tool', toolId: 'run', input: { command: 'npm run validate:next-routes' } },
+  )
+  assert.deepEqual(
+    decodedControl('<tool_calls> <invoke name="run"> <parameter name="command">node scripts/vercel-cos-gates.mjs &amp;&amp; npm run prebuild</parameter> </invoke> </tool_calls>'),
+    { type: 'tool', toolId: 'run', input: { command: 'node scripts/vercel-cos-gates.mjs && npm run prebuild' } },
+  )
+  assert.deepEqual(
+    decodedControl('Let me verify it. <tool_call name="run"> {"input":{"command":"next build"}} </tool_call>'),
+    { type: 'tool', toolId: 'run', input: { command: 'next build' } },
+  )
+})
+
+test('DeepSeek control normalization never expands the Builder tool allowlist', () => {
+  const unsupported = '<tool><toolId>delete_file</toolId><input><path>package.json</path></input></tool>'
+  assert.equal(normalizeBuilderControlOutput(unsupported), unsupported)
+})
+
 test('normalized aliases still pass through Builder tool validation and execution evidence', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const workspaceId = 'user:provider-control-adapter'

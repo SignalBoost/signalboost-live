@@ -285,10 +285,20 @@ export async function POST(req: NextRequest) {
     auditIdentityCaptured: Boolean(auditUserId),
   }))
 
-  const response = await withPublicAuditIdentity(auditUserId, () =>
-    withPublicDeliveryScope(() =>
-      withRunpodWakePermission(permission, () => isConciergeBuilderObjective(operationalPrompt, routingContext) ? legacyConciergePost(routedRequest) : cosPrimaryPost(routedRequest)),
-    ),
+  const executeRoutedRequest = () => withRunpodWakePermission(
+    permission,
+    () => isConciergeBuilderObjective(operationalPrompt, routingContext)
+      ? legacyConciergePost(routedRequest)
+      : cosPrimaryPost(routedRequest),
   )
+
+  // Public-delivery scope is a data-isolation boundary for Concierge/guest traffic. It must never
+  // wrap the authenticated owner Assistant: privileged COS needs owner-scoped memory/provenance and
+  // its deterministic platform-stack response must read the real Production model configuration.
+  const response = access?.isOwner
+    ? await executeRoutedRequest()
+    : await withPublicAuditIdentity(auditUserId, () =>
+        withPublicDeliveryScope(() => executeRoutedRequest()),
+      )
   return withSuggestedFollowups(response, prompt, auditUserId)
 }

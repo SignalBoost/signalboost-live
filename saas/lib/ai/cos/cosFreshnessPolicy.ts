@@ -124,11 +124,12 @@ function isSignalboostIdentityQuestion(text: string): boolean {
  * pre-change cached answer, so the owner never saw it).
  */
 const PLATFORM_STACK_ASK = /(?:model|modelo|llm|reasoner|engine).{0,50}(?:platform|plataforma|this service|este servi[cç]o|cos|signalboost)|(?:platform|plataforma|this service|este servi[cç]o).{0,50}(?:model|modelo|llm|reasoner)/i
+const DIRECT_MODEL_IDENTITY_ASK = /^\s*(?:(?:what(?:'s|\s+is)?|which)\s+(?:is\s+)?(?:your|the)\s+(?:model|llm|reasoner|engine)|what\s+(?:model|llm|reasoner|engine)\s+(?:are\s+you|do\s+you\s+use)|which\s+(?:model|llm|reasoner|engine)\s+do\s+you\s+use)\s*[?!.]*\s*$/i
 
 export function isPlatformSelfKnowledgePrompt(input: string): boolean {
   const text = normalizedText(input)
   if (!text) return false
-  return isSignalboostIdentityQuestion(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text) || PLATFORM_STACK_ASK.test(text)
+  return isSignalboostIdentityQuestion(text) || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text) || PLATFORM_STACK_ASK.test(text) || DIRECT_MODEL_IDENTITY_ASK.test(text)
 }
 
 // Pure arithmetic and local clock/date questions have deterministic utilities. They should never

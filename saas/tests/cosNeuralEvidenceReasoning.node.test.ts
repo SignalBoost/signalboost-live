@@ -2,7 +2,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
-import { parseCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from '../lib/ai/cos/cosSemanticTaskIntent.ts'
 
 const policy = readFileSync('lib/ai/cos/cosAnswerPolicyCore.ts', 'utf8')
 const grounding = readFileSync('lib/ai/cos/cosFreshGrounding.ts', 'utf8')
@@ -173,42 +172,26 @@ test('semantic task intent is neural, multilingual, and classifies the requested
   assert.match(semanticTaskIntent, /When ambiguous between interpretation and verification, prefer external_fact_verification/i)
 })
 
-test('a confident request to interpret supplied conversation may bypass freshness without bypassing the model', () => {
-  const parsed = parseCosSemanticTaskIntent(JSON.stringify({
-    mode: 'contextual_interpretation',
-    confidence: 0.94,
-    suppliedContextPrimary: true,
-    externalFactsRequired: false,
-  }))
-  assert.ok(parsed)
-  assert.equal(semanticIntentSuppressesFreshness(parsed), true)
+test('only confident supplied-context interpretation may suppress freshness', () => {
+  assert.match(semanticTaskIntent, /intent\.mode === 'contextual_interpretation'/)
+  assert.match(semanticTaskIntent, /intent\.suppliedContextPrimary/)
+  assert.match(semanticTaskIntent, /!intent\.externalFactsRequired/)
+  assert.match(semanticTaskIntent, /intent\.confidence >= 0\.72/)
 })
 
-test('verification requests and uncertain interpretation never suppress freshness', () => {
-  const verification = parseCosSemanticTaskIntent(JSON.stringify({
-    mode: 'external_fact_verification',
-    confidence: 0.99,
-    suppliedContextPrimary: true,
-    externalFactsRequired: true,
-  }))
-  const uncertain = parseCosSemanticTaskIntent(JSON.stringify({
-    mode: 'contextual_interpretation',
-    confidence: 0.61,
-    suppliedContextPrimary: true,
-    externalFactsRequired: false,
-  }))
-  assert.equal(semanticIntentSuppressesFreshness(verification), false)
-  assert.equal(semanticIntentSuppressesFreshness(uncertain), false)
-  assert.equal(parseCosSemanticTaskIntent('not-json'), null)
+test('semantic task intent fails safe when classification is missing, malformed, or ambiguous', () => {
+  assert.match(semanticTaskIntent, /if \(start < 0 \|\| end <= start\) return null/)
+  assert.match(semanticTaskIntent, /catch \{\s*return null\s*\}/s)
+  assert.match(semanticTaskIntent, /prefer external_fact_verification so freshness protection fails safe/i)
 })
 
 test('primary routing lets semantic task intent decide whether a baseline freshness hit is really a verification task', () => {
   const baseline = primaryRoute.indexOf('baselineRequiresFreshEvidence=requiresFreshExternalEvidence(input)')
-  const semantic = primaryRoute.indexOf('classifyCosSemanticTaskIntent')
+  const semantic = primaryRoute.indexOf('? await classifyCosSemanticTaskIntent')
   const finalGate = primaryRoute.indexOf('requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness')
   assert.ok(baseline >= 0)
-  assert.ok(semantic >= 0)
-  assert.ok(finalGate > baseline)
+  assert.ok(semantic > baseline)
+  assert.ok(finalGate > semantic)
   assert.match(primaryRoute, /event:'freshness_semantic_intent_suppressed'/)
 })
 

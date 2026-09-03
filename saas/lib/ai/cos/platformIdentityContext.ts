@@ -1,33 +1,40 @@
 // saas/lib/ai/cos/platformIdentityContext.ts
 
-export const DEFAULT_COS_REASONER_MODEL = 'Qwen/Qwen3.6-35B-A3B'
-export const DEFAULT_BUILDER_CODING_MODEL = 'deepseek-ai/DeepSeek-V4-Pro'
-export const DEFAULT_COS_EMBEDDING_MODEL = 'BAAI/bge-base-en-v1.5'
-export const DEFAULT_COS_MANAGED_PROVIDER = 'deepinfra'
+export const BUILDER_MODEL_NOT_CONFIGURED = 'DEEPINFRA_BUILDER_MODEL is required for Builder coding inference'
 
 export type PlatformModelTopology = Readonly<{
-  primaryReasonerModel: string
-  builderCodingModel: string
-  embeddingModel: string
-  managedProvider: string
+  primaryReasonerModel: string | null
+  builderCodingModel: string | null
+  embeddingModel: string | null
+  managedProvider: string | null
 }>
+
+function configuredValue(name: 'LOCAL_AI_MODEL' | 'DEEPINFRA_BUILDER_MODEL' | 'LOCAL_AI_EMBEDDING_MODEL' | 'LOCAL_AI_MANAGED_PROVIDER'): string | null {
+  const value = process.env[name]?.trim()
+  return value ? value : null
+}
 
 export function currentPlatformModelTopology(): PlatformModelTopology {
   return {
-    primaryReasonerModel: process.env.LOCAL_AI_MODEL?.trim() || DEFAULT_COS_REASONER_MODEL,
-    builderCodingModel: process.env.DEEPINFRA_BUILDER_MODEL?.trim() || DEFAULT_BUILDER_CODING_MODEL,
-    embeddingModel: process.env.LOCAL_AI_EMBEDDING_MODEL?.trim() || DEFAULT_COS_EMBEDDING_MODEL,
-    managedProvider: process.env.LOCAL_AI_MANAGED_PROVIDER?.trim() || DEFAULT_COS_MANAGED_PROVIDER,
+    primaryReasonerModel: configuredValue('LOCAL_AI_MODEL'),
+    builderCodingModel: configuredValue('DEEPINFRA_BUILDER_MODEL'),
+    embeddingModel: configuredValue('LOCAL_AI_EMBEDDING_MODEL'),
+    managedProvider: configuredValue('LOCAL_AI_MANAGED_PROVIDER'),
   }
+}
+
+function runtimeFact(value: string | null, variable: string): string {
+  return value ?? `[unverified: ${variable} is not configured in this runtime]`
 }
 
 /**
  * Trusted runtime facts for the authenticated owner channel.
  *
- * This is CONTEXT, not an answer template. The neural reasoner receives these facts on ordinary
- * owner turns and decides from the meaning of the user's request whether they are relevant, how
- * much detail to use, and how to explain the relationship between components. No regex/detector
- * selects a canned owner identity answer.
+ * This is CONTEXT, not an answer template. Every mutable identifier in this block comes only from
+ * the live process environment. There are deliberately no model/provider-name fallbacks here: if a
+ * value is missing, owner self-knowledge must say it is unverified instead of substituting a
+ * plausible default. The neural reasoner may explain the supplied facts, but it must not alter,
+ * expand, abbreviate, version-complete, or otherwise invent an identifier.
  *
  * Public delivery never receives this block; public model/provider disclosure remains a separate
  * deterministic safety boundary.
@@ -36,10 +43,12 @@ export function ownerPlatformIdentityContext(): string {
   const topology = currentPlatformModelTopology()
   return [
     'TRUSTED OWNER RUNTIME CONTEXT — SIGNALBOOST MODEL TOPOLOGY:',
-    `- General COS reasoning model: ${topology.primaryReasonerModel}`,
-    `- Builder / Platform Engineer coding-specialist model: ${topology.builderCodingModel}`,
-    `- Embedding model: ${topology.embeddingModel}`,
-    `- Managed inference provider: ${topology.managedProvider}`,
+    `- General COS reasoning model: ${runtimeFact(topology.primaryReasonerModel, 'LOCAL_AI_MODEL')}`,
+    `- Builder / Platform Engineer coding-specialist model: ${runtimeFact(topology.builderCodingModel, 'DEEPINFRA_BUILDER_MODEL')}`,
+    `- Embedding model: ${runtimeFact(topology.embeddingModel, 'LOCAL_AI_EMBEDDING_MODEL')}`,
+    `- Managed inference provider: ${runtimeFact(topology.managedProvider, 'LOCAL_AI_MANAGED_PROVIDER')}`,
+    '- Exact identifiers above are immutable runtime facts for this turn. Quote them verbatim when',
+    '  needed. Do not alter, expand, abbreviate, infer, or version-complete any identifier.',
     '- The Builder coding model is task-specialized. It is selected only after work is routed into',
     '  authenticated COS Builder / Platform Engineer coding execution; it does not replace the',
     '  general COS reasoner for ordinary conversation, analysis, research synthesis, or Concierge.',

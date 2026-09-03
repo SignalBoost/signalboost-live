@@ -1,24 +1,56 @@
 // saas/lib/ai/cos/platformIdentityContext.ts
-
-export const DEFAULT_COS_REASONER_MODEL = 'Qwen/Qwen3.6-35B-A3B'
-export const DEFAULT_BUILDER_CODING_MODEL = 'deepseek-ai/DeepSeek-V4-Pro'
-export const DEFAULT_COS_EMBEDDING_MODEL = 'BAAI/bge-base-en-v1.5'
-export const DEFAULT_COS_MANAGED_PROVIDER = 'deepinfra'
+//
+// Owner rule (2026-09-03): NOTHING about SignalBoost's current configuration is hard-coded.
+// The runtime supplies the facts; the neural reasoner supplies the intelligence. A hard-coded
+// default is not a safety net here — it is a lie that survives a misconfiguration silently. The
+// previous hard-coded Builder default named a different model release from the one Production
+// actually runs, and it would have been reported to the owner as fact had the environment
+// variable ever gone missing. No model, provider or version literal belongs in this file.
+//
+// Two failure modes, deliberately different:
+//   - EXECUTION (Builder coding calls): fail closed. Running a coding job on a guessed model is
+//     worse than an error. See requireBuilderCodingModel().
+//   - DISCLOSURE (owner self-knowledge): report the gap. A missing string must not take down an
+//     ordinary owner turn, and must never be filled in with a plausible value.
 
 export type PlatformModelTopology = Readonly<{
-  primaryReasonerModel: string
-  builderCodingModel: string
-  embeddingModel: string
-  managedProvider: string
+  primaryReasonerModel: string | null
+  builderCodingModel: string | null
+  embeddingModel: string | null
+  managedProvider: string | null
 }>
+
+export const BUILDER_MODEL_NOT_CONFIGURED = 'builder_model_not_configured'
+
+/** A configuration value that is absent is null. It is never substituted. */
+function configured(value: string | undefined): string | null {
+  const trimmed = String(value ?? '').trim()
+  return trimmed || null
+}
 
 export function currentPlatformModelTopology(): PlatformModelTopology {
   return {
-    primaryReasonerModel: process.env.LOCAL_AI_MODEL?.trim() || DEFAULT_COS_REASONER_MODEL,
-    builderCodingModel: process.env.DEEPINFRA_BUILDER_MODEL?.trim() || DEFAULT_BUILDER_CODING_MODEL,
-    embeddingModel: process.env.LOCAL_AI_EMBEDDING_MODEL?.trim() || DEFAULT_COS_EMBEDDING_MODEL,
-    managedProvider: process.env.LOCAL_AI_MANAGED_PROVIDER?.trim() || DEFAULT_COS_MANAGED_PROVIDER,
+    primaryReasonerModel: configured(process.env.LOCAL_AI_MODEL),
+    builderCodingModel: configured(process.env.DEEPINFRA_BUILDER_MODEL),
+    embeddingModel: configured(process.env.LOCAL_AI_EMBEDDING_MODEL),
+    managedProvider: configured(process.env.LOCAL_AI_MANAGED_PROVIDER),
   }
+}
+
+/**
+ * Execution path. Builder must never run on an assumed model, so an unset variable is a
+ * configuration error the operator can act on, not a silent substitution.
+ */
+export function requireBuilderCodingModel(): string {
+  const model = currentPlatformModelTopology().builderCodingModel
+  if (!model) throw new Error(BUILDER_MODEL_NOT_CONFIGURED)
+  return model
+}
+
+const NOT_CONFIGURED = 'NOT CONFIGURED — no value is set in this runtime and no default is substituted'
+
+function fact(label: string, value: string | null, variable: string): string {
+  return `- ${label} ${value ?? `${NOT_CONFIGURED} (${variable})`}`
 }
 
 /**
@@ -36,13 +68,19 @@ export function ownerPlatformIdentityContext(): string {
   const topology = currentPlatformModelTopology()
   return [
     'TRUSTED OWNER RUNTIME CONTEXT — SIGNALBOOST MODEL TOPOLOGY:',
-    `- General COS reasoning model: ${topology.primaryReasonerModel}`,
-    `- Builder / Platform Engineer coding-specialist model: ${topology.builderCodingModel}`,
-    `- Embedding model: ${topology.embeddingModel}`,
-    `- Managed inference provider: ${topology.managedProvider}`,
+    fact('General COS reasoning model:', topology.primaryReasonerModel, 'LOCAL_AI_MODEL'),
+    fact('Builder / Platform Engineer coding-specialist model:', topology.builderCodingModel, 'DEEPINFRA_BUILDER_MODEL'),
+    fact('Embedding model:', topology.embeddingModel, 'LOCAL_AI_EMBEDDING_MODEL'),
+    fact('Managed inference provider:', topology.managedProvider, 'LOCAL_AI_MANAGED_PROVIDER'),
     '- The Builder coding model is task-specialized. It is selected only after work is routed into',
     '  authenticated COS Builder / Platform Engineer coding execution; it does not replace the',
     '  general COS reasoner for ordinary conversation, analysis, research synthesis, or Concierge.',
+    '- IDENTIFIERS ABOVE ARE VERBATIM FACTUAL ATOMS. Reproduce any model name, provider name or',
+    '  version EXACTLY as written, character for character. You may explain, compare and reason',
+    '  about what these components do and why they are separated. You may NOT alter, abbreviate,',
+    '  expand, infer, or version-complete them — never add or change a version suffix, date or',
+    '  release tag. If a line above says NOT CONFIGURED, say that it is not currently configured;',
+    '  do not supply a likely value.',
     '- Treat these lines as current runtime facts, not as a scripted response. Reason over the',
     '  user request and these facts together. Decide relevance semantically, explain roles and',
     '  relationships in your own words, and do not mechanically echo this block.',

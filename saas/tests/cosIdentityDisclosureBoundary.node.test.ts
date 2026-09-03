@@ -25,12 +25,17 @@ test('the active owner entrypoint does not define or release a canned model/spec
   assert.match(shared, /The deterministic compatibility answer was blocked rather than released/)
 })
 
-test('trusted runtime context describes the multi-model topology instead of one platform-wide model', () => {
+test('trusted owner topology comes only from runtime configuration and never committed model names', () => {
   assert.match(topology, /General COS reasoning model:/)
   assert.match(topology, /Builder \/ Platform Engineer coding-specialist model:/)
-  assert.match(topology, /DEEPINFRA_BUILDER_MODEL/)
-  assert.match(topology, /deepseek-ai\/DeepSeek-V4-Pro/)
-  assert.match(topology, /Qwen\/Qwen3\.6-35B-A3B/)
+  assert.match(topology, /configuredValue\('LOCAL_AI_MODEL'\)/)
+  assert.match(topology, /configuredValue\('DEEPINFRA_BUILDER_MODEL'\)/)
+  assert.match(topology, /configuredValue\('LOCAL_AI_EMBEDDING_MODEL'\)/)
+  assert.match(topology, /configuredValue\('LOCAL_AI_MANAGED_PROVIDER'\)/)
+  assert.match(topology, /Do not alter, expand, abbreviate, infer, or version-complete any identifier/)
+  assert.doesNotMatch(topology, /Qwen\//)
+  assert.doesNotMatch(topology, /DeepSeek/)
+  assert.doesNotMatch(topology, /BAAI\//)
   assert.match(topology, /it does not replace the/)
   assert.match(topology, /general COS reasoner/)
 })

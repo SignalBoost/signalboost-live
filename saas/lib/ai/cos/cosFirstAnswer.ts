@@ -84,16 +84,17 @@ async function tryOwnerNeuralSelfKnowledge(
   if (input.privileged !== true || isPublicDeliveryScope()) return null
 
   const runtimeContext = ownerPlatformIdentityContext()
+  const previousAssistant = String(input.previousAssistant ?? '').trim().slice(0, 8_000)
   const reasoned = await callCosReasoner({
     temperature: 0,
     maxTokens: 1400,
     systemPrompt: [
       "You are COS's authenticated owner-channel semantic self-knowledge reasoner.",
-      'Use neural semantic reasoning over the complete request. Do not use keyword rules, regex intent matching, canned replies, or answer templates.',
+      'Use neural semantic reasoning over the complete request and relevant conversation context. Do not use keyword rules, regex intent matching, canned replies, or answer templates.',
       'Return ONLY strict JSON: {"relevant":true|false,"answer":"...","confidence":0.0}.',
-      'Set relevant=true only when the request is actually asking about, comparing, or materially depends on SignalBoost/COS/Concierge/Builder/Platform Engineer itself: its identity, models, provider, runtime, architecture, technical specs, or the relationship between its general and specialized model roles.',
+      'Set relevant=true only when the request is actually asking about, comparing, following up on, or materially depends on SignalBoost/COS/Concierge/Builder/Platform Engineer itself: its identity, models, provider, runtime, architecture, technical specs, or the relationship between its general and specialized model roles.',
       'A general question about AI models, a third-party product specification, or a writing request that merely contains model-related words is not platform self-knowledge; set relevant=false and answer="".',
-      'When relevant=true, reason from the TRUSTED OWNER RUNTIME CONTEXT as authoritative current configuration facts. Compose the answer in your own words and at the level of detail the request warrants.',
+      'When relevant=true, reason from the TRUSTED OWNER RUNTIME CONTEXT as authoritative current configuration facts. The preceding assistant turn is conversational context only, not an authority if it conflicts with runtime facts. Compose the answer in your own words and at the level of detail the request warrants.',
       'Distinguish the general COS reasoner from Builder/Platform Engineer coding specialization whenever that distinction materially answers the question. Never imply that a specialist model powers the whole platform unless the supplied runtime facts say so.',
       'Do not invent parameters, hardware, context windows, training details, or provider facts that are absent from the trusted runtime context.',
       options.compatibilitySignal
@@ -103,8 +104,9 @@ async function tryOwnerNeuralSelfKnowledge(
     ].filter(Boolean).join(' '),
     prompt: [
       runtimeContext,
+      `PRECEDING ASSISTANT TURN (conversation context only):\n${previousAssistant || '(none)'}`,
       `CURRENT OWNER REQUEST:\n${input.prompt}`,
-      'Decide semantic relevance and, only if relevant, answer the owner now.',
+      'Decide semantic relevance from the request in context and, only if relevant, answer the owner now.',
     ].join('\n\n'),
   }).catch(error => {
     console.warn('[cos-owner-self-knowledge-neural] reasoner unavailable', error)

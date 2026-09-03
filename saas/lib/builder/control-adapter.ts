@@ -25,6 +25,21 @@ const CONTROL_KEYS = new Set([
   'tool_calls',
 ])
 
+const XML_INPUT_KEYS = Object.freeze([
+  'path',
+  'filePath',
+  'filename',
+  'file',
+  'name',
+  'content',
+  'contents',
+  'code',
+  'text',
+  'search',
+  'replace',
+  'command',
+])
+
 export const BUILDER_TURN_TIMEOUT_ERROR = 'builder_turn_timeout'
 export const DEFAULT_BUILDER_AI_WINDOW_MS = 180_000
 export const MAX_BUILDER_AI_WINDOW_MS = 220_000
@@ -109,9 +124,90 @@ function normalizeTypedToolRecord(value: Record<string, unknown>): string | null
   return input ? canonicalToolControl(type, input) : null
 }
 
+function decodeXmlText(value: string): string {
+  return value
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&')
+    .trim()
+}
+
+function xmlAttributes(value: string): Record<string, string> {
+  const result: Record<string, string> = {}
+  const pattern = /([A-Za-z_][\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
+  for (const match of value.matchAll(pattern)) {
+    result[match[1]] = decodeXmlText(match[2] ?? match[3] ?? '')
+  }
+  return result
+}
+
+function xmlNamedInput(value: string): Record<string, unknown> {
+  const result: Record<string, unknown> = {}
+  for (const key of XML_INPUT_KEYS) {
+    const pattern = new RegExp(`<${key}\\b[^>]*>([\\s\\S]*?)<\\/${key}>`, 'i')
+    const match = pattern.exec(value)
+    if (match) result[key] = decodeXmlText(match[1])
+  }
+  for (const match of value.matchAll(/<parameter\b([^>]*)>([\s\S]*?)<\/parameter>/gi)) {
+    const attributes = xmlAttributes(match[1])
+    const name = attributes.name
+    if (name && XML_INPUT_KEYS.includes(name as typeof XML_INPUT_KEYS[number])) result[name] = decodeXmlText(match[2])
+  }
+  return result
+}
+
+function normalizeDeepSeekXmlControl(raw: string): string | null {
+  for (const match of raw.matchAll(/<invoke\b([^>]*)>([\s\S]*?)<\/invoke>/gi)) {
+    const attributes = xmlAttributes(match[1])
+    const toolId = String(attributes.name || '').trim().toLowerCase()
+    if (!isExecutableTool(toolId)) continue
+    const input = xmlNamedInput(match[2])
+    return canonicalToolControl(toolId, input)
+  }
+
+  for (const match of raw.matchAll(/<(list_files|read_file|write_file|edit_file|run)\b([^>]*)\/>/gi)) {
+    const toolId = String(match[1] || '').trim().toLowerCase()
+    if (!isExecutableTool(toolId)) continue
+    return canonicalToolControl(toolId, xmlAttributes(match[2]))
+  }
+
+  for (const match of raw.matchAll(/<tool\b[^>]*>([\s\S]*?)<\/tool>/gi)) {
+    const body = match[1]
+    const toolMatch = /<toolId\b[^>]*>([\s\S]*?)<\/toolId>/i.exec(body)
+    const toolId = decodeXmlText(toolMatch?.[1] || '').toLowerCase()
+    if (!isExecutableTool(toolId)) continue
+    const inputMatch = /<input\b[^>]*>([\s\S]*?)<\/input>/i.exec(body)
+    const input = xmlNamedInput(inputMatch?.[1] || '')
+    return canonicalToolControl(toolId, input)
+  }
+
+  for (const match of raw.matchAll(/<tool_call\b([^>]*)>([\s\S]*?)<\/tool_call>/gi)) {
+    const attributes = xmlAttributes(match[1])
+    const toolId = String(attributes.name || '').trim().toLowerCase()
+    if (!isExecutableTool(toolId)) continue
+    for (const candidate of balancedObjects(match[2])) {
+      try {
+        const decoded = JSON.parse(candidate)
+        if (!isRecord(decoded)) continue
+        const input = decodeInput(decoded)
+        if (input) return canonicalToolControl(toolId, input)
+      } catch {
+        // Try another bounded object inside the tool_call envelope.
+      }
+    }
+    const input = xmlNamedInput(match[2])
+    if (Object.keys(input).length > 0) return canonicalToolControl(toolId, input)
+  }
+
+  return null
+}
+
 /**
  * OpenAI-compatible local providers sometimes preserve the intended tool and arguments but emit a
- * compact alias instead of Builder's canonical envelope. Normalize only bounded, unambiguous forms;
+ * compact alias instead of Builder's canonical envelope. DeepSeek can also emit bounded XML-style
+ * tool envelopes. Normalize only known executable tools and unambiguous argument shapes; the
  * BuilderToolLoop still applies the existing tool allowlist and exact per-tool input validation.
  */
 export function normalizeBuilderControlOutput(value: string | null): string | null {
@@ -132,6 +228,9 @@ export function normalizeBuilderControlOutput(value: string | null): string | nu
 
   const runCommand = /^run\s+command\s*:\s*`([^`\r\n]{1,2000})`\s*$/i.exec(raw)
   if (runCommand) return canonicalToolControl('run', { command: runCommand[1] })
+
+  const deepSeekXml = normalizeDeepSeekXmlControl(raw)
+  if (deepSeekXml) return deepSeekXml
 
   for (const candidate of [raw, ...balancedObjects(raw)]) {
     try {

@@ -1,4 +1,4 @@
-// app/api/cos-browser/route.ts
+// saas/app/api/cos-browser/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as legacyConciergePost } from '@/app/api/concierge/route'
@@ -155,21 +155,33 @@ export async function POST(req: NextRequest) {
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
     branch: process.env.VERCEL_GIT_COMMIT_REF,
   }
-  const signalBoostProjectBound = SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req)
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
-  const exactFailedLogTarget = operationalEvidence && operationalLogAnalysis.failed
+  const exactFailedLogTarget = operationalEvidence
     ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
 
-  // One owner repository lane. Prefer the exact failed snapshot named by the log; otherwise an
-  // explicit owner repair request may use the immutable deployed revision. A failed owner log whose
-  // clone line was clipped may also fall back to that immutable deployment revision.
-  const ownerRepositoryRepairTarget = access?.isOwner && access.userId && !hasSourceAttachment && signalBoostProjectBound
+  // ONE OWNER REPOSITORY LANE, AND IT MUST MATCH THE DIRECT DEVELOPER SURFACE.
+  // 2026-09-03: the same owner paste reached the repository lane through /api/builder but not
+  // through this ingress, because this route added two preconditions the direct route does not
+  // have: a hard `signalBoostProjectBound` AND on the whole branch, and a requirement that the
+  // pasted log already parse as FAILED. A log pasted from below its Cloning line, or one whose
+  // failure block was clipped, silently dropped out of the repository lane here and landed in the
+  // staged-workspace lane whose workspace holds only the paths the log happens to name — which is
+  // why Builder "worked directly but not through COS or Concierge".
+  //
+  // Authority is NOT widened by removing them. signalBoostDeployedRepairTarget() still returns null
+  // unless the objective is an explicit platform-repair objective or ownerDeveloperLogSubmission is
+  // true, and this branch still requires an authenticated owner with no source attachment. The
+  // owner/log/project evidence now enters exactly where the direct route puts it: as the option on
+  // the deployed fallback, not as a gate on the branch.
+  const ownerDeveloperLogSubmission = access?.isOwner === true
+    && operationalEvidence
+    && (SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req))
+
+  const ownerRepositoryRepairTarget = access?.isOwner && access.userId && !hasSourceAttachment
     ? exactFailedLogTarget
       ?? signalBoostDeployedRepairTarget(prompt, deployment)
-      ?? (operationalEvidence && operationalLogAnalysis.failed
-        ? signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission: true })
-        : null)
+      ?? signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission })
     : null
   if (ownerRepositoryRepairTarget && access?.userId) {
     return queueOwnerRepositoryRepair({

@@ -969,7 +969,11 @@ export async function tryCOSFirstAnswer(input: {
     return learnFromTurn(input, await tryLiveNamedCatalog(input))
   }
 
-  if (isPlatformStackQuestion(input.prompt)) {
+  // Any identity/model/provider question is answered deterministically and scope-aware, BEFORE the
+  // enterprise reasoner runs — otherwise the owner's phrasing can slip past the narrow platform-stack
+  // detector, reach the model, and get the public non-disclosure deflection on the owner's own
+  // channel. Public scope still gets the non-disclosure boundary; the owner gets the real stack.
+  if (isPlatformStackQuestion(input.prompt) || asksAboutServiceIdentity(input.prompt)) {
     const reply = isPublicDeliveryScope()
       ? publicImplementationDisclosureReply(input.language)
       : ownerPlatformStackReply(input.language)

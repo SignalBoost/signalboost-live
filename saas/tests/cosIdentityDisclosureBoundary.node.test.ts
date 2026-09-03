@@ -8,8 +8,6 @@ const core = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerCore.ts', import.
 const enterprise = readFileSync(new URL('../lib/ai/cos/cosFirstAnswerEnterprise.ts', import.meta.url), 'utf8')
 const topology = readFileSync(new URL('../lib/ai/cos/platformIdentityContext.ts', import.meta.url), 'utf8')
 
-// Owner correction, 2026-09-03: model/spec self-knowledge must be reasoned from current runtime
-// topology facts. The final owner answer cannot be a regex-selected canned string.
 test('authenticated owner self-knowledge is decided and answered by neural semantic reasoning', () => {
   assert.match(shared, /async function tryOwnerNeuralSelfKnowledge/)
   assert.match(shared, /callCosReasoner\(\{/)
@@ -43,9 +41,10 @@ test('public disclosure remains a deterministic safety boundary, separate from o
   assert.doesNotMatch(enterprise, /publicImplementationDisclosureReply/)
 })
 
-test('core compatibility can still be recognized, but shared entrypoint owns release authority', () => {
+test('both legacy owner hardcode paths are identifiable so the active entrypoint can block them', () => {
   assert.match(core, /selfKnowledgeDeterministic:\s*true/)
-  assert.match(core, /PLATFORM TECHNICAL SPECIFICATION \(owner-only\):/)
+  assert.match(core, /function ownerPlatformStackReply/)
+  assert.match(enterprise, /PLATFORM TECHNICAL SPECIFICATION \(owner-only\):/)
   const neuralAttempt = shared.indexOf('tryOwnerNeuralSelfKnowledge(input)')
   const coreAttempt = shared.indexOf('tryCoreCOSFirstAnswer(input)')
   assert.ok(neuralAttempt >= 0, 'neural owner self-knowledge attempt must exist')

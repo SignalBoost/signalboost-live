@@ -30,6 +30,12 @@ import {
   type EditorialSkillContext,
 } from './editorialSkillContext.ts'
 import {
+  classifyCommunicationRegister,
+  registerGuidance,
+  ROUTINE_REGISTER,
+  type RegisterProfile,
+} from './communicationRegister.ts'
+import {
   formatNeuralCommunicationResult,
   tryNeuralCommunicationTransformation as tryStrategicNeuralCommunicationTransformation,
   type NeuralCommunicationAlternative,
@@ -77,6 +83,7 @@ function provenance(
   invoked: boolean,
   skills: SkillUsageCounts = EMPTY_EDITORIAL_SKILL_CONTEXT,
   neuralCommunication = false,
+  register: RegisterProfile = ROUTINE_REGISTER,
 ) {
   return {
     responseSource: invoked ? 'local_cos_reasoning' : 'external_fallback_required',
@@ -93,6 +100,7 @@ function provenance(
       'Transformation Depth Policy',
       'Executive Communication Framework',
       'Correspondence Layout',
+      ...(register.sensitivity !== 'routine' ? [`Communicative Register (${register.sensitivity})`] : []),
       ...(neuralCommunication
         ? ['Neural Communication Advisor', 'Neural Communication Quality Board', 'Validated Cognitive Skills']
         : ['Editorial Quality Pass', ...(skills.selected > 0 ? ['Validated Cognitive Skills'] : [])]),
@@ -142,6 +150,7 @@ async function refineProfessionalDraft(input: {
   anchorBlock: string
   styleBlock: string
   skillBlock: string
+  registerBlock: string
   language?: string
 }) {
   return tryNeuralCommunicationTransformation(input)
@@ -155,6 +164,7 @@ async function tryNeuralCommunicationTransformation(input: {
   anchorBlock: string
   styleBlock: string
   skillBlock: string
+  registerBlock: string
   language?: string
 }) {
   const context = input.referenceContext ? input.referenceContext.slice(0, 12_000) : null
@@ -178,6 +188,8 @@ async function tryNeuralCommunicationTransformation(input: {
       'REFERENCE CONTEXT is read-only. Never reproduce or append the quoted thread.',
       input.anchorBlock,
       transformationLanguageInstruction(input.language),
+      executiveCommunicationBlock(input.language),
+      input.registerBlock,
     ].filter(Boolean).join('\n\n'),
     prompt: [
       `USER INSTRUCTION:\n${input.instruction}`,
@@ -239,14 +251,24 @@ export async function tryDirectTextTransformation(input: {
     }
   }
 
+  // Register judgment and editorial-skill retrieval are independent; run them concurrently so the
+  // sensitivity check improves communication quality without serially extending the editing path.
+  const [editorialSkills, register] = await Promise.all([
+    retrieveEditorialSkills(request.instruction, editableSource),
+    classifyCommunicationRegister(editableSource),
+  ])
+  const skillBlock = editorialSkills.block
+  const registerBlock = registerGuidance(register)
+
   // Communication is not a grammar subtask. For correspondence, COS first uses the deep-neural
   // communication lane: validated procedural skills -> multiple neural approaches -> neural quality
-  // review -> bounded neural repair. Deterministic code below only protects facts/intent.
+  // review -> bounded neural repair. The register guidance is included in the protected semantic
+  // guidance so delicate correspondence cannot be flattened by generic brevity pressure.
   const neuralCommunication = await tryStrategicNeuralCommunicationTransformation({
     instruction: request.instruction,
     source: editableSource,
     referenceContext,
-    semanticAnchors: anchorBlock,
+    semanticAnchors: [anchorBlock, registerBlock].filter(Boolean).join('\n\n'),
     language: input.language,
   })
 
@@ -281,6 +303,7 @@ export async function tryDirectTextTransformation(input: {
           true,
           neuralCommunication.skillUsage,
           true,
+          register,
         ) as any,
       }
     }
@@ -288,8 +311,6 @@ export async function tryDirectTextTransformation(input: {
 
   // Non-correspondence transformations, plus a safe fallback if the strategic neural result is
   // unavailable or fails the deterministic meaning-fidelity boundary.
-  const editorialSkills: EditorialSkillContext = await retrieveEditorialSkills(request.instruction, editableSource)
-  const skillBlock = editorialSkills.block
   let reasoned = await callCosReasoner({
     temperature: 0.08,
     maxTokens: 2400,
@@ -314,6 +335,7 @@ export async function tryDirectTextTransformation(input: {
       anchorBlock,
       transformationLanguageInstruction(input.language),
       executiveCommunicationBlock(input.language),
+      registerBlock,
     ].filter(Boolean).join('\n\n'),
     prompt: [
       `USER INSTRUCTION:\n${request.instruction}`,
@@ -336,7 +358,9 @@ export async function tryDirectTextTransformation(input: {
         CORRESPONDENCE_LAYOUT_RULES,
         skillBlock,
         transformationLanguageInstruction(input.language),
-      ].join('\n\n'),
+        executiveCommunicationBlock(input.language),
+        registerBlock,
+      ].filter(Boolean).join('\n\n'),
       prompt: [
         `USER INSTRUCTION:\n${request.instruction}`,
         `EDITABLE SOURCE TEXT:\n${editableSource}`,
@@ -349,6 +373,8 @@ export async function tryDirectTextTransformation(input: {
     reasoned?.reasoner.label ?? resolved.config.label,
     Boolean(reasoned?.text),
     editorialSkills,
+    false,
+    register,
   )
   if (!reasoned?.text) {
     return {
@@ -385,6 +411,7 @@ export async function tryDirectTextTransformation(input: {
     anchorBlock,
     styleBlock,
     skillBlock,
+    registerBlock,
     language: input.language,
   })
   if (refined) {
@@ -399,11 +426,64 @@ export async function tryDirectTextTransformation(input: {
     language: input.language,
   })
   if (!finalized) {
-    finalAnswer = restoreCorrespondenceLayout(
-      normalizeTextTransformationPresentation(editableSource.trim()),
-      rawEditableSource,
-    )
-    finalConfidence = Math.min(finalConfidence, 0.5)
+    // REPAIR THE VIOLATION, DO NOT DISCARD THE EDIT
+    // A good rewrite that broadened one request or reassigned one actor should be repaired at that
+    // exact semantic boundary, not thrown away and replaced with the rough source.
+    const violation = contextualEditIntentViolation({
+      originalSource: rawEditableSource,
+      answer: normalizeTextTransformationPresentation(finalAnswer),
+    })
+    let repairedAnswer = ''
+
+    if (violation) {
+      const intentRepair = await callCosReasoner({
+        temperature: 0,
+        maxTokens: 1800,
+        systemPrompt: [
+          'You are COS repairing ONE scope error in an otherwise edited draft.',
+          'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+          `The detected semantic violation is: ${violation}.`,
+          'Repair only the sentence or clause responsible for that violation so it again preserves the ORIGINAL actor/action/recipient relationship and request scope.',
+          'Every other sentence must survive word for word.',
+          'Do not restore rough source wording elsewhere.',
+          'Do not add facts, requests, commitments, explanations, or outside knowledge.',
+          'Preserve names, terms of art, dates, numbers, links, uncertainty, and all unaffected improvements.',
+          MEANING_FIDELITY_RULES,
+          registerBlock,
+          transformationLanguageInstruction(input.language),
+        ].filter(Boolean).join('\n\n'),
+        prompt: [
+          `ORIGINAL EDITABLE SOURCE:\n<<<SOURCE\n${rawEditableSource}\nSOURCE`,
+          referenceContext ? `REFERENCE CONTEXT — READ ONLY:\n<<<CONTEXT\n${referenceContext.slice(0, 8_000)}\nCONTEXT` : '',
+          `EDITED DRAFT WITH ONE SCOPE ERROR:\n<<<DRAFT\n${finalAnswer}\nDRAFT`,
+          'Return the repaired edited draft, keeping every unaffected sentence unchanged.',
+        ].filter(Boolean).join('\n\n'),
+      }).catch(() => null)
+
+      if (intentRepair?.text) {
+        const intentParsed = parseLocalResult(intentRepair.text)
+        if (intentParsed && !intentParsed.truncated && intentParsed.answer.trim()) {
+          repairedAnswer = repairContextualEditDrift({
+            originalSource: rawEditableSource,
+            referenceContext,
+            answer: intentParsed.answer.trim(),
+            language: input.language,
+          })
+          repairedAnswer = stripEditorialSkillLabels(normalizeTextTransformationPresentation(repairedAnswer))
+        }
+      }
+    }
+
+    if (repairedAnswer && !contextualEditIntentViolation({ originalSource: rawEditableSource, answer: repairedAnswer })) {
+      finalAnswer = restoreCorrespondenceLayout(repairedAnswer, rawEditableSource)
+      finalConfidence = Math.max(0.45, Math.min(finalConfidence, 0.75))
+    } else {
+      // Last resort only, once the bounded repair has also failed: preserve meaning rather than
+      // releasing a scope-changing rewrite.
+      finalAnswer = normalizeTextTransformationPresentation(editableSource.trim())
+      finalAnswer = restoreCorrespondenceLayout(finalAnswer, rawEditableSource)
+      finalConfidence = Math.min(finalConfidence, 0.5)
+    }
   } else {
     finalAnswer = finalized
   }

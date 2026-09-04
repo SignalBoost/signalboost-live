@@ -139,7 +139,18 @@ test('browser Concierge and owner Assistant both enter the canonical COS browser
   assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
   assert.doesNotMatch(client, /args\.target === 'cos' \? '\/api\/cos-browser' : '\/api\/concierge'/)
   assert.match(browser, /const access = await getAccess\(\)\.catch/)
+  assert.match(browser, /const executeOwnerRequest = .*cosPrimaryPost\(routedRequest\)/)
+  assert.match(browser, /const executePublicRequest = .*publicConciergePost\(routedRequest\)/)
   assert.match(browser, /const response = access\?\.isOwner[\s\S]*withPublicDeliveryScope/)
+})
+
+test('public Concierge rebuilds the support request from parsed JSON instead of wrapping a consumed request stream', () => {
+  const concierge = read('../app/api/concierge/route.ts')
+  assert.match(concierge, /function boundedPrimary\(req: NextRequest, body: any\)/)
+  assert.match(concierge, /body: JSON\.stringify\(body\)/)
+  assert.match(concierge, /const primary = supportPost\(supportRequest\)/)
+  assert.match(concierge, /const primaryRun = await boundedPrimary\(req, body\)/)
+  assert.doesNotMatch(concierge, /supportPost\(new NextRequest\(req\.clone\(\)\)\)/)
 })
 
 test('raw pasted TypeScript becomes a real editable Builder file instead of an empty workspace', () => {

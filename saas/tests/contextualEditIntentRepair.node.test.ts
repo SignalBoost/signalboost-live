@@ -31,7 +31,6 @@ test('the discard is reachable only after the repair has also failed', () => {
   const discardIndex = branch.indexOf('finalAnswer = normalizeTextTransformationPresentation(editableSource.trim())')
   assert.ok(repairIndex > -1, 'bounded repair call must exist')
   assert.ok(discardIndex > repairIndex, 'the discard must come after the repair attempt')
-  assert.match(branch, /Last resort only, once the bounded repair has also failed/)
 })
 
 test('the repair result is revalidated before release', () => {

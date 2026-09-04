@@ -24,20 +24,27 @@ import {
   restoreCorrespondenceLayout,
 } from './correspondenceLayout.ts'
 import {
+  classifyCommunicationRegister,
+  registerGuidance,
+  ROUTINE_REGISTER,
+  type RegisterProfile,
+} from './communicationRegister.ts'
+import {
   EMPTY_EDITORIAL_SKILL_CONTEXT,
   retrieveEditorialSkills,
   stripEditorialSkillLabels,
   type EditorialSkillContext,
 } from './editorialSkillContext.ts'
-import {
-  formatNeuralCommunicationResult,
-  tryNeuralCommunicationTransformation as tryStrategicNeuralCommunicationTransformation,
-  type NeuralCommunicationAlternative,
-} from './communicationNeuralReasoning.ts'
 
 export { detectDirectTextTransformation, splitQuotedEmailThread, stripQuotedEmailThread } from './textTransformationInput.ts'
 export type { DirectTextTransformationRequest } from './textTransformationInput.ts'
 
+// MEANING-FIDELITY CONTRACT (2026-09-04)
+// -------------------------------------
+// Fidelity protects facts and intent, not weak wording. Earlier protection correctly stopped
+// dangerous substitutions such as "one-person post" -> "personal post", but it also made ordinary
+// editing behave like proofreading. The editor may now substantially improve ordinary language
+// when the requested mode permits while immutable semantic anchors remain protected.
 const MEANING_FIDELITY_RULES = [
   'MEANING FIDELITY IS THE HIGHEST PRIORITY AND OUTRANKS EVERY STYLE RULE BELOW.',
   '- Preserve the user\'s intended meaning, first-person voice, names, titles, numbers, dates, links, commitments, and level of certainty unless the user explicitly asks to change them.',
@@ -66,17 +73,11 @@ function emptyStage() {
   return { retrieved: 0, relevant: 0, selected: 0, injected: 0, cited: 0 }
 }
 
-type SkillUsageCounts = Readonly<{
-  retrieved: number
-  relevant: number
-  selected: number
-}>
-
 function provenance(
   reasonerLabel: string | null,
   invoked: boolean,
-  skills: SkillUsageCounts = EMPTY_EDITORIAL_SKILL_CONTEXT,
-  neuralCommunication = false,
+  skills: EditorialSkillContext = EMPTY_EDITORIAL_SKILL_CONTEXT,
+  register: RegisterProfile = ROUTINE_REGISTER,
 ) {
   return {
     responseSource: invoked ? 'local_cos_reasoning' : 'external_fallback_required',
@@ -86,18 +87,7 @@ function provenance(
     escalationReason: invoked ? null : 'The configured COS reasoner was unavailable for the direct text-transformation request.',
     localModelInvoked: invoked,
     reasonerLabel,
-    internalSystemsConsulted: [
-      'Direct Text Transformation',
-      'Meaning Fidelity Contract',
-      'Communicative Intent Guard',
-      'Transformation Depth Policy',
-      'Executive Communication Framework',
-      'Correspondence Layout',
-      ...(neuralCommunication
-        ? ['Neural Communication Advisor', 'Neural Communication Quality Board', 'Validated Cognitive Skills']
-        : ['Editorial Quality Pass', ...(skills.selected > 0 ? ['Validated Cognitive Skills'] : [])]),
-      ...(invoked ? ['Independent Local Reasoner'] : []),
-    ],
+    internalSystemsConsulted: ['Direct Text Transformation', 'Meaning Fidelity Contract', 'Communicative Intent Guard', 'Transformation Depth Policy', 'Executive Communication Framework', 'Editorial Quality Pass', 'Correspondence Layout', ...(register.sensitivity !== 'routine' ? [`Communicative Register (${register.sensitivity})`] : []), ...(skills.selected > 0 ? ['Validated Cognitive Skills'] : []), ...(invoked ? ['Independent Local Reasoner'] : [])],
     knowledgeFactsUsed: 0,
     learnedItemsUsed: 0,
     enterpriseMemoriesUsed: 0,
@@ -111,18 +101,12 @@ function provenance(
       enterpriseMemory: emptyStage(),
       userMemory: emptyStage(),
     },
-    cognitiveSkillFunnel: {
-      retrieved: skills.retrieved,
-      relevant: skills.relevant,
-      selected: skills.selected,
-      injected: skills.selected,
-      cited: neuralCommunication ? skills.selected : 0,
-    },
+    cognitiveSkillFunnel: { retrieved: skills.retrieved, relevant: skills.relevant, selected: skills.selected, injected: skills.selected > 0 ? 1 : 0, cited: 0 },
     knowledgeFactsCited: 0,
     learnedItemsCited: 0,
     enterpriseMemoriesCited: 0,
     userMemoriesCited: 0,
-    cognitiveSkillsCited: neuralCommunication ? skills.selected : 0,
+    cognitiveSkillsCited: 0,
     autonomousResearchAttempted: false,
     researchDocumentsAcquired: 0,
     knowledgeNewlyRetained: 0,
@@ -142,6 +126,7 @@ async function refineProfessionalDraft(input: {
   anchorBlock: string
   styleBlock: string
   skillBlock: string
+  registerBlock: string
   language?: string
 }) {
   return tryNeuralCommunicationTransformation(input)
@@ -155,6 +140,7 @@ async function tryNeuralCommunicationTransformation(input: {
   anchorBlock: string
   styleBlock: string
   skillBlock: string
+  registerBlock: string
   language?: string
 }) {
   const context = input.referenceContext ? input.referenceContext.slice(0, 12_000) : null
@@ -164,14 +150,20 @@ async function tryNeuralCommunicationTransformation(input: {
     systemPrompt: [
       'You are the FINAL COS professional copy editor. The candidate below has already been drafted once. Release a materially better final version; do not explain it.',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
-      'MEANING FIDELITY OUTRANKS POLISH. Before improving anything, silently compare the candidate against the ORIGINAL EDITABLE SOURCE and repair semantic regressions.',
-      MEANING_FIDELITY_RULES,
+      'MEANING FIDELITY OUTRANKS POLISH. Before improving anything, silently compare the candidate against the ORIGINAL EDITABLE SOURCE and repair these regressions first:',
+      '- If the candidate changed who is being asked to do what, restore the ORIGINAL actor/action/recipient relationship. In particular, a request to identify a person or office must not become a request for the current recipient to perform the underlying task or provide the underlying information.',
+      '- If the candidate broadened the user\'s requested action, remove the added request. Preserve referral-only, information-only, approval-only, confirmation-only, and action-only scopes exactly as written.',
+      '- If the candidate changed a name, role, title, acronym, program, office, technical term, or term of art into a different concept, restore the protected term.',
+      '- If the candidate added, inverted, or redirected any consequence, obligation, or responsibility that the source does not state, remove it.',
+      '- If the candidate introduced any fact, promise, deadline, or characterization of the recipient that is not present in the source or reference context, remove it.',
+      '- Preserve all names, numbers, dates, commitments, uncertainty, and factual constraints supplied by the user or reference context.',
       input.styleBlock,
       'Then improve the actual writing to the requested depth. Do not collapse an edit, polish, or rewrite request into minimal proofreading.',
       BUSINESS_REGISTER_RULES,
       CORRESPONDENCE_LAYOUT_RULES,
       input.skillBlock,
-      'Prefer concrete wording over vague substitutes when the reference context identifies the referent.',
+      input.registerBlock,
+      'Prefer concrete wording over vague substitutes when the reference context identifies what "it", "this", a shipment, a flight, a post, or another shorthand refers to.',
       'If the incoming message asks a direct question and the original draft clearly indicates the answer, ensure the final reply answers that question explicitly.',
       'Normalize obvious presentation-only escaping in URLs, such as www\\.example.com -> www.example.com, without changing the target domain.',
       'Do not introduce new facts or commitments. Do not browse or verify externally.',
@@ -196,25 +188,6 @@ async function tryNeuralCommunicationTransformation(input: {
   return { answer: parsed.answer.trim(), confidence }
 }
 
-function finalizeOne(input: {
-  originalSource: string
-  referenceContext: string | null
-  answer: string
-  language?: string
-}): string | null {
-  let answer = repairContextualEditDrift({
-    originalSource: input.originalSource,
-    referenceContext: input.referenceContext,
-    answer: input.answer,
-    language: input.language,
-  })
-  answer = normalizeTextTransformationPresentation(answer)
-  answer = stripEditorialSkillLabels(answer)
-  if (contextualEditIntentViolation({ originalSource: input.originalSource, answer })) return null
-  answer = restoreCorrespondenceLayout(answer, input.originalSource)
-  return answer.trim() || null
-}
-
 export async function tryDirectTextTransformation(input: {
   prompt: string
   language?: string
@@ -226,70 +199,33 @@ export async function tryDirectTextTransformation(input: {
   const rawEditableSource = sourceSplit.editableSource || request.sourceText
   const referenceContext = sourceSplit.referenceContext
   const styleBlock = textTransformationStyleBlock(request.instruction)
+  // Deterministic pre-pass. contextualEditQuality normalizes known rough phrasings and emits
+  // SEMANTIC ANCHORS for factual meaning plus communicative intent, so the model may improve
+  // wording without silently reassigning responsibility or broadening the user's request.
   const prepared = prepareContextualEdit(rawEditableSource, referenceContext)
   const editableSource = prepared.editableSource
   const anchorBlock = contextualEditAnchorBlock(prepared.anchors)
+  // THE LEARNED LAYER, READ BACK (2026-09-04). Embedding-ranked, metacognitively selected editing
+  // skills are injected as procedure. Best-effort and time-boxed: no skills means the turn behaves
+  // exactly as it did before, never a refusal.
+  // REGISTER AND SKILLS ARE INDEPENDENT LOOKUPS (2026-09-04). Run them together so the register
+  // pass costs no additional wall-clock time on the editing turn.
+  const [editorialSkills, registerProfile] = await Promise.all([
+    retrieveEditorialSkills(request.instruction, editableSource),
+    classifyCommunicationRegister(editableSource),
+  ])
+  const skillBlock = editorialSkills.block
+  const registerBlock = registerGuidance(registerProfile)
   const resolved = resolveCosReasoner()
   if (!resolved.config) {
     return {
       handled: false,
       confidence: 0,
       reason: 'The configured COS reasoner is unavailable for the direct text-transformation request.',
-      provenance: provenance(null, false) as any,
+      provenance: provenance(null, false, editorialSkills, registerProfile) as any,
     }
   }
 
-  // Communication is not a grammar subtask. For correspondence, COS first uses the deep-neural
-  // communication lane: validated procedural skills -> multiple neural approaches -> neural quality
-  // review -> bounded neural repair. Deterministic code below only protects facts/intent.
-  const neuralCommunication = await tryStrategicNeuralCommunicationTransformation({
-    instruction: request.instruction,
-    source: editableSource,
-    referenceContext,
-    semanticAnchors: anchorBlock,
-    language: input.language,
-  })
-
-  if (neuralCommunication) {
-    const recommended = finalizeOne({
-      originalSource: rawEditableSource,
-      referenceContext,
-      answer: neuralCommunication.recommended,
-      language: input.language,
-    })
-    if (recommended) {
-      const alternatives: NeuralCommunicationAlternative[] = neuralCommunication.alternatives.flatMap(alternative => {
-        const text = finalizeOne({
-          originalSource: rawEditableSource,
-          referenceContext,
-          answer: alternative.text,
-          language: input.language,
-        })
-        return text ? [{ label: alternative.label, text }] : []
-      })
-      const reply = formatNeuralCommunicationResult({
-        recommended,
-        alternatives,
-        alternativesUseful: neuralCommunication.alternativesUseful && alternatives.length > 0,
-      })
-      return {
-        handled: true,
-        reply,
-        confidence: neuralCommunication.confidence,
-        provenance: provenance(
-          neuralCommunication.reasonerLabel || resolved.config.label,
-          true,
-          neuralCommunication.skillUsage,
-          true,
-        ) as any,
-      }
-    }
-  }
-
-  // Non-correspondence transformations, plus a safe fallback if the strategic neural result is
-  // unavailable or fails the deterministic meaning-fidelity boundary.
-  const editorialSkills: EditorialSkillContext = await retrieveEditorialSkills(request.instruction, editableSource)
-  const skillBlock = editorialSkills.block
   let reasoned = await callCosReasoner({
     temperature: 0.08,
     maxTokens: 2400,
@@ -303,8 +239,9 @@ export async function tryDirectTextTransformation(input: {
       BUSINESS_REGISTER_RULES,
       CORRESPONDENCE_LAYOUT_RULES,
       skillBlock,
+      registerBlock,
       'REFERENCE CONTEXT HANDLING:',
-      '- Use REFERENCE CONTEXT only to understand what the draft is replying to.',
+      '- Use REFERENCE CONTEXT only to understand what the draft is replying to. Resolve ambiguous references such as this, it, that, because of me, the shipment, the flight, or the post when the context makes the referent clear.',
       '- When the reference context contains a direct question or requested decision, and the editable draft clearly indicates the user\'s answer, make the finished reply answer that question explicitly rather than leaving it implicit.',
       '- REFERENCE CONTEXT is read-only. Never reproduce, rewrite, summarize, quote, or append the prior message thread unless the user explicitly asks you to edit that quoted history too.',
       'Normalize obvious presentation-only escaping in URLs, such as www\\.example.com -> www.example.com, without changing the target domain.',
@@ -323,6 +260,8 @@ export async function tryDirectTextTransformation(input: {
     ].filter(Boolean).join('\n\n'),
   }).catch(() => null)
 
+  // A transient empty response must not turn a normal rewrite into a fail-closed refusal.
+  // Retry once with a compact, equivalent editor request before reporting the reasoner unavailable.
   if (!reasoned?.text) {
     reasoned = await callCosReasoner({
       temperature: 0.05,
@@ -335,6 +274,7 @@ export async function tryDirectTextTransformation(input: {
         'Follow the requested transformation depth. For edit, polish, or rewrite, materially improve awkward wording and structure instead of doing grammar-only corrections. Do not research, explain, or add facts.',
         CORRESPONDENCE_LAYOUT_RULES,
         skillBlock,
+        registerBlock,
         transformationLanguageInstruction(input.language),
       ].join('\n\n'),
       prompt: [
@@ -345,11 +285,7 @@ export async function tryDirectTextTransformation(input: {
     }).catch(() => null)
   }
 
-  const baseProvenance = provenance(
-    reasoned?.reasoner.label ?? resolved.config.label,
-    Boolean(reasoned?.text),
-    editorialSkills,
-  )
+  const baseProvenance = provenance(reasoned?.reasoner.label ?? resolved.config.label, Boolean(reasoned?.text), editorialSkills, registerProfile)
   if (!reasoned?.text) {
     return {
       handled: false,
@@ -360,6 +296,8 @@ export async function tryDirectTextTransformation(input: {
   }
 
   const parsed = parseLocalResult(reasoned.text)
+  // The editor has already been asked for JSON, but an otherwise valid prose draft must not make
+  // the Concierge unavailable merely because the provider omitted that envelope.
   const plainDraft = String(reasoned.text || '')
     .trim()
     .replace(/^\x60\x60\x60(?:json|text)?\s*/i, '')
@@ -385,6 +323,7 @@ export async function tryDirectTextTransformation(input: {
     anchorBlock,
     styleBlock,
     skillBlock,
+    registerBlock,
     language: input.language,
   })
   if (refined) {
@@ -392,22 +331,80 @@ export async function tryDirectTextTransformation(input: {
     finalConfidence = refined.confidence
   }
 
-  const finalized = finalizeOne({
+  // Deterministic post-pass. Even a compliant model can drift back to a different protected term,
+  // drop an explicit answer, or reassign a referral-only request to the current recipient.
+  finalAnswer = repairContextualEditDrift({
     originalSource: rawEditableSource,
     referenceContext,
     answer: finalAnswer,
     language: input.language,
   })
-  if (!finalized) {
-    finalAnswer = restoreCorrespondenceLayout(
-      normalizeTextTransformationPresentation(editableSource.trim()),
-      rawEditableSource,
-    )
-    finalConfidence = Math.min(finalConfidence, 0.5)
-  } else {
-    finalAnswer = finalized
+  finalAnswer = normalizeTextTransformationPresentation(finalAnswer)
+  // Skills are procedure, never content. Any label or skill_key that survived the instruction is
+  // removed here so internal identifiers cannot reach the reader — this editor returns before the
+  // public disclosure gate, so it must clean up after itself.
+  finalAnswer = stripEditorialSkillLabels(finalAnswer)
+
+  // REPAIR THE VIOLATION, DO NOT DISCARD THE EDIT (2026-09-04)
+  // ---------------------------------------------------------
+  // This branch used to throw the entire rewrite away and hand back the prepared source the moment
+  // one sentence expanded the recipient's role. To the user that is indistinguishable from "it did
+  // nothing" — they asked for an edit and got their own text returned, at reduced confidence, with
+  // no explanation. One offending sentence should not cost a whole correct edit.
+  //
+  // Every other release check in this file already does the right thing: bounded repair call,
+  // recheck, only then fail. The intent check was the one that skipped straight to giving up. It
+  // now follows the same shape. The deterministic repairContextualEditDrift pass above is also
+  // English-only, so a Spanish, Portuguese, Polish or Russian draft previously had no repair at all
+  // before the discard; this model pass is language-agnostic and covers them.
+  if (contextualEditIntentViolation({ originalSource: rawEditableSource, answer: finalAnswer })) {
+    const intentRepair = await callCosReasoner({
+      temperature: 0,
+      maxTokens: 2400,
+      systemPrompt: [
+        'You are COS repairing ONE scope error in an otherwise finished edit. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+        'The draft broadened what the writer asked for: the source asks the recipient only to identify WHO or WHICH OFFICE can help, and the draft also asks that recipient to supply the information or perform the task themselves.',
+        'Rewrite ONLY the sentences that carry that expansion so they request routing or referral alone. Every other sentence must survive word for word, including layout, line breaks, greeting, closing, links and signature.',
+        'Do not restore rough source wording elsewhere, do not re-proofread, and do not mention this repair.',
+        anchorBlock,
+        transformationLanguageInstruction(input.language),
+      ].filter(Boolean).join('\n\n'),
+      prompt: [
+        `ORIGINAL EDITABLE SOURCE:\n<<<SOURCE\n${rawEditableSource}\nSOURCE`,
+        `DRAFT TO REPAIR:\n<<<DRAFT\n${finalAnswer}\nDRAFT`,
+        'Return the corrected version now.',
+      ].join('\n\n'),
+    }).catch(() => null)
+
+    const intentRepaired = intentRepair?.text ? parseLocalResult(intentRepair.text) : null
+    const repairedAnswer = intentRepaired && !intentRepaired.truncated && intentRepaired.answer.trim()
+      ? repairContextualEditDrift({
+          originalSource: rawEditableSource,
+          referenceContext,
+          answer: stripEditorialSkillLabels(normalizeTextTransformationPresentation(intentRepaired.answer.trim())),
+          language: input.language,
+        })
+      : ''
+
+    if (repairedAnswer && !contextualEditIntentViolation({ originalSource: rawEditableSource, answer: repairedAnswer })) {
+      finalAnswer = repairedAnswer
+      finalConfidence = Math.min(finalConfidence, Math.max(0.6, Math.min(1, intentRepaired?.confidence ?? 0.6)))
+    } else {
+      // Last resort only, once the bounded repair has also failed: the writer's own text is safer
+      // than an edit that reassigns responsibility on their behalf.
+      finalAnswer = normalizeTextTransformationPresentation(editableSource.trim())
+      finalConfidence = Math.min(finalConfidence, 0.5)
+    }
   }
 
+  // LAYOUT IS PART OF THE DELIVERABLE (2026-09-04). A wording-correct edit that comes back as one
+  // run-on block is not something the user can paste into an email client. This pass is
+  // whitespace-only and runs last, after every fidelity and intent check, so it cannot alter a
+  // single word the gates above approved.
+  finalAnswer = restoreCorrespondenceLayout(finalAnswer, rawEditableSource)
+
+  // Editing user-supplied text is not a factual assertion. Once a non-empty, fidelity-checked
+  // draft exists, release it; a generic answer-confidence threshold must not turn it into a refusal.
   return {
     handled: true,
     reply: finalAnswer,

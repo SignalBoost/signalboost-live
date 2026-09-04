@@ -204,9 +204,11 @@ export async function executeSignalBoostRepositoryRepair(input: {
       files: changes.files,
       patch: changes.patch,
     })
-    const writebackReply = writeback.repositoryWriteTaken
+    const writebackReply = writeback.stage === 'pr_created' && writeback.pullRequestNumber
       ? `A governed review branch ${writeback.branch} and PR #${writeback.pullRequestNumber} were created from pinned commit ${target.fullCommitSha}. The agent did not merge or deploy it.`
-      : `A reviewable patch was created from pinned commit ${target.fullCommitSha}. Repository write-back was not taken${writeback.error ? ` (${writeback.error})` : ''}. Nothing was merged or deployed.`
+      : writeback.repositoryWriteTaken
+        ? `A verified patch was created from pinned commit ${target.fullCommitSha}, and repository write-back began but stopped after ${writeback.stage}${writeback.commitSha ? ` at commit ${writeback.commitSha}` : ''}${writeback.branch ? ` on branch ${writeback.branch}` : ''}${writeback.error ? ` (${writeback.error})` : ''}. Nothing was merged or deployed.`
+        : `A reviewable patch was created from pinned commit ${target.fullCommitSha}. Repository write-back was not taken${writeback.error ? ` (${writeback.error})` : ''}. Nothing was merged or deployed.`
 
     return Object.freeze({
       status: 200,
@@ -219,6 +221,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
         execution_allowed: true,
         repository_write_allowed: writeback.repositoryWriteAllowed,
         repository_write_taken: writeback.repositoryWriteTaken,
+        repository_write_stage: writeback.stage,
         repository_write_error: writeback.error,
         merge_allowed: false,
         deployment_allowed: false,

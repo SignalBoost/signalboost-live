@@ -216,7 +216,8 @@ test('owner Assistant uses the same Software Specialist and no longer jumps to C
   assert.match(source, /tryCosSoftwareSpecialist/)
   assert.match(source, /surface: 'assistant'/)
   assert.match(source, /allowRepositoryRepair: true/)
-  assert.match(source, /withRunpodWakePermission\(permission, \(\) => cosPrimaryPost\(routedRequest\)\)/)
+  assert.match(source, /const executeOwnerRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
+  assert.doesNotMatch(source, /RunPod|Runpod|runpod|withRunpodWakePermission|evaluateRunpodWakePermission/)
   assert.doesNotMatch(source, /legacyConciergePost/)
 })
 

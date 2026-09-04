@@ -8,6 +8,7 @@ const MAX_WRITE_FILES = 30
 
 type RequestLike = typeof fetch
 type JsonRecord = Record<string, any>
+type GitBlobMode = '100644' | '100755'
 export type RepositoryRepairWritebackStage = 'not_started' | 'preflight' | 'objects_written' | 'branch_created' | 'pr_created'
 
 export type RepositoryRepairWritebackResult = Readonly<{
@@ -69,6 +70,36 @@ async function requestJson(request: RequestLike, url: string, init: RequestInit,
     throw new Error(`builder_repository_writeback_${detail.replace(/\s+/g, '_').toLowerCase()}`)
   }
   return payload
+}
+
+async function executableModesForChangedFiles(
+  request: RequestLike,
+  baseTree: string,
+  files: readonly { path: string }[],
+  writeHeaders: Record<string, string>,
+): Promise<Map<string, GitBlobMode>> {
+  // Today the repository's tracked executable sources live under saas/scripts/. Avoid an extra
+  // GitHub tree read for ordinary code repairs, but never rewrite a tracked script until its base
+  // mode has been observed. New scripts default to non-executable unless the repository already
+  // tracks that path as executable.
+  const candidates = new Set(files.map(file => file.path).filter(path => path.startsWith('saas/scripts/')))
+  if (!candidates.size) return new Map()
+
+  const baseTreeListing = await requestJson(
+    request,
+    `${GITHUB_API}/git/trees/${baseTree}?recursive=1`,
+    { method: 'GET', headers: writeHeaders },
+    [200],
+  )
+  const modes = new Map<string, GitBlobMode>()
+  const entries = Array.isArray(baseTreeListing?.tree) ? baseTreeListing.tree : []
+  for (const entry of entries) {
+    const path = String(entry?.path || '')
+    const mode = String(entry?.mode || '')
+    if (!candidates.has(path) || String(entry?.type || '') !== 'blob') continue
+    if (mode === '100644' || mode === '100755') modes.set(path, mode)
+  }
+  return modes
 }
 
 /**
@@ -144,8 +175,9 @@ export async function publishSignalBoostRepositoryRepair(input: {
     )
     const baseTree = String(baseCommit?.tree?.sha || '')
     if (!SAFE_SHA.test(baseTree)) throw new Error('builder_repository_writeback_base_tree_invalid')
+    const executableModes = await executableModesForChangedFiles(request, baseTree, files, writeHeaders)
 
-    const tree: Array<{ path: string; mode: '100644'; type: 'blob'; sha: string }> = []
+    const tree: Array<{ path: string; mode: GitBlobMode; type: 'blob'; sha: string }> = []
     for (const file of files) {
       const blob = await requestJson(
         request,
@@ -157,7 +189,7 @@ export async function publishSignalBoostRepositoryRepair(input: {
       stage = 'objects_written'
       const blobSha = String(blob?.sha || '')
       if (!SAFE_SHA.test(blobSha)) throw new Error('builder_repository_writeback_blob_invalid')
-      tree.push({ path: file.path, mode: '100644', type: 'blob', sha: blobSha })
+      tree.push({ path: file.path, mode: executableModes.get(file.path) || '100644', type: 'blob', sha: blobSha })
     }
 
     branch = repairBranch(baseSha, input.workspaceId)

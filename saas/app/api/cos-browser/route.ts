@@ -4,8 +4,6 @@ import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as publicConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
-import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
-import { withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { getAccess } from '@/lib/auth/access'
 import { withPublicAuditIdentity } from '@/lib/auth/publicAuditIdentity'
 import { withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
@@ -141,8 +139,6 @@ export async function POST(req: NextRequest) {
 
   const access = await getAccess().catch(() => null)
   const auditUserId = access?.userId ?? null
-  // Fail-safe default: an unmarked browser request is public Concierge. Only the explicit owner
-  // Assistant marker may request the privileged lane, and server-side identity is still required.
   const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos'
     ? 'assistant'
     : 'concierge'
@@ -163,9 +159,6 @@ export async function POST(req: NextRequest) {
     branch: process.env.VERCEL_GIT_COMMIT_REF,
   }
 
-  // COS owns specialist selection for both faces, but authority is asymmetric. The public specialist
-  // itself is entered under public-delivery scope so an owner account using the homepage cannot leak
-  // ownerAuthorized metadata into an otherwise public Builder job.
   const softwareSpecialist = browserSurface === 'assistant'
     ? await tryCosSoftwareSpecialist({
         body,
@@ -187,13 +180,10 @@ export async function POST(req: NextRequest) {
       )
   if (softwareSpecialist) return softwareSpecialist
 
-  const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
   const exactFailedLogTarget = operationalEvidence
     ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
 
-  // Transitional defense-in-depth fallback. Public Concierge can never enter this owner lane even
-  // when the signed-in account happens to be the owner.
   const ownerDeveloperLogSubmission = browserSurface === 'assistant'
     && access?.isOwner === true
     && operationalEvidence
@@ -227,9 +217,6 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId)
   }
 
-  // Unattached operational evidence has a dedicated bounded reasoning lane. It never enters the
-  // generic intent router, so test titles cannot become artifact/visual/provenance requests, but
-  // COS can still explain the observed failure instead of merely echoing the exit code.
   if (operationalEvidence && !hasSourceAttachment) {
     const diagnostic = await diagnoseOperationalLog({ request: prompt, log: operationalPrompt, language })
     return withSuggestedFollowups(NextResponse.json({
@@ -283,9 +270,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Public Concierge gets the public recorded-provenance posture regardless of whether the account
-  // behind the audit identity is an owner. Only the explicit Assistant surface may see privileged
-  // provenance through cos-primary.
   if (!operationalEvidence && browserSurface === 'concierge' && isProvenanceIntrospection(prompt)) {
     const recorded = await withPublicAuditIdentity(auditUserId, () =>
       withPublicDeliveryScope(() => readCosPrimaryPriorProvenance(auditUserId, priorAnswer)),
@@ -300,32 +284,10 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId)
   }
 
-  const permission = evaluateRunpodWakePermission({
-    body,
-    interactionHeader: req.headers.get('x-signalboost-user-interaction'),
-    requestOrigin: req.headers.get('origin'),
-    expectedOrigin: req.nextUrl.origin,
-    secFetchSite: req.headers.get('sec-fetch-site'),
-  })
-
-  console.info('[cos-browser-runpod-wake-permission]', JSON.stringify({
-    at: new Date().toISOString(),
-    allowed: permission.allowed,
-    source: permission.source,
-    interactionId: permission.interactionId,
-    ageMs: permission.ageMs,
-    reason: permission.reason,
-    auditIdentityCaptured: Boolean(auditUserId),
-    browserSurface,
-  }))
-
-  const executeOwnerRequest = () => withRunpodWakePermission(permission, () => cosPrimaryPost(routedRequest))
-  const executePublicRequest = () => withRunpodWakePermission(permission, () => publicConciergePost(routedRequest))
-
   const response = access?.isOwner && browserSurface === 'assistant'
-    ? await executeOwnerRequest()
+    ? await cosPrimaryPost(routedRequest)
     : await withPublicAuditIdentity(auditUserId, () =>
-        withPublicDeliveryScope(() => executePublicRequest()),
+        withPublicDeliveryScope(() => publicConciergePost(routedRequest)),
       )
   return withSuggestedFollowups(response, prompt, auditUserId)
 }

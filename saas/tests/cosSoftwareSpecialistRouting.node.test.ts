@@ -82,18 +82,21 @@ test('repository repair preflight fails closed when current branch head cannot b
 })
 
 test('COS Software Specialist owns Builder and owner Platform Engineer execution seams', () => {
-  const source = read('../lib/ai/cos/softwareSpecialist.ts')
-  assert.match(source, /export async function tryCosSoftwareSpecialist/)
-  assert.match(source, /isConciergeBuilderObjective/)
-  assert.match(source, /enqueueBuilderJob/)
-  assert.match(source, /enqueueSignalBoostRepositoryRepairJob/)
-  assert.match(source, /input\.allowRepositoryRepair && access\?\.isOwner && access\.userId && !sourceAttached/)
-  assert.match(source, /const targetFreshness = await verifySignalBoostRepositoryRepairTargetCurrent\(target\)/)
-  assert.match(source, /cos-platform-engineer-stale-target/)
-  assert.match(source, /cos-platform-engineer-target-unverified/)
-  assert.ok(source.indexOf('const targetFreshness = await verifySignalBoostRepositoryRepairTargetCurrent(target)') < source.indexOf('return enqueueRepositoryRepair({'))
-  assert.match(source, /specialist_family: 'software'/)
-  assert.match(source, /orchestrator: 'cos'/)
+  const specialist = read('../lib/ai/cos/softwareSpecialist.ts')
+  const repairJob = read('../lib/builder/repository-repair-job.ts')
+
+  assert.match(specialist, /export async function tryCosSoftwareSpecialist/)
+  assert.match(specialist, /isConciergeBuilderObjective/)
+  assert.match(specialist, /enqueueBuilderJob/)
+  assert.match(specialist, /enqueueSignalBoostRepositoryRepairJob/)
+  assert.match(specialist, /input\.allowRepositoryRepair && access\?\.isOwner && access\.userId && !sourceAttached/)
+  assert.match(repairJob, /const targetFreshness = await verifySignalBoostRepositoryRepairTargetCurrent\(input\.target\)/)
+  assert.match(repairJob, /builder_repository_target_superseded/)
+  assert.match(repairJob, /builder_repository_target_unverified/)
+  assert.match(repairJob, /source: 'cos-platform-engineer-preflight'/)
+  assert.ok(repairJob.indexOf('const targetFreshness = await verifySignalBoostRepositoryRepairTargetCurrent(input.target)') < repairJob.indexOf('const workspace = createSupabaseBuilderWorkspace(input.userId)'))
+  assert.match(specialist, /specialist_family: 'software'/)
+  assert.match(specialist, /orchestrator: 'cos'/)
 })
 
 test('Concierge delegates coding to COS Software Specialist without repository authority', () => {

@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 const PLAN_PRICES: Record<string, number> = {
   free: 0, demo: 0,
-  launch: 29, starter: 29,
+  launch: 15, starter: 15,
   growth: 99, pro: 99, paid: 99,
   command: 249,
 }

@@ -37,7 +37,20 @@ type DraftSet = {
 
 const CORRESPONDENCE_OPENING = /^\s*(?:hi|hello|dear|good\s+(?:morning|afternoon|evening))\b/im
 const CORRESPONDENCE_SIGNAL = /\b(?:thank\s+you|thanks|regards|sincerely|respectfully|please|appreciate|feedback|follow\s+up|catch(?:ing)?\s+up)\b/i
+const BODY_ONLY_CORRESPONDENCE_SIGNAL = /\b(?:email|message|thread|chain|reply|respond|recipient|colleague|colleagues|manager|supervisor|team)\b/i
 const EMAIL_HEADER = /^\s*(?:from|sent|to|cc|bcc|subject)\s*:/im
+
+const INSTITUTIONAL_DIPLOMATIC_GUIDANCE = [
+  'INSTITUTIONAL / DIPLOMATIC CORRESPONDENCE — APPLY WHEN THE DRAFT TOUCHES COLLEAGUES, CAREERS, PROMOTION, PERFORMANCE, POLICY, LEADERSHIP, GRIEVANCES, OR A CONTESTED INTERNAL QUESTION:',
+  '- Preserve the writer\'s substantive point and conviction, but remove ridicule, contempt, needless personal characterization, and language that sounds bitter or accusatory unless the user explicitly asks to retain that tone.',
+  '- Distinguish observation from inference. "I have heard colleagues say..." must not become "colleagues claim..." or a statement about their true motives.',
+  '- Convert personal frustration into an institutional argument where possible: context -> observed tension -> concrete proposal -> rationale -> limitations/tradeoffs -> concluding principle. Do not force this structure when the source does not support it.',
+  '- When proposing a policy or process change, frame it as a serious recommendation for consideration rather than an attack on people who may prefer a different career path.',
+  '- Respect legitimate differences in professional goals. Do not imply that technical, operational, non-managerial, or hands-on work is lesser work.',
+  '- Preserve useful concessions and limits, such as acknowledging that wanting promotion does not itself make someone a good manager. These qualifications strengthen credibility and are not filler.',
+  '- Assume the message could be forwarded to the people it discusses or to senior leadership. Every sentence should remain professional and defensible in that setting.',
+  '- Diplomatic does not mean vague. The proposal, rationale, and requested institutional change should remain clear.',
+].join('\n')
 
 function clamp(value: unknown, fallback = 0): number {
   const numeric = Number(value)
@@ -102,6 +115,7 @@ export function isNeuralCommunicationTransformation(instruction: string, source:
   return CORRESPONDENCE_OPENING.test(text)
     || EMAIL_HEADER.test(text)
     || (text.length >= 120 && CORRESPONDENCE_SIGNAL.test(text))
+    || (text.length >= 220 && BODY_ONLY_CORRESPONDENCE_SIGNAL.test(text))
 }
 
 function skillUsage(context: CognitiveSkillContextResult) {
@@ -144,6 +158,7 @@ async function generateDraftSet(input: {
   source: string
   referenceContext: string | null
   semanticAnchors: string
+  editorialGuidance?: string
   language?: string
   skills: CognitiveSkillContextResult
 }): Promise<{ set: DraftSet; reasonerLabel: string | null } | null> {
@@ -163,6 +178,7 @@ async function generateDraftSet(input: {
       '4. Select the approach that best serves the sender’s objective while sounding natural, credible, human, and appropriately warm or diplomatic.',
       '5. When two other approaches would genuinely help the sender, return up to two complete alternatives with useful labels. Alternatives may change tone, concision, or emphasis but must not change facts or commitments.',
       '6. Self-review for strategic helpfulness, audience fit, naturalness, factual fidelity, clarity, and whether the result materially improves the original instead of sentence-by-sentence grammar repair.',
+      INSTITUTIONAL_DIPLOMATIC_GUIDANCE,
       'QUALITY FLOOR:',
       '- A grammar-checker result is a failure. For rough or non-native source text, rebuild sentences and paragraph flow substantially.',
       '- Preserve names, acronyms, program names, roles, dates, numbers, links, commitments, uncertainty, actor/action/recipient relationships, and all factual constraints.',
@@ -172,6 +188,7 @@ async function generateDraftSet(input: {
       '- Normalize presentation-only URL escaping such as www\\.example.com to www.example.com without changing the destination.',
       '- Return complete ready-to-send drafts, not commentary about how to write them.',
       input.semanticAnchors,
+      input.editorialGuidance,
       skillBlock(input.skills),
       executiveCommunicationBlock(input.language),
     ].filter(Boolean).join('\n\n'),
@@ -193,6 +210,7 @@ async function neuralQualityReview(input: {
   source: string
   referenceContext: string | null
   semanticAnchors: string
+  editorialGuidance?: string
   language?: string
   skills: CognitiveSkillContextResult
   candidate: DraftSet
@@ -206,12 +224,16 @@ async function neuralQualityReview(input: {
       '{"recommended":"...","alternatives_useful":true,"alternatives":[{"label":"...","text":"..."}],"confidence":0.0,"release_score":0.0}',
       'Evaluate the proposed communication against the ORIGINAL draft, not just against grammar.',
       'A release-quality result must: preserve facts and actor/action/recipient relationships; understand the relationship and purpose; materially improve awkward/non-native phrasing; organize the message naturally; make the request or next step clear; sound like a capable human; and avoid invented facts or overstatement.',
-      'If the proposed result still tracks the original sentence-by-sentence, sounds generic, awkward, sterile, or merely corrected, REWRITE IT rather than approving it.',
+      'For sensitive institutional correspondence, the result must preserve the writer’s argument while removing unnecessary personal disparagement, mind-reading, contempt, or wording that would make the message needlessly adversarial.',
+      'Do not erase the position in the name of diplomacy. The substantive proposal and rationale must remain clear, but they should be framed in language the writer could defend if the message were forwarded broadly.',
+      'If the proposed result still tracks the original sentence-by-sentence, sounds generic, awkward, sterile, accusatory, or merely corrected, REWRITE IT rather than approving it.',
       'If an alternative is not genuinely useful or materially distinct, replace it or omit it. Never manufacture factual differences between alternatives.',
       'For an ambiguous domain term or program action, preserve the ambiguity rather than guessing a more specific action.',
       'Normalize Markdown-escaped URL dots without changing the URL.',
       'Set release_score below 0.82 unless you would confidently send the recommended draft to the stated recipient without further rewriting.',
+      INSTITUTIONAL_DIPLOMATIC_GUIDANCE,
       input.semanticAnchors,
+      input.editorialGuidance,
       skillBlock(input.skills),
       executiveCommunicationBlock(input.language),
     ].filter(Boolean).join('\n\n'),
@@ -234,6 +256,7 @@ async function neuralLastRepair(input: {
   source: string
   referenceContext: string | null
   semanticAnchors: string
+  editorialGuidance?: string
   language?: string
   candidate: DraftSet
 }): Promise<{ set: DraftSet; reasonerLabel: string | null } | null> {
@@ -245,9 +268,12 @@ async function neuralLastRepair(input: {
       'Do not reveal chain-of-thought. Return ONLY strict JSON in the draft-set schema.',
       'Rewrite from the underlying communication objective, not from the previous wording. Preserve facts, names, acronyms, links, commitments, uncertainty, and actor/action/recipient relationships.',
       'The result must sound natural and purposeful, not like a grammar-corrected copy. Use paragraphs and transitions that fit the relationship and objective.',
+      'For sensitive institutional writing, keep the proposal strong while removing needless personal attacks, ridicule, motive attribution, or contempt.',
       'Do not invent facts or resolve ambiguous domain terminology by guessing.',
       'Normalize Markdown-escaped URL dots without changing the destination.',
+      INSTITUTIONAL_DIPLOMATIC_GUIDANCE,
       input.semanticAnchors,
+      input.editorialGuidance,
       executiveCommunicationBlock(input.language),
     ].filter(Boolean).join('\n\n'),
     prompt: [
@@ -268,6 +294,7 @@ export async function tryNeuralCommunicationTransformation(input: {
   source: string
   referenceContext?: string | null
   semanticAnchors?: string
+  editorialGuidance?: string
   language?: string
 }): Promise<NeuralCommunicationResult | null> {
   if (!isNeuralCommunicationTransformation(input.instruction, input.source)) return null
@@ -278,6 +305,7 @@ export async function tryNeuralCommunicationTransformation(input: {
     source: input.source,
     referenceContext: input.referenceContext ?? null,
     semanticAnchors: input.semanticAnchors || '',
+    editorialGuidance: input.editorialGuidance || '',
     language: input.language,
     skills,
   })
@@ -289,6 +317,7 @@ export async function tryNeuralCommunicationTransformation(input: {
     source: input.source,
     referenceContext: input.referenceContext ?? null,
     semanticAnchors: input.semanticAnchors || '',
+    editorialGuidance: input.editorialGuidance || '',
     language: input.language,
     skills,
     candidate: generated.set,
@@ -301,6 +330,7 @@ export async function tryNeuralCommunicationTransformation(input: {
       source: input.source,
       referenceContext: input.referenceContext ?? null,
       semanticAnchors: input.semanticAnchors || '',
+      editorialGuidance: input.editorialGuidance || '',
       language: input.language,
       candidate: chosen.set,
     })

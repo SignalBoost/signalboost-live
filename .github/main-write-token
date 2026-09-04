@@ -1,5 +1,5 @@
 # SignalBoost main integration serialization token
 # Every pull request targeting main must replace BOTH values below.
 # This shared-file write intentionally makes concurrent PRs conflict after one merges.
-base_sha=7955d2b9e4a3d1420fb2d648ccbce6a01b47518b
-branch=fix/concierge-governed-repair-20260904
+base_sha=0242eb884e552386da68fba3e5251cf197d1ede1
+branch=cleanup/remove-runpod-lifecycle-20260904

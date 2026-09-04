@@ -1,17 +1,14 @@
 // saas/app/api/admin/cos-capability-benchmark/route.ts
 //
 // Private held-out capability benchmark. Owner-only. Cache and external-AI answers do not count.
-//
-// THE RUNNER MUST WAKE THE REASONER BEFORE IT SCORES ANYTHING, and that wake must be granted
-// EXPLICITLY — this route cannot rely on ensureLocalInferenceRuntimeReady()'s default gate.
+// The runner verifies the configured reasoner before scoring any case.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { runPrivateCapabilityCase } from '@/lib/ai/cos/capabilityBenchmarkRunner'
-import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
+import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { probeReasoner } from '@/lib/ai/cos/reasonerProbe'
 import { isPrivateCapabilityAcceptanceOrigin } from '@/lib/ai/cos/capabilityBenchmarkCohort'
-import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -86,15 +83,6 @@ export async function POST(request: NextRequest) {
   const run = await db.from('cos_capability_benchmark_runs').insert({ requested_limit: selected.length }).select('id').single()
   if (run.error || !run.data) return NextResponse.json({ error: run.error?.message ?? 'Could not create benchmark run.' }, { status: 500 })
 
-  const ownerWakePermission: RunpodWakePermission = {
-    allowed: true,
-    source: 'user_interactive',
-    interactionId: null,
-    issuedAtMs: null,
-    ageMs: null,
-    reason: 'owner_authenticated_admin_action',
-  }
-
   let reasonerReady = true
   let reasonerError = ''
   let passed = 0
@@ -102,26 +90,23 @@ export async function POST(request: NextRequest) {
   let blockedVerdict: string | null = null
   let blockedSummary = ''
   try {
-    await withRunpodWakePermission(ownerWakePermission, async () => {
-      try {
-        await ensureLocalInferenceRuntimeReady()
-      } catch (error) {
-        reasonerReady = false
-        reasonerError = errorText(error).slice(0, 600)
-        console.warn('[cos-capability-benchmark] reasoner readiness failed; results will reflect run conditions, not capability:', reasonerError)
-      }
+    try {
+      await ensureLocalInferenceRuntimeReady()
+    } catch (error) {
+      reasonerReady = false
+      reasonerError = errorText(error).slice(0, 600)
+      console.warn('[cos-capability-benchmark] reasoner readiness failed; results will reflect run conditions, not capability:', reasonerError)
+    }
 
-      // Managed providers can legitimately exceed the general 45-second diagnostic probe while
-      // still completing benchmark answers successfully. Give owner-run acceptance a larger but
-      // bounded preflight window so slow healthy Qwen calls are not mislabeled as 0/0 failures.
-      const probe = await probeReasoner({ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS })
-      if (probe.verdict !== 'ok') {
-        blockedVerdict = probe.verdict
-        blockedSummary = probe.summary.slice(0, 1200)
-        console.warn('[cos-capability-benchmark] blocked before scoring:', blockedVerdict, blockedSummary)
-        return
-      }
-
+    // Managed providers can legitimately exceed the general 45-second diagnostic probe while
+    // still completing benchmark answers successfully. Give owner-run acceptance a larger but
+    // bounded preflight window so slow healthy calls are not mislabeled as 0/0 failures.
+    const probe = await probeReasoner({ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS })
+    if (probe.verdict !== 'ok') {
+      blockedVerdict = probe.verdict
+      blockedSummary = probe.summary.slice(0, 1200)
+      console.warn('[cos-capability-benchmark] blocked before scoring:', blockedVerdict, blockedSummary)
+    } else {
       for (const row of selected) {
         attempted += 1
         try {
@@ -156,7 +141,7 @@ export async function POST(request: NextRequest) {
           if (inserted.error) throw inserted.error
         }
       }
-    })
+    }
 
     if (blockedVerdict) {
       const blockedError = `Reasoner unavailable (${blockedVerdict}) — no cases were scored. ${blockedSummary}`

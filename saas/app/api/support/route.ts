@@ -16,8 +16,6 @@ import {
   latestUserTurnProvenance,
   type RecordedTurnProvenance,
 } from '@/lib/ai/cos/supportTurnProvenance'
-import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
-import { withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { POST as legacyPOST } from './routeCoreLegacy.ts'
@@ -320,23 +318,7 @@ export async function POST(req: NextRequest) {
   if (directStrategy) {
     response = directStrategy
   } else {
-    const wakePermission = evaluateRunpodWakePermission({
-      body,
-      interactionHeader: req.headers.get('x-signalboost-user-interaction'),
-      requestOrigin: req.headers.get('origin'),
-      expectedOrigin: req.nextUrl.origin,
-      secFetchSite: req.headers.get('sec-fetch-site'),
-    })
-    console.info('[cos-runpod-wake-permission]', JSON.stringify({
-      at: new Date().toISOString(),
-      allowed: wakePermission.allowed,
-      source: wakePermission.source,
-      interactionId: wakePermission.interactionId,
-      ageMs: wakePermission.ageMs,
-      reason: wakePermission.reason,
-    }))
-
-    response = await withRunpodWakePermission(wakePermission, () => legacyPOST(req))
+    response = await legacyPOST(req)
   }
 
   const securityBlocked = await blockedUnsafeOutput(response)

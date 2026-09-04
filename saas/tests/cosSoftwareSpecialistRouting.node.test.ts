@@ -103,6 +103,16 @@ test('COS Software Specialist owns Builder and owner Platform Engineer execution
   assert.match(specialist, /orchestrator: 'cos'/)
 })
 
+test('stale repair terminal response shows COS explanation before internal error code', () => {
+  const repairJob = read('../lib/builder/repository-repair-job.ts')
+  const builderRoute = read('../app/api/builder/route.ts')
+  const assistantPage = read('../app/dashboard/assistant/page.tsx')
+
+  assert.match(repairJob, /result:\s*\{\s*reply,\s*source: 'cos-platform-engineer-preflight'/s)
+  assert.ok(builderRoute.indexOf('...(job.result || {})') < builderRoute.indexOf('...(job.error ? { error: job.error } : {})'))
+  assert.match(assistantPage, /const directReply = data\?\.reply \|\| data\?\.error \|\| ''/)
+})
+
 test('Concierge delegates coding to COS Software Specialist without repository authority', () => {
   const source = read('../app/api/concierge/route.ts')
   assert.match(source, /tryCosSoftwareSpecialist/)

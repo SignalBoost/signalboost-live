@@ -1,4 +1,4 @@
-/ saas/lib/ai/cos/directTextTransformation.ts
+// saas/lib/ai/cos/directTextTransformation.ts
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
 import type { COSFirstAnswerResult } from './cosFirstAnswerEnterprise.ts'
@@ -67,10 +67,6 @@ function emptyStage() {
   return { retrieved: 0, relevant: 0, selected: 0, injected: 0, cited: 0 }
 }
 
-function tryNeuralCommunicationTransformation() {
-  return null
-}
-
 function provenance(
   reasonerLabel: string | null,
   invoked: boolean,
@@ -116,6 +112,19 @@ function provenance(
 }
 
 async function refineProfessionalDraft(input: {
+  instruction: string
+  editableSource: string
+  referenceContext: string | null
+  candidate: string
+  anchorBlock: string
+  styleBlock: string
+  skillBlock: string
+  language?: string
+}) {
+  return tryNeuralCommunicationTransformation(input)
+}
+
+async function tryNeuralCommunicationTransformation(input: {
   instruction: string
   editableSource: string
   referenceContext: string | null

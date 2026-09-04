@@ -14,6 +14,7 @@ const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|ba
 const MAX_CLIENT_FILE_BYTES = 512 * 1024
 const FENCED_SOURCE = /```([A-Za-z0-9_+#.-]*)\s*\n?([\s\S]*?)```/m
 const SOURCE_START = /^\s*(?:import|export|const|let|var|function|class|interface|type|enum|namespace|def|from\s+\S+\s+import|#include|#define|package\s+|using\s+|public\s+class|private\s+class|protected\s+class)\b/m
+const SOURCE_CONTINUATION_START = /^\s*(?:(?:type\s+)?[A-Za-z_$][\w$]*,|}\s*from\s*['"][^'"]+['"])\s*$/
 const SOURCE_SHAPE: readonly RegExp[] = [
   /^\s*(?:import|export|from|const|let|var|function|class|def|interface|type|enum|namespace)\b/m,
   /=>|\)\s*\{|^\s*[})\]];?\s*$/m,
@@ -97,11 +98,29 @@ function sourceLike(value: string): boolean {
   return SOURCE_SHAPE.reduce((count, pattern) => count + (pattern.test(source) ? 1 : 0), 0) >= 2
 }
 
+function sourceBeginsHere(value: string): boolean {
+  const first = String(value || '').split(/\r?\n/).find(line => line.trim()) || ''
+  return SOURCE_START.test(first) || SOURCE_CONTINUATION_START.test(first)
+}
+
+function inlineSeparatedSource(raw: string): string | null {
+  const separators = [...raw.matchAll(/\s[-–—]\s+/g)]
+  for (let index = separators.length - 1; index >= 0; index -= 1) {
+    const separator = separators[index]
+    const start = (separator.index ?? -1) + separator[0].length
+    if (start <= 0) continue
+    const candidate = raw.slice(start).trim()
+    if (sourceBeginsHere(candidate) && sourceLike(candidate)) return candidate
+  }
+  return null
+}
+
 /**
  * Browser users often paste source directly instead of attaching a file. The routing policy already
  * recognizes that as executable source, but the old transport created no Builder file, leaving an
  * empty workspace. Stage a bounded synthetic source file so Builder can actually inspect/edit it.
- * Prose before the first source declaration remains in the objective, not in the executable file.
+ * Prose before the pasted source remains in the objective, not in the executable file. Continuations
+ * of multi-line imports are preserved as well, including the common "explanation - code" paste form.
  */
 export function pastedConciergeSourceFile(objective: string): { path: string; content: string } | null {
   const raw = String(objective || '').trim()
@@ -114,8 +133,14 @@ export function pastedConciergeSourceFile(objective: string): { path: string; co
     return { path: `pasted-source.${inferredExtension(fenced[1] || '', content)}`, content }
   }
 
+  const separated = inlineSeparatedSource(raw)
+  if (separated) {
+    if (new TextEncoder().encode(separated).byteLength > MAX_CLIENT_FILE_BYTES) return null
+    return { path: `pasted-source.${inferredExtension('', separated)}`, content: separated }
+  }
+
   const lines = raw.split(/\r?\n/)
-  const startLine = lines.findIndex(line => SOURCE_START.test(line))
+  const startLine = lines.findIndex(line => SOURCE_START.test(line) || SOURCE_CONTINUATION_START.test(line))
   if (startLine < 0) return null
   const content = lines.slice(startLine).join('\n').trim()
   if (!sourceLike(content) || new TextEncoder().encode(content).byteLength > MAX_CLIENT_FILE_BYTES) return null

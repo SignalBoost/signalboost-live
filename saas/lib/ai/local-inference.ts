@@ -19,18 +19,35 @@ export interface LocalInferenceTelemetry {
   runpodLifecycleEnabled: boolean
 }
 
-const runpodWakeContext = new AsyncLocalStorage<RunpodWakePermission>()
+type LocalInferenceRequestContext = {
+  permission: RunpodWakePermission
+  inferenceCircuitOpen: boolean
+  inferenceFailure: string | null
+}
+
+const runpodWakeContext = new AsyncLocalStorage<LocalInferenceRequestContext>()
 
 export function withRunpodWakePermission<T>(permission: RunpodWakePermission, operation: () => Promise<T>): Promise<T> {
-  return runpodWakeContext.run(permission, operation)
+  return runpodWakeContext.run({ permission, inferenceCircuitOpen: false, inferenceFailure: null }, operation)
 }
 
 export function currentRunpodWakePermission(): RunpodWakePermission | null {
-  return runpodWakeContext.getStore() ?? null
+  return runpodWakeContext.getStore()?.permission ?? null
 }
 
 export function runpodWakePermitted(): boolean {
   return currentRunpodWakePermission()?.allowed === true
+}
+
+function currentInferenceContext(): LocalInferenceRequestContext | null {
+  return runpodWakeContext.getStore() ?? null
+}
+
+function markRequestInferenceFailure(reason: string): void {
+  const context = currentInferenceContext()
+  if (!context) return
+  context.inferenceCircuitOpen = true
+  context.inferenceFailure = String(reason || 'local_inference_failed').slice(0, 500)
 }
 
 function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
@@ -55,6 +72,26 @@ function configuredReasoningEffort(): 'none' | 'low' | 'medium' | 'high' | undef
   const value = process.env.LOCAL_AI_REASONING_EFFORT?.trim().toLowerCase()
   if (value === 'none' || value === 'low' || value === 'medium' || value === 'high') return value
   return undefined
+}
+
+function isDeepInfraEndpoint(baseUrl: string): boolean {
+  try { return normalizeHost(new URL(baseUrl).hostname) === 'api.deepinfra.com' } catch { return false }
+}
+
+function interactiveInferenceRequest(): boolean {
+  const permission = currentRunpodWakePermission()
+  return permission?.allowed === true && permission.source === 'user_interactive'
+}
+
+function deepInfraEngineOverloaded(body: string): boolean {
+  const text = String(body || '').toLowerCase()
+  return text.includes('engine_overloaded') || text.includes('model busy')
+}
+
+function priorityRetryTimeoutMs(configuredTimeoutMs: number): number {
+  const configured = Number(process.env.LOCAL_AI_PRIORITY_RETRY_TIMEOUT_MS || '60000')
+  const bounded = Number.isFinite(configured) ? Math.max(5_000, Math.min(120_000, Math.round(configured))) : 60_000
+  return Math.min(configuredTimeoutMs, bounded)
 }
 
 export function localInferenceConfigFromEnv(): LocalInferenceConfig {
@@ -261,13 +298,22 @@ export async function ensureLocalInferenceRuntimeReady(config = localInferenceCo
 }
 
 export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
+  const requestContext = currentInferenceContext()
+  if (requestContext?.inferenceCircuitOpen) {
+    console.warn('[cos-local-inference-circuit-open]', JSON.stringify({
+      at: new Date().toISOString(),
+      model: config.model,
+      reason: requestContext.inferenceFailure,
+      effect: 'duplicate_model_call_skipped_within_same_browser_turn',
+    }))
+    return null
+  }
+
   const startedAt = Date.now()
   let startupLatencyMs = 0
   let inferenceStartedAt: number | null = null
   let httpStatus: number | null = null
   let errorText: string | null = null
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  const controller = new AbortController()
   try {
     const startupStartedAt = Date.now()
     try {
@@ -275,9 +321,6 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     } finally {
       startupLatencyMs = Date.now() - startupStartedAt
     }
-    // Start the inference timeout only after the pod is healthy. A cold start therefore cannot
-    // consume the actual model-call timeout before the request begins.
-    timeout = setTimeout(() => controller.abort(), config.timeoutMs)
     inferenceStartedAt = Date.now()
     const reasoningEffort = configuredReasoningEffort()
     // Repetition controls. Greedy decoding (temperature 0, used on every reasoning call)
@@ -293,38 +336,82 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     }
     const frequencyPenalty = parsePenalty(process.env.COS_REASONER_FREQUENCY_PENALTY, 0.4)
     const presencePenalty = parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
-    const response = await fetch(`${config.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: config.model,
-        max_tokens: args.maxTokens ?? 2048,
-        temperature: args.temperature ?? 0.2,
-        frequency_penalty: frequencyPenalty,
-        presence_penalty: presencePenalty,
-        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
-        messages: [
-          { role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' },
-          { role: 'user', content: args.prompt },
-        ],
-      }),
-    })
+    const deepInfra = isDeepInfraEndpoint(config.baseUrl)
+    const baseBody = {
+      model: config.model,
+      max_tokens: args.maxTokens ?? 2048,
+      temperature: args.temperature ?? 0.2,
+      frequency_penalty: frequencyPenalty,
+      presence_penalty: presencePenalty,
+      ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+      messages: [
+        { role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' },
+        { role: 'user', content: args.prompt },
+      ],
+    }
+
+    const completion = async (extraBody: Record<string, unknown>, timeoutMs: number): Promise<Response> => {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), timeoutMs)
+      try {
+        return await fetch(`${config.baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
+          signal: controller.signal,
+          body: JSON.stringify({ ...baseBody, ...extraBody }),
+        })
+      } finally {
+        clearTimeout(timeout)
+      }
+    }
+
+    // DeepInfra's fail_fast control rejects capacity-queued work immediately with engine_overloaded.
+    // This preserves the current configured model/provider while preventing a standard request from
+    // sitting silently in a provider queue until LOCAL_AI_TIMEOUT_MS expires.
+    let response = await completion(deepInfra ? { fail_fast: true } : {}, config.timeoutMs)
     httpStatus = response.status
+    if (deepInfra && response.status === 429) {
+      const firstErrorBody = await response.text()
+      if (deepInfraEngineOverloaded(firstErrorBody) && interactiveInferenceRequest()) {
+        const retryTimeoutMs = priorityRetryTimeoutMs(config.timeoutMs)
+        console.warn('[cos-deepinfra-capacity-retry]', JSON.stringify({
+          at: new Date().toISOString(),
+          model: config.model,
+          firstStatus: 429,
+          sameModel: true,
+          serviceTier: 'priority',
+          retryTimeoutMs,
+          reason: 'engine_overloaded',
+        }))
+        httpStatus = null
+        response = await completion({ service_tier: 'priority' }, retryTimeoutMs)
+        httpStatus = response.status
+      } else {
+        errorText = `HTTP 429: ${firstErrorBody}`
+        markRequestInferenceFailure(errorText)
+        console.error('localInference: HTTP error', 429, errorText)
+        return null
+      }
+    }
+
     if (!response.ok) {
       errorText = `HTTP ${response.status}: ${await response.text()}`
+      markRequestInferenceFailure(errorText)
       console.error('localInference: HTTP error', response.status, errorText)
       return null
     }
     const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }; const text = data.choices?.[0]?.message?.content
-    if (typeof text !== 'string' || text.length === 0) errorText = 'Local inference returned an empty response'
+    if (typeof text !== 'string' || text.length === 0) {
+      errorText = 'Local inference returned an empty response'
+      markRequestInferenceFailure(errorText)
+    }
     return typeof text === 'string' && text.length > 0 ? text : null
   } catch (error) {
     errorText = error instanceof Error ? error.message : String(error)
+    markRequestInferenceFailure(errorText)
     console.error('localInference: request failed', error)
     return null
   } finally {
-    if (timeout) clearTimeout(timeout)
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     emitLocalInferenceTelemetry({

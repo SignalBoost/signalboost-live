@@ -39,7 +39,7 @@ import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/a
 import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
 import { deepenClaimResearch } from './cosClaimResearch.ts'
-import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
+import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { QUANTITATIVE_ANSWER_POLICY } from './cosAnswerPolicyCore.ts'
 import { resolveCalcMarkers } from './calcExpressions.ts'
@@ -1054,14 +1054,7 @@ export async function tryCOSFirstAnswer(input: {
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
       console.info('[cos-runtime-preflight-unavailable]', JSON.stringify({ at: new Date().toISOString(), reason }))
-      const result = await withRunpodWakePermission({
-        allowed: false,
-        source: 'background_or_untrusted',
-        interactionId: null,
-        issuedAtMs: null,
-        ageMs: null,
-        reason: 'runtime_preflight_failed_no_retry',
-      }, () => tryEnterpriseCOSFirstAnswer(input))
+      const result = await tryEnterpriseCOSFirstAnswer(input)
 
       const capacity = classifyRunpodFailure(reason)
       if (capacity.capacityUnavailable && result.handled === false) {

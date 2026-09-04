@@ -74,6 +74,7 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
       reply,
       error,
       result: {
+        reply,
         source: 'cos-platform-engineer-preflight',
         execution_allowed: false,
         external_action_taken: false,

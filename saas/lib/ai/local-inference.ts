@@ -1,8 +1,4 @@
 // saas/lib/ai/local-inference.ts
-import { AsyncLocalStorage } from 'node:async_hooks'
-import { ensureRunpodReasonerStarted, runpodLifecycleEnabled, stopRunpodReasoner } from '@/lib/ai/cos/runpodLifecycle'
-import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
-import { configuredRunpodApiKey, configuredRunpodPodId, explicitRunpodPodId, deriveRunpodPodIdFromLocalAiBaseUrl, localInferenceTargetsRunpod } from '@/lib/ai/cos/runpodConfig'
 
 export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
@@ -16,21 +12,23 @@ export interface LocalInferenceTelemetry {
   success: boolean
   httpStatus: number | null
   error: string | null
-  runpodLifecycleEnabled: boolean
 }
 
-const runpodWakeContext = new AsyncLocalStorage<RunpodWakePermission>()
-
-export function withRunpodWakePermission<T>(permission: RunpodWakePermission, operation: () => Promise<T>): Promise<T> {
-  return runpodWakeContext.run(permission, operation)
+/**
+ * Compatibility shim for callers that were written while COS used a stateful RunPod lifecycle.
+ * The active runtime is managed/configured inference (currently DeepInfra), so there is no compute
+ * lifecycle for a browser request to wake. Remove remaining callers in the follow-up dead-code pass.
+ */
+export function withRunpodWakePermission<T>(_permission: unknown, operation: () => Promise<T>): Promise<T> {
+  return operation()
 }
 
-export function currentRunpodWakePermission(): RunpodWakePermission | null {
-  return runpodWakeContext.getStore() ?? null
+export function currentRunpodWakePermission(): null {
+  return null
 }
 
 export function runpodWakePermitted(): boolean {
-  return currentRunpodWakePermission()?.allowed === true
+  return false
 }
 
 function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
@@ -41,7 +39,10 @@ function normalizeHost(value: string): string { return value.trim().toLowerCase(
 function configuredRemoteHosts(): Set<string> { return new Set((process.env.LOCAL_AI_ALLOWED_HOSTS || '').split(',').map(normalizeHost).filter(Boolean)) }
 function isLoopbackOrInternalHost(hostname: string): boolean { const host = normalizeHost(hostname); return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === 'ai-brain' }
 function normalizeBaseUrl(value: string): string {
-  const url = new URL(value); const host = normalizeHost(url.hostname); const internal = isLoopbackOrInternalHost(host); const explicitlyAllowed = configuredRemoteHosts().has(host)
+  const url = new URL(value)
+  const host = normalizeHost(url.hostname)
+  const internal = isLoopbackOrInternalHost(host)
+  const explicitlyAllowed = configuredRemoteHosts().has(host)
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Local AI endpoint must use http or https')
   if (!internal && !explicitlyAllowed) throw new Error(`Local AI endpoint host is not allowed: ${url.hostname}. Add the exact host to LOCAL_AI_ALLOWED_HOSTS.`)
   if (!internal && url.protocol !== 'https:') throw new Error('Remote local-AI endpoints must use https')
@@ -58,235 +59,29 @@ function configuredReasoningEffort(): 'none' | 'low' | 'medium' | 'high' | undef
 }
 
 export function localInferenceConfigFromEnv(): LocalInferenceConfig {
-  const baseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || 'http://ai-brain:8000/v1'); const model = (process.env.LOCAL_AI_MODEL || '').trim()
+  const baseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || 'http://ai-brain:8000/v1')
+  const model = (process.env.LOCAL_AI_MODEL || '').trim()
   if (!model) throw new Error('LOCAL_AI_MODEL is required when local inference is enabled')
   const timeoutMs = Number(process.env.LOCAL_AI_TIMEOUT_MS || '120000')
   if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 600000) throw new Error('LOCAL_AI_TIMEOUT_MS must be between 1000 and 600000')
   return { baseUrl, model, apiKey: process.env.LOCAL_AI_API_KEY?.trim() || undefined, timeoutMs }
 }
 
-let runtimeReadyPromise: Promise<void> | null = null
-
-const COS_PRIMARY_FUNCTION_BUDGET_MS = 300_000
-const COS_POST_INFERENCE_RESERVE_MS = 60_000
-const MAX_RUNPOD_READINESS_BUDGET_MS = 120_000
-const MIN_RUNPOD_READINESS_SLICE_MS = 5_000
-// Ceiling on how much of the function budget a single inference may reserve when deciding whether a
-// cold start still fits. 150s leaves >=90s for a wake inside the 300s ceiling.
-const COLD_START_INFERENCE_RESERVE_CAP_MS = 150_000
-
-function runpodStartTimeoutMs(): number {
-  const configured = Number(process.env.RUNPOD_START_TIMEOUT_MS || '90000')
-  return Number.isFinite(configured) ? Math.max(5_000, Math.min(90_000, configured)) : 90_000
-}
-
-function runpodTotalReadinessBudgetMs(config: LocalInferenceConfig): number {
-  // /api/cos-primary and its browser ingress run with maxDuration=300s. Reserve the model-call
-  // timeout plus a fixed tail for retrieval, persistence, telemetry and serialization. The
-  // cold-start gate may use only what remains, never a fresh 60s retry on top of the first wait.
-  //
-  // CRITICAL: the reservation is capped at COLD_START_INFERENCE_RESERVE_CAP_MS rather than using
-  // the raw configured timeout. Raising LOCAL_AI_TIMEOUT_MS to accommodate slow answers used to
-  // shrink `available` to zero, so the readiness gate threw "no safe RunPod readiness budget
-  // remains" and the turn escalated to an external provider WITHOUT EVER ATTEMPTING A WAKE — a
-  // latency setting silently disabling cold start. A stopped pod must always be wakeable; a long
-  // per-call timeout only ever applies to a pod that is already running.
-  const inferenceReserveMs = Math.min(config.timeoutMs, COLD_START_INFERENCE_RESERVE_CAP_MS)
-  if (inferenceReserveMs < config.timeoutMs) {
-    console.info('[cos-runpod-readiness-budget-clamped]', JSON.stringify({
-      at: new Date().toISOString(),
-      configuredInferenceTimeoutMs: config.timeoutMs,
-      inferenceReserveUsedMs: inferenceReserveMs,
-      note: 'cold-start wake budget preserved; the configured timeout still applies once the pod is healthy',
-    }))
-  }
-  const available = COS_PRIMARY_FUNCTION_BUDGET_MS - inferenceReserveMs - COS_POST_INFERENCE_RESERVE_MS
-  return Math.max(0, Math.min(MAX_RUNPOD_READINESS_BUDGET_MS, available))
-}
-
-function remainingReadinessBudgetMs(startedAt: number, totalBudgetMs: number): number {
-  return Math.max(0, totalBudgetMs - (Date.now() - startedAt))
-}
-
-async function waitForLocalInferenceHealth(config: LocalInferenceConfig, timeoutMs: number): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs
-  while (true) {
-    const remainingMs = deadline - Date.now()
-    if (remainingMs < 1_000) return false
-    const health = await checkLocalInferenceHealth({ ...config, timeoutMs: Math.min(config.timeoutMs, remainingMs) })
-    if (health.ok) return true
-    const sleepMs = Math.min(3_000, Math.max(0, deadline - Date.now()))
-    if (sleepMs <= 0) return false
-    await new Promise(resolve => setTimeout(resolve, sleepMs))
-  }
-}
-
-/**
- * Shared readiness gate for every consumer of the secured RunPod runtime.
- *
- * Managed/non-RunPod providers have no lifecycle to wake and therefore bypass this gate entirely;
- * their availability is established by the actual completion request and by probeReasoner().
- *
- * CRITICAL COST BOUNDARY: a stopped/unhealthy RunPod may be resumed ONLY inside a request-scoped
- * permission created from a fresh same-origin user interaction. Background jobs, cron handlers,
- * delayed server-to-server calls, stale browser replays and tests have no permission by default and
- * therefore fail fast instead of allocating GPU compute. If the model is already healthy, callers
- * may continue to use it without changing lifecycle state.
- *
- * Cost fail-safe: if an authorized interactive gate started compute and readiness never succeeds, it
- * immediately stops the Pod before propagating the error. A cold start that returns to EXITED may be
- * resumed one additional time under the same already-validated request permission, but both attempts
- * share one end-to-end readiness budget so model inference and downstream response work remain reserved.
- */
-export async function ensureLocalInferenceRuntimeReady(config = localInferenceConfigFromEnv()): Promise<void> {
-  if (!localInferenceTargetsRunpod(config.baseUrl)) return
-
-  const readinessStartedAt = Date.now()
-  const current = await checkLocalInferenceHealth(config)
-  if (current.ok) return
-
-  // Lifecycle disabled/unconfigured used to return SILENTLY here, before any log. An authorized
-  // browser turn would then quietly skip the wake, fail the health check and fall through to an
-  // external provider — indistinguishable, from the outside, from "the model refused to wake".
-  // Diagnosing it required reading source. Every other refusal in this path logs its reason, so
-  // this one does too: it names WHICH half of the contract is missing (credentials vs pod id vs
-  // explicit kill switch), because those have completely different fixes.
-  if (!runpodLifecycleEnabled()) {
-    console.warn('[cos-runpod-lifecycle-disabled]', JSON.stringify({
-      at: new Date().toISOString(),
-      effect: 'stopped_or_unhealthy_reasoner_will_not_be_woken; request falls back to its configured external path',
-      runpodApiKeyPresent: Boolean(configuredRunpodApiKey()),
-      podIdResolved: configuredRunpodPodId(),
-      podIdSource: explicitRunpodPodId() ? 'RUNPOD_POD_ID' : (deriveRunpodPodIdFromLocalAiBaseUrl() ? 'derived_from_LOCAL_AI_BASE_URL' : 'unresolved'),
-      lifecycleKillSwitch: process.env.RUNPOD_LIFECYCLE_ENABLED?.trim().toLowerCase() ?? null,
-      healthError: current.error ?? null,
-    }))
-    return
-  }
-
-  const permission = currentRunpodWakePermission()
-  if (!permission?.allowed) {
-    console.info('[cos-runpod-wake-blocked]', JSON.stringify({
-      at: new Date().toISOString(),
-      reason: permission?.reason ?? 'no_request_scoped_wake_permission',
-      source: permission?.source ?? 'background_or_untrusted',
-      interactionId: permission?.interactionId ?? null,
-      healthError: current.error ?? null,
-    }))
-    throw new Error('Reasoner is stopped or unhealthy and this request is not allowed to wake RunPod')
-  }
-
-  if (runtimeReadyPromise) return runtimeReadyPromise
-
-  runtimeReadyPromise = (async () => {
-    const totalReadinessBudgetMs = runpodTotalReadinessBudgetMs(config)
-    let firstWake: Awaited<ReturnType<typeof ensureRunpodReasonerStarted>> | null = null
-    let retryWake: Awaited<ReturnType<typeof ensureRunpodReasonerStarted>> | null = null
-    try {
-      if (remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs) < MIN_RUNPOD_READINESS_SLICE_MS) {
-        throw new Error(`Reasoner unavailable (cold start): no safe RunPod readiness budget remains after reserving ${config.timeoutMs}ms for inference and ${COS_POST_INFERENCE_RESERVE_MS}ms for downstream work`)
-      }
-
-      firstWake = await ensureRunpodReasonerStarted()
-      const firstWaitMs = Math.min(runpodStartTimeoutMs(), remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs))
-      if (firstWaitMs < MIN_RUNPOD_READINESS_SLICE_MS) {
-        throw new Error('Reasoner unavailable (cold start): RunPod lifecycle setup exhausted the safe readiness budget')
-      }
-      if (await waitForLocalInferenceHealth(config, firstWaitMs)) return
-
-      // Production acceptance observed RunPod acknowledge podResume, fall back to EXITED, and then
-      // recover on a second resume. Retry exactly once only when this request owned the first compute
-      // allocation. The retry receives only the readiness time still available after the first attempt.
-      if (firstWake.computeStartedByRequest) {
-        const beforeRetryMs = remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs)
-        if (beforeRetryMs >= MIN_RUNPOD_READINESS_SLICE_MS) {
-          retryWake = await ensureRunpodReasonerStarted()
-          if (retryWake.computeStartedByRequest) {
-            const retryTimeoutMs = Math.min(60_000, remainingReadinessBudgetMs(readinessStartedAt, totalReadinessBudgetMs))
-            if (retryTimeoutMs < MIN_RUNPOD_READINESS_SLICE_MS) {
-              throw new Error('Reasoner unavailable (cold start): retry lifecycle setup exhausted the safe readiness budget')
-            }
-            console.warn('[cos-runpod-cold-start-retry]', JSON.stringify({
-              at: new Date().toISOString(),
-              firstResumeRequested: firstWake.resumeRequested,
-              firstStartupContractRepaired: firstWake.startupContractRepaired,
-              retryResumeRequested: retryWake.resumeRequested,
-              retryStartupContractRepaired: retryWake.startupContractRepaired,
-              previousStatus: retryWake.previousStatus,
-              desiredStatus: retryWake.desiredStatus,
-              totalReadinessBudgetMs,
-              readinessElapsedMs: Date.now() - readinessStartedAt,
-              retryTimeoutMs,
-            }))
-            if (await waitForLocalInferenceHealth(config, retryTimeoutMs)) return
-            throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within the ${totalReadinessBudgetMs}ms total readiness budget`)
-          }
-        }
-      }
-
-      throw new Error(`Reasoner unavailable (cold start): RunPod did not become healthy within the ${totalReadinessBudgetMs}ms total readiness budget`)
-    } catch (error) {
-      const computeStartedByRequest = firstWake?.computeStartedByRequest === true || retryWake?.computeStartedByRequest === true
-      if (computeStartedByRequest) {
-        try {
-          const stopped = await stopRunpodReasoner()
-          console.warn('[cos-runpod-cold-start-failsafe]', JSON.stringify({
-            at: new Date().toISOString(),
-            resumeRequested: firstWake?.resumeRequested ?? false,
-            startupContractRepaired: firstWake?.startupContractRepaired ?? false,
-            retryResumeRequested: retryWake?.resumeRequested ?? false,
-            retryStartupContractRepaired: retryWake?.startupContractRepaired ?? false,
-            computeStartedByRequest,
-            totalReadinessBudgetMs,
-            readinessElapsedMs: Date.now() - readinessStartedAt,
-            stopAttempted: stopped.attempted,
-            stopped: stopped.stopped,
-            previousStatus: stopped.previousStatus ?? null,
-            desiredStatus: stopped.desiredStatus ?? null,
-            reason: error instanceof Error ? error.message : String(error),
-          }))
-        } catch (stopError) {
-          console.error('[cos-runpod-cold-start-failsafe] stop failed', stopError instanceof Error ? stopError.message : String(stopError))
-        }
-      }
-      throw error
-    }
-  })()
-
-  try {
-    await runtimeReadyPromise
-  } finally {
-    runtimeReadyPromise = null
-  }
+/** Managed/configured inference has no server-owned pod lifecycle to prepare. */
+export async function ensureLocalInferenceRuntimeReady(_config = localInferenceConfigFromEnv()): Promise<void> {
+  return
 }
 
 export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
   const startedAt = Date.now()
-  let startupLatencyMs = 0
   let inferenceStartedAt: number | null = null
   let httpStatus: number | null = null
   let errorText: string | null = null
-  let timeout: ReturnType<typeof setTimeout> | null = null
   const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
   try {
-    const startupStartedAt = Date.now()
-    try {
-      await ensureLocalInferenceRuntimeReady(config)
-    } finally {
-      startupLatencyMs = Date.now() - startupStartedAt
-    }
-    // Start the inference timeout only after the pod is healthy. A cold start therefore cannot
-    // consume the actual model-call timeout before the request begins.
-    timeout = setTimeout(() => controller.abort(), config.timeoutMs)
     inferenceStartedAt = Date.now()
     const reasoningEffort = configuredReasoningEffort()
-    // Repetition controls. Greedy decoding (temperature 0, used on every reasoning call)
-    // with no penalty lets the model fall into degenerate loops — re-emitting the same
-    // lines until it hits the token ceiling, leaving output that never parses (503) after
-    // a long "thinking" wait. frequency_penalty / presence_penalty are OpenAI-standard
-    // fields, applied to the logits before selection (so they take effect even at
-    // temperature 0) and ignored by servers that don't support them. Env-tunable, clamped
-    // to the valid 0..2 range; set COS_REASONER_FREQUENCY_PENALTY=0 to disable.
     const parsePenalty = (value: string | undefined, fallback: number): number => {
       const n = Number(value)
       return Number.isFinite(n) ? Math.max(0, Math.min(2, n)) : fallback
@@ -316,7 +111,8 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       console.error('localInference: HTTP error', response.status, errorText)
       return null
     }
-    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }; const text = data.choices?.[0]?.message?.content
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
+    const text = data.choices?.[0]?.message?.content
     if (typeof text !== 'string' || text.length === 0) errorText = 'Local inference returned an empty response'
     return typeof text === 'string' && text.length > 0 ? text : null
   } catch (error) {
@@ -324,25 +120,25 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     console.error('localInference: request failed', error)
     return null
   } finally {
-    if (timeout) clearTimeout(timeout)
+    clearTimeout(timeout)
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     emitLocalInferenceTelemetry({
       at: new Date().toISOString(),
       model: config.model,
       latencyMs,
-      startupLatencyMs,
+      startupLatencyMs: 0,
       inferenceLatencyMs,
       success: errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300,
       httpStatus,
       error: errorText,
-      runpodLifecycleEnabled: runpodLifecycleEnabled(),
     })
   }
 }
 
 export async function checkLocalInferenceHealth(config = localInferenceConfigFromEnv()): Promise<{ ok: boolean; model: string; error?: string }> {
-  const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), Math.min(config.timeoutMs, 5000))
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), Math.min(config.timeoutMs, 5000))
   try {
     const response = await fetch(`${config.baseUrl}/models`, { headers: authHeaders(config.apiKey), signal: controller.signal })
     if (!response.ok) return { ok: false, model: config.model, error: `HTTP ${response.status}` }
@@ -351,5 +147,7 @@ export async function checkLocalInferenceHealth(config = localInferenceConfigFro
     return available ? { ok: true, model: config.model } : { ok: false, model: config.model, error: 'Configured model is not served by the local endpoint' }
   } catch (error) {
     return { ok: false, model: config.model, error: error instanceof Error ? error.message : 'Local inference health check failed' }
-  } finally { clearTimeout(timeout) }
+  } finally {
+    clearTimeout(timeout)
+  }
 }

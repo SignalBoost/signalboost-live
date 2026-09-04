@@ -1,6 +1,7 @@
 // saas/app/api/cos-browser/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
+import { POST as publicConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
 import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
@@ -118,12 +119,11 @@ function builderRoutingContextFromBody(body: any) {
 /**
  * Canonical browser ingress for both Concierge and owner Assistant.
  *
- * Operational/build logs are a first-class input type. They are resolved here before any artifact,
- * visual, provenance, generic-COS, or ordinary Builder route can reinterpret words inside the log.
- * An authenticated owner failed SignalBoost log enters the pinned Software Specialist / Platform
- * Engineer lane; public or analysis-only logs enter a bounded COS diagnostic lane that has no tools
- * or execution authority. Source-attached repairs enter the Software Specialist sandbox so the
- * supplied file can be inspected, edited, run, and verified.
+ * The browser surface is explicit and security-relevant. `x-signalboost-surface: concierge` always
+ * retains public-delivery isolation even when the authenticated account is the owner; only the
+ * `cos` Assistant surface may use owner memory, configuration, or repository-repair authority.
+ * Operational/build logs are resolved before generic intent routing so copied logs cannot gain
+ * authority merely from words inside them.
  */
 export async function POST(req: NextRequest) {
   const body = await req.clone().json().catch(() => ({}))
@@ -141,6 +141,11 @@ export async function POST(req: NextRequest) {
 
   const access = await getAccess().catch(() => null)
   const auditUserId = access?.userId ?? null
+  // Fail-safe default: an unmarked browser request is public Concierge. Only the explicit owner
+  // Assistant marker may request the privileged lane, and server-side identity is still required.
+  const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos'
+    ? 'assistant'
+    : 'concierge'
 
   const routingContext = builderRoutingContextFromBody(body)
   const attachedOperationalEvidence = readAttachedOperationalEvidence(body?.attachments)
@@ -158,17 +163,28 @@ export async function POST(req: NextRequest) {
     branch: process.env.VERCEL_GIT_COMMIT_REF,
   }
 
-  // COS owns specialist selection. Both ordinary code work and the owner-only pinned repository
-  // repair capability enter the Software Specialist before any surface-specific fallback can decide
-  // to act as a second coding brain.
-  const softwareSpecialist = await tryCosSoftwareSpecialist({
-    body,
-    objective: operationalPrompt || prompt,
-    surface: 'assistant',
-    allowRepositoryRepair: true,
-    signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
-    deployment,
-  })
+  // COS owns specialist selection for both faces, but authority is asymmetric. The public specialist
+  // itself is entered under public-delivery scope so an owner account using the homepage cannot leak
+  // ownerAuthorized metadata into an otherwise public Builder job.
+  const softwareSpecialist = browserSurface === 'assistant'
+    ? await tryCosSoftwareSpecialist({
+        body,
+        objective: operationalPrompt || prompt,
+        surface: 'assistant',
+        allowRepositoryRepair: true,
+        signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
+        deployment,
+      })
+    : await withPublicAuditIdentity(auditUserId, () =>
+        withPublicDeliveryScope(() => tryCosSoftwareSpecialist({
+          body,
+          objective: operationalPrompt || prompt,
+          surface: 'concierge',
+          allowRepositoryRepair: false,
+          signalBoostDeploymentContext: false,
+          deployment,
+        })),
+      )
   if (softwareSpecialist) return softwareSpecialist
 
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
@@ -176,13 +192,14 @@ export async function POST(req: NextRequest) {
     ? parseSignalBoostRepositoryRepairTarget(operationalPrompt)
     : null
 
-  // Transitional defense-in-depth fallback. The Software Specialist above owns the active decision;
-  // this branch preserves the previously accepted owner lane until the shared path is Production-observed.
-  const ownerDeveloperLogSubmission = access?.isOwner === true
+  // Transitional defense-in-depth fallback. Public Concierge can never enter this owner lane even
+  // when the signed-in account happens to be the owner.
+  const ownerDeveloperLogSubmission = browserSurface === 'assistant'
+    && access?.isOwner === true
     && operationalEvidence
     && (SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req))
 
-  const ownerRepositoryRepairTarget = access?.isOwner && access.userId && !hasSourceAttachment
+  const ownerRepositoryRepairTarget = browserSurface === 'assistant' && access?.isOwner && access.userId && !hasSourceAttachment
     ? exactFailedLogTarget
       ?? signalBoostDeployedRepairTarget(prompt, deployment)
       ?? signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission })
@@ -266,10 +283,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Public/guest callers get the recorded-provenance disclosure posture. The owner Assistant must
-  // NOT be intercepted here — it falls through to cos-primary, whose privileged branch returns the
-  // authoritative provenance instead of the visitor-facing "no live sources" reply.
-  if (!operationalEvidence && !access?.isOwner && isProvenanceIntrospection(prompt)) {
+  // Public Concierge gets the public recorded-provenance posture regardless of whether the account
+  // behind the audit identity is an owner. Only the explicit Assistant surface may see privileged
+  // provenance through cos-primary.
+  if (!operationalEvidence && browserSurface === 'concierge' && isProvenanceIntrospection(prompt)) {
     const recorded = await withPublicAuditIdentity(auditUserId, () =>
       withPublicDeliveryScope(() => readCosPrimaryPriorProvenance(auditUserId, priorAnswer)),
     )
@@ -299,19 +316,16 @@ export async function POST(req: NextRequest) {
     ageMs: permission.ageMs,
     reason: permission.reason,
     auditIdentityCaptured: Boolean(auditUserId),
+    browserSurface,
   }))
 
-  // Non-specialist work always continues through the COS brain. The browser surface no longer
-  // decides that a coding-looking prompt should jump directly into the Concierge route.
-  const executeRoutedRequest = () => withRunpodWakePermission(permission, () => cosPrimaryPost(routedRequest))
+  const executeOwnerRequest = () => withRunpodWakePermission(permission, () => cosPrimaryPost(routedRequest))
+  const executePublicRequest = () => withRunpodWakePermission(permission, () => publicConciergePost(routedRequest))
 
-  // Public-delivery scope is a data-isolation boundary for Concierge/guest traffic. It must never
-  // wrap the authenticated owner Assistant: privileged COS needs owner-scoped memory/provenance and
-  // its deterministic platform-stack response must read the real Production model configuration.
-  const response = access?.isOwner
-    ? await executeRoutedRequest()
+  const response = access?.isOwner && browserSurface === 'assistant'
+    ? await executeOwnerRequest()
     : await withPublicAuditIdentity(auditUserId, () =>
-        withPublicDeliveryScope(() => executeRoutedRequest()),
+        withPublicDeliveryScope(() => executePublicRequest()),
       )
   return withSuggestedFollowups(response, prompt, auditUserId)
 }

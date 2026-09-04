@@ -49,10 +49,11 @@ test('Builder persists running before 202 and replaces it with the terminal resu
   assert.match(transport, /BUILDER_HISTORY_POLL_DELAY_MS = 2_500/)
   assert.match(assistantPage, /recoverCompletedTurn\(conversationId, content, sentAtMs\)/)
   // The page delegates its single send to the progress client. That client still POSTs once;
-  // subsequent durable Builder observations are read-only GETs by job id. Owner COS enters the
-  // canonical browser dispatcher first so Software Specialist selection cannot be bypassed.
+  // subsequent durable Builder observations are read-only GETs by job id. Browser COS enters the
+  // canonical dispatcher with an explicit surface marker so public Concierge cannot inherit owner authority.
   assert.equal((assistantPage.match(/postWithAgentProgress\(/g) ?? []).length, 1)
-  assert.equal((progressClient.match(/\/api\/cos-browser/g) ?? []).length, 1)
+  assert.match(progressClient, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
+  assert.match(progressClient, /'x-signalboost-surface': args\.target/)
   assert.equal((progressClient.match(/\/api\/cos-primary/g) ?? []).length, 0)
   assert.equal((progressClient.match(/method: 'POST'/g) ?? []).length, 1)
   assert.match(progressClient, /method: 'GET'/)

@@ -231,7 +231,10 @@ test('generate-a-script programming redirect is rejected and repaired as narrati
 test('Concierge preserves Primary denials and returns healthy Primary without waiting for Backup COS', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'app/api/concierge/route.ts'), 'utf8').then(hydrateLocalizedSource)
   assert.match(source, /POST as supportPost/)
-  assert.match(source, /supportPost\(new NextRequest\(req\.clone\(\)\)\)/)
+  assert.match(source, /function boundedPrimary\(req: NextRequest, body: any\)/)
+  assert.match(source, /body: JSON\.stringify\(body\)/)
+  assert.match(source, /supportPost\(supportRequest\)/)
+  assert.doesNotMatch(source, /supportPost\(new NextRequest\(req\.clone\(\)\)\)/)
   assert.match(source, /researchLifeline\?\.cancel\(\)/)
   assert.match(source, /primary\.status >= 400 && primary\.status < 500\) return primary/)
   assert.match(source, /if \(primary && immediateReasons\.length === 0\) return primary/)

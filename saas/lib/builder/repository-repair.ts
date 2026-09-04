@@ -7,6 +7,7 @@ import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { verifiedRepairLesson } from './verified-lessons.ts'
 import { inferBuilderCertificationAttempt } from './certification.ts'
 import { parseSignalBoostRepositoryRepairTarget, resolveSignalBoostRepositoryCommit, signalBoostRepositoryRepairObjective, type SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
+import { publishSignalBoostRepositoryRepair } from './repository-repair-writeback.ts'
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
 import type { BuilderRunnerPort, BuilderToolTrace } from './contracts.ts'
 
@@ -51,7 +52,9 @@ function failedPayload(input: {
       trace: publicTrace(input.trace),
       execution_allowed: true,
       repository_write_allowed: false,
+      repository_write_taken: false,
       merge_allowed: false,
+      deployment_allowed: false,
       base_commit_sha: input.baseCommitSha,
     },
   })
@@ -195,19 +198,39 @@ export async function executeSignalBoostRepositoryRepair(input: {
       console.error('[builder_repository_certification_write_failed]', { message: error instanceof Error ? error.message : 'unknown' })
     })
 
+    const writeback = await publishSignalBoostRepositoryRepair({
+      target,
+      workspaceId: input.workspaceId,
+      files: changes.files,
+      patch: changes.patch,
+    })
+    const writebackReply = writeback.stage === 'pr_created' && writeback.pullRequestNumber
+      ? `A governed review branch ${writeback.branch} and PR #${writeback.pullRequestNumber} were created from pinned commit ${target.fullCommitSha}. The agent did not merge or deploy it.`
+      : writeback.repositoryWriteTaken
+        ? `A verified patch was created from pinned commit ${target.fullCommitSha}, and repository write-back began but stopped after ${writeback.stage}${writeback.commitSha ? ` at commit ${writeback.commitSha}` : ''}${writeback.branch ? ` on branch ${writeback.branch}` : ''}${writeback.error ? ` (${writeback.error})` : ''}. Nothing was merged or deployed.`
+        : `A reviewable patch was created from pinned commit ${target.fullCommitSha}. Repository write-back was not taken${writeback.error ? ` (${writeback.error})` : ''}. Nothing was merged or deployed.`
+
     return Object.freeze({
       status: 200,
       payload: {
         source: 'cos-platform-engineer',
         workspaceId: input.workspaceId,
-        reply: `${result.answer}\n\nA reviewable patch was created from pinned commit ${target.fullCommitSha}. Nothing was committed, merged, or deployed.`,
+        reply: `${result.answer}\n\n${writebackReply}`,
         files,
         trace: publicTrace(result.trace),
         execution_allowed: true,
-        repository_write_allowed: false,
+        repository_write_allowed: writeback.repositoryWriteAllowed,
+        repository_write_taken: writeback.repositoryWriteTaken,
+        repository_write_stage: writeback.stage,
+        repository_write_error: writeback.error,
         merge_allowed: false,
+        deployment_allowed: false,
         base_commit_sha: target.fullCommitSha,
         branch: target.branch,
+        repair_branch: writeback.branch,
+        repair_commit_sha: writeback.commitSha,
+        pull_request_number: writeback.pullRequestNumber,
+        pull_request_url: writeback.pullRequestUrl,
       },
     })
   } finally {

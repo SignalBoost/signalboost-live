@@ -10,7 +10,7 @@ test.describe('Unified SignalBoost public shell', () => {
 
   test('the COS-first home accepts keyboard prompts without the duplicate dock', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('signalboost_language', 'en'))
-    await page.route('**/api/concierge', async route => {
+    await page.route('**/api/cos-browser', async route => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

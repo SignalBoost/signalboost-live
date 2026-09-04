@@ -366,12 +366,24 @@ function timestamp(): string {
   return new Date().toISOString().replace('T', ' ').replace('Z', '')
 }
 
-function boundedPrimary(req: NextRequest): Promise<{ response: Response | null; timedOut: boolean }> {
+function boundedPrimary(req: NextRequest, body: any): Promise<{ response: Response | null; timedOut: boolean }> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<{ response: null; timedOut: true }>((resolve) => {
     timer = setTimeout(() => resolve({ response: null, timedOut: true }), PRIMARY_TIMEOUT_MS)
   })
-  const primary = supportPost(new NextRequest(req.clone()))
+  // Rebuild from the already-parsed JSON rather than wrapping an in-process NextRequest. When the
+  // browser dispatcher calls Concierge directly, wrapping req.clone() can lose the stream body before
+  // the legacy support route reads it. A fresh JSON request is equivalent at the support boundary and
+  // works identically for network-delivered and in-process Concierge calls.
+  const headers = new Headers(req.headers)
+  headers.set('content-type', 'application/json')
+  headers.delete('content-length')
+  const supportRequest = new NextRequest(req.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  const primary = supportPost(supportRequest)
     .then((response) => ({ response, timedOut: false as const }))
     .catch(() => ({ response: null, timedOut: false as const }))
   return Promise.race([primary, deadline]).finally(() => {
@@ -555,7 +567,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const researchPlan = planResearchTask(input)
   const researchLifeline = createResearchLifeline(researchPlan)
 
-  const primaryRun = await boundedPrimary(req)
+  const primaryRun = await boundedPrimary(req, body)
   if (primaryRun.timedOut) {
     if (researchPlan && researchLifeline) {
       const partial = buildBoundedResearchPartial(

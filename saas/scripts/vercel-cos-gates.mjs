@@ -30,6 +30,7 @@ const tests = [
   'tests/builderRepositoryRepairTarget.node.test.ts',
   'tests/builderRepositoryRepairSecurity.node.test.ts',
   'tests/cosSoftwareSpecialistRouting.node.test.ts',
+  'tests/conciergeGovernedRepairHardening.node.test.ts',
   'tests/mainWriteDiscipline.node.test.ts',
   'tests/conciergeVisuals.node.test.ts',
   'tests/conciergeVisualTypoRouting.node.test.ts',

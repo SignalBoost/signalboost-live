@@ -30,7 +30,7 @@ export const A2A_SPECIALIST_FAMILIES: readonly A2ASpecialistFamily[] = Object.fr
       Object.freeze({ skillId: 'software.analyze', risk: 'advisory', purpose: 'Analyze code, architecture, failures, and engineering trade-offs without mutation.' }),
       Object.freeze({ skillId: 'software.build', risk: 'write', purpose: 'Create or edit code inside an authorized isolated workspace and prove the requested result.' }),
       Object.freeze({ skillId: 'software.repair', risk: 'write', purpose: 'Reproduce, repair, and verify supplied or explicitly authorized software failures.' }),
-      Object.freeze({ skillId: 'software.platform-repair', risk: 'write', purpose: 'Prepare owner-authorized pinned SignalBoost repository repairs in the network-denied staging environment; never merge or deploy.' }),
+      Object.freeze({ skillId: 'software.platform-repair', risk: 'write', purpose: 'Repair an owner-authorized pinned SignalBoost revision, prove the change, and when a server-side write credential is configured publish a serialized review branch and PR. Merge and deployment remain separate governed actions.' }),
       Object.freeze({ skillId: 'software.verify', risk: 'advisory', purpose: 'Verify code, tests, build evidence, and repair claims independently of mutation authority.' }),
     ]),
   }),

@@ -131,7 +131,18 @@ body:has(.sb-ai-app-shell--home) > footer {
   background: rgba(3, 6, 17, .86) !important;
 }
 
-.concierge-shell .assistant-header .header-copy,
+.concierge-shell .assistant-header .header-copy {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 .concierge-shell .assistant-header .header-actions a {
   display: none !important;
 }

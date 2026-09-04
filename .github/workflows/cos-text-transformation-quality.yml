@@ -1,0 +1,40 @@
+name: COS Text Transformation Quality
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/ai/cos/directTextTransformation.ts'
+      - 'saas/lib/ai/cos/communicationNeuralReasoning.ts'
+      - 'saas/lib/ai/cos/textTransformationQuality.ts'
+      - 'saas/lib/ai/cos/textTransformationInput.ts'
+      - 'saas/tests/cosTextTransformationQuality.node.test.ts'
+      - '.github/workflows/cos-text-transformation-quality.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/ai/cos/directTextTransformation.ts'
+      - 'saas/lib/ai/cos/communicationNeuralReasoning.ts'
+      - 'saas/lib/ai/cos/textTransformationQuality.ts'
+      - 'saas/lib/ai/cos/textTransformationInput.ts'
+      - 'saas/tests/cosTextTransformationQuality.node.test.ts'
+      - '.github/workflows/cos-text-transformation-quality.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  writing-quality:
+    name: Neural communication depth and fidelity
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify neural communication reasoning, alternatives, and editing depth
+        run: npx --yes tsx --test tests/cosTextTransformationQuality.node.test.ts

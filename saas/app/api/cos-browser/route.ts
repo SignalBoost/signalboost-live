@@ -163,9 +163,9 @@ export async function POST(req: NextRequest) {
     branch: process.env.VERCEL_GIT_COMMIT_REF,
   }
 
-  // COS owns specialist selection for both faces, but authority is asymmetric. Public Concierge can
-  // use the isolated Software Specialist workspace; repository repair remains exclusive to the owner
-  // Assistant surface and still requires server-side owner authentication inside the specialist.
+  // COS owns specialist selection for both faces, but authority is asymmetric. The public specialist
+  // itself is entered under public-delivery scope so an owner account using the homepage cannot leak
+  // ownerAuthorized metadata into an otherwise public Builder job.
   const softwareSpecialist = browserSurface === 'assistant'
     ? await tryCosSoftwareSpecialist({
         body,
@@ -175,14 +175,16 @@ export async function POST(req: NextRequest) {
         signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
         deployment,
       })
-    : await tryCosSoftwareSpecialist({
-        body,
-        objective: operationalPrompt || prompt,
-        surface: 'concierge',
-        allowRepositoryRepair: false,
-        signalBoostDeploymentContext: false,
-        deployment,
-      })
+    : await withPublicAuditIdentity(auditUserId, () =>
+        withPublicDeliveryScope(() => tryCosSoftwareSpecialist({
+          body,
+          objective: operationalPrompt || prompt,
+          surface: 'concierge',
+          allowRepositoryRepair: false,
+          signalBoostDeploymentContext: false,
+          deployment,
+        })),
+      )
   if (softwareSpecialist) return softwareSpecialist
 
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)

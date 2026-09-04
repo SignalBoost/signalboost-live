@@ -94,6 +94,7 @@
   min-height: 0 !important;
   max-height: none !important;
   height: 100% !important;
+  overflow-y: auto !important;
   padding: 22px clamp(14px, 3vw, 36px) !important;
   border: 0 !important;
   border-radius: 0 !important;

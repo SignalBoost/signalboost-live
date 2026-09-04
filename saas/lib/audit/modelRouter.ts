@@ -1,155 +1,132 @@
-// saas/lib/audit/modelRouter.ts
-// Audit microservice model router — ISOLATED from lib/ai/modelRouter.ts on purpose.
-// Deep recursive scans, compliance logic, RLS-bypass analysis and auto-patch
-// reasoning route to OpenAI's flagship (GPT-5.5). Claude is the resilience
-// fallback so an OpenAI outage never silently kills an audit run.
-//
-// Why a separate router: the Audit Project runs as its own load-isolated service.
-// Keeping its routing here means tuning audit token budgets / models never
-// perturbs live console traffic that depends on lib/ai/modelRouter.ts.
+// Canonical Audit reasoning seam. Audit is a COS capability and therefore uses
+// only the configured LOCAL_AI_* runtime. There is no external-provider fallback.
 
+import { randomUUID } from 'node:crypto'
+import {
+  callLocalModel,
+  checkLocalInferenceHealth,
+  localInferenceConfigFromEnv,
+} from '@/lib/ai/local-inference'
+import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { TurnRecorder, extractQueryFeatures } from '@/lib/ai/cos/turnExperience'
+import { hashPrompt, recordTurnExperience } from '@/lib/ai/cos/turnExperienceStore'
 import { getAdminSupabase } from '@/utils/supabase/server'
-
-export type AuditProvider = 'openai' | 'claude'
+import { AUDIT_UNTRUSTED_DATA_RULE } from '@/lib/audit/untrustedData'
 
 export interface AuditModelArgs {
-  modelPreference?: AuditProvider
-  prompt:           string
-  systemPrompt?:    string
-  maxTokens?:       number
+  prompt: string
+  systemPrompt?: string
+  maxTokens?: number
 }
 
-// Flagship, not the mini tier — deep logic checking needs the reasoning engine.
-const OPENAI_FLAGSHIP = 'gpt-5.5'
-const CLAUDE_FALLBACK  = 'claude-sonnet-4-6'
-const DEFAULT_MAX      = 8192
+export interface AuditRuntimeIdentity {
+  provider: 'cos'
+  model: string
+  reasoner: string
+  runtimeProvider: 'independent-local' | 'managed-open-model'
+}
 
+const DEFAULT_MAX = 8192
 const AUDIT_SYSTEM_DEFAULT =
-  'You are a senior application-security and code-quality auditor. Analyze the ' +
-  'provided source rigorously for vulnerabilities, RLS/authorization bypasses, ' +
-  'injection, secret leakage, logic flaws, and standards violations. When asked ' +
-  'for findings, return ONLY valid JSON in the exact shape requested — no prose, ' +
-  'no markdown fences.'
+  'You are the COS software-audit specialist. Analyze the provided source rigorously for ' +
+  'vulnerabilities, RLS/authorization bypasses, injection, secret leakage, logic flaws, and ' +
+  'standards violations. When asked for findings, return ONLY valid JSON in the exact shape ' +
+  `requested — no prose and no markdown fences. ${AUDIT_UNTRUSTED_DATA_RULE}`
 
-// ── OpenAI flagship ──────────────────────────────────────────────────────────
-async function callOpenAI(args: AuditModelArgs): Promise<{ text: string | null; fellBack: boolean }> {
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    console.warn('audit/modelRouter: OPENAI_API_KEY missing — falling back to Claude')
-    const text = await callClaude(args)
-    return { text, fellBack: true }
-  }
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model:                 OPENAI_FLAGSHIP,
-        // GPT-5 family on chat/completions REQUIRES max_completion_tokens.
-        // Sending max_tokens here returns HTTP 400 and would force the fallback.
-        max_completion_tokens: args.maxTokens ?? DEFAULT_MAX,
-        messages: [
-          { role: 'system', content: args.systemPrompt ?? AUDIT_SYSTEM_DEFAULT },
-          { role: 'user',   content: args.prompt },
-        ],
-      }),
-    })
-
-    if (!response.ok) {
-      console.error('audit/modelRouter: OpenAI HTTP error', response.status, await response.text())
-      console.warn('audit/modelRouter: OpenAI failed — falling back to Claude')
-      const text = await callClaude(args)
-      return { text, fellBack: true }
-    }
-
-    const data = await response.json()
-    const text = data.choices?.[0]?.message?.content || ''
-    return { text, fellBack: false }
-  } catch (err) {
-    console.error('audit/modelRouter: OpenAI exception — falling back to Claude', err)
-    const text = await callClaude(args)
-    return { text, fellBack: true }
+function auditRuntimeConfigFromEnv() {
+  const reasoner = resolveCosReasoner()
+  if ('reason' in reasoner) throw new Error(reasoner.reason)
+  const config = localInferenceConfigFromEnv()
+  return {
+    config,
+    identity: {
+      provider: 'cos' as const,
+      model: config.model,
+      reasoner: reasoner.config.label,
+      runtimeProvider: reasoner.config.kind,
+    },
   }
 }
 
-// ── Claude (resilience fallback / Claude-handled tasks) ──────────────────────
-async function callClaude(args: AuditModelArgs): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) { console.error('audit/modelRouter: ANTHROPIC_API_KEY missing'); return null }
+export function auditRuntimeIdentityFromEnv(): AuditRuntimeIdentity {
+  return auditRuntimeConfigFromEnv().identity
+}
 
+export async function preflightAuditCos(): Promise<
+  { ok: true; identity: AuditRuntimeIdentity } | { ok: false; error: string }
+> {
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method:  'POST',
-      headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model:      CLAUDE_FALLBACK,
-        max_tokens: args.maxTokens ?? DEFAULT_MAX,
-        system:     args.systemPrompt ?? AUDIT_SYSTEM_DEFAULT,
-        messages:   [{ role: 'user', content: args.prompt }],
-      }),
-    })
-
-    if (!response.ok) {
-      console.error('audit/modelRouter: Claude HTTP error', response.status, await response.text())
-      return null
-    }
-
-    const data = await response.json()
-    return data.content?.[0]?.text || ''
-  } catch (err) {
-    console.error('audit/modelRouter: Claude exception', err)
-    return null
+    const { config, identity } = auditRuntimeConfigFromEnv()
+    const health = await checkLocalInferenceHealth(config)
+    if (!health.ok) return { ok: false, error: health.error || 'Configured COS model is unavailable.' }
+    return { ok: true, identity }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'COS Audit preflight failed.' }
   }
 }
 
 async function logAuditTask(row: {
-  provider:   AuditProvider
-  status:     'success' | 'error' | 'fallback'
+  identity: AuditRuntimeIdentity
+  status: 'success' | 'error'
   durationMs: number
-  fellBack:   boolean
-  promptLen:  number
+  promptLen: number
 }) {
   try {
     const admin = getAdminSupabase()
     await admin.from('ai_task_log').insert({
-      task_type:     'audit',
-      provider:      row.provider,
-      model:         row.fellBack ? CLAUDE_FALLBACK : (row.provider === 'openai' ? OPENAI_FLAGSHIP : CLAUDE_FALLBACK),
-      status:        row.status,
-      duration_ms:   row.durationMs,
-      fallback_used: row.fellBack,
-      metadata:      { promptLength: row.promptLen },
+      task_type: 'audit',
+      provider: row.identity.provider,
+      model: row.identity.model,
+      status: row.status,
+      duration_ms: row.durationMs,
+      fallback_used: false,
+      error_message: row.status === 'error' ? 'cos_audit_reasoner_no_text' : null,
+      metadata: {
+        promptLength: row.promptLen,
+        orchestrator: 'cos',
+        specialistFamily: 'software',
+        reasoner: row.identity.reasoner,
+        runtimeProvider: row.identity.runtimeProvider,
+      },
     })
   } catch {
-    // Observability must never break an audit run.
+    // Observability must never replace the Audit result.
   }
 }
 
-// ── Main export ──────────────────────────────────────────────────────────────
-// Audit defaults to OpenAI flagship; pass modelPreference:'claude' for the
-// tasks Claude owns (frontend/structural generation).
 export async function callAuditModel(args: AuditModelArgs): Promise<string | null> {
-  const preference: AuditProvider = args.modelPreference ?? 'openai'
   const startedAt = Date.now()
-
-  if (preference === 'claude') {
-    const text = await callClaude(args)
-    await logAuditTask({ provider: 'claude', status: text ? 'success' : 'error', durationMs: Date.now() - startedAt, fellBack: false, promptLen: args.prompt.length })
-    return text
+  const { config, identity } = auditRuntimeConfigFromEnv()
+  const recorder = new TurnRecorder()
+  const turnId = randomUUID()
+  let text: string | null = null
+  try {
+    // The general prose reasoner may repair output into an {answer, confidence} envelope.
+    // Audit requires several different strict JSON schemas, so it uses the same COS-only
+    // LOCAL_AI transport while recording a COS-owned specialist turn directly.
+    text = await recorder.time('audit_specialist_reasoning', () => callLocalModel({
+      prompt: args.prompt,
+      systemPrompt: args.systemPrompt ?? AUDIT_SYSTEM_DEFAULT,
+      maxTokens: args.maxTokens ?? DEFAULT_MAX,
+      temperature: 0,
+    }, config), 'model')
+  } finally {
+    recordTurnExperience(recorder.snapshot({
+      turnId,
+      promptHash: hashPrompt(args.prompt),
+      problemClass: 'software_audit',
+      features: extractQueryFeatures(args.prompt),
+      reasonerLabel: identity.reasoner,
+      answered: Boolean(text?.trim()),
+      confidence: null,
+      confidenceThreshold: null,
+    }))
   }
-
-  const { text, fellBack } = await callOpenAI(args)
   await logAuditTask({
-    provider:   'openai',
-    status:     text ? (fellBack ? 'fallback' : 'success') : 'error',
+    identity,
+    status: text ? 'success' : 'error',
     durationMs: Date.now() - startedAt,
-    fellBack,
-    promptLen:  args.prompt.length,
+    promptLen: args.prompt.length,
   })
   return text
 }

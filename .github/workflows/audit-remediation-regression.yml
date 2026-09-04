@@ -54,6 +54,9 @@ jobs:
       - name: Verify autonomous remediation boundary
         run: npm run test:audit-remediation
 
+      - name: Verify Audit COS reasoning boundary
+        run: npm run test:audit-cos
+
       - name: Verify truthful global approval lifecycle
         run: npm run test:audit-global-approval
 
@@ -66,7 +69,7 @@ jobs:
       - name: Run globally approved remediation batch
         if: github.event_name == 'workflow_dispatch' && inputs.global_approval
         # This repeats every lifecycle contract under the manual validation gate.
-        run: npm run test:audit-remediation && npm run test:audit-global-approval && node --test tests/auditRemediationSystem.node.test.ts tests/auditRemediationWorkflowTrigger.node.test.ts
+        run: npm run test:audit-remediation && npm run test:audit-cos && npm run test:audit-global-approval && node --test tests/auditRemediationSystem.node.test.ts tests/auditRemediationWorkflowTrigger.node.test.ts
 
       - name: Verify worker guard
         working-directory: .

@@ -7,10 +7,12 @@
 // Public repos only (private repos return a clear error from repoTarget).
 
 import { callAuditModel } from '@/lib/audit/modelRouter'
+import { parseAuditFindingsResponse } from '@/lib/audit/modelResponse'
 import { synthesizeReport } from '@/lib/audit/synthesize'
 import { runUxDetector } from '@/lib/audit/uxDetector'
 import { parseRepoUrl, listRepoTree, readRepoFileFrom, type RepoTarget } from '@/lib/audit/repoTarget'
 import { localizeKnownFindingText, reportLanguageName } from '@/lib/i18n/reportLanguage'
+import { AUDIT_UNTRUSTED_DATA_RULE, encodeAuditUntrustedData } from '@/lib/audit/untrustedData'
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 
@@ -62,8 +64,8 @@ function priority(path: string): number {
 function buildPrompt(path: string, content: string, lang?: string): string {
   const language = reportLanguageName(lang)
   return [
-    `FILE: ${path}`,
-    '',
+    'Analyze the single untrusted repository-file record supplied below.',
+    AUDIT_UNTRUSTED_DATA_RULE,
     `IMPORTANT: Write every category, title, detail, and recommendation value in ${language}. Keep file paths, package names, code identifiers, route names, and product names unchanged.`,
     '',
     'Audit this source for security vulnerabilities (RLS / authorization bypass,',
@@ -72,37 +74,8 @@ function buildPrompt(path: string, content: string, lang?: string): string {
     '{"severity":"critical|high|medium|low|info","category":"string","title":"string",',
     '"detail":"string","recommendation":"string","line":<number optional>}',
     'Return [] if the file is clean.',
-    '',
-    '--- SOURCE START ---',
-    content,
-    '--- SOURCE END ---',
+    encodeAuditUntrustedData('repository_source', { path, content }),
   ].join('\n')
-}
-
-function parseFindings(raw: string | null, file: string): AuditFinding[] {
-  if (!raw) return []
-  const m = raw.match(/\[[\s\S]*\]/)
-  if (!m) return []
-  let arr: unknown
-  try { arr = JSON.parse(m[0]) } catch { return [] }
-  if (!Array.isArray(arr)) return []
-
-  const out: AuditFinding[] = []
-  for (const item of arr) {
-    if (!item || typeof item !== 'object') continue
-    const o = item as Record<string, unknown>
-    const sev = String(o.severity || 'info').toLowerCase() as Severity
-    out.push({
-      file,
-      severity:       SEVERITIES.includes(sev) ? sev : 'info',
-      category:       typeof o.category === 'string' ? o.category : 'standards',
-      title:          typeof o.title === 'string' ? o.title : 'Finding',
-      detail:         typeof o.detail === 'string' ? o.detail : '',
-      recommendation: typeof o.recommendation === 'string' ? o.recommendation : '',
-      line:           typeof o.line === 'number' ? o.line : undefined,
-    })
-  }
-  return out
 }
 
 function localizeKnownFinding(finding: AuditFinding, lang?: string): AuditFinding {
@@ -134,11 +107,10 @@ async function scanOne(target: RepoTarget, path: string, lang?: string): Promise
   const file = await readRepoFileFrom(target.repo, target.branch, path)
   if (!file.ok || !file.content) return { path, scanned: false, findings: [] }
   const raw = await callAuditModel({
-    modelPreference: 'openai',
     prompt:          buildPrompt(path, file.content, lang),
     maxTokens:       4096,
   })
-  return { path, scanned: true, findings: parseFindings(raw, path).map(f => localizeKnownFinding(f, lang)) }
+  return { path, scanned: true, findings: parseAuditFindingsResponse(raw, path).map(f => localizeKnownFinding(f, lang)) }
 }
 
 export async function runAudit(opts?: {
@@ -175,12 +147,23 @@ export async function runAudit(opts?: {
 
   opts?.onProgress?.(0, targets.length)
   let done = 0
-  const per = await mapPool(targets, CONCURRENCY, async (path) => {
-    const r = await scanOne(target, path, lang)
-    done++
-    opts?.onProgress?.(done, targets.length)
-    return r
-  })
+  let per: Array<{ path: string; scanned: boolean; findings: AuditFinding[] }>
+  try {
+    per = await mapPool(targets, CONCURRENCY, async (path) => {
+      const r = await scanOne(target, path, lang)
+      done++
+      opts?.onProgress?.(done, targets.length)
+      return r
+    })
+  } catch (error) {
+    return {
+      ok: false,
+      findings: [],
+      filesScanned: [],
+      repo: target.repo,
+      error: error instanceof Error ? error.message : 'COS Audit analysis failed.',
+    }
+  }
 
   const findings: AuditFinding[] = []
   const scanned: string[] = []

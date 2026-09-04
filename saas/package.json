@@ -40,6 +40,7 @@
     "validate:providers": "node scripts/validate-provider-runtime.mjs",
     "validate:next-routes": "node scripts/validate-next-route-config.mjs",
     "test:audit-global-approval": "node --test tests/auditGlobalApproval.node.test.ts",
+    "test:audit-cos": "node --test tests/auditCosRuntime.node.test.ts",
     "test:cyber-progress": "node --test tests/cybersecurityLiveProgress.node.test.ts",
     "test:agent-runtime-foundation": "node --test tests/agentRuntimePolicy.node.test.ts tests/agentOutputLimits.node.test.ts",
     "test:repository-intelligence": "node --test tests/repositoryIntelligence.node.test.ts tests/repositoryIntelligenceSecurity.node.test.ts",

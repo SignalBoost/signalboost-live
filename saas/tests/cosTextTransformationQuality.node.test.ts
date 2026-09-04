@@ -7,6 +7,10 @@ import {
   textTransformationMode,
   textTransformationStyleBlock,
 } from '../lib/ai/cos/textTransformationQuality.ts'
+import {
+  formatNeuralCommunicationResult,
+  isNeuralCommunicationTransformation,
+} from '../lib/ai/cos/communicationNeuralReasoning.ts'
 
 const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
 
@@ -41,13 +45,18 @@ test('proofread mode remains conservative so factual-fidelity protection is not 
   assert.doesNotMatch(block, /mirrors the source sentence-by-sentence with corrected grammar is insufficient/i)
 })
 
-test('rough JC email is recognized as an edit objective and keeps protected domain terms', () => {
+test('rough JC email is recognized as an edit objective and a neural communication task', () => {
   const request = detectDirectTextTransformation(`edit - ${JC_DRAFT}`)
   assert.ok(request)
   assert.equal(textTransformationMode(request!.instruction), 'edit')
+  assert.equal(isNeuralCommunicationTransformation(request!.instruction, request!.sourceText), true)
   assert.match(request!.sourceText, /\bJC\b/)
   assert.match(request!.sourceText, /\bREA\b/)
   assert.match(request!.sourceText, /signalboostapp\.com/)
+})
+
+test('proofreading does not invoke strategic neural correspondence rewriting', () => {
+  assert.equal(isNeuralCommunicationTransformation('proofread this email', JC_DRAFT), false)
 })
 
 test('presentation cleanup removes Markdown URL escaping without changing the destination', () => {
@@ -61,11 +70,39 @@ test('presentation cleanup removes Markdown URL escaping without changing the de
   )
 })
 
-test('direct editor no longer treats all edits as bounded grammar-only correction', () => {
+test('neural communication result can offer a recommended reply plus distinct alternatives', () => {
+  const rendered = formatNeuralCommunicationResult({
+    recommended: 'Recommended draft',
+    alternativesUseful: true,
+    alternatives: [
+      { label: 'Warmer', text: 'Warmer draft' },
+      { label: 'More concise', text: 'Concise draft' },
+    ],
+  })
+  assert.match(rendered, /^Recommended reply/m)
+  assert.match(rendered, /Alternative — Warmer/)
+  assert.match(rendered, /Alternative — More concise/)
+})
+
+test('correspondence route uses deep-neural communication judgment and validated cognitive skills', () => {
+  const direct = read('../lib/ai/cos/directTextTransformation.ts')
+  const neural = read('../lib/ai/cos/communicationNeuralReasoning.ts')
+
+  assert.match(direct, /tryNeuralCommunicationTransformation/)
+  assert.match(direct, /Neural Communication Advisor/)
+  assert.match(direct, /Validated Cognitive Skills/)
+  assert.match(neural, /retrieveValidatedCognitiveSkills/)
+  assert.match(neural, /Generate at least THREE genuinely different candidate approaches internally/i)
+  assert.match(neural, /Neural Communication Quality Board/)
+  assert.match(neural, /releaseScore < 0\.82/)
+  assert.match(neural, /recordCitedCognitiveSkillReuse/)
+  assert.doesNotMatch(neural, /canned reply|fixed email template/i)
+})
+
+test('direct editor keeps deterministic code as a fidelity guard rather than the writer', () => {
   const source = read('../lib/ai/cos/directTextTransformation.ts')
-  assert.match(source, /textTransformationStyleBlock/)
-  assert.match(source, /materially improve rough wording/i)
-  assert.match(source, /ordinary wording is editable/i)
+  assert.match(source, /Deterministic code below only protects facts\/intent/i)
+  assert.match(source, /normalizeTextTransformationPresentation/)
+  assert.match(source, /contextualEditIntentViolation/)
   assert.doesNotMatch(source, /The permitted scope of correction is grammar, spelling, agreement, articles, hyphenation, punctuation, word order, and sentence structure\. Nothing wider\./)
-  assert.match(source, /normalizeTextTransformationPresentation\(finalAnswer\)/)
 })

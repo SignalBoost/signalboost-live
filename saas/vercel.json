@@ -4,9 +4,7 @@
   "env": {
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",
     "COS_LIVE_SOURCES_ENABLED": "true",
-    "COS_LOCAL_FIRST_ENABLED": "true",
-    "COS_RUNPOD_AUTO_STOP_ENABLED": "false",
-    "COS_RUNPOD_ORPHAN_GUARD_ENABLED": "true"
+    "COS_LOCAL_FIRST_ENABLED": "true"
   },
   "crons": [
     { "path": "/api/cron/opportunity-scan", "schedule": "0 12 * * *" },
@@ -37,7 +35,6 @@
     { "path": "/api/cron/press-campaign", "schedule": "47 */6 * * *" },
     { "path": "/api/cron/business-intelligence-corpus-populate", "schedule": "57 * * * *" },
     { "path": "/api/cron/outreach-digest", "schedule": "0 13 * * *" },
-    { "path": "/api/cron/cos-runpod-idle-stop", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/cos-learning-continuity", "schedule": "45 7 * * *" }
   ]
 }

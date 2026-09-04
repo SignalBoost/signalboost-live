@@ -1,211 +1,95 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { requireOwner } from '@/lib/auth/access'
+import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
+import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 
-// Reads live env + session + DB; must never be cached.
 export const dynamic = 'force-dynamic'
-export const maxDuration = 20
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+type ProductLine = 'platform' | 'podcast'
+type CheckoutPlan = { internalPlan: string; priceId: string | undefined; expectedMonthlyCents: number }
 
-const present = (v: string | undefined | null): boolean => !!(v && v.trim())
-
-function keyMode(key: string | undefined): 'live' | 'test' | 'unknown' {
-  if (!key) return 'unknown'
-  if (key.startsWith('sk_live')) return 'live'
-  if (key.startsWith('sk_test')) return 'test'
-  return 'unknown'
+function resolvePlan(productLine: ProductLine, requestedPlan: string): CheckoutPlan | null {
+  const platform: Record<string, CheckoutPlan> = {
+    launch: { internalPlan: 'starter', priceId: process.env.STRIPE_PRICE_WEBSITE_LAUNCH ?? process.env.STRIPE_PRICE_WEBSITE_STARTER, expectedMonthlyCents: 1500 },
+    growth: { internalPlan: 'pro', priceId: process.env.STRIPE_PRICE_WEBSITE_GROWTH ?? process.env.STRIPE_PRICE_WEBSITE_PRO, expectedMonthlyCents: 9900 },
+    command: { internalPlan: 'business', priceId: process.env.STRIPE_PRICE_WEBSITE_COMMAND ?? process.env.STRIPE_PRICE_WEBSITE_BUSINESS, expectedMonthlyCents: 24900 },
+  }
+  const podcast: Record<string, CheckoutPlan> = {
+    indie: { internalPlan: 'indie', priceId: process.env.STRIPE_PRICE_PODCAST_INDIE, expectedMonthlyCents: 2900 },
+    pro: { internalPlan: 'pro', priceId: process.env.STRIPE_PRICE_PODCAST_PRO, expectedMonthlyCents: 7900 },
+    network: { internalPlan: 'network', priceId: process.env.STRIPE_PRICE_PODCAST_NETWORK, expectedMonthlyCents: 29900 },
+  }
+  return (productLine === 'podcast' ? podcast : platform)[requestedPlan] ?? null
 }
 
-// SaaS keys contain "51H8a"; Operations keys contain "51TVXg". The substring
-// lives inside the secret — we derive the family WITHOUT ever returning the key.
-function accountFamily(key: string | undefined): 'SaaS' | 'Operations' | 'unknown' {
-  if (!key) return 'unknown'
-  if (key.includes('51H8a')) return 'SaaS'
-  if (key.includes('51TVXg')) return 'Operations'
-  return 'unknown'
-}
-
-// Canonical Stripe account for SaaS billing. Set to 'Operations' per owner
-// decision (2026-06-16): subscriptions bill into the Operations account. Flip
-// this single constant to 'SaaS' if billing is ever migrated to the 51H8a account.
-const EXPECTED_FAMILY: 'SaaS' | 'Operations' = 'Operations'
-
-const EXPECTED_MARKER = EXPECTED_FAMILY === 'Operations' ? '51TVXg' : '51H8a'
-const OTHER_FAMILY = EXPECTED_FAMILY === 'Operations' ? 'SaaS' : 'Operations'
-const OTHER_MARKER = EXPECTED_FAMILY === 'Operations' ? '51H8a' : '51TVXg'
-
-// ─── route ──────────────────────────────────────────────────────────────────
-
-export async function GET() {
-  // Owner-only. requireOwner verifies the Supabase session server-side and
-  // returns the real auth UUID — not a hub-workspace id — so the row read below
-  // is bound to the correct user.
-  const guard = await requireOwner()
-  if (!guard.ok) {
-    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
-  }
-
-  const userId = guard.ctx.userId
-  const email = guard.ctx.email
-  const failures: string[] = []
-
-  // ── Stripe key + account family ────────────────────────────────────────────
-  const secretKey = process.env.STRIPE_SECRET_KEY
-  const family = accountFamily(secretKey)
-  const mode = keyMode(secretKey)
-  const secretPresent = present(secretKey)
-
-  if (!secretPresent) failures.push('STRIPE_SECRET_KEY is missing')
-  if (secretPresent && family !== EXPECTED_FAMILY) {
-    failures.push(
-      family === OTHER_FAMILY
-        ? `STRIPE_SECRET_KEY belongs to the ${OTHER_FAMILY} account (${OTHER_MARKER}) — must be the ${EXPECTED_FAMILY} account (${EXPECTED_MARKER})`
-        : 'STRIPE_SECRET_KEY account family is unrecognised (neither 51H8a nor 51TVXg)',
-    )
-  }
-
-  // ── Ping Stripe to prove the key actually authenticates ─────────────────────
-  let apiReachable = false
-  let accountId: string | null = null
-  let accountName: string | null = null
-  let stripeError: string | null = null
-  if (secretPresent) {
-    try {
-      const res = await fetch('https://api.stripe.com/v1/account', {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${secretKey}` },
-      })
-      const acct = await res.json()
-      if (res.ok) {
-        apiReachable = true
-        accountId = acct?.id ?? null
-        accountName =
-          acct?.business_profile?.name ??
-          acct?.settings?.dashboard?.display_name ??
-          null
-      } else {
-        stripeError = acct?.error?.message || `Stripe returned ${res.status}`
-        failures.push(`Stripe key did not authenticate: ${stripeError}`)
-      }
-    } catch (err: any) {
-      stripeError = err?.message || 'Stripe request failed'
-      failures.push(`Stripe ping failed: ${stripeError}`)
-    }
-  }
-
-  // ── Other required env (never echo secret values) ───────────────────────────
-  const webhookSecretPresent = present(process.env.STRIPE_WEBHOOK_SECRET)
-  if (!webhookSecretPresent) failures.push('STRIPE_WEBHOOK_SECRET is missing')
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceRolePresent = present(process.env.SUPABASE_SERVICE_ROLE_KEY)
-  if (!present(supabaseUrl)) failures.push('NEXT_PUBLIC_SUPABASE_URL is missing')
-  if (!serviceRolePresent) failures.push('SUPABASE_SERVICE_ROLE_KEY is missing')
-
-  const appUrlPresent = present(process.env.NEXT_PUBLIC_APP_URL)
-  if (!appUrlPresent) failures.push('NEXT_PUBLIC_APP_URL is missing')
-
-  // ── Price IDs (the 6 the checkout + webhook depend on) ──────────────────────
-  // Presence alone is not enough: Stripe price IDs are account-scoped, so a price
-  // set in one account 404s under another account's key. When the key authenticates
-  // we ping each price to prove it lives on the SAME account — catching the
-  // cross-account mismatch that would otherwise only surface as "No such price"
-  // mid-checkout.
-  const priceEnv: Array<{ envVar: string; id: string | undefined }> = [
-    { envVar: 'STRIPE_PRICE_WEBSITE_LAUNCH',  id: process.env.STRIPE_PRICE_WEBSITE_LAUNCH  ?? process.env.STRIPE_PRICE_WEBSITE_STARTER },
-    { envVar: 'STRIPE_PRICE_WEBSITE_GROWTH',  id: process.env.STRIPE_PRICE_WEBSITE_GROWTH  ?? process.env.STRIPE_PRICE_WEBSITE_PRO },
-    { envVar: 'STRIPE_PRICE_WEBSITE_COMMAND', id: process.env.STRIPE_PRICE_WEBSITE_COMMAND ?? process.env.STRIPE_PRICE_WEBSITE_BUSINESS },
-    { envVar: 'STRIPE_PRICE_PODCAST_INDIE', id: process.env.STRIPE_PRICE_PODCAST_INDIE },
-    { envVar: 'STRIPE_PRICE_PODCAST_PRO', id: process.env.STRIPE_PRICE_PODCAST_PRO },
-    { envVar: 'STRIPE_PRICE_PODCAST_NETWORK', id: process.env.STRIPE_PRICE_PODCAST_NETWORK },
-  ]
-
-  async function checkPrice(id: string | undefined): Promise<boolean | null> {
-    // null = could not check (price unset, or key absent/unauthenticated)
-    if (!present(id) || !secretPresent || !apiReachable) return null
-    try {
-      const r = await fetch(`https://api.stripe.com/v1/prices/${id}`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${secretKey}` },
-      })
-      return r.ok
-    } catch {
-      return false
-    }
-  }
-
-  const priceResults = await Promise.all(priceEnv.map((p) => checkPrice(p.id)))
-  const price_ids = priceEnv.map((p, i) => ({
-    env_var: p.envVar,
-    present: present(p.id),
-    valid_on_account: priceResults[i], // true | false | null(not-checked)
-  }))
-
-  const missingPrices = price_ids.filter((p) => !p.present).map((p) => p.env_var)
-  if (missingPrices.length) failures.push(`Missing price env vars: ${missingPrices.join(', ')}`)
-
-  const wrongAccountPrices = price_ids
-    .filter((p) => p.present && p.valid_on_account === false)
-    .map((p) => p.env_var)
-  if (wrongAccountPrices.length) {
-    failures.push(
-      `Price IDs not found on the authenticated Stripe account (cross-account mismatch): ${wrongAccountPrices.join(', ')}`,
-    )
-  }
-
-  // ── Phase D: read back THIS owner's subscription row ────────────────────────
-  // Informational — only populated after a real purchase. Does not gate config_ok.
-  let subscription: Record<string, unknown> = { found: false }
-  if (supabaseUrl && serviceRolePresent && userId) {
-    try {
-      const supabase = createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!)
-      const { data: row } = await supabase
-        .from('subscriptions')
-        .select(
-          'plan, status, stripe_customer_id, stripe_subscription_id, current_period_ends_at, podcast_plan, podcast_status',
-        )
-        .eq('user_id', userId)
-        .maybeSingle()
-      if (row) {
-        subscription = {
-          found: true,
-          plan: (row as any).plan ?? null,
-          status: (row as any).status ?? null,
-          stripe_customer_id_present: present((row as any).stripe_customer_id),
-          stripe_subscription_id_present: present((row as any).stripe_subscription_id),
-          current_period_ends_at: (row as any).current_period_ends_at ?? null,
-          podcast_plan: (row as any).podcast_plan ?? null,
-          podcast_status: (row as any).podcast_status ?? null,
-        }
-      }
-    } catch (err: any) {
-      subscription = { found: false, error: err?.message || 'row read failed' }
-    }
-  }
-
-  const configOk = failures.length === 0
-
-  return NextResponse.json({
-    ok: configOk, // overall Phase A config readiness
-    checked_at: new Date().toISOString(),
-    caller: { userId, email },
-    stripe: {
-      secret_key_present: secretPresent,
-      key_mode: mode,
-      account_family: family,
-      expected_account: EXPECTED_FAMILY,
-      account_family_ok: family === EXPECTED_FAMILY,
-      api_reachable: apiReachable,
-      account_id: accountId,
-      account_name: accountName,
-      error: stripeError,
-    },
-    webhook_secret_present: webhookSecretPresent,
-    supabase: { url_present: present(supabaseUrl), service_role_present: serviceRolePresent },
-    app_url_present: appUrlPresent,
-    price_ids,
-    subscription,
-    failures,
+async function priceMatchesCatalog(priceId: string, expectedMonthlyCents: number): Promise<boolean> {
+  const response = await fetch(`https://api.stripe.com/v1/prices/${encodeURIComponent(priceId)}`, {
+    headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` },
+    cache: 'no-store',
   })
+  if (!response.ok) return false
+  const price = await response.json()
+  return price.active === true && price.currency === 'usd' && price.unit_amount === expectedMonthlyCents && price.recurring?.interval === 'month'
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}))
+    const requestedPlan = String(body?.plan || '').toLowerCase()
+    const productLine: ProductLine = body?.productLine === 'podcast' ? 'podcast' : 'platform'
+    const selected = resolvePlan(productLine, requestedPlan)
+
+    if (!selected?.priceId) return NextResponse.json({ error: 'Pricing is not configured for this plan.' }, { status: 503 })
+
+    const cookieStore = await cookies()
+    const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+      cookieOptions: saasSupabaseCookieOptions,
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll(cookiesToSet) {
+          try { cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options)) } catch { /* Server Component */ }
+        },
+      },
+    })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user?.id) return NextResponse.json({ error: 'You must be signed in to subscribe.' }, { status: 401 })
+    if (!process.env.STRIPE_SECRET_KEY || !await priceMatchesCatalog(selected.priceId, selected.expectedMonthlyCents)) {
+      console.error('Checkout blocked: Stripe price does not match the public catalog', { productLine, requestedPlan })
+      return NextResponse.json({ error: 'This plan is temporarily unavailable while pricing is updated.' }, { status: 503 })
+    }
+
+    const stripeProductLine = productLine === 'platform' ? 'website' : 'podcast'
+    const params: Record<string, string> = {
+      mode: 'subscription',
+      'payment_method_types[0]': 'card',
+      'line_items[0][price]': selected.priceId,
+      'line_items[0][quantity]': '1',
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?success=true`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing?cancelled=true`,
+      'metadata[userId]': user.id,
+      'metadata[priceId]': selected.priceId,
+      'metadata[plan]': selected.internalPlan,
+      'metadata[productLine]': stripeProductLine,
+      'subscription_data[metadata][userId]': user.id,
+      'subscription_data[metadata][priceId]': selected.priceId,
+      'subscription_data[metadata][plan]': selected.internalPlan,
+      'subscription_data[metadata][productLine]': stripeProductLine,
+    }
+    if (user.email) params.customer_email = user.email
+
+    const stripeResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(params).toString(),
+    })
+    const session = await stripeResponse.json()
+    if (!stripeResponse.ok || !session?.url) {
+      console.error('Stripe checkout creation failed', session?.error)
+      return NextResponse.json({ error: session?.error?.message || 'Stripe checkout failed.' }, { status: 400 })
+    }
+    return NextResponse.json({ url: session.url })
+  } catch (error) {
+    console.error('Checkout route error', error)
+    return NextResponse.json({ error: 'Checkout could not be started.' }, { status: 500 })
+  }
 }

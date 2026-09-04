@@ -7,12 +7,13 @@ const SAFE_BRANCH = /^(?![-/])(?!.*(?:\.\.|\/\/))[A-Za-z0-9._/-]{1,180}$/
 const MAX_WRITE_FILES = 30
 
 type RequestLike = typeof fetch
-
 type JsonRecord = Record<string, any>
+export type RepositoryRepairWritebackStage = 'not_started' | 'preflight' | 'objects_written' | 'branch_created' | 'pr_created'
 
 export type RepositoryRepairWritebackResult = Readonly<{
   repositoryWriteAllowed: boolean
   repositoryWriteTaken: boolean
+  stage: RepositoryRepairWritebackStage
   branch: string | null
   commitSha: string | null
   pullRequestNumber: number | null
@@ -24,6 +25,7 @@ function result(input: Partial<RepositoryRepairWritebackResult>): RepositoryRepa
   return Object.freeze({
     repositoryWriteAllowed: false,
     repositoryWriteTaken: false,
+    stage: 'not_started',
     branch: null,
     commitSha: null,
     pullRequestNumber: null,
@@ -73,6 +75,9 @@ async function requestJson(request: RequestLike, url: string, init: RequestInit,
  * Publish an already-verified Platform Engineer repair as a review branch + GitHub PR.
  * This function never merges or deploys. The server-only write token is capability evidence;
  * caller/user text cannot supply or upgrade it.
+ *
+ * Partial mutations are reported honestly. If Git objects or a branch were created before a later
+ * API call failed, repositoryWriteTaken remains true and the last completed stage is returned.
  */
 export async function publishSignalBoostRepositoryRepair(input: {
   target: SignalBoostRepositoryRepairTarget
@@ -111,6 +116,11 @@ export async function publishSignalBoostRepositoryRepair(input: {
   }
 
   const writeHeaders = headers(token)
+  let mutationTaken = false
+  let stage: RepositoryRepairWritebackStage = 'not_started'
+  let branch: string | null = null
+  let commitSha: string | null = null
+
   try {
     // Re-verify freshness immediately before mutation. A repair generated against a superseded
     // branch head is never written, even if the earlier enqueue preflight was current.
@@ -121,8 +131,9 @@ export async function publishSignalBoostRepositoryRepair(input: {
       [200],
     )
     const currentHead = String(branchRef?.object?.sha || '').toLowerCase()
+    stage = 'preflight'
     if (!SAFE_SHA.test(currentHead) || currentHead !== baseSha) {
-      return result({ repositoryWriteAllowed: true, error: 'builder_repository_write_target_superseded' })
+      return result({ repositoryWriteAllowed: true, stage, error: 'builder_repository_write_target_superseded' })
     }
 
     const baseCommit = await requestJson(
@@ -142,12 +153,14 @@ export async function publishSignalBoostRepositoryRepair(input: {
         { method: 'POST', headers: writeHeaders, body: JSON.stringify({ content: file.content, encoding: 'utf-8' }) },
         [201],
       )
+      mutationTaken = true
+      stage = 'objects_written'
       const blobSha = String(blob?.sha || '')
       if (!SAFE_SHA.test(blobSha)) throw new Error('builder_repository_writeback_blob_invalid')
       tree.push({ path: file.path, mode: '100644', type: 'blob', sha: blobSha })
     }
 
-    const branch = repairBranch(baseSha, input.workspaceId)
+    branch = repairBranch(baseSha, input.workspaceId)
     if (baseBranch === 'main') {
       const tokenContent = [
         '# SignalBoost main integration serialization token',
@@ -163,6 +176,8 @@ export async function publishSignalBoostRepositoryRepair(input: {
         { method: 'POST', headers: writeHeaders, body: JSON.stringify({ content: tokenContent, encoding: 'utf-8' }) },
         [201],
       )
+      mutationTaken = true
+      stage = 'objects_written'
       const tokenBlobSha = String(tokenBlob?.sha || '')
       if (!SAFE_SHA.test(tokenBlobSha)) throw new Error('builder_repository_writeback_token_blob_invalid')
       tree.push({ path: '.github/main-write-token', mode: '100644', type: 'blob', sha: tokenBlobSha })
@@ -174,6 +189,8 @@ export async function publishSignalBoostRepositoryRepair(input: {
       { method: 'POST', headers: writeHeaders, body: JSON.stringify({ base_tree: baseTree, tree }) },
       [201],
     )
+    mutationTaken = true
+    stage = 'objects_written'
     const treeSha = String(createdTree?.sha || '')
     if (!SAFE_SHA.test(treeSha)) throw new Error('builder_repository_writeback_tree_invalid')
 
@@ -191,7 +208,9 @@ export async function publishSignalBoostRepositoryRepair(input: {
       },
       [201],
     )
-    const commitSha = String(createdCommit?.sha || '')
+    mutationTaken = true
+    stage = 'objects_written'
+    commitSha = String(createdCommit?.sha || '')
     if (!SAFE_SHA.test(commitSha)) throw new Error('builder_repository_writeback_commit_invalid')
 
     await requestJson(
@@ -200,6 +219,8 @@ export async function publishSignalBoostRepositoryRepair(input: {
       { method: 'POST', headers: writeHeaders, body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: commitSha }) },
       [201],
     )
+    mutationTaken = true
+    stage = 'branch_created'
 
     const pull = await requestJson(
       request,
@@ -225,6 +246,8 @@ export async function publishSignalBoostRepositoryRepair(input: {
       },
       [201],
     )
+    mutationTaken = true
+    stage = 'pr_created'
     const pullRequestNumber = Number(pull?.number)
     const pullRequestUrl = typeof pull?.html_url === 'string' ? pull.html_url : ''
     if (!Number.isInteger(pullRequestNumber) || pullRequestNumber < 1 || !/^https:\/\/github\.com\//i.test(pullRequestUrl)) {
@@ -234,6 +257,7 @@ export async function publishSignalBoostRepositoryRepair(input: {
     return result({
       repositoryWriteAllowed: true,
       repositoryWriteTaken: true,
+      stage,
       branch,
       commitSha,
       pullRequestNumber,
@@ -243,6 +267,10 @@ export async function publishSignalBoostRepositoryRepair(input: {
     const message = error instanceof Error ? error.message : 'builder_repository_writeback_failed'
     return result({
       repositoryWriteAllowed: true,
+      repositoryWriteTaken: mutationTaken,
+      stage,
+      branch: stage === 'branch_created' || stage === 'pr_created' ? branch : null,
+      commitSha,
       error: message.startsWith('builder_repository_') ? message : 'builder_repository_writeback_failed',
     })
   }

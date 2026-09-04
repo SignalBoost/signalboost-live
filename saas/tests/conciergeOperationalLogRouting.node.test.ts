@@ -26,7 +26,7 @@ test('transitional owner repository fallback remains durable while Software Spec
   assert.match(text, /runBuilderJob\(job\.jobId/)
   assert.match(text, /status: 'queued'/)
   assert.match(text, /source: 'cos-platform-engineer'/)
-  assert.match(route, /const softwareSpecialist = await tryCosSoftwareSpecialist/)
+  assert.match(route, /const softwareSpecialist = browserSurface === 'assistant'[\s\S]*\? await tryCosSoftwareSpecialist/)
 })
 
 // 2026-09-03: this ingress must not be stricter than the direct Developer surface. The same owner
@@ -45,17 +45,18 @@ test('owner repository repair matches the direct Developer surface and prefers t
   assert.ok(analysis >= 0 && exact > analysis && ownerTarget > exact)
   assert.match(route.slice(exact, ownerTarget), /parseSignalBoostRepositoryRepairTarget\(operationalPrompt\)/)
   assert.ok(exactPreference > ownerTarget && intentFallback > exactPreference && clippedFallback > intentFallback && queue > clippedFallback)
-  // Owner + no source attachment remain mandatory; the extra project-bound AND is gone.
-  assert.match(route.slice(ownerTarget, queue), /access\?\.isOwner && access\.userId && !hasSourceAttachment\n/)
+  // Owner + explicit Assistant surface + no source attachment remain mandatory; the extra project-bound AND is gone.
+  assert.match(route.slice(ownerTarget, queue), /browserSurface === 'assistant' && access\?\.isOwner && access\.userId && !hasSourceAttachment\n/)
   assert.doesNotMatch(route.slice(ownerTarget, queue), /signalBoostProjectBound/)
   // A clipped log that does not parse as failed can still reach the lane, as it does directly.
   assert.doesNotMatch(route.slice(ownerTarget, queue), /operationalLogAnalysis\.failed/)
 })
 
-test('repository authority still requires owner plus project evidence, never the branch gate alone', () => {
+test('repository authority still requires Assistant surface, owner, and project evidence, never the branch gate alone', () => {
   const flag = route.indexOf('const ownerDeveloperLogSubmission =')
   assert.ok(flag >= 0)
-  const block = route.slice(flag, flag + 400)
+  const block = route.slice(flag, flag + 500)
+  assert.match(block, /browserSurface === 'assistant'/)
   assert.match(block, /access\?\.isOwner === true/)
   assert.match(block, /operationalEvidence/)
   assert.match(block, /SIGNALBOOST_OPERATIONAL_TARGET\.test\(operationalPrompt\) \|\| isSignalBoostDeploymentContext\(req\)/)
@@ -98,10 +99,13 @@ test('bounded diagnostic lane treats log text as untrusted data and has no tool 
 
 test('source-attached repair remains in the shared isolated Software Specialist lane', () => {
   assert.match(route, /const hasSourceAttachment =/)
-  assert.match(route, /const softwareSpecialist = await tryCosSoftwareSpecialist/)
+  assert.match(route, /const softwareSpecialist = browserSurface === 'assistant'[\s\S]*\? await tryCosSoftwareSpecialist/)
   assert.match(route, /surface: 'assistant'/)
   assert.match(route, /allowRepositoryRepair: true/)
-  assert.match(route, /ownerRepositoryRepairTarget = access\?\.isOwner && access\.userId && !hasSourceAttachment/)
+  assert.match(route, /withPublicDeliveryScope\(\(\) => tryCosSoftwareSpecialist/)
+  assert.match(route, /surface: 'concierge'/)
+  assert.match(route, /allowRepositoryRepair: false/)
+  assert.match(route, /ownerRepositoryRepairTarget = browserSurface === 'assistant' && access\?\.isOwner && access\.userId && !hasSourceAttachment/)
   assert.match(route, /if \(operationalEvidence && !hasSourceAttachment\)/)
   assert.match(route, /cosPrimaryPost\(routedRequest\)/)
   assert.doesNotMatch(route, /legacyConciergePost/)

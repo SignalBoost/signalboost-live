@@ -8,6 +8,7 @@
 
 import { classifyTemporalSensitivity } from './temporalClaimGuard.ts'
 import { isContentGenerationRequest } from './contentGenerationIntent.ts'
+import { detectDirectTextTransformation } from './textTransformationInput.ts'
 import { isProvenanceIntrospection } from './provenanceIntrospection.ts'
 import { englishNormalizedForClassification } from './crossLanguageFreshness.ts'
 import { detectAdvisoryDiagnosisIntent } from './advisoryDiagnosisIntent.ts'
@@ -143,15 +144,32 @@ const RUNS_ON_ASK = /(?<![\p{L}\p{N}_])(?:hardware|gpu|gpus|infrastructure|model
 export function isPlatformSelfKnowledgePrompt(input: string): boolean {
   const text = normalizedText(input)
   if (!text) return false
+
+  // THE AUTHORING ESCAPE MUST COME FIRST (2026-09-04)
+  // ------------------------------------------------
+  // The comment below has always stated the intent — an authoring request that merely mentions the
+  // stack is not a self-knowledge question — but the check sat AFTER the four hard predicates, so
+  // it could never rescue a request those had already matched. Anything containing both a stack
+  // noun and a nearby "platform", "cos" or "signalboost" was classified as a question about the
+  // service, and cosFirstAnswerCore answers that deterministically at line 977, BEFORE the editor
+  // runs at line 989. The result: "edit this in a diplomatic way for the platform model review"
+  // and "COS still not writing well, edit this: our reasoner model needs work" both returned the
+  // canned implementation-disclosure reply instead of an edited draft. The user's own work was
+  // never seen, and no amount of editor improvement could reach it.
+  //
+  // A request that carries an artifact to transform, or asks for content to be produced, is by
+  // construction not a question about what runs this service — whatever nouns it happens to
+  // contain. Both are decided by the existing intent detectors, so no vocabulary is added here and
+  // the gate keeps every genuine identity question it caught before.
+  if (isContentGenerationRequest(input)) return false
+  if (detectDirectTextTransformation(input)) return false
+
   if (
     isSignalboostIdentityQuestion(text)
     || INTERNAL_PLATFORM_SELF_KNOWLEDGE.test(text)
     || PLATFORM_STACK_ASK.test(text)
     || DIRECT_MODEL_IDENTITY_ASK.test(text)
   ) return true
-  // An authoring request that merely mentions the stack ("write a post about your model") is not
-  // a self-knowledge question and must keep its ordinary generation path.
-  if (isContentGenerationRequest(input)) return false
   return SELF_SPEC_ASK.test(text) || RUNS_ON_ASK.test(text)
 }
 

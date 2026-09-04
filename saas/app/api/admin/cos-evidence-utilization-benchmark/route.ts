@@ -6,9 +6,8 @@ import {
   COS_EVIDENCE_UTILIZATION_BENCHMARK,
   evidenceUtilizationDomains,
 } from '@/lib/ai/cos/evidenceUtilizationBenchmark'
-import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
+import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { probeReasoner } from '@/lib/ai/cos/reasonerProbe'
-import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -93,15 +92,6 @@ export async function POST(request: NextRequest) {
     .single()
   if (run.error || !run.data) return NextResponse.json({ error: run.error?.message ?? 'Could not create utilization benchmark run.' }, { status: 500 })
 
-  const wakePermission: RunpodWakePermission = {
-    allowed: true,
-    source: 'user_interactive',
-    interactionId: null,
-    issuedAtMs: null,
-    ageMs: null,
-    reason: 'owner_authenticated_evidence_utilization_benchmark',
-  }
-
   const runStartedAt = Date.now()
   let attempted = 0
   let passed = 0
@@ -109,21 +99,18 @@ export async function POST(request: NextRequest) {
   let blockedVerdict: string | null = null
   let blockedSummary = ''
   try {
-    await withRunpodWakePermission(wakePermission, async () => {
-      await ensureLocalInferenceRuntimeReady().catch(error => {
-        console.warn('[cos-evidence-utilization-benchmark] readiness warning:', errorText(error).slice(0, 600))
-      })
+    await ensureLocalInferenceRuntimeReady().catch(error => {
+      console.warn('[cos-evidence-utilization-benchmark] readiness warning:', errorText(error).slice(0, 600))
+    })
 
-      // Managed Qwen calls can exceed the general 45-second diagnostic probe while remaining
-      // healthy. Use a larger bounded preflight here so infrastructure slowness does not become a
-      // false 0/0 utilization failure. The route budget still prevents starting another slow case.
-      const probe = await probeReasoner({ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS })
-      if (probe.verdict !== 'ok') {
-        blockedVerdict = probe.verdict
-        blockedSummary = probe.summary.slice(0, 1200)
-        return
-      }
-
+    // Managed calls can exceed the general 45-second diagnostic probe while remaining healthy.
+    // Use a larger bounded preflight so infrastructure slowness does not become a false 0/0
+    // utilization failure. The route budget still prevents starting another slow case.
+    const probe = await probeReasoner({ completionTimeoutMs: BENCHMARK_PROBE_TIMEOUT_MS })
+    if (probe.verdict !== 'ok') {
+      blockedVerdict = probe.verdict
+      blockedSummary = probe.summary.slice(0, 1200)
+    } else {
       for (let index = 0; index < selected.length; index += 1) {
         if (index > 0 && Date.now() - runStartedAt >= START_NEXT_CASE_CUTOFF_MS) {
           stoppedEarlyForBudget = true
@@ -162,7 +149,7 @@ export async function POST(request: NextRequest) {
           if (inserted.error) throw inserted.error
         }
       }
-    })
+    }
 
     if (blockedVerdict) {
       const error = `Reasoner unavailable (${blockedVerdict}) — no utilization cases were scored. ${blockedSummary}`

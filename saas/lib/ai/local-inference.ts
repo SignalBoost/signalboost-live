@@ -14,23 +14,6 @@ export interface LocalInferenceTelemetry {
   error: string | null
 }
 
-/**
- * Compatibility shim for callers that were written while COS used a stateful RunPod lifecycle.
- * The active runtime is managed/configured inference (currently DeepInfra), so there is no compute
- * lifecycle for a browser request to wake. Remove remaining callers in the follow-up dead-code pass.
- */
-export function withRunpodWakePermission<T>(_permission: unknown, operation: () => Promise<T>): Promise<T> {
-  return operation()
-}
-
-export function currentRunpodWakePermission(): null {
-  return null
-}
-
-export function runpodWakePermitted(): boolean {
-  return false
-}
-
 function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
   console.info('[cos-local-inference-telemetry]', JSON.stringify(event))
 }

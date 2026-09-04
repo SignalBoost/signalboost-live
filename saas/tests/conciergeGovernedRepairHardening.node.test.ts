@@ -39,6 +39,7 @@ test('browser surface marker keeps homepage Concierge public even for an owner a
   assert.match(browser, /req\.headers\.get\('x-signalboost-surface'\) === 'cos'/)
   assert.match(browser, /surface: 'concierge'/)
   assert.match(browser, /allowRepositoryRepair: false/)
+  assert.match(browser, /withPublicAuditIdentity\(auditUserId,[\s\S]*withPublicDeliveryScope\(\(\) => tryCosSoftwareSpecialist/)
   assert.match(browser, /surface: 'assistant'/)
   assert.match(browser, /allowRepositoryRepair: true/)
   assert.match(browser, /access\?\.isOwner && browserSurface === 'assistant'/)

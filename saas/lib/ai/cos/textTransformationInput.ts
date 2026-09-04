@@ -44,6 +44,13 @@ const CORRESPONDENCE_CLOSING_RE = /(?:\bthank\s+you[.!]?|\b(?:regards|best\s+reg
 const MAIL_HEADER_RE = /^\s*(?:from|sent|to|cc|bcc|subject|de|enviado|enviada|para|asunto|assunto|od|wys[łl]ano|do|dw|temat|от|отправлено|кому|копия|тема)\s*:\s*\S/iu
 const STRUCTURED_DOCUMENT_HEADER_RE = /^\s*(?:memo(?:randum)?|report|policy|notice|announcement|date|subject|to|from)\s*:\s*\S/iu
 
+// Body-only correspondence is common too. A user may paste a long draft after omitting the
+// salutation, especially when continuing an existing email thread. Keep this high precision: an
+// ordinary long question that happens to start with "I would like to" is not correspondence.
+const UNGREETED_OUTBOUND_CONTEXT_RE = /(?:\b(?:address|send|write|reply(?:ing)?|respond(?:ing)?|follow(?:ing)?\s+up)\b[^\n.!?]{0,70}\b(?:email|message|thread|chain)\b|\b(?:email|message|thread|chain)\b[^\n.!?]{0,70}\b(?:again|reply|response|follow[- ]?up)\b)/iu
+const FIRST_PERSON_DRAFT_RE = /(?<![\p{L}\p{N}_])(?:i|i['’]m|i['’]ve|i['’]d|my|we|we['’]re|we['’]ve|our)(?![\p{L}\p{N}_])/iu
+const META_ANALYSIS_INTENT_RE = /(?:^\s*(?:what\s+do\s+you\s+think|do\s+you\s+think|what\s+does\s+this\s+mean|analy[sz]e|interpret|explain|assess|evaluate|review\s+this\s+(?:email|message|thread|chain|response)|can\s+you\s+(?:explain|analy[sz]e|interpret|tell\s+me)|could\s+you\s+(?:explain|analy[sz]e|interpret|tell\s+me)|please\s+(?:explain|analy[sz]e|interpret)|should\s+i\s+send\b|is\s+this\s+(?:good|appropriate|professional)\b)|\b(?:do\s+not|don't)\s+(?:rewrite|edit|polish|rephrase)\b|\brather\s+than\s+(?:rewrit(?:e|ing)|edit(?:ing)?|polish(?:ing)?)\b)/iu
+
 const IMPLICIT_DRAFT_EDIT_INSTRUCTION = [
   'Edit this pasted draft for grammar, spelling, clarity, flow, and professional tone.',
   'Preserve the sender perspective, intended meaning, names, dates, times, roles, requests, commitments, and uncertainty.',
@@ -62,12 +69,21 @@ function countMailHeaders(raw: string): number {
     .length
 }
 
+function looksLikeUngreetedOutboundDraft(raw: string): boolean {
+  if (raw.length < 220 || META_ANALYSIS_INTENT_RE.test(raw)) return false
+  if (!FIRST_PERSON_DRAFT_RE.test(raw)) return false
+  if (!UNGREETED_OUTBOUND_CONTEXT_RE.test(raw)) return false
+  const sentenceCount = raw.split(/[.!?]+(?:\s+|$)/u).filter(part => part.trim().length >= 12).length
+  return raw.includes('\n\n') || sentenceCount >= 3
+}
+
 /**
  * Classify pasted text that has no explicit user instruction.
  *
  * `edit` is intentionally high precision: a greeting addressed to someone other than COS plus
- * enough correspondence evidence. `clarify` is reserved for recognizable mail/document artifacts
- * whose intended transformation is not clear. Ordinary conversational questions remain null.
+ * enough correspondence evidence, or a long body-only draft with explicit correspondence-writing
+ * context. `clarify` is reserved for recognizable mail/document artifacts whose intended
+ * transformation is not clear. Ordinary conversational questions remain null.
  */
 export function classifyUninstructedTextArtifact(prompt: string): UninstructedTextArtifactDisposition {
   const raw = String(prompt || '').trim()
@@ -91,6 +107,8 @@ export function classifyUninstructedTextArtifact(prompt: string): UninstructedTe
 
     if (correspondenceEvidence) return 'edit'
   }
+
+  if (looksLikeUngreetedOutboundDraft(raw)) return 'edit'
 
   if (countMailHeaders(raw) >= 2) return 'clarify'
   if (STRUCTURED_DOCUMENT_HEADER_RE.test(raw) && (raw.includes('\n') || raw.length >= 160)) return 'clarify'

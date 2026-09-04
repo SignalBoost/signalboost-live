@@ -11,6 +11,7 @@ import {
 } from '../lib/ai/cos/textTransformationInput.ts'
 import { isContentGenerationRequest } from '../lib/ai/cos/contentGenerationIntent.ts'
 import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
+import { asksAboutServiceIdentity } from '../lib/ai/cos/publicDisclosureGate.ts'
 
 test('editing, summarizing and translation are recognized across all five SignalBoost locales', () => {
   const prompts = [
@@ -43,6 +44,41 @@ test('the exact Sarah transportation draft is implicitly edited instead of answe
   assert.match(request.instruction, /Edit this pasted draft/i)
   assert.match(request.instruction, /Do not answer the draft as though you are its recipient/i)
   assert.match(request.instruction, /Do not claim that you noted, scheduled, informed, contacted, notified, arranged, ensured/i)
+})
+
+test('the Foreign Service body-only email-chain draft is implicitly edited instead of falling into COS identity handling', () => {
+  const prompt = 'I struggle all night wether i should or not address this email chain again, but like one of our colleagues mentioned, if not for us, we should help others who can benefit. After 20+ years I am retiring next year, since I joined the foreign service I have been hearing from some of our coleagues that they do not want to get promoted, and some of these coleagues are the ones promoted over and over again. The department should place a box in the EER, something like "do you care about carrer mobiltiy" yes or no, and this box shold be mandatory to fill. If you are the kind of person who join the FS and your main reasons to do so was opportunity to travel, living overseas, get to know new cultures instead of carrer mobility and eventually be part of the decision making process within the US government put this on the paper. The promotion board knowing who wants to be promoted or not will save time and other resources for the department. Give the chance for those who want carrer mobility and be part of the decision makers group, while let those who enjoy carrying pouches or crawling under desks fixing computers to do so. It makes little sense to promote people to a level that they do not want to be. I am not saying that everyone who wants to get promoted will be a good manager but at least that person is willing to try, as opposed to many of us who say that they do not want to be in that position. The bottom line is, if you say you do not want to be promoted, say so officially.'
+
+  assert.equal(asksAboutServiceIdentity(prompt), false)
+  assert.equal(classifyUninstructedTextArtifact(prompt), 'edit')
+  const request = detectDirectTextTransformation(prompt)
+  assert.ok(request)
+  assert.equal(request.sourceText, prompt)
+  assert.match(request.instruction, /Edit this pasted draft/i)
+})
+
+test('explicit COS identity questions remain identity questions rather than implicit editing requests', () => {
+  const prompt = 'What model powers COS, who built it, and what provider runs this service?'
+  assert.equal(asksAboutServiceIdentity(prompt), true)
+  assert.equal(classifyUninstructedTextArtifact(prompt), null)
+  assert.equal(detectDirectTextTransformation(prompt), null)
+})
+
+test('a meta-analysis request about an email is not silently rewritten', () => {
+  const prompt = 'What do you think about this email chain and what does it imply about the sender? I received the message yesterday and I want your interpretation before I decide whether to respond. Please explain the tone and the likely intent rather than rewriting the message for me.'
+  assert.equal(classifyUninstructedTextArtifact(prompt), null)
+})
+
+test('generic first-person questions are not mistaken for ungreeted correspondence', () => {
+  const prompt = 'I would like to understand how distributed message queues guarantee delivery when consumers fail. I am comparing at-least-once and exactly-once semantics across several systems. Can you explain the tradeoffs and when each model is appropriate?'
+  assert.equal(classifyUninstructedTextArtifact(prompt), null)
+  assert.equal(detectDirectTextTransformation(prompt), null)
+})
+
+test('explicit analysis intent anywhere in the prompt prevents silent rewriting', () => {
+  const prompt = 'Analyze this email chain response and tell me whether the sender is agreeing or only acknowledging the request. I may reply later, but I want interpretation first. Please explain the tone and likely intent; do not rewrite the message.'
+  assert.equal(classifyUninstructedTextArtifact(prompt), null)
+  assert.equal(detectDirectTextTransformation(prompt), null)
 })
 
 test('ambiguous pasted mail metadata asks what the user wants instead of role-playing the message', () => {
@@ -118,7 +154,7 @@ test('five locale codes produce explicit full language instructions', () => {
   }
 })
 
-test('direct editor uses context, neural communication reasoning, and an editorial fallback pass', () => {
+test('direct editor uses context, strategic neural communication reasoning, and a final neural editorial pass', () => {
   const source = readFileSync(join(process.cwd(), 'lib/ai/cos/directTextTransformation.ts'), 'utf8')
   assert.match(source, /capable human colleague/i)
   assert.match(source, /REFERENCE CONTEXT HANDLING/i)
@@ -126,10 +162,11 @@ test('direct editor uses context, neural communication reasoning, and an editori
   assert.match(source, /make the finished reply answer that question explicitly/i)
   assert.match(source, /REFERENCE CONTEXT — READ ONLY, DO NOT ECHO/)
   assert.match(source, /splitQuotedEmailThread\(request\.sourceText\)/)
-  assert.match(source, /tryNeuralCommunicationTransformation/)
+  assert.match(source, /tryStrategicNeuralCommunicationTransformation/)
+  assert.match(source, /PRIMARY CORRESPONDENCE WRITER — DEEP-NEURAL/i)
   assert.match(source, /async function refineProfessionalDraft/)
   assert.match(source, /FINAL COS professional copy editor/)
   assert.match(source, /FIRST-PASS CANDIDATE/)
-  assert.match(source, /Editorial Quality Pass/)
+  assert.match(source, /Neural Communication Quality Board/)
   assert.doesNotMatch(source, /const editableSource = stripQuotedEmailThread\(request\.sourceText\)/)
 })

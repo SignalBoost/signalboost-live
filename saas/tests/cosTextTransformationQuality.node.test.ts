@@ -20,6 +20,8 @@ It was nice to talk to you after all these years. I am really sorry you have to 
 
 Thank you`
 
+const FOREIGN_SERVICE_DRAFT = `I struggle all night wether i should or not address this email chain again, but like one of our colleagues mentioned, if not for us, we should help others who can benefit. After 20+ years I am retiring next year, since I joined the foreign service I have been hearing from some of our coleagues that they do not want to get promoted, and some of these coleagues are the ones promoted over and over again. The department should place a box in the EER, something like "do you care about carrer mobiltiy" yes or no, and this box shold be mandatory to fill. The promotion board knowing who wants to be promoted or not will save time and other resources for the department. Give the chance for those who want carrer mobility and be part of the decision makers group, while let those who enjoy carrying pouches or crawling under desks fixing computers to do so. It makes little sense to promote people to a level that they do not want to be. I am not saying that everyone who wants to get promoted will be a good manager but at least that person is willing to try. The bottom line is, if you say you do not want to be promoted, say so officially.`
+
 test('transformation depth distinguishes proofreading from real editing and rewriting', () => {
   assert.equal(textTransformationMode('proofread this email'), 'proofread')
   assert.equal(textTransformationMode('edit this email'), 'edit')
@@ -55,6 +57,13 @@ test('rough JC email is recognized as an edit objective and a neural communicati
   assert.match(request!.sourceText, /signalboostapp\.com/)
 })
 
+test('body-only Foreign Service correspondence is also sent to the deep-neural communication lane', () => {
+  const request = detectDirectTextTransformation(`edit - ${FOREIGN_SERVICE_DRAFT}`)
+  assert.ok(request)
+  assert.equal(textTransformationMode(request!.instruction), 'edit')
+  assert.equal(isNeuralCommunicationTransformation(request!.instruction, request!.sourceText), true)
+})
+
 test('proofreading does not invoke strategic neural correspondence rewriting', () => {
   assert.equal(isNeuralCommunicationTransformation('proofread this email', JC_DRAFT), false)
 })
@@ -84,13 +93,14 @@ test('neural communication result can offer a recommended reply plus distinct al
   assert.match(rendered, /Alternative — More concise/)
 })
 
-test('correspondence route uses deep-neural communication judgment and validated cognitive skills', () => {
+test('correspondence route uses the real deep-neural communication advisor and quality board', () => {
   const direct = read('../lib/ai/cos/directTextTransformation.ts')
   const neural = read('../lib/ai/cos/communicationNeuralReasoning.ts')
 
-  assert.match(direct, /tryNeuralCommunicationTransformation/)
+  assert.match(direct, /tryStrategicNeuralCommunicationTransformation/)
+  assert.match(direct, /PRIMARY CORRESPONDENCE WRITER — DEEP-NEURAL/i)
   assert.match(direct, /Neural Communication Advisor/)
-  assert.match(direct, /Validated Cognitive Skills/)
+  assert.match(direct, /Neural Communication Quality Board/)
   assert.match(neural, /retrieveValidatedCognitiveSkills/)
   assert.match(neural, /Generate at least THREE genuinely different candidate approaches internally/i)
   assert.match(neural, /Neural Communication Quality Board/)
@@ -99,10 +109,21 @@ test('correspondence route uses deep-neural communication judgment and validated
   assert.doesNotMatch(neural, /canned reply|fixed email template/i)
 })
 
-test('direct editor keeps deterministic code as a fidelity guard rather than the writer', () => {
+test('deep-neural communication guidance covers sensitive institutional and diplomatic writing', () => {
+  const neural = read('../lib/ai/cos/communicationNeuralReasoning.ts')
+  assert.match(neural, /INSTITUTIONAL \/ DIPLOMATIC CORRESPONDENCE/i)
+  assert.match(neural, /Distinguish observation from inference/i)
+  assert.match(neural, /Convert personal frustration into an institutional argument/i)
+  assert.match(neural, /Diplomatic does not mean vague/i)
+  assert.match(neural, /technical, operational, non-managerial, or hands-on work is lesser work/i)
+})
+
+test('direct editor keeps deterministic code as fidelity and release guards rather than the writer', () => {
   const source = read('../lib/ai/cos/directTextTransformation.ts')
-  assert.match(source, /Deterministic code below only protects facts\/intent/i)
+  assert.match(source, /Deterministic code only protects meaning/i)
   assert.match(source, /normalizeTextTransformationPresentation/)
   assert.match(source, /contextualEditIntentViolation/)
+  assert.match(source, /restoreCorrespondenceLayout/)
+  assert.doesNotMatch(source, /canned reply|fixed email template/i)
   assert.doesNotMatch(source, /The permitted scope of correction is grammar, spelling, agreement, articles, hyphenation, punctuation, word order, and sentence structure\. Nothing wider\./)
 })

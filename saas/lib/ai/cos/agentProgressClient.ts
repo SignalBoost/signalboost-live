@@ -195,10 +195,11 @@ export async function postWithAgentProgress(args: {
       ? 'COS Builder is working in the isolated user workspace'
       : 'Waiting for the COS response — connection active'), 2_000)
 
-  // The owner Assistant must enter through the canonical browser COS dispatcher. That ingress owns
-  // specialist selection (including Software Specialist) and falls through to cos-primary for
-  // ordinary reasoning. Posting owner turns directly to cos-primary would bypass specialist routing.
-  const endpoint = builderRequest?.endpoint ?? (args.target === 'cos' ? '/api/cos-browser' : '/api/concierge')
+  // /api/cos-browser is the canonical browser ingress for both Concierge and owner Assistant. It
+  // preserves public-delivery isolation for guests, but it reads verified owner identity before
+  // choosing that scope. Sending ordinary Concierge browser turns there prevents an authenticated
+  // owner from being downgraded to guest merely because they used the homepage Concierge surface.
+  const endpoint = builderRequest?.endpoint ?? '/api/cos-browser'
   let response: Response
   try {
     response = await fetch(endpoint, {

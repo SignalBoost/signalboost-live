@@ -31,7 +31,7 @@ import {
 } from './editorialSkillContext.ts'
 import {
   formatNeuralCommunicationResult,
-  tryNeuralCommunicationTransformation,
+  tryNeuralCommunicationTransformation as tryStrategicNeuralCommunicationTransformation,
   type NeuralCommunicationAlternative,
 } from './communicationNeuralReasoning.ts'
 
@@ -229,7 +229,7 @@ export async function tryDirectTextTransformation(input: {
   // Communication is not a grammar subtask. For correspondence, COS first uses the deep-neural
   // communication lane: validated procedural skills -> multiple neural approaches -> neural quality
   // review -> bounded neural repair. Deterministic code below only protects facts/intent.
-  const neuralCommunication = await tryNeuralCommunicationTransformation({
+  const neuralCommunication = await tryStrategicNeuralCommunicationTransformation({
     instruction: request.instruction,
     source: editableSource,
     referenceContext,

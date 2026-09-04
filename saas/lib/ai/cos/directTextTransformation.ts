@@ -1,4 +1,4 @@
-// saas/lib/ai/cos/directTextTransformation.ts
+/ saas/lib/ai/cos/directTextTransformation.ts
 import { callCosReasoner, resolveCosReasoner } from './cosReasoner.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
 import type { COSFirstAnswerResult } from './cosFirstAnswerEnterprise.ts'
@@ -65,6 +65,10 @@ const BUSINESS_REGISTER_RULES = [
 
 function emptyStage() {
   return { retrieved: 0, relevant: 0, selected: 0, injected: 0, cited: 0 }
+}
+
+function tryNeuralCommunicationTransformation() {
+  return null
 }
 
 function provenance(

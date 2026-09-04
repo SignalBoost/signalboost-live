@@ -47,8 +47,8 @@ error?: string
 
 // Monthly revenue per paid plan — includes legacy plan names
 const PLAN_MRR: Record<string, number> = {
-launch: 29,
-starter: 29, // legacy alias for launch
+launch: 15,
+starter: 15, // legacy alias for launch
 growth: 99,
 pro: 99, // legacy alias for growth
 command: 249,

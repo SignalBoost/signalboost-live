@@ -82,10 +82,10 @@ export const UNIFIED_PRICING_CATALOG: Record<ProductLine, UnifiedTier[]> = {
   ],
 
   // ── LINE 2: CORE SAAS PLATFORM (website builder) ────────────────────────────
-  //    $29 / $99 / $249. Server-side checkout; plan → price id resolved from
+  //    $15 / $99 / $249. Server-side checkout; plan → price id resolved from
   //    STRIPE_PRICE_WEBSITE_LAUNCH/GROWTH/COMMAND (names synced to Stripe).
   platform: [
-    { id: 'launch',  name: 'Launch',  price: 29,  monthlyPrice: 29,  fallbackPrice: '$29',
+    { id: 'launch',  name: 'Launch',  price: 15,  monthlyPrice: 15,  fallbackPrice: '$15',
       envVar: 'STRIPE_PRICE_WEBSITE_LAUNCH',
       checkout: { endpoint: '/api/checkout', kind: 'plan', plan: 'launch',  productLine: 'platform' } },
     { id: 'growth',  name: 'Growth',  price: 99,  monthlyPrice: 99,  fallbackPrice: '$99', popular: true,

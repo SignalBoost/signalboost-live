@@ -11,6 +11,13 @@ const MODULE = readFileSync(join(process.cwd(), 'lib/ai/cos/communicationRegiste
 const DELICATE: RegisterProfile = {
   sensitivity: 'delicate',
   audience: 'colleagues on a service-wide distribution list',
+  objective: 'offer a constructive promotion-policy suggestion',
+  relationship: 'experienced colleague addressing peers',
+  voiceCues: ['candid late-career reflection'],
+  emotionalStakes: ['hesitation about reopening the discussion'],
+  seniorityCues: ['more than twenty years of service'],
+  rhetoricalElements: ['sharp contrast should be transformed, not copied'],
+  requiredTransformations: ['retain the concern while removing ridicule'],
   risks: ['dismissive characterization of technical and support staff', 'a contested opinion stated as established fact'],
 }
 
@@ -52,6 +59,23 @@ test('identified risks are itemized and required to be resolved', () => {
   assert.match(guidance, /without dropping the writer's point/)
 })
 
+test('one integrated profile preserves voice and experience without preserving risky wording', () => {
+  const guidance = registerGuidance(DELICATE)
+  assert.match(guidance, /WRITER'S OBJECTIVE: offer a constructive promotion-policy suggestion/)
+  assert.match(guidance, /candid late-career reflection/)
+  assert.match(guidance, /hesitation about reopening the discussion/)
+  assert.match(guidance, /more than twenty years of service/)
+  assert.match(guidance, /Transform a risky metaphor, idiom, joke, or sharp contrast/)
+  assert.match(guidance, /do not preserve rough syntax or risky wording merely in the name of authenticity/)
+})
+
+test('integrated profile blocks mechanical memo structure and unsupported benefits', () => {
+  const guidance = registerGuidance(DELICATE)
+  assert.match(guidance, /Do not impose memo headings, numbered policy-benefit lists/)
+  assert.match(guidance, /Do not add claims that the proposal will improve fairness, efficiency, morale, resource use, or outcomes/)
+  assert.match(guidance, /never invent rank, title, leadership status, or credentials/)
+})
+
 test('only delicate assumes onward forwarding', () => {
   assert.match(registerGuidance(DELICATE), /forwarded beyond its original recipients/)
   assert.ok(!/forwarded beyond/.test(registerGuidance({ sensitivity: 'careful', audience: 'a manager', risks: [] })))
@@ -67,6 +91,11 @@ test('classification is semantic — no vocabulary list decides sensitivity', ()
   assert.ok(!/\bsensitiveWords\b|\bKEYWORDS\b/.test(MODULE))
   assert.match(MODULE, /callCosReasoner/)
   assert.match(MODULE, /Judge the draft in the language it is written in/)
+  assert.match(MODULE, /one integrated communication profile/)
+  assert.match(MODULE, /voice_cues/)
+  assert.match(MODULE, /emotional_stakes/)
+  assert.match(MODULE, /seniority_cues/)
+  assert.match(MODULE, /rhetorical_elements/)
 })
 
 test('the register block is emitted after the executive block so it wins on conflict', () => {

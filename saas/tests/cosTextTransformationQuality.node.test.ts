@@ -116,6 +116,17 @@ test('deep-neural communication guidance covers sensitive institutional and dipl
   assert.match(neural, /Convert personal frustration into an institutional argument/i)
   assert.match(neural, /Diplomatic does not mean vague/i)
   assert.match(neural, /technical, operational, non-managerial, or hands-on work is lesser work/i)
+  assert.match(neural, /five independent dimensions: meaning fidelity, diplomatic judgment, elegance\/naturalness, authentic voice, and absence of unsupported additions/i)
+  assert.match(neural, /Reject generic memo structure, invented headings or numbered benefit lists/i)
+  assert.match(neural, /Reject categorical claims about fairness, efficiency, resource savings, morale, or institutional outcomes/i)
+})
+
+test('final editor preserves authentic voice without copying risky rhetoric or inventing identity', () => {
+  const direct = read('../lib/ai/cos/directTextTransformation.ts')
+  assert.match(direct, /Preserve supported emotional meaning, lived experience, reflective authority, and recognizable voice/i)
+  assert.match(direct, /Transform ridicule, contempt, or a risky metaphor into a dignified expression/i)
+  assert.match(direct, /Never invent a salutation, sign-off, name, title, or bracketed signature placeholder/i)
+  assert.match(direct, /sound like this writer at their best, not like an anonymous staff template/i)
 })
 
 test('direct editor keeps deterministic code as fidelity and release guards rather than the writer', () => {

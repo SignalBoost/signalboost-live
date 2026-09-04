@@ -96,6 +96,7 @@ test('COS Software Specialist owns Builder and owner Platform Engineer execution
   assert.match(repairJob, /source: 'cos-platform-engineer-preflight'/)
   assert.match(repairJob, /const claimed = await claimBuilderJob\(jobId, input\.userId\)/)
   assert.match(repairJob, /builder_repository_preflight_claim_failed/)
+  assert.match(repairJob, /result:\s*\{\s*reply,\s*source: 'cos-platform-engineer-preflight'/s)
   assert.ok(repairJob.indexOf('const targetFreshness = await verifySignalBoostRepositoryRepairTargetCurrent(input.target)') < repairJob.indexOf('const workspace = createSupabaseBuilderWorkspace(input.userId)'))
   assert.ok(repairJob.indexOf('const claimed = await claimBuilderJob(jobId, input.userId)') < repairJob.indexOf('await finishBuilderJob({'))
   assert.match(specialist, /specialist_family: 'software'/)

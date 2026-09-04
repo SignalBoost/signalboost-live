@@ -2,8 +2,34 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { getA2ASpecialistFamily } from '../a2a-host/a2a-specialist-catalog.ts'
+import { verifySignalBoostRepositoryRepairTargetCurrent } from '../lib/builder/repository-repair-freshness.ts'
+import type { SignalBoostRepositoryRepairTarget } from '../lib/builder/repository-repair-target.ts'
 
 const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
+
+function repositoryTarget(commitSha: string, branch = 'fix/cos-primary-software-specialist-20260903'): SignalBoostRepositoryRepairTarget {
+  return Object.freeze({
+    trigger: 'failed_build_log',
+    repository: 'SignalBoost/signalboost-live',
+    repositoryUrl: 'https://github.com/SignalBoost/signalboost-live.git',
+    branch,
+    commitSha,
+    fullCommitSha: commitSha,
+    projectRoot: 'saas',
+    pathHints: Object.freeze(['saas/tests/builderTransportRecovery.node.test.ts']),
+    symbolHints: Object.freeze([]),
+    failedCommand: 'node --test tests/builderTransportRecovery.node.test.ts',
+    failureEvidence: Object.freeze(['AssertionError [ERR_ASSERTION]']),
+    rawLog: 'failed build log',
+  })
+}
+
+function branchResponse(sha: string, status = 200): Response {
+  return new Response(JSON.stringify({ object: { sha } }), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+}
 
 test('Software Specialist is a canonical proficient specialist family with governed engineering skills', () => {
   const family = getA2ASpecialistFamily('software')
@@ -16,6 +42,45 @@ test('Software Specialist is a canonical proficient specialist family with gover
   assert.equal(family.skills.find(skill => skill.skillId === 'software.platform-repair')?.risk, 'write')
 })
 
+test('repository repair preflight accepts only the current branch head', async () => {
+  const sha = 'a'.repeat(40)
+  const result = await verifySignalBoostRepositoryRepairTargetCurrent(
+    repositoryTarget(sha),
+    (async input => {
+      assert.match(String(input), /git\/ref\/heads\/fix\/cos-primary-software-specialist-20260903$/)
+      return branchResponse(sha)
+    }) as typeof fetch,
+  )
+
+  assert.equal(result.status, 'current')
+  assert.equal(result.reportedCommitSha, sha)
+  assert.equal(result.currentBranchHeadSha, sha)
+})
+
+test('repository repair preflight rejects a superseded failed commit without launching repair', async () => {
+  const reported = 'a'.repeat(40)
+  const current = 'b'.repeat(40)
+  const result = await verifySignalBoostRepositoryRepairTargetCurrent(
+    repositoryTarget(reported),
+    (async () => branchResponse(current)) as typeof fetch,
+  )
+
+  assert.equal(result.status, 'superseded')
+  assert.equal(result.reportedCommitSha, reported)
+  assert.equal(result.currentBranchHeadSha, current)
+  assert.equal(result.reason, 'branch_advanced')
+})
+
+test('repository repair preflight fails closed when current branch head cannot be verified', async () => {
+  const result = await verifySignalBoostRepositoryRepairTargetCurrent(
+    repositoryTarget('a'.repeat(40)),
+    (async () => branchResponse('', 404)) as typeof fetch,
+  )
+
+  assert.equal(result.status, 'unverifiable')
+  assert.equal(result.reason, 'branch_head_unavailable')
+})
+
 test('COS Software Specialist owns Builder and owner Platform Engineer execution seams', () => {
   const source = read('../lib/ai/cos/softwareSpecialist.ts')
   assert.match(source, /export async function tryCosSoftwareSpecialist/)
@@ -23,6 +88,10 @@ test('COS Software Specialist owns Builder and owner Platform Engineer execution
   assert.match(source, /enqueueBuilderJob/)
   assert.match(source, /enqueueSignalBoostRepositoryRepairJob/)
   assert.match(source, /input\.allowRepositoryRepair && access\?\.isOwner && access\.userId && !sourceAttached/)
+  assert.match(source, /const targetFreshness = await verifySignalBoostRepositoryRepairTargetCurrent\(target\)/)
+  assert.match(source, /cos-platform-engineer-stale-target/)
+  assert.match(source, /cos-platform-engineer-target-unverified/)
+  assert.ok(source.indexOf('const targetFreshness = await verifySignalBoostRepositoryRepairTargetCurrent(target)') < source.indexOf('return enqueueRepositoryRepair({'))
   assert.match(source, /specialist_family: 'software'/)
   assert.match(source, /orchestrator: 'cos'/)
 })

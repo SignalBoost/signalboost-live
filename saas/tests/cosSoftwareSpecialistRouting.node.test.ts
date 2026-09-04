@@ -177,6 +177,25 @@ test('raw pasted TypeScript becomes a real editable Builder file instead of an e
   assert.deepEqual((request.body.files as Array<{ path: string }>).map(file => file.path), ['pasted-source.ts'])
 })
 
+test('the original import-continuation paste shape is preserved instead of dropping its first lines', () => {
+  const objective = [
+    'I gave this to Concierge and it did not fix/debug properly - stripEditorialSkillLabels,',
+    '  type EditorialSkillContext,',
+    "} from './editorialSkillContext.ts'",
+    "export { detectDirectTextTransformation } from './textTransformationInput.ts'",
+    'function emptyStage() {',
+    '  return { retrieved: 0, relevant: 0 }',
+    '}',
+  ].join('\n')
+  const staged = pastedConciergeSourceFile(objective)
+  assert.ok(staged)
+  assert.equal(staged.path, 'pasted-source.ts')
+  assert.match(staged.content, /^stripEditorialSkillLabels,/)
+  assert.match(staged.content, /type EditorialSkillContext,/)
+  assert.match(staged.content, /} from '\.\/editorialSkillContext\.ts'/)
+  assert.doesNotMatch(staged.content, /I gave this to Concierge/)
+})
+
 test('an explanation-only source paste stays on ordinary COS instead of mutating code', () => {
   const objective = [
     'Explain this code:',

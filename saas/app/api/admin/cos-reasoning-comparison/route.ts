@@ -3,13 +3,12 @@ import { requireOwner } from '@/lib/auth/access'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { runPrivateCapabilityCase } from '@/lib/ai/cos/capabilityBenchmarkRunner'
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
-import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
+import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { probeReasoner } from '@/lib/ai/cos/reasonerProbe'
 import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { selectCosReasoningWorkerRole } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { MINIMUM_VERIFIED_OUTCOMES_PER_CANDIDATE } from '@/lib/ai/cos/reasoningOutcomeProfile'
-import type { RunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
 import {
   COS_COMPARISON_ROLES,
   MAX_REASONING_COMPARISON_CANDIDATES,
@@ -130,120 +129,109 @@ export async function POST(request: NextRequest) {
   }).select('id').single()
   if (run.error || !run.data) return NextResponse.json({ error: run.error?.message ?? 'Could not create comparison run.' }, { status: 500 })
 
-  const ownerWakePermission: RunpodWakePermission = {
-    allowed: true,
-    source: 'user_interactive',
-    interactionId: null,
-    issuedAtMs: null,
-    ageMs: null,
-    reason: 'owner_authenticated_reasoning_comparison',
-  }
-
   const resultRows: Array<{ candidateId: string; passed: boolean; verifiedOutcomeRecorded: boolean }> = []
   try {
-    return await withRunpodWakePermission(ownerWakePermission, async () => {
+    try {
+      await ensureLocalInferenceRuntimeReady()
+    } catch (error) {
+      const message = `Reasoner readiness failed: ${errorText(error)}`.slice(0, 1600)
+      await db.from('cos_reasoning_comparison_runs').update({ status: 'failed', completed_at: new Date().toISOString(), error: message }).eq('id', run.data.id)
+      return NextResponse.json({ ok: false, runId: run.data.id, error: message }, { status: 503 })
+    }
+
+    const probe = await probeReasoner({ completionTimeoutMs: COMPARISON_PROBE_TIMEOUT_MS })
+    if (probe.verdict !== 'ok') {
+      const message = `Reasoner unavailable (${probe.verdict}) — no comparison outcomes were recorded. ${probe.summary}`.slice(0, 2000)
+      await db.from('cos_reasoning_comparison_runs').update({ status: 'failed', completed_at: new Date().toISOString(), error: message }).eq('id', run.data.id)
+      return NextResponse.json({ ok: false, runId: run.data.id, blocked: true, verdict: probe.verdict, error: message }, { status: 503 })
+    }
+
+    const benchmarkCase = {
+      id: String(selected.id),
+      track: String(selected.track),
+      prompt: String(selected.prompt),
+      requiredTerms: terms(selected.required_terms),
+      forbiddenTerms: terms(selected.forbidden_terms),
+      requiresProvenance: true,
+      requiresLocalReasoning: Boolean(selected.requires_local_reasoning),
+    }
+
+    for (const candidate of candidates) {
+      let passed = false
+      let reasons: string[] = []
+      let turnId: string | null = null
+      let latencyMs = 0
+      let verifiedOutcomeRecorded = false
+      let reasonerLabel: string | null = null
       try {
-        await ensureLocalInferenceRuntimeReady()
-      } catch (error) {
-        const message = `Reasoner readiness failed: ${errorText(error)}`.slice(0, 1600)
-        await db.from('cos_reasoning_comparison_runs').update({ status: 'failed', completed_at: new Date().toISOString(), error: message }).eq('id', run.data.id)
-        return NextResponse.json({ ok: false, runId: run.data.id, error: message }, { status: 503 })
-      }
-
-      const probe = await probeReasoner({ completionTimeoutMs: COMPARISON_PROBE_TIMEOUT_MS })
-      if (probe.verdict !== 'ok') {
-        const message = `Reasoner unavailable (${probe.verdict}) — no comparison outcomes were recorded. ${probe.summary}`.slice(0, 2000)
-        await db.from('cos_reasoning_comparison_runs').update({ status: 'failed', completed_at: new Date().toISOString(), error: message }).eq('id', run.data.id)
-        return NextResponse.json({ ok: false, runId: run.data.id, blocked: true, verdict: probe.verdict, error: message }, { status: 503 })
-      }
-
-      const benchmarkCase = {
-        id: String(selected.id),
-        track: String(selected.track),
-        prompt: String(selected.prompt),
-        requiredTerms: terms(selected.required_terms),
-        forbiddenTerms: terms(selected.forbidden_terms),
-        requiresProvenance: true,
-        requiresLocalReasoning: Boolean(selected.requires_local_reasoning),
-      }
-
-      for (const candidate of candidates) {
-        let passed = false
-        let reasons: string[] = []
-        let turnId: string | null = null
-        let latencyMs = 0
-        let verifiedOutcomeRecorded = false
-        let reasonerLabel: string | null = null
-        try {
-          const outcome = await runPrivateCapabilityCase(benchmarkCase, {
-            attachOutcome: false,
-            outcomeSource: `reasoning_comparison:${run.data.id}:${candidate.id}`,
-            evaluation: {
-              source: 'controlled_comparison',
-              runId: run.data.id,
-              candidateId: candidate.id,
-              workerRole: candidate.workerRole,
-            },
-          })
-          passed = outcome.score.passed
-          reasons = outcome.score.reasons
-          turnId = outcome.turnId ?? null
-          latencyMs = outcome.latencyMs
-          reasonerLabel = resolveCosReasoner().config?.label ?? null
-
-          const validLocalExecution = Boolean(
-            turnId
-            && Boolean(outcome.provenance.localModelInvoked)
-            && !Boolean(outcome.provenance.externalAiInvoked),
-          )
-          if (validLocalExecution && turnId) {
-            verifiedOutcomeRecorded = await attachTurnOutcome(turnId, {
-              verifiedSuccess: passed,
-              repairNeeded: !passed,
-              escalated: !outcome.handled,
-              source: `reasoning_comparison:${selected.track}:${candidate.workerRole}`,
-            })
-          }
-          if (!verifiedOutcomeRecorded) reasons = [...reasons, 'verified_outcome_not_recorded']
-        } catch (error) {
-          reasons = ['candidate_execution_failed', errorText(error).slice(0, 1000)]
-        }
-
-        const inserted = await db.from('cos_reasoning_comparison_results').insert({
-          run_id: run.data.id,
-          case_id: selected.id,
-          track: selected.track,
-          candidate_id: candidate.id,
-          worker_role: candidate.workerRole,
-          reasoner_label: reasonerLabel,
-          passed,
-          reasons,
-          turn_id: turnId,
-          latency_ms: Math.max(0, latencyMs),
-          verified_outcome_recorded: verifiedOutcomeRecorded,
+        const outcome = await runPrivateCapabilityCase(benchmarkCase, {
+          attachOutcome: false,
+          outcomeSource: `reasoning_comparison:${run.data.id}:${candidate.id}`,
+          evaluation: {
+            source: 'controlled_comparison',
+            runId: run.data.id,
+            candidateId: candidate.id,
+            workerRole: candidate.workerRole,
+          },
         })
-        if (inserted.error) throw inserted.error
-        resultRows.push({ candidateId: candidate.id, passed, verifiedOutcomeRecorded })
+        passed = outcome.score.passed
+        reasons = outcome.score.reasons
+        turnId = outcome.turnId ?? null
+        latencyMs = outcome.latencyMs
+        reasonerLabel = resolveCosReasoner().config?.label ?? null
+
+        const validLocalExecution = Boolean(
+          turnId
+          && Boolean(outcome.provenance.localModelInvoked)
+          && !Boolean(outcome.provenance.externalAiInvoked),
+        )
+        if (validLocalExecution && turnId) {
+          verifiedOutcomeRecorded = await attachTurnOutcome(turnId, {
+            verifiedSuccess: passed,
+            repairNeeded: !passed,
+            escalated: !outcome.handled,
+            source: `reasoning_comparison:${selected.track}:${candidate.workerRole}`,
+          })
+        }
+        if (!verifiedOutcomeRecorded) reasons = [...reasons, 'verified_outcome_not_recorded']
+      } catch (error) {
+        reasons = ['candidate_execution_failed', errorText(error).slice(0, 1000)]
       }
 
-      const summary = summarizeReasoningComparison(resultRows)
-      await db.from('cos_reasoning_comparison_runs').update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        attempted: summary.attempted,
-        verified: summary.verified,
-        passed: summary.passed,
-      }).eq('id', run.data.id)
-
-      return NextResponse.json({
-        ok: true,
-        runId: run.data.id,
-        caseId: selected.id,
-        candidates,
-        currentReasoner: resolveCosReasoner().config?.label ?? null,
-        summary,
-        note: 'Only locally executed candidates with a durable verified outcome can teach Phase 4. Failed infrastructure or external fallback does not become negative capability evidence.',
+      const inserted = await db.from('cos_reasoning_comparison_results').insert({
+        run_id: run.data.id,
+        case_id: selected.id,
+        track: selected.track,
+        candidate_id: candidate.id,
+        worker_role: candidate.workerRole,
+        reasoner_label: reasonerLabel,
+        passed,
+        reasons,
+        turn_id: turnId,
+        latency_ms: Math.max(0, latencyMs),
+        verified_outcome_recorded: verifiedOutcomeRecorded,
       })
+      if (inserted.error) throw inserted.error
+      resultRows.push({ candidateId: candidate.id, passed, verifiedOutcomeRecorded })
+    }
+
+    const summary = summarizeReasoningComparison(resultRows)
+    await db.from('cos_reasoning_comparison_runs').update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      attempted: summary.attempted,
+      verified: summary.verified,
+      passed: summary.passed,
+    }).eq('id', run.data.id)
+
+    return NextResponse.json({
+      ok: true,
+      runId: run.data.id,
+      caseId: selected.id,
+      candidates,
+      currentReasoner: resolveCosReasoner().config?.label ?? null,
+      summary,
+      note: 'Only locally executed candidates with a durable verified outcome can teach Phase 4. Failed infrastructure or external fallback does not become negative capability evidence.',
     })
   } catch (error) {
     const message = errorText(error).slice(0, 2000)

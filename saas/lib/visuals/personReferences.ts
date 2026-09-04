@@ -8,6 +8,12 @@ export type VerifiedPersonReference = Readonly<{
   assetUrl: string
 }>
 
+export type VerifiedPersonReferenceResolution = Readonly<{
+  reference: VerifiedPersonReference | null
+  attempts: number
+  strategies: readonly string[]
+}>
+
 type CuratedPersonReference = Readonly<{
   canonicalName: string
   aliases: readonly string[]
@@ -61,13 +67,18 @@ const PERSON_TITLE_WORDS = new Set([
   'king', 'queen', 'rei', 'rainha', 'prezydent', 'президент',
 ])
 const NAME_CONNECTORS = new Set(['da', 'de', 'do', 'dos', 'das', 'del', 'della', 'di', 'van', 'von', 'bin', 'ibn', 'al', 'j'])
-const PORTRAIT_WORDS = ['portrait', 'official', 'headshot', 'retrato', 'oficial', 'foto', 'portret', 'портрет']
+const PORTRAIT_WORDS = ['portrait', 'official', 'headshot', 'photo', 'retrato', 'oficial', 'foto', 'portret', 'портрет']
 const REJECT_WORDS = [
   'with', ' and ', 'meeting', 'family', 'group', 'crowd', 'rally', 'speech', 'statue', 'wax', 'painting', 'drawing',
   'caricature', 'cartoon', 'mural', 'impersonator', 'lookalike', 'cosplay', 'poster', 'banner', 'memorial', 'grave', 'signature',
 ]
+const COMMONS_SEARCH_STRATEGIES = [
+  { id: 'commons-official-portrait', suffix: 'official portrait' },
+  { id: 'commons-portrait', suffix: 'portrait' },
+  { id: 'commons-name', suffix: '' },
+] as const
 
-const referenceCache = new Map<string, Promise<VerifiedPersonReference | null>>()
+const referenceCache = new Map<string, Promise<VerifiedPersonReferenceResolution>>()
 
 function normalize(value: string): string {
   return String(value || '')
@@ -217,8 +228,12 @@ async function downloadImage(
     'image/png,image/jpeg,image/webp;q=0.9,*/*;q=0.1',
   )
   const mime = sniffImageMime(downloaded.bytes)
-  if (!mime) throw new Error(`person_reference_invalid_image_${downloaded.contentType || 'unknown'}`)
+  if (!mime) throw new Error(`person_reference_invalid_image_${downloadloadedContentType(downloaded.contentType)}`)
   return { b64: Buffer.from(downloaded.bytes).toString('base64'), mime, finalUrl: downloaded.finalUrl }
+}
+
+function downloadloadedContentType(value: string): string {
+  return value || 'unknown'
 }
 
 async function downloadCandidate(candidate: CommonsPersonCandidate, canonicalName: string): Promise<VerifiedPersonReference> {
@@ -308,25 +323,32 @@ async function exactCommonsPerson(entry: CuratedPersonReference): Promise<Common
   return pages.map(candidateFromPage).find((candidate): candidate is CommonsPersonCandidate => Boolean(candidate)) || null
 }
 
-async function searchCommonsPerson(query: string): Promise<CommonsPersonCandidate | null> {
+async function searchCommonsPerson(identityQuery: string, searchSuffix: string): Promise<CommonsPersonCandidate | null> {
   const endpoint = commonsEndpoint()
   endpoint.searchParams.set('action', 'query')
   endpoint.searchParams.set('generator', 'search')
-  endpoint.searchParams.set('gsrsearch', `${query} official portrait`)
+  endpoint.searchParams.set('gsrsearch', [identityQuery, searchSuffix].filter(Boolean).join(' '))
   endpoint.searchParams.set('gsrnamespace', '6')
   endpoint.searchParams.set('gsrlimit', '16')
-  return selectCommonsPersonCandidate(query, await fetchCommonsPages(endpoint))
+  return selectCommonsPersonCandidate(identityQuery, await fetchCommonsPages(endpoint))
 }
 
-async function resolveUncached(referenceQuery: string): Promise<VerifiedPersonReference | null> {
+async function resolveUncached(referenceQuery: string): Promise<VerifiedPersonReferenceResolution> {
   const curated = findCuratedPerson(referenceQuery)
   const canonicalName = curated?.canonicalName || referenceQuery.replace(/\s+/g, ' ').trim()
-  if (!canonicalName) return null
+  if (!canonicalName) return { reference: null, attempts: 0, strategies: [] }
+
+  let attempts = 0
+  const strategies: string[] = []
 
   if (curated) {
+    attempts += 1
+    strategies.push('curated-metadata')
     try {
       const exact = await exactCommonsPerson(curated)
-      if (exact) return await downloadCandidate(exact, curated.canonicalName)
+      if (exact) {
+        return { reference: await downloadCandidate(exact, curated.canonicalName), attempts, strategies }
+      }
     } catch (error) {
       console.warn('[concierge-person-reference-curated-api-failure]', JSON.stringify({
         referenceQuery,
@@ -335,8 +357,10 @@ async function resolveUncached(referenceQuery: string): Promise<VerifiedPersonRe
       }))
     }
 
+    attempts += 1
+    strategies.push('curated-redirect')
     try {
-      return await downloadCurated(curated)
+      return { reference: await downloadCurated(curated), attempts, strategies }
     } catch (error) {
       console.warn('[concierge-person-reference-curated-redirect-failure]', JSON.stringify({
         referenceQuery,
@@ -346,35 +370,66 @@ async function resolveUncached(referenceQuery: string): Promise<VerifiedPersonRe
     }
   }
 
-  try {
-    const candidate = await searchCommonsPerson(canonicalName)
-    return candidate ? await downloadCandidate(candidate, canonicalName) : null
-  } catch (error) {
-    console.warn('[concierge-person-reference-commons-failure]', JSON.stringify({
-      referenceQuery,
-      canonicalName,
-      error: error instanceof Error ? error.message : 'unknown',
-    }))
-    return null
+  const searchStrategies = COMMONS_SEARCH_STRATEGIES.map((strategy) => {
+    attempts += 1
+    strategies.push(strategy.id)
+    return strategy
+  })
+  const candidateResults = await Promise.all(searchStrategies.map(async (strategy) => {
+    try {
+      return await searchCommonsPerson(canonicalName, strategy.suffix)
+    } catch (error) {
+      console.warn('[concierge-person-reference-commons-failure]', JSON.stringify({
+        referenceQuery,
+        canonicalName,
+        strategy: strategy.id,
+        error: error instanceof Error ? error.message : 'unknown',
+      }))
+      return null
+    }
+  }))
+
+  const uniqueCandidates = new Map<string, CommonsPersonCandidate>()
+  for (const candidate of candidateResults) {
+    if (candidate && !uniqueCandidates.has(candidate.assetUrl)) uniqueCandidates.set(candidate.assetUrl, candidate)
   }
+  for (const candidate of uniqueCandidates.values()) {
+    try {
+      return { reference: await downloadCandidate(candidate, canonicalName), attempts, strategies }
+    } catch (error) {
+      console.warn('[concierge-person-reference-download-failure]', JSON.stringify({
+        referenceQuery,
+        canonicalName,
+        title: candidate.title,
+        error: error instanceof Error ? error.message : 'unknown',
+      }))
+    }
+  }
+
+  return { reference: null, attempts, strategies }
 }
 
 /**
  * Resolves a named real person to a verified portrait before image generation. Curated public
- * figures use exact Commons metadata first, then the file redirect and search fallback.
- * Missing or ambiguous references return null; COS never substitutes a different identity.
+ * figures use exact Commons metadata first, then the file redirect. Uncurated names use a bounded
+ * set of read-only Commons search strategies in parallel. Every candidate still has to pass the
+ * original identity-token and portrait checks; recovery never substitutes a different identity.
  */
-export async function resolveVerifiedPersonReference(referenceQuery: string): Promise<VerifiedPersonReference | null> {
+export async function resolveVerifiedPersonReferenceWithRecovery(referenceQuery: string): Promise<VerifiedPersonReferenceResolution> {
   const key = normalize(referenceQuery)
-  if (!key) return null
+  if (!key) return { reference: null, attempts: 0, strategies: [] }
   const existing = referenceCache.get(key)
   if (existing) return existing
 
   const pending = resolveUncached(referenceQuery)
   referenceCache.set(key, pending)
   const resolved = await pending
-  if (!resolved) referenceCache.delete(key)
+  if (!resolved.reference) referenceCache.delete(key)
   return resolved
+}
+
+export async function resolveVerifiedPersonReference(referenceQuery: string): Promise<VerifiedPersonReference | null> {
+  return (await resolveVerifiedPersonReferenceWithRecovery(referenceQuery)).reference
 }
 
 export function clearVerifiedPersonReferenceCacheForTests(): void {

@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
+import { blockedGoal, completedGoal, partialGoal } from '@/lib/ai/cos/goalCompletion'
 import { createPlatformImagePort } from '@/lib/cos/aiPort'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { detectConciergeVisualIntent } from '@/lib/visuals/intent'
 import { resolveVerifiedReferenceVisual, type VerifiedReferenceVisual } from '@/lib/visuals/referenceAssets'
-import { resolveVerifiedPersonReference, type VerifiedPersonReference } from '@/lib/visuals/personReferences'
+import {
+  resolveVerifiedPersonReferenceWithRecovery,
+  type VerifiedPersonReference,
+} from '@/lib/visuals/personReferences'
 import { generateReferenceConditionedImage, type ReferenceConditionedImageResult } from '@/lib/visuals/referenceImageGeneration'
 import { verifyReferenceConditionedPeopleImage } from '@/lib/visuals/personImageVerification'
 import { isVisualObjectiveError, readVisualObjective } from '@/lib/visuals/request-contract'
@@ -82,23 +86,34 @@ function unverifiedReferenceReply(language: VisualLanguage): string {
   }[language]
 }
 
-function unverifiedPeopleReply(language: VisualLanguage): string {
+function unverifiedPeopleReply(language: VisualLanguage, unresolvedPeople: readonly string[]): string {
+  const names = unresolvedPeople.filter(Boolean).join(', ')
   return {
-    en: 'I could not verify a reliable reference for every named person, so I did not substitute or invent anyone. Use full names or provide reference images.',
-    es: 'No pude verificar una referencia fiable para cada persona nombrada, así que no sustituí ni inventé a nadie. Usa nombres completos o proporciona imágenes de referencia.',
-    pt: 'Não encontrei uma referência verificável para todas as pessoas citadas, então não substituí nem inventei ninguém. Use os nomes completos ou envie imagens de referência.',
-    pl: 'Nie udało się zweryfikować wzorca każdej wskazanej osoby, więc nikogo nie zastąpiłem ani nie wymyśliłem. Podaj pełne imiona i nazwiska lub prześlij zdjęcia wzorcowe.',
-    ru: 'Не удалось проверить эталонное изображение для каждого указанного человека, поэтому я никого не заменял и не выдумывал. Укажите полные имена или пришлите изображения-образцы.',
+    en: names
+      ? `I tried the available verified-reference searches, but I still could not verify ${names}. Please provide the full name or a reference image for the unresolved person.`
+      : 'I could not determine which named people require verified references. Please provide their full names.',
+    es: names
+      ? `Probé las búsquedas disponibles de referencias verificadas, pero aún no pude verificar a ${names}. Proporciona el nombre completo o una imagen de referencia de la persona pendiente.`
+      : 'No pude determinar qué personas nombradas requieren referencias verificadas. Proporciona sus nombres completos.',
+    pt: names
+      ? `Tentei as buscas disponíveis de referências verificadas, mas ainda não consegui verificar ${names}. Envie o nome completo ou uma imagem de referência da pessoa pendente.`
+      : 'Não consegui determinar quais pessoas citadas exigem referências verificadas. Envie os nomes completos.',
+    pl: names
+      ? `Sprawdziłem dostępne źródła zweryfikowanych zdjęć, ale nadal nie udało się potwierdzić osoby: ${names}. Podaj pełne imię i nazwisko lub prześlij zdjęcie wzorcowe.`
+      : 'Nie udało się ustalić, które wskazane osoby wymagają zweryfikowanych wzorców. Podaj ich pełne imiona i nazwiska.',
+    ru: names
+      ? `Я проверил доступные источники подтверждённых изображений, но всё ещё не удалось подтвердить: ${names}. Укажите полное имя или пришлите изображение-образец.`
+      : 'Не удалось определить, для каких названных людей нужны подтверждённые изображения. Укажите полные имена.',
   }[language]
 }
 
 function peopleVerificationFailureReply(language: VisualLanguage): string {
   return {
-    en: 'The generated scene did not preserve every requested identity distinctly, so I blocked it instead of showing a substituted or duplicated person.',
-    es: 'La escena generada no conservó claramente todas las identidades solicitadas, así que la bloqueé en vez de mostrar una persona sustituida o duplicada.',
-    pt: 'A cena gerada não preservou claramente todas as identidades solicitadas, então eu a bloqueei em vez de mostrar uma pessoa substituída ou duplicada.',
-    pl: 'Wygenerowana scena nie zachowała wyraźnie wszystkich wskazanych tożsamości, więc została zablokowana zamiast pokazania osoby zastąpionej lub zduplikowanej.',
-    ru: 'Сгенерированная сцена не сохранила каждую запрошенную личность отдельно, поэтому она была заблокирована, а не показана с заменённым или дублированным человеком.',
+    en: 'The generated scene did not preserve every requested identity distinctly, so I blocked it instead of showing a substituted or duplicated person. You can provide clearer reference images or simplify the scene and try again.',
+    es: 'La escena generada no conservó claramente todas las identidades solicitadas, así que la bloqueé en vez de mostrar una persona sustituida o duplicada. Puedes proporcionar referencias más claras o simplificar la escena e intentarlo de nuevo.',
+    pt: 'A cena gerada não preservou claramente todas as identidades solicitadas, então eu a bloqueei em vez de mostrar uma pessoa substituída ou duplicada. Você pode enviar referências mais claras ou simplificar a cena e tentar novamente.',
+    pl: 'Wygenerowana scena nie zachowała wyraźnie wszystkich wskazanych tożsamości, więc została zablokowana zamiast pokazania osoby zastąpionej lub zduplikowanej. Możesz przesłać wyraźniejsze wzorce albo uprościć scenę i spróbować ponownie.',
+    ru: 'Сгенерированная сцена не сохранила каждую запрошенную личность отдельно, поэтому она была заблокирована, а не показана с заменённым или дублированным человеком. Можно прислать более чёткие образцы или упростить сцену и повторить попытку.',
   }[language]
 }
 
@@ -120,6 +135,11 @@ function guestTrialLimitResponse(language: VisualLanguage): NextResponse {
     signup_required: true,
     execution_allowed: false,
     external_action_taken: false,
+    goal_completion: blockedGoal(
+      ['anonymous_visual_trial_limit_reached'],
+      ['authenticated_visual_access'],
+      'ask_user',
+    ),
   }, { status: 429 })
 }
 
@@ -240,7 +260,12 @@ export async function POST(request: Request) {
     const { objective } = readVisualObjective(body)
     const language = visualLanguage(objective)
     const intent = detectConciergeVisualIntent(objective)
-    if (!intent) return NextResponse.json({ error: 'visual_request_not_recognised' }, { status: 400 })
+    if (!intent) {
+      return NextResponse.json({
+        error: 'visual_request_not_recognised',
+        goal_completion: blockedGoal([], ['visual_intent'], 'ask_user'),
+      }, { status: 400 })
+    }
     const guestTrial = !access?.userId
 
     let b64: string
@@ -248,6 +273,7 @@ export async function POST(request: Request) {
     let verifiedReference: VerifiedReferenceVisual | null = null
     let verifiedPeople: VerifiedPersonReference[] = []
     let peopleGenerationAttempts = 0
+    let personReferenceAttempts = 0
 
     if (intent.mode === 'reference-mark') {
       verifiedReference = await resolveVerifiedReferenceVisual(intent.referenceQuery || '')
@@ -258,6 +284,11 @@ export async function POST(request: Request) {
           source: 'concierge-visual-reference-unverified',
           execution_allowed: false,
           external_action_taken: false,
+          goal_completion: blockedGoal(
+            ['verified_reference_lookup_exhausted'],
+            ['reference_mark'],
+            'ask_user',
+          ),
         }, { status: 422 })
       }
       if (guestTrial && !(await reserveGuestVisualTrial(request))) return guestTrialLimitResponse(language)
@@ -265,18 +296,31 @@ export async function POST(request: Request) {
       mime = verifiedReference.mime
     } else if (intent.mode === 'reference-people') {
       const requestedPeople = [...(intent.referencePeople || [])].slice(0, 4)
-      const resolved = await Promise.all(requestedPeople.map((person) => resolveVerifiedPersonReference(person)))
-      if (!requestedPeople.length || resolved.some((reference) => !reference)) {
+      const resolutions = await Promise.all(requestedPeople.map((person) => resolveVerifiedPersonReferenceWithRecovery(person)))
+      personReferenceAttempts = resolutions.reduce((total, resolution) => total + resolution.attempts, 0)
+      const unresolvedPeople = requestedPeople.filter((_, index) => !resolutions[index]?.reference)
+
+      if (!requestedPeople.length || unresolvedPeople.length > 0) {
+        const unresolved = unresolvedPeople.length > 0 ? unresolvedPeople : ['named_people_not_detected']
         return NextResponse.json({
           error: 'visual_person_reference_not_verified',
-          reply: unverifiedPeopleReply(language),
+          reply: unverifiedPeopleReply(language, unresolvedPeople),
           source: 'concierge-visual-people-reference-unverified',
           execution_allowed: false,
           external_action_taken: false,
           requested_people: requestedPeople,
+          unresolved_people: unresolvedPeople,
+          reference_lookup_attempts: personReferenceAttempts,
+          goal_completion: blockedGoal(
+            ['verified_reference_search_exhausted'],
+            unresolved.map((person) => person === 'named_people_not_detected' ? person : `reference:${person}`),
+            'ask_user',
+            { attempts: personReferenceAttempts },
+          ),
         }, { status: 422 })
       }
-      verifiedPeople = resolved as VerifiedPersonReference[]
+
+      verifiedPeople = resolutions.map((resolution) => resolution.reference) as VerifiedPersonReference[]
       if (guestTrial && !(await reserveGuestVisualTrial(request))) return guestTrialLimitResponse(language)
       const generated = await createVerifiedPeopleVisual(objective, verifiedPeople)
       peopleGenerationAttempts = generated.attempts
@@ -289,6 +333,12 @@ export async function POST(request: Request) {
           external_action_taken: false,
           requested_people: requestedPeople,
           reason_codes: generated.reasonCodes,
+          goal_completion: blockedGoal(
+            ['identity_references_verified', 'visual_identity_verification_failed'],
+            ['identity_preservation'],
+            'ask_user',
+            { attempts: personReferenceAttempts + peopleGenerationAttempts },
+          ),
         }, { status: 422 })
       }
       b64 = generated.generated.b64
@@ -297,7 +347,10 @@ export async function POST(request: Request) {
       if (guestTrial && !(await reserveGuestVisualTrial(request))) return guestTrialLimitResponse(language)
       const generated: ReferenceConditionedImageResult = await createPlatformImagePort().generate({ prompt: visualPrompt(objective), size: '1024x1024' })
       if (!generated.ok || !generated.b64) {
-        return NextResponse.json({ error: generated.error || 'visual_generation_unavailable' }, { status: 503 })
+        return NextResponse.json({
+          error: generated.error || 'visual_generation_unavailable',
+          goal_completion: blockedGoal([], ['visual_generation'], 'wait'),
+        }, { status: 503 })
       }
       b64 = generated.b64
       mime = imageMimeType(generated.b64)
@@ -319,11 +372,29 @@ export async function POST(request: Request) {
         identity_reference_used: isPeopleVisual,
         identity_verification_passed: isPeopleVisual,
         generation_attempts: isPeopleVisual ? peopleGenerationAttempts : undefined,
+        reference_lookup_attempts: isPeopleVisual ? personReferenceAttempts : undefined,
+        goal_completion: completedGoal(
+          isPeopleVisual
+            ? ['identity_references_verified', 'visual_identity_verification_passed', 'visual_delivered_inline']
+            : verifiedReference
+              ? ['reference_verified', 'visual_delivered_inline']
+              : ['visual_generated', 'visual_delivered_inline'],
+          { attempts: isPeopleVisual ? personReferenceAttempts + peopleGenerationAttempts : 1 },
+        ),
       })
     }
 
     const workspace = createSupabaseBuilderWorkspace(access.userId!)
-    if (!workspace) return NextResponse.json({ error: 'visual_storage_unavailable' }, { status: 503 })
+    if (!workspace) {
+      return NextResponse.json({
+        error: 'visual_storage_unavailable',
+        goal_completion: partialGoal(
+          ['visual_generated'],
+          ['durable_visual_storage'],
+          'wait',
+        ),
+      }, { status: 503 })
+    }
 
     const workspaceId = crypto.randomUUID()
     await workspace.ensureWorkspace(workspaceId)
@@ -342,6 +413,15 @@ export async function POST(request: Request) {
       identity_reference_used: isPeopleVisual,
       identity_verification_passed: isPeopleVisual,
       generation_attempts: isPeopleVisual ? peopleGenerationAttempts : undefined,
+      reference_lookup_attempts: isPeopleVisual ? personReferenceAttempts : undefined,
+      goal_completion: completedGoal(
+        isPeopleVisual
+          ? ['identity_references_verified', 'visual_identity_verification_passed', 'visual_saved']
+          : verifiedReference
+            ? ['reference_verified', 'visual_saved']
+            : ['visual_generated', 'visual_saved'],
+        { attempts: isPeopleVisual ? personReferenceAttempts + peopleGenerationAttempts : 1 },
+      ),
       reference: verifiedReference ? {
         title: verifiedReference.title,
         provider: verifiedReference.provider,
@@ -373,11 +453,15 @@ export async function POST(request: Request) {
         objective_source: error.source,
         observed_length: error.observedLength,
         max_length: error.maxLength,
+        goal_completion: blockedGoal([], ['valid_visual_objective'], 'ask_user'),
       }, { status: 400 })
     }
 
     const message = error instanceof Error ? error.message : 'visual_request_failed'
     const status = /^visual_request/.test(message) ? 400 : 502
-    return NextResponse.json({ error: message }, { status })
+    return NextResponse.json({
+      error: message,
+      goal_completion: blockedGoal([], ['visual_request'], status === 400 ? 'ask_user' : 'wait'),
+    }, { status })
   }
 }

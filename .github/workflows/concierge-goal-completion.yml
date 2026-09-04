@@ -1,0 +1,39 @@
+name: Concierge Goal Completion
+
+on:
+  pull_request:
+    paths:
+      - 'saas/app/api/visuals/**'
+      - 'saas/lib/ai/cos/goalCompletion.ts'
+      - 'saas/lib/visuals/personReferences.ts'
+      - 'saas/tests/conciergeGoalCompletion.node.test.ts'
+      - '.github/workflows/concierge-goal-completion.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/app/api/visuals/**'
+      - 'saas/lib/ai/cos/goalCompletion.ts'
+      - 'saas/lib/visuals/personReferences.ts'
+      - 'saas/tests/conciergeGoalCompletion.node.test.ts'
+      - '.github/workflows/concierge-goal-completion.yml'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: saas
+
+jobs:
+  goal-completion-contract:
+    name: Concierge objective completion and safe recovery
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify objective state, replay boundary, and named-person recovery
+        run: npx --yes tsx --test tests/conciergeGoalCompletion.node.test.ts

@@ -4,7 +4,6 @@ import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as publicConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
-import { withRunpodWakePermission } from '@/lib/ai/local-inference'
 import { getAccess } from '@/lib/auth/access'
 import { withPublicAuditIdentity } from '@/lib/auth/publicAuditIdentity'
 import { withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
@@ -197,10 +196,8 @@ export async function POST(req: NextRequest) {
     return withSuggestedFollowups(NextResponse.json({ reply, source: recorded ? 'concierge-public-provenance-recorded' : 'concierge-public-provenance-unavailable', external_ai_invoked: false, local_model_invoked: false, provenance_match_verified: Boolean(recorded) }), prompt, auditUserId)
   }
 
-  // Compatibility shape only. Managed inference has no request-owned compute lifecycle to wake.
-  const permission = null
-  const executeOwnerRequest = () => withRunpodWakePermission(permission, () => cosPrimaryPost(routedRequest))
-  const executePublicRequest = () => withRunpodWakePermission(permission, () => publicConciergePost(routedRequest))
+  const executeOwnerRequest = () => cosPrimaryPost(routedRequest)
+  const executePublicRequest = () => publicConciergePost(routedRequest)
 
   const response = access?.isOwner && browserSurface === 'assistant'
     ? await executeOwnerRequest()

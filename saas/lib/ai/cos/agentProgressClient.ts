@@ -22,6 +22,14 @@ const SOURCE_SHAPE: readonly RegExp[] = [
   /\b(?:console\.log|printf|println|System\.out)\s*\(|^\s*(?:print|echo)\s*\(/m,
   /<\/?[A-Za-z][\w.-]*(?:\s[^<>]*)?\/?>/,
 ]
+const FENCE_LANGUAGE_EXTENSION: Readonly<Record<string, string>> = Object.freeze({
+  js: 'js', javascript: 'js', mjs: 'mjs', cjs: 'cjs',
+  ts: 'ts', typescript: 'ts', tsx: 'tsx', jsx: 'jsx',
+  py: 'py', python: 'py', html: 'html', css: 'css', json: 'json', sql: 'sql',
+  sh: 'sh', shell: 'sh', bash: 'sh', java: 'java', cpp: 'cpp', 'c++': 'cpp', cs: 'cs', 'c#': 'cs',
+  go: 'go', golang: 'go', rust: 'rs', rs: 'rs', php: 'php', rb: 'rb', ruby: 'rb',
+  swift: 'swift', kotlin: 'kt', kt: 'kt',
+})
 
 type ConciergeAttachment = Readonly<{
   name?: unknown
@@ -77,15 +85,7 @@ function decodeTextDataUrl(value: string): string | null {
 
 function inferredExtension(language: string, source: string): string {
   const value = language.toLowerCase()
-  const languageMap: Record<string, string> = {
-    js: 'js', javascript: 'js', mjs: 'mjs', cjs: 'cjs',
-    ts: 'ts', typescript: 'ts', tsx: 'tsx', jsx: 'jsx',
-    py: 'py', python: 'py', html: 'html', css: 'css', json: 'json', sql: 'sql',
-    sh: 'sh', bash: 'sh', java: 'java', cpp: 'cpp', 'c++': 'cpp', cs: 'cs', 'c#': 'cs',
-    go: 'go', golang: 'go', rust: 'rs', rs: 'rs', php: 'php', rb: 'rb', ruby: 'rb',
-    swift: 'swift', kotlin: 'kt', kt: 'kt',
-  }
-  if (languageMap[value]) return languageMap[value]
+  if (FENCE_LANGUAGE_EXTENSION[value]) return FENCE_LANGUAGE_EXTENSION[value]
   if (/\b(?:interface|type)\s+[A-Za-z_$]|\bimport\s+type\b|\bas\s+const\b|:\s*(?:string|number|boolean|unknown|never)\b/.test(source)) return 'ts'
   if (/\bdef\s+[A-Za-z_]\w*\s*\(|^\s*from\s+\S+\s+import\s+/m.test(source)) return 'py'
   if (/<[A-Z][A-Za-z0-9]*(?:\s|>|\/)/.test(source)) return 'tsx'
@@ -129,8 +129,10 @@ export function pastedConciergeSourceFile(objective: string): { path: string; co
   const fenced = FENCED_SOURCE.exec(raw)
   if (fenced?.[2]?.trim()) {
     const content = fenced[2].trim()
-    if (!sourceLike(content) || new TextEncoder().encode(content).byteLength > MAX_CLIENT_FILE_BYTES) return null
-    return { path: `pasted-source.${inferredExtension(fenced[1] || '', content)}`, content }
+    const language = String(fenced[1] || '').trim().toLowerCase()
+    const explicitlySupported = Boolean(FENCE_LANGUAGE_EXTENSION[language])
+    if ((!explicitlySupported && !sourceLike(content)) || new TextEncoder().encode(content).byteLength > MAX_CLIENT_FILE_BYTES) return null
+    return { path: `pasted-source.${inferredExtension(language, content)}`, content }
   }
 
   const separated = inlineSeparatedSource(raw)
@@ -220,17 +222,20 @@ export async function postWithAgentProgress(args: {
       ? 'COS Builder is working in the isolated user workspace'
       : 'Waiting for the COS response — connection active'), 2_000)
 
-  // /api/cos-browser is the canonical browser ingress for both Concierge and owner Assistant. It
-  // preserves public-delivery isolation for guests, but it reads verified owner identity before
-  // choosing that scope. Sending ordinary Concierge browser turns there prevents an authenticated
-  // owner from being downgraded to guest merely because they used the homepage Concierge surface.
+  // /api/cos-browser remains the canonical browser ingress. The explicit surface header prevents
+  // a signed-in owner using the public homepage Concierge from inheriting private owner authority;
+  // only the owner Assistant surface may enter the privileged lane after server-side authentication.
   const endpoint = builderRequest?.endpoint ?? '/api/cos-browser'
   let response: Response
   try {
     response = await fetch(endpoint, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+        'x-signalboost-surface': args.target,
+      },
       body: JSON.stringify(requestBody),
       signal: args.signal,
     })

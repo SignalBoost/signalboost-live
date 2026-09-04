@@ -60,3 +60,16 @@ test('legacy person-reference callers receive the recovered verified reference',
   assert.match(source, /export async function resolveVerifiedPersonReferenceWithRecovery/)
   assert.match(source, /return \(await resolveVerifiedPersonReferenceWithRecovery\(referenceQuery\)\)\.reference/)
 })
+
+test('Concierge visual execution reports completion and asks only after safe reference recovery is exhausted', () => {
+  const route = read('../app/api/visuals/route.ts')
+
+  assert.match(route, /resolveVerifiedPersonReferenceWithRecovery/)
+  assert.match(route, /verified_reference_search_exhausted/)
+  assert.match(route, /unresolved_people: unresolvedPeople/)
+  assert.match(route, /goal_completion: blockedGoal/)
+  assert.match(route, /goal_completion: completedGoal/)
+  assert.match(route, /goal_completion: partialGoal/)
+  assert.match(route, /reference_lookup_attempts/)
+  assert.match(route, /I tried the available verified-reference searches/)
+})

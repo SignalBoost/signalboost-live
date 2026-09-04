@@ -1,4 +1,4 @@
-import { enqueueBuilderJob, finishBuilderJob } from './job-store.ts'
+import { claimBuilderJob, enqueueBuilderJob, finishBuilderJob } from './job-store.ts'
 import { verifySignalBoostRepositoryRepairTargetCurrent } from './repository-repair-freshness.ts'
 import type { SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
@@ -58,6 +58,12 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
   })
 
   if (blocked) {
+    // finish_builder_job only accepts running jobs. Claim this audit-only record here and finish it
+    // before the route schedules runBuilderJob. The later worker claim then returns null, so no
+    // repository mount or Builder model invocation can occur for a stale/unverifiable target.
+    const claimed = await claimBuilderJob(jobId, input.userId)
+    if (!claimed) throw new Error('builder_repository_preflight_claim_failed')
+
     const error = stale
       ? 'builder_repository_target_superseded'
       : 'builder_repository_target_unverified'

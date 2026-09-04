@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'saas/lib/ai/cos/directTextTransformation.ts'
+      - 'saas/lib/ai/cos/communicationNeuralReasoning.ts'
       - 'saas/lib/ai/cos/textTransformationQuality.ts'
       - 'saas/lib/ai/cos/textTransformationInput.ts'
       - 'saas/tests/cosTextTransformationQuality.node.test.ts'
@@ -12,6 +13,7 @@ on:
     branches: [main]
     paths:
       - 'saas/lib/ai/cos/directTextTransformation.ts'
+      - 'saas/lib/ai/cos/communicationNeuralReasoning.ts'
       - 'saas/lib/ai/cos/textTransformationQuality.ts'
       - 'saas/lib/ai/cos/textTransformationInput.ts'
       - 'saas/tests/cosTextTransformationQuality.node.test.ts'
@@ -22,7 +24,7 @@ permissions:
 
 jobs:
   writing-quality:
-    name: Direct edit depth and fidelity
+    name: Neural communication depth and fidelity
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,5 +36,5 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Verify proofreading and editing have different quality contracts
+      - name: Verify neural communication reasoning, alternatives, and editing depth
         run: npx --yes tsx --test tests/cosTextTransformationQuality.node.test.ts

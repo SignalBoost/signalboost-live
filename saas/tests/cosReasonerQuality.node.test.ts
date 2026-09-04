@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   assessReasonerDraft,
@@ -108,4 +109,21 @@ test('long technical answers that reuse domain terms but add real reasoning are 
     confidence: 0.86,
   })
   assert.equal(promptEchoNonAnswer(prompt, answer), false)
+})
+
+test('managed DeepInfra capacity recovery never changes the configured COS model', () => {
+  const source = readFileSync('lib/ai/local-inference.ts', 'utf8')
+  assert.match(source, /deepInfra \? \{ fail_fast: true \} : \{\}/)
+  assert.match(source, /deepInfraEngineOverloaded\(firstErrorBody\) && interactiveInferenceRequest\(\)/)
+  assert.match(source, /completion\(\{ service_tier: 'priority' \}, retryTimeoutMs\)/)
+  assert.match(source, /sameModel: true/)
+  assert.doesNotMatch(source, /LOCAL_AI_(?:FALLBACK|SECONDARY)_MODEL/)
+})
+
+test('one final inference failure opens a request-scoped circuit against duplicate 120-second calls', () => {
+  const source = readFileSync('lib/ai/local-inference.ts', 'utf8')
+  assert.match(source, /runpodWakeContext\.run\(\{ permission, inferenceCircuitOpen: false, inferenceFailure: null \}/)
+  assert.match(source, /if \(requestContext\?\.inferenceCircuitOpen\)/)
+  assert.match(source, /duplicate_model_call_skipped_within_same_browser_turn/)
+  assert.match(source, /markRequestInferenceFailure\(errorText\)/)
 })

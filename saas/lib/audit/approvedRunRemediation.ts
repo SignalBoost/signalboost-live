@@ -8,6 +8,7 @@ import { readRepoFile } from '@/lib/ai/tools/repoReader'
 import { callAuditModel } from '@/lib/audit/modelRouter'
 import { listRepoTree, parseRepoUrl, readRepoFileFrom } from '@/lib/audit/repoTarget'
 import { i18nRawStringPhrases } from '@/lib/audit/uxDetector'
+import { AUDIT_UNTRUSTED_DATA_RULE, encodeAuditUntrustedData } from '@/lib/audit/untrustedData'
 
 const REPO = 'SignalBoost/signalboost-live'
 const BASE_BRANCH = 'main'
@@ -194,11 +195,8 @@ async function aiRemediateFile(file: string, content: string, findings: AuditFin
     line: finding.line ?? null,
   }))
   const prompt = [
-    `Repository: ${REPO}`,
-    `Target branch source: ${BASE_BRANCH}`,
-    `File: ${file}`,
-    '',
     'The owner has already approved remediation for this audit run.',
+    AUDIT_UNTRUSTED_DATA_RULE,
     'Repair ONLY the listed findings that can be safely fixed inside this one existing file.',
     'Do not invent files, packages, environment variables, database columns, APIs, or product behavior.',
     'Preserve public behavior unless a finding specifically requires restricting unsafe behavior.',
@@ -206,15 +204,18 @@ async function aiRemediateFile(file: string, content: string, findings: AuditFin
     'Return ONLY valid JSON with exactly this shape:',
     '{"content":"COMPLETE updated file contents","fixedFindingIndexes":[0,1],"note":"short optional note"}',
     'The content field MUST contain the complete file, never a patch, diff, ellipsis, or omitted section.',
-    '',
-    `Findings:\n${JSON.stringify(compactFindings, null, 2)}`,
-    '',
-    `Current complete file:\n<<<FILE\n${content}\nFILE`,
+    encodeAuditUntrustedData('approved_file_remediation', {
+      repository: REPO,
+      branch: BASE_BRANCH,
+      file,
+      findings: compactFindings,
+      content,
+    }),
   ].join('\n')
 
   const response = await callAuditModel({
     prompt,
-    systemPrompt: 'You are the governed remediation engine for a production SaaS repository. Apply minimal secure fixes only when supported by the provided source. Never claim a finding fixed unless the returned complete file actually implements the repair. Return only strict JSON.',
+    systemPrompt: `You are the governed remediation engine for a production SaaS repository. ${AUDIT_UNTRUSTED_DATA_RULE} Apply minimal secure fixes only when supported by the provided source. Never claim a finding fixed unless the returned complete file actually implements the repair. Return only strict JSON.`,
     maxTokens: 16_000,
   })
   if (!response) return { ok: false, error: 'Audit remediation model returned no response.' }

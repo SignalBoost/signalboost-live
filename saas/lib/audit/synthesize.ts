@@ -10,6 +10,7 @@
 
 import { callAuditModel } from '@/lib/audit/modelRouter'
 import { reportLanguageName } from '@/lib/i18n/reportLanguage'
+import { AUDIT_UNTRUSTED_DATA_RULE, encodeAuditUntrustedData } from '@/lib/audit/untrustedData'
 
 export interface SynthFinding {
   file: string
@@ -46,24 +47,6 @@ function buildSynthesisPrompt(input: SynthesisInput): string {
   const { repo, scope, filesScanned, findings, repoMap } = input
   const language = reportLanguageName(input.lang)
 
-  const mapBlock = (repoMap && repoMap.length)
-    ? `Repository file tree — the MACRO LAYOUT of the whole codebase (${repoMap.length} paths${repoMap.length >= 500 ? ', truncated' : ''}). Use it to reason about architecture and cross-file structure even for files that were not individually deep-scanned:\n${repoMap.map(p => `- ${p}`).join('\n')}`
-    : ''
-
-  const digest = findings.length
-    ? findings
-        .map((f, i) => {
-          const where = `${f.file}${typeof f.line === 'number' ? `:${f.line}` : ''}`
-          return [
-            `${i + 1}. [${String(f.severity || 'info').toUpperCase()}] ${f.title}`,
-            `   file: ${where}  |  category: ${f.category}`,
-            `   detail: ${f.detail}`,
-            `   fix: ${f.recommendation}`,
-          ].join('\n')
-        })
-        .join('\n\n')
-    : '(no individual issues were flagged in the scanned files)'
-
   return [
     'You are a principal security & platform engineer writing a paid, enterprise-grade audit',
     'report for the engineering leadership of a SaaS company. Write with depth, authority, and',
@@ -71,16 +54,8 @@ function buildSynthesisPrompt(input: SynthesisInput): string {
     '',
     `IMPORTANT: Write the entire report in ${language}. Keep file paths, package names, code identifiers, route names, and product names unchanged.`,
     '',
-    `Repository: ${repo}`,
-    `Scanned scope: ${scope || '(application code)'}`,
-    '',
-    mapBlock,
-    '',
-    `Deep-scanned files (${filesScanned.length}):`,
-    (filesScanned.length ? filesScanned.map(f => `- ${f}`).join('\n') : '- (none)'),
-    '',
     `Findings (${findings.length}; severity mix: ${tally(findings)}):`,
-    digest,
+    AUDIT_UNTRUSTED_DATA_RULE,
     '',
     'Now write a COMPREHENSIVE report in GitHub-flavored Markdown. Do NOT merely restate the',
     'findings — SYNTHESIZE: connect issues across files, infer architectural patterns and systemic',
@@ -110,13 +85,21 @@ function buildSynthesisPrompt(input: SynthesisInput): string {
     '',
     'Be exhaustive but precise — no filler. Never claim certifications (do not write "SOC 2',
     'certified" or "compliant"); describe readiness and risk instead.',
+    '',
+    encodeAuditUntrustedData('audit_synthesis_evidence', {
+      repo,
+      scope: scope || '(application code)',
+      repoMap: repoMap || [],
+      repoMapTruncated: Boolean(repoMap && repoMap.length >= 500),
+      filesScanned,
+      findings,
+    }),
   ].join('\n')
 }
 
 export async function synthesizeReport(input: SynthesisInput): Promise<string> {
   try {
     const raw = await callAuditModel({
-      modelPreference: 'openai',
       prompt: buildSynthesisPrompt(input),
       maxTokens: 4096,
     })

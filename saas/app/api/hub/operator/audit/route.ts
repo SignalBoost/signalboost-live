@@ -20,21 +20,10 @@ import { checkScanQuota, clampScanSize } from '@/lib/audit/scanThrottle'
 import { collectProviderTemplateSnapshot } from '@/lib/audit/providerTemplateSnapshot'
 import { writeSnapshot } from '@/lib/audit/snapshotCache'
 import { normalizeReportLang, reportLangFromCookie } from '@/lib/i18n/reportLanguage'
+import { preflightAuditCos } from '@/lib/audit/modelRouter'
 
 export const runtime     = 'nodejs'
 export const maxDuration = 300
-
-async function preflightOpenAI(): Promise<{ ok: boolean; error?: string }> {
-  const key = process.env.OPENAI_API_KEY
-  if (!key) return { ok: false, error: 'OPENAI_API_KEY is not configured.' }
-  try {
-    const res = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${key}` }, cache: 'no-store' })
-    if (!res.ok) return { ok: false, error: `OpenAI key did not authenticate (HTTP ${res.status}).` }
-    return { ok: true }
-  } catch (e: unknown) {
-    return { ok: false, error: e instanceof Error ? e.message : 'OpenAI preflight request failed.' }
-  }
-}
 
 export async function POST(req: NextRequest) {
   const ctx = await getAccess()
@@ -78,8 +67,8 @@ export async function POST(req: NextRequest) {
         try { controller.enqueue(enc.encode(JSON.stringify(obj) + '\n')) } catch { /* client gone */ }
       }
       try {
-        const pre = await preflightOpenAI()
-        if (!pre.ok) { send({ phase: 'ERROR', error: `Preflight failed: ${pre.error}` }); controller.close(); return }
+        const pre = await preflightAuditCos()
+        if ('error' in pre) { send({ phase: 'ERROR', error: `Preflight failed: ${pre.error}` }); controller.close(); return }
 
         send({ phase: 'SCAN_TARGET', prefix })
 
@@ -119,7 +108,9 @@ export async function POST(req: NextRequest) {
 
         await admin.from('audit_runs').update({
           status: 'complete', files_scanned: result.filesScanned.length,
-          findings_count: result.findings.length, provider: 'openai', model: 'gpt-5.5',
+          findings_count: result.findings.length,
+          provider: pre.identity.provider,
+          model: pre.identity.model,
         }).eq('id', runId)
 
         const payload = {
@@ -130,6 +121,12 @@ export async function POST(req: NextRequest) {
           findings: result.findings,
           narrative: result.narrative || '',
           lang,
+          reasoning: {
+            orchestrator: pre.identity.provider,
+            runtimeProvider: pre.identity.runtimeProvider,
+            reasoner: pre.identity.reasoner,
+            model: pre.identity.model,
+          },
         }
         await admin.from('audit_logs').insert({ run_id: runId, user_id: ctx.userId, payload })
 

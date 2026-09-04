@@ -6,6 +6,7 @@
 // bypassing them, and only then mark findings fixed in Supabase.
 
 import { callAuditModel } from '@/lib/audit/modelRouter'
+import { AUDIT_UNTRUSTED_DATA_RULE, encodeAuditUntrustedData } from '@/lib/audit/untrustedData'
 import {
   runApprovedAuditRemediation,
   type ApprovedRunRemediationResult,
@@ -352,6 +353,7 @@ function validateCatalog(current: string, proposed: string, phrases: string[]): 
 async function generateCatalogUpdate(path: string, current: string, phrases: string[]): Promise<{ ok: boolean; content: string; error: string }> {
   const systemPrompt = [
     'You update a TypeScript localization catalog.',
+    AUDIT_UNTRUSTED_DATA_RULE,
     'Return ONLY the complete corrected file, with no markdown fences or explanation.',
     'Preserve every existing key, translation, comment, type, and export exactly.',
     'Add each requested English key exactly once inside each es, pt, pl, and ru object.',
@@ -359,13 +361,8 @@ async function generateCatalogUpdate(path: string, current: string, phrases: str
     'Do not add imports, dependencies, languages, or unrelated changes.',
   ].join(' ')
   const basePrompt = [
-    `FILE: ${path}`,
-    'Add exact ES/PT/PL/RU translations for these owner-approved fallback strings:',
-    ...phrases.map(phrase => `- ${JSON.stringify(phrase)}`),
-    '',
-    '--- CURRENT FILE START ---',
-    current,
-    '--- CURRENT FILE END ---',
+    'Add exact ES/PT/PL/RU translations for the supplied owner-approved fallback strings.',
+    encodeAuditUntrustedData('localization_catalog_update', { path, phrases, current }),
   ].join('\n')
 
   let errors: string[] = []

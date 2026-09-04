@@ -1,5 +1,5 @@
 # SignalBoost main integration serialization token
 # Every pull request targeting main must replace BOTH values below.
 # This shared-file write intentionally makes concurrent PRs conflict after one merges.
-base_sha=4859037e4b8233ed3b85254b76dfe7f4e22f161c
-branch=fix/cos-builder-terminal-reply-20260904
+base_sha=639a5377ed059331435ff61155df5c097d89c848
+branch=fix/audit-cos-migration-20260904

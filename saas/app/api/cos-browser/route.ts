@@ -1,6 +1,7 @@
 // saas/app/api/cos-browser/route.ts
 import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
+import { POST as publicConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
 import { evaluateRunpodWakePermission } from '@/lib/ai/cos/runpodWakePermission'
@@ -301,17 +302,17 @@ export async function POST(req: NextRequest) {
     auditIdentityCaptured: Boolean(auditUserId),
   }))
 
-  // Non-specialist work always continues through the COS brain. The browser surface no longer
-  // decides that a coding-looking prompt should jump directly into the Concierge route.
-  const executeRoutedRequest = () => withRunpodWakePermission(permission, () => cosPrimaryPost(routedRequest))
+  // The browser dispatcher authenticates first, then selects the correct delivery lane. Owner turns
+  // continue through privileged COS. Guest/member turns enter the public Concierge inside explicit
+  // public-delivery scope, preserving the established public customer-service path without ever
+  // downgrading an authenticated owner merely because they typed into the homepage Concierge.
+  const executeOwnerRequest = () => withRunpodWakePermission(permission, () => cosPrimaryPost(routedRequest))
+  const executePublicRequest = () => withRunpodWakePermission(permission, () => publicConciergePost(routedRequest))
 
-  // Public-delivery scope is a data-isolation boundary for Concierge/guest traffic. It must never
-  // wrap the authenticated owner Assistant: privileged COS needs owner-scoped memory/provenance and
-  // its deterministic platform-stack response must read the real Production model configuration.
   const response = access?.isOwner
-    ? await executeRoutedRequest()
+    ? await executeOwnerRequest()
     : await withPublicAuditIdentity(auditUserId, () =>
-        withPublicDeliveryScope(() => executeRoutedRequest()),
+        withPublicDeliveryScope(() => executePublicRequest()),
       )
   return withSuggestedFollowups(response, prompt, auditUserId)
 }

@@ -7,13 +7,13 @@
 // reachable, has the configured model, and can produce a real completion — and reports the raw
 // endpoint error text that callLocalModel() throws away.
 //
-// Read-only: one model-list GET and one 16-token generation. It optionally wakes the pod first,
-// because probing a stopped pod would only ever report "unreachable".
+// Read-only: one model-list GET and one 16-token generation. The optional readiness step is retained
+// for API compatibility even though the managed inference runtime has no server-owned pod lifecycle.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { probeReasoner } from '@/lib/ai/cos/reasonerProbe'
-import { ensureLocalInferenceRuntimeReady, withRunpodWakePermission } from '@/lib/ai/local-inference'
+import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { checkLocalEmbeddingHealth, embeddingEndpointIsSeparate, embeddingInferenceConfig, LOCAL_EMBEDDING_DIMENSIONS } from '@/lib/ai/cos/localEmbeddings'
 
 export const runtime = 'nodejs'
@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
 
-  // ?wake=false probes exactly what a caller would hit without a wake, which is how the benchmark
-  // behaved before the wake-permission fix. Default is to wake, matching the chat path.
+  // Preserve the existing ?wake=false diagnostic contract. On managed inference, readiness is a
+  // no-op and the probe itself is the authoritative availability check.
   const wake = request.nextUrl.searchParams.get('wake') !== 'false'
   let wakeError: string | null = null
 
@@ -34,8 +34,8 @@ export async function GET(request: NextRequest) {
       try {
         await ensureLocalInferenceRuntimeReady()
       } catch (error) {
-        // A wake failure is reported, never fatal: the probe below still records what the endpoint
-        // does right now, and its result is the more specific evidence.
+        // A readiness failure is reported, never fatal: the probe below still records what the
+        // endpoint does right now, and its result is the more specific evidence.
         wakeError = error instanceof Error ? error.message : String(error)
       }
     }
@@ -69,21 +69,7 @@ export async function GET(request: NextRequest) {
     note: undefined as string | undefined,
   }))
 
-  const result = wake
-    ? await withRunpodWakePermission(
-        {
-          allowed: true,
-          // An owner hitting this endpoint in a browser is the same trust class as an interactive
-          // chat turn, which is what the wake gate exists to admit.
-          source: 'user_interactive',
-          interactionId: null,
-          issuedAtMs: Date.now(),
-          ageMs: 0,
-          reason: 'owner-initiated reasoner diagnosis',
-        },
-        run,
-      )
-    : await run()
+  const result = await run()
 
   return NextResponse.json(
     // ok requires BOTH halves. A green reasoner with broken embeddings is not a working COS.

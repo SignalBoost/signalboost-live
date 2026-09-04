@@ -121,6 +121,19 @@ async function refineProfessionalDraft(input: {
   skillBlock: string
   language?: string
 }) {
+  return tryNeuralCommunicationTransformation(input)
+}
+
+async function tryNeuralCommunicationTransformation(input: {
+  instruction: string
+  editableSource: string
+  referenceContext: string | null
+  candidate: string
+  anchorBlock: string
+  styleBlock: string
+  skillBlock: string
+  language?: string
+}) {
   const context = input.referenceContext ? input.referenceContext.slice(0, 12_000) : null
   const reasoned = await callCosReasoner({
     temperature: 0.08,

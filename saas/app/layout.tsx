@@ -1,6 +1,7 @@
 // saas/app/layout.tsx
 import type { Metadata } from 'next'
 import './globals.css'
+import './concierge-workspace.css'
 import Navbar from '@/components/Navbar'
 import Footer from '@/components/Footer'
 import AppShell from '@/components/layout/AppShell'

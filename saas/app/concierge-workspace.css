@@ -1,0 +1,216 @@
+/* Concierge is a working surface, not a landing page with a chat box attached.
+ * These global overrides intentionally preserve the existing homepage behavior and
+ * Builder/artifact components while giving the conversation the browser viewport.
+ */
+
+.concierge-shell {
+  width: min(1480px, calc(100% - 24px)) !important;
+  max-width: 1480px !important;
+  min-height: calc(100svh - 184px) !important;
+  margin: 14px auto 18px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  background:
+    linear-gradient(150deg, rgba(12, 19, 34, 0.94), rgba(2, 7, 18, 0.9)),
+    radial-gradient(circle at 18% 8%, rgba(26, 240, 255, 0.08), transparent 36%);
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.32);
+  overflow: hidden !important;
+}
+
+.concierge-shell .aurora {
+  inset: -12% !important;
+  opacity: 0.72;
+}
+
+/* Empty conversation: the greeting is the workspace empty state, not a permanent hero card. */
+.concierge-shell .welcome-card {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: clamp(38px, 7vh, 76px) clamp(28px, 6vw, 86px) 34px !important;
+  align-items: center !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.concierge-shell .welcome-copy {
+  max-width: 980px !important;
+}
+
+.concierge-shell .welcome-card h1 {
+  max-width: 940px;
+  margin: 14px 0 14px !important;
+  font-size: clamp(42px, 5.5vw, 76px) !important;
+}
+
+.concierge-shell .welcome-lead {
+  max-width: 820px !important;
+}
+
+.concierge-shell .welcome-mark {
+  width: 132px !important;
+  height: 132px !important;
+  font-size: 42px !important;
+  opacity: 0.72;
+}
+
+/* This page is the full Concierge. Do not send the customer to a second assistant surface. */
+.concierge-shell a[href="/dashboard/assistant"] {
+  display: none !important;
+}
+
+/* Active conversation toolbar stays compact so the thread owns the screen. */
+.concierge-shell .assistant-header {
+  margin: 0 !important;
+  padding: 13px 18px !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 0 !important;
+  background: rgba(5, 11, 24, 0.62) !important;
+}
+
+.concierge-shell .assistant-header h1 {
+  margin: 3px 0 !important;
+  font-size: clamp(18px, 2.4vw, 25px) !important;
+}
+
+.concierge-shell .assistant-header .subtitle {
+  max-width: 900px !important;
+  font-size: 12px !important;
+}
+
+/* The conversation becomes the primary scroll surface. */
+.concierge-shell .thread-wrap {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  overflow: hidden;
+}
+
+.concierge-shell .thread {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+  padding: 22px clamp(14px, 3vw, 36px) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  scrollbar-gutter: stable;
+}
+
+.concierge-shell .message {
+  width: min(96%, 1180px) !important;
+}
+
+.concierge-shell .user-message {
+  width: min(84%, 940px) !important;
+}
+
+.concierge-shell .assistant-message {
+  width: min(98%, 1220px) !important;
+  overflow: visible;
+}
+
+/* Generated code and text files are first-class working artifacts. */
+.concierge-shell .assistant-message pre {
+  max-width: 100%;
+  border-radius: 12px;
+  scrollbar-gutter: stable;
+}
+
+.concierge-shell .assistant-message iframe {
+  min-height: 460px;
+  max-height: 70vh;
+}
+
+.concierge-shell .assistant-message a[download] {
+  min-height: 34px;
+}
+
+/* Composer is the persistent bottom tool bar for attach / ask / continue work. */
+.concierge-shell .composer-area {
+  position: sticky !important;
+  bottom: 0;
+  z-index: 8;
+  flex-shrink: 0;
+  margin-top: 0 !important;
+  padding: 12px 18px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(2, 8, 23, 0.74), rgba(2, 8, 23, 0.97) 30%);
+  backdrop-filter: blur(18px);
+}
+
+.concierge-shell .welcome-composer {
+  margin-top: 0 !important;
+}
+
+.concierge-shell .composer {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 17px !important;
+}
+
+.concierge-shell .composer textarea {
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.concierge-shell .attachments {
+  max-height: 132px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.concierge-shell .suggestions {
+  margin: 10px 0 0 !important;
+}
+
+@media (max-width: 900px) {
+  .concierge-shell {
+    width: calc(100% - 12px) !important;
+    min-height: calc(100svh - 154px) !important;
+    margin: 6px auto 10px !important;
+    border-radius: 20px;
+  }
+
+  .concierge-shell .welcome-card {
+    padding: 30px 20px 22px !important;
+  }
+
+  .concierge-shell .welcome-mark {
+    display: none !important;
+  }
+
+  .concierge-shell .assistant-header {
+    padding: 11px 12px !important;
+  }
+
+  .concierge-shell .assistant-header .subtitle {
+    display: none;
+  }
+
+  .concierge-shell .thread {
+    padding: 14px 10px !important;
+  }
+
+  .concierge-shell .message,
+  .concierge-shell .assistant-message {
+    width: 100% !important;
+  }
+
+  .concierge-shell .user-message {
+    width: 94% !important;
+  }
+
+  .concierge-shell .composer-area {
+    padding: 9px 9px 11px;
+  }
+
+  .concierge-shell .composer-hint {
+    margin-left: 4px !important;
+  }
+}

@@ -10,8 +10,17 @@ export type AgentProgressEvent = {
 
 const JOB_POLL_DELAY_MS = 1_500
 const JOB_POLL_ATTEMPTS = 180
-const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|py)$/i
+const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
 const MAX_CLIENT_FILE_BYTES = 512 * 1024
+const FENCED_SOURCE = /```([A-Za-z0-9_+#.-]*)\s*\n?([\s\S]*?)```/m
+const SOURCE_START = /^\s*(?:import|export|const|let|var|function|class|interface|type|enum|namespace|def|from\s+\S+\s+import|#include|#define|package\s+|using\s+|public\s+class|private\s+class|protected\s+class)\b/m
+const SOURCE_SHAPE: readonly RegExp[] = [
+  /^\s*(?:import|export|from|const|let|var|function|class|def|interface|type|enum|namespace)\b/m,
+  /=>|\)\s*\{|^\s*[})\]];?\s*$/m,
+  /^\s*(?:if|for|while|switch|catch|elif|foreach|else\s+if)\s*\(/m,
+  /\b(?:console\.log|printf|println|System\.out)\s*\(|^\s*(?:print|echo)\s*\(/m,
+  /<\/?[A-Za-z][\w.-]*(?:\s[^<>]*)?\/?>/,
+]
 
 type ConciergeAttachment = Readonly<{
   name?: unknown
@@ -65,34 +74,85 @@ function decodeTextDataUrl(value: string): string | null {
   }
 }
 
+function inferredExtension(language: string, source: string): string {
+  const value = language.toLowerCase()
+  const languageMap: Record<string, string> = {
+    js: 'js', javascript: 'js', mjs: 'mjs', cjs: 'cjs',
+    ts: 'ts', typescript: 'ts', tsx: 'tsx', jsx: 'jsx',
+    py: 'py', python: 'py', html: 'html', css: 'css', json: 'json', sql: 'sql',
+    sh: 'sh', bash: 'sh', java: 'java', cpp: 'cpp', 'c++': 'cpp', cs: 'cs', 'c#': 'cs',
+    go: 'go', golang: 'go', rust: 'rs', rs: 'rs', php: 'php', rb: 'rb', ruby: 'rb',
+    swift: 'swift', kotlin: 'kt', kt: 'kt',
+  }
+  if (languageMap[value]) return languageMap[value]
+  if (/\b(?:interface|type)\s+[A-Za-z_$]|\bimport\s+type\b|\bas\s+const\b|:\s*(?:string|number|boolean|unknown|never)\b/.test(source)) return 'ts'
+  if (/\bdef\s+[A-Za-z_]\w*\s*\(|^\s*from\s+\S+\s+import\s+/m.test(source)) return 'py'
+  if (/<[A-Z][A-Za-z0-9]*(?:\s|>|\/)/.test(source)) return 'tsx'
+  return 'js'
+}
+
+function sourceLike(value: string): boolean {
+  const source = String(value || '').trim()
+  if (source.split(/\n/).filter(line => line.trim()).length < 2) return false
+  return SOURCE_SHAPE.reduce((count, pattern) => count + (pattern.test(source) ? 1 : 0), 0) >= 2
+}
+
 /**
- * The public Concierge transports executable source-file requests directly into the same durable
- * Builder job contract used by the authenticated Developer surface. Source attachments alone are
- * not enough to override read-only questions such as “explain” or “summarize”; those remain on
- * ordinary Concierge. This is transport selection only: the server still authenticates the user
- * and enforces the 1–4 file, size, extension and execution limits. Image/PDF/reference attachments
- * also remain on ordinary Concierge.
+ * Browser users often paste source directly instead of attaching a file. The routing policy already
+ * recognizes that as executable source, but the old transport created no Builder file, leaving an
+ * empty workspace. Stage a bounded synthetic source file so Builder can actually inspect/edit it.
+ * Prose before the first source declaration remains in the objective, not in the executable file.
+ */
+export function pastedConciergeSourceFile(objective: string): { path: string; content: string } | null {
+  const raw = String(objective || '').trim()
+  if (!raw) return null
+
+  const fenced = FENCED_SOURCE.exec(raw)
+  if (fenced?.[2]?.trim()) {
+    const content = fenced[2].trim()
+    if (!sourceLike(content) || new TextEncoder().encode(content).byteLength > MAX_CLIENT_FILE_BYTES) return null
+    return { path: `pasted-source.${inferredExtension(fenced[1] || '', content)}`, content }
+  }
+
+  const lines = raw.split(/\r?\n/)
+  const startLine = lines.findIndex(line => SOURCE_START.test(line))
+  if (startLine < 0) return null
+  const content = lines.slice(startLine).join('\n').trim()
+  if (!sourceLike(content) || new TextEncoder().encode(content).byteLength > MAX_CLIENT_FILE_BYTES) return null
+  return { path: `pasted-source.${inferredExtension('', content)}`, content }
+}
+
+/**
+ * Concierge transports executable source requests directly into the same durable Builder job
+ * contract used by the Developer surface. Source attachments alone are not enough to override
+ * read-only questions such as “explain” or “summarize”; those remain on ordinary Concierge.
+ * A source-dominant paste is also staged as a synthetic file so recognized code never reaches an
+ * empty Builder workspace. The server remains authoritative for identity and execution limits.
  */
 export function conciergeBuilderRequest(body: unknown): { endpoint: '/api/builder'; body: Record<string, unknown> } | null {
   const record = bodyRecord(body)
   if (!record) return null
   const attachments = Array.isArray(record.attachments) ? record.attachments as ConciergeAttachment[] : []
-  if (!attachments.length) return null
-
   const attachmentNames = attachments.map(attachment => typeof attachment?.name === 'string' ? attachment.name.trim().replace(/\\/g, '/') : '')
   const attachmentMimeTypes = attachments.map(attachment => String(attachment?.mimeType || attachment?.type || ''))
   const objective = latestUserText(record)
   if (!objective || !isConciergeBuilderObjective(objective, { attachmentNames, attachmentMimeTypes })) return null
 
   const files: Array<{ path: string; content: string }> = []
-  for (let index = 0; index < attachments.length; index += 1) {
-    const attachment = attachments[index]
-    const path = attachmentNames[index]
-    const dataUrl = typeof attachment?.dataUrl === 'string' ? attachment.dataUrl : ''
-    if (!path || !SOURCE_FILE.test(path) || !dataUrl) return null
-    const content = decodeTextDataUrl(dataUrl)
-    if (content === null) return null
-    files.push({ path, content })
+  if (attachments.length) {
+    for (let index = 0; index < attachments.length; index += 1) {
+      const attachment = attachments[index]
+      const path = attachmentNames[index]
+      const dataUrl = typeof attachment?.dataUrl === 'string' ? attachment.dataUrl : ''
+      if (!path || !SOURCE_FILE.test(path) || !dataUrl) return null
+      const content = decodeTextDataUrl(dataUrl)
+      if (content === null) return null
+      files.push({ path, content })
+    }
+  } else {
+    const pasted = pastedConciergeSourceFile(objective)
+    if (!pasted) return null
+    files.push(pasted)
   }
 
   const conversationId = typeof record.context?.conversationId === 'string' ? record.context.conversationId : ''

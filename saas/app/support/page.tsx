@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { t } from '@/lib/i18n/t'
-const SUPPORT_EMAIL = 'support@signalboostapp.com'
+const SUPPORT_EMAIL = 'saascontact@signalboostapp.com'
 
 export default function SupportPage() {
   const { dict, lang } = useI18n()

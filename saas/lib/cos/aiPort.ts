@@ -48,12 +48,14 @@ export function createBuilderCodingAiPort(): CosAiPort {
         prompt: input.prompt,
         systemPrompt: input.systemPrompt,
         maxTokens: input.maxTokens,
-        jsonObject: true,
         // Source code is legitimately repetitive. The prose reasoner's repetition penalties
         // accumulate over a generated file and push the sampler off valid syntax, so coding
         // calls generate unpenalised.
         frequencyPenalty: 0,
         presencePenalty: 0,
+        // The control object must be JSON. Provider-enforced JSON mode removes the class of
+        // failures where source quoting or escaping breaks the surrounding envelope.
+        jsonObject: true,
       }, {
         ...config,
         model: builderCodingModelFromEnv(),

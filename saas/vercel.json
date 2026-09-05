@@ -1,6 +1,5 @@
 {
   "buildCommand": "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build",
-  "ignoreCommand": "node scripts/vercel-main-write-guard.mjs",
   "env": {
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",
     "COS_LIVE_SOURCES_ENABLED": "true",

@@ -5,7 +5,7 @@ export type RegressionVerdict = Readonly<{ satisfied: true }> | Readonly<{ satis
 
 const PROOF_COMMAND = /\b(?:test|spec)\b|node\s+--test|\bnode\s+[\w./-]+\.(?:c?js|mjs)\b|vitest|jest|mocha|\btap\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test|\.(?:test|spec)\.[cm]?[jt]sx?\b|(?:^|[\s;&|])(?:npx\s+)?tsc(?:\s|$)|\bnext\s+build\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:typecheck|type-check|build|prebuild)\b/i
 
-const REPAIR_WORDS = /\b(?:fix(?:ed)?|repair(?:ed)?|correct(?:ed)?|bug|error|failure|broken|regression|crash|failing|defect)\b/i
+const REPAIR_WORDS = /\b(?:fix(?:es|ed|ing)?|repair(?:s|ed|ing)?|correct(?:s|ed|ing)?|bug|bugs|error|errors|failure|failures|broken|regression|regressions|crash(?:es|ed|ing)?|fail(?:s|ed|ing)?|defect|defects|misbehav(?:es|ing)?|malfunction(?:s|ing)?)\b/i
 
 const CREATION_DIRECTIVE = /^(?:please\s+|can\s+you\s+|could\s+you\s+|i\s+need\s+(?:you\s+to\s+)?|i\s+want\s+(?:you\s+to\s+)?|help\s+me\s+)*(?:build|create|write|implement|generate|scaffold|produce|make|design)\b/i
 

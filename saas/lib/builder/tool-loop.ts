@@ -329,6 +329,21 @@ export class BuilderToolLoop {
       const lastWorkspaceChange = Math.max(...trace.map((item, index) => (
         item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file') ? index : -1
       )))
+      // The controller owns verification scheduling. Once a new build's declared files
+      // exist, execute the user's explicit Run list before asking for any more edits.
+      // A failed command is attempted only once per file revision, then returned to the
+      // model for diagnosis; no blind execution retries or additional command authority.
+      const verificationCommand = !repairObjective && writeCount > 0 && task.files.length > 0 && progress.missingFiles.length === 0
+        ? progress.pendingCommands.find(command => !trace.slice(lastWorkspaceChange + 1)
+          .some(item => item.toolId === 'run' && item.input.command === command))
+        : undefined
+      const currentStep = !repairObjective && progress.missingFiles.length > 0
+        ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files or return partial source.`
+        : !repairObjective && progress.pendingCommands.length === 0 && !progress.testsSatisfied
+          ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. Complete the test suite with distinct meaningful assertions covering the requested normal, edge, and failure cases. Do not duplicate empty tests or weaken the requirement. Verification will run again after the file changes.`
+        : trace.slice(lastWorkspaceChange + 1).some(item => item.toolId === 'run' && !item.ok)
+          ? 'CURRENT STEP: Use the recorded command failures to repair the source. Read the failing file if needed. If a newly created file is incomplete, replace it with complete source rather than repeatedly patching a fragment. Do not claim success or weaken tests.'
+          : 'CURRENT STEP: Follow the objective and use tools for any remaining work; report only recorded evidence.'
       const blockedInspectionTools = new Set(trace
         .slice(lastWorkspaceChange + 1)
         .filter(item => (item.toolId === 'list_files' || item.toolId === 'read_file')
@@ -353,7 +368,11 @@ export class BuilderToolLoop {
         formatBuilderProjectContext(projectContext),
         repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',
         `TOOLS: ${safeJson(availableTools)}`,
-        trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
+        // Old write proposals are not current source. Replaying their large strings,
+        // especially rejected duplicates, crowds out the actual runner diagnostics.
+        trace.length ? `RESULTS:\n${safeJson(trace.map(item => item.toolId === 'write_file' || item.toolId === 'edit_file'
+          ? { ...item, input: { path: toolPath(item.input) } } : item))}` : '',
+        currentStep,
         'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
         'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
         availableTools.includes('read_file')
@@ -371,10 +390,10 @@ export class BuilderToolLoop {
         'When done: {"type":"answer","answer":"what changed and what ran"}',
       ].filter(Boolean)
 
-      let action: Action | null = null
+      let action: Action | null = verificationCommand ? { type: 'tool', toolId: 'run', input: { command: verificationCommand } } : null
       let blockedAction: ToolAction | null = null
       let controlFailure: ModelControlFailure | null = null
-      for (let controlAttempt = 0; controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
+      for (let controlAttempt = 0; !action && controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
         const recoveryInstruction = controlAttempt > 0
           ? `CONTROL RECOVERY ATTEMPT ${controlAttempt}: The previous response could not be used. Return exactly one compact JSON object using one TOOL INPUT SCHEMA above. Use only type, toolId, and input; input must be an object, not a JSON string. Emit no prose or Markdown. For an existing file, use edit_file with search and replace instead of rewriting the whole file.`
           : ''
@@ -570,6 +589,7 @@ export class BuilderToolLoop {
         }
         const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0
         if (runFailed) {
+          completedRunsInCurrentWorkspaceState.add(fingerprint)
           const details = diagnose(`${(output as ReturnType<typeof summarizeRun>).stderr}\n${(output as ReturnType<typeof summarizeRun>).stdout}`, workspacePaths)
           trace.push({ round, toolId: action.toolId, input: action.input, ok: false, output, error: `builder_command_failed: exit ${(output as ReturnType<typeof summarizeRun>).exitCode}`, ...details })
           continue

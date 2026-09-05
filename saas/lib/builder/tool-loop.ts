@@ -5,6 +5,7 @@ import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBuilderSandboxCommand } from './project-context.ts'
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 import { builderTaskContract, builderTaskProgress } from './task-contract.ts'
+import { formatBuilderWorkingFiles } from './working-context.ts'
 
 type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
 type Action = ToolAction | { type: 'answer'; answer: string }
@@ -299,6 +300,7 @@ export class BuilderToolLoop {
 
   async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
     const trace: BuilderToolTrace[] = []
+    const workingFiles = new Map<string, BuilderFile>()
     const inspectedInCurrentWorkspaceState = new Set<string>()
     const completedMutations = new Set<string>()
     const completedRunsInCurrentWorkspaceState = new Set<string>()
@@ -372,6 +374,7 @@ export class BuilderToolLoop {
         // especially rejected duplicates, crowds out the actual runner diagnostics.
         trace.length ? `RESULTS:\n${safeJson(trace.map(item => item.toolId === 'write_file' || item.toolId === 'edit_file'
           ? { ...item, input: { path: toolPath(item.input) } } : item))}` : '',
+        formatBuilderWorkingFiles([...workingFiles.values()]),
         currentStep,
         'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
         'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
@@ -570,8 +573,13 @@ export class BuilderToolLoop {
           const file = await this.workspace.readFile(input.workspaceId, toolPath(action.input))
           output = file ? { path: file.path, content: file.content, updatedAt: file.updatedAt } : null
         }
-        if (action.toolId === 'write_file') output = summarize(await this.workspace.writeFile(input.workspaceId, toolPath(action.input), toolContent(action.input)))
-        if (action.toolId === 'edit_file') output = summarize(await this.workspace.editFile(input.workspaceId, toolPath(action.input), text(action.input.search), text(action.input.replace)))
+        if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
+          const file = action.toolId === 'write_file'
+            ? await this.workspace.writeFile(input.workspaceId, toolPath(action.input), toolContent(action.input))
+            : await this.workspace.editFile(input.workspaceId, toolPath(action.input), text(action.input.search), text(action.input.replace))
+          workingFiles.set(file.path, file)
+          output = summarize(file)
+        }
         if (action.toolId === 'run') {
           const listed = await this.workspace.listFiles(input.workspaceId)
           workspacePaths = listed.map(file => file.path)

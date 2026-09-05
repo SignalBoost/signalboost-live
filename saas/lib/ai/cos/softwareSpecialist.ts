@@ -6,6 +6,8 @@ import { isOperationalLogEvidence } from '@/lib/ai/cos/pastedOperationalLog'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
 import { extractBuilderSourceFiles, planDebugFileJob } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob } from '@/lib/builder/job-store'
+import { readBuilderEvidenceJob } from '@/lib/builder/job-store'
+import { builderEvidenceReply } from '@/lib/builder/execution-evidence'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import {
   parseSignalBoostRepositoryRepairTarget,
@@ -122,6 +124,22 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   const context = routingContext(input.body)
   const sourceAttached = hasSourceAttachment(context)
   const access = await getAccess().catch(() => null)
+
+  const priorAnswer = (Array.isArray(input.body?.messages) ? input.body.messages : [])
+    .filter((message: any) => message?.role === 'assistant' && typeof message.content === 'string').at(-1)?.content || ''
+  const evidence = await builderEvidenceReply({
+    prompt: objective,
+    userId: access?.userId || publicAuditUserId(),
+    conversationId: conversationIdFrom(input.body),
+    priorAnswer,
+    allowRepositoryEvidence: input.surface === 'assistant' && access?.isOwner === true,
+  }, readBuilderEvidenceJob)
+  if (evidence !== null) return NextResponse.json({
+    reply: evidence, source: 'cos-builder-recorded-evidence',
+    execution_allowed: false, external_action_taken: false,
+    local_model_invoked: false, external_ai_invoked: false,
+    ...softwareSpecialistFields('software.verify'),
+  })
 
   if (input.allowRepositoryRepair && access?.isOwner && access.userId && !sourceAttached) {
     const operationalEvidence = isOperationalLogEvidence(objective)

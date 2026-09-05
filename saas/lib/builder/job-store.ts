@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { EvidenceLookup } from './execution-evidence.ts'
 
 export type BuilderJobKind = 'standard' | 'debug_file'
 export type BuilderJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
@@ -86,6 +87,21 @@ function stale(job: BuilderJobRecord): boolean {
 
 export function builderJobStorageAvailable(): boolean {
   return serviceClient() !== null
+}
+
+export async function readBuilderEvidenceJob(input: EvidenceLookup): Promise<BuilderJobRecord | null> {
+  if (![input.userId, input.conversationId].every(value => UUID.test(value))) return null
+  if (input.jobId && !UUID.test(input.jobId)) return null
+  if (input.workspaceId && !UUID.test(input.workspaceId)) return null
+  const db = serviceClient()
+  if (!db) return null
+  let query = db.from('builder_jobs').select(JOB_SELECT)
+    .eq('user_id', input.userId).eq('conversation_id', input.conversationId)
+  if (input.jobId) query = query.eq('id', input.jobId)
+  if (input.workspaceId) query = query.eq('workspace_id', input.workspaceId)
+  const { data, error } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw new Error('builder_evidence_read_failed')
+  return data ? toJob(data) : null
 }
 
 export async function enqueueBuilderJob(input: {

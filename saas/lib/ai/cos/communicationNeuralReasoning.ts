@@ -1,3 +1,4 @@
+// REPO PATH: saas/lib/ai/cos/communicationNeuralReasoning.ts
 import { callCosReasoner } from './cosReasoner.ts'
 import {
   recordCitedCognitiveSkillReuse,
@@ -47,7 +48,17 @@ const COMMUNICATION_REASONING_PROCEDURE = [
   '3. Infer the register from the source, not from a house style. If the source is a first-person thread reply with no greeting, keep it that way. If it is warm personal mail, keep warmth. If it is blunt institutional argument, keep bluntness after cleaning grammar.',
   '4. Reason about structure from the argument the source already makes. Do not pour the draft into a fixed memo shape (greeting, recap, observation, proposal, concession, close).',
   '5. Generate at least THREE genuinely different candidate approaches internally before choosing the recommended draft. Do not expose those hidden candidates or your reasoning. Choose the approach that best preserves meaning and voice while making the argument easier to follow.',
-  '6. Self-review against the source: every material claim still present; no invented greeting, motive, fact, or commitment; distinctive images and idioms kept when they carry the point; result does not read like HR copy or a grammar-checker pass.',
+  '6. Self-review against the source: every material claim still present; no invented greeting, motive, fact, or commitment; distinctive images and idioms kept when they carry the point; result does not read like HR copy, a school essay, or a grammar-checker pass.',
+].join('\n')
+
+const ADULT_PROSE_STANDARD = [
+  'ADULT PROSE — EDUCATED HUMAN, NOT SCHOOL ESSAY:',
+  '- Write as a well-educated adult in the sender\'s profession would write to peers. Fluent, specific, economical. Not a five-paragraph essay and not a student recap.',
+  '- Fail the draft if it uses school scaffolding: announce that you thought about writing, state a general observation, explain why a proposal is good, then restate the thesis as "the bottom line is simple."',
+  '- Fail stock machinery: "I have observed a recurring pattern", "this would allow us to distinguish", "this ensures that", "conversely, it is inefficient", "those who can benefit from the opportunity."',
+  '- Prefer concrete nouns and verbs from the source over category language (do not replace pouches, desks, computers, "check where your mouth is" with "operational contributions" or "leadership roles" unless the source used those abstractions).',
+  '- Vary sentence length. Do not march every paragraph from topic sentence to restatement. Cut filler. Stop when the point is made.',
+  '- Transitions should be invisible. If a sentence exists only to sound organized, delete it.',
 ].join('\n')
 
 const INSTITUTIONAL_DIPLOMATIC_GUIDANCE = [
@@ -185,6 +196,7 @@ async function generateDraftSet(input: {
       'Do not reveal private chain-of-thought. Perform the reasoning silently and return ONLY strict JSON with this schema:',
       '{"recommended":"...","alternatives_useful":true,"alternatives":[{"label":"Warmer","text":"..."},{"label":"More concise","text":"..."}],"confidence":0.0,"release_score":0.0}',
       COMMUNICATION_REASONING_PROCEDURE,
+      ADULT_PROSE_STANDARD,
       'When two other approaches would genuinely help the sender, return up to two complete alternatives with useful labels. Alternatives may change tone, concision, or emphasis but must not change facts or commitments.',
       INSTITUTIONAL_DIPLOMATIC_GUIDANCE,
       'QUALITY FLOOR:',
@@ -231,8 +243,10 @@ async function neuralQualityReview(input: {
       'Do not reveal private chain-of-thought. Return ONLY strict JSON with the same draft-set schema:',
       '{"recommended":"...","alternatives_useful":true,"alternatives":[{"label":"...","text":"..."}],"confidence":0.0,"release_score":0.0}',
       COMMUNICATION_REASONING_PROCEDURE,
+      ADULT_PROSE_STANDARD,
       'Evaluate the proposed communication against the ORIGINAL draft, not just against grammar.',
-      'A release-quality result must: preserve facts and actor/action/recipient relationships; understand the relationship and purpose; materially improve awkward/non-native phrasing; organize the message from the source\'s own argument; make the request or next step clear; sound like the same capable human; and avoid invented facts, greetings, or overstatement.',
+      'A release-quality result must: preserve facts and actor/action/recipient relationships; understand the relationship and purpose; materially improve awkward/non-native phrasing; organize the message from the source\'s own argument; make the request or next step clear; sound like the same well-educated adult; and avoid invented facts, greetings, school-essay scaffolding, or overstatement.',
+      'Set release_score below 0.82 if the draft reads like a high-school essay, HR memo, or topic-sentence march.',
       'For sensitive institutional correspondence, the result must preserve the writer’s argument while removing unnecessary personal disparagement, mind-reading, contempt, or wording that would make the message needlessly adversarial.',
       'Do not erase the position in the name of diplomacy. The substantive proposal and rationale must remain clear, but they should be framed in language the writer could defend if the message were forwarded broadly.',
       'If the proposed result still tracks the original sentence-by-sentence, sounds generic, awkward, sterile, accusatory, or merely corrected, REWRITE IT rather than approving it.',
@@ -276,6 +290,7 @@ async function neuralLastRepair(input: {
       'You are COS doing a final neural rewrite because the previous communication did not clear the release-quality threshold.',
       'Do not reveal chain-of-thought. Return ONLY strict JSON in the draft-set schema.',
       COMMUNICATION_REASONING_PROCEDURE,
+      ADULT_PROSE_STANDARD,
       'Rewrite from the underlying communication objective, not from the previous wording. Preserve facts, names, acronyms, links, commitments, uncertainty, voice, and actor/action/recipient relationships.',
       'The result must sound natural and purposeful, not like a grammar-corrected copy or a stock memo. Use paragraphs and transitions that follow from the source\'s argument.',
       'For sensitive institutional writing, keep the proposal strong while removing needless personal attacks, ridicule, motive attribution, or contempt.',

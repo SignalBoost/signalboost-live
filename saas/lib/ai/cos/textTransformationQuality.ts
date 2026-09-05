@@ -1,3 +1,4 @@
+// REPO PATH: saas/lib/ai/cos/textTransformationQuality.ts
 export type TextTransformationMode =
   | 'proofread'
   | 'edit'
@@ -50,7 +51,7 @@ export function textTransformationStyleBlock(instruction: string): string {
     edit: [
       '- EDITING is more than proofreading. Reason about the sender\'s objective, then rewrite awkward, literal, fragmented, repetitive, or non-native wording into fluent idiomatic language in the sender\'s register.',
       '- Reorganize sentences and paragraphs when that improves flow, warmth, clarity, or emphasis. A result that simply mirrors the source sentence-by-sentence with corrected grammar is insufficient when the source is visibly rough.',
-      '- For correspondence, make the message sound like the same person wrote a cleaner version of it, not like a grammar checker or an HR memo. Preserve personality, idioms, concrete images, and level of formality. Do not add a greeting or closing the source omitted.',
+      '- For correspondence, make the message sound like the same well-educated adult wrote a cleaner version of it, not like a grammar checker, a high-school essay, or an HR memo. Preserve personality, idioms, concrete images, and level of formality. Do not add a greeting or closing the source omitted.',
     ],
     polish: [
       '- POLISHING should materially improve tone, rhythm, clarity, transitions, concision, and professional warmth while preserving the same substance.',

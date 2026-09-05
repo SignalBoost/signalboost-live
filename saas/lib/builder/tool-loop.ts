@@ -19,6 +19,11 @@ const MAX_GATE_NUDGES = 3
 const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
 const MAX_MODEL_ROUND_ATTEMPTS = 2
 const MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS = 1
+/**
+ * A round must not be started that the wall clock cannot finish. Reserving one model round plus a
+ * command run means the loop stops with its evidence intact instead of dying inside a generation.
+ */
+const ROUND_RESERVE_MS = 75_000
 const MODEL_CONTROL_MAX_TOKENS = 2_400
 const MODEL_REPAIR_CONTROL_MAX_TOKENS = 4_096
 const MODEL_CONTROL_RECOVERY_MAX_TOKENS = 4_096
@@ -300,8 +305,7 @@ export class BuilderToolLoop {
     this.workspace = workspace
     this.runner = runner
   }
-
-  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean }): Promise<BuilderLoopResult> {
+  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; deadlineAtMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean }): Promise<BuilderLoopResult> {
     const saved = input.checkpoint
     if (saved && (saved.version !== 1 || saved.workspaceId !== input.workspaceId || saved.objectiveDigest !== checkpointDigest(input.objective))) {
       return { ok: false, error: 'builder_checkpoint_scope_mismatch', trace: [] }
@@ -327,7 +331,7 @@ export class BuilderToolLoop {
     let workspacePaths: string[] = initialListing.map(file => file.path)
     let repairObjective = saved?.repairObjective ?? isRepairObjective(input.objective)
     let writeCount = saved?.writeCount || 0, runCount = saved?.runCount || 0, gateNudges = saved?.gateNudges || 0
-    const maxRounds = Math.max(1, Math.min(input.maxRounds ?? Math.max(8, task.files.length * 3 + task.commands.length + 4), 24))
+    const maxRounds = Math.max(1, Math.min(input.maxRounds ?? Math.max(8, task.files.length * 3 + task.commands.length + 4), 40))
     let workRounds = saved?.workRounds || 0
     let attempt = saved?.attempt || 0
     // Checkpoints are made only between completed tools. No pending command is replayable.
@@ -345,7 +349,11 @@ export class BuilderToolLoop {
       }
       return { ok: false, error: 'builder_job_paused', trace, checkpoint }
     }
+    const deadlineAtMs = Number(input.deadlineAtMs)
+    const outOfTime = (): boolean => Number.isFinite(deadlineAtMs)
+      && deadlineAtMs - Date.now() <= ROUND_RESERVE_MS
     while (workRounds < maxRounds && attempt < maxRounds + MAX_REPEAT_RECOVERY_ATTEMPTS) {
+      if (outOfTime()) return { ok: false, error: 'builder_time_budget_reached', trace }
       if (input.shouldPause?.()) return pause()
       attempt += 1
       const round = attempt

@@ -61,6 +61,9 @@ test('repair classification is never derived from the model own answer prose', (
 })
 
 test('a build objective gets a round budget that can carry a multi-file build', () => {
-  assert.match(jobRunner, /maxRounds: isRepairObjective\(job\.objective\) \? 20 : 16/)
+  // Rounds are no longer rationed per objective kind: the wall clock decides when work stops,
+  // so a build gets the same headroom as a repair.
+  assert.doesNotMatch(jobRunner, /maxRounds: isRepairObjective/)
+  assert.match(jobRunner, /maxRounds: 40/)
   assert.match(gate, /tests\/builderRepairClassification\.node\.test\.ts/)
 })

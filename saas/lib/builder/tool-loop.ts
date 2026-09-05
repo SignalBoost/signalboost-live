@@ -6,6 +6,7 @@ import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBu
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 import { builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderWorkingFiles } from './working-context.ts'
+import { detectContractOscillation, formatContractOscillation } from './contract-oscillation.ts'
 
 type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
 type Action = ToolAction | { type: 'answer'; answer: string }
@@ -375,6 +376,7 @@ export class BuilderToolLoop {
         trace.length ? `RESULTS:\n${safeJson(trace.map(item => item.toolId === 'write_file' || item.toolId === 'edit_file'
           ? { ...item, input: { path: toolPath(item.input) } } : item))}` : '',
         formatBuilderWorkingFiles([...workingFiles.values()]),
+        formatContractOscillation(detectContractOscillation(trace)),
         currentStep,
         'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
         'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',

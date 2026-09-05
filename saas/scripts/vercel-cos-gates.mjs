@@ -20,6 +20,7 @@ const tests = [
   'tests/pastedOperationalLog.node.test.ts',
   'tests/attachedOperationalEvidence.node.test.ts',
   'tests/builderOperationalLogRouting.node.test.ts',
+  'tests/builderContractOscillation.node.test.ts',
   'tests/builderControlRecovery.node.test.ts',
   'tests/builderControlAdapter.node.test.ts',
   'tests/builderRequestDeadline.node.test.ts',

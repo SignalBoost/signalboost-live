@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { stripTypeScriptTypes } from 'node:module'
 import test from 'node:test'
 import { getA2ASpecialistFamily } from '../a2a-host/a2a-specialist-catalog.ts'
 import { conciergeBuilderRequest, pastedConciergeSourceFile } from '../lib/ai/cos/agentProgressClient.ts'
@@ -9,6 +10,10 @@ import type { BuilderFile } from '../lib/builder/contracts.ts'
 import type { SignalBoostRepositoryRepairTarget } from '../lib/builder/repository-repair-target.ts'
 
 const read = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
+
+test('Software Specialist module has valid TypeScript syntax', () => {
+  assert.doesNotThrow(() => stripTypeScriptTypes(read('../lib/ai/cos/softwareSpecialist.ts')))
+})
 
 function repositoryTarget(commitSha: string, branch = 'fix/cos-primary-software-specialist-20260903'): SignalBoostRepositoryRepairTarget {
   return Object.freeze({

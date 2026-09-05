@@ -1,6 +1,8 @@
 import { spawnSync } from 'node:child_process'
 
 const tests = [
+  'tests/builderToolLoop.node.test.ts',
+  'tests/builderProjectContext.node.test.ts',
   'tests/builderExecutionEvidence.node.test.ts',
   'tests/auditCosRuntime.node.test.ts',
   'tests/deterministicUtilities.node.test.ts',

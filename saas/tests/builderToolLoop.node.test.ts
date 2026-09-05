@@ -89,10 +89,11 @@ test('Builder retries one transient model-round timeout before failing the turn'
 test('Production Builder lanes allow a valid slow local control round without becoming unbounded', () => {
   const jobRunner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
   const repositoryRepair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
-  const conciergeRoute = readFileSync(new URL('../app/api/concierge/route.ts', import.meta.url), 'utf8')
-  for (const source of [jobRunner, repositoryRepair, conciergeRoute]) {
+  for (const source of [jobRunner, repositoryRepair]) {
     assert.match(source, /modelRoundTimeoutMs: 55_000/)
   }
+  const specialist = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
+  assert.match(specialist, /await runBuilderJob\(jobId, builderUserId\)/)
 })
 
 test('Builder recovers when the model replays a completed tool call', async () => {
@@ -158,6 +159,19 @@ test('Builder blocks an unsupported repair claim even when the objective avoids 
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Update index.js.', workspaceId: 'user:claim' })
   assert.equal(result.ok, false)
   if (!result.ok) assert.equal(result.error, 'builder_regression_evidence_required')
+})
+
+test('modifying an existing file cannot use the new-file completion shortcut', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('user:existing', 'index.js', 'module.exports = 1')
+  const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }
+  const ai = new ScriptedBuilderAi([
+    '{"type":"tool","toolId":"write_file","input":{"path":"index.js","content":"module.exports = 5"}}',
+    '{"type":"tool","toolId":"run","input":{"command":"node index.js"}}',
+    ...Array(4).fill('{"type":"answer","answer":"Updated index.js."}'),
+  ])
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Update index.js.', workspaceId: 'user:existing' })
+  assert.equal(result.ok, false)
 })
 
 test('Builder requires fail then repair then pass evidence only for repair objectives', async () => {

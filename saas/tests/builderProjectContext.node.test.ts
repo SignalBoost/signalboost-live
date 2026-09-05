@@ -39,6 +39,13 @@ test('bare npm test becomes one staged proof file', () => {
   )
 })
 
+test('preserves a real package test script instead of silently replacing its proof', () => {
+  assert.equal(normalizeBuilderSandboxCommand('npm test', [
+    { path: 'package.json', content: JSON.stringify({ scripts: { test: 'node --test tests/math.test.js' } }) },
+    { path: 'tests/math.test.js' },
+  ]), 'npm test')
+})
+
 test('rewrites aimed npm test and foreign cd prefixes for the sandbox', () => {
   assert.equal(
     normalizeBuilderSandboxCommand('cd /home/user/repos/saas && npm test -- tests/advisoryDiagnosisPolicy.node.test.ts'),

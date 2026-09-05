@@ -4,6 +4,7 @@
 ## Cognitive Operating System (COS)
 
 **Version:** 1.35
+**Embedding overflow repair — 2026-09-05:** implementation on `fix/cos-embedding-overflow-20260905`, not yet Production-accepted. Production `dpl_ALZsunZPEMrck2QENtqibDvPhwxn` logs at 02:12 UTC confirmed three backfill inputs shrinking from 1,000 to 772 characters over five retries while the provider continued reporting 513/512 tokens. The retry now treats that reported count as potentially capped and applies a conservative UTF-8 byte budget from the reported context limit, with eight tokens of headroom and Unicode-safe head/tail sampling. Only the embedding request is shortened; retained source records are untouched. The existing mandatory transport test now executes the retry functions against capped-count, multilingual, batch-order, unrelated-error and retry-exhaustion cases. Exact Preview and a post-merge owner backfill with zero pending/failed rows remain required for Production acceptance.
 **Updated:** 2026-09-04 UTC
 **Canonical scope:** current engineering / operations handoff; verify live state before acting  
 **Accepted cognitive implementation baseline:** `84de50b8e67feea2e27d658e4cc3982e9e97a603`  

@@ -1,14 +1,64 @@
 // saas/tests/localEmbeddingsWindowSafeTransport.node.test.ts
 //
-// Source-level assertions, deliberately. localEmbeddings.ts imports through the '@/' path alias,
-// which the bare node test runner cannot resolve — tests/localEmbeddings.node.test.ts and
-// tests/localEmbeddingsNativeFallback.node.test.ts both fail to load for that reason and have
-// been unable to run at all. This file imports nothing from the module, so it executes.
+// Execute the dependency-free retry functions with a fake provider, and check transport
+// wiring separately. This avoids the module's Next.js path aliases in the bare Node runner.
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { stripTypeScriptTypes } from 'node:module'
 
 const SOURCE = readFileSync('lib/ai/cos/localEmbeddings.ts', 'utf8')
+
+// Execute the actual retry implementation with a fake transport; no Next.js aliases or
+// provider credentials are needed. Keep source checks below for transport wiring.
+const retrySource = SOURCE.slice(SOURCE.indexOf('function embeddingContextWindowError'), SOURCE.indexOf('function missingModelError'))
+const windowSafe = new Function('Buffer', 'console', stripTypeScriptTypes(
+  `const MAX_EMBEDDING_WINDOW_RETRIES = 5; ${retrySource}`,
+) + '; return requestEmbeddingsWindowSafe;')(Buffer, { info() {} })
+const overflow = { ok: false, status: 400, body: JSON.stringify({ error: { message:
+  'You passed 513 input tokens and requested 0 output tokens. However, the model\'s context length is only 512 tokens, resulting in a maximum input length of 512 tokens.',
+} }) }
+
+test('recovers from capped 513-token reports for dense and multilingual inputs', async () => {
+  for (const text of ['x '.repeat(500), '漢字🙂 '.repeat(1000), 'é'.repeat(1000)]) {
+    const inputs: string[] = []
+    const result = await windowSafe([text], {}, 'configured-model', async ([input]: string[]) => {
+      inputs.push(input)
+      assert.equal(input.isWellFormed(), true)
+      return Buffer.byteLength(input, 'utf8') + 2 > 512
+        ? overflow : { ok: true, vectors: [[1, 2, 3]] }
+    })
+    assert.equal(result.ok, true)
+    assert.equal(inputs.length, 2, 'one bounded retry must fit even when the reported count is capped')
+    assert.ok(inputs[1].includes('…'))
+  }
+})
+
+test('batch overflow preserves order and leaves fitting inputs intact', async () => {
+  const texts = ['short', 'x '.repeat(500), 'tail']
+  const result = await windowSafe(texts, {}, 'configured-model', async (inputs: string[]) => {
+    if (inputs.some(input => Buffer.byteLength(input) + 2 > 512)) return overflow
+    return { ok: true, vectors: inputs.map(input => [input === 'short' ? 1 : input === 'tail' ? 3 : 2]) }
+  })
+  assert.deepEqual(result, { ok: true, vectors: [[1], [2], [3]] })
+  assert.equal(texts[1].length, 1000, 'retained source content must not be modified')
+})
+
+test('unrelated provider errors are returned without retries', async () => {
+  for (const status of [400, 401, 429, 500]) {
+    let calls = 0
+    const failure = { ok: false, status, body: 'provider failure' }
+    assert.equal(await windowSafe(['text'], {}, 'configured-model', async () => { calls++; return failure }), failure)
+    assert.equal(calls, 1)
+  }
+})
+
+test('persistent overflow still stops at the bounded retry limit', async () => {
+  let calls = 0
+  const result = await windowSafe(['x'.repeat(10000)], {}, 'configured-model', async () => { calls++; return overflow })
+  assert.equal(result.ok, false)
+  assert.ok(calls <= 6)
+})
 
 test('the native transport is wrapped in the context-window retry', () => {
   // Production log, 2026-08-26: "You passed 513 input tokens ... context length is only 512".

@@ -190,8 +190,6 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   ])
   for (const file of stagedFiles) await workspace.writeFile(workspaceId, file.path, file.content)
 
-  }
-
   const conversationId = conversationIdFrom(input.body) || crypto.randomUUID()
   const jobId = crypto.randomUUID()
   const debugPlan = planDebugFileJob(objective, stagedFiles)

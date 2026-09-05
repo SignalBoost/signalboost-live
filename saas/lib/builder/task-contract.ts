@@ -26,7 +26,10 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
     const command = line.replace(/^\$\s+/, '').replace(/^`|`$/g, '')
     if (/^(?:node|python3?|npm|pnpm|yarn|bun)\s+\S/.test(command) && command.length <= 2_000) commands.add(command)
   }
-  const count = /\b(?:at least|minimum(?: of)?)\s+(\d+)\s+(?:(?:meaningful|automated|unit|integration|regression)\s+)*tests\b/i.exec(objective)
+  // Only Node's test runner has a summary parser here; other runtimes retain command proof.
+  const count = [...commands].some(command => /^node\s+.*--test\b/.test(command))
+    ? /\b(?:at least|minimum(?: of)?)\s+(\d+)\s+(?:(?:meaningful|automated|unit|integration|regression)\s+)*tests\b/i.exec(objective)
+    : null
   return { files: [...files], commands: [...commands], requiresRun: commands.size > 0 || /\b(?:run|execute|test|verify)\b/i.test(objective), minimumTests: count ? Number(count[1]) : 0 }
 }
 

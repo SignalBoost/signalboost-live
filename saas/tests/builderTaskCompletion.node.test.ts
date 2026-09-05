@@ -46,6 +46,7 @@ test('references are not deliverables and declared traversal is not accepted', (
   const contract = builderTaskContract('Create:\n- result.json\n- ../secret.txt\nCompare with old.csv.\nRun:\n`node check.js`')
   assert.deepEqual(contract.files, ['result.json'])
   assert.deepEqual(contract.commands, ['node check.js'])
+  assert.equal(builderTaskContract('Write at least 10 tests.\npython3 -m unittest').minimumTests, 0)
 })
 
 test('completion requires all files, all commands, and the requested number of passing tests', () => {

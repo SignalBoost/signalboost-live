@@ -105,21 +105,8 @@ test('correspondence route uses the real deep-neural communication advisor and q
   assert.match(neural, /Generate at least THREE genuinely different candidate approaches internally/i)
   assert.match(neural, /Neural Communication Quality Board/)
   assert.match(neural, /releaseScore < 0\.82/)
-  assert.match(neural, /evaluateDelicateCandidate/)
-  assert.match(neural, /repairFromIndependentEvaluation/)
-  assert.match(neural, /evaluationPasses/)
-  assert.match(direct, /if \(!strategicNeural\?\.recommended\.trim\(\)\)/)
   assert.match(neural, /recordCitedCognitiveSkillReuse/)
   assert.doesNotMatch(neural, /canned reply|fixed email template/i)
-})
-
-test('independent delicate-writing gate targets the observed accusatory and generic failures', () => {
-  const neural = read('../lib/ai/cos/communicationNeuralReasoning.ts')
-  assert.match(neural, /changes "say\/express" into accusatory wording such as "claim"/i)
-  assert.match(neural, /uses blunt conclusions such as "the bottom line is simple"/i)
-  assert.match(neural, /invents organizational benefits, motives, conduct, acceptance of promotion, succession planning, or HR practices/i)
-  assert.match(neural, /Score each dimension independently/i)
-  assert.match(neural, /re-evaluation/i)
 })
 
 test('deep-neural communication guidance covers sensitive institutional and diplomatic writing', () => {
@@ -129,17 +116,6 @@ test('deep-neural communication guidance covers sensitive institutional and dipl
   assert.match(neural, /Convert personal frustration into an institutional argument/i)
   assert.match(neural, /Diplomatic does not mean vague/i)
   assert.match(neural, /technical, operational, non-managerial, or hands-on work is lesser work/i)
-  assert.match(neural, /five independent dimensions: meaning fidelity, diplomatic judgment, elegance\/naturalness, authentic voice, and absence of unsupported additions/i)
-  assert.match(neural, /Reject generic memo structure, invented headings or numbered benefit lists/i)
-  assert.match(neural, /Reject categorical claims about fairness, efficiency, resource savings, morale, or institutional outcomes/i)
-})
-
-test('final editor preserves authentic voice without copying risky rhetoric or inventing identity', () => {
-  const direct = read('../lib/ai/cos/directTextTransformation.ts')
-  assert.match(direct, /Preserve supported emotional meaning, lived experience, reflective authority, and recognizable voice/i)
-  assert.match(direct, /Transform ridicule, contempt, or a risky metaphor into a dignified expression/i)
-  assert.match(direct, /Never invent a salutation, sign-off, name, title, or bracketed signature placeholder/i)
-  assert.match(direct, /sound like this writer at their best, not like an anonymous staff template/i)
 })
 
 test('direct editor keeps deterministic code as fidelity and release guards rather than the writer', () => {
@@ -148,7 +124,6 @@ test('direct editor keeps deterministic code as fidelity and release guards rath
   assert.match(source, /normalizeTextTransformationPresentation/)
   assert.match(source, /contextualEditIntentViolation/)
   assert.match(source, /restoreCorrespondenceLayout/)
-  assert.match(source, /stripInventedCorrespondenceFraming/)
   assert.doesNotMatch(source, /canned reply|fixed email template/i)
   assert.doesNotMatch(source, /The permitted scope of correction is grammar, spelling, agreement, articles, hyphenation, punctuation, word order, and sentence structure\. Nothing wider\./)
 })

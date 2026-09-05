@@ -30,26 +30,12 @@ export type CommunicationSensitivity = 'routine' | 'careful' | 'delicate'
 export type RegisterProfile = Readonly<{
   sensitivity: CommunicationSensitivity
   audience: string
-  objective?: string
-  relationship?: string
-  voiceCues?: readonly string[]
-  emotionalStakes?: readonly string[]
-  seniorityCues?: readonly string[]
-  rhetoricalElements?: readonly string[]
-  requiredTransformations?: readonly string[]
   risks: readonly string[]
 }>
 
 export const ROUTINE_REGISTER: RegisterProfile = Object.freeze({
   sensitivity: 'routine',
   audience: '',
-  objective: '',
-  relationship: '',
-  voiceCues: Object.freeze([]),
-  emotionalStakes: Object.freeze([]),
-  seniorityCues: Object.freeze([]),
-  rhetoricalElements: Object.freeze([]),
-  requiredTransformations: Object.freeze([]),
   risks: Object.freeze([]),
 })
 
@@ -61,19 +47,12 @@ function budgetMs(): number {
 }
 
 const CLASSIFIER_SYSTEM = [
-  'You create one integrated communication profile for a draft message. You do not edit it.',
-  'Return ONLY strict JSON: {"sensitivity":"routine|careful|delicate","audience":"<short phrase>","objective":"<short phrase>","relationship":"<short phrase>","voice_cues":["<short phrase>"],"emotional_stakes":["<short phrase>"],"seniority_cues":["<short phrase>"],"rhetorical_elements":["<short phrase>"],"required_transformations":["<short phrase>"],"risks":["<short phrase>"]}.',
+  'You classify the communicative situation of a draft message. You do not edit it.',
+  'Return ONLY strict JSON: {"sensitivity":"routine|careful|delicate","audience":"<short phrase>","risks":["<short phrase>", ...]}.',
   'sensitivity is delicate when the draft touches a contested question inside an organization, evaluates or characterizes colleagues, concerns careers, promotion, performance, conduct, grievances, or reputations, or would be read by people whose behaviour it describes.',
   'sensitivity is careful when the draft is professionally consequential but not contested — a request to someone senior, a refusal, an apology, a correction, bad news.',
   'sensitivity is routine for ordinary correspondence with no interpersonal or institutional exposure.',
   'audience names who will read it, in a few words, as the draft implies.',
-  'objective states what the writer wants the communication to accomplish, without inventing an outcome.',
-  'relationship states the implied relationship between writer and audience.',
-  'voice_cues identifies authentic qualities worth preserving, such as candor, reflection, warmth, urgency, conviction, or humility. Report only cues supported by the draft.',
-  'emotional_stakes identifies emotional meaning that contributes to the objective. Emotion is evidence about the voice, not an instruction to preserve every emotional phrase literally.',
-  'seniority_cues identifies supported perspective such as long service, leadership experience, institutional memory, or late-career reflection. Never infer rank or title.',
-  'rhetorical_elements identifies metaphors, humor, idioms, contrasts, or narrative framing. Identify whether each should be preserved, transformed, or removed to serve the objective safely.',
-  'required_transformations describes the smallest high-value changes needed to preserve the writer while improving the result. Prefer transforming risky rhetoric over either copying it literally or erasing its underlying point.',
   'risks names, in short phrases, what in THIS draft could damage the writer or a third party if published as written: dismissive characterizations of a group, criticism attributed to named people, a contested opinion stated as established fact, self-deprecation that undercuts the writer, wording that could be read as bitterness.',
   'Report only risks actually present. Return an empty array when there are none. Judge the draft in the language it is written in.',
 ].join('\n')
@@ -93,20 +72,13 @@ function parseProfile(raw: string): RegisterProfile | null {
   const value = parsed as Record<string, unknown>
   const sensitivity = String(value.sensitivity || '').toLowerCase() as CommunicationSensitivity
   if (!SENSITIVITIES.includes(sensitivity)) return null
-  const list = (field: string, max = 8) => Array.isArray(value[field])
-    ? (value[field] as unknown[]).map(item => String(item || '').trim()).filter(Boolean).slice(0, max)
+  const risks = Array.isArray(value.risks)
+    ? value.risks.map(risk => String(risk || '').trim()).filter(Boolean).slice(0, 8)
     : []
   return Object.freeze({
     sensitivity,
     audience: String(value.audience || '').trim().slice(0, 120),
-    objective: String(value.objective || '').trim().slice(0, 180),
-    relationship: String(value.relationship || '').trim().slice(0, 120),
-    voiceCues: Object.freeze(list('voice_cues')),
-    emotionalStakes: Object.freeze(list('emotional_stakes')),
-    seniorityCues: Object.freeze(list('seniority_cues')),
-    rhetoricalElements: Object.freeze(list('rhetorical_elements')),
-    requiredTransformations: Object.freeze(list('required_transformations')),
-    risks: Object.freeze(list('risks')),
+    risks: Object.freeze(risks),
   })
 }
 
@@ -142,8 +114,6 @@ export function registerGuidance(profile: RegisterProfile): string {
 
   const lines: string[] = [
     `COMMUNICATIVE SITUATION — ${profile.sensitivity.toUpperCase()}${profile.audience ? `, addressed to ${profile.audience}` : ''}.`,
-    profile.objective ? `WRITER'S OBJECTIVE: ${profile.objective}` : '',
-    profile.relationship ? `AUDIENCE RELATIONSHIP: ${profile.relationship}` : '',
     'WHERE THIS CONFLICTS WITH THE EXECUTIVE WRITING GUIDANCE ABOVE, THIS SECTION GOVERNS.',
     '- Concision is not the goal here. Qualification, acknowledgement of other views, and careful framing are the substance of a message like this, not filler to be removed. The finished text may be longer than the source.',
     '- Never sharpen the writer. If the source states something tentatively, as an impression, or as one person\'s view, it must stay that way. Do not convert an observation into an assertion, a wondering into a proposal, or a concern into a criticism.',
@@ -151,11 +121,6 @@ export function registerGuidance(profile: RegisterProfile): string {
     '- Where the source dismisses, mocks, or belittles a group of people, render the underlying point in neutral, respectful terms and drop the disparagement. Do not preserve it and do not replace it with a politer form of the same put-down.',
     '- Where the draft advances a contested position, present it as the writer\'s suggestion offered for consideration, acknowledge that reasonable colleagues hold the other view, and affirm the legitimacy of the people the position could be read as diminishing.',
     '- Preserve the writer\'s standing and good faith: keep hedges, courtesy, and any statement of their own limits. Do not make them sound aggrieved, superior, or certain beyond what they wrote.',
-    '- Preserve the writer\'s recognizable voice and emotional meaning when they advance the objective; do not preserve rough syntax or risky wording merely in the name of authenticity.',
-    '- Transform a risky metaphor, idiom, joke, or sharp contrast into a defensible equivalent that retains its underlying point. Preserve it literally only when it remains appropriate for the audience; remove it only when no safe equivalent serves the objective.',
-    '- Let supported experience and institutional perspective shape cadence and authority, but never invent rank, title, leadership status, or credentials.',
-    '- Do not impose memo headings, numbered policy-benefit lists, a salutation, a closing, or signature placeholders unless the source or instruction calls for them.',
-    '- Do not add claims that the proposal will improve fairness, efficiency, morale, resource use, or outcomes unless the source states or supports that rationale. Present plausible but unstated effects as possibilities, not facts.',
   ]
 
   if (profile.sensitivity === 'delicate') {
@@ -167,16 +132,5 @@ export function registerGuidance(profile: RegisterProfile): string {
     for (const risk of profile.risks) lines.push(`- ${risk}`)
   }
 
-  const addProfileItems = (heading: string, items: readonly string[]) => {
-    if (!items.length) return
-    lines.push(heading)
-    for (const item of items) lines.push(`- ${item}`)
-  }
-  addProfileItems('VOICE CUES TO PRESERVE IN SUBSTANCE:', profile.voiceCues || [])
-  addProfileItems('EMOTIONAL MEANING TO PRESERVE WHEN IT SERVES THE OBJECTIVE:', profile.emotionalStakes || [])
-  addProfileItems('SUPPORTED SENIORITY / EXPERIENCE CUES:', profile.seniorityCues || [])
-  addProfileItems('RHETORICAL ELEMENTS AND THEIR SAFE TREATMENT:', profile.rhetoricalElements || [])
-  addProfileItems('REQUIRED TRANSFORMATIONS:', profile.requiredTransformations || [])
-
-  return lines.filter(Boolean).join('\n')
+  return lines.join('\n')
 }

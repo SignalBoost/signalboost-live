@@ -22,7 +22,6 @@ import {
 import {
   CORRESPONDENCE_LAYOUT_RULES,
   restoreCorrespondenceLayout,
-  stripInventedCorrespondenceFraming,
 } from './correspondenceLayout.ts'
 import {
   classifyCommunicationRegister,
@@ -176,13 +175,6 @@ async function tryNeuralCommunicationTransformation(input: {
       '- Preserve all names, numbers, dates, commitments, uncertainty, and factual constraints supplied by the user or reference context.',
       input.styleBlock,
       'Then improve the actual writing to the requested depth. Do not collapse an edit, polish, or rewrite request into minimal proofreading.',
-      'VOICE AND DIPLOMACY RELEASE TEST:',
-      '- Preserve supported emotional meaning, lived experience, reflective authority, and recognizable voice when they strengthen the writer\'s purpose. Do not copy rough or risky wording merely to preserve voice.',
-      '- Do not replace personal, reflective correspondence with a generic policy memo. Avoid headings, numbered benefit lists, and formulaic labels unless the source or instruction requests them.',
-      '- Transform ridicule, contempt, or a risky metaphor into a dignified expression of the underlying point; do not erase the substantive concern and do not preserve the insult.',
-      '- Remove every unsupported claim introduced by the candidate. Do not state that a proposal improves fairness, efficiency, morale, or resource allocation unless the source supports it; qualify genuine inferences as possibilities.',
-      '- Never invent a salutation, sign-off, name, title, or bracketed signature placeholder.',
-      '- The final draft must sound like this writer at their best, not like an anonymous staff template.',
       BUSINESS_REGISTER_RULES,
       CORRESPONDENCE_LAYOUT_RULES,
       input.skillBlock,
@@ -267,7 +259,6 @@ export async function tryDirectTextTransformation(input: {
       registerBlock,
       transformationLanguageInstruction(input.language),
     ].filter(Boolean).join('\n\n'),
-    sensitivity: registerProfile.sensitivity,
     language: input.language,
   }).catch(() => null)
 
@@ -388,25 +379,20 @@ export async function tryDirectTextTransformation(input: {
   // a final independent neural copy-edit pass using the detected communication register. This is
   // where delicate workplace/institutional messages are checked for diplomacy without erasing the
   // writer's substantive position.
-  // The strategic path already has a quality board, threshold repair, and independent comparative
-  // evaluator. Running a fourth unconditional rewrite after those gates can degrade an accepted
-  // diplomatic draft. The legacy final copy-edit remains only for the fallback path.
-  if (!strategicNeural?.recommended.trim()) {
-    const refined = await refineProfessionalDraft({
-      instruction: request.instruction,
-      editableSource,
-      referenceContext,
-      candidate: finalAnswer,
-      anchorBlock,
-      styleBlock,
-      skillBlock,
-      registerBlock,
-      language: input.language,
-    })
-    if (refined) {
-      finalAnswer = refined.answer
-      finalConfidence = refined.confidence
-    }
+  const refined = await refineProfessionalDraft({
+    instruction: request.instruction,
+    editableSource,
+    referenceContext,
+    candidate: finalAnswer,
+    anchorBlock,
+    styleBlock,
+    skillBlock,
+    registerBlock,
+    language: input.language,
+  })
+  if (refined) {
+    finalAnswer = refined.answer
+    finalConfidence = refined.confidence
   }
 
   // Deterministic post-pass. Even a compliant neural writer can drift back to a different protected
@@ -466,12 +452,8 @@ export async function tryDirectTextTransformation(input: {
     }
   }
 
-  // A body-only source cannot acquire a fabricated Subject, recipient, or placeholder identity,
-  // even if every neural reviewer ignores that release rule. This narrow guard removes framing
-  // categories only when they were absent from the source; it never rewrites body prose.
-  finalAnswer = stripInventedCorrespondenceFraming(finalAnswer, rawEditableSource)
-
-  // Layout is part of the deliverable. This whitespace-only pass runs after semantic checks.
+  // Layout is part of the deliverable. This whitespace-only pass runs after semantic checks and
+  // therefore cannot become a hidden deterministic writer.
   finalAnswer = restoreCorrespondenceLayout(finalAnswer, rawEditableSource)
 
   return {

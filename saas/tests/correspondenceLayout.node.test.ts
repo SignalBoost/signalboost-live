@@ -5,6 +5,7 @@ import {
   CORRESPONDENCE_LAYOUT_RULES,
   looksLikeCorrespondence,
   restoreCorrespondenceLayout,
+  stripInventedCorrespondenceFraming,
 } from '../lib/ai/cos/correspondenceLayout.ts'
 
 // The exact production failure: a wording-correct edit returned as one run-on block.
@@ -66,6 +67,28 @@ test('a closing word inside the body is not moved — only a trailing one is', (
 test('empty and whitespace answers are passed through', () => {
   assert.equal(restoreCorrespondenceLayout('', PRODUCTION_SOURCE), '')
   assert.equal(restoreCorrespondenceLayout('   ', PRODUCTION_SOURCE), '   ')
+})
+
+test('body-only drafts cannot acquire invented subject recipient or signature placeholders', () => {
+  const source = 'I spent last night considering whether to reopen this discussion. I offer this suggestion for those who follow.'
+  const answer = `Subject: Reflections on Career Paths
+
+Dear [Recipient Name],
+
+I spent last night considering whether to reopen this discussion. I offer this suggestion for those who follow.
+
+Best regards,
+[Your Name]
+[Your Title]`
+  assert.equal(
+    stripInventedCorrespondenceFraming(answer, source),
+    'I spent last night considering whether to reopen this discussion. I offer this suggestion for those who follow.',
+  )
+})
+
+test('framing present in the source is preserved', () => {
+  const source = `Subject: Career Paths\n\nDear Colleagues,\n\nDraft body.\n\nRespectfully,\nLuis`
+  assert.equal(stripInventedCorrespondenceFraming(source, source), source)
 })
 
 test('looksLikeCorrespondence separates letters from prose', () => {

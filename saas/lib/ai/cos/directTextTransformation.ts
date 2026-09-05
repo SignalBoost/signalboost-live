@@ -22,6 +22,7 @@ import {
 import {
   CORRESPONDENCE_LAYOUT_RULES,
   restoreCorrespondenceLayout,
+  stripInventedCorrespondenceFraming,
 } from './correspondenceLayout.ts'
 import {
   classifyCommunicationRegister,
@@ -459,8 +460,12 @@ export async function tryDirectTextTransformation(input: {
     }
   }
 
-  // Layout is part of the deliverable. This whitespace-only pass runs after semantic checks and
-  // therefore cannot become a hidden deterministic writer.
+  // A body-only source cannot acquire a fabricated Subject, recipient, or placeholder identity,
+  // even if every neural reviewer ignores that release rule. This narrow guard removes framing
+  // categories only when they were absent from the source; it never rewrites body prose.
+  finalAnswer = stripInventedCorrespondenceFraming(finalAnswer, rawEditableSource)
+
+  // Layout is part of the deliverable. This whitespace-only pass runs after semantic checks.
   finalAnswer = restoreCorrespondenceLayout(finalAnswer, rawEditableSource)
 
   return {

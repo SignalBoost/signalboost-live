@@ -7,6 +7,7 @@ import { registerGuidance, ROUTINE_REGISTER, type RegisterProfile } from '../lib
 
 const EDITOR = readFileSync(join(process.cwd(), 'lib/ai/cos/directTextTransformation.ts'), 'utf8')
 const MODULE = readFileSync(join(process.cwd(), 'lib/ai/cos/communicationRegister.ts'), 'utf8')
+const NEURAL = readFileSync(join(process.cwd(), 'lib/ai/cos/communicationNeuralReasoning.ts'), 'utf8')
 
 const DELICATE: RegisterProfile = {
   sensitivity: 'delicate',
@@ -98,11 +99,10 @@ test('classification is semantic — no vocabulary list decides sensitivity', ()
   assert.match(MODULE, /rhetorical_elements/)
 })
 
-test('the register block is emitted after the executive block so it wins on conflict', () => {
-  const promptRegion = EDITOR.slice(EDITOR.indexOf('CORRESPONDENCE_LAYOUT_RULES'))
-  assert.ok(promptRegion.indexOf('registerBlock') > -1)
-  assert.match(EDITOR, /executiveCommunicationBlock/)
-  assert.ok(EDITOR.indexOf('executiveCommunicationBlock') < EDITOR.indexOf('registerBlock,'))
+test('task-specific register guidance follows the executive block in every neural writing pass', () => {
+  const occurrences = [...NEURAL.matchAll(/executiveCommunicationBlock\(input\.language\),\s*\n\s*(?:\/\/[\s\S]*?\n\s*)?input\.editorialGuidance,/g)]
+  assert.equal(occurrences.length, 3)
+  assert.doesNotMatch(NEURAL, /input\.editorialGuidance,\s*\n\s*(?:skillBlock\(input\.skills\),\s*\n\s*)?executiveCommunicationBlock\(input\.language\),/)
 })
 
 test('register and skill lookups run concurrently, not in series', () => {

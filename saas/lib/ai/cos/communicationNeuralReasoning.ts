@@ -188,9 +188,12 @@ async function generateDraftSet(input: {
       '- Normalize presentation-only URL escaping such as www\\.example.com to www.example.com without changing the destination.',
       '- Return complete ready-to-send drafts, not commentary about how to write them.',
       input.semanticAnchors,
-      input.editorialGuidance,
       skillBlock(input.skills),
       executiveCommunicationBlock(input.language),
+      // Task-specific register/voice guidance must be last. The generic executive module values
+      // compression and directness; for delicate correspondence those defaults must not erase
+      // qualification, emotional context, or diplomacy.
+      input.editorialGuidance,
     ].filter(Boolean).join('\n\n'),
     prompt: [
       `USER INSTRUCTION:\n${cleanText(input.instruction, 1_500)}`,
@@ -237,9 +240,9 @@ async function neuralQualityReview(input: {
       'Set release_score below 0.82 unless you would confidently send the recommended draft to the stated recipient without further rewriting.',
       INSTITUTIONAL_DIPLOMATIC_GUIDANCE,
       input.semanticAnchors,
-      input.editorialGuidance,
       skillBlock(input.skills),
       executiveCommunicationBlock(input.language),
+      input.editorialGuidance,
     ].filter(Boolean).join('\n\n'),
     prompt: [
       `USER INSTRUCTION:\n${cleanText(input.instruction, 1_500)}`,
@@ -279,8 +282,8 @@ async function neuralLastRepair(input: {
       'Normalize Markdown-escaped URL dots without changing the destination.',
       INSTITUTIONAL_DIPLOMATIC_GUIDANCE,
       input.semanticAnchors,
-      input.editorialGuidance,
       executiveCommunicationBlock(input.language),
+      input.editorialGuidance,
     ].filter(Boolean).join('\n\n'),
     prompt: [
       `USER INSTRUCTION:\n${cleanText(input.instruction, 1_500)}`,

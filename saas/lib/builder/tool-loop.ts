@@ -69,12 +69,16 @@ async function within<T>(work: Promise<T>, timeoutMs?: number): Promise<T> {
 
 async function generateWithRetry(ai: BuilderAiPort, input: Parameters<BuilderAiPort['generate']>[0], timeoutMs?: number): Promise<string | null> {
   let lastError: unknown
+  let request = input
   for (let modelAttempt = 1; modelAttempt <= MAX_MODEL_ROUND_ATTEMPTS; modelAttempt += 1) {
     try {
-      return await within(ai.generate(input), timeoutMs)
+      return await within(ai.generate(request), timeoutMs)
     } catch (error) {
       lastError = error
-      if (!(error instanceof Error && error.message === 'builder_model_round_timeout') || modelAttempt === MAX_MODEL_ROUND_ATTEMPTS) throw error
+      if (modelAttempt === MAX_MODEL_ROUND_ATTEMPTS) throw error
+      if (error instanceof Error && error.message === 'builder_model_output_limit') {
+        request = { ...request, maxTokens: Math.min(8_192, request.maxTokens * 2) }
+      } else if (!(error instanceof Error && error.message === 'builder_model_round_timeout')) throw error
     }
   }
   throw lastError instanceof Error ? lastError : new Error('builder_model_call_failed')
@@ -236,7 +240,7 @@ function modelControlFailure(value: string | null): ModelControlFailure {
     anyValidJson,
   })
   if (!trimmed) return { error: 'builder_model_control_empty_response', remediation: 'The reasoner returned no control content. Inspect local inference telemetry for HTTP status, timeout, or an empty provider message before retrying.', telemetry }
-  if (hasUnclosedObject) return { error: 'builder_model_control_truncated', remediation: 'The reasoner response ended before a complete JSON control object. Inspect the control-token budget and reasoning-output settings before retrying.', telemetry }
+  if (hasUnclosedObject && !trimmed.endsWith('}')) return { error: 'builder_model_control_truncated', remediation: 'The response contains incomplete JSON. Check the recorded provider finish reason before attributing this to the token limit.', telemetry }
   if (hasThinkOpen && !hasThinkClose) return { error: 'builder_model_control_reasoning_truncated', remediation: 'The reasoner stopped inside a reasoning envelope before emitting a control object. Inspect the control-token budget and reasoning-output settings before retrying.', telemetry }
   if (hasThinkOpen) return { error: 'builder_model_control_reasoning_only', remediation: 'The reasoner emitted a reasoning envelope but no usable JSON control object. Configure the model to emit its final control message separately, then retry.', telemetry }
   if (anyValidJson) return { error: 'builder_model_control_schema_mismatch', remediation: 'The reasoner emitted valid JSON that is not a control object the Builder accepts (unrecognized tool, missing input, or a non-control shape). Align the control-schema instruction or the accepted schema, then retry.', telemetry }
@@ -434,7 +438,7 @@ export class BuilderToolLoop {
           if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_task_incomplete', trace }
           continue
         }
-        repairObjective ||= isRepairObjective(action.answer)
+        repairObjective ||= isRepairObjective(`${input.objective}\n${action.answer}`)
         const verdict = evaluateRegressionGate(input.objective, trace, repairObjective)
         if (verdict.satisfied && progress.satisfied) return { ok: true, answer: action.answer, trace }
         if (repairObjective) {

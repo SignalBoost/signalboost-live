@@ -34,9 +34,14 @@ export type AutoMergeRefusalReason =
   | 'snapshot_capture_failed'
   | 'snapshot_not_restorable'
 
-export type AutoMergeEligibility =
-  | Readonly<{ eligible: true }>
-  | Readonly<{ eligible: false; reason: AutoMergeRefusalReason; dangerCategory?: RepositoryChangeDangerCategory; detail: string }>
+// Flat result shape, not a discriminated union: this repository builds with
+// tsconfig strict:false, where unions do not narrow on a literal discriminant.
+export type AutoMergeEligibility = Readonly<{
+  eligible: boolean
+  reason: AutoMergeRefusalReason | null
+  dangerCategory: RepositoryChangeDangerCategory | null
+  detail: string | null
+}>
 
 /**
  * The danger check alone, exposed separately so a caller can explain a PR-only outcome
@@ -48,9 +53,9 @@ export function evaluateAutoMergeDangerCategory(
 ): AutoMergeEligibility {
   const category = repositoryChangeDangerCategory(files, patch)
   if (category) {
-    return { eligible: false, reason: 'danger_category', dangerCategory: category, detail: repositoryChangeDangerReason(category) }
+    return Object.freeze({ eligible: false, reason: 'danger_category', dangerCategory: category, detail: repositoryChangeDangerReason(category) })
   }
-  return { eligible: true }
+  return Object.freeze({ eligible: true, reason: null, dangerCategory: null, detail: null })
 }
 
 export type AutoMergeResult = Readonly<{
@@ -94,7 +99,7 @@ export async function attemptSignalBoostRepositoryAutoMerge(input: {
 }): Promise<AutoMergeResult> {
   const dangerCheck = evaluateAutoMergeDangerCategory(input.files, input.patch)
   if (!dangerCheck.eligible) {
-    return refusal(dangerCheck.reason, dangerCheck.detail, dangerCheck.dangerCategory ?? null)
+    return refusal(dangerCheck.reason, dangerCheck.detail || '', dangerCheck.dangerCategory)
   }
 
   if (!input.snapshotPort) {

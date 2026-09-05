@@ -135,6 +135,7 @@ test('direct editor keeps deterministic code as fidelity and release guards rath
   assert.match(source, /normalizeTextTransformationPresentation/)
   assert.match(source, /contextualEditIntentViolation/)
   assert.match(source, /restoreCorrespondenceLayout/)
+  assert.match(source, /stripInventedCorrespondenceFraming/)
   assert.doesNotMatch(source, /canned reply|fixed email template/i)
   assert.doesNotMatch(source, /The permitted scope of correction is grammar, spelling, agreement, articles, hyphenation, punctuation, word order, and sentence structure\. Nothing wider\./)
 })

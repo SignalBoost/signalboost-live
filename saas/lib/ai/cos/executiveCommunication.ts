@@ -1,3 +1,4 @@
+// REPO PATH: saas/lib/ai/cos/executiveCommunication.ts
 export type SupportedExecutiveLocale = 'en' | 'pt' | 'es' | 'pl' | 'ru'
 
 const LOCALE_ALIASES: Record<string, SupportedExecutiveLocale> = {
@@ -17,8 +18,8 @@ export function executiveLocale(language?: string): SupportedExecutiveLocale {
 const EXECUTIVE_WRITING_MODULES: Record<SupportedExecutiveLocale, string> = {
   en: [
     'ENGLISH EXECUTIVE COMMUNICATION:',
-    '- Write in natural professional English with leadership presence: concise, confident, respectful, and outcome-oriented.',
-    '- Prefer active voice, direct statements, precise verbs, and economical wording. Remove filler, repetition, slang, and awkward literal phrasing.',
+    '- Write as a well-educated adult professional: specific, fluent, confident, and economical. Not a school essay and not ceremonial leadership copy.',
+    '- Prefer active voice, concrete nouns, precise verbs, and varied sentence length. Remove filler, repetition, and awkward literal phrasing. Do not replace concrete source images with abstract category words.',
     '- For correspondence, infer opening and closing from the source. Do not add a purpose-led greeting or executive close the writer did not use. Organize the body only as far as the argument requires.',
     '- Elevate rough or non-native input into polished leadership communication without changing the user’s intended meaning, facts, commitments, or certainty.',
   ].join('\n'),

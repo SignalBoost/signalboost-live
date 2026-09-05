@@ -52,11 +52,13 @@ const FIRST_PERSON_DRAFT_RE = /(?<![\p{L}\p{N}_])(?:i|i['’]m|i['’]ve|i['’]
 const META_ANALYSIS_INTENT_RE = /(?:^\s*(?:what\s+do\s+you\s+think|do\s+you\s+think|what\s+does\s+this\s+mean|analy[sz]e|interpret|explain|assess|evaluate|review\s+this\s+(?:email|message|thread|chain|response)|can\s+you\s+(?:explain|analy[sz]e|interpret|tell\s+me)|could\s+you\s+(?:explain|analy[sz]e|interpret|tell\s+me)|please\s+(?:explain|analy[sz]e|interpret)|should\s+i\s+send\b|is\s+this\s+(?:good|appropriate|professional)\b)|\b(?:do\s+not|don't)\s+(?:rewrite|edit|polish|rephrase)\b|\brather\s+than\s+(?:rewrit(?:e|ing)|edit(?:ing)?|polish(?:ing)?)\b)/iu
 
 const IMPLICIT_DRAFT_EDIT_INSTRUCTION = [
-  'Edit this pasted draft for grammar, spelling, clarity, flow, and professional tone.',
-  'Preserve the sender perspective, intended meaning, names, dates, times, roles, requests, commitments, and uncertainty.',
+  'Edit this pasted draft for grammar, spelling, clarity, and flow.',
+  'Reason about the sender objective and audience, then write. Do not apply a memo template.',
+  'Preserve the sender voice, perspective, intended meaning, names, dates, times, roles, requests, commitments, idioms, and uncertainty.',
+  'Do not impose a stock greeting or generic professional tone the source did not use.',
   'Do not answer the draft as though you are its recipient.',
   'Do not claim that you noted, scheduled, informed, contacted, notified, arranged, ensured, or will perform any real-world action.',
-  'Do not add outside facts or commitments. Return only the polished draft.',
+  'Do not add outside facts or commitments. Return only the edited draft.',
 ].join(' ')
 
 const AMBIGUOUS_ARTIFACT_CLARIFICATION = 'What would you like me to do with this text—edit, rewrite, shorten, translate, summarize, or something else?'

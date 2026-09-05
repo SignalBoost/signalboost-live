@@ -267,6 +267,7 @@ export async function tryDirectTextTransformation(input: {
       registerBlock,
       transformationLanguageInstruction(input.language),
     ].filter(Boolean).join('\n\n'),
+    sensitivity: registerProfile.sensitivity,
     language: input.language,
   }).catch(() => null)
 
@@ -387,20 +388,25 @@ export async function tryDirectTextTransformation(input: {
   // a final independent neural copy-edit pass using the detected communication register. This is
   // where delicate workplace/institutional messages are checked for diplomacy without erasing the
   // writer's substantive position.
-  const refined = await refineProfessionalDraft({
-    instruction: request.instruction,
-    editableSource,
-    referenceContext,
-    candidate: finalAnswer,
-    anchorBlock,
-    styleBlock,
-    skillBlock,
-    registerBlock,
-    language: input.language,
-  })
-  if (refined) {
-    finalAnswer = refined.answer
-    finalConfidence = refined.confidence
+  // The strategic path already has a quality board, threshold repair, and independent comparative
+  // evaluator. Running a fourth unconditional rewrite after those gates can degrade an accepted
+  // diplomatic draft. The legacy final copy-edit remains only for the fallback path.
+  if (!strategicNeural?.recommended.trim()) {
+    const refined = await refineProfessionalDraft({
+      instruction: request.instruction,
+      editableSource,
+      referenceContext,
+      candidate: finalAnswer,
+      anchorBlock,
+      styleBlock,
+      skillBlock,
+      registerBlock,
+      language: input.language,
+    })
+    if (refined) {
+      finalAnswer = refined.answer
+      finalConfidence = refined.confidence
+    }
   }
 
   // Deterministic post-pass. Even a compliant neural writer can drift back to a different protected

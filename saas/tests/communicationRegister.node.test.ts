@@ -99,9 +99,9 @@ test('classification is semantic — no vocabulary list decides sensitivity', ()
   assert.match(MODULE, /rhetorical_elements/)
 })
 
-test('task-specific register guidance follows the executive block in every neural writing pass', () => {
+test('task-specific register guidance follows the executive block in every neural writing and repair pass', () => {
   const occurrences = [...NEURAL.matchAll(/executiveCommunicationBlock\(input\.language\),\s*\n\s*(?:\/\/[\s\S]*?\n\s*)?input\.editorialGuidance,/g)]
-  assert.equal(occurrences.length, 3)
+  assert.equal(occurrences.length, 4)
   assert.doesNotMatch(NEURAL, /input\.editorialGuidance,\s*\n\s*(?:skillBlock\(input\.skills\),\s*\n\s*)?executiveCommunicationBlock\(input\.language\),/)
 })
 

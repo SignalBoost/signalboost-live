@@ -1,3 +1,4 @@
+// REPO PATH: saas/tests/cosTextTransformationQuality.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -38,6 +39,7 @@ test('edit mode explicitly requires material improvement rather than grammar-onl
   assert.match(block, /rewrite awkward, literal, fragmented, repetitive, or non-native wording/i)
   assert.match(block, /mirrors the source sentence-by-sentence with corrected grammar is insufficient/i)
   assert.match(block, /reorganize sentences and paragraphs/i)
+  assert.match(block, /Do not add a greeting or closing the source omitted/i)
 })
 
 test('proofread mode remains conservative so factual-fidelity protection is not lost', () => {
@@ -113,9 +115,16 @@ test('deep-neural communication guidance covers sensitive institutional and dipl
   const neural = read('../lib/ai/cos/communicationNeuralReasoning.ts')
   assert.match(neural, /INSTITUTIONAL \/ DIPLOMATIC CORRESPONDENCE/i)
   assert.match(neural, /Distinguish observation from inference/i)
-  assert.match(neural, /Convert personal frustration into an institutional argument/i)
+  assert.match(neural, /THIS IS A METHOD, NOT A TEMPLATE/i)
+  assert.match(neural, /Do not apply a memo template, stock greeting, or fixed paragraph order/i)
+  assert.match(neural, /Never invent a salutation/i)
+  assert.match(neural, /Preserve the writer's voice/i)
   assert.match(neural, /Diplomatic does not mean vague/i)
   assert.match(neural, /technical, operational, non-managerial, or hands-on work is lesser work/i)
+  assert.doesNotMatch(neural, /context -> observed tension -> concrete proposal/i)
+  assert.match(neural, /ADULT PROSE — EDUCATED HUMAN, NOT SCHOOL ESSAY/i)
+  assert.match(neural, /five-paragraph essay/i)
+  assert.match(neural, /high-school essay/i)
 })
 
 test('direct editor keeps deterministic code as fidelity and release guards rather than the writer', () => {

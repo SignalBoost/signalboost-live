@@ -1,6 +1,18 @@
 // saas/lib/ai/local-inference.ts
 
-export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number; jsonObject?: boolean }
+export interface LocalModelCallArgs {
+  prompt: string
+  systemPrompt?: string
+  maxTokens?: number
+  temperature?: number
+  /**
+   * Repetition penalties are prose defaults. Code generation must be able to override them:
+   * indentation, braces, `const`, and repeated identifiers are required tokens in source, and
+   * penalising them steers the sampler away from valid code as a file grows.
+   */
+  frequencyPenalty?: number
+  presencePenalty?: number
+}
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
 
 export interface LocalInferenceTelemetry {
@@ -12,8 +24,10 @@ export interface LocalInferenceTelemetry {
   success: boolean
   httpStatus: number | null
   error: string | null
-  finishReason?: string | null
-  outputTokens?: number | null
+  /** Provider stop reason. 'length' means the answer was cut off by max_tokens, not finished. */
+  finishReason: string | null
+  requestedMaxTokens: number
+  completionTokens: number | null
 }
 
 function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
@@ -63,7 +77,8 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   let httpStatus: number | null = null
   let errorText: string | null = null
   let finishReason: string | null = null
-  let outputTokens: number | null = null
+  let completionTokens: number | null = null
+  const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
   try {
@@ -73,16 +88,19 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       const n = Number(value)
       return Number.isFinite(n) ? Math.max(0, Math.min(2, n)) : fallback
     }
-    const frequencyPenalty = parsePenalty(process.env.COS_REASONER_FREQUENCY_PENALTY, 0.4)
-    const presencePenalty = parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
+    const frequencyPenalty = typeof args.frequencyPenalty === 'number' && Number.isFinite(args.frequencyPenalty)
+      ? Math.max(0, Math.min(2, args.frequencyPenalty))
+      : parsePenalty(process.env.COS_REASONER_FREQUENCY_PENALTY, 0.4)
+    const presencePenalty = typeof args.presencePenalty === 'number' && Number.isFinite(args.presencePenalty)
+      ? Math.max(0, Math.min(2, args.presencePenalty))
+      : parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
       signal: controller.signal,
       body: JSON.stringify({
         model: config.model,
-        max_tokens: args.maxTokens ?? 2048,
-        ...(args.jsonObject ? { response_format: { type: 'json_object' } } : {}),
+        max_tokens: requestedMaxTokens,
         temperature: args.temperature ?? 0.2,
         frequency_penalty: frequencyPenalty,
         presence_penalty: presencePenalty,
@@ -99,17 +117,30 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       console.error('localInference: HTTP error', response.status, errorText)
       return null
     }
-    const data = await response.json() as { choices?: Array<{ finish_reason?: string; message?: { content?: string } }>; usage?: { completion_tokens?: number } }
-    finishReason = data.choices?.[0]?.finish_reason ?? null
-    outputTokens = data.usage?.completion_tokens ?? null
-    if (args.jsonObject && finishReason === 'length') throw new Error('builder_model_output_limit')
+    const data = await response.json() as {
+      choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
+      usage?: { completion_tokens?: number }
+    }
+    const rawFinishReason = data.choices?.[0]?.finish_reason
+    finishReason = typeof rawFinishReason === 'string' ? rawFinishReason : null
+    completionTokens = typeof data.usage?.completion_tokens === 'number' ? data.usage.completion_tokens : null
     const text = data.choices?.[0]?.message?.content
+    // A provider that stops on max_tokens returns HTTP 200 with a half-finished answer. Without this
+    // line a truncated result is indistinguishable from a model that chose to stop early.
+    if (finishReason && finishReason !== 'stop') {
+      console.warn('[cos-local-inference-incomplete]', {
+        model: config.model,
+        finishReason,
+        requestedMaxTokens,
+        completionTokens,
+        contentLength: typeof text === 'string' ? text.length : 0,
+      })
+    }
     if (typeof text !== 'string' || text.length === 0) errorText = 'Local inference returned an empty response'
     return typeof text === 'string' && text.length > 0 ? text : null
   } catch (error) {
     errorText = error instanceof Error ? error.message : String(error)
     console.error('localInference: request failed', error)
-    if (args.jsonObject && errorText === 'builder_model_output_limit') throw error
     return null
   } finally {
     clearTimeout(timeout)
@@ -125,7 +156,8 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       httpStatus,
       error: errorText,
       finishReason,
-      outputTokens,
+      requestedMaxTokens,
+      completionTokens,
     })
   }
 }

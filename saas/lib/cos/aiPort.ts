@@ -53,6 +53,9 @@ export function createBuilderCodingAiPort(): CosAiPort {
         // calls generate unpenalised.
         frequencyPenalty: 0,
         presencePenalty: 0,
+        // The control object must be JSON. Provider-enforced JSON mode removes the class of
+        // failures where source quoting or escaping breaks the surrounding envelope.
+        jsonObject: true,
       }, {
         ...config,
         model: builderCodingModelFromEnv(),

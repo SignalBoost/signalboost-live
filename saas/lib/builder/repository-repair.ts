@@ -8,8 +8,10 @@ import { verifiedRepairLesson } from './verified-lessons.ts'
 import { inferBuilderCertificationAttempt } from './certification.ts'
 import { parseSignalBoostRepositoryRepairTarget, resolveSignalBoostRepositoryCommit, signalBoostRepositoryRepairObjective, type SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { publishSignalBoostRepositoryRepair } from './repository-repair-writeback.ts'
+import { attemptSignalBoostRepositoryAutoMerge, type AutoMergeResult } from './repository-repair-automerge.ts'
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
 import type { BuilderRunnerPort, BuilderToolTrace } from './contracts.ts'
+import type { StateSnapshotPort } from '@/lib/portable/state-snapshot-port'
 
 export type SignalBoostRepositoryRepairExecution = Readonly<{
   status: number
@@ -17,6 +19,12 @@ export type SignalBoostRepositoryRepairExecution = Readonly<{
 }>
 
 const DEFAULT_REPOSITORY_REQUEST_BUDGET_MS = 250_000
+
+// Auto-merge is OFF unless the environment says otherwise, explicitly and exactly.
+// Any other value — unset, empty, '1', 'yes' — leaves the lane PR-only.
+function autoMergeEnabled(): boolean {
+  return String(process.env.BUILDER_AUTO_MERGE_ENABLED || '').trim().toLowerCase() === 'true'
+}
 const REPOSITORY_RESULT_RESERVE_MS = 45_000
 
 function publicTrace(trace: readonly BuilderToolTrace[]) {
@@ -86,6 +94,11 @@ export async function executeSignalBoostRepositoryRepair(input: {
   workspaceId: string
   deadlineAtMs?: number
   target?: SignalBoostRepositoryRepairTarget
+  /**
+   * Injected checkpoint port for auto-merge. Absent means no checkpoint, which
+   * attemptSignalBoostRepositoryAutoMerge refuses on — the lane stays PR-only.
+   */
+  snapshotPort?: StateSnapshotPort | null
 }): Promise<SignalBoostRepositoryRepairExecution | null> {
   const parsed = input.target ?? parseSignalBoostRepositoryRepairTarget(input.rawObjective)
   if (!parsed) return null
@@ -204,6 +217,27 @@ export async function executeSignalBoostRepositoryRepair(input: {
       files: changes.files,
       patch: changes.patch,
     })
+    // Auto-merge is attempted ONLY on a real published PR, only behind the env flag, and it
+    // refuses itself on a danger category or a missing/unrestorable checkpoint. A refusal here
+    // changes nothing: the PR stays open for human review, exactly as before.
+    let autoMerge: AutoMergeResult | null = null
+    if (autoMergeEnabled() && writeback.stage === 'pr_created' && writeback.pullRequestNumber) {
+      autoMerge = await attemptSignalBoostRepositoryAutoMerge({
+        files: changes.files,
+        patch: changes.patch,
+        pullRequestNumber: writeback.pullRequestNumber,
+        snapshotPort: input.snapshotPort ?? null,
+      }).catch(error => {
+        console.error('[builder_repository_automerge_failed]', { message: error instanceof Error ? error.message : 'unknown' })
+        return null
+      })
+    }
+    const autoMergeReply = !autoMerge
+      ? ''
+      : autoMerge.merged
+        ? ` It was then auto-merged as ${autoMerge.mergeCommitSha}, with deployment ${autoMerge.preMergeSnapshotId} captured beforehand as the rollback target. Post-merge deployment health is not watched automatically.`
+        : ` Auto-merge was attempted and refused (${autoMerge.reason}): ${autoMerge.detail} The pull request remains open for review.`
+
     const writebackReply = writeback.stage === 'pr_created' && writeback.pullRequestNumber
       ? `A governed review branch ${writeback.branch} and PR #${writeback.pullRequestNumber} were created from pinned commit ${target.fullCommitSha}. The agent did not merge or deploy it.`
       : writeback.repositoryWriteTaken
@@ -215,7 +249,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
       payload: {
         source: 'cos-platform-engineer',
         workspaceId: input.workspaceId,
-        reply: `${result.answer}\n\n${writebackReply}`,
+        reply: `${result.answer}\n\n${writebackReply}${autoMergeReply}`,
         files,
         trace: publicTrace(result.trace),
         execution_allowed: true,
@@ -223,7 +257,11 @@ export async function executeSignalBoostRepositoryRepair(input: {
         repository_write_taken: writeback.repositoryWriteTaken,
         repository_write_stage: writeback.stage,
         repository_write_error: writeback.error,
-        merge_allowed: false,
+        merge_allowed: autoMergeEnabled(),
+        merge_taken: Boolean(autoMerge?.merged),
+        merge_refused_reason: autoMerge && !autoMerge.merged ? autoMerge.reason : null,
+        merge_commit_sha: autoMerge?.mergeCommitSha ?? null,
+        pre_merge_snapshot_id: autoMerge?.preMergeSnapshotId ?? null,
         deployment_allowed: false,
         base_commit_sha: target.fullCommitSha,
         branch: target.branch,

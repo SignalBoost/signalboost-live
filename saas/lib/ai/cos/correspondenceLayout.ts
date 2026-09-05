@@ -45,25 +45,9 @@ const RUN_ON_CLOSING_RE =
 const LOOKS_LIKE_CORRESPONDENCE_RE =
   /^[ \t]*(?:hi|hello|hey|dear|good morning|good afternoon|good evening|hola|buenos d[ií]as|buenas tardes|buenas noches|estimad[oa]s?|ol[aá]|bom dia|boa tarde|boa noite|prezad[oa]s?|car[oa]|cze[sś][cć]|dzie[nń] dobry|witam|szanown[ya]|здравствуйте|привет|добрый день|добрый вечер|уважаем(?:ый|ая|ые))(?![\p{L}\p{N}_])/iu
 
-const SUBJECT_LINE_RE = /^\s*(?:subject|asunto|assunto|temat|тема)\s*:[^\n]*(?:\n[ \t]*)*/iu
-const OPENING_LINE_RE = /^\s*(?:hi|hello|hey|dear|good morning|good afternoon|good evening|hola|buenos d[ií]as|buenas tardes|buenas noches|estimad[oa]s?|ol[aá]|bom dia|boa tarde|boa noite|prezad[oa]s?|car[oa]|cze[sś][cć]|dzie[nń] dobry|witam|szanown[ya]|здравствуйте|привет|добрый день|добрый вечер|уважаем(?:ый|ая|ые))[^\n]{0,100}[,:!]\s*(?:\n[ \t]*)*/iu
-const CLOSING_WITH_PLACEHOLDER_RE = /(?:\n[ \t]*){1,2}(?:best regards|kind regards|warm regards|regards|sincerely|respectfully|saludos|atentamente|atenciosamente|pozdrawiam|z powa[zż]aniem|с уважением)[,.]?[ \t]*\n[ \t]*(?:\[[^\]\n]{1,80}\]|<[^>\n]{1,80}>)(?:[ \t]*\n[ \t]*(?:\[[^\]\n]{1,80}\]|<[^>\n]{1,80}>))*[ \t]*$/iu
-
 /** True when the supplied text opens like a letter or email addressed to a person. */
 export function looksLikeCorrespondence(text: string): boolean {
   return LOOKS_LIKE_CORRESPONDENCE_RE.test(String(text || '').trim())
-}
-
-/** Remove only conventional correspondence framing whose category was absent from the source. */
-export function stripInventedCorrespondenceFraming(answer: string, originalSource: string): string {
-  let out = String(answer || '').replace(/\r\n?/g, '\n').trim()
-  const source = String(originalSource || '').replace(/\r\n?/g, '\n').trim()
-  if (!out) return out
-
-  if (!SUBJECT_LINE_RE.test(source)) out = out.replace(SUBJECT_LINE_RE, '')
-  if (!looksLikeCorrespondence(source)) out = out.replace(OPENING_LINE_RE, '')
-  if (!CLOSING_WITH_PLACEHOLDER_RE.test(source)) out = out.replace(CLOSING_WITH_PLACEHOLDER_RE, '')
-  return out.trim()
 }
 
 /**

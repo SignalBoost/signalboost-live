@@ -6,6 +6,7 @@ import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, type BuilderJobRecord } from './job-store.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { isRepairObjective } from './regression-gate.ts'
+import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
@@ -230,7 +231,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     const baseReply = isRepairObjective(job.objective)
       ? formatBuilderOperatorRepairReply({ ok: true, answer: result.answer, trace })
       : result.answer
-    const reply = historyReply(baseReply, job.workspaceId, files)
+    const reply = historyReply(`${baseReply}\n\n${formatBuilderExecutionEvidence(trace)}`, job.workspaceId, files)
     await finishBuilderJob({
       jobId: job.id,
       userId: job.userId,

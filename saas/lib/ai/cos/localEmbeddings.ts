@@ -173,22 +173,37 @@ function parseEmbeddingWindow(body: string): { passed: number | null; limit: num
 }
 
 function shrinkEmbeddingInput(text: string, body: string): string {
-  const { passed, limit } = parseEmbeddingWindow(body)
-  let ratio = 0.75
-  if (passed && limit && passed > limit) {
-    // Leave a small token margin so tokenizer-boundary differences do not produce a 512/513 loop.
-    ratio = Math.max(0.2, Math.min(0.95, (Math.max(1, limit - 8)) / passed))
-  }
-  let targetChars = Math.max(96, Math.floor(text.length * ratio))
-  if (targetChars >= text.length) targetChars = Math.max(1, text.length - 16)
-  if (targetChars >= text.length) return text
+  const { limit } = parseEmbeddingWindow(body)
+  // Providers may stop counting at limit + 1: "513" is not necessarily the full
+  // token count. A proportional 512/513 estimate can exhaust every retry. Use a
+  // conservative UTF-8 byte budget on overflow, reserving space for special tokens.
+  // This is a fallback bound, not a claim to reproduce the configured tokenizer.
+  const currentBytes = Buffer.byteLength(text, 'utf8')
+  const targetBytes = Math.max(0, Math.min(
+    Math.floor(currentBytes * 0.75),
+    limit && limit > 0 ? Math.max(1, limit - 8) : currentBytes - 1,
+  ))
+  if (targetBytes === 0) return text
 
+  const points = Array.from(text)
+  const takeBytes = (characters: string[], budget: number): string[] => {
+    const result: string[] = []
+    let used = 0
+    for (const character of characters) {
+      const size = Buffer.byteLength(character, 'utf8')
+      if (used + size > budget) break
+      result.push(character)
+      used += size
+    }
+    return result
+  }
   const marker = '\n…\n'
-  if (targetChars <= marker.length + 16) return text.slice(0, targetChars)
-  const available = targetChars - marker.length
-  const headChars = Math.max(8, Math.floor(available * 0.6))
-  const tailChars = Math.max(8, available - headChars)
-  return `${text.slice(0, headChars)}${marker}${text.slice(-tailChars)}`
+  const available = targetBytes - Buffer.byteLength(marker, 'utf8')
+  if (available < 16) return takeBytes(points, targetBytes).join('') || text
+  const headBudget = Math.floor(available * 0.6)
+  const head = takeBytes(points, headBudget).join('')
+  const tail = takeBytes(points.reverse(), available - headBudget).reverse().join('')
+  return `${head}${marker}${tail}`
 }
 
 /**

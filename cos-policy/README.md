@@ -40,6 +40,8 @@ Tests should enforce the architecture rather than memorize a gold paragraph:
 
 Do not grow a template farm. If a new question exposes a weakness, fix the evidence, inference instructions, or control boundary so the improvement generalizes.
 
+The same rule applies to correspondence. COS edits by reasoning about objective, audience, invariants, and register. It must not pour drafts into a stock memo skeleton or invent a greeting the source did not use.
+
 ## Files
 
 | File | Role |

@@ -48,9 +48,9 @@ export function textTransformationStyleBlock(instruction: string): string {
       '- Do not substantially reorganize or restyle text unless needed to make a sentence grammatical.',
     ],
     edit: [
-      '- EDITING is more than proofreading. Rewrite awkward, literal, fragmented, repetitive, or non-native wording into fluent idiomatic professional language.',
+      '- EDITING is more than proofreading. Reason about the sender\'s objective, then rewrite awkward, literal, fragmented, repetitive, or non-native wording into fluent idiomatic language in the sender\'s register.',
       '- Reorganize sentences and paragraphs when that improves flow, warmth, clarity, or emphasis. A result that simply mirrors the source sentence-by-sentence with corrected grammar is insufficient when the source is visibly rough.',
-      '- For correspondence, make the message sound like a capable human colleague wrote it, not like a grammar checker. Preserve the sender\'s personality and level of formality while improving delivery.',
+      '- For correspondence, make the message sound like the same person wrote a cleaner version of it, not like a grammar checker or an HR memo. Preserve personality, idioms, concrete images, and level of formality. Do not add a greeting or closing the source omitted.',
     ],
     polish: [
       '- POLISHING should materially improve tone, rhythm, clarity, transitions, concision, and professional warmth while preserving the same substance.',

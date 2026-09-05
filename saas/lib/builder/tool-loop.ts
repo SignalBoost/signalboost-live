@@ -4,6 +4,7 @@ import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
 import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBuilderSandboxCommand } from './project-context.ts'
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
+import { builderTaskContract, builderTaskProgress } from './task-contract.ts'
 
 type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
 type Action = ToolAction | { type: 'answer'; answer: string }
@@ -301,16 +302,19 @@ export class BuilderToolLoop {
       ...(file.path === 'package.json' && manifestFile ? { content: manifestFile.content } : {}),
     })))
     const initialPaths = new Set(initialListing.map(file => file.path))
+    const task = builderTaskContract(input.objective)
+    const maxWrites = Math.min(16, Math.max(MAX_WRITES_PER_TURN, task.files.length + 4))
     let workspacePaths: string[] = [...initialPaths]
     let repairObjective = isRepairObjective(input.objective)
     let writeCount = 0, runCount = 0, gateNudges = 0
-    const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 24))
+    const maxRounds = Math.max(1, Math.min(input.maxRounds ?? Math.max(8, task.files.length * 3 + task.commands.length + 4), 24))
     let workRounds = 0
     let attempt = 0
     while (workRounds < maxRounds && attempt < maxRounds + MAX_REPEAT_RECOVERY_ATTEMPTS) {
       attempt += 1
       const round = attempt
       const lastTrace = trace.at(-1)
+      const progress = builderTaskProgress(task, workspacePaths, trace)
       // A model can alternate list_files and read_file to evade a last-tool-only
       // restriction. Keep every repeated inspection unavailable until a write/edit
       // changes the workspace and resets the inspection state.
@@ -337,6 +341,7 @@ export class BuilderToolLoop {
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
         `OBJECTIVE:\n${input.objective}`,
+        `DELIVERY PROGRESS: ${safeJson(progress)}. Writes remaining: ${maxWrites - writeCount}. Create every missing file before polishing newly created files. Then run every pending command separately, preserving its exit status. A passing first command is not completion when another command or file is still pending.`,
         formatBuilderProjectContext(projectContext),
         repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',
         `TOOLS: ${safeJson(availableTools)}`,
@@ -368,11 +373,11 @@ export class BuilderToolLoop {
         let response: string | null
         try {
           response = await generateWithRetry(this.ai, {
-            systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${MAX_WRITES_PER_TURN} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. Normal file-creation tasks only require their requested successful proving command. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
+            systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${maxWrites} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. A new build with conditional instructions to fix failing tests is still a creation task: write complete files (including the CLI entry point), create tests and sample data, execute all requested commands, and repair only observed failures. Do not repeatedly inspect or polish one new file while other deliverables are missing. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
             prompt: [...promptParts, recoveryInstruction].filter(Boolean).join('\n\n'),
             maxTokens: controlAttempt > 0
               ? MODEL_CONTROL_RECOVERY_MAX_TOKENS
-              : repairObjective ? MODEL_REPAIR_CONTROL_MAX_TOKENS : MODEL_CONTROL_MAX_TOKENS,
+              : repairObjective || task.files.length > 1 ? MODEL_REPAIR_CONTROL_MAX_TOKENS : MODEL_CONTROL_MAX_TOKENS,
           }, input.modelRoundTimeoutMs)
         } catch (error) {
           return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
@@ -422,9 +427,16 @@ export class BuilderToolLoop {
       }
 
       if (action.type === 'answer') {
+        if (!progress.satisfied && !repairObjective) {
+          gateNudges += 1
+          trace.push({ round, toolId: 'model_control', input: {}, ok: false,
+            error: 'builder_task_incomplete', remediation: `Complete the missing files and pending commands: ${safeJson(progress)}` })
+          if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_task_incomplete', trace }
+          continue
+        }
         repairObjective ||= isRepairObjective(action.answer)
         const verdict = evaluateRegressionGate(input.objective, trace, repairObjective)
-        if (verdict.satisfied) return { ok: true, answer: action.answer, trace }
+        if (verdict.satisfied && progress.satisfied) return { ok: true, answer: action.answer, trace }
         if (repairObjective) {
           const listed = await this.workspace.listFiles(input.workspaceId)
           workspacePaths = listed.map(file => file.path)
@@ -475,7 +487,7 @@ export class BuilderToolLoop {
               ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
             })
             runCount += 1
-            if (!failed && evaluateRegressionGate(input.objective, trace, true).satisfied) return { ok: true, answer: action.answer, trace }
+            if (!failed && evaluateRegressionGate(input.objective, trace, true).satisfied && builderTaskProgress(task, workspacePaths, trace).satisfied) return { ok: true, answer: action.answer, trace }
             continue
           }
           if (passedProof && !failedProof && !edited) {
@@ -487,11 +499,17 @@ export class BuilderToolLoop {
         if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_regression_evidence_required', trace }
         continue
       }
-      if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= MAX_WRITES_PER_TURN) return { ok: false, error: 'builder_write_budget_exhausted', trace }
+      if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= maxWrites) return { ok: false, error: 'builder_write_budget_exhausted', trace }
       if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
       const fingerprint = `${action.toolId}:${safeJson(action.input)}`
       const inspection = action.toolId === 'list_files' || action.toolId === 'read_file'
       const mutation = action.toolId === 'write_file' || action.toolId === 'edit_file'
+      if (mutation && !repairObjective && progress.missingFiles.length > 0
+        && workspacePaths.includes(toolPath(action.input)) && !initialPaths.has(toolPath(action.input))) {
+        trace.push({ round, toolId: action.toolId, input: action.input, ok: false,
+          error: 'builder_missing_deliverables', remediation: `Create ${progress.missingFiles.join(', ')} before revising this new file. Then run the requested commands and use their output for targeted repairs.` })
+        continue
+      }
       if (mutation && initialPaths.has(toolPath(action.input))) repairObjective = true
       // An alternating list/read loop observes unchanged workspace state without progress.
       if (inspection && inspectedInCurrentWorkspaceState.has(fingerprint)) {
@@ -537,6 +555,7 @@ export class BuilderToolLoop {
         }
         if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
           writeCount += 1
+          if (!workspacePaths.includes(toolPath(action.input))) workspacePaths.push(toolPath(action.input))
           inspectedInCurrentWorkspaceState.clear()
           completedMutations.add(fingerprint)
           completedRunsInCurrentWorkspaceState.clear()
@@ -551,13 +570,13 @@ export class BuilderToolLoop {
             && (item.toolId === 'write_file' || item.toolId === 'edit_file')
             && initialPaths.has(toolPath(item.input)))
           const verdict = evaluateRegressionGate(input.objective, trace, modifiedExistingFile)
-          if (verdict.satisfied) return { ok: true, answer: verifiedRepairAnswer(trace), trace }
+          if (verdict.satisfied && builderTaskProgress(task, workspacePaths, trace).satisfied) return { ok: true, answer: verifiedRepairAnswer(trace), trace }
         }
         // A new-file design/create objective is complete once Builder has both written workspace
         // output and observed its requested proof command succeed. Do not spend additional model
         // rounds merely to obtain a prose completion object: that can turn a finished artifact
         // into a 422 after the model keeps inspecting the same workspace.
-        if (action.toolId === 'run' && writeCount > 0 && !repairObjective) {
+        if (action.toolId === 'run' && writeCount > 0 && !repairObjective && builderTaskProgress(task, workspacePaths, trace).satisfied) {
           return { ok: true, answer: 'Created the requested workspace files and verified the proving command completed successfully.', trace }
         }
       } catch (error) {

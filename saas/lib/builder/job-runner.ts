@@ -78,7 +78,13 @@ function fallbackFailureReply(error: string, trace: ReturnType<typeof publicTrac
     if (stream) parts.push(stream)
     return `  ${parts.join(' · ')}`
   })
-  return `COS Builder stopped: ${error}${tail.length ? `\n\nBuilder evidence:\n${tail.join('\n')}` : ''}`
+  const reason = /budget_exhausted|builder_turn_timeout/.test(error)
+    ? 'Builder reached its work limit before completing the requested files and verification.'
+    : `Builder could not complete the task: ${error}`
+  const execution = trace.some(entry => entry.toolId === 'run')
+    ? formatBuilderExecutionEvidence(trace)
+    : 'No command was run. No runtime or test result was recorded.'
+  return `${reason}\n\n${execution}${tail.length ? `\n\nBuilder evidence:\n${tail.join('\n')}` : ''}`
 }
 
 function repairAwareFailureReply(job: BuilderJobRecord, error: string, trace: ReturnType<typeof publicTrace>): string {
@@ -201,7 +207,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons: [],
-          maxRounds: isRepairObjective(job.objective) ? 20 : 8,
+          maxRounds: 24,
           modelRoundTimeoutMs: 55_000,
         })
 

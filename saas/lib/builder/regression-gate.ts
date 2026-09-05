@@ -5,7 +5,12 @@ export type RegressionVerdict = Readonly<{ satisfied: true }> | Readonly<{ satis
 const PROOF_COMMAND = /\b(?:test|spec)\b|node\s+--test|\bnode\s+[\w./-]+\.(?:c?js|mjs)\b|vitest|jest|mocha|\btap\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test|\.(?:test|spec)\.[cm]?[jt]sx?\b|(?:^|[\s;&|])(?:npx\s+)?tsc(?:\s|$)|\bnext\s+build\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:typecheck|type-check|build|prebuild)\b/i
 
 export function isRepairObjective(objective: string): boolean {
-  return /\b(?:fix(?:ed)?|repair(?:ed)?|correct(?:ed)?|bug|error|failure|broken|regression|crash|failing|defect)\b/i.test(String(objective || ''))
+  // Conditional recovery instructions and error-handling requirements do not turn a new
+  // build into an existing defect. Actual repair requests/claims still require proof.
+  const request = String(objective || '').replace(/\bif\s+(?:any\s+)?(?:tests?|checks?)\s+fails?\b[^\n.]*\.?/gi, '')
+  if (/\b(?:fix(?:ed)?|repair(?:ed)?|correct(?:ed)?|debug)\b/i.test(request)) return true
+  if (/^\s*(?:please\s+)?(?:build|create|write|make)\b/i.test(request)) return false
+  return /\b(?:bug|error|failure|broken|regression|crash(?:es|ed)?|failing|defect)\b/i.test(request)
 }
 
 function commandOf(trace: BuilderToolTrace): string {

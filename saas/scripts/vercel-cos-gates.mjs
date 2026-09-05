@@ -113,6 +113,7 @@ const tests = [
   'tests/publicCorpusEvidence.node.test.ts',
   'tests/googleSheetsConnector.node.test.ts',
   'tests/describeThrownValue.node.test.ts',
+    'tests/demoPricing.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {
@@ -127,3 +128,4 @@ if (result.error) {
 }
 
 process.exit(result.status ?? 1)
+  

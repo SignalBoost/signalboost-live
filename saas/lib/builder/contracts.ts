@@ -11,6 +11,8 @@ export interface BuilderWorkspacePort {
 }
 
 export interface BuilderRunResult {
+  readonly executedCommand?: string
+  readonly generatedFiles?: readonly { path: string; content: string }[]
   readonly exitCode: number
   readonly stdout: string
   readonly stderr: string

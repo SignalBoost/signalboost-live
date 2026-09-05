@@ -1,3 +1,4 @@
+import { builderRepositoryTarget, importBuilderRepository, builderRepositoryErrorReply } from '@/lib/builder/repository-import'
 import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
@@ -108,7 +109,7 @@ async function enqueueRepositoryRepair(input: {
  * preserving the existing public-workspace and owner-only repository-repair authority boundaries.
  */
 export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistRequest): Promise<NextResponse | null> {
-  const objective = String(input.objective || '').trim()
+  let objective = String(input.objective || '').trim()
   if (!objective) return null
 
   const context = routingContext(input.body)
@@ -154,9 +155,13 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     }
   }
 
+  let repositoryTarget
+  try { repositoryTarget = builderRepositoryTarget(objective, input.body?.repositoryUrl) }
+  catch (error) { return NextResponse.json({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 400 }) }
+
   const roleMatched = isConciergeBuilderObjective(objective, context)
   const designMatched = DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective)
-  if (hasImageOrPdfAttachment(input.body) || !(roleMatched || designMatched)) return null
+  if (hasImageOrPdfAttachment(input.body) || !(roleMatched || designMatched || repositoryTarget)) return null
 
   // Public Concierge intentionally receives guest access under public-delivery scope. Its server-
   // captured audit identity may own an isolated workspace, but it never gains owner repository authority.
@@ -184,15 +189,25 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
 
   const workspaceId = workspaceIdFrom(input.body)
   await workspace.ensureWorkspace(workspaceId)
-  const stagedFiles = extractBuilderSourceFiles([
+  let stagedFiles = extractBuilderSourceFiles([
     ...(Array.isArray(input.body?.files) ? input.body.files : []),
     ...(Array.isArray(input.body?.attachments) ? input.body.attachments : []),
   ])
+  if (repositoryTarget) {
+    try {
+      if ((await workspace.listFiles(workspaceId)).length || stagedFiles.length) throw new Error('builder_repository_requires_empty_workspace')
+      const imported = await importBuilderRepository(repositoryTarget)
+      stagedFiles = imported.files
+      objective += `\nSource imported from ${imported.repository} at commit ${imported.commitSha}${imported.directory ? `, folder ${imported.directory}` : ''}.`
+    } catch (error) {
+      return NextResponse.json({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 422 })
+    }
+  }
   for (const file of stagedFiles) await workspace.writeFile(workspaceId, file.path, file.content)
 
   const conversationId = conversationIdFrom(input.body) || crypto.randomUUID()
   const jobId = crypto.randomUUID()
-  const debugPlan = planDebugFileJob(objective, stagedFiles)
+  const debugPlan = repositoryTarget ? null : planDebugFileJob(objective, stagedFiles)
   const reply = runningReply(jobId)
   const specialistSkill = debugPlan ? 'software.repair' : 'software.build'
 

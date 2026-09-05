@@ -4,6 +4,7 @@ import type { BuilderProjectContext } from './project-context.ts'
 
 /** Private controller state, never a client-provided continuation or model reasoning transcript. */
 export type BuilderLoopCheckpoint = Readonly<{
+  chunks?: readonly [string, string][]
   version: 1
   workspaceId: string
   objectiveDigest: string
@@ -36,4 +37,13 @@ export async function workspaceDigest(workspace: BuilderWorkspacePort, workspace
       return [file.path, current.content]
     }))
   return checkpointDigest(JSON.stringify(files))
+}
+
+export async function validateBuilderCheckpoint(value: BuilderLoopCheckpoint, workspace: BuilderWorkspacePort, workspaceId: string, objective: string): Promise<void> {
+  if (value.version !== 1 || value.workspaceId !== workspaceId || value.objectiveDigest !== checkpointDigest(objective)) throw new Error('builder_checkpoint_scope_mismatch')
+  if (value.workspaceDigest !== await workspaceDigest(workspace, workspaceId)) throw new Error('builder_checkpoint_workspace_changed')
+  if ([value.writeCount, value.runCount, value.workRounds, value.attempt, value.gateNudges]
+    .some(count => !Number.isSafeInteger(count) || count < 0 || count > 200)
+    || !Array.isArray(value.trace) || value.trace.length > 200
+    || Buffer.byteLength(JSON.stringify(value)) > 4_000_000) throw new Error('builder_checkpoint_invalid')
 }

@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process'
 
 const tests = [
   'tests/builderToolLoop.node.test.ts',
+  'tests/builderProductReadiness.node.test.ts',
   'tests/builderTaskCompletion.node.test.ts',
   'tests/builderCheckpoint.node.test.ts',
   'tests/localOpenModelInference.node.test.ts',

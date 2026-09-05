@@ -1,3 +1,4 @@
+import { builderRepositoryTarget, importBuilderRepository, builderRepositoryErrorReply } from '@/lib/builder/repository-import'
 // saas/app/api/builder/route.ts
 import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
@@ -21,7 +22,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const MAX_JOB_FILES = 20
+const MAX_JOB_FILES = 100
 const DEBUG_OBJECTIVE = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
 const SIGNALBOOST_OPERATIONAL_TARGET = /\b(?:signalboost-live|(?:saas\.)?signalboostapp\.com)\b/i
 
@@ -142,7 +143,8 @@ export async function POST(request: Request) {
     }
     const workspaceId = requestedWorkspaceId || crypto.randomUUID()
 
-    const files = cleanFiles(body?.files)
+    let files = cleanFiles(body?.files)
+    const repositoryTarget = builderRepositoryTarget(objective, body?.repositoryUrl)
     const debugPlan = planDebugFileJob(objective, files)
     const ownerDeveloperLogSubmission = access.isOwner
       && isOperationalLogEvidence(objective)
@@ -191,25 +193,12 @@ export async function POST(request: Request) {
     const logEvidence = isOperationalLogEvidence(objective)
     const passiveLogEvidence = isPastedOperationalLog(objective)
 
-    if (files.length > 0 && DEBUG_OBJECTIVE.test(objective) && !debugPlan) {
-      const reply = 'COS Builder debug jobs require 1–4 supported .js, .mjs, .cjs, .ts, .mts, .cts, or .py attachments no larger than 128 KiB each. No code was run.'
-      await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
-      return noStore({
-        error: 'builder_debug_attachment_required',
-        reply,
-        execution_allowed: false,
-        external_action_taken: false,
-        files: [],
-        trace: [],
-      }, { status: 400 })
-    }
-
     // Shared Concierge routing deliberately refuses pasted build/runtime logs so an ordinary chat
     // turn never silently starts coding work. On the Builder surface the log IS the submitted job:
     // the user pasted failure evidence into a developer workspace and asked it to debug. Logs are
     // admitted here, and only here; every other objective still faces the strict coding gate.
     const routingContext = { attachmentNames: files.map(file => file.path) }
-    if (!debugPlan && !logEvidence && !isConciergeBuilderObjective(objective, routingContext)) {
+    if (!repositoryTarget && !debugPlan && !logEvidence && !isConciergeBuilderObjective(objective, routingContext)) {
       const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({
@@ -231,6 +220,16 @@ export async function POST(request: Request) {
 
     await workspace.ensureWorkspace(workspaceId)
     await workspace.setObjective(workspaceId, objective)
+    if (repositoryTarget) {
+      try {
+        if ((await workspace.listFiles(workspaceId)).length || files.length) throw new Error('builder_repository_requires_empty_workspace')
+        const imported = await importBuilderRepository(repositoryTarget)
+        files = imported.files
+        objective += `\nSource imported from ${imported.repository} at commit ${imported.commitSha}${imported.directory ? `, folder ${imported.directory}` : ''}.`
+      } catch (error) {
+        return noStore({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 422 })
+      }
+    }
     for (const file of files) await workspace.writeFile(workspaceId, file.path, file.content)
 
     const jobId = crypto.randomUUID()

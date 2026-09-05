@@ -61,6 +61,6 @@ test('repair classification is never derived from the model own answer prose', (
 })
 
 test('a build objective gets a round budget that can carry a multi-file build', () => {
-  assert.match(jobRunner, /maxRounds: isRepairObjective\(job\.objective\) \? 20 : 16/)
+  assert.match(jobRunner, /maxRounds: 96/)
   assert.match(gate, /tests\/builderRepairClassification\.node\.test\.ts/)
 })

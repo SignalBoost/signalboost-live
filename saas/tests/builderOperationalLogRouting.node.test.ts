@@ -42,13 +42,13 @@ test('log-derived workspace jobs never acquire repository authority', () => {
 })
 
 test('a log plus one attached source file still enters only the fixed debug protocol', () => {
-  const files = route.indexOf('const files = cleanFiles(body?.files)')
+  const files = route.indexOf('let files = cleanFiles(body?.files)')
   const plan = route.indexOf('const debugPlan = planDebugFileJob(objective, files)', files)
   const kind = route.indexOf("jobKind: debugPlan ? 'debug_file' : 'standard'", plan)
   assert.ok(files >= 0)
   assert.ok(plan > files)
   assert.ok(kind > plan)
-  assert.match(route, /error: 'builder_debug_attachment_required'/)
+  assert.match(route, /debugPaths: debugPlan\.files/)
 })
 
 test('non-coding, non-log objectives are still refused without creating a job', () => {

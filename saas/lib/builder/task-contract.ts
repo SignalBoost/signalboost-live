@@ -10,8 +10,14 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
   const files = new Set<string>()
   const commands = new Set<string>()
   let fileList = false
+  let runList = false
   for (const raw of objective.split(/\r?\n/)) {
     const line = raw.trim()
+    if (/^run(?:\s+(?:these|the following)\s+commands)?\s*:\s*$/i.test(line)) {
+      runList = true
+      fileList = false
+      continue
+    }
     if (/^(?:create|write|deliver|provide)(?:\s+(?:these|the|following|files|all))*\s*:\s*$/i.test(line)) {
       fileList = true
       continue
@@ -24,7 +30,8 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
     const inline = /\b(?:create|write)\s+`?((?:[\w-]+\/)*[\w.-]+\.[a-z0-9]+)\b/i.exec(line)
     if (inline && FILE.test(inline[1])) files.add(inline[1])
     const command = line.replace(/^\$\s+/, '').replace(/^`|`$/g, '')
-    if (/^(?:node|python3?|npm|pnpm|yarn|bun)\s+\S/.test(command) && command.length <= 2_000) commands.add(command)
+    if (runList && /^(?:node|python3?|npm|pnpm|yarn|bun)\s+\S/.test(command) && command.length <= 2_000) commands.add(command)
+    else if (line && !/^```/.test(line)) runList = false
   }
   // Only Node's test runner has a summary parser here; other runtimes retain command proof.
   const count = [...commands].some(command => /^node\s+.*--test\b/.test(command))

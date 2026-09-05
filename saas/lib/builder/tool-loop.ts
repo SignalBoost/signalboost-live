@@ -6,6 +6,7 @@ import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBu
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 import { builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderWorkingFiles } from './working-context.ts'
+import { formatBuilderCliTestGuidance } from './cli-test-guidance.ts'
 import { detectContractOscillation, formatContractOscillation } from './contract-oscillation.ts'
 
 type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
@@ -367,6 +368,7 @@ export class BuilderToolLoop {
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
         `OBJECTIVE:\n${input.objective}`,
+        formatBuilderCliTestGuidance(input.objective),
         `DELIVERY PROGRESS: ${safeJson(progress)}. Writes remaining: ${maxWrites - writeCount}. Create every missing file before polishing newly created files. Then run every pending command separately, preserving its exit status. A passing first command is not completion when another command or file is still pending.`,
         formatBuilderProjectContext(projectContext),
         repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',

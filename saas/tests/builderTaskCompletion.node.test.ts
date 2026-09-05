@@ -267,3 +267,49 @@ test('reported expense artifacts recover their shared interface with real Node p
     assert.equal(result.trace.filter(item => item.toolId === 'read_file').length, 0)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+test('CLI guidance applies to CLI test generation and excludes library-only tasks', async () => {
+  const { formatBuilderCliTestGuidance } = await import('../lib/builder/cli-test-guidance.ts')
+  assert.equal(formatBuilderCliTestGuidance('Create a library and write unit tests.'), '')
+  assert.equal(formatBuilderCliTestGuidance('Explain what a CLI is.'), '')
+  const guidance = formatBuilderCliTestGuidance(objective)
+  for (const pattern of [/spawnSync/, /signal === null/, /integer status/, /t.after/, /missing-file/, /README example output/, /specific error on stderr/]) assert.match(guidance, pattern)
+})
+
+test('Builder CLI process tests catch swallowed executable errors despite passing library tests', async () => {
+  // The owner's CLI suite is now a mandatory Builder regression fixture, not just a download.
+  // Generation choices are scripted; the requested test and sample commands execute real Node.
+  const files = Object.fromEntries(task.files.map(path => [path, readFileSync(new URL(`./fixtures/builder-cli-contract/${path}`, import.meta.url), 'utf8')]))
+  const broken = files['expenses.js'].replace('process.exitCode = 1;', 'process.exitCode = 0;')
+  assert.notEqual(broken, files['expenses.js'])
+  const actions = task.files.map(path => write(path, path === 'expenses.js' ? broken : files[path]))
+  let repaired = false
+  const directory = await mkdtemp(join(tmpdir(), 'builder-cli-proof-'))
+  try {
+    const result = await new BuilderToolLoop({ async generate(input) {
+      assert.match(input.prompt, /CLI PROCESS CONTRACT/)
+      if (actions.length) return actions.shift()!
+      assert.equal(repaired, false)
+      assert.match(input.prompt, /CLI exits nonzero/)
+      repaired = true
+      return write('expenses.js', files['expenses.js'])
+    } }, new InMemoryBuilderWorkspace(), {
+      async run(input) {
+        assert.ok(task.commands.includes(input.command))
+        for (const file of input.files) await writeFile(join(directory, file.path), file.content)
+        const env = { ...process.env }
+        delete env.NODE_TEST_CONTEXT
+        const executed = spawnSync(process.execPath, input.command.split(' ').slice(1), { cwd: directory, env, encoding: 'utf8', timeout: 20_000 })
+        return { exitCode: executed.status ?? 124, stdout: executed.stdout, stderr: executed.stderr, timedOut: !!executed.error }
+      },
+    }).run({ objective, workspaceId: 'cli-contract', maxRounds: 16 })
+    assert.equal(result.ok, true, JSON.stringify(result))
+    const runs = result.trace.filter(item => item.toolId === 'run')
+    assert.deepEqual(runs.map(item => item.ok), [false, true, true, true])
+    assert.match((runs[0].output as typeof passing).stdout, /(?:#|ℹ) fail 9/)
+    assert.match((runs[2].output as typeof passing).stdout, /(?:#|ℹ) pass 29/)
+    const actual = JSON.parse((runs[3].output as typeof passing).stdout)
+    const documented = JSON.parse(files['README.md'].match(/```json\n([\s\S]*?)\n```/)![1])
+    assert.deepEqual(actual, documented)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})

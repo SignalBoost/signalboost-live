@@ -117,7 +117,7 @@ test('independent delicate-writing gate targets the observed accusatory and gene
   const neural = read('../lib/ai/cos/communicationNeuralReasoning.ts')
   assert.match(neural, /changes "say\/express" into accusatory wording such as "claim"/i)
   assert.match(neural, /uses blunt conclusions such as "the bottom line is simple"/i)
-  assert.match(neural, /invented benefits, motives, conduct, acceptance of promotion, succession planning, or HR practices/i)
+  assert.match(neural, /invents organizational benefits, motives, conduct, acceptance of promotion, succession planning, or HR practices/i)
   assert.match(neural, /Score each dimension independently/i)
   assert.match(neural, /re-evaluation/i)
 })

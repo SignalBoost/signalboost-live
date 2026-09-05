@@ -19,7 +19,7 @@ const EXECUTIVE_WRITING_MODULES: Record<SupportedExecutiveLocale, string> = {
     'ENGLISH EXECUTIVE COMMUNICATION:',
     '- Write in natural professional English with leadership presence: concise, confident, respectful, and outcome-oriented.',
     '- Prefer active voice, direct statements, precise verbs, and economical wording. Remove filler, repetition, slang, and awkward literal phrasing.',
-    '- For correspondence, use a clear purpose-led opening, a logically organized body, and a concise professional closing when appropriate.',
+    '- For correspondence, infer opening and closing from the source. Do not add a purpose-led greeting or executive close the writer did not use. Organize the body only as far as the argument requires.',
     '- Elevate rough or non-native input into polished leadership communication without changing the user’s intended meaning, facts, commitments, or certainty.',
   ].join('\n'),
   pt: [

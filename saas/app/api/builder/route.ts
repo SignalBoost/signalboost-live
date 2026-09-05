@@ -77,12 +77,12 @@ export async function GET(request: Request) {
     try {
       const job = await getBuilderJobForUser(jobId, access.userId)
       if (!job) return noStore({ error: 'Builder job not found.' }, { status: 404 })
-      if (job.status === 'queued' || job.status === 'running') {
+      if (job.status === 'queued' || job.status === 'running' || job.status === 'paused') {
         return noStore({
           jobId: job.id,
           workspaceId: job.workspaceId,
           status: job.status,
-          reply: runningReply(job.id),
+          reply: job.status === 'paused' ? 'Builder saved its progress and will continue automatically. Verification is not complete yet.' : runningReply(job.id),
         }, { status: 202 })
       }
       return noStore({

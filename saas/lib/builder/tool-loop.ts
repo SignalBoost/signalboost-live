@@ -1,4 +1,5 @@
 // saas/lib/builder/tool-loop.ts
+import { checkpointDigest, workspaceDigest, type BuilderLoopCheckpoint } from './checkpoint.ts'
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
 import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
@@ -300,29 +301,52 @@ export class BuilderToolLoop {
     this.runner = runner
   }
 
-  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
-    const trace: BuilderToolTrace[] = []
-    const workingFiles = new Map<string, BuilderFile>()
-    const inspectedInCurrentWorkspaceState = new Set<string>()
-    const completedMutations = new Set<string>()
-    const completedRunsInCurrentWorkspaceState = new Set<string>()
+  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean }): Promise<BuilderLoopResult> {
+    const saved = input.checkpoint
+    if (saved && (saved.version !== 1 || saved.workspaceId !== input.workspaceId || saved.objectiveDigest !== checkpointDigest(input.objective))) {
+      return { ok: false, error: 'builder_checkpoint_scope_mismatch', trace: [] }
+    }
+    if (saved && saved.workspaceDigest !== await workspaceDigest(this.workspace, input.workspaceId)) {
+      return { ok: false, error: 'builder_checkpoint_workspace_changed', trace: saved.trace }
+    }
+    const trace: BuilderToolTrace[] = [...(saved?.trace || [])]
+    const workingFiles = new Map<string, BuilderFile>((saved?.workingFiles || []).map(file => [file.path, file]))
+    const inspectedInCurrentWorkspaceState = new Set<string>(saved?.inspections)
+    const completedMutations = new Set<string>(saved?.mutations)
+    const completedRunsInCurrentWorkspaceState = new Set<string>(saved?.runs)
     const initialListing = await this.workspace.listFiles(input.workspaceId)
     const manifest = initialListing.find(file => file.path === 'package.json')
     const manifestFile = manifest ? await this.workspace.readFile(input.workspaceId, manifest.path) : null
-    const projectContext = discoverBuilderProjectContext(initialListing.map(file => ({
+    const projectContext = saved?.projectContext || discoverBuilderProjectContext(initialListing.map(file => ({
       path: file.path,
       ...(file.path === 'package.json' && manifestFile ? { content: manifestFile.content } : {}),
     })))
-    const initialPaths = new Set(initialListing.map(file => file.path))
+    const initialPaths = new Set(saved?.initialPaths || initialListing.map(file => file.path))
     const task = builderTaskContract(input.objective)
     const maxWrites = Math.min(16, Math.max(MAX_WRITES_PER_TURN, task.files.length + 4))
-    let workspacePaths: string[] = [...initialPaths]
-    let repairObjective = isRepairObjective(input.objective)
-    let writeCount = 0, runCount = 0, gateNudges = 0
+    let workspacePaths: string[] = initialListing.map(file => file.path)
+    let repairObjective = saved?.repairObjective ?? isRepairObjective(input.objective)
+    let writeCount = saved?.writeCount || 0, runCount = saved?.runCount || 0, gateNudges = saved?.gateNudges || 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? Math.max(8, task.files.length * 3 + task.commands.length + 4), 24))
-    let workRounds = 0
-    let attempt = 0
+    let workRounds = saved?.workRounds || 0
+    let attempt = saved?.attempt || 0
+    // Checkpoints are made only between completed tools. No pending command is replayable.
+    const pause = async (): Promise<BuilderLoopResult> => {
+      const checkpoint: BuilderLoopCheckpoint = {
+        version: 1, workspaceId: input.workspaceId, objectiveDigest: checkpointDigest(input.objective),
+        workspaceDigest: await workspaceDigest(this.workspace, input.workspaceId),
+        trace, workingFiles: [...workingFiles.values()], initialPaths: [...initialPaths], projectContext,
+        inspections: [...inspectedInCurrentWorkspaceState], mutations: [...completedMutations],
+        runs: [...completedRunsInCurrentWorkspaceState], repairObjective,
+        writeCount, runCount, gateNudges, workRounds, attempt,
+      }
+      if (Buffer.byteLength(JSON.stringify(checkpoint)) > 4_000_000) {
+        return { ok: false, error: 'builder_checkpoint_too_large', trace }
+      }
+      return { ok: false, error: 'builder_job_paused', trace, checkpoint }
+    }
     while (workRounds < maxRounds && attempt < maxRounds + MAX_REPEAT_RECOVERY_ATTEMPTS) {
+      if (input.shouldPause?.()) return pause()
       attempt += 1
       const round = attempt
       const lastTrace = trace.at(-1)
@@ -419,12 +443,14 @@ export class BuilderToolLoop {
         try {
           response = await generateControl(controlBudget)
         } catch (error) {
+          if (input.shouldPause && error instanceof Error && error.message === 'builder_turn_timeout') return pause()
           if (!isOutputTruncation(error)) {
             return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
           }
           try {
             response = await generateControl(controlBudget * 2)
           } catch (retryError) {
+            if (input.shouldPause && retryError instanceof Error && retryError.message === 'builder_turn_timeout') return pause()
             if (isOutputTruncation(retryError)) return { ok: false, error: 'builder_model_output_limit', trace }
             return { ok: false, error: retryError instanceof Error ? retryError.message : 'builder_model_call_failed', trace }
           }
@@ -448,6 +474,7 @@ export class BuilderToolLoop {
         })
       }
 
+      if (input.shouldPause?.(true)) return pause()
       if (blockedAction) {
         trace.push({
           round,

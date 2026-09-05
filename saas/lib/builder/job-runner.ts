@@ -3,7 +3,7 @@ import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
-import { finishBuilderJob, claimBuilderJob, type BuilderJobRecord } from './job-store.ts'
+import { finishBuilderJob, claimBuilderJob, pauseBuilderJob, type BuilderJobRecord } from './job-store.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { isRepairObjective } from './regression-gate.ts'
 import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
@@ -102,7 +102,7 @@ function historyReply(reply: string, workspaceId: string, files: readonly string
   return links.length ? `${reply.trim()}\n\nBuilder files:\n${links.join('\n')}` : reply.trim()
 }
 
-async function terminalFailure(job: BuilderJobRecord, error: string, trace: readonly BuilderToolTrace[] = []): Promise<void> {
+async function terminalFailure(job: BuilderJobRecord, error: string, trace: readonly BuilderToolTrace[] = job.checkpoint?.trace || []): Promise<void> {
   const safeTrace = publicTrace(trace)
   const workspace = createSupabaseBuilderWorkspace(job.userId)
   const files = workspace
@@ -112,6 +112,7 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
   await finishBuilderJob({
     jobId: job.id,
     userId: job.userId,
+    claimGeneration: job.claimGeneration,
     status: 'failed',
     reply,
     error,
@@ -133,6 +134,7 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
  */
 export async function runBuilderJob(jobId: string, userId: string): Promise<void> {
   let job: BuilderJobRecord | null = null
+  let lastTrace: readonly BuilderToolTrace[] = []
   try {
     job = await claimBuilderJob(jobId, userId)
     if (!job) return
@@ -174,6 +176,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       await finishBuilderJob({
         jobId: job.id,
         userId: job.userId,
+        claimGeneration: job.claimGeneration,
         status: succeeded ? 'succeeded' : 'failed',
         reply,
         ...(error ? { error } : {}),
@@ -188,6 +191,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       return
     }
 
+    const sliceStartedAtMs = Date.now()
     const deadlineAtMs = Date.now() + BUILDER_JOB_BUDGET_MS
     const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), {
       deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
@@ -207,25 +211,36 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons: [],
+          checkpoint: job.checkpoint,
+          // Leave room for a slow model round, then a bounded sandbox command and persistence.
+          shouldPause: (beforeTool = false) => Date.now() - sliceStartedAtMs >= (beforeTool ? 180_000 : 130_000),
           maxRounds: isRepairObjective(job.objective) ? 20 : 16,
           modelRoundTimeoutMs: 55_000,
         })
 
+    lastTrace = result.trace
     const files = (await workspace.listFiles(job.workspaceId)).map(file => file.path)
     const trace = publicTrace(result.trace)
+    if (result.ok === false && result.checkpoint && job.claimGeneration < 4) {
+      const reply = historyReply('Builder saved its progress and will continue automatically. Verification is not complete yet.', job.workspaceId, files)
+      await pauseBuilderJob({ job, checkpoint: result.checkpoint, reply,
+        result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
+      return
+    }
     if (result.ok === false) {
-      const reply = historyReply(repairAwareFailureReply(job, result.error, trace), job.workspaceId, files)
+      const reply = historyReply(repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace), job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id,
         userId: job.userId,
+        claimGeneration: job.claimGeneration,
         status: 'failed',
         reply,
-        error: result.error,
+        error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error,
         result: {
           jobId: job.id,
           workspaceId: job.workspaceId,
           status: 'failed',
-          error: result.error,
+          error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error,
           reply,
           files,
           trace,
@@ -241,6 +256,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     await finishBuilderJob({
       jobId: job.id,
       userId: job.userId,
+      claimGeneration: job.claimGeneration,
       status: 'succeeded',
       reply,
       result: {
@@ -256,7 +272,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     const message = error instanceof Error ? error.message : 'builder_job_failed'
     console.error('[builder_job_execution_failed]', { jobId, message })
     if (job) {
-      await terminalFailure(job, message === BUILDER_TURN_TIMEOUT_ERROR ? BUILDER_TURN_TIMEOUT_ERROR : message).catch(finishError => {
+      await terminalFailure(job, message === BUILDER_TURN_TIMEOUT_ERROR ? BUILDER_TURN_TIMEOUT_ERROR : message, lastTrace.length ? lastTrace : job.checkpoint?.trace || []).catch(finishError => {
         console.error('[builder_job_terminal_persist_failed]', {
           jobId,
           message: finishError instanceof Error ? finishError.message : 'unknown',

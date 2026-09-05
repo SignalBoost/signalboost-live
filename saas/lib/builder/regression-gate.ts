@@ -1,16 +1,30 @@
+// saas/lib/builder/regression-gate.ts
 import type { BuilderToolTrace } from './contracts.ts'
 
 export type RegressionVerdict = Readonly<{ satisfied: true }> | Readonly<{ satisfied: false; reason: string }>
 
 const PROOF_COMMAND = /\b(?:test|spec)\b|node\s+--test|\bnode\s+[\w./-]+\.(?:c?js|mjs)\b|vitest|jest|mocha|\btap\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?test|\.(?:test|spec)\.[cm]?[jt]sx?\b|(?:^|[\s;&|])(?:npx\s+)?tsc(?:\s|$)|\bnext\s+build\b|(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:typecheck|type-check|build|prebuild)\b/i
 
+const REPAIR_WORDS = /\b(?:fix(?:ed)?|repair(?:ed)?|correct(?:ed)?|bug|error|failure|broken|regression|crash|failing|defect)\b/i
+
+const CREATION_DIRECTIVE = /^(?:please\s+|can\s+you\s+|could\s+you\s+|i\s+need\s+(?:you\s+to\s+)?|i\s+want\s+(?:you\s+to\s+)?|help\s+me\s+)*(?:build|create|write|implement|generate|scaffold|produce|make|design)\b/i
+
+const SUPPLIED_FAILURE_EVIDENCE = /(?:^|\n)\s*(?:[A-Z][A-Za-z]*Error\b|Traceback\b|npm ERR!|error TS\d+)|\bexit code [1-9]\b|\bstack trace\b|\b(?:still|again|keeps?|currently|now)\s+(?:fail(?:s|ing)?|break(?:s|ing)?|broken|crash(?:es|ing)?|erroring)\b|\b(?:this|that|the|my|our)\s+(?:bug|crash|regression|defect)\b|\bdoes(?:n't| not)\s+work\b|\bnot working\b/i
+
+function openingDirective(objective: string): string {
+  const line = String(objective || '').split(/\r?\n/).find(item => item.trim().length > 0)
+  return line ? line.trim() : ''
+}
+
 export function isRepairObjective(objective: string): boolean {
-  // Conditional recovery instructions and error-handling requirements do not turn a new
-  // build into an existing defect. Actual repair requests/claims still require proof.
-  const request = String(objective || '').replace(/\bif\s+(?:any\s+)?(?:tests?|checks?)\s+fails?\b[^\n.]*\.?/gi, '')
-  if (/\b(?:fix(?:ed)?|repair(?:ed)?|correct(?:ed)?|debug)\b/i.test(request)) return true
-  if (/^\s*(?:please\s+)?(?:build|create|write|make)\b/i.test(request)) return false
-  return /\b(?:bug|error|failure|broken|regression|crash(?:es|ed)?|failing|defect)\b/i.test(request)
+  const value = String(objective || '')
+  // Pasted failure evidence is a repair request on its own: a stack trace carries no
+  // repair vocabulary ("TypeError" contains no word-boundary "error").
+  if (SUPPLIED_FAILURE_EVIDENCE.test(value)) return true
+  if (!REPAIR_WORDS.test(value)) return false
+  // A creation directive owns the objective: acceptance criteria that mention fixing,
+  // errors or failures describe the artifact to be built, not an existing defect.
+  return !CREATION_DIRECTIVE.test(openingDirective(value))
 }
 
 function commandOf(trace: BuilderToolTrace): string {

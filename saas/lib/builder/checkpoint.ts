@@ -20,6 +20,7 @@ export type BuilderLoopCheckpoint = Readonly<{
   runCount: number
   gateNudges: number
   workRounds: number
+  pendingWrite?: import('./chunked-write.ts').PendingBuilderWrite | null
   attempt: number
 }>
 

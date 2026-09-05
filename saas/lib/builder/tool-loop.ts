@@ -1,4 +1,5 @@
 // saas/lib/builder/tool-loop.ts
+import { assembleBuilderChunk, formatPendingBuilderWrite, isChunkedWrite, type PendingBuilderWrite } from './chunked-write.ts'
 import { checkpointDigest, workspaceDigest, type BuilderLoopCheckpoint } from './checkpoint.ts'
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
@@ -309,6 +310,7 @@ export class BuilderToolLoop {
     if (saved && saved.workspaceDigest !== await workspaceDigest(this.workspace, input.workspaceId)) {
       return { ok: false, error: 'builder_checkpoint_workspace_changed', trace: saved.trace }
     }
+    let pendingWrite: PendingBuilderWrite | null = saved?.pendingWrite || null
     const trace: BuilderToolTrace[] = [...(saved?.trace || [])]
     const workingFiles = new Map<string, BuilderFile>((saved?.workingFiles || []).map(file => [file.path, file]))
     const inspectedInCurrentWorkspaceState = new Set<string>(saved?.inspections)
@@ -338,7 +340,7 @@ export class BuilderToolLoop {
         trace, workingFiles: [...workingFiles.values()], initialPaths: [...initialPaths], projectContext,
         inspections: [...inspectedInCurrentWorkspaceState], mutations: [...completedMutations],
         runs: [...completedRunsInCurrentWorkspaceState], repairObjective,
-        writeCount, runCount, gateNudges, workRounds, attempt,
+        writeCount, runCount, gateNudges, workRounds, attempt, pendingWrite,
       }
       if (Buffer.byteLength(JSON.stringify(checkpoint)) > 4_000_000) {
         return { ok: false, error: 'builder_checkpoint_too_large', trace }
@@ -361,12 +363,12 @@ export class BuilderToolLoop {
       // exist, execute the user's explicit Run list before asking for any more edits.
       // A failed command is attempted only once per file revision, then returned to the
       // model for diagnosis; no blind execution retries or additional command authority.
-      const verificationCommand = !repairObjective && writeCount > 0 && task.files.length > 0 && progress.missingFiles.length === 0
+      const verificationCommand = !pendingWrite && !repairObjective && writeCount > 0 && task.files.length > 0 && progress.missingFiles.length === 0
         ? progress.pendingCommands.find(command => !trace.slice(lastWorkspaceChange + 1)
           .some(item => item.toolId === 'run' && item.input.command === command))
         : undefined
       const currentStep = !repairObjective && progress.missingFiles.length > 0
-        ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files or return partial source.`
+        ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files. For large source use sequential chunked write_file controls, each with valid complete JSON.`
         : !repairObjective && progress.pendingCommands.length === 0 && !progress.testsSatisfied
           ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. Complete the test suite with distinct meaningful assertions covering the requested normal, edge, and failure cases. Do not duplicate empty tests or weaken the requirement. Verification will run again after the file changes.`
         : trace.slice(lastWorkspaceChange + 1).some(item => item.toolId === 'run' && !item.ok)
@@ -403,8 +405,10 @@ export class BuilderToolLoop {
           ? { ...item, input: { path: toolPath(item.input) } } : item))}` : '',
         formatBuilderWorkingFiles([...workingFiles.values()]),
         formatContractOscillation(detectContractOscillation(trace)),
-        currentStep,
-        'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
+        pendingWrite ? '' : currentStep,
+        formatPendingBuilderWrite(pendingWrite),
+        'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete file or next chunk segment"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
+        'Chunked write_file additionally requires chunkIndex (starting at 0, increment by 1) and final (boolean). Omit both for a normal complete-file write. Never return an incomplete JSON control object; split large source into complete chunk controls.',
         'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
         availableTools.includes('read_file')
           ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
@@ -500,6 +504,12 @@ export class BuilderToolLoop {
         return { ok: false, error: failure.error, trace }
       }
 
+      if (pendingWrite && (action.type === 'answer' || action.toolId === 'run'
+        || action.toolId === 'edit_file' || (action.toolId === 'write_file' && !isChunkedWrite(action.input)))) {
+        trace.push({ round, toolId: 'model_control', input: {}, ok: false,
+          error: 'builder_chunk_incomplete', remediation: `Finish ${pendingWrite.path} with chunkIndex ${pendingWrite.nextIndex} before other work.` })
+        continue
+      }
       if (action.type === 'answer') {
         if (!progress.satisfied && !repairObjective) {
           gateNudges += 1
@@ -605,9 +615,27 @@ export class BuilderToolLoop {
           output = file ? { path: file.path, content: file.content, updatedAt: file.updatedAt } : null
         }
         if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
+          let content = toolContent(action.input)
+          const chunked = action.toolId === 'write_file' && isChunkedWrite(action.input)
+          if (chunked) {
+            const current = await this.workspace.readFile(input.workspaceId, toolPath(action.input))
+            const originalDigest = current ? checkpointDigest(current.content) : null
+            const assembled = assembleBuilderChunk(pendingWrite, {
+              path: toolPath(action.input), content, chunkIndex: action.input.chunkIndex, final: action.input.final,
+            }, originalDigest)
+            if (pendingWrite && pendingWrite.originalDigest !== originalDigest) throw new Error('builder_chunk_workspace_changed')
+            if (!assembled.final) {
+              pendingWrite = assembled.file
+              trace.push({ round, toolId: 'stage_file', input: { path: pendingWrite.path, chunkIndex: action.input.chunkIndex }, ok: true,
+                output: { staged: true, nextChunkIndex: pendingWrite.nextIndex, characters: pendingWrite.content.length } })
+              continue
+            }
+            content = assembled.file.content
+          }
           const file = action.toolId === 'write_file'
-            ? await this.workspace.writeFile(input.workspaceId, toolPath(action.input), toolContent(action.input))
+            ? await this.workspace.writeFile(input.workspaceId, toolPath(action.input), content)
             : await this.workspace.editFile(input.workspaceId, toolPath(action.input), text(action.input.search), text(action.input.replace))
+          if (chunked) pendingWrite = null
           workingFiles.set(file.path, file)
           output = summarize(file)
         }

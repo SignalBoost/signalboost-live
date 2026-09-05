@@ -27,6 +27,17 @@ export type NeuralCommunicationResult = Readonly<{
   }>
 }>
 
+type CommunicationEvaluation = Readonly<{
+  meaningFidelity: number
+  diplomacy: number
+  elegance: number
+  authenticVoice: number
+  unsupportedAdditions: number
+  literalness: number
+  violations: readonly string[]
+  repairInstructions: readonly string[]
+}>
+
 type DraftSet = {
   recommended: string
   alternatives: NeuralCommunicationAlternative[]
@@ -105,6 +116,101 @@ function parseDraftSet(raw: string): DraftSet | null {
     confidence: clamp(parsed.confidence, 0.6),
     releaseScore: clamp(parsed.release_score, clamp(parsed.confidence, 0.6)),
   }
+}
+
+function parseEvaluation(raw: string): CommunicationEvaluation | null {
+  const parsed = parseJsonObject(raw)
+  if (!parsed || !parsed.scores || typeof parsed.scores !== 'object' || Array.isArray(parsed.scores)) return null
+  const scores = parsed.scores as Record<string, unknown>
+  const list = (field: string) => Array.isArray(parsed[field])
+    ? (parsed[field] as unknown[]).map(item => cleanLabel(item)).filter(Boolean).slice(0, 10)
+    : []
+  return {
+    meaningFidelity: clamp(scores.meaning_fidelity, 0),
+    diplomacy: clamp(scores.diplomacy, 0),
+    elegance: clamp(scores.elegance, 0),
+    authenticVoice: clamp(scores.authentic_voice, 0),
+    unsupportedAdditions: clamp(scores.absence_of_unsupported_additions, 0),
+    literalness: clamp(scores.non_literal_reconstruction, 0),
+    violations: list('violations'),
+    repairInstructions: list('repair_instructions'),
+  }
+}
+
+function evaluationFloor(value: CommunicationEvaluation): number {
+  return Math.min(
+    value.meaningFidelity,
+    value.diplomacy,
+    value.elegance,
+    value.authenticVoice,
+    value.unsupportedAdditions,
+    value.literalness,
+  )
+}
+
+function evaluationPasses(value: CommunicationEvaluation): boolean {
+  return evaluationFloor(value) >= 0.82 && value.violations.length === 0
+}
+
+async function evaluateDelicateCandidate(input: {
+  instruction: string
+  source: string
+  candidate: string
+  editorialGuidance?: string
+}): Promise<CommunicationEvaluation | null> {
+  const reasoned = await callCosReasoner({
+    temperature: 0,
+    maxTokens: 1000,
+    systemPrompt: [
+      'You are an independent senior communication editor evaluating a proposed rewrite against its ORIGINAL source. Do not rewrite it and do not defend it.',
+      'Return ONLY strict JSON: {"scores":{"meaning_fidelity":0.0,"diplomacy":0.0,"elegance":0.0,"authentic_voice":0.0,"absence_of_unsupported_additions":0.0,"non_literal_reconstruction":0.0},"violations":["..."],"repair_instructions":["..."]}.',
+      'Score each dimension independently. A fluent or grammatical draft can still fail diplomacy, elegance, voice, or factual restraint.',
+      'Mark a violation when the candidate: changes "say/express" into accusatory wording such as "claim"; addresses colleagues as "you should" when reflective institutional framing is more appropriate; uses blunt conclusions such as "the bottom line is simple" in a delicate discussion; tracks the rough source sentence by sentence; erases the writer\'s hesitation or late-career perspective; invents organizational benefits, motives, conduct, acceptance of promotion, succession planning, or HR practices; or sounds like a generic memo rather than a seasoned colleague.',
+      'Diplomacy requires careful attribution, legitimate alternative perspectives, explicit respect for technical/operational work, and a proposal offered for consideration without erasing its substance.',
+      'Elegance requires natural cadence, transitions, qualification, and institutional maturity—not headings, slogans, or bureaucratic filler.',
+      input.editorialGuidance,
+    ].filter(Boolean).join('\n\n'),
+    prompt: [
+      `USER INSTRUCTION:\n${cleanText(input.instruction, 1500)}`,
+      `ORIGINAL SOURCE:\n<<<SOURCE\n${cleanText(input.source, 12000)}\nSOURCE`,
+      `CANDIDATE TO EVALUATE:\n<<<CANDIDATE\n${cleanText(input.candidate, 12000)}\nCANDIDATE`,
+    ].join('\n\n'),
+  }).catch(() => null)
+  return reasoned?.text ? parseEvaluation(reasoned.text) : null
+}
+
+async function repairFromIndependentEvaluation(input: {
+  instruction: string
+  source: string
+  candidate: DraftSet
+  evaluation: CommunicationEvaluation
+  editorialGuidance?: string
+  language?: string
+}): Promise<{ set: DraftSet; reasonerLabel: string | null } | null> {
+  const reasoned = await callCosReasoner({
+    temperature: 0.12,
+    maxTokens: 3200,
+    systemPrompt: [
+      'You are the senior writer repairing a delicate communication that failed an independent comparative review.',
+      'Return ONLY strict JSON in the draft-set schema.',
+      'Rebuild from the ORIGINAL source and the writer\'s objective. Do not merely substitute synonyms in the failed candidate.',
+      'Resolve every listed violation. Preserve the writer\'s hesitation, lived experience, substantive proposal, and legitimate qualification while using defensible, elegant institutional language.',
+      'Never use "claim" for what colleagues say, never address a broad colleague group as "you should" in this reflective proposal, and never invent what colleagues did, accepted, preferred, or intended.',
+      'Do not use "the bottom line is simple" or another blunt ultimatum. Do not invent benefits, succession planning, talent alignment, people practices, headings, recipients, closings, or signatures.',
+      executiveCommunicationBlock(input.language),
+      input.editorialGuidance,
+    ].filter(Boolean).join('\n\n'),
+    prompt: [
+      `USER INSTRUCTION:\n${cleanText(input.instruction, 1500)}`,
+      `ORIGINAL SOURCE:\n<<<SOURCE\n${cleanText(input.source, 12000)}\nSOURCE`,
+      `FAILED CANDIDATE:\n${JSON.stringify(input.candidate)}`,
+      `INDEPENDENT REVIEW:\n${JSON.stringify(input.evaluation)}`,
+      'Return a materially stronger complete draft now.',
+    ].join('\n\n'),
+  }).catch(() => null)
+  if (!reasoned?.text) return null
+  const set = parseDraftSet(reasoned.text)
+  return set ? { set, reasonerLabel: reasoned.reasoner.label } : null
 }
 
 export function isNeuralCommunicationTransformation(instruction: string, source: string): boolean {
@@ -304,6 +410,7 @@ export async function tryNeuralCommunicationTransformation(input: {
   referenceContext?: string | null
   semanticAnchors?: string
   editorialGuidance?: string
+  sensitivity?: 'routine' | 'careful' | 'delicate'
   language?: string
 }): Promise<NeuralCommunicationResult | null> {
   if (!isNeuralCommunicationTransformation(input.instruction, input.source)) return null
@@ -344,6 +451,38 @@ export async function tryNeuralCommunicationTransformation(input: {
       candidate: chosen.set,
     })
     if (repaired) chosen = repaired
+  }
+
+  // Self-review scores from the writer are not acceptance evidence. Delicate/careful work receives
+  // a separate comparison against the original, followed by one bounded repair and re-evaluation.
+  if (input.sensitivity && input.sensitivity !== 'routine') {
+    const evaluation = await evaluateDelicateCandidate({
+      instruction: input.instruction,
+      source: input.source,
+      candidate: chosen.set.recommended,
+      editorialGuidance: input.editorialGuidance,
+    })
+    if (evaluation && !evaluationPasses(evaluation)) {
+      const repaired = await repairFromIndependentEvaluation({
+        instruction: input.instruction,
+        source: input.source,
+        candidate: chosen.set,
+        evaluation,
+        editorialGuidance: input.editorialGuidance,
+        language: input.language,
+      })
+      if (repaired) {
+        const recheck = await evaluateDelicateCandidate({
+          instruction: input.instruction,
+          source: input.source,
+          candidate: repaired.set.recommended,
+          editorialGuidance: input.editorialGuidance,
+        })
+        if (recheck && (evaluationPasses(recheck) || evaluationFloor(recheck) > evaluationFloor(evaluation))) {
+          chosen = repaired
+        }
+      }
+    }
   }
 
   if (skills.items.length) {

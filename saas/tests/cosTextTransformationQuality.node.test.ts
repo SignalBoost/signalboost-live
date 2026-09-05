@@ -105,8 +105,21 @@ test('correspondence route uses the real deep-neural communication advisor and q
   assert.match(neural, /Generate at least THREE genuinely different candidate approaches internally/i)
   assert.match(neural, /Neural Communication Quality Board/)
   assert.match(neural, /releaseScore < 0\.82/)
+  assert.match(neural, /evaluateDelicateCandidate/)
+  assert.match(neural, /repairFromIndependentEvaluation/)
+  assert.match(neural, /evaluationPasses/)
+  assert.match(direct, /if \(!strategicNeural\?\.recommended\.trim\(\)\)/)
   assert.match(neural, /recordCitedCognitiveSkillReuse/)
   assert.doesNotMatch(neural, /canned reply|fixed email template/i)
+})
+
+test('independent delicate-writing gate targets the observed accusatory and generic failures', () => {
+  const neural = read('../lib/ai/cos/communicationNeuralReasoning.ts')
+  assert.match(neural, /changes "say\/express" into accusatory wording such as "claim"/i)
+  assert.match(neural, /uses blunt conclusions such as "the bottom line is simple"/i)
+  assert.match(neural, /invented benefits, motives, conduct, acceptance of promotion, succession planning, or HR practices/i)
+  assert.match(neural, /Score each dimension independently/i)
+  assert.match(neural, /re-evaluation/i)
 })
 
 test('deep-neural communication guidance covers sensitive institutional and diplomatic writing', () => {

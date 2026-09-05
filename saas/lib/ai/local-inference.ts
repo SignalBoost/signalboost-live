@@ -1,6 +1,6 @@
 // saas/lib/ai/local-inference.ts
 
-export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number }
+export interface LocalModelCallArgs { prompt: string; systemPrompt?: string; maxTokens?: number; temperature?: number; jsonObject?: boolean }
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
 
 export interface LocalInferenceTelemetry {
@@ -12,6 +12,8 @@ export interface LocalInferenceTelemetry {
   success: boolean
   httpStatus: number | null
   error: string | null
+  finishReason?: string | null
+  outputTokens?: number | null
 }
 
 function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
@@ -60,6 +62,8 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   let inferenceStartedAt: number | null = null
   let httpStatus: number | null = null
   let errorText: string | null = null
+  let finishReason: string | null = null
+  let outputTokens: number | null = null
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
   try {
@@ -78,6 +82,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       body: JSON.stringify({
         model: config.model,
         max_tokens: args.maxTokens ?? 2048,
+        ...(args.jsonObject ? { response_format: { type: 'json_object' } } : {}),
         temperature: args.temperature ?? 0.2,
         frequency_penalty: frequencyPenalty,
         presence_penalty: presencePenalty,
@@ -94,13 +99,17 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       console.error('localInference: HTTP error', response.status, errorText)
       return null
     }
-    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
+    const data = await response.json() as { choices?: Array<{ finish_reason?: string; message?: { content?: string } }>; usage?: { completion_tokens?: number } }
+    finishReason = data.choices?.[0]?.finish_reason ?? null
+    outputTokens = data.usage?.completion_tokens ?? null
+    if (args.jsonObject && finishReason === 'length') throw new Error('builder_model_output_limit')
     const text = data.choices?.[0]?.message?.content
     if (typeof text !== 'string' || text.length === 0) errorText = 'Local inference returned an empty response'
     return typeof text === 'string' && text.length > 0 ? text : null
   } catch (error) {
     errorText = error instanceof Error ? error.message : String(error)
     console.error('localInference: request failed', error)
+    if (args.jsonObject && errorText === 'builder_model_output_limit') throw error
     return null
   } finally {
     clearTimeout(timeout)
@@ -115,6 +124,8 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       success: errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300,
       httpStatus,
       error: errorText,
+      finishReason,
+      outputTokens,
     })
   }
 }

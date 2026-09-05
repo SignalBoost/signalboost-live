@@ -207,7 +207,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons: [],
-          maxRounds: 24,
+          maxRounds: isRepairObjective(job.objective) ? 20 : 16,
           modelRoundTimeoutMs: 55_000,
         })
 

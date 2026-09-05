@@ -48,6 +48,7 @@ export function createBuilderCodingAiPort(): CosAiPort {
         prompt: input.prompt,
         systemPrompt: input.systemPrompt,
         maxTokens: input.maxTokens,
+        jsonObject: true,
       }, {
         ...config,
         model: builderCodingModelFromEnv(),

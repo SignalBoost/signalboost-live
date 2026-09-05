@@ -20,7 +20,7 @@ function testCommand(manager: BuilderProjectContext['packageManager'], scripts: 
   const script = typeof scripts.test === 'string' ? scripts.test.trim() : ''
   // A hardcoded `node --test a.ts b.ts …` suite cannot be aimed with `npm test -- file`.
   // Point at one staged test file or the model OOMs the sandbox (exit 137).
-  if (/\bnode\s+--test\s+\S+/.test(script) && testFiles.length > 0) {
+  if (/\bnode\s+--test\s+\S+\s+\S+/.test(script) && testFiles.length > 0) {
     return `node --experimental-strip-types --test ${testFiles[0]}`
   }
   if (script) {
@@ -46,6 +46,7 @@ export function normalizeBuilderSandboxCommand(command: string, files: readonly 
     return `node --experimental-strip-types --test ${aimed[1]}`
   }
   if (/^npm\s+(?:run\s+)?test\s*$/i.test(next)) {
+    if (discoverBuilderProjectContext(files).recommendedTestCommand === 'npm test') return next
     const proof = pickProofTest(files)
     if (proof) return `node --experimental-strip-types --test ${proof}`
   }

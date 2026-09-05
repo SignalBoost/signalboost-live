@@ -1,6 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { mkdtemp, writeFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
+import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { builderEvidenceReply, formatBuilderExecutionEvidence, isBuilderEvidenceRequest } from '../lib/builder/execution-evidence.ts'
 
 const userId = '11111111-1111-4111-8111-111111111111'
@@ -11,6 +17,36 @@ const trace = [{ toolId: 'run', command: 'node hello.js; echo EXIT_CODE:$?', exi
 const job = { id, userId, conversationId, workspaceId, status: 'succeeded', metadata: {}, result: { trace } }
 const input = { prompt: 'Show the recorded execution evidence for that Builder job: exact command, exit code, stdout, and stderr. Do not rerun it or reconstruct missing evidence.', userId, conversationId,
   priorAnswer: `Builder files: [Download hello.js](/api/builder/workspaces/${workspaceId}/files/hello.js)`, allowRepositoryEvidence: false }
+
+test('create, execute with real Node, render evidence, and retrieve it without another run', async () => {
+  const prompt = 'Create hello.js that prints “Hello from COS Builder.” Run it with Node. Show the exact command, exit code, and output, and provide the downloadable file. Do not claim success unless execution succeeds.'
+  assert.equal(await builderEvidenceReply({ ...input, prompt }, async () => { assert.fail('new request must not read old jobs'); return null }), null)
+  const workspace = new InMemoryBuilderWorkspace()
+  const responses = [
+    JSON.stringify({ type: 'tool', toolId: 'write_file', input: { path: 'hello.js', content: 'console.log("Hello from COS Builder.")' } }),
+    JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node hello.js' } }),
+  ]
+  const directory = await mkdtemp(join(tmpdir(), 'builder-proof-'))
+  let runs = 0
+  try {
+    const result = await new BuilderToolLoop({ async generate() { return responses.shift() || null } }, workspace, {
+      async run(request) {
+        assert.equal(request.command, 'node hello.js')
+        const file = request.files.find(file => file.path === 'hello.js')!
+        await writeFile(join(directory, 'hello.js'), file.content)
+        runs++
+        return { exitCode: 0, stdout: execFileSync(process.execPath, ['hello.js'], { cwd: directory, encoding: 'utf8' }), stderr: '', timedOut: false }
+      },
+    }).run({ objective: prompt, workspaceId })
+    assert.equal(result.ok, true)
+    const savedTrace = result.trace.filter(item => item.toolId === 'run').map(item => ({ toolId: 'run', command: item.input.command, ...(item.output as object) }))
+    assert.match(formatBuilderExecutionEvidence(savedTrace), /Hello from COS Builder\./)
+    const reply = await builderEvidenceReply(input, async () => ({ ...job, result: { trace: savedTrace } }))
+    assert.match(reply!, /Exit code: 0/)
+    assert.match(reply!, /Hello from COS Builder\./)
+    assert.equal(runs, 1)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
 
 test('the reported follow-up retrieves saved command and streams without running code', async () => {
   let reads = 0
@@ -55,9 +91,24 @@ test('explicit job selection overrides the preceding workspace but cannot cross 
 })
 
 test('ordinary coding and unrelated requests do not enter evidence lookup', async () => {
-  for (const prompt of ['Create hello.js and run it.', 'What is Builder?', 'Show the weather', 'Build a website showing job evidence']) {
+  for (const prompt of [
+    'Create hello.js that prints “Hello from COS Builder.” Run it with Node. Show the exact command, exit code, and output, and provide the downloadable file. Do not claim success unless execution succeeds.',
+    'Please create hello.js, run it, and show Builder execution evidence.',
+    'Can you write a Python script and show the Builder job stdout and exit code?',
+    'Show the recorded Builder evidence, then run the job again.',
+    'Run hello.js and provide Builder job execution evidence.',
+    'Create hello.js and run it.', 'What is Builder?', 'Show the weather', 'Build a website showing job evidence',
+  ]) {
     assert.equal(isBuilderEvidenceRequest(prompt), false)
+    assert.equal(await builderEvidenceReply({ ...input, prompt }, async () => { assert.fail('new work must not look up old evidence'); return null }), null)
   }
+})
+
+test('read-only follow-ups still match despite quoted create/run instructions and negation', () => {
+  for (const prompt of [input.prompt, 'Show the saved stdout and stderr for the last Builder job. Do not execute anything.',
+    'What exit code did that Builder job return?', 'Show recorded execution evidence for the previous run.',
+    'Show the recorded evidence for the Builder job "Create hello.js and run it". Do not rerun it.',
+  ]) assert.equal(isBuilderEvidenceRequest(prompt), true, prompt)
 })
 
 test('failed and unfinished jobs retain their status and missing evidence', async () => {
@@ -77,6 +128,7 @@ test('both initial History reply and shared pre-execution routing use recorded e
   const runner = readFileSync('lib/builder/job-runner.ts', 'utf8')
   const specialist = readFileSync('lib/ai/cos/softwareSpecialist.ts', 'utf8')
   const store = readFileSync('lib/builder/job-store.ts', 'utf8')
+  assert.doesNotMatch(specialist, /await workspace.writeFile\(workspaceId, 'index.html', travelLandingPageHtml\(\)\)/)
   assert.match(runner, /historyReply\(`\$\{baseReply\}.*formatBuilderExecutionEvidence\(trace\)/)
   assert.ok(specialist.indexOf('await builderEvidenceReply(') < specialist.indexOf('if (input.allowRepositoryRepair'))
   const read = store.slice(store.indexOf('export async function readBuilderEvidenceJob'), store.indexOf('export async function enqueueBuilderJob'))

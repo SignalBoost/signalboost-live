@@ -11,10 +11,14 @@ export type EvidenceJob = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function isBuilderEvidenceRequest(prompt: string): boolean {
-  return /\b(?:show|provide|display|retrieve|what|give)\b/i.test(prompt)
-    && /\b(?:recorded|execution|exit\s*code|stdout|stderr|command|evidence)\b/i.test(prompt)
-    && /\b(?:builder|job|recorded execution|that run|previous run)\b/i.test(prompt)
-    && !/\b(?:create|build|fix|repair)\s+(?:a\s+|the\s+)?(?:file|app|website|project)\b/i.test(prompt)
+  // Classify the requested action, not words inside the file's output or a quoted
+  // former objective. A create/run request may also demand execution evidence.
+  const request = prompt.replace(/"[^"\n]*"|“[^”\n]*”|`[^`\n]*`/g, ' ')
+  const newWork = /(?:^|[.!?;,\n]|\b(?:and|then)\b)\s*(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+)?(?:create|write|build|make|edit|update|fix|repair|debug|run|rerun|execute|test)\b/i
+  if (newWork.test(request)) return false
+  return /^\s*(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:show|provide|display|retrieve|what|give)\b/i.test(request)
+    && /\b(?:recorded|execution|exit\s*code|stdout|stderr|command|evidence)\b/i.test(request)
+    && /\b(?:builder|job|recorded execution|that run|previous run)\b/i.test(request)
 }
 
 function block(value: unknown): string {

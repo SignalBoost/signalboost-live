@@ -302,7 +302,7 @@ export class BuilderToolLoop {
     })))
     const initialPaths = new Set(initialListing.map(file => file.path))
     let workspacePaths: string[] = [...initialPaths]
-    const repairObjective = isRepairObjective(input.objective)
+    let repairObjective = isRepairObjective(input.objective)
     let writeCount = 0, runCount = 0, gateNudges = 0
     const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 8, 24))
     let workRounds = 0
@@ -422,16 +422,20 @@ export class BuilderToolLoop {
       }
 
       if (action.type === 'answer') {
+        repairObjective ||= isRepairObjective(action.answer)
+        const verdict = evaluateRegressionGate(input.objective, trace, repairObjective)
+        if (verdict.satisfied) return { ok: true, answer: action.answer, trace }
         if (repairObjective) {
           const listed = await this.workspace.listFiles(input.workspaceId)
           workspacePaths = listed.map(file => file.path)
           const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
             .filter((file): file is BuilderFile => file !== null)
-          const proofFile = files.find(file => /builderAsyncJobs|builderDebugFileJob|builderRoutingStrict/.test(file.path))
-            || files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
-          const proofCommand = proofFile
-            ? `node --experimental-strip-types --test ${proofFile.path}`
-            : (projectContext.recommendedTestCommand || '')
+          const proofFile = files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
+          const observedFailedCommand = trace.find(item => item.toolId === 'run' && !item.ok)?.input.command
+          const proofCommand = (typeof observedFailedCommand === 'string' ? observedFailedCommand : '')
+            || (projectContext.manifestPath ? projectContext.recommendedTestCommand : '')
+            || (proofFile ? `node --experimental-strip-types --test ${proofFile.path}` : '')
+            || projectContext.recommendedTestCommand || ''
           const proofIdx = trace
             .map((item, index) => ({ item, index }))
             .filter(({ item }) => item.toolId === 'run' && text(item.input.command) === proofCommand)
@@ -440,9 +444,11 @@ export class BuilderToolLoop {
           const verifiedAfterFail = failedProof
             ? proofIdx.some(({ item, index }) => item.ok && index > failedProof.index)
             : false
-          const edited = trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
+          const edited = trace.some((item, index) => index > (failedProof?.index ?? -1)
+            && item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
 
           if (proofCommand && !failedProof && !passedProof) {
+            if (runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
             const output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: proofCommand, files }))
             const failed = output.exitCode !== 0
             trace.push({
@@ -457,6 +463,7 @@ export class BuilderToolLoop {
             continue
           }
           if (proofCommand && failedProof && edited && !verifiedAfterFail) {
+            if (runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
             const output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: proofCommand, files }))
             const failed = output.exitCode !== 0
             trace.push({
@@ -468,15 +475,13 @@ export class BuilderToolLoop {
               ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
             })
             runCount += 1
-            if (!failed) return { ok: true, answer: action.answer, trace }
+            if (!failed && evaluateRegressionGate(input.objective, trace, true).satisfied) return { ok: true, answer: action.answer, trace }
             continue
           }
           if (passedProof && !failedProof && !edited) {
             return { ok: false, error: 'builder_regression_not_reproduced', trace }
           }
         }
-        const verdict = evaluateRegressionGate(input.objective, trace)
-        if (verdict.satisfied) return { ok: true, answer: action.answer, trace }
         const reason = 'reason' in verdict ? verdict.reason : 'regression evidence is required'
         gateNudges += 1
         if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_regression_evidence_required', trace }
@@ -487,6 +492,7 @@ export class BuilderToolLoop {
       const fingerprint = `${action.toolId}:${safeJson(action.input)}`
       const inspection = action.toolId === 'list_files' || action.toolId === 'read_file'
       const mutation = action.toolId === 'write_file' || action.toolId === 'edit_file'
+      if (mutation && initialPaths.has(toolPath(action.input))) repairObjective = true
       // An alternating list/read loop observes unchanged workspace state without progress.
       if (inspection && inspectedInCurrentWorkspaceState.has(fingerprint)) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })

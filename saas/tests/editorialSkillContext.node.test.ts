@@ -13,7 +13,7 @@ test('the retrieval query carries the draft, not just the boilerplate instructio
   const draft = 'Hi JC, It was nice to talk to you after all these years.'
   const query = editorialSkillQuery(instruction, draft)
   assert.ok(query.includes('JC'))
-  assert.ok(query.includes('professional tone'))
+  assert.ok(query.includes('clarity'))
   assert.ok(query.length <= 4000)
 })
 

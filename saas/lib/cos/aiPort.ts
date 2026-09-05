@@ -48,7 +48,11 @@ export function createBuilderCodingAiPort(): CosAiPort {
         prompt: input.prompt,
         systemPrompt: input.systemPrompt,
         maxTokens: input.maxTokens,
-        jsonObject: true,
+        // Source code is legitimately repetitive. The prose reasoner's repetition penalties
+        // accumulate over a generated file and push the sampler off valid syntax, so coding
+        // calls generate unpenalised.
+        frequencyPenalty: 0,
+        presencePenalty: 0,
       }, {
         ...config,
         model: builderCodingModelFromEnv(),

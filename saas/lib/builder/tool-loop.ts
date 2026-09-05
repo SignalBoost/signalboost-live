@@ -18,6 +18,10 @@ const MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS = 1
 const MODEL_CONTROL_MAX_TOKENS = 2_400
 const MODEL_REPAIR_CONTROL_MAX_TOKENS = 4_096
 const MODEL_CONTROL_RECOVERY_MAX_TOKENS = 4_096
+/** Message raised by the model port when the provider reported an incomplete generation. */
+const MODEL_OUTPUT_TRUNCATED = 'local_model_output_truncated'
+const isOutputTruncation = (error: unknown): boolean =>
+  error instanceof Error && error.message === MODEL_OUTPUT_TRUNCATED
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
@@ -74,7 +78,6 @@ async function generateWithRetry(ai: BuilderAiPort, input: Parameters<BuilderAiP
     try {
       return await within(ai.generate(request), timeoutMs)
     } catch (error) {
-      if (error instanceof Error && error.message === 'local_model_output_truncated') error = new Error('builder_model_output_limit')
       lastError = error
       if (modelAttempt === MAX_MODEL_ROUND_ATTEMPTS) throw error
       if (error instanceof Error && error.message === 'builder_model_output_limit') {
@@ -326,21 +329,6 @@ export class BuilderToolLoop {
       const lastWorkspaceChange = Math.max(...trace.map((item, index) => (
         item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file') ? index : -1
       )))
-      // The controller owns verification scheduling. Once a new build's declared files
-      // exist, execute the user's explicit Run list before asking for any more edits.
-      // A failed command is attempted only once per file revision, then returned to the
-      // model for diagnosis; no blind execution retries or additional command authority.
-      const verificationCommand = !repairObjective && writeCount > 0 && task.files.length > 0 && progress.missingFiles.length === 0
-        ? progress.pendingCommands.find(command => !trace.slice(lastWorkspaceChange + 1)
-          .some(item => item.toolId === 'run' && item.input.command === command))
-        : undefined
-      const currentStep = !repairObjective && progress.missingFiles.length > 0
-        ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files or return partial source.`
-        : !repairObjective && progress.pendingCommands.length === 0 && !progress.testsSatisfied
-          ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. Complete the test suite with distinct meaningful assertions covering the requested normal, edge, and failure cases. Do not duplicate empty tests or weaken the requirement. Verification will run again after the file changes.`
-        : trace.slice(lastWorkspaceChange + 1).some(item => item.toolId === 'run' && !item.ok)
-          ? 'CURRENT STEP: Use the recorded command failures to repair the source. Read the failing file if needed. If a newly created file is incomplete, replace it with complete source rather than repeatedly patching a fragment. Do not claim success or weaken tests.'
-          : 'CURRENT STEP: Follow the objective and use tools for any remaining work; report only recorded evidence.'
       const blockedInspectionTools = new Set(trace
         .slice(lastWorkspaceChange + 1)
         .filter(item => (item.toolId === 'list_files' || item.toolId === 'read_file')
@@ -365,11 +353,7 @@ export class BuilderToolLoop {
         formatBuilderProjectContext(projectContext),
         repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',
         `TOOLS: ${safeJson(availableTools)}`,
-        // Old write proposals are not current source. Replaying their large strings,
-        // especially rejected duplicates, crowds out the actual runner diagnostics.
-        trace.length ? `RESULTS:\n${safeJson(trace.map(item => item.toolId === 'write_file' || item.toolId === 'edit_file'
-          ? { ...item, input: { path: toolPath(item.input) } } : item))}` : '',
-        currentStep,
+        trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
         'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
         'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
         availableTools.includes('read_file')
@@ -387,24 +371,37 @@ export class BuilderToolLoop {
         'When done: {"type":"answer","answer":"what changed and what ran"}',
       ].filter(Boolean)
 
-      let action: Action | null = verificationCommand ? { type: 'tool', toolId: 'run', input: { command: verificationCommand } } : null
+      let action: Action | null = null
       let blockedAction: ToolAction | null = null
       let controlFailure: ModelControlFailure | null = null
-      for (let controlAttempt = 0; !action && controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
+      for (let controlAttempt = 0; controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
         const recoveryInstruction = controlAttempt > 0
           ? `CONTROL RECOVERY ATTEMPT ${controlAttempt}: The previous response could not be used. Return exactly one compact JSON object using one TOOL INPUT SCHEMA above. Use only type, toolId, and input; input must be an object, not a JSON string. Emit no prose or Markdown. For an existing file, use edit_file with search and replace instead of rewriting the whole file.`
           : ''
-        let response: string | null
-        try {
-          response = await generateWithRetry(this.ai, {
+        const controlBudget = controlAttempt > 0
+          ? MODEL_CONTROL_RECOVERY_MAX_TOKENS
+          : repairObjective || task.files.length > 1 ? MODEL_REPAIR_CONTROL_MAX_TOKENS : MODEL_CONTROL_MAX_TOKENS
+        const generateControl = (maxTokens: number) => generateWithRetry(this.ai, {
             systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${maxWrites} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. A new build with conditional instructions to fix failing tests is still a creation task: write complete files (including the CLI entry point), create tests and sample data, execute all requested commands, and repair only observed failures. Do not repeatedly inspect or polish one new file while other deliverables are missing. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
             prompt: [...promptParts, recoveryInstruction].filter(Boolean).join('\n\n'),
-            maxTokens: controlAttempt > 0
-              ? MODEL_CONTROL_RECOVERY_MAX_TOKENS
-              : repairObjective || task.files.length > 1 ? MODEL_REPAIR_CONTROL_MAX_TOKENS : MODEL_CONTROL_MAX_TOKENS,
+            maxTokens,
           }, input.modelRoundTimeoutMs)
+
+        // A provider-confirmed incomplete generation is a budget problem, not a model mistake:
+        // retry the same round once with double the room, and never parse the fragment.
+        let response: string | null
+        try {
+          response = await generateControl(controlBudget)
         } catch (error) {
-          return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
+          if (!isOutputTruncation(error)) {
+            return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
+          }
+          try {
+            response = await generateControl(controlBudget * 2)
+          } catch (retryError) {
+            if (isOutputTruncation(retryError)) return { ok: false, error: 'builder_model_output_limit', trace }
+            return { ok: false, error: retryError instanceof Error ? retryError.message : 'builder_model_call_failed', trace }
+          }
         }
 
         action = parse(response, availableTools)
@@ -573,7 +570,6 @@ export class BuilderToolLoop {
         }
         const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0
         if (runFailed) {
-          completedRunsInCurrentWorkspaceState.add(fingerprint)
           const details = diagnose(`${(output as ReturnType<typeof summarizeRun>).stderr}\n${(output as ReturnType<typeof summarizeRun>).stdout}`, workspacePaths)
           trace.push({ round, toolId: action.toolId, input: action.input, ok: false, output, error: `builder_command_failed: exit ${(output as ReturnType<typeof summarizeRun>).exitCode}`, ...details })
           continue

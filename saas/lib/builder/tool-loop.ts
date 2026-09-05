@@ -1,3 +1,320 @@
+// saas/lib/cos/aiPort.ts
+// Injected model-access seam for COS generators. Text requests enter the shared COS gateway so
+// existing Portables gain durable reuse and single-flight protection without owning provider logic.
+import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
+import { callProviderModel, type ModelProvider } from '@/lib/ai/providerRouter'
+import { callCosText } from '@/lib/cos/textGateway'
+import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
+
+export interface CosAiPort {
+  generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
+}
+
+export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
+
+/**
+ * Execution path: no default, no substitution. An unset DEEPINFRA_BUILDER_MODEL throws
+ * `builder_model_not_configured` rather than quietly sending a guessed model to the provider.
+ */
+export function builderCodingModelFromEnv(): string {
+  return requireBuilderCodingModel()
+}
+
+function requireText(result: string | null, provider: string): string {
+  if (!result) throw new Error(`${provider} AI provider returned no text`)
+  return result
+}
+
+export function createPlatformAiPort(): CosAiPort {
+  return {
+    generate: async (input) => requireText(await callCosText({ ...input, taskId: 'cos-portable-text' }), 'platform'),
+  }
+}
+
+/**
+ * Coding-specialist port for Builder and Platform Engineer.
+ *
+ * Keep coding work on the approved local/DeepInfra inference boundary, but select the coding model
+ * independently from the general COS reasoner. This intentionally bypasses shared answer caching and
+ * external-provider fallback: Builder must reason from the current workspace/repository evidence and
+ * prove its result with tools rather than reuse a prior prose answer. The local inference layer still
+ * records the exact selected model in its telemetry.
+ */
+export function createBuilderCodingAiPort(): CosAiPort {
+  return {
+    generate: async (input) => {
+      const config = localInferenceConfigFromEnv()
+      return requireText(await callLocalModel({
+        prompt: input.prompt,
+        systemPrompt: input.systemPrompt,
+        maxTokens: input.maxTokens,
+        // Source code is legitimately repetitive. The prose reasoner's repetition penalties
+        // accumulate over a generated file and push the sampler off valid syntax, so coding
+        // calls generate unpenalised.
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        // The control object must be JSON. Provider-enforced JSON mode removes the class of
+        // failures where source quoting or escaping breaks the surrounding envelope.
+        jsonObject: true,
+      }, {
+        ...config,
+        model: builderCodingModelFromEnv(),
+      }), 'builder coding')
+    },
+  }
+}
+
+export function createLocalApplianceAiPort(): CosAiPort {
+  return {
+    generate: async (input) => requireText(await callProviderModel({ ...input, modelPreference: 'local' }), 'local appliance'),
+  }
+}
+
+/** SignalBoost-host adapter for optional frontier teacher/evaluator work. */
+export function createExternalTeacherAiPort(provider: ExternalTeacherProvider): CosAiPort {
+  return {
+    generate: async (input) => requireText(
+      await callProviderModel({ ...input, modelPreference: provider }),
+      `external teacher ${provider}`,
+    ),
+  }
+}
+
+export type CosImageResult = { ok: boolean; b64?: string; url?: string; error?: string }
+
+export interface CosImagePort {
+  generate(input: { prompt: string; size?: string }): Promise<CosImageResult>
+}
+
+export function createPlatformImagePort(): CosImagePort {
+  return {
+    async generate({ prompt, size = '1024x1024' }): Promise<CosImageResult> {
+      // Visual creation uses only the approved COS managed runtime. It must never select an
+      // ambient OpenAI key or any other external-provider fallback.
+      const key = process.env.LOCAL_AI_API_KEY?.trim()
+      const baseUrl = (process.env.LOCAL_AI_BASE_URL || '').replace(/\/$/, '')
+      if (!key || !/^https:\/\/api\.deepinfra\.com\/v1\/openai$/i.test(baseUrl)) {
+        return { ok: false, error: 'Approved visual runtime is not configured.' }
+      }
+
+      try {
+        const response = await fetch('https://api.deepinfra.com/v1/openai/images/generations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+          body: JSON.stringify({ model: 'black-forest-labs/FLUX-2-klein-4b', prompt, size, n: 1 }),
+        })
+        const raw = await response.text()
+        let data: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } | string; detail?: string | { message?: string }; message?: string } = {}
+        try { data = JSON.parse(raw) } catch { /* provider returned a non-JSON error */ }
+        if (!response.ok) {
+          const detail = typeof data.error === 'string'
+            ? data.error
+            : data.error?.message || (typeof data.detail === 'string' ? data.detail : data.detail?.message) || data.message || raw.slice(0, 240)
+          console.warn('[concierge-visual-runtime-failure]', JSON.stringify({ status: response.status, detail: detail || 'no_provider_error_detail' }))
+          return { ok: false, error: detail || `Approved visual runtime failed (HTTP ${response.status}).` }
+        }
+        const first = data.data?.[0]
+        return first?.b64_json ? { ok: true, b64: first.b64_json, url: first.url } : { ok: false, error: 'Creative image provider returned no image.' }
+      } catch (e: any) {
+        return { ok: false, error: e?.message || 'Creative image generation failed.' }
+      }
+    },
+  }
+}
+// saas/lib/ai/local-inference.ts
+
+export interface LocalModelCallArgs {
+  prompt: string
+  systemPrompt?: string
+  maxTokens?: number
+  temperature?: number
+  /**
+   * Repetition penalties are prose defaults. Code generation must be able to override them:
+   * indentation, braces, `const`, and repeated identifiers are required tokens in source, and
+   * penalising them steers the sampler away from valid code as a file grows.
+   */
+  frequencyPenalty?: number
+  presencePenalty?: number
+  /** Ask the provider to enforce a JSON object response. Required for control-object generation. */
+  jsonObject?: boolean
+}
+
+/**
+ * Thrown when the provider reports finish_reason 'length'. The partial content is never returned:
+ * a half-written control object or source file must not be mistaken for a finished answer.
+ */
+export const LOCAL_MODEL_OUTPUT_TRUNCATED = 'local_model_output_truncated'
+export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
+
+export interface LocalInferenceTelemetry {
+  at: string
+  model: string
+  latencyMs: number
+  startupLatencyMs: number
+  inferenceLatencyMs: number
+  success: boolean
+  httpStatus: number | null
+  error: string | null
+  /** Provider stop reason. 'length' means the answer was cut off by max_tokens, not finished. */
+  finishReason: string | null
+  requestedMaxTokens: number
+  completionTokens: number | null
+}
+
+function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
+  console.info('[cos-local-inference-telemetry]', JSON.stringify(event))
+}
+
+function normalizeHost(value: string): string { return value.trim().toLowerCase().replace(/^\[|\]$/g, '') }
+function configuredRemoteHosts(): Set<string> { return new Set((process.env.LOCAL_AI_ALLOWED_HOSTS || '').split(',').map(normalizeHost).filter(Boolean)) }
+function isLoopbackOrInternalHost(hostname: string): boolean { const host = normalizeHost(hostname); return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === 'ai-brain' }
+function normalizeBaseUrl(value: string): string {
+  const url = new URL(value)
+  const host = normalizeHost(url.hostname)
+  const internal = isLoopbackOrInternalHost(host)
+  const explicitlyAllowed = configuredRemoteHosts().has(host)
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('Local AI endpoint must use http or https')
+  if (!internal && !explicitlyAllowed) throw new Error(`Local AI endpoint host is not allowed: ${url.hostname}. Add the exact host to LOCAL_AI_ALLOWED_HOSTS.`)
+  if (!internal && url.protocol !== 'https:') throw new Error('Remote local-AI endpoints must use https')
+  if (!internal && !process.env.LOCAL_AI_API_KEY?.trim()) throw new Error('LOCAL_AI_API_KEY is required for a remote local-AI endpoint')
+  if (url.username || url.password) throw new Error('Local AI endpoint credentials must not be embedded in LOCAL_AI_BASE_URL')
+  return url.toString().replace(/\/$/, '')
+}
+function authHeaders(apiKey?: string): Record<string, string> { return apiKey ? { Authorization: `Bearer ${apiKey}`, 'x-api-key': apiKey } : {} }
+
+function configuredReasoningEffort(): 'none' | 'low' | 'medium' | 'high' | undefined {
+  const value = process.env.LOCAL_AI_REASONING_EFFORT?.trim().toLowerCase()
+  if (value === 'none' || value === 'low' || value === 'medium' || value === 'high') return value
+  return undefined
+}
+
+export function localInferenceConfigFromEnv(): LocalInferenceConfig {
+  const baseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || 'http://ai-brain:8000/v1')
+  const model = (process.env.LOCAL_AI_MODEL || '').trim()
+  if (!model) throw new Error('LOCAL_AI_MODEL is required when local inference is enabled')
+  const timeoutMs = Number(process.env.LOCAL_AI_TIMEOUT_MS || '120000')
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 1000 || timeoutMs > 600000) throw new Error('LOCAL_AI_TIMEOUT_MS must be between 1000 and 600000')
+  return { baseUrl, model, apiKey: process.env.LOCAL_AI_API_KEY?.trim() || undefined, timeoutMs }
+}
+
+/** Managed/configured inference has no server-owned pod lifecycle to prepare. */
+export async function ensureLocalInferenceRuntimeReady(_config = localInferenceConfigFromEnv()): Promise<void> {
+  return
+}
+
+export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
+  const startedAt = Date.now()
+  let inferenceStartedAt: number | null = null
+  let httpStatus: number | null = null
+  let errorText: string | null = null
+  let finishReason: string | null = null
+  let completionTokens: number | null = null
+  let text: string | null = null
+  const requestedMaxTokens = args.maxTokens ?? 2048
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
+  try {
+    inferenceStartedAt = Date.now()
+    const reasoningEffort = configuredReasoningEffort()
+    const parsePenalty = (value: string | undefined, fallback: number): number => {
+      const n = Number(value)
+      return Number.isFinite(n) ? Math.max(0, Math.min(2, n)) : fallback
+    }
+    const frequencyPenalty = typeof args.frequencyPenalty === 'number' && Number.isFinite(args.frequencyPenalty)
+      ? Math.max(0, Math.min(2, args.frequencyPenalty))
+      : parsePenalty(process.env.COS_REASONER_FREQUENCY_PENALTY, 0.4)
+    const presencePenalty = typeof args.presencePenalty === 'number' && Number.isFinite(args.presencePenalty)
+      ? Math.max(0, Math.min(2, args.presencePenalty))
+      : parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
+    const response = await fetch(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: config.model,
+        max_tokens: requestedMaxTokens,
+        temperature: args.temperature ?? 0.2,
+        frequency_penalty: frequencyPenalty,
+        presence_penalty: presencePenalty,
+        ...(args.jsonObject ? { response_format: { type: 'json_object' } } : {}),
+        ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+        messages: [
+          { role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' },
+          { role: 'user', content: args.prompt },
+        ],
+      }),
+    })
+    httpStatus = response.status
+    if (!response.ok) {
+      errorText = `HTTP ${response.status}: ${await response.text()}`
+      console.error('localInference: HTTP error', response.status, errorText)
+    } else {
+      const data = await response.json() as {
+        choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
+        usage?: { completion_tokens?: number }
+      }
+      const rawFinishReason = data.choices?.[0]?.finish_reason
+      finishReason = typeof rawFinishReason === 'string' ? rawFinishReason : null
+      completionTokens = typeof data.usage?.completion_tokens === 'number' ? data.usage.completion_tokens : null
+      const content = data.choices?.[0]?.message?.content
+      // A provider that stops on max_tokens returns HTTP 200 with a half-finished answer. Without
+      // this a truncated result is indistinguishable from one the model chose to end.
+      if (finishReason && finishReason !== 'stop') {
+        console.warn('[cos-local-inference-incomplete]', {
+          model: config.model,
+          finishReason,
+          requestedMaxTokens,
+          completionTokens,
+          contentLength: typeof content === 'string' ? content.length : 0,
+        })
+      }
+      if (typeof content !== 'string' || content.length === 0) errorText = 'Local inference returned an empty response'
+      text = typeof content === 'string' && content.length > 0 ? content : null
+    }
+  } catch (error) {
+    errorText = error instanceof Error ? error.message : String(error)
+    console.error('localInference: request failed', error)
+    text = null
+  } finally {
+    clearTimeout(timeout)
+    const latencyMs = Date.now() - startedAt
+    const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
+    emitLocalInferenceTelemetry({
+      at: new Date().toISOString(),
+      model: config.model,
+      latencyMs,
+      startupLatencyMs: 0,
+      inferenceLatencyMs,
+      success: errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300,
+      httpStatus,
+      error: errorText,
+      finishReason,
+      requestedMaxTokens,
+      completionTokens,
+    })
+  }
+
+  // Raised after telemetry so the caller can retry with a larger budget instead of parsing a
+  // fragment. Partial output is discarded even when it happens to parse.
+  if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
+  return text
+}
+
+export async function checkLocalInferenceHealth(config = localInferenceConfigFromEnv()): Promise<{ ok: boolean; model: string; error?: string }> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), Math.min(config.timeoutMs, 5000))
+  try {
+    const response = await fetch(`${config.baseUrl}/models`, { headers: authHeaders(config.apiKey), signal: controller.signal })
+    if (!response.ok) return { ok: false, model: config.model, error: `HTTP ${response.status}` }
+    const data = await response.json() as { data?: Array<{ id?: string }> }
+    const available = data.data?.some(item => item.id === config.model) ?? false
+    return available ? { ok: true, model: config.model } : { ok: false, model: config.model, error: 'Configured model is not served by the local endpoint' }
+  } catch (error) {
+    return { ok: false, model: config.model, error: error instanceof Error ? error.message : 'Local inference health check failed' }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
 // saas/lib/builder/tool-loop.ts
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
@@ -18,6 +335,10 @@ const MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS = 1
 const MODEL_CONTROL_MAX_TOKENS = 2_400
 const MODEL_REPAIR_CONTROL_MAX_TOKENS = 4_096
 const MODEL_CONTROL_RECOVERY_MAX_TOKENS = 4_096
+/** Message raised by the model port when the provider reported an incomplete generation. */
+const MODEL_OUTPUT_TRUNCATED = 'local_model_output_truncated'
+const isOutputTruncation = (error: unknown): boolean =>
+  error instanceof Error && error.message === MODEL_OUTPUT_TRUNCATED
 const text = (value: unknown) => typeof value === 'string' ? value : ''
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 
@@ -199,395 +520,4 @@ function parse(value: string | null, allowedTools: readonly BuilderToolId[] = to
     } catch {}
   }
   return null
-}
-
-type ModelControlFailure = Readonly<{
-  error: string
-  remediation: string
-  telemetry: Readonly<Record<string, boolean | number>>
-}>
-
-function modelControlFailure(value: string | null): ModelControlFailure {
-  const raw = String(value || '')
-  const trimmed = raw.trim()
-  const hasThinkOpen = /<think(?:\s[^>]*)?>/i.test(raw)
-  const hasThinkClose = /<\/think>/i.test(raw)
-  const hasUnclosedObject = (() => {
-    let depth = 0
-    let inString = false
-    let escaped = false
-    for (const character of trimmed) {
-      if (inString) {
-        if (escaped) escaped = false
-        else if (character === '\\') escaped = true
-        else if (character === '"') inString = false
-      } else if (character === '"') inString = true
-      else if (character === '{') depth += 1
-      else if (character === '}' && depth > 0) depth -= 1
-    }
-    return depth > 0
-  })()
-  const anyValidJson = jsonObjectCandidates(raw).some((candidate) => {
-    try { JSON.parse(candidate); return true } catch { return false }
-  })
-  const telemetry = Object.freeze({
-    responseLength: raw.length,
-    startsWithObject: trimmed.startsWith('{'),
-    endsWithObject: trimmed.endsWith('}'),
-    hasThinkOpen,
-    hasThinkClose,
-    hasUnclosedObject,
-    anyValidJson,
-  })
-  if (!trimmed) return { error: 'builder_model_control_empty_response', remediation: 'The reasoner returned no control content. Inspect local inference telemetry for HTTP status, timeout, or an empty provider message before retrying.', telemetry }
-  if (hasUnclosedObject && !trimmed.endsWith('}')) return { error: 'builder_model_control_truncated', remediation: 'The response contains incomplete JSON. Check the recorded provider finish reason before attributing this to the token limit.', telemetry }
-  if (hasThinkOpen && !hasThinkClose) return { error: 'builder_model_control_reasoning_truncated', remediation: 'The reasoner stopped inside a reasoning envelope before emitting a control object. Inspect the control-token budget and reasoning-output settings before retrying.', telemetry }
-  if (hasThinkOpen) return { error: 'builder_model_control_reasoning_only', remediation: 'The reasoner emitted a reasoning envelope but no usable JSON control object. Configure the model to emit its final control message separately, then retry.', telemetry }
-  if (anyValidJson) return { error: 'builder_model_control_schema_mismatch', remediation: 'The reasoner emitted valid JSON that is not a control object the Builder accepts (unrecognized tool, missing input, or a non-control shape). Align the control-schema instruction or the accepted schema, then retry.', telemetry }
-  return { error: 'builder_model_control_malformed_json', remediation: 'The reasoner emitted content with no parseable JSON control object and no reasoning envelope (likely invalid quoting, escaping, or trailing commas). Constrain the model to strict JSON output, then retry.', telemetry }
-}
-
-function summarize(file: { path: string; content: string; updatedAt: number }) { return { path: file.path, bytes: new TextEncoder().encode(file.content).byteLength, updatedAt: file.updatedAt } }
-function summarizeRun(result: BuilderRunResult) { return { exitCode: result.exitCode, stdout: result.stdout.slice(0, 16_000), stderr: result.stderr.slice(0, 16_000), timedOut: result.timedOut } }
-
-function verifiedRepairAnswer(trace: readonly BuilderToolTrace[]): string {
-  const changedPaths = [...new Set(trace
-    .filter(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
-    .map(item => toolPath(item.input))
-    .filter(Boolean))]
-  const passingRun = [...trace].reverse().find(item => item.ok && item.toolId === 'run')
-  const command = passingRun ? text(passingRun.input.command) : ''
-  const target = changedPaths.length ? changedPaths.join(', ') : 'the staged project'
-  return `Repaired ${target} and verified ${command || 'the proving command'} completed successfully.`
-}
-
-function diagnose(value: unknown, knownPaths: readonly string[] = []): { failureClass: BuilderFailureClass; remediation: string } {
-  const message = String(value || '').toLowerCase()
-  if (/supabase|postgres|database|constraint|pgrst|duplicate key|relation .* does not exist/.test(message)) return { failureClass: 'storage', remediation: 'Inspect the exact database error and the storage contract before retrying.' }
-  if (/cannot find package|no module named|unable to resolve|npm err|dependency|lockfile/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
-  if (/cannot find module\s+['"](?![./])[^'"]+['"]/.test(message)) return { failureClass: 'dependency', remediation: 'Inspect the dependency manifest and installed runtime before changing source.' }
-  if (/invalid_path|not found|no such file|module_not_found|cannot find module|enoent|path/.test(message)) {
-    // A generic "go list the files" nudge is not enough: the model has already listed them and still
-    // invents a directory prefix. Name the real paths so the next command cannot be a guess.
-    const listing = knownPaths.slice(0, 20).join(', ')
-    return {
-      failureClass: 'path',
-      remediation: listing
-        ? `This workspace contains exactly these paths: ${listing}. Use one of them verbatim, relative to the workspace root, and do not prepend any directory that is not listed here.`
-        : 'List or read the workspace files, then use a verified relative path.',
-    }
-  }
-  if (/node.*not found|command not found|runtime|timed out|timeout|sigkill/.test(message)) return { failureClass: 'runtime', remediation: 'Inspect the runtime evidence and choose an available command; do not guess environment capabilities.' }
-  if (/assert|expected|test|exit [1-9]|exit code [1-9]|syntaxerror|typeerror|referenceerror/.test(message)) return { failureClass: 'test', remediation: 'Read the failure output, make the smallest targeted change, then rerun the relevant test.' }
-  if (/deploy|vercel|build|compile|production|preview/.test(message)) return { failureClass: 'deployment', remediation: 'Inspect the build or deployment evidence; do not treat local success as deployment proof.' }
-  return { failureClass: 'unknown', remediation: 'Inspect the exact failure evidence before making another change.' }
-}
-export class BuilderToolLoop {
-  private readonly ai: BuilderAiPort
-  private readonly workspace: BuilderWorkspacePort
-  private readonly runner: BuilderRunnerPort
-
-  constructor(ai: BuilderAiPort, workspace: BuilderWorkspacePort, runner: BuilderRunnerPort) {
-    this.ai = ai
-    this.workspace = workspace
-    this.runner = runner
-  }
-
-  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[] }): Promise<BuilderLoopResult> {
-    const trace: BuilderToolTrace[] = []
-    const inspectedInCurrentWorkspaceState = new Set<string>()
-    const completedMutations = new Set<string>()
-    const completedRunsInCurrentWorkspaceState = new Set<string>()
-    const initialListing = await this.workspace.listFiles(input.workspaceId)
-    const manifest = initialListing.find(file => file.path === 'package.json')
-    const manifestFile = manifest ? await this.workspace.readFile(input.workspaceId, manifest.path) : null
-    const projectContext = discoverBuilderProjectContext(initialListing.map(file => ({
-      path: file.path,
-      ...(file.path === 'package.json' && manifestFile ? { content: manifestFile.content } : {}),
-    })))
-    const initialPaths = new Set(initialListing.map(file => file.path))
-    const task = builderTaskContract(input.objective)
-    const maxWrites = Math.min(16, Math.max(MAX_WRITES_PER_TURN, task.files.length + 4))
-    let workspacePaths: string[] = [...initialPaths]
-    let repairObjective = isRepairObjective(input.objective)
-    let writeCount = 0, runCount = 0, gateNudges = 0
-    const maxRounds = Math.max(1, Math.min(input.maxRounds ?? Math.max(8, task.files.length * 3 + task.commands.length + 4), 24))
-    let workRounds = 0
-    let attempt = 0
-    while (workRounds < maxRounds && attempt < maxRounds + MAX_REPEAT_RECOVERY_ATTEMPTS) {
-      attempt += 1
-      const round = attempt
-      const lastTrace = trace.at(-1)
-      const progress = builderTaskProgress(task, workspacePaths, trace)
-      // A model can alternate list_files and read_file to evade a last-tool-only
-      // restriction. Keep every repeated inspection unavailable until a write/edit
-      // changes the workspace and resets the inspection state.
-      const lastWorkspaceChange = Math.max(...trace.map((item, index) => (
-        item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file') ? index : -1
-      )))
-      const blockedInspectionTools = new Set(trace
-        .slice(lastWorkspaceChange + 1)
-        .filter(item => (item.toolId === 'list_files' || item.toolId === 'read_file')
-          && item.error?.startsWith('builder_repeated_tool_call:'))
-        .map(item => item.toolId))
-      const blockedTool = lastTrace?.error?.startsWith('builder_repeated_tool_call:')
-        ? lastTrace.toolId
-        : null
-      const repairPhase = repairObjective ? deriveRepairPhase(trace, initialPaths) : null
-      const repairNeedsChange = repairObjective && !trace.some(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
-      const inspectedSource = repairNeedsChange
-        ? [...trace].reverse().find(item => item.ok && item.toolId === 'read_file' && toolPath(item.input))
-        : undefined
-      const availableTools = tools
-        .filter(toolId => toolId !== blockedTool)
-        .filter(toolId => !blockedInspectionTools.has(toolId))
-        .filter(toolId => !inspectedSource || (toolId !== 'list_files' && toolId !== 'read_file'))
-      const promptParts = [
-        formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
-        `OBJECTIVE:\n${input.objective}`,
-        `DELIVERY PROGRESS: ${safeJson(progress)}. Writes remaining: ${maxWrites - writeCount}. Create every missing file before polishing newly created files. Then run every pending command separately, preserving its exit status. A passing first command is not completion when another command or file is still pending.`,
-        formatBuilderProjectContext(projectContext),
-        repairPhase ? formatRepairPhase(repairPhase, projectContext.recommendedTestCommand) : '',
-        `TOOLS: ${safeJson(availableTools)}`,
-        trace.length ? `RESULTS:\n${safeJson(trace)}` : '',
-        'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
-        'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
-        availableTools.includes('read_file')
-          ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
-          : 'Do not request read_file in this round; it is unavailable until the workspace changes.',
-        'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
-        blockedInspectionTools.size
-          ? `RECOVERY CONSTRAINT: ${[...blockedInspectionTools].join(', ')} ${blockedInspectionTools.size === 1 ? 'was' : 'were'} rejected against unchanged workspace state. ${blockedInspectionTools.size === 1 ? 'It is' : 'They are'} unavailable this round. Select a different tool from TOOLS; do not request ${blockedInspectionTools.size === 1 ? 'it' : 'them'} again.`
-          : blockedTool
-            ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected in the preceding round. It is unavailable this round. Select a different tool from TOOLS; do not request it again.`
-            : '',
-        inspectedSource
-          ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Do not list or read again until you make progress. ${projectContext.recommendedTestCommand ? `Run ${projectContext.recommendedTestCommand} to reproduce the defect, then edit the source and rerun it.` : 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.'}`
-          : '',
-        'When done: {"type":"answer","answer":"what changed and what ran"}',
-      ].filter(Boolean)
-
-      let action: Action | null = null
-      let blockedAction: ToolAction | null = null
-      let controlFailure: ModelControlFailure | null = null
-      for (let controlAttempt = 0; controlAttempt <= MAX_INVALID_CONTROL_RECOVERY_ATTEMPTS; controlAttempt += 1) {
-        const recoveryInstruction = controlAttempt > 0
-          ? `CONTROL RECOVERY ATTEMPT ${controlAttempt}: The previous response could not be used. Return exactly one compact JSON object using one TOOL INPUT SCHEMA above. Use only type, toolId, and input; input must be an object, not a JSON string. Emit no prose or Markdown. For an existing file, use edit_file with search and replace instead of rewriting the whole file.`
-          : ''
-        let response: string | null
-        try {
-          response = await generateWithRetry(this.ai, {
-            systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${maxWrites} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. A new build with conditional instructions to fix failing tests is still a creation task: write complete files (including the CLI entry point), create tests and sample data, execute all requested commands, and repair only observed failures. Do not repeatedly inspect or polish one new file while other deliverables are missing. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
-            prompt: [...promptParts, recoveryInstruction].filter(Boolean).join('\n\n'),
-            maxTokens: controlAttempt > 0
-              ? MODEL_CONTROL_RECOVERY_MAX_TOKENS
-              : repairObjective || task.files.length > 1 ? MODEL_REPAIR_CONTROL_MAX_TOKENS : MODEL_CONTROL_MAX_TOKENS,
-          }, input.modelRoundTimeoutMs)
-        } catch (error) {
-          return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
-        }
-
-        action = parse(response, availableTools)
-        if (action) break
-        const unrestricted = parse(response)
-        if (unrestricted?.type === 'tool' && !availableTools.includes(unrestricted.toolId)) {
-          blockedAction = unrestricted
-          break
-        }
-        controlFailure = modelControlFailure(response)
-        console.warn('[builder_invalid_model_control_output]', {
-          round,
-          controlAttempt,
-          ...controlFailure.telemetry,
-          // Server-log only (owner-readable), never added to the client trace: the exact rejected
-          // control attempt is what separates malformed JSON from a valid-JSON schema mismatch.
-          sample: String(response || '').replace(/\s+/g, ' ').trim().slice(0, 240),
-        })
-      }
-
-      if (blockedAction) {
-        trace.push({
-          round,
-          toolId: blockedAction.toolId,
-          input: blockedAction.input,
-          ok: false,
-          error: `builder_repeated_tool_call:${blockedAction.toolId}; choose a different next step`,
-        })
-        continue
-      }
-      if (!action) {
-        const failure = controlFailure ?? modelControlFailure(null)
-        trace.push({
-          round,
-          toolId: 'model_control',
-          input: {},
-          ok: false,
-          output: failure.telemetry,
-          error: failure.error,
-          failureClass: failure.error === 'builder_model_control_empty_response' ? 'runtime' : 'unknown',
-          remediation: failure.remediation,
-        })
-        return { ok: false, error: failure.error, trace }
-      }
-
-      if (action.type === 'answer') {
-        if (!progress.satisfied && !repairObjective) {
-          gateNudges += 1
-          trace.push({ round, toolId: 'model_control', input: {}, ok: false,
-            error: 'builder_task_incomplete', remediation: `Complete the missing files and pending commands: ${safeJson(progress)}` })
-          if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_task_incomplete', trace }
-          continue
-        }
-        repairObjective ||= isRepairObjective(`${input.objective}\n${action.answer}`)
-        const verdict = evaluateRegressionGate(input.objective, trace, repairObjective)
-        if (verdict.satisfied && progress.satisfied) return { ok: true, answer: action.answer, trace }
-        if (repairObjective) {
-          const listed = await this.workspace.listFiles(input.workspaceId)
-          workspacePaths = listed.map(file => file.path)
-          const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
-            .filter((file): file is BuilderFile => file !== null)
-          const proofFile = files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
-          const observedFailedCommand = trace.find(item => item.toolId === 'run' && !item.ok)?.input.command
-          const proofCommand = (typeof observedFailedCommand === 'string' ? observedFailedCommand : '')
-            || (projectContext.manifestPath ? projectContext.recommendedTestCommand : '')
-            || (proofFile ? `node --experimental-strip-types --test ${proofFile.path}` : '')
-            || projectContext.recommendedTestCommand || ''
-          const proofIdx = trace
-            .map((item, index) => ({ item, index }))
-            .filter(({ item }) => item.toolId === 'run' && text(item.input.command) === proofCommand)
-          const failedProof = proofIdx.find(({ item }) => !item.ok)
-          const passedProof = proofIdx.find(({ item }) => item.ok)
-          const verifiedAfterFail = failedProof
-            ? proofIdx.some(({ item, index }) => item.ok && index > failedProof.index)
-            : false
-          const edited = trace.some((item, index) => index > (failedProof?.index ?? -1)
-            && item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
-
-          if (proofCommand && !failedProof && !passedProof) {
-            if (runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
-            const output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: proofCommand, files }))
-            const failed = output.exitCode !== 0
-            trace.push({
-              round,
-              toolId: 'run',
-              input: { command: proofCommand },
-              ok: !failed,
-              output,
-              ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
-            })
-            runCount += 1
-            continue
-          }
-          if (proofCommand && failedProof && edited && !verifiedAfterFail) {
-            if (runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
-            const output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: proofCommand, files }))
-            const failed = output.exitCode !== 0
-            trace.push({
-              round,
-              toolId: 'run',
-              input: { command: proofCommand },
-              ok: !failed,
-              output,
-              ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
-            })
-            runCount += 1
-            if (!failed && evaluateRegressionGate(input.objective, trace, true).satisfied && builderTaskProgress(task, workspacePaths, trace).satisfied) return { ok: true, answer: action.answer, trace }
-            continue
-          }
-          if (passedProof && !failedProof && !edited) {
-            return { ok: false, error: 'builder_regression_not_reproduced', trace }
-          }
-        }
-        const reason = 'reason' in verdict ? verdict.reason : 'regression evidence is required'
-        gateNudges += 1
-        if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_regression_evidence_required', trace }
-        continue
-      }
-      if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= maxWrites) return { ok: false, error: 'builder_write_budget_exhausted', trace }
-      if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
-      const fingerprint = `${action.toolId}:${safeJson(action.input)}`
-      const inspection = action.toolId === 'list_files' || action.toolId === 'read_file'
-      const mutation = action.toolId === 'write_file' || action.toolId === 'edit_file'
-      if (mutation && !repairObjective && progress.missingFiles.length > 0
-        && workspacePaths.includes(toolPath(action.input)) && !initialPaths.has(toolPath(action.input))) {
-        trace.push({ round, toolId: action.toolId, input: action.input, ok: false,
-          error: 'builder_missing_deliverables', remediation: `Create ${progress.missingFiles.join(', ')} before revising this new file. Then run the requested commands and use their output for targeted repairs.` })
-        continue
-      }
-      if (mutation && initialPaths.has(toolPath(action.input))) repairObjective = true
-      // An alternating list/read loop observes unchanged workspace state without progress.
-      if (inspection && inspectedInCurrentWorkspaceState.has(fingerprint)) {
-        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
-        continue
-      }
-      if ((mutation && completedMutations.has(fingerprint))
-        || (action.toolId === 'run' && completedRunsInCurrentWorkspaceState.has(fingerprint))) {
-        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: `builder_repeated_tool_call:${action.toolId}; choose a different next step` })
-        continue
-      }
-      if (inspection) inspectedInCurrentWorkspaceState.add(fingerprint)
-      workRounds += 1
-      try {
-        let output: unknown
-        if (action.toolId === 'list_files') output = await this.workspace.listFiles(input.workspaceId)
-        if (action.toolId === 'read_file') {
-          const file = await this.workspace.readFile(input.workspaceId, toolPath(action.input))
-          output = file ? { path: file.path, content: file.content, updatedAt: file.updatedAt } : null
-        }
-        if (action.toolId === 'write_file') output = summarize(await this.workspace.writeFile(input.workspaceId, toolPath(action.input), toolContent(action.input)))
-        if (action.toolId === 'edit_file') output = summarize(await this.workspace.editFile(input.workspaceId, toolPath(action.input), text(action.input.search), text(action.input.replace)))
-        if (action.toolId === 'run') {
-          const listed = await this.workspace.listFiles(input.workspaceId)
-          workspacePaths = listed.map(file => file.path)
-          const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
-            .filter((file): file is BuilderFile => file !== null)
-          let command = normalizeBuilderSandboxCommand(text(action.input.command), files)
-          if (!command) command = projectContext.recommendedTestCommand || ''
-          if (!command) {
-            const proof = files.find(file => /builderAsyncJobs|builderDebugFileJob|builderRoutingStrict/.test(file.path))
-              || files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
-            command = proof ? `node --experimental-strip-types --test ${proof.path}` : 'node --experimental-strip-types --test'
-          }
-          action.input = { ...action.input, command }
-          output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command, files }))
-        }
-        const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0
-        if (runFailed) {
-          const details = diagnose(`${(output as ReturnType<typeof summarizeRun>).stderr}\n${(output as ReturnType<typeof summarizeRun>).stdout}`, workspacePaths)
-          trace.push({ round, toolId: action.toolId, input: action.input, ok: false, output, error: `builder_command_failed: exit ${(output as ReturnType<typeof summarizeRun>).exitCode}`, ...details })
-          continue
-        }
-        if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
-          writeCount += 1
-          if (!workspacePaths.includes(toolPath(action.input))) workspacePaths.push(toolPath(action.input))
-          inspectedInCurrentWorkspaceState.clear()
-          completedMutations.add(fingerprint)
-          completedRunsInCurrentWorkspaceState.clear()
-        }
-        if (action.toolId === 'run') {
-          runCount += 1
-          completedRunsInCurrentWorkspaceState.add(fingerprint)
-        }
-        trace.push({ round, toolId: action.toolId, input: action.input, ok: true, output })
-        if (action.toolId === 'run' && repairObjective) {
-          const modifiedExistingFile = trace.some(item => item.ok
-            && (item.toolId === 'write_file' || item.toolId === 'edit_file')
-            && initialPaths.has(toolPath(item.input)))
-          const verdict = evaluateRegressionGate(input.objective, trace, modifiedExistingFile)
-          if (verdict.satisfied && builderTaskProgress(task, workspacePaths, trace).satisfied) return { ok: true, answer: verifiedRepairAnswer(trace), trace }
-        }
-        // A new-file design/create objective is complete once Builder has both written workspace
-        // output and observed its requested proof command succeed. Do not spend additional model
-        // rounds merely to obtain a prose completion object: that can turn a finished artifact
-        // into a 422 after the model keeps inspecting the same workspace.
-        if (action.toolId === 'run' && writeCount > 0 && !repairObjective && builderTaskProgress(task, workspacePaths, trace).satisfied) {
-          return { ok: true, answer: 'Created the requested workspace files and verified the proving command completed successfully.', trace }
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'builder_tool_failed'
-        trace.push({ round, toolId: action.toolId, input: action.input, ok: false, error: message, ...diagnose(message, workspacePaths) })
-      }
-    }
-    return { ok: false, error: workRounds >= maxRounds ? 'builder_round_budget_exhausted' : 'builder_stalled_repeated_inspection', trace }
-  }
 }

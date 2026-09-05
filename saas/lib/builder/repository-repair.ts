@@ -9,6 +9,7 @@ import { inferBuilderCertificationAttempt } from './certification.ts'
 import { parseSignalBoostRepositoryRepairTarget, resolveSignalBoostRepositoryCommit, signalBoostRepositoryRepairObjective, type SignalBoostRepositoryRepairTarget } from './repository-repair-target.ts'
 import { publishSignalBoostRepositoryRepair } from './repository-repair-writeback.ts'
 import { attemptSignalBoostRepositoryAutoMerge, type AutoMergeResult } from './repository-repair-automerge.ts'
+import { watchMergedDeployment, type MergeWatchResult } from './repository-merge-watch.ts'
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
 import type { BuilderRunnerPort, BuilderToolTrace } from './contracts.ts'
 import type { StateSnapshotPort } from '@/lib/portable/state-snapshot-port'
@@ -232,10 +233,26 @@ export async function executeSignalBoostRepositoryRepair(input: {
         return null
       })
     }
+    // A merge that is never looked at is the whole risk. Watch the deployment it produced and
+    // roll back on failure — bounded by whatever request budget is left, and reporting an
+    // honest "unresolved" rather than rolling back on a merely slow build.
+    let mergeWatch: MergeWatchResult | null = null
+    if (autoMerge?.merged && autoMerge.mergeCommitSha && autoMerge.preMergeSnapshotId) {
+      mergeWatch = await watchMergedDeployment({
+        mergeCommitSha: autoMerge.mergeCommitSha,
+        preMergeSnapshotId: autoMerge.preMergeSnapshotId,
+        snapshotPort: input.snapshotPort ?? null,
+        projectId: process.env.VERCEL_PROJECT_ID || '',
+        teamId: process.env.VERCEL_TEAM_ID || undefined,
+        token: process.env.VERCEL_TOKEN || process.env.VERCEL_API_TOKEN || '',
+        deadlineAtMs,
+      })
+    }
+
     const autoMergeReply = !autoMerge
       ? ''
       : autoMerge.merged
-        ? ` It was then auto-merged as ${autoMerge.mergeCommitSha}, with deployment ${autoMerge.preMergeSnapshotId} captured beforehand as the rollback target. Post-merge deployment health is not watched automatically.`
+        ? ` It was then auto-merged as ${autoMerge.mergeCommitSha}, with deployment ${autoMerge.preMergeSnapshotId} captured beforehand as the rollback target.${mergeWatch ? ` ${mergeWatch.detail}` : ''}`
         : ` Auto-merge was attempted and refused (${autoMerge.reason}): ${autoMerge.detail} The pull request remains open for review.`
 
     const writebackReply = writeback.stage === 'pr_created' && writeback.pullRequestNumber
@@ -262,6 +279,9 @@ export async function executeSignalBoostRepositoryRepair(input: {
         merge_refused_reason: autoMerge && !autoMerge.merged ? autoMerge.reason : null,
         merge_commit_sha: autoMerge?.mergeCommitSha ?? null,
         pre_merge_snapshot_id: autoMerge?.preMergeSnapshotId ?? null,
+        merge_watch_outcome: mergeWatch?.outcome ?? null,
+        merge_watch_deployment_id: mergeWatch?.deploymentId ?? null,
+        merge_watch_deployment_state: mergeWatch?.deploymentState ?? null,
         deployment_allowed: false,
         base_commit_sha: target.fullCommitSha,
         branch: target.branch,

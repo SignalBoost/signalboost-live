@@ -47,6 +47,7 @@ test('references are not deliverables and declared traversal is not accepted', (
   assert.deepEqual(contract.files, ['result.json'])
   assert.deepEqual(contract.commands, ['node check.js'])
   assert.equal(builderTaskContract('Write at least 10 tests.\npython3 -m unittest').minimumTests, 0)
+  assert.deepEqual(builderTaskContract('Create example.js. Do not run this example:\nnode example.js').commands, [])
 })
 
 test('completion requires all files, all commands, and the requested number of passing tests', () => {
@@ -77,7 +78,7 @@ test('new-file polishing is redirected to missing deliverables without consuming
     return actions.shift() || null
   } }, workspace, { async run() { return passing } }).run({ objective, workspaceId: 'new-project' })
   assert.equal(result.ok, true)
-  assert.equal(result.trace.filter(item => item.toolId === 'run').length, 2)
+  assert.equal(result.trace.filter(item => item.toolId === 'run' && item.output).length, 2)
   assert.equal(result.trace.some(item => item.error === 'builder_missing_deliverables'), true)
   assert.equal((await workspace.readFile('new-project', 'expenses.js'))?.content, 'fixture')
 })
@@ -92,7 +93,7 @@ test('a premature answer cannot complete a new build without running code', asyn
 })
 
 test('a successful test command cannot hide a failed sample command', async () => {
-  const actions = [...task.files.map(path => write(path)), ...task.commands.map(run), answer, answer, answer, answer]
+  const actions = [...task.files.map(path => write(path)), answer, answer, answer, answer]
   const result = await new BuilderToolLoop({ async generate() { return actions.shift() || null } }, new InMemoryBuilderWorkspace(), {
     async run(input) { return input.command === task.commands[0] ? passing : { ...passing, exitCode: 1, stderr: 'Error: sample failed' } },
   }).run({ objective, workspaceId: 'failed-sample' })
@@ -101,8 +102,8 @@ test('a successful test command cannot hide a failed sample command', async () =
 })
 
 test('after an observed sample failure a new build repairs then reruns both commands', async () => {
-  const actions = [...task.files.map(path => write(path)), ...task.commands.map(run),
-    action('edit_file', { path: 'expenses.js', search: 'fixture', replace: 'fixed source' }), ...task.commands.map(run)]
+  const actions = [...task.files.map(path => write(path)),
+    action('edit_file', { path: 'expenses.js', search: 'fixture', replace: 'fixed source' })]
   let runs = 0
   const result = await new BuilderToolLoop({ async generate() { return actions.shift() || null } }, new InMemoryBuilderWorkspace(), {
     async run() { return ++runs === 2 ? { ...passing, exitCode: 1, stderr: 'Error: sample failed' } : passing },
@@ -125,7 +126,7 @@ test('changed production modules parse before deployment', () => {
   }
 })
 
-test('multi-file Builder executes real Node tests and a separate sample command', async () => {
+test('controller executes real Node proofs and repairs incomplete source even when the model never requests run', async () => {
   // Scripted control isolates the controller regression; execution uses real Node, not a mock exit code.
   const files = {
     'sum.js': 'exports.sum = (a, b) => a + b; if (require.main === module) console.log(exports.sum(10, 20));',
@@ -133,10 +134,18 @@ test('multi-file Builder executes real Node tests and a separate sample command'
     'README.md': 'Run node --test sum.test.js and node sum.js.',
   }
   const prompt = 'Create:\n- sum.js\n- sum.test.js\n- README.md\nWrite at least 10 automated tests.\nRun:\nnode --test sum.test.js\nnode sum.js'
-  const actions = [...Object.entries(files).map(([path, content]) => write(path, content)), run('node --test sum.test.js'), run('node sum.js')]
+  const actions = Object.entries(files).map(([path, content]) => write(path, path === 'sum.js' ? 'exports.sum = (' : content))
+  let repairIssued = false
   const directory = await mkdtemp(join(tmpdir(), 'builder-multifile-'))
   try {
-    const result = await new BuilderToolLoop({ async generate() { return actions.shift() || null } }, new InMemoryBuilderWorkspace(), {
+    const result = await new BuilderToolLoop({ async generate(input) {
+      if (actions.length) return actions.shift()!
+      assert.equal(repairIssued, false, 'verification must not ask the model to select a command')
+      assert.match(input.prompt, /SyntaxError/)
+      assert.match(input.prompt, /node --test sum.test.js/)
+      repairIssued = true
+      return write('sum.js', files['sum.js'])
+    } }, new InMemoryBuilderWorkspace(), {
       async run(input) {
         assert.ok(['node --test sum.test.js', 'node sum.js'].includes(input.command))
         for (const file of input.files) await writeFile(join(directory, file.path), file.content)
@@ -148,8 +157,32 @@ test('multi-file Builder executes real Node tests and a separate sample command'
     }).run({ objective: prompt, workspaceId: 'real-node-multifile' })
     assert.equal(result.ok, true, JSON.stringify(result))
     const runs = result.trace.filter(item => item.toolId === 'run')
-    assert.equal(runs.length, 2)
-    assert.match((runs[0].output as typeof passing).stdout, /(?:#|ℹ) pass 10/)
-    assert.equal((runs[1].output as typeof passing).stdout, '30\n')
+    assert.equal(runs.length, 4)
+    assert.deepEqual(runs.map(item => item.ok), [false, false, true, true])
+    assert.match((runs[2].output as typeof passing).stdout, /(?:#|ℹ) pass 10/)
+    assert.equal((runs[3].output as typeof passing).stdout, '30\n')
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+
+test('one passing test directs completion of the requested suite before success', async () => {
+  const actions = task.files.map(path => write(path))
+  let repaired = false
+  let runs = 0
+  const result = await new BuilderToolLoop({ async generate(input) {
+    if (actions.length) return actions.shift()!
+    assert.equal(repaired, false)
+    assert.match(input.prompt, /recorded test total does not meet the requested minimum of 10/)
+    assert.match(input.prompt, /distinct meaningful assertions/)
+    repaired = true
+    return write('expenses.test.js', 'completed suite fixture')
+  } }, new InMemoryBuilderWorkspace(), {
+    async run() {
+      runs++
+      return { ...passing, stdout: repaired ? passing.stdout : '# pass 1\n# fail 0\n' }
+    },
+  }).run({ objective, workspaceId: 'insufficient-tests' })
+  assert.equal(result.ok, true)
+  assert.equal(repaired, true)
+  assert.equal(runs, 4)
 })

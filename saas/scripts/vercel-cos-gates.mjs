@@ -114,6 +114,7 @@ const tests = [
   'tests/googleSheetsConnector.node.test.ts',
   'tests/describeThrownValue.node.test.ts',
     'tests/demoPricing.node.test.ts',
+    'tests/repositoryRepairAutoMerge.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

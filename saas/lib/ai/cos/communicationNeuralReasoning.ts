@@ -40,16 +40,29 @@ const CORRESPONDENCE_SIGNAL = /\b(?:thank\s+you|thanks|regards|sincerely|respect
 const BODY_ONLY_CORRESPONDENCE_SIGNAL = /\b(?:email|message|thread|chain|reply|respond|recipient|colleague|colleagues|manager|supervisor|team)\b/i
 const EMAIL_HEADER = /^\s*(?:from|sent|to|cc|bcc|subject)\s*:/im
 
+const COMMUNICATION_REASONING_PROCEDURE = [
+  'COMMUNICATION REASONING — APPLY SILENTLY, THEN WRITE. THIS IS A METHOD, NOT A TEMPLATE:',
+  '1. Parse the actual writing job. What did the sender ask the draft to do? Who is the audience? What must the reader understand or decide?',
+  '2. Separate invariants from wording. Invariants: facts, names, titles, acronyms, dates, numbers, links, actor/action/recipient relations, commitments, uncertainty, and the sender\'s stance. Wording: grammar, fluency, order, and emphasis.',
+  '3. Infer the register from the source, not from a house style. If the source is a first-person thread reply with no greeting, keep it that way. If it is warm personal mail, keep warmth. If it is blunt institutional argument, keep bluntness after cleaning grammar.',
+  '4. Reason about structure from the argument the source already makes. Do not pour the draft into a fixed memo shape (greeting, recap, observation, proposal, concession, close).',
+  '5. Generate at least THREE genuinely different candidate approaches internally before choosing the recommended draft. Do not expose those hidden candidates or your reasoning. Choose the approach that best preserves meaning and voice while making the argument easier to follow.',
+  '6. Self-review against the source: every material claim still present; no invented greeting, motive, fact, or commitment; distinctive images and idioms kept when they carry the point; result does not read like HR copy or a grammar-checker pass.',
+].join('\n')
+
 const INSTITUTIONAL_DIPLOMATIC_GUIDANCE = [
   'INSTITUTIONAL / DIPLOMATIC CORRESPONDENCE — APPLY WHEN THE DRAFT TOUCHES COLLEAGUES, CAREERS, PROMOTION, PERFORMANCE, POLICY, LEADERSHIP, GRIEVANCES, OR A CONTESTED INTERNAL QUESTION:',
-  '- Preserve the writer\'s substantive point and conviction, but remove ridicule, contempt, needless personal characterization, and language that sounds bitter or accusatory unless the user explicitly asks to retain that tone.',
+  '- Neural reasoning writes the draft. Do not apply a memo template, stock greeting, or fixed paragraph order.',
+  '- Never invent a salutation the source did not use (including "Dear Colleagues") and never open with stock hedges such as "I have debated whether to re-engage", "I have observed a recurring pattern", or "we risk missing an opportunity".',
+  '- Preserve the writer\'s voice: first-person stance, cadence, idioms, concrete occupational images, and plain-speech closings. Correct spelling and grammar; do not launder the speaker into HR or front-office copy.',
+  '- Distinctive source phrases that carry the argument must survive when they are not slurs or threats.',
+  '- Preserve the writer\'s substantive point and conviction. Soften only ridicule, contempt, needless personal characterization, or wording that is bitter or accusatory unless the user explicitly asks to retain that tone.',
   '- Distinguish observation from inference. "I have heard colleagues say..." must not become "colleagues claim..." or a statement about their true motives.',
-  '- Convert personal frustration into an institutional argument where possible: context -> observed tension -> concrete proposal -> rationale -> limitations/tradeoffs -> concluding principle. Do not force this structure when the source does not support it.',
-  '- When proposing a policy or process change, frame it as a serious recommendation for consideration rather than an attack on people who may prefer a different career path.',
+  '- When proposing a policy or process change, keep it as the writer\'s own recommendation. Do not recast it as a committee brief or an attack on people who prefer a different career path.',
   '- Respect legitimate differences in professional goals. Do not imply that technical, operational, non-managerial, or hands-on work is lesser work.',
   '- Preserve useful concessions and limits, such as acknowledging that wanting promotion does not itself make someone a good manager. These qualifications strengthen credibility and are not filler.',
-  '- Assume the message could be forwarded to the people it discusses or to senior leadership. Every sentence should remain professional and defensible in that setting.',
-  '- Diplomatic does not mean vague. The proposal, rationale, and requested institutional change should remain clear.',
+  '- Assume the message could be forwarded. Keep it defensible without flattening it into generic institutional language.',
+  '- Diplomatic does not mean vague or templated. The proposal, rationale, and requested change should remain clear in the writer\'s register.',
 ].join('\n')
 
 function clamp(value: unknown, fallback = 0): number {
@@ -171,13 +184,8 @@ async function generateDraftSet(input: {
       'The actual writing and communication judgment MUST come from neural reasoning. Deterministic code outside this call may only classify the task, protect facts, and verify release boundaries; it is not the writer.',
       'Do not reveal private chain-of-thought. Perform the reasoning silently and return ONLY strict JSON with this schema:',
       '{"recommended":"...","alternatives_useful":true,"alternatives":[{"label":"Warmer","text":"..."},{"label":"More concise","text":"..."}],"confidence":0.0,"release_score":0.0}',
-      'COMMUNICATION REASONING — APPLY SILENTLY:',
-      '1. Infer the sender’s actual objective, the audience relationship, emotional stakes, desired outcome, sensitivity, and what the recipient needs to understand or do.',
-      '2. Distinguish facts/terms that must be preserved from weak wording that should be replaced.',
-      '3. Generate at least THREE genuinely different candidate approaches internally before choosing the recommended draft. Do not expose those hidden candidates or your reasoning.',
-      '4. Select the approach that best serves the sender’s objective while sounding natural, credible, human, and appropriately warm or diplomatic.',
-      '5. When two other approaches would genuinely help the sender, return up to two complete alternatives with useful labels. Alternatives may change tone, concision, or emphasis but must not change facts or commitments.',
-      '6. Self-review for strategic helpfulness, audience fit, naturalness, factual fidelity, clarity, and whether the result materially improves the original instead of sentence-by-sentence grammar repair.',
+      COMMUNICATION_REASONING_PROCEDURE,
+      'When two other approaches would genuinely help the sender, return up to two complete alternatives with useful labels. Alternatives may change tone, concision, or emphasis but must not change facts or commitments.',
       INSTITUTIONAL_DIPLOMATIC_GUIDANCE,
       'QUALITY FLOOR:',
       '- A grammar-checker result is a failure. For rough or non-native source text, rebuild sentences and paragraph flow substantially.',
@@ -222,8 +230,9 @@ async function neuralQualityReview(input: {
       'You are the final COS Neural Communication Quality Board. Use neural judgment, not a grammar checklist.',
       'Do not reveal private chain-of-thought. Return ONLY strict JSON with the same draft-set schema:',
       '{"recommended":"...","alternatives_useful":true,"alternatives":[{"label":"...","text":"..."}],"confidence":0.0,"release_score":0.0}',
+      COMMUNICATION_REASONING_PROCEDURE,
       'Evaluate the proposed communication against the ORIGINAL draft, not just against grammar.',
-      'A release-quality result must: preserve facts and actor/action/recipient relationships; understand the relationship and purpose; materially improve awkward/non-native phrasing; organize the message naturally; make the request or next step clear; sound like a capable human; and avoid invented facts or overstatement.',
+      'A release-quality result must: preserve facts and actor/action/recipient relationships; understand the relationship and purpose; materially improve awkward/non-native phrasing; organize the message from the source\'s own argument; make the request or next step clear; sound like the same capable human; and avoid invented facts, greetings, or overstatement.',
       'For sensitive institutional correspondence, the result must preserve the writer’s argument while removing unnecessary personal disparagement, mind-reading, contempt, or wording that would make the message needlessly adversarial.',
       'Do not erase the position in the name of diplomacy. The substantive proposal and rationale must remain clear, but they should be framed in language the writer could defend if the message were forwarded broadly.',
       'If the proposed result still tracks the original sentence-by-sentence, sounds generic, awkward, sterile, accusatory, or merely corrected, REWRITE IT rather than approving it.',
@@ -266,8 +275,9 @@ async function neuralLastRepair(input: {
     systemPrompt: [
       'You are COS doing a final neural rewrite because the previous communication did not clear the release-quality threshold.',
       'Do not reveal chain-of-thought. Return ONLY strict JSON in the draft-set schema.',
-      'Rewrite from the underlying communication objective, not from the previous wording. Preserve facts, names, acronyms, links, commitments, uncertainty, and actor/action/recipient relationships.',
-      'The result must sound natural and purposeful, not like a grammar-corrected copy. Use paragraphs and transitions that fit the relationship and objective.',
+      COMMUNICATION_REASONING_PROCEDURE,
+      'Rewrite from the underlying communication objective, not from the previous wording. Preserve facts, names, acronyms, links, commitments, uncertainty, voice, and actor/action/recipient relationships.',
+      'The result must sound natural and purposeful, not like a grammar-corrected copy or a stock memo. Use paragraphs and transitions that follow from the source\'s argument.',
       'For sensitive institutional writing, keep the proposal strong while removing needless personal attacks, ridicule, motive attribution, or contempt.',
       'Do not invent facts or resolve ambiguous domain terminology by guessing.',
       'Normalize Markdown-escaped URL dots without changing the destination.',

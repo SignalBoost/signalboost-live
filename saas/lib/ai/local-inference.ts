@@ -12,7 +12,15 @@ export interface LocalModelCallArgs {
    */
   frequencyPenalty?: number
   presencePenalty?: number
+  /** Ask the provider to enforce a JSON object response. Required for control-object generation. */
+  jsonObject?: boolean
 }
+
+/**
+ * Thrown when the provider reports finish_reason 'length'. The partial content is never returned:
+ * a half-written control object or source file must not be mistaken for a finished answer.
+ */
+export const LOCAL_MODEL_OUTPUT_TRUNCATED = 'local_model_output_truncated'
 export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
 
 export interface LocalInferenceTelemetry {
@@ -78,6 +86,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   let errorText: string | null = null
   let finishReason: string | null = null
   let completionTokens: number | null = null
+  let text: string | null = null
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
@@ -104,6 +113,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
         temperature: args.temperature ?? 0.2,
         frequency_penalty: frequencyPenalty,
         presence_penalty: presencePenalty,
+        ...(args.jsonObject ? { response_format: { type: 'json_object' } } : {}),
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         messages: [
           { role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' },
@@ -115,33 +125,33 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     if (!response.ok) {
       errorText = `HTTP ${response.status}: ${await response.text()}`
       console.error('localInference: HTTP error', response.status, errorText)
-      return null
+    } else {
+      const data = await response.json() as {
+        choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
+        usage?: { completion_tokens?: number }
+      }
+      const rawFinishReason = data.choices?.[0]?.finish_reason
+      finishReason = typeof rawFinishReason === 'string' ? rawFinishReason : null
+      completionTokens = typeof data.usage?.completion_tokens === 'number' ? data.usage.completion_tokens : null
+      const content = data.choices?.[0]?.message?.content
+      // A provider that stops on max_tokens returns HTTP 200 with a half-finished answer. Without
+      // this a truncated result is indistinguishable from one the model chose to end.
+      if (finishReason && finishReason !== 'stop') {
+        console.warn('[cos-local-inference-incomplete]', {
+          model: config.model,
+          finishReason,
+          requestedMaxTokens,
+          completionTokens,
+          contentLength: typeof content === 'string' ? content.length : 0,
+        })
+      }
+      if (typeof content !== 'string' || content.length === 0) errorText = 'Local inference returned an empty response'
+      text = typeof content === 'string' && content.length > 0 ? content : null
     }
-    const data = await response.json() as {
-      choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
-      usage?: { completion_tokens?: number }
-    }
-    const rawFinishReason = data.choices?.[0]?.finish_reason
-    finishReason = typeof rawFinishReason === 'string' ? rawFinishReason : null
-    completionTokens = typeof data.usage?.completion_tokens === 'number' ? data.usage.completion_tokens : null
-    const text = data.choices?.[0]?.message?.content
-    // A provider that stops on max_tokens returns HTTP 200 with a half-finished answer. Without this
-    // line a truncated result is indistinguishable from a model that chose to stop early.
-    if (finishReason && finishReason !== 'stop') {
-      console.warn('[cos-local-inference-incomplete]', {
-        model: config.model,
-        finishReason,
-        requestedMaxTokens,
-        completionTokens,
-        contentLength: typeof text === 'string' ? text.length : 0,
-      })
-    }
-    if (typeof text !== 'string' || text.length === 0) errorText = 'Local inference returned an empty response'
-    return typeof text === 'string' && text.length > 0 ? text : null
   } catch (error) {
     errorText = error instanceof Error ? error.message : String(error)
     console.error('localInference: request failed', error)
-    return null
+    text = null
   } finally {
     clearTimeout(timeout)
     const latencyMs = Date.now() - startedAt
@@ -160,6 +170,11 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       completionTokens,
     })
   }
+
+  // Raised after telemetry so the caller can retry with a larger budget instead of parsing a
+  // fragment. Partial output is discarded even when it happens to parse.
+  if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
+  return text
 }
 
 export async function checkLocalInferenceHealth(config = localInferenceConfigFromEnv()): Promise<{ ok: boolean; model: string; error?: string }> {

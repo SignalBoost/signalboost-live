@@ -3,9 +3,9 @@ import type { BuilderToolTrace } from './contracts.ts'
 
 /**
  * Two consecutive failures of the same proof command where some assertions recovered and others
- * regressed are not partial progress. They mean the deliverables disagree about one contract
+ * regressed are not partial progress. They can indicate that the deliverables disagree about one contract
  * (field name, value type, or output shape) and each edit satisfies one side by breaking the other.
- * Editing the implementation again cannot converge; the contradiction has to be resolved once.
+ * Review the requirements and both files before deciding whether implementation or tests need repair.
  */
 export type ContractOscillation = Readonly<{
   command: string
@@ -65,7 +65,7 @@ export function formatContractOscillation(signal: ContractOscillation | null): s
     `CONTRACT CONTRADICTION: \`${signal.command}\` has now failed ${signal.failures} times, and the failures moved instead of shrinking.`,
     `These assertions started passing: ${signal.recovered.join('; ')}.`,
     `These assertions stopped passing: ${signal.regressed.join('; ')}.`,
-    'Assertions that trade places prove the deliverables disagree about one contract — a field name, a value type, or an output shape — so satisfying one side breaks the other. Another implementation edit cannot converge.',
-    'Do this instead: read the failing expectations, decide the single contract they should share, and change whichever file is inconsistent with it — including the test file, which may be contradicting itself. State the contract you chose in your answer, then rerun the same command.',
+    'Assertions that trade places can indicate inconsistent field names, value types, or output shapes. Inspect the actual failures and current files against the user requirements; this signal alone does not establish the cause.',
+    'Do this instead: compare all failing expectations with the user requirements and current source, preserve one consistent public contract, and change whichever file is inconsistent with it — including the test file, which may be contradicting itself. State the contract you chose in your answer, then rerun the same command.',
   ].join(' ')
 }

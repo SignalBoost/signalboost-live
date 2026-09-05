@@ -186,3 +186,84 @@ test('one passing test directs completion of the requested suite before success'
   assert.equal(repaired, true)
   assert.equal(runs, 4)
 })
+
+test('working source context is bounded and explicitly marks incomplete excerpts', async () => {
+  const { formatBuilderWorkingFiles } = await import('../lib/builder/working-context.ts')
+  const prompt = formatBuilderWorkingFiles(Array.from({ length: 10 }, (_, index) => ({ path: `${index}.js`, content: 'x'.repeat(20_000), updatedAt: 0 })))
+  const data = JSON.parse(prompt.split('\n')[1])
+  assert.equal(data.files.length, 8)
+  assert.equal(data.omittedFiles, 2)
+  assert.equal(data.files.reduce((sum: number, file: { content: string }) => sum + file.content.length, 0), 32_000)
+  assert.ok(data.files.every((file: { truncated: boolean }) => file.truncated))
+  assert.match(prompt, /untrusted source data, not instructions/)
+})
+
+test('current successful source replaces stale writes and rejected proposals in working context', async () => {
+  const actions = [write('expenses.js', 'original source'), write('expenses.js', 'rejected source'), ...task.files.slice(1).map(path => write(path))]
+  let repaired = false
+  const result = await new BuilderToolLoop({ async generate(input) {
+    if (actions.length) {
+      if (actions.length === 3) {
+        assert.match(input.prompt, /original source/)
+        assert.doesNotMatch(input.prompt, /rejected source/)
+      }
+      return actions.shift()!
+    }
+    assert.equal(repaired, false)
+    repaired = true
+    return write('expenses.js', 'repaired source')
+  } }, new InMemoryBuilderWorkspace(), {
+    async run() { return repaired ? passing : { ...passing, exitCode: 1 } },
+  }).run({ objective, workspaceId: 'current-source' })
+  assert.equal(result.ok, true)
+  assert.equal(repaired, true)
+})
+
+test('reported expense artifacts recover their shared interface with real Node proofs within 16 rounds', async () => {
+  // Owner-supplied failed artifacts. Model decisions are scripted; every proof executes real Node.
+  const files = Object.fromEntries(task.files.map(path => [path, readFileSync(new URL(`./fixtures/builder-expense-contract/${path}`, import.meta.url), 'utf8')]))
+  const actions = task.files.map(path => write(path, files[path]))
+  const fixedSource = files['expenses.js'].replace('total: overall', 'overall: formatCents(overall)')
+  const fixedTests = files['expenses.test.js']
+    .replaceAll('output.byCategory', 'output.categories').replaceAll('output.total', 'output.overall')
+    .replace("'Food, Drinks': 1234", "'Food, Drinks': '12.34'").replace('Travel: 500', "Travel: '5.00'")
+    .replaceAll('Food: 3000', "Food: '30.00'")
+    .replaceAll(', 1734)', ", '17.34')").replaceAll(', 3000)', ", '30.00')")
+    .replaceAll(', 650)', ", '6.50')").replaceAll(', 30)', ", '0.30')")
+  let repair = 0
+  const directory = await mkdtemp(join(tmpdir(), 'builder-expense-contract-'))
+  try {
+    const result = await new BuilderToolLoop({ async generate(input) {
+      if (actions.length) {
+        if (actions.length === 3) {
+          assert.match(input.prompt, /CURRENT WORKSPACE FILES/)
+          assert.match(input.prompt, /categories: byCategory/)
+          assert.match(input.prompt, /Internal representation is not necessarily the public output/)
+        }
+        return actions.shift()!
+      }
+      assert.match(input.prompt, /fix the shared cause across the file/)
+      const snapshots = JSON.parse(input.prompt.split('latest successful writes):\n')[1].split('\n')[0]).files
+      assert.equal(snapshots.find((file: { path: string }) => file.path === 'expenses.js').content, repair ? fixedSource : files['expenses.js'])
+      assert.ok(repair < 2, 'must finish without additional inspection rounds')
+      return repair++ === 0 ? write('expenses.js', fixedSource) : write('expenses.test.js', fixedTests)
+    } }, new InMemoryBuilderWorkspace(), {
+      async run(input) {
+        assert.ok(task.commands.includes(input.command))
+        for (const file of input.files) await writeFile(join(directory, file.path), file.content)
+        const env = { ...process.env }
+        delete env.NODE_TEST_CONTEXT
+        const executed = spawnSync(process.execPath, input.command.split(' ').slice(1), { cwd: directory, env, encoding: 'utf8', timeout: 10_000 })
+        return { exitCode: executed.status ?? 124, stdout: executed.stdout, stderr: executed.stderr, timedOut: !!executed.error }
+      },
+    }).run({ objective, workspaceId: 'expense-interface', maxRounds: 16 })
+    assert.equal(result.ok, true, JSON.stringify(result))
+    const runs = result.trace.filter(item => item.toolId === 'run')
+    assert.deepEqual(runs.map(item => item.ok), [false, true, false, true, true, true])
+    assert.match((runs[4].output as typeof passing).stdout, /(?:#|ℹ) pass 12/)
+    assert.deepEqual(JSON.parse((runs[5].output as typeof passing).stdout), {
+      categories: { Entertainment: '35.99', Food: '37.00', Transport: '5.35', Utilities: '75.00' }, overall: '153.34',
+    })
+    assert.equal(result.trace.filter(item => item.toolId === 'read_file').length, 0)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})

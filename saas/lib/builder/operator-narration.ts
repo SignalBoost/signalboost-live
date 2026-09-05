@@ -44,7 +44,7 @@ function quotedPaths(paths: readonly string[]): string {
 
 function failureLabel(value: unknown): string {
   const normalized = text(value).replace(/[_-]+/g, ' ')
-  return normalized || 'runtime'
+  return normalized || 'unclassified'
 }
 
 function latestFailure(trace: readonly OperatorTraceEntry[]): OperatorTraceEntry | undefined {
@@ -78,7 +78,9 @@ export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): 
       : `Diagnosed — the ${failureLabel(failedRun.failureClass)} failure was isolated from the recorded tool evidence.`)
   } else {
     lines.push('Found — I inspected the repair request and the available workspace evidence.')
-    lines.push(lastFailure
+    lines.push(/budget_exhausted|builder_turn_timeout/.test(text(result.error))
+      ? 'Diagnosed — the work limit was reached before verification completed.'
+      : lastFailure
       ? `Diagnosed — the remaining blocker is a ${failureLabel(lastFailure.failureClass)} failure.`
       : 'Diagnosed — no failing proof was recorded before the terminal result.')
   }

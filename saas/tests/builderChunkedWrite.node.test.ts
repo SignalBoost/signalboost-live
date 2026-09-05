@@ -36,6 +36,7 @@ test('chunk assembly preserves exact text and rejects duplicate, skipped, malfor
     { path: 'other.js', content: 'wrong file', chunkIndex: 1, final: true },
     { path: '../host.js', content: 'escape', chunkIndex: 1, final: true },
     { path: 'large.js', content: 'bad flag', chunkIndex: 1, final: 'false' },
+    { path: 'large.js', content: '\0', chunkIndex: 1, final: false },
   ]) assert.throws(() => assembleBuilderChunk(first.file, input, null))
   assert.equal(first.file.content, 'hello\r\n', 'rejected proposals never mutate staged content')
 })

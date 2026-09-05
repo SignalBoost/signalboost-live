@@ -1,3 +1,5 @@
+import { assertPersistable } from './storage-contract.ts'
+
 export type PendingBuilderWrite = Readonly<{
   path: string
   content: string
@@ -25,6 +27,7 @@ export function assembleBuilderChunk(pending: PendingBuilderWrite | null, input:
   if (input.chunkIndex !== nextIndex) throw new Error(`builder_chunk_out_of_order: expected chunkIndex ${nextIndex}`)
   if (nextIndex >= 16 || (nextIndex === 15 && !input.final)) throw new Error('builder_chunk_limit: maximum 16 chunks per file')
   const content = (pending?.content || '') + input.content
+  assertPersistable(content, path)
   if (new TextEncoder().encode(content).byteLength > 512 * 1024) throw new Error('builder_file_too_large')
   return { file: { path, content, nextIndex: nextIndex + 1, originalDigest: pending ? pending.originalDigest : originalDigest }, final: input.final }
 }

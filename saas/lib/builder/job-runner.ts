@@ -12,6 +12,7 @@ import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { executeSignalBoostRepositoryRepair } from './repository-repair.ts'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
+import { builderAutoMergeSnapshotPort } from './repository-repair-snapshot-host.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -158,6 +159,8 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         rawObjective: job.objective,
         workspaceId: job.workspaceId,
         target,
+        // Null when Vercel credentials are absent, which auto-merge refuses on.
+        snapshotPort: builderAutoMergeSnapshotPort(),
       })
       if (!execution) {
         await terminalFailure(job, 'builder_repository_repair_target_unavailable')

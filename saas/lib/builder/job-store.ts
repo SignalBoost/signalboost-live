@@ -1,8 +1,9 @@
+import type { BuilderLoopCheckpoint } from './checkpoint.ts'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { EvidenceLookup } from './execution-evidence.ts'
 
 export type BuilderJobKind = 'standard' | 'debug_file'
-export type BuilderJobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
+export type BuilderJobStatus = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed'
 
 export type BuilderJobRecord = Readonly<{
   id: string
@@ -13,6 +14,8 @@ export type BuilderJobRecord = Readonly<{
   jobKind: BuilderJobKind
   metadata: Record<string, unknown>
   ownerAuthorized: boolean
+  claimGeneration: number
+  checkpoint: BuilderLoopCheckpoint | null
   status: BuilderJobStatus
   result: Record<string, unknown> | null
   error: string | null
@@ -26,7 +29,7 @@ export type BuilderJobRecord = Readonly<{
 export const BUILDER_JOB_STALE_AFTER_MS = 6 * 60 * 1000
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const JOB_SELECT = 'id,workspace_id,user_id,conversation_id,objective,job_kind,metadata,owner_authorized,status,result,error,history_message_id,created_at,started_at,finished_at,updated_at'
+const JOB_SELECT = 'id,workspace_id,user_id,conversation_id,objective,job_kind,metadata,owner_authorized,status,result,error,history_message_id,created_at,started_at,finished_at,updated_at,claim_generation'
 
 function serviceClient(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
@@ -51,6 +54,8 @@ function toJob(row: any): BuilderJobRecord {
     jobKind: String(row.job_kind || 'standard') as BuilderJobKind,
     metadata: Object.freeze(record(row.metadata)),
     ownerAuthorized: row.owner_authorized === true,
+    claimGeneration: Number(row.claim_generation || 0),
+    checkpoint: row.checkpoint || null,
     status: String(row.status || 'queued') as BuilderJobStatus,
     result: row.result && typeof row.result === 'object' && !Array.isArray(row.result)
       ? Object.freeze(row.result as Record<string, unknown>)
@@ -143,7 +148,7 @@ export async function claimBuilderJob(jobId: string, userId: string): Promise<Bu
   if (!UUID.test(jobId) || !UUID.test(userId)) return null
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')
-  const { data, error } = await db.rpc('claim_builder_job', {
+  const { data, error } = await db.rpc('claim_builder_job_slice', {
     p_job_id: jobId,
     p_user_id: userId,
   })
@@ -195,6 +200,7 @@ export async function getBuilderJobForUser(jobId: string, userId: string): Promi
 export async function finishBuilderJob(input: {
   jobId: string
   userId: string
+  claimGeneration: number
   status: 'succeeded' | 'failed'
   reply: string
   result: Record<string, unknown>
@@ -203,13 +209,37 @@ export async function finishBuilderJob(input: {
   if (!UUID.test(input.jobId) || !UUID.test(input.userId)) throw new Error('builder_job_invalid_identity')
   const db = serviceClient()
   if (!db) throw new Error('builder_job_storage_unavailable')
-  const { error } = await db.rpc('finish_builder_job', {
+  const { error } = await db.rpc('finish_builder_job_slice', {
     p_job_id: input.jobId,
     p_user_id: input.userId,
+    p_generation: input.claimGeneration,
     p_status: input.status,
     p_reply: String(input.reply || '').trim(),
     p_result: input.result || {},
     p_error: input.error || null,
   })
   if (error) throw new Error(`builder_job_finish: ${error.message}`)
+}
+
+/** Only server-owned paused checkpoints are eligible; running/uncertain work is never replayed. */
+export async function listBuilderContinuations(): Promise<Array<{ id: string; userId: string }>> {
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.from('builder_jobs').select('id,user_id')
+    .eq('status', 'paused').eq('job_kind', 'standard').not('checkpoint', 'is', null)
+    .lt('claim_generation', 4).order('updated_at', { ascending: true }).limit(3)
+  if (error) throw new Error('builder_continuations_read_failed')
+  return (data || []).map(row => ({ id: row.id, userId: row.user_id }))
+}
+
+export async function pauseBuilderJob(input: {
+  job: BuilderJobRecord; checkpoint: BuilderLoopCheckpoint; reply: string; result: Record<string, unknown>
+}): Promise<void> {
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.rpc('pause_builder_job_slice', {
+    p_job_id: input.job.id, p_user_id: input.job.userId, p_generation: input.job.claimGeneration,
+    p_checkpoint: input.checkpoint, p_reply: input.reply, p_result: input.result,
+  })
+  if (error || data !== true) throw new Error('builder_checkpoint_persist_failed')
 }

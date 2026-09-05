@@ -182,7 +182,7 @@ async function pollBuilderJob(
       const payload = await response.json().catch(() => null)
       if (!payload || typeof payload !== 'object' || Array.isArray(payload)) continue
       const record = payload as Record<string, unknown>
-      if (response.status === 202 || record.status === 'queued' || record.status === 'running') continue
+      if (response.status === 202 || record.status === 'queued' || record.status === 'running' || record.status === 'paused') continue
       return { payload: record, status: response.status }
     } catch (error) {
       if (deliberateAbort(error, signal)) throw error

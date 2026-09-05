@@ -39,7 +39,7 @@ export type BuilderToolTrace = Readonly<{
 
 export type BuilderLoopResult =
   | Readonly<{ ok: true; answer: string; trace: readonly BuilderToolTrace[] }>
-  | Readonly<{ ok: false; error: string; trace: readonly BuilderToolTrace[] }>
+  | Readonly<{ ok: false; error: string; trace: readonly BuilderToolTrace[]; checkpoint?: import('./checkpoint.ts').BuilderLoopCheckpoint }>
 
 /** A lesson is admitted only when a failure is followed by a successful proving command. */
 export type BuilderVerifiedRepairLesson = Readonly<{

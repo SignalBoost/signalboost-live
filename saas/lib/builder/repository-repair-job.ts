@@ -70,6 +70,7 @@ export async function enqueueSignalBoostRepositoryRepairJob(input: {
     await finishBuilderJob({
       jobId,
       userId: input.userId,
+      claimGeneration: claimed.claimGeneration,
       status: 'failed',
       reply,
       error,

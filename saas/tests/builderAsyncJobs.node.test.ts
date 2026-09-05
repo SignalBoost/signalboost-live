@@ -101,8 +101,8 @@ test('running and terminal History share one durable assistant message', () => {
   assert.match(migration, /update public\.assistant_messages[\s\S]*where id = v_history_message_id/)
   assert.match(migration, /revoke all on public\.builder_jobs from anon, authenticated/)
   assert.match(jobStore, /\.rpc\('enqueue_builder_job'/)
-  assert.match(jobStore, /\.rpc\('claim_builder_job'/)
-  assert.match(jobStore, /\.rpc\('finish_builder_job'/)
+  assert.match(jobStore, /\.rpc\('claim_builder_job_slice'/)
+  assert.match(jobStore, /\.rpc\('finish_builder_job_slice'/)
 })
 
 test('expired background workers become terminal in both polling and History', () => {

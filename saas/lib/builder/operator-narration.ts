@@ -1,3 +1,5 @@
+import { builderEvidenceEvents } from './evidence-events.ts'
+
 type OperatorTraceEntry = Readonly<{
   round?: number
   toolId?: string
@@ -61,8 +63,9 @@ function latestRemediation(trace: readonly OperatorTraceEntry[]): string {
  */
 export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): string {
   const trace = Array.isArray(result.trace) ? result.trace : []
-  const failedRun = trace.find(entry => entry.toolId === 'run' && entry.ok === false)
-  const successfulRuns = trace.filter(entry => entry.toolId === 'run' && entry.ok === true)
+  const events = builderEvidenceEvents(trace)
+  const failedRun = trace.find((_, index) => events[index].outcome === 'exited_nonzero')
+  const successfulRuns = trace.filter((_, index) => events[index].outcome === 'exited_zero')
   const successfulRun = successfulRuns.at(-1)
   const changedPaths = unique(trace
     .filter(entry => entry.ok === true && (entry.toolId === 'edit_file' || entry.toolId === 'write_file'))
@@ -98,8 +101,6 @@ export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): 
       lines.push('Verification — no successful proving command was recorded, so I am not labeling this repair verified.')
     }
 
-    const detail = text(result.answer)
-    if (detail) lines.push('', 'Details:', detail)
     return lines.join('\n')
   }
 

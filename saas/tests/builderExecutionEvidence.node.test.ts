@@ -157,6 +157,8 @@ test('explanation reads current source and discloses missing historical diff', a
   const reply = await explainBuilderEvidence({ prompt: 'Explain the repair', job: { ...job, result: { trace: [{ toolId: 'edit_file', path: 'total.js', ok: true }, ...trace] } },
     workspace: { async readFile(workspace, path) { assert.equal(workspace, workspaceId); assert.equal(path, 'total.js'); return { path, content: 'index < values.length', updatedAt: 1 } } },
     ai: { async generate(request) {
+      if (request.systemPrompt.startsWith('BUILDER EXPLANATION EVIDENCE REVIEW')) return '{"supported":true}'
+
       assert.match(request.systemPrompt, /cannot verify the exact change/)
       assert.match(request.prompt, /index < values.length/)
       assert.match(request.prompt, /Hello from COS Builder/)
@@ -201,7 +203,9 @@ test('run-first imported jobs explain from their saved artifact list', async () 
   const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
   const reply = await explainBuilderEvidence({ prompt: 'Explain why that run failed in index.js', job: { ...job, result: { files: ['package.json', 'index.js'], trace } },
     workspace: { async readFile(workspace, path) { assert.equal(workspace, workspaceId); return { path, content: path === 'index.js' ? 'module.exports = 42' : '{}', updatedAt: 1 } } },
-    ai: { async generate(request) { assert.match(request.prompt, /module.exports = 42/); return '{"type":"answer","answer":"The recorded run succeeded."}' } },
+    ai: { async generate(request) {
+      if (request.systemPrompt.startsWith('BUILDER EXPLANATION EVIDENCE REVIEW')) return '{"supported":true}'
+ assert.match(request.prompt, /module.exports = 42/); return '{"type":"answer","answer":"The recorded run succeeded."}' } },
   })
   assert.match(reply, /current workspace files/)
 })
@@ -227,6 +231,8 @@ test('initial repair explains actual failure, edit and passing check without a f
     const reply = await explainInitialBuilderRepair({ prompt: 'Repair sum.cjs', job: { ...job, result: { trace: recorded } },
       workspace: { async readFile() { return { path: 'sum.cjs', content: after, updatedAt: 1 } } },
       ai: { async generate(request) {
+      if (request.systemPrompt.startsWith('BUILDER EXPLANATION EVIDENCE REVIEW')) return '{"supported":true}'
+
         const evidence = JSON.parse(request.prompt)
         assert.equal(evidence.currentFiles[0].content, after)
         assert.deepEqual(evidence.recordedTrace, recorded)
@@ -274,6 +280,8 @@ test('a proposal is displayed only after its exact objective is persisted', asyn
     let saved = ''
     const reply = await explainBuilderEvidence({ prompt: 'What improvement is next for this app?', job, workspace: null,
       ai: { async generate(request) {
+      if (request.systemPrompt.startsWith('BUILDER EXPLANATION EVIDENCE REVIEW')) return '{"supported":true}'
+
         assert.match(request.systemPrompt, /MUST include a top-level proposal string/)
         assert.match(request.systemPrompt, /No deployment, publishing, credentials/)
         assert.equal(JSON.parse(request.prompt).proposalInstructions, undefined)
@@ -331,4 +339,88 @@ test('proposal completion requires every promised command after the last edit', 
   assert.equal(builderTaskProgress(contract, ['cli.js'], trace).satisfied, false)
   trace.push({ toolId: 'run', ok: true, input: { command: 'node cli.js --help' }, output: { exitCode: 0 } })
   assert.equal(builderTaskProgress(contract, ['cli.js'], trace).satisfied, true)
+})
+
+
+test('blocked requests, timeouts and missing outcomes do not become reproduced failures', async () => {
+  const { builderEvidenceEvents } = await import('../lib/builder/evidence-events.ts')
+  const { formatBuilderOperatorRepairReply } = await import('../lib/builder/operator-narration.ts')
+  const recorded = [
+    { toolId: 'run', ok: false, command: 'npm test', error: 'builder_repeated_tool_call:run; choose a different next step' },
+    { toolId: 'run', ok: false, command: 'npm test', timedOut: true, exitCode: 124 },
+    { toolId: 'run', ok: false, command: 'npm test' },
+    { toolId: 'edit_file', ok: false, path: 'money.js', error: 'builder_verification_order_required' },
+  ]
+  assert.deepEqual(builderEvidenceEvents(recorded).map(item => item.outcome),
+    ['blocked_before_execution', 'timed_out', 'execution_unconfirmed', 'blocked_before_mutation'])
+  const reply = formatBuilderOperatorRepairReply({ ok: false, trace: recorded })
+  assert.doesNotMatch(reply, /reproduced the reported failure/)
+  const evidence = formatBuilderExecutionEvidence(recorded)
+  assert.match(evidence, /blocked before execution/)
+  assert.match(evidence, /builder_repeated_tool_call:run/)
+  assert.match(evidence, /timed out/)
+  assert.match(evidence, /execution unconfirmed/)
+})
+
+test('unsupported failed-edit narration is withheld in initial and follow-up responses', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  for (const presentation of ['initial', 'followup'] as const) {
+    for (const verdict of ['{"supported":false}', '{}', 'not json', 'throw']) {
+      let calls = 0
+      let saved = false
+      const recorded = [{ toolId: 'run', ok: false, command: 'npm test', error: 'builder_repeated_tool_call:run' }]
+      const reply = await explainBuilderEvidence({ prompt: 'Explain the last repair', job: { ...job, result: { trace: recorded } },
+        workspace: null, presentation, fallback: 'Source explanation unavailable.',
+        saveProposal: async () => { saved = true },
+        ai: { async generate(request) {
+          calls++
+          if (calls === 1) return JSON.stringify({ type: 'answer', answer: 'The edit failed because its search string did not match.',
+            proposal: 'Add a test to money.test.js.\nRun:\nnpm test' })
+          assert.match(request.systemPrompt, /Reject invented attempts/)
+          const context = JSON.parse(request.prompt)
+          assert.equal(context.events[0].toolId, 'run')
+          assert.equal(context.events[0].outcome, 'blocked_before_execution')
+          assert.match(context.draft, /search string/)
+          if (verdict === 'throw') throw new Error('unavailable')
+          return verdict
+        } },
+      })
+      assert.equal(calls, 2)
+      assert.equal(saved, false)
+      assert.doesNotMatch(reply, /search string did not match/)
+      assert.match(reply, /blocked before execution/)
+    }
+  }
+})
+
+test('unreviewed model details cannot leak through deterministic repair fallback', async () => {
+  const { formatBuilderOperatorRepairReply } = await import('../lib/builder/operator-narration.ts')
+  const reply = formatBuilderOperatorRepairReply({ ok: true, answer: 'An invented edit failed.', trace: [
+    { toolId: 'run', ok: true, command: 'npm test', exitCode: 0 },
+  ] })
+  assert.doesNotMatch(reply, /invented edit/)
+  assert.match(reply, /passed with exit code 0/)
+})
+
+test('a stalled explanation review preserves the terminal result within the existing deadline', async t => {
+  const { explainInitialBuilderRepair } = await import('../lib/builder/explain-evidence.ts')
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let reviewing!: () => void
+  const started = new Promise<void>(resolve => { reviewing = resolve })
+  let release!: (value: string) => void
+  const pending = explainInitialBuilderRepair({ prompt: 'Explain repair', job, workspace: null,
+    fallback: 'Recorded check passed.', deadlineAtMs: Date.now() + 2000,
+    ai: { async generate(request) {
+      if (!request.systemPrompt.startsWith('BUILDER EXPLANATION EVIDENCE REVIEW')) return '{"type":"answer","answer":"Unreviewed draft."}'
+      reviewing()
+      return new Promise(resolve => { release = resolve })
+    } },
+  })
+  await started
+  t.mock.timers.tick(2001)
+  const reply = await pending
+  assert.match(reply, /Recorded check passed/)
+  assert.doesNotMatch(reply, /Unreviewed draft/)
+  release('{"supported":true}')
+  await Promise.resolve()
 })

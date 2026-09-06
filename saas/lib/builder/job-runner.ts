@@ -316,7 +316,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
 
     const baseReply = isRepairObjective(job.objective)
       ? formatBuilderOperatorRepairReply({ ok: true, answer: result.answer, trace })
-      : result.answer
+      : shouldExplain ? 'The job completed. See the recorded verification below.' : result.answer
     const reply = historyReply(await initialReply(baseReply, 'succeeded'), job.workspaceId, files)
     await finishBuilderJob({
       jobId: job.id,

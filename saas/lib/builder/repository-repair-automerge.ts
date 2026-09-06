@@ -1,3 +1,104 @@
+// saas/lib/builder/repository-repair-automerge.ts
+//
+// AUTO-MERGE OF AN ALREADY-VERIFIED REPAIR PULL REQUEST.
+//
+// This file never opens a PR, never writes source, and never deploys. It answers exactly
+// one question: given a PR that publishSignalBoostRepositoryRepair already created from a
+// pinned commit, may the agent press merge unattended? Every gate below is a reason to
+// refuse; a refusal costs nothing, because the PR simply stays open for human review.
+//
+// The gates, in order — each one is cheaper and safer than the one after it:
+//   1. danger category   — billing/credential changes never auto-merge, tests or no tests.
+//   2. checkpoint        — no restorable pre-merge snapshot, no pre-authorized merge.
+//   3. write credential  — absent means this lane was never configured to write at all.
+//   4. green checks      — absence of evidence is not evidence the project still builds.
+import type { BuilderFile } from './contracts.ts'
+import type { StateSnapshotPort } from '../portable/state-snapshot-port.ts'
+import {
+  repositoryChangeDangerCategory,
+  repositoryChangeDangerReason,
+  type RepositoryChangeDangerCategory,
+} from './repository-change-danger-policy.ts'
+
+const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
+
+type RequestLike = typeof fetch
+type JsonRecord = Record<string, any>
+
+export type AutoMergeRefusalReason =
+  | 'danger_category'
+  | 'snapshot_capture_failed'
+  | 'snapshot_not_restorable'
+  | 'checks_not_green'
+
+export type AutoMergeResult = Readonly<{
+  merged: boolean
+  reason: AutoMergeRefusalReason | null
+  detail: string | null
+  dangerCategory: RepositoryChangeDangerCategory | null
+  preMergeSnapshotId: string | null
+  mergeCommitSha: string | null
+}>
+
+export type AutoMergeDangerVerdict = Readonly<{
+  eligible: boolean
+  reason: AutoMergeRefusalReason | null
+  detail: string | null
+  dangerCategory: RepositoryChangeDangerCategory | null
+}>
+
+function refusal(
+  reason: AutoMergeRefusalReason,
+  detail: string,
+  dangerCategory: RepositoryChangeDangerCategory | null = null,
+): AutoMergeResult {
+  return Object.freeze({
+    merged: false,
+    reason,
+    detail: detail || null,
+    dangerCategory,
+    preMergeSnapshotId: null,
+    mergeCommitSha: null,
+  })
+}
+
+async function requestJson(
+  request: RequestLike,
+  url: string,
+  init: RequestInit,
+  expected: readonly number[],
+): Promise<JsonRecord> {
+  const response = await request(url, init)
+  const payload = await response.json().catch(() => ({})) as JsonRecord
+  if (!expected.includes(response.status)) {
+    const detail = typeof payload?.message === 'string' ? payload.message.slice(0, 240) : `http_${response.status}`
+    throw new Error(`builder_repository_automerge_${detail.replace(/\s+/g, '_').toLowerCase()}`)
+  }
+  return payload
+}
+
+/**
+ * Default-deny classification of the change itself, decided before any port or network call
+ * so a dangerous diff never even causes a checkpoint to be taken. Exported because the same
+ * verdict is worth asserting directly in tests and reusable by any caller that wants to know
+ * whether a change is auto-mergeable before it starts the publish work.
+ */
+export function evaluateAutoMergeDangerCategory(
+  files: readonly Pick<BuilderFile, 'path' | 'content'>[],
+  patch: string,
+): AutoMergeDangerVerdict {
+  const dangerCategory = repositoryChangeDangerCategory(files, patch)
+  if (!dangerCategory) {
+    return Object.freeze({ eligible: true, reason: null, detail: null, dangerCategory: null })
+  }
+  return Object.freeze({
+    eligible: false,
+    reason: 'danger_category' as const,
+    detail: repositoryChangeDangerReason(dangerCategory),
+    dangerCategory,
+  })
+}
+
 /**
  * Read the pull request's head commit and judge its check runs and commit statuses.
  *
@@ -65,7 +166,7 @@ export async function attemptSignalBoostRepositoryAutoMerge(input: {
 }): Promise<AutoMergeResult> {
   const dangerCheck = evaluateAutoMergeDangerCategory(input.files, input.patch)
   if (!dangerCheck.eligible) {
-    return refusal(dangerCheck.reason, dangerCheck.detail || '', dangerCheck.dangerCategory)
+    return refusal(dangerCheck.reason ?? 'danger_category', dangerCheck.detail || '', dangerCheck.dangerCategory)
   }
 
   if (!input.snapshotPort) {
@@ -78,7 +179,7 @@ export async function attemptSignalBoostRepositoryAutoMerge(input: {
     environment: 'production',
     reason: 'Pre-merge checkpoint before COS Platform Engineer auto-merge',
   })
-  if (!capture.ok) {
+  if (!capture.ok || !capture.snapshot) {
     return refusal('snapshot_capture_failed', capture.error || 'Snapshot capture failed for an unspecified reason.')
   }
   if (!capture.snapshot.restorable) {

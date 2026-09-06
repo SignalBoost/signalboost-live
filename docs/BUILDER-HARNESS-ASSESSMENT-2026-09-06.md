@@ -41,4 +41,32 @@ The next correction implements a deterministic gate for explicit `run COMMAND be
 
 The reasoning prompt additionally asks Builder to derive boundary/counterexample tests beyond literal examples, implement the general rule and avoid arbitrary numerical tolerances. This is guidance, not a deterministic proof of generalization. A separate engineering probe uses BigInt decimal arithmetic to check 10,102 signed decimal cases, including nearby values around ties. It is held outside the live workspace during generation; it is not model-generated evidence or private cognitive certification.
 
-The exact saved money.js from job 2432fd49-9eb1-4158-802f-b75e39302782 is retained as `docs/fixtures/builder-rounding/observed-money.cjs`. Before correction, the independent probe failed 30 cases; for example 0.0049999 yielded 1 cent instead of 0 and 0.0149999 yielded 2 instead of 1, with matching negative failures. Run the probe with NODE_PATH pointing at the installed saas/node_modules and pass the candidate module path. The original six-file expense fixture remains unchanged. After integration with concurrent #1894, all 984 mandatory regressions and TypeScript passed locally. Review also caught command normalization: the host now retains the original requested command alongside the executed command, and both ordering and completion recognize that attested alias. Real Node regressions cover normalized npm commands with and without checkpoint resume. Post-deployment live correction and independent candidate results remain pending.
+The exact saved money.js from job 2432fd49-9eb1-4158-802f-b75e39302782 is retained as `docs/fixtures/builder-rounding/observed-money.cjs`. Before correction, the independent probe failed 30 cases; for example 0.0049999 yielded 1 cent instead of 0 and 0.0149999 yielded 2 instead of 1, with matching negative failures. Run the probe with NODE_PATH pointing at the installed saas/node_modules and pass the candidate module path. The original six-file expense fixture remains unchanged. After integration with concurrent #1894, all 984 mandatory regressions and TypeScript passed locally. Review also caught command normalization: the host now retains the original requested command alongside the executed command, and both ordering and completion recognize that attested alias. Real Node regressions cover normalized npm commands with and without checkpoint resume. Post-deployment results follow.
+
+
+## Live ordering and independent rounding evaluation
+
+PR #1896 application merge: `72bdaa211fa815d5edf4c3c03b949691d4acd47c`. Exact Preview `dpl_22o8htn3RQG1jbCe1ZZ7LBv8byYQ` and ten CI workflows passed on head `578985b1500e44013cd7922b01db6a5c7e6ca40a`; all review threads were resolved. Production `dpl_AgkAQcZDhpYk34HWXMbWej4ctq2M` was READY before the live request.
+
+The existing expense-report conversation received this request, without uploading the engineering probe:
+
+> Fix money.js in this existing expense-report project. Decimal-string amounts must round to the nearest cent, with exact ties away from zero; values just below a half-cent boundary must not round up. Preserve the public toCents API, invalid-input rejection, and all twelve existing tests. Add focused boundary and counterexample assertions of your own in report.test.js, run npm test before changing money.js, then repair the general rule and run npm test again. Keep the existing assertions unchanged. Explain the verified cause, repair and results, including any limits.
+
+Job `b6585c7f-601e-4092-9027-7009d1799b7c` succeeded in the same workspace. The recorded sequence was:
+
+1. Read money.js.
+2. Add two tests containing ten new boundary assertions to report.test.js.
+3. Run npm test: fourteen passed, zero failed.
+4. Attempt the unchanged npm test again: the repeat guard rejected it before execution; no exit code exists.
+5. Edit money.js, removing only the 0.0001 term from its rounding expression.
+6. Run npm test: fourteen passed, zero failed.
+
+Comparing scoped database source snapshots before and after, removing the two added test blocks reproduces the prior report.test.js byte-for-byte. The public export and invalid-input rejection remain present. This accepts the requested new-test-before-source-edit ordering. The model's new tests did not reproduce the old bug, so there is no live fail-first claim for this sample.
+
+The exact resulting source is retained in `docs/fixtures/builder-rounding/candidate-money.cjs`. Running the unchanged independent `rounding-probe.cjs` against it returned `{"checked":10102,"failures":0,"examples":[]}`, exit 0; the prior source failed 30 of those same cases. Builder did not see the probe or its individual counterexamples before generation. This is finite-case improvement, not a proof for every decimal string: the implementation still uses binary Number arithmetic and an EPSILON correction. No causal benefit from learned procedures is established.
+
+## Remaining explanation-fidelity defect
+
+The visible response correctly disclosed that the new baseline passed and that no failing test had reproduced the pre-repair problem. However, it also described an unsuccessful source edit whose search string did not match. The trace contains no such edit: round 4 is `builder_repeated_tool_call:run; choose a different next step`. The response's explanation of that event is unsupported. Its execution evidence correctly marks the blocked run's exit code as not recorded.
+
+This discrepancy remains open. Improving evidence-grounded narration, including distinguishing blocked requests from executed commands and unsuccessful edits, is the next concrete harness gap. Do not call this response fully faithful merely because its final test count and source are correct.

@@ -10,4 +10,19 @@ Explanation generation and review receive the last three available run snapshots
 
 Tests cover real Node execution followed by a workspace mutation, durable serialized old content, different and same identities, bounded large-file excerpts with full fingerprints, omitted files, corrupted complete snapshots, missing/legacy/latest-missing snapshots, both public serializers, and delivery of the same authoritative evidence to generation and both review stages. Existing authorization/deadline and repair regressions remain required. Live acceptance must check a legacy job and a newly recorded job after a later file change.
 
-Local validation: 40 focused tests, all 1009 mandatory regressions and TypeScript passed. Exact-head CI, Preview, Production and live acceptance pending.
+Local validation: 40 focused tests, all 1009 mandatory regressions and TypeScript passed. Exact head 7d3d6df096be99cc77dea8e7684085f0fe1c2b75 passed ten CI workflows and Preview dpl_FAjXHojE5ZQ3YUXMKAJJWpM1G6oG with no unresolved review threads. #1907 merged at 4967fe8a3f5efb574a2812e1144064411ad803fc; Production dpl_385qSkfTezQZjyED4XWmSr3TQQau was verified READY at that SHA.
+
+
+## Live comparison
+
+Job 40025dd2-d165-45ab-85cc-4206ce310317 added README.md. Its round-1 npm test passed all fifteen tests with seven captured source fingerprints; its round-3 node cli.js --help passed with eight captured files including the complete README excerpt. The README fingerprint was 8526c2b8ef24b9570678d1a455466ed83c2153eea5afcbe5f7d4da74ac747137.
+
+Later job 97abd8c1-2211-4c2b-8dd0-3f6cff7f6e9e appended a Troubleshooting / Missing input file section and then passed fifteen tests. Its recorded README fingerprint became 14463e173011e246f5958bb55563400cd533119a842e29da7b0504315592a6f5. The other seven fingerprints, including all runtime source and tests, remained identical. The original job's snapshot remained intact after this edit. The later job was nevertheless marked failed with builder_regression_evidence_required; this is an intent-classification defect, not a failed npm test.
+
+The read-only question about whether today's README matched the last command input of the original job returned an accurate answer: different fingerprints, the newly added section, and the old CLI-help command/exit/output kept distinct from the later edit. Runtime review returned supported=true. The explicit legacy identity question for job e22206f9-7008-41c5-aba7-5f0bb880e691 correctly reported unavailable comparison because no historical SHA-256 snapshot exists. Neither question created a new job; the latest scoped job remained the later documentation job.
+
+## Remaining boundaries and discovered routing defects
+
+Repeating the broader legacy precision-repair explanation returned safe raw evidence rather than useful prose. It did not repeat the false match claim, but broad explanation availability is not accepted. A question beginning Does and asking whether the same legacy job's saved source established a match incorrectly entered generic answer-provenance handling; an explicit Explain-question used the correct Builder evidence route. This wording sensitivity is a separate conversation-routing gap.
+
+The documentation request mentioned the existing missing-input-file error as the subject to explain. Current isRepairObjective treats error vocabulary as repair intent unless the opening directive matches its creation exceptions; Extend is absent. The later task therefore required a failing regression that the owner never requested. Its deterministic fallback compounded this by saying proof had not passed despite a recorded zero exit and fifteen passing tests. Correct intent classification and truthful gate-versus-command narration are next. Do not infer that source-history acceptance makes the full engineering harness or every conversation path complete.

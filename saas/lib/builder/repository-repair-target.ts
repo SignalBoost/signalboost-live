@@ -1,3 +1,4 @@
+// saas/lib/builder/repository-repair-target.ts
 import { analyzeOperationalLog } from '../ai/cos/pastedOperationalLog.ts'
 
 export const SIGNALBOOST_REPOSITORY = 'SignalBoost/signalboost-live' as const
@@ -13,6 +14,8 @@ export type SignalBoostRepositoryRepairTarget = Readonly<{
   projectRoot: 'saas'
   pathHints: readonly string[]
   symbolHints: readonly string[]
+  /** Imports the build could not resolve — files the repair must create. */
+  missingModuleHints: readonly string[]
   failedCommand: string | null
   failureEvidence: readonly string[]
   rawLog: string
@@ -84,6 +87,35 @@ function sourcePaths(input: string): readonly string[] {
   return unique(paths, 32)
 }
 
+// A bundler that cannot resolve an import is naming a FILE THAT DOES NOT EXIST, and that
+// is invisible to every other extractor here: there is no failing test, no missing export,
+// no type error — only a specifier. Without this, the repair lane is handed half the failure
+// and can honestly fix what it was given while the build stays broken for the other reason.
+//
+// Specifiers are normalized to workspace paths. '@/' is this repository's alias for the saas
+// project root, and an extensionless specifier is reported as its .ts candidate, because that
+// is what the repair has to create.
+// "Can't resolve" contributes its own apostrophe, so the line carries an ODD number of quote
+// characters and any naive pairing captures "t resolve " instead of the module. Anchor on the
+// word that actually precedes the specifier.
+const UNRESOLVED_MODULE = /(?:resolve|Cannot find module)\s+['"`]([^'"`\n]+)['"`]/i
+
+function unresolvedModulePaths(input: string): readonly string[] {
+  const paths: string[] = []
+  for (const line of normalizedLogLines(input)) {
+    if (!/Module not found|Cannot find module/i.test(line)) continue
+    const specifier = String(UNRESOLVED_MODULE.exec(line)?.[1] || '').trim()
+    // Bare package names are a dependency problem, not a missing source file, and this lane
+    // must never be pointed at node_modules.
+    if (!specifier || !/^(?:@\/|\.{1,2}\/)/.test(specifier)) continue
+    const relative = specifier.startsWith('@/') ? specifier.slice(2) : specifier.replace(/^\.{1,2}\//, '')
+    if (!relative || relative.includes('..')) continue
+    const normalized = relative.startsWith('saas/') ? relative : `saas/${relative}`
+    paths.push(/\.[a-z]+$/i.test(normalized) ? normalized : `${normalized}.ts`)
+  }
+  return unique(paths, 12)
+}
+
 function symbolNames(input: string): readonly string[] {
   const values: string[] = []
   const patterns = [
@@ -107,7 +139,6 @@ function failureEvidence(input: string): readonly string[] {
   )
   return unique(selected.map(line => line.slice(0, 900)), MAX_FAILURE_EVIDENCE)
 }
-
 /**
  * Repository repair is deliberately limited to an exact failed SignalBoost snapshot named by
  * Vercel build evidence. Arbitrary repositories, moving branches, and successful logs are rejected.
@@ -133,6 +164,7 @@ export function parseSignalBoostRepositoryRepairTarget(input: string): SignalBoo
     projectRoot: 'saas',
     pathHints: sourcePaths(rawLog),
     symbolHints: symbolNames(rawLog),
+    missingModuleHints: unresolvedModulePaths(rawLog),
     failedCommand: analysis.command,
     failureEvidence: failureEvidence(rawLog),
     rawLog,
@@ -165,6 +197,7 @@ export function signalBoostDeployedRepairTarget(
     projectRoot: 'saas',
     pathHints: sourcePaths(objective),
     symbolHints: symbolNames(objective),
+    missingModuleHints: unresolvedModulePaths(objective),
     failedCommand: analyzeOperationalLog(objective).command,
     failureEvidence: failureEvidence(objective),
     rawLog: objective,
@@ -223,11 +256,20 @@ export function signalBoostRepositoryRepairObjective(target: SignalBoostReposito
       : `Diagnose and prepare a verified repair for ${target.repository} at exact deployed commit ${target.fullCommitSha || target.commitSha}.`,
     `The host mounted the pinned repository's ${target.projectRoot}/ directory as this isolated workspace. Tool paths are relative to ${target.projectRoot}/.`,
     'Inspect the implicated source, reproduce the failure with the narrowest relevant command, make the smallest source repair, and rerun the same command until it passes.',
+    // History is evidence. A missing property, a deleted import, or a signature that no longer
+    // matches its callers is usually something a recent commit removed, and the current file
+    // cannot show that. Reading the change is faster and more truthful than inferring intent.
+    'The mounted repository carries recent history. When a failure is a contract, type, or missing-symbol mismatch, first run `git log --oneline -15 -- <file>` and `git show <sha> -- <file>` on the implicated file and read what the recent commits removed. If a commit deleted the property, import, or branch the failure names, restore it from `git show <sha>^:<file>` rather than writing a replacement from scratch. Report the commit you found. These git commands are read-only; committing, pushing, and merging remain forbidden.',
     narrowProof,
     'Do not weaken tests, access another repository, use the network, commit, push, merge, deploy, or claim success without fail-before/pass-after evidence.',
     command,
     paths.length ? `Path hints: ${paths.join(', ')}` : '',
     target.symbolHints.length ? `Symbol hints: ${target.symbolHints.join(', ')}` : '',
+    // Stated as a completion condition, not a hint, because a module-not-found failure has no
+    // failing test to reproduce: the only proof is that the file exists and imports cleanly.
+    target.missingModuleHints.length
+      ? `MISSING MODULES — the build could not resolve these imports, which means these files do not exist: ${target.missingModuleHints.join(', ')}. Create each one. Infer its required exports from every file that imports it and from any migration or schema it maps to; read those importers before writing. The repair is NOT complete while any of these paths is still absent, even if another proof command passes. Prove each with a command that actually imports it, for example \`node --experimental-strip-types -e "import('./<path>').then(()=>console.log('resolved'))"\`.`
+      : '',
     `Failure evidence:\n${evidence}`,
   ].filter(Boolean).join('\n\n').slice(0, 7_900)
 }

@@ -8,7 +8,7 @@ import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
 import { appendBuilderChunk } from '../lib/builder/file-chunks.ts'
 import { builderDependencyPlan } from '../lib/builder/dependencies.ts'
-import { builderRepositoryTarget, importBuilderRepository } from '../lib/builder/repository-import.ts'
+import { builderRepositoryImportIntent, builderRepositoryTarget, importBuilderRepository } from '../lib/builder/repository-import.ts'
 import { VercelSandboxBuilderRunner } from '../lib/builder/vercel-sandbox-runner.ts'
 import { builderMissingSourceReply } from '../lib/builder/user-guidance.ts'
 import type { BuilderRunnerPort } from '../lib/builder/contracts.ts'
@@ -145,10 +145,12 @@ test('repository importer pins source and never sends platform credentials', asy
     urls.push(url)
     assert.equal(options.headers.Authorization, undefined)
     assert.equal(options.redirect, 'error')
+    if (url.includes('/commits/main%2Fsrc')) return new Response('{}', { status: 404 })
+    if (url.endsWith(`/git/trees/${sha}`)) return Response.json({ tree: [{ path: 'src', type: 'tree', sha: 'b'.repeat(40) }] })
     const data = url.includes('/commits/') ? { sha } : url.includes('/git/trees/') ? { tree: [
-      { path: 'src/app.js', type: 'blob', mode: '100644', size: 10 },
-      { path: 'src/.env.json', type: 'blob', mode: '100644', size: 10 },
-      { path: 'src/link.js', type: 'blob', mode: '120000', size: 10 },
+      { path: 'app.js', type: 'blob', mode: '100644', size: 10 },
+      { path: '.env.json', type: 'blob', mode: '100644', size: 10 },
+      { path: 'link.js', type: 'blob', mode: '120000', size: 10 },
     ] } : null
     return new Response(data ? JSON.stringify(data) : 'console.log(1)')
   }) as typeof fetch)
@@ -169,4 +171,50 @@ test('resume is scoped, generation-fenced and scheduled independently of the bro
   assert.match(sql, /claim_generation < 4/)
   assert.match(sql, /revoke all on function public.pause_builder_job_slice.*from public, anon, authenticated/)
   assert.ok(config.crons.some((job: any) => job.path === '/api/cron/builder-continuations'))
+})
+
+
+test('GitHub links in questions never authorize executable import', async () => {
+  for (const prompt of ['What does this repository do? https://github.com/example/project', 'Explain https://github.com/example/project', 'https://github.com/example/project', 'Does this build correctly? https://github.com/example/project']) assert.equal(builderRepositoryImportIntent(prompt), false)
+  for (const prompt of ['Import https://github.com/example/project', 'Please fix https://github.com/example/project', 'Can you build this repository?']) assert.equal(builderRepositoryImportIntent(prompt), true)
+  const source = await readFile(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')
+  assert.match(source, /repositoryTarget = importRequested \? builderRepositoryTarget/)
+})
+
+test('slash refs resolve longest-first and only the requested subtree is recursively fetched', async () => {
+  const sha = 'c'.repeat(40), folderSha = 'd'.repeat(40)
+  const urls: string[] = []
+  const result = await importBuilderRepository(builderRepositoryTarget('Import https://github.com/example/project/tree/feature/foo/src')!, (async (url: string) => {
+    urls.push(url)
+    if (url.endsWith('/commits/feature%2Ffoo%2Fsrc')) return new Response('{}', { status: 404 })
+    if (url.endsWith('/commits/feature%2Ffoo')) return Response.json({ sha })
+    if (url.endsWith(`/git/trees/${sha}`)) return Response.json({ tree: [{ path: 'src', type: 'tree', sha: folderSha }] })
+    if (url.endsWith(`/git/trees/${folderSha}?recursive=1`)) return Response.json({ tree: [{ path: 'app.js', type: 'blob', mode: '100644', size: 14 }] })
+    if (url.endsWith(`/${sha}/src/app.js`)) return new Response('console.log(1)')
+    throw new Error(`unexpected request ${url}`)
+  }) as typeof fetch)
+  assert.equal(result.directory, 'src')
+  assert.equal(result.files[0].path, 'app.js')
+  assert.ok(!urls.includes(`https://api.github.com/repos/example/project/git/trees/${sha}?recursive=1`))
+})
+
+test('full workspace cannot erase a completed command when its lockfile cannot be saved', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  for (let n = 0; n < 99; n++) await workspace.writeFile('full', `file${n}.js`, '')
+  await workspace.writeFile('full', 'package.json', '{"dependencies":{"is-number":"7.0.0"}}')
+  const originalWrite = workspace.writeFile.bind(workspace)
+  workspace.writeFile = async (id, path, content) => {
+    if (path === 'package-lock.json') throw new Error('builder_file_limit')
+    return originalWrite(id, path, content)
+  }
+  let runs = 0
+  const result = await new BuilderToolLoop(scripted([action('run', { command: 'node file0.js' }), JSON.stringify({ type: 'answer', answer: 'Command passed; generated lockfile was not saved.' })]), workspace, { async run() {
+    runs++
+    return { exitCode: 0, stdout: 'executed once', stderr: '', timedOut: false, generatedFiles: [{ path: 'package-lock.json', content: '{"lockfileVersion":3,"packages":{}}' }] }
+  } }).run({ objective: 'Run node file0.js and report its output.', workspaceId: 'full' })
+  assert.equal(runs, 1)
+  const proof = result.trace.find(item => item.toolId === 'run')!
+  assert.equal(proof.ok, true)
+  assert.equal((proof.output as any).stdout, 'executed once')
+  assert.ok(result.trace.some(item => item.error?.includes('builder_generated_lock_not_saved')))
 })

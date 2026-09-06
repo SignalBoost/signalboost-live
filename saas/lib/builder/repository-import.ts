@@ -1,6 +1,6 @@
 import { builderFilePath } from './file-chunks.ts'
 
-export type BuilderRepositoryTarget = Readonly<{ owner: string; repo: string; ref: string; directory: string }>
+export type BuilderRepositoryTarget = Readonly<{ owner: string; repo: string; ref: string; directory: string; refPath?: string }>
 export function builderRepositoryTarget(objective: string, value?: unknown): BuilderRepositoryTarget | null {
   const explicit = typeof value === 'string' ? value : ''
   const link = explicit || objective.match(/https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+(?:\/(?:tree|commit)\/[A-Za-z0-9_./-]+)?/)?.[0]
@@ -14,7 +14,14 @@ export function builderRepositoryTarget(objective: string, value?: unknown): Bui
     || (kind && !['tree', 'commit'].includes(kind)) || (kind && !ref)) throw new Error('builder_repository_url_invalid')
   if (`${owner}/${repo}`.toLowerCase() === 'signalboost/signalboost-live') throw new Error('builder_platform_repository_requires_owner_lane')
   const folder = directory.length ? builderFilePath(directory.join('/')) : ''
-  return { owner, repo, ref: ref || 'HEAD', directory: folder }
+  return { owner, repo, ref: ref || 'HEAD', directory: folder, ...(kind === 'tree' ? { refPath: [ref, ...directory].join('/') } : {}) }
+}
+
+/** A link is source context, not permission to start an executable job. */
+export function builderRepositoryImportIntent(objective: string): boolean {
+  const request = objective.replace(/https?:\/\/\S+/g, '').replace(/`[^`]*`|"[^"\n]*"/g, '').trim()
+  return /^(?:please\s+)?(?:import|clone|build|fix|repair|debug|implement|modify|edit|run|test)\b/i.test(request)
+    || /^(?:can|could|would)\s+you\s+(?:please\s+)?(?:import|clone|build|fix|repair|debug|implement|modify|edit|run|test)\b/i.test(request)
 }
 
 const SOURCE = /(?:\.(?:[cm]?[jt]sx?|json|html?|css|scss|md|txt|ya?ml|toml|py|go|rs|java|sql|sh|csv)|(?:^|\/)(?:Dockerfile|Makefile))$/i
@@ -47,21 +54,44 @@ async function boundedText(fetcher: typeof fetch, url: string, maximum: number, 
 export async function importBuilderRepository(target: BuilderRepositoryTarget, fetcher: typeof fetch = fetch) {
   const deadline = Date.now() + 60_000
   const root = `${encodeURIComponent(target.owner)}/${encodeURIComponent(target.repo)}`
-  const commit = JSON.parse(await boundedText(fetcher, `https://api.github.com/repos/${root}/commits/${encodeURIComponent(target.ref)}`, 512 * 1024, deadline))
-  if (!/^[a-f0-9]{40}$/i.test(commit.sha || '')) throw new Error('builder_repository_revision_invalid')
-  const tree = JSON.parse(await boundedText(fetcher, `https://api.github.com/repos/${root}/git/trees/${commit.sha}?recursive=1`, 2 * 1024 * 1024, deadline))
+  let directory = target.directory
+  let commit: { sha: string } | undefined
+  const candidates = target.refPath ? target.refPath.split('/') : [target.ref]
+  if (candidates.length > 32) throw new Error('builder_repository_url_invalid')
+  // GitHub refs can contain slashes. Only a missing candidate permits trying a shorter ref.
+  for (let length = candidates.length; length > 0; length--) {
+    const ref = candidates.slice(0, length).join('/')
+    try {
+      commit = JSON.parse(await boundedText(fetcher, `https://api.github.com/repos/${root}/commits/${encodeURIComponent(ref)}`, 512 * 1024, deadline))
+      if (target.refPath) directory = candidates.slice(length).join('/')
+      break
+    } catch (error) {
+      if ((error as Error).message !== 'builder_repository_not_public_or_missing' || length === 1) throw error
+    }
+  }
+  if (!commit || !/^[a-f0-9]{40}$/i.test(commit.sha || '')) throw new Error('builder_repository_revision_invalid')
+  let treeSha = commit.sha
+  // Resolve each directory without asking GitHub for the entire recursive repository tree.
+  for (const segment of directory.split('/').filter(Boolean)) {
+    const parent = JSON.parse(await boundedText(fetcher, `https://api.github.com/repos/${root}/git/trees/${treeSha}`, 2 * 1024 * 1024, deadline))
+    if (parent.truncated || !Array.isArray(parent.tree)) throw new Error('builder_repository_too_large')
+    const child = parent.tree.find((item: { path: string; type: string }) => item.path === segment && item.type === 'tree')
+    if (!child || !/^[a-f0-9]{40}$/i.test(child.sha || '')) throw new Error('builder_repository_no_source')
+    treeSha = child.sha
+  }
+  const tree = JSON.parse(await boundedText(fetcher, `https://api.github.com/repos/${root}/git/trees/${treeSha}?recursive=1`, 2 * 1024 * 1024, deadline))
   if (tree.truncated || !Array.isArray(tree.tree)) throw new Error('builder_repository_too_large')
-  const prefix = target.directory ? `${target.directory}/` : ''
+  const prefix = directory ? `${directory}/` : ''
   const selected = tree.tree.filter((item: { path: string; type: string; mode: string }) => item.type === 'blob'
-    && ['100644', '100755'].includes(item.mode) && item.path.startsWith(prefix) && allowedSource(item.path))
+    && ['100644', '100755'].includes(item.mode) && allowedSource(item.path))
   if (!selected.length) throw new Error('builder_repository_no_source')
   if (selected.length > 100 || selected.reduce((sum: number, file: { size?: number }) => sum + Number(file.size || 0), 0) > 2 * 1024 * 1024) throw new Error('builder_repository_too_large')
   const files: { path: string; content: string }[] = []
   let total = 0
   for (let start = 0; start < selected.length; start += 5) {
     const batch = await Promise.all(selected.slice(start, start + 5).map(async (item: { path: string }) => {
-      const path = builderFilePath(item.path.slice(prefix.length))
-      const content = await boundedText(fetcher, `https://raw.githubusercontent.com/${root}/${commit.sha}/${item.path.split('/').map(encodeURIComponent).join('/')}`, 512 * 1024, deadline)
+      const path = builderFilePath(item.path)
+      const content = await boundedText(fetcher, `https://raw.githubusercontent.com/${root}/${commit.sha}/${(prefix + path).split('/').map(encodeURIComponent).join('/')}`, 512 * 1024, deadline)
       if (content.includes('\0')) throw new Error('builder_repository_binary_file')
       return { path, content }
     }))
@@ -69,7 +99,7 @@ export async function importBuilderRepository(target: BuilderRepositoryTarget, f
     if (total > 2 * 1024 * 1024) throw new Error('builder_repository_too_large')
     files.push(...batch)
   }
-  return { files, repository: `${target.owner}/${target.repo}`, commitSha: commit.sha as string, directory: target.directory }
+  return { files, repository: `${target.owner}/${target.repo}`, commitSha: commit.sha as string, directory }
 }
 
 export function builderRepositoryErrorReply(error: string): string {

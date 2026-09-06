@@ -56,3 +56,17 @@ non-npm lockfile-only projects, workspaces and overrides. Native packages requir
 lifecycle installation scripts may not work with scripts disabled. This release does
 not grant external network access to user code, deployment authority, remote repository
 writes, or private company access.
+
+## Review follow-up — 2026-09-06
+
+Reconciled main b1fc71f without dropping its repository search or deadline controls.
+Informational GitHub links do not start executable jobs. Explicit import/build/repair
+requests may import source; slash-containing refs resolve longest-first, and folder
+imports traverse nonrecursive parent trees before fetching only the selected subtree.
+If generated-lock persistence fails, the completed run remains recorded accurately
+and the trace separately reports the storage failure. All 928 mandatory tests and
+TypeScript pass locally. Updated remote CI/Preview verification is pending.
+
+Engineering owns these checks and repairs; owner evaluation follows delivery.
+The independent #1863 chunk implementation remains open and must not be merged as
+a second protocol without reconciling its rejection and storage-retry coverage.

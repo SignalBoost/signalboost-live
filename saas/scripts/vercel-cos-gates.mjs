@@ -1,10 +1,13 @@
+// saas/scripts/vercel-cos-gates.mjs
 import { spawnSync } from 'node:child_process'
 
 const tests = [
   'tests/builderToolLoop.node.test.ts',
   'tests/builderProductReadiness.node.test.ts',
-  'tests/builderTaskCompletion.node.test.ts',
+  'tests/builderRepositorySearch.node.test.ts',
+  'tests/builderCertificationRunner.node.test.ts',
   'tests/builderCheckpoint.node.test.ts',
+  'tests/builderTaskCompletion.node.test.ts',
   'tests/localOpenModelInference.node.test.ts',
   'tests/builderRepairClassification.node.test.ts',
   'tests/builderProjectContext.node.test.ts',
@@ -23,6 +26,7 @@ const tests = [
   'tests/attachedOperationalEvidence.node.test.ts',
   'tests/builderOperationalLogRouting.node.test.ts',
   'tests/builderContractOscillation.node.test.ts',
+  'tests/builderTimeBudget.node.test.ts',
   'tests/builderControlRecovery.node.test.ts',
   'tests/builderControlAdapter.node.test.ts',
   'tests/builderRequestDeadline.node.test.ts',
@@ -114,6 +118,9 @@ const tests = [
   'tests/publicCorpusEvidence.node.test.ts',
   'tests/googleSheetsConnector.node.test.ts',
   'tests/describeThrownValue.node.test.ts',
+  'tests/demoPricing.node.test.ts',
+  'tests/repositoryRepairAutoMerge.node.test.ts',
+  'tests/repositoryMergeWatch.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

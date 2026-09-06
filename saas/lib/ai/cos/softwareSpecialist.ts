@@ -1,4 +1,4 @@
-import { builderRepositoryTarget, importBuilderRepository, builderRepositoryErrorReply } from '@/lib/builder/repository-import'
+import { builderRepositoryImportIntent, builderRepositoryTarget, importBuilderRepository, builderRepositoryErrorReply } from '@/lib/builder/repository-import'
 import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { publicAuditUserId } from '@/lib/auth/publicAuditIdentity'
@@ -155,8 +155,9 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     }
   }
 
+  const importRequested = builderRepositoryImportIntent(objective)
   let repositoryTarget
-  try { repositoryTarget = builderRepositoryTarget(objective, input.body?.repositoryUrl) }
+  try { repositoryTarget = importRequested ? builderRepositoryTarget(objective, input.body?.repositoryUrl) : null }
   catch (error) { return NextResponse.json({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 400 }) }
 
   const roleMatched = isConciergeBuilderObjective(objective, context)

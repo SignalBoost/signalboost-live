@@ -13,6 +13,7 @@ import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { executeSignalBoostRepositoryRepair } from './repository-repair.ts'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
+import { builderAutoMergeSnapshotPort } from './repository-repair-snapshot-host.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -79,7 +80,7 @@ function fallbackFailureReply(error: string, trace: ReturnType<typeof publicTrac
     if (stream) parts.push(stream)
     return `  ${parts.join(' · ')}`
   })
-  const reason = /budget_exhausted|builder_turn_timeout/.test(error)
+  const reason = /budget_exhausted|builder_turn_timeout|builder_time_budget_reached/.test(error)
     ? 'Builder reached its work limit before completing the requested files and verification.'
     : `Builder could not complete the task: ${error}`
   const execution = trace.some(entry => entry.toolId === 'run')
@@ -159,6 +160,8 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         rawObjective: job.objective,
         workspaceId: job.workspaceId,
         target,
+        // Null when Vercel credentials are absent, which auto-merge refuses on.
+        snapshotPort: builderAutoMergeSnapshotPort(),
       })
       if (!execution) {
         await terminalFailure(job, 'builder_repository_repair_target_unavailable')
@@ -216,6 +219,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           // Leave room for a slow model round, then a bounded sandbox command and persistence.
           shouldPause: (beforeTool = false) => Date.now() - sliceStartedAtMs >= (beforeTool ? 150_000 : 100_000),
           maxRounds: 96,
+          deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
           modelRoundTimeoutMs: 55_000,
         })
 

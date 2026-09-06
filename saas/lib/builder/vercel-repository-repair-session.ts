@@ -9,6 +9,7 @@ const REPOSITORY_ROOT = '/tmp/cos-signalboost-repair'
 const PROJECT_ROOT = `${REPOSITORY_ROOT}/saas`
 const MAX_FILE_BYTES = 512 * 1024
 const MAX_VISIBLE_FILES = 80
+const MAX_SEARCH_RESULTS = 32
 const MAX_CHANGED_FILES = 30
 const MAX_PATCH_BYTES = 480 * 1024
 const COMMAND_TIMEOUT_MS = 60_000
@@ -285,6 +286,37 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
 
   async listFiles(_workspaceId: string): Promise<readonly Pick<BuilderFile, 'path' | 'updatedAt'>[]> {
     return Object.freeze([...this.visiblePaths].sort().map(path => Object.freeze({ path, updatedAt: 0 })))
+  }
+
+  /**
+   * Literal search across the staged project, returning matching paths only — never file bodies.
+   *
+   * This is the discovery capability the seeded listing cannot provide. Seeding greps the symbols
+   * named in the failed build; it cannot anticipate a symbol the model only realises it needs
+   * three rounds in, or an implementation that was committed to the wrong directory. Without it
+   * the model must guess paths, and a wrong guess is indistinguishable from a missing file.
+   *
+   * It widens no boundary. `git grep` is already how seeding works, it is scoped to `saas`, every
+   * hit passes the same path rules readFile applies, and symlinks and non-regular files are
+   * dropped. Matches join the visible set because a path the model has been told exists is a path
+   * it may read.
+   */
+  async searchFiles(_workspaceId: string, value: string): Promise<readonly string[]> {
+    const query = String(value || '').trim()
+    if (!query || query.length > 200 || query.includes('\0') || CONTROL_CHARACTER.test(query)) return Object.freeze([])
+    const result = await this.exec('git', ['-C', REPOSITORY_ROOT, 'grep', '-l', '-F', '-e', query, '--', 'saas'], '/tmp', 20_000, 40_000)
+    // Exit 1 is git grep reporting no match, which is an answer, not a failure.
+    if (result.exitCode !== 0 && result.exitCode !== 1) return Object.freeze([])
+    const found: string[] = []
+    for (const line of result.stdout.split('\n')) {
+      if (found.length >= MAX_SEARCH_RESULTS) break
+      const path = stripProjectPrefix(line)
+      if (!path || found.includes(path)) continue
+      if (!await this.isRegularProjectFile(path)) continue
+      found.push(path)
+      this.visiblePaths.add(path)
+    }
+    return Object.freeze(found)
   }
 
   async readFile(_workspaceId: string, value: string): Promise<BuilderFile | null> {

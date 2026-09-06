@@ -12,7 +12,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function isBuilderExplanationRequest(prompt: string): boolean {
   return /^\s*(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:explain|why|what\s+(?:changed|caused)|how\s+(?:did|was))\b/i.test(prompt)
-    && /\b(?:fail(?:ed|ure)?|fix(?:ed)?|repair|changed|recorded|source|code|builder|job)\b/i.test(prompt)
+    && (/\b(?:this|that|the|last|previous|earlier|saved|recorded)\s+(?:builder\s+)?(?:job|run|repair|fix|results?|failure)\b/i.test(prompt)
+      || /\bjob\s+[0-9a-f-]{36}\b/i.test(prompt)
+      || /\b[\w/-]+\.(?:[cm]?js|tsx?|jsx|py|json|html|css|go|rs)\b[^.!?\n]{0,100}\b(?:failed|changed|fixed|repaired)\b/i.test(prompt))
 }
 
 export function isBuilderEvidenceRequest(prompt: string): boolean {

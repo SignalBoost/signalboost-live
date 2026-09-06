@@ -10,7 +10,10 @@ export async function explainBuilderEvidence(input: {
 }): Promise<string> {
   const { job } = input
   const trace = Array.isArray(job.result?.trace) ? job.result.trace : []
-  const paths = [...new Set(trace.flatMap(item => typeof item?.path === 'string' ? [item.path] : []))].slice(-6)
+  const savedPaths = Array.isArray(job.result?.files) ? job.result.files.filter((path): path is string => typeof path === 'string') : []
+  const tracedPaths = trace.flatMap(item => typeof item?.path === 'string' ? [item.path] : [])
+  const candidates = [...new Set([...tracedPaths, ...savedPaths])]
+  const paths = [...new Set([...candidates.filter(path => input.prompt.includes(path)), ...candidates])].slice(0, 6)
   const files = []
   for (const path of paths) {
     const file = await input.workspace?.readFile(job.workspaceId, path).catch(() => null)
@@ -27,5 +30,5 @@ export async function explainBuilderEvidence(input: {
     const parsed = JSON.parse(response || '{}')
     if (parsed.type === 'answer' && typeof parsed.answer === 'string' && parsed.answer.trim()) explanation = parsed.answer.slice(0, 12000)
   } catch { /* Preserve available evidence even if the reasoner is unavailable. */ }
-  return `${explanation}\n\nBuilder job ${job.id} — ${job.status}.\n\n${evidence}\n\nRead from saved job evidence and current workspace files; no code was rerun.`
+  return `${explanation}\n\nBuilder job ${job.id} — ${job.status}.\n\n${evidence}\n\nRead from saved job evidence${files.length ? ' and current workspace files' : '; current source was unavailable'}; no code was rerun.`
 }

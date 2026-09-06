@@ -165,3 +165,19 @@ test('explanation reads current source and discloses missing historical diff', a
   assert.match(reply, /exact earlier source is unavailable/)
   assert.match(reply, /no code was rerun/)
 })
+
+test('general software explanations do not divert into Builder history', async () => {
+  for (const prompt of ['Explain source maps in JavaScript', 'Why is code review important?', 'Explain how Builder works']) {
+    assert.equal(isBuilderEvidenceRequest(prompt), false)
+    assert.equal(await builderEvidenceReply({ ...input, prompt }, async () => { assert.fail('ordinary question'); return null }), null)
+  }
+})
+
+test('run-first imported jobs explain from their saved artifact list', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  const reply = await explainBuilderEvidence({ prompt: 'Explain why that run failed in index.js', job: { ...job, result: { files: ['package.json', 'index.js'], trace } },
+    workspace: { async readFile(workspace, path) { assert.equal(workspace, workspaceId); return { path, content: path === 'index.js' ? 'module.exports = 42' : '{}', updatedAt: 1 } } },
+    ai: { async generate(request) { assert.match(request.prompt, /module.exports = 42/); return '{"type":"answer","answer":"The recorded run succeeded."}' } },
+  })
+  assert.match(reply, /current workspace files/)
+})

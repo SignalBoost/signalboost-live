@@ -56,6 +56,7 @@ const tests = [
   'tests/conciergeNamedPeopleRecovery.node.test.ts',
   'tests/suggestedFollowups.node.test.ts',
   'tests/cosPrimaryDeterministicFreshRouting.node.test.ts',
+  'tests/cosDomainAvailability.node.test.ts',
   'tests/assistantTransportClient.node.test.ts',
   'tests/operationalSystemsLearning.node.test.ts',
   'tests/advisoryDiagnosisPolicy.node.test.ts',

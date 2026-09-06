@@ -7,6 +7,7 @@ import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswer'
 import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
 import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerificationUnavailableReply'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
+import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
 import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import {
@@ -179,6 +180,17 @@ export async function postCosPrimary(req:NextRequest){
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:assessment||(!assessmentRequested&&scan.ok)?'deterministic':'failed_closed',confidence:assessment||(!assessmentRequested&&scan.ok)?1:0,externalAiInvoked:false})
     await writeCosPrimaryProvenance(userId,reply,executionProvenance,assessment?'cos-self-healing-assessment':scan.ok?'cos-repository-scan':'cos-repository-scan-failed',{prompt:input,answered:Boolean(assessment)||(!assessmentRequested&&scan.ok),confidence:assessment||(!assessmentRequested&&scan.ok)?1:0,branch:assessment?'self_healing_assessment':scan.ok?'repository_scan':'repository_scan_failed'})
     return NextResponse.json({ok:Boolean(assessment)||(!assessmentRequested&&scan.ok),reply,source:assessment?'cos-self-healing-assessment':!scan.ok?'cos-repository-scan-failed':assessmentRequested?'cos-self-healing-assessment-failed':'cos-repository-scan',confidence_score:assessment||(!assessmentRequested&&scan.ok)?1:0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:Boolean(assessment),execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:assessment||(!assessmentRequested&&scan.ok)?200:503})
+  }
+
+  if(access?.isOwner){
+    const domainLookup=await tryDomainAvailabilityLookup({input,context:precedingAssistant})
+    if(domainLookup){
+      const executionProvenance=authoritativeProvenance(null,{invoked:false})
+      ;(executionProvenance as any).domain_availability={provider:'IANA_RDAP_bootstrap_and_registry_RDAP',checked_at:domainLookup.results[0]?.checkedAt??null,results:domainLookup.results.map(result=>({domain:result.domain,status:result.status,registry_endpoint:result.registryEndpoint}))}
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:domainLookup.reply,source:'authoritative_source',confidence:domainLookup.results.every(result=>result.status!=='unknown')?1:0,externalAiInvoked:false})
+      await writeCosPrimaryProvenance(userId,domainLookup.reply,executionProvenance,'cos-domain-rdap',{prompt:input,answered:true,confidence:domainLookup.results.every(result=>result.status!=='unknown')?1:0,branch:'domain_rdap'})
+      return NextResponse.json({ok:true,reply:domainLookup.reply,source:'cos-domain-rdap',confidence_score:domainLookup.results.every(result=>result.status!=='unknown')?1:0,external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:false,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,domain_results:domainLookup.results,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+    }
   }
 
   if(isProvenanceIntrospection(input) || asksWhereTheAnswerCameFrom(input)){

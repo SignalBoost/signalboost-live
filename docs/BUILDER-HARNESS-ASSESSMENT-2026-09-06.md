@@ -19,7 +19,17 @@ The correction reads at most twelve same-user/same-workspace repair signals from
 
 New lesson admission requires a real non-timeout failed command, a subsequent source change and the same command passing after the last change. A later contradictory rerun rejects admission. Summaries are deterministic evidence descriptions rather than model-written causal claims. Persistence checks the successful standard job's exact user, workspace and claim generation; the job UUID makes repeat writes idempotent. Writes happen after terminal job persistence and cannot turn a successful task into a failure. Reads/writes are bounded, best effort; no migration or authority expansion.
 
-Regression coverage includes real Node fail/change/pass across a serialized checkpoint, exact PostgREST ownership/runtime/generation filters, duplicate-safe writes, stale-worker rejection, and model prompts receiving the hint only after their own matching failure. All 977 mandatory regressions and TypeScript passed locally. Live post-deployment persistence and follow-up retrieval remain pending.
+Regression coverage includes real Node fail/change/pass across a serialized checkpoint, exact PostgREST ownership/runtime/generation filters, duplicate-safe writes, stale-worker rejection, and model prompts receiving the hint only after their own matching failure. All 977 mandatory regressions and TypeScript passed locally. The exact Preview and ten CI workflows passed before #1893 merged; live connection evidence follows.
+
+## Live result and limitations
+
+Application merge `8f22b3ab3e109eef1beee26566c4d3aa14b8b6ba`; Production `dpl_DmUYTJ3aMsY14iRXpMGQBEqsG4L8` READY. Both requests used the existing expense-report conversation/workspace `1ce11289-af83-4d6a-9baa-bb79fa2d15a8` without upload.
+
+Job `e45b0e19-342b-41fb-99f3-1ee7d43e9d2c` added an assertion that a posted constructor category with amount 5.00 produces an own property equal to 500. npm test reproduced an inherited Object constructor function being concatenated with 500 (ten pass, one fail). Builder changed the accumulator to Object.create(null) with an own-property check, then passed all eleven tests and explained the actual cause. The lesson table contained exactly one row with that job ID and npm test as its proof command. Runtime telemetry reported recorded=true, retrievedSignals=0.
+
+Follow-up `2432fd49-9eb1-4158-802f-b75e39302782` requested decimal-string rounding of 1.005 to 101 cents and -1.005 to -101, preserving eleven old tests. It retrieved one project signal. It ran the old tests, added the two assertions in one test, changed money.js before reproducing that new test, and subsequently observed multiple failures before passing all twelve tests. Its final expression was Math.sign(cents) * Math.round(Math.abs(cents) + Number.EPSILON * Math.abs(cents) + 0.0001). Runtime telemetry reported recorded=true, retrievedSignals=1; scoped database inspection confirmed two lesson rows total.
+
+Acceptance is limited to durable same-project repair-signal persistence/retrieval and fresh post-failure verification. The second job's requested new-test-before-first-source-edit order was not honored; the eventual failed-run/change/pass sequence qualifies as repair of its own failed implementation. The ad hoc numeric adjustment and narrow assertions do not establish correct general decimal rounding or preservation of every previously untested input. No inference improvement can be attributed to a count-only history signal from this uncontrolled sample. Do not present this as mastery, causal learning benefit or full harness completion. These are next engineering gaps, not reasons to inflate the accepted scope.
 
 ## Inference acceptance boundary
 

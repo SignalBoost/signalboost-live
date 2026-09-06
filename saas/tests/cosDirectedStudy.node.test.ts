@@ -44,6 +44,9 @@ test('owner-directed material is admitted when it is substantive and provenance 
   assert.equal(result.sourceKind, 'library_material')
   assert.equal(result.chunks[0]?.reason, 'admitted_owner_directed')
   assert.equal(result.chunks[0]?.admissionBasis, 'owner_directed_intent')
+  assert.equal(result.learningRoute.specialistFamily, 'software')
+  assert.ok(result.learningRoute.curriculumTracks.includes('software.development'))
+  assert.equal(result.learningRoute.authorityGranted, false)
 })
 
 test('multilingual owner-directed literature cannot be vetoed by weak English keyword overlap', () => {
@@ -67,6 +70,7 @@ test('multilingual owner-directed literature cannot be vetoed by weak English ke
   assert.equal(result.chunks[0]?.intentAligned, false, 'lexical relevance may remain weak and diagnostic')
   assert.equal(result.chunks[0]?.matchedTerms.length, 0)
   assert.equal(result.chunks[0]?.reason, 'admitted_owner_directed')
+  assert.equal(result.learningRoute.specialistFamily, null)
 })
 
 test('owner authority does not bypass minimum substance or provenance requirements', () => {
@@ -81,4 +85,7 @@ test('stable source-specific hashes and owner admission provenance are preserved
   const evidence = directedEvidence(input)
   assert.ok(evidence.includes('owner_directed_study'))
   assert.ok(evidence.includes('admission_basis:owner_directed_intent'))
+  assert.ok(evidence.includes('learning_orchestrator:cos'))
+  assert.ok(evidence.includes('specialist_family:software'))
+  assert.ok(evidence.includes('specialist_authority_granted:false'))
 })

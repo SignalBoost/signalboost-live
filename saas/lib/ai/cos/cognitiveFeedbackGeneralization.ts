@@ -11,6 +11,7 @@ import {
 } from '@/lib/ai/cos/cognitiveSkillCandidate'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { detectCognitiveReasoningTriggers } from '@/lib/ai/cos/cognitiveReasoningPatterns'
+import { routeSpecialistLearning } from '@/lib/ai/cos/specialistLearning'
 
 function clean(value: unknown, max = 6000): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
@@ -78,9 +79,11 @@ function reasoningTriggerKinds(input: FeedbackGeneralizationInput): string[] {
 }
 
 function procedureWithTriggers(draft: CognitiveSkillDraft, triggers: string[]): Record<string, unknown> {
+  const route = routeSpecialistLearning({ topic: draft.problemClass, studyIntent: `${draft.title} ${draft.description}` })
   return {
     ...cognitiveSkillProcedure(draft),
     ...(triggers.length ? { reasoningTriggers: triggers } : {}),
+    ...(route.specialistFamily ? { specialistFamily: route.specialistFamily, curriculumTracks: route.curriculumTracks } : {}),
   }
 }
 
@@ -111,6 +114,15 @@ async function persistFeedbackDraft(input: FeedbackGeneralizationInput, draft: C
     feedback_signal_semantics: 'experience_not_verified_truth',
     generalization_rule: 'abstract reusable reasoning only; no one-off facts or user preferences',
     ...(triggers.length ? { reasoningTriggers: triggers } : {}),
+    ...(() => {
+      const route = routeSpecialistLearning({ topic: draft.problemClass, studyIntent: `${draft.title} ${draft.description}` })
+      return route.specialistFamily ? {
+        specialistFamily: route.specialistFamily,
+        curriculumTracks: route.curriculumTracks,
+        specialistLearningSchemaVersion: route.schemaVersion,
+        specialistAuthorityGranted: false,
+      } : {}
+    })(),
   }
 
   if (existing.data?.id) {

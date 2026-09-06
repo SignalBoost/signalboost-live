@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { LearningSourceDocument, RelevanceScore } from '../../cos-core/layers/learning/cycle.ts'
 import type { ContinuousLearningSourceKind } from '../../cos-core/layers/learning/index.ts'
+import { routeSpecialistLearning, specialistLearningEvidence, type SpecialistLearningRoute } from './specialistLearning.ts'
 
 export type DirectedStudyGates = {
   distinctTerms(text: string): string[]
@@ -52,6 +53,7 @@ export type DirectedStudyAssessment = {
   chunks: DirectedChunkVerdict[]
   admitted: number
   rejected: number
+  learningRoute: SpecialistLearningRoute
 }
 
 export const CHUNK_TARGET_CHARACTERS = 4000
@@ -115,8 +117,9 @@ export const directedContentHash = (uri: string, chunk: string) =>
  */
 export function assessDirectedStudy(submission: DirectedStudySubmission, gates: DirectedStudyGates): DirectedStudyAssessment {
   const subject = clean(submission.topic).slice(0, 180)
+  const learningRoute = routeSpecialistLearning(submission)
   const invalid = validateDirectedSubmission(submission)
-  if (invalid) return { ok: false, error: invalid, sourceKind: null, subject, chunks: [], admitted: 0, rejected: 0 }
+  if (invalid) return { ok: false, error: invalid, sourceKind: null, subject, chunks: [], admitted: 0, rejected: 0, learningRoute }
 
   const anchors = gates.distinctTerms(subject).slice(0, 8)
   const anchorSet = new Set(anchors)
@@ -172,15 +175,17 @@ export function assessDirectedStudy(submission: DirectedStudySubmission, gates: 
   })
 
   const admitted = chunks.filter(chunk => chunk.admitted).length
-  return { ok: true, sourceKind, subject, chunks, admitted, rejected: chunks.length - admitted }
+  return { ok: true, sourceKind, subject, chunks, admitted, rejected: chunks.length - admitted, learningRoute }
 }
 
 export function directedEvidence(submission: DirectedStudySubmission) {
+  const learningRoute = routeSpecialistLearning(submission)
   return [
     'owner_directed_study',
     'admission_basis:owner_directed_intent',
     `submitted_by:${clean(submission.submittedBy || 'owner').slice(0, 120)}`,
     `study_intent:${clean(submission.studyIntent).slice(0, 300)}`,
     `material_kind:${submission.materialKind}`,
+    ...specialistLearningEvidence(learningRoute),
   ]
 }

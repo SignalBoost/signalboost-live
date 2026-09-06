@@ -16,6 +16,10 @@ test('explicit verification checks only requested domains and resolves a named p
   )
 })
 
+test('current-turn domains are checked without requiring a separate availability keyword', () => {
+  assert.deepEqual(extractDomainCandidates('check these names deepcloud.ai or deepcloud.com', 'Prior: nexus.dev'), ['deepcloud.ai', 'deepcloud.com'])
+})
+
 test('uses free IANA bootstrap and authoritative registry RDAP without guessing', async () => {
   const calls: string[] = []
   const fakeFetch = (async (url: string | URL | Request) => {

@@ -11,8 +11,17 @@ test('Builder text files render inline with a copy control on both public Concie
   assert.match(preview, /navigator\.clipboard\.writeText\(content\)/)
   assert.match(preview, /<pre[\s\S]*<code>\{content\}<\/code><\/pre>/)
   assert.match(preview, /MAX_INLINE_CHARS = 120_000/)
+  assert.match(preview, /patch\|diff/)
   assert.match(homepage, /<BuilderFilePreviews workspaceId=\{turn\.builderWorkspaceId\} files=\{turn\.builderFiles\}/)
   assert.match(concierge, /<BuilderFilePreviews workspaceId=\{message\.builderWorkspaceId\} files=\{message\.builderFiles\}/)
+})
+
+test('failed repairs create a copy-ready TXT result and file-view commands are not verification', () => {
+  const runner = read('../lib/builder/job-runner.ts')
+  const narration = read('../lib/builder/operator-narration.ts')
+  assert.match(runner, /workspace\.writeFile\(job\.workspaceId, 'builder-result\.txt'/)
+  assert.match(narration, /function isProvingCommand/)
+  assert.match(narration, /successfulRuns = trace\.filter[\s\S]*isProvingCommand/)
 })
 
 test('verified repository repairs create a TXT deliverable before repository mutation', () => {

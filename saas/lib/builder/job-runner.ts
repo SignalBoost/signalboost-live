@@ -138,10 +138,10 @@ function historyReply(reply: string, workspaceId: string, files: readonly string
 async function terminalFailure(job: BuilderJobRecord, error: string, trace: readonly BuilderToolTrace[] = job.checkpoint?.trace || []): Promise<void> {
   const safeTrace = publicTrace(trace)
   const workspace = createSupabaseBuilderWorkspace(job.userId)
-  const files = workspace
-    ? await workspace.listFiles(job.workspaceId).then(items => items.map(item => item.path)).catch(() => [])
-    : []
-  const reply = historyReply(`${repairAwareFailureReply(job, error, safeTrace)}\n\n${builderNextAction(error, trace)}`, job.workspaceId, files)
+  const plainReply = `${repairAwareFailureReply(job, error, safeTrace)}\n\n${builderNextAction(error, trace)}`
+  if (workspace) await workspace.writeFile(job.workspaceId, 'builder-result.txt', `${plainReply.trim()}\n`).catch(() => undefined)
+  const files = workspace ? await workspace.listFiles(job.workspaceId).then(items => items.map(item => item.path)).catch(() => []) : []
+  const reply = historyReply(plainReply, job.workspaceId, files)
   await finishBuilderJob({
     jobId: job.id,
     userId: job.userId,

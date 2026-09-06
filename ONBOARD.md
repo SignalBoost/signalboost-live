@@ -3,7 +3,9 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.74
+**Version:** 1.75
+
+**COS repository-repair evidence and TXT delivery repair — 2026-09-06:** the live Platform Engineer repair after #1914 changed `domainAvailability.ts` directly on `main` despite failing the exact focused suite, then described a `sed` file-view as a passing check and invented a database/storage next action. The verified #1914 implementation is restored, and current-turn domains are an explicit lookup set even without a separate availability keyword. Only test/build/typecheck/lint commands qualify as proving commands in operator narration. Failed repairs now also create `builder-result.txt`; source and patch files render inline with Copy controls. Full CI, merge, Production READY, and the exact `deepcloud.ai`/`deepcloud.com` turn remain required.
 
 **COS explicit domain verification routing repair — 2026-09-06:** implemented on `fix/cos-explicit-domain-verification-20260906` and **not yet Production-accepted**. A live owner request to verify `codevia`, `nova.ai`, and `fluxa.ai` incorrectly entered neural brainstorming because the owner domain route evaluated brainstorming before explicit lookup and its availability-intent vocabulary omitted verify/exist language. Explicit named-domain checks now run before brainstorming, recognize verify/exist variants, check fully qualified domains from the current request, and resolve a bare requested name only against the matching domain in bounded preceding context. Unrequested prior candidates are not swept into the lookup. Neural candidate parsing now rejects non-string meanings such as `-Infinity` or numeric hashes, normalizes escaped domain dots, and deduplicates names case-insensitively. This changes routing and validation, not candidate creativity or authoritative availability: generated names remain neural and current registration evidence remains live RDAP. Fifteen focused regressions pass; full mandatory gates, TypeScript, merge, Production READY, and an exact live explicit verification turn remain required.
 

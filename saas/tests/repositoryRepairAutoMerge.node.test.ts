@@ -93,12 +93,22 @@ test('auto-merge refuses when the captured snapshot is not restorable — no che
   assert.match(String(result.detail), /dpl_frozen/)
 })
 
-test('an ordinary repair with a restorable checkpoint merges and returns the pre-merge snapshot id', async () => {
+const greenChecks = (url: string, headSha: string) => {
+  if (url.endsWith('/pulls/1842')) return jsonResponse({ head: { sha: headSha } })
+  if (url.includes(`/commits/${headSha}/check-runs`)) return jsonResponse({ check_runs: [{ name: 'build', status: 'completed', conclusion: 'success' }] })
+  if (url.endsWith(`/commits/${headSha}/status`)) return jsonResponse({ state: 'success', statuses: [{ state: 'success' }] })
+  return null
+}
+
+test('an ordinary repair with a restorable checkpoint and green checks merges and returns the pre-merge snapshot id', async () => {
+  const headSha = 'b'.repeat(40)
   const calls: Array<{ url: string; method: string }> = []
   const request = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = String(input)
     const method = String(init.method || 'GET')
     calls.push({ url, method })
+    const checks = greenChecks(url, headSha)
+    if (checks) return checks
     if (url.endsWith('/pulls/1842/merge') && method === 'PUT') return jsonResponse({ sha: 'a'.repeat(40), merged: true })
     return jsonResponse({ message: 'unexpected request' }, 500)
   }) as typeof fetch
@@ -116,8 +126,41 @@ test('an ordinary repair with a restorable checkpoint merges and returns the pre
   assert.equal(result.reason, null)
   assert.equal(result.preMergeSnapshotId, 'dpl_good')
   assert.equal(result.mergeCommitSha, 'a'.repeat(40))
-  assert.equal(calls.length, 1)
-  assert.equal(calls[0].method, 'PUT')
+  const writes = calls.filter(call => call.method === 'PUT')
+  assert.equal(writes.length, 1)
+  assert.equal(writes[0].url.endsWith('/pulls/1842/merge'), true)
+})
+
+test('an unchecked or failing head refuses the merge and never sends the PUT', async () => {
+  const headSha = 'c'.repeat(40)
+  for (const [label, runs] of [
+    ['no checks at all', []],
+    ['a failing check', [{ name: 'build', status: 'completed', conclusion: 'failure' }]],
+    ['an unfinished check', [{ name: 'build', status: 'in_progress', conclusion: null }]],
+  ] as Array<[string, unknown[]]>) {
+    const calls: Array<{ url: string; method: string }> = []
+    const request = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = String(input)
+      calls.push({ url, method: String(init.method || 'GET') })
+      if (url.endsWith('/pulls/1842')) return jsonResponse({ head: { sha: headSha } })
+      if (url.includes(`/commits/${headSha}/check-runs`)) return jsonResponse({ check_runs: runs })
+      if (url.endsWith(`/commits/${headSha}/status`)) return jsonResponse({ state: '', statuses: [] })
+      return jsonResponse({ message: 'unexpected request' }, 500)
+    }) as typeof fetch
+
+    const result = await attemptSignalBoostRepositoryAutoMerge({
+      files: [{ path: 'lib/demo/rounding.ts', content: '' }],
+      patch: '+  return roundHalfUp(value)',
+      pullRequestNumber: 1842,
+      snapshotPort: fakePort(),
+      request,
+      token: 'server-write-token',
+    })
+
+    assert.equal(result.merged, false, label)
+    assert.equal(result.reason, 'checks_not_green', label)
+    assert.equal(calls.some(call => call.method === 'PUT'), false, label)
+  }
 })
 
 test('a missing write token refuses without attempting the GitHub merge call', async () => {

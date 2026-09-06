@@ -520,3 +520,81 @@ test('read-only causal explanation and review retain the bounded original behavi
     }
   }
 })
+
+test('rejected explanation gets one independently reviewed correction with identical evidence', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  const requests: any[] = []
+  const responses = [JSON.stringify({ type: 'answer', answer: 'A source edit failed.' }),
+    JSON.stringify({ supported: false, correctedAnswer: 'The recorded command exited zero and printed Hello from COS Builder.' }),
+    JSON.stringify({ supported: true })]
+  const reply = await explainBuilderEvidence({ prompt: 'Explain the last run', job, workspace: null,
+    ai: { async generate(request) { requests.push(request); return responses.shift()! } } })
+  assert.equal(requests.length, 3)
+  assert.doesNotMatch(reply, /A source edit failed/)
+  assert.match(reply, /recorded command exited zero/)
+  const contexts = requests.map(request => JSON.parse(request.prompt))
+  assert.deepEqual(contexts[2].recordedTrace, contexts[0].recordedTrace)
+  assert.deepEqual(contexts[2].events, contexts[0].events)
+  assert.equal(contexts[2].draft, 'The recorded command exited zero and printed Hello from COS Builder.')
+  assert.equal(contexts[2].question, contexts[0].question)
+  assert.match(requests[2].systemPrompt, /Do not rewrite it/)
+})
+
+test('unsupported or unavailable correction review retains evidence and cannot retry indefinitely', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  for (const verdict of ['{"supported":false,"correctedAnswer":"Another draft"}', '{}', 'bad JSON', null]) {
+    let calls = 0
+    const reply = await explainBuilderEvidence({ prompt: 'Explain the last run', job, workspace: null,
+      ai: { async generate() {
+        calls++
+        if (calls === 1) return '{"type":"answer","answer":"Unchecked original."}'
+        if (calls === 2) return '{"supported":false,"correctedAnswer":"Unchecked correction."}'
+        if (verdict === null) throw new Error('offline')
+        return verdict
+      } } })
+    assert.equal(calls, 3)
+    assert.doesNotMatch(reply, /Unchecked|Another draft/)
+    assert.match(reply, /Exit code: 0/)
+  }
+})
+
+test('a corrected explanation cannot rescue a rejected implementation proposal', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  let calls = 0
+  let saves = 0
+  const reply = await explainBuilderEvidence({ prompt: 'Suggest the next change', job, workspace: null,
+    async saveProposal() { saves++ }, ai: { async generate() {
+      calls++
+      return calls === 1 ? JSON.stringify({ type: 'answer', answer: 'Unsupported proposal.', proposal: 'Add a test. Run:\nnode --test' })
+        : '{"supported":false,"correctedAnswer":"A correction."}'
+    } } })
+  assert.equal(calls, 2)
+  assert.equal(saves, 0)
+  assert.doesNotMatch(reply, /Unsupported proposal|A correction|Say “go”/)
+})
+
+test('initial deadline covers correction review and never releases its pending draft', async t => {
+  const { explainInitialBuilderRepair } = await import('../lib/builder/explain-evidence.ts')
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'] })
+  let calls = 0
+  let release!: (value: string) => void
+  let reviewing!: () => void
+  const started = new Promise<void>(resolve => { reviewing = resolve })
+  const pending = explainInitialBuilderRepair({ prompt: 'Explain repair', job, workspace: null,
+    fallback: 'Recorded check passed.', deadlineAtMs: Date.now() + 2000,
+    ai: { async generate() {
+      calls++
+      if (calls === 1) return '{"type":"answer","answer":"Unchecked original."}'
+      if (calls === 2) return '{"supported":false,"correctedAnswer":"Unchecked correction."}'
+      reviewing()
+      return new Promise(resolve => { release = resolve })
+    } } })
+  await started
+  t.mock.timers.tick(2001)
+  const reply = await pending
+  assert.equal(calls, 3)
+  assert.match(reply, /Recorded check passed/)
+  assert.doesNotMatch(reply, /Unchecked/)
+  release('{"supported":true}')
+  await Promise.resolve()
+})

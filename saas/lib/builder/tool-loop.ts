@@ -12,7 +12,7 @@ import { detectContractOscillation, formatContractOscillation } from './contract
 
 type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
 type Action = ToolAction | { type: 'answer'; answer: string }
-const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'write_file', 'edit_file', 'run'])
+const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'search_files', 'write_file', 'edit_file', 'run'])
 const MAX_WRITES_PER_TURN = 6
 const MAX_RUNS_PER_TURN = 5
 const MAX_GATE_NUDGES = 3
@@ -112,6 +112,7 @@ function hasToolContent(input: Record<string, unknown>): boolean {
 function validToolInput(toolId: BuilderToolId, input: Record<string, unknown>): boolean {
   if (toolId === 'list_files') return true
   if (toolId === 'read_file') return Boolean(toolPath(input))
+  if (toolId === 'search_files') return typeof input.query === 'string' && input.query.trim().length > 0
   if (toolId === 'write_file') return Boolean(toolPath(input)) && hasToolContent(input)
   if (toolId === 'edit_file') {
     return Boolean(toolPath(input))
@@ -382,7 +383,7 @@ export class BuilderToolLoop {
           : 'CURRENT STEP: Follow the objective and use tools for any remaining work; report only recorded evidence.'
       const blockedInspectionTools = new Set(trace
         .slice(lastWorkspaceChange + 1)
-        .filter(item => (item.toolId === 'list_files' || item.toolId === 'read_file')
+        .filter(item => (item.toolId === 'list_files' || item.toolId === 'read_file' || item.toolId === 'search_files')
           && item.error?.startsWith('builder_repeated_tool_call:'))
         .map(item => item.toolId))
       const blockedTool = lastTrace?.error?.startsWith('builder_repeated_tool_call:')
@@ -394,6 +395,9 @@ export class BuilderToolLoop {
         ? [...trace].reverse().find(item => item.ok && item.toolId === 'read_file' && toolPath(item.input))
         : undefined
       const availableTools = tools
+        // Offered only when the workspace can actually answer it. A tool named in TOOLS that the
+        // backing store cannot serve teaches the model to request a dead capability.
+        .filter(toolId => toolId !== 'search_files' || typeof this.workspace.searchFiles === 'function')
         .filter(toolId => toolId !== blockedTool)
         .filter(toolId => !blockedInspectionTools.has(toolId))
         .filter(toolId => !inspectedSource || (toolId !== 'list_files' && toolId !== 'read_file'))
@@ -412,11 +416,14 @@ export class BuilderToolLoop {
         formatBuilderWorkingFiles([...workingFiles.values()]),
         formatContractOscillation(detectContractOscillation(trace)),
         currentStep,
-        'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
+        'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; search_files => {"type":"tool","toolId":"search_files","input":{"query":"exact text or symbol"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
         'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
         availableTools.includes('read_file')
           ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
           : 'Do not request read_file in this round; it is unavailable until the workspace changes.',
+        availableTools.includes('search_files')
+          ? 'When a needed file is not in the listing — a symbol that should exist but does not, or an implementation that moved — use search_files with the exact symbol or text to locate it before guessing a path.'
+          : '',
         'After inspecting a file, the next tool must make progress: edit/write it, run a relevant command, or inspect a different file. Repeating list_files or read_file against unchanged workspace state is rejected and does not count as a work round.',
         blockedInspectionTools.size
           ? `RECOVERY CONSTRAINT: ${[...blockedInspectionTools].join(', ')} ${blockedInspectionTools.size === 1 ? 'was' : 'were'} rejected against unchanged workspace state. ${blockedInspectionTools.size === 1 ? 'It is' : 'They are'} unavailable this round. Select a different tool from TOOLS; do not request ${blockedInspectionTools.size === 1 ? 'it' : 'them'} again.`
@@ -584,7 +591,7 @@ export class BuilderToolLoop {
       if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= maxWrites) return { ok: false, error: 'builder_write_budget_exhausted', trace }
       if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
       const fingerprint = `${action.toolId}:${safeJson(action.input)}`
-      const inspection = action.toolId === 'list_files' || action.toolId === 'read_file'
+      const inspection = action.toolId === 'list_files' || action.toolId === 'read_file' || action.toolId === 'search_files'
       const mutation = action.toolId === 'write_file' || action.toolId === 'edit_file'
       if (mutation && !repairObjective && progress.missingFiles.length > 0
         && workspacePaths.includes(toolPath(action.input)) && !initialPaths.has(toolPath(action.input))) {
@@ -608,6 +615,10 @@ export class BuilderToolLoop {
       try {
         let output: unknown
         if (action.toolId === 'list_files') output = await this.workspace.listFiles(input.workspaceId)
+        if (action.toolId === 'search_files') {
+          if (typeof this.workspace.searchFiles !== 'function') throw new Error('builder_search_unavailable')
+          output = await this.workspace.searchFiles(input.workspaceId, text(action.input.query))
+        }
         if (action.toolId === 'read_file') {
           const file = await this.workspace.readFile(input.workspaceId, toolPath(action.input))
           output = file ? { path: file.path, content: file.content, updatedAt: file.updatedAt } : null

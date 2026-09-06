@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { routeSpecialistLearning, specialistCompetencySnapshot } from '../lib/ai/cos/specialistLearning.ts'
+import { directedSoftwareApplicationProgress, routeSpecialistLearning, specialistCompetencySnapshot } from '../lib/ai/cos/specialistLearning.ts'
 
 test('routes software material to deeper curricula while COS remains orchestrator', () => {
   const route = routeSpecialistLearning({
@@ -11,6 +11,19 @@ test('routes software material to deeper curricula while COS remains orchestrato
   assert.equal(route.specialistFamily, 'software')
   assert.equal(route.authorityGranted, false)
   assert.deepEqual(route.curriculumTracks, ['software.debugging', 'software.testing', 'software.delivery', 'software.development'])
+})
+
+test('reports owner-directed software application progress without treating intake as validation', () => {
+  const progress = directedSoftwareApplicationProgress([
+    { status: 'captured', repeat_count: 3, metadata: { sourceUri: 'owner://testing-course' } },
+    { status: 'processed', repeat_count: 1, metadata: { sourceUri: 'owner://testing-course' } },
+    { status: 'rejected', repeat_count: 1, metadata: { sourceUri: 'owner://debugging-course' } },
+  ], [
+    { status: 'encountered' },
+    { status: 'validated' },
+    { status: 'quarantined' },
+  ])
+  assert.deepEqual(progress, { sources: 2, queued: 1, candidates: 3, validated: 1, rejected: 2, reinforcements: 2 })
 })
 
 test('keeps broadly relevant non-software material in general COS study', () => {

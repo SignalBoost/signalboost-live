@@ -1,5 +1,4 @@
 // saas/lib/builder/tool-loop.ts
-import { checkpointDigest, workspaceDigest, type BuilderLoopCheckpoint } from './checkpoint.ts'
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
 import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
@@ -8,13 +7,16 @@ import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 import { builderTaskContract, builderTaskProgress } from './task-contract.ts'
 import { formatBuilderWorkingFiles } from './working-context.ts'
 import { formatBuilderCliTestGuidance } from './cli-test-guidance.ts'
+import { appendBuilderChunk, builderFilePath, formatBuilderChunks } from './file-chunks.ts'
+import { checkpointDigest, workspaceDigest, validateBuilderCheckpoint, type BuilderLoopCheckpoint } from './checkpoint.ts'
+import { validateBuilderLock } from './dependencies.ts'
+import { BUILDER_REASONING_GUIDANCE } from './user-guidance.ts'
 import { detectContractOscillation, formatContractOscillation } from './contract-oscillation.ts'
 
 type ToolAction = { type: 'tool'; toolId: BuilderToolId; input: Record<string, unknown> }
 type Action = ToolAction | { type: 'answer'; answer: string }
 const tools: readonly BuilderToolId[] = Object.freeze(['list_files', 'read_file', 'search_files', 'write_file', 'edit_file', 'run'])
-const MAX_WRITES_PER_TURN = 6
-const MAX_RUNS_PER_TURN = 5
+const MAX_RUNS_PER_TURN = 20
 const MAX_GATE_NUDGES = 3
 const MAX_REPEAT_RECOVERY_ATTEMPTS = 4
 const MAX_MODEL_ROUND_ATTEMPTS = 2
@@ -114,6 +116,7 @@ function validToolInput(toolId: BuilderToolId, input: Record<string, unknown>): 
   if (toolId === 'read_file') return Boolean(toolPath(input))
   if (toolId === 'search_files') return typeof input.query === 'string' && input.query.trim().length > 0
   if (toolId === 'write_file') return Boolean(toolPath(input)) && hasToolContent(input)
+    && (input.mode === undefined || input.mode === 'replace' || (input.mode === 'append' && Number.isSafeInteger(input.offset) && typeof input.final === 'boolean'))
   if (toolId === 'edit_file') {
     return Boolean(toolPath(input))
       && typeof input.search === 'string'
@@ -262,7 +265,7 @@ function modelControlFailure(value: string | null): ModelControlFailure {
 }
 
 function summarize(file: { path: string; content: string; updatedAt: number }) { return { path: file.path, bytes: new TextEncoder().encode(file.content).byteLength, updatedAt: file.updatedAt } }
-function summarizeRun(result: BuilderRunResult) { return { exitCode: result.exitCode, stdout: result.stdout.slice(0, 16_000), stderr: result.stderr.slice(0, 16_000), timedOut: result.timedOut } }
+function summarizeRun(result: BuilderRunResult) { return { ...(result.executedCommand ? { executedCommand: result.executedCommand } : {}), exitCode: result.exitCode, stdout: result.stdout.slice(0, 16_000), stderr: result.stderr.slice(0, 16_000), timedOut: result.timedOut } }
 
 function verifiedRepairAnswer(trace: readonly BuilderToolTrace[]): string {
   const changedPaths = [...new Set(trace
@@ -306,56 +309,54 @@ export class BuilderToolLoop {
     this.workspace = workspace
     this.runner = runner
   }
-  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; deadlineAtMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean }): Promise<BuilderLoopResult> {
+
+  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean; deadlineAtMs?: number; minimumStepMs?: number }): Promise<BuilderLoopResult> {
     const saved = input.checkpoint
     if (saved && (saved.version !== 1 || saved.workspaceId !== input.workspaceId || saved.objectiveDigest !== checkpointDigest(input.objective))) {
       return { ok: false, error: 'builder_checkpoint_scope_mismatch', trace: [] }
     }
-    if (saved && saved.workspaceDigest !== await workspaceDigest(this.workspace, input.workspaceId)) {
-      return { ok: false, error: 'builder_checkpoint_workspace_changed', trace: saved.trace }
+    const initialListing = await this.workspace.listFiles(input.workspaceId)
+    const files = (await Promise.all(initialListing.map(file => this.workspace.readFile(input.workspaceId, file.path))))
+      .filter((file): file is BuilderFile => file !== null)
+    if (saved) {
+      try { await validateBuilderCheckpoint(saved, this.workspace, input.workspaceId, input.objective) }
+      catch (error) { return { ok: false, error: (error as Error).message, trace: saved.trace } }
     }
     const trace: BuilderToolTrace[] = [...(saved?.trace || [])]
-    const workingFiles = new Map<string, BuilderFile>((saved?.workingFiles || []).map(file => [file.path, file]))
-    const inspectedInCurrentWorkspaceState = new Set<string>(saved?.inspections)
-    const completedMutations = new Set<string>(saved?.mutations)
-    const completedRunsInCurrentWorkspaceState = new Set<string>(saved?.runs)
-    const initialListing = await this.workspace.listFiles(input.workspaceId)
-    const manifest = initialListing.find(file => file.path === 'package.json')
-    const manifestFile = manifest ? await this.workspace.readFile(input.workspaceId, manifest.path) : null
-    const projectContext = saved?.projectContext || discoverBuilderProjectContext(initialListing.map(file => ({
-      path: file.path,
-      ...(file.path === 'package.json' && manifestFile ? { content: manifestFile.content } : {}),
-    })))
+    const workingFiles = new Map<string, BuilderFile>(files.map(file => [file.path, file]))
+    const chunks = new Map<string, string>(saved?.chunks || [])
+    const inspectedInCurrentWorkspaceState = new Set<string>(saved?.inspections || [])
+    const completedMutations = new Set<string>(saved?.mutations || [])
+    const completedRunsInCurrentWorkspaceState = new Set<string>(saved?.runs || [])
+    const projectContext = discoverBuilderProjectContext(files)
     const initialPaths = new Set(saved?.initialPaths || initialListing.map(file => file.path))
     const task = builderTaskContract(input.objective)
-    const maxWrites = Math.min(16, Math.max(MAX_WRITES_PER_TURN, task.files.length + 4))
+    const maxWrites = 48
     let workspacePaths: string[] = initialListing.map(file => file.path)
     let repairObjective = saved?.repairObjective ?? isRepairObjective(input.objective)
+    if (repairObjective && !files.length && !saved) return { ok: false, error: 'builder_source_required', trace }
     let writeCount = saved?.writeCount || 0, runCount = saved?.runCount || 0, gateNudges = saved?.gateNudges || 0
-    const maxRounds = Math.max(1, Math.min(input.maxRounds ?? Math.max(8, task.files.length * 3 + task.commands.length + 4), 40))
+    const maxRounds = Math.max(1, Math.min(input.maxRounds ?? 64, 96))
     let workRounds = saved?.workRounds || 0
     let attempt = saved?.attempt || 0
-    // Checkpoints are made only between completed tools. No pending command is replayable.
     const pause = async (): Promise<BuilderLoopResult> => {
       const checkpoint: BuilderLoopCheckpoint = {
         version: 1, workspaceId: input.workspaceId, objectiveDigest: checkpointDigest(input.objective),
-        workspaceDigest: await workspaceDigest(this.workspace, input.workspaceId),
-        trace, workingFiles: [...workingFiles.values()], initialPaths: [...initialPaths], projectContext,
-        inspections: [...inspectedInCurrentWorkspaceState], mutations: [...completedMutations],
-        runs: [...completedRunsInCurrentWorkspaceState], repairObjective,
-        writeCount, runCount, gateNudges, workRounds, attempt,
+        workspaceDigest: await workspaceDigest(this.workspace, input.workspaceId), initialPaths: [...initialPaths], trace,
+        workingFiles: [...workingFiles.values()], projectContext, chunks: [...chunks], mutations: [...completedMutations],
+        inspections: [...inspectedInCurrentWorkspaceState], runs: [...completedRunsInCurrentWorkspaceState],
+        repairObjective, writeCount, runCount, workRounds, attempt, gateNudges,
       }
-      if (Buffer.byteLength(JSON.stringify(checkpoint)) > 4_000_000) {
-        return { ok: false, error: 'builder_checkpoint_too_large', trace }
-      }
+      if (Buffer.byteLength(JSON.stringify(checkpoint)) > 4_000_000) return { ok: false, error: 'builder_checkpoint_too_large', trace }
       return { ok: false, error: 'builder_job_paused', trace, checkpoint }
     }
     const deadlineAtMs = Number(input.deadlineAtMs)
     const outOfTime = (): boolean => Number.isFinite(deadlineAtMs)
       && deadlineAtMs - Date.now() <= ROUND_RESERVE_MS
     while (workRounds < maxRounds && attempt < maxRounds + MAX_REPEAT_RECOVERY_ATTEMPTS) {
-      if (outOfTime()) return { ok: false, error: 'builder_time_budget_reached', trace }
+      if (outOfTime()) return input.shouldPause ? pause() : { ok: false, error: 'builder_time_budget_reached', trace }
       if (input.shouldPause?.()) return pause()
+      if (input.deadlineAtMs && input.deadlineAtMs - Date.now() < (input.minimumStepMs ?? 110_000)) return pause()
       attempt += 1
       const round = attempt
       const lastTrace = trace.at(-1)
@@ -370,12 +371,12 @@ export class BuilderToolLoop {
       // exist, execute the user's explicit Run list before asking for any more edits.
       // A failed command is attempted only once per file revision, then returned to the
       // model for diagnosis; no blind execution retries or additional command authority.
-      const verificationCommand = !repairObjective && writeCount > 0 && task.files.length > 0 && progress.missingFiles.length === 0
+      const verificationCommand = chunks.size === 0 && !repairObjective && writeCount > 0 && task.files.length > 0 && progress.missingFiles.length === 0
         ? progress.pendingCommands.find(command => !trace.slice(lastWorkspaceChange + 1)
-          .some(item => item.toolId === 'run' && item.input.command === command))
+          .some(item => item.toolId === 'run' && (item.input.command === command || item.input.requestedCommand === command)))
         : undefined
-      const currentStep = !repairObjective && progress.missingFiles.length > 0
-        ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files or return partial source.`
+      const currentStep = chunks.size > 0 ? formatBuilderChunks(chunks) : !repairObjective && progress.missingFiles.length > 0
+        ? `CURRENT STEP: Create the complete file ${JSON.stringify(progress.missingFiles[0])} with write_file. Other deliverables and verification are subsequent steps. Do not rewrite earlier files. For large files use bounded append chunks; only final=true publishes the complete file.`
         : !repairObjective && progress.pendingCommands.length === 0 && !progress.testsSatisfied
           ? `CURRENT STEP: The commands passed, but the recorded test total does not meet the requested minimum of ${task.minimumTests}. Complete the test suite with distinct meaningful assertions covering the requested normal, edge, and failure cases. Do not duplicate empty tests or weaken the requirement. Verification will run again after the file changes.`
         : trace.slice(lastWorkspaceChange + 1).some(item => item.toolId === 'run' && !item.ok)
@@ -400,9 +401,10 @@ export class BuilderToolLoop {
         .filter(toolId => toolId !== 'search_files' || typeof this.workspace.searchFiles === 'function')
         .filter(toolId => toolId !== blockedTool)
         .filter(toolId => !blockedInspectionTools.has(toolId))
-        .filter(toolId => !inspectedSource || (toolId !== 'list_files' && toolId !== 'read_file'))
+
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
+        BUILDER_REASONING_GUIDANCE,
         `OBJECTIVE:\n${input.objective}`,
         formatBuilderCliTestGuidance(input.objective),
         `DELIVERY PROGRESS: ${safeJson(progress)}. Writes remaining: ${maxWrites - writeCount}. Create every missing file before polishing newly created files. Then run every pending command separately, preserving its exit status. A passing first command is not completion when another command or file is still pending.`,
@@ -417,6 +419,7 @@ export class BuilderToolLoop {
         formatContractOscillation(detectContractOscillation(trace)),
         currentStep,
         'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; search_files => {"type":"tool","toolId":"search_files","input":{"query":"exact text or symbol"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
+        'LARGE NEW FILES: write_file accepts {path, mode:"append", offset:0, content:"first chunk", final:false}. Continue with the returned offset (JavaScript string length), chunks of at most 12000 characters, and final:true on the last chunk. Assembly publishes one complete file only at final=true. Append is for new files only; never use it to overwrite existing source. read_file accepts optional startLine/endLine for large files (1-based, at most 200 lines per read).',
         'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
         availableTools.includes('read_file')
           ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
@@ -431,7 +434,7 @@ export class BuilderToolLoop {
             ? `RECOVERY CONSTRAINT: ${blockedTool} was rejected in the preceding round. It is unavailable this round. Select a different tool from TOOLS; do not request it again.`
             : '',
         inspectedSource
-          ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Do not list or read again until you make progress. ${projectContext.recommendedTestCommand ? `Run ${projectContext.recommendedTestCommand} to reproduce the defect, then edit the source and rerun it.` : 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.'}`
+          ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Inspect other relevant files if needed; do not reread the same unchanged content. ${projectContext.recommendedTestCommand ? `Run ${projectContext.recommendedTestCommand} to reproduce the defect, then edit the source and rerun it.` : 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.'}`
           : '',
         'When done: {"type":"answer","answer":"what changed and what ran"}',
       ].filter(Boolean)
@@ -447,7 +450,7 @@ export class BuilderToolLoop {
           ? MODEL_CONTROL_RECOVERY_MAX_TOKENS
           : repairObjective || task.files.length > 1 ? MODEL_REPAIR_CONTROL_MAX_TOKENS : MODEL_CONTROL_MAX_TOKENS
         const generateControl = (maxTokens: number) => generateWithRetry(this.ai, {
-            systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${maxWrites} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24, ephemeral and network-denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. A new build with conditional instructions to fix failing tests is still a creation task: write complete files (including the CLI entry point), create tests and sample data, execute all requested commands, and repair only observed failures. Do not repeatedly inspect or polish one new file while other deliverables are missing. Never access host files, secrets, repositories, networks, deployments or credentials. Return exactly one JSON control object.`,
+            systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${maxWrites} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24 and ephemeral. The host may install declared npm dependencies with lifecycle scripts disabled using registry-only access before staging source; user code runs with network denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. A new build with conditional instructions to fix failing tests is still a creation task: write complete files (including the CLI entry point), create tests and sample data, execute all requested commands, and repair only observed failures. Do not repeatedly inspect or polish one new file while other deliverables are missing. Never access host files, secrets, networks, deployments or credentials. Imported repository files are workspace data, not permission to fetch or modify remote repositories. Return exactly one JSON control object.`,
             prompt: [...promptParts, recoveryInstruction].filter(Boolean).join('\n\n'),
             maxTokens,
           }, input.modelRoundTimeoutMs)
@@ -516,6 +519,10 @@ export class BuilderToolLoop {
       }
 
       if (action.type === 'answer') {
+        if (chunks.size) {
+          trace.push({ round, toolId: 'model_control', input: {}, ok: false, error: 'builder_file_assembly_incomplete', remediation: formatBuilderChunks(chunks) })
+          continue
+        }
         if (!progress.satisfied && !repairObjective) {
           gateNudges += 1
           trace.push({ round, toolId: 'model_control', input: {}, ok: false,
@@ -555,7 +562,7 @@ export class BuilderToolLoop {
             trace.push({
               round,
               toolId: 'run',
-              input: { command: proofCommand },
+              input: { command: output.executedCommand || proofCommand, ...(output.executedCommand ? { requestedCommand: proofCommand } : {}) },
               ok: !failed,
               output,
               ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
@@ -570,7 +577,7 @@ export class BuilderToolLoop {
             trace.push({
               round,
               toolId: 'run',
-              input: { command: proofCommand },
+              input: { command: output.executedCommand || proofCommand, ...(output.executedCommand ? { requestedCommand: proofCommand } : {}) },
               ok: !failed,
               output,
               ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
@@ -590,11 +597,11 @@ export class BuilderToolLoop {
       }
       if ((action.toolId === 'write_file' || action.toolId === 'edit_file') && writeCount >= maxWrites) return { ok: false, error: 'builder_write_budget_exhausted', trace }
       if (action.toolId === 'run' && runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
-      const fingerprint = `${action.toolId}:${safeJson(action.input)}`
+      const fingerprint = `${action.toolId}:${checkpointDigest(JSON.stringify(action.input))}`
       const inspection = action.toolId === 'list_files' || action.toolId === 'read_file' || action.toolId === 'search_files'
       const mutation = action.toolId === 'write_file' || action.toolId === 'edit_file'
       if (mutation && !repairObjective && progress.missingFiles.length > 0
-        && workspacePaths.includes(toolPath(action.input)) && !initialPaths.has(toolPath(action.input))) {
+        && action.input.mode !== 'append' && workspacePaths.includes(toolPath(action.input)) && !initialPaths.has(toolPath(action.input))) {
         trace.push({ round, toolId: action.toolId, input: action.input, ok: false,
           error: 'builder_missing_deliverables', remediation: `Create ${progress.missingFiles.join(', ')} before revising this new file. Then run the requested commands and use their output for targeted repairs.` })
         continue
@@ -621,16 +628,37 @@ export class BuilderToolLoop {
         }
         if (action.toolId === 'read_file') {
           const file = await this.workspace.readFile(input.workspaceId, toolPath(action.input))
-          output = file ? { path: file.path, content: file.content, updatedAt: file.updatedAt } : null
+          if (!file) throw new Error('builder_file_not_found')
+          const start = action.input.startLine === undefined ? 1 : Number(action.input.startLine)
+          const end = action.input.endLine === undefined ? start + 199 : Number(action.input.endLine)
+          if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start || end - start >= 200) throw new Error('builder_invalid_line_range')
+          const lines = file.content.split('\n')
+          const content = lines.slice(start - 1, end).join('\n').slice(0, 12_000)
+          output = { path: file.path, content, startLine: start, endLine: Math.min(end, lines.length), totalLines: lines.length,
+            truncated: end < lines.length || content.length < lines.slice(start - 1, end).join('\n').length, updatedAt: file.updatedAt }
         }
         if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
+          if (action.toolId === 'write_file' && action.input.mode === 'append') {
+            const path = builderFilePath(toolPath(action.input))
+            if (workspacePaths.includes(path)) throw new Error('builder_chunk_existing_file')
+            const assembled = appendBuilderChunk(chunks.get(path) || '', action.input)
+            if (action.input.final !== true) {
+              chunks.set(path, assembled)
+              trace.push({ round, toolId: 'write_file', input: { path, mode: 'append', offset: action.input.offset, final: false }, ok: true,
+                output: { path, offset: assembled.length, pending: true } })
+              continue
+            }
+            action.input = { path, content: assembled }
+          }
           const file = action.toolId === 'write_file'
             ? await this.workspace.writeFile(input.workspaceId, toolPath(action.input), toolContent(action.input))
             : await this.workspace.editFile(input.workspaceId, toolPath(action.input), text(action.input.search), text(action.input.replace))
+          chunks.delete(file.path)
           workingFiles.set(file.path, file)
           output = summarize(file)
         }
         if (action.toolId === 'run') {
+          if (chunks.size) throw new Error('builder_file_assembly_incomplete')
           const listed = await this.workspace.listFiles(input.workspaceId)
           workspacePaths = listed.map(file => file.path)
           const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
@@ -643,7 +671,24 @@ export class BuilderToolLoop {
             command = proof ? `node --experimental-strip-types --test ${proof.path}` : 'node --experimental-strip-types --test'
           }
           action.input = { ...action.input, command }
-          output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command, files }))
+          const result = await this.runner.run({ workspaceId: input.workspaceId, command, files })
+          for (const generated of result.generatedFiles || []) {
+            if (generated.path !== 'package-lock.json') throw new Error('builder_generated_file_disallowed')
+            validateBuilderLock(generated.content)
+            try {
+              const savedFile = await this.workspace.writeFile(input.workspaceId, generated.path, generated.content)
+              workingFiles.set(savedFile.path, savedFile)
+              if (!workspacePaths.includes(savedFile.path)) workspacePaths.push(savedFile.path)
+              trace.push({ round, toolId: 'write_file', input: { path: savedFile.path }, ok: true, output: summarize(savedFile) })
+            } catch (error) {
+              // The command already executed. A storage failure must not erase or relabel its evidence.
+              trace.push({ round, toolId: 'write_file', input: { path: generated.path }, ok: false,
+                error: `builder_generated_lock_not_saved: ${(error as Error).message}`, failureClass: 'storage',
+                remediation: 'The command ran, but its generated package-lock.json could not be saved. Free a workspace file slot before the next dependency run.' })
+            }
+          }
+          if (result.executedCommand) action.input = { ...action.input, command: result.executedCommand, requestedCommand: command }
+          output = summarizeRun(result)
         }
         const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0
         if (runFailed) {

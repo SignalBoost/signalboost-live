@@ -23,8 +23,9 @@ const target = {
 test('the pinned repository is fetched with enough history to read a regression', () => {
   // A single commit cannot show what the previous commit removed.
   assert.doesNotMatch(session, /'--depth', '1'/)
-  assert.match(session, /const REPOSITORY_HISTORY_DEPTH = (\d+)/)
-  const depth = Number(/const REPOSITORY_HISTORY_DEPTH = (\d+)/.exec(session)?.[1])
+  const historyDeclaration = /const REPOSITORY_HISTORY_DEPTH = (\d+)/
+  assert.match(session, historyDeclaration)
+  const depth = Number(historyDeclaration.exec(session)?.[1])
   assert.ok(depth >= 25, `history depth must allow a real log, got ${depth}`)
   assert.match(session, /'--depth', String\(REPOSITORY_HISTORY_DEPTH\)/)
 })

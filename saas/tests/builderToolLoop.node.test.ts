@@ -145,7 +145,7 @@ test('Builder does not declare a repair complete without successful runtime evid
   const ai = new ScriptedBuilderAi(Array(4).fill('{"type":"answer","answer":"Fixed."}'))
   const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'fix broken test', workspaceId: 'user:verify' })
   assert.equal(result.ok, false)
-  if (!result.ok) assert.equal(result.error, 'builder_regression_evidence_required')
+  if (!result.ok) assert.equal(result.error, 'builder_source_required')
   assert.equal(verifiedRepairLesson(result), null)
 })
 
@@ -269,18 +269,11 @@ test('Builder rejects traversal and never permits host files', async () => {
 test('Builder stops after the bounded command-run budget', async () => {
   const workspace = new InMemoryBuilderWorkspace()
   const runner: BuilderRunnerPort = { async run() { return { exitCode: 0, stdout: '', stderr: '', timedOut: false } } }
-  const ai = new ScriptedBuilderAi([
-    '{"type":"tool","toolId":"run","input":{"command":"echo 1"}}',
-    '{"type":"tool","toolId":"run","input":{"command":"echo 2"}}',
-    '{"type":"tool","toolId":"run","input":{"command":"echo 3"}}',
-    '{"type":"tool","toolId":"run","input":{"command":"echo 4"}}',
-    '{"type":"tool","toolId":"run","input":{"command":"echo 5"}}',
-    '{"type":"tool","toolId":"run","input":{"command":"echo 6"}}',
-  ])
-  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'run repeatedly', workspaceId: 'user:4', maxRounds: 8 })
+  const ai = new ScriptedBuilderAi(Array.from({ length: 21 }, (_, i) => JSON.stringify({ type: 'tool', toolId: 'run', input: { command: `echo ${i}` } })))
+  const result = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'run repeatedly', workspaceId: 'user:4', maxRounds: 24 })
   assert.equal(result.ok, false)
   if (result.ok === false) assert.equal(result.error, 'builder_run_budget_exhausted')
-  assert.equal(result.trace.length, 5)
+  assert.equal(result.trace.length, 20)
 })
 
 test('Builder rejects alternating repeated inspection without exhausting work rounds', async () => {

@@ -54,6 +54,7 @@ for (const pauseAfterFailure of [false, true]) test(`existing-file repair execut
 
 test('checkpoint rejects changed scope and changed files without model or execution', async () => {
   const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile('scope', 'existing.js', 'console.log(1)')
   const blocked = { async generate(): Promise<string> { assert.fail('no model call') } }
   const runner = { async run(): Promise<never> { assert.fail('no execution') } }
   const initial = await new BuilderToolLoop(blocked, workspace, runner).run({ objective, workspaceId: 'scope', shouldPause: () => true })

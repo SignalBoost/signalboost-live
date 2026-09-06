@@ -5,6 +5,7 @@ import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
 import { finishBuilderJob, claimBuilderJob, pauseBuilderJob, type BuilderJobRecord } from './job-store.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
+import { builderNextAction } from './user-guidance.ts'
 import { isRepairObjective } from './regression-gate.ts'
 import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
@@ -109,7 +110,7 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
   const files = workspace
     ? await workspace.listFiles(job.workspaceId).then(items => items.map(item => item.path)).catch(() => [])
     : []
-  const reply = historyReply(repairAwareFailureReply(job, error, safeTrace), job.workspaceId, files)
+  const reply = historyReply(`${repairAwareFailureReply(job, error, safeTrace)}\n\n${builderNextAction(error, trace)}`, job.workspaceId, files)
   await finishBuilderJob({
     jobId: job.id,
     userId: job.userId,
@@ -216,11 +217,8 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           priorLessons: [],
           checkpoint: job.checkpoint,
           // Leave room for a slow model round, then a bounded sandbox command and persistence.
-          shouldPause: (beforeTool = false) => Date.now() - sliceStartedAtMs >= (beforeTool ? 180_000 : 130_000),
-          // The wall clock, not an arbitrary count, decides when the work stops. Rounds observed in
-          // production average far below the per-round ceiling, so a low constant was ending jobs
-          // with a third of the time budget unspent.
-          maxRounds: 40,
+          shouldPause: (beforeTool = false) => Date.now() - sliceStartedAtMs >= (beforeTool ? 150_000 : 100_000),
+          maxRounds: 96,
           deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
           modelRoundTimeoutMs: 55_000,
         })
@@ -235,7 +233,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       return
     }
     if (result.ok === false) {
-      const reply = historyReply(repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace), job.workspaceId, files)
+      const reply = historyReply(`${repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace)}\n\n${builderNextAction(result.error, result.trace)}`, job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id,
         userId: job.userId,

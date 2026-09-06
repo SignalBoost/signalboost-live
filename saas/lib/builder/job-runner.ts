@@ -1,3 +1,4 @@
+import { builderPendingWriteEvidence } from './evidence-events.ts'
 // lib/builder/job-runner.ts
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
@@ -62,6 +63,7 @@ function publicTrace(trace: readonly BuilderToolTrace[]) {
         : {}
       return {
         ...base,
+        ...builderPendingWriteEvidence(output),
         ...(typeof input.path === 'string' ? { path: input.path.slice(0, 240) } : {}),
         ...(toolId === 'edit_file' && ok && typeof input.search === 'string' && typeof input.replace === 'string'
           ? { change: { search: input.search.slice(0, 4000), replace: input.replace.slice(0, 4000),

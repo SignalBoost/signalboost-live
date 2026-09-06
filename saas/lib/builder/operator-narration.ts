@@ -68,7 +68,7 @@ export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): 
   const successfulRuns = trace.filter((_, index) => events[index].outcome === 'exited_zero')
   const successfulRun = successfulRuns.at(-1)
   const changedPaths = unique(trace
-    .filter(entry => entry.ok === true && (entry.toolId === 'edit_file' || entry.toolId === 'write_file'))
+    .filter((_, index) => events[index].outcome === 'mutation_recorded')
     .map(pathOf))
   const lastFailure = latestFailure(trace)
 

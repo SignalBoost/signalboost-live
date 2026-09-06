@@ -8,4 +8,6 @@ Execution evidence labels blocked requests, timeouts and missing execution outco
 
 Mandatory regression coverage includes the original fabricated failed-edit draft, rejection in initial and follow-up modes, unavailable/malformed reviewers, proposal non-persistence on rejection, blocked/timeout/unconfirmed distinctions, real Node failure/edit/pass explanation, and the existing deadline with a stalled reviewer. Live acceptance must inspect the original job again without rerunning it, then a fresh repair and read-only follow-up.
 
-Local validation: all 988 mandatory regressions and TypeScript passed. Exact Preview/CI, deployment and live observations remain pending.
+Local validation: all 993 mandatory regressions and TypeScript passed. Exact Preview/CI, deployment and live observations remain pending.
+
+Integrated concurrent #1900 without changing its domain lookup. Review repair preserves pending chunk state through both workspace and repository public trace serializers; incomplete assembly cannot be narrated as a completed mutation.

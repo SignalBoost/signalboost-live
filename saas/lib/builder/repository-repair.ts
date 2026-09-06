@@ -1,3 +1,4 @@
+import { builderPendingWriteEvidence } from './evidence-events.ts'
 // lib/builder/repository-repair.ts
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
@@ -34,7 +35,7 @@ const REPOSITORY_RESULT_RESERVE_MS = 45_000
 function publicTrace(trace: readonly BuilderToolTrace[]) {
   return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
     const base = { round, toolId, ok, ...(error ? { error } : {}), ...(failureClass ? { failureClass } : {}), ...(remediation ? { remediation } : {}) }
-    if (toolId !== 'run') return { ...base, ...(typeof input.path === 'string' ? { path: input.path.slice(0, 240) } : {}) }
+    if (toolId !== 'run') return { ...base, ...builderPendingWriteEvidence(output), ...(typeof input.path === 'string' ? { path: input.path.slice(0, 240) } : {}) }
     const result = output && typeof output === 'object' ? output as Record<string, unknown> : {}
     return {
       ...base,

@@ -424,3 +424,20 @@ test('a stalled explanation review preserves the terminal result within the exis
   release('{"supported":true}')
   await Promise.resolve()
 })
+
+test('unfinished chunk state survives both public serializers and cannot claim a changed file', async () => {
+  const { builderPendingWriteEvidence, builderEvidenceEvents } = await import('../lib/builder/evidence-events.ts')
+  const { formatBuilderOperatorRepairReply } = await import('../lib/builder/operator-narration.ts')
+  // A successful staging operation has not yet mutated the workspace.
+  const stored = JSON.parse(JSON.stringify({ toolId: 'write_file', ok: true, path: 'large.js',
+    ...builderPendingWriteEvidence({ path: 'large.js', offset: 1024, pending: true }) }))
+  assert.equal(builderEvidenceEvents([stored])[0].outcome, 'assembly_pending')
+  assert.doesNotMatch(formatBuilderOperatorRepairReply({ ok: false, trace: [stored] }), /changed.*large.js/)
+  const committed = { ...stored, ...builderPendingWriteEvidence({ pending: false }) }
+  assert.equal(builderEvidenceEvents([committed])[0].outcome, 'mutation_recorded')
+  for (const file of ['job-runner.ts', 'repository-repair.ts']) {
+    const source = readFileSync('lib/builder/' + file, 'utf8')
+    const serializer = source.slice(source.indexOf('function publicTrace'), source.indexOf('function publicTrace') + 3000)
+    assert.match(serializer, /builderPendingWriteEvidence\(output\)/)
+  }
+})

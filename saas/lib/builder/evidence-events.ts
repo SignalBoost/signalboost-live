@@ -1,3 +1,9 @@
+/** Preserve assembly state when serializing a tool result for stored/public evidence. */
+export function builderPendingWriteEvidence(output: unknown): { pending?: boolean } {
+  const shape = output && typeof output === 'object' ? output as Record<string, unknown> : {}
+  return typeof shape.pending === 'boolean' ? { pending: shape.pending } : {}
+}
+
 /** Outcomes are derived from host trace fields, never from model prose or overall job status. */
 export function builderEvidenceEvents(trace: unknown) {
   return (Array.isArray(trace) ? trace : []).map((item, index) => {

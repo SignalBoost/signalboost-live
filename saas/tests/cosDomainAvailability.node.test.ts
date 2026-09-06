@@ -80,6 +80,28 @@ test('brainstorms, verifies, and returns fifteen candidates without asking the o
   assert.doesNotMatch(result?.reply || '', /tell me|narrow|if available/i)
 })
 
+test('regenerates after a fully registered naming wave and excludes rejected domains', async () => {
+  const exclusions: string[][] = []
+  let wave = 0
+  const fakeFetch = (async (url: string | URL | Request) => {
+    if (String(url).includes('data.iana.org')) return new Response(JSON.stringify({ services: [[['dev'], ['https://rdap.example.dev']]] }), { status: 200 })
+    return new Response('{}', { status: String(url).includes('fresh') ? 404 : 200 })
+  }) as typeof fetch
+  const result = await brainstormVerifiedDomains({
+    input:'suggest 2 names for this software SaaS platform', context:'shorter domain URL', fetchImpl:fakeFetch,
+    generateImpl:async(_input, _count, excluded=[]) => {
+      exclusions.push(excluded)
+      wave += 1
+      return wave === 1
+        ? { candidates:[{name:'TakenOne',domain:'taken-one.dev',meaning:'First checked concept'},{name:'TakenTwo',domain:'taken-two.dev',meaning:'Second checked concept'}], modelInvoked:true }
+        : { candidates:[{name:'TakenOne',domain:'taken-one.dev',meaning:'Repeated concept'},{name:'FreshOne',domain:'fresh-one.dev',meaning:'Fresh software concept'},{name:'FreshTwo',domain:'fresh-two.dev',meaning:'Fresh SaaS concept'}], modelInvoked:true }
+    },
+  })
+  assert.deepEqual(exclusions, [[], ['taken-one.dev','taken-two.dev']])
+  assert.deepEqual(result?.suggestions.map(item => item.domain), ['fresh-one.dev','fresh-two.dev'])
+  assert.match(result?.reply || '', /2\. \*\*FreshTwo\*\*/)
+})
+
 test('a subdomain is never misreported as an available registrable domain', async () => {
   const fakeFetch = (async (url: string | URL | Request) => {
     if (String(url).includes('data.iana.org')) return new Response(JSON.stringify({ services: [[['com'], ['https://rdap.example.com']]] }), { status: 200 })

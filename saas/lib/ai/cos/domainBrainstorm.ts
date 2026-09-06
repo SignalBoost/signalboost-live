@@ -21,7 +21,7 @@ async function generateWithCos(input: string, count: number, excludedDomains: st
       jsonObject: true,
       frequencyPenalty: 0,
       presencePenalty: 0,
-      systemPrompt: 'You are COS performing a naming assignment for your principal. Return ONLY strict JSON: {"candidates":[{"name":"...","domain":"...","meaning":"..."}]}. Generate distinct, short, pronounceable, globally usable brand names for a platform that builds software and also delivers SaaS. Distribute candidates across .com, .ai, .dev, .app, and .io instead of concentrating on one TLD. Avoid famous brands, generic two-word clichés, and unsupported claims. Do not ask questions. Domain availability will be verified separately, so never claim a candidate is available.',
+      systemPrompt: 'You are COS performing a naming assignment for your principal. Return ONLY strict JSON: {"candidates":[{"name":"...","domain":"...","meaning":"..."}]}. Return the full requested candidate count in one response. Coin distinct, short, pronounceable, globally usable names for a platform that builds software and also delivers SaaS; favor original invented words over existing brands, abbreviations, and generic two-word clichés. Distribute candidates across .com, .ai, .dev, .app, and .io instead of concentrating on one TLD. Obey all naming exclusions in the owner conversation. Do not ask questions. Domain availability will be verified separately, so never claim a candidate is available.',
       prompt: `OWNER REQUEST:\n${input}\n\nGenerate at least ${target} new candidates.${excludedDomains.length ? ` These domains were already generated or rejected by live registry checks and MUST NOT be repeated: ${excludedDomains.join(', ')}.` : ''}`,
     }).catch(() => null)
     modelInvoked ||= Boolean(result)

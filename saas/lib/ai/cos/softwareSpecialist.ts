@@ -1,3 +1,6 @@
+import { explainBuilderEvidence } from '@/lib/builder/explain-evidence'
+import { createBuilderCodingAiPort } from '@/lib/cos/aiPort'
+import { createGovernedBuilderAiPort } from '@/lib/builder/control-adapter'
 import { builderRepositoryImportIntent, builderRepositoryTarget, importBuilderRepository, builderRepositoryErrorReply } from '@/lib/builder/repository-import'
 import { after, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
@@ -118,17 +121,24 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
 
   const priorAnswer = (Array.isArray(input.body?.messages) ? input.body.messages : [])
     .filter((message: any) => message?.role === 'assistant' && typeof message.content === 'string').at(-1)?.content || ''
+  let explanationModelInvoked = false
   const evidence = await builderEvidenceReply({
     prompt: objective,
     userId: access?.userId || publicAuditUserId(),
     conversationId: conversationIdFrom(input.body),
     priorAnswer,
     allowRepositoryEvidence: input.surface === 'assistant' && access?.isOwner === true,
-  }, readBuilderEvidenceJob)
+  }, readBuilderEvidenceJob, async job => {
+    const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: Date.now() + 45_000 })
+    return explainBuilderEvidence({ prompt: objective, job,
+      workspace: createSupabaseBuilderWorkspace(job.userId),
+      ai: { generate: request => { explanationModelInvoked = true; return ai.generate(request) } },
+    })
+  })
   if (evidence !== null) return NextResponse.json({
     reply: evidence, source: 'cos-builder-recorded-evidence',
     execution_allowed: false, external_action_taken: false,
-    local_model_invoked: false, external_ai_invoked: false,
+    local_model_invoked: explanationModelInvoked, external_ai_invoked: false,
     ...softwareSpecialistFields('software.verify'),
   })
 

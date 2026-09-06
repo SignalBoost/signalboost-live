@@ -419,7 +419,7 @@ export class BuilderToolLoop {
         formatContractOscillation(detectContractOscillation(trace)),
         currentStep,
         'TOOL INPUT SCHEMAS: list_files => {"type":"tool","toolId":"list_files","input":{}}; read_file => {"type":"tool","toolId":"read_file","input":{"path":"relative/file.ext"}}; search_files => {"type":"tool","toolId":"search_files","input":{"query":"exact text or symbol"}}; write_file => {"type":"tool","toolId":"write_file","input":{"path":"relative/file.ext","content":"complete new file"}}; edit_file => {"type":"tool","toolId":"edit_file","input":{"path":"relative/file.ext","search":"small unique existing text","replace":"replacement text"}}; run => {"type":"tool","toolId":"run","input":{"command":"command"}}.',
-        'LARGE NEW FILES: write_file accepts {path, mode:"append", offset:0, content:"first chunk", final:false}. Continue with the returned offset (JavaScript string length), chunks of at most 12000 characters, and final:true on the last chunk. Assembly publishes one complete file only at final=true. Append is for new files only; never use it to overwrite existing source. read_file accepts optional startLine/endLine for large files (1-based, at most 200 lines per read).',
+        'LARGE NEW FILES: write_file accepts {path, mode:"append", offset:0, content:"first chunk", final:false}. Continue with the returned offset (JavaScript string length), chunks of at most 2000 characters (the storage limit is 12000, but the JSON output token budget is smaller), and final:true on the last chunk. Assembly publishes one complete file only at final=true. Append is for new files only; never use it to overwrite existing source. read_file accepts optional startLine/endLine for large files (1-based, at most 200 lines per read).',
         'For an existing-file repair, prefer edit_file with the smallest unique search/replace. Do not return the whole existing file through write_file unless a minimal edit cannot express the change.',
         availableTools.includes('read_file')
           ? 'Use: {"type":"tool","toolId":"read_file","input":{"path":"..."}}'
@@ -449,9 +449,9 @@ export class BuilderToolLoop {
         const controlBudget = controlAttempt > 0
           ? MODEL_CONTROL_RECOVERY_MAX_TOKENS
           : repairObjective || task.files.length > 1 ? MODEL_REPAIR_CONTROL_MAX_TOKENS : MODEL_CONTROL_MAX_TOKENS
-        const generateControl = (maxTokens: number) => generateWithRetry(this.ai, {
+        const generateControl = (maxTokens: number, outputRecovery = '') => generateWithRetry(this.ai, {
             systemPrompt: `You are COS Builder. Work only inside the supplied user workspace. Use tools to inspect, edit and run code. You have at most ${maxWrites} successful file writes/edits and ${MAX_RUNS_PER_TURN} successful command runs. The execution runtime is node24 and ephemeral. The host may install declared npm dependencies with lifecycle scripts disabled using registry-only access before staging source; user code runs with network denied. Never claim a file was changed or code ran unless the tool result in this turn proves it. On failure, first classify it as storage, path, runtime, dependency, test, or deployment; read the exact evidence and then choose the smallest next diagnostic or repair. Failed attempts do not consume the successful write/run budget. For a repair objective, do not declare success until a regression test has failed before the repair and passed after it. Use an existing reproducing test when available; otherwise add one. A new build with conditional instructions to fix failing tests is still a creation task: write complete files (including the CLI entry point), create tests and sample data, execute all requested commands, and repair only observed failures. Do not repeatedly inspect or polish one new file while other deliverables are missing. Never access host files, secrets, networks, deployments or credentials. Imported repository files are workspace data, not permission to fetch or modify remote repositories. Return exactly one JSON control object.`,
-            prompt: [...promptParts, recoveryInstruction].filter(Boolean).join('\n\n'),
+            prompt: [...promptParts, recoveryInstruction, outputRecovery].filter(Boolean).join('\n\n'),
             maxTokens,
           }, input.modelRoundTimeoutMs)
 
@@ -466,7 +466,7 @@ export class BuilderToolLoop {
             return { ok: false, error: error instanceof Error ? error.message : 'builder_model_call_failed', trace }
           }
           try {
-            response = await generateControl(controlBudget * 2)
+            response = await generateControl(controlBudget * 2, 'OUTPUT LIMIT RECOVERY: The previous response was truncated and NOTHING from it was written. Do not repeat a whole large file. For a new file emit only one write_file append chunk of at most 2000 characters with the current saved offset and final:false; continue across later rounds. For an existing file emit one small edit_file search/replace. Return one complete compact JSON object.')
           } catch (retryError) {
             if (input.shouldPause && retryError instanceof Error && retryError.message === 'builder_turn_timeout') return pause()
             if (isOutputTruncation(retryError)) return { ok: false, error: 'builder_model_output_limit', trace }

@@ -114,7 +114,14 @@ test('sandbox closes install egress before staging source or running commands', 
     async writeFiles(files: any[]) { steps.push(files.some(file => file.path.endsWith('app.js')) ? 'source' : 'manifest') },
     async runCommand(command: any) {
       steps.push(command.cmd)
-      if (command.cmd === 'npm') assert.ok(command.args.includes('--ignore-scripts'))
+      if (command.cmd === 'npm') {
+        assert.ok(command.args.includes('--ignore-scripts'))
+        const user = command.args.find((arg: string) => arg.startsWith('--userconfig='))
+        const global = command.args.find((arg: string) => arg.startsWith('--globalconfig='))
+        assert.notEqual(user.split('=')[1], global.split('=')[1], 'npm rejects loading the same config path twice')
+        const { execFileSync } = await import('node:child_process')
+        execFileSync('npm', ['config', 'list', '--json', user, global], { stdio: 'pipe' })
+      }
       return { exitCode: 0, async stdout() { return command.cmd === 'cat' ? lock : 'ok' }, async stderr() { return '' } }
     },
     async stop() { steps.push('stop') },

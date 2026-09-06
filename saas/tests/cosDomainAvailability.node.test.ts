@@ -8,6 +8,14 @@ test('extracts explicit domains from the owner request and preceding COS answer'
   assert.deepEqual(extractDomainCandidates('edit this text', 'SignalBoost.ai'), [])
 })
 
+test('explicit verification checks only requested domains and resolves a named prior candidate', () => {
+  const context = 'Try codevia.io, oldidea.dev, and fluxa.io.'
+  assert.deepEqual(
+    extractDomainCandidates('Can you verify these names: codevia, nova.ai, fluxa.ai?', context),
+    ['nova.ai', 'fluxa.ai', 'codevia.io'],
+  )
+})
+
 test('uses free IANA bootstrap and authoritative registry RDAP without guessing', async () => {
   const calls: string[] = []
   const fakeFetch = (async (url: string | URL | Request) => {
@@ -51,6 +59,20 @@ test('generated candidates obey format and explicit signal/boost exclusion', () 
     { name:'Bad',domain:'bad.example.net',meaning:'Unsupported TLD' },
   ]}), true)
   assert.deepEqual(parsed, [{ name:'Nuvora',domain:'nuvora.dev',meaning:'New software taking shape' }])
+})
+
+test('rejects numeric meanings and duplicate neural names while normalizing escaped dots', () => {
+  const parsed = parseGeneratedDomainSuggestions(JSON.stringify({ candidates: [
+    { name:'Telta',domain:'telta.dev',meaning:-1050318937 },
+    { name:'Codexa',domain:'codexa\\.app',meaning:'A concise code workspace' },
+    { name:'codexa',domain:'codexa.ai',meaning:'Duplicate name' },
+  ]}), false)
+  assert.deepEqual(parsed, [{name:'Codexa',domain:'codexa.app',meaning:'A concise code workspace'}])
+})
+
+test('explicit owner domain verification precedes creative brainstorming', async () => {
+  const route = await readFile(new URL('../app/api/cos-primary/route.ts', import.meta.url), 'utf8')
+  assert.ok(route.indexOf('tryDomainAvailabilityLookup({input,context:precedingAssistant})') < route.indexOf('runOwnerDomainBrainstorm({input,context:precedingAssistant})'))
 })
 
 test('domain generation requests provider-enforced JSON rather than relying on prose compliance', async () => {

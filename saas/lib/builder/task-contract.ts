@@ -5,6 +5,27 @@ export type BuilderTaskContract = Readonly<{ files: readonly string[]; commands:
 const FILE = /^(?:[\w-]+\/)*[\w.-]+\.[a-z0-9]+$/i
 const clean = (value: string) => value.trim().replace(/^[-*]\s+/, '').replace(/^`|`[.,;]?$|[.,;]$/g, '')
 
+/** Inline Run: clauses end at an unquoted sentence boundary, never inside a filename. */
+function inlineCommands(line: string): string[] {
+  const visible = line.replace(/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`[^`]*`/g, match => ' '.repeat(match.length))
+  const result: string[] = []
+  for (const match of visible.matchAll(/(?:^|[.!?]\s+)(?:also\s+)?run\s*:/gi)) {
+    const start = match.index + match[0].length
+    let end = start
+    let quote = ''
+    for (; end < line.length; end++) {
+      const char = line[end]
+      if (char === '\\') { end++; continue }
+      if (quote) { if (char === quote) quote = ''; continue }
+      if (char === '"' || char === "'" || char === '`') { quote = char; continue }
+      if (char === '.' && (end === line.length - 1 || /\s/.test(line[end + 1]))) break
+    }
+    const command = clean(line.slice(start, end))
+    if (/^(?:node|python3?|npm|pnpm|yarn|bun)\s+\S/.test(command) && command.length <= 2000) result.push(command)
+  }
+  return result
+}
+
 /** Extract explicit deliverables only; references elsewhere in the request are not output files. */
 export function builderTaskContract(objective: string): BuilderTaskContract {
   const files = new Set<string>()
@@ -27,8 +48,10 @@ export function builderTaskContract(objective: string): BuilderTaskContract {
       if (FILE.test(path) && !path.split('/').includes('..')) files.add(path)
       else fileList = false
     }
-    const inline = /\b(?:create|write)\s+`?((?:[\w-]+\/)*[\w.-]+\.[a-z0-9]+)\b/i.exec(line)
-    if (inline && FILE.test(inline[1])) files.add(inline[1])
+    for (const inline of line.matchAll(/\b(?:create|write)\s+`?((?:[\w-]+\/)*[\w.-]+\.[a-z0-9]+)\b/gi)) {
+      if (FILE.test(inline[1])) files.add(inline[1])
+    }
+    for (const command of inlineCommands(line)) commands.add(command)
     const command = line.replace(/^\$\s+/, '').replace(/^`|`$/g, '')
     if (runList && /^(?:node|python3?|npm|pnpm|yarn|bun)\s+\S/.test(command) && command.length <= 2_000) commands.add(command)
     else if (line && !/^```/.test(line)) runList = false

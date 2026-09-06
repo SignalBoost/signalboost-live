@@ -313,3 +313,18 @@ test('Builder CLI process tests catch swallowed executable errors despite passin
     assert.deepEqual(actual, documented)
   } finally { await rm(directory, { recursive: true, force: true }) }
 })
+
+test('live prose task retains both deliverables and its inline verification command', () => {
+  const objective = 'Create catalog.json containing a literal JSON array of exactly 600 product records, one record per line. Each record must have id 1 through 600, name "Product N" where N is its id, and priceCents equal to id times 100. The downloadable JSON must contain every record, not placeholders or a generator. Also create verify.js using node:assert/strict to read catalog.json, check all 600 ids, names and prices, check the sum is 18030000, and print "600 products verified". Run: node verify.js. Return both files and recorded execution results.'
+  const contract = builderTaskContract(objective)
+  assert.deepEqual(contract.files, ['catalog.json', 'verify.js'])
+  assert.deepEqual(contract.commands, ['node verify.js'])
+  assert.equal(builderTaskProgress(contract, ['catalog.json'], []).satisfied, false)
+  assert.equal(builderTaskProgress(contract, contract.files, []).satisfied, false)
+})
+
+test('inline commands preserve quoted punctuation and exclude quoted instructions', () => {
+  assert.deepEqual(builderTaskContract('Create app.js. Run: node app.js "a. b". Return the result.').commands, ['node app.js "a. b"'])
+  assert.deepEqual(builderTaskContract('Run: `npm test`. Report the result.').commands, ['npm test'])
+  assert.deepEqual(builderTaskContract('Create app.js that prints "Hello. Run: node other.js.".').commands, [])
+})

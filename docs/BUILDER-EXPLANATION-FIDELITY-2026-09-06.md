@@ -35,3 +35,13 @@ The precision candidate is retained as docs/fixtures/builder-rounding/precision-
 Local causal-distinction validation: all 995 mandatory regressions and TypeScript passed.
 
 Review repair: follow-up generation and review now receive the original persisted job requirement, bounded to 8,000 characters with truncation marked. The scoped evidence lookup already retrieves this field. Without it, a follow-up question alone could not distinguish requested behavior changes from existing defects. No lookup or authorization scope changes.
+
+## Review recovery and numeric compatibility
+
+#1904 merged at 6ad1029d7d473a97e7e7db1ed3a895b17a7d7d5c and deployed READY as dpl_3NWgZK4t8GsKZz4CmvoeKXNGrYjA. All 1001 mandatory tests and TypeScript passed; exact head 25592f9ce53e6ca5370dd0e64a40aec8ae867087 passed ten CI workflows and Preview dpl_Cm9Y8UvY5eQ7yf9kQo4B19QqGw4B. The repeated causal follow-up withheld prose and retained raw evidence, so useful explanation acceptance was still incomplete.
+
+Numeric repair job 1f981431-e1d5-47b3-b22f-29c58ce23037 added one test block containing four assertions. Its first npm test failed on value.startsWith for a numeric input before money.js changed. Converting the validated input with String(value) fixed that TypeError, but the next run failed because the small-exponent input returned a fractional cent. Wrapping the final result with Math.round then passed all fifteen tests. The fourteen pre-existing tests/assertions were preserved byte-for-byte after removing only the new block. The exact source is numeric-money.cjs in the rounding fixture directory; the unchanged independent probe passed all 10,102 cases and six focused numeric/long-decimal checks passed. These finite checks do not establish correctness for all magnitudes or numeric formats.
+
+Both the numeric repair's initial answer and its read-only follow-up returned safe evidence without a useful model explanation. The correction permits the reviewer to supply one supported rewritten answer after rejecting a draft, then independently reviews that replacement against identical source, trace, events and original requirement. No unchecked replacement is released; there is no recursive retry. Rejected proposal requests cannot use this recovery to save an objective. The existing initial explanation deadline also covers recovery. Review remains probabilistic, and a rejection alone does not prove the original draft was wrong because rejected prose is not persisted.
+
+Local recovery validation: 36 focused tests and all 1005 mandatory tests passed. TypeScript passed. PR checks, deployment and live explanation acceptance are pending.

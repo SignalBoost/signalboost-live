@@ -3,7 +3,9 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.63
+**Version:** 1.64
+
+**Builder explanation recovery — 2026-09-06:** #1904 is deployed at `6ad1029d7d473a97e7e7db1ed3a895b17a7d7d5c`, Production `dpl_3NWgZK4t8GsKZz4CmvoeKXNGrYjA` READY. Numeric compatibility repair `1f981431-e1d5-47b3-b22f-29c58ce23037` reproduced the string-method TypeError, repaired numeric conversion, then repaired the small-exponent assertion and passed fifteen tests. Its read-only explanation fell back to raw evidence. The next correction allows one evidence-based rewrite after review rejection and independently rechecks it before release, within the existing initial deadline. Proposal requests retain fail-closed behavior. No execution or lookup authority is added. All 1005 mandatory regressions and TypeScript pass. Live acceptance remains pending; see the explanation-fidelity handoff.
 
 **Builder causal explanation follow-through — 2026-09-06:** #1902 deployed at `fc4cbdbea82ae7dd856de7643fd52ee79429f890`, Production `dpl_G8pWtcaEFrb8k6FfVYfNfHzwgE8J` READY. The original-job explanation now correctly reports two added tests and a blocked duplicate, with no failed edit. Fresh job `e22206f9-7008-41c5-aba7-5f0bb880e691` preserved the fourteen-test suite, added two assertions, reproduced the precision failure before source edits, repaired it and passed fourteen tests. Its initial prose was rejected by review and safe recorded evidence was retained. A subsequent explanation incorrectly equated adding coverage with introducing the implementation defect. The follow-through explicitly requires both generation and review to distinguish first-observed failure from defect origin; an old passing suite cannot establish absence of a bug. Fresh causal-explanation acceptance remains pending. See `docs/BUILDER-EXPLANATION-FIDELITY-2026-09-06.md`.
 

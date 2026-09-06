@@ -53,6 +53,13 @@ test('generated candidates obey format and explicit signal/boost exclusion', () 
   assert.deepEqual(parsed, [{ name:'Nuvora',domain:'nuvora.dev',meaning:'New software taking shape' }])
 })
 
+test('domain generation requests provider-enforced JSON rather than relying on prose compliance', async () => {
+  const source = await readFile(new URL('../lib/ai/cos/domainBrainstorm.ts', import.meta.url), 'utf8')
+  assert.match(source, /callCosReasoner\(\{[\s\S]*?jsonObject:\s*true/)
+  assert.match(source, /frequencyPenalty:\s*0/)
+  assert.match(source, /presencePenalty:\s*0/)
+})
+
 test('brainstorming has no hard-coded candidate fallback', async () => {
   const result = await brainstormVerifiedDomains({
     input:'brainstorm 15 names for a software SaaS platform', context:'domain URL',

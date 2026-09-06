@@ -1,3 +1,4 @@
+import { builderTaskContract } from './task-contract.ts'
 import { normalizeBuilderControlOutput } from './control-adapter.ts'
 import type {
   BuilderAiPort,
@@ -10,6 +11,7 @@ import type {
 
 const DEBUG_ACTION = /\b(?:debug|fix|repair|troubleshoot|correct)\b|\b(?:does not work|doesn't work|broken|failing|throws?)\b/i
 const CODE_EXTENSION = /\.(?:c?js|mjs|cts|mts|ts|py)$/i
+const WORKSPACE_EXTENSION = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
 const TEST_PATH = /(?:^|\/)(?:.+[._-](?:test|spec)|(?:test|spec)[._-].+)\.(?:c?js|mjs|cts|mts|ts|py)$/i
 const MAX_DEBUG_FILE_BYTES = 128 * 1024
 const MAX_DEBUG_FILES = 4
@@ -80,7 +82,7 @@ function admissibleFile(file: DebugFileInput | null | undefined): DebugFileInput
 
 /**
  * Accept Builder `{path,content}` files and Concierge `{name,dataUrl}` attachments.
- * Non-code and empty payloads are dropped so logs never become edit authority.
+ * Workspace source, manifests and data are preserved; the narrow debug planner separately limits executable files.
  */
 export function extractBuilderSourceFiles(raw: unknown): DebugFileInput[] {
   if (!Array.isArray(raw)) return []
@@ -92,11 +94,12 @@ export function extractBuilderSourceFiles(raw: unknown): DebugFileInput[] {
     const content = typeof record.content === 'string' && record.content
       ? record.content
       : decodeDataUrl(text(record.dataUrl))
-    const admitted = admissibleFile({ path, content })
+    const admitted = WORKSPACE_EXTENSION.test(path) && new TextEncoder().encode(content).byteLength <= 512 * 1024
+      ? Object.freeze({ path, content }) : null
     if (!admitted || seen.has(admitted.path)) continue
     seen.add(admitted.path)
     files.push(admitted)
-    if (files.length >= MAX_DEBUG_FILES) break
+    if (files.length >= 100) break
   }
   return files
 }
@@ -112,10 +115,14 @@ export function planDebugFileJob(objective: string, files: readonly DebugFileInp
   if (!prompt || !DEBUG_ACTION.test(prompt)) return null
   if (!Array.isArray(files)) return null
   const admitted = files.map(file => admissibleFile(file)).filter((file): file is DebugFileInput => file !== null)
-  if (admitted.length < 1 || admitted.length > MAX_DEBUG_FILES) return null
+  if (admitted.length < 1 || admitted.length > MAX_DEBUG_FILES || admitted.length !== files.length) return null
   const proofSource = admitted.find(file => TEST_PATH.test(file.path)) ?? admitted[0]
   const proof = debugCommand(proofSource.path)
   if (!proof) return null
+  const normalizeCommand = (command: string) => command.replace(/['"`]/g, '').trim().replace(/\s+/g, ' ')
+  // The shortcut can run only its single-file proof; other commands require the full tool loop.
+  if (builderTaskContract(prompt).commands.some(command => normalizeCommand(command) !== normalizeCommand(proof.command))
+    || /\b(?:npm|pnpm|yarn|bun)\s+(?:test|start|run|install|ci)\b/i.test(prompt)) return null
   return Object.freeze({
     ...proof,
     files: Object.freeze(admitted.map(file => file.path)),

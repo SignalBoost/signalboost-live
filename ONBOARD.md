@@ -3,7 +3,9 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.46
+**Version:** 1.47
+
+**Builder complete application repair — 2026-09-06:** after #1881 fixed uploads, a real six-file repair still failed because `planDebugFileJob` filtered out JSON and selected the four executable files for its isolated shortcut. The sandbox therefore lacked package.json/sample.json and the model attempted irrelevant dependency/source changes. `fix/builder-complete-repair-input` now preserves workspace source/manifests/data in shared intake, and declines the shortcut if any supplied file or requested command would be omitted. Complete applications use the full workspace tool loop. Live acceptance remains pending with fresh original inputs; the failed workspace must not be reused as repaired evidence.
 
 **Builder multi-file intake — 2026-09-06:** live application testing on `test/builder-multifile-live` found both Concierge upload controls silently excluded JSON manifests/data and capped attachments at five. The patch admits the source extensions already accepted by Builder transport and supports twenty files. The six-file expense-report fixture in `docs/fixtures/expense-report` is intentionally broken and exercises a real dependency, imports, CLI, refunds and preserved tests. Its live repair and subsequent feature extension remain pending; no broader application acceptance is claimed. Intake regressions are now mandatory, including preservation of package.json and sample.json through transport.
 

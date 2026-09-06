@@ -258,3 +258,21 @@ test('Concierge data-URL attachments decode into editable source files', () => {
   ])
   assert.deepEqual(files, [{ path: 'app.js', content }])
 })
+
+
+test('complete application intake retains JSON and bypasses the single-file shortcut', () => {
+  const files = [
+    { path: 'package.json', content: '{"dependencies":{"is-number":"7.0.0"}}' },
+    { path: 'money.js', content: 'require("is-number")' },
+    { path: 'report.js', content: 'require("./money")' },
+    { path: 'cli.js', content: 'require("./report")' },
+    { path: 'sample.json', content: '[]' },
+    { path: 'report.test.js', content: 'require("./sample.json")' },
+  ]
+  assert.deepEqual(extractBuilderSourceFiles(files), files)
+  assert.equal(planDebugFileJob('Repair this application. Run: npm test.', files), null)
+  assert.equal(planDebugFileJob('Repair this application.', files), null)
+  assert.equal(planDebugFileJob('Repair this file. Run: npm test.', [files[1]]), null)
+  assert.equal(planDebugFileJob('Repair this file. Run: node money.js. Run: node cli.js.', [files[1]]), null)
+  assert.ok(planDebugFileJob('Repair this file. Run: node money.js.', [files[1]]))
+})

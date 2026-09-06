@@ -17,14 +17,14 @@ export function createInMemoryRecipeReuseStore(options: InMemoryRecipeReuseOptio
   const now = options.now ?? Date.now
   const recipes = new Map<string, { recipe: CosConnectorRecipe; updatedAt: number }>()
   return Object.freeze({
-    get: key => {
+    get: (key: string) => {
       const value = recipes.get(key)
       if (!value) return undefined
       if (maxAgeMs > 0 && now() - value.updatedAt > maxAgeMs) { recipes.delete(key); return undefined }
       return value.recipe
     },
-    set: (key, recipe) => { recipes.set(key, { recipe, updatedAt: now() }) },
-    delete: key => { recipes.delete(key) },
+    set: (key: string, recipe: CosConnectorRecipe) => { recipes.set(key, { recipe, updatedAt: now() }) },
+    delete: (key: string) => { recipes.delete(key) },
   })
 }
 

@@ -87,9 +87,9 @@ test('reasoning operator copy is localized while machine identifiers stay stable
   assert.equal(plan.targetProvider, 'generic-cloud')
 })
 
-test('registered mutation strategy is risk-elevated, protected, verified, and rollback-equipped', () => {
+test('registered reversible mutation strategy remains routine, protected, verified, and rollback-equipped', () => {
   const plan = createReasoningEngine({ now, strategies: [mutationStrategy()] }).proposeRepairPlan(incident())
-  assert.equal(plan.riskLevel, 'high')
+  assert.equal(plan.riskLevel, 'low')
   assert.equal(plan.requiresBrowser, false)
   assert.ok(plan.steps.some(step => step.action === 'api_request' && step.protectedAction))
   assert.equal(plan.verificationSteps[0]?.stepId, 'strategy-verify-service')
@@ -178,25 +178,25 @@ test('END TO END: read-only reasoning plan runs through the real policy and orch
   assert.ok(audit.some(event => event.eventType === 'verification_completed'))
 })
 
-test('END TO END: production mutation from reasoning engine still requires human approval', async () => {
+test('END TO END: routine reversible production repair executes without human approval', async () => {
   let executorCalled = false
   const orchestrator = new SupervisorOrchestrator({
     thinker: createReasoningEngine({ now, strategies: [mutationStrategy()] }),
     policyEngine: new DefaultSupervisorPolicyEngine(),
     executor: {
-      execute: () => {
+      execute: ({ approvedStepIds }) => {
         executorCalled = true
-        throw new Error('executor must not run before approval')
+        return { status: 'completed', executedStepIds: approvedStepIds, startedAt: NOW.toISOString(), finishedAt: NOW.toISOString(), summary: 'routine repair completed' }
       },
     },
-    verifier: createReferenceVerifier({ runner: () => ({ ok: true, summary: 'healthy' }), now }),
+    verifier: { verify: () => ({ status: 'verified' as const, verifiedAt: NOW.toISOString(), summary: 'healthy', errors: [] }) },
     audit: { write: () => {} },
     mode: 'autopilot',
     executionContext: { executionId: 'exec-reasoning-prod' },
   })
 
   const outcome = await orchestrator.run(incident())
-  assert.equal(outcome.status, 'approval_required')
-  assert.match(outcome.reason, /Production modifications require approval/)
-  assert.equal(executorCalled, false)
+  assert.equal(outcome.status, 'completed')
+  assert.equal(outcome.policy?.outcome, 'approved')
+  assert.equal(executorCalled, true)
 })

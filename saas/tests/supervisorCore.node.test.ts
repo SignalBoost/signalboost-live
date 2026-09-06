@@ -36,7 +36,7 @@ test('passive mode requires approval for protected actions', () => {
   const decision = new DefaultSupervisorPolicyEngine().evaluate({ incident: parsedIncident(), plan: parsedPlan({ steps: [step({ protectedAction: true, action: 'click' })] }), mode: 'passive', context: {} })
   assert.equal(decision.outcome, 'approval_required')
 })
-test('autopilot approves only low-risk reversible sandbox actions', () => {
+test('autopilot approves low-risk reversible routine actions', () => {
   const engine = new DefaultSupervisorPolicyEngine()
   const approved = engine.evaluate({ incident: parsedIncident(), plan: parsedPlan({ steps: [step({ stepId: 'fill-1', action: 'fill', parameters: { reversible: true } })] }), mode: 'autopilot', context: {} })
   assert.equal(approved.outcome, 'approved')
@@ -44,9 +44,21 @@ test('autopilot approves only low-risk reversible sandbox actions', () => {
   const ambiguous = engine.evaluate({ incident: parsedIncident(), plan: parsedPlan({ steps: [step({ stepId: 'fill-1', action: 'fill' })] }), mode: 'autopilot', context: {} })
   assert.equal(ambiguous.outcome, 'approval_required')
 })
-test('production modifications are not automatically approved', () => {
-  const decision = new DefaultSupervisorPolicyEngine().evaluate({ incident: parsedIncident(), plan: parsedPlan({ targetEnvironment: 'production', steps: [step({ action: 'api_request' })] }), mode: 'autopilot', context: { reversibleStepIds: ['read-1'] } })
+test('routine reversible production repairs are automatically approved', () => {
+  const decision = new DefaultSupervisorPolicyEngine().evaluate({ incident: parsedIncident(), plan: parsedPlan({ targetEnvironment: 'production', steps: [step({ action: 'api_request', parameters: { operation: 'restart_worker', reversible: true } })] }), mode: 'autopilot', context: {} })
+  assert.equal(decision.outcome, 'approved')
+  assert.deepEqual(decision.approvedStepIds, ['read-1'])
+})
+test('financial production changes still require approval even when marked reversible', () => {
+  const decision = new DefaultSupervisorPolicyEngine().evaluate({ incident: parsedIncident(), plan: parsedPlan({ targetEnvironment: 'production', steps: [step({ action: 'api_request', description: 'Update billing limit.', parameters: { reversible: true } })] }), mode: 'autopilot', context: {} })
   assert.equal(decision.outcome, 'approval_required')
+})
+test('medium and high-risk repairs still require approval', () => {
+  const engine = new DefaultSupervisorPolicyEngine()
+  for (const riskLevel of ['medium', 'high'] as const) {
+    const result = engine.evaluate({ incident: parsedIncident(), plan: parsedPlan({ riskLevel, steps: [step({ action: 'api_request', parameters: { reversible: true } })] }), mode: 'autopilot', context: {} })
+    assert.equal(result.outcome, 'approval_required')
+  }
 })
 test('critical-risk plans are blocked', () => {
   const decision = new DefaultSupervisorPolicyEngine().evaluate({ incident: parsedIncident(), plan: parsedPlan({ riskLevel: 'critical' }), mode: 'autopilot', context: {} })

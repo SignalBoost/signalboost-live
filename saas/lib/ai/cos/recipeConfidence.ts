@@ -28,7 +28,10 @@ export const DEFAULT_RECIPE_CONFIDENCE_POLICY = Object.freeze({
 
 export function createInMemoryRecipeConfidenceStore(): CosRecipeConfidenceStore {
   const records = new Map<string, CosRecipeConfidenceRecord>()
-  return Object.freeze({ get: key => records.get(key), set: (key, record) => { records.set(key, Object.freeze({ ...record })) } })
+  return Object.freeze({
+    get: (key: string) => records.get(key),
+    set: (key: string, record: CosRecipeConfidenceRecord) => { records.set(key, Object.freeze({ ...record })) },
+  })
 }
 
 export function isRecipeCoolingDown(record: CosRecipeConfidenceRecord | undefined, now = Date.now()): boolean {

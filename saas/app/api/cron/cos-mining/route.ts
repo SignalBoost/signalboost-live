@@ -17,6 +17,7 @@ import { runKnowledgeApplicationScan } from '@/lib/ai/cos/knowledgeApplicationSt
 import { runEvidenceTriggeredRetest } from '@/lib/ai/cos/evidenceTriggeredRetestStore'
 import { recordAutonomousLearningRun } from '@/lib/ai/cos/autonomousLearningHealth.ts'
 import { operationalSystemsCurriculumSignals } from '@/lib/ai/cos/operationalSystemsLearning'
+import { backfillDirectedSoftwareApplications } from '@/lib/ai/cos/directedStudyStore'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
@@ -64,6 +65,7 @@ export async function GET(req: NextRequest) {
   let cognitiveSkillHealth: Awaited<ReturnType<typeof recordCognitiveSkillPipelineHealth>> | null = null
   let corpus: unknown = null
   let automaticLearningHealthRecorded: boolean | null = null
+  let directedSoftwareBackfill: Awaited<ReturnType<typeof backfillDirectedSoftwareApplications>> | { errors: string[] } | null = null
 
   if (job === 'daily') {
     await touchRunpodActivityLease('daily_learning_batch')
@@ -71,6 +73,14 @@ export async function GET(req: NextRequest) {
       await ensureLocalInferenceRuntimeReady()
     } catch (error) {
       console.warn('cron COS local runtime could not be pre-warmed; individual learning stages will fail closed or use their existing fallbacks:', error instanceof Error ? error.message : String(error))
+    }
+
+    try {
+      directedSoftwareBackfill = await backfillDirectedSoftwareApplications(200)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Directed software backfill failed'
+      console.error('cron COS directed software backfill failed:', message)
+      directedSoftwareBackfill = { errors: [message] }
     }
 
     try {
@@ -194,6 +204,7 @@ export async function GET(req: NextRequest) {
     summary: result.summary,
     learning,
     automaticLearningHealthRecorded,
+    directedSoftwareBackfill,
     cognitive,
     certification,
     cognitiveSkillHealth,

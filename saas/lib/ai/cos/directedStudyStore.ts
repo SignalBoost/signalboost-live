@@ -53,10 +53,12 @@ function proceduralLessonHash(submission: DirectedStudySubmission): string {
 async function queueProceduralApplication(args: {
   db: NonNullable<ReturnType<typeof cosServiceDb>>
   submission: DirectedStudySubmission
-  assessment: ReturnType<typeof assessDirectedStudy>
+  subject: string
+  specialistFamily: 'software' | null
+  curriculumTracks: string[]
   admittedText: string
 }): Promise<DirectedStudyResult['application']> {
-  if (args.assessment.learningRoute.specialistFamily !== 'software') {
+  if (args.specialistFamily !== 'software') {
     return { status: 'not_applicable', message: 'Retained for retrieval; no software application candidate was inferred.' }
   }
   if (!args.admittedText.trim()) {
@@ -72,7 +74,7 @@ async function queueProceduralApplication(args: {
     sourceUri: clean(args.submission.sourceUri).slice(0, 700),
     sourceTitle: clean(args.submission.sourceTitle).slice(0, 300) || null,
     specialistFamily: 'software',
-    curriculumTracks: args.assessment.learningRoute.curriculumTracks,
+    curriculumTracks: args.curriculumTracks,
     admissionBasis: 'owner_directed_intent',
     applicationLifecycle: 'queued_for_candidate_extraction_practice_and_independent_evaluation',
     authorityGranted: false,
@@ -80,7 +82,7 @@ async function queueProceduralApplication(args: {
   const payload = {
     prompt_hash: hash,
     prompt: clean(`Learn and apply this software procedure: ${args.submission.studyIntent}`).slice(0, 20_000),
-    subject: args.assessment.subject,
+    subject: args.subject,
     local_answer: null,
     local_confidence: null,
     escalation_reason: 'Owner-directed procedural study; application has not yet been demonstrated.',
@@ -215,12 +217,111 @@ export async function runDirectedStudy(input: { submission: Omit<DirectedStudySu
       .filter(chunk => chunk.admitted)
       .map(chunk => chunks[chunk.index] || '')
       .join('\n\n')
-    result.application = await queueProceduralApplication({ db, submission, assessment, admittedText })
+    result.application = await queueProceduralApplication({
+      db,
+      submission,
+      subject: assessment.subject,
+      specialistFamily: assessment.learningRoute.specialistFamily,
+      curriculumTracks: assessment.learningRoute.curriculumTracks,
+      admittedText,
+    })
   } catch (error) {
     result.application = { status: 'queue_failed', message: 'Knowledge was retained, but application evaluation could not be queued.' }
     result.errors.push(`application-queue:${String(error instanceof Error ? error.message : error).slice(0, 300)}`)
   }
   return result
+}
+
+type DirectedSoftwareBackfillRow = {
+  source_uri?: string | null
+  source_title?: string | null
+  subject?: string | null
+  summary?: string | null
+  license?: string | null
+  evidence?: unknown
+  created_at?: string | null
+}
+
+export type DirectedSoftwareBackfillResult = {
+  inspectedRows: number
+  sources: number
+  queued: number
+  reinforced: number
+  failed: number
+  errors: string[]
+}
+
+function evidenceValues(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(item => clean(item)).filter(Boolean) : []
+}
+
+/**
+ * Recover the pre-#1883 owner-directed software corpus into the same governed cognitive queue used
+ * by new submissions. Source URI + original study intent retain idempotency, so scheduled reruns
+ * reinforce the same lesson instead of multiplying candidates. Nothing is promoted here.
+ */
+export async function backfillDirectedSoftwareApplications(limit = 200): Promise<DirectedSoftwareBackfillResult> {
+  const summary: DirectedSoftwareBackfillResult = { inspectedRows: 0, sources: 0, queued: 0, reinforced: 0, failed: 0, errors: [] }
+  const db = cosServiceDb()
+  if (!db) { summary.errors.push('COS service database is not configured'); return summary }
+
+  const rowsResult = await db.from('cos_continuous_learning')
+    .select('source_uri,source_title,subject,summary,license,evidence,created_at')
+    .contains('evidence', JSON.stringify(['owner_directed_study', 'specialist_family:software']))
+    .order('created_at', { ascending: true })
+    .limit(Math.max(1, Math.min(1000, Math.floor(limit))))
+  if (rowsResult.error) throw rowsResult.error
+  const rows = (rowsResult.data || []) as DirectedSoftwareBackfillRow[]
+  summary.inspectedRows = rows.length
+
+  const bySource = new Map<string, DirectedSoftwareBackfillRow[]>()
+  for (const row of rows) {
+    const sourceUri = clean(row.source_uri)
+    if (!sourceUri) continue
+    const group = bySource.get(sourceUri) || []
+    group.push(row)
+    bySource.set(sourceUri, group)
+  }
+  summary.sources = bySource.size
+
+  for (const [sourceUri, sourceRows] of bySource) {
+    const first = sourceRows[0]
+    const evidence = evidenceValues(first.evidence)
+    const studyIntent = clean(evidence.find(item => item.startsWith('study_intent:'))?.slice('study_intent:'.length))
+      || `Build transferable software capability from ${clean(first.source_title) || sourceUri}`
+    const curriculumTracks = [...new Set(evidence
+      .filter(item => item.startsWith('curriculum_track:'))
+      .map(item => clean(item.slice('curriculum_track:'.length)))
+      .filter(Boolean))]
+    const materialKind = clean(evidence.find(item => item.startsWith('material_kind:'))?.slice('material_kind:'.length)) as DirectedStudySubmission['materialKind']
+    const submission: DirectedStudySubmission = {
+      topic: clean(first.subject) || 'software engineering',
+      studyIntent,
+      materialKind: materialKind || 'documentation',
+      license: clean(first.license) || 'previously admitted owner-directed material',
+      sourceUri,
+      sourceTitle: clean(first.source_title) || null,
+      text: sourceRows.map(row => clean(row.summary)).filter(Boolean).join('\n\n').slice(0, 40_000),
+      submittedBy: 'owner-directed-backfill',
+      observedAt: first.created_at || undefined,
+    }
+    try {
+      const result = await queueProceduralApplication({
+        db,
+        submission,
+        subject: submission.topic,
+        specialistFamily: 'software',
+        curriculumTracks,
+        admittedText: submission.text,
+      })
+      if (result.status === 'queued') summary.queued += 1
+      else if (result.status === 'reinforced') summary.reinforced += 1
+    } catch (error) {
+      summary.failed += 1
+      summary.errors.push(`${sourceUri}:${String(error instanceof Error ? error.message : error).slice(0, 240)}`)
+    }
+  }
+  return summary
 }
 
 export async function readDirectedStudyHistory(limit = 50): Promise<{ ok: boolean; error?: string; records?: Array<Record<string, unknown>> }> {

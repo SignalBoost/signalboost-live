@@ -1,3 +1,4 @@
+import { validBuilderDocumentationScope } from './documentation-intent.ts'
 import { captureBuilderSource } from './source-evidence.ts'
 // saas/lib/builder/tool-loop.ts
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
@@ -313,7 +314,7 @@ export class BuilderToolLoop {
     this.runner = runner
   }
 
-  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; projectContext?: unknown; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; cognitiveSkills?: readonly import('@/lib/ai/cos/cognitiveSkillContext').CognitiveSkillContextItem[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean; deadlineAtMs?: number; minimumStepMs?: number }): Promise<BuilderLoopResult> {
+  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; projectContext?: unknown; documentationPaths?: readonly string[] | null; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; cognitiveSkills?: readonly import('@/lib/ai/cos/cognitiveSkillContext').CognitiveSkillContextItem[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean; deadlineAtMs?: number; minimumStepMs?: number }): Promise<BuilderLoopResult> {
     const saved = input.checkpoint
     if (saved && (saved.version !== 1 || saved.workspaceId !== input.workspaceId || saved.objectiveDigest !== checkpointDigest(input.objective))) {
       return { ok: false, error: 'builder_checkpoint_scope_mismatch', trace: [] }
@@ -337,8 +338,11 @@ export class BuilderToolLoop {
     const verificationOrder = builderVerificationOrder(input.objective)
     const maxWrites = 48
     let workspacePaths: string[] = initialListing.map(file => file.path)
-    let repairObjective = saved?.repairObjective ?? isRepairObjective(input.objective)
-    const extendingProject = Boolean(input.projectContext) && !isRepairObjective(input.objective)
+    const documentationPaths = saved?.documentationPaths ?? input.documentationPaths ?? null
+    if (documentationPaths && !validBuilderDocumentationScope(input.objective, documentationPaths)) return { ok: false, error: 'builder_documentation_scope_invalid', trace }
+    const gateObjective = documentationPaths ? '' : input.objective
+    let repairObjective = saved?.repairObjective ?? isRepairObjective(gateObjective)
+    const extendingProject = Boolean(documentationPaths) || Boolean(input.projectContext) && !isRepairObjective(input.objective)
       && /^(?:(?:please|now|then|also)\s+|(?:can|could|would)\s+you\s+)*(?:update|edit|modify|extend|change|refactor|add|remove|replace)\b/i.test(input.objective)
     if (repairObjective && !files.length && !saved) return { ok: false, error: 'builder_source_required', trace }
     let writeCount = saved?.writeCount || 0, runCount = saved?.runCount || 0, gateNudges = saved?.gateNudges || 0
@@ -351,7 +355,7 @@ export class BuilderToolLoop {
         workspaceDigest: await workspaceDigest(this.workspace, input.workspaceId), initialPaths: [...initialPaths], trace,
         workingFiles: [...workingFiles.values()], projectContext, chunks: [...chunks], mutations: [...completedMutations],
         inspections: [...inspectedInCurrentWorkspaceState], runs: [...completedRunsInCurrentWorkspaceState],
-        repairObjective, writeCount, runCount, workRounds, attempt, gateNudges,
+        documentationPaths: documentationPaths || undefined, repairObjective, writeCount, runCount, workRounds, attempt, gateNudges,
       }
       if (Buffer.byteLength(JSON.stringify(checkpoint)) > 4_000_000) return { ok: false, error: 'builder_checkpoint_too_large', trace }
       return { ok: false, error: 'builder_job_paused', trace, checkpoint }
@@ -413,6 +417,7 @@ export class BuilderToolLoop {
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
         formatBuilderCognitiveGuidance(input.cognitiveSkills || []),
         BUILDER_REASONING_GUIDANCE,
+        documentationPaths ? `DOCUMENTATION-ONLY TASK: mutations are restricted to ${JSON.stringify(documentationPaths)}. Inspect relevant code, update the requested documentation, and run the requested verification. Existing error behavior being documented does not require a failing baseline. Do not modify implementation, tests or configuration.` : '',
         verificationOrderGuidance(pendingOrder),
         `OBJECTIVE:\n${input.objective}`,
         ...(input.projectContext ? [
@@ -550,8 +555,8 @@ export class BuilderToolLoop {
           if (gateNudges > MAX_GATE_NUDGES) return { ok: false, error: 'builder_task_incomplete', trace }
           continue
         }
-        repairObjective ||= isRepairObjective(`${input.objective}\n${action.answer}`)
-        const verdict = evaluateRegressionGate(input.objective, trace, repairObjective)
+        repairObjective ||= !documentationPaths && isRepairObjective(`${input.objective}\n${action.answer}`)
+        const verdict = evaluateRegressionGate(gateObjective, trace, repairObjective)
         if (verdict.satisfied && progress.satisfied) return { ok: true, answer: action.answer, trace }
         if (repairObjective) {
           const listed = await this.workspace.listFiles(input.workspaceId)
@@ -605,7 +610,7 @@ export class BuilderToolLoop {
               ...(failed ? { error: `builder_command_failed: exit ${output.exitCode}`, failureClass: 'test' as const } : {}),
             })
             runCount += 1
-            if (!failed && evaluateRegressionGate(input.objective, trace, true).satisfied && builderTaskProgress(task, workspacePaths, trace).satisfied) return { ok: true, answer: action.answer, trace }
+            if (!failed && evaluateRegressionGate(gateObjective, trace, true).satisfied && builderTaskProgress(task, workspacePaths, trace).satisfied) return { ok: true, answer: action.answer, trace }
             continue
           }
           if (passedProof && !failedProof && !edited) {
@@ -666,6 +671,7 @@ export class BuilderToolLoop {
             truncated: end < lines.length || content.length < lines.slice(start - 1, end).join('\n').length, updatedAt: file.updatedAt }
         }
         if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
+          if (documentationPaths && !documentationPaths.includes(toolPath(action.input))) throw new Error('builder_documentation_scope_violation')
           if (action.toolId === 'write_file' && action.input.mode === 'append') {
             const path = builderFilePath(toolPath(action.input))
             if (workspacePaths.includes(path) || await this.workspace.readFile(input.workspaceId, path)) throw new Error('builder_chunk_existing_file')
@@ -745,7 +751,7 @@ export class BuilderToolLoop {
           const modifiedExistingFile = trace.some(item => item.ok
             && (item.toolId === 'write_file' || item.toolId === 'edit_file')
             && initialPaths.has(toolPath(item.input)))
-          const verdict = evaluateRegressionGate(input.objective, trace, modifiedExistingFile)
+          const verdict = evaluateRegressionGate(gateObjective, trace, modifiedExistingFile)
           if (verdict.satisfied && builderTaskProgress(task, workspacePaths, trace).satisfied
             && !pendingBuilderVerificationOrder(verificationOrder, trace).length) return { ok: true, answer: verifiedRepairAnswer(trace), trace }
         }

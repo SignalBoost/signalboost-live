@@ -4,6 +4,7 @@ import type { BuilderProjectContext } from './project-context.ts'
 
 /** Private controller state, never a client-provided continuation or model reasoning transcript. */
 export type BuilderLoopCheckpoint = Readonly<{
+  documentationPaths?: readonly string[]
   chunks?: readonly [string, string][]
   version: 1
   workspaceId: string

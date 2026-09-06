@@ -1,3 +1,4 @@
+import { isExplicitBuilderEvidenceRequest } from '../../builder/execution-evidence.ts'
 // saas/lib/ai/cos/provenanceIntrospection.ts
 //
 // Compatibility entrypoint and union of prior-answer introspection classifiers.
@@ -18,6 +19,7 @@ import { isOperationalLogEvidence } from './pastedOperationalLog.ts'
 export function isProvenanceIntrospection(input: string): boolean {
   // Log text can contain test names such as "technical provenance". Whether passive or paired with
   // an explicit repair request, operational evidence must stay on the diagnostic/repair path.
+  if (isExplicitBuilderEvidenceRequest(input)) return false
   if (isOperationalLogEvidence(input)) return false
   return asksWhereTheAnswerCameFrom(input)
     || isConversationProvenanceQuestion(input)

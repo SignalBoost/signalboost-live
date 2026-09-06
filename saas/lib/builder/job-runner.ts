@@ -1,3 +1,4 @@
+import { classifyBuilderDocumentationIntent } from './documentation-intent.ts'
 import { builderRunSourceEvidence } from './source-evidence.ts'
 import { builderPendingWriteEvidence } from './evidence-events.ts'
 // lib/builder/job-runner.ts
@@ -243,6 +244,8 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     })
     const runner = new VercelSandboxBuilderRunner()
     const plan = debugPlan(job)
+    const documentationPaths = !plan && isRepairObjective(job.objective)
+      ? job.checkpoint ? job.checkpoint.documentationPaths ?? null : await classifyBuilderDocumentationIntent(ai, job.objective) : null
     const priorLessons = plan ? [] : await workspace.fetchProjectRepairSignals(job.workspaceId).catch(() => {
       console.warn('[builder_project_lesson_read_failed]', { jobId })
       return []
@@ -264,6 +267,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           cognitiveSkills: cognitive.items,
           projectContext: job.metadata.projectContext,
           checkpoint: job.checkpoint,
+          documentationPaths,
           // Leave room for a slow model round, then a bounded sandbox command and persistence.
           shouldPause: (beforeTool = false) => Date.now() - sliceStartedAtMs >= (beforeTool ? 150_000 : 100_000),
           maxRounds: 96,
@@ -318,7 +322,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       await recordAppliedCognitiveSkills(job, cognitive.items.map(item => item.skillKey), successfulRuns)
     }
 
-    const baseReply = isRepairObjective(job.objective)
+    const baseReply = !documentationPaths && isRepairObjective(job.objective)
       ? formatBuilderOperatorRepairReply({ ok: true, answer: result.answer, trace })
       : shouldExplain ? 'The job completed. See the recorded verification below.' : result.answer
     const reply = historyReply(await initialReply(baseReply, 'succeeded'), job.workspaceId, files)

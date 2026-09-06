@@ -179,12 +179,23 @@ async function persistDraft(
     teacher_provider: lesson.teacher_provider || null,
     teacher_model: lesson.teacher_model || null,
     local_reflector: reasonerLabel,
+    ...(lesson.metadata?.origin === 'owner_directed_study' ? {
+      directed_study_source_uri: lesson.metadata.sourceUri || null,
+      directed_study_source_title: lesson.metadata.sourceTitle || null,
+    } : {}),
   }
   const metadata = {
     ...(existing.data?.metadata && typeof existing.data.metadata === 'object' ? existing.data.metadata : {}),
     activation_rule: 'never inject until status is validated, learned, or mastered',
     confidence_rule: 'skill lifecycle status must not increase answer confidence',
     teacher_signal_semantics: 'experience_not_verified_truth',
+    ...(lesson.metadata?.origin === 'owner_directed_study' ? {
+      origin: 'owner_directed_study',
+      specialistFamily: lesson.metadata.specialistFamily || null,
+      curriculumTracks: Array.isArray(lesson.metadata.curriculumTracks) ? lesson.metadata.curriculumTracks : [],
+      applicationLifecycle: 'candidate_created_awaiting_evidence',
+      authorityGranted: false,
+    } : {}),
   }
 
   if (existing.data?.id) {

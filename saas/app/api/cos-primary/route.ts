@@ -8,6 +8,7 @@ import { buildHonestRefusalReply } from '@/lib/ai/cos/honestRefusalReply'
 import { buildFreshVerificationUnavailableReply } from '@/lib/ai/cos/freshVerificationUnavailableReply'
 import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
+import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
 import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
 import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import {
@@ -183,6 +184,14 @@ export async function postCosPrimary(req:NextRequest){
   }
 
   if(access?.isOwner){
+    const brainstorm=await runOwnerDomainBrainstorm({input,context:precedingAssistant})
+    if(brainstorm){
+      const executionProvenance=authoritativeProvenance(null,{invoked:brainstorm.modelInvoked})
+      ;(executionProvenance as any).domain_brainstorm={provider:'COS_reasoner_plus_IANA_RDAP',requested:brainstorm.requested,returned:brainstorm.suggestions.length,results:brainstorm.results.map(result=>({domain:result.domain,status:result.status,checked_at:result.checkedAt,registry_endpoint:result.registryEndpoint}))}
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:brainstorm.reply,source:'authoritative_source',confidence:brainstorm.suggestions.length===brainstorm.requested?1:.7,externalAiInvoked:false})
+      await writeCosPrimaryProvenance(userId,brainstorm.reply,executionProvenance,'cos-domain-brainstorm-rdap',{prompt:input,answered:brainstorm.suggestions.length>0,confidence:brainstorm.suggestions.length===brainstorm.requested?1:.7,branch:'domain_brainstorm_rdap'})
+      return NextResponse.json({ok:brainstorm.suggestions.length>0,reply:brainstorm.reply,source:'cos-domain-brainstorm-rdap',confidence_score:brainstorm.suggestions.length===brainstorm.requested?1:.7,external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:brainstorm.modelInvoked,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:true,domain_results:brainstorm.results,domain_suggestions:brainstorm.suggestions,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+    }
     const domainLookup=await tryDomainAvailabilityLookup({input,context:precedingAssistant})
     if(domainLookup){
       const executionProvenance=authoritativeProvenance(null,{invoked:false})

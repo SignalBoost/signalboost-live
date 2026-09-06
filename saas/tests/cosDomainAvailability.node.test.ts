@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { extractDomainCandidates, lookupDomainsRdap, renderDomainLookups } from '../lib/ai/cos/domainAvailability.ts'
+import { brainstormVerifiedDomains, extractDomainCandidates, isDomainBrainstormRequest, lookupDomainsRdap, parseGeneratedDomainSuggestions, renderDomainLookups } from '../lib/ai/cos/domainAvailability.ts'
 
 test('extracts explicit domains from the owner request and preceding COS answer', () => {
   assert.deepEqual(extractDomainCandidates('you check availability', 'Try SignalBoost.ai, SBoost.ai, and https://GetSignalBoost.com/pricing.'), ['signalboost.ai','sboost.ai','getsignalboost.com'])
@@ -37,4 +37,55 @@ test('owner COS routes domain checks through RDAP before general model reasoning
   assert.match(route, /if\(access\?\.isOwner\)[\s\S]+tryDomainAvailabilityLookup/)
   assert.match(route, /source:'cos-domain-rdap'/)
   assert.match(gates, /tests\/cosDomainAvailability\.node\.test\.ts/)
+})
+
+test('recognizes the exact creative fifteen-name follow-up as a domain assignment', () => {
+  const input = 'i am asking for you to brainstorm and come out with 15 suggestions? the platform develops software but also is a saas platform?'
+  assert.equal(isDomainBrainstormRequest(input, 'We were discussing a shorter domain URL.'), true)
+})
+
+test('generated candidates obey format and explicit signal/boost exclusion', () => {
+  const parsed = parseGeneratedDomainSuggestions(JSON.stringify({ candidates: [
+    { name:'SignalForge',domain:'signalforge.dev',meaning:'Legacy-shaped name' },
+    { name:'Nuvora',domain:'nuvora.dev',meaning:'New software taking shape' },
+    { name:'Bad',domain:'bad.example.net',meaning:'Unsupported TLD' },
+  ]}), true)
+  assert.deepEqual(parsed, [{ name:'Nuvora',domain:'nuvora.dev',meaning:'New software taking shape' }])
+})
+
+test('brainstorming has no hard-coded candidate fallback', async () => {
+  const result = await brainstormVerifiedDomains({
+    input:'brainstorm 15 names for a software SaaS platform', context:'domain URL',
+    generateImpl:async()=>({ candidates:[], modelInvoked:false }),
+  })
+  assert.equal(result?.suggestions.length, 0)
+  assert.match(result?.reply || '', /generated candidates and checked them/i)
+  assert.doesNotMatch(result?.reply || '', /Nuvora|Forgepath|Klyro/)
+})
+
+test('brainstorms, verifies, and returns fifteen candidates without asking the owner to narrow', async () => {
+  const candidates = Array.from({ length: 20 }, (_, index) => ({ name:`Nuvora${index}`,domain:`nuvora${index}.dev`,meaning:`Software creation concept ${index}` }))
+  const fakeFetch = (async (url: string | URL | Request) => {
+    if (String(url).includes('data.iana.org')) return new Response(JSON.stringify({ services: [[['dev'], ['https://rdap.example.dev']]] }), { status: 200 })
+    return new Response('{}', { status: 404 })
+  }) as typeof fetch
+  const result = await brainstormVerifiedDomains({
+    input:'brainstorm and come out with 15 suggestions for the software and SaaS platform',
+    context:'shorter domain URL', fetchImpl:fakeFetch,
+    generateImpl:async()=>({ candidates, modelInvoked:true }),
+  })
+  assert.equal(result?.suggestions.length, 15)
+  assert.match(result?.reply || '', /1\. \*\*Nuvora0\*\*/)
+  assert.match(result?.reply || '', /15\. \*\*Nuvora14\*\*/)
+  assert.doesNotMatch(result?.reply || '', /tell me|narrow|if available/i)
+})
+
+test('a subdomain is never misreported as an available registrable domain', async () => {
+  const fakeFetch = (async (url: string | URL | Request) => {
+    if (String(url).includes('data.iana.org')) return new Response(JSON.stringify({ services: [[['com'], ['https://rdap.example.com']]] }), { status: 200 })
+    return new Response('{}', { status: 404 })
+  }) as typeof fetch
+  const [result] = await lookupDomainsRdap(['saas.signalboostapp.com'], fakeFetch)
+  assert.equal(result.status, 'unknown')
+  assert.match(result.detail, /subdomain/i)
 })

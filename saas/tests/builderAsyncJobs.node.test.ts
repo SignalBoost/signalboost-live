@@ -111,7 +111,8 @@ test('expired background workers become terminal in both polling and History', (
 test('background execution is idempotently claimed and skips cognitive-skill retrieval', () => {
   assert.match(jobRunner, /job = await claimBuilderJob\(jobId, userId\)/)
   assert.match(jobRunner, /if \(!job\) return/)
-  assert.match(jobRunner, /priorLessons: \[\]/)
+  assert.match(jobRunner, /fetchProjectRepairSignals\(job.workspaceId\)/)
+  assert.doesNotMatch(jobRunner, /fetchVerifiedRepairLessons|retrieveCognitiveSkills/)
   assert.match(jobRunner, /runDebugFileJob/)
   assert.match(jobRunner, /finishBuilderJob/)
 })

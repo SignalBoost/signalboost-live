@@ -212,6 +212,10 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     })
     const runner = new VercelSandboxBuilderRunner()
     const plan = debugPlan(job)
+    const priorLessons = plan ? [] : await workspace.fetchProjectRepairSignals(job.workspaceId).catch(() => {
+      console.warn('[builder_project_lesson_read_failed]', { jobId })
+      return []
+    })
     const result = plan
       ? await runDebugFileJob({
           objective: job.objective,
@@ -224,7 +228,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       : await new BuilderToolLoop(ai, workspace, runner).run({
           objective: job.objective,
           workspaceId: job.workspaceId,
-          priorLessons: [],
+          priorLessons,
           projectContext: job.metadata.projectContext,
           checkpoint: job.checkpoint,
           // Leave room for a slow model round, then a bounded sandbox command and persistence.
@@ -294,6 +298,10 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         trace,
       },
     })
+    // Only after the generation-fenced terminal write; learning failure cannot undo task success.
+    if (!plan) await workspace.recordJobRepairLesson(job.workspaceId, job.id, job.claimGeneration, result)
+      .then(recorded => console.info('[builder_project_lesson_outcome]', { jobId, recorded, retrievedSignals: priorLessons.length }))
+      .catch(() => console.warn('[builder_project_lesson_write_failed]', { jobId }))
   } catch (error) {
     const message = error instanceof Error ? error.message : 'builder_job_failed'
     console.error('[builder_job_execution_failed]', { jobId, message })

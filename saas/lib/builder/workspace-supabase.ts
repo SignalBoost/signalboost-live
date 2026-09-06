@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { BuilderFailureClass, BuilderFile, BuilderVerifiedRepairLesson, BuilderWorkspacePort } from './contracts.ts'
+import type { BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderVerifiedRepairLesson, BuilderWorkspacePort } from './contracts.ts'
+import { verifiedJobRepairLesson } from './verified-lessons.ts'
 import type { BuilderCertificationAttempt } from './certification.ts'
 import { assertPersistable, containsNullByte } from './storage-contract.ts'
 
@@ -37,7 +38,9 @@ function toFile(row: any): BuilderFile {
 }
 
 export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
-  constructor(private readonly db: SupabaseClient, private readonly userId: string) {}
+  private readonly db: SupabaseClient
+  private readonly userId: string
+  constructor(db: SupabaseClient, userId: string) { this.db = db; this.userId = userId }
 
   async ensureWorkspace(workspaceId: string): Promise<void> {
     const { data, error } = await this.db.from('builder_workspaces').select('id').eq('id', workspaceId).eq('user_id', this.userId).maybeSingle()
@@ -170,6 +173,40 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
       regressionCommand: String(row.regression_command || ''),
       runtime: 'node24-network-denied-ephemeral' as const,
     })))
+  }
+
+  /** Same-project signals only. Private corpus, other workspaces and raw historical text never enter the model. */
+  async fetchProjectRepairSignals(workspaceId: string): Promise<readonly BuilderVerifiedRepairLesson[]> {
+    const { data, error } = await this.db.from('builder_verified_repair_lessons')
+      .select('failure_class,runtime')
+      .eq('user_id', this.userId).eq('workspace_id', workspaceId)
+      .eq('runtime', 'node24-network-denied-ephemeral')
+      .order('created_at', { ascending: false }).limit(12)
+      .abortSignal(AbortSignal.timeout(2_000))
+    if (error) throw new Error('builder_project_lesson_read_failed')
+    const classes = new Set(['storage', 'path', 'runtime', 'dependency', 'test', 'deployment'])
+    return (data || []).filter(row => classes.has(row.failure_class) && row.runtime === 'node24-network-denied-ephemeral')
+      .map(row => ({ failureClass: row.failure_class as BuilderFailureClass, runtime: row.runtime as BuilderVerifiedRepairLesson['runtime'],
+        causeEvidence: '', fixSummary: '', regressionCommand: '' }))
+  }
+
+  /** Terminal generation check prevents stale workers from teaching; job UUID prevents duplicate lessons. */
+  async recordJobRepairLesson(workspaceId: string, jobId: string, generation: number, result: BuilderLoopResult): Promise<boolean> {
+    const lesson = verifiedJobRepairLesson(result)
+    if (!lesson) return false
+    const { data: job, error: readError } = await this.db.from('builder_jobs').select('id')
+      .eq('id', jobId).eq('user_id', this.userId).eq('workspace_id', workspaceId)
+      .eq('claim_generation', generation).eq('status', 'succeeded').eq('job_kind', 'standard')
+      .abortSignal(AbortSignal.timeout(2_000)).maybeSingle()
+    if (readError) throw new Error('builder_project_lesson_job_read_failed')
+    if (!job) return false
+    const { error } = await this.db.from('builder_verified_repair_lessons').upsert({
+      id: jobId, workspace_id: workspaceId, user_id: this.userId,
+      failure_class: lesson.failureClass, cause_evidence: lesson.causeEvidence,
+      fix_summary: lesson.fixSummary, regression_command: lesson.regressionCommand, runtime: lesson.runtime,
+    }, { onConflict: 'id', ignoreDuplicates: true }).abortSignal(AbortSignal.timeout(2_000))
+    if (error) throw new Error('builder_project_lesson_write_failed')
+    return true
   }
 
   async recordCertificationAttempt(workspaceId: string, attempt: BuilderCertificationAttempt): Promise<void> {

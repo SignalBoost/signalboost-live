@@ -57,6 +57,10 @@ function latestRemediation(trace: readonly OperatorTraceEntry[]): string {
   return text([...trace].reverse().find(entry => entry.ok === false && text(entry.remediation))?.remediation)
 }
 
+function isProvingCommand(command: string): boolean {
+  return /(?:^|\s)(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|typecheck|lint|build)(?:\s|$)|(?:^|\s)(?:node|python\d*)\b[^\n]*(?:--test|pytest|unittest|\btest(?:s|\.[cm]?[jt]s)?\b)|(?:^|\s)(?:tsc|eslint|vitest|jest|playwright)(?:\s|$)/i.test(command)
+}
+
 /**
  * User-facing repair narration is derived only from recorded Builder tool evidence. It deliberately
  * avoids exposing model chain-of-thought or presenting an internal error code as the conversation.
@@ -65,7 +69,7 @@ export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): 
   const trace = Array.isArray(result.trace) ? result.trace : []
   const events = builderEvidenceEvents(trace)
   const failedRun = trace.find((_, index) => events[index].outcome === 'exited_nonzero')
-  const successfulRuns = trace.filter((_, index) => events[index].outcome === 'exited_zero')
+  const successfulRuns = trace.filter((entry, index) => events[index].outcome === 'exited_zero' && isProvingCommand(commandOf(entry)))
   const successfulRun = successfulRuns.at(-1)
   const changedPaths = unique(trace
     .filter((_, index) => events[index].outcome === 'mutation_recorded')
@@ -77,8 +81,8 @@ export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): 
     lines.push('Found — I reproduced the reported failure in the isolated Builder workspace.')
     const command = commandOf(failedRun)
     lines.push(command
-      ? `Diagnosed — the ${failureLabel(failedRun.failureClass)} failure was isolated with \`${command}\`.`
-      : `Diagnosed — the ${failureLabel(failedRun.failureClass)} failure was isolated from the recorded tool evidence.`)
+      ? `Diagnosed — the recorded failure was reproduced with \`${command}\`.`
+      : 'Diagnosed — the failure was reproduced in the recorded tool evidence.')
   } else {
     lines.push('Found — I inspected the repair request and the available workspace evidence.')
     lines.push(/budget_exhausted|builder_turn_timeout/.test(text(result.error))
@@ -117,7 +121,8 @@ export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): 
     ? 'Task status — the repair gate remains unsatisfied; that is separate from individual command results.'
     : 'Task status — incomplete; see the recorded blocker and command results.')
   const remediation = latestRemediation(trace)
-  lines.push(`Next action — ${remediation || (gateBlocked
+  const evidenceBoundRemediation = remediation && !/database|storage/i.test(remediation) ? remediation : ''
+  lines.push(`Next action — ${evidenceBoundRemediation || (gateBlocked
     ? 'check whether the requested work is a repair or an extension; a genuine repair still needs failure-before-change and passing verification.'
     : 'inspect the remaining task blocker before choosing the next change.')}`)
   return lines.join('\n')

@@ -130,8 +130,9 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     allowRepositoryEvidence: input.surface === 'assistant' && access?.isOwner === true,
   }, readBuilderEvidenceJob, async job => {
     const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: Date.now() + 45_000 })
+    const workspace = createSupabaseBuilderWorkspace(job.userId)
     return explainBuilderEvidence({ prompt: objective, job,
-      workspace: createSupabaseBuilderWorkspace(job.userId),
+      workspace: workspace ? { readFile: (id, path) => workspace.readExistingFile(id, path) } : null,
       ai: { generate: request => { explanationModelInvoked = true; return ai.generate(request) } },
     })
   })

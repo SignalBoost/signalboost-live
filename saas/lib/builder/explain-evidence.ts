@@ -13,7 +13,7 @@ export async function explainBuilderEvidence(input: {
   const paths = [...new Set(trace.flatMap(item => typeof item?.path === 'string' ? [item.path] : []))].slice(-6)
   const files = []
   for (const path of paths) {
-    const file = await input.workspace?.readFile(job.workspaceId, path)
+    const file = await input.workspace?.readFile(job.workspaceId, path).catch(() => null)
     if (file) files.push({ path, content: file.content.slice(0, 8000), truncated: file.content.length > 8000 })
   }
   const evidence = formatBuilderExecutionEvidence(trace)

@@ -87,6 +87,11 @@ export class SupabaseBuilderWorkspace implements BuilderWorkspacePort {
 
   async readFile(workspaceId: string, path: string) {
     await this.ensureWorkspace(workspaceId)
+    return this.readExistingFile(workspaceId, path)
+  }
+
+  /** Scoped read without creating a workspace when historical source is absent. */
+  async readExistingFile(workspaceId: string, path: string) {
     const { data, error } = await this.db.from('builder_workspace_files')
       .select('path,content,updated_at')
       .eq('workspace_id', workspaceId)

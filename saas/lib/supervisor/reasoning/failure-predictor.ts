@@ -15,12 +15,13 @@ function maxRisk(a: FailurePrediction['overallRiskLevel'], b: FailurePrediction[
 export class FailurePredictor {
   predict(input: { incident: SupervisorIncident; task: RewrittenTask; steps: RepairStep[] }): FailurePrediction {
     const hasMutation = input.steps.some(step => mutatingActions.has(step.action))
+    const mutationSteps = input.steps.filter(step => mutatingActions.has(step.action))
+    const allMutationsReversible = mutationSteps.length > 0
+      && mutationSteps.every(step => (step.parameters as Record<string, unknown>).reversible === true)
     const requiresBrowser = input.steps.some(step => ['navigate', 'click', 'fill', 'select', 'screenshot'].includes(step.action))
 
-    let overallRiskLevel: FailurePrediction['overallRiskLevel'] = hasMutation ? 'medium' : 'low'
-    if (hasMutation && input.task.environment === 'production') overallRiskLevel = maxRisk(overallRiskLevel, 'high')
-    if (hasMutation && input.incident.severity === 'critical') overallRiskLevel = maxRisk(overallRiskLevel, 'high')
-    if (input.steps.some(step => step.protectedAction) && input.task.environment === 'production') overallRiskLevel = maxRisk(overallRiskLevel, 'high')
+    let overallRiskLevel: FailurePrediction['overallRiskLevel'] = hasMutation && !allMutationsReversible ? 'medium' : 'low'
+    if (requiresBrowser && hasMutation) overallRiskLevel = maxRisk(overallRiskLevel, 'medium')
 
     const failureModes: string[] = []
     if (hasMutation) {
@@ -37,7 +38,7 @@ export class FailurePredictor {
       failureModes,
       hasMutation,
       requiresBrowser,
-      requiresHumanAttention: hasMutation && input.task.environment === 'production',
+      requiresHumanAttention: hasMutation && !allMutationsReversible,
     }
   }
 }

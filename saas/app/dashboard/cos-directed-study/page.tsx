@@ -12,7 +12,7 @@ import { COS_DIRECTED_STUDY_COPY, type CosDirectedStudyLanguage } from '@/lib/i1
 type ChunkVerdict = { index: number; admitted: boolean; reason: string; confidence: number; coverage: number; matchedTerms: string[] }
 type LearningRoute = { orchestrator: 'cos'; specialistFamily: 'software' | null; curriculumTracks: string[]; routingBasis: string; authorityGranted: false }
 type Assessment = { ok?: boolean; error?: string; subject?: string; chunks?: ChunkVerdict[]; admitted?: number; rejected?: number; learningRoute?: LearningRoute }
-type ApiResult = { ok?: boolean; error?: string; dryRun?: boolean; resolvedFrom?: string | null; assessment?: Assessment | null; stored?: number; duplicates?: number; errors?: string[]; authRequired?: boolean }
+type ApiResult = { ok?: boolean; error?: string; dryRun?: boolean; resolvedFrom?: string | null; assessment?: Assessment | null; stored?: number; duplicates?: number; errors?: string[]; application?: { status?: string; lessonId?: number; message?: string }; authRequired?: boolean }
 type HistoryRecord = { content_hash?: string; source_kind?: string; source_uri?: string; source_title?: string | null; subject?: string; confidence?: number; license?: string; created_at?: string }
 type HistoryResult = { ok?: boolean; error?: string; records?: HistoryRecord[]; authRequired?: boolean }
 
@@ -192,9 +192,9 @@ export default function CosDirectedStudyPage() {
           <p>{copy.learningRoute}: <span className="font-semibold text-text">{learningRoute.specialistFamily === 'software' ? copy.softwareSpecialist : copy.generalCos}</span></p>
           <p>{copy.retentionOutcome}: <span className="font-semibold text-text">{(result.stored ?? 0) > 0 ? copy.newKnowledgeStored : (result.duplicates ?? 0) > 0 ? copy.knownKnowledgeReinforced : copy.noKnowledgeStored}</span></p>
           <p>{copy.curriculumTracks}: <span className="font-semibold text-text">{learningRoute.curriculumTracks.length ? learningRoute.curriculumTracks.join(', ') : '—'}</span></p>
-          <p>{copy.applicationValidation}: <span className="font-semibold text-text">{copy.applicationPending}</span></p>
+          <p>{copy.applicationValidation}: <span className="font-semibold text-text">{result.application?.status === 'queued' || result.application?.status === 'reinforced' ? result.application.message : copy.applicationPending}</span></p>
         </div>
-        <p className="mt-3 text-xs text-text-muted">{copy.applicationExplanation}</p>
+        <p className="mt-3 text-xs text-text-muted">{result.application?.lessonId ? `Evaluation queue #${result.application.lessonId}. ` : ''}{copy.applicationExplanation}</p>
       </div>}
       <h2 className="text-sm font-semibold">{copy.chunksTitle} — {assessment.admitted ?? 0} ✓ / {assessment.rejected ?? 0} ✗</h2>
       <div className="space-y-2">

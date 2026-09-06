@@ -97,8 +97,20 @@ test('stable source-specific hashes and owner admission provenance are preserved
 test('owner UI reports route, retention, and honest application status after feeding', () => {
   assert.match(directedStudyPage, /learningRoute\.specialistFamily === 'software'/)
   assert.match(directedStudyPage, /knownKnowledgeReinforced/)
-  assert.match(directedStudyPage, /applicationPending/)
+  assert.match(directedStudyPage, /result\.application\?\.status === 'queued'/)
+  assert.match(directedStudyPage, /Evaluation queue/)
   assert.doesNotMatch(directedStudyPage, /applicationValidation[^\n]*passed/i)
+})
+
+test('directed-study store hands admitted software lessons to the governed cognitive lifecycle', () => {
+  const store = readFileSync(new URL('../lib/ai/cos/directedStudyStore.ts', import.meta.url), 'utf8')
+  const activeLearning = readFileSync(new URL('../lib/ai/cos/cognitiveActiveLearning.ts', import.meta.url), 'utf8')
+  assert.match(store, /queueProceduralApplication/)
+  assert.match(store, /cos_teacher_lessons/)
+  assert.match(store, /queued_for_candidate_extraction_practice_and_independent_evaluation/)
+  assert.match(store, /authorityGranted: false/)
+  assert.match(activeLearning, /specialistFamily: lesson\.metadata\.specialistFamily/)
+  assert.match(activeLearning, /applicationLifecycle: 'candidate_created_awaiting_evidence'/)
 })
 
 test('learning alert points to current specialist telemetry and never obsolete RunPod', () => {

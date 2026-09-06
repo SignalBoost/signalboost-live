@@ -284,5 +284,9 @@ test('unparsed execution requests cannot use the inferred single-file proof', ()
     'Repair app.js. Run `node verify.js`.',
     'Repair app.js and execute node verify.js.',
     'Repair app.js. Run: node app.js. Also run `node verify.js`.',
+    'Repair app.js; verify by running `node verify.js`.',
+    'Repair app.js; test with `node verify.js`.',
+    'Repair app.js; invoke ./verify.sh.',
+    'Repair app.js; verification command: `node verify.js`.',
   ]) assert.equal(planDebugFileJob(prompt, files), null)
 })

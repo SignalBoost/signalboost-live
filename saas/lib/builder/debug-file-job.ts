@@ -120,8 +120,10 @@ export function planDebugFileJob(objective: string, files: readonly DebugFileInp
   if (!proof) return null
   // Explicit execution instructions belong to the full loop, even when their syntax
   // is not recognized by the task-contract parser. This shortcut infers one proof.
-  if (/\b(?:run|execute)\b/i.test(prompt)
-    || /\b(?:npm|pnpm|yarn|bun)\s+(?:test|start|run|install|ci)\b/i.test(prompt)) return null
+  if (/\b(?:run(?:ning|s)?|execut(?:e|es|ed|ing|ion)|invok(?:e|ing))\b/i.test(prompt)
+    || /\b(?:test|verify|check)(?:ing)?\s+(?:with|using|by)\b/i.test(prompt)
+    || /\b(?:node|python3?)\s+(?:--?[\w-]+|[^\s`]+\.(?:[cm]?js|ts|py)\b)/i.test(prompt)
+    || /\b(?:npm|pnpm|yarn|bun)\s+\S+/i.test(prompt)) return null
   return Object.freeze({
     ...proof,
     files: Object.freeze(admitted.map(file => file.path)),

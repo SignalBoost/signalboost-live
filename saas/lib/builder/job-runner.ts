@@ -3,7 +3,7 @@ import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import type { BuilderToolTrace } from './contracts.ts'
 import { runDebugFileJob, type DebugFilePlan } from './debug-file-job.ts'
-import { finishBuilderJob, claimBuilderJob, pauseBuilderJob, type BuilderJobRecord } from './job-store.ts'
+import { finishBuilderJob, claimBuilderJob, pauseBuilderJob, readBuilderWorkspaceFingerprint, type BuilderJobRecord } from './job-store.ts'
 import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
 import { isRepairObjective } from './regression-gate.ts'
@@ -144,6 +144,12 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
   try {
     job = await claimBuilderJob(jobId, userId)
     if (!job) return
+
+    if (job.claimGeneration === 1 && typeof job.metadata.approvedProposalFingerprint === 'string'
+      && await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId) !== job.metadata.approvedProposalFingerprint) {
+      await terminalFailure(job, 'builder_proposal_source_changed')
+      return
+    }
 
     if (job.metadata.platformRepair === true) {
       if (!job.ownerAuthorized) {

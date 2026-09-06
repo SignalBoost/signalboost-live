@@ -266,3 +266,46 @@ test('initial explanation skips exhausted budget and bounds a stalled source rea
   release(null)
   await Promise.resolve()
 })
+
+test('a proposal is displayed only after its exact objective is persisted', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  const objective = 'Add a --help option to cli.js, preserve current behavior and tests, and run npm test.'
+  for (const saveFails of [false, true]) {
+    let saved = ''
+    const reply = await explainBuilderEvidence({ prompt: 'What improvement is next for this app?', job, workspace: null,
+      ai: { async generate() { return JSON.stringify({ type: 'answer', answer: 'A help option would explain CLI usage.', proposal: objective }) } },
+      saveProposal: async value => { if (saveFails) throw new Error('offline'); saved = value },
+    })
+    if (saveFails) { assert.equal(saved, ''); assert.doesNotMatch(reply, /Say “go”/) }
+    else { assert.equal(saved, objective); assert.ok(reply.includes(objective)); assert.match(reply, /Say “go”/) }
+  }
+})
+
+test('proposal approval is exact, scoped to unchanged evidence and not reconstructed from chat', async () => {
+  const { isBuilderProposalApproval, proposalObjective, workspaceFingerprint, readBuilderProposal, proposalMatches } = await import('../lib/builder/proposal.ts')
+  const objective = 'Add a --help option to cli.js and run npm test.'
+  const fingerprint = workspaceFingerprint([{ path: 'cli.js', content: 'original' }])
+  const proposal = { id, sourceJobId: id, objective, fingerprint, expiresAt: 2000 }
+  for (const text of ['go', 'Go ahead.', 'do it', 'proceed', 'implement that']) assert.equal(isBuilderProposalApproval(text), true)
+  for (const text of ['go to the website', 'yes', 'go but deploy it too', 'do not do it']) assert.equal(isBuilderProposalApproval(text), false)
+  assert.deepEqual(readBuilderProposal(proposal), proposal)
+  assert.equal(proposalObjective('Add logging and deploy to production.'), null)
+  assert.equal(readBuilderProposal({ ...proposal, id: 'bad' }), null)
+  const input = { sourceJobId: id, fingerprint, priorAnswer: `Proposed change:\n${objective}`, now: 1000 }
+  assert.equal(proposalMatches(proposal, input), true)
+  for (const patch of [{ sourceJobId: workspaceId }, { fingerprint: workspaceFingerprint([{ path: 'cli.js', content: 'changed' }]) }, { priorAnswer: 'Unrelated answer' }, { now: 2001 }]) {
+    assert.equal(proposalMatches(proposal, { ...input, ...patch }), false)
+  }
+  assert.notEqual(workspaceFingerprint([{ path: 'cli.js', content: 'original' }, { path: 'new.js', content: '' }]), fingerprint)
+})
+
+test('proposal handoff uses a saved id once and rechecks source before worker execution', () => {
+  const specialist = readFileSync('lib/ai/cos/softwareSpecialist.ts', 'utf8')
+  const store = readFileSync('lib/builder/job-store.ts', 'utf8')
+  const runner = readFileSync('lib/builder/job-runner.ts', 'utf8')
+  assert.match(specialist, /jobId: proposal.id/)
+  assert.match(specialist, /ownerAuthorized: false/)
+  assert.match(store, /eq\('metadata', JSON.stringify\(job.metadata\)\)/)
+  assert.match(runner, /job.claimGeneration === 1/)
+  assert.ok(runner.indexOf("'builder_proposal_source_changed'") < runner.indexOf('await executeSignalBoostRepositoryRepair('))
+})

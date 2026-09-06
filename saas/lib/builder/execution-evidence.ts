@@ -74,7 +74,8 @@ export async function builderEvidenceReply(input: {
   if (!input.userId || !UUID.test(input.userId) || !input.conversationId || !UUID.test(input.conversationId)) return projectQuestion ? null : unavailable
   const jobId = input.prompt.match(/\bjob\s+([0-9a-f-]{36})\b/i)?.[1]
   const workspaceId = input.priorAnswer.match(/\/api\/builder\/workspaces\/([0-9a-f-]{36})\/files\//i)?.[1]
-  if (projectQuestion && /^\s*what(?:'s| is| should i do)\s+next\s*[?.!]*\s*$/i.test(input.prompt) && !workspaceId) return null
+  const priorJobId = input.priorAnswer.match(/Builder job ([0-9a-f-]{36}) — /i)?.[1]
+  if (projectQuestion && /^\s*what(?:'s| is| should i do)\s+next\s*[?.!]*\s*$/i.test(input.prompt) && !workspaceId && !priorJobId) return null
   try {
     const job = await lookup({ userId: input.userId, conversationId: input.conversationId,
       ...(jobId && UUID.test(jobId) ? { jobId } : {}),
@@ -82,6 +83,7 @@ export async function builderEvidenceReply(input: {
     })
     if (!job || job.userId !== input.userId || job.conversationId !== input.conversationId
       || (jobId && job.id !== jobId) || (!jobId && workspaceId && job.workspaceId !== workspaceId)
+      || (projectQuestion && !workspaceId && priorJobId && job.id !== priorJobId)
       || (job.metadata.platformRepair === true && !input.allowRepositoryEvidence)) return projectQuestion ? null : unavailable
     if ((projectQuestion || isBuilderExplanationRequest(input.prompt)) && explain) return await explain(job)
     return `Builder job ${job.id} — ${job.status}.\n\n${formatBuilderExecutionEvidence(job.result?.trace)}\n\nRead from the saved job record; no code was rerun.`

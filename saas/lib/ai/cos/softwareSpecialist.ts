@@ -1,4 +1,6 @@
 import { selectBuilderProject, builderProjectBlockedReply } from '@/lib/builder/project-continuity'
+import { isBuilderProposalApproval, wantsBuilderProposal, readBuilderProposal, proposalMatches } from '@/lib/builder/proposal'
+import { readBuilderWorkspaceFingerprint, saveBuilderProposal } from '@/lib/builder/job-store'
 import { explainBuilderEvidence } from '@/lib/builder/explain-evidence'
 import { createBuilderCodingAiPort } from '@/lib/cos/aiPort'
 import { createGovernedBuilderAiPort } from '@/lib/builder/control-adapter'
@@ -123,6 +125,32 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   const priorAnswer = (Array.isArray(input.body?.messages) ? input.body.messages : [])
     .filter((message: any) => message?.role === 'assistant' && typeof message.content === 'string').at(-1)?.content || ''
   let explanationModelInvoked = false
+  if (isBuilderProposalApproval(objective) && !sourceAttached && !(Array.isArray(input.body?.files) && input.body.files.length) && !hasImageOrPdfAttachment(input.body)) {
+    const userId = access?.userId || publicAuditUserId()
+    const conversationId = conversationIdFrom(input.body)
+    if (userId && conversationId) {
+      try {
+        const job = await readBuilderEvidenceJob({ userId, conversationId })
+        if (job && job.metadata.platformRepair !== true) {
+          const proposal = readBuilderProposal(job.metadata.pendingProposal)
+          if (job.status !== 'succeeded' || !proposal || !proposalMatches(proposal, {
+            sourceJobId: job.id, fingerprint: await readBuilderWorkspaceFingerprint(userId, job.workspaceId), priorAnswer, now: Date.now(),
+          })) return NextResponse.json({ reply: 'There is no current, unchanged Builder proposal to apply. Ask me to suggest the next improvement for this project.', execution_allowed: false })
+          const queued = await enqueueBuilderJob({ jobId: proposal.id, userId, conversationId, workspaceId: job.workspaceId,
+            objective: proposal.objective, jobKind: 'standard', ownerAuthorized: false,
+            metadata: { approvedProposalFingerprint: proposal.fingerprint, proposalSourceJobId: job.id,
+              projectContext: { previousJobId: job.id, previousObjective: job.objective, previousStatus: job.status, previousCommands: [] } },
+            runningReply: runningReply(proposal.id),
+          })
+          after(async () => { await runBuilderJob(queued.jobId, userId) })
+          return NextResponse.json({ ...queued, workspaceId: job.workspaceId, status: 'queued', source: 'cos-builder',
+            ...softwareSpecialistFields('software.build') }, { status: 202 })
+        }
+      } catch {
+        return NextResponse.json({ reply: 'I could not safely start that saved proposal. It may already be running or the project may have changed. Check the project status before retrying.', execution_allowed: false }, { status: 409 })
+      }
+    }
+  }
   const evidence = await builderEvidenceReply({
     prompt: objective,
     userId: access?.userId || publicAuditUserId(),
@@ -133,9 +161,14 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   }, readBuilderEvidenceJob, async job => {
     const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: Date.now() + 45_000 })
     const workspace = createSupabaseBuilderWorkspace(job.userId)
+    const fingerprint = job.status === 'succeeded' && job.metadata.platformRepair !== true && wantsBuilderProposal(objective)
+      ? await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId) : null
     return explainBuilderEvidence({ prompt: objective, job,
       workspace: workspace ? { readFile: (id, path) => workspace.readExistingFile(id, path) } : null,
       ai: { generate: request => { explanationModelInvoked = true; return ai.generate(request) } },
+      ...(fingerprint ? { saveProposal: async (proposed: string) => {
+        await saveBuilderProposal({ userId: job.userId, conversationId: job.conversationId, sourceJobId: job.id, fingerprint, objective: proposed })
+      } } : {}),
     })
   })
   if (evidence !== null) return NextResponse.json({

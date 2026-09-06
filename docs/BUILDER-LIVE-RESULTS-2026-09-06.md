@@ -18,3 +18,15 @@ Recorded jobs: hello 66569497-5504-41da-a6c2-7fa224fad5e7, cba52796-0e13-4dd2-97
 The follow-up patch uses distinct empty npm config files, asks for small append chunks after provider truncation, and routes explanation requests through authorized saved job evidence and current files without an execution port. New successful edit traces retain bounded search/replace evidence. Older jobs lack that historical diff; the explanation must disclose that limitation rather than invent the change.
 
 Local verification: all 931 mandatory regressions and TypeScript passed. Post-deployment retests of these fixes remain pending. These observations establish narrow real-task capability and concrete failures, not general parity. Engineering owns implementation and live verification; the owner evaluates the finished experience.
+
+## Production follow-through after #1866
+
+Commit 62cccc7b6fdd39fc7da76d1eb6b543452ab9e84f; deployment dpl_2pYFjLwMzpyLYRFacqPmDcCK4NqH READY. #1863 closed as superseded after its useful rejection/storage/native-control cases were adapted to the deployed offset protocol. The #1866 mandatory gate passed 937 tests and TypeScript.
+
+- Dependency job 8cf19dac-304b-426c-bc55-ad1dd77832ac: exact is-number 7.0.0 installed, node app.js exited 0 and printed dependency checks passed; manifest, app and generated lock downloadable.
+- Repository job a8699981-f1ef-4fdc-a646-34a11bbb4921: npm test exited 0 with 111 passing. No source/test edit appears in its saved trace.
+- Fresh repair 6b5950f8-142d-46f2-ad55-211a801655d0: failed with NaN !== 6, changed index <= values.length to index < values.length, then passed all three original assertions. Its explanation used the recorded diff and current source to correctly explain the out-of-bounds read, with no command rerun.
+- Older repair follow-up now routes to saved evidence and discloses its missing historical diff, but offered an unnecessary possible-cause example. The follow-up prompt now explicitly forbids speculative examples and asks for missing evidence instead.
+- Large job eb3c541a-14b0-43ef-8fcb-2727cbf9e751: six successful chunk writes produced the literal catalog.json, but the job then failed with builder_model_output_limit and never produced verify.js or ran verification. Independent read-only artifact inspection confirmed 600 records, every id/name/price correct, total 18030000. This is artifact proof, not a passed Builder job.
+
+The exact large-task prompt extracted only catalog.json and no commands. The next patch retains its second inline create (verify.js) and inline Run command (node verify.js). It also directs repetitive checks to compact loops without relaxing any assertion or permitting generators instead of requested literal data. The same full task must be rerun after deployment.

@@ -436,6 +436,7 @@ export class BuilderToolLoop {
         inspectedSource
           ? `REPAIR PROGRESS REQUIRED: ${toolPath(inspectedSource.input)} has been inspected. Inspect other relevant files if needed; do not reread the same unchanged content. ${projectContext.recommendedTestCommand ? `Run ${projectContext.recommendedTestCommand} to reproduce the defect, then edit the source and rerun it.` : 'Create or update a regression test, run it to reproduce the defect, then edit the source and rerun it.'}`
           : '',
+        'For repetitive data validation, use compact loops or parameterized assertions that check every required record. Do not unroll hundreds of identical assertions. This does not relax the requested checks or permit generated placeholders in a requested literal data file.',
         'When done: {"type":"answer","answer":"what changed and what ran"}',
       ].filter(Boolean)
 

@@ -8,6 +8,7 @@ import AgentActivity from '@/components/AgentActivity'
 import { uiText } from '@/lib/i18n/uiText'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findRecoveredAssistantReply } from '@/lib/ai/cos/assistantTransportRecovery'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
+import VoiceInputButton from '@/components/VoiceInputButton'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Msg = { role: 'user' | 'assistant'; content: string; builderWorkspaceId?: string; builderFiles?: string[] }
@@ -702,6 +703,14 @@ export default function AssistantPage() {
           >
             📎
           </button>
+
+          <VoiceInputButton
+            lang={l}
+            value={input}
+            onChange={setInput}
+            disabled={loading}
+            style={{ flexShrink: 0, width: 42, height: 42, borderRadius: 12, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.15)', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.75)' }}
+          />
 
           {/* Text input */}
           <textarea

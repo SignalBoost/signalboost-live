@@ -1,5 +1,5 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { specialistCompetencySnapshot, type SpecialistFamily } from './specialistLearning'
+import { specialistCompetencySnapshot, type SpecialistFamily } from './specialistLearning.ts'
 
 export async function readSpecialistCompetency(family: SpecialistFamily) {
   const db = cosServiceDb()

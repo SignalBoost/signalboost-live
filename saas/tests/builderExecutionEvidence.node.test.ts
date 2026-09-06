@@ -681,3 +681,34 @@ test('historical explanation and both reviews receive authoritative source ident
     }
   }
 })
+
+test('explicit Builder job source questions do not become prior-answer provenance questions', async () => {
+  const { isExplicitBuilderEvidenceRequest } = await import('../lib/builder/execution-evidence.ts')
+  const { isProvenanceIntrospection } = await import('../lib/ai/cos/provenanceIntrospection.ts')
+  for (const question of [
+    `Does the saved source evidence for Builder job ${id} establish that current money.js matches the source used by its last command?`,
+    `Is README.md the same as the source in Builder job ${id}?`,
+    `Are the checks in Builder job ${id} passing?`,
+  ]) {
+    assert.equal(isExplicitBuilderEvidenceRequest(question), true)
+    assert.equal(isProvenanceIntrospection(question), false)
+    let explained = false
+    const reply = await builderEvidenceReply({ ...input, prompt: question }, async () => job, async () => { explained = true; return 'Scoped job evidence.' })
+    assert.equal(explained, true)
+    assert.equal(reply, 'Scoped job evidence.')
+  }
+  assert.equal(isProvenanceIntrospection('Where did you get that answer from?'), true)
+  assert.equal(isExplicitBuilderEvidenceRequest(`Can you fix Builder job ${id} and run npm test?`), false)
+  assert.equal(isExplicitBuilderEvidenceRequest(`Does Builder job ${id} pass? Fix money.js and run npm test.`), false)
+})
+
+test('an unsatisfied task gate cannot erase a recorded passing command', async () => {
+  const { formatBuilderOperatorRepairReply } = await import('../lib/builder/operator-narration.ts')
+  const reply = formatBuilderOperatorRepairReply({ ok: false, error: 'builder_regression_evidence_required', trace: [
+    { toolId: 'edit_file', ok: true, path: 'README.md' },
+    { toolId: 'run', ok: true, command: 'npm test', exitCode: 0 },
+  ] })
+  assert.match(reply, /npm test.*passed with exit code 0/)
+  assert.match(reply, /repair gate remains unsatisfied/)
+  assert.doesNotMatch(reply, /proof has not passed|Verification — not passed|reproduced the reported failure/)
+})

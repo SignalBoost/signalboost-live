@@ -24,7 +24,7 @@ export function isBuilderProjectQuestion(prompt: string): boolean {
 }
 
 export function isBuilderExplanationRequest(prompt: string): boolean {
-  return /^\s*(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:explain|why|what\s+(?:changed|caused)|how\s+(?:did|was))\b/i.test(prompt)
+  return /^\s*(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:explain|why|does|is|are|can|what\s+(?:changed|caused)|how\s+(?:did|was))\b/i.test(prompt)
     && (/\b(?:this|that|the|last|previous|earlier|saved|recorded)\s+(?:builder\s+)?(?:job|run|repair|fix|results?|failure)\b/i.test(prompt)
       || /\bjob\s+[0-9a-f-]{36}\b/i.test(prompt)
       || /\b[\w/-]+\.(?:[cm]?js|tsx?|jsx|py|json|html|css|go|rs)\b[^.!?\n]{0,100}\b(?:failed|changed|fixed|repaired)\b/i.test(prompt))
@@ -40,6 +40,11 @@ export function isBuilderEvidenceRequest(prompt: string): boolean {
   return /^\s*(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:show|provide|display|retrieve|what|give)\b/i.test(request)
     && /\b(?:recorded|execution|exit\s*code|stdout|stderr|command|evidence)\b/i.test(request)
     && /\b(?:builder|job|recorded execution|that run|previous run)\b/i.test(request)
+}
+
+/** An explicit job selector routes to its scoped evidence, never prior-answer provenance. */
+export function isExplicitBuilderEvidenceRequest(prompt: string): boolean {
+  return /\bjob\s+[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/i.test(prompt) && isBuilderEvidenceRequest(prompt)
 }
 
 function block(value: unknown): string {

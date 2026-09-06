@@ -105,10 +105,20 @@ export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): 
   }
 
   lines.push(changedPaths.length
-    ? `Fixing — I changed ${quotedPaths(changedPaths)}, but the proof has not passed yet.`
-    : 'Fixing — no safe code change reached a passing proof in this run.')
-  lines.push('Verification — not passed yet. I am not calling this fixed.')
+    ? `Changed — updated ${quotedPaths(changedPaths)}.`
+    : 'Changes — no completed file mutation was recorded.')
+  if (successfulRun) {
+    lines.push(`Recorded check — ${commandOf(successfulRun) ? '`' + commandOf(successfulRun) + '`' : 'a command'} passed with exit code 0. This does not by itself establish overall task completion.`)
+  } else {
+    lines.push('Verification — no successful command was recorded.')
+  }
+  const gateBlocked = /builder_regression_(?:evidence_required|not_reproduced)/.test(text(result.error))
+  lines.push(gateBlocked
+    ? 'Task status — the repair gate remains unsatisfied; that is separate from individual command results.'
+    : 'Task status — incomplete; see the recorded blocker and command results.')
   const remediation = latestRemediation(trace)
-  lines.push(`Next action — ${remediation || 'use the recorded failure evidence for the next targeted repair attempt.'}`)
+  lines.push(`Next action — ${remediation || (gateBlocked
+    ? 'check whether the requested work is a repair or an extension; a genuine repair still needs failure-before-change and passing verification.'
+    : 'inspect the remaining task blocker before choosing the next change.')}`)
   return lines.join('\n')
 }

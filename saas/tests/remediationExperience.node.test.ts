@@ -57,8 +57,10 @@ test('failed Builder repairs stay active and actionable without presenting an in
 
   assert.match(reply, /^Found —/)
   assert.match(reply, /\nDiagnosed —/)
-  assert.match(reply, /\nFixing — I changed `src\/app\.js`, but the proof has not passed yet\./)
-  assert.match(reply, /\nVerification — not passed yet\. I am not calling this fixed\./)
+  assert.match(reply, /\nChanged — updated `src\/app\.js`\./)
+  assert.match(reply, /\nVerification — no successful command was recorded\./)
+  assert.match(reply, /\nTask status — incomplete/)
+  assert.doesNotMatch(reply, /Verified —|passed with exit code 0/)
   assert.match(reply, /\nNext action — Inspect the remaining assertion/)
   assert.doesNotMatch(reply, /COS Builder stopped|builder_debug_verification_failed/)
 })

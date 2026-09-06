@@ -48,3 +48,16 @@ The unchanged 600-record prompt succeeded through the real Concierge/model/sandb
 The old repair explanation was also repeated on this deployment: it identified the recorded NaN assertion, explicitly disclosed missing pre-edit source/diff, and asked for that evidence without suggesting an unverified cause. The newer repair had already demonstrated correct cause explanation from its saved <= to < diff, preserving all three assertions and running no new commands for the follow-up.
 
 Engineering performed all checks. These results establish the listed live capabilities and resolve the observed failures; they do not establish universal parity, private-repository import, repository-history inspection, or success on arbitrary projects.
+
+
+## Automatic initial repair explanation after #1873
+
+Application commit `a9e799604f9b01ba5a27401a083ffb141167b18a`; Production `dpl_DYqbv14Ar1XTgChPt1f7RRS8Q2eY` observed READY. All 946 mandatory regressions, TypeScript, ten CI workflows and exact Preview passed before merge.
+
+The authenticated Concierge request attached the original broken total.js and said only:
+
+> Repair the attached total.js. First run node total.js to reproduce the failure, fix the implementation without removing or weakening assertions, then rerun node total.js. Return the corrected file.
+
+No explanation request or follow-up was sent. Job `b1ecb21f-37ee-4734-af63-0ce2f61c5837`, workspace `f3a1fd27-6754-4bcb-9da8-45a9ce99c9cd`, succeeded in one invocation with five recorded tool rounds. Read-only job inspection confirmed first run exit 1 with NaN !== 6, a single recorded <= to < loop-boundary edit, then the same command exit 0 with stdout `3 assertions passed` and empty stderr. The displayed corrected source preserved all three original assertions.
+
+The first response automatically explained that values[3] was undefined and made the sum NaN, identified the exact recorded edit, listed the three passing cases and their coverage limit, and said no further action was required for the recorded failure. It returned the corrected downloadable file and actual command evidence. This verifies automatic explanation for the observed workspace repair. It does not extend the separate owner repository-repair reporting lane or establish universal task success.

@@ -61,3 +61,16 @@ The authenticated Concierge request attached the original broken total.js and sa
 No explanation request or follow-up was sent. Job `b1ecb21f-37ee-4734-af63-0ce2f61c5837`, workspace `f3a1fd27-6754-4bcb-9da8-45a9ce99c9cd`, succeeded in one invocation with five recorded tool rounds. Read-only job inspection confirmed first run exit 1 with NaN !== 6, a single recorded <= to < loop-boundary edit, then the same command exit 0 with stdout `3 assertions passed` and empty stderr. The displayed corrected source preserved all three original assertions.
 
 The first response automatically explained that values[3] was undefined and made the sum NaN, identified the exact recorded edit, listed the three passing cases and their coverage limit, and said no further action was required for the recorded failure. It returned the corrected downloadable file and actual command evidence. This verifies automatic explanation for the observed workspace repair. It does not extend the separate owner repository-repair reporting lane or establish universal task success.
+
+
+## Continued project result after #1878
+
+Application `c232aa0546f6b2262a389d13647b8c91d6bedfb8`; Production `dpl_3RY1hv51wXoetBTmPMH9g3UrLF1C` READY. All 950 mandatory tests, TypeScript, eleven CI workflows and exact Preview passed before merge.
+
+In the same Concierge conversation as the earlier repair, without uploading source again, engineering submitted:
+
+> Update total.js in this existing project: preserve the current implementation and all three assertions, add assert.equal(total([10]), 10), and change the success message to "4 assertions passed". Run: node total.js. Return the updated file.
+
+Job `61b2e257-dc51-4a61-82af-992f2f8868cb` succeeded in the original workspace `f3a1fd27-6754-4bcb-9da8-45a9ce99c9cd`. Its persisted project context references prior job `b1ecb21f-37ee-4734-af63-0ce2f61c5837`, the previous objective and command. The current trace contains a targeted edit adding the fourth assertion and updating the output message, followed by fresh `node total.js` exit 0, stdout `4 assertions passed`, empty stderr. Displayed current source preserved the implementation and all three original assertions; the download uses the same workspace path.
+
+This is live proof of same-conversation workspace continuation and fresh verification, not private-repository access or arbitrary cross-project memory. The completion sentence still uses the generic "Created the requested workspace files" wording for this update; source, edit and run evidence establish the actual operation.

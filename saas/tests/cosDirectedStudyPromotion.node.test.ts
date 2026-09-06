@@ -5,6 +5,8 @@ import { ownerDirectedPromotionAuthority } from '../lib/ai/cos/ownerDirectedProm
 
 const relevanceSource = readFileSync(new URL('../lib/ai/cos/knowledgePromotionRelevance.ts', import.meta.url), 'utf8')
 const promotionSource = readFileSync(new URL('../lib/ai/cos/autoPromoteLearning.ts', import.meta.url), 'utf8')
+const extractionSource = readFileSync(new URL('../lib/ai/cos/knowledgeFactExtraction.ts', import.meta.url), 'utf8')
+const reasoningWorkerSource = readFileSync(new URL('../lib/ai/cos/cosReasoningWorkers.ts', import.meta.url), 'utf8')
 const cronSource = readFileSync(new URL('../app/api/cron/cos-directed-study-promotion/route.ts', import.meta.url), 'utf8')
 const vercelConfig = JSON.parse(readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
 
@@ -48,4 +50,11 @@ test('directed-study promotion is recurring, bounded, authenticated, and does no
   assert.match(cronSource, /if \(pendingBefore === 0\)/)
   assert.ok(cronSource.indexOf('if (pendingBefore === 0)') < cronSource.indexOf("touchRunpodActivityLease('owner_directed_knowledge_promotion')"))
   assert.match(cronSource, /autoPromoteLearnedKnowledge\(5, deadlineMs, \{ ownerDirectedOnly: true \}\)/)
+})
+
+test('directed-study fact extraction preserves the enforced JSON contract through the COS control plane', () => {
+  assert.match(extractionSource, /jsonObject: true/)
+  assert.match(extractionSource, /Return at most 5 facts/)
+  assert.match(reasoningWorkerSource, /request\.jsonObject/)
+  assert.match(reasoningWorkerSource, /jsonObject: request\.jsonObject/)
 })

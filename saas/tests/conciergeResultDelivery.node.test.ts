@@ -15,6 +15,14 @@ test('Builder text files render inline with a copy control on both public Concie
   assert.match(concierge, /<BuilderFilePreviews workspaceId=\{message\.builderWorkspaceId\} files=\{message\.builderFiles\}/)
 })
 
+test('verified repository repairs create a TXT deliverable before repository mutation', () => {
+  const repair = read('../lib/builder/repository-repair.ts')
+  assert.match(repair, /BUILDER_RESULT_TEXT_PATH = 'builder-result\.txt'/)
+  assert.match(repair, /workspace\.writeFile\(input\.workspaceId, BUILDER_RESULT_TEXT_PATH, `\$\{result\.answer\.trim\(\)\}\\n`\)[\s\S]*const writeback = await publishSignalBoostRepositoryRepair/)
+  assert.equal((repair.match(/workspace\.writeFile\(input\.workspaceId, BUILDER_RESULT_TEXT_PATH/g) || []).length, 2)
+  assert.match(repair, /const finalReply = [\s\S]*reply: finalReply,[\s\S]*files,/)
+})
+
 test('homepage Concierge is visibly an assistant workspace, not the old landing card', () => {
   const layout = read('../app/layout.tsx')
   const homepage = read('../app/page.tsx')

@@ -12,6 +12,7 @@ import { uiText } from '@/lib/i18n/uiText'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
+import VoiceInputButton from '@/components/VoiceInputButton'
 
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string; error?: string }
@@ -574,6 +575,13 @@ export default function Concierge() {
                 disabled={loading || attachments.length >= ATTACH_MAX_FILES}
                 className="h-[42px] w-10 shrink-0 rounded-xl border border-white/10 bg-white/[.06] text-base text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 disabled:cursor-not-allowed disabled:opacity-40"
               >📎</button>
+              <VoiceInputButton
+                lang={activeLang as 'en' | 'es' | 'pt' | 'pl' | 'ru'}
+                value={input}
+                onChange={setInput}
+                disabled={loading}
+                className="flex h-[42px] w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[.06] text-white outline-none transition hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-cyan-300 aria-pressed:border-red-400/60 aria-pressed:bg-red-500/20 aria-pressed:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
+              />
               <textarea
                 ref={inputRef}
                 aria-label={t(dict, 'concierge.placeholder')}

@@ -71,7 +71,7 @@ export async function saveGoogleWorkspaceConnection(input: {
   if (missingScopes.length) {
     return {
       ok: false,
-      reason: 'Google did not grant all required read-only permissions. Reconnect and approve both Google Sheets read access and Google Drive metadata access.',
+      reason: 'Google did not grant all required read-only permissions. Reconnect and approve Sheets, Drive metadata, and Gmail read-only access.',
     }
   }
 
@@ -145,7 +145,7 @@ export async function getValidGoogleWorkspaceToken(userId: string): Promise<Vali
   const rowScopes = Array.isArray(row.scopes) ? row.scopes.map(String) : []
   const missingScopes = missingGoogleWorkspaceScopes(rowScopes)
   if (missingScopes.length) {
-    const reason = 'Google connection is missing required read-only permissions. Reconnect and approve both Google Sheets read access and Google Drive metadata access.'
+    const reason = 'Google connection is missing required read-only permissions. Reconnect and approve Sheets, Drive metadata, and Gmail read-only access.'
     await recordError(id, reason)
     return { ok: false, reason }
   }

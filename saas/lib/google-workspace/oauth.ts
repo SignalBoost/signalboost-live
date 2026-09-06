@@ -4,6 +4,7 @@
 export const GOOGLE_WORKSPACE_SCOPES = [
   'https://www.googleapis.com/auth/spreadsheets.readonly',
   'https://www.googleapis.com/auth/drive.metadata.readonly',
+  'https://www.googleapis.com/auth/gmail.readonly',
 ] as const
 
 export function missingGoogleWorkspaceScopes(scopes: readonly string[]): string[] {

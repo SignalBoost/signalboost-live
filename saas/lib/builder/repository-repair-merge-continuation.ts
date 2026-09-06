@@ -95,6 +95,8 @@ export async function completePendingRepositoryRepairMerges(input: {
   const request = input.request ?? fetch
   const writeHeaders = headers(token)
   const deadlineAtMs = Number.isFinite(Number(input.deadlineAtMs)) ? Number(input.deadlineAtMs) : Date.now() + 240_000
+  // Host-specific builderAutoMergeSnapshotPort() is injected by the cron route; this core module
+  // never imports the Vercel adapter, so bare Node regressions exercise the same merge state machine.
   const snapshotPort = input.snapshotPort ?? null
 
   const open = await requestJson(request, `${GITHUB_API}/pulls?state=open&base=main&per_page=30`, { method: 'GET', headers: writeHeaders })

@@ -32,6 +32,7 @@ function autoMergeEnabled(): boolean {
   return String(process.env.BUILDER_AUTO_MERGE_ENABLED || '').trim().toLowerCase() === 'true'
 }
 const REPOSITORY_RESULT_RESERVE_MS = 45_000
+const BUILDER_RESULT_TEXT_PATH = 'builder-result.txt'
 
 function publicTrace(trace: readonly BuilderToolTrace[]) {
   return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
@@ -193,7 +194,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
     const patchPath = result.ok && patchPresent ? 'repository-repair.patch' : 'repository-repair-unverified.patch'
     if (patchPresent) await workspace.writeFile(input.workspaceId, patchPath, changes.patch)
     for (const file of changes.files) await workspace.writeFile(input.workspaceId, `repository/${file.path}`, file.content)
-    const files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
+    let files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
 
     if (result.ok === false) {
       return failedPayload({
@@ -213,6 +214,12 @@ export async function executeSignalBoostRepositoryRepair(input: {
         baseCommitSha: target.fullCommitSha,
       })
     }
+
+    // A verified repository repair must always leave the owner a plain-text
+    // deliverable before any repository mutation is attempted. This prevents a
+    // successful code repair from collapsing into narration-only delivery.
+    await workspace.writeFile(input.workspaceId, BUILDER_RESULT_TEXT_PATH, `${result.answer.trim()}\n`)
+    files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
 
     const lesson = verifiedRepairLesson(result)
     if (lesson) await workspace.recordVerifiedRepairLesson(input.workspaceId, lesson).catch(error => {
@@ -288,12 +295,23 @@ export async function executeSignalBoostRepositoryRepair(input: {
         ? `A verified patch was created from pinned commit ${target.fullCommitSha}, and repository write-back began but stopped after ${writeback.stage}${writeback.commitSha ? ` at commit ${writeback.commitSha}` : ''}${writeback.branch ? ` on branch ${writeback.branch}` : ''}${writeback.error ? ` (${writeback.error})` : ''}. Nothing was merged or deployed.`
         : `A reviewable patch was created from pinned commit ${target.fullCommitSha}. Repository write-back was not taken${writeback.error ? ` (${writeback.error})` : ''}. Nothing was merged or deployed.`
 
+    const finalReply = `${result.answer}\n\n${writebackReply}${autoMergeReply}`.trim()
+    try {
+      await workspace.writeFile(input.workspaceId, BUILDER_RESULT_TEXT_PATH, `${finalReply}\n`)
+      files = (await workspace.listFiles(input.workspaceId)).map(file => file.path)
+    } catch (error) {
+      // The pre-write above already guarantees a TXT artifact existed before any
+      // repository mutation. Preserve the real writeback/merge outcome if the
+      // post-action enrichment cannot update that artifact.
+      console.error('[builder_result_artifact_finalize_failed]', { message: error instanceof Error ? error.message : 'unknown' })
+    }
+
     return Object.freeze({
       status: 200,
       payload: {
         source: 'cos-platform-engineer',
         workspaceId: input.workspaceId,
-        reply: `${result.answer}\n\n${writebackReply}${autoMergeReply}`,
+        reply: finalReply,
         files,
         trace: publicTrace(result.trace),
         execution_allowed: true,

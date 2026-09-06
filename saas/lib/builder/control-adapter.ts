@@ -5,6 +5,7 @@ type ExecutableBuilderToolId = Exclude<BuilderToolId, 'model_control'>
 const EXECUTABLE_TOOLS: readonly ExecutableBuilderToolId[] = Object.freeze([
   'list_files',
   'read_file',
+  'search_files',
   'write_file',
   'edit_file',
   'run',
@@ -167,7 +168,7 @@ function normalizeDeepSeekXmlControl(raw: string): string | null {
     return canonicalToolControl(toolId, input)
   }
 
-  for (const match of raw.matchAll(/<(list_files|read_file|write_file|edit_file|run)\b([^>]*)\/>/gi)) {
+  for (const match of raw.matchAll(/<(list_files|read_file|search_files|write_file|edit_file|run)\b([^>]*)\/>/gi)) {
     const toolId = String(match[1] || '').trim().toLowerCase()
     if (!isExecutableTool(toolId)) continue
     return canonicalToolControl(toolId, xmlAttributes(match[2]))
@@ -215,7 +216,7 @@ export function normalizeBuilderControlOutput(value: string | null): string | nu
   const raw = stripFence(String(value))
   if (!raw) return value
 
-  const prefixed = /^(list_files|read_file|write_file|edit_file|run)\s*(\{[\s\S]*\})$/i.exec(raw)
+  const prefixed = /^(list_files|read_file|search_files|write_file|edit_file|run)\s*(\{[\s\S]*\})$/i.exec(raw)
   if (prefixed) {
     try {
       const toolId = prefixed[1].toLowerCase()

@@ -1,85 +1,51 @@
-// saas/lib/builder/repository-repair-automerge.ts
-//
-// The extension of publishSignalBoostRepositoryRepair that closes the loop: fix, verify,
-// commit, merge — with the same admission test the Supervisor's repair envelope already
-// uses, applied to a merge instead of an unattended repair.
-//
-// TWO INDEPENDENT REFUSALS, EITHER ONE IS FINAL:
-//
-//   1. DangerCategory (financial / credential_security) never auto-merges. No amount of
-//      passing test evidence changes this — a diff can satisfy every test it was given
-//      and still be wrong about money or access, and that is a human judgment call, full
-//      stop, same rule as the Supervisor's rollback-coordinator.
-//
-//   2. No restorable snapshot, no auto-merge. Auto-merge is authorization to complete a
-//      fix without a second human click ONLY because the action is checked as reversible
-//      before it happens — the same admission test as lib/portable/repair-envelope.ts:
-//      "a class may run pre-authorised only if the plan is classified BOUNDED." A merge
-//      with nothing to roll back to if it is wrong is not that; it stays PR-only.
-//
-// This module never merges by itself when either refusal applies. It captures the
-// pre-merge Vercel deployment id as the rollback reference, but does not restore it —
-// automated post-merge failure detection and rollback is a separate, not-yet-built piece.
-
-import type { StateSnapshotPort } from '@/lib/portable/state-snapshot-port'
-import type { BuilderFile } from './contracts.ts'
-import { repositoryChangeDangerCategory, repositoryChangeDangerReason, type RepositoryChangeDangerCategory } from './repository-change-danger-policy.ts'
-
-const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
-type RequestLike = typeof fetch
-type JsonRecord = Record<string, any>
-
-export type AutoMergeRefusalReason =
-  | 'danger_category'
-  | 'snapshot_capture_failed'
-  | 'snapshot_not_restorable'
-
-// Flat result shape, not a discriminated union: this repository builds with
-// tsconfig strict:false, where unions do not narrow on a literal discriminant.
-export type AutoMergeEligibility = Readonly<{
-  eligible: boolean
-  reason: AutoMergeRefusalReason | null
-  dangerCategory: RepositoryChangeDangerCategory | null
-  detail: string | null
-}>
-
 /**
- * The danger check alone, exposed separately so a caller can explain a PR-only outcome
- * before spending a snapshot-capture call.
+ * Read the pull request's head commit and judge its check runs and commit statuses.
+ *
+ * Green means: at least one check exists, every completed run concluded success or neutral,
+ * and nothing is still queued or in progress. NO CHECKS IS NOT GREEN — an unchecked head is
+ * an absence of evidence, and this gate exists precisely to stop absence being read as proof.
+ * Skipped runs count as green; a skipped job asserts nothing about the build either way, and
+ * treating conditional workflows as failures would block every merge on this repository.
  */
-export function evaluateAutoMergeDangerCategory(
-  files: readonly Pick<BuilderFile, 'path' | 'content'>[],
-  patch: string,
-): AutoMergeEligibility {
-  const category = repositoryChangeDangerCategory(files, patch)
-  if (category) {
-    return Object.freeze({ eligible: false, reason: 'danger_category', dangerCategory: category, detail: repositoryChangeDangerReason(category) })
+export async function evaluatePullRequestChecks(
+  request: RequestLike,
+  headers: Record<string, string>,
+  pullRequestNumber: number,
+): Promise<{ green: boolean; detail: string }> {
+  const pull = await requestJson(request, `${GITHUB_API}/pulls/${pullRequestNumber}`, { method: 'GET', headers }, [200])
+  const headSha = String(pull?.head?.sha || '')
+  if (!/^[0-9a-f]{40}$/i.test(headSha)) {
+    return { green: false, detail: 'The pull request head commit could not be identified, so its checks could not be judged.' }
   }
-  return Object.freeze({ eligible: true, reason: null, dangerCategory: null, detail: null })
-}
 
-export type AutoMergeResult = Readonly<{
-  merged: boolean
-  reason: AutoMergeRefusalReason | null
-  detail: string | null
-  dangerCategory: RepositoryChangeDangerCategory | null
-  /** The deployment id captured before merge — the rollback target if the merge later proves wrong. */
-  preMergeSnapshotId: string | null
-  mergeCommitSha: string | null
-}>
+  const runs = await requestJson(request, `${GITHUB_API}/commits/${headSha}/check-runs?per_page=100`, { method: 'GET', headers }, [200])
+  const status = await requestJson(request, `${GITHUB_API}/commits/${headSha}/status`, { method: 'GET', headers }, [200])
 
-function refusal(reason: AutoMergeRefusalReason, detail: string, dangerCategory: RepositoryChangeDangerCategory | null = null): AutoMergeResult {
-  return Object.freeze({ merged: false, reason, detail, dangerCategory, preMergeSnapshotId: null, mergeCommitSha: null })
-}
-
-async function requestJson(request: RequestLike, url: string, init: RequestInit, expected: readonly number[]): Promise<JsonRecord> {
-  const response = await request(url, init)
-  const payload = await response.json().catch(() => ({})) as JsonRecord
-  if (!expected.includes(response.status)) {
-    const detail = typeof payload?.message === 'string' ? payload.message.slice(0, 240) : `http_${response.status}`
-    throw new Error(`builder_repository_automerge_${detail.replace(/\s+/g, '_').toLowerCase()}`)
+  const checkRuns = Array.isArray(runs?.check_runs) ? runs.check_runs : []
+  const statuses = Array.isArray(status?.statuses) ? status.statuses : []
+  if (!checkRuns.length && !statuses.length) {
+    return { green: false, detail: `No checks have reported on ${headSha.slice(0, 7)}, so there is no evidence the project still builds.` }
   }
-  return payload
+
+  const pending = checkRuns
+    .filter((run: any) => String(run?.status || '') !== 'completed')
+    .map((run: any) => String(run?.name || 'unnamed'))
+  const failed = checkRuns
+    .filter((run: any) => String(run?.status || '') === 'completed'
+      && !['success', 'neutral', 'skipped'].includes(String(run?.conclusion || '')))
+    .map((run: any) => `${run?.name || 'unnamed'} (${run?.conclusion || 'no conclusion'})`)
+
+  const combined = String(status?.state || '')
+  if (combined === 'pending' && statuses.length) pending.push('commit status: pending')
+  if (combined === 'failure' || combined === 'error') failed.push(`commit status: ${combined}`)
+
+  if (failed.length) {
+    return { green: false, detail: `The pull request checks failed on ${headSha.slice(0, 7)}: ${failed.slice(0, 6).join(', ')}.` }
+  }
+  if (pending.length) {
+    return { green: false, detail: `The pull request checks on ${headSha.slice(0, 7)} have not finished: ${pending.slice(0, 6).join(', ')}.` }
+  }
+  return { green: true, detail: `All checks passed on ${headSha.slice(0, 7)}.` }
 }
 
 /**
@@ -133,6 +99,12 @@ export async function attemptSignalBoostRepositoryAutoMerge(input: {
     'Content-Type': 'application/json',
     'User-Agent': 'SignalBoost-COS-Platform-Engineer',
     'X-GitHub-Api-Version': '2022-11-28',
+  }
+
+  const checks = await evaluatePullRequestChecks(request, headers, input.pullRequestNumber)
+    .catch(error => ({ green: false, detail: `The pull request checks could not be read (${error instanceof Error ? error.message : 'unknown error'}).` }))
+  if (!checks.green) {
+    return refusal('checks_not_green', `${checks.detail} The pull request remains open; merge it once its checks pass.`)
   }
 
   try {

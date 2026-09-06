@@ -15,9 +15,17 @@ const DOMAIN = /(?<![\w@])(?:https?:\/\/)?((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9]
 const INTENT = /\b(?:domain|url|tld|registrar|rdap|whois|availability|available|registered|taken|purchase|buy)\b/i
 const BRAINSTORM = /\b(?:brainstorm|suggest|suggestion|ideas?|names?|naming|brand|creative)\b/i
 const PLATFORM = /\b(?:platform|software|developer|development|coding|code|saas|app|product|domain|url)\b/i
+const LABEL = /^[a-z0-9][a-z0-9-]{1,62}$/
 let cachedBootstrap: { value: Bootstrap; expiresAt: number } | null = null
 
 export type DomainSuggestion = { name: string; domain: string; meaning: string }
+
+// Marketing preference only — which TLDs we are willing to put in front of the
+// owner. Whether any of them can actually be VERIFIED is not decided here; it
+// is resolved live from the IANA bootstrap by resolveVerifiableTlds below, so a
+// TLD the registry does not serve drops out on its own and one that starts
+// being served comes back on its own. No enumerated exclusion list.
+export const BRANDABLE_TLDS: readonly string[] = ['com', 'ai', 'dev', 'app', 'io']
 
 export function isDomainBrainstormRequest(input: string, context = ''): boolean {
   const combined = `${input}\n${context}`
@@ -29,10 +37,15 @@ function requestedSuggestionCount(input: string): number {
   return Math.max(1, Math.min(20, Number(explicit || 15)))
 }
 
-export function parseGeneratedDomainSuggestions(raw: string, excludeLegacyWords: boolean): DomainSuggestion[] {
+export function parseGeneratedDomainSuggestions(
+  raw: string,
+  excludeLegacyWords: boolean,
+  allowedTlds: readonly string[] = BRANDABLE_TLDS,
+): DomainSuggestion[] {
   const start = raw.indexOf('{'), end = raw.lastIndexOf('}')
   const object = start >= 0 && end > start ? raw.slice(start, end + 1) : null
   if (!object) return []
+  const allowed = allowedTlds.length ? allowedTlds : BRANDABLE_TLDS
   try {
     const parsed = JSON.parse(object) as { candidates?: unknown }
     const candidates = Array.isArray(parsed.candidates) ? parsed.candidates : []
@@ -42,7 +55,11 @@ export function parseGeneratedDomainSuggestions(raw: string, excludeLegacyWords:
       const name = String(value?.name || '').replace(/[^a-z0-9 -]/gi, '').trim().slice(0, 40)
       const domain = String(value?.domain || '').trim().toLowerCase()
       const meaning = String(value?.meaning || '').replace(/\s+/g, ' ').trim().slice(0, 180)
-      if (!name || !/^[a-z0-9][a-z0-9-]{1,62}\.(?:com|ai|dev|app|io)$/.test(domain) || !meaning) continue
+      const dot = domain.lastIndexOf('.')
+      const label = dot > 0 ? domain.slice(0, dot) : ''
+      const tld = dot > 0 ? domain.slice(dot + 1) : ''
+      if (!name || !meaning) continue
+      if (!label || !LABEL.test(label) || !allowed.includes(tld)) continue
       if (excludeLegacyWords && /signal|boost/i.test(`${name} ${domain}`)) continue
       if (!out.some(candidate => candidate.domain === domain)) out.push({ name, domain, meaning })
     }
@@ -81,6 +98,25 @@ function endpointFor(domain: string, data: Bootstrap): string | null {
     return endpoint ? String(endpoint) : null
   }
   return null
+}
+
+// Returns the subset of `preferred` the authoritative IANA bootstrap can
+// actually answer for. Generating a name on a TLD outside this set burns a
+// candidate slot on something that can never come back verified.
+export async function resolveVerifiableTlds(
+  preferred: readonly string[] = BRANDABLE_TLDS,
+  fetchImpl: FetchLike = fetch,
+): Promise<{ tlds: string[]; unsupported: string[]; bootstrapAvailable: boolean }> {
+  let data: Bootstrap
+  try { data = await bootstrap(fetchImpl) }
+  catch { return { tlds: [...preferred], unsupported: [], bootstrapAvailable: false } }
+  const tlds: string[] = []
+  const unsupported: string[] = []
+  for (const tld of preferred) {
+    if (endpointFor(`example.${tld}`, data)) tlds.push(tld)
+    else unsupported.push(tld)
+  }
+  return { tlds: tlds.length ? tlds : [...preferred], unsupported, bootstrapAvailable: true }
 }
 
 export async function lookupDomainsRdap(domains: string[], fetchImpl: FetchLike = fetch): Promise<DomainLookup[]> {
@@ -143,21 +179,18 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
   const verified: Array<DomainSuggestion & { lookup: DomainLookup }> = []
   // Every generated candidate that did NOT come back as a clean 404 used to be
   // dropped without trace, so a run in which the registry rate-limited us was
-  // indistinguishable from a run in which the names were genuinely taken. The
-  // owner saw one name out of fifteen and no explanation. Registered and
-  // unresolved outcomes are now carried out of the loop and reported.
+  // indistinguishable from a run in which the names were genuinely taken.
   const registered: Array<DomainSuggestion & { lookup: DomainLookup }> = []
   const unresolved: Array<DomainSuggestion & { lookup: DomainLookup }> = []
   const allLookups: DomainLookup[] = []
   let modelInvoked = false
   let generatedCount = 0
-  const generationInput = args.context ? `${args.context}\n\nCURRENT OWNER REQUEST:\n${args.input}` : args.input
 
   // Availability is part of the search loop, not a one-shot filter. A creative
   // batch that is fully registered must inform the next reasoner batch instead
   // of ending the owner's assignment prematurely.
   for (let wave = 0; wave < 3 && verified.length < count; wave += 1) {
-    const generated = await args.generateImpl(generationInput, count - verified.length, [...seenDomains])
+    const generated = await args.generateImpl(args.input, count - verified.length, [...seenDomains])
     modelInvoked ||= generated.modelInvoked
     const fresh = generated.candidates.filter(candidate => {
       if (seenDomains.has(candidate.domain)) return false
@@ -166,38 +199,19 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
     })
     if (!fresh.length) continue
     generatedCount += fresh.length
-    // A creative name must not be discarded merely because the model's first
-    // TLD choice is registered. Keep the neural name and verify deterministic
-    // TLD alternatives, then retain at most one live candidate per name.
-    const domainsToCheck: string[] = []
-    for (const candidate of fresh) {
-      const label = candidate.domain.split('.')[0]
-      for (const tld of ['com', 'ai', 'dev', 'app', 'io']) {
-        const domain = `${label}.${tld}`
-        if (!domainsToCheck.includes(domain)) domainsToCheck.push(domain)
-      }
-    }
-    const lookups = await lookupDomainsRdap(domainsToCheck, args.fetchImpl)
+    const lookups = await lookupDomainsRdap(fresh.map(candidate => candidate.domain), args.fetchImpl)
     allLookups.push(...lookups)
     const lookupByDomain = new Map(lookups.map(lookup => [lookup.domain, lookup]))
-    const verifiedNames = new Set(verified.map(candidate => candidate.name.toLowerCase()))
     for (const candidate of fresh) {
-      if (verifiedNames.has(candidate.name.toLowerCase())) continue
-      const label = candidate.domain.split('.')[0]
-      const alternatives = ['com', 'ai', 'dev', 'app', 'io']
-        .map(tld => lookupByDomain.get(`${label}.${tld}`))
-        .filter((lookup): lookup is DomainLookup => Boolean(lookup))
-      const lookup = alternatives.find(result => result.status === 'no_registration_found')
-      if (lookup) {
-        verified.push({ ...candidate, domain: lookup.domain, lookup })
-        verifiedNames.add(candidate.name.toLowerCase())
+      const lookup = lookupByDomain.get(candidate.domain)
+      if (!lookup) continue
+      if (lookup.status === 'no_registration_found') {
+        if (verified.length < count) verified.push({ ...candidate, lookup })
+      } else if (lookup.status === 'registered') {
+        registered.push({ ...candidate, lookup })
       } else {
-        const unresolvedLookup = alternatives.find(result => result.status === 'unknown')
-        const registeredLookup = alternatives.find(result => result.status === 'registered')
-        if (unresolvedLookup) unresolved.push({ ...candidate, domain: unresolvedLookup.domain, lookup: unresolvedLookup })
-        else if (registeredLookup) registered.push({ ...candidate, domain: registeredLookup.domain, lookup: registeredLookup })
+        unresolved.push({ ...candidate, lookup })
       }
-      if (verified.length >= count) break
     }
   }
 

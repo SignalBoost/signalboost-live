@@ -2,20 +2,19 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    await req.json();
 
     return NextResponse.json({
       success: true,
-      message: "Login API working",
-      received: body
+      message: "Login API working"
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json(
       {
         success: false,
-        error: err.message
+        error: "Invalid request body"
       },
-      { status: 500 }
+      { status: 400 }
     );
   }
 }

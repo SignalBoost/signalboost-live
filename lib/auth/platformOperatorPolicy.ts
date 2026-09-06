@@ -1,5 +1,6 @@
 export type PlatformOperatorUser = {
   email?: string | null
+  email_verified?: boolean | null
   app_metadata?: Record<string, unknown> | null
 }
 
@@ -13,5 +14,9 @@ export function isPlatformOperator(
   if (role === 'owner' || role === 'platform_operator') return true
 
   const email = String(user.email ?? '').trim().toLowerCase()
-  return Boolean(email && ownerEmails.includes(email))
+  return Boolean(
+    email &&
+      user.email_verified === true &&
+      ownerEmails.some(ownerEmail => String(ownerEmail).trim().toLowerCase() === email),
+  )
 }

@@ -151,12 +151,13 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
   const allLookups: DomainLookup[] = []
   let modelInvoked = false
   let generatedCount = 0
+  const generationInput = args.context ? `${args.context}\n\nCURRENT OWNER REQUEST:\n${args.input}` : args.input
 
   // Availability is part of the search loop, not a one-shot filter. A creative
   // batch that is fully registered must inform the next reasoner batch instead
   // of ending the owner's assignment prematurely.
   for (let wave = 0; wave < 3 && verified.length < count; wave += 1) {
-    const generated = await args.generateImpl(args.input, count - verified.length, [...seenDomains])
+    const generated = await args.generateImpl(generationInput, count - verified.length, [...seenDomains])
     modelInvoked ||= generated.modelInvoked
     const fresh = generated.candidates.filter(candidate => {
       if (seenDomains.has(candidate.domain)) return false
@@ -165,19 +166,38 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
     })
     if (!fresh.length) continue
     generatedCount += fresh.length
-    const lookups = await lookupDomainsRdap(fresh.map(candidate => candidate.domain), args.fetchImpl)
+    // A creative name must not be discarded merely because the model's first
+    // TLD choice is registered. Keep the neural name and verify deterministic
+    // TLD alternatives, then retain at most one live candidate per name.
+    const domainsToCheck: string[] = []
+    for (const candidate of fresh) {
+      const label = candidate.domain.split('.')[0]
+      for (const tld of ['com', 'ai', 'dev', 'app', 'io']) {
+        const domain = `${label}.${tld}`
+        if (!domainsToCheck.includes(domain)) domainsToCheck.push(domain)
+      }
+    }
+    const lookups = await lookupDomainsRdap(domainsToCheck, args.fetchImpl)
     allLookups.push(...lookups)
     const lookupByDomain = new Map(lookups.map(lookup => [lookup.domain, lookup]))
+    const verifiedNames = new Set(verified.map(candidate => candidate.name.toLowerCase()))
     for (const candidate of fresh) {
-      const lookup = lookupByDomain.get(candidate.domain)
-      if (!lookup) continue
-      if (lookup.status === 'no_registration_found') {
-        if (verified.length < count) verified.push({ ...candidate, lookup })
-      } else if (lookup.status === 'registered') {
-        registered.push({ ...candidate, lookup })
+      if (verifiedNames.has(candidate.name.toLowerCase())) continue
+      const label = candidate.domain.split('.')[0]
+      const alternatives = ['com', 'ai', 'dev', 'app', 'io']
+        .map(tld => lookupByDomain.get(`${label}.${tld}`))
+        .filter((lookup): lookup is DomainLookup => Boolean(lookup))
+      const lookup = alternatives.find(result => result.status === 'no_registration_found')
+      if (lookup) {
+        verified.push({ ...candidate, domain: lookup.domain, lookup })
+        verifiedNames.add(candidate.name.toLowerCase())
       } else {
-        unresolved.push({ ...candidate, lookup })
+        const unresolvedLookup = alternatives.find(result => result.status === 'unknown')
+        const registeredLookup = alternatives.find(result => result.status === 'registered')
+        if (unresolvedLookup) unresolved.push({ ...candidate, domain: unresolvedLookup.domain, lookup: unresolvedLookup })
+        else if (registeredLookup) registered.push({ ...candidate, domain: registeredLookup.domain, lookup: registeredLookup })
       }
+      if (verified.length >= count) break
     }
   }
 

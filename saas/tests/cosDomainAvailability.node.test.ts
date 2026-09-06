@@ -109,6 +109,25 @@ test('regenerates after a fully registered naming wave and excludes rejected dom
   assert.match(result?.reply || '', /2\. \*\*FreshTwo\*\*/)
 })
 
+test('preserves prior owner naming constraints and checks alternate TLDs before discarding a neural name', async () => {
+  let generationInput = ''
+  const fakeFetch = (async (url: string | URL | Request) => {
+    if (String(url).includes('data.iana.org')) return new Response(JSON.stringify({ services: [[['com','ai','dev','app','io'], ['https://rdap.example']]] }), { status: 200 })
+    return new Response('{}', { status: String(url).endsWith('/novara.dev') ? 404 : 200 })
+  }) as typeof fetch
+  const result = await brainstormVerifiedDomains({
+    input:'suggest a shorter meaningful URL',
+    context:'Forget Signal and Boost. Be creative.',
+    fetchImpl:fakeFetch,
+    generateImpl:async input => {
+      generationInput = input
+      return { candidates:[{name:'Novara',domain:'novara.com',meaning:'A novel software workspace'}], modelInvoked:true }
+    },
+  })
+  assert.match(generationInput, /Forget Signal and Boost/)
+  assert.deepEqual(result?.suggestions, [{name:'Novara',domain:'novara.dev',meaning:'A novel software workspace'}])
+})
+
 test('a subdomain is never misreported as an available registrable domain', async () => {
   const fakeFetch = (async (url: string | URL | Request) => {
     if (String(url).includes('data.iana.org')) return new Response(JSON.stringify({ services: [[['com'], ['https://rdap.example.com']]] }), { status: 200 })

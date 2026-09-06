@@ -13,6 +13,7 @@ const tests = [
   'tests/builderProjectContext.node.test.ts',
   'tests/builderExecutionEvidence.node.test.ts',
   'tests/builderProjectContinuity.node.test.ts',
+  'tests/agentProgressStreaming.node.test.ts',
   'tests/auditCosRuntime.node.test.ts',
   'tests/deterministicUtilities.node.test.ts',
   'tests/engineeringConstants.node.test.ts',

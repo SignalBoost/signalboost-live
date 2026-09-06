@@ -1,0 +1,6 @@
+[
+  {"category":"travel","amount":"12.50","status":"posted"},
+  {"category":"travel","amount":"-2.50","status":"posted"},
+  {"category":"meals","amount":"4.25","status":"posted"},
+  {"category":"meals","amount":"100.00","status":"void"}
+]

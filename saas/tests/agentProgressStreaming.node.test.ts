@@ -21,8 +21,7 @@ test('Concierge and owner COS consume observable request progress instead of tim
 
 test('progress transport follows the durable Builder job to its terminal result', () => {
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
-  assert.match(client, /\/api\/cos-primary/)
-  assert.match(client, /\/api\/concierge/)
+  assert.match(client, /\/api\/cos-browser/)
   assert.match(client, /\/api\/builder\?jobId=/)
   assert.match(client, /poll\.status === 202/)
   assert.match(client, /COS Builder completed the job/)
@@ -67,7 +66,11 @@ test('real homepage and dock upload handlers admit the Builder source extensions
   const homepage = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8')
   const dock = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
   for (const source of [homepage, dock]) {
-    assert.match(source, /const BUILDER_SOURCE_FILE_RE = \/\\\.\(\?:c\?js\|mjs\|cts\|mts\|ts\|py\)\$\/i/)
+    const matcher = source.match(/const BUILDER_SOURCE_FILE_RE = \/(.+)\/i/)
+    assert.ok(matcher)
+    const allowed = new RegExp(matcher[1], 'i')
+    for (const path of ['package.json', 'sample.json', 'report.test.js', 'view.tsx', 'index.html']) assert.ok(allowed.test(path), path)
+    assert.match(source, /const ATTACH_MAX_FILES = 20/)
     assert.match(source, /\.js,\.mjs,\.cjs,\.ts,\.mts,\.cts,\.py/)
     assert.match(source, /BUILDER_SOURCE_FILE_RE\.test\(file\.name\)/)
     assert.match(source, /accept=\{ATTACH_INPUT_ACCEPT\}/)
@@ -93,6 +96,22 @@ test('progress client selects durable Builder only after shared Builder-intent c
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
   assert.match(client, /isConciergeBuilderObjective\(objective, \{ attachmentNames, attachmentMimeTypes \}\)/)
   assert.match(client, /args\.target === 'concierge' \? conciergeBuilderRequest\(args\.body\) : null/)
-  assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? \(args\.target === 'cos' \? '\/api\/cos-primary' : '\/api\/concierge'\)/)
+  assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
   assert.match(client, /credentials: 'include'/)
+})
+
+
+test('six-file application preserves manifests and data in the Builder transport', () => {
+  const names = ['package.json', 'money.js', 'report.js', 'cli.js', 'sample.json', 'report.test.js']
+  const attachments = names.map(name => {
+    const content = readFileSync(new URL('../../docs/fixtures/expense-report/' + name, import.meta.url), 'utf8')
+    return { name, type: name.endsWith('.json') ? 'application/json' : 'text/javascript', dataUrl: 'data:text/plain;base64,' + Buffer.from(content).toString('base64') }
+  })
+  const request = conciergeBuilderRequest({ messages: [{role: 'user', content: 'Repair this attached application and run npm test.'}], attachments,
+    context: {conversationId: '12345678-1234-1234-1234-123456789abc'} })
+  assert.ok(request)
+  const files = request.body.files as Array<{path: string; content: string}>
+  assert.deepEqual(files.map(file => file.path), names)
+  assert.equal(JSON.parse(files[0].content).dependencies['is-number'], '7.0.0')
+  assert.equal(JSON.parse(files[4].content).length, 4)
 })

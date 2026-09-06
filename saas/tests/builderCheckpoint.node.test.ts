@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { BuilderToolLoop } from '../lib/builder/tool-loop.ts'
 import { InMemoryBuilderWorkspace } from '../lib/builder/workspace.ts'
+import { verifiedJobRepairLesson } from '../lib/builder/verified-lessons.ts'
 
 const action = (toolId: string, input: Record<string, unknown>) => JSON.stringify({ type: 'tool', toolId, input })
 const objective = 'Fix the existing add.js function: it must add both numbers. Preserve the regression test. Run:\nnode --test add.test.js'
@@ -49,6 +50,7 @@ for (const pauseAfterFailure of [false, true]) test(`existing-file repair execut
     assert.equal(result.trace.filter(item => item.toolId === 'edit_file' && item.ok).length, 1)
     assert.match((runs[0].output as { stdout: string }).stdout, /(?:#|ℹ) fail 1/)
     assert.match((runs[1].output as { stdout: string }).stdout, /(?:#|ℹ) pass 1/)
+    assert.equal(verifiedJobRepairLesson(result)?.regressionCommand, 'node --test add.test.js')
   } finally { await rm(dir, { recursive: true, force: true }) }
 })
 

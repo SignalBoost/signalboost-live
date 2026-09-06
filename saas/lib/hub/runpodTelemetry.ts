@@ -4,6 +4,7 @@ import { configuredRunpodApiKey, configuredRunpodPodId, runpodControlConfigured 
 const GRAPHQL_ENDPOINT = 'https://api.runpod.io/graphql'
 const REST_ENDPOINT = 'https://rest.runpod.io/v1'
 const REQUEST_TIMEOUT_MS = 15_000
+const DEFAULT_BOOTSTRAP_URL = 'https://raw.githubusercontent.com/SignalBoost/signalboost-live/main/saas/scripts/runpod/run-cos-reasoner.sh'
 
 export type PodStatus = {
   id: string
@@ -45,21 +46,32 @@ function safeModelName(value: string | undefined, fallback: string): string {
   return model
 }
 
+function bootstrapUrl(): string {
+  const value = process.env.COS_RUNPOD_BOOTSTRAP_URL?.trim() || DEFAULT_BOOTSTRAP_URL
+  const url = new URL(value)
+  if (url.protocol !== 'https:' || url.username || url.password) {
+    throw new Error('COS_RUNPOD_BOOTSTRAP_URL must be an HTTPS URL without embedded credentials')
+  }
+  return url.toString()
+}
+
 /**
  * The Pod's container disk is recreated when RunPod restarts it, while /workspace persists.
  * Therefore the container start command must explicitly launch the persistent COS bootstrap on every
- * cold start. Both historical bootstrap filenames are supported because the live Pod predates the
- * repository-standard /workspace/run-cos-reasoner.sh name.
+ * cold start. Historical bootstrap filenames remain supported, but a missing bootstrap is now restored
+ * from the repository-owned script so a replacement Pod is not dependent on undocumented host-local files.
  */
 export function desiredRunpodStartupContract(): RunpodStartupContract {
   const reasonerModel = safeModelName(process.env.LOCAL_AI_MODEL, 'qwen2.5-coder:32b')
   const embeddingModel = safeModelName(process.env.LOCAL_AI_EMBEDDING_MODEL, 'nomic-embed-text')
+  const repoBootstrapUrl = bootstrapUrl()
   const command = [
     'set -euo pipefail',
+    'mkdir -p /workspace',
     'if [ -x /start.sh ]; then nohup /start.sh >/workspace/runpod-base-start.log 2>&1 & fi',
     'script=""',
     'for candidate in /workspace/cos-runpod-reasoner.sh /workspace/run-cos-reasoner.sh; do if [ -x "$candidate" ]; then script="$candidate"; break; fi; done',
-    'if [ -z "$script" ]; then echo "COS RunPod bootstrap is missing from /workspace" >&2; exit 78; fi',
+    `if [ -z "$script" ]; then curl -fsSL '${repoBootstrapUrl}' -o /workspace/run-cos-reasoner.sh; chmod 0755 /workspace/run-cos-reasoner.sh; script=/workspace/run-cos-reasoner.sh; fi`,
     `export COS_REASONER_MODEL='${reasonerModel}'`,
     `export COS_EMBEDDING_MODEL='${embeddingModel}'`,
     '"$script"',

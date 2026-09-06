@@ -18,48 +18,9 @@ test('public Concierge and owner Assistant both enter the canonical browser ingr
   assert.ok(fullAssistant >= 0 && assistantRewrite > fullAssistant)
 })
 
-test('transitional owner repository fallback remains durable while Software Specialist is canonical', () => {
-  const helper = route.match(/async function queueOwnerRepositoryRepair[\s\S]*?\n}\n\nexport async function withSuggestedFollowups/)
-  assert.ok(helper)
-  const text = helper?.[0] || ''
-  assert.match(text, /enqueueSignalBoostRepositoryRepairJob/)
-  assert.match(text, /runBuilderJob\(job\.jobId/)
-  assert.match(text, /status: 'queued'/)
-  assert.match(text, /source: 'cos-platform-engineer'/)
+test('retired owner repository fallback cannot bypass the Software Specialist', () => {
   assert.match(route, /const softwareSpecialist = browserSurface === 'assistant'[\s\S]*\? await tryCosSoftwareSpecialist/)
-})
-
-// 2026-09-03: this ingress must not be stricter than the direct Developer surface. The same owner
-// paste previously reached the repository lane through /api/builder but not here, because this
-// route gated the whole branch on signalBoostProjectBound and required the log to already parse as
-// failed. Owner/log/project evidence now enters as the option on the deployed fallback, exactly
-// where app/api/builder/route.ts puts it.
-test('owner repository repair matches the direct Developer surface and prefers the exact failed snapshot', () => {
-  const analysis = route.indexOf('const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)')
-  const exact = route.indexOf('const exactFailedLogTarget =', analysis)
-  const ownerTarget = route.indexOf('const ownerRepositoryRepairTarget =', exact)
-  const exactPreference = route.indexOf('? exactFailedLogTarget', ownerTarget)
-  const intentFallback = route.indexOf('signalBoostDeployedRepairTarget(prompt, deployment)', exactPreference)
-  const clippedFallback = route.indexOf('signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission })', intentFallback)
-  const queue = route.indexOf('queueOwnerRepositoryRepair({', clippedFallback)
-  assert.ok(analysis >= 0 && exact > analysis && ownerTarget > exact)
-  assert.match(route.slice(exact, ownerTarget), /parseSignalBoostRepositoryRepairTarget\(operationalPrompt\)/)
-  assert.ok(exactPreference > ownerTarget && intentFallback > exactPreference && clippedFallback > intentFallback && queue > clippedFallback)
-  // Owner + explicit Assistant surface + no source attachment remain mandatory; the extra project-bound AND is gone.
-  assert.match(route.slice(ownerTarget, queue), /browserSurface === 'assistant' && access\?\.isOwner && access\.userId && !hasSourceAttachment\n/)
-  assert.doesNotMatch(route.slice(ownerTarget, queue), /signalBoostProjectBound/)
-  // A clipped log that does not parse as failed can still reach the lane, as it does directly.
-  assert.doesNotMatch(route.slice(ownerTarget, queue), /operationalLogAnalysis\.failed/)
-})
-
-test('repository authority still requires Assistant surface, owner, and project evidence, never the branch gate alone', () => {
-  const flag = route.indexOf('const ownerDeveloperLogSubmission =')
-  assert.ok(flag >= 0)
-  const block = route.slice(flag, flag + 500)
-  assert.match(block, /browserSurface === 'assistant'/)
-  assert.match(block, /access\?\.isOwner === true/)
-  assert.match(block, /operationalEvidence/)
-  assert.match(block, /SIGNALBOOST_OPERATIONAL_TARGET\.test\(operationalPrompt\) \|\| isSignalBoostDeploymentContext\(req\)/)
+  assert.doesNotMatch(route, /queueOwnerRepositoryRepair|enqueueSignalBoostRepositoryRepairJob|ownerRepositoryRepairTarget/)
 })
 
 test('quoted clone and failure lines alone do not satisfy operational-log evidence', () => {
@@ -105,7 +66,6 @@ test('source-attached repair remains in the shared isolated Software Specialist 
   assert.match(route, /withPublicDeliveryScope\(\(\) => tryCosSoftwareSpecialist/)
   assert.match(route, /surface: 'concierge'/)
   assert.match(route, /allowRepositoryRepair: false/)
-  assert.match(route, /ownerRepositoryRepairTarget = browserSurface === 'assistant' && access\?\.isOwner && access\.userId && !hasSourceAttachment/)
   assert.match(route, /if \(operationalEvidence && !hasSourceAttachment\)/)
   assert.match(route, /cosPrimaryPost\(routedRequest\)/)
   assert.doesNotMatch(route, /legacyConciergePost/)

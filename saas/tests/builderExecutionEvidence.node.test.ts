@@ -470,3 +470,28 @@ test('explanation sees edit delta without counting retained replacement context 
   })
   assert.match(reply, /Two tests were added/)
 })
+
+
+test('causal review does not equate new coverage with introducing the implementation bug', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  let reviewPrompt = ''
+  let generationPrompt = ''
+  const reply = await explainBuilderEvidence({ prompt: 'Explain the repair', job: { ...job, result: { trace: [
+    { toolId: 'run', command: 'npm test', exitCode: 0 },
+    { toolId: 'edit_file', path: 'money.test.js', ok: true },
+    { toolId: 'run', command: 'npm test', exitCode: 1 },
+  ] } }, workspace: null,
+    ai: { async generate(request) {
+      if (request.systemPrompt.startsWith('BUILDER EXPLANATION EVIDENCE REVIEW')) {
+        reviewPrompt = request.systemPrompt
+        return '{"supported":false}'
+      }
+      generationPrompt = request.systemPrompt
+      return '{"type":"answer","answer":"The new test introduced the bug; no pre-existing defect existed."}'
+    } },
+  })
+  assert.match(generationPrompt, /passing old suite does not prove the implementation was correct/)
+  assert.match(reviewPrompt, /first observed failure is not defect origin/)
+  assert.doesNotMatch(reply, /new test introduced the bug/)
+  assert.match(reply, /Exit code: 1/)
+})

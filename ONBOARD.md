@@ -3,7 +3,9 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.61
+**Version:** 1.62
+
+**Builder causal explanation follow-through — 2026-09-06:** #1902 deployed at `fc4cbdbea82ae7dd856de7643fd52ee79429f890`, Production `dpl_G8pWtcaEFrb8k6FfVYfNfHzwgE8J` READY. The original-job explanation now correctly reports two added tests and a blocked duplicate, with no failed edit. Fresh job `e22206f9-7008-41c5-aba7-5f0bb880e691` preserved the fourteen-test suite, added two assertions, reproduced the precision failure before source edits, repaired it and passed fourteen tests. Its initial prose was rejected by review and safe recorded evidence was retained. A subsequent explanation incorrectly equated adding coverage with introducing the implementation defect. The follow-through explicitly requires both generation and review to distinguish first-observed failure from defect origin; an old passing suite cannot establish absence of a bug. Fresh causal-explanation acceptance remains pending. See `docs/BUILDER-EXPLANATION-FIDELITY-2026-09-06.md`.
 
 **Builder explanation fidelity — live follow-through, 2026-09-06:** #1901 merged at `28e085ff81cbedb76e86bd02cb521d175b41d60e`; Production `dpl_CQV9qkeJmUHTYywkz7uTvQma3Tq8` READY. All 993 mandatory regressions, TypeScript, ten CI workflows and exact Preview passed. Host-derived outcomes and a separate semantic evidence review now distinguish blocked requests, timeouts, pending assembly and completed operations; fallback excludes unchecked model details. A live read-only explanation correctly identified the prior blocked run and stated no source edit failed, but miscounted two newly added tests as three; the review accepted that error. The follow-through removes unchanged leading/trailing replacement context before generation/review and requires counts to follow the actual delta. This remains model-based semantic review, not a universal grounding guarantee. Fresh acceptance of the delta correction and a new repair/follow-up remain pending; exact evidence is in `docs/BUILDER-EXPLANATION-FIDELITY-2026-09-06.md`.
 

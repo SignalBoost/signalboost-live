@@ -31,16 +31,18 @@ export class VercelSandboxBuilderRunner implements BuilderRunnerPort {
       if (dependencies) {
         await sandbox.writeFiles([
           { path: `${ROOT}/package.json`, content: Buffer.from(dependencies.manifest) },
+          { path: '/tmp/builder-user.npmrc', content: Buffer.from('') },
+          { path: '/tmp/builder-global.npmrc', content: Buffer.from('') },
           ...(dependencies.lock ? [{ path: `${ROOT}/package-lock.json`, content: Buffer.from(dependencies.lock) }] : []),
         ])
         await sandbox.updateNetworkPolicy({ allow: ['registry.npmjs.org'] })
         try {
           const install = await sandbox.runCommand({ cmd: 'npm',
             args: [dependencies.command, '--ignore-scripts', '--no-audit', '--no-fund', '--registry=https://registry.npmjs.org',
-              '--userconfig=/dev/null', '--globalconfig=/dev/null'], cwd: ROOT, timeoutMs: 60_000 })
+              '--userconfig=/tmp/builder-user.npmrc', '--globalconfig=/tmp/builder-global.npmrc'], cwd: ROOT, timeoutMs: 60_000 })
           if (install.exitCode !== 0) return { exitCode: install.exitCode, stdout: '',
             stderr: `Dependency installation failed before the requested command ran: ${bounded(await install.stderr())}`, timedOut: false,
-            executedCommand: `npm ${dependencies.command} --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --userconfig=/dev/null --globalconfig=/dev/null` }
+            executedCommand: `npm ${dependencies.command} --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org --userconfig=/tmp/builder-user.npmrc --globalconfig=/tmp/builder-global.npmrc` }
           if (!dependencies.lock) {
             const lock = await sandbox.runCommand({ cmd: 'cat', args: [`${ROOT}/package-lock.json`], timeoutMs: 5_000 })
             if (lock.exitCode !== 0) throw new Error('builder_dependency_lock_missing')

@@ -114,7 +114,14 @@ test('sandbox closes install egress before staging source or running commands', 
     async writeFiles(files: any[]) { steps.push(files.some(file => file.path.endsWith('app.js')) ? 'source' : 'manifest') },
     async runCommand(command: any) {
       steps.push(command.cmd)
-      if (command.cmd === 'npm') assert.ok(command.args.includes('--ignore-scripts'))
+      if (command.cmd === 'npm') {
+        assert.ok(command.args.includes('--ignore-scripts'))
+        const user = command.args.find((arg: string) => arg.startsWith('--userconfig='))
+        const global = command.args.find((arg: string) => arg.startsWith('--globalconfig='))
+        assert.notEqual(user.split('=')[1], global.split('=')[1], 'npm rejects loading the same config path twice')
+        const { execFileSync } = await import('node:child_process')
+        execFileSync('npm', ['config', 'list', '--json', user, global], { stdio: 'pipe' })
+      }
       return { exitCode: 0, async stdout() { return command.cmd === 'cat' ? lock : 'ok' }, async stderr() { return '' } }
     },
     async stop() { steps.push('stop') },
@@ -217,4 +224,59 @@ test('full workspace cannot erase a completed command when its lockfile cannot b
   assert.equal(proof.ok, true)
   assert.equal((proof.output as any).stdout, 'executed once')
   assert.ok(result.trace.some(item => item.error?.includes('builder_generated_lock_not_saved')))
+})
+
+// Reconciled from superseded #1863; retain the deployed offset protocol.
+const appendAction = (content: string, offset: number, final: boolean) => action('write_file', { path: 'large.js', mode: 'append', content, offset, final })
+
+test('rejected duplicate chunk preserves a later valid completion', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const result = await new BuilderToolLoop(scripted([appendAction('console.', 0, false), appendAction('console.', 0, false), appendAction('log("ok");', 8, true)]), workspace, realNode)
+    .run({ objective: 'Create large.js.\nRun:\nnode large.js', workspaceId: 'chunk-duplicate' })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal((await workspace.readFile('chunk-duplicate', 'large.js'))?.content, 'console.log("ok");')
+})
+
+test('failed final storage write retries without duplicating source', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const write = workspace.writeFile.bind(workspace)
+  let attempts = 0
+  workspace.writeFile = async (...args) => {
+    if (++attempts === 1) throw new Error('builder_file_write: temporary storage failure')
+    return write(...args)
+  }
+  const result = await new BuilderToolLoop(scripted([appendAction('console.', 0, false), appendAction('log("ok");', 8, true), appendAction('log("ok");', 8, true)]), workspace, realNode)
+    .run({ objective: 'Create large.js.\nRun:\nnode large.js', workspaceId: 'chunk-storage' })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal(attempts, 2)
+  assert.equal((await workspace.readFile('chunk-storage', 'large.js'))?.content, 'console.log("ok");')
+})
+
+test('another writer creating the chunk target is detected before finalization', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  let calls = 0
+  const result = await new BuilderToolLoop({ async generate() {
+    if (++calls === 1) return appendAction('console.', 0, false)
+    await workspace.writeFile('chunk-changed', 'large.js', 'another writer')
+    return appendAction('log("ok");', 8, true)
+  } }, workspace, { async run() { assert.fail('must not execute unfinished source') } })
+    .run({ objective: 'Create large.js.', workspaceId: 'chunk-changed', maxRounds: 2 })
+  assert.equal(result.ok, false)
+  assert.ok(result.trace.some(step => step.error === 'builder_chunk_existing_file'))
+  assert.equal((await workspace.readFile('chunk-changed', 'large.js'))?.content, 'another writer')
+})
+
+test('provider tool-call normalization preserves offset chunks and final flags', async () => {
+  const { normalizeBuilderControlOutput } = await import('../lib/builder/control-adapter.ts')
+  const input = { path: 'large.js', mode: 'append', offset: 0, content: 'console.', final: false }
+  const normalized = normalizeBuilderControlOutput(JSON.stringify({ tool_calls: [{ function: { name: 'write_file', arguments: JSON.stringify(input) } }] }))
+  const workspace = new InMemoryBuilderWorkspace()
+  let called = false
+  const result = await new BuilderToolLoop({ async generate() { called = true; return normalized } }, workspace, realNode)
+    .run({ objective: 'Create large.js.', workspaceId: 'native-chunk', shouldPause: beforeTool => !beforeTool && called })
+  assert.equal(result.ok, false)
+  if (result.ok || !result.checkpoint) assert.fail('expected pending chunk checkpoint')
+  assert.equal((await workspace.listFiles('native-chunk')).length, 0)
+  assert.equal(result.checkpoint.chunks?.[0]?.[1], input.content)
+  assert.throws(() => appendBuilderChunk('a'.repeat(512 * 1024 - 1), { offset: 512 * 1024 - 1, content: 'é', final: true }), /file_too_large/)
 })

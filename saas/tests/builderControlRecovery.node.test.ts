@@ -325,3 +325,22 @@ test('Builder stops truthfully when the discovered regression proof passes and n
   ])
   assert.ok(result.trace.filter(item => item.toolId === 'run').every(item => Boolean(item.input.command)))
 })
+
+test('provider output limit switches to bounded append recovery instead of repeating the full file', async () => {
+  const workspace = new InMemoryBuilderWorkspace()
+  const inputs: ModelInput[] = []
+  const result = await new BuilderToolLoop({ async generate(input) {
+    inputs.push(input)
+    if (inputs.length === 1) throw new Error('local_model_output_truncated')
+    if (inputs.length === 2) {
+      assert.match(input.prompt, /OUTPUT LIMIT RECOVERY/)
+      assert.match(input.prompt, /2000 characters/)
+      return JSON.stringify({ type: 'tool', toolId: 'write_file', input: { path: 'catalog.json', mode: 'append', offset: 0, content: '[1,', final: false } })
+    }
+    if (inputs.length > 3) return JSON.stringify({ type: 'answer', answer: 'Created catalog.json.' })
+    assert.equal(await workspace.readFile('chunk-recovery', 'catalog.json'), null)
+    return JSON.stringify({ type: 'tool', toolId: 'write_file', input: { path: 'catalog.json', mode: 'append', offset: 3, content: '2]', final: true } })
+  } }, workspace, { async run() { assert.fail('no command requested') } }).run({ objective: 'Create catalog.json.', workspaceId: 'chunk-recovery', maxRounds: 3 })
+  assert.equal(result.ok, true, JSON.stringify(result))
+  assert.equal((await workspace.readFile('chunk-recovery', 'catalog.json'))?.content, '[1,2]')
+})

@@ -136,3 +136,48 @@ test('both initial History reply and shared pre-execution routing use recorded e
   assert.doesNotMatch(read, /\.rpc\(|\.update\(|\.insert\(|runBuilderJob/)
   assert.match(readFileSync('scripts/vercel-cos-gates.mjs', 'utf8'), /builderExecutionEvidence.node.test.ts/)
 })
+
+test('live explanation follow-up reaches an authorized read-only source explanation', async () => {
+  const prompt = 'Explain why total.js failed and exactly what changed, using the actual source and recorded results. Do not rerun any commands.'
+  let explanations = 0
+  assert.equal(isBuilderEvidenceRequest(prompt), true)
+  assert.equal(await builderEvidenceReply({ ...input, prompt }, async () => job, async authorized => {
+    assert.equal(authorized, job)
+    explanations++
+    return 'source explanation'
+  }), 'source explanation')
+  await builderEvidenceReply({ ...input, prompt }, async () => ({ ...job, userId: id }), async () => { assert.fail('wrong owner'); return '' })
+  assert.equal(explanations, 1)
+  assert.equal(isBuilderEvidenceRequest('Explain why total.js failed, then run node total.js.'), false)
+})
+
+test('explanation reads current source and discloses missing historical diff', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  const reply = await explainBuilderEvidence({ prompt: 'Explain the repair', job: { ...job, result: { trace: [{ toolId: 'edit_file', path: 'total.js', ok: true }, ...trace] } },
+    workspace: { async readFile(workspace, path) { assert.equal(workspace, workspaceId); assert.equal(path, 'total.js'); return { path, content: 'index < values.length', updatedAt: 1 } } },
+    ai: { async generate(request) {
+      assert.match(request.systemPrompt, /cannot verify the exact change/)
+      assert.match(request.prompt, /index < values.length/)
+      assert.match(request.prompt, /Hello from COS Builder/)
+      return JSON.stringify({ type: 'answer', answer: 'The saved test passed. The exact earlier source is unavailable.' })
+    } },
+  })
+  assert.match(reply, /exact earlier source is unavailable/)
+  assert.match(reply, /no code was rerun/)
+})
+
+test('general software explanations do not divert into Builder history', async () => {
+  for (const prompt of ['Explain source maps in JavaScript', 'Why is code review important?', 'Explain how Builder works']) {
+    assert.equal(isBuilderEvidenceRequest(prompt), false)
+    assert.equal(await builderEvidenceReply({ ...input, prompt }, async () => { assert.fail('ordinary question'); return null }), null)
+  }
+})
+
+test('run-first imported jobs explain from their saved artifact list', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  const reply = await explainBuilderEvidence({ prompt: 'Explain why that run failed in index.js', job: { ...job, result: { files: ['package.json', 'index.js'], trace } },
+    workspace: { async readFile(workspace, path) { assert.equal(workspace, workspaceId); return { path, content: path === 'index.js' ? 'module.exports = 42' : '{}', updatedAt: 1 } } },
+    ai: { async generate(request) { assert.match(request.prompt, /module.exports = 42/); return '{"type":"answer","answer":"The recorded run succeeded."}' } },
+  })
+  assert.match(reply, /current workspace files/)
+})

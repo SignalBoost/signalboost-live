@@ -10,12 +10,20 @@ export type EvidenceJob = {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+export function isBuilderExplanationRequest(prompt: string): boolean {
+  return /^\s*(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:explain|why|what\s+(?:changed|caused)|how\s+(?:did|was))\b/i.test(prompt)
+    && (/\b(?:this|that|the|last|previous|earlier|saved|recorded)\s+(?:builder\s+)?(?:job|run|repair|fix|results?|failure)\b/i.test(prompt)
+      || /\bjob\s+[0-9a-f-]{36}\b/i.test(prompt)
+      || /\b[\w/-]+\.(?:[cm]?js|tsx?|jsx|py|json|html|css|go|rs)\b[^.!?\n]{0,100}\b(?:failed|changed|fixed|repaired)\b/i.test(prompt))
+}
+
 export function isBuilderEvidenceRequest(prompt: string): boolean {
   // Classify the requested action, not words inside the file's output or a quoted
   // former objective. A create/run request may also demand execution evidence.
   const request = prompt.replace(/"[^"\n]*"|“[^”\n]*”|`[^`\n]*`/g, ' ')
   const newWork = /(?:^|[.!?;,\n]|\b(?:and|then)\b)\s*(?:please\s+)?(?:(?:can|could|would|will)\s+you\s+)?(?:create|write|build|make|edit|update|fix|repair|debug|run|rerun|execute|test)\b/i
   if (newWork.test(request)) return false
+  if (isBuilderExplanationRequest(request)) return true
   return /^\s*(?:please\s+)?(?:(?:can|could|would)\s+you\s+)?(?:show|provide|display|retrieve|what|give)\b/i.test(request)
     && /\b(?:recorded|execution|exit\s*code|stdout|stderr|command|evidence)\b/i.test(request)
     && /\b(?:builder|job|recorded execution|that run|previous run)\b/i.test(request)
@@ -47,7 +55,7 @@ export async function builderEvidenceReply(input: {
   conversationId: string | null
   priorAnswer: string
   allowRepositoryEvidence: boolean
-}, lookup: (target: EvidenceLookup) => Promise<EvidenceJob | null>): Promise<string | null> {
+}, lookup: (target: EvidenceLookup) => Promise<EvidenceJob | null>, explain?: (job: EvidenceJob) => Promise<string>): Promise<string | null> {
   if (!isBuilderEvidenceRequest(input.prompt)) return null
   const unavailable = 'I could not find recorded execution evidence for that Builder job in this conversation. No code was rerun.'
   if (!input.userId || !UUID.test(input.userId) || !input.conversationId || !UUID.test(input.conversationId)) return unavailable
@@ -61,6 +69,7 @@ export async function builderEvidenceReply(input: {
     if (!job || job.userId !== input.userId || job.conversationId !== input.conversationId
       || (jobId && job.id !== jobId) || (!jobId && workspaceId && job.workspaceId !== workspaceId)
       || (job.metadata.platformRepair === true && !input.allowRepositoryEvidence)) return unavailable
+    if (isBuilderExplanationRequest(input.prompt) && explain) return await explain(job)
     return `Builder job ${job.id} — ${job.status}.\n\n${formatBuilderExecutionEvidence(job.result?.trace)}\n\nRead from the saved job record; no code was rerun.`
   } catch { return unavailable }
 }

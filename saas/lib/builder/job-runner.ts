@@ -40,6 +40,9 @@ function publicTrace(trace: readonly BuilderToolTrace[]) {
       return {
         ...base,
         ...(typeof input.path === 'string' ? { path: input.path.slice(0, 240) } : {}),
+        ...(toolId === 'edit_file' && ok && typeof input.search === 'string' && typeof input.replace === 'string'
+          ? { change: { search: input.search.slice(0, 4000), replace: input.replace.slice(0, 4000),
+              truncated: input.search.length > 4000 || input.replace.length > 4000 } } : {}),
         ...telemetry,
       }
     }

@@ -128,6 +128,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     userId: access?.userId || publicAuditUserId(),
     conversationId: conversationIdFrom(input.body),
     priorAnswer,
+    hasNewSource: sourceAttached || (Array.isArray(input.body?.files) && input.body.files.length > 0) || hasImageOrPdfAttachment(input.body),
     allowRepositoryEvidence: input.surface === 'assistant' && access?.isOwner === true,
   }, readBuilderEvidenceJob, async job => {
     const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: Date.now() + 45_000 })

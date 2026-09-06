@@ -1,7 +1,6 @@
 import { attemptSignalBoostRepositoryAutoMerge, evaluateAutoMergeDangerCategory, evaluatePullRequestChecks } from './repository-repair-automerge.ts'
-import { builderAutoMergeSnapshotPort } from './repository-repair-snapshot-host.ts'
 import { watchMergedDeployment } from './repository-merge-watch.ts'
-import type { StateSnapshotPort } from '@/lib/portable/state-snapshot-port'
+import type { StateSnapshotPort } from '../portable/state-snapshot-port.ts'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
 export const REPOSITORY_REPAIR_AUTOMERGE_MARKER = 'Owner-authorized Platform Engineer repair.'
@@ -96,7 +95,7 @@ export async function completePendingRepositoryRepairMerges(input: {
   const request = input.request ?? fetch
   const writeHeaders = headers(token)
   const deadlineAtMs = Number.isFinite(Number(input.deadlineAtMs)) ? Number(input.deadlineAtMs) : Date.now() + 240_000
-  const snapshotPort = input.snapshotPort === undefined ? builderAutoMergeSnapshotPort() : input.snapshotPort
+  const snapshotPort = input.snapshotPort ?? null
 
   const open = await requestJson(request, `${GITHUB_API}/pulls?state=open&base=main&per_page=30`, { method: 'GET', headers: writeHeaders })
   const pulls = (Array.isArray(open) ? open : []).filter(isCandidate).slice(0, MAX_CANDIDATES)

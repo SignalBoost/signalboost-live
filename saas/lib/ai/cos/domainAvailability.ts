@@ -128,20 +128,45 @@ export async function tryDomainAvailabilityLookup(args: { input: string; context
   return { results, reply: renderDomainLookups(results) }
 }
 
-export async function brainstormVerifiedDomains(args: { input: string; context?: string; fetchImpl?: FetchLike; generateImpl?: (input:string,count:number)=>Promise<{candidates:DomainSuggestion[];modelInvoked:boolean}> }) {
+type DomainCandidateGenerator = (
+  input: string,
+  count: number,
+  excludedDomains?: string[],
+) => Promise<{ candidates: DomainSuggestion[]; modelInvoked: boolean }>
+
+export async function brainstormVerifiedDomains(args: { input: string; context?: string; fetchImpl?: FetchLike; generateImpl?: DomainCandidateGenerator }) {
   if (!isDomainBrainstormRequest(args.input, args.context)) return null
   const count = requestedSuggestionCount(args.input)
   if (!args.generateImpl) return null
-  const generated = await args.generateImpl(args.input, count)
-  const lookups = await lookupDomainsRdap(generated.candidates.map(candidate => candidate.domain), args.fetchImpl)
-  const lookupByDomain = new Map(lookups.map(lookup => [lookup.domain, lookup]))
-  const verified = generated.candidates
-    .map(candidate => ({ ...candidate, lookup: lookupByDomain.get(candidate.domain)! }))
-    .filter(candidate => candidate.lookup?.status === 'no_registration_found')
-    .slice(0, count)
+  const seenDomains = new Set<string>()
+  const verified: Array<DomainSuggestion & { lookup: DomainLookup }> = []
+  const allLookups: DomainLookup[] = []
+  let modelInvoked = false
+
+  // Availability is part of the search loop, not a one-shot filter. A creative
+  // batch that is fully registered must inform the next reasoner batch instead
+  // of ending the owner's assignment prematurely.
+  for (let wave = 0; wave < 3 && verified.length < count; wave += 1) {
+    const generated = await args.generateImpl(args.input, count - verified.length, [...seenDomains])
+    modelInvoked ||= generated.modelInvoked
+    const fresh = generated.candidates.filter(candidate => {
+      if (seenDomains.has(candidate.domain)) return false
+      seenDomains.add(candidate.domain)
+      return true
+    })
+    if (!fresh.length) continue
+    const lookups = await lookupDomainsRdap(fresh.map(candidate => candidate.domain), args.fetchImpl)
+    allLookups.push(...lookups)
+    const lookupByDomain = new Map(lookups.map(lookup => [lookup.domain, lookup]))
+    for (const candidate of fresh) {
+      const lookup = lookupByDomain.get(candidate.domain)
+      if (lookup?.status === 'no_registration_found') verified.push({ ...candidate, lookup })
+      if (verified.length >= count) break
+    }
+  }
   const lines = verified.map((candidate, index) => `${index + 1}. **${candidate.name}** — ${candidate.domain} — ${candidate.meaning}`)
   const reply = verified.length
-    ? [`I generated candidates for a software-building and SaaS platform, then checked them through authoritative registry RDAP.`, '', ...lines, '', `Verification: all ${verified.length} domains above returned no registration record at ${lookups[0]?.checkedAt || new Date().toISOString()}. Registrar checkout must still confirm reserved or premium status.`].join('\n')
+    ? [`I generated candidates for a software-building and SaaS platform, then checked them through authoritative registry RDAP.`, '', ...lines, '', `Verification: all ${verified.length} domains above returned no registration record at ${allLookups[0]?.checkedAt || new Date().toISOString()}. Registrar checkout must still confirm reserved or premium status.`].join('\n')
     : 'COS generated candidates and checked them through authoritative registry RDAP, but none returned a reliable no-registration result. I will not substitute registered or unverified names.'
-  return { reply, results: verified.map(item => item.lookup), suggestions: verified.map(({lookup,...candidate}) => candidate), modelInvoked: generated.modelInvoked, requested: count }
+  return { reply, results: verified.map(item => item.lookup), suggestions: verified.map(({lookup,...candidate}) => candidate), modelInvoked, requested: count }
 }

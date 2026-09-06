@@ -13,6 +13,9 @@ import { watchMergedDeployment, type MergeWatchResult } from './repository-merge
 import { VercelRepositoryRepairSession } from './vercel-repository-repair-session.ts'
 import type { BuilderRunnerPort, BuilderToolTrace } from './contracts.ts'
 import type { StateSnapshotPort } from '@/lib/portable/state-snapshot-port'
+import { retrieveValidatedCognitiveSkills } from '@/lib/ai/cos/cognitiveSkillContext'
+import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
+import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
 
 export type SignalBoostRepositoryRepairExecution = Readonly<{
   status: number
@@ -115,6 +118,10 @@ export async function executeSignalBoostRepositoryRepair(input: {
     console.error('[builder_repository_lesson_read_failed]', { message: error instanceof Error ? error.message : 'unknown' })
     return []
   })
+  const cognitive = await retrieveValidatedCognitiveSkills(objective, { specialistFamily: 'software' }).catch(error => {
+    console.error('[builder_repository_cognitive_skill_retrieval_failed]', { message: error instanceof Error ? error.message : 'unknown' })
+    return { items: [] }
+  })
 
   if (Date.now() >= deadlineAtMs - REPOSITORY_RESULT_RESERVE_MS) {
     return failedPayload({
@@ -158,6 +165,7 @@ export async function executeSignalBoostRepositoryRepair(input: {
       objective,
       workspaceId: input.workspaceId,
       priorLessons,
+      cognitiveSkills: cognitive.items,
       maxRounds: 20,
       // Repository-control prompts are larger than ordinary chat prompts. Production telemetry
       // has shown valid responses slightly above 35s, so retain a bounded 55s round budget.
@@ -211,6 +219,22 @@ export async function executeSignalBoostRepositoryRepair(input: {
     if (certification) await workspace.recordCertificationAttempt(input.workspaceId, certification).catch(error => {
       console.error('[builder_repository_certification_write_failed]', { message: error instanceof Error ? error.message : 'unknown' })
     })
+    if (verifiedBuilderCognitiveApplication(result)) {
+      const successfulRuns = result.trace.filter(item => item.toolId === 'run' && item.ok).length
+      await Promise.all(cognitive.items.map(item => recordVerifiedCognitiveProductionOutcome({
+        skillKey: item.skillKey,
+        success: true,
+        score: 1,
+        evidence: {
+          source: 'cos_software_specialist_platform_engineer',
+          verification: 'repository_changed_and_host_command_exit_zero',
+          successfulRuns,
+          authorityGranted: false,
+        },
+      }).catch(error => {
+        console.error('[builder_repository_cognitive_application_record_failed]', { skillKey: item.skillKey, message: error instanceof Error ? error.message : 'unknown' })
+      })))
+    }
 
     const writeback = await publishSignalBoostRepositoryRepair({
       target,

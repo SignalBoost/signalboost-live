@@ -1,4 +1,5 @@
 import { normalizeBuilderControlOutput } from './control-adapter.ts'
+import { formatBuilderCognitiveGuidance } from './cognitive-application.ts'
 import type {
   BuilderAiPort,
   BuilderFile,
@@ -269,6 +270,7 @@ export async function runDebugFileJob(input: {
   workspace: BuilderWorkspacePort
   runner: BuilderRunnerPort
   ai: BuilderAiPort
+  cognitiveSkills?: readonly import('@/lib/ai/cos/cognitiveSkillContext').CognitiveSkillContextItem[]
 }): Promise<BuilderLoopResult> {
   const trace: BuilderToolTrace[] = []
   const plannedPaths = input.plan.files?.length ? input.plan.files : [input.plan.path]
@@ -334,6 +336,7 @@ export async function runDebugFileJob(input: {
 
   for (let repairIteration = 1; repairIteration <= MAX_REPAIR_ITERATIONS; repairIteration += 1) {
     const basePrompt = [
+      formatBuilderCognitiveGuidance(input.cognitiveSkills || []),
       `OBJECTIVE:\n${String(input.objective || '').slice(0, 2_000)}`,
       `REPAIR ITERATION: ${repairIteration} of ${MAX_REPAIR_ITERATIONS}`,
       sourceBlock(currentFiles),

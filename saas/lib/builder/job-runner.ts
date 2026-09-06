@@ -15,9 +15,31 @@ import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { executeSignalBoostRepositoryRepair } from './repository-repair.ts'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from './repository-repair-target.ts'
 import { builderAutoMergeSnapshotPort } from './repository-repair-snapshot-host.ts'
+import { retrieveValidatedCognitiveSkills, type CognitiveSkillContextResult } from '@/lib/ai/cos/cognitiveSkillContext'
+import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
+import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
+
+const emptyCognitiveContext = (): CognitiveSkillContextResult => ({ retrieved: 0, relevant: 0, selected: 0, dependencyRejected: 0, items: [] })
+
+async function recordAppliedCognitiveSkills(job: BuilderJobRecord, skillKeys: readonly string[], successfulRuns: number): Promise<void> {
+  await Promise.all(skillKeys.map(skillKey => recordVerifiedCognitiveProductionOutcome({
+    skillKey,
+    success: true,
+    score: 1,
+    evidence: {
+      source: 'cos_software_specialist_builder',
+      builderJobId: job.id,
+      verification: 'workspace_changed_and_host_command_exit_zero',
+      successfulRuns,
+      authorityGranted: false,
+    },
+  }).catch(error => {
+    console.error('[builder_cognitive_application_record_failed]', { skillKey, message: error instanceof Error ? error.message : 'unknown' })
+  })))
+}
 
 function publicTrace(trace: readonly BuilderToolTrace[]) {
   return trace.map(({ round, toolId, ok, input, output, error, failureClass, remediation }) => {
@@ -205,6 +227,11 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       return
     }
 
+    const cognitive = await retrieveValidatedCognitiveSkills(job.objective, { specialistFamily: 'software' }).catch(error => {
+      console.error('[builder_cognitive_skill_retrieval_failed]', { message: error instanceof Error ? error.message : 'unknown' })
+      return emptyCognitiveContext()
+    })
+
     const sliceStartedAtMs = Date.now()
     const deadlineAtMs = Date.now() + BUILDER_JOB_BUDGET_MS
     const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), {
@@ -224,11 +251,13 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           workspace,
           runner,
           ai,
+          cognitiveSkills: cognitive.items,
         })
       : await new BuilderToolLoop(ai, workspace, runner).run({
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons,
+          cognitiveSkills: cognitive.items,
           projectContext: job.metadata.projectContext,
           checkpoint: job.checkpoint,
           // Leave room for a slow model round, then a bounded sandbox command and persistence.
@@ -277,6 +306,12 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         },
       })
       return
+    }
+
+
+    if (verifiedBuilderCognitiveApplication(result)) {
+      const successfulRuns = result.trace.filter(item => item.toolId === 'run' && item.ok).length
+      await recordAppliedCognitiveSkills(job, cognitive.items.map(item => item.skillKey), successfulRuns)
     }
 
     const baseReply = isRepairObjective(job.objective)

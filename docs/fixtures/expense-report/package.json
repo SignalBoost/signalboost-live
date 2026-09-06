@@ -1,0 +1,1 @@
+{"name":"builder-expense-report-fixture","version":"1.0.0","private":true,"scripts":{"test":"node --test report.test.js","start":"node cli.js sample.json"},"dependencies":{"is-number":"7.0.0"}}

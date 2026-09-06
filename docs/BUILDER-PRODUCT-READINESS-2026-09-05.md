@@ -70,3 +70,10 @@ TypeScript pass locally. Updated remote CI/Preview verification is pending.
 Engineering owns these checks and repairs; owner evaluation follows delivery.
 The independent #1863 chunk implementation remains open and must not be merged as
 a second protocol without reconciling its rejection and storage-retry coverage.
+
+CI also exposed a false duplicate-declaration report in main's history-evidence
+test: two identical regex literals looked like declarations to the repository scanner.
+The test now shares one expression without changing its assertions. That inherited
+history suite is not in main's deployment gate and currently fails independently
+(shallow-history implementation and stale target fixture); it is not included in
+the 928 passing tests or represented as working history inspection.

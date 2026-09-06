@@ -3,7 +3,9 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.50
+**Version:** 1.51
+
+**Builder proposal live follow-through — 2026-09-06:** #1887 merged at db96f4d409d712225805957279639f14fe3072c0; eleven CI checks and exact Preview passed, Production dpl_6CLtJVtT2mxtsrYkXyb8mBp1EyPe was READY. The first live recommendation on existing job 9775dea0-2e54-4035-a6c8-21a36f3dc6b5 described --help but produced no saved pendingProposal, so the go handoff is not yet accepted. The response contract now requests the proposal in trusted system instructions rather than inside the evidence JSON, and records bounded failure reasons when a model proposal is missing/invalid or cannot be persisted. 969 mandatory tests pass; TypeScript, exact Preview/CI and a fresh live retry remain required.
 
 **Builder proposal handoff — 2026-09-06:** `feat/builder-proposal-handoff` lets a successful isolated project suggest one bounded local improvement and save its exact objective in service-only job metadata. A matching short approval uses that server-owned proposal, same user/conversation/workspace, a one-hour expiry and unchanged file fingerprint. The proposal ID becomes the new job ID, so duplicate intake cannot create another execution. First worker claim checks the file fingerprint again. New uploads and separate execution requests retain normal routing; private repository jobs cannot use this handoff and owner repository authority is never inherited. Suggestions do not execute code. 969 mandatory regressions and TypeScript pass. Exact Preview/CI, deployment and live suggest/go/verify acceptance remain pending.
 

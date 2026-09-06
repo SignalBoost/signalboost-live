@@ -273,7 +273,12 @@ test('a proposal is displayed only after its exact objective is persisted', asyn
   for (const saveFails of [false, true]) {
     let saved = ''
     const reply = await explainBuilderEvidence({ prompt: 'What improvement is next for this app?', job, workspace: null,
-      ai: { async generate() { return JSON.stringify({ type: 'answer', answer: 'A help option would explain CLI usage.', proposal: objective }) } },
+      ai: { async generate(request) {
+        assert.match(request.systemPrompt, /MUST include a top-level proposal string/)
+        assert.match(request.systemPrompt, /No deployment, publishing, credentials/)
+        assert.equal(JSON.parse(request.prompt).proposalInstructions, undefined)
+        return JSON.stringify({ type: 'answer', answer: 'A help option would explain CLI usage.', proposal: objective })
+      } },
       saveProposal: async value => { if (saveFails) throw new Error('offline'); saved = value },
     })
     if (saveFails) { assert.equal(saved, ''); assert.doesNotMatch(reply, /Say “go”/) }

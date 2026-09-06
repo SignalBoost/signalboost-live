@@ -174,6 +174,29 @@ test('general software explanations do not divert into Builder history', async (
   }
 })
 
+test('project questions read the scoped saved project without authorizing work', async () => {
+  for (const prompt of ['How do I use this app?', 'Explain how report.js works.', 'What should I do next?', 'Does this CLI support refunds?']) {
+    let reads = 0
+    assert.equal(await builderEvidenceReply({ ...input, prompt }, async target => {
+      reads++
+      assert.deepEqual(target, { userId, conversationId, workspaceId })
+      return job
+    }, async authorized => { assert.equal(authorized, job); return 'Project guidance' }), 'Project guidance')
+    assert.equal(reads, 1)
+  }
+})
+
+test('project conversation does not steal new work, unrelated next steps or another user’s source', async () => {
+  assert.equal(await builderEvidenceReply({ ...input, prompt: 'Explain how this app works.', hasNewSource: true }, async () => { assert.fail('new files'); return null }), null)
+  for (const prompt of ['Explain this app, then deploy it.', 'How does this app work? Add logging.', 'Explain this app and run npm test.']) {
+    assert.equal(await builderEvidenceReply({ ...input, prompt }, async () => { assert.fail('new work'); return null }), null)
+  }
+  assert.equal(await builderEvidenceReply({ ...input, prompt: 'What is next?', priorAnswer: 'Weather forecast' }, async () => { assert.fail('unrelated context'); return null }), null)
+  for (const candidate of [null, { ...job, userId: id }, { ...job, conversationId: id }, { ...job, metadata: { platformRepair: true } }]) {
+    assert.equal(await builderEvidenceReply({ ...input, prompt: 'How do I use this app?' }, async () => candidate, async () => { assert.fail('unauthorized source'); return '' }), null)
+  }
+})
+
 test('run-first imported jobs explain from their saved artifact list', async () => {
   const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
   const reply = await explainBuilderEvidence({ prompt: 'Explain why that run failed in index.js', job: { ...job, result: { files: ['package.json', 'index.js'], trace } },

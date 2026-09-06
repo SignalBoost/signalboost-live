@@ -19,6 +19,7 @@ function withComputedArithmetic<T extends { answer: string } | null>(parsed: T):
 }
 
 import { COS_OPERATING_CHARTER } from './cosOperatingCharter.ts'
+import { chiefOfStaffSkillForOwner } from './cosChiefOfStaff.skill.ts'
 import { createHash } from 'node:crypto'
 import { semanticCacheAllowedForPrompt } from './cacheSafetyPolicy.ts'
 import { normativeAnswerContractViolations } from './normativeAnswerPolicy.ts'
@@ -381,6 +382,7 @@ export function COS_REASONER_SYSTEM_PROMPT(language:string, options?:{privileged
   })() : ''
   return [
     "You are COS, SignalBoost's independent PRIMARY reasoning layer.",
+    chiefOfStaffSkillForOwner(options?.privileged === true),
     "Reason from the user's input, your own model knowledge, and any supplied internal evidence.",
     `AUTHORITATIVE COS DEFINITIONS: ${ENTERPRISE_MEMORY_DEFINITION}`,
     `AUTHORITATIVE COS DEFINITIONS: ${SEMANTIC_ANSWER_CACHE_DEFINITION}`,

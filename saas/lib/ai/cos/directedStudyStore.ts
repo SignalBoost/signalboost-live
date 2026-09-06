@@ -17,6 +17,7 @@
 // Everything else is unchanged in intent: owner-supplied material is never auto-trusted — every
 // chunk passes the autonomous cycle's real admission gates, and only admitted chunks persist.
 
+import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { candidate0Confidence, distinctTerms, relevanceOf, sourceAwareRelevant } from '@/lib/cos-core/layers/learning/cycle'
 import { fetchReadableDocument, isFetchableDocumentUrl } from '@/lib/cos-core/layers/learning/documentFetch'
@@ -34,6 +35,73 @@ export type DirectedStudyResult = {
   stored: number
   duplicates: number
   errors: string[]
+  application: {
+    status: 'not_applicable' | 'not_queued' | 'queued' | 'reinforced' | 'queue_failed'
+    lessonId?: number
+    message: string
+  }
+}
+
+function proceduralLessonHash(submission: DirectedStudySubmission): string {
+  return createHash('sha256').update([
+    'owner_directed_procedural_study_v1',
+    clean(submission.sourceUri).toLowerCase(),
+    clean(submission.studyIntent).toLowerCase(),
+  ].join(':')).digest('hex')
+}
+
+async function queueProceduralApplication(args: {
+  db: NonNullable<ReturnType<typeof cosServiceDb>>
+  submission: DirectedStudySubmission
+  assessment: ReturnType<typeof assessDirectedStudy>
+  admittedText: string
+}): Promise<DirectedStudyResult['application']> {
+  if (args.assessment.learningRoute.specialistFamily !== 'software') {
+    return { status: 'not_applicable', message: 'Retained for retrieval; no software application candidate was inferred.' }
+  }
+  if (!args.admittedText.trim()) {
+    return { status: 'not_queued', message: 'No newly admitted software material was available to test.' }
+  }
+
+  const hash = proceduralLessonHash(args.submission)
+  const existing = await args.db.from('cos_teacher_lessons').select('id,repeat_count').eq('prompt_hash', hash).maybeSingle()
+  if (existing.error) throw existing.error
+  const now = new Date().toISOString()
+  const metadata = {
+    origin: 'owner_directed_study',
+    sourceUri: clean(args.submission.sourceUri).slice(0, 700),
+    sourceTitle: clean(args.submission.sourceTitle).slice(0, 300) || null,
+    specialistFamily: 'software',
+    curriculumTracks: args.assessment.learningRoute.curriculumTracks,
+    admissionBasis: 'owner_directed_intent',
+    applicationLifecycle: 'queued_for_candidate_extraction_practice_and_independent_evaluation',
+    authorityGranted: false,
+  }
+  const payload = {
+    prompt_hash: hash,
+    prompt: clean(`Learn and apply this software procedure: ${args.submission.studyIntent}`).slice(0, 20_000),
+    subject: args.assessment.subject,
+    local_answer: null,
+    local_confidence: null,
+    escalation_reason: 'Owner-directed procedural study; application has not yet been demonstrated.',
+    teacher_answer: clean(args.admittedText).slice(0, 40_000),
+    teacher_provider: 'owner_directed_material',
+    teacher_model: null,
+    status: 'captured',
+    metadata,
+    updated_at: now,
+  }
+  if (existing.data?.id) {
+    const write = await args.db.from('cos_teacher_lessons').update({
+      ...payload,
+      repeat_count: Number(existing.data.repeat_count || 1) + 1,
+    }).eq('id', existing.data.id)
+    if (write.error) throw write.error
+    return { status: 'reinforced', lessonId: Number(existing.data.id), message: 'Software application candidate reinforced and awaiting governed evaluation.' }
+  }
+  const write = await args.db.from('cos_teacher_lessons').insert(payload).select('id').single()
+  if (write.error) throw write.error
+  return { status: 'queued', lessonId: Number(write.data.id), message: 'Software application candidate queued for extraction, practice, and independent evaluation.' }
 }
 
 export function youTubeVideoId(rawUrl: string): string | null {
@@ -86,7 +154,7 @@ async function fetchYouTubeTranscript(videoId: string, videoUrl: string): Promis
 }
 
 export async function runDirectedStudy(input: { submission: Omit<DirectedStudySubmission, 'text'> & { text?: string | null }; dryRun?: boolean }): Promise<DirectedStudyResult> {
-  const result: DirectedStudyResult = { ok: false, resolvedFrom: null, assessment: null, stored: 0, duplicates: 0, errors: [] }
+  const result: DirectedStudyResult = { ok: false, resolvedFrom: null, assessment: null, stored: 0, duplicates: 0, errors: [], application: { status: 'not_queued', message: 'Application evaluation was not queued.' } }
 
   let text = String(input.submission.text || '').trim()
   if (text) {
@@ -141,6 +209,16 @@ export async function runDirectedStudy(input: { submission: Omit<DirectedStudySu
     } else {
       result.stored += 1
     }
+  }
+  try {
+    const admittedText = assessment.chunks
+      .filter(chunk => chunk.admitted)
+      .map(chunk => chunks[chunk.index] || '')
+      .join('\n\n')
+    result.application = await queueProceduralApplication({ db, submission, assessment, admittedText })
+  } catch (error) {
+    result.application = { status: 'queue_failed', message: 'Knowledge was retained, but application evaluation could not be queued.' }
+    result.errors.push(`application-queue:${String(error instanceof Error ? error.message : error).slice(0, 300)}`)
   }
   return result
 }

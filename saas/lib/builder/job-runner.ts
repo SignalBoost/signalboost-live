@@ -1,3 +1,4 @@
+import { builderRunSourceEvidence } from './source-evidence.ts'
 import { builderPendingWriteEvidence } from './evidence-events.ts'
 // lib/builder/job-runner.ts
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
@@ -74,6 +75,7 @@ function publicTrace(trace: readonly BuilderToolTrace[]) {
     const result = output && typeof output === 'object' ? output as Record<string, unknown> : {}
     return {
       ...base,
+      ...builderRunSourceEvidence(output),
       command: typeof input.command === 'string' ? input.command.slice(0, 2_000) : '',
       ...(typeof result.exitCode === 'number' ? { exitCode: result.exitCode } : {}),
       ...(typeof result.stdout === 'string' ? { stdout: result.stdout.slice(0, 16_000) } : {}),

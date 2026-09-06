@@ -1,3 +1,4 @@
+import { captureBuilderSource } from './source-evidence.ts'
 // saas/lib/builder/tool-loop.ts
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
@@ -426,7 +427,8 @@ export class BuilderToolLoop {
         // Old write proposals are not current source. Replaying their large strings,
         // especially rejected duplicates, crowds out the actual runner diagnostics.
         trace.length ? `RESULTS:\n${safeJson(trace.map(item => item.toolId === 'write_file' || item.toolId === 'edit_file'
-          ? { ...item, input: { path: toolPath(item.input) } } : item))}` : '',
+          ? { ...item, input: { path: toolPath(item.input) } } : item.toolId === 'run'
+            ? { ...item, output: { ...(isRecord(item.output) ? item.output : {}), sourceSnapshot: undefined } } : item))}` : '',
         formatBuilderWorkingFiles([...workingFiles.values()]),
         formatContractOscillation(detectContractOscillation(trace)),
         currentStep,
@@ -575,7 +577,8 @@ export class BuilderToolLoop {
 
           if (proofCommand && !failedProof && !passedProof) {
             if (runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
-            const output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: proofCommand, files }))
+            const sourceSnapshot = captureBuilderSource(files)
+            const output = { ...summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: proofCommand, files })), sourceSnapshot }
             const failed = output.exitCode !== 0
             trace.push({
               round,
@@ -590,7 +593,8 @@ export class BuilderToolLoop {
           }
           if (proofCommand && failedProof && edited && !verifiedAfterFail) {
             if (runCount >= MAX_RUNS_PER_TURN) return { ok: false, error: 'builder_run_budget_exhausted', trace }
-            const output = summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: proofCommand, files }))
+            const sourceSnapshot = captureBuilderSource(files)
+            const output = { ...summarizeRun(await this.runner.run({ workspaceId: input.workspaceId, command: proofCommand, files })), sourceSnapshot }
             const failed = output.exitCode !== 0
             trace.push({
               round,
@@ -697,6 +701,7 @@ export class BuilderToolLoop {
           }
           // Only the host may attest a requested/executed-command alias; discard model-supplied aliases.
           action.input = { command, ...(requestedCommand && requestedCommand !== command ? { requestedCommand } : {}) }
+          const sourceSnapshot = captureBuilderSource(files)
           const result = await this.runner.run({ workspaceId: input.workspaceId, command, files })
           for (const generated of result.generatedFiles || []) {
             if (generated.path !== 'package-lock.json') throw new Error('builder_generated_file_disallowed')
@@ -714,7 +719,7 @@ export class BuilderToolLoop {
             }
           }
           if (result.executedCommand) action.input = { command: result.executedCommand, requestedCommand: requestedCommand || command }
-          output = summarizeRun(result)
+          output = { ...summarizeRun(result), sourceSnapshot }
         }
         const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0
         if (runFailed) {

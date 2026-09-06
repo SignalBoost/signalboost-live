@@ -44,7 +44,10 @@ test('more than the allowed silent days in a week is red', () => {
   const report = assessLearningContinuity(corpus, [], { now })
   assert.equal(report.silentDaysLast7 > MAX_SILENT_DAYS_IN_7, true)
   assert.equal(report.status, 'red')
-  assert.ok(report.findings.some(f => f.code === 'silent_days'))
+  const finding = report.findings.find(f => f.code === 'silent_days')
+  assert.ok(finding)
+  assert.match(finding.detail, /managed reasoner/)
+  assert.doesNotMatch(finding.detail, /pod/i)
 })
 
 test('reinforcement without expansion is amber, not green', () => {

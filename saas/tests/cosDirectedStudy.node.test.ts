@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import {
   assessDirectedStudy,
   directedContentHash,
@@ -35,6 +36,9 @@ const input: DirectedStudySubmission = {
   sourceUri: 'owner://book/chapter',
   text: 'Transformer attention mechanisms compute weighted combinations of value vectors. Multi head attention distributes context through transformer layers for efficient retrieval.'.repeat(2),
 }
+
+const directedStudyPage = readFileSync(new URL('../app/dashboard/cos-directed-study/page.tsx', import.meta.url), 'utf8')
+const continuityEmail = readFileSync(new URL('../app/api/cron/cos-learning-continuity/route.ts', import.meta.url), 'utf8')
 
 test('owner-directed material is admitted when it is substantive and provenance requirements are present', () => {
   const result = assessDirectedStudy(input, gates)
@@ -88,4 +92,16 @@ test('stable source-specific hashes and owner admission provenance are preserved
   assert.ok(evidence.includes('learning_orchestrator:cos'))
   assert.ok(evidence.includes('specialist_family:software'))
   assert.ok(evidence.includes('specialist_authority_granted:false'))
+})
+
+test('owner UI reports route, retention, and honest application status after feeding', () => {
+  assert.match(directedStudyPage, /learningRoute\.specialistFamily === 'software'/)
+  assert.match(directedStudyPage, /knownKnowledgeReinforced/)
+  assert.match(directedStudyPage, /applicationPending/)
+  assert.doesNotMatch(directedStudyPage, /applicationValidation[^\n]*passed/i)
+})
+
+test('learning alert points to current specialist telemetry and never obsolete RunPod', () => {
+  assert.match(continuityEmail, /api\/admin\/cos-specialist-learning/)
+  assert.doesNotMatch(continuityEmail, /api\/admin\/cos-runpod/)
 })

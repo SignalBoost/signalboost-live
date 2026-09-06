@@ -3,7 +3,9 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.41
+**Version:** 1.42
+
+**Builder initial repair explanation — 2026-09-06:** implemented on `feat/builder-initial-explanation`; live acceptance pending. Terminal workspace repairs now automatically request a source-based explanation from the approved Builder model before saving the initial response. The read-only explanation uses current source, recorded edit evidence, command results and terminal error, and covers cause, change, verification and the useful next step. Paused jobs continue without narration. A 35-second maximum bounded by the existing persistence reserve keeps explanation failure from discarding execution results; unavailable explanations retain deterministic repair evidence. This changes workspace repair reporting, not private repository access or the separate owner repository-repair lane. Focused tests cover real failing/passing Node evidence, malformed/unavailable inference and stalled reads. Production acceptance requires a repair request without a separate explanation question.
 
 **Software Specialist learning telemetry — 2026-09-06:** implemented on `feat/specialist-learning-telemetry-20260906` and **not yet Production-accepted**. Directed Study now records a deterministic COS-owned learning route for software material, including deeper curriculum tracks for development, debugging, testing, architecture, delivery, security, and technical writing. General material remains COS study and is not forced into the Software Specialist. New feedback-derived procedural candidates persist the same stable specialist identity and curriculum metadata. Owner-only `GET /api/admin/cos-specialist-learning` reports lifecycle counts, curriculum coverage, and fresh/stale validated skills from the existing cognitive-skill evidence; it cannot promote a skill, increase answer confidence, grant tools, or widen execution authority. No new learning database or parallel brain was created. Exact Preview/CI, Production deployment, and a real routed Directed Study observation remain required before runtime acceptance.
 

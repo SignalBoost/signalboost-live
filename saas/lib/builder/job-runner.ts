@@ -8,6 +8,7 @@ import { formatBuilderOperatorRepairReply } from './operator-narration.ts'
 import { builderNextAction } from './user-guidance.ts'
 import { isRepairObjective } from './regression-gate.ts'
 import { formatBuilderExecutionEvidence } from './execution-evidence.ts'
+import { explainInitialBuilderRepair } from './explain-evidence.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
 import { VercelSandboxBuilderRunner } from './vercel-sandbox-runner.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
@@ -235,8 +236,18 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
       return
     }
+    const shouldExplain = Boolean(plan) || isRepairObjective(job.objective)
+      || trace.some(item => item.toolId === 'run' && !item.ok)
+    const initialReply = async (fallback: string, status: string) => shouldExplain
+      ? explainInitialBuilderRepair({
+          prompt: job.objective,
+          job: { ...job, status, result: { files, trace, ...(result.ok === false ? { error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error } : {}) } },
+          workspace: { readFile: (workspaceId, path) => workspace.readExistingFile(workspaceId, path) },
+          ai, fallback, deadlineAtMs: deadlineAtMs - BUILDER_JOB_RESULT_RESERVE_MS,
+        })
+      : `${fallback}\n\n${formatBuilderExecutionEvidence(trace)}`
     if (result.ok === false) {
-      const reply = historyReply(`${repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace)}\n\n${builderNextAction(result.error, result.trace)}`, job.workspaceId, files)
+      const reply = historyReply(await initialReply(`${repairAwareFailureReply(job, result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error, trace)}\n\n${builderNextAction(result.error, result.trace)}`, 'failed'), job.workspaceId, files)
       await finishBuilderJob({
         jobId: job.id,
         userId: job.userId,
@@ -260,7 +271,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
     const baseReply = isRepairObjective(job.objective)
       ? formatBuilderOperatorRepairReply({ ok: true, answer: result.answer, trace })
       : result.answer
-    const reply = historyReply(`${baseReply}\n\n${formatBuilderExecutionEvidence(trace)}`, job.workspaceId, files)
+    const reply = historyReply(await initialReply(baseReply, 'succeeded'), job.workspaceId, files)
     await finishBuilderJob({
       jobId: job.id,
       userId: job.userId,

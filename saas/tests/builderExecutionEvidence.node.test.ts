@@ -129,7 +129,8 @@ test('both initial History reply and shared pre-execution routing use recorded e
   const specialist = readFileSync('lib/ai/cos/softwareSpecialist.ts', 'utf8')
   const store = readFileSync('lib/builder/job-store.ts', 'utf8')
   assert.doesNotMatch(specialist, /await workspace.writeFile\(workspaceId, 'index.html', travelLandingPageHtml\(\)\)/)
-  assert.match(runner, /historyReply\(`\$\{baseReply\}.*formatBuilderExecutionEvidence\(trace\)/)
+  assert.match(runner, /historyReply\(await initialReply\(baseReply, 'succeeded'\)/)
+  assert.match(runner, /explainInitialBuilderRepair\(/)
   assert.ok(specialist.indexOf('await builderEvidenceReply(') < specialist.indexOf('if (input.allowRepositoryRepair'))
   const read = store.slice(store.indexOf('export async function readBuilderEvidenceJob'), store.indexOf('export async function enqueueBuilderJob'))
   assert.match(read, /\.eq\('user_id', input.userId\)\.eq\('conversation_id', input.conversationId\)/)
@@ -180,4 +181,65 @@ test('run-first imported jobs explain from their saved artifact list', async () 
     ai: { async generate(request) { assert.match(request.prompt, /module.exports = 42/); return '{"type":"answer","answer":"The recorded run succeeded."}' } },
   })
   assert.match(reply, /current workspace files/)
+})
+
+
+test('initial repair explains actual failure, edit and passing check without a follow-up', async () => {
+  const { explainInitialBuilderRepair } = await import('../lib/builder/explain-evidence.ts')
+  const before = 'const assert = require("node:assert/strict"); assert.equal(1 + 1, 3)'
+  const after = before.replace(', 3)', ', 2)')
+  const directory = await mkdtemp(join(tmpdir(), 'builder-initial-'))
+  try {
+    await writeFile(join(directory, 'sum.cjs'), before)
+    let failure = ''
+    try { execFileSync(process.execPath, ['sum.cjs'], { cwd: directory, encoding: 'utf8', stdio: 'pipe' }); assert.fail('must fail') }
+    catch (error: any) { assert.equal(error.status, 1); failure = error.stderr }
+    await writeFile(join(directory, 'sum.cjs'), after)
+    const stdout = execFileSync(process.execPath, ['sum.cjs'], { cwd: directory, encoding: 'utf8' })
+    const recorded = [
+      { toolId: 'run', command: 'node sum.cjs', exitCode: 1, stderr: failure, stdout: '' },
+      { toolId: 'edit_file', ok: true, path: 'sum.cjs', change: { search: ', 3)', replace: ', 2)', truncated: false } },
+      { toolId: 'run', command: 'node sum.cjs', exitCode: 0, stderr: '', stdout },
+    ]
+    const reply = await explainInitialBuilderRepair({ prompt: 'Repair sum.cjs', job: { ...job, result: { trace: recorded } },
+      workspace: { async readFile() { return { path: 'sum.cjs', content: after, updatedAt: 1 } } },
+      ai: { async generate(request) {
+        const evidence = JSON.parse(request.prompt)
+        assert.equal(evidence.currentFiles[0].content, after)
+        assert.deepEqual(evidence.recordedTrace, recorded)
+        assert.match(request.systemPrompt, /without requiring a follow-up question/)
+        return JSON.stringify({ type: 'answer', answer: 'sum.cjs expected 3 for 1 + 1. The expectation changed to 2; the recorded check now passes.' })
+      } }, fallback: 'Verified check passed.', deadlineAtMs: Date.now() + 5000 })
+    assert.match(reply, /expected 3 for 1 \+ 1/)
+    assert.match(reply, /Exit code: 1/)
+    assert.match(reply, /Exit code: 0/)
+    assert.doesNotMatch(reply, /no code was rerun/)
+  } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test('initial explanation failures preserve execution evidence and terminal fallback', async () => {
+  const { explainInitialBuilderRepair } = await import('../lib/builder/explain-evidence.ts')
+  for (const response of ['not json', '{}', 'throw']) {
+    const reply = await explainInitialBuilderRepair({ prompt: 'Repair', job, workspace: null,
+      ai: { async generate() { if (response === 'throw') throw new Error('offline'); return response } },
+      fallback: 'The check passed; source explanation unavailable.', deadlineAtMs: Date.now() + 5000 })
+    assert.match(reply, /The check passed/)
+    assert.match(reply, /Hello from COS Builder/)
+  }
+})
+
+test('initial explanation skips exhausted budget and bounds a stalled source read', async t => {
+  const { explainInitialBuilderRepair } = await import('../lib/builder/explain-evidence.ts')
+  const ai = { async generate(): Promise<string> { assert.fail('must not call model') } }
+  const fallback = 'Repair remains unverified.'
+  const expired = await explainInitialBuilderRepair({ prompt: 'Repair', job, workspace: null, ai, fallback, deadlineAtMs: Date.now() })
+  assert.match(expired, /Repair remains unverified/)
+  t.mock.timers.enable({ apis: ['setTimeout'] })
+  let release!: (value: null) => void
+  const pending = explainInitialBuilderRepair({ prompt: 'Repair', job: { ...job, status: 'failed', result: { files: ['sum.cjs'], trace } },
+    workspace: { readFile: () => new Promise(resolve => { release = resolve }) }, ai, fallback, deadlineAtMs: Date.now() + 2000 })
+  t.mock.timers.tick(2001)
+  assert.match(await pending, /Repair remains unverified/)
+  release(null)
+  await Promise.resolve()
 })

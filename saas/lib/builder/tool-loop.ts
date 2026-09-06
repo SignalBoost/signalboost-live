@@ -2,6 +2,7 @@
 import type { BuilderAiPort, BuilderFailureClass, BuilderFile, BuilderLoopResult, BuilderRunResult, BuilderRunnerPort, BuilderToolId, BuilderToolTrace, BuilderWorkspacePort } from './contracts.ts'
 import { evaluateRegressionGate, isRepairObjective } from './regression-gate.ts'
 import { formatVerifiedLessonsForPrompt } from './verified-lessons.ts'
+import { formatBuilderCognitiveGuidance } from './cognitive-application.ts'
 import { discoverBuilderProjectContext, formatBuilderProjectContext, normalizeBuilderSandboxCommand } from './project-context.ts'
 import { deriveRepairPhase, formatRepairPhase } from './repair-phase.ts'
 import { builderTaskContract, builderTaskProgress } from './task-contract.ts'
@@ -310,7 +311,7 @@ export class BuilderToolLoop {
     this.runner = runner
   }
 
-  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; projectContext?: unknown; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean; deadlineAtMs?: number; minimumStepMs?: number }): Promise<BuilderLoopResult> {
+  async run(input: { objective: string; workspaceId: string; maxRounds?: number; modelRoundTimeoutMs?: number; projectContext?: unknown; priorLessons?: readonly import('./contracts.ts').BuilderVerifiedRepairLesson[]; cognitiveSkills?: readonly import('@/lib/ai/cos/cognitiveSkillContext').CognitiveSkillContextItem[]; checkpoint?: BuilderLoopCheckpoint | null; shouldPause?: (beforeTool?: boolean) => boolean; deadlineAtMs?: number; minimumStepMs?: number }): Promise<BuilderLoopResult> {
     const saved = input.checkpoint
     if (saved && (saved.version !== 1 || saved.workspaceId !== input.workspaceId || saved.objectiveDigest !== checkpointDigest(input.objective))) {
       return { ok: false, error: 'builder_checkpoint_scope_mismatch', trace: [] }
@@ -406,6 +407,7 @@ export class BuilderToolLoop {
 
       const promptParts = [
         formatVerifiedLessonsForPrompt(input.priorLessons || [], [...trace].reverse().find(item => !item.ok && item.failureClass)?.failureClass || null),
+        formatBuilderCognitiveGuidance(input.cognitiveSkills || []),
         BUILDER_REASONING_GUIDANCE,
         `OBJECTIVE:\n${input.objective}`,
         ...(input.projectContext ? [

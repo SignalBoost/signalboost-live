@@ -1,14 +1,25 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { verifiedBuilderCognitiveApplication } from '../lib/builder/cognitive-application.ts'
 
 const route = readFileSync(new URL('../app/api/builder/route.ts', import.meta.url), 'utf8')
 const historyRoute = readFileSync(new URL('../app/api/assistant/chats/route.ts', import.meta.url), 'utf8')
 const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
 const jobStore = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
 const jobRunner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+const repositoryRepair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+const cognitiveSkillContext = readFileSync(new URL('../lib/ai/cos/cognitiveSkillContext.ts', import.meta.url), 'utf8')
 const migration = readFileSync(new URL('../supabase/migrations/20260831174502_builder_jobs_and_history_order.sql', import.meta.url), 'utf8')
 const staleRecoveryMigration = readFileSync(new URL('../supabase/migrations/20260831180318_builder_job_stale_recovery.sql', import.meta.url), 'utf8')
+
+test('cognitive application requires a workspace change and successful host verification', () => {
+  const change = { round: 1, toolId: 'edit_file' as const, input: {}, ok: true }
+  const pass = { round: 2, toolId: 'run' as const, input: {}, ok: true, output: { exitCode: 0 } }
+  assert.equal(verifiedBuilderCognitiveApplication({ ok: true, answer: 'done', trace: [change, pass] }), true)
+  assert.equal(verifiedBuilderCognitiveApplication({ ok: true, answer: 'done', trace: [pass] }), false)
+  assert.equal(verifiedBuilderCognitiveApplication({ ok: false, error: 'failed', trace: [change, pass] }), false)
+})
 
 test('POST creates a durable job, schedules work after the response, and returns 202', () => {
   assert.match(route, /import \{ after, NextResponse \} from 'next\/server'/)
@@ -108,11 +119,16 @@ test('expired background workers become terminal in both polling and History', (
   assert.match(staleRecoveryMigration, /grant execute on function public\.expire_stale_builder_jobs[\s\S]*service_role/)
 })
 
-test('background execution is idempotently claimed and skips cognitive-skill retrieval', () => {
+test('background execution is idempotently claimed and applies only validated software skills with verified outcomes', () => {
   assert.match(jobRunner, /job = await claimBuilderJob\(jobId, userId\)/)
   assert.match(jobRunner, /if \(!job\) return/)
   assert.match(jobRunner, /fetchProjectRepairSignals\(job.workspaceId\)/)
-  assert.doesNotMatch(jobRunner, /fetchVerifiedRepairLessons|retrieveCognitiveSkills/)
+  assert.match(jobRunner, /retrieveValidatedCognitiveSkills\(job\.objective, \{ specialistFamily: 'software' \}\)/)
+  assert.match(cognitiveSkillContext, /query\.contains\('metadata', \{ specialistFamily: options\.specialistFamily \}\)/)
+  assert.match(jobRunner, /verifiedBuilderCognitiveApplication\(result\)/)
+  assert.match(jobRunner, /recordVerifiedCognitiveProductionOutcome/)
+  assert.match(repositoryRepair, /cognitiveSkills: cognitive\.items/)
+  assert.match(repositoryRepair, /cos_software_specialist_platform_engineer/)
   assert.match(jobRunner, /runDebugFileJob/)
   assert.match(jobRunner, /finishBuilderJob/)
 })

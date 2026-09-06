@@ -24,7 +24,7 @@ create table if not exists public.builder_merge_watches (
   pre_merge_snapshot_id text not null check (length(pre_merge_snapshot_id) between 1 and 200),
   pull_request_number integer,
   -- Bounded so a deployment that never resolves stops costing cron time rather than retrying forever.
-  attempts integer not null default 0 check (attempts between 0 and 10),
+  attempts integer not null default 0 check (attempts between 0 and 3),
   status text not null default 'pending'
     check (status in ('pending', 'healthy', 'rolled_back', 'abandoned')),
   outcome_detail text,
@@ -55,7 +55,7 @@ language sql security invoker set search_path = public, pg_temp as $$
       updated_at = now()
   where w.id in (
     select id from public.builder_merge_watches
-    where status = 'pending' and next_check_at <= now() and attempts < 10
+    where status = 'pending' and next_check_at <= now() and attempts < 3
     order by next_check_at asc
     limit greatest(least(p_limit, 5), 1)
     for update skip locked

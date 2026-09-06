@@ -4,14 +4,14 @@ import { watchMergedDeployment } from './repository-merge-watch.ts'
 import type { StateSnapshotPort } from '@/lib/portable/state-snapshot-port'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
-export const REPOSITORY_REPAIR_AUTOMERGE_MARKER = 'COS_AUTOMERGE_AUTHORIZED: owner-platform-repair-v1'
+export const REPOSITORY_REPAIR_AUTOMERGE_MARKER = 'Owner-authorized Platform Engineer repair.'
 const REPAIR_TITLE = 'COS Platform Engineer: verified repository repair'
 const REPAIR_BRANCH = /^cos\/platform-repair-[0-9a-f]{8}-[a-z0-9]{1,20}$/
 const SAFE_SHA = /^[0-9a-f]{40}$/i
 const MAX_CANDIDATES = 4
 
 type RequestLike = typeof fetch
-type JsonRecord = Record<string, any>
+type JsonValue = Record<string, any> | any[]
 
 export type RepositoryRepairMergeContinuationResult = Readonly<{
   enabled: boolean
@@ -41,9 +41,9 @@ function headers(token: string): Record<string, string> {
   }
 }
 
-async function requestJson(request: RequestLike, url: string, init: RequestInit = {}): Promise<JsonRecord> {
+async function requestJson(request: RequestLike, url: string, init: RequestInit = {}): Promise<JsonValue> {
   const response = await request(url, init)
-  const payload = await response.json().catch(() => ({})) as JsonRecord
+  const payload = await response.json().catch(() => ({})) as JsonValue
   if (!response.ok) throw new Error(`repository_repair_merge_continuation_http_${response.status}`)
   return payload
 }
@@ -69,7 +69,7 @@ async function pullChangeEvidence(request: RequestLike, writeHeaders: Record<str
     `${GITHUB_API}/pulls/${pullRequestNumber}/files?per_page=100`,
     { method: 'GET', headers: writeHeaders },
   )
-  const rows = Array.isArray(payload) ? payload : Array.isArray((payload as any)?.items) ? (payload as any).items : []
+  const rows = Array.isArray(payload) ? payload : []
   const files = rows
     .filter((row: any) => typeof row?.filename === 'string')
     .map((row: any) => ({ path: String(row.filename), content: '' }))

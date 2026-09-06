@@ -5,13 +5,19 @@ import {
   OBSERVATION_POLICY_DRIFT_ERROR_CODE,
   OBSERVATION_POLICY_RECONCILE_TARGET,
 } from '@/agent-gateway-host/observation-policy-recovery'
+import {
+  COS_QUALITY_AUTOPSY_BACKLOG_ERROR_CODE,
+  COS_QUALITY_RECOVERY_TARGET,
+  COS_QUALITY_REGRESSION_ERROR_CODE,
+} from '@/agent-gateway-host/cos-quality-recovery'
 
 const DRIFT_REPAIR_WORDS = /\b(observation|scheduler|schedule|cadence|interval|policy|configuration|config)\b/i
+const QUALITY_REPAIR_WORDS = /\b(benchmark|quality|autopsy|retest|reasoning|evidence|lesson|skill|regression)\b/i
 
 /**
  * Add trusted incident context to the otherwise prose-only repair resolver. Model text can select
- * nothing by itself: the automatic target is reachable only when the host-created incident names
- * this exact registered recovery and marks it pre-authorized.
+ * nothing by itself: an automatic target is reachable only when the host-created incident names
+ * that exact registered recovery and marks it pre-authorized.
  */
 export function createNativeRepairActionResolver(incident: SupervisorIncident): RepairActionResolver {
   return (step, normalizedIncident) => {
@@ -21,6 +27,14 @@ export function createNativeRepairActionResolver(incident: SupervisorIncident): 
       && step.executor === 'api_executor'
       && DRIFT_REPAIR_WORDS.test(`${step.action} ${step.target} ${step.expected_result}`)
     if (trustedDrift) return OBSERVATION_POLICY_RECONCILE_TARGET
+
+    const trustedQuality = [COS_QUALITY_REGRESSION_ERROR_CODE, COS_QUALITY_AUTOPSY_BACKLOG_ERROR_CODE].includes(String(incident.errorCode || ''))
+      && incident.metadata?.registeredRecoveryAction === COS_QUALITY_RECOVERY_TARGET
+      && incident.metadata?.recoveryPreauthorized === true
+      && step.executor === 'api_executor'
+      && QUALITY_REPAIR_WORDS.test(`${step.action} ${step.target} ${step.expected_result}`)
+    if (trustedQuality) return COS_QUALITY_RECOVERY_TARGET
+
     return resolveSupervisorRepairAction(step, normalizedIncident)
   }
 }

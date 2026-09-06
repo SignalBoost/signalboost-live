@@ -269,7 +269,7 @@ test('initial explanation skips exhausted budget and bounds a stalled source rea
 
 test('a proposal is displayed only after its exact objective is persisted', async () => {
   const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
-  const objective = 'Add a --help option to cli.js, preserve current behavior and tests, and run npm test.'
+  const objective = 'Add a --help option to cli.js, preserve current behavior and tests.\nRun:\nnpm test\nnode cli.js --help'
   for (const saveFails of [false, true]) {
     let saved = ''
     const reply = await explainBuilderEvidence({ prompt: 'What improvement is next for this app?', job, workspace: null,
@@ -288,7 +288,7 @@ test('a proposal is displayed only after its exact objective is persisted', asyn
 
 test('proposal approval is exact, scoped to unchanged evidence and not reconstructed from chat', async () => {
   const { isBuilderProposalApproval, proposalObjective, workspaceFingerprint, readBuilderProposal, proposalMatches } = await import('../lib/builder/proposal.ts')
-  const objective = 'Add a --help option to cli.js and run npm test.'
+  const objective = 'Add a --help option to cli.js.\nRun:\nnpm test\nnode cli.js --help'
   const fingerprint = workspaceFingerprint([{ path: 'cli.js', content: 'original' }])
   const proposal = { id, sourceJobId: id, objective, fingerprint, expiresAt: 2000 }
   for (const text of ['go', 'Go ahead.', 'do it', 'proceed', 'implement that']) assert.equal(isBuilderProposalApproval(text), true)
@@ -313,4 +313,22 @@ test('proposal handoff uses a saved id once and rechecks source before worker ex
   assert.match(store, /eq\('metadata', JSON.stringify\(job.metadata\)\)/)
   assert.match(runner, /job.claimGeneration === 1/)
   assert.ok(runner.indexOf("'builder_proposal_source_changed'") < runner.indexOf('await executeSignalBoostRepositoryRepair('))
+})
+
+
+test('proposal completion requires every promised command after the last edit', async () => {
+  const { proposalObjective } = await import('../lib/builder/proposal.ts')
+  const { builderTaskContract, builderTaskProgress } = await import('../lib/builder/task-contract.ts')
+  const raw = 'Add a `--help` usage branch to `cli.js`; verify with `npm test` and `node cli.js --help`.'
+  const objective = proposalObjective(raw)!
+  assert.ok(objective.endsWith('Run:\nnpm test\nnode cli.js --help'))
+  assert.equal(proposalObjective(objective), objective)
+  assert.equal(proposalObjective('Add a helpful usage message to cli.js.'), null)
+  const contract = builderTaskContract(objective)
+  const trace: any[] = [{ toolId: 'edit_file', ok: true, input: { path: 'cli.js' } },
+    { toolId: 'run', ok: true, input: { command: 'npm test' }, output: { exitCode: 0 } }]
+  assert.deepEqual(builderTaskProgress(contract, ['cli.js'], trace).pendingCommands, ['node cli.js --help'])
+  assert.equal(builderTaskProgress(contract, ['cli.js'], trace).satisfied, false)
+  trace.push({ toolId: 'run', ok: true, input: { command: 'node cli.js --help' }, output: { exitCode: 0 } })
+  assert.equal(builderTaskProgress(contract, ['cli.js'], trace).satisfied, true)
 })

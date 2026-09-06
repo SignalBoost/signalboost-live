@@ -243,7 +243,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         result: { jobId: job.id, workspaceId: job.workspaceId, status: 'paused', reply, files, trace } })
       return
     }
-    const shouldExplain = Boolean(plan) || isRepairObjective(job.objective)
+    const shouldExplain = Boolean(plan) || isRepairObjective(job.objective) || typeof job.metadata.proposalSourceJobId === 'string'
       || trace.some(item => item.toolId === 'run' && !item.ok)
     const initialReply = async (fallback: string, status: string) => shouldExplain
       ? explainInitialBuilderRepair({

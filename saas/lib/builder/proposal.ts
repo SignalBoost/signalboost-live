@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { builderTaskContract } from './task-contract.ts'
 
 export type BuilderProposal = {
   id: string
@@ -15,11 +16,18 @@ export const wantsBuilderProposal = (text: string) => /\b(?:next|recommend|sugge
 export function proposalObjective(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const text = value.trim()
-  if (text.length < 20 || text.length > 3000 || !/^(?:add|update|extend|improve|refactor|fix)\b/i.test(text)) return null
+  if (text.length < 20 || text.length > 4000 || !/^(?:add|update|extend|improve|refactor|fix)\b/i.test(text)) return null
   // This handoff authorizes isolated project edits/tests only. Other action lanes
   // must receive their own explicit request and normal authorization checks.
   if (/\b(?:deploy|publish|merge|push|production|credentials?|secrets?|billing|purchase|payment|delete|drop|truncate)\b|https?:\/\//i.test(text)) return null
-  return text
+  const explicit = builderTaskContract(text).commands
+  const quoted = [...text.matchAll(/`([^`\n]+)`/g)].map(match => match[1].trim())
+    .filter(command => /^(?:node|python3?|npm|pnpm|yarn|bun)\s+\S/.test(command))
+  const commands = [...new Set([...explicit, ...quoted])]
+  if (!commands.length || commands.length > 8 || commands.some(command => command.length > 2000)) return null
+  const missing = commands.filter(command => !explicit.includes(command))
+  const normalized = missing.length ? `${text}\nRun:\n${missing.join('\n')}` : text
+  return normalized.length <= 4000 ? normalized : null
 }
 
 export function workspaceFingerprint(files: readonly { path: string; content: string }[]): string {

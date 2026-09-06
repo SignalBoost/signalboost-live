@@ -3,7 +3,9 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.51
+**Version:** 1.52
+
+**Builder proposal verification follow-through — 2026-09-06:** #1889 merged at 440ea3225514dcb2a03a6e1151bdf6a954601b8d, Production dpl_B1a8By9fLEKJtTijwogLuNEUSESU READY. The identical recommendation request saved proposal f0f01b8b-ab34-4201-a11c-a10e2921a3c3; a bare go created that exact job in workspace 1ce11289-af83-4d6a-9baa-bb79fa2d15a8 and added the proposed --help branch. All nine existing tests passed, but the loop stopped before the additionally promised node cli.js --help command. Full acceptance remains withheld. Proposal normalization now promotes quoted verification commands into an explicit Run section before saving/display, and rejects proposals without an enforceable verification command. Completion uses the existing all-commands gate; approved proposal jobs also receive automatic source/result explanations. 970 mandatory tests pass; TypeScript, Preview/CI, deployment and a fresh end-to-end proposal remain required.
 
 **Builder proposal live follow-through — 2026-09-06:** #1887 merged at db96f4d409d712225805957279639f14fe3072c0; eleven CI checks and exact Preview passed, Production dpl_6CLtJVtT2mxtsrYkXyb8mBp1EyPe was READY. The first live recommendation on existing job 9775dea0-2e54-4035-a6c8-21a36f3dc6b5 described --help but produced no saved pendingProposal, so the go handoff is not yet accepted. The response contract now requests the proposal in trusted system instructions rather than inside the evidence JSON, and records bounded failure reasons when a model proposal is missing/invalid or cannot be persisted. 969 mandatory tests pass; TypeScript, exact Preview/CI and a fresh live retry remain required.
 

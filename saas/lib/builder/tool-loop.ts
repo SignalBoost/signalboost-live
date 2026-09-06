@@ -640,7 +640,7 @@ export class BuilderToolLoop {
         if (action.toolId === 'write_file' || action.toolId === 'edit_file') {
           if (action.toolId === 'write_file' && action.input.mode === 'append') {
             const path = builderFilePath(toolPath(action.input))
-            if (workspacePaths.includes(path)) throw new Error('builder_chunk_existing_file')
+            if (workspacePaths.includes(path) || await this.workspace.readFile(input.workspaceId, path)) throw new Error('builder_chunk_existing_file')
             const assembled = appendBuilderChunk(chunks.get(path) || '', action.input)
             if (action.input.final !== true) {
               chunks.set(path, assembled)

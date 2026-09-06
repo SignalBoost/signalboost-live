@@ -1,3 +1,4 @@
+import { selectBuilderProject, builderProjectBlockedReply } from '@/lib/builder/project-continuity'
 import { explainBuilderEvidence } from '@/lib/builder/explain-evidence'
 import { createBuilderCodingAiPort } from '@/lib/cos/aiPort'
 import { createGovernedBuilderAiPort } from '@/lib/builder/control-adapter'
@@ -171,9 +172,17 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   try { repositoryTarget = importRequested ? builderRepositoryTarget(objective, input.body?.repositoryUrl) : null }
   catch (error) { return NextResponse.json({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 400 }) }
 
+  const project = await selectBuilderProject({
+    objective, userId: access?.userId || publicAuditUserId(), conversationId: conversationIdFrom(input.body),
+    requestedWorkspaceId: String(input.body?.workspaceId || input.body?.context?.workspaceId || ''),
+    hasNewSource: sourceAttached || (Array.isArray(input.body?.files) && input.body.files.length > 0),
+    repositoryImport: Boolean(repositoryTarget),
+  }, readBuilderEvidenceJob)
+  if (project.blocked) return NextResponse.json({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: project.blocked === 'busy' ? 409 : 503 })
+
   const roleMatched = isConciergeBuilderObjective(objective, context)
   const designMatched = DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective)
-  if (hasImageOrPdfAttachment(input.body) || !(roleMatched || designMatched || repositoryTarget)) return null
+  if (hasImageOrPdfAttachment(input.body) || !(roleMatched || designMatched || repositoryTarget || project.context)) return null
 
   // Public Concierge intentionally receives guest access under public-delivery scope. Its server-
   // captured audit identity may own an isolated workspace, but it never gains owner repository authority.
@@ -199,7 +208,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     }, { status: 503 })
   }
 
-  const workspaceId = workspaceIdFrom(input.body)
+  const workspaceId = project.workspaceId || workspaceIdFrom(input.body)
   await workspace.ensureWorkspace(workspaceId)
   let stagedFiles = extractBuilderSourceFiles([
     ...(Array.isArray(input.body?.files) ? input.body.files : []),
@@ -238,7 +247,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
             debugRuntime: debugPlan.runtime,
             debugPaths: debugPlan.files,
           }
-        : {},
+        : { ...(project.context ? { projectContext: project.context } : {}) },
       ownerAuthorized: access?.isOwner === true,
       runningReply: reply,
     })

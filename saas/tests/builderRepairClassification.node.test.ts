@@ -57,7 +57,7 @@ test('objectives with no repair vocabulary at all remain build objectives', () =
 test('repair classification is never derived from the model own answer prose', () => {
   assert.doesNotMatch(toolLoop, /isRepairObjective\(action\.answer\)/)
   assert.match(toolLoop, /isRepairObjective\(`\$\{input\.objective\}\\n\$\{action\.answer\}`\)/)
-  assert.match(toolLoop, /if \(mutation && initialPaths\.has\(toolPath\(action\.input\)\)\) repairObjective = true/)
+  assert.match(toolLoop, /if \(mutation && initialPaths\.has\(toolPath\(action\.input\)\) && !extendingProject\) repairObjective = true/)
 })
 
 test('a build objective gets a round budget that can carry a multi-file build', () => {

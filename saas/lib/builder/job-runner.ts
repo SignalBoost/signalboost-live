@@ -219,6 +219,7 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           objective: job.objective,
           workspaceId: job.workspaceId,
           priorLessons: [],
+          projectContext: job.metadata.projectContext,
           checkpoint: job.checkpoint,
           // Leave room for a slow model round, then a bounded sandbox command and persistence.
           shouldPause: (beforeTool = false) => Date.now() - sliceStartedAtMs >= (beforeTool ? 150_000 : 100_000),

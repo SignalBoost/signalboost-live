@@ -1,3 +1,4 @@
+import { selectBuilderProject, builderProjectBlockedReply } from '@/lib/builder/project-continuity'
 import { builderRepositoryTarget, importBuilderRepository, builderRepositoryErrorReply } from '@/lib/builder/repository-import'
 // saas/app/api/builder/route.ts
 import { after, NextResponse } from 'next/server'
@@ -6,7 +7,7 @@ import { isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/p
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { persistTurn } from '@/lib/ai/tools/conversationHistory'
 import { planDebugFileJob, type DebugFileInput } from '@/lib/builder/debug-file-job'
-import { enqueueBuilderJob, getBuilderJobForUser } from '@/lib/builder/job-store'
+import { enqueueBuilderJob, getBuilderJobForUser, readBuilderEvidenceJob } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget } from '@/lib/builder/repository-repair-target'
 import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
@@ -141,7 +142,7 @@ export async function POST(request: Request) {
     if (requestedWorkspaceId && !UUID.test(requestedWorkspaceId)) {
       return noStore({ error: 'Invalid workspace id.' }, { status: 400 })
     }
-    const workspaceId = requestedWorkspaceId || crypto.randomUUID()
+    let workspaceId = requestedWorkspaceId || crypto.randomUUID()
 
     let files = cleanFiles(body?.files)
     const repositoryTarget = builderRepositoryTarget(objective, body?.repositoryUrl)
@@ -197,8 +198,13 @@ export async function POST(request: Request) {
     // turn never silently starts coding work. On the Builder surface the log IS the submitted job:
     // the user pasted failure evidence into a developer workspace and asked it to debug. Logs are
     // admitted here, and only here; every other objective still faces the strict coding gate.
+    const project = await selectBuilderProject({ objective, userId: access.userId, conversationId,
+      requestedWorkspaceId, hasNewSource: files.length > 0, repositoryImport: Boolean(repositoryTarget),
+    }, readBuilderEvidenceJob)
+    if (project.blocked) return noStore({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: project.blocked === 'busy' ? 409 : 503 })
+    workspaceId = project.workspaceId || workspaceId
     const routingContext = { attachmentNames: files.map(file => file.path) }
-    if (!repositoryTarget && !debugPlan && !logEvidence && !isConciergeBuilderObjective(objective, routingContext)) {
+    if (!project.context && !repositoryTarget && !debugPlan && !logEvidence && !isConciergeBuilderObjective(objective, routingContext)) {
       const reply = 'This request does not contain an executable coding or design objective with concrete source evidence. No Builder job was created and no code was run.'
       await persistSynchronousReply({ conversationId, userId: access.userId, objective, reply })
       return noStore({
@@ -250,11 +256,12 @@ export async function POST(request: Request) {
           }
         : logEvidence
           ? {
+              ...(project.context ? { projectContext: project.context } : {}),
               logEvidence: true,
               passiveLogEvidence,
               repositoryAuthority: false,
             }
-          : {},
+          : { ...(project.context ? { projectContext: project.context } : {}) },
       ownerAuthorized: access.isOwner === true,
       runningReply: reply,
     })

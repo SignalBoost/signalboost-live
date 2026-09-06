@@ -95,3 +95,29 @@ The initial explanation correctly described the negative refund becoming positiv
 In the same conversation, without any upload, engineering requested --by-category while preserving default output and all old tests, adding category/empty-report tests, and running npm test plus node cli.js sample.json --by-category. Job `9775dea0-2e54-4035-a6c8-21a36f3dc6b5` succeeded in the same workspace; saved project context names the preceding repair job. It added summarizeByCategory in report.js, selected it only with the CLI flag, and appended two tests without changing the seven originals. Its first new empty-report test failed because t.after was used without a t callback parameter. Builder corrected that callback, reran all nine tests successfully, and ran the requested CLI command with exit 0 and `{"travel":1000,"meals":425}`. The response accurately explained the implementation and its self-repair.
 
 A separate #1882 review found unparsed execution requests such as “Run `node verify.js`” could use the inferred single-file proof. The follow-up routes explicit run/execute instructions to the full loop conservatively, including mixed parsed/unparsed requests. Local mandatory verification passed 962 tests and TypeScript. These observations establish the tested multi-file repair and continuation behavior, not arbitrary-project success.
+
+
+## Proposal → go → implementation → verification → explanation
+
+Application `a7b786ae6950815223ffa366db8ce52cad2e2bc7` (#1890); Production `dpl_AMXcCHrTyZAiNcvHAKxj5fjh5Gux` observed READY. The exact application change passed 970 mandatory tests, TypeScript, ten CI workflows and Preview.
+
+Engineering used the existing expense-report conversation and workspace `1ce11289-af83-4d6a-9baa-bb79fa2d15a8`, with no upload:
+
+> What small improvement would you recommend next for this CLI? Propose one concrete local change with verification, but do not implement it yet.
+
+Builder identified missing automated coverage for the existing --help path. Its saved, displayed proposal was:
+
+> Add a CLI test in report.test.js that runs cli.js with --help and asserts exit code 0, empty stderr, and stdout containing '<input.json> [--by-category]'.
+> Run: npm test
+
+The next user message contained only `go`. Builder created job `07a543dc-6c2e-43b9-bdd9-36299705d2b1`, matching the server-saved proposal UUID, in the same workspace. The job objective exactly matched the displayed proposal and metadata points to source job `f0f01b8b-ab34-4201-a11c-a10e2921a3c3`.
+
+Its trace contains one targeted report.test.js insertion and fresh npm test exit 0: ten tests, ten pass, zero fail. The inserted test launches the real CLI with --help, asserts no spawn error or signal, integer exit status 0, empty stderr and the expected usage text. All nine previous tests remain present and passed. The initial answer accurately explained the new test and recorded coverage. Workspace job count advanced from three to four, with one job for this approval.
+
+Observed failures repaired during this work:
+
+- #1887 saved proposal metadata, scope/fingerprint/expiry checks and fixed execution IDs, but the first live recommendation returned only prose. No pending proposal was stored and this attempt was not accepted. #1889 moved the proposal response contract into trusted system instructions.
+- After #1889, saved proposal/job `f0f01b8b-ab34-4201-a11c-a10e2921a3c3` correctly added --help on a bare go and passed nine old tests, but stopped before the additionally promised node cli.js --help check. This was partial execution, not full acceptance.
+- #1890 normalizes proposed quoted verification commands into the existing explicit Run contract, rejects proposals lacking an enforceable command, and automatically explains approved proposal results. Its deterministic regression proves npm test alone cannot satisfy a proposal also promising node cli.js --help. The final live proposal above verified the help path through a newly added process-level test.
+
+Proposals are service-only records bound to the same authenticated user/conversation, latest successful isolated job and file-content fingerprint, with one-hour expiry. The worker checks that fingerprint again before its first tool round. Exact proposal IDs and atomic job claims prevent duplicate execution. This handoff grants no owner repository, credential, publishing or deployment authority. Passing this observed flow is not a guarantee of success on arbitrary projects or every conversational wording.

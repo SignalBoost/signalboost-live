@@ -12,10 +12,18 @@ export type DomainLookup = {
 type Bootstrap = { services?: Array<[string[], string[]]> }
 
 const DOMAIN = /(?<![\w@])(?:https?:\/\/)?((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?![\w.-])/gi
-const INTENT = /\b(?:domain|url|tld|registrar|rdap|whois|availability|available|registered|taken|purchase|buy|verify|verification|exist|exists|existing)\b/i
+const INTENT = /\b(?:domain|url|tld|registrar|rdap|whois|availability|available|registered|taken|purchase|buy)\b/i
 const BRAINSTORM = /\b(?:brainstorm|suggest|suggestion|ideas?|names?|naming|brand|creative)\b/i
 const PLATFORM = /\b(?:platform|software|developer|development|coding|code|saas|app|product|domain|url)\b/i
 const LABEL = /^[a-z0-9][a-z0-9-]{1,62}$/
+// A registrable domain written directly in the owner's message: exactly two
+// labels. Three or more labels is a host he already operates (saas.example.com)
+// and is context for a naming request, not a verification target.
+const REGISTRABLE_IN_INPUT = /(?<![\w@.-])([a-z0-9][a-z0-9-]{0,61}[a-z0-9]\.[a-z]{2,63})(?![\w.-])/gi
+// Guards the direct-check shortcut below. Only consulted when the owner already
+// wrote concrete domains, so it never gates ordinary naming requests.
+const GENERATION_VERB = /(?<!\p{L})(?:brainstorm|generat\p{L}*|invent\p{L}*|coin|propos\p{L}*|alternativ\p{L}*|come\s+up\s+with|think\s+up|sugier\p{L}*|sugir\p{L}*|gere|wygeneruj|zaproponuj|alternatyw\p{L}*|придума\p{L}*|предлож\p{L}*|сгенерир\p{L}*|альтернатив\p{L}*)(?!\p{L})/iu
+const EXPLICIT_COUNT = /\b\d{1,2}\s+(?:domain\s+)?(?:suggestions?|ideas?|names?)/i
 let cachedBootstrap: { value: Bootstrap; expiresAt: number } | null = null
 
 export type DomainSuggestion = { name: string; domain: string; meaning: string }
@@ -27,7 +35,32 @@ export type DomainSuggestion = { name: string; domain: string; meaning: string }
 // being served comes back on its own. No enumerated exclusion list.
 export const BRANDABLE_TLDS: readonly string[] = ['com', 'ai', 'dev', 'app', 'io']
 
+export function registrableDomainsInInput(input: string): string[] {
+  const found: string[] = []
+  for (const match of input.matchAll(REGISTRABLE_IN_INPUT)) {
+    const value = String(match[1] || '').toLowerCase().replace(/\.$/, '')
+    const dot = value.lastIndexOf('.')
+    if (dot <= 0) continue
+    if (!LABEL.test(value.slice(0, dot))) continue
+    if (!found.includes(value)) found.push(value)
+    if (found.length >= 10) break
+  }
+  return found
+}
+
+// "check these names deepcloud.ai or deepcloud.com" used to be swallowed by the
+// brainstorm branch, because BRAINSTORM matches the NOUN "names". The owner had
+// already supplied the answer set; he wanted those two checked, not fourteen new
+// ones invented. When he writes registrable domains himself and asks for neither
+// a quantity nor generation, the domains ARE the request.
+export function isDirectDomainCheckRequest(input: string): boolean {
+  if (!registrableDomainsInInput(input).length) return false
+  if (EXPLICIT_COUNT.test(input)) return false
+  return !GENERATION_VERB.test(input)
+}
+
 export function isDomainBrainstormRequest(input: string, context = ''): boolean {
+  if (isDirectDomainCheckRequest(input)) return false
   const combined = `${input}\n${context}`
   return BRAINSTORM.test(input) && PLATFORM.test(combined)
 }
@@ -53,33 +86,32 @@ export function parseGeneratedDomainSuggestions(
     for (const item of candidates) {
       const value = item as Record<string, unknown>
       const name = String(value?.name || '').replace(/[^a-z0-9 -]/gi, '').trim().slice(0, 40)
-      const domain = typeof value?.domain === 'string' ? value.domain.replace(/\\\./g, '.').trim().toLowerCase() : ''
-      const meaning = typeof value?.meaning === 'string' ? value.meaning.replace(/\s+/g, ' ').trim().slice(0, 180) : ''
+      const domain = String(value?.domain || '').trim().toLowerCase()
+      const meaning = String(value?.meaning || '').replace(/\s+/g, ' ').trim().slice(0, 180)
       const dot = domain.lastIndexOf('.')
       const label = dot > 0 ? domain.slice(0, dot) : ''
       const tld = dot > 0 ? domain.slice(dot + 1) : ''
       if (!name || !meaning) continue
       if (!label || !LABEL.test(label) || !allowed.includes(tld)) continue
       if (excludeLegacyWords && /signal|boost/i.test(`${name} ${domain}`)) continue
-      if (!out.some(candidate => candidate.domain === domain || candidate.name.toLowerCase() === name.toLowerCase())) out.push({ name, domain, meaning })
+      if (!out.some(candidate => candidate.domain === domain)) out.push({ name, domain, meaning })
     }
     return out.slice(0, 50)
   } catch { return [] }
 }
 
 export function extractDomainCandidates(input: string, context = ''): string[] {
+  // A domain written in the input is its own statement of intent — "check these
+  // names deepcloud.ai or deepcloud.com" carries no INTENT keyword at all. In
+  // that case only the input is scanned: pulling domains out of the preceding
+  // answer would submit the whole previous brainstorm for re-checking.
+  const inInput = registrableDomainsInInput(input)
+  if (inInput.length) return inInput
   if (!INTENT.test(input)) return []
   const found: string[] = []
-  for (const match of input.matchAll(DOMAIN)) {
+  for (const match of `${input}\n${context}`.matchAll(DOMAIN)) {
     const value = String(match[1] || '').toLowerCase().replace(/\.$/, '')
     if (value && !found.includes(value)) found.push(value)
-  }
-  const explicitCount = found.length
-  const contextual = [...context.matchAll(DOMAIN)].map(match => String(match[1] || '').toLowerCase().replace(/\.$/, ''))
-  for (const value of contextual) {
-    const label = value.split('.')[0]
-    const explicitlyNamed = new RegExp(`(?:^|[^a-z0-9-])${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-z0-9-])`, 'i').test(input)
-    if ((explicitCount === 0 || explicitlyNamed) && value && !found.includes(value)) found.push(value)
     if (found.length >= 10) break
   }
   return found
@@ -178,16 +210,6 @@ type DomainCandidateGenerator = (
   excludedDomains?: string[],
 ) => Promise<{ candidates: DomainSuggestion[]; modelInvoked: boolean }>
 
-function candidateLabel(domain: string): string {
-  const dot = domain.lastIndexOf('.')
-  return dot > 0 ? domain.slice(0, dot) : ''
-}
-
-function generationInput(input: string, context = ''): string {
-  const prior = context.trim().slice(-6_000)
-  return prior ? `${prior}\n\n${input.trim()}` : input.trim()
-}
-
 export async function brainstormVerifiedDomains(args: { input: string; context?: string; fetchImpl?: FetchLike; generateImpl?: DomainCandidateGenerator }) {
   if (!isDomainBrainstormRequest(args.input, args.context)) return null
   const count = requestedSuggestionCount(args.input)
@@ -202,17 +224,12 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
   const allLookups: DomainLookup[] = []
   let modelInvoked = false
   let generatedCount = 0
-  const fetchImpl = args.fetchImpl ?? fetch
-  const { tlds: verifiableTlds } = await resolveVerifiableTlds(BRANDABLE_TLDS, fetchImpl)
-  const ownerGenerationInput = generationInput(args.input, args.context)
 
   // Availability is part of the search loop, not a one-shot filter. A creative
   // batch that is fully registered must inform the next reasoner batch instead
-  // of ending the owner's assignment prematurely. The preceding owner context
-  // is carried into every generation wave so constraints such as abandoning the
-  // old brand cannot disappear on a terse follow-up.
+  // of ending the owner's assignment prematurely.
   for (let wave = 0; wave < 3 && verified.length < count; wave += 1) {
-    const generated = await args.generateImpl(ownerGenerationInput, count - verified.length, [...seenDomains])
+    const generated = await args.generateImpl(args.input, count - verified.length, [...seenDomains])
     modelInvoked ||= generated.modelInvoked
     const fresh = generated.candidates.filter(candidate => {
       if (seenDomains.has(candidate.domain)) return false
@@ -221,49 +238,19 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
     })
     if (!fresh.length) continue
     generatedCount += fresh.length
-
-    const originalLookups = await lookupDomainsRdap(fresh.map(candidate => candidate.domain), fetchImpl)
-    allLookups.push(...originalLookups)
-    const originalByDomain = new Map(originalLookups.map(lookup => [lookup.domain, lookup]))
-    const pending: Array<{ candidate: DomainSuggestion; original: DomainLookup; alternatives: string[] }> = []
-
+    const lookups = await lookupDomainsRdap(fresh.map(candidate => candidate.domain), args.fetchImpl)
+    allLookups.push(...lookups)
+    const lookupByDomain = new Map(lookups.map(lookup => [lookup.domain, lookup]))
     for (const candidate of fresh) {
-      const original = originalByDomain.get(candidate.domain)
-      if (!original) continue
-      if (original.status === 'no_registration_found') {
-        if (verified.length < count) verified.push({ ...candidate, lookup: original })
-        continue
+      const lookup = lookupByDomain.get(candidate.domain)
+      if (!lookup) continue
+      if (lookup.status === 'no_registration_found') {
+        if (verified.length < count) verified.push({ ...candidate, lookup })
+      } else if (lookup.status === 'registered') {
+        registered.push({ ...candidate, lookup })
+      } else {
+        unresolved.push({ ...candidate, lookup })
       }
-      if (verified.length >= count) break
-      const label = candidateLabel(candidate.domain)
-      const originalTld = candidate.domain.split('.').at(-1) || ''
-      const alternatives = verifiableTlds
-        .filter(tld => tld !== originalTld)
-        .map(tld => `${label}.${tld}`)
-        .filter(domain => domain !== candidate.domain && !seenDomains.has(domain))
-      for (const domain of alternatives) seenDomains.add(domain)
-      pending.push({ candidate, original, alternatives })
-    }
-
-    // A neural name is not discarded merely because its first TLD is registered.
-    // Check deterministic TLD alternatives for the SAME neural name and meaning;
-    // code changes only the registry suffix and never invents a replacement name.
-    const alternateDomains = pending.flatMap(item => item.alternatives)
-    const alternateLookups = alternateDomains.length ? await lookupDomainsRdap(alternateDomains, fetchImpl) : []
-    allLookups.push(...alternateLookups)
-    const alternateByDomain = new Map(alternateLookups.map(lookup => [lookup.domain, lookup]))
-
-    for (const item of pending) {
-      if (verified.length >= count) break
-      const alternatives = item.alternatives.map(domain => alternateByDomain.get(domain)).filter((lookup): lookup is DomainLookup => Boolean(lookup))
-      const available = alternatives.find(lookup => lookup.status === 'no_registration_found')
-      if (available) {
-        verified.push({ ...item.candidate, domain: available.domain, lookup: available })
-        continue
-      }
-      const unknown = [item.original, ...alternatives].find(lookup => lookup.status === 'unknown')
-      if (unknown) unresolved.push({ ...item.candidate, lookup: unknown })
-      else registered.push({ ...item.candidate, lookup: item.original })
     }
   }
 
@@ -280,8 +267,8 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
 
   const accounting = [
     `Verification at ${checkedAt}: ${verified.length} of ${generatedCount} generated ${generatedCount === 1 ? 'name' : 'names'} returned no registration record`,
-    registered.length ? `${registered.length} came back registered across checked TLDs` : '',
-    unresolved.length ? `${unresolved.length} could not be checked conclusively` : '',
+    registered.length ? `${registered.length} came back registered` : '',
+    unresolved.length ? `${unresolved.length} could not be checked` : '',
   ].filter(Boolean).join(', ') + '.'
 
   const reply = verified.length

@@ -65,6 +65,21 @@ export type SpecialistSkillTelemetryRow = {
   updated_at?: string | null
 }
 
+export type DirectedSoftwareLessonTelemetryRow = {
+  status?: string | null
+  repeat_count?: number | null
+  metadata?: Record<string, unknown> | null
+}
+
+export type DirectedSoftwareApplicationProgress = {
+  sources: number
+  queued: number
+  candidates: number
+  validated: number
+  rejected: number
+  reinforcements: number
+}
+
 export type SpecialistCompetencySnapshot = {
   specialistFamily: SpecialistFamily
   totalSkills: number
@@ -76,6 +91,21 @@ export type SpecialistCompetencySnapshot = {
 
 const STATUSES: CognitiveSkillStatus[] = ['encountered', 'evaluated', 'understood', 'practiced', 'validated', 'learned', 'mastered', 'weakened', 'quarantined']
 const STRONG = new Set<CognitiveSkillStatus>(['validated', 'learned', 'mastered'])
+
+export function directedSoftwareApplicationProgress(
+  lessons: DirectedSoftwareLessonTelemetryRow[],
+  skills: SpecialistSkillTelemetryRow[],
+): DirectedSoftwareApplicationProgress {
+  return {
+    sources: new Set(lessons.map(row => String(record(row.metadata).sourceUri || '').trim()).filter(Boolean)).size,
+    queued: lessons.filter(row => row.status === 'captured').length,
+    candidates: skills.length,
+    validated: skills.filter(row => STRONG.has(String(row.status || '') as CognitiveSkillStatus)).length,
+    rejected: lessons.filter(row => row.status === 'rejected').length
+      + skills.filter(row => row.status === 'quarantined').length,
+    reinforcements: lessons.reduce((total, row) => total + Math.max(0, Number(row.repeat_count || 1) - 1), 0),
+  }
+}
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}

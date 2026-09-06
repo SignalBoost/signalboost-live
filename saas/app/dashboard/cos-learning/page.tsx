@@ -8,6 +8,8 @@ type Readiness = { ok?: boolean; enabled?: boolean; questions?: number; sourceAd
 type CycleResult = { gapsConsidered?: number; documentsAcquired?: number; accepted?: number; rejected?: Record<string, number>; sourceErrors?: Record<string, number>; externalCostUsd?: number }
 type LearningResult = { ok?: boolean; curriculumQuestions?: number; sourceAdapters?: string[]; retainedKnowledge?: number | null; batch?: { offset?: number; size?: number; nextOffset?: number; done?: boolean }; result?: CycleResult; authRequired?: boolean; error?: string }
 type EmbeddingResult = { ok?: boolean; completed?: boolean; attempted?: number; embedded?: number; failed?: number; remaining?: number | null; total?: number | null; rejected?: number | null; eligible?: number | null; eligibleEmbedded?: number | null; batches?: number; batchSize?: number; durationMs?: number; authRequired?: boolean; error?: string }
+type ApplicationProgress = { sources?: number; queued?: number; candidates?: number; validated?: number; rejected?: number; reinforcements?: number }
+type SpecialistResult = { applicationProgress?: ApplicationProgress | null; authRequired?: boolean; error?: string }
 
 const CANONICAL_HOST = 'saas.signalboostapp.com'
 const CANONICAL_URL = `https://${CANONICAL_HOST}/dashboard/cos-learning`
@@ -35,6 +37,7 @@ export default function CosLearningPage() {
   const [result, setResult] = useState<LearningResult | null>(null)
   const [embeddingStatus, setEmbeddingStatus] = useState<EmbeddingResult | null>(null)
   const [embeddingRun, setEmbeddingRun] = useState<EmbeddingResult | null>(null)
+  const [applicationProgress, setApplicationProgress] = useState<ApplicationProgress | null>(null)
   const [busy, setBusy] = useState(false)
   const [embeddingBusy, setEmbeddingBusy] = useState(false)
   const [hostMismatch, setHostMismatch] = useState(false)
@@ -60,15 +63,18 @@ export default function CosLearningPage() {
     setHostMismatch(false)
     setAuthRequired(false)
     try {
-      const [learningResponse, embeddingResponse] = await Promise.all([
+      const [learningResponse, embeddingResponse, specialistResponse] = await Promise.all([
         fetch('/api/admin/cos-learning/foundational', { cache: 'no-store', credentials: 'include' }),
         fetch('/api/admin/cos-learning/backfill-embeddings', { cache: 'no-store', credentials: 'include' }),
+        fetch('/api/admin/cos-specialist-learning', { cache: 'no-store', credentials: 'include' }),
       ])
-      const [learningBody, embeddingBody] = await Promise.all([readResponse(learningResponse), readResponse(embeddingResponse)])
+      const [learningBody, embeddingBody, specialistBody] = await Promise.all([readResponse(learningResponse), readResponse(embeddingResponse), readResponse(specialistResponse)])
       setStatus(learningBody)
       setEmbeddingStatus(embeddingBody)
+      setApplicationProgress((specialistBody as SpecialistResult).applicationProgress ?? null)
       if (!learningResponse.ok) throw responseError(learningResponse, learningBody, copy.requestFailed)
       if (!embeddingResponse.ok) throw responseError(embeddingResponse, embeddingBody, copy.embeddingBackfillFailed)
+      if (!specialistResponse.ok) throw responseError(specialistResponse, specialistBody, copy.requestFailed)
     } catch (e) {
       setError(e instanceof Error ? e.message : copy.requestFailed)
     }
@@ -142,6 +148,18 @@ export default function CosLearningPage() {
       <Card label={copy.embeddingRejected} value={String(embeddingStatus?.rejected ?? '—')} />
     </div>
     <p className="text-xs text-text-muted">{copy.embeddingScope}</p>
+    <section className="rounded-md border border-border bg-surface p-4">
+      <h2 className="text-base font-semibold">{copy.softwareApplicationTitle}</h2>
+      <p className="mt-1 text-xs text-text-muted">{copy.softwareApplicationExplanation}</p>
+      <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <Card label={copy.softwareSources} value={String(applicationProgress?.sources ?? '—')} />
+        <Card label={copy.softwareQueued} value={String(applicationProgress?.queued ?? '—')} />
+        <Card label={copy.softwareCandidates} value={String(applicationProgress?.candidates ?? '—')} />
+        <Card label={copy.softwareValidated} value={String(applicationProgress?.validated ?? '—')} />
+        <Card label={copy.softwareRejected} value={String(applicationProgress?.rejected ?? '—')} />
+        <Card label={copy.softwareReinforced} value={String(applicationProgress?.reinforcements ?? '—')} />
+      </div>
+    </section>
     <div className="flex flex-wrap gap-3">
       <button onClick={run} disabled={busy || embeddingBusy || hostMismatch || authRequired || !status?.enabled} className="rounded-md bg-accent px-4 py-2 text-sm font-semibold text-bg disabled:opacity-50">{busy ? copy.running : copy.run}</button>
       {embeddingsComplete

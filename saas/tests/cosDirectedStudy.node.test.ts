@@ -40,6 +40,7 @@ const input: DirectedStudySubmission = {
 const directedStudyPage = readFileSync(new URL('../app/dashboard/cos-directed-study/page.tsx', import.meta.url), 'utf8')
 const continuityEmail = readFileSync(new URL('../app/api/cron/cos-learning-continuity/route.ts', import.meta.url), 'utf8')
 const miningCron = readFileSync(new URL('../app/api/cron/cos-mining/route.ts', import.meta.url), 'utf8')
+const foundationalLearningPage = readFileSync(new URL('../app/dashboard/cos-learning/page.tsx', import.meta.url), 'utf8')
 
 test('owner-directed material is admitted when it is substantive and provenance requirements are present', () => {
   const result = assessDirectedStudy(input, gates)
@@ -123,6 +124,13 @@ test('daily learning backfills pre-loop software lessons idempotently into the g
   assert.doesNotMatch(store, /status:\s*'(?:validated|learned|mastered)'/)
   assert.match(miningCron, /await backfillDirectedSoftwareApplications\(200\)/)
   assert.ok(miningCron.indexOf('backfillDirectedSoftwareApplications(200)') < miningCron.indexOf('runGovernedCognitiveLearningCycle()'))
+})
+
+test('foundational learning displays live software application progress', () => {
+  assert.match(foundationalLearningPage, /api\/admin\/cos-specialist-learning/)
+  assert.match(foundationalLearningPage, /applicationProgress\?\.sources/)
+  assert.match(foundationalLearningPage, /applicationProgress\?\.validated/)
+  assert.match(foundationalLearningPage, /softwareApplicationExplanation/)
 })
 
 test('learning alert points to current specialist telemetry and never obsolete RunPod', () => {

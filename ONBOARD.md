@@ -5,6 +5,8 @@
 
 **Version:** 1.54
 
+**COS software application visibility — 2026-09-06:** `feat/cos-learning-application-proof-20260906` adds owner-visible, live-derived software learning progress to COS Foundational Learning. It separately reports distinct directed software sources, lessons waiting for evaluation, procedural candidates, application-validated skills, rejected/quarantined work, and duplicate reinforcements. Intake and repetition remain explicitly distinct from validation; this adds telemetry only and grants no authority or mastery. All matching protected learning rows are paginated, so lifetime totals do not stop at 1,000. Existing service-only tables are read through the owner-only specialist endpoint; no schema or RLS change is introduced. 972 mandatory tests and TypeScript pass; merge, Production READY, and live data observation remain pending.
+
 ## Builder engineering harness — owner goal, 2026-09-06
 
 The product goal is a complete agent engineering harness: a persistent project environment where Builder can inspect actual artifacts, reason about the task, execute changes, verify results, explain what happened, guide the user and continue through follow-up conversation. Builder remains a governed capability of the COS Software Specialist; this goal does not create a second brain or change execution authority.

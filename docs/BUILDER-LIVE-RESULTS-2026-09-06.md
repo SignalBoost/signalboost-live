@@ -30,3 +30,21 @@ Commit 62cccc7b6fdd39fc7da76d1eb6b543452ab9e84f; deployment dpl_2pYFjLwMzpyLYRFa
 - Large job eb3c541a-14b0-43ef-8fcb-2727cbf9e751: six successful chunk writes produced the literal catalog.json, but the job then failed with builder_model_output_limit and never produced verify.js or ran verification. Independent read-only artifact inspection confirmed 600 records, every id/name/price correct, total 18030000. This is artifact proof, not a passed Builder job.
 
 The exact large-task prompt extracted only catalog.json and no commands. The next patch retains its second inline create (verify.js) and inline Run command (node verify.js). It also directs repetitive checks to compact loops without relaxing any assertion or permitting generators instead of requested literal data. The same full task must be rerun after deployment.
+
+## Full large-task result after #1870
+
+Application commit **5fe8fa801897613b6fd5d6bcaea2d042f21bb635**; Production **dpl_7DgpSPxZCYPaEwMV8aoQpgdQJ44N** observed READY. All 940 mandatory regressions, TypeScript, Preview and applicable CI workflows passed before merge.
+
+The unchanged 600-record prompt succeeded through the real Concierge/model/sandbox path:
+
+- Job: 534edf15-ac7b-4778-8f52-c782be05e0e4.
+- Workspace: 16100648-15d7-4a17-bcb3-4601e6c975cc.
+- Nine recorded tool rounds; one invocation.
+- Downloadable files: catalog.json and verify.js.
+- Recorded command: node verify.js.
+- Exit code: 0. stdout: 600 products verified. stderr: empty.
+- Inspected verifier uses node:assert/strict, checks exactly 600 records, every sequential id, Product N name, id-times-100 price, and sum 18030000 before printing success.
+
+The old repair explanation was also repeated on this deployment: it identified the recorded NaN assertion, explicitly disclosed missing pre-edit source/diff, and asked for that evidence without suggesting an unverified cause. The newer repair had already demonstrated correct cause explanation from its saved <= to < diff, preserving all three assertions and running no new commands for the follow-up.
+
+Engineering performed all checks. These results establish the listed live capabilities and resolve the observed failures; they do not establish universal parity, private-repository import, repository-history inspection, or success on arbitrary projects.

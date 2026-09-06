@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/domainAvailability.ts
 type FetchLike = typeof fetch
 
 export type DomainLookup = {
@@ -140,8 +141,16 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
   if (!args.generateImpl) return null
   const seenDomains = new Set<string>()
   const verified: Array<DomainSuggestion & { lookup: DomainLookup }> = []
+  // Every generated candidate that did NOT come back as a clean 404 used to be
+  // dropped without trace, so a run in which the registry rate-limited us was
+  // indistinguishable from a run in which the names were genuinely taken. The
+  // owner saw one name out of fifteen and no explanation. Registered and
+  // unresolved outcomes are now carried out of the loop and reported.
+  const registered: Array<DomainSuggestion & { lookup: DomainLookup }> = []
+  const unresolved: Array<DomainSuggestion & { lookup: DomainLookup }> = []
   const allLookups: DomainLookup[] = []
   let modelInvoked = false
+  let generatedCount = 0
 
   // Availability is part of the search loop, not a one-shot filter. A creative
   // batch that is fully registered must inform the next reasoner batch instead
@@ -155,18 +164,65 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
       return true
     })
     if (!fresh.length) continue
+    generatedCount += fresh.length
     const lookups = await lookupDomainsRdap(fresh.map(candidate => candidate.domain), args.fetchImpl)
     allLookups.push(...lookups)
     const lookupByDomain = new Map(lookups.map(lookup => [lookup.domain, lookup]))
     for (const candidate of fresh) {
       const lookup = lookupByDomain.get(candidate.domain)
-      if (lookup?.status === 'no_registration_found') verified.push({ ...candidate, lookup })
-      if (verified.length >= count) break
+      if (!lookup) continue
+      if (lookup.status === 'no_registration_found') {
+        if (verified.length < count) verified.push({ ...candidate, lookup })
+      } else if (lookup.status === 'registered') {
+        registered.push({ ...candidate, lookup })
+      } else {
+        unresolved.push({ ...candidate, lookup })
+      }
     }
   }
+
+  const checkedAt = allLookups.at(-1)?.checkedAt || allLookups[0]?.checkedAt || new Date().toISOString()
   const lines = verified.map((candidate, index) => `${index + 1}. **${candidate.name}** — ${candidate.domain} — ${candidate.meaning}`)
+  const shortfall = Math.max(0, count - verified.length)
+  const unresolvedLines = shortfall && unresolved.length
+    ? [
+      '',
+      `Not verified — the authoritative registry did not answer for these ${unresolved.length}. Treat them as unknown, not as available:`,
+      ...unresolved.slice(0, count).map(candidate => `- **${candidate.name}** — ${candidate.domain} — ${candidate.meaning} (${candidate.lookup.detail})`),
+    ]
+    : []
+
+  const accounting = [
+    `Verification at ${checkedAt}: ${verified.length} of ${generatedCount} generated ${generatedCount === 1 ? 'name' : 'names'} returned no registration record`,
+    registered.length ? `${registered.length} came back registered` : '',
+    unresolved.length ? `${unresolved.length} could not be checked` : '',
+  ].filter(Boolean).join(', ') + '.'
+
   const reply = verified.length
-    ? [`I generated candidates for a software-building and SaaS platform, then checked them through authoritative registry RDAP.`, '', ...lines, '', `Verification: all ${verified.length} domains above returned no registration record at ${allLookups[0]?.checkedAt || new Date().toISOString()}. Registrar checkout must still confirm reserved or premium status.`].join('\n')
-    : 'COS generated candidates and checked them through authoritative registry RDAP, but none returned a reliable no-registration result. I will not substitute registered or unverified names.'
-  return { reply, results: verified.map(item => item.lookup), suggestions: verified.map(({lookup,...candidate}) => candidate), modelInvoked, requested: count }
+    ? [
+      `I generated ${generatedCount} ${generatedCount === 1 ? 'candidate' : 'candidates'} for a software-building and SaaS platform, then checked them through authoritative registry RDAP.`,
+      '',
+      ...lines,
+      ...unresolvedLines,
+      '',
+      accounting,
+      shortfall ? `You asked for ${count}; I can only stand behind ${verified.length}. Registrar checkout must still confirm reserved or premium status.` : 'Registrar checkout must still confirm reserved or premium status.',
+    ].join('\n')
+    : [
+      'COS generated candidates and checked them through authoritative registry RDAP, but none returned a reliable no-registration result. I will not substitute registered or unverified names.',
+      ...unresolvedLines,
+      generatedCount ? '' : '',
+      generatedCount ? accounting : '',
+    ].filter((line, index, all) => !(line === '' && all[index - 1] === '')).join('\n').trim()
+
+  return {
+    reply,
+    results: verified.map(item => item.lookup),
+    suggestions: verified.map(({ lookup, ...candidate }) => candidate),
+    unresolved: unresolved.map(({ lookup, ...candidate }) => candidate),
+    registeredCount: registered.length,
+    generatedCount,
+    modelInvoked,
+    requested: count,
+  }
 }

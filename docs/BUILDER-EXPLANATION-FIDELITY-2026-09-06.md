@@ -33,3 +33,5 @@ A read-only follow-up described the concrete edits and checks but incorrectly sa
 The precision candidate is retained as docs/fixtures/builder-rounding/precision-money.cjs. Removing the two added assertion lines reproduces the prior test file byte-for-byte. The unchanged independent probe passed all 10,102 cases, and both supplied long-decimal regressions returned the requested cents. A separate compatibility check found a remaining regression: numeric 12.5 throws value.startsWith is not a function, whereas the preceding implementation accepted numbers. Builder must repair this before accepting preservation of the public input contract.
 
 Local causal-distinction validation: all 995 mandatory regressions and TypeScript passed.
+
+Review repair: follow-up generation and review now receive the original persisted job requirement, bounded to 8,000 characters with truncation marked. The scoped evidence lookup already retrieves this field. Without it, a follow-up question alone could not distinguish requested behavior changes from existing defects. No lookup or authorization scope changes.

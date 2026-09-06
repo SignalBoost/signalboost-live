@@ -26,7 +26,8 @@ export async function explainBuilderEvidence(input: {
     if (file) files.push({ path, content: file.content.slice(0, 8000), truncated: file.content.length > 8000 })
   }
   const evidence = formatBuilderExecutionEvidence(trace)
-  const context = { question: input.prompt, status: job.status, recordedError: job.result?.error, currentFiles: files,
+  const context = { question: input.prompt, originalRequirement: typeof job.objective === 'string'
+    ? { text: job.objective.slice(0, 8000), truncated: job.objective.length > 8000 } : null, status: job.status, recordedError: job.result?.error, currentFiles: files,
     recordedTrace: trace.slice(-20).map(item => item?.toolId === 'edit_file'
       ? { ...item, change: undefined, editEvidence: builderEditEvidence(item.change) } : item), events: builderEvidenceEvents(trace).slice(-20), omittedEvents: Math.max(0, trace.length - 20) }
   let explanation = input.fallback || 'I could not generate a source explanation. The recorded results are below.'

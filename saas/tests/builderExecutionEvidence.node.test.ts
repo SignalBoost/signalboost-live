@@ -495,3 +495,28 @@ test('causal review does not equate new coverage with introducing the implementa
   assert.doesNotMatch(reply, /new test introduced the bug/)
   assert.match(reply, /Exit code: 1/)
 })
+
+
+test('read-only causal explanation and review retain the bounded original behavior-change requirement', async () => {
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  const objective = 'Change the default greeting from Hello to Welcome; the previous behavior was intentional.'
+  for (const suffix of ['', 'x'.repeat(9000)]) {
+    const seen: any[] = []
+    const reply = await builderEvidenceReply({ ...input, prompt: 'Explain the last repair. Do not rerun code.' },
+      async () => ({ ...job, objective: objective + suffix }),
+      authorized => explainBuilderEvidence({ prompt: 'Explain the last repair. Do not rerun code.', job: authorized, workspace: null,
+        ai: { async generate(request) {
+          seen.push(JSON.parse(request.prompt))
+          return request.systemPrompt.startsWith('BUILDER EXPLANATION EVIDENCE REVIEW')
+            ? '{"supported":true}' : '{"type":"answer","answer":"This task requested a behavior change, not correction of a previously established defect."}'
+        } },
+      }))
+    assert.match(reply!, /requested a behavior change/)
+    assert.equal(seen.length, 2)
+    for (const context of seen) {
+      assert.equal(context.originalRequirement.text, (objective + suffix).slice(0, 8000))
+      assert.equal(context.originalRequirement.truncated, suffix.length > 0)
+      assert.notEqual(context.question, context.originalRequirement.text)
+    }
+  }
+})

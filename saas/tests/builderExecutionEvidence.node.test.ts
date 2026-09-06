@@ -235,7 +235,9 @@ test('initial repair explains actual failure, edit and passing check without a f
 
         const evidence = JSON.parse(request.prompt)
         assert.equal(evidence.currentFiles[0].content, after)
-        assert.deepEqual(evidence.recordedTrace, recorded)
+        assert.deepEqual(evidence.recordedTrace[0], recorded[0])
+        assert.equal(evidence.recordedTrace[1].editEvidence.removedText, ', 3)')
+        assert.equal(evidence.recordedTrace[1].editEvidence.addedText, ', 2)')
         assert.match(request.systemPrompt, /without requiring a follow-up question/)
         return JSON.stringify({ type: 'answer', answer: 'sum.cjs expected 3 for 1 + 1. The expectation changed to 2; the recorded check now passes.' })
       } }, fallback: 'Verified check passed.', deadlineAtMs: Date.now() + 5000 })
@@ -376,7 +378,7 @@ test('unsupported failed-edit narration is withheld in initial and follow-up res
           calls++
           if (calls === 1) return JSON.stringify({ type: 'answer', answer: 'The edit failed because its search string did not match.',
             proposal: 'Add a test to money.test.js.\nRun:\nnpm test' })
-          assert.match(request.systemPrompt, /Reject invented attempts/)
+          assert.match(request.systemPrompt, /invented attempts/)
           const context = JSON.parse(request.prompt)
           assert.equal(context.events[0].toolId, 'run')
           assert.equal(context.events[0].outcome, 'blocked_before_execution')
@@ -440,4 +442,31 @@ test('unfinished chunk state survives both public serializers and cannot claim a
     const serializer = source.slice(source.indexOf('function publicTrace'), source.indexOf('function publicTrace') + 3000)
     assert.match(serializer, /builderPendingWriteEvidence\(output\)/)
   }
+})
+
+
+test('explanation sees edit delta without counting retained replacement context as new tests', async () => {
+  const { builderEditEvidence } = await import('../lib/builder/edit-evidence.ts')
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  const retained = "test('existing', () => assert.equal(1, 1));"
+  const added = "test('boundary', () => assert.equal(2, 2));\ntest('counterexample', () => assert.equal(3, 3));"
+  const change = { search: retained, replace: retained + '\n' + added, truncated: false }
+  assert.equal(builderEditEvidence(change).addedText, added)
+  assert.equal(builderEditEvidence(change).removedText, '')
+  assert.equal(builderEditEvidence({ ...change, truncated: true }).complete, false)
+  assert.equal(builderEditEvidence({}).complete, false)
+  const reply = await explainBuilderEvidence({ prompt: 'Explain the recorded edit', job: { ...job,
+    result: { trace: [{ toolId: 'edit_file', ok: true, path: 'report.test.js', change }] } }, workspace: null,
+    ai: { async generate(request) {
+      const context = JSON.parse(request.prompt)
+      assert.equal(context.recordedTrace[0].change, undefined)
+      assert.equal(context.recordedTrace[0].editEvidence.addedText, added)
+      if (request.systemPrompt.startsWith('BUILDER EXPLANATION EVIDENCE REVIEW')) {
+        assert.match(request.systemPrompt, /Reject incorrect added\/removed counts/)
+        return '{"supported":true}'
+      }
+      return '{"type":"answer","answer":"Two tests were added; the existing test was retained."}'
+    } },
+  })
+  assert.match(reply, /Two tests were added/)
 })

@@ -11,3 +11,11 @@ Mandatory regression coverage includes the original fabricated failed-edit draft
 Local validation: all 993 mandatory regressions and TypeScript passed. Exact Preview/CI, deployment and live observations remain pending.
 
 Integrated concurrent #1900 without changing its domain lookup. Review repair preserves pending chunk state through both workspace and repository public trace serializers; incomplete assembly cannot be narrated as a completed mutation.
+
+## First live check and edit-delta correction
+
+#1901 merged at 28e085ff81cbedb76e86bd02cb521d175b41d60e; Production dpl_CQV9qkeJmUHTYywkz7uTvQma3Tq8 READY. Exact head f06cefb6a0ac5e06ae979b882c8bb85d7f9e7308 passed ten CI workflows and Preview dpl_2Gx7Z5DLh8ydqK2wvUmqQyZqk59q. All 993 regressions and TypeScript passed.
+
+The read-only original-job explanation correctly reported two completed npm test commands, the blocked duplicate, and no failed source edit. It incorrectly said three tests were added: the recorded replacement retained one existing test and appended two. Runtime review returned supported=true. Therefore this first observation does not accept complete explanation fidelity.
+
+The follow-through derives a contiguous edit delta by removing identical leading/trailing lines from complete search/replace evidence. Initial generation and review receive that delta instead of an ambiguous replacement block. Truncated or missing historical changes are explicitly incomplete. Interior lines can still be unchanged, so the review must compare both sides and omit unsupported counts rather than infer semantic additions from raw line counts. This is a general evidence representation correction, not a hardcoded test-name or numerical-output patch.

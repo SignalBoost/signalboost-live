@@ -17,3 +17,7 @@ Failure narration separates recorded passing commands from overall task completi
 Focused tests cover model true/false/malformed/unavailable results, host path restrictions, real Node verification of a documentation extension, blocked implementation writes, continuation scope, actual failed checks, Does/Is/Are routing, retained provenance behavior, explicit execution precedence, and passing-command versus task-gate narration. Full gates, TypeScript, exact Preview and live repeated requests remain required.
 
 Local validation: 53 focused tests, all 1016 mandatory regressions and TypeScript passed after preserving concurrent #1908. Exact Preview/CI, Production and repeated live requests remain pending.
+
+Review follow-through: the semantic classifier now returns explicit write targets, excluding reference/preserved documents; the host validates them against mentioned plain-document paths and explicit preservation clauses. Runner-generated lockfiles remain ephemeral in documentation mode and cannot be persisted. Regression coverage verifies both restrictions. The older narration assertion was updated to require accurate incomplete-task wording while retaining no-false-success checks; the complete 1874-test CI unit suite then passed locally.
+
+After review repairs: all 1017 mandatory regressions and TypeScript pass; 61 focused intent/evidence/narration tests pass. Final exact-head CI/Preview and live acceptance remain pending.

@@ -711,6 +711,8 @@ export class BuilderToolLoop {
           const result = await this.runner.run({ workspaceId: input.workspaceId, command, files })
           for (const generated of result.generatedFiles || []) {
             if (generated.path !== 'package-lock.json') throw new Error('builder_generated_file_disallowed')
+            // Verification may create an ephemeral lock, but documentation mode cannot persist it.
+            if (documentationPaths) continue
             validateBuilderLock(generated.content)
             try {
               const savedFile = await this.workspace.writeFile(input.workspaceId, generated.path, generated.content)

@@ -69,7 +69,7 @@ test('ambiguous documentation intent uses the model but only permits explicitly 
   const { classifyBuilderDocumentationIntent, validBuilderDocumentationScope } = await import('../lib/builder/documentation-intent.ts')
   const objective = 'Extend README.md with guidance for the existing missing-input-file error. Inspect cli.js and preserve implementation and tests. Run npm test.'
   const requests: any[] = []
-  const scope = await classifyBuilderDocumentationIntent({ async generate(request) { requests.push(request); return '{"documentationOnly":true}' } }, objective)
+  const scope = await classifyBuilderDocumentationIntent({ async generate(request) { requests.push(request); return '{"documentationOnly":true,"writePaths":["README.md"]}' } }, objective)
   assert.deepEqual(scope, ['README.md'])
   assert.equal(requests.length, 1)
   assert.equal(JSON.parse(requests[0].prompt).objective, objective)
@@ -91,12 +91,14 @@ test('documentation extension edits its document and accepts a passing requested
   const responses = [JSON.stringify({ type: 'tool', toolId: 'edit_file', input: { path: 'README.md', search: '# Usage', replace: '# Usage\nMissing file errors mean you should check the input path.' } }),
     JSON.stringify({ type: 'tool', toolId: 'run', input: { command: 'node cli.js' } })]
   const result = await new BuilderToolLoop({ async generate() { return responses.shift() || null } }, workspace, {
-    async run(request) { return { exitCode: 0, stdout: execFileSync(process.execPath, ['-e', request.files.find(file => file.path === 'cli.js')!.content], { encoding: 'utf8' }), stderr: '', timedOut: false } },
+    async run(request) { return { exitCode: 0, stdout: execFileSync(process.execPath, ['-e', request.files.find(file => file.path === 'cli.js')!.content], { encoding: 'utf8' }), stderr: '', timedOut: false, generatedFiles: [{ path: 'package-lock.json', content: '{"lockfileVersion":3,"packages":{}}' }] } },
   }).run({ objective: 'Extend README.md with guidance about an existing error. Run node cli.js.', workspaceId: 'docs', documentationPaths: ['README.md'] })
   assert.equal(result.ok, true)
   assert.match((await workspace.readFile('docs', 'README.md'))!.content, /Missing file/)
   assert.equal((await workspace.readFile('docs', 'cli.js'))!.content, 'console.log("unchanged")')
   assert.equal(result.trace.filter(item => item.toolId === 'run').length, 1)
+  assert.equal(await workspace.readFile('docs', 'package-lock.json'), null)
+  assert.equal(result.trace.some(item => item.toolId === 'write_file' && item.input.path === 'package-lock.json'), false)
 })
 
 test('documentation mode cannot mutate implementation even when the reasoner asks for it', async () => {
@@ -127,4 +129,15 @@ test('documentation scope survives checkpoints and failed checks cannot be accep
   const resumed = await new BuilderToolLoop(ai, workspace, runner).run({ objective: 'Extend README.md to explain errors. Run npm test.', workspaceId: 'checkpoint-docs', checkpoint: JSON.parse(JSON.stringify(paused.checkpoint)), maxRounds: 1 })
   assert.equal(resumed.ok, false)
   assert.ok(resumed.trace.some(item => item.toolId === 'run' && item.ok === false))
+})
+
+
+test('reference and explicitly preserved documents are not writable documentation targets', async () => {
+  const { classifyBuilderDocumentationIntent, validBuilderDocumentationScope } = await import('../lib/builder/documentation-intent.ts')
+  const objective = 'Extend README.md with error guidance from docs/guide.md; do not modify docs/guide.md.'
+  const accepted = await classifyBuilderDocumentationIntent({ async generate() { return '{"documentationOnly":true,"writePaths":["README.md"]}' } }, objective)
+  assert.deepEqual(accepted, ['README.md'])
+  assert.equal(validBuilderDocumentationScope(objective, ['README.md', 'docs/guide.md']), false)
+  assert.equal(await classifyBuilderDocumentationIntent({ async generate() { return '{"documentationOnly":true,"writePaths":["README.md","docs/guide.md"]}' } }, objective), null)
+  assert.equal(await classifyBuilderDocumentationIntent({ async generate() { return '{"documentationOnly":true}' } }, objective), null)
 })

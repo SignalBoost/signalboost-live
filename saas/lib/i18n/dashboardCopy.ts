@@ -1756,3 +1756,11 @@ ru: {
     'dash.time.justNow': 'Только что',
   },
 }
+
+export const VOICE_INPUT_COPY = {
+  en: { locale: 'en-US', start: 'Use microphone', stop: 'Stop listening', unavailable: 'Voice input is not supported in this browser', denied: 'Microphone access was denied', failed: 'Voice input stopped unexpectedly' },
+  es: { locale: 'es-MX', start: 'Usar micrófono', stop: 'Dejar de escuchar', unavailable: 'La entrada de voz no es compatible con este navegador', denied: 'Se denegó el acceso al micrófono', failed: 'La entrada de voz se detuvo inesperadamente' },
+  pt: { locale: 'pt-BR', start: 'Usar microfone', stop: 'Parar de ouvir', unavailable: 'A entrada de voz não é compatível com este navegador', denied: 'O acesso ao microfone foi negado', failed: 'A entrada de voz parou inesperadamente' },
+  pl: { locale: 'pl-PL', start: 'Użyj mikrofonu', stop: 'Zatrzymaj nasłuchiwanie', unavailable: 'Wprowadzanie głosowe nie jest obsługiwane w tej przeglądarce', denied: 'Odmówiono dostępu do mikrofonu', failed: 'Wprowadzanie głosowe zostało nieoczekiwanie zatrzymane' },
+  ru: { locale: 'ru-RU', start: 'Использовать микрофон', stop: 'Остановить прослушивание', unavailable: 'Голосовой ввод не поддерживается в этом браузере', denied: 'Доступ к микрофону запрещён', failed: 'Голосовой ввод неожиданно остановлен' },
+} as const

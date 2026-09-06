@@ -110,17 +110,22 @@ function emitRetrievalTelemetry(telemetry: CognitiveSkillRetrievalTelemetry): vo
  * query embedding is always fresh, so this optimization reduces repeated inference cost without
  * changing lifecycle eligibility, domain gating, semantic thresholds, or selection scoring.
  */
-export async function retrieveValidatedCognitiveSkills(prompt: string): Promise<CognitiveSkillContextResult> {
+export async function retrieveValidatedCognitiveSkills(
+  prompt: string,
+  options: { specialistFamily?: 'software' } = {},
+): Promise<CognitiveSkillContextResult> {
   const startedAt = Date.now()
   const empty: CognitiveSkillContextResult = { retrieved: 0, relevant: 0, selected: 0, dependencyRejected: 0, items: [] }
   const db = cosServiceDb()
   if (!db) return empty
 
   const skillStoreStartedAt = Date.now()
-  const result = await db
+  let query = db
     .from('cos_cognitive_skills')
     .select('id,skill_key,subject,title,description,procedure,status,last_validated_at,updated_at,provenance,metadata,production_attempts,production_successes,retention_attempts,retention_successes,failure_count')
     .in('status', ['validated', 'learned', 'mastered'])
+  if (options.specialistFamily) query = query.contains('metadata', { specialistFamily: options.specialistFamily })
+  const result = await query
     .order('last_validated_at', { ascending: false, nullsFirst: false })
     .order('updated_at', { ascending: false })
     .limit(32)

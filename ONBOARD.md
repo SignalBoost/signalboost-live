@@ -3,7 +3,9 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.59
+**Version:** 1.60
+
+**Builder explanation fidelity — implementation, 2026-09-06:** `fix/builder-explanation-fidelity` addresses the fabricated failed-edit narrative in live job `b6585c7f-601e-4092-9027-7009d1799b7c`. Host-derived event outcomes distinguish completed commands, blocked requests, timeouts, unconfirmed execution and mutations. Both initial and follow-up explanations receive those outcomes; a separate bounded model review must accept the full draft against the artifacts before prose or a proposed change is released. Rejected/malformed/unavailable review retains recorded evidence and fallback text. The existing initial-response deadline covers both inference calls. Deterministic repair fallback no longer treats a blocked run as a reproduced failure or includes unchecked model details. This adds a model-based semantic check, not a universal guarantee against hallucination. Exact gates, deployment and live repair/follow-up acceptance remain pending; see `docs/BUILDER-EXPLANATION-FIDELITY-2026-09-06.md`.
 
 **COS free domain registration lookup — 2026-09-06:** `feat/cos-rdap-domain-lookup-20260906` gives authenticated owner COS turns a deterministic live domain-registration check before general model reasoning. Explicit domains in the owner request or immediately preceding COS reply are resolved through the free IANA DNS RDAP bootstrap and the authoritative registry RDAP endpoint; no paid registrar API is required. HTTP success is reported as registered, authoritative 404 only as no registration found, and missing/error responses as unverified. COS must not convert RDAP absence into guaranteed availability because registrar reservation, premium status, and purchasability remain checkout facts. The path records provider, timestamp, endpoint and per-domain status in provenance; it grants no purchase authority and is not exposed to Concierge. TypeScript, four focused tests and all 988 mandatory tests pass; merge, deployment and live owner acceptance remain pending.
 

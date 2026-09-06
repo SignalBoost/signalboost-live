@@ -1,3 +1,5 @@
+import { builderEvidenceEvents } from './evidence-events.ts'
+
 export type EvidenceJob = {
   id: string
   userId: string
@@ -51,8 +53,9 @@ function block(value: unknown): string {
 export function formatBuilderExecutionEvidence(trace: unknown): string {
   const runs = Array.isArray(trace) ? trace.filter(item => item && item.toolId === 'run') : []
   if (!runs.length) return 'No execution evidence was recorded for this job.'
+  const events = builderEvidenceEvents(runs)
   return 'Recorded execution evidence:\n\n' + runs.slice(-5).map((run, index) =>
-    `Run ${index + 1}\nCommand:\n${block(run.command)}\nExit code: ${typeof run.exitCode === 'number' ? run.exitCode : '(not recorded)'}\nstdout:\n${block(run.stdout)}\nstderr:\n${block(run.stderr)}`,
+    `Run ${index + 1}\nOutcome: ${events.slice(-5)[index].outcome.replace(/_/g, ' ')}\n${typeof run.error === 'string' ? 'Recorded tool error:\n' + block(run.error) + '\n' : ''}Command:\n${block(run.command)}\nExit code: ${typeof run.exitCode === 'number' ? run.exitCode : '(not recorded)'}\nstdout:\n${block(run.stdout)}\nstderr:\n${block(run.stderr)}`,
   ).join('\n\n') + (runs.length > 5 ? '\nShowing the last five recorded runs.' : '')
 }
 

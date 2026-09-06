@@ -1400,7 +1400,7 @@ Always query current state; this sequence can advance after this document is mer
 
 # Immediate next engineering priorities
 
-**Current top priority:** deploy and observe the owner-directed software application loop: admitted software material must create/reinforce a governed cognitive candidate, retain Software Specialist curriculum metadata through extraction, and advance only through existing independent evaluation evidence. Inspect the queue/candidate/certification evidence from one real owner submission; do not call queued or encountered material learned.
+**Current top priority:** deploy and observe the owner-directed software application loop, including the bounded idempotent backfill of pre-#1883 owner-fed software material. Inspect durable queue/candidate/certification evidence from the backfill and one new owner submission; do not call queued or encountered material learned.
 
 1. **Observe first post-#1539 real current-fact turn:** inspect exact Production telemetry for normal first-attempt success or a bounded `[cos-fresh-local-synthesis-retry]` followed by success. Do not manufacture traffic. If both attempts fail, retain fail-closed behavior and use the evidence to diagnose provider/runtime reliability rather than weakening grounding.
 2. **Observe private cognitive certification progression:** verify the ambiguity, performance-regression and architecture-discovery candidates advance only when their private understanding/practice/holdout evidence passes. Never manually set lifecycle flags or counters.

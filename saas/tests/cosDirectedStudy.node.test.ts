@@ -39,6 +39,7 @@ const input: DirectedStudySubmission = {
 
 const directedStudyPage = readFileSync(new URL('../app/dashboard/cos-directed-study/page.tsx', import.meta.url), 'utf8')
 const continuityEmail = readFileSync(new URL('../app/api/cron/cos-learning-continuity/route.ts', import.meta.url), 'utf8')
+const miningCron = readFileSync(new URL('../app/api/cron/cos-mining/route.ts', import.meta.url), 'utf8')
 
 test('owner-directed material is admitted when it is substantive and provenance requirements are present', () => {
   const result = assessDirectedStudy(input, gates)
@@ -111,6 +112,17 @@ test('directed-study store hands admitted software lessons to the governed cogni
   assert.match(store, /authorityGranted: false/)
   assert.match(activeLearning, /specialistFamily: lesson\.metadata\.specialistFamily/)
   assert.match(activeLearning, /applicationLifecycle: 'candidate_created_awaiting_evidence'/)
+})
+
+test('daily learning backfills pre-loop software lessons idempotently into the governed queue', () => {
+  const store = readFileSync(new URL('../lib/ai/cos/directedStudyStore.ts', import.meta.url), 'utf8')
+  assert.match(store, /backfillDirectedSoftwareApplications/)
+  assert.match(store, /owner_directed_study', 'specialist_family:software'/)
+  assert.match(store, /source URI \+ original study intent retain idempotency/i)
+  assert.match(store, /specialistFamily: 'software'/)
+  assert.doesNotMatch(store, /status:\s*'(?:validated|learned|mastered)'/)
+  assert.match(miningCron, /await backfillDirectedSoftwareApplications\(200\)/)
+  assert.ok(miningCron.indexOf('backfillDirectedSoftwareApplications(200)') < miningCron.indexOf('runGovernedCognitiveLearningCycle()'))
 })
 
 test('learning alert points to current specialist telemetry and never obsolete RunPod', () => {

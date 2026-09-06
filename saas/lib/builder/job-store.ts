@@ -1,6 +1,7 @@
 import type { BuilderLoopCheckpoint } from './checkpoint.ts'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { EvidenceLookup } from './execution-evidence.ts'
+import { proposalObjective, workspaceFingerprint, type BuilderProposal } from './proposal.ts'
 
 export type BuilderJobKind = 'standard' | 'debug_file'
 export type BuilderJobStatus = 'queued' | 'running' | 'paused' | 'succeeded' | 'failed'
@@ -242,4 +243,34 @@ export async function pauseBuilderJob(input: {
     p_checkpoint: input.checkpoint, p_reply: input.reply, p_result: input.result,
   })
   if (error || data !== true) throw new Error('builder_checkpoint_persist_failed')
+}
+
+/** Read all scoped file identities for a proposal; never creates or changes a workspace. */
+export async function readBuilderWorkspaceFingerprint(userId: string, workspaceId: string): Promise<string> {
+  if (![userId, workspaceId].every(value => UUID.test(value))) throw new Error('builder_proposal_scope')
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.from('builder_workspace_files').select('path,content')
+    .eq('user_id', userId).eq('workspace_id', workspaceId).order('path').limit(101)
+  if (error || !data?.length || data.length > 100) throw new Error('builder_proposal_source_unavailable')
+  return workspaceFingerprint(data.map(row => ({ path: String(row.path), content: String(row.content) })))
+}
+
+export async function saveBuilderProposal(input: {
+  userId: string; conversationId: string; sourceJobId: string; fingerprint: string; objective: string
+}): Promise<BuilderProposal> {
+  const objective = proposalObjective(input.objective)
+  const job = await readBuilderEvidenceJob(input)
+  if (!objective || !job || job.id !== input.sourceJobId || job.status !== 'succeeded' || job.metadata.platformRepair === true)
+    throw new Error('builder_proposal_unavailable')
+  if (await readBuilderWorkspaceFingerprint(job.userId, job.workspaceId) !== input.fingerprint) throw new Error('builder_proposal_source_changed')
+  const proposal: BuilderProposal = { id: crypto.randomUUID(), sourceJobId: job.id, objective,
+    fingerprint: input.fingerprint, expiresAt: Date.now() + 60 * 60 * 1000 }
+  const db = serviceClient()
+  if (!db) throw new Error('builder_job_storage_unavailable')
+  const { data, error } = await db.from('builder_jobs').update({ metadata: { ...job.metadata, pendingProposal: proposal } })
+    .eq('id', job.id).eq('user_id', job.userId).eq('conversation_id', job.conversationId)
+    .eq('status', 'succeeded').eq('metadata', JSON.stringify(job.metadata)).select('id').maybeSingle()
+  if (error || !data) throw new Error('builder_proposal_save_failed')
+  return proposal
 }

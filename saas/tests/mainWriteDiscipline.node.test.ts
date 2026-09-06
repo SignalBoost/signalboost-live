@@ -40,13 +40,16 @@ test('Vercel does not skip deployments based on Git commit provenance', () => {
   assert.equal(vercel.ignoreCommand, undefined)
 })
 
-test('owner review and no-agent-self-merge are repository policy', () => {
+test('ordinary PRs require owner integration while owner-authorized Platform Engineer repairs have one narrow self-merge exception', () => {
   const codeowners = readRoot('.github/CODEOWNERS')
   const policy = readRoot('docs/MAIN-WRITE-DISCIPLINE.md')
   assert.match(codeowners, /^\* @SignalBoost$/m)
-  assert.match(policy, /Agents do not self-merge\./)
-  assert.match(policy, /only one PR at a time using a GitHub merge commit/i)
-  assert.match(policy, /There is no agent emergency bypass\./)
+  assert.match(policy, /Agents do not self-merge ordinary task PRs\./)
+  assert.match(policy, /owner-authorized COS Platform Engineer repair/i)
+  assert.match(policy, /every GitHub check is green/i)
+  assert.match(policy, /restorable production checkpoint/i)
+  assert.match(policy, /two-parent GitHub merge commit|GitHub \*\*merge commit\*\*/i)
+  assert.match(policy, /There is no generic agent emergency bypass\./)
 })
 
 test('the shared token is a conflict surface, not an authority credential', () => {

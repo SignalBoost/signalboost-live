@@ -1,91 +1,92 @@
-// saas/lib/builder/merge-watch-runner.ts
+// saas/lib/builder/merge-watch-store.ts
 //
-// The decision half of the durable post-merge watch, with every dependency injected so the
-// decisions can be tested. One of them rolls production back; none of them should first be
-// exercised in production.
+// Storage for merges that were completed but not yet judged.
 //
-// WHAT EACH OUTCOME MEANS HERE:
-//
-//   healthy      the merged deployment reached READY. Row closed, nothing done.
-//   rolled_back  it failed and the checkpoint was restored. Row closed.
-//   unresolved   still building, or the check itself failed. THE ROW STAYS PENDING and the
-//                next tick tries again — this is the whole reason the table exists.
-//   abandoned    the attempt budget ran out with the deployment still unresolved. Closed with
-//                the rollback target named, because a watch that quietly stops watching is
-//                worse than one that never started.
-//
-// The attempt budget is the honest limit: after it, a human owns the outcome, and the detail
-// says which deployment and which build to roll back to.
+// The port is declared separately from the Supabase implementation so the cron's decision
+// logic can be tested without a database — the decisions are what matter here, since one of
+// them rolls production back.
 
-import type { MergeWatchStore, PendingMergeWatch } from './merge-watch-store.ts'
-import type { MergeWatchResult } from './repository-merge-watch.ts'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-/** Matches the attempts ceiling in the migration. */
-export const MERGE_WATCH_MAX_ATTEMPTS = 10
+export type MergeWatchStatus = 'healthy' | 'rolled_back' | 'abandoned'
 
-export type MergeWatchSweep = Readonly<{
-  claimed: number
-  healthy: number
-  rolledBack: number
-  abandoned: number
-  stillPending: number
+export type PendingMergeWatch = Readonly<{
+  id: string
+  workspaceId: string
+  userId: string
+  mergeCommitSha: string
+  preMergeSnapshotId: string
+  pullRequestNumber: number | null
+  attempts: number
 }>
 
-type WatchFn = (input: PendingMergeWatch) => Promise<MergeWatchResult>
+export interface MergeWatchStore {
+  /** Lease due rows. The lease is written by the same statement that returns them. */
+  claim(limit: number, backoffSeconds: number): Promise<readonly PendingMergeWatch[]>
+  close(id: string, status: MergeWatchStatus, detail: string): Promise<void>
+  record(input: {
+    workspaceId: string
+    userId: string
+    mergeCommitSha: string
+    preMergeSnapshotId: string
+    pullRequestNumber: number | null
+  }): Promise<void>
+}
 
-/**
- * Run one sweep of due watches. Never throws for a single row's sake: one merge that cannot be
- * judged must not stop the others from being judged.
- */
-export async function runPendingMergeWatches(input: {
-  store: MergeWatchStore
-  watch: WatchFn
-  limit?: number
-  backoffSeconds?: number
-}): Promise<MergeWatchSweep> {
-  const rows = await input.store.claim(input.limit ?? 3, input.backoffSeconds ?? 60)
-  let healthy = 0
-  let rolledBack = 0
-  let abandoned = 0
-  let stillPending = 0
+function serviceClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  if (!url || !key) return null
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+}
 
-  for (const pending of rows) {
-    let outcome: MergeWatchResult
-    try {
-      outcome = await input.watch(pending)
-    } catch (error) {
-      outcome = {
-        outcome: 'unresolved',
-        deploymentId: null,
-        deploymentState: null,
-        rollbackTargetId: pending.preMergeSnapshotId,
-        detail: `The check failed (${error instanceof Error ? error.message : 'unknown error'}).`,
-      }
-    }
+function row(value: any): PendingMergeWatch {
+  return Object.freeze({
+    id: String(value?.id || ''),
+    workspaceId: String(value?.workspace_id || ''),
+    userId: String(value?.user_id || ''),
+    mergeCommitSha: String(value?.merge_commit_sha || ''),
+    preMergeSnapshotId: String(value?.pre_merge_snapshot_id || ''),
+    pullRequestNumber: typeof value?.pull_request_number === 'number' ? value.pull_request_number : null,
+    attempts: Number(value?.attempts || 0),
+  })
+}
 
-    if (outcome.outcome === 'healthy') {
-      healthy += 1
-      await input.store.close(pending.id, 'healthy', outcome.detail).catch(() => {})
-      continue
-    }
-    if (outcome.outcome === 'rolled_back') {
-      rolledBack += 1
-      await input.store.close(pending.id, 'rolled_back', outcome.detail).catch(() => {})
-      continue
-    }
+/** Null when storage is unconfigured, so callers degrade rather than throw mid-repair. */
+export function createSupabaseMergeWatchStore(): MergeWatchStore | null {
+  const db = serviceClient()
+  if (!db) return null
 
-    // Unresolved. Leave it pending unless the budget is spent.
-    if (pending.attempts >= MERGE_WATCH_MAX_ATTEMPTS) {
-      abandoned += 1
-      await input.store.close(
-        pending.id,
-        'abandoned',
-        `Gave up after ${pending.attempts} checks without a verdict. ${outcome.detail} Roll back to ${pending.preMergeSnapshotId} manually if the deployment for ${pending.mergeCommitSha} failed.`,
-      ).catch(() => {})
-      continue
-    }
-    stillPending += 1
+  return {
+    async claim(limit, backoffSeconds) {
+      const { data, error } = await db.rpc('claim_builder_merge_watches', {
+        p_limit: limit,
+        p_backoff_seconds: backoffSeconds,
+      })
+      if (error) throw new Error('builder_merge_watch_claim_failed')
+      return (Array.isArray(data) ? data : []).map(row)
+    },
+
+    async close(id, status, detail) {
+      const { error } = await db.rpc('close_builder_merge_watch', {
+        p_id: id,
+        p_status: status,
+        p_detail: detail,
+      })
+      if (error) throw new Error('builder_merge_watch_close_failed')
+    },
+
+    async record(input) {
+      // A duplicate for the same commit hits the pending-unique index. That is the intended
+      // outcome, not an error: one merge, one watcher.
+      const { error } = await db.from('builder_merge_watches').insert({
+        workspace_id: input.workspaceId,
+        user_id: input.userId,
+        merge_commit_sha: input.mergeCommitSha.toLowerCase(),
+        pre_merge_snapshot_id: input.preMergeSnapshotId,
+        pull_request_number: input.pullRequestNumber,
+      })
+      if (error && error.code !== '23505') throw new Error('builder_merge_watch_record_failed')
+    },
   }
-
-  return Object.freeze({ claimed: rows.length, healthy, rolledBack, abandoned, stillPending })
 }

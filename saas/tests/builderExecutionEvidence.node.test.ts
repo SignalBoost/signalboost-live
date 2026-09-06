@@ -598,3 +598,86 @@ test('initial deadline covers correction review and never releases its pending d
   release('{"supported":true}')
   await Promise.resolve()
 })
+
+test('run source snapshot records dispatched content and survives later workspace changes', async () => {
+  const { builderRunSourceEvidence, builderSourceDigest, builderSourceComparison } = await import('../lib/builder/source-evidence.ts')
+  const workspace = new InMemoryBuilderWorkspace()
+  await workspace.writeFile(workspaceId, 'hello.js', 'console.log("before")')
+  const responses = ['{"type":"tool","toolId":"run","input":{"command":"node hello.js"}}', '{"type":"answer","answer":"Done"}']
+  const result = await new BuilderToolLoop({ async generate() { return responses.shift() || null } }, workspace, {
+    async run(request) {
+      const original = request.files.find(file => file.path === 'hello.js')!
+      const stdout = execFileSync(process.execPath, ['-e', original.content], { encoding: 'utf8' })
+      await workspace.writeFile(workspaceId, 'hello.js', 'console.log("after")')
+      return { exitCode: 0, stdout, stderr: '', timedOut: false }
+    },
+  }).run({ objective: 'Run node hello.js and report its output.', workspaceId })
+  const run = result.trace.find(item => item.toolId === 'run')!
+  const stored = JSON.parse(JSON.stringify({ toolId: 'run', ...builderRunSourceEvidence(run.output) }))
+  assert.equal(stored.sourceSnapshot.files.find((file: any) => file.path === 'hello.js').content, 'console.log("before")')
+  assert.equal((run.output as any).stdout, 'before\n')
+  const comparison = builderSourceComparison([stored], [{ path: 'hello.js', sha256: builderSourceDigest('console.log("after")') }])
+  assert.equal(comparison.files[0].relation, 'different')
+  for (const path of ['job-runner.ts', 'repository-repair.ts']) {
+    const source = readFileSync('lib/builder/' + path, 'utf8')
+    const serializer = source.slice(source.indexOf('function publicTrace'), source.indexOf('function publicTrace') + 3500)
+    assert.match(serializer, /builderRunSourceEvidence\(output\)/)
+  }
+})
+
+test('source snapshots bound excerpts without weakening full-content identity', async () => {
+  const { captureBuilderSource, builderRunSourceEvidence, builderSourceDigest, builderSourceComparison } = await import('../lib/builder/source-evidence.ts')
+  const files = Array.from({ length: 205 }, (_, i) => ({ path: `file-${String(i).padStart(3, '0')}.js`, content: 'x'.repeat(9000) }))
+  const snapshot = captureBuilderSource(files)
+  assert.equal(snapshot.omittedFiles, 5)
+  assert.equal(snapshot.files.length, 200)
+  assert.equal(snapshot.files.reduce((sum, file) => sum + file.content.length, 0), 24000)
+  assert.ok(snapshot.files.every(file => file.truncated))
+  assert.equal(snapshot.files[0].sha256, builderSourceDigest(files[0].content))
+  assert.ok(builderRunSourceEvidence({ sourceSnapshot: snapshot }).sourceSnapshot)
+  const compare = builderSourceComparison([{ toolId: 'run', sourceSnapshot: snapshot }], [
+    { path: files[0].path, sha256: builderSourceDigest(files[0].content) },
+    { path: files[204].path, sha256: builderSourceDigest(files[204].content) },
+  ])
+  assert.deepEqual(compare.files.map(file => file.relation), ['same', 'unavailable'])
+  const corrupt = captureBuilderSource([{ path: 'a.js', content: 'actual' }])
+  corrupt.files[0].content = 'forged'
+  assert.deepEqual(builderRunSourceEvidence({ sourceSnapshot: corrupt }), {})
+})
+
+test('legacy or missing last-run snapshots never borrow identity from an earlier run', async () => {
+  const { captureBuilderSource, builderSourceDigest, builderSourceComparison } = await import('../lib/builder/source-evidence.ts')
+  const sourceSnapshot = captureBuilderSource([{ path: 'money.js', content: 'old' }])
+  const current = [{ path: 'money.js', sha256: builderSourceDigest('old') }]
+  for (const trace of [[], [{ toolId: 'run' }], [{ toolId: 'run', sourceSnapshot }, { toolId: 'run', error: 'blocked' }]]) {
+    const comparison = builderSourceComparison(trace, current)
+    assert.equal(comparison.identityAvailable, false)
+    assert.equal(comparison.files[0].relation, 'unavailable')
+  }
+})
+
+test('historical explanation and both reviews receive authoritative source identity and separate excerpts', async () => {
+  const { captureBuilderSource } = await import('../lib/builder/source-evidence.ts')
+  const { explainBuilderEvidence } = await import('../lib/builder/explain-evidence.ts')
+  for (const recorded of [undefined, captureBuilderSource([{ path: 'money.js', content: 'old' }])]) {
+    const requests: any[] = []
+    const responses = ['{"type":"answer","answer":"Current files match the old final state."}',
+      '{"supported":false,"correctedAnswer":"The recorded checks passed, but current files do not establish the historical final source."}',
+      '{"supported":true}']
+    const reply = await explainBuilderEvidence({ prompt: 'Explain the old job',
+      job: { ...job, result: { files: ['money.js'], trace: [{ toolId: 'run', command: 'npm test', exitCode: 0, sourceSnapshot: recorded }] } },
+      workspace: { async readFile() { return { path: 'money.js', content: 'new', updatedAt: 1 } } },
+      ai: { async generate(request) { requests.push(request); return responses.shift()! } } })
+    assert.equal(requests.length, 3)
+    assert.doesNotMatch(reply, /Current files match the old final state/)
+    for (const request of requests) {
+      const context = JSON.parse(request.prompt)
+      assert.equal(context.sourceComparison.files[0].relation, recorded ? 'different' : 'unavailable')
+      assert.equal(context.recordedTrace[0].sourceSnapshot, undefined)
+      assert.equal(context.sourceHistory.length, recorded ? 1 : 0)
+      if (recorded) assert.equal(context.sourceHistory[0].files[0].content, 'old')
+      assert.equal(context.currentFiles[0].content, 'new')
+      assert.match(request.systemPrompt, /Never claim that current files match an old job/)
+    }
+  }
+})

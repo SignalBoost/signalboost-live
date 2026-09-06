@@ -274,5 +274,19 @@ test('complete application intake retains JSON and bypasses the single-file shor
   assert.equal(planDebugFileJob('Repair this application.', files), null)
   assert.equal(planDebugFileJob('Repair this file. Run: npm test.', [files[1]]), null)
   assert.equal(planDebugFileJob('Repair this file. Run: node money.js. Run: node cli.js.', [files[1]]), null)
-  assert.ok(planDebugFileJob('Repair this file. Run: node money.js.', [files[1]]))
+  assert.equal(planDebugFileJob('Repair this file. Run: node money.js.', [files[1]]), null)
+  assert.ok(planDebugFileJob('Repair this file.', [files[1]]))
+})
+
+test('unparsed execution requests cannot use the inferred single-file proof', () => {
+  const files = [{ path: 'app.js', content: 'console.log("ok")' }]
+  for (const prompt of [
+    'Repair app.js. Run `node verify.js`.',
+    'Repair app.js and execute node verify.js.',
+    'Repair app.js. Run: node app.js. Also run `node verify.js`.',
+    'Repair app.js; verify by running `node verify.js`.',
+    'Repair app.js; test with `node verify.js`.',
+    'Repair app.js; invoke ./verify.sh.',
+    'Repair app.js; verification command: `node verify.js`.',
+  ]) assert.equal(planDebugFileJob(prompt, files), null)
 })

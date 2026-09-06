@@ -1,5 +1,5 @@
 // saas/app/api/cos-browser/route.ts
-import { after, NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as publicConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
@@ -15,10 +15,6 @@ import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnPr
 import { tryCosSoftwareSpecialist } from '@/lib/ai/cos/softwareSpecialist'
 import { analyzeOperationalLog, hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { diagnoseOperationalLog } from '@/lib/ai/cos/operationalLogDiagnostic'
-import { parseSignalBoostRepositoryRepairTarget, signalBoostDeployedRepairTarget, type SignalBoostRepositoryRepairTarget } from '@/lib/builder/repository-repair-target'
-import { enqueueSignalBoostRepositoryRepairJob } from '@/lib/builder/repository-repair-job'
-import { runBuilderJob } from '@/lib/builder/job-runner'
-import { readBuilderObjective } from '@/lib/builder/request-contract'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
@@ -26,34 +22,12 @@ import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationa
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
-const SIGNALBOOST_OPERATIONAL_TARGET = /\b(?:signalboost-live|(?:saas\.)?signalboostapp\.com)\b/i
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function isSignalBoostDeploymentContext(req: NextRequest): boolean {
   const owner = String(process.env.VERCEL_GIT_REPO_OWNER || '').trim().toLowerCase()
   const repo = String(process.env.VERCEL_GIT_REPO_SLUG || '').trim().toLowerCase()
   const host = String(req.nextUrl.hostname || '').trim().toLowerCase()
   return (owner === 'signalboost' && repo === 'signalboost-live') || host === 'saas.signalboostapp.com'
-}
-
-async function queueOwnerRepositoryRepair(input: {
-  body: any
-  userId: string
-  objective: string
-  target: SignalBoostRepositoryRepairTarget
-}): Promise<NextResponse> {
-  const conversationId = UUID.test(String(input.body?.context?.conversationId || ''))
-    ? String(input.body.context.conversationId)
-    : crypto.randomUUID()
-  const objective = readBuilderObjective({ objective: input.objective }).objective
-  const job = await enqueueSignalBoostRepositoryRepairJob({
-    userId: input.userId,
-    conversationId,
-    objective,
-    target: input.target,
-  })
-  after(async () => { await runBuilderJob(job.jobId, input.userId) })
-  return NextResponse.json({ ...job, status: 'queued', source: 'cos-platform-engineer' }, { status: 202 })
 }
 
 export async function withSuggestedFollowups(response: Response, prompt: string, userId: string | null = null): Promise<NextResponse> {
@@ -140,24 +114,8 @@ export async function POST(req: NextRequest) {
 
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
   void operationalLogAnalysis
-  const exactFailedLogTarget = operationalEvidence ? parseSignalBoostRepositoryRepairTarget(operationalPrompt) : null
-  const ownerDeveloperLogSubmission = browserSurface === 'assistant'
-    && access?.isOwner === true
-    && operationalEvidence
-    && (SIGNALBOOST_OPERATIONAL_TARGET.test(operationalPrompt) || isSignalBoostDeploymentContext(req))
-  const ownerRepositoryRepairTarget = browserSurface === 'assistant' && access?.isOwner && access.userId && !hasSourceAttachment
-    ? exactFailedLogTarget
-      ?? signalBoostDeployedRepairTarget(prompt, deployment)
-      ?? signalBoostDeployedRepairTarget(operationalPrompt, deployment, { ownerDeveloperLogSubmission })
-    : null
-  if (ownerRepositoryRepairTarget && access?.userId) {
-    return queueOwnerRepositoryRepair({ body, userId: access.userId, objective: operationalPrompt || prompt, target: ownerRepositoryRepairTarget })
-  }
-
   if (explicitOperationalRepair && !hasSourceAttachment) {
-    const reply = exactFailedLogTarget
-      ? 'This is an explicit SignalBoost repository-repair request, but repository repair is owner-only. No code was run.'
-      : `${operationalLogReply(operationalPrompt)} For repository repair directly from a Vercel log, an authenticated owner can use the pinned SignalBoost deployment context; other users need to provide editable source in the ordinary Builder lane.`
+    const reply = `${operationalLogReply(operationalPrompt)} Repository repair is owner-only through the COS Software Specialist; other users need to provide editable source in the ordinary Builder lane.`
     return withSuggestedFollowups(NextResponse.json({ reply, source: 'concierge-operational-log-repair-not-authorized', execution_allowed: false, external_action_taken: false, external_ai_invoked: false, local_model_invoked: false }), prompt, auditUserId)
   }
 

@@ -1,4 +1,3 @@
-import { builderTaskContract } from './task-contract.ts'
 import { normalizeBuilderControlOutput } from './control-adapter.ts'
 import type {
   BuilderAiPort,
@@ -119,9 +118,9 @@ export function planDebugFileJob(objective: string, files: readonly DebugFileInp
   const proofSource = admitted.find(file => TEST_PATH.test(file.path)) ?? admitted[0]
   const proof = debugCommand(proofSource.path)
   if (!proof) return null
-  const normalizeCommand = (command: string) => command.replace(/['"`]/g, '').trim().replace(/\s+/g, ' ')
-  // The shortcut can run only its single-file proof; other commands require the full tool loop.
-  if (builderTaskContract(prompt).commands.some(command => normalizeCommand(command) !== normalizeCommand(proof.command))
+  // Explicit execution instructions belong to the full loop, even when their syntax
+  // is not recognized by the task-contract parser. This shortcut infers one proof.
+  if (/\b(?:run|execute)\b/i.test(prompt)
     || /\b(?:npm|pnpm|yarn|bun)\s+(?:test|start|run|install|ci)\b/i.test(prompt)) return null
   return Object.freeze({
     ...proof,

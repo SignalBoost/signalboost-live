@@ -74,3 +74,24 @@ In the same Concierge conversation as the earlier repair, without uploading sour
 Job `61b2e257-dc51-4a61-82af-992f2f8868cb` succeeded in the original workspace `f3a1fd27-6754-4bcb-9da8-45a9ce99c9cd`. Its persisted project context references prior job `b1ecb21f-37ee-4734-af63-0ce2f61c5837`, the previous objective and command. The current trace contains a targeted edit adding the fourth assertion and updating the output message, followed by fresh `node total.js` exit 0, stdout `4 assertions passed`, empty stderr. Displayed current source preserved the implementation and all three original assertions; the download uses the same workspace path.
 
 This is live proof of same-conversation workspace continuation and fresh verification, not private-repository access or arbitrary cross-project memory. The completion sentence still uses the generic "Created the requested workspace files" wording for this update; source, edit and run evidence establish the actual operation.
+
+
+## Six-file application repair and feature extension after #1882
+
+Application `af5f930b0e1da073c30bf98fd8193ace580efb26`; Production `dpl_2m4LMXUi2wfKVYzGeM77k6WzDNCu` observed READY. #1881 corrected JSON attachment filtering and the five-file cap. #1882 preserved complete application input through execution selection. Its ten CI workflows and exact Preview passed.
+
+The untouched six-file expense-report fixture in `docs/fixtures/expense-report` contains one intentional implementation bug: Math.abs makes refunds positive. Independent baseline verification produced five passing and two failing tests, with 1925 cents instead of 1425. The original failed live job `ef59e39c-52d4-42e2-ba7d-311470ba63a2` is rejected: its narrow debug runner omitted package.json/sample.json and made unrelated edits. The retry used a new conversation and original files.
+
+Fresh job `018ebb16-7cce-4d00-b09b-c06e54b6a630`, workspace `1ce11289-af83-4d6a-9baa-bb79fa2d15a8`, succeeded. The real prompt requested dependency installation, reproduction with npm test, inspection of implementation/imports, preservation of all tests/files, a fix, and explicit Run-list commands npm test and npm start. Its recorded evidence was:
+
+- npm install && npm test: exit 1; five pass, refund and CLI assertions fail at 1925 versus 1425.
+- One original-file edit in report.js: `sum + Math.abs(toCents(entry.amount))` to `sum + toCents(entry.amount)`.
+- npm test: exit 0, all seven pass; npm start: exit 0, `{"count":3,"totalCents":1425}`.
+- The original failing compound command reran with exit 0 and seven passing tests.
+- All six supplied files and generated package-lock.json were downloadable. Read-only stored-file hash comparison confirmed cli.js, money.js, package.json, report.test.js and sample.json were byte-for-byte unchanged. The declared is-number dependency remained in both source and manifest.
+
+The initial explanation correctly described the negative refund becoming positive, the exact edit and verified result. It also added an unnecessary caveat about the full pre-edit source not appearing in the trace, although the recorded search/replace already establishes the edited expression. This wording limitation does not invalidate the execution evidence.
+
+In the same conversation, without any upload, engineering requested --by-category while preserving default output and all old tests, adding category/empty-report tests, and running npm test plus node cli.js sample.json --by-category. Job `9775dea0-2e54-4035-a6c8-21a36f3dc6b5` succeeded in the same workspace; saved project context names the preceding repair job. It added summarizeByCategory in report.js, selected it only with the CLI flag, and appended two tests without changing the seven originals. Its first new empty-report test failed because t.after was used without a t callback parameter. Builder corrected that callback, reran all nine tests successfully, and ran the requested CLI command with exit 0 and `{"travel":1000,"meals":425}`. The response accurately explained the implementation and its self-repair.
+
+A separate #1882 review found unparsed execution requests such as “Run `node verify.js`” could use the inferred single-file proof. The follow-up routes explicit run/execute instructions to the full loop conservatively, including mixed parsed/unparsed requests. Local mandatory verification passed 962 tests and TypeScript. These observations establish the tested multi-file repair and continuation behavior, not arbitrary-project success.

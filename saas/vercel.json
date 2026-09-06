@@ -7,6 +7,7 @@
   },
   "crons": [
     { "path": "/api/cron/builder-continuations", "schedule": "* * * * *" },
+    { "path": "/api/cron/builder-repair-merge", "schedule": "* * * * *" },
     { "path": "/api/cron/opportunity-scan", "schedule": "0 12 * * *" },
     { "path": "/api/cron/batch-poll", "schedule": "10 * * * *" },
     { "path": "/api/cron/cos-video-poll", "schedule": "*/20 * * * *" },

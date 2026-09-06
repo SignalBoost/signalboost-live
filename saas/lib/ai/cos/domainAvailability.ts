@@ -12,7 +12,7 @@ export type DomainLookup = {
 type Bootstrap = { services?: Array<[string[], string[]]> }
 
 const DOMAIN = /(?<![\w@])(?:https?:\/\/)?((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63})(?![\w.-])/gi
-const INTENT = /\b(?:domain|url|tld|registrar|rdap|whois|availability|available|registered|taken|purchase|buy)\b/i
+const INTENT = /\b(?:domain|url|tld|registrar|rdap|whois|availability|available|registered|taken|purchase|buy|verify|verification|exist|exists|existing)\b/i
 const BRAINSTORM = /\b(?:brainstorm|suggest|suggestion|ideas?|names?|naming|brand|creative)\b/i
 const PLATFORM = /\b(?:platform|software|developer|development|coding|code|saas|app|product|domain|url)\b/i
 const LABEL = /^[a-z0-9][a-z0-9-]{1,62}$/
@@ -53,15 +53,15 @@ export function parseGeneratedDomainSuggestions(
     for (const item of candidates) {
       const value = item as Record<string, unknown>
       const name = String(value?.name || '').replace(/[^a-z0-9 -]/gi, '').trim().slice(0, 40)
-      const domain = String(value?.domain || '').trim().toLowerCase()
-      const meaning = String(value?.meaning || '').replace(/\s+/g, ' ').trim().slice(0, 180)
+      const domain = typeof value?.domain === 'string' ? value.domain.replace(/\\\./g, '.').trim().toLowerCase() : ''
+      const meaning = typeof value?.meaning === 'string' ? value.meaning.replace(/\s+/g, ' ').trim().slice(0, 180) : ''
       const dot = domain.lastIndexOf('.')
       const label = dot > 0 ? domain.slice(0, dot) : ''
       const tld = dot > 0 ? domain.slice(dot + 1) : ''
       if (!name || !meaning) continue
       if (!label || !LABEL.test(label) || !allowed.includes(tld)) continue
       if (excludeLegacyWords && /signal|boost/i.test(`${name} ${domain}`)) continue
-      if (!out.some(candidate => candidate.domain === domain)) out.push({ name, domain, meaning })
+      if (!out.some(candidate => candidate.domain === domain || candidate.name.toLowerCase() === name.toLowerCase())) out.push({ name, domain, meaning })
     }
     return out.slice(0, 50)
   } catch { return [] }
@@ -70,9 +70,16 @@ export function parseGeneratedDomainSuggestions(
 export function extractDomainCandidates(input: string, context = ''): string[] {
   if (!INTENT.test(input)) return []
   const found: string[] = []
-  for (const match of `${input}\n${context}`.matchAll(DOMAIN)) {
+  for (const match of input.matchAll(DOMAIN)) {
     const value = String(match[1] || '').toLowerCase().replace(/\.$/, '')
     if (value && !found.includes(value)) found.push(value)
+  }
+  const explicitCount = found.length
+  const contextual = [...context.matchAll(DOMAIN)].map(match => String(match[1] || '').toLowerCase().replace(/\.$/, ''))
+  for (const value of contextual) {
+    const label = value.split('.')[0]
+    const explicitlyNamed = new RegExp(`(?:^|[^a-z0-9-])${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-z0-9-])`, 'i').test(input)
+    if ((explicitCount === 0 || explicitlyNamed) && value && !found.includes(value)) found.push(value)
     if (found.length >= 10) break
   }
   return found

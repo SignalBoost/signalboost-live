@@ -171,6 +171,16 @@ type DomainCandidateGenerator = (
   excludedDomains?: string[],
 ) => Promise<{ candidates: DomainSuggestion[]; modelInvoked: boolean }>
 
+function candidateLabel(domain: string): string {
+  const dot = domain.lastIndexOf('.')
+  return dot > 0 ? domain.slice(0, dot) : ''
+}
+
+function generationInput(input: string, context = ''): string {
+  const prior = context.trim().slice(-6_000)
+  return prior ? `${prior}\n\n${input.trim()}` : input.trim()
+}
+
 export async function brainstormVerifiedDomains(args: { input: string; context?: string; fetchImpl?: FetchLike; generateImpl?: DomainCandidateGenerator }) {
   if (!isDomainBrainstormRequest(args.input, args.context)) return null
   const count = requestedSuggestionCount(args.input)
@@ -185,12 +195,17 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
   const allLookups: DomainLookup[] = []
   let modelInvoked = false
   let generatedCount = 0
+  const fetchImpl = args.fetchImpl ?? fetch
+  const { tlds: verifiableTlds } = await resolveVerifiableTlds(BRANDABLE_TLDS, fetchImpl)
+  const ownerGenerationInput = generationInput(args.input, args.context)
 
   // Availability is part of the search loop, not a one-shot filter. A creative
   // batch that is fully registered must inform the next reasoner batch instead
-  // of ending the owner's assignment prematurely.
+  // of ending the owner's assignment prematurely. The preceding owner context
+  // is carried into every generation wave so constraints such as abandoning the
+  // old brand cannot disappear on a terse follow-up.
   for (let wave = 0; wave < 3 && verified.length < count; wave += 1) {
-    const generated = await args.generateImpl(args.input, count - verified.length, [...seenDomains])
+    const generated = await args.generateImpl(ownerGenerationInput, count - verified.length, [...seenDomains])
     modelInvoked ||= generated.modelInvoked
     const fresh = generated.candidates.filter(candidate => {
       if (seenDomains.has(candidate.domain)) return false
@@ -199,19 +214,49 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
     })
     if (!fresh.length) continue
     generatedCount += fresh.length
-    const lookups = await lookupDomainsRdap(fresh.map(candidate => candidate.domain), args.fetchImpl)
-    allLookups.push(...lookups)
-    const lookupByDomain = new Map(lookups.map(lookup => [lookup.domain, lookup]))
+
+    const originalLookups = await lookupDomainsRdap(fresh.map(candidate => candidate.domain), fetchImpl)
+    allLookups.push(...originalLookups)
+    const originalByDomain = new Map(originalLookups.map(lookup => [lookup.domain, lookup]))
+    const pending: Array<{ candidate: DomainSuggestion; original: DomainLookup; alternatives: string[] }> = []
+
     for (const candidate of fresh) {
-      const lookup = lookupByDomain.get(candidate.domain)
-      if (!lookup) continue
-      if (lookup.status === 'no_registration_found') {
-        if (verified.length < count) verified.push({ ...candidate, lookup })
-      } else if (lookup.status === 'registered') {
-        registered.push({ ...candidate, lookup })
-      } else {
-        unresolved.push({ ...candidate, lookup })
+      const original = originalByDomain.get(candidate.domain)
+      if (!original) continue
+      if (original.status === 'no_registration_found') {
+        if (verified.length < count) verified.push({ ...candidate, lookup: original })
+        continue
       }
+      if (verified.length >= count) break
+      const label = candidateLabel(candidate.domain)
+      const originalTld = candidate.domain.split('.').at(-1) || ''
+      const alternatives = verifiableTlds
+        .filter(tld => tld !== originalTld)
+        .map(tld => `${label}.${tld}`)
+        .filter(domain => domain !== candidate.domain && !seenDomains.has(domain))
+      for (const domain of alternatives) seenDomains.add(domain)
+      pending.push({ candidate, original, alternatives })
+    }
+
+    // A neural name is not discarded merely because its first TLD is registered.
+    // Check deterministic TLD alternatives for the SAME neural name and meaning;
+    // code changes only the registry suffix and never invents a replacement name.
+    const alternateDomains = pending.flatMap(item => item.alternatives)
+    const alternateLookups = alternateDomains.length ? await lookupDomainsRdap(alternateDomains, fetchImpl) : []
+    allLookups.push(...alternateLookups)
+    const alternateByDomain = new Map(alternateLookups.map(lookup => [lookup.domain, lookup]))
+
+    for (const item of pending) {
+      if (verified.length >= count) break
+      const alternatives = item.alternatives.map(domain => alternateByDomain.get(domain)).filter((lookup): lookup is DomainLookup => Boolean(lookup))
+      const available = alternatives.find(lookup => lookup.status === 'no_registration_found')
+      if (available) {
+        verified.push({ ...item.candidate, domain: available.domain, lookup: available })
+        continue
+      }
+      const unknown = [item.original, ...alternatives].find(lookup => lookup.status === 'unknown')
+      if (unknown) unresolved.push({ ...item.candidate, lookup: unknown })
+      else registered.push({ ...item.candidate, lookup: item.original })
     }
   }
 
@@ -228,8 +273,8 @@ export async function brainstormVerifiedDomains(args: { input: string; context?:
 
   const accounting = [
     `Verification at ${checkedAt}: ${verified.length} of ${generatedCount} generated ${generatedCount === 1 ? 'name' : 'names'} returned no registration record`,
-    registered.length ? `${registered.length} came back registered` : '',
-    unresolved.length ? `${unresolved.length} could not be checked` : '',
+    registered.length ? `${registered.length} came back registered across checked TLDs` : '',
+    unresolved.length ? `${unresolved.length} could not be checked conclusively` : '',
   ].filter(Boolean).join(', ') + '.'
 
   const reply = verified.length

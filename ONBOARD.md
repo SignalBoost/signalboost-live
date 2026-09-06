@@ -3,7 +3,17 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.53
+**Version:** 1.54
+
+## Builder engineering harness — owner goal, 2026-09-06
+
+The product goal is a complete agent engineering harness: a persistent project environment where Builder can inspect actual artifacts, reason about the task, execute changes, verify results, explain what happened, guide the user and continue through follow-up conversation. Builder remains a governed capability of the COS Software Specialist; this goal does not create a second brain or change execution authority.
+
+The harness must support six connected capabilities: project context (files, dependencies, logs and authorized repository history); evidence-based reasoning and useful guidance; file/dependency/command execution; fresh verification and repair; durable task and conversation continuity; and permission enforcement, isolation and interruption recovery. Explanations must distinguish verified causes from hypotheses and identify the specific missing evidence when inspection is insufficient. Follow-up instructions must preserve the user's goal and current project while incorporating corrections.
+
+**Verified progress:** the dated live records below and `docs/BUILDER-LIVE-RESULTS-2026-09-06.md` establish repeatable small builds, large-file generation, declared npm installation, pinned public-repository import, supplied multi-file repair, source-based explanation, project Q&A, same-project feature extension and a saved proposal followed by bare `go`, edit, test and explanation. The latest accepted proposal flow passed ten application tests; its implementation passed 970 mandatory regressions. These are bounded observed outcomes, not proof that the complete harness or general coding-agent parity is finished. Repository history, arbitrary project handling, conversational variants and interruption recovery need their own implementation/evidence assessment.
+
+**Next Builder task:** scan current main and the existing harness against these six capabilities, identify the highest-impact remaining gap from implementation and runtime evidence, then implement and verify that gap through the existing execution path. Reuse completed capabilities; do not substitute repeated demonstrations of an accepted flow for missing functionality. Engineering owns implementation and verification. The owner evaluates the completed experience; owner certification is not a prerequisite for engineering work. This documentation update precedes that next task and does not claim the assessment has already been performed.
 
 **Builder proposal-to-action live acceptance — 2026-09-06:** #1890 merged at a7b786ae6950815223ffa366db8ce52cad2e2bc7, Production dpl_AMXcCHrTyZAiNcvHAKxj5fjh5Gux READY. A fresh natural request for the next small CLI improvement produced a saved proposal to add process-level --help regression coverage. Sending only go created job 07a543dc-6c2e-43b9-bdd9-36299705d2b1, exactly matching the stored proposal ID, in the existing workspace 1ce11289-af83-4d6a-9baa-bb79fa2d15a8. Its single recorded edit inserted the proposed test without weakening the original nine. Fresh npm test passed all ten, including real cli.js --help exit 0, empty stderr and expected usage output. The initial response explained the change and actual coverage. The source proposal/job relation is persisted; no files or full task were re-uploaded. All 970 mandatory tests, TypeScript, ten CI workflows and exact Preview passed for the application change. Detailed chronology and limits are in docs/BUILDER-LIVE-RESULTS-2026-09-06.md. This accepts the observed suggest/go/edit/test/explain flow, not general coding-agent parity.
 
@@ -1407,6 +1417,8 @@ Always query current state; this sequence can advance after this document is mer
 ---
 
 # Immediate next engineering priorities
+
+**Builder workstream:** follow the owner-defined engineering-harness goal at the top of this file. The next task is the current-state capability assessment and first evidence-backed gap, while preserving the separate learning workstream below.
 
 **Current top priority:** deploy and observe the owner-directed software application loop, including the bounded idempotent backfill of pre-#1883 owner-fed software material. Inspect durable queue/candidate/certification evidence from the backfill and one new owner submission; do not call queued or encountered material learned.
 

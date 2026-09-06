@@ -3,7 +3,9 @@
   "env": {
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",
     "COS_LIVE_SOURCES_ENABLED": "true",
-    "COS_LOCAL_FIRST_ENABLED": "true"
+    "COS_LOCAL_FIRST_ENABLED": "true",
+    "BUILDER_AUTO_MERGE_ENABLED": "true",
+    "BUILDER_AUTO_MERGE_ROLLBACK_ENABLED": "true"
   },
   "crons": [
     { "path": "/api/cron/builder-continuations", "schedule": "* * * * *" },

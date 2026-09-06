@@ -78,7 +78,7 @@ function emailHtml(report: ContinuityReport): string {
       <ol style="padding-left:18px;margin:0 0 16px 0;color:#444">
         <li><a href="${base}/api/admin/cos-learning/run">/api/admin/cos-learning/run</a> — separates a saturated cycle (duplicate-dominant rejections) from a dead one (sourceErrors, or no run at all).</li>
         <li><a href="${base}/api/admin/cos-learning/coverage">/api/admin/cos-learning/coverage</a> — which declared subjects have never been studied.</li>
-        <li><a href="${base}/api/admin/cos-runpod">/api/admin/cos-runpod</a> — extraction needs the reasoner; a stopped pod stops learning.</li>
+        <li><a href="${base}/api/admin/cos-specialist-learning">/api/admin/cos-specialist-learning</a> — shows whether routed software study has produced validated specialist skills.</li>
       </ol>
 
       <p style="margin:0;color:#777;font-size:12px">Sent only because this check is not green. A healthy day sends no email.</p>

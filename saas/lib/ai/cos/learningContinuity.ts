@@ -239,7 +239,7 @@ export function assessLearningContinuity(
       code: 'silent_days',
       severity: 'red',
       title: `${silentDaysLast7} of the last 7 days retained nothing`,
-      detail: 'A daily cycle that produces nothing on most days is not running daily, whatever the schedule says. Check the cron invocation and the reasoner pod availability — extraction needs the local model up.',
+      detail: 'A daily cycle that produces nothing on most days is not running daily, whatever the schedule says. Check the cron invocation, source errors, and the configured managed reasoner availability.',
     })
   }
 

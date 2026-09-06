@@ -38,6 +38,18 @@ export type CosDirectedStudyCopy = {
   matchedTerms: string
   storedResult: string
   duplicatesResult: string
+  learningProofTitle: string
+  learningRoute: string
+  softwareSpecialist: string
+  generalCos: string
+  retentionOutcome: string
+  newKnowledgeStored: string
+  knownKnowledgeReinforced: string
+  noKnowledgeStored: string
+  curriculumTracks: string
+  applicationValidation: string
+  applicationPending: string
+  applicationExplanation: string
   dryRunNote: string
   historyTitle: string
   historyEmpty: string
@@ -92,6 +104,18 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     matchedTerms: 'Matched terms (diagnostic)',
     storedResult: 'Chunks stored',
     duplicatesResult: 'Already known (duplicates)',
+    learningProofTitle: 'Learning result',
+    learningRoute: 'Routed to',
+    softwareSpecialist: 'Software Specialist',
+    generalCos: 'General COS study',
+    retentionOutcome: 'Retention',
+    newKnowledgeStored: 'New knowledge stored',
+    knownKnowledgeReinforced: 'Known knowledge reinforced; no new row',
+    noKnowledgeStored: 'No knowledge stored',
+    curriculumTracks: 'Curriculum tracks',
+    applicationValidation: 'Applied successfully',
+    applicationPending: 'Not proven yet',
+    applicationExplanation: 'Feeding material does not prove a new competency. COS records mastery only after the knowledge is used and passes an evidence-backed application test.',
     dryRunNote: 'Dry run: nothing was stored. Review the chunks, then press "Feed COS" to store the eligible material.',
     historyTitle: 'Previously fed material',
     historyEmpty: 'Nothing has been fed by hand yet.',
@@ -144,6 +168,18 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     matchedTerms: 'Términos coincidentes (diagnóstico)',
     storedResult: 'Fragmentos almacenados',
     duplicatesResult: 'Ya conocidos (duplicados)',
+    learningProofTitle: 'Resultado del aprendizaje',
+    learningRoute: 'Enviado a',
+    softwareSpecialist: 'Especialista de Software',
+    generalCos: 'Estudio general de COS',
+    retentionOutcome: 'Retención',
+    newKnowledgeStored: 'Nuevo conocimiento almacenado',
+    knownKnowledgeReinforced: 'Conocimiento conocido reforzado; sin registro nuevo',
+    noKnowledgeStored: 'No se almacenó conocimiento',
+    curriculumTracks: 'Áreas curriculares',
+    applicationValidation: 'Aplicado correctamente',
+    applicationPending: 'Aún no comprobado',
+    applicationExplanation: 'Alimentar material no demuestra una nueva competencia. COS solo registra dominio después de usar el conocimiento y aprobar una prueba de aplicación con evidencia.',
     dryRunNote: 'Simulacro: no se almacenó nada. Revise los fragmentos y luego presione "Alimentar COS" para guardar el material elegible.',
     historyTitle: 'Material alimentado previamente',
     historyEmpty: 'Todavía no se ha alimentado nada manualmente.',
@@ -196,6 +232,18 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     matchedTerms: 'Termos correspondentes (diagnóstico)',
     storedResult: 'Trechos armazenados',
     duplicatesResult: 'Já conhecidos (duplicados)',
+    learningProofTitle: 'Resultado do aprendizado',
+    learningRoute: 'Encaminhado para',
+    softwareSpecialist: 'Especialista de Software',
+    generalCos: 'Estudo geral do COS',
+    retentionOutcome: 'Retenção',
+    newKnowledgeStored: 'Novo conhecimento armazenado',
+    knownKnowledgeReinforced: 'Conhecimento conhecido reforçado; nenhum novo registro',
+    noKnowledgeStored: 'Nenhum conhecimento armazenado',
+    curriculumTracks: 'Trilhas curriculares',
+    applicationValidation: 'Aplicado com sucesso',
+    applicationPending: 'Ainda não comprovado',
+    applicationExplanation: 'Alimentar material não comprova uma nova competência. O COS só registra domínio após usar o conhecimento e passar em um teste de aplicação baseado em evidências.',
     dryRunNote: 'Simulação: nada foi armazenado. Revise os trechos e pressione "Alimentar o COS" para armazenar o material elegível.',
     historyTitle: 'Material alimentado anteriormente',
     historyEmpty: 'Nada foi alimentado manualmente ainda.',
@@ -248,6 +296,18 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     matchedTerms: 'Dopasowane terminy (diagnostyka)',
     storedResult: 'Zapisane fragmenty',
     duplicatesResult: 'Już znane (duplikaty)',
+    learningProofTitle: 'Wynik uczenia',
+    learningRoute: 'Przekazano do',
+    softwareSpecialist: 'Specjalista ds. oprogramowania',
+    generalCos: 'Ogólna nauka COS',
+    retentionOutcome: 'Zapamiętanie',
+    newKnowledgeStored: 'Zapisano nową wiedzę',
+    knownKnowledgeReinforced: 'Wzmocniono znaną wiedzę; brak nowego rekordu',
+    noKnowledgeStored: 'Nie zapisano wiedzy',
+    curriculumTracks: 'Ścieżki programu',
+    applicationValidation: 'Zastosowano pomyślnie',
+    applicationPending: 'Jeszcze nie potwierdzono',
+    applicationExplanation: 'Samo dodanie materiału nie potwierdza nowej kompetencji. COS rejestruje opanowanie dopiero po użyciu wiedzy i zaliczeniu testu zastosowania opartego na dowodach.',
     dryRunNote: 'Próba na sucho: nic nie zostało zapisane. Przejrzyj fragmenty, a następnie naciśnij "Zasil COS", aby zapisać kwalifikujący się materiał.',
     historyTitle: 'Wcześniej przekazany materiał',
     historyEmpty: 'Nic nie zostało jeszcze przekazane ręcznie.',
@@ -300,6 +360,18 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     matchedTerms: 'Совпавшие термины (диагностика)',
     storedResult: 'Сохранено фрагментов',
     duplicatesResult: 'Уже известно (дубликаты)',
+    learningProofTitle: 'Результат обучения',
+    learningRoute: 'Направлено',
+    softwareSpecialist: 'Специалисту по ПО',
+    generalCos: 'Общее обучение COS',
+    retentionOutcome: 'Сохранение',
+    newKnowledgeStored: 'Новые знания сохранены',
+    knownKnowledgeReinforced: 'Известные знания закреплены; новой записи нет',
+    noKnowledgeStored: 'Знания не сохранены',
+    curriculumTracks: 'Учебные направления',
+    applicationValidation: 'Успешно применено',
+    applicationPending: 'Пока не доказано',
+    applicationExplanation: 'Добавление материала не доказывает новую компетенцию. COS отмечает освоение только после применения знаний и успешного прохождения подтверждённого теста.',
     dryRunNote: 'Пробный запуск: ничего не сохранено. Просмотрите фрагменты, затем нажмите «Обучить COS», чтобы сохранить подходящий материал.',
     historyTitle: 'Ранее добавленные материалы',
     historyEmpty: 'Материалы вручную ещё не добавлялись.',

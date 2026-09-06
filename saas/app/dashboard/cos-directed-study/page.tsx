@@ -10,7 +10,8 @@ import { useTranslation } from '@/lib/i18n/useTranslation'
 import { COS_DIRECTED_STUDY_COPY, type CosDirectedStudyLanguage } from '@/lib/i18n/cosDirectedStudyCopy'
 
 type ChunkVerdict = { index: number; admitted: boolean; reason: string; confidence: number; coverage: number; matchedTerms: string[] }
-type Assessment = { ok?: boolean; error?: string; subject?: string; chunks?: ChunkVerdict[]; admitted?: number; rejected?: number }
+type LearningRoute = { orchestrator: 'cos'; specialistFamily: 'software' | null; curriculumTracks: string[]; routingBasis: string; authorityGranted: false }
+type Assessment = { ok?: boolean; error?: string; subject?: string; chunks?: ChunkVerdict[]; admitted?: number; rejected?: number; learningRoute?: LearningRoute }
 type ApiResult = { ok?: boolean; error?: string; dryRun?: boolean; resolvedFrom?: string | null; assessment?: Assessment | null; stored?: number; duplicates?: number; errors?: string[]; authRequired?: boolean }
 type HistoryRecord = { content_hash?: string; source_kind?: string; source_uri?: string; source_title?: string | null; subject?: string; confidence?: number; license?: string; created_at?: string }
 type HistoryResult = { ok?: boolean; error?: string; records?: HistoryRecord[]; authRequired?: boolean }
@@ -133,6 +134,7 @@ export default function CosDirectedStudyPage() {
   useEffect(() => { void loadHistory() }, [])
 
   const assessment = result?.assessment
+  const learningRoute = assessment?.learningRoute
   const resolvedLabel = result?.resolvedFrom === 'youtube_transcript' ? copy.resolvedYoutube
     : result?.resolvedFrom === 'document_fetch' ? copy.resolvedDocument
       : result?.resolvedFrom === 'pasted_text' ? copy.resolvedPasted : null
@@ -184,6 +186,16 @@ export default function CosDirectedStudyPage() {
         {!result.dryRun && <span>{copy.storedResult}: <span className="font-semibold text-text">{result.stored ?? 0}</span></span>}
         {!result.dryRun && (result.duplicates ?? 0) > 0 && <span>{copy.duplicatesResult}: <span className="font-semibold text-text">{result.duplicates}</span></span>}
       </div>
+      {!result.dryRun && learningRoute && <div className="rounded-md border border-border p-4 text-sm">
+        <h2 className="font-semibold">{copy.learningProofTitle}</h2>
+        <div className="mt-2 grid gap-2 md:grid-cols-2">
+          <p>{copy.learningRoute}: <span className="font-semibold text-text">{learningRoute.specialistFamily === 'software' ? copy.softwareSpecialist : copy.generalCos}</span></p>
+          <p>{copy.retentionOutcome}: <span className="font-semibold text-text">{(result.stored ?? 0) > 0 ? copy.newKnowledgeStored : (result.duplicates ?? 0) > 0 ? copy.knownKnowledgeReinforced : copy.noKnowledgeStored}</span></p>
+          <p>{copy.curriculumTracks}: <span className="font-semibold text-text">{learningRoute.curriculumTracks.length ? learningRoute.curriculumTracks.join(', ') : '—'}</span></p>
+          <p>{copy.applicationValidation}: <span className="font-semibold text-text">{copy.applicationPending}</span></p>
+        </div>
+        <p className="mt-3 text-xs text-text-muted">{copy.applicationExplanation}</p>
+      </div>}
       <h2 className="text-sm font-semibold">{copy.chunksTitle} — {assessment.admitted ?? 0} ✓ / {assessment.rejected ?? 0} ✗</h2>
       <div className="space-y-2">
         {(assessment.chunks ?? []).map(chunk => <div key={chunk.index} className={`rounded-md border p-3 text-xs ${chunk.admitted ? 'border-border' : 'border-warning/40'}`}>

@@ -68,7 +68,7 @@ export function builderTaskProgress(contract: BuilderTaskContract, paths: readon
   const lastChange = trace.findLastIndex(item => item.ok && (item.toolId === 'write_file' || item.toolId === 'edit_file'))
   const recent = trace.slice(lastChange + 1).filter(item => item.toolId === 'run')
   const passed = (command: string) => {
-    const latest = recent.findLast(item => item.input.command === command)
+    const latest = recent.findLast(item => item.input.command === command || item.input.requestedCommand === command)
     const output = latest?.output as { exitCode?: number; timedOut?: boolean } | undefined
     return latest?.ok === true && output?.exitCode === 0 && output?.timedOut !== true
   }

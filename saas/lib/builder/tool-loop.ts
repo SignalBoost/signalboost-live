@@ -687,14 +687,16 @@ export class BuilderToolLoop {
           workspacePaths = listed.map(file => file.path)
           const files = (await Promise.all(listed.map(file => this.workspace.readFile(input.workspaceId, file.path))))
             .filter((file): file is BuilderFile => file !== null)
-          let command = normalizeBuilderSandboxCommand(text(action.input.command), files)
+          const requestedCommand = text(action.input.command)
+          let command = normalizeBuilderSandboxCommand(requestedCommand, files)
           if (!command) command = projectContext.recommendedTestCommand || ''
           if (!command) {
             const proof = files.find(file => /builderAsyncJobs|builderDebugFileJob|builderRoutingStrict/.test(file.path))
               || files.find(file => /\.(?:test|spec)\.[cm]?[jt]sx?$/i.test(file.path))
             command = proof ? `node --experimental-strip-types --test ${proof.path}` : 'node --experimental-strip-types --test'
           }
-          action.input = { ...action.input, command }
+          // Only the host may attest a requested/executed-command alias; discard model-supplied aliases.
+          action.input = { command, ...(requestedCommand && requestedCommand !== command ? { requestedCommand } : {}) }
           const result = await this.runner.run({ workspaceId: input.workspaceId, command, files })
           for (const generated of result.generatedFiles || []) {
             if (generated.path !== 'package-lock.json') throw new Error('builder_generated_file_disallowed')
@@ -711,7 +713,7 @@ export class BuilderToolLoop {
                 remediation: 'The command ran, but its generated package-lock.json could not be saved. Free a workspace file slot before the next dependency run.' })
             }
           }
-          if (result.executedCommand) action.input = { ...action.input, command: result.executedCommand, requestedCommand: command }
+          if (result.executedCommand) action.input = { command: result.executedCommand, requestedCommand: requestedCommand || command }
           output = summarizeRun(result)
         }
         const runFailed = action.toolId === 'run' && (output as ReturnType<typeof summarizeRun>).exitCode !== 0

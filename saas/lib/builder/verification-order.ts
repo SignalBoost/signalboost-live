@@ -30,7 +30,8 @@ export function pendingBuilderVerificationOrder(orders: readonly BuilderVerifica
     if (order.afterTestChange && testChange < 0) return true
     return !trace.some((item, index) => {
       if (index <= testChange || item.toolId !== 'run'
-        || normalizedCommand(item.input.command) !== order.command) return false
+        || (normalizedCommand(item.input.command) !== order.command
+          && normalizedCommand(item.input.requestedCommand) !== order.command)) return false
       const output = item.output as { exitCode?: unknown; timedOut?: unknown } | undefined
       return typeof output?.exitCode === 'number' && output.timedOut === false
         && (item.ok ? output.exitCode === 0 : output.exitCode !== 0)

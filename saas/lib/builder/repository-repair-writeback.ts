@@ -103,9 +103,10 @@ async function executableModesForChangedFiles(
 }
 
 /**
- * Publish an already-verified Platform Engineer repair as a review branch + GitHub PR.
- * This function never merges or deploys. The server-only write token is capability evidence;
- * caller/user text cannot supply or upgrade it.
+ * Publish an already-verified Platform Engineer repair as a governed branch + GitHub PR.
+ * The server-only write token is capability evidence; caller/user text cannot supply or upgrade it.
+ * Owner-authorized repair PRs may be completed later by the separately gated merge continuation;
+ * this function itself never merges or deploys.
  *
  * Partial mutations are reported honestly. If Git objects or a branch were created before a later
  * API call failed, repositoryWriteTaken remains true and the last completed stage is returned.
@@ -271,7 +272,7 @@ export async function publishSignalBoostRepositoryRepair(input: {
             `Changed files: ${files.length}`,
             '',
             'The repair was generated and proved in the network-denied repository sandbox.',
-            'This PR is intentionally not self-merged or deployed by the agent.',
+            'When governed auto-merge is enabled, the durable merge continuation may integrate this PR only after all checks are green, the danger classifier remains clear, and a restorable production checkpoint exists.',
           ].join('\n'),
           maintainer_can_modify: true,
         }),

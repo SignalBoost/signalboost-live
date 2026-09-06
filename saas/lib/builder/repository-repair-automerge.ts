@@ -212,7 +212,9 @@ export async function attemptSignalBoostRepositoryAutoMerge(input: {
     const merge = await requestJson(
       request,
       `${GITHUB_API}/pulls/${input.pullRequestNumber}/merge`,
-      { method: 'PUT', headers, body: JSON.stringify({ merge_method: 'squash' }) },
+      // Main Write Discipline requires a two-parent GitHub merge commit. Squash/rebase writes are
+      // integration violations because they erase the PR parent and bypass the serialized path.
+      { method: 'PUT', headers, body: JSON.stringify({ merge_method: 'merge' }) },
       [200],
     )
     const mergeCommitSha = String(merge?.sha || '')

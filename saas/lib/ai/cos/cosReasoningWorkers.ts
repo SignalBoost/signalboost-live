@@ -62,6 +62,7 @@ function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistR
     ...(systemPrompt === undefined ? {} : { systemPrompt }),
     ...(maxTokens === undefined ? {} : { maxTokens }),
     ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
+    ...(request.jsonObject === undefined ? {} : { jsonObject: request.jsonObject }),
   }
 }
 

@@ -6,6 +6,8 @@ export type CosReasoningRequest = {
   systemPrompt?: string
   maxTokens?: number
   temperature?: number
+  /** Preserve provider-enforced JSON contracts through the COS worker boundary. */
+  jsonObject?: boolean
   requestedRole?: CosReasoningWorkerRole
   allowExternalEscalation?: boolean
 }

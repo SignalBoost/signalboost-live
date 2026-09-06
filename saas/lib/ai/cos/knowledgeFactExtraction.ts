@@ -45,6 +45,7 @@ const SYSTEM_PROMPT = [
   'You extract factual statements from a source document for a knowledge base.',
   'Return ONLY a JSON object, no preamble, no code fences, no commentary.',
   'Shape: {"facts":[{"subject":"...","predicate":"...","object":"...","confidence":0.0}]}',
+  'Return at most 5 facts. Prefer the most durable, important claims and keep every field concise.',
   'Each fact must be a single self-contained claim the document itself makes.',
   'predicate is a short relation in snake_case, for example causes, is_diagnosed_by, requires, measures.',
   'object must paraphrase content that is present in the document. Never add knowledge from elsewhere.',
@@ -148,7 +149,7 @@ export async function extractFactsFromDocument(document: ExtractionSourceDocumen
     source,
   ].filter(Boolean).join('\n')
 
-  const answer = await callCosReasoner({ prompt, systemPrompt: SYSTEM_PROMPT, maxTokens: 1500, temperature: 0 })
+  const answer = await callCosReasoner({ prompt, systemPrompt: SYSTEM_PROMPT, maxTokens: 1500, temperature: 0, jsonObject: true })
   if (!answer) {
     const resolved = resolveCosReasoner()
     return { ...base, error: 'config' in resolved && resolved.config ? 'COS reasoner did not answer' : (resolved as { reason: string }).reason }

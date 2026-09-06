@@ -5,6 +5,7 @@ export type EvidenceJob = {
   userId: string
   conversationId: string
   workspaceId: string
+  objective?: string
   status: string
   metadata: Record<string, unknown>
   result: Record<string, unknown> | null

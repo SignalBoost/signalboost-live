@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
+  conciergeLanguageQualityInstruction,
   explicitlyPreservedCriticalTokens,
   preservesExplicitlyRequestedCriticalTokens,
 } from '../lib/ai/cos/conciergeLanguageQuality.ts'
@@ -20,6 +21,14 @@ test('explicit preservation is a release invariant, not merely a prompt instruct
   assert.match(entrypoint, /EXPLICITLY PROTECTED LITERALS/)
   assert.match(entrypoint, /if \(!preservesExplicitlyRequestedCriticalTokens\([\s\S]*restoredDecisionAnswer\)\) \{/)
   assert.match(entrypoint, /still missing after the bounded repair/)
+})
+
+test('first-pass policy makes protected literals executable constraints before review', () => {
+  const instruction = conciergeLanguageQualityInstruction('en')
+  assert.match(instruction, /internal checklist/)
+  assert.match(instruction, /first semantically relevant item/)
+  assert.match(instruction, /byte-for-byte/)
+  assert.match(instruction, /never assume a later reviewer will restore it/)
 })
 
 test('native reviewer is explicitly required to scan morphology and agreement', () => {

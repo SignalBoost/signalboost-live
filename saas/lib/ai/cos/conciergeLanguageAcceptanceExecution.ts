@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks'
 import { withPublicDeliveryScope } from '../../auth/publicDeliveryScope.ts'
 import { getConciergeAnswer } from '../../platform/unifiedPlatform.ts'
 import { tryCOSFirstAnswer } from './cosFirstAnswer.ts'
+import { hasAvoidableEnglishProcessJargon } from './conciergeLanguageQuality.ts'
 import {
   evaluateLanguageAcceptanceText,
   type ConciergeLanguageAcceptanceCase,
@@ -48,7 +49,7 @@ export async function executeConciergeLanguageAcceptanceCase(test: ConciergeLang
   }
 
   const latencyMs = Math.max(0, Math.round(performance.now() - started))
-  const verdicts = evaluateLanguageAcceptanceText({
+  const baseVerdicts = evaluateLanguageAcceptanceText({
     test,
     reply,
     handled,
@@ -57,6 +58,11 @@ export async function executeConciergeLanguageAcceptanceCase(test: ConciergeLang
     externalAiInvoked,
     latencyMs,
   })
+  const verdicts = {
+    ...baseVerdicts,
+    noEnglishLeakage: baseVerdicts.noEnglishLeakage
+      && !hasAvoidableEnglishProcessJargon(reply, test.language, test.prompt),
+  }
 
   return {
     test,

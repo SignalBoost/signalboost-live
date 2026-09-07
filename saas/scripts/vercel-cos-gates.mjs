@@ -119,6 +119,7 @@ const tests = [
   'tests/cosChiefOfStaffReliability.node.test.ts',
   'tests/cosChiefOfStaffAcceptance.node.test.ts',
   'tests/conciergeLanguageAcceptance.node.test.ts',
+  'tests/conciergeFinalNativeAcceptance.node.test.ts',
   'tests/publicRecordedProvenance.node.test.ts',
   'tests/groundingConcepts.node.test.ts',
   'tests/answerEvidenceAttributionRepair.node.test.ts',

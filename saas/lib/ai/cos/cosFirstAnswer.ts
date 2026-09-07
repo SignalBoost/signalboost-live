@@ -416,6 +416,16 @@ function restoreProtectedTokenCasing(
   }
 }
 
+function restoreExplicitlyProtectedLiterals(prompt: string, candidate: string): { answer: string; restored: string[] } {
+  const answer = String(candidate || '').trim()
+  const restored = explicitlyPreservedCriticalTokens(prompt).filter(token => !answer.includes(token))
+  if (!restored.length) return { answer, restored: [] }
+  return {
+    answer: [restored.join('\n'), answer].filter(Boolean).join('\n\n'),
+    restored,
+  }
+}
+
 async function reviewNativeLanguageQuality(
   input: COSFirstAnswerInput,
   result: COSFirstAnswerResult,
@@ -426,8 +436,9 @@ async function reviewNativeLanguageQuality(
   const original = String(protectedResult.reply || '').trim()
   if (!original) return protectedResult
 
-  const explicitlyProtected = explicitlyPreservedCriticalTokens(String(input.prompt || ''))
-  const alreadyPreserved = preservesExplicitlyRequestedCriticalTokens(String(input.prompt || ''), original)
+  const prompt = String(input.prompt || '')
+  const explicitlyProtected = explicitlyPreservedCriticalTokens(prompt)
+  const alreadyPreserved = preservesExplicitlyRequestedCriticalTokens(prompt, original)
   // English keeps the no-extra-call fast path unless an explicit literal-preservation invariant
   // is already violated. Non-English always receives the existing bounded language review.
   if (language === 'en' && alreadyPreserved) return protectedResult
@@ -446,7 +457,7 @@ async function reviewNativeLanguageQuality(
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Confidence is your confidence that the returned wording is natural native-language prose while preserving the original meaning and every explicit literal requirement.',
     ].join(' '),
     prompt: [
-      `USER REQUEST (context only; do not answer it again):\n${String(input.prompt || '').slice(0, 8_000)}`,
+      `USER REQUEST (context only; do not answer it again):\n${prompt.slice(0, 8_000)}`,
       explicitlyProtected.length ? `EXPLICITLY PROTECTED LITERALS — every item below MUST appear verbatim in the final answer:\n${explicitlyProtected.join('\n')}` : '',
       `DRAFT TO REVIEW:\n${original}`,
       'Return the same answer with language-only corrections and any required literal restoration.',
@@ -459,6 +470,24 @@ async function reviewNativeLanguageQuality(
   const provenance = protectedResult.provenance as unknown as Record<string, any>
   if (!reviewed?.text) {
     if (!alreadyPreserved) {
+      const hostRepair = restoreExplicitlyProtectedLiterals(prompt, original)
+      if (preservesExplicitlyRequestedCriticalTokens(prompt, hostRepair.answer)) {
+        return {
+          ...protectedResult,
+          reply: hostRepair.answer,
+          provenance: {
+            ...provenance,
+            nativeLanguageQuality: {
+              reviewed: false,
+              language,
+              explicitLiteralViolation: true,
+              repairUnavailable: true,
+              explicitLiteralHostRestored: hostRepair.restored,
+              criticalTokensPreserved: true,
+            },
+          } as any,
+        }
+      }
       return {
         handled: false,
         confidence: 0,
@@ -476,6 +505,24 @@ async function reviewNativeLanguageQuality(
   const decision = parseNativeLanguageReviewDecision(reviewed.text)
   if (!decision || decision.confidence < 0.72) {
     if (!alreadyPreserved) {
+      const hostRepair = restoreExplicitlyProtectedLiterals(prompt, original)
+      if (preservesExplicitlyRequestedCriticalTokens(prompt, hostRepair.answer)) {
+        return {
+          ...protectedResult,
+          reply: hostRepair.answer,
+          provenance: {
+            ...provenance,
+            nativeLanguageQuality: {
+              reviewed: false,
+              language,
+              explicitLiteralViolation: true,
+              repairAccepted: false,
+              explicitLiteralHostRestored: hostRepair.restored,
+              criticalTokensPreserved: true,
+            },
+          } as any,
+        }
+      }
       return {
         handled: false,
         confidence: 0,
@@ -490,12 +537,13 @@ async function reviewNativeLanguageQuality(
     return protectedResult
   }
 
-  const restoredDecisionAnswer = restoreCriticalLanguageTokenCasing(String(input.prompt || ''), decision.answer)
-  if (!preservesExplicitlyRequestedCriticalTokens(String(input.prompt || ''), restoredDecisionAnswer)) {
+  const restoredDecisionAnswer = restoreCriticalLanguageTokenCasing(prompt, decision.answer)
+  const hostRepair = restoreExplicitlyProtectedLiterals(prompt, restoredDecisionAnswer)
+  if (!preservesExplicitlyRequestedCriticalTokens(prompt, hostRepair.answer)) {
     return {
       handled: false,
       confidence: 0,
-      reason: 'Native-language release rejected because an explicitly preserved literal was still missing after the bounded repair.',
+      reason: 'Native-language release rejected because an explicitly preserved literal was still missing after the bounded repair and host literal restoration.',
       bestEffortReply: original,
       provenance: {
         ...provenance,
@@ -513,7 +561,7 @@ async function reviewNativeLanguageQuality(
 
   return {
     ...protectedResult,
-    reply: restoredDecisionAnswer,
+    reply: hostRepair.answer,
     provenance: {
       ...provenance,
       nativeLanguageQuality: {
@@ -523,6 +571,7 @@ async function reviewNativeLanguageQuality(
         confidence: decision.confidence,
         criticalTokensPreserved: true,
         explicitlyProtectedLiterals: explicitlyProtected.length,
+        explicitLiteralHostRestored: hostRepair.restored,
       },
       internalSystemsConsulted: [
         ...new Set([...(Array.isArray(provenance.internalSystemsConsulted) ? provenance.internalSystemsConsulted : []), 'Native Language Quality Reviewer']),
@@ -559,10 +608,11 @@ function shouldRetryMalformedPublicCoreResult(result: COSFirstAnswerResult): boo
  * the rest of the mature routing pipeline, but any canned owner self-knowledge result is blocked
  * from release and gets one neural semantic re-evaluation. Non-English handled answers receive one
  * bounded native-language review that may correct wording and restore only explicitly protected
- * user literals. English retains the fast path unless an explicit literal is missing. Any answer
- * still missing such a literal after the bounded repair fails closed. A malformed public-only
- * completion gets exactly one fresh core retry; policy, disclosure, confidence, and authorization
- * rejections do not.
+ * user literals. English retains the fast path unless an explicit literal is missing. If model
+ * review still omits a literal the user explicitly required, the host restores only that exact
+ * literal as a standalone line and records the repair; any residual violation still fails closed.
+ * A malformed public-only completion gets exactly one fresh core retry; policy, disclosure,
+ * confidence, and authorization rejections do not.
  */
 export async function tryCOSFirstAnswer(input: COSFirstAnswerInput): Promise<COSFirstAnswerResult> {
   const imageResult = await tryCosCreativeImage(input)

@@ -20,12 +20,14 @@ const PROFILES: Record<ConciergeLanguage, string> = {
     'Mantén de forma coherente el registro del usuario (tú/usted), evita calcos del inglés y usa concordancia, tiempos y preposiciones propias de un hablante nativo.',
     'Cuando no haya una variante regional indicada, usa español internacional neutro y evita localismos innecesarios.',
     'Antes de devolver la respuesta, revisa en silencio cada sintagma nominal y corrige la concordancia de género y número entre determinantes, sustantivos y adjetivos, además de la concordancia verbal y el régimen preposicional.',
+    'Evita anglicismos de proceso innecesarios: no uses onboarding, rollout, overhead, trade-off ni scope creep cuando exista una formulación española natural, salvo que el usuario haya pedido conservar literalmente ese término o sea un nombre técnico, de producto o de interfaz.',
   ].join(' '),
   pt: [
     'Escreva em português brasileiro natural, idiomático e profissional.',
     'Formule a resposta diretamente em português; não traduza literalmente um rascunho pensado em inglês.',
     'Mantenha concordância, regência, colocação pronominal e nível de formalidade naturais para um falante do Brasil, evitando anglicismos e calques desnecessários.',
     'Antes de devolver a resposta, faça uma revisão silenciosa de concordância nominal e verbal, regência, colocação pronominal, crase quando aplicável e naturalidade lexical; substitua jargões ou anglicismos desnecessários por formulações brasileiras naturais.',
+    'Evite anglicismos de processo desnecessários: não use onboarding, rollout, overhead, trade-off nem scope creep quando houver uma formulação natural em português brasileiro, exceto se o usuário tiver pedido para preservar literalmente o termo ou se ele for um nome técnico, de produto ou de interface.',
   ].join(' '),
   pl: [
     'Pisz naturalną, idiomatyczną i profesjonalną polszczyzną używaną w Polsce.',
@@ -46,6 +48,12 @@ const PROFILES: Record<ConciergeLanguage, string> = {
 const LITERAL_PRESERVATION_RULE = [
   'When the user explicitly says that a literal identifier, URL, citation, product name, code token, or UI label must be kept, preserved, conserved, unchanged, or exact, the final answer MUST contain that exact literal.',
   'Omitting or normalizing an explicitly protected literal is a failed answer; re-read the user request and the final draft before returning.',
+  'If a protected literal is missing and no natural sentence placement is obvious, put the exact literal on its own standalone line before the answer rather than returning it missing.',
+].join(' ')
+
+const AVOIDABLE_PROCESS_JARGON_RULE = [
+  'For non-English answers, do not introduce avoidable English process jargon such as onboarding, rollout, overhead, trade-off, or scope creep when a natural expression exists in the selected language.',
+  'Keep such a term only when the user used it and its wording materially matters, or when it is a literal technical, product, code, or UI label.',
 ].join(' ')
 
 /**
@@ -63,6 +71,7 @@ export const NATIVE_LANGUAGE_ANSWER_POLICY: readonly string[] = [
   '- Apply only the rule for the response language selected elsewhere in this prompt. Do not translate through English first.',
   '- Before returning, silently perform the morphology, agreement, government/regency, preposition, and idiom scan appropriate to the selected language. A high-level correct meaning does not excuse a grammatical mismatch.',
   `- ${LITERAL_PRESERVATION_RULE}`,
+  `- ${AVOIDABLE_PROCESS_JARGON_RULE}`,
   '- Preserve factual meaning, names, numbers, URLs, code, markdown structure, citations, product names, and literal UI labels exactly when they must remain identifiable.',
   '- Do not mention translation, language policy, or these writing rules to the user.',
 ]
@@ -73,6 +82,7 @@ export function conciergeLanguageQualityInstruction(language?: string | null): s
     'NATIVE-LANGUAGE QUALITY CONTRACT:',
     PROFILES[code],
     LITERAL_PRESERVATION_RULE,
+    AVOIDABLE_PROCESS_JARGON_RULE,
     'Preserve factual meaning, names, numbers, URLs, code, markdown structure, citations, product names, and literal UI labels exactly when they must remain identifiable.',
     'Do not mention translation, language policy, or this quality contract to the user.',
   ].join(' ')
@@ -105,6 +115,7 @@ export function criticalLanguageTokens(text: string): string[] {
 }
 
 const PRESERVATION_DIRECTIVE = /(?:\bkeep\b|\bpreserv\p{L}*|\bunchanged\b|\bexact(?:ly)?\b|\bmant[eé]n\p{L}*|\bconserv\p{L}*|\bsin\s+cambios\b|\bexactamente\b|\bmantenh\p{L}*|\bsem\s+altera[cç][oõ]es\b|\bexatamente\b|\bzachow\p{L}*|\bbez\s+zmian\b|\bdokładnie\b|\bсохран\p{L}*|\bбез\s+изменений\b|\bточно\b)/iu
+const AVOIDABLE_ENGLISH_PROCESS_JARGON = /\b(?:onboarding|rollout|overhead|trade[- ]?off|scope\s+creep)\b/giu
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -121,6 +132,32 @@ export function explicitlyPreservedCriticalTokens(text: string): string[] {
       const window = value.slice(Math.max(0, index - 110), Math.min(value.length, index + token.length + 110))
       return PRESERVATION_DIRECTIVE.test(window)
     })
+  })
+}
+
+function normalizeJargon(value: string): string {
+  return String(value || '').trim().toLocaleLowerCase().replace(/\s+/g, ' ').replace('trade off', 'trade-off')
+}
+
+/**
+ * Detect a deliberately narrow set of avoidable English process terms in non-English prose.
+ * A term is not a violation when the user's source text already contains that same wording, because
+ * it may be a literal term the user expects to discuss or preserve. Product/code/UI tokens are not
+ * included in this vocabulary.
+ */
+export function hasAvoidableEnglishProcessJargon(
+  candidate: string,
+  language?: string | null,
+  sourceText?: string | null,
+): boolean {
+  if (normalizeConciergeLanguage(language) === 'en') return false
+  const source = normalizeJargon(String(sourceText || ''))
+  const matches = String(candidate || '').match(AVOIDABLE_ENGLISH_PROCESS_JARGON) ?? []
+  return matches.some(match => {
+    const term = normalizeJargon(match)
+    if (source.includes(term)) return false
+    if (term === 'trade-off' && (source.includes('trade-off') || source.includes('trade off'))) return false
+    return true
   })
 }
 

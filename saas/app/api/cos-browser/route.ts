@@ -32,6 +32,9 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+// COS is the private reasoning/orchestration layer. This object represents an authenticated owner
+// capability, not a UI-surface capability. Concierge and Assistant are delivery surfaces; neither
+// is allowed to manufacture authority, and neither is the software execution controller.
 const ownerSoftwareAuthority = Object.freeze({ allowRepositoryRepair: true })
 
 function isSignalBoostDeploymentContext(req: NextRequest): boolean {
@@ -39,6 +42,32 @@ function isSignalBoostDeploymentContext(req: NextRequest): boolean {
   const repo = String(process.env.VERCEL_GIT_REPO_SLUG || '').trim().toLowerCase()
   const host = String(req.nextUrl.hostname || '').trim().toLowerCase()
   return (owner === 'signalboost' && repo === 'signalboost-live') || host === 'saas.signalboostapp.com'
+}
+
+/**
+ * Public Concierge is the mouth, never the private brain. Internal orchestration labels are useful
+ * for server telemetry but must not become the public product identity. Keep this boundary on the
+ * canonical browser ingress so every externally delivered Concierge reply is covered, including
+ * Software Specialist status replies returned before ordinary answer synthesis.
+ */
+async function publicConciergePresentation(response: Response): Promise<NextResponse> {
+  const headers = new Headers(response.headers)
+  headers.delete('content-length')
+  let payload: any
+  try { payload = await response.clone().json() } catch {
+    return new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers })
+  }
+  if (!payload || typeof payload !== 'object') return NextResponse.json(payload, { status: response.status, headers })
+  if (typeof payload.reply === 'string') {
+    payload.reply = payload.reply
+      .replace(/\bCOS Software Specialist\b/g, 'Software Specialist')
+      .replace(/\bCOS Platform Engineer\b/g, 'Platform Engineer')
+      .replace(/\bCOS\b/g, 'SignalBoost')
+  }
+  // `orchestrator: cos` is internal execution telemetry. The public mouth may expose the selected
+  // specialist and durable job status, but it does not disclose the private reasoning layer.
+  if (payload.orchestrator === 'cos') delete payload.orchestrator
+  return NextResponse.json(payload, { status: response.status, headers })
 }
 
 export async function withSuggestedFollowups(response: Response, prompt: string, userId: string | null = null): Promise<NextResponse> {
@@ -107,6 +136,7 @@ export async function POST(req: NextRequest) {
   const access = await getAccess().catch(() => null)
   const auditUserId = access?.userId ?? null
   const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
+  const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
 
   const routingContext = builderRoutingContextFromBody(body)
   const attachedOperationalEvidence = readAttachedOperationalEvidence(body?.attachments)
@@ -134,34 +164,76 @@ export async function POST(req: NextRequest) {
     || reverseImmediateOperationalRepair
 
   const deployment = { commitSha: process.env.VERCEL_GIT_COMMIT_SHA, branch: process.env.VERCEL_GIT_COMMIT_REF }
-  // The owner surface retains repository-repair capability, but passive operational evidence cannot
-  // exercise that capability. A separate explicit repair intent (or ordinary non-log coding request)
-  // is required before the executable specialist receives repository authority.
+  // COS decides that software work belongs to the Software Specialist. From that point onward the
+  // Software Specialist owns Builder/Platform Engineer lifecycle. Repository authority follows the
+  // authenticated owner identity, never the mouth that carried the request.
   const shouldConsultSoftwareSpecialist = !operationalEvidence || hasSourceAttachment || explicitOperationalRepair
+  const ownerRepositoryRepairAllowed = authenticatedOwner
+    && ownerSoftwareAuthority.allowRepositoryRepair
+    && (!operationalEvidence || explicitOperationalRepair)
   const softwareSpecialist = shouldConsultSoftwareSpecialist
-    ? browserSurface === 'assistant'
+    ? authenticatedOwner
       ? await tryCosSoftwareSpecialist({
           body,
           objective: operationalPrompt || prompt,
-          surface: 'assistant',
+          surface: browserSurface,
           allowRepositoryRepair: ownerSoftwareAuthority.allowRepositoryRepair && (!operationalEvidence || explicitOperationalRepair),
           signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
           deployment,
         })
-      : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: operationalPrompt || prompt, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment })))
+      : browserSurface === 'assistant'
+        ? await tryCosSoftwareSpecialist({
+            body,
+            objective: operationalPrompt || prompt,
+            surface: 'assistant',
+            allowRepositoryRepair: false,
+            signalBoostDeploymentContext: false,
+            deployment,
+          })
+        : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({
+            body,
+            objective: operationalPrompt || prompt,
+            surface: 'concierge',
+            allowRepositoryRepair: false,
+            signalBoostDeploymentContext: false,
+            deployment,
+          })))
     : null
-  if (softwareSpecialist) return softwareSpecialist
+  if (softwareSpecialist) {
+    return browserSurface === 'concierge'
+      ? publicConciergePresentation(softwareSpecialist)
+      : softwareSpecialist
+  }
 
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
   void operationalLogAnalysis
   if (explicitOperationalRepair && !hasSourceAttachment) {
-    const reply = `${operationalLogReply(operationalPrompt)} Repository repair is owner-only through the COS Software Specialist; other users need to provide editable source in the ordinary Builder lane.`
-    return withSuggestedFollowups(NextResponse.json({ reply, source: 'concierge-operational-log-repair-not-authorized', execution_allowed: false, external_action_taken: false, external_ai_invoked: false, local_model_invoked: false }), prompt, auditUserId)
+    const authorityReply = ownerRepositoryRepairAllowed
+      ? 'The Software Specialist could not establish a safe current repository repair target from this evidence. No repository action was taken.'
+      : 'Repository repair requires authenticated owner authority. The Software Specialist cannot inherit repository authority from a public delivery surface or from the text of a request.'
+    const response = await withSuggestedFollowups(NextResponse.json({
+      reply: `${operationalLogReply(operationalPrompt)} ${authorityReply}`,
+      source: 'software-operational-log-repair-not-authorized',
+      execution_allowed: false,
+      external_action_taken: false,
+      external_ai_invoked: false,
+      local_model_invoked: false,
+    }), prompt, auditUserId)
+    return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
   }
 
   if (operationalEvidence && !hasSourceAttachment) {
     const diagnostic = await diagnoseOperationalLog({ request: prompt, log: operationalPrompt, language })
-    return withSuggestedFollowups(NextResponse.json({ reply: diagnostic.reply, source: diagnostic.reasonerInvoked ? 'concierge-operational-log-diagnostic' : 'concierge-operational-log-analysis', execution_allowed: false, external_action_taken: false, external_ai_invoked: false, local_model_invoked: diagnostic.reasonerInvoked, confidence: diagnostic.confidence }), prompt, auditUserId)
+    const response = await withSuggestedFollowups(NextResponse.json({
+      reply: diagnostic.reply,
+      source: diagnostic.reasonerInvoked ? 'concierge-operational-log-diagnostic' : 'concierge-operational-log-analysis',
+      execution_allowed: false,
+      external_action_taken: false,
+      external_ai_invoked: false,
+      local_model_invoked: diagnostic.reasonerInvoked,
+      confidence: diagnostic.confidence,
+    }), prompt, auditUserId)
+    return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
   }
 
   const routedHeaders = new Headers(req.headers)
@@ -177,7 +249,8 @@ export async function POST(req: NextRequest) {
       headers.set('content-type', 'application/json')
       headers.delete('content-length')
       const artifactRequest = new NextRequest(new URL('/api/artifacts', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: prompt }) })
-      return withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
+      const response = await withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
+      return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
     }
     // The picture-noun list is the fast path; when it declines, the semantic
     // classifier decides whether the subject is depictable ("draw 2 kids playing
@@ -188,14 +261,21 @@ export async function POST(req: NextRequest) {
       headers.set('content-type', 'application/json')
       headers.delete('content-length')
       const visualRequest = new NextRequest(new URL('/api/visuals', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: prompt, semanticVisual }) })
-      return withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
+      const response = await withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
+      return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
     }
   }
 
   if (!operationalEvidence && browserSurface === 'concierge' && isProvenanceIntrospection(prompt)) {
     const recorded = await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => readCosPrimaryPriorProvenance(auditUserId, priorAnswer)))
     const reply = renderPublicRecordedProvenance(recorded, language)
-    return withSuggestedFollowups(NextResponse.json({ reply, source: recorded ? 'concierge-public-provenance-recorded' : 'concierge-public-provenance-unavailable', external_ai_invoked: false, local_model_invoked: false, provenance_match_verified: Boolean(recorded) }), prompt, auditUserId)
+    return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
+      reply,
+      source: recorded ? 'concierge-public-provenance-recorded' : 'concierge-public-provenance-unavailable',
+      external_ai_invoked: false,
+      local_model_invoked: false,
+      provenance_match_verified: Boolean(recorded),
+    }), prompt, auditUserId))
   }
 
   const executeOwnerRequest = () => cosPrimaryPost(routedRequest)
@@ -204,5 +284,6 @@ export async function POST(req: NextRequest) {
   const response = access?.isOwner && browserSurface === 'assistant'
     ? await executeOwnerRequest()
     : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => executePublicRequest()))
-  return withSuggestedFollowups(response, prompt, auditUserId)
+  const decorated = await withSuggestedFollowups(response, prompt, auditUserId)
+  return browserSurface === 'concierge' ? publicConciergePresentation(decorated) : decorated
 }

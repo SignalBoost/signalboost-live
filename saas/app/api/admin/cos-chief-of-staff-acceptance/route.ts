@@ -67,7 +67,7 @@ export async function POST() {
           requiresLocalReasoning: true,
         }, { attachOutcome: false, outcomeSource: 'chief_of_staff_acceptance' })
         const freshExecution = outcome.provenance.localModelInvoked === true
-          && outcome.provenance.externalAiInvoked !== true
+          && !outcome.provenance.externalAiInvoked
           && !['semantic_cache', 'semantic_similarity'].includes(String(outcome.provenance.responseSource))
         const provenanceRecorded = Boolean(outcome.turnId)
         const observation = evaluateChiefOfStaffAcceptanceCase({ runId, test, reply: outcome.replyExcerpt, freshExecution, provenanceRecorded })

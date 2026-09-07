@@ -3,10 +3,13 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import {
   conciergeLanguageQualityInstruction,
+  NATIVE_LANGUAGE_ANSWER_POLICY,
   normalizeConciergeLanguage,
   preservesCriticalLanguageTokens,
 } from '../lib/ai/cos/conciergeLanguageQuality.ts'
 import { classifyConciergeIntent, getConciergeAnswer } from '../lib/platform/unifiedPlatform.ts'
+
+const read = (path:string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 test('Concierge has a native-language quality contract for all five supported languages', () => {
   for (const language of ['en', 'es', 'pt', 'pl', 'ru'] as const) {
@@ -21,6 +24,29 @@ test('Concierge has a native-language quality contract for all five supported la
   assert.match(polish, /kalek/)
   assert.equal(normalizeConciergeLanguage('pl-PL'), 'pl')
   assert.equal(normalizeConciergeLanguage('xx'), 'en')
+})
+
+test('first-pass shared answer policy carries native rules for every supported language', () => {
+  const policy = NATIVE_LANGUAGE_ANSWER_POLICY.join('\n')
+  assert.match(policy, /English:/)
+  assert.match(policy, /Spanish:/)
+  assert.match(policy, /Brazilian Portuguese:/)
+  assert.match(policy, /Polish:/)
+  assert.match(policy, /Russian:/)
+  assert.match(policy, /przypadków/)
+  assert.match(policy, /rodzaju/)
+  assert.match(policy, /rekcji/)
+  assert.match(policy, /zgodności gramatycznej/)
+
+  const answerPolicy = read('../lib/ai/cos/cosAnswerPolicyCore.ts')
+  const enterprise = read('../lib/ai/cos/cosFirstAnswerEnterprise.ts')
+  const core = read('../lib/ai/cos/cosFirstAnswerCore.ts')
+  assert.match(answerPolicy, /import \{ NATIVE_LANGUAGE_ANSWER_POLICY \} from '\.\/conciergeLanguageQuality\.ts'/)
+  assert.match(answerPolicy, /\.\.\.NATIVE_LANGUAGE_ANSWER_POLICY/)
+  assert.match(enterprise, /\.\.\.QUANTITATIVE_ANSWER_POLICY/)
+  assert.match(enterprise, /`Reply in \$\{language\}\.\`/)
+  assert.match(core, /\.\.\.QUANTITATIVE_ANSWER_POLICY/)
+  assert.match(core, /input\.language \? `Reply in \$\{input\.language\}\.\` : 'Reply in the language of the user\.'/)
 })
 
 test('native-language review cannot drop critical facts and identifiers', () => {
@@ -66,10 +92,11 @@ test('all five deterministic fallbacks stay in the selected language', () => {
   }
 })
 
-test('production Concierge propagates UI language and COS applies native-language review', () => {
-  const uiSource = readFileSync(new URL('../components/Concierge.tsx', import.meta.url), 'utf8')
-  const cosSource = readFileSync(new URL('../lib/ai/cos/cosFirstAnswer.ts', import.meta.url), 'utf8')
+test('production Concierge propagates UI language and keeps review as a secondary guard', () => {
+  const uiSource = read('../components/Concierge.tsx')
+  const cosSource = read('../lib/ai/cos/cosFirstAnswer.ts')
   assert.match(uiSource, /language:\s*activeLang/)
   assert.match(cosSource, /reviewNativeLanguageQuality/)
   assert.match(cosSource, /preservesCriticalLanguageTokens/)
+  assert.match(cosSource, /nativeLanguageQuality/)
 })

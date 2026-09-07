@@ -4,7 +4,13 @@
 // runtime topology facts; no canned owner model/spec answer is released from this entrypoint.
 
 import { callCosReasoner } from './cosReasoner.ts'
-import { conciergeLanguageName, conciergeLanguageQualityInstruction, normalizeConciergeLanguage, preservesCriticalLanguageTokens } from './conciergeLanguageQuality.ts'
+import {
+  conciergeLanguageName,
+  conciergeLanguageQualityInstruction,
+  normalizeConciergeLanguage,
+  preservesCriticalLanguageTokens,
+  restoreCriticalLanguageTokenCasing,
+} from './conciergeLanguageQuality.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
 import { ownerPlatformIdentityContext } from './platformIdentityContext.ts'
@@ -312,16 +318,36 @@ async function tryOwnerNeuralSelfKnowledge(
   return result
 }
 
+function restoreProtectedTokenCasing(
+  input: COSFirstAnswerInput,
+  result: COSFirstAnswerResult,
+): COSFirstAnswerResult {
+  if (!result.handled) return result
+  const reply = String(result.reply || '').trim()
+  if (!reply) return result
+  const restored = restoreCriticalLanguageTokenCasing(String(input.prompt || ''), reply)
+  if (restored === reply) return result
+  return {
+    ...result,
+    reply: restored,
+    provenance: {
+      ...(result.provenance as unknown as Record<string, unknown>),
+      protectedTokenCaseRestored: true,
+    } as any,
+  }
+}
+
 async function reviewNativeLanguageQuality(
   input: COSFirstAnswerInput,
   result: COSFirstAnswerResult,
 ): Promise<COSFirstAnswerResult> {
-  if (!result.handled) return result
+  const protectedResult = restoreProtectedTokenCasing(input, result)
+  if (!protectedResult.handled) return protectedResult
   const language = normalizeConciergeLanguage(input.language)
-  if (language === 'en') return result
+  if (language === 'en') return protectedResult
 
-  const original = String(result.reply || '').trim()
-  if (!original) return result
+  const original = String(protectedResult.reply || '').trim()
+  if (!original) return protectedResult
 
   const reviewed = await callCosReasoner({
     temperature: 0,
@@ -345,16 +371,16 @@ async function reviewNativeLanguageQuality(
     return null
   })
 
-  if (!reviewed?.text) return result
+  if (!reviewed?.text) return protectedResult
   const decision = parseNativeLanguageReviewDecision(reviewed.text)
-  if (!decision || decision.confidence < 0.72 || !preservesCriticalLanguageTokens(original, decision.answer)) {
-    return result
-  }
+  if (!decision || decision.confidence < 0.72) return protectedResult
+  const restoredDecisionAnswer = restoreCriticalLanguageTokenCasing(String(input.prompt || ''), decision.answer)
+  if (!preservesCriticalLanguageTokens(String(input.prompt || ''), restoredDecisionAnswer)) return protectedResult
 
-  const provenance = result.provenance as unknown as Record<string, any>
+  const provenance = protectedResult.provenance as unknown as Record<string, any>
   return {
-    ...result,
-    reply: decision.answer,
+    ...protectedResult,
+    reply: restoredDecisionAnswer,
     provenance: {
       ...provenance,
       nativeLanguageQuality: {
@@ -381,6 +407,14 @@ function coreReleasedCannedOwnerSelfKnowledge(result: COSFirstAnswerResult): boo
     || /^Canal do owner:\s*o reasoner do COS nesta plataforma é\b/i.test(reply)
 }
 
+function shouldRetryMalformedPublicCoreResult(result: COSFirstAnswerResult): boolean {
+  if (!isPublicDeliveryScope() || result.handled) return false
+  const reason = 'reason' in result ? String(result.reason || '') : ''
+  const provenance = result.provenance as unknown as Record<string, unknown>
+  return provenance.responseSource === 'local_cos_reasoning'
+    && /public-only COS result was empty, truncated, or unparseable/i.test(reason)
+}
+
 /**
  * Contextual interpretation is isolated before the mature retrieval pipeline so supplied language
  * cannot be contaminated by unrelated learned/internal evidence. Owner model/spec questions are
@@ -389,7 +423,8 @@ function coreReleasedCannedOwnerSelfKnowledge(result: COSFirstAnswerResult): boo
  * the rest of the mature routing pipeline, but any canned owner self-knowledge result is blocked
  * from release and gets one neural semantic re-evaluation. Non-English handled answers receive one
  * bounded native-language review that may correct wording but must preserve the answer's evidence,
- * facts, identifiers, URLs, citations, code, and meaning.
+ * facts, identifiers, URLs, citations, code, and meaning. A malformed public-only completion gets
+ * exactly one fresh core retry; policy, disclosure, confidence, and authorization rejections do not.
  */
 export async function tryCOSFirstAnswer(input: COSFirstAnswerInput): Promise<COSFirstAnswerResult> {
   const contextualInterpretation = await tryNeuralContextualInterpretation(input)
@@ -398,7 +433,11 @@ export async function tryCOSFirstAnswer(input: COSFirstAnswerInput): Promise<COS
   const neuralSelfKnowledge = await tryOwnerNeuralSelfKnowledge(input)
   if (neuralSelfKnowledge) return reviewNativeLanguageQuality(input, neuralSelfKnowledge)
 
-  const coreResult = await tryCoreCOSFirstAnswer(input)
+  let coreResult = await tryCoreCOSFirstAnswer(input)
+  if (shouldRetryMalformedPublicCoreResult(coreResult)) {
+    coreResult = await tryCoreCOSFirstAnswer({ ...input, disableCache: true })
+  }
+
   if (input.privileged !== true || isPublicDeliveryScope() || !coreReleasedCannedOwnerSelfKnowledge(coreResult)) {
     return reviewNativeLanguageQuality(input, coreResult)
   }

@@ -105,6 +105,64 @@ test('second live evidence wording is graded by meaning rather than one literal 
   assert.equal(observation.verdicts.truthful_reporting.passed, true)
 })
 
+test('third live evidence case rejects rechecking settled tests instead of the unresolved operational state', () => {
+  const liveReply = [
+    'Verified facts',
+    '- The test suite recorded 42 passing tests.',
+    '- There is no deployment record.',
+    '- Production health was not checked.',
+    '',
+    'Unresolved uncertainty',
+    '- Whether the 42 passing tests constitute a complete, representative acceptance suite for this release.',
+    '- Whether the codebase is in a deployable state despite the absence of a deployment record.',
+    '- The actual state of the production environment and whether it is healthy or degraded.',
+    '',
+    'Next action',
+    'Run the full acceptance test suite against the current build artifact and record the results.',
+  ].join('\n')
+  const rejected = observe('evidence-boundary', liveReply)
+  assert.equal(rejected.verdicts.evidence_accuracy.passed, true)
+  assert.equal(rejected.verdicts.autonomous_follow_through.passed, false)
+
+  const corrected = [
+    'Verified facts',
+    '- The test suite recorded 42 passing tests.',
+    '- There is no deployment record.',
+    '- Production health was not checked.',
+    '',
+    'Unresolved uncertainty',
+    '- Deployment and production health remain unverified.',
+    '',
+    'Next action',
+    '- Check the deployment registry for the current build and then verify production health.',
+  ].join('\n')
+  const accepted = observe('evidence-boundary', corrected)
+  assert.equal(accepted.verdicts.evidence_accuracy.passed, true)
+  assert.equal(accepted.verdicts.autonomous_follow_through.passed, true)
+})
+
+test('third live truthful-status case rejects unsupported negative inference and missing supplied facts', () => {
+  const liveReply = 'Status: Blocked. The pipeline failed the deployment check, and no merge or production record exists, meaning the code is not integrated or live. This matters because unmerged changes risk drift and lack auditability. Next action: investigate the CI failure logs, resolve the specific deployment check error, and re-run the pipeline to achieve a passing state.'
+  const rejected = observe('truthful-status', liveReply)
+  assert.equal(rejected.verdicts.evidence_accuracy.passed, false)
+  assert.equal(rejected.verdicts.instruction_adherence.passed, false)
+
+  const corrected = 'Status: blocked. Code review passed; CI failed on the deployment check; no merge record exists; no production deployment record exists. The missing records leave integration and production state unverified. Next action: inspect the deployment check logs.'
+  const accepted = observe('truthful-status', corrected)
+  assert.equal(accepted.verdicts.evidence_accuracy.passed, true)
+  assert.equal(accepted.verdicts.instruction_adherence.passed, true)
+  assert.equal(accepted.verdicts.autonomous_follow_through.passed, true)
+  assert.equal(accepted.verdicts.truthful_reporting.passed, true)
+})
+
+test('Chief of Staff operating skill preserves bounded facts and prioritizes unresolved evidence', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosChiefOfStaff.skill.ts', import.meta.url), 'utf8')
+  assert.match(source, /preserve every material supplied fact/i)
+  assert.match(source, /Absence of evidence is not evidence of the opposite/i)
+  assert.match(source, /highest-value unresolved required fact/i)
+  assert.match(source, /Do not rerun or re-prove an already supplied verification/i)
+})
+
 test('reasoner quality isolates diagnostic intent to the real user request and repairs source-boundary leaks', () => {
   const source = readFileSync(new URL('../lib/ai/cos/reasonerQuality.ts', import.meta.url), 'utf8')
   assert.match(source, /DIAGNOSTIC_PROMPT\.test\(latestUserRequest\(prompt\)\)/)

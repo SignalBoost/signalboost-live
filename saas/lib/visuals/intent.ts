@@ -403,10 +403,10 @@ export function isConciergeVisualObjective(prompt: string): boolean {
 }
 
 /**
- * A drawing verb is present. This is the precondition for the semantic check in
- * ./semanticIntent.ts, which answers the part no word list can: whether the
- * SUBJECT is depictable. Exported so that check never has to restate the verb
- * vocabulary in a second place.
+ * Reports whether a listed drawing verb is present. This is diagnostic only —
+ * it is NOT a precondition for anything. It used to gate the semantic classifier
+ * in ./semanticIntent.ts, which meant an unlisted inflection could never reach
+ * the network; that veto is gone from both sides.
  */
 export function hasVisualActionToken(prompt: string): boolean {
   const tokens = normalizedVisualTokens(prompt)
@@ -425,7 +425,7 @@ export function detectConciergeVisualIntent(
   options?: { semanticVisual?: boolean },
 ): ConciergeVisualIntent | null {
   const admitted = isConciergeVisualObjective(prompt)
-    || (options?.semanticVisual === true && hasVisualActionToken(prompt))
+    || options?.semanticVisual === true
   if (!admitted) return null
 
   const tokens = normalizedVisualTokens(prompt)

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireOwner } from "@/lib/auth/access";
 import { generateCosCreativeImage } from "@/lib/cos/creative-image";
 
 export const dynamic = "force-dynamic";
@@ -6,6 +7,14 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function POST(req: Request) {
+  const guard = await requireOwner();
+  if (!guard.ok) {
+    return NextResponse.json(
+      { success: false, error: guard.error },
+      { status: guard.status }
+    );
+  }
+
   try {
     const body = await req.json().catch(() => null);
     const prompt = body && typeof body.prompt === "string" ? body.prompt.trim() : "";

@@ -1,2 +1,2 @@
-base_sha=7cf8350562d137b12311208bd0f44260589255d0
-branch=fix/concierge-distinct-fresh-images-20260907
+base_sha=192842e8228535b1c649c558855b44b726114af7
+branch=fix/concierge-provider-prompt-isolation-20260907

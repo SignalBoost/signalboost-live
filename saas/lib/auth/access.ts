@@ -94,16 +94,24 @@ export function accessFromVerifiedIdentity(
   return buildContext(userId, email || null, envRole(email))
 }
 
-export async function getAccess(): Promise<AccessContext> {
-  // Concierge is a public delivery surface. Even if the browser belongs to the
-  // owner, public-delivery execution must never inherit owner/admin identity,
-  // private memory, internal tools, metrics, repo access, or Chief-of-Staff mode.
-  if (isPublicDeliveryScope()) return buildContext(null, null, 'guest')
+// Public Concierge may retain the authenticated CUSTOMER identity so COS can scope
+// that customer's own durable history/memory. It must never retain owner/admin
+// authority or expose the authenticated email through the public delivery surface.
+export function publicAccessFromVerifiedIdentity(userId: string): AccessContext {
+  return buildContext(userId, null, 'member')
+}
 
+export async function getAccess(): Promise<AccessContext> {
   const supabase = await getServerSupabase()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user?.id) return buildContext(null, null, 'guest')
+
+  // Concierge is a public delivery surface. Preserve only the verified customer id
+  // for per-user COS continuity. Always downgrade owner/admin authority to member and
+  // strip email/private role metadata before any public-delivery code can see it.
+  if (isPublicDeliveryScope()) return publicAccessFromVerifiedIdentity(user.id)
+
   return accessFromVerifiedIdentity(user.id, user.email)
 }
 

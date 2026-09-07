@@ -74,6 +74,25 @@ export function criticalLanguageTokens(text: string): string[] {
   return [...new Set(tokens)]
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Restore only case-insensitive drift of explicit all-caps identifiers such as ALPHA-42.
+ * URLs, citations, domains, and mixed-case names remain exact-match only because their case can
+ * carry meaning. This is a release guard, not a general text-normalization pass.
+ */
+export function restoreCriticalLanguageTokenCasing(original: string, candidate: string): string {
+  let output = String(candidate || '')
+  for (const token of criticalLanguageTokens(original)) {
+    if (!/^[A-Z][A-Z0-9_-]{2,}$/.test(token) || output.includes(token)) continue
+    const pattern = new RegExp(`(?<![\\p{L}\\p{N}_-])${escapeRegExp(token)}(?![\\p{L}\\p{N}_-])`, 'giu')
+    output = output.replace(pattern, token)
+  }
+  return output
+}
+
 export function preservesCriticalLanguageTokens(original: string, candidate: string): boolean {
   const required = criticalLanguageTokens(original)
   const output = String(candidate || '')

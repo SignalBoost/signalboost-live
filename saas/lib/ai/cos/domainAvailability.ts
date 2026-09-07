@@ -179,7 +179,14 @@ export function renderDomainLookups(results: DomainLookup[]): string {
 }
 
 export async function tryDomainAvailabilityLookup(args: { input: string; context?: string; fetchImpl?: FetchLike }) {
-  const domains = extractDomainCandidates(args.input, args.context)
+  // Only independently registrable names are an availability question. A host
+  // like saas.example.com is something the owner already operates, and he names
+  // it to say what he wants REPLACED — "change from saas.example.com to a
+  // shorter URL, any suggestions?". Verification runs before brainstorming in
+  // the owner route, so if this kept such a turn it would answer the naming
+  // request with an RDAP verdict on the very host being retired. Declining lets
+  // the turn fall through to brainstorming, where it belongs.
+  const domains = extractDomainCandidates(args.input, args.context).filter(domain => domain.split('.').length === 2)
   if (!domains.length) return null
   const results = await lookupDomainsRdap(domains, args.fetchImpl)
   return { results, reply: renderDomainLookups(results) }

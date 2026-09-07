@@ -4,6 +4,8 @@
 // Fortune-500 buyer's Chief of Staff remembers THEIR users' facts in THEIR own database via
 // one adapter. On SignalBoost's own deployment the default adapter uses Supabase, unchanged.
 import { createClient } from '@supabase/supabase-js'
+import { searchPastConversations } from './conversationHistory.ts'
+import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 
 export type UserMemory = { id: string; kind: string; content: string; created_at: string }
 
@@ -67,11 +69,32 @@ export function getUserMemoryStore(): UserMemoryStore {
 // ── Public memory API (used by the AI routes) ──
 const MAX_MEMORIES_PER_USER = 30
 const MAX_CONTENT_LENGTH = 300
+const PUBLIC_RECENT_CONVERSATION_LIMIT = 6
 const VALID_KINDS = new Set(['preference', 'fact', 'goal'])
+
+function conversationContextMemories(results: Awaited<ReturnType<typeof searchPastConversations>>['results']): UserMemory[] {
+  return results.slice(0, PUBLIC_RECENT_CONVERSATION_LIMIT).map(result => ({
+    id: `conversation:${result.conversationId}`,
+    kind: 'conversation',
+    content: [result.title, result.summary].filter(Boolean).join(' — ').slice(0, 900),
+    created_at: result.lastActive,
+  })).filter(memory => memory.content.trim().length > 0)
+}
 
 export async function loadUserMemories(userId: string): Promise<UserMemory[]> {
   try {
-    return await getUserMemoryStore().list(userId, MAX_MEMORIES_PER_USER)
+    const saved = await getUserMemoryStore().list(userId, MAX_MEMORIES_PER_USER)
+
+    // Concierge is only the public delivery surface; COS owns customer continuity. For an
+    // authenticated public turn, expose a bounded read-only slice of THIS user's own recent
+    // conversation history to the same COS user-memory ranking stage. The history adapter is
+    // user-scoped, guests have no userId and never reach this function, and no owner/company
+    // Enterprise Memory is opened by this path.
+    if (!isPublicDeliveryScope()) return saved
+
+    const history = await searchPastConversations(userId, '', null).catch(() => ({ ok: false as const, results: [] }))
+    if (!history.ok || history.results.length === 0) return saved
+    return [...saved, ...conversationContextMemories(history.results)]
   } catch (err) {
     console.error('userMemory: load exception', err)
     return []

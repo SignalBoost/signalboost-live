@@ -1,0 +1,21 @@
+SignalBoost Builder feature-branch repository repair completion
+Date: 2026-09-07
+
+Live acceptance evidence
+- Owner-authorized Platform Engineer job f57bedbf-f0ff-4a80-9bcc-4bccb46120d4 targeted failed commit 92e6a195a37bdd602d910a18a7b2c19c5f45b315 on fix/concierge-native-language-quality.
+- Builder reproduced the exact contextual-interpretation test failure before editing.
+- Builder changed lib/ai/cos/cosFirstAnswer.ts and reran the focused test successfully: 6 passed, 0 failed.
+- Builder produced builder-result.txt and repository-repair.patch, created repair commit bd64620f1d5b07afd512a67c676e0454af2a5a27, and opened PR #1920.
+- The originating job then remained paused because durable repair merge continuation scanned only PRs based on main, while PR #1920 correctly targeted the failed feature branch.
+
+Harness correction
+- Server-created Platform Engineer repair PRs may now be considered on their exact base branch, not only main.
+- The current base-branch head must still equal the PR body's pinned failed revision. If it moved, the repair is stale, the PR is closed, and the Builder job terminates failed as superseded.
+- Financial and credential/security changes remain ineligible for unattended merge.
+- GitHub checks must be green before any merge.
+- Repairs targeting main still require a restorable Production checkpoint and use the Production deployment watch.
+- Repairs targeting a non-main preview/feature branch merge only back into that exact branch and do not capture or restore Production state.
+- The originating Builder job is finalized with the real base branch and merge commit, or with a truthful superseded failure. builder-result.txt is preserved in either terminal outcome.
+
+Acceptance requirement
+This harness change is not complete until focused/full CI and Vercel Preview pass, the PR is merged to main with the normal two-parent merge method, Production reaches READY on the exact merge commit, and the previously stranded #1920/job pair is reconciled rather than remaining paused.

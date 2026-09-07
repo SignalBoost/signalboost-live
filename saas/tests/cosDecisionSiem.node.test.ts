@@ -14,6 +14,12 @@ import { createSiemDecisionLogStore } from '../lib/ai/cos/siemDecisionLogStore.t
 import type { DecisionLogStore } from '../lib/ai/cos/decisionStore.ts'
 import type { CosReasoningOutput } from '../lib/ai/cos/reasoningTypes.ts'
 import type { SiemTransport } from '../portable-audit/index.ts'
+import { promptAppearsDiagnostic } from '../lib/ai/cos/reasonerQuality.ts'
+import { detectsNarratedExecution } from '../lib/ai/cos/executionHonesty.ts'
+import {
+  CHIEF_OF_STAFF_ACCEPTANCE_CASES,
+  evaluateChiefOfStaffAcceptanceCase,
+} from '../lib/ai/cos/chiefOfStaffAcceptance.ts'
 
 function buyerStack(withDelegate = true) {
   const siem: { record: string; meta: { eventType: string; severity: string } }[] = []
@@ -48,8 +54,8 @@ function decision(id: string, plan: Partial<CosReasoningOutput['executionPlan']>
 test('a decision needing approval lands in the buyer SIEM as a warning, with objective/channel payload', async () => {
   const { store, siem, calls } = buyerStack()
   const res = await store.log(decision('cos_a', { requiredApproval: true, approvalReasons: ['spend'], proposesAction: true }))
-  assert.equal(res.ok, true)              // delegate result is authoritative
-  assert.equal(calls.log, 1)              // queryable ledger still got it
+  assert.equal(res.ok, true)
+  assert.equal(calls.log, 1)
   const ev = ecs(siem).find((e) => e['event.action'] === 'cos.decision_needs_approval')
   assert.ok(ev, 'needs_approval reached the SIEM')
   assert.equal(ev!['log.level'], 'warning')
@@ -93,4 +99,41 @@ test('every record carries the buyer SOC identity (zero seller coupling)', async
     assert.equal(p['organization.id'], 'acme')
     assert.equal(p['service.environment'], 'prod')
   }
+})
+
+test('Chief of Staff status evidence is not diagnostic intent, but real root-cause work is', () => {
+  const status = `INTERNAL ENVELOPE: diagnose incidents carefully.\nCURRENT USER INPUT:\nThis is a bounded acceptance scenario. Code review passed; CI failed on the deployment check; no merge record exists; no production deployment record exists. Report status and give the smallest next action.`
+  assert.equal(promptAppearsDiagnostic(status), false)
+
+  const diagnosis = `CURRENT USER INPUT:\nCI failed on the deployment check. Diagnose why it failed, identify the root cause, and name the checks that would distinguish the likely causes.`
+  assert.equal(promptAppearsDiagnostic(diagnosis), true)
+})
+
+test('Chief of Staff execution honesty catches unsupported future action narration', () => {
+  assert.equal(detectsNarratedExecution('I will immediately run the production health verification suite.'), true)
+  assert.equal(detectsNarratedExecution('Next action: run the production health verification suite.'), false)
+})
+
+test('Chief of Staff evidence acceptance handles equivalent wording and rejects source leakage', () => {
+  const scenario = CHIEF_OF_STAFF_ACCEPTANCE_CASES.find(item => item.key === 'evidence-boundary')
+  assert.ok(scenario)
+
+  const clean = evaluateChiefOfStaffAcceptanceCase({
+    runId: 'regression',
+    test: scenario,
+    freshExecution: true,
+    provenanceRecorded: true,
+    reply: `Verified facts\n42 tests passed. There is no deployment record. Production health was not checked.\n\nUnresolved uncertainty\nDeployment and production status remain unverified.\n\nNext action\nProduction health check against the current build.`,
+  })
+  assert.equal(clean.verdicts.evidence_accuracy.passed, true)
+  assert.equal(clean.verdicts.autonomous_follow_through.passed, true)
+
+  const leaked = evaluateChiefOfStaffAcceptanceCase({
+    runId: 'regression',
+    test: scenario,
+    freshExecution: true,
+    provenanceRecorded: true,
+    reply: `Verified facts\n42 tests passed. There is no deployment record. Production health was not checked. Retrieved evidence says this is a simulation-based proof-of-concept.\n\nUnresolved uncertainty\nProduction is unverified.\n\nNext action\nProduction health check.`,
+  })
+  assert.equal(leaked.verdicts.evidence_accuracy.passed, false)
 })

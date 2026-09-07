@@ -75,6 +75,17 @@ test('the original four-case v1 scorer is byte-for-byte frozen', () => {
     'Do not tune the accepted v1 scorer. Create a new profile/version for any semantic change.')
 })
 
+test('Chief of Staff behavior improvement is a general owner-trust release audit, not fixture coaching', () => {
+  const skill = readFileSync(new URL('../lib/ai/cos/cosChiefOfStaff.skill.ts', import.meta.url), 'utf8')
+  assert.match(skill, /OWNER-TRUST RELEASE AUDIT/)
+  assert.match(skill, /Scope and instruction check/)
+  assert.match(skill, /Evidence check/)
+  assert.match(skill, /Ownership check/)
+  assert.match(skill, /Status-truth check/)
+  assert.match(skill, /repair the draft before release/)
+  assert.doesNotMatch(skill, /Option North|Option South|Cedar|Harbor|Quartz|31 passing checks/)
+})
+
 test('blind suite is deterministic per seed but varies its facts across seeds', () => {
   const first = buildBlindChiefOfStaffAcceptanceSuite(SEED_A)
   const replay = buildBlindChiefOfStaffAcceptanceSuite(SEED_A)
@@ -138,6 +149,16 @@ test('blind route persists an auditable manifest and feeds host-verified outcome
   assert.match(route, /verifiedSuccess:passed/)
   assert.match(route, /repairNeeded:!passed/)
   assert.match(route, /attachOutcome:false/)
+})
+
+test('blind case manifest stays server-side during execution', () => {
+  const route = readFileSync(new URL('../app/api/admin/cos-chief-of-staff-blind-acceptance/route.ts', import.meta.url), 'utf8')
+  const getStart = route.indexOf('export async function GET()')
+  const postStart = route.indexOf('export async function POST(')
+  assert.ok(getStart >= 0 && postStart > getStart)
+  const getSource = route.slice(getStart, postStart)
+  assert.doesNotMatch(getSource, /case_manifest/)
+  assert.doesNotMatch(getSource, /prompt/)
 })
 
 test('blind execution is retry-safe without duplicating model turns', () => {

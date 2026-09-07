@@ -1,0 +1,31 @@
+Concierge / Owner Assistant operational-log routing regression repair — 2026-09-07
+
+Observed current-main failure
+- Vercel built `main` at `5d07f14868ee0119fbf3478cf58d0fd68fce5f38` and the mandatory COS gate ran 1,045 tests: 1,035 passed and 10 failed.
+- All ten failures were static contract regressions against `saas/app/api/cos-browser/route.ts`.
+- The failures covered owner repository authority isolation, passive-log diagnosis-only behavior, natural log -> `fix it` reconstruction, immediate-message adjacency for reverse-order repair intent, and source-backed Software Specialist routing.
+- The build exited 1 before Next production build could proceed.
+
+Cause
+- Direct commit `03ccbf92dc788e28d9c801e0839a86db853f0974` (`Refactor route.ts for improved operational log processing`) added semantic visual routing but simultaneously removed the live operational-log safeguards previously shipped in #1936.
+- It removed `compactOperationalLogForRepair`, `ownerSoftwareAuthority`, immediate preceding-message inspection, `followupOperationalRepair`, `reverseImmediateOperationalRepair`, `shouldConsultSoftwareSpecialist`, and the conditional owner repository-authority gate.
+- The later regression tests remained present, so the next full Vercel gate correctly exposed the drift.
+
+Repair
+- Restore the #1936 operational-log authority and handoff contract on top of the current main revision.
+- Keep the newer semantic visual classifier and `semanticVisual` request forwarding introduced after #1936.
+- Passive operational evidence cannot invoke owner repository repair.
+- A following explicit `fix it` carries bounded head+tail failure evidence into the Software Specialist.
+- Reverse-order repair intent is accepted only when the repair instruction is the immediately preceding message.
+- Source-attached coding remains in the shared Software Specialist lane.
+- Owner repository capability remains available for explicit authorized repair and ordinary owner coding work.
+
+Acceptance requirements
+- The exact 10 previously failing assertions must pass on the repair head.
+- The full mandatory Vercel COS gate must be green.
+- GitHub workflows must be green on the exact head.
+- Preview must be READY.
+- Before merge, current main must still equal the serialized base or the repair must be rebuilt.
+- Merge must be a normal two-parent merge with exact-head guard.
+- Production for the exact merge SHA must be READY.
+- This document records implementation evidence only; a fresh live Concierge passive-log -> `fix it` conversation remains the runtime acceptance test.

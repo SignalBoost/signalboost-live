@@ -6,9 +6,11 @@ const KNOWN_TOOL_NAME = /\b(getPricing|getBusinessMetrics|getExternalInfo|search
 
 const EXECUTION_CLAIM = new RegExp([
   'executing (them |these |the [a-z ]{0,20})?(now|immediately)',
-  'i am (now )?(executing|starting|running|pulling|fetching|checking)',
-  'i[’\']?m (now )?(executing|starting|running|pulling|fetching|checking)',
-  'i (have|’ve|\'ve) (now )?(fetched|queried|pulled|scanned|retrieved|checked)',
+  'i am (now )?(executing|starting|running|pulling|fetching|checking|verifying|testing)',
+  'i[’\']?m (now )?(executing|starting|running|pulling|fetching|checking|verifying|testing)',
+  'i (?:will|shall) (?:now |immediately )?(?:run|check|verify|test|fetch|pull|query|inspect|execute|start)',
+  'i[’\']?ll (?:now |immediately )?(?:run|check|verify|test|fetch|pull|query|inspect|execute|start)',
+  'i (have|’ve|\'ve) (now )?(fetched|queried|pulled|scanned|retrieved|checked|verified|tested)',
   'i (called|invoked|ran) [a-zA-Z]+ (and|to)',
   '\\(executing immediately\\)',
   'ejecutando (ahora|inmediatamente)', 'estoy ejecutando',
@@ -24,8 +26,6 @@ const INVOCATION_FRAME = new RegExp([
   'wywołam [a-zA-Z]', 'вызову [a-zA-Z]',
 ].join('|'), 'i')
 
-// Tool-looking identifiers that are NOT in the real tool registry are especially
-// dangerous: they make COS claim integrations/capabilities that do not exist.
 const TOOL_LIKE_IDENTIFIER = /\b([a-z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)+|(?:get|list|read|run|fetch|search|query|scan|check|pull)[A-Z][A-Za-z0-9]*)\s*\(/g
 const TOOL_CAPABILITY_FRAME = /\b(COS tools?|tools? can|I can (?:call|use|run)|I (?:will|am going to|am about to) (?:call|use|run)|execut(?:e|ing)|call(?:ing)?)\b/i
 

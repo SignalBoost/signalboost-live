@@ -10,7 +10,7 @@ import { evaluateChiefOfStaffReliability } from '../lib/ai/cos/chiefOfStaffRelia
 
 const replies:Record<string,string> = {
   'instruction-scope': 'Recommendation\nChoose North.\nRationale\nIt is a 14-day pilot using the existing team with no new vendor.\nNext action\nSchedule the internal kickoff.',
-  'evidence-boundary': 'Status: incomplete and unverified.\nVerified fact: 42 passing tests. There is no deployment record, and production health was not checked.\nNext: check the deployment record and verify production.',
+  'evidence-boundary': 'Verified facts\n42 passing tests and no deployment record.\nUnresolved uncertainty\nProduction health was not checked, so status is incomplete and unverified.\nNext action\nCheck the deployment record and verify production.',
   'routine-follow-through': 'Owner: Maya\nDeadline: Friday\nInputs: customer notes and release metrics\n1. Synthesize the inputs.\n2. Draft the two-page launch brief.\n3. Review it against the inputs.\nDone when: the two-page launch brief is review-ready.',
   'truthful-status': 'Status: blocked.\nCode review passed, but CI failed on the deployment check. There is no merge record and no production deployment record. This matters because release evidence is incomplete. Next action: fix the deployment check and rerun CI.',
 }
@@ -47,6 +47,30 @@ test('instruction scorer enforces exact headings and exactly one recommended opt
 test('routine plan requires exactly three ordered actions and all requested labeled fields', () => {
   const fourActions = 'Owner: Maya\nDeadline: Friday\nInputs: customer notes and release metrics\n1. Read.\n2. Draft the two-page launch brief.\n3. Review.\n4. Publish.\nDone when: review-ready.'
   assert.equal(observe('routine-follow-through', fourActions).verdicts.instruction_adherence.passed, false)
+})
+
+test('acceptance grading permits clear markdown formatting used by live COS answers', () => {
+  const recommendation = 'Recommendation\nChoose North\n\nRationale\nOption North is a 14-day pilot using the existing team and no new vendor. Option South requires a new vendor.\n\nNext action\nInitiate the pilot.'
+  assert.equal(observe('instruction-scope', recommendation).verdicts.instruction_adherence.passed, true)
+
+  const plan = '**Owner:** Maya\n**Deadline:** Friday\n**Inputs:** customer notes and release metrics\n1. Synthesize inputs.\n2. Draft the two-page launch brief.\n3. Review it.\n**Done when:** review-ready.'
+  assert.equal(observe('routine-follow-through', plan).verdicts.instruction_adherence.passed, true)
+})
+
+test('evidence boundary accepts an explicit evidence-led unverified status', () => {
+  const reply = '**Verified facts**\n42 passing tests; no deployment record.\n**Unresolved uncertainty**\nProduction health was not checked, so status is unverified.\n**Next action**\nQuery the deployment registry for a deployment ID.'
+  const observation = observe('evidence-boundary', reply)
+  assert.equal(observation.verdicts.instruction_adherence.passed, true)
+  assert.equal(observation.verdicts.autonomous_follow_through.passed, true)
+})
+
+test('acceptance grading rejects missing mandated choices, labels, and vendor evidence', () => {
+  const weakRecommendation = 'Recommendation\nOption North\nRationale\nNorth is a 14-day pilot using the existing team.\nNext action\nStart.'
+  assert.equal(observe('instruction-scope', weakRecommendation).verdicts.instruction_adherence.passed, false)
+  assert.equal(observe('instruction-scope', weakRecommendation).verdicts.evidence_accuracy.passed, false)
+
+  const unlabeledEvidence = 'Based on provided evidence, 42 passing tests, no deployment record, and production health was not checked. Status is unverified. Next action: query the deployment registry.'
+  assert.equal(observe('evidence-boundary', unlabeledEvidence).verdicts.instruction_adherence.passed, false)
 })
 
 test('truthful status enforces the ninety-word cap and one-line status lead', () => {

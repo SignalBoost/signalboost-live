@@ -5,28 +5,43 @@ import test from 'node:test'
 test('Full Assistant routes every pasted operational log through the canonical browser ingress', () => {
   const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
   assert.match(boundary, /hasExplicitOperationalLogRepairIntent/)
+  assert.match(boundary, /isOperationalLogEvidence/)
   assert.match(boundary, /isPastedOperationalLog/)
-  assert.match(boundary, /let operationalRepair = isPastedOperationalLog\(userContent\) \|\| shouldUseConciergeRepairIngress\(body\)/)
+  assert.match(boundary, /let operationalRepair = isOperationalLogEvidence\(userContent\) \|\| shouldUseConciergeRepairIngress\(body\)/)
   assert.match(boundary, /executeOperationalRepairFromConcierge/)
   assert.match(boundary, /sendUrl: '\/api\/cos-primary'/)
-  assert.match(boundary, /const previous = users\.at\(-2\) \|\| ''/)
-  assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(previous\)/)
 })
 
-test('Full Assistant recovers missing previous repair intent from durable conversation History', () => {
+test('Full Assistant carries a passive operational log into the next explicit fix-it turn', () => {
+  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
+  assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(current\) && isPastedOperationalLog\(previous\)/)
+  assert.match(boundary, /function bodyWithOperationalRepairFollowup/)
+  assert.match(boundary, /content: `\$\{current\}\\n\\n\$\{operationalLog\.trim\(\)\}`/)
+  assert.match(boundary, /if \(hasExplicitOperationalLogRepairIntent\(userContent\)\)/)
+  assert.match(boundary, /previousOperationalLog = isPastedOperationalLog\(previousUserContent\)/)
+  assert.match(boundary, /sendBody = bodyWithOperationalRepairFollowup\(body, previousOperationalLog\)/)
+})
+
+test('Full Assistant can recover the prior passive log from durable History when the request transcript is clipped', () => {
+  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
+  assert.match(boundary, /async function durablePreviousOperationalLog/)
+  assert.match(boundary, /`\/api\/assistant\/chats\?id=\$\{encodeURIComponent\(conversationId\)\}`/)
+  assert.match(boundary, /return isPastedOperationalLog\(content\) \? content : null/)
+  assert.match(boundary, /previousOperationalLog = await durablePreviousOperationalLog/)
+})
+
+test('Full Assistant preserves reverse-order repair-intent recovery for clipped transcripts', () => {
   const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
   assert.match(boundary, /async function durablePreviousRepairIntent/)
-  assert.match(boundary, /`\/api\/assistant\/chats\?id=\$\{encodeURIComponent\(conversationId\)\}`/)
-  assert.match(boundary, /if \(!operationalRepair && isPastedOperationalLog\(userContent\)\)/)
+  assert.match(boundary, /if \(isPastedOperationalLog\(userContent\) && !hasExplicitOperationalLogRepairIntent\(previousUserContent\)\)/)
   assert.match(boundary, /const recoveredRepairIntent = await durablePreviousRepairIntent/)
   assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(content\) \? content : null/)
 })
 
-test('recovered repair intent is forwarded in the server-visible browser-ingress transcript', () => {
+test('recovered reverse-order repair intent is forwarded in the server-visible browser-ingress transcript', () => {
   const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
   assert.match(boundary, /function bodyWithPreviousUserTurn/)
   assert.match(boundary, /sendBody = bodyWithPreviousUserTurn\(body, recoveredRepairIntent\)/)
-  assert.match(boundary, /executeOperationalRepairFromConcierge\([\s\S]{0,180}sendBody/)
   assert.match(boundary, /\{ role: 'user', content: previousUserContent \}/)
 })
 

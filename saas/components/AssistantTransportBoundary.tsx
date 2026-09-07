@@ -8,7 +8,7 @@ import {
   type AssistantTransportLocale,
 } from '@/lib/ai/cos/assistantTransportClient'
 import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
-import { hasExplicitOperationalLogRepairIntent, isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
+import { hasExplicitOperationalLogRepairIntent, isOperationalLogEvidence, isPastedOperationalLog } from '@/lib/ai/cos/pastedOperationalLog'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 
 type AssistantRequestBody = {
@@ -47,8 +47,8 @@ function shouldUseConciergeRepairIngress(body: AssistantRequestBody): boolean {
   const users = userContents(body)
   const current = users.at(-1) || ''
   const previous = users.at(-2) || ''
-  return isPastedOperationalLog(current)
-    && (hasExplicitOperationalLogRepairIntent(current) || hasExplicitOperationalLogRepairIntent(previous))
+  return isOperationalLogEvidence(current)
+    || (hasExplicitOperationalLogRepairIntent(current) && isPastedOperationalLog(previous))
 }
 
 async function durablePreviousRepairIntent(
@@ -79,6 +79,35 @@ async function durablePreviousRepairIntent(
   return null
 }
 
+async function durablePreviousOperationalLog(
+  fetchImpl: typeof window.fetch,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  try {
+    const response = await fetchImpl(`/api/assistant/chats?id=${encodeURIComponent(conversationId)}`, {
+      method: 'GET',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { accept: 'application/json' },
+      signal,
+    })
+    if (!response.ok) return null
+    const payload = await response.json().catch(() => null)
+    const messages = Array.isArray(payload?.messages) ? payload.messages : []
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+      if (message?.role !== 'user' || typeof message.content !== 'string') continue
+      const content = message.content.trim()
+      if (hasExplicitOperationalLogRepairIntent(content)) continue
+      return isPastedOperationalLog(content) ? content : null
+    }
+  } catch (error) {
+    if (deliberateAbort(error, signal)) throw error
+  }
+  return null
+}
+
 function bodyWithPreviousUserTurn(body: AssistantRequestBody, previousUserContent: string): AssistantRequestBody {
   const messages = Array.isArray(body.messages) ? body.messages : []
   let latestUserIndex = -1
@@ -96,6 +125,27 @@ function bodyWithPreviousUserTurn(body: AssistantRequestBody, previousUserConten
       { role: 'user', content: previousUserContent },
       ...messages.slice(latestUserIndex),
     ],
+  }
+}
+
+function bodyWithOperationalRepairFollowup(body: AssistantRequestBody, operationalLog: string): AssistantRequestBody {
+  const messages = Array.isArray(body.messages) ? body.messages : []
+  let latestUserIndex = -1
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index]?.role === 'user') {
+      latestUserIndex = index
+      break
+    }
+  }
+  if (latestUserIndex < 0) return body
+  const latest = messages[latestUserIndex]
+  const current = typeof latest?.content === 'string' ? latest.content.trim() : ''
+  if (!current || !operationalLog.trim()) return body
+  return {
+    ...body,
+    messages: messages.map((message, index) => index === latestUserIndex
+      ? { ...message, content: `${current}\n\n${operationalLog.trim()}` }
+      : message),
   }
 }
 
@@ -377,9 +427,32 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
         return executeBuilderFromConcierge(originalFetch, body, userContent, conversationId, init?.signal ?? undefined)
       }
 
-      let operationalRepair = isPastedOperationalLog(userContent) || shouldUseConciergeRepairIngress(body)
+      const users = userContents(body)
+      const previousUserContent = users.at(-2) || ''
+      let operationalRepair = isOperationalLogEvidence(userContent) || shouldUseConciergeRepairIngress(body)
       let sendBody: AssistantRequestBody = body
-      if (!operationalRepair && isPastedOperationalLog(userContent)) {
+
+      // Natural two-turn flow: the user pastes a passive failure, Concierge explains it, then the
+      // user says "fix it". Carry the immediately preceding log into the current request so the
+      // server receives explicit repair intent and the original failure evidence in one bounded turn.
+      if (hasExplicitOperationalLogRepairIntent(userContent)) {
+        let previousOperationalLog = isPastedOperationalLog(previousUserContent) ? previousUserContent : null
+        if (!previousOperationalLog) {
+          previousOperationalLog = await durablePreviousOperationalLog(
+            originalFetch,
+            conversationId,
+            init?.signal ?? undefined,
+          )
+        }
+        if (previousOperationalLog) {
+          operationalRepair = true
+          sendBody = bodyWithOperationalRepairFollowup(body, previousOperationalLog)
+        }
+      }
+
+      // Preserve the older reverse-order recovery as well: a repair instruction may have been sent
+      // immediately before a pasted log and omitted from the current request transcript.
+      if (isPastedOperationalLog(userContent) && !hasExplicitOperationalLogRepairIntent(previousUserContent)) {
         const recoveredRepairIntent = await durablePreviousRepairIntent(
           originalFetch,
           conversationId,
@@ -390,6 +463,7 @@ export default function AssistantTransportBoundary({ children }: { children: Rea
           sendBody = bodyWithPreviousUserTurn(body, recoveredRepairIntent)
         }
       }
+
       // Preserve privileged owner COS scope for ordinary turns. Every pasted operational log enters
       // the canonical browser ingress; the server alone decides whether it is owner-bound SignalBoost
       // repair evidence or a passive analysis-only log.

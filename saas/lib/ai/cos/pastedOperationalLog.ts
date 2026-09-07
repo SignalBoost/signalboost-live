@@ -70,7 +70,7 @@ export function analyzeOperationalLog(input: string): OperationalLogAnalysis {
 export function operationalLogReply(input: string): string {
   const analysis = analyzeOperationalLog(input)
   if (!analysis.failed) {
-    return 'The excerpt shows a Vercel build in progress, but it does not include a failing assertion or a non-zero final command, so there is not enough evidence yet to identify a defect. No code was changed. Paste the final error or ✖ assertion and, if you want a code repair, attach the affected source file.'
+    return 'The excerpt shows a Vercel build in progress, but it does not include a failing assertion or a non-zero final command, so there is not enough evidence yet to identify a defect. No code was changed. Paste the final error or ✖ assertion. If you want the identified failure repaired, say "fix it"; Builder will use source already available to the authorized workspace or repository and ask for source only if it cannot access it.'
   }
   const failures = analysis.testFailures.length
     ? ` The failing checks shown are: ${analysis.testFailures.join('; ')}.`
@@ -80,5 +80,5 @@ export function operationalLogReply(input: string): string {
     : analysis.exitCode !== null
       ? ` The build command exited ${analysis.exitCode}.`
       : ''
-  return `This Vercel build failed.${command}${failures} No code was changed from the log alone. Attach the affected source file and COS can diagnose, repair, and verify it; if the source is not available, paste the final assertion/error block and COS will continue the diagnosis.`
+  return `This Vercel build failed.${command}${failures} No code was changed because this was passive diagnostic evidence, not a repair request. If you want it repaired, say "fix it"; Builder will use the failure evidence and source already available to the authorized workspace or repository, asking for source only if it cannot access it. If the current surface does not have repair authority, it will say so instead of pretending to act.`
 }

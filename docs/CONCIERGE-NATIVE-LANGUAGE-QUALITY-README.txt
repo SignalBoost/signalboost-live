@@ -1,1 +1,0 @@
-This branch implements and tests native-quality Concierge communication in English, Spanish, Portuguese, Polish, and Russian. See CONCIERGE-NATIVE-LANGUAGE-QUALITY-2026-09-07.md for the contract and CONCIERGE-NATIVE-LANGUAGE-QUALITY-2026-09-07.txt for the text acceptance record.

@@ -10,11 +10,9 @@ const OPERATIONAL_LOG = /(?:^\d{2}:\d{2}:\d{2}\.\d{3}\s+(?:running|cloning|insta
 const CLIPPED_LOG_TIMESTAMP = /(?:^|\n)\d{2}:\d{2}:\d{2}\.\d{3}\s+/g
 const CLIPPED_LOG_MARKER = /(?:file:\/\/\/vercel\/path0|\/vercel\/path0\/saas\/tests\/|MODULE_TYPELESS_PACKAGE_JSON|Reparsing as ES Module|node:internal\/test_runner|\bVercel CLI\b|\bnext build\b|(?:^|\s)[✔✓✖]\s|ℹ\s+(?:tests|pass|fail)\b)/im
 
-// Explicit repair language is authority intent, not proof of authority. Callers still have to
-// enforce authentication, exact repository/source scope, and the relevant Builder safety lane.
-// Keep this deliberately narrow so words such as "failed", "error", or test names inside the
-// pasted log cannot accidentally turn passive evidence into an execution request.
-const EXPLICIT_LOG_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|the\s+(?:build|failure|error|code|problem)|it)\b|\b(?:can|could|would)\s+you\s+(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|it|the\s+(?:build|failure|error|problem))\b|\bi\s+(?:need|want)\s+(?:you\s+to\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|it|the\s+(?:build|failure|error|problem))\b/i
+// Legacy compatibility helpers. Canonical browser routing no longer uses phrase matching to decide
+// what the person wants; requestUnderstanding.ts performs semantic intent resolution instead.
+const LEGACY_EXPLICIT_LOG_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|the\s+(?:build|failure|error|code|problem)|it)\b|\b(?:can|could|would)\s+you\s+(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|it|the\s+(?:build|failure|error|problem))\b|\bi\s+(?:need|want)\s+(?:you\s+to\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|it|the\s+(?:build|failure|error|problem))\b/i
 
 const OPERATIONAL_REPAIR_MAX_CHARS = 60_000
 const OPERATIONAL_REPAIR_HEAD_CHARS = 8_000
@@ -34,23 +32,25 @@ export function isOperationalLogEvidence(input: string): boolean {
   return timestampCount >= 3 && CLIPPED_LOG_MARKER.test(text)
 }
 
-/** Intent only; this does not grant authority and does not require log evidence. */
+/** @deprecated Canonical browser routing uses semantic request understanding. */
 export function hasExplicitOperationalLogRepairIntent(input: string): boolean {
-  return EXPLICIT_LOG_REPAIR.test(String(input || ''))
+  return LEGACY_EXPLICIT_LOG_REPAIR.test(String(input || ''))
 }
 
+/** @deprecated Canonical browser routing uses semantic request understanding. */
 export function isExplicitOperationalLogRepairRequest(input: string): boolean {
   const text = String(input || '')
   return isOperationalLogEvidence(text) && hasExplicitOperationalLogRepairIntent(text)
 }
 
 /**
- * "Pasted operational log" here means passive log evidence. An explicit repair request is
- * intentionally excluded so authenticated Builder/Platform Engineer routing can evaluate it.
+ * A pasted operational log is evidence, regardless of what words happen to occur inside it.
+ * Whether the human wants analysis, explanation, repair, or something else is a separate semantic
+ * decision. Keeping those concepts separate prevents log text or magic phrases from becoming
+ * execution authority.
  */
 export function isPastedOperationalLog(input: string): boolean {
-  const text = String(input || '')
-  return isOperationalLogEvidence(text) && !isExplicitOperationalLogRepairRequest(text)
+  return isOperationalLogEvidence(String(input || ''))
 }
 
 /**
@@ -91,11 +91,8 @@ export function analyzeOperationalLog(input: string): OperationalLogAnalysis {
 
 /**
  * A person who hands over a failing log and is asked "want me to fix it?" answers like
- * a person. Previously this paragraph demanded the literal phrase "fix it" and then
- * spent three clauses on internal authority bookkeeping — machine-shaped, and it put
- * the burden of finding the magic words on the owner. It is now a plain offer; any
- * ordinary agreement is understood by ./repairConfirmationIntent.ts. The authority
- * boundary is unchanged: the person must still actually say yes.
+ * a person. The offer is intentionally natural language; semantic request understanding decides
+ * what the reply means, while authentication and execution policy decide whether action is allowed.
  */
 export function operationalLogRepairHandoff(language = 'en'): string {
   const locale = String(language || 'en').toLowerCase()

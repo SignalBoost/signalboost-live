@@ -1,0 +1,5 @@
+Status: implementation branch fix/concierge-native-language-quality
+
+The previous Vercel failure was a single brittle regression assertion in cosContextualInterpretationIsolation.node.test.ts. The invariant is still preserved: contextual interpretation runs before mature retrieval. The regression now checks the ordering invariant while allowing the native-language review wrapper.
+
+Final acceptance still requires the current branch head to pass the mandatory Vercel gate before merge.

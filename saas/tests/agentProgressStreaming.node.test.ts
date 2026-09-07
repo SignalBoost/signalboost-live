@@ -13,6 +13,7 @@ test('Concierge and owner COS consume observable request progress instead of tim
   assert.match(homepage, /target: 'concierge'/)
   assert.match(homepage, /<AgentActivity lang=\{lang\} compact activity=\{activity\}/)
   assert.doesNotMatch(homepage, /loading \? <p className="thinking"/)
+  assert.match(assistant, /postWithAgentProgress\(\{/)
   assert.match(assistant, /target: 'cos'/)
   assert.match(concierge, /activity=\{activity\}/)
   assert.match(assistant, /activity=\{activity\}/)
@@ -26,6 +27,19 @@ test('progress transport follows the durable Builder job to its terminal result'
   assert.match(client, /poll\.status === 202/)
   assert.match(client, /COS Builder completed the job/)
   assert.doesNotMatch(client, /\/api\/agent-progress/)
+})
+
+test('the actual owner Assistant live path never exposes a transient fetch loss after a durable job was accepted', () => {
+  const assistant = readFileSync(new URL('../app/dashboard/assistant/page.tsx', import.meta.url), 'utf8')
+  const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+  assert.match(assistant, /postWithAgentProgress\(\{/)
+  assert.match(assistant, /target: 'cos'/)
+  assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
+  assert.match(client, /source: 'assistant-transport-unconfirmed'/)
+  assert.match(client, /Builder is still durable; a status check was lost/)
+  assert.match(client, /if \(deliberateAbort\(error, args\.signal\)\) throw error/)
+  assert.match(client, /if \(!poll\.ok && poll\.status >= 500\)/)
+  assert.match(client, /continue/)
 })
 
 test('actual Concierge source attachments decode into the durable Builder request shape', () => {
@@ -99,7 +113,6 @@ test('progress client selects durable Builder only after shared Builder-intent c
   assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
   assert.match(client, /credentials: 'include'/)
 })
-
 
 test('six-file application preserves manifests and data in the Builder transport', () => {
   const names = ['package.json', 'money.js', 'report.js', 'cli.js', 'sample.json', 'report.test.js']

@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   analyzeOperationalLog,
+  ensureOperationalLogRepairHandoff,
   hasExplicitOperationalLogRepairIntent,
   isExplicitOperationalLogRepairRequest,
   isOperationalLogEvidence,
   isPastedOperationalLog,
+  operationalLogRepairHandoff,
   operationalLogReply,
 } from '../lib/ai/cos/pastedOperationalLog.ts'
 
@@ -100,4 +103,25 @@ test('an incomplete build excerpt asks for missing failure evidence, not reposit
   assert.match(reply, /say "fix it"/i)
   assert.doesNotMatch(reply, /attach the affected source file/i)
   assert.doesNotMatch(reply, /not editable source code|not a request to portray anyone/i)
+})
+
+test('host handoff is deterministic after a richer neural diagnosis and localized across all five platform languages', () => {
+  const neural = 'The build has one isolated assertion failure in the contextual-interpretation ordering gate.'
+  const English = ensureOperationalLogRepairHandoff(neural, 'en')
+  assert.match(English, /say "fix it"/i)
+  assert.match(English, /Builder/i)
+  assert.equal(ensureOperationalLogRepairHandoff(English, 'en'), English)
+
+  const localized = ['en', 'es', 'pt', 'pl', 'ru'].map(locale => operationalLogRepairHandoff(locale))
+  assert.equal(new Set(localized).size, 5)
+  for (const handoff of localized) {
+    assert.match(handoff, /"fix it"/i)
+    assert.match(handoff, /Builder/i)
+  }
+})
+
+test('the live operational diagnostic wraps both fallback and neural success with the host-owned handoff', () => {
+  const diagnostic = readFileSync(new URL('../lib/ai/cos/operationalLogDiagnostic.ts', import.meta.url), 'utf8')
+  assert.match(diagnostic, /const fallback = ensureOperationalLogRepairHandoff\(operationalLogReply\(input\.log\), input\.language\)/)
+  assert.match(diagnostic, /reply: ensureOperationalLogRepairHandoff\(reply, input\.language\)/)
 })

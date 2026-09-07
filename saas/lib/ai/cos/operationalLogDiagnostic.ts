@@ -1,6 +1,6 @@
 import { callCosReasoner } from './cosReasoner.ts'
 import { parseLocalResult } from './reasonerOutput.ts'
-import { analyzeOperationalLog, operationalLogReply } from './pastedOperationalLog.ts'
+import { analyzeOperationalLog, ensureOperationalLogRepairHandoff, operationalLogReply } from './pastedOperationalLog.ts'
 import { publicDisclosureViolations } from './publicDisclosureGate.ts'
 import { hasUnsafePublicModelOutput } from './publicPromptSecurity.ts'
 
@@ -48,7 +48,9 @@ export async function diagnoseOperationalLog(input: {
   log: string
   language: string
 }): Promise<OperationalLogDiagnosticResult> {
-  const fallback = operationalLogReply(input.log)
+  // The neural diagnosis may improve specificity, but the host owns the action boundary. Always
+  // preserve the deterministic "fix it" handoff after either fallback or model-generated prose.
+  const fallback = ensureOperationalLogRepairHandoff(operationalLogReply(input.log), input.language)
   const analysis = analyzeOperationalLog(input.log)
   if (!analysis.failed) {
     return Object.freeze({ reply: fallback, reasonerInvoked: false, confidence: null })
@@ -69,7 +71,7 @@ export async function diagnoseOperationalLog(input: {
 
   const confidence = Number(parsed?.confidence)
   return Object.freeze({
-    reply,
+    reply: ensureOperationalLogRepairHandoff(reply, input.language),
     reasonerInvoked: true,
     confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : null,
   })

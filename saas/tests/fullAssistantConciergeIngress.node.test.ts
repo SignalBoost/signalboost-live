@@ -5,6 +5,7 @@ import test from 'node:test'
 const assistantPage = readFileSync(new URL('../app/dashboard/assistant/page.tsx', import.meta.url), 'utf8')
 const progressClient = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
 const browserRoute = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+const homepageWorkspaceCss = readFileSync(new URL('../app/concierge-workspace.css', import.meta.url), 'utf8')
 
 test('Full Assistant live page uses observable progress and the canonical COS browser ingress', () => {
   assert.match(assistantPage, /postWithAgentProgress\(\{/)
@@ -48,4 +49,12 @@ test('Full Assistant durable Builder polling survives transient read-only transp
   assert.match(progressClient, /without replaying the action/)
   assert.match(progressClient, /if \(!poll\.ok && poll\.status >= 500\)/)
   assert.match(progressClient, /source: 'assistant-transport-unconfirmed'/)
+})
+
+test('Homepage Concierge renders assistant content full bleed without visual card chrome or page-wide horizontal scrolling', () => {
+  assert.match(homepageWorkspaceCss, /\.concierge-shell \.exchange\s*\{[\s\S]*?width:\s*100%\s*!important;[\s\S]*?max-width:\s*none\s*!important;/)
+  assert.match(homepageWorkspaceCss, /\.concierge-shell \.assistant-message\s*\{[\s\S]*?width:\s*100%\s*!important;[\s\S]*?max-width:\s*none\s*!important;/)
+  assert.match(homepageWorkspaceCss, /\.concierge-shell \[data-concierge-visual-preview="true"\]\s*\{[\s\S]*?aspect-ratio:\s*auto\s*!important;[\s\S]*?padding:\s*0\s*!important;[\s\S]*?border:\s*0\s*!important;[\s\S]*?background:\s*transparent\s*!important;/)
+  assert.match(homepageWorkspaceCss, /\.concierge-shell \.thread\s*\{[\s\S]*?overflow-x:\s*hidden\s*!important;/)
+  assert.match(homepageWorkspaceCss, /\.concierge-shell \.assistant-message pre\s*\{[\s\S]*?overflow-x:\s*auto;/)
 })

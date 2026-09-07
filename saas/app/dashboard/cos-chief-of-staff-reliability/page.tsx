@@ -30,16 +30,26 @@ export default function ChiefOfStaffReliabilityPage() {
   useEffect(() => { void load().catch(e => setError(e.message)) }, [])
   const run = async () => {
     setBusy(true); setError('')
-    const controller = new AbortController()
-    const timeout = window.setTimeout(() => controller.abort(), 295_000)
     try {
-      const response = await fetch('/api/admin/cos-chief-of-staff-acceptance', { method:'POST', credentials:'include', signal:controller.signal })
+      const response = await fetch('/api/admin/cos-chief-of-staff-acceptance', { method:'POST', credentials:'include' })
       const body = await response.json()
       if (!response.ok) throw new Error(body.error || 'Acceptance cycle failed.')
+      for (const caseKey of body.caseKeys as string[]) {
+        const controller = new AbortController()
+        const timeout = window.setTimeout(() => controller.abort(), 295_000)
+        try {
+          const result = await fetch('/api/admin/cos-chief-of-staff-acceptance', {
+            method:'PUT', credentials:'include', signal:controller.signal,
+            headers:{ 'content-type':'application/json' }, body:JSON.stringify({ runId:body.runId, caseKey }),
+          })
+          const resultBody = await result.json()
+          if (!result.ok) throw new Error(resultBody.error || `Acceptance case ${caseKey} failed.`)
+        } finally { window.clearTimeout(timeout) }
+      }
       await load()
     } catch (e) {
       setError(e instanceof DOMException && e.name === 'AbortError' ? 'The browser stopped waiting. Refresh to read the durable result.' : e instanceof Error ? e.message : 'Acceptance cycle failed.')
-    } finally { window.clearTimeout(timeout); setBusy(false) }
+    } finally { setBusy(false) }
   }
   const latest = state.runs[0]
   const results = latest ? state.results.filter(item => item.run_id === latest.id) : []

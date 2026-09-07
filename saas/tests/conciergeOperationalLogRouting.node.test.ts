@@ -32,8 +32,9 @@ test('quoted clone and failure lines alone do not satisfy operational-log eviden
 })
 
 test('passive operational evidence is diagnosis-only even for the authenticated owner', () => {
+  assert.match(route, /const ownerSoftwareAuthority = Object\.freeze\(\{ allowRepositoryRepair: true \}\)/)
   assert.match(route, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
-  assert.match(route, /allowRepositoryRepair: !operationalEvidence \|\| explicitOperationalRepair/)
+  assert.match(route, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
   const specialistGate = route.indexOf('const shouldConsultSoftwareSpecialist')
   const terminal = route.indexOf('if (operationalEvidence && !hasSourceAttachment)')
   const diagnostic = route.indexOf('await diagnoseOperationalLog({', terminal)
@@ -75,7 +76,7 @@ test('source-attached work remains in the shared isolated Software Specialist la
   assert.match(route, /const hasSourceAttachment =/)
   assert.match(route, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
   assert.match(route, /surface: 'assistant'/)
-  assert.match(route, /allowRepositoryRepair: !operationalEvidence \|\| explicitOperationalRepair/)
+  assert.match(route, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
   assert.match(route, /withPublicDeliveryScope\(\(\) => tryCosSoftwareSpecialist/)
   assert.match(route, /surface: 'concierge'/)
   assert.match(route, /allowRepositoryRepair: false/)

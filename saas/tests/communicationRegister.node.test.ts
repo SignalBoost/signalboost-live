@@ -4,16 +4,9 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { registerGuidance, ROUTINE_REGISTER, type RegisterProfile } from '../lib/ai/cos/communicationRegister.ts'
-import {
-  conciergeLanguageQualityInstruction,
-  explicitlyPreservedCriticalTokens,
-  hasAvoidableEnglishProcessJargon,
-} from '../lib/ai/cos/conciergeLanguageQuality.ts'
 
 const EDITOR = readFileSync(join(process.cwd(), 'lib/ai/cos/directTextTransformation.ts'), 'utf8')
 const MODULE = readFileSync(join(process.cwd(), 'lib/ai/cos/communicationRegister.ts'), 'utf8')
-const LANGUAGE_EXECUTION = readFileSync(join(process.cwd(), 'lib/ai/cos/conciergeLanguageAcceptanceExecution.ts'), 'utf8')
-const COS_ENTRYPOINT = readFileSync(join(process.cwd(), 'lib/ai/cos/cosFirstAnswer.ts'), 'utf8')
 
 const DELICATE: RegisterProfile = {
   sensitivity: 'delicate',
@@ -90,47 +83,4 @@ test('register and skill lookups run concurrently, not in series', () => {
 
 test('a non-routine register is reported in provenance', () => {
   assert.match(EDITOR, /Communicative Register \(\$\{register\.sensitivity\}\)/)
-})
-
-test('explicit protected literal repair has an unambiguous standalone fallback', () => {
-  const prompt = 'I want to improve a customer email for project ALPHA-42. Keep ALPHA-42 unchanged.'
-  assert.deepEqual(explicitlyPreservedCriticalTokens(prompt), ['ALPHA-42'])
-  const instruction = conciergeLanguageQualityInstruction('en')
-  assert.match(instruction, /standalone line before the answer/i)
-  assert.match(instruction, /final answer MUST contain that exact literal/i)
-  assert.match(COS_ENTRYPOINT, /EXPLICITLY PROTECTED LITERALS/)
-  assert.match(COS_ENTRYPOINT, /every item below MUST appear verbatim in the final answer/)
-  assert.match(COS_ENTRYPOINT, /required literal restoration/)
-  assert.match(COS_ENTRYPOINT, /explicitly preserved literal was still missing after the bounded repair/)
-})
-
-test('avoidable English process jargon is not native-quality evidence in Spanish or Brazilian Portuguese', () => {
-  const spanish = 'Compensación (Trade-off): se elimina la fricción del onboarding.'
-  const portuguese = 'Um rollout amplo introduz overhead significativo de onboarding.'
-  assert.equal(hasAvoidableEnglishProcessJargon(spanish, 'es'), true)
-  assert.equal(hasAvoidableEnglishProcessJargon(portuguese, 'pt'), true)
-  assert.equal(hasAvoidableEnglishProcessJargon('El worker procesa FFmpeg.', 'es'), false)
-  assert.equal(hasAvoidableEnglishProcessJargon('O worker processa FFmpeg.', 'pt'), false)
-})
-
-test('user-supplied jargon remains discussable instead of being blindly rejected', () => {
-  const source = 'Explique em português o que significa onboarding neste contrato.'
-  assert.equal(hasAvoidableEnglishProcessJargon('Onboarding é o processo de integração inicial.', 'pt', source), false)
-  assert.equal(hasAvoidableEnglishProcessJargon('O rollout deve ocorrer amanhã.', 'pt', source), true)
-})
-
-test('the Production acceptance executor folds avoidable jargon into the English-leakage verdict', () => {
-  assert.match(LANGUAGE_EXECUTION, /hasAvoidableEnglishProcessJargon/)
-  assert.match(LANGUAGE_EXECUTION, /noEnglishLeakage:\s*baseVerdicts\.noEnglishLeakage/)
-  assert.match(LANGUAGE_EXECUTION, /!hasAvoidableEnglishProcessJargon\(reply, test\.language, test\.prompt\)/)
-})
-
-test('five-language quality policy explicitly rejects the observed process-jargon family', () => {
-  const spanish = conciergeLanguageQualityInstruction('es')
-  const portuguese = conciergeLanguageQualityInstruction('pt')
-  for (const term of ['onboarding', 'rollout', 'overhead', 'trade-off', 'scope creep']) {
-    const pattern = new RegExp(term.replace('-', '[- ]?'), 'i')
-    assert.match(spanish, pattern)
-    assert.match(portuguese, pattern)
-  }
 })

@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       title: "Generated graphic",
     });
 
-    if (!generated.ok) {
+    if (generated.ok === false) {
       console.warn("[generate-graphic] COS image generation failed", generated.error);
       return NextResponse.json(
         { success: false, error: generated.error },

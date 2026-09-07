@@ -116,6 +116,7 @@ const tests = [
   'tests/cosPragmaticIntentCore.node.test.ts',
   'tests/cosContextualInterpretationIsolation.node.test.ts',
   'tests/cosOperatingCharter.node.test.ts',
+  'tests/cosChiefOfStaffReliability.node.test.ts',
   'tests/publicRecordedProvenance.node.test.ts',
   'tests/groundingConcepts.node.test.ts',
   'tests/answerEvidenceAttributionRepair.node.test.ts',

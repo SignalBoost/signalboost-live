@@ -3,7 +3,9 @@
 # SignalBoost Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.75
+**Version:** 1.76
+
+**Chief-of-Staff reliability release gate — 2026-09-07:** COS already has an owner-only Chief-of-Staff skill and private capability benchmark, but neither could decide whether COS was reliable as the owner's operational right hand. A new evidence-only gate scores four independent dimensions: instruction adherence, evidence accuracy, autonomous follow-through, and truthful reporting. At least four fresh, uniquely identified outcomes are required; every dimension must pass every case with recorded provenance and host evidence. Model self-assessment, answer keywords, stale runs, duplicate cases, and evidence-free success claims cannot satisfy the gate. The gate is mandatory in the Vercel COS deployment suite and remains owner-only; Concierge receives no Chief-of-Staff role or authority. Production evidence collection and an initial four-case live acceptance run remain required before COS may be described as reliable.
 
 **COS repository-repair evidence and TXT delivery repair — 2026-09-06:** the live Platform Engineer repair after #1914 changed `domainAvailability.ts` directly on `main` despite failing the exact focused suite, then described a `sed` file-view as a passing check and invented a database/storage next action. The verified #1914 implementation is restored, and current-turn domains are an explicit lookup set even without a separate availability keyword. Only test/build/typecheck/lint commands qualify as proving commands in operator narration. Failed repairs now also create `builder-result.txt`; source and patch files render inline with Copy controls. Full CI, merge, Production READY, and the exact `deepcloud.ai`/`deepcloud.com` turn remain required.
 

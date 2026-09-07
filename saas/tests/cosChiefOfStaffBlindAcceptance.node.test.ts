@@ -132,11 +132,24 @@ test('blind route persists an auditable manifest and feeds host-verified outcome
   assert.match(route, /CHIEF_OF_STAFF_BLIND_PROFILE/)
   assert.match(route, /variant_seed:seed/)
   assert.match(route, /case_manifest:suite/)
-  assert.match(route, /storedManifest !== JSON\.stringify\(suite\)/)
+  assert.match(route, /canonicalJson\(run\.data\.case_manifest \?\? \{\}\) !== canonicalJson\(suite\)/)
+  assert.match(route, /manifest drift detected/)
   assert.match(route, /attachTurnOutcome\(outcome\.turnId/)
   assert.match(route, /verifiedSuccess:passed/)
   assert.match(route, /repairNeeded:!passed/)
   assert.match(route, /attachOutcome:false/)
+})
+
+test('blind execution is retry-safe without duplicating model turns', () => {
+  const route = readFileSync(new URL('../app/api/admin/cos-chief-of-staff-blind-acceptance/route.ts', import.meta.url), 'utf8')
+  const page = readFileSync(new URL('../app/dashboard/cos-chief-of-staff-blind-reliability/page.tsx', import.meta.url), 'utf8')
+  assert.match(route, /id:runId/)
+  assert.match(route, /const prior = await db\.from\('cos_chief_of_staff_acceptance_results'\)/)
+  assert.match(route, /if \(prior\.data\)/)
+  assert.match(route, /replayed:true/)
+  assert.match(page, /const runId = crypto\.randomUUID\(\)/)
+  assert.match(page, /requestJson\([^)]*3/)
+  assert.match(page, /295_000/)
 })
 
 test('frozen dashboard API filters out blind-profile rows instead of mixing scores', () => {
@@ -152,4 +165,9 @@ test('blind manifest schema migration is service-table additive and auditable', 
   assert.match(migration, /case_manifest jsonb not null/)
   assert.match(migration, /profile, started_at desc/)
   assert.doesNotMatch(migration, /grant .* anon|grant .* authenticated/i)
+})
+
+test('blind generalization regression is mandatory in the Vercel COS gate', () => {
+  const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
+  assert.match(gate, /tests\/cosChiefOfStaffBlindAcceptance\.node\.test\.ts/)
 })

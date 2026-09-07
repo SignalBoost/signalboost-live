@@ -59,13 +59,18 @@ export function conciergeLanguageName(language?: string | null): string {
   return names[normalizeConciergeLanguage(language)]
 }
 
+function normalizeProtectedToken(token: string): string {
+  if (/^https?:\/\//i.test(token)) return token.replace(/[.,;:!?]+$/u, '')
+  return token
+}
+
 export function criticalLanguageTokens(text: string): string[] {
   const value = String(text || '')
   const tokens = [
     ...value.matchAll(/https?:\/\/[^\s)\]}>,]+/gi),
     ...value.matchAll(/\[(?:KG|CL|EM|UM|SK)\d{1,3}\]/g),
     ...value.matchAll(/\b(?:[A-Z][A-Z0-9_-]{2,}|[A-Za-z0-9_-]+\.(?:com|ai|app|dev|io))\b/g),
-  ].map(match => match[0])
+  ].map(match => normalizeProtectedToken(match[0])).filter(Boolean)
   return [...new Set(tokens)]
 }
 

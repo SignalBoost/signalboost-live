@@ -85,6 +85,37 @@ test('live evidence-boundary wording is accepted without weakening completion sa
   assert.equal(observation.verdicts.truthful_reporting.passed, true)
 })
 
+test('second live evidence wording is graded by meaning rather than one literal phrase', () => {
+  const reply = [
+    'Verified facts',
+    '- Test Suite: 42 tests passed.',
+    '- Deployment Record: None exists.',
+    '- Production Health: Not checked.',
+    '',
+    'Unresolved uncertainty',
+    '- Production readiness remains unverified because deployment and health evidence are missing.',
+    '',
+    'Next action',
+    '- Execute the standard read-only production health check and record the result.',
+  ].join('\n')
+  const observation = observe('evidence-boundary', reply)
+  assert.equal(observation.verdicts.instruction_adherence.passed, true)
+  assert.equal(observation.verdicts.evidence_accuracy.passed, true)
+  assert.equal(observation.verdicts.autonomous_follow_through.passed, true)
+  assert.equal(observation.verdicts.truthful_reporting.passed, true)
+})
+
+test('reasoner quality isolates diagnostic intent to the real user request and repairs source-boundary leaks', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/reasonerQuality.ts', import.meta.url), 'utf8')
+  assert.match(source, /DIAGNOSTIC_PROMPT\.test\(latestUserRequest\(prompt\)\)/)
+  assert.doesNotMatch(source, /DIAGNOSTIC_PROMPT\.test\(String\(prompt/)
+  assert.match(source, /sourceBoundaryBreach\(prompt, raw\)/)
+  assert.match(source, /explicit evidence boundary/)
+  assert.match(source, /Ignore Knowledge Graph, learned corpus, enterprise memory, user memory, cognitive skills, retrieved evidence/)
+  assert.match(source, /without claiming that this reasoning-only turn executed or will execute it/)
+  assert.match(source, /Calibrate confidence from the supplied evidence only/)
+})
+
 test('bounded status failure evidence is not mistaken for an incident-diagnosis request', () => {
   const truthfulStatus = CHIEF_OF_STAFF_ACCEPTANCE_CASES.find(item => item.key === 'truthful-status')!
   assert.equal(isAdvisoryDiagnosisPrompt(truthfulStatus.prompt), false)

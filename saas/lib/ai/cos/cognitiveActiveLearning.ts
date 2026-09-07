@@ -393,12 +393,26 @@ async function markLessonAttempt(
   if (result.error) throw result.error
 }
 
-export async function evaluateNextTeacherLesson(): Promise<Record<string, unknown> | null> {
+export type TeacherLessonSelection = {
+  lane?: 'general' | 'owner_directed_software'
+  excludeLessonIds?: number[]
+}
+
+export async function evaluateNextTeacherLesson(selection: TeacherLessonSelection = {}): Promise<Record<string, unknown> | null> {
   const db = cosServiceDb()
   if (!db) return null
-  const lessonResult = await db.from('cos_teacher_lessons')
-    .select('*')
-    .in('status', ['captured', 'evaluated'])
+  let lessonQuery = db.from('cos_teacher_lessons').select('*')
+  if (selection.lane === 'owner_directed_software') {
+    lessonQuery = lessonQuery
+      .eq('status', 'captured')
+      .contains('metadata', { origin: 'owner_directed_study', specialistFamily: 'software' })
+  } else {
+    lessonQuery = lessonQuery.in('status', ['captured', 'evaluated'])
+  }
+  for (const lessonId of [...new Set(selection.excludeLessonIds || [])]) {
+    if (Number.isFinite(lessonId) && lessonId > 0) lessonQuery = lessonQuery.neq('id', lessonId)
+  }
+  const lessonResult = await lessonQuery
     .order('updated_at', { ascending: true })
     .limit(1)
     .maybeSingle()

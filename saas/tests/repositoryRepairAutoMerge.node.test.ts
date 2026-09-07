@@ -54,7 +54,7 @@ test('auto-merge refuses on a danger category before ever touching the snapshot 
   assert.equal(captureCalled, false)
 })
 
-test('auto-merge refuses with no snapshot port configured', async () => {
+test('production auto-merge refuses with no snapshot port configured', async () => {
   const result = await attemptSignalBoostRepositoryAutoMerge({
     files: [{ path: 'lib/demo/rounding.ts', content: '' }],
     patch: '',
@@ -102,7 +102,7 @@ const greenChecks = (url: string, headSha: string) => {
   return null
 }
 
-test('an ordinary repair with a restorable checkpoint and green checks merges with a two-parent merge method', async () => {
+test('an ordinary production repair with a restorable checkpoint and green checks merges with a two-parent merge method', async () => {
   const headSha = 'b'.repeat(40)
   const calls: Array<{ url: string; method: string; body: string }> = []
   const request = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
@@ -132,6 +132,37 @@ test('an ordinary repair with a restorable checkpoint and green checks merges wi
   assert.equal(writes.length, 1)
   assert.equal(writes[0].url.endsWith('/pulls/1842/merge'), true)
   assert.deepEqual(JSON.parse(writes[0].body), { merge_method: 'merge' })
+})
+
+test('a preview-branch repair can merge after green checks without touching a production snapshot', async () => {
+  const headSha = 'b'.repeat(40)
+  let captureCalled = false
+  const port = fakePort({
+    capture: async () => {
+      captureCalled = true
+      throw new Error('preview repair must not snapshot production')
+    },
+  })
+  const request = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const url = String(input)
+    const checks = greenChecks(url, headSha)
+    if (checks) return checks
+    if (url.endsWith('/pulls/1842/merge') && String(init.method || 'GET') === 'PUT') return jsonResponse({ sha: 'a'.repeat(40), merged: true })
+    return jsonResponse({ message: 'unexpected request' }, 500)
+  }) as typeof fetch
+
+  const result = await attemptSignalBoostRepositoryAutoMerge({
+    files: [{ path: 'lib/demo/rounding.ts', content: '' }],
+    patch: '+  return roundHalfUp(value)',
+    pullRequestNumber: 1842,
+    snapshotPort: port,
+    requireProductionSnapshot: false,
+    request,
+    token: 'server-write-token',
+  })
+  assert.equal(result.merged, true)
+  assert.equal(result.preMergeSnapshotId, null)
+  assert.equal(captureCalled, false)
 })
 
 test('an unchecked or failing head refuses the merge and never sends the PUT', async () => {
@@ -178,7 +209,7 @@ test('a missing write token refuses without attempting the GitHub merge call', a
   assert.equal(result.merged, false)
 })
 
-test('durable continuation merges only the exact server-created repair PR after CI is green', async () => {
+test('durable continuation merges only the exact server-created main repair PR after CI is green', async () => {
   const oldEnabled = process.env.BUILDER_AUTO_MERGE_ENABLED
   const oldVercelToken = process.env.VERCEL_TOKEN
   const oldProject = process.env.VERCEL_PROJECT_ID
@@ -186,6 +217,7 @@ test('durable continuation merges only the exact server-created repair PR after 
   process.env.VERCEL_TOKEN = ''
   process.env.VERCEL_PROJECT_ID = ''
   try {
+    const pinnedBase = 'a'.repeat(40)
     const headSha = 'd'.repeat(40)
     const mergeSha = 'e'.repeat(40)
     const calls: Array<{ url: string; method: string }> = []
@@ -193,11 +225,11 @@ test('durable continuation merges only the exact server-created repair PR after 
       const url = String(input)
       const method = String(init.method || 'GET')
       calls.push({ url, method })
-      if (url.includes('/pulls?state=open&base=main')) return jsonResponse([
+      if (url.includes('/pulls?state=open&per_page=100')) return jsonResponse([
         {
           number: 1842,
           title: 'COS Platform Engineer: verified repository repair',
-          body: `${REPOSITORY_REPAIR_AUTOMERGE_MARKER}\n\nPinned base: abc`,
+          body: `${REPOSITORY_REPAIR_AUTOMERGE_MARKER}\n\nPinned base: \`${pinnedBase}\``,
           base: { ref: 'main' },
           head: { ref: 'cos/platform-repair-1234abcd-a1b2c3d4e5', sha: headSha, repo: { full_name: 'SignalBoost/signalboost-live' } },
         },
@@ -209,6 +241,7 @@ test('durable continuation merges only the exact server-created repair PR after 
           head: { ref: 'feature/not-a-repair', sha: headSha, repo: { full_name: 'SignalBoost/signalboost-live' } },
         },
       ])
+      if (url.endsWith('/git/ref/heads/main')) return jsonResponse({ object: { sha: pinnedBase } })
       if (url.endsWith('/pulls/1842/files?per_page=100')) return jsonResponse([{ filename: 'saas/lib/demo/rounding.ts', patch: '+  return roundHalfUp(value)' }])
       if (url.endsWith('/pulls/1842')) return jsonResponse({ head: { sha: headSha } })
       if (url.includes(`/commits/${headSha}/check-runs`)) return jsonResponse({ check_runs: [{ name: 'SaaS CI', status: 'completed', conclusion: 'success' }] })
@@ -228,6 +261,7 @@ test('durable continuation merges only the exact server-created repair PR after 
     assert.equal(result.merged, 1)
     assert.equal(result.pending, 0)
     assert.equal(result.outcomes[0]?.pullRequestNumber, 1842)
+    assert.equal(result.outcomes[0]?.baseBranch, 'main')
     assert.equal(result.outcomes[0]?.mergeCommitSha, mergeSha)
     assert.equal(calls.some(call => call.url.includes('/pulls/1843/')), false)
   } finally {
@@ -240,17 +274,102 @@ test('durable continuation merges only the exact server-created repair PR after 
   }
 })
 
-test('merge continuation is cron-authenticated, minute-scheduled, and controlled by the server kill switch', async () => {
-  const [route, vercel, continuation] = await Promise.all([
+test('durable continuation merges a current feature-branch repair back to that exact branch without production snapshot', async () => {
+  const oldEnabled = process.env.BUILDER_AUTO_MERGE_ENABLED
+  process.env.BUILDER_AUTO_MERGE_ENABLED = 'true'
+  try {
+    const pinnedBase = '1'.repeat(40)
+    const headSha = '2'.repeat(40)
+    const mergeSha = '3'.repeat(40)
+    const baseBranch = 'fix/preview-repair'
+    let captureCalled = false
+    const request = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = String(input)
+      const method = String(init.method || 'GET')
+      if (url.includes('/pulls?state=open&per_page=100')) return jsonResponse([{
+        number: 1844,
+        title: 'COS Platform Engineer: verified repository repair',
+        body: `${REPOSITORY_REPAIR_AUTOMERGE_MARKER}\n\nPinned base: \`${pinnedBase}\``,
+        base: { ref: baseBranch },
+        head: { ref: 'cos/platform-repair-1234abcd-a1b2c3d4e5', sha: headSha, repo: { full_name: 'SignalBoost/signalboost-live' } },
+      }])
+      if (url.endsWith(`/git/ref/heads/${baseBranch}`)) return jsonResponse({ object: { sha: pinnedBase } })
+      if (url.endsWith('/pulls/1844/files?per_page=100')) return jsonResponse([{ filename: 'saas/lib/demo/rounding.ts', patch: '+  return roundHalfUp(value)' }])
+      if (url.endsWith('/pulls/1844')) return jsonResponse({ head: { sha: headSha } })
+      if (url.includes(`/commits/${headSha}/check-runs`)) return jsonResponse({ check_runs: [{ name: 'SaaS CI', status: 'completed', conclusion: 'success' }] })
+      if (url.endsWith(`/commits/${headSha}/status`)) return jsonResponse({ state: 'success', statuses: [{ state: 'success' }] })
+      if (url.endsWith('/pulls/1844/merge') && method === 'PUT') return jsonResponse({ sha: mergeSha, merged: true })
+      return jsonResponse({ message: `unexpected ${method} ${url}` }, 500)
+    }) as typeof fetch
+    const port = fakePort({ capture: async () => { captureCalled = true; throw new Error('must not capture production') } })
+    const result = await completePendingRepositoryRepairMerges({ request, token: 'server-write-token', snapshotPort: port, deadlineAtMs: Date.now() + 60_000 })
+    assert.equal(result.merged, 1)
+    assert.equal(result.outcomes[0]?.baseBranch, baseBranch)
+    assert.equal(result.outcomes[0]?.mergeCommitSha, mergeSha)
+    assert.equal(captureCalled, false)
+  } finally {
+    if (oldEnabled === undefined) delete process.env.BUILDER_AUTO_MERGE_ENABLED
+    else process.env.BUILDER_AUTO_MERGE_ENABLED = oldEnabled
+  }
+})
+
+test('a repair becomes terminally superseded when its feature branch advances and the stale PR is closed', async () => {
+  const oldEnabled = process.env.BUILDER_AUTO_MERGE_ENABLED
+  process.env.BUILDER_AUTO_MERGE_ENABLED = 'true'
+  try {
+    const pinnedBase = '1'.repeat(40)
+    const currentBase = '4'.repeat(40)
+    const headSha = '2'.repeat(40)
+    const baseBranch = 'fix/preview-repair'
+    const calls: Array<{ url: string; method: string; body: string }> = []
+    const request = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = String(input)
+      const method = String(init.method || 'GET')
+      calls.push({ url, method, body: String(init.body || '') })
+      if (url.includes('/pulls?state=open&per_page=100')) return jsonResponse([{
+        number: 1844,
+        title: 'COS Platform Engineer: verified repository repair',
+        body: `${REPOSITORY_REPAIR_AUTOMERGE_MARKER}\n\nPinned base: \`${pinnedBase}\``,
+        base: { ref: baseBranch },
+        head: { ref: 'cos/platform-repair-1234abcd-a1b2c3d4e5', sha: headSha, repo: { full_name: 'SignalBoost/signalboost-live' } },
+      }])
+      if (url.endsWith(`/git/ref/heads/${baseBranch}`)) return jsonResponse({ object: { sha: currentBase } })
+      if (url.endsWith('/pulls/1844') && method === 'PATCH') return jsonResponse({ number: 1844, state: 'closed' })
+      return jsonResponse({ message: `unexpected ${method} ${url}` }, 500)
+    }) as typeof fetch
+
+    const result = await completePendingRepositoryRepairMerges({ request, token: 'server-write-token', snapshotPort: fakePort(), deadlineAtMs: Date.now() + 60_000 })
+    assert.equal(result.merged, 0)
+    assert.equal(result.refused, 1)
+    assert.equal(result.outcomes[0]?.reason, 'base_superseded')
+    assert.equal(result.outcomes[0]?.baseBranch, baseBranch)
+    assert.equal(calls.some(call => call.method === 'PUT'), false)
+    const close = calls.find(call => call.method === 'PATCH')
+    assert.ok(close)
+    assert.deepEqual(JSON.parse(close.body), { state: 'closed' })
+  } finally {
+    if (oldEnabled === undefined) delete process.env.BUILDER_AUTO_MERGE_ENABLED
+    else process.env.BUILDER_AUTO_MERGE_ENABLED = oldEnabled
+  }
+})
+
+test('merge continuation is cron-authenticated, minute-scheduled, branch-aware, and controlled by the server kill switch', async () => {
+  const [route, vercel, continuation, lifecycle] = await Promise.all([
     readFile(new URL('../app/api/cron/builder-repair-merge/route.ts', import.meta.url), 'utf8'),
     readFile(new URL('../vercel.json', import.meta.url), 'utf8'),
     readFile(new URL('../lib/builder/repository-repair-merge-continuation.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../lib/builder/repository-repair-job-lifecycle.ts', import.meta.url), 'utf8'),
   ])
   assert.match(route, /CRON_SECRET/)
   assert.match(route, /completePendingRepositoryRepairMerges/)
+  assert.match(route, /failBuilderRepositoryRepairAfterSupersededBase/)
   assert.match(vercel, /"\/api\/cron\/builder-repair-merge"[\s\S]*"\* \* \* \* \*"/)
   assert.match(continuation, /BUILDER_AUTO_MERGE_ENABLED/)
   assert.match(continuation, /evaluateAutoMergeDangerCategory/)
   assert.match(continuation, /evaluatePullRequestChecks/)
-  assert.match(continuation, /builderAutoMergeSnapshotPort/)
+  assert.match(continuation, /requireProductionSnapshot: productionMerge/)
+  assert.match(continuation, /base_superseded/)
+  assert.doesNotMatch(continuation, /pulls\?state=open&base=main/)
+  assert.match(lifecycle, /merged into \$\{input\.baseBranch\}/)
+  assert.match(lifecycle, /builder_repository_target_superseded/)
 })

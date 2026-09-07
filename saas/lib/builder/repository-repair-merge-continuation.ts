@@ -7,10 +7,22 @@ export const REPOSITORY_REPAIR_AUTOMERGE_MARKER = 'Owner-authorized Platform Eng
 const REPAIR_TITLE = 'COS Platform Engineer: verified repository repair'
 const REPAIR_BRANCH = /^cos\/platform-repair-[0-9a-f]{8}-[a-z0-9]{1,20}$/
 const SAFE_SHA = /^[0-9a-f]{40}$/i
+const SAFE_BRANCH = /^(?![-/])(?!.*(?:\.\.|\/\/))[A-Za-z0-9._/-]{1,180}$/
 const MAX_CANDIDATES = 4
 
 type RequestLike = typeof fetch
 type JsonValue = Record<string, any> | any[]
+export type RepositoryRepairMergeReason =
+  | 'invalid_head'
+  | 'invalid_pinned_base'
+  | 'base_unverifiable'
+  | 'base_superseded'
+  | 'diff_unavailable'
+  | 'empty_diff'
+  | 'danger_category'
+  | 'checks_not_green'
+  | 'merge_refused'
+  | null
 
 export type RepositoryRepairMergeContinuationResult = Readonly<{
   enabled: boolean
@@ -21,6 +33,8 @@ export type RepositoryRepairMergeContinuationResult = Readonly<{
   outcomes: ReadonlyArray<Readonly<{
     pullRequestNumber: number
     outcome: 'merged' | 'pending' | 'refused'
+    reason: RepositoryRepairMergeReason
+    baseBranch: string
     detail: string
     mergeCommitSha: string | null
   }>>
@@ -40,6 +54,10 @@ function headers(token: string): Record<string, string> {
   }
 }
 
+function encodedBranch(branch: string): string {
+  return branch.split('/').map(encodeURIComponent).join('/')
+}
+
 async function requestJson(request: RequestLike, url: string, init: RequestInit = {}): Promise<JsonValue> {
   const response = await request(url, init)
   const payload = await response.json().catch(() => ({})) as JsonValue
@@ -57,9 +75,46 @@ function isCandidate(value: any): boolean {
   return Number.isInteger(number) && number > 0
     && title === REPAIR_TITLE
     && body.split(/\r?\n/).some(line => line.trim() === REPOSITORY_REPAIR_AUTOMERGE_MARKER)
-    && base === 'main'
+    && SAFE_BRANCH.test(base)
+    && base !== head
     && headRepo === 'SignalBoost/signalboost-live'
     && REPAIR_BRANCH.test(head)
+}
+
+function pinnedBaseSha(body: string): string | null {
+  const match = String(body || '').match(/(?:^|\n)Pinned base:\s*`([0-9a-f]{40})`\s*(?:\n|$)/i)
+  return match && SAFE_SHA.test(match[1]) ? match[1].toLowerCase() : null
+}
+
+async function currentBranchHeadSha(
+  request: RequestLike,
+  writeHeaders: Record<string, string>,
+  branch: string,
+): Promise<string | null> {
+  const payload = await requestJson(
+    request,
+    `${GITHUB_API}/git/ref/heads/${encodedBranch(branch)}`,
+    { method: 'GET', headers: writeHeaders },
+  )
+  const sha = String((payload as Record<string, any>)?.object?.sha || '').toLowerCase()
+  return SAFE_SHA.test(sha) ? sha : null
+}
+
+async function closeSupersededRepairPullRequest(
+  request: RequestLike,
+  writeHeaders: Record<string, string>,
+  pullRequestNumber: number,
+): Promise<boolean> {
+  try {
+    await requestJson(
+      request,
+      `${GITHUB_API}/pulls/${pullRequestNumber}`,
+      { method: 'PATCH', headers: writeHeaders, body: JSON.stringify({ state: 'closed' }) },
+    )
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function pullChangeEvidence(request: RequestLike, writeHeaders: Record<string, string>, pullRequestNumber: number) {
@@ -80,7 +135,12 @@ async function pullChangeEvidence(request: RequestLike, writeHeaders: Record<str
  * Durable completion for owner-authorized Platform Engineer repairs. The initial Builder job may
  * finish before GitHub CI does, so the minute cron revisits only server-marked repair PRs. It never
  * invents work, never widens the danger policy, and never merges until GitHub reports every check
- * finished green. A restorable production snapshot is still mandatory immediately before merge.
+ * finished green.
+ *
+ * Main repairs are production mutations and still require a restorable production checkpoint.
+ * A repair of a feature/preview branch may merge only back into that exact branch, only while the
+ * branch head still equals the pinned failed revision. If another writer advances the branch, the
+ * repair is stale: the PR is closed and the originating Builder job is reconciled as superseded.
  */
 export async function completePendingRepositoryRepairMerges(input: {
   request?: RequestLike
@@ -95,20 +155,62 @@ export async function completePendingRepositoryRepairMerges(input: {
   const request = input.request ?? fetch
   const writeHeaders = headers(token)
   const deadlineAtMs = Number.isFinite(Number(input.deadlineAtMs)) ? Number(input.deadlineAtMs) : Date.now() + 240_000
-  // Host-specific builderAutoMergeSnapshotPort() is injected by the cron route; this core module
-  // never imports the Vercel adapter, so bare Node regressions exercise the same merge state machine.
   const snapshotPort = input.snapshotPort ?? null
 
-  const open = await requestJson(request, `${GITHUB_API}/pulls?state=open&base=main&per_page=30`, { method: 'GET', headers: writeHeaders })
+  const open = await requestJson(request, `${GITHUB_API}/pulls?state=open&per_page=100`, { method: 'GET', headers: writeHeaders })
   const pulls = (Array.isArray(open) ? open : []).filter(isCandidate).slice(0, MAX_CANDIDATES)
-  const outcomes: Array<{ pullRequestNumber: number; outcome: 'merged' | 'pending' | 'refused'; detail: string; mergeCommitSha: string | null }> = []
+  const outcomes: Array<{
+    pullRequestNumber: number
+    outcome: 'merged' | 'pending' | 'refused'
+    reason: RepositoryRepairMergeReason
+    baseBranch: string
+    detail: string
+    mergeCommitSha: string | null
+  }> = []
 
   for (const pull of pulls) {
     if (Date.now() >= deadlineAtMs - 20_000) break
     const pullRequestNumber = Number(pull.number)
     const headSha = String(pull?.head?.sha || '')
+    const baseBranch = String(pull?.base?.ref || '')
+    const pinnedBase = pinnedBaseSha(String(pull?.body || ''))
     if (!SAFE_SHA.test(headSha)) {
-      outcomes.push({ pullRequestNumber, outcome: 'refused', detail: 'The repair PR head SHA is invalid.', mergeCommitSha: null })
+      outcomes.push({ pullRequestNumber, outcome: 'refused', reason: 'invalid_head', baseBranch, detail: 'The repair PR head SHA is invalid.', mergeCommitSha: null })
+      continue
+    }
+    if (!pinnedBase) {
+      outcomes.push({ pullRequestNumber, outcome: 'refused', reason: 'invalid_pinned_base', baseBranch, detail: 'The repair PR does not contain a valid pinned base SHA.', mergeCommitSha: null })
+      continue
+    }
+
+    let currentBase: string | null = null
+    try {
+      currentBase = await currentBranchHeadSha(request, writeHeaders, baseBranch)
+    } catch (error) {
+      outcomes.push({
+        pullRequestNumber,
+        outcome: 'pending',
+        reason: 'base_unverifiable',
+        baseBranch,
+        detail: error instanceof Error ? error.message : 'Could not verify the current repair base branch.',
+        mergeCommitSha: null,
+      })
+      continue
+    }
+    if (!currentBase) {
+      outcomes.push({ pullRequestNumber, outcome: 'pending', reason: 'base_unverifiable', baseBranch, detail: `Could not identify the current head of ${baseBranch}.`, mergeCommitSha: null })
+      continue
+    }
+    if (currentBase !== pinnedBase) {
+      const closed = await closeSupersededRepairPullRequest(request, writeHeaders, pullRequestNumber)
+      outcomes.push({
+        pullRequestNumber,
+        outcome: 'refused',
+        reason: 'base_superseded',
+        baseBranch,
+        detail: `The repair targeted ${pinnedBase.slice(0, 12)} on ${baseBranch}, but that branch is now ${currentBase.slice(0, 12)}. The stale repair PR ${closed ? 'was closed' : 'could not be closed'} and was not merged.`,
+        mergeCommitSha: null,
+      })
       continue
     }
 
@@ -116,43 +218,43 @@ export async function completePendingRepositoryRepairMerges(input: {
     try {
       evidence = await pullChangeEvidence(request, writeHeaders, pullRequestNumber)
     } catch (error) {
-      outcomes.push({ pullRequestNumber, outcome: 'pending', detail: error instanceof Error ? error.message : 'Could not read repair diff.', mergeCommitSha: null })
+      outcomes.push({ pullRequestNumber, outcome: 'pending', reason: 'diff_unavailable', baseBranch, detail: error instanceof Error ? error.message : 'Could not read repair diff.', mergeCommitSha: null })
       continue
     }
     if (!evidence.files.length) {
-      outcomes.push({ pullRequestNumber, outcome: 'refused', detail: 'The repair PR contains no changed files.', mergeCommitSha: null })
+      outcomes.push({ pullRequestNumber, outcome: 'refused', reason: 'empty_diff', baseBranch, detail: 'The repair PR contains no changed files.', mergeCommitSha: null })
       continue
     }
     const danger = evaluateAutoMergeDangerCategory(evidence.files, evidence.patch)
     if (!danger.eligible) {
-      outcomes.push({ pullRequestNumber, outcome: 'refused', detail: danger.detail || 'Danger policy refused auto-merge.', mergeCommitSha: null })
+      outcomes.push({ pullRequestNumber, outcome: 'refused', reason: 'danger_category', baseBranch, detail: danger.detail || 'Danger policy refused auto-merge.', mergeCommitSha: null })
       continue
     }
 
-    // Check CI before taking a production snapshot. Pending CI is normal and costs no checkpoint;
-    // the next cron tick will retry the same immutable PR head.
     const checks = await evaluatePullRequestChecks(request, writeHeaders, pullRequestNumber)
       .catch(error => ({ green: false, detail: error instanceof Error ? error.message : 'Could not read GitHub checks.' }))
     if (!checks.green) {
-      outcomes.push({ pullRequestNumber, outcome: 'pending', detail: checks.detail, mergeCommitSha: null })
+      outcomes.push({ pullRequestNumber, outcome: 'pending', reason: 'checks_not_green', baseBranch, detail: checks.detail, mergeCommitSha: null })
       continue
     }
 
+    const productionMerge = baseBranch === 'main'
     const merge = await attemptSignalBoostRepositoryAutoMerge({
       files: evidence.files,
       patch: evidence.patch,
       pullRequestNumber,
-      snapshotPort,
+      snapshotPort: productionMerge ? snapshotPort : null,
+      requireProductionSnapshot: productionMerge,
       request,
       token,
     })
     if (!merge.merged || !merge.mergeCommitSha) {
-      outcomes.push({ pullRequestNumber, outcome: 'refused', detail: merge.detail || merge.reason || 'Merge refused.', mergeCommitSha: null })
+      outcomes.push({ pullRequestNumber, outcome: 'refused', reason: 'merge_refused', baseBranch, detail: merge.detail || merge.reason || 'Merge refused.', mergeCommitSha: null })
       continue
     }
 
-    let detail = `Merged verified repair PR #${pullRequestNumber} as ${merge.mergeCommitSha}.`
-    if (merge.preMergeSnapshotId && snapshotPort && Date.now() < deadlineAtMs - 15_000) {
+    let detail = `Merged verified repair PR #${pullRequestNumber} into ${baseBranch} as ${merge.mergeCommitSha}.`
+    if (productionMerge && merge.preMergeSnapshotId && snapshotPort && Date.now() < deadlineAtMs - 15_000) {
       const watch = await watchMergedDeployment({
         mergeCommitSha: merge.mergeCommitSha,
         preMergeSnapshotId: merge.preMergeSnapshotId,
@@ -164,7 +266,7 @@ export async function completePendingRepositoryRepairMerges(input: {
       }).catch(() => null)
       if (watch?.detail) detail += ` ${watch.detail}`
     }
-    outcomes.push({ pullRequestNumber, outcome: 'merged', detail, mergeCommitSha: merge.mergeCommitSha })
+    outcomes.push({ pullRequestNumber, outcome: 'merged', reason: null, baseBranch, detail, mergeCommitSha: merge.mergeCommitSha })
   }
 
   return Object.freeze({

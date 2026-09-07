@@ -9,7 +9,8 @@
 //
 // The gates, in order — each one is cheaper and safer than the one after it:
 //   1. danger category   — billing/credential changes never auto-merge, tests or no tests.
-//   2. checkpoint        — no restorable pre-merge snapshot, no pre-authorized merge.
+//   2. checkpoint        — required for production/main merges; preview-branch repairs do not
+//                          need a production rollback checkpoint because they do not change prod.
 //   3. write credential  — absent means this lane was never configured to write at all.
 //   4. green checks      — absence of evidence is not evidence the project still builds.
 import type { BuilderFile } from './contracts.ts'
@@ -153,12 +154,17 @@ export async function evaluatePullRequestChecks(
  * Attempt to auto-merge an already-opened, already-verified repair PR. Called only after
  * publishSignalBoostRepositoryRepair has returned a real pullRequestNumber — this function
  * never opens a PR itself and never touches source; it only decides whether to press merge.
+ *
+ * `requireProductionSnapshot` is true by default. The durable continuation sets it false only
+ * when the repair PR targets a non-main branch whose current head still equals the pinned failed
+ * revision. That operation changes only the preview/feature branch, not Production.
  */
 export async function attemptSignalBoostRepositoryAutoMerge(input: {
   files: readonly Pick<BuilderFile, 'path' | 'content'>[]
   patch: string
   pullRequestNumber: number
   snapshotPort: StateSnapshotPort | null
+  requireProductionSnapshot?: boolean
   /** Passed through to StateSnapshotPort.capture(). Defaults describe this exact call site. */
   captureContext?: { scope: 'deployment'; provider: string; environment: string; reason: string }
   request?: RequestLike
@@ -169,24 +175,29 @@ export async function attemptSignalBoostRepositoryAutoMerge(input: {
     return refusal(dangerCheck.reason ?? 'danger_category', dangerCheck.detail || '', dangerCheck.dangerCategory)
   }
 
-  if (!input.snapshotPort) {
-    return refusal('snapshot_capture_failed', 'No snapshot port is configured. No checkpoint, no pre-authorized merge.')
-  }
+  const requireProductionSnapshot = input.requireProductionSnapshot !== false
+  let preMergeSnapshotId: string | null = null
+  if (requireProductionSnapshot) {
+    if (!input.snapshotPort) {
+      return refusal('snapshot_capture_failed', 'No snapshot port is configured. No checkpoint, no pre-authorized production merge.')
+    }
 
-  const capture = await input.snapshotPort.capture(input.captureContext ?? {
-    scope: 'deployment',
-    provider: 'vercel',
-    environment: 'production',
-    reason: 'Pre-merge checkpoint before COS Platform Engineer auto-merge',
-  })
-  if (!capture.ok || !capture.snapshot) {
-    return refusal('snapshot_capture_failed', capture.error || 'Snapshot capture failed for an unspecified reason.')
-  }
-  if (!capture.snapshot.restorable) {
-    return refusal(
-      'snapshot_not_restorable',
-      `A checkpoint (${capture.snapshot.snapshotId}) was captured but is not restorable under current configuration, so the merge would be unrecoverable if it proves wrong. Merge manually, or enable restore, then retry.`,
-    )
+    const capture = await input.snapshotPort.capture(input.captureContext ?? {
+      scope: 'deployment',
+      provider: 'vercel',
+      environment: 'production',
+      reason: 'Pre-merge checkpoint before COS Platform Engineer auto-merge',
+    })
+    if (!capture.ok || !capture.snapshot) {
+      return refusal('snapshot_capture_failed', capture.error || 'Snapshot capture failed for an unspecified reason.')
+    }
+    if (!capture.snapshot.restorable) {
+      return refusal(
+        'snapshot_not_restorable',
+        `A checkpoint (${capture.snapshot.snapshotId}) was captured but is not restorable under current configuration, so the production merge would be unrecoverable if it proves wrong. Merge manually, or enable restore, then retry.`,
+      )
+    }
+    preMergeSnapshotId = capture.snapshot.snapshotId
   }
 
   const token = String(input.token ?? process.env.GITHUB_WRITE_TOKEN ?? '').trim()
@@ -212,8 +223,8 @@ export async function attemptSignalBoostRepositoryAutoMerge(input: {
     const merge = await requestJson(
       request,
       `${GITHUB_API}/pulls/${input.pullRequestNumber}/merge`,
-      // Main Write Discipline requires a two-parent GitHub merge commit. Squash/rebase writes are
-      // integration violations because they erase the PR parent and bypass the serialized path.
+      // Main Write Discipline requires a two-parent GitHub merge commit for main. We use the same
+      // merge method on preview branches so repair history remains explicit and auditable there too.
       { method: 'PUT', headers, body: JSON.stringify({ merge_method: 'merge' }) },
       [200],
     )
@@ -223,7 +234,7 @@ export async function attemptSignalBoostRepositoryAutoMerge(input: {
       reason: null,
       detail: null,
       dangerCategory: null,
-      preMergeSnapshotId: capture.snapshot.snapshotId,
+      preMergeSnapshotId,
       mergeCommitSha: mergeCommitSha || null,
     })
   } catch (error) {

@@ -174,11 +174,16 @@ function visualPrompt(objective: string): string {
   return [
     'Create one polished, high-quality original visual for the user request below.',
     'Use a style appropriate to the requested format, with strong composition, clear visual hierarchy, and no watermarks.',
-    'For an original logo, badge, emblem, insignia, or icon, use a clean centered graphic-design composition rather than an editorial scene.',
+    // These two lines used to name the logo/badge and diagram formats outright, and they
+    // shipped on EVERY request. "draw 2 kids playing football in the rain" was therefore
+    // told to produce a centered graphic-design composition, and came back as a circular
+    // emblem with a lettered ring. Format belongs to the request, not to the house prompt:
+    // the model already knows what a logo is when someone asks for one.
+    'Let the request itself decide the visual format — an illustrated scene, a portrait, an emblem, a diagram — and match it.',
+    'Never impose a centered badge, emblem, roundel, crest, or logo composition on a request that did not ask for one.',
     'Do not reconstruct, imitate, or claim to reproduce an existing named brand or team mark from model memory.',
-    'Do not add unrelated logos, UI chrome, or unrelated text.',
+    'Do not add unrelated logos, UI chrome, or unrelated text. Add lettering only if the request asks for it.',
     'For unnamed people or animals, use an original, non-identifiable depiction.',
-    'For a diagram, favor a clean visual layout and simple, legible labels only when essential.',
     '',
     'USER REQUEST:',
     objective,

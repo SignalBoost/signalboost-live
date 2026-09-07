@@ -23,8 +23,8 @@
 // classes, and the same question in different words maps to the same class.
 //
 // Classification must use the user's task, not the evidence/advisory envelope injected around it.
-// The same USER QUESTION / Original question extraction used by worker routing therefore protects
-// learning telemetry as well. This is deterministic and adds no model call or embedding.
+// The canonical reasoner currently uses CURRENT USER INPUT markers while older workers use USER
+// QUESTION / Original question. Normalize all of those seams here before taxonomy matching.
 
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
 import { cosRoutingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
@@ -49,12 +49,36 @@ const GENERAL_PROBLEM_CLASSES: { id: string; test: RegExp }[] = [
 
 export const UNCLASSIFIED_PROBLEM_CLASS = 'general reasoning'
 
+const USER_TASK_MARKERS = [
+  'CURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):',
+  'CURRENT USER INPUT:',
+  'USER REQUEST:',
+  'USER QUESTION:',
+  'USER INSTRUCTION:',
+] as const
+
+function taxonomyObjective(prompt: string): string {
+  const raw = String(prompt ?? '').replace(/\r/g, '').trim()
+  const upper = raw.toUpperCase()
+  let bestIndex = -1
+  let marker = ''
+  for (const candidate of USER_TASK_MARKERS) {
+    const index = upper.lastIndexOf(candidate)
+    if (index > bestIndex) {
+      bestIndex = index
+      marker = candidate
+    }
+  }
+  if (bestIndex >= 0) return raw.slice(bestIndex + marker.length).trim().slice(0, 2000)
+  return cosRoutingObjective(raw)
+}
+
 export function knownProblemClasses(): string[] {
   return [...GENERAL_PROBLEM_CLASSES.map(entry => entry.id), UNCLASSIFIED_PROBLEM_CLASS]
 }
 
 export function classifyProblemClass(prompt: string): string {
-  const text = cosRoutingObjective(prompt)
+  const text = taxonomyObjective(prompt)
   if (!text) return UNCLASSIFIED_PROBLEM_CLASS
 
   const foundational = nearestFoundationalSubject(text)

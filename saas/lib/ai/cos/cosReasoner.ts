@@ -36,6 +36,7 @@ import {
 } from './advisoryDiagnosisPolicy.ts'
 import { retrievePublishedDiagnosticReferences, type PublishedDiagnosticLookupResult } from './advisoryDiagnosisPublishedLookup.ts'
 import { recordAdvisoryDiagnosisResearchForAnswer } from './advisoryDiagnosisResearchTrace.ts'
+import { currentReasoningEvaluationContext } from './reasoningEvaluationContext.ts'
 
 export type CosReasonerKind = 'independent-local' | 'managed-open-model'
 
@@ -138,6 +139,7 @@ function primaryReasonerRequest(args: LocalModelCallArgs): boolean {
 
 function primaryCouncilEligible(args: LocalModelCallArgs): boolean {
   if (process.env.COS_COUNCIL_ENABLED === 'false') return false
+  if (currentReasoningEvaluationContext()) return false
   return primaryReasonerRequest(args)
 }
 

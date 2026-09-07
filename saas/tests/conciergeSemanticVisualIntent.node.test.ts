@@ -14,13 +14,15 @@ const offline = (async () => null) as any
 // PR #1939 made draw/sketch/paint/illustrate self-sufficient verbs, so the exact
 // production prompt is now admitted deterministically and never reaches the
 // semantic classifier. This pins that outcome directly.
-test('the exact production prompt routes to the visual generator with no model call', async () => {
+test('the exact production prompt routes to the visual generator deterministically', async () => {
   const prompt = 'draw 2 kids playing football in the rain'
-  const seen: string[] = []
   assert.equal(isConciergeVisualObjective(prompt), true)
   assert.deepEqual(detectConciergeVisualIntent(prompt), { filename: 'visual.png', mode: 'generate' })
-  await isSemanticVisualRequest('what is 2 + 2', reasoner({ depictable_image: true }, seen))
-  assert.deepEqual(seen, [])
+  // The route consults the network only when the fast path declined, so a prompt
+  // the deterministic list already accepts still costs no model call.
+  const fs = await import('node:fs/promises')
+  const route = await fs.readFile('app/api/cos-browser/route.ts', 'utf8')
+  assert.match(route, /isConciergeVisualObjective\(prompt\) \? false : await isSemanticVisualRequest\(prompt\)/)
 })
 
 // The verb list closes the draw/paint family. It cannot close the generic verbs,
@@ -67,11 +69,38 @@ test('ordinary work keeping the same generic verbs is never turned into a pictur
   }
 })
 
-test('a semantic verdict can never admit a request that has no drawing verb', async () => {
-  const prompt = 'what is the weather in Merida today'
-  assert.equal(hasVisualActionToken(prompt), false)
-  assert.equal(await isSemanticVisualRequest(prompt, reasoner({ depictable_image: true })), false)
-  assert.equal(detectConciergeVisualIntent(prompt, { semanticVisual: true }), null)
+// The word list no longer gates entry to the network, so inflected and
+// pronoun-attached forms that no constant will ever enumerate are judged on
+// meaning. Every prompt below is invisible to the deterministic verb list.
+test('inflected phrasings the verb list cannot enumerate reach the network and are admitted', async () => {
+  for (const prompt of [
+    'narysujcie statek kosmiczny',
+    'czy mozesz narysowac statek kosmiczny?',
+    'naszkicuj dwoje dzieci grajacych w pilke',
+    'dibujame dos ninos jugando al futbol bajo la lluvia',
+    'puedes dibujarme una nave espacial?',
+    'mozhesh narisovat kosmicheskiy korabl?',
+  ]) {
+    assert.equal(hasVisualActionToken(prompt), false, prompt)
+    assert.equal(isConciergeVisualObjective(prompt), false, prompt)
+    assert.equal(await isSemanticVisualRequest(prompt, reasoner({ depictable_image: true })), true, prompt)
+    assert.deepEqual(detectConciergeVisualIntent(prompt, { semanticVisual: true }), { filename: 'visual.png', mode: 'generate' }, prompt)
+  }
+})
+
+// Removing the verb precondition moves the whole safety burden onto the verdict.
+// A negative verdict must still refuse, including for prompts that carry no
+// drawing verb at all and would previously have been refused by the list.
+test('a negative verdict refuses, with or without a drawing verb', async () => {
+  for (const prompt of [
+    'what is the weather in Merida today',
+    'create a go-to-market strategy for Q4',
+    'podsumuj ten raport kwartalny',
+    'resume este informe trimestral',
+  ]) {
+    assert.equal(await isSemanticVisualRequest(prompt, reasoner({ depictable_image: false })), false, prompt)
+    assert.equal(detectConciergeVisualIntent(prompt, { semanticVisual: false }), null, prompt)
+  }
 })
 
 test('the classifier fails closed on outage, junk and malformed verdicts', async () => {

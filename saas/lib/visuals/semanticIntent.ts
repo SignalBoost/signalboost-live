@@ -1,6 +1,4 @@
 // saas/lib/visuals/semanticIntent.ts
-import { hasVisualActionToken } from './intent.ts'
-
 // The reasoner is loaded lazily rather than imported at module scope: its own
 // module graph uses path aliases the plain test runner cannot resolve, and this
 // classifier must stay unit-testable without booting the whole COS stack.
@@ -18,11 +16,11 @@ async function defaultReasoner(args: Record<string, unknown>) {
  * "kids", "football" and "rain" are not in the noun list — and no finite noun
  * list ever covers what a person might ask to be drawn.
  *
- * This decides the same question semantically instead: given a request that
- * already carries a drawing verb, is the thing being asked for a depictable
- * picture, or is it ordinary work that happens to use the verb "create",
- * "make" or "design"? The noun list stays as the fast path; this only runs
- * when the noun list declined, so an accepted request costs no model call.
+ * This decides the same question with the network instead: is the thing being
+ * asked for a depictable picture, or is it ordinary work? No word list gates
+ * entry, so an inflected or unlisted phrasing in any of the five platform
+ * languages is judged on meaning. The deterministic lists stay as the fast
+ * path ahead of this, so a request they already accept costs no model call.
  *
  * Fails closed: any transport failure, malformed output, or ambiguity returns
  * false and the request keeps the exact behaviour it has today.
@@ -57,10 +55,13 @@ export async function isSemanticVisualRequest(
   callImpl: VisualIntentReasoner = defaultReasoner,
 ): Promise<boolean> {
   const trimmed = typeof prompt === 'string' ? prompt.trim() : ''
-  // A drawing verb is still required. Without it the request is not a visual
-  // request in any phrasing, and this stays off the hot path for every turn
-  // that never mentions drawing anything.
-  if (!trimmed || trimmed.length > MAX_CLASSIFIABLE_PROMPT || !hasVisualActionToken(trimmed)) return false
+  // No vocabulary precondition. Requiring a listed verb here was the whole bug:
+  // Polish inflects (narysuj / narysujcie / narysowac), Spanish attaches the
+  // pronoun (dibuja / dibujame / dibujarme), and every unlisted form was refused
+  // entry to the very classifier that exists to understand it. The network reads
+  // the request itself, in whatever language it is written. The only bound left
+  // is length, which is structural rather than lexical.
+  if (!trimmed || trimmed.length > MAX_CLASSIFIABLE_PROMPT) return false
 
   const result = await callImpl({
     temperature: 0,

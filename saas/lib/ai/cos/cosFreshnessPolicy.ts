@@ -96,23 +96,24 @@ const INTERNAL_PLATFORM_SELF_KNOWLEDGE = new RegExp(
 )
 
 // Company-identity questions ("what is SignalBoost", "who owns SignalBoost") are self-knowledge
-// too, but they don't mention any SELF_KNOWLEDGE_TOPIC word above. The first fix (2026-08-24)
-// used an anchored whole-message regex; production broke it the very next day with "what OR WHO
-// is signalboost and who owns it?" — one extra word and the anchor missed, sending the platform's
-// own identity to public web search, which fail-closed. Anchored exact phrasings cannot win this
-// game. Scope by MEANING instead: the message names SignalBoost AND asks an identity/ownership/
-// leadership/product question about it. The platform is the sole authority on itself — the owner
-// channel answers from canonical internal identity (cosMemoryLayerDefinitions.ts), the public
-// channel from the public catalog with its not-public-information rule — so no phrasing of this
-// question is ever a public-web lookup. Ordinary tasks that merely mention the company are not
-// questions and are excluded earlier by the content-generation classifier.
+// too, but they don't mention any SELF_KNOWLEDGE_TOPIC word above. Identity grammar must remain
+// local to the company mention: a Portuguese subordinate conjunction such as "que" later in an
+// operational request must not combine with an unrelated token such as the "e" in "e-mail" and
+// manufacture an identity question.
 const MENTIONS_SIGNALBOOST = /\bsignalboost\b/i
 const IDENTITY_INTERROGATIVE = /(?<![\p{L}\p{N}_])(?:who|what|whom|whose|qui[eé]n(?:es)?|qu[eé]|quem|o\s+que|kto|co|czyj[ae]?|кто|что|чей|чья)(?![\p{L}\p{N}_])/iu
-const IDENTITY_SUBJECT = /(?<![\p{L}\p{N}_])(?:is|are|owns?|owned|owner(?:s)?|founder(?:s)?|founded|created|built|runs?|behind|about|company|startup|business|platform|product(?:s)?|does|ceo|leadership|es|son|due[nñ]o|fundador(?:a|es)?|empresa|[eé]|s[aã]o|dono|jest|w[lł]a[sś]ciciel(?:em)?|firma|это|владелец|владельц[аеу]|компани[яию]|основа[лт]|созда[лт])(?![\p{L}\p{N}_])/iu
+const IDENTITY_SUBJECT = /(?<![\p{L}\p{N}_])(?:is|are|owns?|owned|owner(?:s)?|founder(?:s)?|founded|created|built|runs?|behind|about|company|startup|business|platform|product(?:s)?|does|ceo|leadership|es|son|due[nñ]o|fundador(?:a|es)?|empresa|é|s[aã]o|dono|jest|w[lł]a[sś]ciciel(?:em)?|firma|это|владелец|владельц[аеу]|компани[яию]|основа[лт]|созда[лт])(?![\p{L}\p{N}_])/iu
+const PORTUGUESE_UNACCENTED_SIGNALBOOST_IDENTITY = /(?<![\p{L}\p{N}_])(?:quem|o\s+que)\s+e\s+(?:o\s+)?signalboost(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])signalboost\s+(?:e\s+o\s+que|e\s+quem)(?![\p{L}\p{N}_])/iu
+const SIGNALBOOST_IDENTITY_WINDOW = 120
 
 function isSignalboostIdentityQuestion(text: string): boolean {
-  if (!MENTIONS_SIGNALBOOST.test(text)) return false
-  return IDENTITY_INTERROGATIVE.test(text) && IDENTITY_SUBJECT.test(text)
+  const mention = text.search(MENTIONS_SIGNALBOOST)
+  if (mention < 0) return false
+  if (PORTUGUESE_UNACCENTED_SIGNALBOOST_IDENTITY.test(text)) return true
+  const start = Math.max(0, mention - SIGNALBOOST_IDENTITY_WINDOW)
+  const end = Math.min(text.length, mention + 'signalboost'.length + SIGNALBOOST_IDENTITY_WINDOW)
+  const local = text.slice(start, end)
+  return IDENTITY_INTERROGATIVE.test(local) && IDENTITY_SUBJECT.test(local)
 }
 
 /**
@@ -139,7 +140,7 @@ const DIRECT_MODEL_IDENTITY_ASK = /^\s*(?:(?:what(?:'s|\s+is)?|which)\s+(?:is\s+
 // "your specs", "tus especificaciones") is always a question about THIS platform, never a public
 // lookup — the platform is the sole authority on itself. Same for "what hardware do you run on".
 const SELF_SPEC_ASK = /(?<![\p{L}\p{N}_])(?:your|yours|tu|tus|seu|seus|sua|suas|tw[oó]j|twoje|twoja|twoich|twojej|ваш|ваша|ваше|ваши|вашей|вашего|вас|тебя)(?![\p{L}\p{N}_])[^?!.]{0,25}(?<![\p{L}\p{N}_])(?:model|models|llm|llms|reasoner|engine|spec|specs|specification|specifications|stack|hardware|gpu|gpus|architecture|configuration|config|provider|host|parameters|context\s+window|modelo|modelos|especificaci[oó]n|especificaciones|especifica[cç][oõ]es|arquitectura|arquitetura|configuraci[oó]n|configura[cç][ãa]o|proveedor|provedor|specyfikacj\p{L}*|architektur\p{L}*|konfiguracj\p{L}*|sprz[eę]t\p{L}*|модел\p{L}*|характеристик\p{L}*|архитектур\p{L}*|конфигурац\p{L}*|оборудован\p{L}*)(?![\p{L}\p{N}_])/iu
-const RUNS_ON_ASK = /(?<![\p{L}\p{N}_])(?:hardware|gpu|gpus|infrastructure|model|llm|engine|reasoner|provider)(?![\p{L}\p{N}_])[^?!.]{0,30}(?<![\p{L}\p{N}_])(?:(?:do|does)\s+(?:you|cos)\s+(?:run|running|use|using|host|hosted|operate|execute)|(?:hosts?|powers?|runs?|serves?)\s+(?:you|cos))(?![\p{L}\p{N}_])|(?<![\p{L}\p{N}_])(?:are\s+)?(?:you|cos)\s+(?:run|runs|running|operate|operating)\s+on(?![\p{L}\p{N}_])/iu
+const RUNS_ON_ASK = /(?<![\p{L}\p{N}_])(?:hardware|gpu|gpus|infrastructure|model|llm|engine|reasoner|provider)(?![\p{L}\p{N}_])[^?!.]{0,30}(?<![\p{L}\p{N}_])(?:(?:do|does)\s+(?:you|cos)\s+(?:run|running|use|using|host|hosted|operate|execute)|(?:hosts?|powers?|runs?|serves?)\s+(?:you|cos))(?![\p{L}\p{N}_])/iu
 
 export function isPlatformSelfKnowledgePrompt(input: string): boolean {
   const text = normalizedText(input)

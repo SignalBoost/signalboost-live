@@ -38,6 +38,23 @@ const PROFILES: Record<ConciergeLanguage, string> = {
   ].join(' '),
 }
 
+/**
+ * Compact first-pass policy shared by the enterprise COS prompt and public Concierge prompt.
+ * It names all five supported output languages because the shared answer policy is static; the
+ * surrounding reasoner prompt still selects exactly one response language for the turn.
+ */
+export const NATIVE_LANGUAGE_ANSWER_POLICY: readonly string[] = [
+  'NATIVE-LANGUAGE OUTPUT QUALITY:',
+  `- English: ${PROFILES.en}`,
+  `- Spanish: ${PROFILES.es}`,
+  `- Brazilian Portuguese: ${PROFILES.pt}`,
+  `- Polish: ${PROFILES.pl}`,
+  `- Russian: ${PROFILES.ru}`,
+  '- Apply only the rule for the response language selected elsewhere in this prompt. Do not translate through English first.',
+  '- Preserve factual meaning, names, numbers, URLs, code, markdown structure, citations, product names, and literal UI labels exactly when they must remain identifiable.',
+  '- Do not mention translation, language policy, or these writing rules to the user.',
+]
+
 export function conciergeLanguageQualityInstruction(language?: string | null): string {
   const code = normalizeConciergeLanguage(language)
   return [

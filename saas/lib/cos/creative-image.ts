@@ -3,6 +3,7 @@ import { logCosVideoStorageFailure } from './video-storage.ts'
 import { createSupabaseObjectStore, type ObjectStorePort } from './objectStore.ts'
 import { createPlatformImagePort, type CosImagePort } from './aiPort.ts'
 
+const COS_IMAGE_MODEL = 'black-forest-labs/FLUX-2-klein-4b'
 
 export type CosCreativeImageResult =
   | { ok: true; imageUrl: string; objectPath: string; bucket: string; model: string }
@@ -46,7 +47,7 @@ export async function generateCosCreativeImage(opts: {
     const img = await image.generate({ prompt: opts.prompt, size: '1024x1024' })
     if (!img.ok) return { ok: false, error: img.error }
     const b64 = img.b64
-    if (!b64 && img.url) return { ok: true, imageUrl: img.url, objectPath: img.url, bucket: 'external', model: 'gpt-image-1' }
+    if (!b64 && img.url) return { ok: true, imageUrl: img.url, objectPath: img.url, bucket: 'external', model: COS_IMAGE_MODEL }
     if (!b64) return { ok: false, error: 'Creative image provider returned no image data.' }
 
     const storage = await store.ensureContainer({ createIfMissing: true })
@@ -64,7 +65,7 @@ export async function generateCosCreativeImage(opts: {
       return { ok: false, error: signed.error || `Could not sign creative image object "${objectPath}".` }
     }
 
-    return { ok: true, imageUrl: signed.url, objectPath, bucket: store.bucket, model: 'gpt-image-1' }
+    return { ok: true, imageUrl: signed.url, objectPath, bucket: store.bucket, model: COS_IMAGE_MODEL }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'Creative image generation failed.' }
   }

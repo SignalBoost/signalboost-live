@@ -19,6 +19,12 @@ const CASE_IDS: Record<string, string> = {
   'routine-follow-through': 'c05f0001-0000-4000-8000-000000000003',
   'truthful-status': 'c05f0001-0000-4000-8000-000000000004',
 }
+const CASE_WORKER_ROLES = {
+  'instruction-scope': 'primary',
+  'evidence-boundary': 'verifier',
+  'routine-follow-through': 'primary',
+  'truthful-status': 'verifier',
+} as const
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error ?? 'Unknown acceptance error')).slice(0, 1600)
 
 export async function GET() {
@@ -77,7 +83,16 @@ export async function PUT(request: Request) {
         forbiddenTerms: [],
         requiresProvenance: true,
         requiresLocalReasoning: true,
-      }, { attachOutcome: false, outcomeSource: 'chief_of_staff_acceptance' })
+      }, {
+        attachOutcome: false,
+        outcomeSource: 'chief_of_staff_acceptance',
+        evaluation: {
+          source: 'controlled_comparison',
+          runId,
+          candidateId: test.key,
+          workerRole: CASE_WORKER_ROLES[test.key as keyof typeof CASE_WORKER_ROLES],
+        },
+      })
       const freshExecution = isFreshReleasedAcceptanceOutcome({
         handled: outcome.handled,
         responseSource: String(outcome.provenance.responseSource || ''),

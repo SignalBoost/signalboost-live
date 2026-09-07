@@ -31,6 +31,13 @@ const CASE_WORKER_ROLES = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const errorText = (error:unknown) => (error instanceof Error ? error.message : String(error ?? 'Unknown blind acceptance error')).slice(0, 1600)
 
+function canonicalJson(value:unknown):string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
+  const record = value as Record<string,unknown>
+  return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(',')}}`
+}
+
 async function readBlindRun(db:NonNullable<ReturnType<typeof cosServiceDb>>, runId:string) {
   return db.from('cos_chief_of_staff_acceptance_runs')
     .select('id,profile,status,started_at,completed_at,gate_passed,observed_cases,dimensions,failures,error,variant_seed,case_manifest')
@@ -106,8 +113,7 @@ export async function PUT(request:Request) {
   const run = await readBlindRun(db, runId)
   if (run.error || !run.data) return NextResponse.json({ ok:false, error:run.error?.message ?? 'Blind acceptance run was not found.' }, { status:404 })
   const suite = buildBlindChiefOfStaffAcceptanceSuite(String(run.data.variant_seed || ''))
-  const storedManifest = JSON.stringify(run.data.case_manifest ?? {})
-  if (storedManifest !== JSON.stringify(suite)) {
+  if (canonicalJson(run.data.case_manifest ?? {}) !== canonicalJson(suite)) {
     return NextResponse.json({ ok:false, error:'Blind acceptance manifest drift detected; this run cannot be scored by a changed generator.' }, { status:409 })
   }
   const test = suite.cases.find(candidate => candidate.key === body.caseKey)

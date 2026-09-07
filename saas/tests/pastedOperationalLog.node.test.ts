@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   analyzeOperationalLog,
+  compactOperationalLogForRepair,
   ensureOperationalLogRepairHandoff,
   hasExplicitOperationalLogRepairIntent,
   isExplicitOperationalLogRepairRequest,
@@ -67,6 +68,26 @@ test('failure words inside the log do not manufacture explicit repair authority'
   ].join('\n')
   assert.equal(isExplicitOperationalLogRepairRequest(log), false)
   assert.equal(isPastedOperationalLog(log), true)
+})
+
+test('huge repair evidence preserves immutable build identity and the final failure inside the durable objective cap', () => {
+  const header = '00:10:42.552 Cloning github.com/SignalBoost/signalboost-live (Branch: fix/cos-image-generation, Commit: dfb50b4)\n'
+  const middle = '00:10:50.000 ✔ unrelated passing test\n'.repeat(7_000)
+  const tail = [
+    '00:11:03.682 ✖ failing tests:',
+    '00:11:03.689 ✖ contextual interpretation is handled before the mature retrieval pipeline',
+    '00:11:03.742 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+  ].join('\n')
+  const original = `${header}${middle}${tail}`
+  assert.ok(original.length > 250_000)
+
+  const compacted = compactOperationalLogForRepair(original)
+  assert.ok(compacted.length <= 60_000)
+  assert.match(compacted, /Branch: fix\/cos-image-generation, Commit: dfb50b4/)
+  assert.match(compacted, /contextual interpretation is handled before the mature retrieval pipeline/)
+  assert.match(compacted, /exited with 1/)
+  assert.match(compacted, /middle omitted by SignalBoost transport/)
+  assert.equal(isOperationalLogEvidence(compacted), true)
 })
 
 test('reports a final test failure and offers an explicit repair handoff without demanding repository source', () => {

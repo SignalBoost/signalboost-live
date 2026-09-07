@@ -19,7 +19,7 @@ test('public Concierge and owner Assistant both enter the canonical browser ingr
 })
 
 test('retired owner repository fallback cannot bypass the Software Specialist', () => {
-  assert.match(route, /const softwareSpecialist = browserSurface === 'assistant'[\s\S]*\? await tryCosSoftwareSpecialist/)
+  assert.match(route, /const softwareSpecialist = shouldConsultSoftwareSpecialist/)
   assert.doesNotMatch(route, /queueOwnerRepositoryRepair|enqueueSignalBoostRepositoryRepairJob|ownerRepositoryRepairTarget/)
 })
 
@@ -31,19 +31,33 @@ test('quoted clone and failure lines alone do not satisfy operational-log eviden
   assert.equal(isOperationalLogEvidence(quoted), false)
 })
 
-test('unattached operational evidence enters bounded COS diagnosis before downstream intent routing', () => {
+test('passive operational evidence is diagnosis-only even for the authenticated owner', () => {
+  assert.match(route, /const ownerSoftwareAuthority = Object\.freeze\(\{ allowRepositoryRepair: true \}\)/)
+  assert.match(route, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
+  assert.match(route, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
+  const specialistGate = route.indexOf('const shouldConsultSoftwareSpecialist')
   const terminal = route.indexOf('if (operationalEvidence && !hasSourceAttachment)')
   const diagnostic = route.indexOf('await diagnoseOperationalLog({', terminal)
-  const artifact = route.indexOf('isConciergeArtifactObjective(prompt)', terminal)
-  const provenance = route.indexOf('isProvenanceIntrospection(prompt)', terminal)
-  const genericCos = route.indexOf('cosPrimaryPost(routedRequest)', terminal)
-  assert.ok(terminal >= 0 && diagnostic > terminal)
-  assert.ok(artifact > diagnostic && provenance > artifact && genericCos > provenance)
-  const branch = route.slice(terminal, artifact)
-  assert.match(branch, /execution_allowed: false/)
-  assert.match(branch, /external_action_taken: false/)
-  assert.match(branch, /external_ai_invoked: false/)
-  assert.match(branch, /concierge-operational-log-diagnostic/)
+  assert.ok(specialistGate >= 0 && terminal > specialistGate && diagnostic > terminal)
+  const specialistBlock = route.slice(specialistGate, route.indexOf('if (softwareSpecialist) return softwareSpecialist') + 80)
+  assert.match(specialistBlock, /shouldConsultSoftwareSpecialist/)
+  assert.match(specialistBlock, /explicitOperationalRepair/)
+  assert.match(route.slice(terminal, diagnostic + 120), /execution_allowed: false|diagnoseOperationalLog/)
+})
+
+test('natural log then fix-it is reconstructed on the canonical server route with bounded head-tail evidence', () => {
+  assert.match(route, /const followupOperationalRepair = hasExplicitOperationalLogRepairIntent\(prompt\)/)
+  assert.match(route, /isPastedOperationalLog\(previousUserPrompt\)/)
+  assert.match(route, /compactOperationalLogForRepair\(previousUserPrompt\)/)
+  assert.match(route, /const operationalPrompt = followupOperationalRepair/)
+  assert.match(route, /isExplicitOperationalLogRepairRequest\(operationalPrompt\)/)
+})
+
+test('reverse-order repair intent is accepted only when it is the immediately preceding message', () => {
+  assert.match(route, /const immediatePreviousMessage = latestUserIndex > 0 \? messages\[latestUserIndex - 1\] : null/)
+  assert.match(route, /reverseImmediateOperationalRepair = isPastedOperationalLog\(prompt\)/)
+  assert.match(route, /immediatePreviousMessage\?\.role === 'user'/)
+  assert.doesNotMatch(route, /pastedOperationalLog && hasExplicitOperationalLogRepairIntent\(previousUserPrompt\)/)
 })
 
 test('bounded diagnostic lane treats log text as untrusted data and has no tool or web authority', () => {
@@ -58,11 +72,11 @@ test('bounded diagnostic lane treats log text as untrusted data and has no tool 
   assert.doesNotMatch(diagnostic, /getExternalInfo|publicWebAgent|fetch\(/)
 })
 
-test('source-attached repair remains in the shared isolated Software Specialist lane', () => {
+test('source-attached work remains in the shared isolated Software Specialist lane', () => {
   assert.match(route, /const hasSourceAttachment =/)
-  assert.match(route, /const softwareSpecialist = browserSurface === 'assistant'[\s\S]*\? await tryCosSoftwareSpecialist/)
+  assert.match(route, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
   assert.match(route, /surface: 'assistant'/)
-  assert.match(route, /allowRepositoryRepair: true/)
+  assert.match(route, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
   assert.match(route, /withPublicDeliveryScope\(\(\) => tryCosSoftwareSpecialist/)
   assert.match(route, /surface: 'concierge'/)
   assert.match(route, /allowRepositoryRepair: false/)

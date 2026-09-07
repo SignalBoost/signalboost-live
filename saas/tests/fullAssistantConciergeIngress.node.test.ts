@@ -2,59 +2,50 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-test('Full Assistant routes every pasted operational log through the canonical browser ingress', () => {
-  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
-  assert.match(boundary, /hasExplicitOperationalLogRepairIntent/)
-  assert.match(boundary, /isOperationalLogEvidence/)
-  assert.match(boundary, /isPastedOperationalLog/)
-  assert.match(boundary, /let operationalRepair = isOperationalLogEvidence\(userContent\) \|\| shouldUseConciergeRepairIngress\(body\)/)
-  assert.match(boundary, /executeOperationalRepairFromConcierge/)
-  assert.match(boundary, /sendUrl: '\/api\/cos-primary'/)
+const assistantPage = readFileSync(new URL('../app/dashboard/assistant/page.tsx', import.meta.url), 'utf8')
+const progressClient = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
+const browserRoute = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+
+test('Full Assistant live page uses observable progress and the canonical COS browser ingress', () => {
+  assert.match(assistantPage, /postWithAgentProgress\(\{/)
+  assert.match(assistantPage, /target: 'cos'/)
+  assert.match(progressClient, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
+  assert.match(progressClient, /'x-signalboost-surface': args\.target/)
 })
 
-test('Full Assistant carries a passive operational log into the next explicit fix-it turn', () => {
-  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
-  assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(current\) && isPastedOperationalLog\(previous\)/)
-  assert.match(boundary, /function bodyWithOperationalRepairFollowup/)
-  assert.match(boundary, /content: `\$\{current\}\\n\\n\$\{operationalLog\.trim\(\)\}`/)
-  assert.match(boundary, /if \(hasExplicitOperationalLogRepairIntent\(userContent\)\)/)
-  assert.match(boundary, /previousOperationalLog = isPastedOperationalLog\(previousUserContent\)/)
-  assert.match(boundary, /sendBody = bodyWithOperationalRepairFollowup\(body, previousOperationalLog\)/)
+test('Full Assistant passive operational logs are diagnosis-only until explicit repair intent', () => {
+  assert.match(browserRoute, /const ownerSoftwareAuthority = Object\.freeze\(\{ allowRepositoryRepair: true \}\)/)
+  assert.match(browserRoute, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
+  assert.match(browserRoute, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
+  assert.match(browserRoute, /if \(operationalEvidence && !hasSourceAttachment\)/)
+  assert.match(browserRoute, /await diagnoseOperationalLog\(\{/)
 })
 
-test('Full Assistant can recover the prior passive log from durable History when the request transcript is clipped', () => {
-  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
-  assert.match(boundary, /async function durablePreviousOperationalLog/)
-  assert.match(boundary, /`\/api\/assistant\/chats\?id=\$\{encodeURIComponent\(conversationId\)\}`/)
-  assert.match(boundary, /return isPastedOperationalLog\(content\) \? content : null/)
-  assert.match(boundary, /previousOperationalLog = await durablePreviousOperationalLog/)
+test('Full Assistant carries a passive operational log into the next explicit fix-it turn on the server', () => {
+  assert.match(browserRoute, /const followupOperationalRepair = hasExplicitOperationalLogRepairIntent\(prompt\)/)
+  assert.match(browserRoute, /isPastedOperationalLog\(previousUserPrompt\)/)
+  assert.match(browserRoute, /compactOperationalLogForRepair\(previousUserPrompt\)/)
+  assert.match(browserRoute, /const operationalPrompt = followupOperationalRepair/)
 })
 
-test('Full Assistant preserves reverse-order repair-intent recovery for clipped transcripts', () => {
-  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
-  assert.match(boundary, /async function durablePreviousRepairIntent/)
-  assert.match(boundary, /if \(isPastedOperationalLog\(userContent\) && !hasExplicitOperationalLogRepairIntent\(previousUserContent\)\)/)
-  assert.match(boundary, /const recoveredRepairIntent = await durablePreviousRepairIntent/)
-  assert.match(boundary, /hasExplicitOperationalLogRepairIntent\(content\) \? content : null/)
+test('Full Assistant does not let an old reverse-order fix-it authorize a later log', () => {
+  assert.match(browserRoute, /const immediatePreviousMessage = latestUserIndex > 0 \? messages\[latestUserIndex - 1\] : null/)
+  assert.match(browserRoute, /reverseImmediateOperationalRepair = isPastedOperationalLog\(prompt\)/)
+  assert.match(browserRoute, /immediatePreviousMessage\?\.role === 'user'/)
+  assert.doesNotMatch(browserRoute, /pastedOperationalLog && hasExplicitOperationalLogRepairIntent\(previousUserPrompt\)/)
 })
 
-test('recovered reverse-order repair intent is forwarded in the server-visible browser-ingress transcript', () => {
-  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
-  assert.match(boundary, /function bodyWithPreviousUserTurn/)
-  assert.match(boundary, /sendBody = bodyWithPreviousUserTurn\(body, recoveredRepairIntent\)/)
-  assert.match(boundary, /\{ role: 'user', content: previousUserContent \}/)
+test('Full Assistant source-backed coding remains owned by the server-side Software Specialist', () => {
+  assert.match(browserRoute, /const hasSourceAttachment =/)
+  assert.match(browserRoute, /tryCosSoftwareSpecialist\(\{/)
+  assert.match(browserRoute, /surface: 'assistant'/)
+  assert.match(browserRoute, /hasSourceAttachment \|\| explicitOperationalRepair/)
 })
 
-test('Full Assistant keeps direct Builder interception for source-backed objectives', () => {
-  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
-  assert.match(boundary, /isConciergeBuilderObjective\(userContent, builderRoutingContext\(body\)\)/)
-  assert.match(boundary, /executeBuilderFromConcierge\(originalFetch/)
-})
-
-test('Full Assistant renders terminal output from queued operational Builder jobs', () => {
-  const boundary = readFileSync(new URL('../components/AssistantTransportBoundary.tsx', import.meta.url), 'utf8')
-  assert.match(boundary, /async function executeOperationalRepairFromConcierge/)
-  assert.match(boundary, /response\.status !== 202 \|\| !jobId/)
-  assert.match(boundary, /pollBuilderJob\(fetchImpl, jobId, signal\)/)
-  assert.match(boundary, /'operational-repair-terminal'/)
+test('Full Assistant durable Builder polling survives transient read-only transport losses', () => {
+  assert.match(progressClient, /\/api\/builder\?jobId=/)
+  assert.match(progressClient, /Builder is still durable; a status check was lost/)
+  assert.match(progressClient, /without replaying the action/)
+  assert.match(progressClient, /if \(!poll\.ok && poll\.status >= 500\)/)
+  assert.match(progressClient, /source: 'assistant-transport-unconfirmed'/)
 })

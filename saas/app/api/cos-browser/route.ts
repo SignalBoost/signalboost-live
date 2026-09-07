@@ -13,25 +13,16 @@ import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProve
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import { tryCosSoftwareSpecialist } from '@/lib/ai/cos/softwareSpecialist'
-import {
-  analyzeOperationalLog,
-  compactOperationalLogForRepair,
-  hasExplicitOperationalLogRepairIntent,
-  isExplicitOperationalLogRepairRequest,
-  isOperationalLogEvidence,
-  isPastedOperationalLog,
-  operationalLogReply,
-} from '@/lib/ai/cos/pastedOperationalLog'
+import { analyzeOperationalLog, hasExplicitOperationalLogRepairIntent, isExplicitOperationalLogRepairRequest, isOperationalLogEvidence, isPastedOperationalLog, operationalLogReply } from '@/lib/ai/cos/pastedOperationalLog'
 import { diagnoseOperationalLog } from '@/lib/ai/cos/operationalLogDiagnostic'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
+import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
-
-const ownerSoftwareAuthority = Object.freeze({ allowRepositoryRepair: true })
 
 function isSignalBoostDeploymentContext(req: NextRequest): boolean {
   const owner = String(process.env.VERCEL_GIT_REPO_OWNER || '').trim().toLowerCase()
@@ -95,8 +86,6 @@ export async function POST(req: NextRequest) {
   const previousUser = userMessages.at(-2)
   const prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
   const previousUserPrompt = typeof previousUser?.content === 'string' ? previousUser.content : ''
-  const latestUserIndex = messages.lastIndexOf(latestUser)
-  const immediatePreviousMessage = latestUserIndex > 0 ? messages[latestUserIndex - 1] : null
   const assistantMessages = messages.filter((message: any) => message?.role === 'assistant' && typeof message?.content === 'string')
   const priorAnswer = typeof assistantMessages.at(-1)?.content === 'string' ? assistantMessages.at(-1).content : ''
   const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
@@ -109,46 +98,19 @@ export async function POST(req: NextRequest) {
 
   const routingContext = builderRoutingContextFromBody(body)
   const attachedOperationalEvidence = readAttachedOperationalEvidence(body?.attachments)
-  const currentOperationalPrompt = attachedOperationalEvidence ? `${prompt}\n\n${attachedOperationalEvidence}`.trim() : prompt
-
-  // The real browser transport posts directly to this canonical route. Preserve the natural
-  // passive-log -> diagnostic -> "fix it" contract server-side rather than relying on a second
-  // client wrapper. For repository repair, keep both immutable branch/commit evidence from the log
-  // head and the actual failing assertions from its tail inside Builder's 64k durable objective cap.
-  const followupOperationalRepair = hasExplicitOperationalLogRepairIntent(prompt)
-    && isPastedOperationalLog(previousUserPrompt)
-  const reverseImmediateOperationalRepair = isPastedOperationalLog(prompt)
-    && immediatePreviousMessage?.role === 'user'
-    && typeof immediatePreviousMessage?.content === 'string'
-    && hasExplicitOperationalLogRepairIntent(immediatePreviousMessage.content)
-  const operationalPrompt = followupOperationalRepair
-    ? `${prompt.trim()}\n\n${compactOperationalLogForRepair(previousUserPrompt)}`
-    : currentOperationalPrompt
-
+  const operationalPrompt = attachedOperationalEvidence ? `${prompt}\n\n${attachedOperationalEvidence}`.trim() : prompt
   const hasSourceAttachment = (routingContext.attachmentNames || []).some((name: string) =>
     /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i.test(String(name || '')),
   )
   const operationalEvidence = isOperationalLogEvidence(operationalPrompt)
+  const pastedOperationalLog = isPastedOperationalLog(operationalPrompt)
   const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(operationalPrompt)
-    || reverseImmediateOperationalRepair
+    || (pastedOperationalLog && hasExplicitOperationalLogRepairIntent(previousUserPrompt))
 
   const deployment = { commitSha: process.env.VERCEL_GIT_COMMIT_SHA, branch: process.env.VERCEL_GIT_COMMIT_REF }
-  // The owner surface retains repository-repair capability, but passive operational evidence cannot
-  // exercise that capability. A separate explicit repair intent (or ordinary non-log coding request)
-  // is required before the executable specialist receives repository authority.
-  const shouldConsultSoftwareSpecialist = !operationalEvidence || hasSourceAttachment || explicitOperationalRepair
-  const softwareSpecialist = shouldConsultSoftwareSpecialist
-    ? browserSurface === 'assistant'
-      ? await tryCosSoftwareSpecialist({
-          body,
-          objective: operationalPrompt || prompt,
-          surface: 'assistant',
-          allowRepositoryRepair: ownerSoftwareAuthority.allowRepositoryRepair && (!operationalEvidence || explicitOperationalRepair),
-          signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
-          deployment,
-        })
-      : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: operationalPrompt || prompt, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment })))
-    : null
+  const softwareSpecialist = browserSurface === 'assistant'
+    ? await tryCosSoftwareSpecialist({ body, objective: operationalPrompt || prompt, surface: 'assistant', allowRepositoryRepair: true, signalBoostDeploymentContext: isSignalBoostDeploymentContext(req), deployment })
+    : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: operationalPrompt || prompt, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment })))
   if (softwareSpecialist) return softwareSpecialist
 
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
@@ -178,11 +140,15 @@ export async function POST(req: NextRequest) {
       const artifactRequest = new NextRequest(new URL('/api/artifacts', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: prompt }) })
       return withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
     }
-    if (isConciergeVisualObjective(prompt)) {
+    // The picture-noun list is the fast path; when it declines, the semantic
+    // classifier decides whether the subject is depictable. Both surfaces use
+    // this identical gate, so Concierge and the owner Assistant draw alike.
+    const semanticVisual = isConciergeVisualObjective(prompt) ? false : await isSemanticVisualRequest(prompt)
+    if (isConciergeVisualObjective(prompt) || semanticVisual) {
       const headers = new Headers(req.headers)
       headers.set('content-type', 'application/json')
       headers.delete('content-length')
-      const visualRequest = new NextRequest(new URL('/api/visuals', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: prompt }) })
+      const visualRequest = new NextRequest(new URL('/api/visuals', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: prompt, semanticVisual }) })
       return withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
     }
   }

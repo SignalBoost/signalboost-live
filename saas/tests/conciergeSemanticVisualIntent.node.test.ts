@@ -118,5 +118,5 @@ test('the browser ingress uses the semantic gate and forwards its verdict', asyn
   assert.match(route, /isSemanticVisualRequest/)
   assert.match(route, /semanticVisual/)
   const visuals = await fs.readFile('app/api/visuals/route.ts', 'utf8')
-  assert.match(visuals, /detectConciergeVisualIntent\(objective, \{ semanticVisual \}\)/)
+  assert.match(visuals, /detectConciergeVisualIntent\(objective, \{ semanticVisual, realPeople \}\)/)
 })

@@ -6,11 +6,17 @@ const entrypoint = readFileSync(new URL('../lib/ai/cos/cosFirstAnswer.ts', impor
 
 test('contextual interpretation is handled before the mature retrieval pipeline', () => {
   const contextual = entrypoint.indexOf('const contextualInterpretation = await tryNeuralContextualInterpretation(input)')
-  const contextualReturn = entrypoint.indexOf('if (contextualInterpretation) return contextualInterpretation', contextual)
-  const core = entrypoint.indexOf('const coreResult = await tryCoreCOSFirstAnswer(input)', contextualReturn)
+  const contextualBranch = entrypoint.indexOf('if (contextualInterpretation)', contextual)
+  const core = entrypoint.indexOf('const coreResult = await tryCoreCOSFirstAnswer(input)', contextualBranch)
   assert.ok(contextual >= 0)
-  assert.ok(contextualReturn > contextual)
-  assert.ok(core > contextualReturn)
+  assert.ok(contextualBranch > contextual)
+  assert.ok(core > contextualBranch)
+
+  const earlyReturn = entrypoint.slice(contextualBranch, core)
+  assert.match(earlyReturn, /return\s+(?:reviewNativeLanguageQuality\(input,\s*)?contextualInterpretation\)?/)
+
+  const nativeReview = entrypoint.indexOf('reviewNativeLanguageQuality(input, contextualInterpretation)', contextualBranch)
+  if (nativeReview >= 0) assert.ok(nativeReview < core)
 })
 
 test('context-only provenance records zero retrieved knowledge and memory', () => {

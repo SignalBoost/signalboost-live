@@ -8,18 +8,18 @@ const FRAMING_VARIANTS = Object.freeze([
   'Use a wider environmental view with more surrounding context where framing is not explicitly constrained.',
   'Use a closer action-focused view with stronger subject presence where framing is not explicitly constrained.',
   'Use a medium-distance environmental view with clear separation between primary and secondary elements.',
-  'Use more negative space and a less centered crop where the request permits.',
+  'Use more negative space with an asymmetric crop where the request permits.',
   'Use a fuller edge-to-edge environment with less empty background where the request permits.',
   'Use stronger foreground-to-background depth where the request permits.',
-  'Use a natural documentary-style spatial composition with clear depth where the request permits.',
+  'Use a natural spatial composition with clear depth where the request permits.',
   'Use a more panoramic environmental balance where aspect and framing are not explicitly constrained.',
 ] as const)
 
 const LAYOUT_VARIANTS = Object.freeze([
   'Place the main visual weight left of center and balance it with secondary environmental detail on the right.',
   'Place the main visual weight right of center and balance it with secondary environmental detail on the left.',
-  'Use an asymmetric diagonal flow rather than a centered arrangement.',
-  'Use a layered triangular arrangement rather than an even horizontal arrangement.',
+  'Use an asymmetric diagonal flow with clear directional movement.',
+  'Use a layered triangular arrangement with distinct foreground, middle-ground, and background relationships.',
   'Use a stronger foreground/background separation with a visibly different placement of non-required elements.',
   'Use an offset focal point with different scale relationships and spacing among non-required elements.',
   'Use a sweeping side-to-side flow with a different spatial relationship among non-required elements.',
@@ -74,8 +74,8 @@ function baseGenerationPrompt(objective: string): readonly string[] {
     'FULL-FRAME VISUAL GENERATION DIRECTIVE:',
     'Create the requested visual as a complete edge-to-edge image occupying the entire rectangular canvas.',
     'Extend the requested environment and background continuously to every edge of the image.',
-    'Treat the request as a full scene or complete visual, not as an isolated centered design asset, unless the user explicitly requests that treatment.',
-    'Use a natural spatial composition appropriate to the subject and requested style.',
+    'Compose the primary subjects naturally inside a surrounding environment appropriate to the request.',
+    'Use spatial depth, contextual surroundings, and scene composition appropriate to the requested subject and style.',
   ]
 }
 

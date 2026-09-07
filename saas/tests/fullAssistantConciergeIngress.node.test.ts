@@ -13,7 +13,7 @@ test('Full Assistant live page uses observable progress and the canonical COS br
   assert.match(progressClient, /'x-signalboost-surface': args\.target/)
 })
 
-test('Full Assistant passive operational logs are diagnosis-only until explicit repair intent', () => {
+test('Full Assistant passive operational logs are diagnosis-only until semantic repair intent', () => {
   assert.match(browserRoute, /const ownerSoftwareAuthority = Object\.freeze\(\{ allowRepositoryRepair: true \}\)/)
   assert.match(browserRoute, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
   assert.match(browserRoute, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
@@ -21,18 +21,20 @@ test('Full Assistant passive operational logs are diagnosis-only until explicit 
   assert.match(browserRoute, /await diagnoseOperationalLog\(\{/)
 })
 
-test('Full Assistant carries a passive operational log into the next explicit fix-it turn on the server', () => {
-  assert.match(browserRoute, /const followupOperationalRepair = hasExplicitOperationalLogRepairIntent\(prompt\)/)
-  assert.match(browserRoute, /isPastedOperationalLog\(previousUserPrompt\)/)
+test('Full Assistant carries prior operational evidence into a semantically understood repair turn', () => {
+  assert.match(browserRoute, /const requestUnderstanding = await understandRequest\(\{/)
+  assert.match(browserRoute, /const previousOperationalEvidence = isPastedOperationalLog\(previousUserPrompt\)/)
+  assert.match(browserRoute, /const followupOperationalRepair = requestUnderstanding\?\.softwareRepairIntent === true/)
   assert.match(browserRoute, /compactOperationalLogForRepair\(previousUserPrompt\)/)
   assert.match(browserRoute, /const operationalPrompt = followupOperationalRepair/)
+  assert.doesNotMatch(browserRoute, /hasExplicitOperationalLogRepairIntent/)
 })
 
-test('Full Assistant does not let an old reverse-order fix-it authorize a later log', () => {
-  assert.match(browserRoute, /const immediatePreviousMessage = latestUserIndex > 0 \? messages\[latestUserIndex - 1\] : null/)
-  assert.match(browserRoute, /reverseImmediateOperationalRepair = isPastedOperationalLog\(prompt\)/)
-  assert.match(browserRoute, /immediatePreviousMessage\?\.role === 'user'/)
-  assert.doesNotMatch(browserRoute, /pastedOperationalLog && hasExplicitOperationalLogRepairIntent\(previousUserPrompt\)/)
+test('Full Assistant asks naturally instead of fabricating intent when action or referent is unresolved', () => {
+  assert.match(browserRoute, /requestUnderstanding\?\.needsClarification/)
+  assert.match(browserRoute, /clarificationQuestion\(language, requestUnderstanding\.missing\)/)
+  assert.match(browserRoute, /execution_allowed: false/)
+  assert.match(browserRoute, /external_action_taken: false/)
 })
 
 test('Full Assistant source-backed coding remains owned by the server-side Software Specialist', () => {

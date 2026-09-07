@@ -27,6 +27,7 @@ const tests = [
   'tests/conciergeFullTranscript.node.test.ts',
   'tests/conciergeTransportBudget.node.test.ts',
   'tests/pastedOperationalLog.node.test.ts',
+  'tests/repairConfirmationIntent.node.test.ts',
   'tests/attachedOperationalEvidence.node.test.ts',
   'tests/builderOperationalLogRouting.node.test.ts',
   'tests/builderContractOscillation.node.test.ts',

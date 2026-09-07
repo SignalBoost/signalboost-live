@@ -9,7 +9,7 @@ import {
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-test('explicit protected literal repair has an unambiguous standalone fallback', () => {
+test('explicit protected literal repair has an unambiguous host fallback', () => {
   const prompt = 'I want to improve a customer email for project ALPHA-42. Keep ALPHA-42 unchanged.'
   assert.deepEqual(explicitlyPreservedCriticalTokens(prompt), ['ALPHA-42'])
   const instruction = conciergeLanguageQualityInstruction('en')
@@ -20,7 +20,10 @@ test('explicit protected literal repair has an unambiguous standalone fallback',
   assert.match(entrypoint, /EXPLICITLY PROTECTED LITERALS/)
   assert.match(entrypoint, /every item below MUST appear verbatim in the final answer/)
   assert.match(entrypoint, /required literal restoration/)
-  assert.match(entrypoint, /explicitly preserved literal was still missing after the bounded repair/)
+  assert.match(entrypoint, /function restoreExplicitlyProtectedLiterals/)
+  assert.match(entrypoint, /explicitLiteralHostRestored/)
+  assert.match(entrypoint, /restored\.join\('\\n'\)/)
+  assert.match(entrypoint, /explicitly preserved literal was still missing after the bounded repair and host literal restoration/)
 })
 
 test('avoidable English process jargon is not native-quality evidence in Spanish or Brazilian Portuguese', () => {

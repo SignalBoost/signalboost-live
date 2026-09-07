@@ -25,6 +25,25 @@ const VISUAL_ACTION_TOKENS = new Set([
   'визуализируй', 'визуализируйте', 'сделай', 'сделайте', 'спроектируй', 'спроектируйте', 'изобрази', 'изобразите',
 ])
 
+// These verbs are visual by themselves. Requiring an additional noun such as "image" or "picture"
+// made natural Concierge requests like "draw 2 kids playing football in the rain" fall through to
+// ordinary text support. Keep generic verbs such as create/make/design/generate guarded by a visual
+// subject so non-visual requests are not accidentally routed to the image generator.
+const SELF_SUFFICIENT_VISUAL_ACTION_TOKENS = new Set([
+  // English
+  'sketch', 'draw', 'illustrate', 'visualize', 'visualise', 'paint', 'depict',
+  // Portuguese
+  'desenhe', 'desenhar', 'desenha', 'desenhem', 'ilustre', 'ilustrar', 'ilustra', 'ilustrem',
+  'visualize', 'visualizar', 'visualiza', 'visualizem', 'pinte', 'pintar',
+  // Spanish
+  'dibuja', 'dibujar', 'dibuje', 'dibujen', 'ilustra', 'ilustrar', 'ilustre', 'ilustren',
+  'visualiza', 'visualizar', 'visualice', 'visualicen', 'pinta', 'pintar',
+  // Polish
+  'narysuj', 'rysuj', 'zilustruj', 'zwizualizuj', 'namaluj',
+  // Russian
+  'нарисуй', 'нарисуйте', 'проиллюстрируй', 'проиллюстрируйте', 'визуализируй', 'визуализируйте', 'изобрази', 'изобразите',
+])
+
 const REFERENCE_MARK_TOKENS = new Set([
   'logo', 'logotype', 'emblem', 'badge', 'crest', 'insignia', 'icon', 'symbol', 'mark', 'shield',
   'logotipo', 'emblema', 'distintivo', 'escudo', 'brasao', 'icone', 'simbolo', 'marca',
@@ -375,6 +394,7 @@ function filenameForPeople(people: readonly string[]): string {
 export function isConciergeVisualObjective(prompt: string): boolean {
   const tokens = normalizedVisualTokens(prompt)
   if (!tokens.length || !tokens.some((token) => VISUAL_ACTION_TOKENS.has(token))) return false
+  if (tokens.some((token) => SELF_SUFFICIENT_VISUAL_ACTION_TOKENS.has(token))) return true
   if (tokens.some((token) => VISUAL_SUBJECT_TOKENS.has(token))) return true
 
   const normalized = ` ${tokens.join(' ')} `

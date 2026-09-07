@@ -65,6 +65,12 @@ function configuredReasoningEffort(): 'none' | 'low' | 'medium' | 'high' | undef
   return undefined
 }
 
+/** Align a caller's explicit strict-JSON contract with the transport instead of relying on prose alone. */
+function strictJsonObjectRequested(args: LocalModelCallArgs): boolean {
+  if (args.jsonObject === true) return true
+  return /\bReturn ONLY strict JSON\b/i.test(String(args.systemPrompt ?? ''))
+}
+
 export function localInferenceConfigFromEnv(): LocalInferenceConfig {
   const baseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || 'http://ai-brain:8000/v1')
   const model = (process.env.LOCAL_AI_MODEL || '').trim()
@@ -93,6 +99,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   try {
     inferenceStartedAt = Date.now()
     const reasoningEffort = configuredReasoningEffort()
+    const enforceJsonObject = strictJsonObjectRequested(args)
     const parsePenalty = (value: string | undefined, fallback: number): number => {
       const n = Number(value)
       return Number.isFinite(n) ? Math.max(0, Math.min(2, n)) : fallback
@@ -113,7 +120,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
         temperature: args.temperature ?? 0.2,
         frequency_penalty: frequencyPenalty,
         presence_penalty: presencePenalty,
-        ...(args.jsonObject ? { response_format: { type: 'json_object' } } : {}),
+        ...(enforceJsonObject ? { response_format: { type: 'json_object' } } : {}),
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         messages: [
           { role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' },

@@ -1,3 +1,4 @@
+// saas/app/api/visuals/route.ts
 import { NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
 import { blockedGoal, completedGoal, partialGoal } from '@/lib/ai/cos/goalCompletion'
@@ -259,7 +260,10 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const { objective } = readVisualObjective(body)
     const language = visualLanguage(objective)
-    const intent = detectConciergeVisualIntent(objective)
+    // The caller may have admitted this request semantically when the prompt
+    // named no picture-noun ("draw 2 kids playing football in the rain").
+    const semanticVisual = (body as { semanticVisual?: unknown })?.semanticVisual === true
+    const intent = detectConciergeVisualIntent(objective, { semanticVisual })
     if (!intent) {
       return NextResponse.json({
         error: 'visual_request_not_recognised',

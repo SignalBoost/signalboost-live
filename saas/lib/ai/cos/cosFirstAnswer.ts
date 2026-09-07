@@ -179,6 +179,8 @@ async function tryNeuralContextualInterpretation(input: COSFirstAnswerInput): Pr
   if (!semanticIntentSuppressesFreshness(intent)) return null
 
   const previousAssistant = String(input.previousAssistant ?? '').trim().slice(0, 8_000)
+  const contextualInterpretation = await tryNeuralContextualInterpretation(input)
+  if (contextualInterpretation) return contextualInterpretation
   const reasoned = await callCosReasoner({
     temperature: 0.1,
     maxTokens: 1800,

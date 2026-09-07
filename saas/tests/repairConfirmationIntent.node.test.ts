@@ -51,7 +51,8 @@ test('a long reply is never read as a bare confirmation', async () => {
   assert.deepEqual(seen, [])
 })
 
-// The confirmation path is reachable only when the assistant actually offered.
+// The confirmation path remains available to older callers while canonical browser ingress now
+// uses the shared semantic request-understanding layer instead of phrase syntax.
 test('the offer is recognised only from text this module generated', () => {
   assert.equal(isOperationalLogRepairOffer(`Build failed. ${operationalLogRepairHandoff('en')}`), true)
   assert.equal(isOperationalLogRepairOffer(`Mogę to naprawić. Chcesz, żebym to zrobił?`), true)
@@ -59,12 +60,16 @@ test('the offer is recognised only from text this module generated', () => {
   assert.equal(isOperationalLogRepairOffer(''), false)
 })
 
-test('the browser ingress gates confirmation on a real prior offer and passive log evidence', async () => {
+test('browser ingress uses semantic intent and clarification rather than repair command regexes', async () => {
   const fs = await import('node:fs/promises')
   const route = await fs.readFile('app/api/cos-browser/route.ts', 'utf8')
-  assert.match(route, /isOperationalLogRepairOffer\(priorAnswer\)/)
-  assert.match(route, /explicitOperationalRepair = [\s\S]{0,200}confirmedRepairOffer/)
-  // A log alone still cannot authorise itself.
-  assert.match(route, /const confirmedRepairOffer = answeringOurRepairOffer && await isRepairConfirmation\(prompt\)/)
-  assert.match(route, /const followupOperationalRepair = hasExplicitOperationalLogRepairIntent\(prompt\)/)
+  assert.match(route, /understandRequest\(\{/)
+  assert.match(route, /requestUnderstanding\?\.softwareRepairIntent === true/)
+  assert.match(route, /requestUnderstanding\?\.needsClarification/)
+  assert.match(route, /clarificationQuestion\(language, requestUnderstanding\.missing\)/)
+  assert.doesNotMatch(route, /hasExplicitOperationalLogRepairIntent/)
+  assert.doesNotMatch(route, /isExplicitOperationalLogRepairRequest/)
+  // Passive evidence is still required before an operational repair follow-up can inherit it.
+  assert.match(route, /previousOperationalEvidence = isPastedOperationalLog\(previousUserPrompt\)/)
+  assert.match(route, /followupOperationalRepair = requestUnderstanding\?\.softwareRepairIntent === true[\s\S]{0,120}previousOperationalEvidence/)
 })

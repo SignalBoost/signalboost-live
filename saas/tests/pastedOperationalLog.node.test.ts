@@ -39,14 +39,14 @@ test('recognizes a clipped middle section of Vercel test output after the compos
   assert.equal(isOperationalLogEvidence('Meeting notes: 10:52:09.206 we discussed technical provenance and PDF exports.'), false)
 })
 
-test('standalone repair intent is detectable without manufacturing log evidence', () => {
+test('legacy repair-intent helpers do not manufacture log evidence', () => {
   assert.equal(hasExplicitOperationalLogRepairIntent('please debug this'), true)
   assert.equal(hasExplicitOperationalLogRepairIntent('fix it'), true)
   assert.equal(isOperationalLogEvidence('please debug this'), false)
   assert.equal(isExplicitOperationalLogRepairRequest('please debug this'), false)
 })
 
-test('explicit debug/fix language is distinguishable from passive pasted log evidence', () => {
+test('log evidence stays log evidence even when repair words appear inside it', () => {
   const log = [
     'Please debug this build.',
     '15:27:17.225 Running "vercel build"',
@@ -54,7 +54,7 @@ test('explicit debug/fix language is distinguishable from passive pasted log evi
   ].join('\n')
   assert.equal(isOperationalLogEvidence(log), true)
   assert.equal(isExplicitOperationalLogRepairRequest(log), true)
-  assert.equal(isPastedOperationalLog(log), false)
+  assert.equal(isPastedOperationalLog(log), true)
 
   const passive = log.replace('Please debug this build.\n', '')
   assert.equal(isExplicitOperationalLogRepairRequest(passive), false)
@@ -135,7 +135,7 @@ test('host handoff is deterministic after a richer neural diagnosis and localize
   const localized = ['en', 'es', 'pt', 'pl', 'ru'].map(locale => operationalLogRepairHandoff(locale))
   assert.equal(new Set(localized).size, 5)
   for (const handoff of localized) {
-    assert.ok(handoff.trim().length > 0 && handoff.trim().endsWith("?"), handoff)
+    assert.ok(handoff.trim().length > 0 && handoff.trim().endsWith('?'), handoff)
   }
 })
 

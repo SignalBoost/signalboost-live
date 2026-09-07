@@ -67,10 +67,34 @@ export function analyzeOperationalLog(input: string): OperationalLogAnalysis {
   }
 }
 
+export function operationalLogRepairHandoff(language = 'en'): string {
+  const locale = String(language || 'en').toLowerCase()
+  if (locale === 'es') {
+    return 'Si quieres que se repare, di "fix it"; Builder llevará esta evidencia del fallo a la ruta de reparación autorizada, usará el código fuente del repositorio o espacio de trabajo al que ya tenga acceso y solo pedirá el código si no puede acceder a él. Si esta superficie no tiene autoridad de reparación, lo dirá en lugar de fingir que actuó.'
+  }
+  if (locale === 'pt') {
+    return 'Se quiser que isso seja reparado, diga "fix it"; o Builder levará esta evidência da falha para o fluxo de reparo autorizado, usará o código-fonte do repositório ou workspace ao qual já tenha acesso e só pedirá o código se não conseguir acessá-lo. Se esta superfície não tiver autoridade para reparar, ela dirá isso em vez de fingir que agiu.'
+  }
+  if (locale === 'pl') {
+    return 'Jeśli chcesz, aby to zostało naprawione, napisz "fix it"; Builder przekaże te dowody awarii do autoryzowanej ścieżki naprawy, użyje kodu źródłowego repozytorium lub obszaru roboczego, do którego ma już dostęp, i poprosi o kod tylko wtedy, gdy nie będzie mógł go uzyskać. Jeśli ta powierzchnia nie ma uprawnień do naprawy, poinformuje o tym zamiast udawać wykonanie działania.'
+  }
+  if (locale === 'ru') {
+    return 'Если вы хотите, чтобы это было исправлено, напишите "fix it"; Builder передаст эти данные о сбое в авторизованный процесс исправления, использует исходный код репозитория или рабочей области, к которому у него уже есть доступ, и запросит код только если доступа нет. Если эта поверхность не имеет полномочий на исправление, она сообщит об этом, а не будет делать вид, что выполнила действие.'
+  }
+  return 'If you want it repaired, say "fix it"; Builder will carry this failure evidence into the authorized repair path, use repository or workspace source it can already access, and ask for source only if it cannot access it. If this surface does not have repair authority, it will say so instead of pretending to act.'
+}
+
+export function ensureOperationalLogRepairHandoff(reply: string, language = 'en'): string {
+  const text = String(reply || '').trim()
+  if (/['"“”]fix it['"“”]/i.test(text) && /\bBuilder\b/i.test(text)) return text
+  const handoff = operationalLogRepairHandoff(language)
+  return text ? `${text} ${handoff}` : handoff
+}
+
 export function operationalLogReply(input: string): string {
   const analysis = analyzeOperationalLog(input)
   if (!analysis.failed) {
-    return 'The excerpt shows a Vercel build in progress, but it does not include a failing assertion or a non-zero final command, so there is not enough evidence yet to identify a defect. No code was changed. Paste the final error or ✖ assertion. If you want the identified failure repaired, say "fix it"; Builder will use source already available to the authorized workspace or repository and ask for source only if it cannot access it.'
+    return `The excerpt shows a Vercel build in progress, but it does not include a failing assertion or a non-zero final command, so there is not enough evidence yet to identify a defect. No code was changed. Paste the final error or ✖ assertion. ${operationalLogRepairHandoff('en')}`
   }
   const failures = analysis.testFailures.length
     ? ` The failing checks shown are: ${analysis.testFailures.join('; ')}.`
@@ -80,5 +104,5 @@ export function operationalLogReply(input: string): string {
     : analysis.exitCode !== null
       ? ` The build command exited ${analysis.exitCode}.`
       : ''
-  return `This Vercel build failed.${command}${failures} No code was changed because this was passive diagnostic evidence, not a repair request. If you want it repaired, say "fix it"; Builder will use the failure evidence and source already available to the authorized workspace or repository, asking for source only if it cannot access it. If the current surface does not have repair authority, it will say so instead of pretending to act.`
+  return `This Vercel build failed.${command}${failures} No code was changed because this was passive diagnostic evidence, not a repair request. ${operationalLogRepairHandoff('en')}`
 }

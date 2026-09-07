@@ -1,3 +1,4 @@
+// saas/tests/pastedOperationalLog.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -104,8 +105,7 @@ test('reports a final test failure and offers an explicit repair handoff without
   assert.equal(analysis.testFailures.length, 1)
   assert.match(reply, /This Vercel build failed/)
   assert.match(reply, /both answer paths resolve markers/i)
-  assert.match(reply, /say "fix it"/i)
-  assert.match(reply, /Builder/i)
+  assert.match(reply, /I can repair this\. Want me to\?/)
   assert.match(reply, /passive diagnostic evidence, not a repair request/i)
   assert.doesNotMatch(reply, /attach the affected source file/i)
   assert.doesNotMatch(reply, /No code was changed from the log alone/i)
@@ -121,7 +121,7 @@ test('an incomplete build excerpt asks for missing failure evidence, not reposit
   assert.match(reply, /does not include a failing assertion or a non-zero final command/i)
   assert.match(reply, /No code was changed/i)
   assert.match(reply, /Paste the final error or ✖ assertion/i)
-  assert.match(reply, /say "fix it"/i)
+  assert.match(reply, /I can repair this\. Want me to\?/)
   assert.doesNotMatch(reply, /attach the affected source file/i)
   assert.doesNotMatch(reply, /not editable source code|not a request to portray anyone/i)
 })
@@ -129,15 +129,13 @@ test('an incomplete build excerpt asks for missing failure evidence, not reposit
 test('host handoff is deterministic after a richer neural diagnosis and localized across all five platform languages', () => {
   const neural = 'The build has one isolated assertion failure in the contextual-interpretation ordering gate.'
   const English = ensureOperationalLogRepairHandoff(neural, 'en')
-  assert.match(English, /say "fix it"/i)
-  assert.match(English, /Builder/i)
+  assert.match(English, /I can repair this\. Want me to\?/)
   assert.equal(ensureOperationalLogRepairHandoff(English, 'en'), English)
 
   const localized = ['en', 'es', 'pt', 'pl', 'ru'].map(locale => operationalLogRepairHandoff(locale))
   assert.equal(new Set(localized).size, 5)
   for (const handoff of localized) {
-    assert.match(handoff, /"fix it"/i)
-    assert.match(handoff, /Builder/i)
+    assert.ok(handoff.trim().length > 0 && handoff.trim().endsWith("?"), handoff)
   }
 })
 

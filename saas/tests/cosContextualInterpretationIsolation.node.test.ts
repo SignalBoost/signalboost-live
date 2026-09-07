@@ -14,6 +14,9 @@ test('contextual interpretation is handled before the mature retrieval pipeline'
 
   const earlyReturn = entrypoint.slice(contextualBranch, core)
   assert.match(earlyReturn, /return\s+(?:reviewNativeLanguageQuality\(input,\s*)?contextualInterpretation\)?/)
+
+  const nativeReview = entrypoint.indexOf('reviewNativeLanguageQuality(input, contextualInterpretation)', contextualBranch)
+  if (nativeReview >= 0) assert.ok(nativeReview < core)
 })
 
 test('context-only provenance records zero retrieved knowledge and memory', () => {

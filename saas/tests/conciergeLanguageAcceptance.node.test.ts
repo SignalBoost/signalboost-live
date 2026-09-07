@@ -46,13 +46,19 @@ test('language signal recognizes representative native-language prose for all fi
   assert.equal(selectedLanguageSignal('Команда может использовать пилот, чтобы снизить риск и проверить решение перед внедрением.', 'ru'), true)
 })
 
+test('Polish orthographic evidence prevents a false negative on natural concise Polish guidance', () => {
+  const livePolish = '1. Wklej treść wiadomości e-mail dotyczącej projektu ALPHA-42 do okna czatu.\n2. Określ, co dokładnie ma zostać poprawione (np. ton, gramatyka, klarowność lub struktura).\n3. Otrzymaj gotowy, zredagowany projekt wiadomości.'
+  assert.equal(selectedLanguageSignal(livePolish, 'pl'), true)
+  assert.equal(selectedLanguageSignal('Please paste the email draft and I will improve it.', 'pl'), false)
+})
+
 test('obvious English support leakage is rejected in every non-English locale', () => {
   const leak = 'I can help. To get started, tell me your goal and then choose the next step.'
   for (const language of ['es','pt','pl','ru'] as const) assert.equal(hasEnglishLeakage(leak, language), true, language)
   assert.equal(hasEnglishLeakage(leak, 'en'), false)
 })
 
-test('critical token preservation is part of the automated acceptance verdict', () => {
+test('explicit critical token preservation is part of the automated acceptance verdict', () => {
   const testCase = CONCIERGE_LANGUAGE_ACCEPTANCE_CASES.find(item => item.language === 'pl' && item.category === 'transformation')!
   const base = {
     test:testCase,
@@ -66,6 +72,14 @@ test('critical token preservation is part of the automated acceptance verdict', 
   assert.equal(preserved.criticalTokensPreserved, true)
   const lost = evaluateLanguageAcceptanceText({ ...base, reply:'Proszę sprawdzić projekt i przekazać uwagi, aby zespół mógł zakończyć przegląd.' })
   assert.equal(lost.criticalTokensPreserved, false)
+
+  const spanishConversation = CONCIERGE_LANGUAGE_ACCEPTANCE_CASES.find(item => item.language === 'es' && item.category === 'conversation')!
+  const spanishLost = evaluateLanguageAcceptanceText({
+    ...base,
+    test: spanishConversation,
+    reply: 'Un piloto corto reduce el riesgo al limitar el alcance antes de una implantación completa.',
+  })
+  assert.equal(spanishLost.criticalTokensPreserved, false)
 })
 
 test('protected all-caps identifiers recover case drift without normalizing URL path case', () => {

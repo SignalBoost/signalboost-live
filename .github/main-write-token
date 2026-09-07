@@ -1,2 +1,2 @@
-base_sha=9927ad2cd96e6654f620071048d3c610d27eaa97
-branch=fix/concierge-first-pass-native-language-20260907
+base_sha=dc2a58ba58f8a085544cbf1dda3567442eede7fb
+branch=fix/concierge-native-release-guard-20260907

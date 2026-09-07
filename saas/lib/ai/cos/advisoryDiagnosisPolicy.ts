@@ -7,7 +7,11 @@ export type PublishedDiagnosticReference = {
   snippet: string
 }
 
-const DIAGNOSIS_RE = /(?:\b(?:diagnos\w*|troubleshoot\w*|root\s+cause|incident|fault|fail(?:ure|ed|s)?|alarm|alert|degrad\w*|bottleneck|why\s+.*(?:slow|fail|error)|candidate\s+causes?|hypotheses?)\b|(?<![\p{L}\p{N}_])(?:diagn[oó]stico|diagnosticar|causa\s+ra[ií]z|incidente|falla|fallo|falha|alarma|alarme|hip[oó]tesis|hip[oó]tese|hip[oó]teses|diagnoza|diagnozowanie|przyczyna|przyczyny|awaria|awarii|incydent|alarm|hipoteza|hipotezy|диагностика|диагностировать|коренная\s+причина|инцидент|сбой|отказ|авария|гипотеза|гипотезы)(?![\p{L}\p{N}_]))/iu
+// Failure words are evidence, not intent. A status report, release summary, or writing task may
+// legitimately say that CI "failed" without asking COS to diagnose an incident. Apply the strict
+// advisory-diagnosis contract only when the user actually asks for diagnosis/discrimination work.
+const DIAGNOSIS_EVIDENCE_RE = /(?:\b(?:diagnos\w*|troubleshoot\w*|root\s+cause|incident|fault|fail(?:ure|ed|s)?|alarm|alert|degrad\w*|bottleneck|why\s+.*(?:slow|fail|error)|candidate\s+causes?|hypotheses?)\b|(?<![\p{L}\p{N}_])(?:diagn[oó]stico|diagnosticar|causa\s+ra[ií]z|incidente|falla|fallo|falha|alarma|alarme|hip[oó]tesis|hip[oó]tese|hip[oó]teses|diagnoza|diagnozowanie|przyczyna|przyczyny|awaria|awarii|incydent|alarm|hipoteza|hipotezy|диагностика|диагностировать|коренная\s+причина|инцидент|сбой|отказ|авария|гипотеза|гипотезы)(?![\p{L}\p{N}_]))/iu
+const DIAGNOSIS_REQUEST_RE = /(?:\b(?:diagnos\w*|troubleshoot\w*|root\s+cause|candidate\s+causes?|hypotheses?|why\s+[^?\n]{0,180}(?:slow|fail|error|degrad|alarm|alert)|what\s+(?:caused|causes|is\s+causing)|investigat\w*\s+[^?\n]{0,160}(?:fail|error|incident|fault|degrad|alarm|alert)|(?:identify|find|determine)\s+(?:the\s+)?(?:cause|fault))\b|(?<![\p{L}\p{N}_])(?:diagn[oó]stico|diagnosticar|causa\s+ra[ií]z|hip[oó]tesis|hip[oó]tese|hip[oó]teses|diagnoza|diagnozowanie|przyczyna|przyczyny|hipoteza|hipotezy|диагностика|диагностировать|коренная\s+причина|гипотеза|гипотезы)(?![\p{L}\p{N}_]))/iu
 const METHODS_RE = /(?:\b(?:what|which)\s+(?:diagnostic\s+)?(?:methods?|techniques?|approaches?|mechanisms?)\s+(?:exist|are\s+used|can\s+be\s+used)|\b(?:methods?|techniques?|approaches?)\s+(?:exist|for|to)\s+(?:diagnos\w*|troubleshoot\w*|distinguish|investigate)|\bhow\s+(?:would|should|can)\s+(?:you|we|an?\s+operator)\s+(?:diagnos\w*|troubleshoot\w*|distinguish|investigate)\b|(?<![\p{L}\p{N}_])(?:qu[eé]|cu[aá]les|quais|jakie|какие)\s+(?:m[eé]todos?|t[eé]cnicas?|abordagens?|metody|techniki|методы|методики)[\s\S]{0,100}(?:diagnosticar|diagn[oó]stico|distinguir|investigar|diagnozowa[cć]|diagnoza|rozr[oó][żz]ni[cć]|bada[cć]|диагностировать|диагностика|различить|исследовать)|(?<![\p{L}\p{N}_])(?:como|c[oó]mo|jak|как)\s+[\s\S]{0,80}(?:diagnosticar|distinguir|investigar|diagnozowa[cć]|rozr[oó][żz]ni[cć]|bada[cć]|диагностировать|различить|исследовать))/iu
 const REFUSAL_RE = /(?:\b(?:i\s+(?:do\s+not|don't)\s+know|i\s+(?:still\s+)?cannot\s+stand\s+behind|i\s+(?:still\s+)?can't\s+stand\s+behind|(?:still\s+)?cannot\s+(?:determine|identify|name)|(?:still\s+)?can't\s+(?:determine|identify|name)|unable\s+to\s+(?:determine|identify|name)|insufficient\s+(?:evidence|information)|not\s+enough\s+(?:evidence|information))\b|(?<![\p{L}\p{N}_])(?:no\s+(?:puedo|podemos)\s+(?:determinar|identificar|respaldar|afirmar|nombrar)|n[aã]o\s+(?:posso|podemos)\s+(?:determinar|identificar|sustentar|afirmar|nomear)|nie\s+mog[eę]\s+(?:ustali[cć]|wskaza[cć]|potwierdzi[cć]|nazwa[cć])|не\s+могу\s+(?:определить|указать|подтвердить|назвать))(?![\p{L}\p{N}_]))/iu
 const WINNER_RE = /\b(?:primary line of defense|the primary (?:measure|response|lever)|recommendation\s*:\s*|most likely|root cause is|the winner is)\b/i
@@ -42,12 +46,13 @@ export function advisoryDiagnosisUserRequest(prompt: string): string {
 }
 
 export function isAdvisoryDiagnosisPrompt(prompt: string): boolean {
-  return DIAGNOSIS_RE.test(requestText(prompt))
+  const request = requestText(prompt)
+  return DIAGNOSIS_REQUEST_RE.test(request) || (METHODS_RE.test(request) && DIAGNOSIS_EVIDENCE_RE.test(request))
 }
 
 export function asksForPublishedDiagnosticMethods(prompt: string): boolean {
   const request = requestText(prompt)
-  return DIAGNOSIS_RE.test(request) && METHODS_RE.test(request)
+  return isAdvisoryDiagnosisPrompt(request) && METHODS_RE.test(request)
 }
 
 export function diagnosticPublishedSearchQuery(prompt: string): string {

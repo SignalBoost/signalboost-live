@@ -5,6 +5,7 @@ import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-infe
 import { callProviderModel, type ModelProvider } from '@/lib/ai/providerRouter'
 import { callCosText } from '@/lib/cos/textGateway'
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
+import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
 
 export interface CosAiPort {
   generate(input: { prompt: string; systemPrompt?: string; maxTokens?: number; modelPreference?: ModelProvider }): Promise<string>
@@ -101,7 +102,12 @@ export function createPlatformImagePort(): CosImagePort {
         const response = await fetch('https://api.deepinfra.com/v1/openai/images/generations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-          body: JSON.stringify({ model: 'black-forest-labs/FLUX-2-klein-4b', prompt, size, n: 1 }),
+          body: JSON.stringify({
+            model: 'black-forest-labs/FLUX-2-klein-4b',
+            prompt: freshVisualPrompt(prompt),
+            size,
+            n: 1,
+          }),
         })
         const raw = await response.text()
         let data: { data?: Array<{ b64_json?: string; url?: string }>; error?: { message?: string } | string; detail?: string | { message?: string }; message?: string } = {}

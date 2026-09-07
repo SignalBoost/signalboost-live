@@ -8,6 +8,7 @@ import {
 } from '../lib/ai/cos/chiefOfStaffAcceptance.ts'
 import { evaluateChiefOfStaffReliability } from '../lib/ai/cos/chiefOfStaffReliability.ts'
 import { isAdvisoryDiagnosisPrompt } from '../lib/ai/cos/advisoryDiagnosisPolicy.ts'
+import { classifyProblemClass } from '../lib/ai/cos/cosProblemClass.ts'
 
 const replies:Record<string,string> = {
   'instruction-scope': 'Recommendation\nChoose North.\nRationale\nIt is a 14-day pilot using the existing team with no new vendor.\nNext action\nSchedule the internal kickoff.',
@@ -90,6 +91,20 @@ test('bounded status failure evidence is not mistaken for an incident-diagnosis 
   assert.equal(isAdvisoryDiagnosisPrompt(truthfulStatus.prompt), false)
   assert.equal(isAdvisoryDiagnosisPrompt('Why did GEN-2 fail during the test? Give leading hypotheses.'), true)
   assert.equal(isAdvisoryDiagnosisPrompt('Diagnose the root cause of the failed deployment check.'), true)
+})
+
+test('problem-class learning ignores internal reasoning-envelope topics', () => {
+  const truthfulStatus = CHIEF_OF_STAFF_ACCEPTANCE_CASES.find(item => item.key === 'truthful-status')!
+  const expanded = [
+    'KNOWLEDGE GRAPH FACTS:',
+    '[KG1] PostgreSQL database performance multi tenant SaaS indexes and connection pools.',
+    '[KG2] Current public facts changed today.',
+    '',
+    'CURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):',
+    truthfulStatus.prompt,
+  ].join('\n')
+  assert.equal(classifyProblemClass(expanded), classifyProblemClass(truthfulStatus.prompt))
+  assert.notEqual(classifyProblemClass(expanded), 'PostgreSQL database performance multi tenant SaaS')
 })
 
 test('acceptance grading rejects missing mandated choices, labels, and vendor evidence', () => {

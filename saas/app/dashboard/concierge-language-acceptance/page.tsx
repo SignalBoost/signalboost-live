@@ -138,7 +138,7 @@ export default function ConciergeLanguageAcceptancePage() {
           const summary = latest.language_summary?.[code] || { attempted:0, passed:0, automatedPassed:false }
           const native = latest.native_reviews?.[code] || 'pending'
           return <div className="space-y-3 rounded-md border border-border p-4" key={code}>
-            <div><div className="font-semibold">{LANGUAGE_NAMES[code]}</div><div className="text-xs text-muted-foreground">{summary.passed} / {summary.attempted} automated</div></div>
+            <div><div className="font-semibold">{LANGUAGE_NAMES[code]}</div><div className="text-xs text-muted-foreground">{summary.passed} / {summary.attempted} {c.automated}</div></div>
             <div className={summary.automatedPassed ? 'text-green-400' : 'text-yellow-400'}>{c.automated}: {summary.automatedPassed ? c.pass : c.pending}</div>
             <div className={native === 'pass' ? 'text-green-400' : native === 'fail' ? 'text-red-400' : 'text-yellow-400'}>{c.native}: {native === 'pass' ? c.pass : native === 'fail' ? c.fail : c.pending}</div>
             <textarea className="min-h-20 w-full rounded-md border border-border bg-background p-2 text-sm" value={notes[code] ?? latest.native_review_notes?.[code] ?? ''} onChange={e => setNotes(value => ({...value,[code]:e.target.value}))} placeholder={c.notePlaceholder} />

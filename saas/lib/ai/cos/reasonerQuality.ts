@@ -3,8 +3,8 @@ import { parseLocalResult } from './reasonerOutput.ts'
 import { classifyScriptRequest, executiveDecisionDirective, scriptRequestDirective } from './scriptRequestIntent.ts'
 import { creativeConstraintRepairInstruction, unsupportedCreativeConstraintClaims } from './creativeConstraintFidelity.ts'
 import { isPowerStabilizationPrompt, powerStabilizationDefects, powerStabilizationRepairInstruction } from './powerStabilizationRelease.ts'
+import { isAdvisoryDiagnosisPrompt } from './advisoryDiagnosisPolicy.ts'
 
-const DIAGNOSTIC_PROMPT = /\b(?:diagnos\w*|root cause|rank(?:ed|ing)?|most likely|bottleneck|latency|incident|degrad\w*|why .*slow|why .*fail)\b/i
 const CODE_SHAPED_ANSWER = /```\s*(?:python|py|javascript|js|typescript|ts|bash|shell|powershell|ruby|php|java|c\+\+|c#|go|rust)?\b|\b(?:import\s+[A-Za-z_][\w.]*|from\s+[A-Za-z_][\w.]*\s+import\s+|class\s+[A-Za-z_]\w*\s*[:({]|def\s+[A-Za-z_]\w*\s*\(|function\s+[A-Za-z_$]\w*\s*\(|if\s+__name__\s*==|console\.log\s*\(|npm\s+(?:run|install)|#!\/(?:usr\/bin\/env\s+)?(?:bash|sh|python))\b/m
 const PROGRAMMING_REDIRECT = /\b(?:programming language|source code|python|javascript|typescript|bash|powershell|choose (?:a |the )?(?:language|runtime)|specify (?:a |the )?(?:language|runtime|format))\b/i
 const CONTENT_SCRIPT_REFUSAL = /\b(?:a single script cannot be written|cannot write (?:a |the )?script|can't write (?:a |the )?script|unable to write (?:a |the )?script|need you to specify|need more information before (?:i can |i )?(?:write|produce|draft|create))\b/i
@@ -12,9 +12,6 @@ const EXECUTIVE_UNSUPPORTED_CERTAINTY = /\b(?:risk of (?:cannibali[sz]ation|down
 const SECURITY_SCENARIO = /\b(?:zero[- ]day|vulnerabilit|tenant\s+metadata|infosec|security\s+lead)\b/i
 const UNSUPPORTED_SECURITY_FRAMEWORK = /\b(?:IL[2456]|impact\s+level\s*[2456]|authorizing\s+official|system\s+security\s+plan|\bSSP\b|fedramp|rmf|nist\s*800[- ]53)\b/i
 const QUANTITATIVE_TASK = /\b(?:calculate|compute|quantif(?:y|ication)|break[- ]even|overhead|cost\s+savings?|power\s+cost|bandwidth|throughput|latency|checkpoint|synchroni[sz]ation|equation|formula|exact)\b/i
-const EXPLICIT_SOURCE_BOUNDARY = /(?:\b(?:use|using)\s+only\b[^.\n]{0,100}\b(?:evidence|packet|record|facts?|material|information|data|supplied|provided)\b|\b(?:base|based)\b[^.\n]{0,80}\bonly\b[^.\n]{0,80}\b(?:evidence|packet|record|facts?|material|information|data)\b|\bdo not fill gaps from memory\b)/i
-const INTERNAL_EVIDENCE_ID = /\[(?:KG|CL|OEM|EM|SK)\d{1,2}\]/i
-const INTERNAL_SOURCE_LANGUAGE = /\b(?:retrieved evidence|knowledge graph|learned corpus|enterprise memory|user memory|cognitive skill)\b/i
 const ECHO_MIN_PROMPT_CHARS = 180
 const ECHO_MIN_ANSWER_CHARS = 60
 const ECHO_STOPWORDS = new Set([
@@ -42,20 +39,6 @@ function latestUserRequest(prompt: string): string {
   let request = (bestIndex >= 0 ? text.slice(bestIndex + bestMarker.length) : text).trim()
   request = request.replace(/\n\n(?:Answer the public user now\.|Return the corrected answer now\.|Write your reply now\.)[\s\S]*$/i, '').trim()
   return request.slice(0, 16_000)
-}
-
-function explicitSourceBoundary(prompt: string): boolean {
-  return EXPLICIT_SOURCE_BOUNDARY.test(latestUserRequest(prompt))
-}
-
-export function sourceBoundaryBreach(prompt: string, raw: string): boolean {
-  if (!explicitSourceBoundary(prompt)) return false
-  const parsed = parseLocalResult(String(raw ?? ''))
-  if (!parsed) return false
-  const request = latestUserRequest(prompt)
-  const answer = parsed.answer
-  if (INTERNAL_EVIDENCE_ID.test(answer)) return true
-  return INTERNAL_SOURCE_LANGUAGE.test(answer) && !INTERNAL_SOURCE_LANGUAGE.test(request)
 }
 
 function allTokens(text: string): string[] {
@@ -87,53 +70,47 @@ function powerDefectCount(prompt: string, raw: string): number {
   return powerStabilizationDefects(answer).length
 }
 
-/**
- * Reject a long answer that is essentially a span/paraphrase copied from the user's own request.
- * This prevents a low-confidence best-effort path from presenting the task itself as though it
- * were a solution. Short factual questions are excluded so concise direct answers remain safe.
- */
 export function promptEchoNonAnswer(prompt: string, raw: string): boolean {
   const parsed = parseLocalResult(String(raw ?? ''))
   if (!parsed) return false
   const request = latestUserRequest(prompt)
   const answer = parsed.answer.trim()
   if (request.length < ECHO_MIN_PROMPT_CHARS || answer.length < ECHO_MIN_ANSWER_CHARS) return false
-
   const requestContent = contentTokens(request)
   const answerContent = contentTokens(answer)
   if (requestContent.length < 12 || answerContent.length < 8) return false
-
   const requestSet = new Set(requestContent)
   const covered = answerContent.filter(token => requestSet.has(token)).length
   const coverage = covered / answerContent.length
   const novel = new Set(answerContent.filter(token => !requestSet.has(token)))
   const phraseOverlap = ngramOverlap(allTokens(answer), allTokens(request), 4)
-
   return coverage >= 0.84 && novel.size <= 5 && phraseOverlap >= 0.42
 }
 
-/**
- * Executive recommendations may state user-supplied facts, but must not turn uncertain outcomes
- * into facts or introduce numeric targets that the scenario never supplied.
- */
 export function executiveDecisionUnsupportedClaims(prompt: string, raw: string): string[] {
-  const securityScenario = SECURITY_SCENARIO.test(prompt)
-  if (!executiveDecisionDirective(prompt) && !securityScenario) return []
+  const request = latestUserRequest(prompt)
+  const securityScenario = SECURITY_SCENARIO.test(request)
+  if (!executiveDecisionDirective(request) && !securityScenario) return []
   const parsed = parseLocalResult(String(raw ?? ''))
   if (!parsed) return []
   const answer = parsed.answer
   const signals: string[] = []
   if (EXECUTIVE_UNSUPPORTED_CERTAINTY.test(answer)) signals.push('unsupported_certainty')
-  if (securityScenario && UNSUPPORTED_SECURITY_FRAMEWORK.test(answer) && !UNSUPPORTED_SECURITY_FRAMEWORK.test(prompt)) signals.push('unsupported_security_framework')
-  const suppliedNumbers = new Set((String(prompt).match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')))
+  if (securityScenario && UNSUPPORTED_SECURITY_FRAMEWORK.test(answer) && !UNSUPPORTED_SECURITY_FRAMEWORK.test(request)) signals.push('unsupported_security_framework')
+  const suppliedNumbers = new Set((request.match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')))
   const novelNumber = (answer.match(/\b\d+(?:[.,]\d+)?\b/g) || []).map(value => value.replace(/[,]/g, '')).find(value => !suppliedNumbers.has(value))
   if (novelNumber) signals.push('novel_numeric_target')
   return signals
 }
 
-/** Whether the actual user request asks for diagnosis/troubleshooting. Internal envelopes are not intent. */
+/**
+ * Only genuine diagnostic/troubleshooting intent receives diagnostic specificity scoring.
+ * Failure/status words inside evidence packets, release summaries, or internal prompt envelopes
+ * are not diagnostic intent. Reuse the same user-request boundary as advisory diagnosis so the
+ * two quality systems cannot drift apart again.
+ */
 export function promptAppearsDiagnostic(prompt: string): boolean {
-  return DIAGNOSTIC_PROMPT.test(latestUserRequest(prompt))
+  return isAdvisoryDiagnosisPrompt(prompt)
 }
 
 export type ReasonerDraftQuality = {
@@ -148,9 +125,7 @@ export type ReasonerDraftQuality = {
 export function assessReasonerDraft(prompt: string, raw: string): ReasonerDraftQuality {
   const parsed = parseLocalResult(String(raw ?? ''))
   const diagnostic = promptAppearsDiagnostic(prompt)
-  if (!parsed) {
-    return { parseable: false, diagnostic, cap: 0, score: 0, genericBuckets: 0, mechanisms: 0 }
-  }
+  if (!parsed) return { parseable: false, diagnostic, cap: 0, score: 0, genericBuckets: 0, mechanisms: 0 }
   const specificity = assessAnswerSpecificity(parsed.answer)
   return {
     parseable: true,
@@ -162,13 +137,9 @@ export function assessReasonerDraft(prompt: string, raw: string): ReasonerDraftQ
   }
 }
 
-/**
- * A written-script request must not silently drift into executable code merely because the named
- * subject is underspecified. The prompt already tells us which sense of "script" the user asked
- * for; this gate checks whether the draft violated that deterministic interpretation.
- */
 export function contentScriptSemanticMismatch(prompt: string, raw: string): boolean {
-  if (classifyScriptRequest(prompt) !== 'content') return false
+  const request = latestUserRequest(prompt)
+  if (classifyScriptRequest(request) !== 'content') return false
   const parsed = parseLocalResult(String(raw ?? ''))
   if (!parsed) return false
   const answer = parsed.answer
@@ -176,26 +147,11 @@ export function contentScriptSemanticMismatch(prompt: string, raw: string): bool
   return CODE_SHAPED_ANSWER.test(answer) || PROGRAMMING_REDIRECT.test(opening) || CONTENT_SCRIPT_REFUSAL.test(opening)
 }
 
-/**
- * One local rewrite is allowed when a draft violates a deterministic semantic boundary or when a
- * diagnostic answer is structurally generic. This is not a second opinion and it does not involve
- * an external provider; it is the same independent COS runtime being told exactly why its first
- * draft failed the deterministic quality gate.
- */
 export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
-  // A prompt echo is not a low-confidence answer. It is a non-answer and gets one bounded local
-  // repair before any best-effort release path can expose it.
+  const request = latestUserRequest(prompt)
   if (promptEchoNonAnswer(prompt, raw)) return true
-  // When the user explicitly bounds the answer to supplied evidence, retrieved internal material
-  // cannot silently become part of the answer even if ordinary RAG ran upstream.
-  if (sourceBoundaryBreach(prompt, raw)) return true
-  // The answer may invent open creative details, but it may never retroactively claim the user
-  // requested a constraint that is absent from the real prompt.
-  if (unsupportedCreativeConstraintClaims(prompt, raw).length) return true
-  // Humor is a material user requirement when it is actually present in the prompt. Give the same
-  // COS reasoner a focused rewrite pass so it produces a real comedic beat rather than merely
-  // restating the requested tone or rules.
-  if (classifyScriptRequest(prompt) === 'content' && /\b(?:humou?rous|humou?r|funny|comedic)\b/i.test(prompt)) return true
+  if (unsupportedCreativeConstraintClaims(request, raw).length) return true
+  if (classifyScriptRequest(request) === 'content' && /\b(?:humou?rous|humou?r|funny|comedic)\b/i.test(request)) return true
   if (contentScriptSemanticMismatch(prompt, raw)) return true
   if (executiveDecisionUnsupportedClaims(prompt, raw).length) return true
   if (powerDefectCount(prompt, raw) > 0) return true
@@ -206,32 +162,14 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
 }
 
 export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: string): string {
-  const scriptDirective = scriptRequestDirective(originalPrompt)
-  const creativeConstraintRepair = creativeConstraintRepairInstruction(originalPrompt, firstRaw)
-  if (sourceBoundaryBreach(originalPrompt, firstRaw)) {
-    return [
-      originalPrompt,
-      '',
-      'QUALITY REPAIR — the prior draft violated the user\'s explicit evidence boundary.',
-      'Answer the ORIGINAL user request using ONLY facts stated in the current user input/evidence packet.',
-      'Ignore Knowledge Graph, learned corpus, enterprise memory, user memory, cognitive skills, retrieved evidence, and any other internal context even if they appear earlier in this prompt.',
-      'Do not cite or paraphrase [KG], [CL], [OEM], [EM], or [SK] material. Do not fill gaps from memory.',
-      'Keep unresolved facts unresolved. If the user asks for a next verification step, name the smallest routine step without claiming that this reasoning-only turn executed or will execute it.',
-      '',
-      'Return ONLY strict JSON with keys "answer" and "confidence". Calibrate confidence from the supplied evidence only; do not lower it merely because this is a repair. Do not mention this repair instruction or the rejected draft.',
-    ].join('\n')
-  }
+  const request = latestUserRequest(originalPrompt)
+  const scriptDirective = scriptRequestDirective(request)
+  const creativeConstraintRepair = creativeConstraintRepairInstruction(request, firstRaw)
   if (powerDefectCount(originalPrompt, firstRaw) > 0) {
-    return [
-      originalPrompt,
-      '',
-      powerStabilizationRepairInstruction(),
-      '',
-      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Do not mention this repair instruction or the rejected draft.',
-    ].join('\n')
+    return [originalPrompt, '', powerStabilizationRepairInstruction(), '', 'Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Do not mention this repair instruction or the rejected draft.'].join('\n')
   }
   if (promptEchoNonAnswer(originalPrompt, firstRaw)) {
-    const quantitative = QUANTITATIVE_TASK.test(latestUserRequest(originalPrompt))
+    const quantitative = QUANTITATIVE_TASK.test(request)
     return [
       originalPrompt,
       '',
@@ -240,117 +178,83 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: st
       ...(quantitative ? [
         'This is a quantitative/engineering task. Separate what can be computed from what cannot be computed from the supplied premises.',
         'For every calculable quantity, show the equation, units, and substitution from user-supplied values.',
-        'If an exact numeric result requires a missing variable (for example power draw, egress price, checkpoint size, bandwidth, transfer duration, utilization, or efficiency), name the missing input and give the symbolic break-even formula or sensitivity relation instead of inventing a value.',
-        'Complete any non-numeric portion of the request — such as a protocol, consistency rule, algorithm, decision procedure, or validation sequence — when it can be answered from general technical reasoning without those missing values.',
-        'Clearly distinguish assumptions from user-supplied facts. Do not present an illustrative assumption as measured reality.',
+        'If an exact numeric result requires a missing variable, name the missing input and give the symbolic break-even formula or sensitivity relation instead of inventing a value.',
+        'Complete every non-numeric portion that can be answered from general technical reasoning.',
+        'Clearly distinguish assumptions from user-supplied facts.',
       ] : [
         'Add substantive reasoning, conclusions, or requested deliverables that are not merely copied from the prompt.',
-        'If information is genuinely missing, state the missing input and still complete every part of the task that can be answered without it.',
+        'If information is genuinely missing, state the missing input and still complete every part that can be answered without it.',
       ]),
       '',
       'Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Do not mention this repair instruction or the rejected draft.',
     ].join('\n')
   }
   if (creativeConstraintRepair) {
-    return [
-      originalPrompt,
-      '',
-      'QUALITY REPAIR — the prior draft attributed one or more invented requirements to the user.',
-      creativeConstraintRepair,
-      scriptDirective || '',
-      '',
-      'Return a complete fresh answer to the ORIGINAL request. Preserve the requested generate/critique/rewrite workflow when present. Do not mention this repair instruction or the rejected draft.',
-    ].filter(Boolean).join('\n')
+    return [originalPrompt, '', 'QUALITY REPAIR — the prior draft attributed one or more invented requirements to the user.', creativeConstraintRepair, scriptDirective || '', '', 'Return a complete fresh answer to the ORIGINAL request. Preserve the requested generate/critique/rewrite workflow when present. Do not mention this repair instruction or the rejected draft.'].filter(Boolean).join('\n')
   }
-  if (executiveDecisionDirective(originalPrompt)) {
+  if (executiveDecisionDirective(request)) {
     return [
       originalPrompt,
       '',
       'QUALITY REPAIR — the prior executive recommendation stated unsupported outcomes or numeric targets.',
-      executiveDecisionDirective(originalPrompt),
+      executiveDecisionDirective(request),
       '',
       'Rewrite the memo from the supplied facts only.',
-      '- Do not say that renewals are safe, cannibalization is low, customers will or will not downgrade, or that a contract guarantees a commercial outcome unless the supplied evidence establishes it.',
-      '- Do not add feature limits, timelines, savings targets, percentages, user counts, legal conclusions, or price points that are not in the request.',
-      '- Convert unsupported predictions into risks, hypotheses, decision gates, experiments, and measurements; state what evidence would confirm or falsify them.',
+      '- Do not state unsupported commercial outcomes as facts.',
+      '- Do not add feature limits, timelines, savings targets, percentages, user counts, legal conclusions, or price points absent from the request.',
+      '- Convert unsupported predictions into risks, hypotheses, decision gates, experiments, and measurements.',
       '- Preserve the useful arbitration framework and deliver the complete requested memo.',
       '',
       'Return a fresh answer. Do not mention this repair instruction or the rejected draft.',
     ].join('\n')
   }
-  if (scriptDirective && classifyScriptRequest(originalPrompt) === 'content') {
+  if (scriptDirective && classifyScriptRequest(request) === 'content') {
     return [
       originalPrompt,
       '',
       'QUALITY REPAIR — your previous draft did not fully satisfy the requested written script.',
       scriptDirective,
       '',
-      'If the user asked for humor, the script must contain an actual restrained comic beat: a concrete situational contrast, escalation, or payoff. Do not merely mention humor, professionalism, policy, or compliance.',
-      'Produce the requested written script now.',
-      '- Keep every unknown attribute unknown; use wording that remains valid whether the named subject is a person, product, company, service, project, or something else.',
-      '- Do not explain that the ambiguity prevents writing. The ambiguity is a constraint on wording, not a reason to refuse.',
-      '- Do not provide a programming template, source code, classes, functions, APIs, or a choice of programming language.',
-      '- Do not invent factual attributes, features, roles, capabilities, dates, or identity details that the user did not supply.',
-      '- Return the actual script first. A short note about what was intentionally left unspecified is allowed only after the script.',
+      'Produce the requested written script now. Keep unknown attributes unknown, do not refuse merely because wording is ambiguous, do not provide programming code, and do not invent factual attributes.',
       '',
       'Return a fresh answer. Do not mention this repair instruction or the rejected draft.',
     ].join('\n')
   }
-
+  if (!promptAppearsDiagnostic(originalPrompt)) {
+    return originalPrompt
+  }
   return [
     originalPrompt,
     '',
-    'QUALITY REPAIR — solve the incident again from the original facts. Your previous draft was rejected as category-shaped; do not copy it, defend it, or reuse the headings from it.',
-    '',
-    'Reason from all asymmetries before naming causes:',
-    '- If only one tenant class is affected, prefer mechanisms scoped to that class or to resources it uniquely uses. Demote explanations that should affect all tenants equally.',
-    '- If overall traffic is unchanged, prefer state-dependent mechanisms such as queue/pool saturation at a tier boundary, working-set/cache threshold crossing, plan/cardinality changes, shard or routing placement, throttling/quota thresholds, or dependency behavior tied to that tenant class over a generic load explanation.',
-    '- If there was no deployment, distinguish mechanisms that can change without code: data growth/skew, statistics or plan changes, cache eviction, pool occupancy, noisy-neighbor placement, routing/config drift, certificate/DNS/dependency state, or provider-side throttling.',
-    '- Treat normal aggregate CPU and memory as evidence against global compute exhaustion, not as proof that waits, queues, locks, I/O, pools, caches, or downstream dependencies are healthy.',
-    '',
-    'The rewritten answer MUST:',
-    '- rank concrete causal mechanisms, not generic buckets such as "resource contention", "network latency", "configuration differences", or "application bottleneck";',
-    '- explicitly say why each mechanism fits the enterprise-only symptom, the no-deployment fact, the unchanged overall traffic, and the normal aggregate database CPU/memory;',
-    '- for each ranked cause, name exact read-only observables that distinguish it from the others and a condition that would falsify it;',
-    '- use only existing logs, traces, metrics, database/system views, configuration snapshots, query plans already captured by observability, or historical telemetry; do not require a production mutation;',
-    '- avoid EXPLAIN ANALYZE on production unless an equivalent plan is already captured, because executing it can add load or side effects;',
-    '- keep claims proportional to supplied evidence and lower confidence if the mechanisms remain uncertain.',
+    'QUALITY REPAIR — solve the diagnostic task again from the original facts. Do not copy or defend the rejected draft.',
+    'Rank concrete causal mechanisms; explain how each fits the supplied asymmetries; name read-only observables that distinguish and falsify each cause; avoid production mutations; keep confidence proportional to evidence.',
     '',
     'Return a fresh answer. Do not mention this repair instruction or the rejected draft.',
   ].join('\n')
 }
 
 export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRaw: string): boolean {
-  const firstBoundary = sourceBoundaryBreach(prompt, firstRaw)
-  const repairedBoundary = sourceBoundaryBreach(prompt, repairedRaw)
-  if (firstBoundary !== repairedBoundary) return !repairedBoundary
-  if (firstBoundary && repairedBoundary) return false
-
   const firstPower = powerDefectCount(prompt, firstRaw)
   const repairedPower = powerDefectCount(prompt, repairedRaw)
   if (firstPower !== repairedPower) return repairedPower < firstPower
   if (firstPower && repairedPower) return false
-
   const firstEcho = promptEchoNonAnswer(prompt, firstRaw)
   const repairedEcho = promptEchoNonAnswer(prompt, repairedRaw)
   if (firstEcho !== repairedEcho) return !repairedEcho
   if (firstEcho && repairedEcho) return false
-
-  const firstCreativeViolations = unsupportedCreativeConstraintClaims(prompt, firstRaw)
-  const repairedCreativeViolations = unsupportedCreativeConstraintClaims(prompt, repairedRaw)
+  const request = latestUserRequest(prompt)
+  const firstCreativeViolations = unsupportedCreativeConstraintClaims(request, firstRaw)
+  const repairedCreativeViolations = unsupportedCreativeConstraintClaims(request, repairedRaw)
   if (firstCreativeViolations.length !== repairedCreativeViolations.length) return repairedCreativeViolations.length < firstCreativeViolations.length
   if (firstCreativeViolations.length && repairedCreativeViolations.length) return false
-
   const firstScriptMismatch = contentScriptSemanticMismatch(prompt, firstRaw)
   const repairedScriptMismatch = contentScriptSemanticMismatch(prompt, repairedRaw)
   if (firstScriptMismatch !== repairedScriptMismatch) return !repairedScriptMismatch
   if (firstScriptMismatch && repairedScriptMismatch) return false
-
   const firstExecutiveSignals = executiveDecisionUnsupportedClaims(prompt, firstRaw)
   const repairedExecutiveSignals = executiveDecisionUnsupportedClaims(prompt, repairedRaw)
   if (firstExecutiveSignals.length !== repairedExecutiveSignals.length) return repairedExecutiveSignals.length < firstExecutiveSignals.length
   if (firstExecutiveSignals.length && repairedExecutiveSignals.length) return false
-
   const first = assessReasonerDraft(prompt, firstRaw)
   const repaired = assessReasonerDraft(prompt, repairedRaw)
   if (!repaired.parseable) return false
@@ -367,15 +271,13 @@ function qualityRepairPersistenceError(error: unknown): string {
   if (error instanceof Error) return error.message
   if (error && typeof error === 'object') {
     const value = error as Record<string, unknown>
-    const fields = [value.code, value.message, value.details, value.hint]
-      .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    const fields = [value.code, value.message, value.details, value.hint].filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
     if (fields.length) return fields.join(' | ')
     try { return JSON.stringify(error) } catch { /* fall through */ }
   }
   return String(error)
 }
 
-/** Best-effort audit persistence; never blocks COS reasoning. */
 export async function recordQualityRepairDecision(input:QualityRepairDecisionInput):Promise<void>{
   try{
     const { cosServiceDb }=await import('@/lib/cos-core/storage/supabase')

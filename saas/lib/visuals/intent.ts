@@ -422,7 +422,7 @@ export function hasVisualActionToken(prompt: string): boolean {
  */
 export function detectConciergeVisualIntent(
   prompt: string,
-  options?: { semanticVisual?: boolean },
+  options?: { semanticVisual?: boolean; realPeople?: readonly string[] },
 ): ConciergeVisualIntent | null {
   const admitted = isConciergeVisualObjective(prompt)
     || options?.semanticVisual === true
@@ -437,7 +437,10 @@ export function detectConciergeVisualIntent(
     return Object.freeze({ filename: filenameForReference(query), mode: 'reference-mark', referenceQuery: query })
   }
 
-  const people = extractNamedPeople(prompt)
+  // Capitalisation only PROPOSES people. When the caller has had the proposal filtered
+  // semantically (see ./namedSubjectIntent.ts) its verdict wins, so "Noah's Ark" and
+  // "Eiffel Tower" stop being sent to person-verification and refused as unresolved.
+  const people = options?.realPeople ? [...options.realPeople] : extractNamedPeople(prompt)
   if (people.length) {
     return Object.freeze({ filename: filenameForPeople(people), mode: 'reference-people', referencePeople: Object.freeze(people) })
   }

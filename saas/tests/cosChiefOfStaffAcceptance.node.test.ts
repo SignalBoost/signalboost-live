@@ -42,8 +42,11 @@ test('owner route executes the normal COS reasoning runner and persists all four
 
 test('dashboard exposes one owner action and the schema is service-role only', () => {
   const page = readFileSync(new URL('../app/dashboard/cos-chief-of-staff-reliability/page.tsx', import.meta.url), 'utf8')
+  const copy = readFileSync(new URL('../lib/i18n/chiefOfStaffAcceptanceCopy.ts', import.meta.url), 'utf8')
   const migration = readFileSync(new URL('../supabase/migrations/20260907004535_cos_chief_of_staff_acceptance.sql', import.meta.url), 'utf8')
-  assert.match(page, /Run four-case acceptance cycle/)
+  assert.match(page, /getChiefOfStaffAcceptanceCopy/)
+  assert.match(copy, /Run four-case acceptance cycle/)
+  for (const language of ['en:', 'es:', 'pt:', 'pl:', 'ru:']) assert.match(copy, new RegExp(language))
   assert.match(page, /\/api\/admin\/cos-chief-of-staff-acceptance/)
   assert.match(migration, /enable row level security/)
   assert.match(migration, /revoke all .* anon, authenticated/)

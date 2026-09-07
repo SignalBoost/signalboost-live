@@ -5,16 +5,20 @@ on:
     paths:
       - 'saas/app/api/visuals/**'
       - 'saas/lib/ai/cos/goalCompletion.ts'
+      - 'saas/lib/visuals/intent.ts'
       - 'saas/lib/visuals/personReferences.ts'
       - 'saas/tests/conciergeGoalCompletion.node.test.ts'
+      - 'saas/tests/conciergeVisualIntent.node.test.ts'
       - '.github/workflows/concierge-goal-completion.yml'
   push:
     branches: [main]
     paths:
       - 'saas/app/api/visuals/**'
       - 'saas/lib/ai/cos/goalCompletion.ts'
+      - 'saas/lib/visuals/intent.ts'
       - 'saas/lib/visuals/personReferences.ts'
       - 'saas/tests/conciergeGoalCompletion.node.test.ts'
+      - 'saas/tests/conciergeVisualIntent.node.test.ts'
       - '.github/workflows/concierge-goal-completion.yml'
 
 permissions:
@@ -35,5 +39,5 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: npm install --no-audit --no-fund
-      - name: Verify objective state, replay boundary, and named-person recovery
-        run: npx --yes tsx --test tests/conciergeGoalCompletion.node.test.ts
+      - name: Verify objective state, replay boundary, named-person recovery, and visual intent routing
+        run: npx --yes tsx --test tests/conciergeGoalCompletion.node.test.ts tests/conciergeVisualIntent.node.test.ts

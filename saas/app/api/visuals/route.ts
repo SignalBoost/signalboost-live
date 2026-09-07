@@ -4,7 +4,8 @@ import { getAccess } from '@/lib/auth/access'
 import { blockedGoal, completedGoal, partialGoal } from '@/lib/ai/cos/goalCompletion'
 import { createPlatformImagePort } from '@/lib/cos/aiPort'
 import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase'
-import { detectConciergeVisualIntent } from '@/lib/visuals/intent'
+import { filterRealPeople } from '@/lib/visuals/namedSubjectIntent'
+import { extractNamedPeople, detectConciergeVisualIntent } from '@/lib/visuals/intent'
 import { resolveVerifiedReferenceVisual, type VerifiedReferenceVisual } from '@/lib/visuals/referenceAssets'
 import {
   resolveVerifiedPersonReferenceWithRecovery,
@@ -268,7 +269,12 @@ export async function POST(request: Request) {
     // The caller may have admitted this request semantically when the prompt
     // named no picture-noun ("draw 2 kids playing football in the rain").
     const semanticVisual = (body as { semanticVisual?: unknown })?.semanticVisual === true
-    const intent = detectConciergeVisualIntent(objective, { semanticVisual })
+    // Two capitalised words is not a person. Filter the orthographic guess semantically
+    // before it can send a vessel or a landmark to verified-person lookup and refuse the
+    // request as an "unresolved person". The filter only removes candidates and fails
+    // safe, so a real likeness still cannot be drawn without reference verification.
+    const realPeople = await filterRealPeople(objective, extractNamedPeople(objective))
+    const intent = detectConciergeVisualIntent(objective, { semanticVisual, realPeople })
     if (!intent) {
       return NextResponse.json({
         error: 'visual_request_not_recognised',

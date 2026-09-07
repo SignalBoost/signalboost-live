@@ -3,9 +3,11 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import {
   conciergeLanguageQualityInstruction,
+  explicitlyPreservedCriticalTokens,
   NATIVE_LANGUAGE_ANSWER_POLICY,
   normalizeConciergeLanguage,
   preservesCriticalLanguageTokens,
+  preservesExplicitlyRequestedCriticalTokens,
 } from '../lib/ai/cos/conciergeLanguageQuality.ts'
 import { classifyConciergeIntent, getConciergeAnswer } from '../lib/platform/unifiedPlatform.ts'
 
@@ -16,12 +18,17 @@ test('Concierge has a native-language quality contract for all five supported la
     const instruction = conciergeLanguageQualityInstruction(language)
     assert.match(instruction, /NATIVE-LANGUAGE QUALITY CONTRACT:/)
     assert.match(instruction, /direct|directamente|diretamente|bezpośrednio|сразу/i)
+    assert.match(instruction, /MUST contain that exact literal/)
   }
+  const spanish = conciergeLanguageQualityInstruction('es')
+  assert.match(spanish, /concordancia de género y número/)
+  assert.match(spanish, /determinantes, sustantivos y adjetivos/)
   const polish = conciergeLanguageQualityInstruction('pl')
   assert.match(polish, /przypadków/)
   assert.match(polish, /aspektu/)
   assert.match(polish, /Pan\/Pani/)
   assert.match(polish, /kalek/)
+  assert.match(polish, /kontrolę odmiany/)
   assert.equal(normalizeConciergeLanguage('pl-PL'), 'pl')
   assert.equal(normalizeConciergeLanguage('xx'), 'en')
 })
@@ -37,6 +44,8 @@ test('first-pass shared answer policy carries native rules for every supported l
   assert.match(policy, /rodzaju/)
   assert.match(policy, /rekcji/)
   assert.match(policy, /zgodności gramatycznej/)
+  assert.match(policy, /morphology, agreement/)
+  assert.match(policy, /failed answer/)
 
   const answerPolicy = read('../lib/ai/cos/cosAnswerPolicyCore.ts')
   const enterprise = read('../lib/ai/cos/cosFirstAnswerEnterprise.ts')
@@ -47,6 +56,18 @@ test('first-pass shared answer policy carries native rules for every supported l
   assert.match(enterprise, /`Reply in \$\{language\}\.\`/)
   assert.match(core, /\.\.\.QUANTITATIVE_ANSWER_POLICY/)
   assert.match(core, /input\.language \? `Reply in \$\{input\.language\}\.\` : 'Reply in the language of the user\.'/)
+})
+
+test('explicit preservation directives identify only literals the user required unchanged', () => {
+  const spanish = 'Mantén ALPHA-42 sin cambios y explica el piloto en lenguaje natural.'
+  assert.deepEqual(explicitlyPreservedCriticalTokens(spanish), ['ALPHA-42'])
+  assert.equal(preservesExplicitlyRequestedCriticalTokens(spanish, 'ALPHA-42 sigue siendo el identificador del proyecto.'), true)
+  assert.equal(preservesExplicitlyRequestedCriticalTokens(spanish, 'El proyecto sigue siendo el mismo.'), false)
+
+  const transformed = 'Preserve ALPHA-42 and https://example.com/Plan exactly while rewriting the message.'
+  assert.deepEqual(explicitlyPreservedCriticalTokens(transformed), ['https://example.com/Plan', 'ALPHA-42'])
+  assert.equal(preservesExplicitlyRequestedCriticalTokens(transformed, 'ALPHA-42 — https://example.com/Plan'), true)
+  assert.equal(preservesExplicitlyRequestedCriticalTokens(transformed, 'ALPHA-42 — https://example.com/plan'), false)
 })
 
 test('native-language review cannot drop critical facts and identifiers', () => {

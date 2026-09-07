@@ -1,4 +1,8 @@
-import { criticalLanguageTokens, preservesCriticalLanguageTokens, type ConciergeLanguage } from './conciergeLanguageQuality.ts'
+import {
+  criticalLanguageTokens,
+  preservesExplicitlyRequestedCriticalTokens,
+  type ConciergeLanguage,
+} from './conciergeLanguageQuality.ts'
 
 export type ConciergeLanguageAcceptanceCategory = 'conversation' | 'operational' | 'transformation' | 'reasoning' | 'fallback'
 export type ConciergeLanguageAcceptanceMode = 'cos' | 'deterministic_fallback'
@@ -104,6 +108,10 @@ export function selectedLanguageSignal(text: string, language: ConciergeLanguage
   const targetHits = stopwordHits(value, language)
   if (language === 'ru') return (value.match(/[А-Яа-яЁё]/g) ?? []).length >= 12 && targetHits >= 2
   if (language === 'en') return targetHits >= 3
+  if (language === 'pl') {
+    const polishOrthographyHits = (value.match(/[ąćęłńóśźż]/giu) ?? []).length
+    if (polishOrthographyHits >= 3 && targetHits >= 1) return true
+  }
   const otherHits = ACCEPTANCE_LANGUAGES.filter(code => code !== language && code !== 'en').map(code => stopwordHits(value, code))
   return targetHits >= 2 && targetHits >= Math.max(0, ...otherHits)
 }
@@ -124,7 +132,9 @@ export function evaluateLanguageAcceptanceText(input: {
   externalAiInvoked: boolean
   latencyMs: number
 }): ConciergeLanguageAcceptanceVerdicts {
-  const criticalOk = input.test.preserveCriticalTokens === false ? true : preservesCriticalLanguageTokens(input.test.prompt, input.reply)
+  const criticalOk = input.test.preserveCriticalTokens === false
+    ? true
+    : preservesExplicitlyRequestedCriticalTokens(input.test.prompt, input.reply)
   const source = String(input.responseSource || '').trim().toLowerCase()
   const routingHealthy = input.handled && Boolean(source) && !NON_RELEASE_SOURCES.has(source) && input.externalAiInvoked === false
     && (input.test.mode === 'deterministic_fallback' || input.localModelInvoked === true || source.startsWith('deterministic_') || source.startsWith('cos_'))

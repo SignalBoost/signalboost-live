@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks'
-import { withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
-import { getConciergeAnswer } from '@/lib/platform/unifiedPlatform'
+import { withPublicDeliveryScope } from '../../auth/publicDeliveryScope.ts'
+import { getConciergeAnswer } from '../../platform/unifiedPlatform.ts'
 import { criticalLanguageTokens, preservesCriticalLanguageTokens, type ConciergeLanguage } from './conciergeLanguageQuality.ts'
 import { tryCOSFirstAnswer } from './cosFirstAnswer.ts'
 

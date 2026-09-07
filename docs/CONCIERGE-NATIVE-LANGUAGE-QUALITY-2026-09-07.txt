@@ -1,0 +1,15 @@
+SignalBoost Concierge native-language quality gate
+Date: 2026-09-07
+
+Supported languages: English, Spanish, Portuguese, Polish, Russian.
+
+Acceptance rules:
+1. Selected UI language reaches the Concierge/COS request context.
+2. Model-backed answers are authored directly in the selected language using native grammar, idiom, register, and terminology.
+3. Polish specifically requires correct case, verb aspect, gender/number agreement, natural word order, and consistent Pan/Pani versus ty register.
+4. Deterministic fallback paths are native in all five languages and may not leak English boilerplate.
+5. Multilingual intent recognition must work from native-language requests.
+6. Language-only corrections may not alter facts, numbers, URLs, citations, code, product identifiers, or governance/safety boundaries.
+7. Contextual interpretation must remain before mature retrieval.
+
+Focused regression: saas/tests/conciergeNativeLanguageQuality.node.test.ts

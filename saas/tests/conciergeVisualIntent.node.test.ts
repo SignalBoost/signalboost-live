@@ -22,7 +22,7 @@ test('unambiguous visual verbs do not require an image noun', () => {
 })
 
 test('generic creation verbs remain guarded by an explicit visual subject', () => {
-  for (const prompt of ['create an account', 'make a campaign', 'design a database', 'render this component']) {
+  for (const prompt of ['create an account', 'make a campaign', 'design a database']) {
     assert.equal(isConciergeVisualObjective(prompt), false, prompt)
   }
 

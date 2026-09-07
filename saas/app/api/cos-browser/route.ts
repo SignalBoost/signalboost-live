@@ -31,6 +31,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+const ownerSoftwareAuthority = Object.freeze({ allowRepositoryRepair: true })
+
 function isSignalBoostDeploymentContext(req: NextRequest): boolean {
   const owner = String(process.env.VERCEL_GIT_REPO_OWNER || '').trim().toLowerCase()
   const repo = String(process.env.VERCEL_GIT_REPO_SLUG || '').trim().toLowerCase()
@@ -131,9 +133,9 @@ export async function POST(req: NextRequest) {
     || reverseImmediateOperationalRepair
 
   const deployment = { commitSha: process.env.VERCEL_GIT_COMMIT_SHA, branch: process.env.VERCEL_GIT_COMMIT_REF }
-  // Passive operational evidence must never enter the executable Software Specialist merely because
-  // the signed-in user owns the repository. It is diagnosis-only until a separate explicit repair
-  // intent is present. Source-backed work still uses the isolated Software Specialist as before.
+  // The owner surface retains repository-repair capability, but passive operational evidence cannot
+  // exercise that capability. A separate explicit repair intent (or ordinary non-log coding request)
+  // is required before the executable specialist receives repository authority.
   const shouldConsultSoftwareSpecialist = !operationalEvidence || hasSourceAttachment || explicitOperationalRepair
   const softwareSpecialist = shouldConsultSoftwareSpecialist
     ? browserSurface === 'assistant'
@@ -141,7 +143,7 @@ export async function POST(req: NextRequest) {
           body,
           objective: operationalPrompt || prompt,
           surface: 'assistant',
-          allowRepositoryRepair: !operationalEvidence || explicitOperationalRepair,
+          allowRepositoryRepair: ownerSoftwareAuthority.allowRepositoryRepair && (!operationalEvidence || explicitOperationalRepair),
           signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
           deployment,
         })

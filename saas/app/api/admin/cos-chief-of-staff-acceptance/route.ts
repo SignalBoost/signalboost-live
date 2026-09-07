@@ -6,6 +6,7 @@ import { evaluateChiefOfStaffReliability } from '@/lib/ai/cos/chiefOfStaffReliab
 import {
   CHIEF_OF_STAFF_ACCEPTANCE_CASES,
   evaluateChiefOfStaffAcceptanceCase,
+  isFreshReleasedAcceptanceOutcome,
 } from '@/lib/ai/cos/chiefOfStaffAcceptance'
 
 export const runtime = 'nodejs'
@@ -58,7 +59,9 @@ export async function PUT(request: Request) {
   const body = await request.json().catch(() => ({})) as { runId?:string; caseKey?:string }
   const runId = String(body.runId ?? '')
   const test = CHIEF_OF_STAFF_ACCEPTANCE_CASES.find(candidate => candidate.key === body.caseKey)
-  if (!/^[0-9a-f-]{36}$/i.test(runId) || !test) return NextResponse.json({ ok:false, error:'A valid run and acceptance case are required.' }, { status:400 })
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(runId) || !test) {
+    return NextResponse.json({ ok:false, error:'A valid run and acceptance case are required.' }, { status:400 })
+  }
   const run = await db.from('cos_chief_of_staff_acceptance_runs').select('id,status').eq('id', runId).single()
   if (run.error || !run.data) return NextResponse.json({ ok:false, error:'Acceptance run was not found.' }, { status:404 })
   if (run.data.status !== 'running') return NextResponse.json({ ok:false, error:'Acceptance run is already final.' }, { status:409 })
@@ -67,49 +70,52 @@ export async function PUT(request: Request) {
     let row
     try {
       const outcome = await runPrivateCapabilityCase({
-          id: CASE_IDS[test.key],
-          track: 'chief_of_staff_acceptance',
-          prompt: test.prompt,
-          requiredTerms: [],
-          forbiddenTerms: [],
-          requiresProvenance: true,
-          requiresLocalReasoning: true,
+        id: CASE_IDS[test.key],
+        track: 'chief_of_staff_acceptance',
+        prompt: test.prompt,
+        requiredTerms: [],
+        forbiddenTerms: [],
+        requiresProvenance: true,
+        requiresLocalReasoning: true,
       }, { attachOutcome: false, outcomeSource: 'chief_of_staff_acceptance' })
-      const freshExecution = outcome.provenance.localModelInvoked === true
-          && !outcome.provenance.externalAiInvoked
-          && !['semantic_cache', 'semantic_similarity'].includes(String(outcome.provenance.responseSource))
+      const freshExecution = isFreshReleasedAcceptanceOutcome({
+        handled: outcome.handled,
+        responseSource: String(outcome.provenance.responseSource || ''),
+        localModelInvoked: outcome.provenance.localModelInvoked === true,
+        externalAiInvoked: outcome.provenance.externalAiInvoked === true,
+      })
       const provenanceRecorded = Boolean(outcome.turnId)
       const observation = evaluateChiefOfStaffAcceptanceCase({ runId, test, reply: outcome.replyExcerpt, freshExecution, provenanceRecorded })
       row = {
-          run_id: runId,
-          case_key: test.key,
-          title: test.title,
-          verdicts: observation.verdicts,
-          response_excerpt: outcome.replyExcerpt,
-          response_source: outcome.provenance.responseSource,
-          local_model_invoked: outcome.provenance.localModelInvoked,
-          external_ai_invoked: outcome.provenance.externalAiInvoked,
-          fresh_execution: freshExecution,
-          provenance_recorded: provenanceRecorded,
-          turn_id: outcome.turnId,
-          latency_ms: outcome.latencyMs,
-          passed: Object.values(observation.verdicts).every(verdict => verdict.passed) && freshExecution && provenanceRecorded,
+        run_id: runId,
+        case_key: test.key,
+        title: test.title,
+        verdicts: observation.verdicts,
+        response_excerpt: outcome.replyExcerpt,
+        response_source: outcome.provenance.responseSource,
+        local_model_invoked: outcome.provenance.localModelInvoked,
+        external_ai_invoked: outcome.provenance.externalAiInvoked,
+        fresh_execution: freshExecution,
+        provenance_recorded: provenanceRecorded,
+        turn_id: outcome.turnId,
+        latency_ms: outcome.latencyMs,
+        passed: Object.values(observation.verdicts).every(verdict => verdict.passed) && freshExecution && provenanceRecorded,
       }
     } catch (error) {
       const observation = evaluateChiefOfStaffAcceptanceCase({ runId, test, reply: '', freshExecution: false, provenanceRecorded: false })
       row = {
-          run_id: runId,
-          case_key: test.key,
-          title: test.title,
-          passed: false,
-          verdicts: observation.verdicts,
-          response_excerpt: `Execution failed: ${errorText(error)}`,
-          response_source: 'none',
-          local_model_invoked: false,
-          external_ai_invoked: false,
-          fresh_execution: false,
-          provenance_recorded: false,
-          latency_ms: 0,
+        run_id: runId,
+        case_key: test.key,
+        title: test.title,
+        passed: false,
+        verdicts: observation.verdicts,
+        response_excerpt: `Execution failed: ${errorText(error)}`,
+        response_source: 'none',
+        local_model_invoked: false,
+        external_ai_invoked: false,
+        fresh_execution: false,
+        provenance_recorded: false,
+        latency_ms: 0,
       }
     }
     const stored = await db.from('cos_chief_of_staff_acceptance_results').upsert(row, { onConflict:'run_id,case_key' })

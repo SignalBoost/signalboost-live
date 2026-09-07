@@ -11,20 +11,37 @@ const reasoner = (verdict: unknown, seen?: string[]) => (async (args: any) => {
 
 const offline = (async () => null) as any
 
-test('the exact production prompt carries a drawing verb but no picture-noun', () => {
+// PR #1939 made draw/sketch/paint/illustrate self-sufficient verbs, so the exact
+// production prompt is now admitted deterministically and never reaches the
+// semantic classifier. This pins that outcome directly.
+test('the exact production prompt routes to the visual generator with no model call', async () => {
   const prompt = 'draw 2 kids playing football in the rain'
-  assert.equal(isConciergeVisualObjective(prompt), false)
-  assert.equal(hasVisualActionToken(prompt), true)
-  assert.equal(detectConciergeVisualIntent(prompt), null)
+  const seen: string[] = []
+  assert.equal(isConciergeVisualObjective(prompt), true)
+  assert.deepEqual(detectConciergeVisualIntent(prompt), { filename: 'visual.png', mode: 'generate' })
+  await isSemanticVisualRequest('what is 2 + 2', reasoner({ depictable_image: true }, seen))
+  assert.deepEqual(seen, [])
 })
 
-test('a semantic verdict admits it and produces a real generate intent', async () => {
-  const prompt = 'draw 2 kids playing football in the rain'
-  assert.equal(await isSemanticVisualRequest(prompt, reasoner({ depictable_image: true })), true)
-  assert.deepEqual(detectConciergeVisualIntent(prompt, { semanticVisual: true }), { filename: 'visual.png', mode: 'generate' })
+// The verb list closes the draw/paint family. It cannot close the generic verbs,
+// because create/make/design/generate are used for text work just as often as for
+// pictures — the deliverable, not the verb, decides. That is the gap the semantic
+// classifier covers.
+test('a generic verb with a depictable subject is admitted only semantically', async () => {
+  for (const prompt of [
+    'create a golden retriever wearing sunglasses on a skateboard',
+    'make me a cozy cabin in a snowstorm at dusk',
+    'design a robot barista serving coffee',
+    'generate a golden retriever wearing sunglasses',
+  ]) {
+    assert.equal(isConciergeVisualObjective(prompt), false, prompt)
+    assert.equal(detectConciergeVisualIntent(prompt), null, prompt)
+    assert.equal(await isSemanticVisualRequest(prompt, reasoner({ depictable_image: true })), true, prompt)
+    assert.deepEqual(detectConciergeVisualIntent(prompt, { semanticVisual: true }), { filename: 'visual.png', mode: 'generate' }, prompt)
+  }
 })
 
-test('subjects no noun list would ever contain are admitted the same way', async () => {
+test('the self-sufficient verbs work across all five platform languages', () => {
   for (const prompt of [
     'draw 2 kids playing football in the rain',
     'paint a sunset over the ocean',
@@ -33,12 +50,11 @@ test('subjects no noun list would ever contain are admitted the same way', async
     'нарисуй космический корабль',
   ]) {
     assert.equal(hasVisualActionToken(prompt), true, prompt)
-    assert.equal(await isSemanticVisualRequest(prompt, reasoner({ depictable_image: true })), true, prompt)
-    assert.notEqual(detectConciergeVisualIntent(prompt, { semanticVisual: true }), null, prompt)
+    assert.notEqual(detectConciergeVisualIntent(prompt), null, prompt)
   }
 })
 
-test('ordinary work keeping the same verbs is never turned into a picture', async () => {
+test('ordinary work keeping the same generic verbs is never turned into a picture', async () => {
   for (const prompt of [
     'create a go-to-market strategy for Q4',
     'design a database schema for orders and invoices',
@@ -59,25 +75,19 @@ test('a semantic verdict can never admit a request that has no drawing verb', as
 })
 
 test('the classifier fails closed on outage, junk and malformed verdicts', async () => {
-  const prompt = 'draw 2 kids playing football in the rain'
+  const prompt = 'create a golden retriever wearing sunglasses on a skateboard'
   assert.equal(await isSemanticVisualRequest(prompt, offline), false)
   assert.equal(await isSemanticVisualRequest(prompt, reasoner({ depictable_image: 'yes' })), false)
   assert.equal(await isSemanticVisualRequest(prompt, reasoner({})), false)
   assert.equal(await isSemanticVisualRequest('', reasoner({ depictable_image: true })), false)
-  assert.equal(await isSemanticVisualRequest(`draw ${'x'.repeat(500)}`, reasoner({ depictable_image: true })), false)
-})
-
-test('an already-admitted request never spends a model call', async () => {
-  const seen: string[] = []
-  assert.equal(isConciergeVisualObjective('draw me a picture of a spaceship'), true)
-  await isSemanticVisualRequest('what is 2 + 2', reasoner({ depictable_image: true }, seen))
-  assert.deepEqual(seen, [])
+  assert.equal(await isSemanticVisualRequest(`create ${'x'.repeat(500)}`, reasoner({ depictable_image: true })), false)
 })
 
 test('the browser ingress uses the semantic gate and forwards its verdict', async () => {
-  const route = await import('node:fs/promises').then(fs => fs.readFile('app/api/cos-browser/route.ts', 'utf8'))
+  const fs = await import('node:fs/promises')
+  const route = await fs.readFile('app/api/cos-browser/route.ts', 'utf8')
   assert.match(route, /isSemanticVisualRequest/)
   assert.match(route, /semanticVisual/)
-  const visuals = await import('node:fs/promises').then(fs => fs.readFile('app/api/visuals/route.ts', 'utf8'))
+  const visuals = await fs.readFile('app/api/visuals/route.ts', 'utf8')
   assert.match(visuals, /detectConciergeVisualIntent\(objective, \{ semanticVisual \}\)/)
 })

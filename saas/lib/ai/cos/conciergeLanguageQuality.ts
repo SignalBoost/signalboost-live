@@ -35,6 +35,7 @@ const PROFILES: Record<ConciergeLanguage, string> = {
     'Pilnuj poprawnych przypadków, rodzaju, liczby, aspektu czasownika, rekcji, szyku zdania i zgodności gramatycznej.',
     'Zachowuj konsekwentny rejestr rozmowy (ty albo Pan/Pani), unikaj angielskich kalek składniowych i wybieraj sformułowania, których rzeczywiście użyłby rodzimy użytkownik języka polskiego.',
     'Przed zwróceniem odpowiedzi wykonaj cichą kontrolę odmiany i zgody gramatycznej: sprawdź przypadek, rodzaj i liczbę każdego połączenia rzeczownika z określeniami, rekcję czasowników i przyimków oraz naturalny szyk zdania.',
+    'Unikaj przeciążonych ciągów rzeczownikowych i przymiotnikowych oraz korporacyjnych kalek; jeśli konstrukcja brzmi jak tłumaczenie z angielskiego, przepisz ją prostszym, idiomatycznym polskim zdaniem.',
   ].join(' '),
   ru: [
     'Пиши на естественном, идиоматичном и профессиональном русском языке.',

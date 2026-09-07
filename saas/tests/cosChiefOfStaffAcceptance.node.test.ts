@@ -7,6 +7,7 @@ import {
   isFreshReleasedAcceptanceOutcome,
 } from '../lib/ai/cos/chiefOfStaffAcceptance.ts'
 import { evaluateChiefOfStaffReliability } from '../lib/ai/cos/chiefOfStaffReliability.ts'
+import { isAdvisoryDiagnosisPrompt } from '../lib/ai/cos/advisoryDiagnosisPolicy.ts'
 
 const replies:Record<string,string> = {
   'instruction-scope': 'Recommendation\nChoose North.\nRationale\nIt is a 14-day pilot using the existing team with no new vendor.\nNext action\nSchedule the internal kickoff.',
@@ -64,6 +65,42 @@ test('evidence boundary accepts an explicit evidence-led unverified status', () 
   assert.equal(observation.verdicts.autonomous_follow_through.passed, true)
 })
 
+test('live evidence-boundary wording is accepted without weakening completion safety', () => {
+  const reply = [
+    '**Verified facts**',
+    '- The test suite recorded 42 passing tests.',
+    '- There is no deployment record for this cycle.',
+    '- Production health was not checked.',
+    '',
+    '**Unresolved uncertainty**',
+    '- We do not know if the system is currently healthy, degraded, or failing in production because health checks were skipped.',
+    '',
+    '**Next action**',
+    'The smallest routine verification step is to run a live smoke test against the current production endpoint.',
+  ].join('\n')
+  const observation = observe('evidence-boundary', reply)
+  assert.equal(observation.verdicts.instruction_adherence.passed, true)
+  assert.equal(observation.verdicts.evidence_accuracy.passed, true)
+  assert.equal(observation.verdicts.autonomous_follow_through.passed, true)
+  assert.equal(observation.verdicts.truthful_reporting.passed, true)
+})
+
+test('bounded status failure evidence is not mistaken for an incident-diagnosis request', () => {
+  const truthfulStatus = CHIEF_OF_STAFF_ACCEPTANCE_CASES.find(item => item.key === 'truthful-status')!
+  assert.equal(isAdvisoryDiagnosisPrompt(truthfulStatus.prompt), false)
+  assert.equal(isAdvisoryDiagnosisPrompt('Why did GEN-2 fail during the test? Give leading hypotheses.'), true)
+  assert.equal(isAdvisoryDiagnosisPrompt('Diagnose the root cause of the failed deployment check.'), true)
+})
+
+test('problem-class learning isolates the canonical user-input envelope', () => {
+  const source = readFileSync(new URL('../lib/ai/cos/cosProblemClass.ts', import.meta.url), 'utf8')
+  assert.match(source, /CURRENT USER INPUT \(QUESTION, STATEMENT, OR PASTED TEXT\):/)
+  assert.match(source, /lastIndexOf\(candidate\)/)
+  const markerIndex = source.indexOf('USER_TASK_MARKERS')
+  const foundationalIndex = source.indexOf('nearestFoundationalSubject(text)')
+  assert.ok(markerIndex >= 0 && foundationalIndex > markerIndex)
+})
+
 test('acceptance grading rejects missing mandated choices, labels, and vendor evidence', () => {
   const weakRecommendation = 'Recommendation\nOption North\nRationale\nNorth is a 14-day pilot using the existing team.\nNext action\nStart.'
   assert.equal(observe('instruction-scope', weakRecommendation).verdicts.instruction_adherence.passed, false)
@@ -116,4 +153,9 @@ test('dashboard exposes one owner action and the schema is service-role only', (
   assert.match(migration, /enable row level security/)
   assert.match(migration, /revoke all .* anon, authenticated/)
   assert.match(migration, /grant select, insert, update, delete .* service_role/)
+})
+
+test('chief-of-staff acceptance regression is mandatory in the Vercel COS gate', () => {
+  const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
+  assert.match(gate, /tests\/cosChiefOfStaffAcceptance\.node\.test\.ts/)
 })

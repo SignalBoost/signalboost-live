@@ -7,8 +7,9 @@ import { callCosReasoner } from './cosReasoner.ts'
 import {
   conciergeLanguageName,
   conciergeLanguageQualityInstruction,
+  explicitlyPreservedCriticalTokens,
   normalizeConciergeLanguage,
-  preservesCriticalLanguageTokens,
+  preservesExplicitlyRequestedCriticalTokens,
   restoreCriticalLanguageTokenCasing,
 } from './conciergeLanguageQuality.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
@@ -344,10 +345,14 @@ async function reviewNativeLanguageQuality(
   const protectedResult = restoreProtectedTokenCasing(input, result)
   if (!protectedResult.handled) return protectedResult
   const language = normalizeConciergeLanguage(input.language)
-  if (language === 'en') return protectedResult
-
   const original = String(protectedResult.reply || '').trim()
   if (!original) return protectedResult
+
+  const explicitlyProtected = explicitlyPreservedCriticalTokens(String(input.prompt || ''))
+  const alreadyPreserved = preservesExplicitlyRequestedCriticalTokens(String(input.prompt || ''), original)
+  // English keeps the no-extra-call fast path unless an explicit literal-preservation invariant
+  // is already violated. Non-English always receives the existing bounded language review.
+  if (language === 'en' && alreadyPreserved) return protectedResult
 
   const reviewed = await callCosReasoner({
     temperature: 0,
@@ -356,28 +361,78 @@ async function reviewNativeLanguageQuality(
       'You are the final native-language quality reviewer for SignalBoost Concierge.',
       `The required output language is ${conciergeLanguageName(language)}.`,
       conciergeLanguageQualityInstruction(language),
-      'Improve grammar, idiom, register, fluency, and native phrasing only where needed.',
-      'Do NOT add, remove, reinterpret, summarize, or change factual claims. Do NOT alter recommendations, uncertainty, safety boundaries, names, numbers, URLs, code, markdown, citations, quoted text, product names, or literal UI labels.',
-      'If the draft is already natural and correct, return it unchanged.',
-      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Confidence is your confidence that the returned wording is natural native-language prose while preserving the original meaning exactly.',
+      'Improve grammar, morphology, agreement, idiom, register, fluency, and native phrasing wherever needed. Perform a silent final scan before returning.',
+      'Do NOT add, remove, reinterpret, summarize, or change factual claims. Do NOT alter recommendations, uncertainty, safety boundaries, numbers, code, markdown, citations, or quoted text.',
+      'EXCEPTION FOR EXPLICIT USER LITERALS: if the user explicitly required an identifier, URL, product name, code token, citation, or UI label to remain unchanged and the draft omitted it, restore that exact user-provided literal. Restoring it is instruction repair, not a new factual claim.',
+      'If the draft is already natural and correct and all explicitly protected literals are present, return it unchanged.',
+      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Confidence is your confidence that the returned wording is natural native-language prose while preserving the original meaning and every explicit literal requirement.',
     ].join(' '),
     prompt: [
       `USER REQUEST (context only; do not answer it again):\n${String(input.prompt || '').slice(0, 8_000)}`,
+      explicitlyProtected.length ? `EXPLICITLY PROTECTED LITERALS — every item below MUST appear verbatim in the final answer:\n${explicitlyProtected.join('\n')}` : '',
       `DRAFT TO REVIEW:\n${original}`,
-      'Return the same answer with language-only corrections if needed.',
-    ].join('\n\n'),
+      'Return the same answer with language-only corrections and any required literal restoration.',
+    ].filter(Boolean).join('\n\n'),
   }).catch(error => {
     console.warn('[concierge-native-language-review] reasoner unavailable', error)
     return null
   })
 
-  if (!reviewed?.text) return protectedResult
-  const decision = parseNativeLanguageReviewDecision(reviewed.text)
-  if (!decision || decision.confidence < 0.72) return protectedResult
-  const restoredDecisionAnswer = restoreCriticalLanguageTokenCasing(String(input.prompt || ''), decision.answer)
-  if (!preservesCriticalLanguageTokens(String(input.prompt || ''), restoredDecisionAnswer)) return protectedResult
-
   const provenance = protectedResult.provenance as unknown as Record<string, any>
+  if (!reviewed?.text) {
+    if (!alreadyPreserved) {
+      return {
+        handled: false,
+        confidence: 0,
+        reason: 'Native-language release rejected because an explicitly preserved literal was missing and the bounded repair was unavailable.',
+        bestEffortReply: original,
+        provenance: {
+          ...provenance,
+          nativeLanguageQuality: { reviewed: false, language, explicitLiteralViolation: true, repairUnavailable: true },
+        } as any,
+      }
+    }
+    return protectedResult
+  }
+
+  const decision = parseNativeLanguageReviewDecision(reviewed.text)
+  if (!decision || decision.confidence < 0.72) {
+    if (!alreadyPreserved) {
+      return {
+        handled: false,
+        confidence: 0,
+        reason: 'Native-language release rejected because an explicitly preserved literal was missing and the bounded repair did not produce an acceptable result.',
+        bestEffortReply: original,
+        provenance: {
+          ...provenance,
+          nativeLanguageQuality: { reviewed: false, language, explicitLiteralViolation: true, repairAccepted: false },
+        } as any,
+      }
+    }
+    return protectedResult
+  }
+
+  const restoredDecisionAnswer = restoreCriticalLanguageTokenCasing(String(input.prompt || ''), decision.answer)
+  if (!preservesExplicitlyRequestedCriticalTokens(String(input.prompt || ''), restoredDecisionAnswer)) {
+    return {
+      handled: false,
+      confidence: 0,
+      reason: 'Native-language release rejected because an explicitly preserved literal was still missing after the bounded repair.',
+      bestEffortReply: original,
+      provenance: {
+        ...provenance,
+        nativeLanguageQuality: {
+          reviewed: true,
+          language,
+          reviewer: reviewed.reasoner.label,
+          confidence: decision.confidence,
+          explicitLiteralViolation: true,
+          criticalTokensPreserved: false,
+        },
+      } as any,
+    }
+  }
+
   return {
     ...protectedResult,
     reply: restoredDecisionAnswer,
@@ -389,6 +444,7 @@ async function reviewNativeLanguageQuality(
         reviewer: reviewed.reasoner.label,
         confidence: decision.confidence,
         criticalTokensPreserved: true,
+        explicitlyProtectedLiterals: explicitlyProtected.length,
       },
       internalSystemsConsulted: [
         ...new Set([...(Array.isArray(provenance.internalSystemsConsulted) ? provenance.internalSystemsConsulted : []), 'Native Language Quality Reviewer']),
@@ -422,9 +478,11 @@ function shouldRetryMalformedPublicCoreResult(result: COSFirstAnswerResult): boo
  * context. The old deterministic core remains temporarily behind this compatibility entrypoint for
  * the rest of the mature routing pipeline, but any canned owner self-knowledge result is blocked
  * from release and gets one neural semantic re-evaluation. Non-English handled answers receive one
- * bounded native-language review that may correct wording but must preserve the answer's evidence,
- * facts, identifiers, URLs, citations, code, and meaning. A malformed public-only completion gets
- * exactly one fresh core retry; policy, disclosure, confidence, and authorization rejections do not.
+ * bounded native-language review that may correct wording and restore only explicitly protected
+ * user literals. English retains the fast path unless an explicit literal is missing. Any answer
+ * still missing such a literal after the bounded repair fails closed. A malformed public-only
+ * completion gets exactly one fresh core retry; policy, disclosure, confidence, and authorization
+ * rejections do not.
  */
 export async function tryCOSFirstAnswer(input: COSFirstAnswerInput): Promise<COSFirstAnswerResult> {
   const contextualInterpretation = await tryNeuralContextualInterpretation(input)

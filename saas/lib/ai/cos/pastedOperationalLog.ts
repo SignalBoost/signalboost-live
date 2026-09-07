@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/pastedOperationalLog.ts
 // A pasted runtime/build log is evidence to analyze, not code to execute, a provenance query,
 // a visual job, or a request to portray anyone named inside a test title.
 const OPERATIONAL_LOG = /(?:^\d{2}:\d{2}:\d{2}\.\d{3}\s+(?:running|cloning|installing|restored)\b|\b(?:running|cloning|installing|restored build cache)\b[\s\S]{0,400}\b(?:vercel|next\.js|npm|node)\b|\bvercel cli\s+\d|\b(?:✖\s+failing tests|ℹ\s+fail\s+\d+|error:\s*command\s+")\b)/im
@@ -88,26 +89,33 @@ export function analyzeOperationalLog(input: string): OperationalLogAnalysis {
   }
 }
 
+/**
+ * A person who hands over a failing log and is asked "want me to fix it?" answers like
+ * a person. Previously this paragraph demanded the literal phrase "fix it" and then
+ * spent three clauses on internal authority bookkeeping — machine-shaped, and it put
+ * the burden of finding the magic words on the owner. It is now a plain offer; any
+ * ordinary agreement is understood by ./repairConfirmationIntent.ts. The authority
+ * boundary is unchanged: the person must still actually say yes.
+ */
 export function operationalLogRepairHandoff(language = 'en'): string {
   const locale = String(language || 'en').toLowerCase()
-  if (locale === 'es') {
-    return 'Si quieres que se repare, di "fix it"; Builder llevará esta evidencia del fallo a la ruta de reparación autorizada, usará el código fuente del repositorio o espacio de trabajo al que ya tenga acceso y solo pedirá el código si no puede acceder a él. Si esta superficie no tiene autoridad de reparación, lo dirá en lugar de fingir que actuó.'
-  }
-  if (locale === 'pt') {
-    return 'Se quiser que isso seja reparado, diga "fix it"; o Builder levará esta evidência da falha para o fluxo de reparo autorizado, usará o código-fonte do repositório ou workspace ao qual já tenha acesso e só pedirá o código se não conseguir acessá-lo. Se esta superfície não tiver autoridade para reparar, ela dirá isso em vez de fingir que agiu.'
-  }
-  if (locale === 'pl') {
-    return 'Jeśli chcesz, aby to zostało naprawione, napisz "fix it"; Builder przekaże te dowody awarii do autoryzowanej ścieżki naprawy, użyje kodu źródłowego repozytorium lub obszaru roboczego, do którego ma już dostęp, i poprosi o kod tylko wtedy, gdy nie będzie mógł go uzyskać. Jeśli ta powierzchnia nie ma uprawnień do naprawy, poinformuje o tym zamiast udawać wykonanie działania.'
-  }
-  if (locale === 'ru') {
-    return 'Если вы хотите, чтобы это было исправлено, напишите "fix it"; Builder передаст эти данные о сбое в авторизованный процесс исправления, использует исходный код репозитория или рабочей области, к которому у него уже есть доступ, и запросит код только если доступа нет. Если эта поверхность не имеет полномочий на исправление, она сообщит об этом, а не будет делать вид, что выполнила действие.'
-  }
-  return 'If you want it repaired, say "fix it"; Builder will carry this failure evidence into the authorized repair path, use repository or workspace source it can already access, and ask for source only if it cannot access it. If this surface does not have repair authority, it will say so instead of pretending to act.'
+  if (locale === 'es') return 'Puedo repararlo. ¿Quieres que lo haga?'
+  if (locale === 'pt') return 'Posso reparar isso. Quer que eu faça?'
+  if (locale === 'pl') return 'Mogę to naprawić. Chcesz, żebym to zrobił?'
+  if (locale === 'ru') return 'Я могу это исправить. Хотите, чтобы я это сделал?'
+  return 'I can repair this. Want me to?'
+}
+
+/** Recognises this module's own emitted offer. Matching text we generated ourselves is
+ * not classifying a human's words, so no vocabulary rule is implied by this list. */
+export function isOperationalLogRepairOffer(reply: string): boolean {
+  const text = String(reply || '')
+  return (['en', 'es', 'pt', 'pl', 'ru'] as const).some(locale => text.includes(operationalLogRepairHandoff(locale)))
 }
 
 export function ensureOperationalLogRepairHandoff(reply: string, language = 'en'): string {
   const text = String(reply || '').trim()
-  if (/['"“”]fix it['"“”]/i.test(text) && /\bBuilder\b/i.test(text)) return text
+  if (isOperationalLogRepairOffer(text)) return text
   const handoff = operationalLogRepairHandoff(language)
   return text ? `${text} ${handoff}` : handoff
 }

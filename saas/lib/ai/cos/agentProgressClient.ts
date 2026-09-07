@@ -1,5 +1,6 @@
 import { isConciergeBuilderObjective } from './cosReasoningRolePolicy.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
+import { ASSISTANT_TRANSPORT_TIMEOUT_COPY } from './assistantTransportRecovery.ts'
 
 export type AgentProgressEvent = {
   phase: 'accepted' | 'running' | 'complete'
@@ -63,6 +64,16 @@ function latestUserText(body: Record<string, any>): string {
     if (message?.role === 'user' && typeof message?.content === 'string') return message.content.trim()
   }
   return ''
+}
+
+function transportFailureReply(body: unknown): string {
+  const record = bodyRecord(body)
+  const locale = String(record?.context?.language || 'en').toLowerCase() as keyof typeof ASSISTANT_TRANSPORT_TIMEOUT_COPY
+  return ASSISTANT_TRANSPORT_TIMEOUT_COPY[locale] || ASSISTANT_TRANSPORT_TIMEOUT_COPY.en
+}
+
+function deliberateAbort(error: unknown, signal: AbortSignal): boolean {
+  return signal.aborted || (error instanceof DOMException && error.name === 'AbortError')
 }
 
 function decodeTextDataUrl(value: string): string | null {
@@ -228,17 +239,32 @@ export async function postWithAgentProgress(args: {
   const endpoint = builderRequest?.endpoint ?? '/api/cos-browser'
   let response: Response
   try {
-    response = await fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json',
-        'x-signalboost-surface': args.target,
-      },
-      body: JSON.stringify(requestBody),
-      signal: args.signal,
-    })
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json',
+          'x-signalboost-surface': args.target,
+        },
+        body: JSON.stringify(requestBody),
+        signal: args.signal,
+      })
+    } catch (error) {
+      if (deliberateAbort(error, args.signal)) throw error
+      report('complete', operatorProgressMessage({ stage: 'blocked', target: progressTarget, builder: builderActive }))
+      return {
+        ok: false,
+        status: 503,
+        data: {
+          reply: transportFailureReply(requestBody),
+          source: 'assistant-transport-unconfirmed',
+          execution_allowed: false,
+          external_action_taken: false,
+        },
+      }
+    }
   } finally {
     window.clearInterval(heartbeat)
   }
@@ -252,17 +278,37 @@ export async function postWithAgentProgress(args: {
     return { ok: response.ok, status: response.status, data }
   }
 
+  // Once a POST has returned a durable job id, every later request is read-only status checking.
+  // A transient GET/network loss must never throw away the accepted job or cause a second POST.
   for (let attempt = 0; attempt < JOB_POLL_ATTEMPTS; attempt += 1) {
     report('running', repairRequest
       ? operatorProgressMessage({ stage: 'fixing', target: progressTarget, builder: true })
       : `COS Builder job ${String(data.status || 'running')} — checking durable progress`)
-    await wait(JOB_POLL_DELAY_MS, args.signal)
-    const poll = await fetch(`/api/builder?jobId=${encodeURIComponent(jobId)}`, {
-      method: 'GET', credentials: 'include', cache: 'no-store', signal: args.signal,
-      headers: { accept: 'application/json' },
-    })
+
+    let poll: Response
+    try {
+      await wait(JOB_POLL_DELAY_MS, args.signal)
+      poll = await fetch(`/api/builder?jobId=${encodeURIComponent(jobId)}`, {
+        method: 'GET', credentials: 'include', cache: 'no-store', signal: args.signal,
+        headers: { accept: 'application/json' },
+      })
+    } catch (error) {
+      if (deliberateAbort(error, args.signal)) throw error
+      report('running', 'Builder is still durable; a status check was lost, so COS is retrying the read-only status check without replaying the action.')
+      continue
+    }
+
+    if (!poll.ok && poll.status >= 500) {
+      report('running', 'Builder is still durable; the status endpoint was temporarily unavailable, so COS is retrying the read-only status check.')
+      continue
+    }
+
     data = await poll.json().catch(() => ({ error: 'builder_job_status_unavailable' }))
-    if (poll.status === 202 || ['queued', 'running'].includes(String(data?.status || ''))) continue
+    if (data?.error === 'builder_job_status_unavailable') {
+      report('running', 'Builder is still durable; the status response was incomplete, so COS is retrying the read-only status check.')
+      continue
+    }
+    if (poll.status === 202 || ['queued', 'running', 'paused'].includes(String(data?.status || ''))) continue
     const terminalSucceeded = isVerifiedBuilderTerminal(data, poll.ok)
     report('complete', repairRequest
       ? operatorProgressMessage({ stage: terminalSucceeded ? 'verified' : 'blocked', target: progressTarget, builder: true })

@@ -1,0 +1,37 @@
+Concierge / Owner Assistant operational-log live transport acceptance — 2026-09-07
+
+Observed live failure
+- In the authenticated owner Assistant, a very large pasted Vercel build log ended with the public UI message: "Sorry, I could not answer that right now. [TypeError] Failed to fetch".
+- The pasted log was roughly 254k characters and described a failed SignalBoost preview build.
+- Production runtime evidence showed the request reached POST /api/cos-browser and returned 202, after which the browser polled /api/builder and History.
+- The durable Builder job created from that passive log was owner-authorized and marked platformRepair even though the user had only pasted diagnostic evidence and had not yet issued a separate repair command.
+- The job later failed terminally with builder_stalled_repeated_inspection. It was not left running.
+- Durable Builder/History storage retained the governed 64,000-character objective, while the browser recovery path still attempted to identify the turn from the original much larger paste. Exact-content recovery therefore could not recognize the persisted result.
+
+Root causes
+1. The actual owner Assistant page uses postWithAgentProgress() directly; earlier acceptance tests primarily inspected AssistantTransportBoundary and therefore did not gate the live page transport that failed.
+2. /api/cos-browser called the owner Software Specialist before the passive operational-log diagnostic branch and supplied repository-repair capability unconditionally. A parseable SignalBoost branch/commit in passive evidence could therefore enqueue a repository repair without a separate explicit repair turn.
+3. After a durable Builder job was accepted, a transient read-only status fetch could throw out of postWithAgentProgress(), losing the visible result even though the server job persisted.
+4. Very large operational evidence must preserve both immutable build identity near the head and failing assertions/exit state near the tail. One-sided truncation or exact matching against the original giant paste is not a valid durable handoff contract.
+
+Required behavior
+- A passive operational log is diagnostic evidence only, including for the authenticated owner. It cannot by itself exercise repository-repair authority.
+- The owner surface retains repository-repair capability for explicit repair requests and ordinary authorized coding work.
+- A passive failed build receives a bounded diagnosis and the host-owned "fix it" / Builder handoff.
+- A following explicit "fix it" turn reconstructs the repair objective on the canonical server route and carries compacted operational evidence into Builder.
+- Compaction preserves the build header/branch/commit and the failure tail while staying below the 64k durable Builder objective boundary.
+- Reverse-order repair intent is valid only when the explicit repair user turn is immediately before the log in the complete transcript; stale earlier repair language cannot authorize a later passive log.
+- Once a durable job id is returned, later polling is GET-only. Transient poll/network failures are retried without replaying POST or discarding the durable job.
+- A non-abort initial transport failure returns bounded human-facing recovery copy; raw browser TypeError text is not released as the assistant answer.
+
+Regression coverage
+- pastedOperationalLog.node.test.ts proves >250k operational evidence retains both branch/commit identity and final failure/exit within the bounded repair objective.
+- conciergeOperationalLogRouting.node.test.ts proves passive logs cannot exercise owner repository authority and explicit follow-up repair is reconstructed on the canonical server route.
+- agentProgressStreaming.node.test.ts proves the actual owner page path uses postWithAgentProgress and durable polling survives transient read-only transport loss without action replay.
+- fullAssistantConciergeIngress.node.test.ts now gates the actual page -> progress client -> /api/cos-browser path instead of treating an unused/parallel transport boundary as proof of the live behavior.
+- builderRepositoryRepairSecurity.node.test.ts preserves owner repository capability while asserting passive operational evidence cannot exercise it.
+
+Acceptance status
+- Functional branch mandatory Vercel test suite: 1,063/1,063 passing on the pre-document head.
+- Full exact-head Preview, GitHub workflows, current-main serialization, normal two-parent merge, exact Production READY, and a fresh live UI passive-log turn remain required before runtime acceptance is complete.
+- The unrelated build failures inside the pasted fix/cos-image-generation log are not repaired by this change; they require their own explicit repair authority and lifecycle.

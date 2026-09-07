@@ -15,6 +15,10 @@ const CLIPPED_LOG_MARKER = /(?:file:\/\/\/vercel\/path0|\/vercel\/path0\/saas\/t
 // pasted log cannot accidentally turn passive evidence into an execution request.
 const EXPLICIT_LOG_REPAIR = /(?:^|[\n.!?]\s*)(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|the\s+(?:build|failure|error|code|problem)|it)\b|\b(?:can|could|would)\s+you\s+(?:please\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|it|the\s+(?:build|failure|error|problem))\b|\bi\s+(?:need|want)\s+(?:you\s+to\s+)?(?:debug|fix|repair|troubleshoot|correct)\s+(?:this|it|the\s+(?:build|failure|error|problem))\b/i
 
+const OPERATIONAL_REPAIR_MAX_CHARS = 60_000
+const OPERATIONAL_REPAIR_HEAD_CHARS = 8_000
+const OPERATIONAL_REPAIR_OMISSION = '\n\n[... operational log middle omitted by SignalBoost transport; build header and failure tail preserved ...]\n\n'
+
 export type OperationalLogAnalysis = Readonly<{
   failed: boolean
   testFailures: string[]
@@ -46,6 +50,23 @@ export function isExplicitOperationalLogRepairRequest(input: string): boolean {
 export function isPastedOperationalLog(input: string): boolean {
   const text = String(input || '')
   return isOperationalLogEvidence(text) && !isExplicitOperationalLogRepairRequest(text)
+}
+
+/**
+ * Repository repair needs both immutable deployment identity near the start of a build log and the
+ * failing assertions/exit status near the end. Builder's durable objective is capped at 64k, so a
+ * huge browser paste must never be naively truncated from one side. Keep a bounded head + tail and
+ * make the omission explicit. Passive diagnosis may still inspect its own smaller bounded view.
+ */
+export function compactOperationalLogForRepair(input: string, maxChars = OPERATIONAL_REPAIR_MAX_CHARS): string {
+  const text = String(input || '').trim()
+  const limit = Math.max(4_000, Math.min(64_000, Math.floor(Number(maxChars) || OPERATIONAL_REPAIR_MAX_CHARS)))
+  if (text.length <= limit) return text
+
+  const available = Math.max(1, limit - OPERATIONAL_REPAIR_OMISSION.length)
+  const headChars = Math.min(OPERATIONAL_REPAIR_HEAD_CHARS, Math.max(1, Math.floor(available / 3)))
+  const tailChars = Math.max(1, available - headChars)
+  return `${text.slice(0, headChars).trimEnd()}${OPERATIONAL_REPAIR_OMISSION}${text.slice(-tailChars).trimStart()}`
 }
 
 export function analyzeOperationalLog(input: string): OperationalLogAnalysis {

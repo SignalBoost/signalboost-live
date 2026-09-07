@@ -1,3 +1,4 @@
+// saas/lib/visuals/intent.ts
 export type ConciergeVisualMode = 'generate' | 'reference-mark' | 'reference-people'
 
 export type ConciergeVisualIntent = Readonly<{
@@ -381,8 +382,31 @@ export function isConciergeVisualObjective(prompt: string): boolean {
   return VISUAL_SUBJECT_PHRASES.some((phrase) => normalized.includes(` ${phrase} `))
 }
 
-export function detectConciergeVisualIntent(prompt: string): ConciergeVisualIntent | null {
-  if (!isConciergeVisualObjective(prompt)) return null
+/**
+ * A drawing verb is present. This is the precondition for the semantic check in
+ * ./semanticIntent.ts, which answers the part no word list can: whether the
+ * SUBJECT is depictable. Exported so that check never has to restate the verb
+ * vocabulary in a second place.
+ */
+export function hasVisualActionToken(prompt: string): boolean {
+  const tokens = normalizedVisualTokens(prompt)
+  return tokens.some((token) => VISUAL_ACTION_TOKENS.has(token))
+}
+
+/**
+ * `semanticVisual` is the verdict of the semantic classifier, passed in by the
+ * caller because that check is asynchronous and this function is not. It
+ * substitutes for the picture-noun requirement only — every other rule below
+ * (verified marks, named people, filenames) is unchanged, so a semantically
+ * admitted request is treated exactly like a noun-carrying one.
+ */
+export function detectConciergeVisualIntent(
+  prompt: string,
+  options?: { semanticVisual?: boolean },
+): ConciergeVisualIntent | null {
+  const admitted = isConciergeVisualObjective(prompt)
+    || (options?.semanticVisual === true && hasVisualActionToken(prompt))
+  if (!admitted) return null
 
   const tokens = normalizedVisualTokens(prompt)
   const asksForMark = tokens.some((token) => REFERENCE_MARK_TOKENS.has(token))

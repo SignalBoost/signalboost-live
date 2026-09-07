@@ -12,6 +12,9 @@ const EXECUTIVE_UNSUPPORTED_CERTAINTY = /\b(?:risk of (?:cannibali[sz]ation|down
 const SECURITY_SCENARIO = /\b(?:zero[- ]day|vulnerabilit|tenant\s+metadata|infosec|security\s+lead)\b/i
 const UNSUPPORTED_SECURITY_FRAMEWORK = /\b(?:IL[2456]|impact\s+level\s*[2456]|authorizing\s+official|system\s+security\s+plan|\bSSP\b|fedramp|rmf|nist\s*800[- ]53)\b/i
 const QUANTITATIVE_TASK = /\b(?:calculate|compute|quantif(?:y|ication)|break[- ]even|overhead|cost\s+savings?|power\s+cost|bandwidth|throughput|latency|checkpoint|synchroni[sz]ation|equation|formula|exact)\b/i
+const EXPLICIT_SOURCE_BOUNDARY = /(?:\b(?:use|using)\s+only\b[^.\n]{0,100}\b(?:evidence|packet|record|facts?|material|information|data|supplied|provided)\b|\b(?:base|based)\b[^.\n]{0,80}\bonly\b[^.\n]{0,80}\b(?:evidence|packet|record|facts?|material|information|data)\b|\bdo not fill gaps from memory\b)/i
+const INTERNAL_EVIDENCE_ID = /\[(?:KG|CL|OEM|EM|SK)\d{1,2}\]/i
+const INTERNAL_SOURCE_LANGUAGE = /\b(?:retrieved evidence|knowledge graph|learned corpus|enterprise memory|user memory|cognitive skill)\b/i
 const ECHO_MIN_PROMPT_CHARS = 180
 const ECHO_MIN_ANSWER_CHARS = 60
 const ECHO_STOPWORDS = new Set([
@@ -39,6 +42,20 @@ function latestUserRequest(prompt: string): string {
   let request = (bestIndex >= 0 ? text.slice(bestIndex + bestMarker.length) : text).trim()
   request = request.replace(/\n\n(?:Answer the public user now\.|Return the corrected answer now\.|Write your reply now\.)[\s\S]*$/i, '').trim()
   return request.slice(0, 16_000)
+}
+
+function explicitSourceBoundary(prompt: string): boolean {
+  return EXPLICIT_SOURCE_BOUNDARY.test(latestUserRequest(prompt))
+}
+
+export function sourceBoundaryBreach(prompt: string, raw: string): boolean {
+  if (!explicitSourceBoundary(prompt)) return false
+  const parsed = parseLocalResult(String(raw ?? ''))
+  if (!parsed) return false
+  const request = latestUserRequest(prompt)
+  const answer = parsed.answer
+  if (INTERNAL_EVIDENCE_ID.test(answer)) return true
+  return INTERNAL_SOURCE_LANGUAGE.test(answer) && !INTERNAL_SOURCE_LANGUAGE.test(request)
 }
 
 function allTokens(text: string): string[] {
@@ -114,9 +131,9 @@ export function executiveDecisionUnsupportedClaims(prompt: string, raw: string):
   return signals
 }
 
-/** Whether a prompt asks for diagnosis/troubleshooting rather than a conceptual explanation. */
+/** Whether the actual user request asks for diagnosis/troubleshooting. Internal envelopes are not intent. */
 export function promptAppearsDiagnostic(prompt: string): boolean {
-  return DIAGNOSTIC_PROMPT.test(String(prompt ?? ''))
+  return DIAGNOSTIC_PROMPT.test(latestUserRequest(prompt))
 }
 
 export type ReasonerDraftQuality = {
@@ -169,6 +186,9 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
   // A prompt echo is not a low-confidence answer. It is a non-answer and gets one bounded local
   // repair before any best-effort release path can expose it.
   if (promptEchoNonAnswer(prompt, raw)) return true
+  // When the user explicitly bounds the answer to supplied evidence, retrieved internal material
+  // cannot silently become part of the answer even if ordinary RAG ran upstream.
+  if (sourceBoundaryBreach(prompt, raw)) return true
   // The answer may invent open creative details, but it may never retroactively claim the user
   // requested a constraint that is absent from the real prompt.
   if (unsupportedCreativeConstraintClaims(prompt, raw).length) return true
@@ -188,6 +208,19 @@ export function reasonerDraftNeedsRepair(prompt: string, raw: string): boolean {
 export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: string): string {
   const scriptDirective = scriptRequestDirective(originalPrompt)
   const creativeConstraintRepair = creativeConstraintRepairInstruction(originalPrompt, firstRaw)
+  if (sourceBoundaryBreach(originalPrompt, firstRaw)) {
+    return [
+      originalPrompt,
+      '',
+      'QUALITY REPAIR — the prior draft violated the user\'s explicit evidence boundary.',
+      'Answer the ORIGINAL user request using ONLY facts stated in the current user input/evidence packet.',
+      'Ignore Knowledge Graph, learned corpus, enterprise memory, user memory, cognitive skills, retrieved evidence, and any other internal context even if they appear earlier in this prompt.',
+      'Do not cite or paraphrase [KG], [CL], [OEM], [EM], or [SK] material. Do not fill gaps from memory.',
+      'Keep unresolved facts unresolved. If the user asks for a next verification step, name the smallest routine step without claiming that this reasoning-only turn executed or will execute it.',
+      '',
+      'Return ONLY strict JSON with keys "answer" and "confidence". Calibrate confidence from the supplied evidence only; do not lower it merely because this is a repair. Do not mention this repair instruction or the rejected draft.',
+    ].join('\n')
+  }
   if (powerDefectCount(originalPrompt, firstRaw) > 0) {
     return [
       originalPrompt,
@@ -288,6 +321,11 @@ export function buildDiagnosticRepairPrompt(originalPrompt: string, firstRaw: st
 }
 
 export function preferRepairedDraft(prompt: string, firstRaw: string, repairedRaw: string): boolean {
+  const firstBoundary = sourceBoundaryBreach(prompt, firstRaw)
+  const repairedBoundary = sourceBoundaryBreach(prompt, repairedRaw)
+  if (firstBoundary !== repairedBoundary) return !repairedBoundary
+  if (firstBoundary && repairedBoundary) return false
+
   const firstPower = powerDefectCount(prompt, firstRaw)
   const repairedPower = powerDefectCount(prompt, repairedRaw)
   if (firstPower !== repairedPower) return repairedPower < firstPower

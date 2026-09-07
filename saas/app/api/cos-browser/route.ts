@@ -16,15 +16,13 @@ import { tryCosSoftwareSpecialist } from '@/lib/ai/cos/softwareSpecialist'
 import {
   analyzeOperationalLog,
   compactOperationalLogForRepair,
-  hasExplicitOperationalLogRepairIntent,
-  isExplicitOperationalLogRepairRequest,
   isOperationalLogEvidence,
   isPastedOperationalLog,
   operationalLogReply,
 } from '@/lib/ai/cos/pastedOperationalLog'
 import { diagnoseOperationalLog } from '@/lib/ai/cos/operationalLogDiagnostic'
 import { isOperationalLogRepairOffer } from '@/lib/ai/cos/pastedOperationalLog'
-import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'
+import { clarificationQuestion, understandRequest } from '@/lib/ai/cos/requestUnderstanding'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
@@ -127,8 +125,6 @@ export async function POST(req: NextRequest) {
   const previousUser = userMessages.at(-2)
   const prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
   const previousUserPrompt = typeof previousUser?.content === 'string' ? previousUser.content : ''
-  const latestUserIndex = messages.lastIndexOf(latestUser)
-  const immediatePreviousMessage = latestUserIndex > 0 ? messages[latestUserIndex - 1] : null
   const assistantMessages = messages.filter((message: any) => message?.role === 'assistant' && typeof message?.content === 'string')
   const priorAnswer = typeof assistantMessages.at(-1)?.content === 'string' ? assistantMessages.at(-1).content : ''
   const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
@@ -144,26 +140,24 @@ export async function POST(req: NextRequest) {
   const attachedOperationalEvidence = readAttachedOperationalEvidence(body?.attachments)
   const currentOperationalPrompt = attachedOperationalEvidence ? `${prompt}\n\n${attachedOperationalEvidence}`.trim() : prompt
 
-  // The real browser transport posts directly to this canonical route. Preserve the natural
-  // passive-log -> diagnostic -> "fix it" contract server-side rather than relying on a second
-  // client wrapper. For repository repair, keep both immutable branch/commit evidence from the log
-  // head and the actual failing assertions from its tail inside Builder's 64k durable objective cap.
-  // A person answering an offer says "yes", "go", "please", "tak", "да" — or swears at
-  // it. The keyword path stays as the fast, zero-cost route; when it declines, the
-  // network reads the reply as consent or not. This is consulted ONLY when the prior
-  // assistant turn was our own repair offer and the turn before it was passive log
-  // evidence, so a log still cannot authorise itself and no authority is widened.
-  const followupOperationalRepair = hasExplicitOperationalLogRepairIntent(prompt)
-    && isPastedOperationalLog(previousUserPrompt)
-  const answeringOurRepairOffer = !followupOperationalRepair
-    && isPastedOperationalLog(previousUserPrompt)
-    && isOperationalLogRepairOffer(priorAnswer)
-  const confirmedRepairOffer = answeringOurRepairOffer && await isRepairConfirmation(prompt)
-  const reverseImmediateOperationalRepair = isPastedOperationalLog(prompt)
-    && immediatePreviousMessage?.role === 'user'
-    && typeof immediatePreviousMessage?.content === 'string'
-    && hasExplicitOperationalLogRepairIntent(immediatePreviousMessage.content)
-  const operationalPrompt = followupOperationalRepair || confirmedRepairOffer
+  // Understand the request as a conversation, not as a command language. This semantic pass does
+  // not grant authority. Its mutation-specific output can only narrow an execution lane, while an
+  // unresolved action/referent returns one natural clarification before any specialist can act.
+  const requestUnderstanding = await understandRequest({
+    prompt,
+    previousUserPrompt,
+    priorAnswer,
+    hasAttachments: Array.isArray(body?.attachments) && body.attachments.length > 0,
+  })
+
+  // Passive operational evidence never authorizes itself. When the current turn semantically asks
+  // to repair the immediately preceding log (including an ordinary agreement to our repair offer),
+  // preserve the log head+tail inside Builder's durable objective cap. No literal phrase is special.
+  const previousOperationalEvidence = isPastedOperationalLog(previousUserPrompt)
+  const answeringOurRepairOffer = previousOperationalEvidence && isOperationalLogRepairOffer(priorAnswer)
+  const followupOperationalRepair = requestUnderstanding?.softwareRepairIntent === true
+    && previousOperationalEvidence
+  const operationalPrompt = followupOperationalRepair
     ? `${prompt.trim()}\n\n${compactOperationalLogForRepair(previousUserPrompt)}`
     : currentOperationalPrompt
 
@@ -171,9 +165,22 @@ export async function POST(req: NextRequest) {
     /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i.test(String(name || '')),
   )
   const operationalEvidence = isOperationalLogEvidence(operationalPrompt)
-  const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(operationalPrompt)
-    || reverseImmediateOperationalRepair
-    || confirmedRepairOffer
+  const explicitOperationalRepair = requestUnderstanding?.softwareRepairIntent === true && operationalEvidence
+
+  // If COS cannot tell what the person wants or what "this/it/that" refers to, ask rather than
+  // fabricate intent or reject the user for not knowing a command syntax. Passive logs retain their
+  // dedicated diagnostic behavior, and semantic-classifier failure falls through to ordinary COS.
+  if (requestUnderstanding?.needsClarification && !operationalEvidence) {
+    const response = await withSuggestedFollowups(NextResponse.json({
+      reply: clarificationQuestion(language, requestUnderstanding.missing),
+      source: 'cos-semantic-clarification',
+      execution_allowed: false,
+      external_action_taken: false,
+      external_ai_invoked: false,
+      local_model_invoked: true,
+    }), prompt, auditUserId)
+    return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
+  }
 
   const deployment = { commitSha: process.env.VERCEL_GIT_COMMIT_SHA, branch: process.env.VERCEL_GIT_COMMIT_REF }
   // COS decides that software work belongs to the Software Specialist. From that point onward the
@@ -212,6 +219,7 @@ export async function POST(req: NextRequest) {
 
   const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
   void operationalLogAnalysis
+  void answeringOurRepairOffer
   if (explicitOperationalRepair && !hasSourceAttachment) {
     const authorityReply = ownerRepositoryRepairAllowed
       ? 'The Software Specialist could not establish a safe current repository repair target from this evidence. No repository action was taken.'

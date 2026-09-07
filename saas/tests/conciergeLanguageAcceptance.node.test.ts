@@ -9,6 +9,8 @@ import {
   hasEnglishLeakage,
   selectedLanguageSignal,
 } from '../lib/ai/cos/conciergeLanguageAcceptance.ts'
+import { restoreCriticalLanguageTokenCasing } from '../lib/ai/cos/conciergeLanguageQuality.ts'
+import { isPlatformSelfKnowledgePrompt } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 import { getConciergeAnswer } from '../lib/platform/unifiedPlatform.ts'
 
 const read = (path:string) => readFileSync(new URL(path, import.meta.url), 'utf8')
@@ -64,6 +66,34 @@ test('critical token preservation is part of the automated acceptance verdict', 
   assert.equal(preserved.criticalTokensPreserved, true)
   const lost = evaluateLanguageAcceptanceText({ ...base, reply:'Proszę sprawdzić projekt i przekazać uwagi, aby zespół mógł zakończyć przegląd.' })
   assert.equal(lost.criticalTokensPreserved, false)
+})
+
+test('protected all-caps identifiers recover case drift without normalizing URL path case', () => {
+  const original = 'Keep ALPHA-42 and https://example.com/Plan exactly.'
+  assert.equal(
+    restoreCriticalLanguageTokenCasing(original, 'Keep Alpha-42 and https://example.com/Plan exactly.'),
+    'Keep ALPHA-42 and https://example.com/Plan exactly.',
+  )
+  assert.equal(
+    restoreCriticalLanguageTokenCasing(original, 'Keep Alpha-42 and https://example.com/plan exactly.'),
+    'Keep ALPHA-42 and https://example.com/plan exactly.',
+  )
+})
+
+test('Portuguese Concierge operational guidance is not misclassified as SignalBoost identity', () => {
+  const operational = 'Quero usar o SignalBoost Concierge para melhorar um e-mail para um cliente sobre o projeto ALPHA-42. Dê três passos curtos. Mantenha ALPHA-42 sem alterações e não diga que o e-mail já foi enviado.'
+  assert.equal(isPlatformSelfKnowledgePrompt(operational), false)
+  assert.equal(isPlatformSelfKnowledgePrompt('O que é SignalBoost?'), true)
+  assert.equal(isPlatformSelfKnowledgePrompt('Quem e o dono da SignalBoost?'), true)
+})
+
+test('malformed public-only completion retry is bounded and cannot retry policy rejection', () => {
+  const source = read('../lib/ai/cos/cosFirstAnswer.ts')
+  assert.match(source, /shouldRetryMalformedPublicCoreResult/)
+  assert.match(source, /public-only COS result was empty, truncated, or unparseable/i)
+  assert.match(source, /provenance\.responseSource\s*===\s*'local_cos_reasoning'/)
+  assert.match(source, /if \(shouldRetryMalformedPublicCoreResult\(coreResult\)\) \{\s*coreResult = await tryCoreCOSFirstAnswer\(\{ \.\.\.input, disableCache: true \}\)\s*\}/s)
+  assert.doesNotMatch(source, /shouldRetryMalformedPublicCoreResult[\s\S]{0,500}(?:disclosure|authorization|confidence).*return true/i)
 })
 
 test('deterministic Concierge fallback stays in the selected language across all five locales', () => {

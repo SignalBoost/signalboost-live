@@ -1,5 +1,2 @@
-# SignalBoost main integration serialization token
-# Every pull request targeting main must replace BOTH values below.
-# This shared-file write intentionally makes concurrent PRs conflict after one merges.
-base_sha=bf76ee53f5bd8c7d24e313c4658264d628bfba03
-branch=fix/concierge-live-diagnostic-handoff-20260907
+base_sha=184c2d1946e334dbed102f8c965b69ad9f364e93
+branch=fix/concierge-language-acceptance-live-failures-20260907

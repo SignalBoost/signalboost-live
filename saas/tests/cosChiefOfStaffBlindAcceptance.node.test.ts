@@ -137,7 +137,7 @@ test('blind routine follow-through rejects deflection back to the owner', () => 
   assert.equal(observe(testCase, reply).verdicts.autonomous_follow_through.passed, false)
 })
 
-test('blind route persists an auditable manifest and feeds host-verified outcomes into COS learning', () => {
+test('blind route persists an auditable manifest and feeds durable host-verified outcomes into COS learning', () => {
   const route = readFileSync(new URL('../app/api/admin/cos-chief-of-staff-blind-acceptance/route.ts', import.meta.url), 'utf8')
   assert.match(route, /requireOwner\(\)/)
   assert.match(route, /CHIEF_OF_STAFF_BLIND_PROFILE/)
@@ -145,10 +145,12 @@ test('blind route persists an auditable manifest and feeds host-verified outcome
   assert.match(route, /case_manifest:suite/)
   assert.match(route, /canonicalJson\(run\.data\.case_manifest \?\? \{\}\) !== canonicalJson\(suite\)/)
   assert.match(route, /manifest drift detected/)
-  assert.match(route, /attachTurnOutcome\(outcome\.turnId/)
-  assert.match(route, /verifiedSuccess:passed/)
-  assert.match(route, /repairNeeded:!passed/)
+  assert.match(route, /async function attachStoredOutcome/)
+  assert.match(route, /await attachTurnOutcome\(row\.turn_id/)
+  assert.match(route, /verifiedSuccess:row\.passed/)
+  assert.match(route, /repairNeeded:!row\.passed/)
   assert.match(route, /attachOutcome:false/)
+  assert.ok(route.indexOf('upsert(row') < route.lastIndexOf('await attachStoredOutcome('), 'Outcome learning must follow durable result storage.')
 })
 
 test('blind case manifest stays server-side during execution', () => {
@@ -161,14 +163,30 @@ test('blind case manifest stays server-side during execution', () => {
   assert.doesNotMatch(getSource, /prompt/)
 })
 
-test('blind execution is retry-safe without duplicating model turns', () => {
+test('blind execution leases prevent concurrent duplicate model turns and allow stale-claim takeover', () => {
   const route = readFileSync(new URL('../app/api/admin/cos-chief-of-staff-blind-acceptance/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /cos_chief_of_staff_acceptance_case_claims/)
+  assert.match(route, /async function acquireCaseClaim/)
+  assert.match(route, /lease_expires_at:leaseExpiresAt/)
+  assert.match(route, /\.lt\('lease_expires_at', claimedAt\)/)
+  assert.match(route, /async function waitForStoredCase/)
+  assert.match(route, /status:425/)
+  assert.match(route, /finally \{\s*await releaseCaseClaim/s)
+})
+
+test('blind replay finalizes a four-row run instead of leaving it stuck running', () => {
+  const route = readFileSync(new URL('../app/api/admin/cos-chief-of-staff-blind-acceptance/route.ts', import.meta.url), 'utf8')
+  const priorBranch = route.slice(route.indexOf('const prior = await readStoredCase'), route.indexOf("if (run.data.status !== 'running')"))
+  assert.match(priorBranch, /finalizeBlindRunIfComplete/)
+  assert.match(priorBranch, /replayed:true/)
+  assert.match(route, /\.eq\('status', 'running'\)/)
+})
+
+test('blind browser retries preserve one run identity', () => {
   const page = readFileSync(new URL('../app/dashboard/cos-chief-of-staff-blind-reliability/page.tsx', import.meta.url), 'utf8')
-  assert.match(route, /id:runId/)
-  assert.match(route, /const prior = await db\.from\('cos_chief_of_staff_acceptance_results'\)/)
-  assert.match(route, /if \(prior\.data\)/)
-  assert.match(route, /replayed:true/)
   assert.match(page, /const runId = crypto\.randomUUID\(\)/)
+  assert.match(page, /JSON\.stringify\(\{ runId \}\)/)
+  assert.match(page, /JSON\.stringify\(\{ runId, caseKey \}\)/)
   assert.match(page, /requestJson\([^)]*3/)
   assert.match(page, /295_000/)
 })
@@ -180,12 +198,16 @@ test('frozen dashboard API filters out blind-profile rows instead of mixing scor
   assert.match(route, /insert\(\{ profile: CHIEF_OF_STAFF_RELIABILITY_PROFILE \}\)/)
 })
 
-test('blind manifest schema migration is service-table additive and auditable', () => {
+test('blind manifest and execution-claim schema remain service-role-only and auditable', () => {
   const migration = readFileSync(new URL('../supabase/migrations/20260907222500_cos_chief_of_staff_blind_acceptance.sql', import.meta.url), 'utf8')
   assert.match(migration, /variant_seed text/)
   assert.match(migration, /case_manifest jsonb not null/)
   assert.match(migration, /profile, started_at desc/)
-  assert.doesNotMatch(migration, /grant .* anon|grant .* authenticated/i)
+  assert.match(migration, /cos_chief_of_staff_acceptance_case_claims/)
+  assert.match(migration, /primary key \(run_id, case_key\)/)
+  assert.match(migration, /enable row level security/)
+  assert.match(migration, /revoke all .* anon, authenticated/)
+  assert.match(migration, /grant select, insert, update, delete .* service_role/)
 })
 
 test('blind generalization regression is mandatory in the Vercel COS gate', () => {

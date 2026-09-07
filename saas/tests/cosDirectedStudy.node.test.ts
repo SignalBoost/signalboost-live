@@ -41,6 +41,7 @@ const directedStudyPage = readFileSync(new URL('../app/dashboard/cos-directed-st
 const continuityEmail = readFileSync(new URL('../app/api/cron/cos-learning-continuity/route.ts', import.meta.url), 'utf8')
 const miningCron = readFileSync(new URL('../app/api/cron/cos-mining/route.ts', import.meta.url), 'utf8')
 const foundationalLearningPage = readFileSync(new URL('../app/dashboard/cos-learning/page.tsx', import.meta.url), 'utf8')
+const cognitiveOrchestrator = readFileSync(new URL('../lib/ai/cos/cognitiveLearningOrchestrator.ts', import.meta.url), 'utf8')
 
 test('owner-directed material is admitted when it is substantive and provenance requirements are present', () => {
   const result = assessDirectedStudy(input, gates)
@@ -124,6 +125,20 @@ test('daily learning backfills pre-loop software lessons idempotently into the g
   assert.doesNotMatch(store, /status:\s*'(?:validated|learned|mastered)'/)
   assert.match(miningCron, /await backfillDirectedSoftwareApplications\(200\)/)
   assert.ok(miningCron.indexOf('backfillDirectedSoftwareApplications(200)') < miningCron.indexOf('runGovernedCognitiveLearningCycle()'))
+})
+
+test('fresh owner-directed software lessons receive a bounded evaluation lane without promotion shortcuts', () => {
+  const activeLearning = readFileSync(new URL('../lib/ai/cos/cognitiveActiveLearning.ts', import.meta.url), 'utf8')
+  assert.match(activeLearning, /lane\?: 'general' \| 'owner_directed_software'/)
+  assert.match(activeLearning, /\.eq\('status', 'captured'\)/)
+  assert.match(activeLearning, /\.contains\('metadata', \{ origin: 'owner_directed_study', specialistFamily: 'software' \}\)/)
+  assert.match(activeLearning, /excludeLessonIds\?: number\[\]/)
+  assert.match(activeLearning, /lessonQuery = lessonQuery\.neq\('id', lessonId\)/)
+  assert.match(cognitiveOrchestrator, /for \(let i = 0; i < lessonLimit; i \+= 1\)/)
+  assert.match(cognitiveOrchestrator, /lane: 'owner_directed_software'/)
+  assert.match(cognitiveOrchestrator, /excludeLessonIds: \[\.\.\.processedLessonIds\]/)
+  assert.match(cognitiveOrchestrator, /evaluationLane: 'owner_directed_software'/)
+  assert.doesNotMatch(cognitiveOrchestrator, /status:\s*'(?:validated|learned|mastered)'/)
 })
 
 test('foundational learning displays live software application progress', () => {

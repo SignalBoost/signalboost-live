@@ -14,8 +14,9 @@ test('Full Assistant live page uses observable progress and the canonical COS br
 })
 
 test('Full Assistant passive operational logs are diagnosis-only until explicit repair intent', () => {
+  assert.match(browserRoute, /const ownerSoftwareAuthority = Object\.freeze\(\{ allowRepositoryRepair: true \}\)/)
   assert.match(browserRoute, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
-  assert.match(browserRoute, /allowRepositoryRepair: !operationalEvidence \|\| explicitOperationalRepair/)
+  assert.match(browserRoute, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
   assert.match(browserRoute, /if \(operationalEvidence && !hasSourceAttachment\)/)
   assert.match(browserRoute, /await diagnoseOperationalLog\(\{/)
 })

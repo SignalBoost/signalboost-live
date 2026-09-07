@@ -101,11 +101,14 @@ test('Platform Engineer normalizes model run commands and forces exact failed te
   assert.match(repair.slice(runnerAt, loopAt + 32), /session!\.run/)
 })
 
-test('browser repository repair is owned only by the shared Software Specialist', () => {
+test('browser repository repair is owned only by the shared Software Specialist and passive logs cannot exercise owner authority', () => {
   const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(browser, /const deployment = \{[\s\S]*commitSha: process\.env\.VERCEL_GIT_COMMIT_SHA[\s\S]*branch: process\.env\.VERCEL_GIT_COMMIT_REF/)
   assert.match(browser, /tryCosSoftwareSpecialist/)
-  assert.match(browser, /surface: 'assistant', allowRepositoryRepair: true, signalBoostDeploymentContext: isSignalBoostDeploymentContext\(req\), deployment/)
+  assert.match(browser, /const ownerSoftwareAuthority = Object\.freeze\(\{ allowRepositoryRepair: true \}\)/)
+  assert.match(browser, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)
+  assert.match(browser, /surface: 'assistant'/)
+  assert.match(browser, /allowRepositoryRepair: ownerSoftwareAuthority\.allowRepositoryRepair && \(!operationalEvidence \|\| explicitOperationalRepair\)/)
   assert.match(browser, /surface: 'concierge', allowRepositoryRepair: false/)
   assert.doesNotMatch(browser, /queueOwnerRepositoryRepair|ownerRepositoryRepairTarget|enqueueSignalBoostRepositoryRepairJob/)
   const specialist = readFileSync(new URL('../lib/ai/cos/softwareSpecialist.ts', import.meta.url), 'utf8')

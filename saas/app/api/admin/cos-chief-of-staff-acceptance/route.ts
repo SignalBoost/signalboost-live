@@ -82,7 +82,7 @@ export async function PUT(request: Request) {
         handled: outcome.handled,
         responseSource: String(outcome.provenance.responseSource || ''),
         localModelInvoked: outcome.provenance.localModelInvoked === true,
-        externalAiInvoked: outcome.provenance.externalAiInvoked === true,
+        externalAiInvoked: Boolean(outcome.provenance.externalAiInvoked),
       })
       const provenanceRecorded = Boolean(outcome.turnId)
       const observation = evaluateChiefOfStaffAcceptanceCase({ runId, test, reply: outcome.replyExcerpt, freshExecution, provenanceRecorded })

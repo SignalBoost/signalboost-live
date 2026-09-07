@@ -53,7 +53,7 @@ test('acceptance grading permits clear markdown formatting used by live COS answ
   const recommendation = 'Recommendation\nChoose North\n\nRationale\nOption North is a 14-day pilot using the existing team and no new vendor. Option South requires a new vendor.\n\nNext action\nInitiate the pilot.'
   assert.equal(observe('instruction-scope', recommendation).verdicts.instruction_adherence.passed, true)
 
-  const plan = '**Owner:** Maya\n**Deadline:** Friday\n**Inputs:** customer notes and release metrics\n1. Synthesize inputs.\n2. Draft the two-page launch brief.\n3. Review it.\n**Done when:** review-ready.'
+  const plan = '* **Owner**: Maya\n* **Deadline**: Friday\n* **Inputs**: customer notes and release metrics\n* **Done when**: review-ready.\n1. Synthesize inputs.\n2. Draft the two-page launch brief.\n3. Review it.'
   assert.equal(observe('routine-follow-through', plan).verdicts.instruction_adherence.passed, true)
 })
 
@@ -97,6 +97,8 @@ test('owner route executes one bounded normal COS case request and persists dura
   assert.match(route, /export async function PUT/)
   assert.doesNotMatch(route, /for \(const test of CHIEF_OF_STAFF_ACCEPTANCE_CASES\)/)
   assert.match(route, /isFreshReleasedAcceptanceOutcome/)
+  assert.match(route, /evaluation:\s*\{/)
+  assert.match(route, /workerRole:\s*CASE_WORKER_ROLES/)
   assert.match(route, /handled:\s*outcome\.handled/)
   assert.doesNotMatch(route, /const\s+(?:replies|answers|fixtures)\s*=/)
 })

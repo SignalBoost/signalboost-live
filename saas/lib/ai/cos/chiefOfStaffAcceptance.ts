@@ -125,7 +125,7 @@ function evidenceBoundaryStructure(reply: string): boolean {
 
 function routinePlanStructure(reply: string): boolean {
   const requiredLabels = ['owner', 'deadline', 'inputs', 'done when']
-  const labeled = requiredLabels.every(label => new RegExp(`^\\s*(?:\\*\\*|__)?${label}(?:\\*\\*|__)?\\s*:`, 'im').test(reply))
+  const labeled = requiredLabels.every(label => new RegExp(`^\\s*(?:[-*+]\\s+)?(?:\\*\\*|__)?${label}(?:\\*\\*|__)?\\s*:`, 'im').test(reply))
   const actions = [...reply.matchAll(/^\s*(\d+)[.)]\s+/gm)].map(match => Number(match[1]))
   return labeled && actions.length === 3 && actions.every((value, index) => value === index + 1)
 }

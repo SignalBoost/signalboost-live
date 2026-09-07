@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { runPrivateCapabilityCase } from '@/lib/ai/cos/capabilityBenchmarkRunner'
-import { probeReasoner } from '@/lib/ai/cos/reasonerProbe'
 import { evaluateChiefOfStaffReliability } from '@/lib/ai/cos/chiefOfStaffReliability'
 import {
   CHIEF_OF_STAFF_ACCEPTANCE_CASES,
@@ -48,16 +47,26 @@ export async function POST() {
 
   const created = await db.from('cos_chief_of_staff_acceptance_runs').insert({}).select('id').single()
   if (created.error || !created.data) return NextResponse.json({ ok: false, error: created.error?.message ?? 'Could not create acceptance run.' }, { status: 500 })
-  const runId = String(created.data.id)
+  return NextResponse.json({ ok: true, runId: String(created.data.id), caseKeys: CHIEF_OF_STAFF_ACCEPTANCE_CASES.map(test => test.key) })
+}
+
+export async function PUT(request: Request) {
+  const guard = await requireOwner()
+  if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  const db = cosServiceDb()
+  if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
+  const body = await request.json().catch(() => ({})) as { runId?:string; caseKey?:string }
+  const runId = String(body.runId ?? '')
+  const test = CHIEF_OF_STAFF_ACCEPTANCE_CASES.find(candidate => candidate.key === body.caseKey)
+  if (!/^[0-9a-f-]{36}$/i.test(runId) || !test) return NextResponse.json({ ok:false, error:'A valid run and acceptance case are required.' }, { status:400 })
+  const run = await db.from('cos_chief_of_staff_acceptance_runs').select('id,status').eq('id', runId).single()
+  if (run.error || !run.data) return NextResponse.json({ ok:false, error:'Acceptance run was not found.' }, { status:404 })
+  if (run.data.status !== 'running') return NextResponse.json({ ok:false, error:'Acceptance run is already final.' }, { status:409 })
 
   try {
-    const probe = await probeReasoner({ completionTimeoutMs: 90_000 })
-    if (probe.verdict !== 'ok') throw new Error(`Reasoner unavailable (${probe.verdict}): ${probe.summary}`)
-
-    const observations = []
-    for (const test of CHIEF_OF_STAFF_ACCEPTANCE_CASES) {
-      try {
-        const outcome = await runPrivateCapabilityCase({
+    let row
+    try {
+      const outcome = await runPrivateCapabilityCase({
           id: CASE_IDS[test.key],
           track: 'chief_of_staff_acceptance',
           prompt: test.prompt,
@@ -65,20 +74,16 @@ export async function POST() {
           forbiddenTerms: [],
           requiresProvenance: true,
           requiresLocalReasoning: true,
-        }, { attachOutcome: false, outcomeSource: 'chief_of_staff_acceptance' })
-        const freshExecution = outcome.provenance.localModelInvoked === true
+      }, { attachOutcome: false, outcomeSource: 'chief_of_staff_acceptance' })
+      const freshExecution = outcome.provenance.localModelInvoked === true
           && !outcome.provenance.externalAiInvoked
           && !['semantic_cache', 'semantic_similarity'].includes(String(outcome.provenance.responseSource))
-        const provenanceRecorded = Boolean(outcome.turnId)
-        const observation = evaluateChiefOfStaffAcceptanceCase({ runId, test, reply: outcome.replyExcerpt, freshExecution, provenanceRecorded })
-        observations.push(observation)
-        const passed = Object.values(observation.verdicts).every(verdict => verdict.passed)
-          && freshExecution && provenanceRecorded
-        const inserted = await db.from('cos_chief_of_staff_acceptance_results').insert({
+      const provenanceRecorded = Boolean(outcome.turnId)
+      const observation = evaluateChiefOfStaffAcceptanceCase({ runId, test, reply: outcome.replyExcerpt, freshExecution, provenanceRecorded })
+      row = {
           run_id: runId,
           case_key: test.key,
           title: test.title,
-          passed,
           verdicts: observation.verdicts,
           response_excerpt: outcome.replyExcerpt,
           response_source: outcome.provenance.responseSource,
@@ -88,12 +93,11 @@ export async function POST() {
           provenance_recorded: provenanceRecorded,
           turn_id: outcome.turnId,
           latency_ms: outcome.latencyMs,
-        })
-        if (inserted.error) throw inserted.error
-      } catch (error) {
-        const observation = evaluateChiefOfStaffAcceptanceCase({ runId, test, reply: '', freshExecution: false, provenanceRecorded: false })
-        observations.push(observation)
-        const inserted = await db.from('cos_chief_of_staff_acceptance_results').insert({
+          passed: Object.values(observation.verdicts).every(verdict => verdict.passed) && freshExecution && provenanceRecorded,
+      }
+    } catch (error) {
+      const observation = evaluateChiefOfStaffAcceptanceCase({ runId, test, reply: '', freshExecution: false, provenanceRecorded: false })
+      row = {
           run_id: runId,
           case_key: test.key,
           title: test.title,
@@ -106,11 +110,20 @@ export async function POST() {
           fresh_execution: false,
           provenance_recorded: false,
           latency_ms: 0,
-        })
-        if (inserted.error) throw inserted.error
       }
     }
-
+    const stored = await db.from('cos_chief_of_staff_acceptance_results').upsert(row, { onConflict:'run_id,case_key' })
+    if (stored.error) throw stored.error
+    const collected = await db.from('cos_chief_of_staff_acceptance_results')
+      .select('case_key,verdicts,fresh_execution,provenance_recorded').eq('run_id', runId)
+    if (collected.error) throw collected.error
+    if ((collected.data ?? []).length < CHIEF_OF_STAFF_ACCEPTANCE_CASES.length) {
+      return NextResponse.json({ ok:true, runId, caseKey:test.key, completed:false })
+    }
+    const observations = (collected.data ?? []).map(item => ({
+      caseId:item.case_key, verdicts:item.verdicts,
+      freshExecution:item.fresh_execution, provenanceRecorded:item.provenance_recorded,
+    })) as Parameters<typeof evaluateChiefOfStaffReliability>[0]
     const report = evaluateChiefOfStaffReliability(observations)
     const updated = await db.from('cos_chief_of_staff_acceptance_runs').update({
       status: 'completed',
@@ -121,7 +134,7 @@ export async function POST() {
       failures: report.failures,
     }).eq('id', runId)
     if (updated.error) throw updated.error
-    return NextResponse.json({ ok: true, runId, report })
+    return NextResponse.json({ ok: true, runId, caseKey:test.key, completed:true, report })
   } catch (error) {
     const message = errorText(error)
     await db.from('cos_chief_of_staff_acceptance_runs').update({ status: 'failed', completed_at: new Date().toISOString(), error: message }).eq('id', runId)

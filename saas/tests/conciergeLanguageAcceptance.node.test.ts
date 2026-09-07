@@ -79,11 +79,12 @@ test('deterministic Concierge fallback stays in the selected language across all
 
 test('route is owner-only, executes public scope with cache disabled, and keeps human native review separate', () => {
   const route = read('../app/api/admin/concierge-language-acceptance/route.ts')
-  const runner = read('../lib/ai/cos/conciergeLanguageAcceptance.ts')
+  const execution = read('../lib/ai/cos/conciergeLanguageAcceptanceExecution.ts')
   const migration = read('../supabase/migrations/20260907015500_concierge_language_acceptance.sql')
   assert.match(route, /requireOwner\(\)/)
-  assert.match(runner, /withPublicDeliveryScope/)
-  assert.match(runner, /disableCache:\s*true/)
+  assert.match(route, /conciergeLanguageAcceptanceExecution/)
+  assert.match(execution, /withPublicDeliveryScope/)
+  assert.match(execution, /disableCache:\s*true/)
   assert.match(route, /method|PATCH|native_reviews/i)
   assert.match(route, /allNativeReviewsPass/)
   assert.match(migration, /"en":"pending","es":"pending","pt":"pending","pl":"pending","ru":"pending"/)

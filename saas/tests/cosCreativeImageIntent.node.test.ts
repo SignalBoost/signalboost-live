@@ -12,6 +12,19 @@ test('routes explicit visual creation to COS image generation', () => {
   assert.equal(isCosCreativeImageRequest('Draw an illustration of a futuristic command center.'), true)
 })
 
+test('routes direct draw requests even when the user omits the word image', () => {
+  assert.equal(isCosCreativeImageRequest('draw a spaceship'), true)
+  assert.equal(isCosCreativeImageRequest('draw two kids playing soccer'), true)
+  assert.equal(isCosCreativeImageRequest('please draw a map of a fantasy island'), true)
+})
+
+test('does not treat common non-visual draw phrases as image generation', () => {
+  assert.equal(isCosCreativeImageRequest('draw a conclusion from these results'), false)
+  assert.equal(isCosCreativeImageRequest('draw attention to the second paragraph'), false)
+  assert.equal(isCosCreativeImageRequest('draw blood for the lab test'), false)
+  assert.equal(isCosCreativeImageRequest('draw the curtains'), false)
+})
+
 test('does not steal image research, analysis, OCR, or editing requests', () => {
   assert.equal(isCosCreativeImageRequest('Find an image of an alien spaceship.'), false)
   assert.equal(isCosCreativeImageRequest('Describe this image for me.'), false)

@@ -3,6 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { detectConciergeVisualIntent, hasVisualActionToken, isConciergeVisualObjective } from '../lib/visuals/intent.ts'
 import { isSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
+import { readRepoFile, requireWiring } from './helpers/requiredWiring.ts'
 
 const reasoner = (verdict: unknown, seen?: string[]) => (async (args: any) => {
   seen?.push(String(args?.prompt || ''))
@@ -20,9 +21,15 @@ test('the exact production prompt routes to the visual generator deterministical
   assert.deepEqual(detectConciergeVisualIntent(prompt), { filename: 'visual.png', mode: 'generate' })
   // The route consults the network only when the fast path declined, so a prompt
   // the deterministic list already accepts still costs no model call.
-  const fs = await import('node:fs/promises')
-  const route = await fs.readFile('app/api/cos-browser/route.ts', 'utf8')
-  assert.match(route, /isConciergeVisualObjective\(prompt\) \? false : await isSemanticVisualRequest\(prompt\)/)
+  const route = await readRepoFile('app/api/cos-browser/route.ts')
+  requireWiring(route, {
+    file: 'saas/app/api/cos-browser/route.ts',
+    purpose: 'Consult the semantic classifier only when the deterministic list declined, so an accepted prompt costs no model call.',
+    expect: /isConciergeVisualObjective\(prompt\) \? false : await isSemanticVisualRequest\(prompt\)/,
+    insert: '    const semanticVisual = isConciergeVisualObjective(prompt) ? false : await isSemanticVisualRequest(prompt)',
+    after: '    // this identical gate, so Concierge and the owner Assistant draw alike.',
+    requiresImport: "import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
+  })
 })
 
 // The verb list closes the draw/paint family. It cannot close the generic verbs,
@@ -113,10 +120,21 @@ test('the classifier fails closed on outage, junk and malformed verdicts', async
 })
 
 test('the browser ingress uses the semantic gate and forwards its verdict', async () => {
-  const fs = await import('node:fs/promises')
-  const route = await fs.readFile('app/api/cos-browser/route.ts', 'utf8')
-  assert.match(route, /isSemanticVisualRequest/)
-  assert.match(route, /semanticVisual/)
-  const visuals = await fs.readFile('app/api/visuals/route.ts', 'utf8')
-  assert.match(visuals, /detectConciergeVisualIntent\(objective, \{ semanticVisual, realPeople \}\)/)
+  const route = await readRepoFile('app/api/cos-browser/route.ts')
+  requireWiring(route, {
+    file: 'saas/app/api/cos-browser/route.ts',
+    purpose: 'Forward the semantic verdict to the visuals route so it can admit a request that named no picture-noun.',
+    expect: /semanticVisual/,
+    insert: "      body: JSON.stringify({ objective: prompt, semanticVisual })",
+    after: '      headers.delete(\'content-length\')',
+    requiresImport: "import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
+  })
+  const visuals = await readRepoFile('app/api/visuals/route.ts')
+  requireWiring(visuals, {
+    file: 'saas/app/api/visuals/route.ts',
+    purpose: 'Honour the forwarded semantic verdict and the filtered people list when detecting intent.',
+    expect: /detectConciergeVisualIntent\(objective, \{ semanticVisual, realPeople \}\)/,
+    insert: '    const intent = detectConciergeVisualIntent(objective, { semanticVisual, realPeople })',
+    after: '    const realPeople = await filterRealPeople(objective, extractNamedPeople(objective))',
+  })
 })

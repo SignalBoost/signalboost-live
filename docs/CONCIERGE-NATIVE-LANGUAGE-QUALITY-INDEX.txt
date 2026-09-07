@@ -1,3 +1,0 @@
-Canonical implementation records:
-- docs/CONCIERGE-NATIVE-LANGUAGE-QUALITY-2026-09-07.md
-- docs/CONCIERGE-NATIVE-LANGUAGE-QUALITY-2026-09-07.txt

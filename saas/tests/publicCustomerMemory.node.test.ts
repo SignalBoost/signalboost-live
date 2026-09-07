@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   formatPublicCustomerMemoryContext,
@@ -114,4 +115,23 @@ test('public customer memory formatting is bounded and fingerprints are determin
   assert.equal(a, b)
   assert.notEqual(a, c)
   assert.equal(sanitizePublicCustomerMemoryText('api_key=abc123456789'), 'api_key=[REDACTED]')
+})
+
+test('shared COS wrapper keeps public memory isolated from generic/private memory and bypasses it for fresh facts', () => {
+  const wrapper = readFileSync(new URL('../lib/ai/cos/cosFirstAnswer.ts', import.meta.url), 'utf8')
+  const memoryStore = readFileSync(new URL('../lib/ai/cos/publicCustomerMemory.ts', import.meta.url), 'utf8')
+
+  assert.match(wrapper, /if \(!isPublicDeliveryScope\(\)\) return null/)
+  assert.match(wrapper, /if \(!userId \|\| !prompt\) return null/)
+  assert.doesNotMatch(wrapper, /['"]@\/lib\/ai\/tools\/conversationHistory/)
+  assert.doesNotMatch(wrapper, /['"]@\/lib\/ai\/tools\/userMemory/)
+  assert.doesNotMatch(wrapper, /['"]@\/lib\/enterprise\/memory/)
+  assert.doesNotMatch(memoryStore, /assistant_conversations|assistant_messages|enterprise\/memory|userMemory/)
+
+  const freshBypass = wrapper.indexOf('requiresFreshExternalEvidence(prompt)')
+  const memoryRetrieval = wrapper.indexOf('retrievePublicCustomerMemory({ userId, query: prompt })')
+  assert.ok(freshBypass >= 0 && memoryRetrieval > freshBypass, 'fresh/current facts must bypass memory retrieval')
+
+  const legacyFallback = wrapper.indexOf('tryLegacyCOSFirstAnswer(input)')
+  assert.ok(legacyFallback > memoryRetrieval, 'existing COS pipeline must remain the fallback after bounded public memory')
 })

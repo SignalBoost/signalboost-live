@@ -3,6 +3,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { isOperationalLogRepairOffer, operationalLogRepairHandoff } from '../lib/ai/cos/pastedOperationalLog.ts'
 import { isRepairConfirmation } from '../lib/ai/cos/repairConfirmationIntent.ts'
+import { readRepoFile, requireWiring } from './helpers/requiredWiring.ts'
 
 const reasoner = (verdict: unknown, seen?: string[]) => (async (args: any) => {
   seen?.push(String(args?.prompt || ''))
@@ -60,11 +61,35 @@ test('the offer is recognised only from text this module generated', () => {
 })
 
 test('the browser ingress gates confirmation on a real prior offer and passive log evidence', async () => {
-  const fs = await import('node:fs/promises')
-  const route = await fs.readFile('app/api/cos-browser/route.ts', 'utf8')
-  assert.match(route, /isOperationalLogRepairOffer\(priorAnswer\)/)
-  assert.match(route, /explicitOperationalRepair = [\s\S]{0,200}confirmedRepairOffer/)
-  // A log alone still cannot authorise itself.
-  assert.match(route, /const confirmedRepairOffer = answeringOurRepairOffer && await isRepairConfirmation\(prompt\)/)
-  assert.match(route, /const followupOperationalRepair = hasExplicitOperationalLogRepairIntent\(prompt\)/)
+  const route = await readRepoFile('app/api/cos-browser/route.ts')
+  requireWiring(route, {
+    file: 'saas/app/api/cos-browser/route.ts',
+    purpose: 'Recognise that the prior assistant turn was our own repair offer, so a log can never authorise itself.',
+    expect: /isOperationalLogRepairOffer\(priorAnswer\)/,
+    insert: '    && isOperationalLogRepairOffer(priorAnswer)',
+    after: '    && isPastedOperationalLog(previousUserPrompt)',
+    requiresImport: "import { isOperationalLogRepairOffer } from '@/lib/ai/cos/pastedOperationalLog'",
+  })
+  requireWiring(route, {
+    file: 'saas/app/api/cos-browser/route.ts',
+    purpose: 'Let an ordinary human yes authorise the offered repair instead of requiring the literal phrase "fix it".',
+    expect: /const confirmedRepairOffer = answeringOurRepairOffer && await isRepairConfirmation\(prompt\)/,
+    insert: '    const confirmedRepairOffer = answeringOurRepairOffer && await isRepairConfirmation(prompt)',
+    after: '    && isOperationalLogRepairOffer(priorAnswer)',
+    requiresImport: "import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'",
+  })
+  requireWiring(route, {
+    file: 'saas/app/api/cos-browser/route.ts',
+    purpose: 'Authorise the repair once the person has confirmed the offer.',
+    expect: /explicitOperationalRepair = [\s\S]{0,200}confirmedRepairOffer/,
+    insert: '    || confirmedRepairOffer',
+    after: '    || reverseImmediateOperationalRepair',
+  })
+  requireWiring(route, {
+    file: 'saas/app/api/cos-browser/route.ts',
+    purpose: 'Keep the zero-cost keyword path as the fast route ahead of the network.',
+    expect: /const followupOperationalRepair = hasExplicitOperationalLogRepairIntent\(prompt\)/,
+    insert: '    const followupOperationalRepair = hasExplicitOperationalLogRepairIntent(prompt)',
+    after: '  // evidence, so a log still cannot authorise itself and no authority is widened.',
+  })
 })

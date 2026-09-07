@@ -16,12 +16,14 @@ body:has(.sb-ai-app-shell--home) > footer {
   display: flex !important;
   flex: 1 1 auto;
   min-height: 0;
+  min-width: 0;
   flex-direction: column;
 }
 
 .concierge-shell {
   width: 100% !important;
   max-width: none !important;
+  min-width: 0 !important;
   min-height: calc(100svh - 154px) !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -159,35 +161,45 @@ body:has(.sb-ai-app-shell--home) > footer {
   color: rgba(255,255,255,.78) !important;
 }
 
-/* Conversation is the primary scroll surface. */
+/* Conversation owns vertical scrolling; horizontal overflow is contained locally. */
 .concierge-shell .thread-wrap {
   position: relative;
   display: flex;
   flex: 1 1 0 !important;
+  width: 100%;
+  min-width: 0 !important;
   min-height: 0 !important;
   overflow: hidden;
 }
 
 .concierge-shell .thread {
   flex: 1 1 0 !important;
+  width: 100% !important;
+  min-width: 0 !important;
   min-height: 0 !important;
   max-height: none !important;
   height: 100% !important;
   overflow-y: auto !important;
-  padding: 28px clamp(16px, 6vw, 88px) !important;
+  overflow-x: hidden !important;
+  padding: 24px clamp(12px, 2vw, 28px) 32px !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
   scrollbar-gutter: stable;
+  box-sizing: border-box;
 }
 
+/* Full-bleed answer surface: assistant output may use the monitor instead of a centered card. */
 .concierge-shell .exchange {
-  width: min(1180px, 100%);
-  margin: 0 auto;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
 }
 
 .concierge-shell .message {
-  width: min(96%, 1120px) !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
 }
 
 .concierge-shell .user-message {
@@ -197,7 +209,9 @@ body:has(.sb-ai-app-shell--home) > footer {
 }
 
 .concierge-shell .assistant-message {
-  width: min(100%, 1180px) !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
   border: 0 !important;
@@ -205,13 +219,45 @@ body:has(.sb-ai-app-shell--home) > footer {
   overflow: visible;
 }
 
+.concierge-shell .assistant-content {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+}
+
+/* Generated visuals are content, not cards: no frame, white mat, padding, or artificial square. */
+.concierge-shell [data-concierge-visual-preview="true"] {
+  width: 100% !important;
+  max-width: none !important;
+  aspect-ratio: auto !important;
+  margin: 16px 0 12px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.concierge-shell [data-concierge-visual-preview="true"] img {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  object-fit: contain !important;
+}
+
 .concierge-shell .assistant-message pre {
   max-width: 100%;
+  overflow-x: auto;
   border-radius: 12px;
   scrollbar-gutter: stable;
 }
 
 .concierge-shell .assistant-message iframe {
+  width: 100% !important;
+  max-width: none !important;
   min-height: 460px;
   max-height: 70vh;
 }
@@ -284,7 +330,7 @@ body:has(.sb-ai-app-shell--home) > footer {
   }
 
   .concierge-shell .thread {
-    padding: 18px 10px !important;
+    padding: 18px 10px 24px !important;
   }
 
   .concierge-shell .message,

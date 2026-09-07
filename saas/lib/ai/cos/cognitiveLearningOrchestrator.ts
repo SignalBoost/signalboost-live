@@ -171,6 +171,11 @@ function mergeCleanup(target: CognitivePracticeCleanup, next: CognitivePracticeC
   if (target.details.length > 40) target.details.splice(0, target.details.length - 40)
 }
 
+function recordProcessedLessonId(target: Set<number>, result: Record<string, unknown>): void {
+  const lessonId = Number(result.lessonId)
+  if (Number.isFinite(lessonId) && lessonId > 0) target.add(lessonId)
+}
+
 /**
  * Production cognitive-learning orchestration. Candidate reflection remains available, but the
  * active-learning practice loop is allowed to consume reasoner calls only when an independent
@@ -199,6 +204,7 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
     practiceSkippedReason: null,
     errors: [],
   }
+  const processedLessonIds = new Set<number>()
 
   try {
     mergeCleanup(summary.cleanup, await discardUnnecessaryLocalCognitivePractice())
@@ -210,6 +216,7 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
     try {
       const result = await evaluateNextTeacherLesson()
       if (!result) break
+      recordProcessedLessonId(processedLessonIds, result)
       summary.lessons.push(result)
       // evaluateNextTeacherLesson may have produced local practice. Remove it before any practice
       // worker can spend another reasoner call on a candidate that lacks independent promotion.
@@ -218,6 +225,24 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
       summary.errors.push(`lesson:${error instanceof Error ? error.message : String(error)}`)
       break
     }
+  }
+
+  // Preserve the normal general-learning budget above, then give fresh owner-directed software
+  // material one additional bounded evaluation opportunity. It still goes through the exact same
+  // extraction, validation, practice and independent-evidence lifecycle; this lane changes only
+  // queue selection and never promotes a lesson or cognitive skill by itself.
+  try {
+    const directedResult = await evaluateNextTeacherLesson({
+      lane: 'owner_directed_software',
+      excludeLessonIds: [...processedLessonIds],
+    })
+    if (directedResult) {
+      recordProcessedLessonId(processedLessonIds, directedResult)
+      summary.lessons.push({ ...directedResult, evaluationLane: 'owner_directed_software' })
+      mergeCleanup(summary.cleanup, await discardUnnecessaryLocalCognitivePractice())
+    }
+  } catch (error) {
+    summary.errors.push(`directed-software-lesson:${error instanceof Error ? error.message : String(error)}`)
   }
 
   const externalEnabled = externalEvaluationEnabled()

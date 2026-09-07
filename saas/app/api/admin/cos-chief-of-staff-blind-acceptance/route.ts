@@ -32,7 +32,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const errorText = (error:unknown) => (error instanceof Error ? error.message : String(error ?? 'Unknown blind acceptance error')).slice(0, 1600)
 
 function canonicalJson(value:unknown):string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value)
+  if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null'
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`
   const record = value as Record<string,unknown>
   return `{${Object.keys(record).sort().map(key => `${JSON.stringify(key)}:${canonicalJson(record[key])}`).join(',')}}`
@@ -50,7 +50,7 @@ export async function GET() {
   const db = cosServiceDb()
   if (!db) return NextResponse.json({ ok:false, error:'COS service database is not configured.' }, { status:503 })
   const runs = await db.from('cos_chief_of_staff_acceptance_runs')
-    .select('id,profile,status,started_at,completed_at,gate_passed,observed_cases,dimensions,failures,error,variant_seed,case_manifest')
+    .select('id,profile,status,started_at,completed_at,gate_passed,observed_cases,dimensions,failures,error,variant_seed')
     .eq('profile', CHIEF_OF_STAFF_BLIND_PROFILE)
     .order('started_at', { ascending:false }).limit(20)
   if (runs.error) return NextResponse.json({ ok:false, error:runs.error.message }, { status:500 })

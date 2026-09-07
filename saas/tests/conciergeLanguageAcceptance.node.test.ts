@@ -87,12 +87,14 @@ test('route is owner-only, executes public scope with cache disabled, and keeps 
   assert.match(execution, /disableCache:\s*true/)
   assert.match(route, /method|PATCH|native_reviews/i)
   assert.match(route, /allNativeReviewsPass/)
+  assert.match(route, /fullGatePassed\s*=\s*automatedGatePassed\s*&&\s*allNativeReviewsPass\(run\.data\.native_reviews\)/)
+  assert.match(route, /fullGatePassed\s*=\s*run\.data\.automated_gate_passed\s*===\s*true\s*&&\s*allNativeReviewsPass\(reviews\)/)
   assert.match(migration, /"en":"pending","es":"pending","pt":"pending","pl":"pending","ru":"pending"/)
   assert.match(migration, /revoke all .* anon, authenticated/i)
   assert.match(migration, /enable row level security/i)
 })
 
-test('dashboard separates automated evidence from fluent-human native review', () => {
+test('dashboard exposes automated evidence and fluent-human review as separate controls', () => {
   const page = read('../app/dashboard/concierge-language-acceptance/page.tsx')
   assert.match(page, /runMatrix/)
   assert.match(page, /caseKeys/)
@@ -100,5 +102,6 @@ test('dashboard separates automated evidence from fluent-human native review', (
   assert.match(page, /automated_gate_passed/)
   assert.match(page, /full_gate_passed/)
   assert.match(page, /native_reviews/)
-  assert.doesNotMatch(page, /automated_gate_passed\s*\?\s*.*full_gate_passed/s)
+  assert.match(page, /reviewLanguage\(code,'pass'\)/)
+  assert.match(page, /reviewLanguage\(code,'fail'\)/)
 })

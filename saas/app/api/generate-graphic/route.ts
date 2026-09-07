@@ -1,8 +1,20 @@
 import { NextResponse } from "next/server";
+import { requireOwner } from "@/lib/auth/access";
+import { generateCosCreativeImage } from "@/lib/cos/creative-image";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 300;
 
 export async function POST(req: Request) {
+  const guard = await requireOwner();
+  if (!guard.ok) {
+    return NextResponse.json(
+      { success: false, error: guard.error },
+      { status: guard.status }
+    );
+  }
+
   try {
     const body = await req.json().catch(() => null);
     const prompt = body && typeof body.prompt === "string" ? body.prompt.trim() : "";
@@ -13,9 +25,28 @@ export async function POST(req: Request) {
       );
     }
 
-    // NOTE: image generation is not yet wired to a provider. Returns a demo
-    // asset, flagged mock:true so callers don't treat it as real output.
-    return NextResponse.json({ success: true, mock: true, image_url: "/demo/sample.png" });
+    const generated = await generateCosCreativeImage({
+      prompt,
+      campaignKey: "api-generate-graphic",
+      title: "Generated graphic",
+    });
+
+    if (generated.ok === false) {
+      console.warn("[generate-graphic] COS image generation failed", generated.error);
+      return NextResponse.json(
+        { success: false, error: generated.error },
+        { status: 503 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      mock: false,
+      image_url: generated.imageUrl,
+      object_path: generated.objectPath,
+      bucket: generated.bucket,
+      model: generated.model,
+    });
   } catch (err) {
     console.error("generate-graphic route error:", err);
     return NextResponse.json(

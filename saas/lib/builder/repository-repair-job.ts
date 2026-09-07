@@ -43,10 +43,11 @@ async function finishPreflightRecord(input: {
   result: Record<string, unknown>
   error?: string
 }): Promise<void> {
-  const claimed = await claimBuilderJob(input.jobId, input.userId)
+  const jobId = input.jobId
+  const claimed = await claimBuilderJob(jobId, input.userId)
   if (!claimed) throw new Error('builder_repository_preflight_claim_failed')
   await finishBuilderJob({
-    jobId: input.jobId,
+    jobId,
     userId: input.userId,
     claimGeneration: claimed.claimGeneration,
     status: input.status,

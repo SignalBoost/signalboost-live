@@ -66,6 +66,7 @@ const tests = [
   'tests/operationalSystemsLearning.node.test.ts',
   'tests/advisoryDiagnosisPolicy.node.test.ts',
   'tests/cosChiefOfStaffAcceptance.node.test.ts',
+  'tests/cosChiefOfStaffBlindAcceptance.node.test.ts',
   'tests/cosGroundingConfidence.node.test.ts',
   'tests/groundingConfidence.powerCap.node.test.ts',
   'tests/cosPublicProvenanceAuditIdentity.node.test.ts',

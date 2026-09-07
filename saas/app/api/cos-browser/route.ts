@@ -23,6 +23,8 @@ import {
   operationalLogReply,
 } from '@/lib/ai/cos/pastedOperationalLog'
 import { diagnoseOperationalLog } from '@/lib/ai/cos/operationalLogDiagnostic'
+import { isOperationalLogRepairOffer } from '@/lib/ai/cos/pastedOperationalLog'
+import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
@@ -146,13 +148,22 @@ export async function POST(req: NextRequest) {
   // passive-log -> diagnostic -> "fix it" contract server-side rather than relying on a second
   // client wrapper. For repository repair, keep both immutable branch/commit evidence from the log
   // head and the actual failing assertions from its tail inside Builder's 64k durable objective cap.
+  // A person answering an offer says "yes", "go", "please", "tak", "да" — or swears at
+  // it. The keyword path stays as the fast, zero-cost route; when it declines, the
+  // network reads the reply as consent or not. This is consulted ONLY when the prior
+  // assistant turn was our own repair offer and the turn before it was passive log
+  // evidence, so a log still cannot authorise itself and no authority is widened.
   const followupOperationalRepair = hasExplicitOperationalLogRepairIntent(prompt)
     && isPastedOperationalLog(previousUserPrompt)
+  const answeringOurRepairOffer = !followupOperationalRepair
+    && isPastedOperationalLog(previousUserPrompt)
+    && isOperationalLogRepairOffer(priorAnswer)
+  const confirmedRepairOffer = answeringOurRepairOffer && await isRepairConfirmation(prompt)
   const reverseImmediateOperationalRepair = isPastedOperationalLog(prompt)
     && immediatePreviousMessage?.role === 'user'
     && typeof immediatePreviousMessage?.content === 'string'
     && hasExplicitOperationalLogRepairIntent(immediatePreviousMessage.content)
-  const operationalPrompt = followupOperationalRepair
+  const operationalPrompt = followupOperationalRepair || confirmedRepairOffer
     ? `${prompt.trim()}\n\n${compactOperationalLogForRepair(previousUserPrompt)}`
     : currentOperationalPrompt
 
@@ -162,6 +173,7 @@ export async function POST(req: NextRequest) {
   const operationalEvidence = isOperationalLogEvidence(operationalPrompt)
   const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(operationalPrompt)
     || reverseImmediateOperationalRepair
+    || confirmedRepairOffer
 
   const deployment = { commitSha: process.env.VERCEL_GIT_COMMIT_SHA, branch: process.env.VERCEL_GIT_COMMIT_REF }
   // COS decides that software work belongs to the Software Specialist. From that point onward the

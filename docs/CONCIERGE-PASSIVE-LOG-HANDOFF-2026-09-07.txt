@@ -1,1 +1,23 @@
-placeholder
+Concierge passive operational-log handoff — 2026-09-07
+
+Observed behavior:
+- A passive pasted Vercel failure was diagnosed correctly.
+- Concierge did not mutate code without explicit repair intent.
+- The reply then asked the user to attach source code even though an authorized SignalBoost repair can inspect its repository once the user explicitly requests repair.
+
+Required behavior:
+- Passive logs remain read-only evidence.
+- Concierge explains the failed command/checks concisely.
+- Failure words inside the log never manufacture repair authority.
+- Concierge does not demand repository source up front when source may already be available to the authorized Builder workspace/repository.
+- It offers an explicit repair handoff rather than delegating repository discovery back to the user.
+- If source is genuinely unavailable, Builder may ask for it then.
+- If the current surface lacks repair authority, it says so rather than pretending to act.
+
+Acceptance:
+- Focused pastedOperationalLog regression must pass.
+- The two-turn log -> explicit repair handoff must preserve the prior failure evidence.
+- Full mandatory gates, TypeScript, Preview, normal two-parent PR merge, and Production READY remain required.
+
+Repository-write note:
+- A placeholder version of this file was accidentally created directly on main before the repair branch existed. That was an integration-discipline mistake, not a functional source change. This governed repair PR replaces the placeholder with the real record and performs all functional changes on the branch.

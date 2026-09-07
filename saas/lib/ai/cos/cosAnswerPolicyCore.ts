@@ -21,13 +21,16 @@
 
 import { ENGINEERING_CONSTANTS } from './engineeringConstants.ts'
 import { NORMATIVE_ANSWER_POLICY } from './normativeAnswerPolicy.ts'
+import { NATIVE_LANGUAGE_ANSWER_POLICY } from './conciergeLanguageQuality.ts'
 
 /**
- * Rules governing quantitative work, constraint compliance, and what may be asserted.
- * Included verbatim in the owner reasoner prompt and the public stateless prompt.
+ * Rules governing evidence discipline, native-language output quality, quantitative work,
+ * constraint compliance, and what may be asserted. Included verbatim in the owner reasoner
+ * prompt and the public stateless prompt before generation.
  */
 export const QUANTITATIVE_ANSWER_POLICY: readonly string[] = [
   ...NORMATIVE_ANSWER_POLICY,
+  ...NATIVE_LANGUAGE_ANSWER_POLICY,
   'EVIDENCE-BASED REASONING:',
   '- Reason from the proposition the user actually asked, not from a topic template, keyword rule, retrieved headline, or canned answer. Infer the relevant distinctions from the question and evidence each turn.',
   '- Before combining evidence, identify what each item actually measures or establishes: the construct, population, denominator, time window, comparison basis, and controls that materially affect interpretation.',

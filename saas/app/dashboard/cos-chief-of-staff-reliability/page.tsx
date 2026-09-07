@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { getChiefOfStaffAcceptanceCopy } from '@/lib/i18n/chiefOfStaffAcceptanceCopy'
+import { getChiefOfStaffBlindAcceptanceCopy } from '@/lib/i18n/chiefOfStaffBlindAcceptanceCopy'
 
 type Dimension = { passed:number; attempted:number; rate:number }
 type Run = { id:string; status:string; started_at:string; completed_at?:string|null; gate_passed?:boolean|null; observed_cases:number; dimensions:Record<string,Dimension>; failures:string[]; error?:string|null }
@@ -18,6 +19,7 @@ const labels:Record<string,string> = {
 export default function ChiefOfStaffReliabilityPage() {
   const { lang } = useTranslation()
   const c = getChiefOfStaffAcceptanceCopy(lang)
+  const blind = getChiefOfStaffBlindAcceptanceCopy(lang)
   const [state, setState] = useState<State>({ runs:[], results:[] })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -61,6 +63,7 @@ export default function ChiefOfStaffReliabilityPage() {
     <div className="flex flex-wrap gap-3">
       <button className="rounded-md bg-yellow-500 px-4 py-2 font-semibold text-black disabled:opacity-50" disabled={busy} onClick={() => void run()}>{busy ? c.running : c.run}</button>
       <button className="rounded-md border border-border px-4 py-2" disabled={busy} onClick={() => void load().catch(e => setError(e.message))}>{c.refresh}</button>
+      <Link className="rounded-md border border-border px-4 py-2" href="/dashboard/cos-chief-of-staff-blind-reliability">{blind.nav}</Link>
       <Link className="rounded-md border border-border px-4 py-2" href="/dashboard/cos-capability-benchmark">{c.back}</Link>
     </div>
     {error ? <div className="rounded-md border border-red-500/50 bg-red-500/10 p-3 text-red-200">{error}</div> : null}

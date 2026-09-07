@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { runPrivateCapabilityCase } from '@/lib/ai/cos/capabilityBenchmarkRunner'
-import { evaluateChiefOfStaffReliability } from '@/lib/ai/cos/chiefOfStaffReliability'
+import { CHIEF_OF_STAFF_RELIABILITY_PROFILE, evaluateChiefOfStaffReliability } from '@/lib/ai/cos/chiefOfStaffReliability'
 import {
   CHIEF_OF_STAFF_ACCEPTANCE_CASES,
   evaluateChiefOfStaffAcceptanceCase,
@@ -34,6 +34,7 @@ export async function GET() {
   if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
   const runs = await db.from('cos_chief_of_staff_acceptance_runs')
     .select('id,profile,status,started_at,completed_at,gate_passed,observed_cases,dimensions,failures,error')
+    .eq('profile', CHIEF_OF_STAFF_RELIABILITY_PROFILE)
     .order('started_at', { ascending: false }).limit(20)
   if (runs.error) return NextResponse.json({ ok: false, error: runs.error.message }, { status: 500 })
   const runIds = (runs.data ?? []).map(row => row.id)
@@ -43,7 +44,7 @@ export async function GET() {
       .in('run_id', runIds).order('created_at', { ascending: true })
     : { data: [], error: null }
   if (results.error) return NextResponse.json({ ok: false, error: results.error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, requiredCases: 4, runs: runs.data ?? [], results: results.data ?? [] })
+  return NextResponse.json({ ok: true, profile: CHIEF_OF_STAFF_RELIABILITY_PROFILE, requiredCases: 4, runs: runs.data ?? [], results: results.data ?? [] })
 }
 
 export async function POST() {
@@ -52,7 +53,7 @@ export async function POST() {
   const db = cosServiceDb()
   if (!db) return NextResponse.json({ ok: false, error: 'COS service database is not configured.' }, { status: 503 })
 
-  const created = await db.from('cos_chief_of_staff_acceptance_runs').insert({}).select('id').single()
+  const created = await db.from('cos_chief_of_staff_acceptance_runs').insert({ profile: CHIEF_OF_STAFF_RELIABILITY_PROFILE }).select('id').single()
   if (created.error || !created.data) return NextResponse.json({ ok: false, error: created.error?.message ?? 'Could not create acceptance run.' }, { status: 500 })
   return NextResponse.json({ ok: true, runId: String(created.data.id), caseKeys: CHIEF_OF_STAFF_ACCEPTANCE_CASES.map(test => test.key) })
 }
@@ -68,7 +69,7 @@ export async function PUT(request: Request) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(runId) || !test) {
     return NextResponse.json({ ok:false, error:'A valid run and acceptance case are required.' }, { status:400 })
   }
-  const run = await db.from('cos_chief_of_staff_acceptance_runs').select('id,status').eq('id', runId).single()
+  const run = await db.from('cos_chief_of_staff_acceptance_runs').select('id,status').eq('id', runId).eq('profile', CHIEF_OF_STAFF_RELIABILITY_PROFILE).single()
   if (run.error || !run.data) return NextResponse.json({ ok:false, error:'Acceptance run was not found.' }, { status:404 })
   if (run.data.status !== 'running') return NextResponse.json({ ok:false, error:'Acceptance run is already final.' }, { status:409 })
 

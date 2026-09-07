@@ -1,2 +1,2 @@
-base_sha=dfe2b144702d48201664f46d663b843028fe0e2c
-branch=fix/cos-image-generation
+base_sha=dc2a58ba58f8a085544cbf1dda3567442eede7fb
+branch=fix/cos-direct-draw-intent-20260907

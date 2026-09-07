@@ -102,7 +102,7 @@ async function tryCosCreativeImage(input: COSFirstAnswerInput): Promise<COSFirst
     title: 'COS generated image',
   })
 
-  if (!generated.ok) {
+  if (generated.ok === false) {
     return {
       handled: false,
       confidence: 0,

@@ -45,6 +45,8 @@ const PROFILES: Record<ConciergeLanguage, string> = {
 
 const LITERAL_PRESERVATION_RULE = [
   'When the user explicitly says that a literal identifier, URL, citation, product name, code token, or UI label must be kept, preserved, conserved, unchanged, or exact, the final answer MUST contain that exact literal.',
+  'First extract every such protected literal from the current request into an internal checklist. For numbered or bulleted guidance, carry each protected literal into the first semantically relevant item rather than leaving it implicit.',
+  'Immediately before returning, compare the final answer text against that checklist byte-for-byte. Do not return until every protected literal appears exactly; never assume a later reviewer will restore it.',
   'Omitting or normalizing an explicitly protected literal is a failed answer; re-read the user request and the final draft before returning.',
 ].join(' ')
 

@@ -5,11 +5,11 @@ import {
   ACCEPTANCE_LANGUAGES,
   CONCIERGE_LANGUAGE_ACCEPTANCE_CASES,
   acceptanceCriticalTokens,
-  executeConciergeLanguageAcceptanceCase,
   requiredNativeReviewTemplate,
   summarizeLanguageAcceptance,
   type ConciergeLanguageAcceptanceExecution,
 } from '@/lib/ai/cos/conciergeLanguageAcceptance'
+import { executeConciergeLanguageAcceptanceCase } from '@/lib/ai/cos/conciergeLanguageAcceptanceExecution'
 import type { ConciergeLanguage } from '@/lib/ai/cos/conciergeLanguageQuality'
 
 export const runtime = 'nodejs'

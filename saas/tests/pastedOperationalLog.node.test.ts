@@ -66,21 +66,28 @@ test('failure words inside the log do not manufacture explicit repair authority'
   assert.equal(isPastedOperationalLog(log), true)
 })
 
-test('reports a final test failure instead of calling the log incomplete', () => {
+test('reports a final test failure and offers an explicit repair handoff without demanding repository source', () => {
   const log = [
+    '15:27:16.225 Cloning github.com/SignalBoost/signalboost-live (Branch: feat/demo, Commit: 1234567)',
     '15:27:17.225 Running "vercel build"',
     '16:07:21.324 ✖ both answer paths resolve markers before anything else sees the text',
     'Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
   ].join('\n')
   const analysis = analyzeOperationalLog(log)
+  const reply = operationalLogReply(log)
   assert.equal(analysis.failed, true)
   assert.equal(analysis.exitCode, 1)
   assert.equal(analysis.testFailures.length, 1)
-  assert.match(operationalLogReply(log), /This Vercel build failed/)
-  assert.match(operationalLogReply(log), /both answer paths resolve markers/i)
+  assert.match(reply, /This Vercel build failed/)
+  assert.match(reply, /both answer paths resolve markers/i)
+  assert.match(reply, /say "fix it"/i)
+  assert.match(reply, /Builder/i)
+  assert.match(reply, /passive diagnostic evidence, not a repair request/i)
+  assert.doesNotMatch(reply, /attach the affected source file/i)
+  assert.doesNotMatch(reply, /No code was changed from the log alone/i)
 })
 
-test('an incomplete build excerpt gets an actionable diagnostic reply instead of the obsolete canned refusal', () => {
+test('an incomplete build excerpt asks for missing failure evidence, not repository source', () => {
   const log = [
     '22:44:23.200 Running vercel build',
     'Vercel CLI 59.3.0',
@@ -89,6 +96,8 @@ test('an incomplete build excerpt gets an actionable diagnostic reply instead of
   const reply = operationalLogReply(log)
   assert.match(reply, /does not include a failing assertion or a non-zero final command/i)
   assert.match(reply, /No code was changed/i)
-  assert.match(reply, /attach the affected source file/i)
+  assert.match(reply, /Paste the final error or ✖ assertion/i)
+  assert.match(reply, /say "fix it"/i)
+  assert.doesNotMatch(reply, /attach the affected source file/i)
   assert.doesNotMatch(reply, /not editable source code|not a request to portray anyone/i)
 })

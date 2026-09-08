@@ -111,6 +111,15 @@ test('PhD actor/project/evidence writes remain host-only seams', () => {
   }
 })
 
+test('PhD owner manual admission and evaluation obey the same fail-closed runtime switch', () => {
+  const route = routeSafe()
+  assert.match(route, /function runtimeEnabled\(\): boolean/)
+  assert.match(route, /COS_UNIVERSITY_PHD_RUNTIME_ENABLED === 'true'/)
+  assert.match(route, /function disabledResponse\(\)/)
+  assert.match(route, /phd_runtime_fail_closed/)
+  assert.equal((route.match(/if \(!runtimeEnabled\(\)\) return disabledResponse\(\)/g) || []).length, 2)
+})
+
 test('PhD admission and progress crons are secret-gated, fail closed, and bounded', () => {
   const admission = file('app/api/cron/cos-university-phd-admission/route.ts')
   const progress = file('app/api/cron/cos-university-phd-progress/route.ts')

@@ -30,7 +30,7 @@ import type { CosUniversitySubjectId } from './cosUniversity.ts'
 
 const AGENT_ID = 'cos'
 const ASSESSMENT_SELECT = 'assessment_key,subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_version,scorer_authority,observed_at,valid_until'
-const EVIDENCE_SELECT = 'evidence_key,stage,passed,variant_hash,independent,verified_practical,authority,observed_at,valid_until'
+const EVIDENCE_SELECT = 'evidence_key,program_id,stage,passed,variant_hash,independent,verified_practical,authority,observed_at,valid_until'
 
 type EnrollmentRow = {
   program_key: string
@@ -52,6 +52,7 @@ type CredentialRow = {
 
 type MastersEvidenceRow = {
   evidence_key: string
+  program_id: CosUniversityMastersProgramId
   stage: CosUniversityMastersEvidenceStage
   passed: boolean
   variant_hash: string
@@ -88,6 +89,7 @@ function mapCredential(row: CredentialRow | null): CosUniversityCredential | nul
 
 function mapEvidence(row: MastersEvidenceRow): CosUniversityMastersEvidence {
   return {
+    programId: row.program_id,
     stage: row.stage,
     passed: row.passed,
     variantHash: row.variant_hash,

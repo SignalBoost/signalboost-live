@@ -91,6 +91,33 @@ test('University practice preparation cannot outpace the normal two-exercise exe
   assert.match(route, /queueDiscipline/)
 })
 
+test('terminal failed University practice reopens study from durable queue state across cron invocations', () => {
+  const bridge = file('lib/ai/cos/cosUniversityPracticeFailureRemediation.ts')
+  const route = file('app/api/cron/cos-university-practice/route.ts')
+  assert.match(bridge, /runs: readonly PracticeRun\[\] = \[\]/)
+  assert.match(bridge, /loadCurrentStudyingPlans\(runPlanIds\)/)
+  assert.match(bridge, /loadUniversityPracticeRows\(\)/)
+  assert.match(bridge, /from\('cos_active_practice_queue'\)/)
+  assert.match(bridge, /const rows = currentRoundRows\(practiceRows, plan\.id, practiceRound\)/)
+  assert.match(bridge, /rows\.every\(row => row\.status !== 'queued' && row\.status !== 'running'\)/)
+  assert.match(bridge, /const failed = rows\.filter\(row => row\.status === 'failed'\)/)
+  assert.match(bridge, /last_attempt_at: null/)
+  assert.match(bridge, /failureReasons: reasons/)
+  assert.match(bridge, /requiresNewStudyAttempt: true/)
+  assert.match(bridge, /requiresIndependentRetest: true/)
+  assert.match(bridge, /academicCredit: false/)
+  assert.match(bridge, /reconciledAcrossRuntimeBoundary: !runKeys\.has/)
+  assert.doesNotMatch(bridge, /if \(!runKeys\.size\)[^{]*return/)
+  assert.doesNotMatch(bridge, /recordCosUniversityAssessment/)
+  assert.doesNotMatch(bridge, /\bgrade\b/i)
+  const practiceAt = route.indexOf('await runCosUniversityDeliberatePractice')
+  const remediationAt = route.indexOf('await reopenCosUniversityStudyAfterFailedPractice')
+  assert.ok(practiceAt >= 0)
+  assert.ok(remediationAt > practiceAt)
+  assert.match(route, /reopenCosUniversityStudyAfterFailedPractice\(result\.runs\)/)
+  assert.match(route, /practiceRemediation/)
+})
+
 test('exam lanes remain independent from continuous study cadence', () => {
   const vercel = JSON.parse(file('vercel.json')) as { env: Record<string, string>; crons: Array<{ path: string; schedule: string }> }
   assert.equal(vercel.env.COS_UNIVERSITY_CONTINUOUS_ENABLED, 'true')

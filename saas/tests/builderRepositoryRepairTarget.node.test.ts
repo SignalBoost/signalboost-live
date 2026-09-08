@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import { readBuilderObjective } from '../lib/builder/request-contract.ts'
 import {
   parseSignalBoostRepositoryRepairTarget,
@@ -44,6 +45,18 @@ const noisyNodeTestFailureLog = [
   '15:25:06.480 // saas/app/api/builder/route.ts',
   '15:25:06.494 expected: /require 1–4 supported/',
   '15:25:06.510 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
+].join('\n')
+
+const blueprintLog = [
+  '21:33:12.287 Cloning github.com/SignalBoost/signalboost-live (Branch: feat/cos-university-continuous-learning-20260907, Commit: 4786511)',
+  '21:33:36.240 {',
+  '21:33:36.240   "ok": false,',
+  '21:33:36.241   "schema": "signalboost-cos-blueprint-v1",',
+  '21:33:36.241   "failures": [',
+  '21:33:36.241     "operational_learning_daily_mining_wiring_missing"',
+  '21:33:36.241   ]',
+  '21:33:36.241 }',
+  '21:33:36.274 Error: Command "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build" exited with 1',
 ].join('\n')
 
 test('extracts the exact SignalBoost branch, revision, source paths and missing symbols from a failed Vercel log', () => {
@@ -181,4 +194,35 @@ test('passive logs and test titles cannot manufacture platform-repair intent', (
   )
   assert.ok(ownerSubmission)
   assert.equal(ownerSubmission.fullCommitSha, sha)
+})
+
+test('a failed Vercel blueprint log is a SignalBoost repository repair target', () => {
+  const target = parseSignalBoostRepositoryRepairTarget(blueprintLog)
+  assert.ok(target)
+  assert.equal(target.repository, 'SignalBoost/signalboost-live')
+  assert.equal(target.branch, 'feat/cos-university-continuous-learning-20260907')
+  assert.equal(target.commitSha, '4786511')
+  assert.match(target.failedCommand || '', /vercel-cos-gates/)
+  assert.ok(target.failureEvidence.some(line => line.includes('operational_learning_daily_mining_wiring_missing')))
+})
+
+test('owner COS repair forces the recorded build command instead of an unrelated unit test', () => {
+  const repair = readFileSync(new URL('../lib/builder/repository-repair.ts', import.meta.url), 'utf8')
+  assert.match(repair, /function recordedBuildProofCommand/)
+  assert.match(repair, /target\.failedCommand/)
+  assert.match(repair, /vercel-cos-gates\|npm run prebuild\|next build\|check-cos-blueprint/)
+  assert.match(repair, /function targetedRepositoryCommand/)
+})
+
+test('owner jobs that carry a failed SignalBoost clone log enter Platform Engineer', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  assert.match(runner, /parsedLogTarget/)
+  assert.match(runner, /treatAsPlatformRepair/)
+  assert.match(runner, /executeSignalBoostRepositoryRepair/)
+  assert.match(runner, /builder_repository_repair_owner_required/)
+})
+
+test('Concierge still cannot inherit repository write', () => {
+  const browser = readFileSync(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  assert.match(browser, /surface: 'concierge', allowRepositoryRepair: false/)
 })

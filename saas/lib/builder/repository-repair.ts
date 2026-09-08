@@ -81,6 +81,13 @@ function requestDeadline(value: unknown): number {
   return Number.isFinite(numeric) ? numeric : Date.now() + DEFAULT_REPOSITORY_REQUEST_BUDGET_MS
 }
 
+function recordedBuildProofCommand(target: SignalBoostRepositoryRepairTarget): string | null {
+  const failedCommand = String(target.failedCommand || '').trim()
+  if (!failedCommand) return null
+  if (/vercel-cos-gates|npm run prebuild|next build|check-cos-blueprint/i.test(failedCommand)) return failedCommand
+  return null
+}
+
 function targetedRepositoryCommand(command: string, target: SignalBoostRepositoryRepairTarget): string {
   const normalized = normalizeBuilderSandboxCommand(command)
   const failingTests = target.pathHints
@@ -92,6 +99,12 @@ function targetedRepositoryCommand(command: string, target: SignalBoostRepositor
   // that evidence; execute those tests directly even if the model asked for the broad script.
   if (failingTests.length > 0 && /^npm\s+(?:run\s+)?test(?:\s|$)/i.test(normalized)) {
     return `node --experimental-strip-types --test ${failingTests.join(' ')}`
+  }
+  const recordedProof = recordedBuildProofCommand(target)
+  // When the log has no failing test file, the recorded Vercel gate/prebuild command is the proof.
+  // Do not let the model substitute an unrelated unit test.
+  if (!failingTests.length && recordedProof && !/vercel-cos-gates|prebuild|next build|check-cos-blueprint/i.test(normalized)) {
+    return recordedProof
   }
   return normalized
 }

@@ -9,6 +9,16 @@ import {
   selectNextCosUniversityStudyTarget,
   type CosUniversityAssessmentEvidence,
 } from '../lib/ai/cos/cosUniversity.ts'
+import {
+  COS_PLATFORM_LANGUAGES,
+  buildCosPlatformLanguageTranscript,
+  deriveCosPlatformLanguageGrade,
+  platformLanguageGraduationReady,
+  weakestPlatformLanguage,
+  type CosPlatformLanguage,
+  type CosPlatformLanguageAssessmentEvidence,
+  type CosPlatformLanguageDimension,
+} from '../lib/ai/cos/cosUniversityLanguages.ts'
 
 const observedAt = (minute: number) => new Date(Date.UTC(2026, 8, 7, 12, minute, 0)).toISOString()
 
@@ -28,6 +38,32 @@ function assessment(
     observedAt: observedAt(1),
     ...overrides,
   }
+}
+
+const LANGUAGE_DIMENSIONS: CosPlatformLanguageDimension[] = [
+  'comprehension',
+  'writing',
+  'instruction_following',
+  'translation_localization',
+  'cultural_pragmatics',
+]
+
+function languageStage(
+  language: CosPlatformLanguage,
+  kind: CosPlatformLanguageAssessmentEvidence['kind'],
+  minute: number,
+): CosPlatformLanguageAssessmentEvidence[] {
+  return LANGUAGE_DIMENSIONS.map((dimension, index) => ({
+    assessmentId: `${language}-${kind}-${dimension}`,
+    language,
+    dimension,
+    kind,
+    passed: true,
+    independentScorer: true,
+    fresh: true,
+    scorerVersion: 'language-host-scorer-v1',
+    observedAt: observedAt(minute + index),
+  }))
 }
 
 test('COS University exposes a stable unique thirteen-subject core', () => {
@@ -150,4 +186,50 @@ test('with no failure signal, continuing education starts from the first subject
   assert.equal(target?.subjectId, 'computer_science')
   assert.equal(target?.currentGrade, 'unassessed')
   assert.ok(target?.reasons.includes('academic_gap=unassessed->A'))
+})
+
+test('SignalBoost platform languages are exactly English Spanish Portuguese Polish and Russian', () => {
+  assert.deepEqual(COS_PLATFORM_LANGUAGES.map(language => language.id), ['en', 'es', 'pt', 'pl', 'ru'])
+  assert.deepEqual(COS_PLATFORM_LANGUAGES.map(language => language.title), ['English', 'Spanish', 'Portuguese', 'Polish', 'Russian'])
+  assert.ok(COS_PLATFORM_LANGUAGES.every(language => language.required))
+})
+
+test('each platform language is graded independently across five communication dimensions', () => {
+  const englishOnly = [
+    ...languageStage('en', 'practice_checkpoint', 10),
+    ...languageStage('en', 'unseen_subject_exam', 20),
+    ...languageStage('en', 'cross_domain_transfer', 30),
+    ...languageStage('en', 'production_transfer', 40),
+  ]
+  assert.equal(deriveCosPlatformLanguageGrade('en', englishOnly).grade, 'A')
+  assert.equal(deriveCosPlatformLanguageGrade('pl', englishOnly).grade, 'unassessed')
+  assert.equal(platformLanguageGraduationReady(buildCosPlatformLanguageTranscript(englishOnly)), false)
+})
+
+test('one weak language dimension blocks the language from being averaged upward', () => {
+  const polish = [
+    ...languageStage('pl', 'practice_checkpoint', 10),
+    ...languageStage('pl', 'unseen_subject_exam', 20),
+  ]
+  const writing = polish.find(row => row.kind === 'unseen_subject_exam' && row.dimension === 'writing')!
+  writing.passed = false
+  const entry = deriveCosPlatformLanguageGrade('pl', polish)
+  assert.equal(entry.grade, 'C')
+  assert.equal(entry.dimensionsPassed.includes('writing'), false)
+})
+
+test('five-language graduation readiness requires every platform language independently at target', () => {
+  const evidence: CosPlatformLanguageAssessmentEvidence[] = []
+  for (const language of COS_PLATFORM_LANGUAGES) {
+    evidence.push(
+      ...languageStage(language.id, 'practice_checkpoint', 10),
+      ...languageStage(language.id, 'unseen_subject_exam', 20),
+      ...languageStage(language.id, 'cross_domain_transfer', 30),
+      ...languageStage(language.id, 'production_transfer', 40),
+    )
+  }
+  const transcript = buildCosPlatformLanguageTranscript(evidence)
+  assert.equal(platformLanguageGraduationReady(transcript, 'A'), true)
+  assert.equal(platformLanguageGraduationReady(transcript, 'A+'), false)
+  assert.equal(weakestPlatformLanguage(transcript)?.grade, 'A')
 })

@@ -84,6 +84,26 @@ function emptySummary(args: {
   }
 }
 
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object') {
+    const row = error as { code?: unknown; message?: unknown; details?: unknown; hint?: unknown }
+    const parts = [
+      row.code ? `code=${String(row.code)}` : '',
+      row.message ? `message=${String(row.message)}` : '',
+      row.details ? `details=${String(row.details)}` : '',
+      row.hint ? `hint=${String(row.hint)}` : '',
+    ].filter(Boolean)
+    if (parts.length) return parts.join(' ').slice(0, 1600)
+    try {
+      return JSON.stringify(error).slice(0, 1600)
+    } catch {
+      return 'unknown_object_error'
+    }
+  }
+  return String(error)
+}
+
 async function claimContinuousSlot(slotKey: string, now: Date): Promise<ContinuousRunRow | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -189,8 +209,13 @@ export async function runCosUniversityContinuousLearning(options: {
     for (const plan of [...remediation.activePlans, ...planning.activePlans]) {
       if (!activeById.has(plan.id)) activeById.set(plan.id, plan)
     }
+    const remediationPlanIds = new Set(remediation.activePlans.map(plan => plan.id))
     const activePlans = [...activeById.values()]
-      .sort((a, b) => b.priority - a.priority || a.planKey.localeCompare(b.planKey))
+      .sort((a, b) =>
+        Number(remediationPlanIds.has(b.id)) - Number(remediationPlanIds.has(a.id))
+        || b.priority - a.priority
+        || a.planKey.localeCompare(b.planKey),
+      )
     summary.planned = activePlans.length
 
     const eligibleIds = await loadEligiblePlanIds(activePlans.map(plan => plan.id), now)
@@ -237,11 +262,11 @@ export async function runCosUniversityContinuousLearning(options: {
     return summary
   } catch (error) {
     summary.status = 'error'
-    summary.errors.push(error instanceof Error ? error.message : String(error))
+    summary.errors.push(describeError(error))
     try {
       await finishContinuousSlot(claim.id, new Date(), summary, attemptedPlanIds)
     } catch (finishError) {
-      summary.errors.push(`finish:${finishError instanceof Error ? finishError.message : String(finishError)}`)
+      summary.errors.push(`finish:${describeError(finishError)}`)
     }
     return summary
   }

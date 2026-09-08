@@ -6,8 +6,9 @@ import test from 'node:test'
 const ROOT = path.resolve(import.meta.dirname, '..')
 const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
 
-test('failed independent exams create priority remediation without exposing hidden scorer details', () => {
+test('failed independent exams create schema-valid priority remediation without exposing hidden scorer details', () => {
   const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
+  const schema = file('supabase/migrations/20260908002000_cos_university_continuous_learning.sql')
   assert.match(bridge, /from\('cos_university_exam_runs'\)/)
   assert.match(bridge, /\.in\('status', \['passed', 'failed'\]\)/)
   assert.match(bridge, /latestByTarget/)
@@ -16,7 +17,9 @@ test('failed independent exams create priority remediation without exposing hidd
   assert.match(bridge, /status: 'superseded'/)
   assert.match(bridge, /source_kind: SOURCE_KIND/)
   assert.match(bridge, /SOURCE_KIND = 'recertification'/)
-  assert.match(bridge, /priority = isLanguage \? 124 : 122/)
+  assert.match(schema, /priority integer not null default 50 check \(priority between 1 and 100\)/i)
+  assert.match(bridge, /const priority = 100/)
+  assert.doesNotMatch(bridge, /priority = isLanguage \? 124 : 122/)
   assert.match(bridge, /hiddenExamDetailsExposed: false/)
   assert.match(bridge, /hidden exam rubric/i)
   assert.doesNotMatch(bridge, /select\([^)]*reasons/)
@@ -33,14 +36,25 @@ test('later terminal pass or expired failure retires obsolete remediation instea
   assert.match(bridge, /\.in\('status', \['queued', 'studying', 'ready_for_exam'\]\)/)
 })
 
-test('continuous learner merges failed-exam remediation ahead of generic planning', () => {
+test('continuous learner keeps failed-exam remediation ahead of generic priority-100 planning', () => {
   const runtime = file('lib/ai/cos/cosUniversityContinuousLearning.ts')
   assert.match(runtime, /ensureCosUniversityExamFailureRemediationPlans/)
   assert.match(runtime, /examFailuresPrioritized/)
   assert.match(runtime, /\[\.\.\.remediation\.activePlans, \.\.\.planning\.activePlans\]/)
+  assert.match(runtime, /const remediationPlanIds = new Set\(remediation\.activePlans\.map\(plan => plan\.id\)\)/)
+  assert.match(runtime, /Number\(remediationPlanIds\.has\(b\.id\)\) - Number\(remediationPlanIds\.has\(a\.id\)\)/)
   assert.match(runtime, /b\.priority - a\.priority/)
   assert.match(runtime, /\[\.\.\.remediation\.gapSignals, \.\.\.planning\.gapSignals\]/)
   assert.match(runtime, /markCosUniversityStudyPlansAttempted/)
+})
+
+test('continuous learner records structured database errors instead of object stringification', () => {
+  const runtime = file('lib/ai/cos/cosUniversityContinuousLearning.ts')
+  assert.match(runtime, /function describeError\(error: unknown\): string/)
+  assert.match(runtime, /row\.code \? `code=\$\{String\(row\.code\)\}`/)
+  assert.match(runtime, /row\.message \? `message=\$\{String\(row\.message\)\}`/)
+  assert.match(runtime, /summary\.errors\.push\(describeError\(error\)\)/)
+  assert.match(runtime, /finish:\$\{describeError\(finishError\)\}/)
 })
 
 test('deliberate practice executes through the dedicated local training seam and cannot write academic credit', () => {

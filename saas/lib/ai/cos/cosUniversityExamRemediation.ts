@@ -160,7 +160,9 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
   const objective = isLanguage
     ? `Remediate the weakness demonstrated by a fresh independent unseen ${failure.language_code} ${String(failure.language_dimension).replaceAll('_', ' ')} examination. Study and practice the competency broadly without access to the hidden exam rubric, then prove improvement on a new independent case.`
     : `Remediate the weakness demonstrated by a fresh independent unseen ${cosUniversitySubjectById(subjectId).title} examination. Study the subject broadly, use deliberate practice, preserve examiner isolation, and prove improvement on a new independent case.`
-  const priority = isLanguage ? 124 : 122
+  // The durable study-plan schema caps priority at 100. Runtime ordering separately keeps
+  // independent-exam remediation ahead of generic plans that may also carry priority 100.
+  const priority = 100
   const now = new Date().toISOString()
   const insert = await db.from('cos_university_study_plans').upsert({
     plan_key: planKey,

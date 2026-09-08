@@ -1,17 +1,16 @@
+// saas/lib/ai/cos/cosUniversityMasters.ts
+// Canonical Master's specialization catalog plus evidence-backed degree semantics.
+
 import type { CosUniversitySubjectId } from './cosUniversity.ts'
 
-export type CosUniversityMastersProgramId =
-  | 'software_engineering'
-  | 'cybersecurity'
-  | 'mathematics'
-  | 'statistics_data_science'
-  | 'finance_economics'
-  | 'international_relations'
-  | 'business_operations'
-  | 'legal_regulatory_analysis'
-  | 'engineering_physical_sciences'
-  | 'social_behavioral_sciences'
-  | 'language_communication'
+export type CosUniversityMastersTrackId =
+  | 'applied_ai_systems'
+  | 'security_and_trust'
+  | 'quantitative_decision_science'
+  | 'enterprise_operations_and_governance'
+  | 'scientific_and_physical_systems'
+
+export type CosUniversityMastersProgramId = CosUniversityMastersTrackId
 
 export type CosUniversityMastersEvidenceStage =
   | 'graduate_coursework'
@@ -25,6 +24,83 @@ export type CosUniversityMastersEvidenceAuthority =
   | 'host_private_exam'
   | 'verified_production'
   | 'host_capstone'
+
+export type CosUniversityMastersTrack = Readonly<{
+  id: CosUniversityMastersTrackId
+  title: string
+  objective: string
+  coreSubjects: readonly CosUniversitySubjectId[]
+  supportingSubjects: readonly CosUniversitySubjectId[]
+  requiredDepthPasses: number
+}>
+
+export const COS_UNIVERSITY_MASTERS_TRACKS: ReadonlyArray<CosUniversityMastersTrack> = Object.freeze([
+  Object.freeze({
+    id: 'applied_ai_systems',
+    title: 'Applied AI Systems',
+    objective: 'Design, evaluate, and operate AI systems end to end, including failure analysis and evaluation design.',
+    coreSubjects: Object.freeze(['computer_science', 'statistics_data_science'] as const),
+    supportingSubjects: Object.freeze(['mathematics', 'reasoning_decision_science'] as const),
+    requiredDepthPasses: 3,
+  }),
+  Object.freeze({
+    id: 'security_and_trust',
+    title: 'Security & Trust Engineering',
+    objective: 'Reason adversarially about systems, identity, and incidents, and defend designs under hostile assumptions.',
+    coreSubjects: Object.freeze(['cybersecurity', 'computer_science'] as const),
+    supportingSubjects: Object.freeze(['law_regulation_governance', 'reasoning_decision_science'] as const),
+    requiredDepthPasses: 3,
+  }),
+  Object.freeze({
+    id: 'quantitative_decision_science',
+    title: 'Quantitative Decision Science',
+    objective: 'Draw defensible conclusions from data under uncertainty and state what the evidence cannot support.',
+    coreSubjects: Object.freeze(['statistics_data_science', 'mathematics'] as const),
+    supportingSubjects: Object.freeze(['economics_finance', 'reasoning_decision_science'] as const),
+    requiredDepthPasses: 3,
+  }),
+  Object.freeze({
+    id: 'enterprise_operations_and_governance',
+    title: 'Enterprise Operations & Governance',
+    objective: 'Run and govern operating businesses: process, control, regulation, and accountable decision records.',
+    coreSubjects: Object.freeze(['business_operations', 'law_regulation_governance'] as const),
+    supportingSubjects: Object.freeze(['economics_finance', 'social_behavioral_sciences'] as const),
+    requiredDepthPasses: 3,
+  }),
+  Object.freeze({
+    id: 'scientific_and_physical_systems',
+    title: 'Scientific & Physical Systems',
+    objective: 'Apply scientific method and physical reasoning to instrumented real-world systems.',
+    coreSubjects: Object.freeze(['physics_natural_sciences', 'mathematics'] as const),
+    supportingSubjects: Object.freeze(['statistics_data_science', 'computer_science'] as const),
+    requiredDepthPasses: 3,
+  }),
+])
+
+export function cosUniversityMastersTrackById(id: string): CosUniversityMastersTrack | null {
+  return COS_UNIVERSITY_MASTERS_TRACKS.find((track) => track.id === id) ?? null
+}
+
+export function cosUniversityMastersProgramKey(trackId: CosUniversityMastersTrackId): string {
+  return `specialist_masters_${trackId}_v1`
+}
+
+export const COS_UNIVERSITY_MASTERS_PROGRAM_KEY_PREFIX = 'specialist_masters_'
+
+export function rankCosUniversityMastersTracks(
+  subjectStanding: ReadonlyMap<CosUniversitySubjectId, number>,
+): ReadonlyArray<{ track: CosUniversityMastersTrack; score: number }> {
+  return COS_UNIVERSITY_MASTERS_TRACKS
+    .map((track, index) => {
+      const core = track.coreSubjects.reduce((sum, id) => sum + (subjectStanding.get(id) ?? 0), 0)
+      const supporting = track.supportingSubjects.reduce((sum, id) => sum + (subjectStanding.get(id) ?? 0), 0)
+      const denominator = track.coreSubjects.length + track.supportingSubjects.length * 0.5
+      const score = denominator > 0 ? (core + supporting * 0.5) / denominator : 0
+      return { track, score, index }
+    })
+    .sort((a, b) => (b.score - a.score) || (a.index - b.index))
+    .map(({ track, score }) => ({ track, score }))
+}
 
 export type CosUniversityMastersProgram = Readonly<{
   id: CosUniversityMastersProgramId
@@ -50,45 +126,27 @@ const STANDARD_EVIDENCE: readonly CosUniversityMastersEvidenceStage[] = Object.f
   'masters_capstone',
 ])
 
-function program(
-  id: CosUniversityMastersProgramId,
-  title: string,
-  primarySubjects: readonly CosUniversitySubjectId[],
-): CosUniversityMastersProgram {
+function academicProgram(track: CosUniversityMastersTrack): CosUniversityMastersProgram {
   return Object.freeze({
-    id,
-    title,
-    primarySubjects: Object.freeze([...primarySubjects]),
+    id: track.id,
+    title: `Master of ${track.title}`,
+    primarySubjects: track.coreSubjects,
     admissionMinimumStanding: 'A' as const,
     requiredEvidenceStages: STANDARD_EVIDENCE,
-    minimumDistinctIndependentPasses: 2,
+    minimumDistinctIndependentPasses: Math.max(2, track.requiredDepthPasses),
     minimumDistinctTransferPasses: 2,
     minimumDistinctPracticalPasses: 1,
     minimumDistinctCapstonePasses: 2,
-    aPlusDistinctIndependentPasses: 3,
+    aPlusDistinctIndependentPasses: Math.max(4, track.requiredDepthPasses + 1),
     aPlusDistinctTransferPasses: 3,
     aPlusDistinctPracticalPasses: 2,
     aPlusDistinctCapstonePasses: 3,
   })
 }
 
-export const COS_UNIVERSITY_MASTERS_PROGRAMS: Readonly<Record<CosUniversityMastersProgramId, CosUniversityMastersProgram>> = Object.freeze({
-  software_engineering: program('software_engineering', 'Master of Software Engineering', ['computer_science', 'reasoning_decision_science', 'business_operations']),
-  cybersecurity: program('cybersecurity', 'Master of Cybersecurity', ['cybersecurity', 'computer_science', 'law_regulation_governance']),
-  mathematics: program('mathematics', 'Master of Mathematics', ['mathematics', 'reasoning_decision_science']),
-  statistics_data_science: program('statistics_data_science', 'Master of Statistics & Data Science', ['statistics_data_science', 'mathematics', 'reasoning_decision_science']),
-  finance_economics: program('finance_economics', 'Master of Finance & Economics', ['economics_finance', 'statistics_data_science', 'business_operations']),
-  international_relations: program('international_relations', 'Master of International Relations', ['politics_government_international_relations', 'history_culture_philosophy_religion', 'law_regulation_governance']),
-  business_operations: program('business_operations', 'Master of Business & Operations', ['business_operations', 'economics_finance', 'social_behavioral_sciences']),
-  legal_regulatory_analysis: program('legal_regulatory_analysis', 'Master of Legal & Regulatory Analysis', ['law_regulation_governance', 'politics_government_international_relations', 'reasoning_decision_science']),
-  engineering_physical_sciences: program('engineering_physical_sciences', 'Master of Engineering & Physical Sciences', ['physics_natural_sciences', 'mathematics', 'computer_science']),
-  social_behavioral_sciences: program('social_behavioral_sciences', 'Master of Social & Behavioral Sciences', ['social_behavioral_sciences', 'statistics_data_science', 'history_culture_philosophy_religion']),
-  language_communication: program('language_communication', 'Master of Language & Communication', ['language_communication', 'social_behavioral_sciences', 'history_culture_philosophy_religion']),
-})
-
-export function cosUniversityMastersProgramKey(programId: CosUniversityMastersProgramId): string {
-  return `masters:${programId}:v1`
-}
+export const COS_UNIVERSITY_MASTERS_PROGRAMS: Readonly<Record<CosUniversityMastersProgramId, CosUniversityMastersProgram>> = Object.freeze(
+  Object.fromEntries(COS_UNIVERSITY_MASTERS_TRACKS.map(track => [track.id, academicProgram(track)])) as Record<CosUniversityMastersProgramId, CosUniversityMastersProgram>,
+)
 
 export function cosUniversityMastersCredentialKey(agentId: string, programId: CosUniversityMastersProgramId): string {
   return `${String(agentId || '').trim()}:masters:${programId}:v1`

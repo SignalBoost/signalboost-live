@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   }
 }
 
-/** Owner may request evaluation; the host issues a credential only from current durable evidence. */
+/** Owner may request evaluation; host evidence still targets A+ until the program target date passes. */
 export async function PUT(request: Request) {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
@@ -67,6 +67,16 @@ export async function PUT(request: Request) {
   const id = programId(body.programId)
   if (!id) return NextResponse.json({ ok: false, error: 'A valid Master’s program is required.' }, { status: 400 })
   try {
+    const current = await readCosUniversityMastersRuntimeStatus(id)
+    if (current.graduation.standing === 'A' && current.timingStatus !== 'target_date_passed') {
+      return NextResponse.json({
+        ok: true,
+        awarded: false,
+        state: 'not_eligible',
+        status: current,
+        reasons: ['masters_A_plus_pursuit_active_until_target_date'],
+      }, { status: 200 })
+    }
     const result = await evaluateAndAwardCosUniversityMastersCredential(id)
     const status = result.state === 'error' ? 500 : result.state === 'not_eligible' ? 409 : 200
     return NextResponse.json({ ok: result.state !== 'error', ...result }, { status })

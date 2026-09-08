@@ -134,7 +134,7 @@ function subjectExam(seed: string, subjectId: CosUniversitySubjectId): CosUniver
     assessmentKind: 'unseen_subject_exam' as const,
     target: { kind: 'subject' as const, subjectId },
     title: `Unseen ${cosUniversitySubjectById(subjectId).title} examination`,
-  }
+  } as const
 
   if (subjectId === 'computer_science') {
     const oldP95 = integer(seed, 'cs:old', 180, 320)
@@ -356,7 +356,7 @@ function languageExam(seed: string, language: CosPlatformLanguage, dimension: Co
     assessmentKind: 'unseen_subject_exam' as const,
     target: { kind: 'language' as const, language, dimension },
     title: `Unseen ${languageTitle} ${dimension.replaceAll('_', ' ')} examination`,
-  }
+  } as const
 
   const localized = {
     en: {

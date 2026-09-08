@@ -29,6 +29,7 @@ import {
 import type { CosUniversitySubjectId } from './cosUniversity.ts'
 
 const AGENT_ID = 'cos'
+const MAX_FUTURE_CLOCK_SKEW_MS = 5 * 60_000
 const ASSESSMENT_SELECT = 'assessment_key,subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_version,scorer_authority,observed_at,valid_until'
 const EVIDENCE_SELECT = 'evidence_key,program_id,stage,passed,variant_hash,independent,verified_practical,authority,observed_at,valid_until'
 
@@ -160,18 +161,21 @@ async function loadEvidence(programKey: string): Promise<MastersEvidenceRow[]> {
     .select(EVIDENCE_SELECT)
     .eq('agent_id', AGENT_ID)
     .eq('program_key', programKey)
-    .order('observed_at', { ascending: true })
+    .order('observed_at', { ascending: false })
     .limit(5000)
   if (result.error) throw result.error
-  return (result.data || []) as MastersEvidenceRow[]
+  return ((result.data || []) as MastersEvidenceRow[]).slice().reverse()
 }
 
-async function currentAdmissionInput(now: Date): Promise<{
-  decisionByProgram: Partial<Record<CosUniversityMastersProgramId, CosUniversityMastersAdmissionDecision>>
+export type CosUniversityMastersSharedAdmissionState = {
   undergraduateCredentialAwarded: boolean
   currentGeneralistStanding: 'not_graduated' | 'A' | 'A+'
   currentSubjectStanding: Partial<Record<CosUniversitySubjectId, string>>
-}> {
+}
+
+export async function readCosUniversityMastersSharedAdmissionState(
+  now = new Date(),
+): Promise<CosUniversityMastersSharedAdmissionState> {
   const [generalist, assessmentRows] = await Promise.all([
     readCosUniversityGeneralistGraduationStatus(now),
     loadAssessmentRows(),
@@ -180,7 +184,6 @@ async function currentAdmissionInput(now: Date): Promise<{
   const currentSubjectStanding: Partial<Record<CosUniversitySubjectId, string>> = {}
   for (const row of academic.subjectTranscript) currentSubjectStanding[row.subjectId] = row.grade
   return {
-    decisionByProgram: {},
     undergraduateCredentialAwarded: Boolean(generalist.credential),
     currentGeneralistStanding: generalist.currentCompetenceStanding,
     currentSubjectStanding,
@@ -211,10 +214,11 @@ export type CosUniversityMastersRuntimeStatus = {
 export async function readCosUniversityMastersRuntimeStatus(
   programId: CosUniversityMastersProgramId,
   now = new Date(),
+  sharedAdmissionState?: CosUniversityMastersSharedAdmissionState,
 ): Promise<CosUniversityMastersRuntimeStatus> {
   const program = COS_UNIVERSITY_MASTERS_PROGRAMS[programId]
   const programKey = cosUniversityMastersProgramKey(programId)
-  const admissionInput = await currentAdmissionInput(now)
+  const admissionInput = sharedAdmissionState ?? await readCosUniversityMastersSharedAdmissionState(now)
   const admission = evaluateCosUniversityMastersAdmission(programId, admissionInput)
   const [enrollment, credential, evidenceRows] = await Promise.all([
     loadEnrollment(programKey),
@@ -314,18 +318,15 @@ export type RecordCosUniversityMastersEvidenceInput = {
   evidenceSnapshot?: Record<string, unknown>
 }
 
-/**
- * Host-only academic write seam. It is intentionally not exposed by the owner/browser API.
- * The caller supplies a host scorer/Production outcome verdict; this function enforces program state,
- * stage authority, independence, practical verification and an immutable service-role ledger.
- */
+/** Host-only academic write seam; never exposed by the owner/browser API. */
 export async function recordHostCosUniversityMastersEvidence(
   input: RecordCosUniversityMastersEvidenceInput,
 ): Promise<boolean> {
-  const now = input.observedAt instanceof Date ? input.observedAt : new Date()
-  if (!Number.isFinite(now.getTime())) return false
+  const observedAt = input.observedAt instanceof Date ? input.observedAt : new Date()
+  const observedMs = observedAt.getTime()
+  if (!Number.isFinite(observedMs) || observedMs > Date.now() + MAX_FUTURE_CLOCK_SKEW_MS) return false
   if (input.authority !== cosUniversityMastersExpectedAuthority(input.stage)) return false
-  const status = await readCosUniversityMastersRuntimeStatus(input.programId, now)
+  const status = await readCosUniversityMastersRuntimeStatus(input.programId, observedAt)
   if (!status.enrollment || status.credential) return false
   if (status.timingStatus === 'deadline_expired' || status.timingStatus === 'not_enrolled') return false
 
@@ -334,7 +335,7 @@ export async function recordHostCosUniversityMastersEvidence(
   const sourceRef = String(input.sourceRef || '').trim()
   if (!evidenceKey || !variantHash || !sourceRef) return false
   const validityDays = Math.max(1, Math.min(730, Math.floor(input.validityDays || 365)))
-  const validUntil = new Date(now.getTime() + validityDays * 86_400_000)
+  const validUntil = new Date(observedMs + validityDays * 86_400_000)
   const independent = input.stage !== 'graduate_coursework'
   const verifiedPractical = input.stage === 'verified_practical_work'
 
@@ -353,7 +354,7 @@ export async function recordHostCosUniversityMastersEvidence(
     authority: input.authority,
     source_ref: sourceRef,
     scorer_version: input.scorerVersion || null,
-    observed_at: now.toISOString(),
+    observed_at: observedAt.toISOString(),
     valid_until: validUntil.toISOString(),
     evidence_snapshot: input.evidenceSnapshot || {},
   })

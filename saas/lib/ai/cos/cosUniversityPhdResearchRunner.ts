@@ -11,6 +11,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   COS_UNIVERSITY_PHD_PROGRAMS,
   cosUniversityPhdEvidenceEligible,
+  cosUniversityPhdExpectedAuthority,
   cosUniversityPhdProgramKey,
   type CosUniversityPhdEvidence,
   type CosUniversityPhdEvidenceStage,
@@ -44,6 +45,11 @@ const RESEARCH_CHAIN: readonly CosUniversityPhdResearchAcademicStage[] = Object.
   'independent_replication',
   'peer_critique_defense',
   'dissertation_defense',
+])
+
+const RESEARCH_STAGE_ORDER: readonly CosUniversityPhdResearchAcademicStage[] = Object.freeze([
+  'research_methodology_exam',
+  ...RESEARCH_CHAIN,
 ])
 
 const CRITICAL_INDEPENDENCE_STAGES: readonly CosUniversityPhdResearchAcademicStage[] = Object.freeze([
@@ -297,6 +303,19 @@ async function loadCandidateIdentity(actorId: string): Promise<CosUniversityPhdA
   return mapActor((result.data || null) as ActorRow | null)
 }
 
+async function loadActorIdentities(actorIds: readonly string[]): Promise<Map<string, CosUniversityPhdActorIdentity>> {
+  const ids = [...new Set(actorIds.map(id => clean(id, 300)).filter(Boolean))]
+  if (!ids.length) return new Map()
+  const result = await dbOrThrow().from('cos_university_phd_actor_identities')
+    .select('actor_id,actor_role,principal_type,principal_fingerprint,source_ref,valid_from,valid_until')
+    .in('actor_id', ids)
+  if (result.error) throw result.error
+  const rows = ((result.data || []) as ActorRow[])
+    .map(row => mapActor(row))
+    .filter((row): row is CosUniversityPhdActorIdentity => Boolean(row))
+  return new Map(rows.map(row => [row.actorId, row]))
+}
+
 async function loadAssignments(programId: CosUniversityPhdProgramId): Promise<CosUniversityPhdResearchAssignment[]> {
   const result = await dbOrThrow().from('cos_university_phd_work_assignments')
     .select('assignment_key,program_id,research_project_id,protocol_id,candidate_actor_id,performer_actor_id,work_kind,academic_stage,attempt_index,parent_evidence_ids,objective,objective_hash,source_ref,assigned_at,not_after')
@@ -363,6 +382,39 @@ function previousStage(stage: CosUniversityPhdResearchAcademicStage): CosUnivers
   return index > 0 ? RESEARCH_CHAIN[index - 1] : null
 }
 
+function normalizedDistinctIds(values: readonly string[] | undefined): { valid: boolean; ids: string[] } {
+  if (!Array.isArray(values)) return { valid: false, ids: [] }
+  const ids = values.map(value => clean(value, 300))
+  if (ids.some(value => !value)) return { valid: false, ids: [] }
+  if (new Set(ids).size !== ids.length) return { valid: false, ids: [] }
+  return { valid: true, ids }
+}
+
+function failureResetEligibleForResearch(row: CosUniversityPhdEvidence, now: Date): boolean {
+  if (row.passed) return false
+  const observedAt = Date.parse(row.observedAt)
+  const validUntil = Date.parse(row.validUntil)
+  if (!Number.isFinite(now.getTime()) || !Number.isFinite(observedAt) || !Number.isFinite(validUntil)) return false
+  if (observedAt > now.getTime() || validUntil <= observedAt) return false
+  if (!clean(row.variantHash, 1000) || !clean(row.evidenceId, 300) || !clean(row.candidateActorId, 300)
+    || !clean(row.researchProjectId, 300) || !clean(row.protocolId, 300)) return false
+  if (row.identityProvenance !== 'host_identity_ledger' || !row.independent) return false
+  if (row.authority !== cosUniversityPhdExpectedAuthority(row.stage)) return false
+
+  const performers = normalizedDistinctIds(row.performerActorIds)
+  const evaluators = normalizedDistinctIds(row.evaluatorActorIds)
+  if (!performers.valid || !evaluators.valid || !performers.ids.length) return false
+  const minimumEvaluators = row.stage === 'research_methodology_exam' || row.stage === 'preregistered_experiment' ? 1 : 2
+  if (evaluators.ids.length < minimumEvaluators) return false
+  const candidate = clean(row.candidateActorId, 300)
+  const evaluatorSet = new Set(evaluators.ids)
+  if (evaluatorSet.has(candidate) || performers.ids.some(actorId => evaluatorSet.has(actorId))) return false
+  if (row.stage === 'independent_replication') {
+    if (performers.ids.includes(candidate)) return false
+  } else if (!performers.ids.includes(candidate)) return false
+  return true
+}
+
 function currentEligibleStagePasses(
   evidence: readonly CosUniversityPhdEvidence[],
   stage: CosUniversityPhdEvidenceStage,
@@ -372,13 +424,13 @@ function currentEligibleStagePasses(
     .filter(row => row.stage === stage)
     .filter(row => row.passed
       ? cosUniversityPhdEvidenceEligible(row, now)
-      : Number.isFinite(Date.parse(row.observedAt)) && Date.parse(row.observedAt) <= now.getTime())
+      : failureResetEligibleForResearch(row, now))
     .slice()
     .sort((left, right) => {
       const delta = Date.parse(left.observedAt) - Date.parse(right.observedAt)
       if (delta !== 0) return delta
       if (left.passed !== right.passed) return left.passed ? -1 : 1
-      return left.evidenceId.localeCompare(right.evidenceId)
+      return clean(left.evidenceId, 300).localeCompare(clean(right.evidenceId, 300))
     })
   let variants = new Map<string, CosUniversityPhdEvidence>()
   for (const row of rows) {
@@ -397,18 +449,27 @@ function integrityRepairStage(
   now: Date,
 ): CosUniversityPhdResearchAcademicStage | null {
   const current = new Map<CosUniversityPhdResearchAcademicStage, CosUniversityPhdEvidence[]>()
-  for (const stage of RESEARCH_CHAIN) current.set(stage, currentEligibleStagePasses(evidence, stage, now))
+  for (const stage of RESEARCH_STAGE_ORDER) current.set(stage, currentEligibleStagePasses(evidence, stage, now))
 
-  if (blockers.includes('research_evidence_identity_collision')) return null
+  if (blockers.includes('research_evidence_identity_collision')) {
+    const seen = new Map<string, CosUniversityPhdResearchAcademicStage>()
+    for (const stage of RESEARCH_STAGE_ORDER) {
+      for (const row of current.get(stage) || []) {
+        const evidenceId = clean(row.evidenceId, 300)
+        if (seen.has(evidenceId)) return stage
+        seen.set(evidenceId, stage)
+      }
+    }
+  }
 
   if (blockers.includes('research_lineage_link_failed') || blockers.includes('research_replication_target_mismatch')) {
     for (let index = 1; index < RESEARCH_CHAIN.length; index += 1) {
       const stage = RESEARCH_CHAIN[index]
       const previousStage = RESEARCH_CHAIN[index - 1]
-      const previousById = new Map((current.get(previousStage) || []).map(row => [row.evidenceId, row]))
+      const previousById = new Map((current.get(previousStage) || []).map(row => [clean(row.evidenceId, 300), row]))
       for (const row of current.get(stage) || []) {
         const linked = (row.parentEvidenceIds || [])
-          .map(id => previousById.get(id))
+          .map(id => previousById.get(clean(id, 300)))
           .filter((parent): parent is CosUniversityPhdEvidence => Boolean(parent))
           .filter(parent => Date.parse(parent.observedAt) < Date.parse(row.observedAt))
         if (!linked.length) return stage
@@ -451,20 +512,84 @@ function integrityRepairStage(
   return null
 }
 
+async function principalIndependenceRepairStage(
+  evidence: readonly CosUniversityPhdEvidence[],
+  reasons: readonly string[],
+  now: Date,
+): Promise<CosUniversityPhdResearchAcademicStage | null> {
+  if (!reasons.length) return null
+  const relevant = reasons.some(reason => [
+    'phd_actor_identity_unresolved',
+    'phd_candidate_principal_unresolved',
+    'phd_actor_principal_unresolved',
+    'phd_candidate_principal_not_independent',
+    'phd_principal_independence_separation_failed',
+  ].includes(reason))
+  if (!relevant) return null
+
+  const current = new Map<CosUniversityPhdResearchAcademicStage, CosUniversityPhdEvidence[]>()
+  for (const stage of CRITICAL_INDEPENDENCE_STAGES) current.set(stage, currentEligibleStagePasses(evidence, stage, now))
+  const rows = CRITICAL_INDEPENDENCE_STAGES.flatMap(stage => current.get(stage) || [])
+  if (!rows.length) return null
+  const actorIds = [...new Set(rows.flatMap(row => [row.candidateActorId, ...row.performerActorIds, ...row.evaluatorActorIds]))]
+  const identities = await loadActorIdentities(actorIds)
+  const candidateId = clean(rows[0].candidateActorId, 300)
+  const candidatePrincipal = identities.get(candidateId)?.principalFingerprint || null
+
+  const pools = new Map<CosUniversityPhdResearchAcademicStage, Set<string>>()
+  for (const stage of CRITICAL_INDEPENDENCE_STAGES) {
+    const pool = new Set<string>()
+    for (const row of current.get(stage) || []) {
+      const observedAt = new Date(row.observedAt)
+      const actorPool = [
+        ...row.evaluatorActorIds,
+        ...(stage === 'preregistered_experiment'
+          ? row.performerActorIds.filter(actorId => clean(actorId, 300) !== clean(row.candidateActorId, 300))
+          : []),
+        ...(stage === 'independent_replication' ? row.performerActorIds : []),
+      ]
+      for (const actorId of actorPool) {
+        const identity = identities.get(clean(actorId, 300))
+        if (!identity || !cosUniversityPhdActorIdentityEligible(identity, observedAt)) return stage
+        if (!clean(identity.principalFingerprint, 500)) return stage
+        if (candidatePrincipal && identity.principalFingerprint === candidatePrincipal) return stage
+        pool.add(identity.principalFingerprint)
+      }
+    }
+    pools.set(stage, pool)
+  }
+
+  for (let left = 0; left < CRITICAL_INDEPENDENCE_STAGES.length; left += 1) {
+    for (let right = left + 1; right < CRITICAL_INDEPENDENCE_STAGES.length; right += 1) {
+      const leftPool = pools.get(CRITICAL_INDEPENDENCE_STAGES[left]) || new Set<string>()
+      const rightPool = pools.get(CRITICAL_INDEPENDENCE_STAGES[right]) || new Set<string>()
+      if ([...leftPool].some(principal => rightPool.has(principal))) return CRITICAL_INDEPENDENCE_STAGES[right]
+    }
+  }
+  return null
+}
+
 function integrityRepairContext(
   evidence: readonly CosUniversityPhdEvidence[],
   blockers: readonly string[],
   now: Date,
+  principalRepairStage: CosUniversityPhdResearchAcademicStage | null = null,
 ): IntegrityRepairContext {
-  const stage = integrityRepairStage(evidence, blockers, now)
+  const stage = integrityRepairStage(evidence, blockers, now) ?? principalRepairStage
   if (!stage) return { stage: null, allowedParentEvidenceIds: null, requiresCandidateWork: false }
   const previous = previousStage(stage)
   const allowedParentEvidenceIds = previous
     ? currentEligibleStagePasses(evidence, previous, now).map(row => row.evidenceId)
     : null
   const independenceFailure = blockers.includes('research_independence_separation_failed')
+    || blockers.includes('phd_candidate_principal_not_independent')
+    || blockers.includes('phd_principal_independence_separation_failed')
+    || blockers.includes('phd_actor_identity_unresolved')
+    || blockers.includes('phd_actor_principal_unresolved')
+    || blockers.includes('phd_candidate_principal_unresolved')
   const requiresCandidateWork = !independenceFailure
-    && (stage === 'hypothesis_proposal'
+    && (stage === 'primary_literature_synthesis'
+      || stage === 'hypothesis_proposal'
       || stage === 'preregistered_experiment'
       || stage === 'dissertation_defense')
   return { stage, allowedParentEvidenceIds, requiresCandidateWork }
@@ -584,6 +709,10 @@ async function createCandidateAssignment(input: {
     const row = (existing.data || null) as AssignmentRow | null
     if (!row) return null
     await ensureRun(row.assignment_key)
+    if (Date.parse(row.not_after) <= input.now.getTime()) {
+      await failUnclaimedAssignment(row.assignment_key, 'expired_research_assignment_recovered', input.now)
+      return null
+    }
     if (row.assignment_key !== assignmentKey) {
       await failUnclaimedAssignment(row.assignment_key, 'assignment_context_superseded_before_claim', input.now)
       return null
@@ -695,6 +824,21 @@ async function recoverResearchRuns(programId: CosUniversityPhdProgramId, now: Da
     if (result.error) throw result.error
   }
 
+  const expiredCreatedKeys = records
+    .filter(record => record.run?.status === 'created'
+      && Date.parse(record.assignment.notAfter) <= now.getTime())
+    .map(record => record.assignment.assignmentKey)
+  if (expiredCreatedKeys.length) {
+    const expired = await db.from('cos_university_phd_work_runs').update({
+      status: 'failed',
+      failure_reason: 'expired_research_assignment_recovered',
+      completed_at: now.toISOString(),
+      claim_expires_at: null,
+      updated_at: now.toISOString(),
+    }).in('assignment_key', expiredCreatedKeys).eq('status', 'created')
+    if (expired.error) throw expired.error
+  }
+
   const staleKeys = records
     .filter(record => record.run?.status === 'running'
       && !record.product
@@ -744,9 +888,11 @@ async function ensureNextCandidateAssignment(
   const lineageRecords = records.filter(record => record.assignment.researchProjectId === project.researchProjectId
     && record.assignment.protocolId === project.protocolId
     && record.assignment.candidateActorId === project.candidateActorId)
-  const repair = integrityRepairContext(evidence, status.graduation.blockers, now)
+  const principalRepair = await principalIndependenceRepairStage(evidence, status.principalIndependence.reasons, now)
+  const combinedBlockers = [...new Set([...status.graduation.blockers, ...status.principalIndependence.reasons])]
+  const repair = integrityRepairContext(evidence, combinedBlockers, now, principalRepair)
   const decision = decideNextCosUniversityPhdCandidateResearch({
-    graduationBlockers: status.graduation.blockers,
+    graduationBlockers: combinedBlockers,
     runs: policyRuns(lineageRecords),
     evidence: evidence.map(row => ({ stage: row.stage, passed: row.passed, observedAt: row.observedAt })),
     integrityRepairStage: repair.stage,
@@ -874,24 +1020,38 @@ async function executeCandidateAssignment(
   const semanticCache = result.provenance.responseSource === 'semantic_cache'
     || result.provenance.responseSource === 'semantic_similarity'
   const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
+  const candidateIdentity = await loadCandidateIdentity(assignment.candidateActorId)
+  const reasonerFingerprint = clean(result.provenance.reasonerLabel, 500)
+  const candidateMatchesReasoner = Boolean(
+    candidateIdentity
+    && candidateIdentity.actorRole === 'candidate'
+    && candidateIdentity.principalType === 'ai_model'
+    && cosUniversityPhdActorIdentityEligible(candidateIdentity, now)
+    && reasonerFingerprint
+    && clean(candidateIdentity.principalFingerprint, 500) === reasonerFingerprint,
+  )
   const freshLocal = Boolean(
     result.handled
     && result.provenance.localModelInvoked
     && !result.provenance.externalAiInvoked
     && !semanticCache
+    && candidateMatchesReasoner
     && turnId
     && String(reply || '').trim(),
   )
   flushCapturedEvidenceSourceUse()
   if (!freshLocal || !turnId) {
-    await failCandidateAssignment(assignment, 'fresh_local_research_execution_required')
+    const failureReason = candidateMatchesReasoner
+      ? 'fresh_local_research_execution_required'
+      : 'research_reasoner_principal_mismatch'
+    await failCandidateAssignment(assignment, failureReason)
     return {
       enabled: true,
       programId: assignment.programId,
       assignmentKey: assignment.assignmentKey,
       workKind: assignment.workKind,
       status: 'failed',
-      reason: 'fresh_local_research_execution_required',
+      reason: failureReason,
       academicCredit: false,
       turnId: turnId || null,
       contentHash: null,

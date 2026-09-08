@@ -4,15 +4,18 @@ Date: 2026-09-08
 
 ## Purpose
 
-This slice creates the University-level gate that answers one question with current evidence: **has COS earned the multidisciplinary generalist foundation required before graduate specialization?**
+COS University is a formal, time-bounded education system. The undergraduate program has a real enrollment date, defined duration, independent examinations, graduation requirements, and a hard end date. An agent cannot remain enrolled forever.
 
-Graduation is not a permanent mutable flag. It is a derived current qualification that can be lost when evidence expires or a later independently verified failure revokes a required stage.
+The system separates two things that human education also separates:
+
+- **credential** — the historical degree/certificate that was actually awarded;
+- **current competence** — what the agent can still demonstrate now through fresh assessment and Production evidence.
+
+A later weakness may trigger continuing education or recertification, but it does not erase a degree that was legitimately earned.
 
 ## Formal program calendar
 
-COS University is not indefinite. Like a human university or professional school, every degree/certificate enrollment has a real start date, an earliest graduation date, a target completion date, and a hard completion deadline.
-
-The default machine-native calendars are intentionally compressed because an AI agent can study continuously:
+The default machine-native calendars are compressed because an AI agent can study continuously:
 
 | Program | Minimum residence | Target completion | Hard deadline |
 | --- | ---: | ---: | ---: |
@@ -21,106 +24,91 @@ The default machine-native calendars are intentionally compressed because an AI 
 | Research PhD | 180 days | 365 days | 730 days |
 | Professional Certificate | 7 days | 30 days | 90 days |
 
-These are configurable program defaults, not claims that human four-year, one-to-two-year, or four-plus-year degrees are literally equivalent to those wall-clock durations. The equivalence is structural: bounded enrollment, curriculum, instruction/practice, independent evaluation, graduation requirements, and a defined end.
+These are configurable defaults. They are not claims that a human four-year undergraduate degree, one-to-two-year Master's, or four-plus-year PhD is literally equivalent to the same wall-clock period for an AI. The equivalence is structural: enrollment, curriculum, minimum residence, target graduation, final deadline, independent examination, credential award, and a defined program end.
 
-The current COS undergraduate cohort is anchored to the first durable University assessment. Before minimum residence is complete, COS may study and accumulate valid evidence but cannot graduate. If the hard deadline passes without graduation, that cohort ends incomplete; the system does not silently extend enrollment forever. Any subsequent degree, repeat enrollment, bridge program, or professional certificate must be an explicit new enrollment.
+The current COS undergraduate cohort is anchored to the first durable University assessment. Before minimum residence is complete, COS may study and accumulate valid evidence but cannot receive the degree. If the hard deadline passes without an award, that cohort ends incomplete. Any repeat degree, bridge program, Master's, PhD, or professional certificate requires an explicit new enrollment.
 
-## Minimum A graduation
+## Minimum A graduation requirement
 
-COS is an A-range graduated generalist only when all of these are simultaneously true:
+The host may issue the Generalist Undergraduate credential only when all of these are simultaneously true inside the valid graduation window:
 
-1. the undergraduate enrollment is inside its permitted graduation window;
+1. minimum residence is complete and the hard deadline has not expired;
 2. all thirteen canonical University subjects have current evidence-backed grade **A or A+**;
 3. English, Spanish, Portuguese, Polish, and Russian each independently have current grade **A or A+**;
 4. no language is averaged with another language and no strong language dimension hides a weak one;
-5. the subject/language A grades therefore already include their required fresh unseen examination, cross-domain transfer, and verified Production-transfer evidence under the existing transcript rules;
+5. the A grades therefore already include fresh unseen examination, cross-domain transfer, and verified Production-transfer evidence under the transcript rules;
 6. the global multidisciplinary **Generalist Graduation Capstone** has at least two materially distinct host-controlled passes after its latest failure.
 
-The current transcript remains deliberately conservative: A requires verified Production transfer. The Graduation Gate does not weaken existing subject or language grading to invent an exception.
+The learner cannot self-issue a credential. The graduation runner computes award eligibility and the service-side host writes the immutable credential.
 
-## A+ generalist standing
+## A+ standing
 
-A+ is stronger than minimum graduation. It requires:
+A+ is stronger than minimum graduation. If every canonical subject and every platform language is A+ when the degree is issued, the credential records A+ standing; otherwise a qualifying A-range graduate receives A standing.
 
-- every canonical subject at A+;
-- every platform language at A+;
-- the same current generalist-capstone requirement;
-- a valid undergraduate program window.
-
-Thus an A graduate is eligible for harder learning while still pursuing A+ continuing education.
+After graduation, current competence can later be lower than the awarded degree standing. That does not rewrite history; it becomes a continuing-education or recertification signal.
 
 ## Generalist graduation capstone
 
-Per-subject capstones and integrated language capstones remain valuable A+ evidence, but they are not substituted for the University-wide graduation capstone required by `SKILLS.md`.
+Per-subject capstones and integrated language capstones remain valuable A+ evidence, but they are not substitutes for the University-wide graduation capstone.
 
-The generalist capstone becomes eligible only after all thirteen subjects and all five languages already meet the A minimum and the minimum residence period is complete. Each capstone is:
+The global capstone becomes eligible only after all thirteen subjects and all five languages meet the A minimum and minimum residence is complete. It is server-seeded, cache-disabled, local-model-only, tied to the exact durable COS turn, independently host-scored, multidisciplinary, bounded to supplied facts, and required to preserve uncertainty and define verification before irreversible action.
 
-- server-seeded and regenerated from the stored seed;
-- fresh, cache-disabled, local-model-only, and tied to the exact durable COS turn;
-- independently host-scored;
-- multidisciplinary, sampling eight University domains per variant with Reasoning & Decision Science always present;
-- bounded to supplied scenario facts so current-world retrieval cannot leak into the hidden exam;
-- required to preserve uncertainty, integrate cross-domain interactions/trade-offs, produce an executable decision, and define verification before irreversible action.
+Two distinct successful variants after the latest capstone failure are required. Duplicate variants count once. A later failed capstone resets this pre-graduation stage until re-earned.
 
-Two distinct successful variants after the latest capstone failure are required. Duplicate variants count once. A later failed capstone resets the capstone stage.
+## Immutable credential vs current competence
 
-## Derived and revocable status
+`public.cos_university_credentials` stores the historical award event. Service role may **select and insert only**; update/delete are rejected by an immutable trigger. The credential has no expiry timestamp.
 
-The graduation evaluator reads current fresh University assessment rows through `academicStateFromRows(...)`, the service-only generalist-capstone evidence ledger, and the current program enrollment window.
-
-It does **not** persist fields such as `graduated=true`, a letter grade, or a permanent diploma. The current result is recomputed:
+Current competence remains derived from fresh University assessments and may weaken later. Conceptually:
 
 ```text
-current program window
-+ fresh subject transcript
-+ fresh five-language transcript
-+ current generalist capstone evidence
-→ current graduation standing
+valid program window
++ current A/A+ transcript
++ current capstone proof
+→ host award eligibility
+→ immutable degree credential
+
+later fresh assessments
+→ current competence / recertification needs
+→ do not erase the credential
 ```
 
-If a required subject becomes stale, a language weakens, Production evidence expires, a later capstone fails, or the cohort deadline expires before graduation, current graduation is false until an appropriate valid program path is completed.
+Graduation therefore ends the undergraduate program. COS may then enter a Master's program, later PhD/research program where appropriate, or additional professional certificates instead of remaining an undergraduate indefinitely.
 
 ## Failed-exam remediation
 
-Fresh independent exam failures are first-class University signals. They receive a high-priority remediation plan before generic operational-learning backlog so a verified academic weakness cannot be starved by newer unrelated retests.
+Fresh independent exam failures are first-class University signals. They receive high-priority remediation before generic operational-learning backlog so a verified academic weakness cannot be starved by newer unrelated retests.
 
-The remediation bridge deliberately does not expose the hidden exam seed, manifest, rubric, or scorer reason. It tells the learner only which subject/language competency failed, then routes the weakness through ordinary study and deliberate practice before a later independent retest.
+The remediation bridge never exposes the hidden exam seed, manifest, rubric, or scorer reason. It identifies only the failed academic competency, routes it through ordinary study and deliberate practice, and leaves later independent retesting to the examiner.
 
-Deliberate practice uses the dedicated local training reasoner rather than owner-facing advisory release policy. Practice remains non-academic: it cannot write a University grade.
+Deliberate practice uses the dedicated local training reasoner rather than owner-facing advisory release policy. Practice remains non-academic and cannot award a grade or credential.
 
-## Meaning of graduation
+## Meaning of a degree
 
-Graduation means:
+An awarded degree means the agent completed that formal program. It also makes the agent eligible for the next educational level where prerequisites are met. It does **not** widen repository, deployment, financial, legal, data-access, publishing, safety-critical, or other execution authority.
 
-```text
-advanced_learning_eligible = true
-continuing_education_required = true
-authority_expanded = false
-```
-
-It qualifies COS for harder learning and the later Master's specialist-program architecture. It does not mean learning stops and it does not widen repository, deployment, financial, legal, data-access, publishing, safety-critical, or other execution authority.
+Continuing education remains normal after graduation, just as professionals continue learning after university.
 
 ## Storage and security
 
-`public.cos_university_generalist_capstone_runs` stores only host-owned operational evidence needed to audit capstone attempts: seed/manifest hash, variant hash, provenance flags, verdict, turn ID, timing, and reasons.
+- `cos_university_program_enrollments` — program calendar only;
+- `cos_university_assessments` — current independent academic evidence;
+- `cos_university_generalist_capstone_runs` — host-controlled capstone evidence;
+- `cos_university_credentials` — immutable historical degree/certificate awards.
 
-`public.cos_university_program_enrollments` stores only the formal academic calendar: program identity/level and enrollment, minimum-residence, target-completion, and hard-deadline timestamps.
-
-Both are service-only with RLS enabled and no `anon` or `authenticated` table privileges. Neither stores a caller-supplied grade or mutable graduation flag.
+Browser roles receive no credential/enrollment mutation authority. No model-supplied grade or graduation flag is accepted.
 
 ## Cadence
 
 - every 15 minutes — bounded continuous University learning/remediation;
-- deliberate practice on its independent bounded schedule;
+- deliberate practice on its separate bounded schedule;
 - 07:00 UTC — independent unseen examiner;
 - 07:10 UTC — subject A-range;
 - 07:20 UTC — five-language A-range;
-- 07:30 UTC — derived Generalist Graduation Gate / eligible global capstone.
+- 07:30 UTC — graduation gate / eligible global capstone / credential award.
 
-The cadence is orchestration, not biological rest. Formal program dates provide the start/end structure; continuous machine learning may operate throughout the enrollment window.
+Formal program dates provide the start/end structure; continuous machine learning can operate throughout the enrollment period.
 
-## Relationship to the roadmap
+## Roadmap relationship
 
-This gate closes the undergraduate **proof architecture**. It does not claim COS has graduated at deployment. Production may correctly show `not_graduated` while the program is in progress.
-
-Only after current evidence and the academic calendar satisfy this gate should the roadmap treat COS as qualified to enter Master's-level specialist education. A graduate may then enroll in a Master's program, PhD/research program where appropriate, or additional professional certificates. Graduation remains the start of harder learning, not the end of learning.
+The undergraduate program now has both **academic proof** and **calendar discipline**. COS is not considered graduated until an immutable credential is actually issued. Once issued, undergraduate study is complete and the next formal path is specialist Master's education, professional certification, or later research/PhD work—not permanent undergraduate enrollment.

@@ -1,4 +1,5 @@
 // saas/tests/cosUniversityAdmission.node.test.ts
+import './cosUniversityAcademicLearningFocus.node.test.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { decideCosUniversityAdmission, COS_UNIVERSITY_UNDERGRADUATE_PROGRAM_KEY } from '../lib/ai/cos/cosUniversityAdmission.ts'

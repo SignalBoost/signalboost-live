@@ -25,9 +25,17 @@ declare
   v_assigned_at timestamptz;
   v_not_after timestamptz;
   v_run_status text;
+  v_run_completed_at timestamptz;
+  v_run_turn_id text;
+  v_run_response_source text;
+  v_run_local_model_invoked boolean;
+  v_run_external_ai_invoked boolean;
+  v_run_semantic_cache boolean;
   v_existing_actor_id text;
   v_existing_content_hash text;
   v_existing_product_key text;
+  v_existing_source_ref text;
+  v_existing_submitted_at timestamptz;
 begin
   if nullif(btrim(coalesce(p_assignment_key, '')), '') is null
      or nullif(btrim(coalesce(p_product_key, '')), '') is null
@@ -55,7 +63,10 @@ begin
     return false;
   end if;
 
-  select status into v_run_status
+  select status, completed_at, turn_id, response_source,
+         local_model_invoked, external_ai_invoked, semantic_cache
+    into v_run_status, v_run_completed_at, v_run_turn_id, v_run_response_source,
+         v_run_local_model_invoked, v_run_external_ai_invoked, v_run_semantic_cache
   from public.cos_university_phd_work_runs
   where assignment_key = p_assignment_key
   for update;
@@ -64,26 +75,46 @@ begin
     return false;
   end if;
 
-  select actor_id, content_hash, product_key
-    into v_existing_actor_id, v_existing_content_hash, v_existing_product_key
+  select actor_id, content_hash, product_key, source_ref, submitted_at
+    into v_existing_actor_id, v_existing_content_hash, v_existing_product_key,
+         v_existing_source_ref, v_existing_submitted_at
   from public.cos_university_phd_work_products
   where assignment_key = p_assignment_key;
 
   if found then
     if v_existing_actor_id <> p_actor_id
        or v_existing_content_hash <> p_content_hash
-       or v_existing_product_key <> p_product_key then
+       or v_existing_product_key <> p_product_key
+       or v_existing_source_ref <> p_source_ref
+       or v_existing_submitted_at is distinct from p_submitted_at then
       return false;
     end if;
-  else
-    insert into public.cos_university_phd_work_products (
-      product_key, assignment_key, actor_id, content_text, content_hash,
-      source_ref, submitted_at, academic_credit
-    ) values (
-      p_product_key, p_assignment_key, p_actor_id, p_content_text, p_content_hash,
-      p_source_ref, p_submitted_at, false
-    );
+
+    -- An idempotent retry of an already committed pair must reproduce the original run provenance.
+    -- Never let a later retry rewrite the mutable run half while the immutable product remains fixed.
+    if v_run_status <> 'submitted'
+       or v_run_completed_at is distinct from p_submitted_at
+       or v_run_turn_id is distinct from p_turn_id
+       or v_run_response_source is distinct from p_response_source
+       or v_run_local_model_invoked is distinct from p_local_model_invoked
+       or v_run_external_ai_invoked is distinct from p_external_ai_invoked
+       or v_run_semantic_cache is distinct from p_semantic_cache then
+      return false;
+    end if;
+    return true;
   end if;
+
+  if v_run_status <> 'running' then
+    return false;
+  end if;
+
+  insert into public.cos_university_phd_work_products (
+    product_key, assignment_key, actor_id, content_text, content_hash,
+    source_ref, submitted_at, academic_credit
+  ) values (
+    p_product_key, p_assignment_key, p_actor_id, p_content_text, p_content_hash,
+    p_source_ref, p_submitted_at, false
+  );
 
   update public.cos_university_phd_work_runs
   set status = 'submitted',

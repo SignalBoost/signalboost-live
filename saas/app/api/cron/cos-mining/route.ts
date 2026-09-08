@@ -18,7 +18,9 @@ import { runEvidenceTriggeredRetest } from '@/lib/ai/cos/evidenceTriggeredRetest
 import { recordAutonomousLearningRun } from '@/lib/ai/cos/autonomousLearningHealth.ts'
 import { operationalSystemsCurriculumSignals } from '@/lib/ai/cos/operationalSystemsLearning'
 import { backfillDirectedSoftwareApplications } from '@/lib/ai/cos/directedStudyStore'
-import { markCosUniversityStudyPlansAttempted, runCosUniversityPlanningCycle } from '@/lib/ai/cos/cosUniversityStore'
+import { runCosUniversityPlanningCycle } from '@/lib/ai/cos/cosUniversityStore'
+import { recordAcceptedCosUniversityStudyAttempts } from '@/lib/ai/cos/cosUniversityStudyProof'
+import { knowledgeGapIdForSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
@@ -125,15 +127,28 @@ export async function GET(req: NextRequest) {
       learning = { status: 'error', error: message }
     }
 
+    // The daily lane may retain University-injected gaps, but it may never advance every active plan
+    // merely because some unrelated document was accepted. The learning cycle returns exact accepted
+    // gap IDs at runtime; bind only matching University signals back to their exact plan and use the
+    // same optimistic proof writer as the dedicated University and Master’s learning lanes.
     if (learning?.status === 'learned' && university?.activePlans.length) {
       try {
-        universityStudyPlansAttempted = await markCosUniversityStudyPlansAttempted(
-          university.activePlans
-            .filter(plan => plan.acquisitionSourceKinds.length > 0)
-            .map(plan => plan.id),
-        )
+        const acceptedGapIds = Array.isArray((learning as { acceptedGapIds?: unknown }).acceptedGapIds)
+          ? ((learning as { acceptedGapIds: unknown[] }).acceptedGapIds.map(value => String(value || '').trim()).filter(Boolean))
+          : []
+        const accepted = new Set(acceptedGapIds)
+        const proofs = university.activePlans
+          .filter(plan => plan.acquisitionSourceKinds.length > 0)
+          .flatMap(plan => {
+            const evidenceRefs = [...new Set((university?.gapSignals || [])
+              .filter(signal => String(signal.taskId || '').endsWith(plan.planKey))
+              .map(signal => knowledgeGapIdForSignal(signal))
+              .filter(gapId => accepted.has(gapId)))]
+            return evidenceRefs.length ? [{ planId: plan.id, evidenceRefs }] : []
+          })
+        universityStudyPlansAttempted = (await recordAcceptedCosUniversityStudyAttempts(proofs, new Date())).length
       } catch (error) {
-        console.warn('cron COS University plan-attempt recording failed:', error instanceof Error ? error.message : String(error))
+        console.warn('cron COS University accepted-study proof recording failed:', error instanceof Error ? error.message : String(error))
       }
     }
 

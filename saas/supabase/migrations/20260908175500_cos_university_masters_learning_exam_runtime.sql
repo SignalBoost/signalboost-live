@@ -37,6 +37,39 @@ alter table public.cos_university_masters_evidence
     or (stage <> 'graduate_coursework' and module_key is null)
   );
 
+create table if not exists public.cos_university_masters_learning_runs (
+  id uuid primary key default gen_random_uuid(),
+  slot_key text not null unique,
+  agent_id text not null default 'cos',
+  program_key text not null,
+  program_id text not null check (program_id in (
+    'applied_ai_systems','security_and_trust','quantitative_decision_science',
+    'enterprise_operations_and_governance','scientific_and_physical_systems'
+  )),
+  status text not null default 'running' check (status in ('running','completed','error')),
+  plans_considered integer not null default 0 check (plans_considered >= 0),
+  plans_attempted integer not null default 0 check (plans_attempted >= 0),
+  documents_acquired integer not null default 0 check (documents_acquired >= 0),
+  accepted_count integer not null default 0 check (accepted_count >= 0),
+  errors jsonb not null default '[]'::jsonb,
+  started_at timestamptz not null default now(),
+  completed_at timestamptz,
+  updated_at timestamptz not null default now(),
+  constraint cos_university_masters_learning_program_identity check (
+    program_key = 'specialist_masters_' || program_id || '_v1'
+  )
+);
+
+create index if not exists cos_university_masters_learning_runs_program_idx
+  on public.cos_university_masters_learning_runs (agent_id, program_key, started_at desc);
+
+alter table public.cos_university_masters_learning_runs enable row level security;
+revoke all on table public.cos_university_masters_learning_runs from anon, authenticated, service_role;
+grant select, insert, update, delete on table public.cos_university_masters_learning_runs to service_role;
+
+comment on table public.cos_university_masters_learning_runs is
+  'Service-only bounded Master''s learning-sweep ledger. Stores orchestration counts only, no lesson body, exam prompt, rubric, reply, or grade.';
+
 create table if not exists public.cos_university_masters_exam_runs (
   id uuid primary key default gen_random_uuid(),
   run_key text not null unique,

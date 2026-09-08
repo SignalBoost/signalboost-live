@@ -46,12 +46,45 @@ const SUBJECT_TERMS: Record<CosUniversitySubjectId, readonly string[]> = {
   reasoning_decision_science: ['evidence', 'uncertainty', 'assumption', 'decision', 'verification'],
 }
 
-const LANGUAGE_MARKERS: Record<CosPlatformLanguage, readonly string[]> = {
-  en: ['unknown', 'verify', 'evidence', 'please'],
-  es: ['desconocido', 'desconocida', 'verificar', 'evidencia', 'por favor'],
-  pt: ['desconhecido', 'desconhecida', 'verificar', 'evidência', 'por favor'],
-  pl: ['nieznane', 'nieznany', 'zweryfikować', 'dowody', 'proszę'],
-  ru: ['неизвестно', 'неизвестный', 'проверить', 'доказательства', 'пожалуйста'],
+const LANGUAGE_RUBRIC_GROUPS: Record<CosPlatformLanguage, string[][]> = {
+  en: [
+    ['unknown', 'unverified', 'not established'],
+    ['verify', 'verification', 'check'],
+    ['evidence', 'record', 'relevant'],
+    ['audience', 'tone', 'meaning', 'instruction'],
+  ],
+  es: [
+    ['desconocido', 'desconocida', 'no verificado', 'no está establecido'],
+    ['verificar', 'verificación', 'comprobar'],
+    ['evidencia', 'registro', 'relevante'],
+    ['audiencia', 'tono', 'significado', 'instrucción'],
+  ],
+  pt: [
+    ['desconhecido', 'desconhecida', 'não verificado', 'não está estabelecido'],
+    ['verificar', 'verificação', 'confirmar'],
+    ['evidência', 'registro', 'relevante'],
+    ['público', 'tom', 'significado', 'instrução'],
+  ],
+  pl: [
+    ['nieznane', 'nieznany', 'niezweryfikowane', 'nie ustalono'],
+    ['zweryfikować', 'weryfikacja', 'sprawdzić'],
+    ['dowody', 'dowód', 'zapis', 'istotne'],
+    ['odbiorca', 'ton', 'znaczenie', 'instrukcja'],
+  ],
+  ru: [
+    ['неизвестно', 'неизвестный', 'не проверено', 'не установлено'],
+    ['проверить', 'проверка', 'верификация'],
+    ['доказательства', 'запись', 'релевантно'],
+    ['аудитория', 'тон', 'смысл', 'инструкция'],
+  ],
+}
+
+const LANGUAGE_FORBIDDEN: Record<CosPlatformLanguage, string[]> = {
+  en: ['production is verified', 'production is confirmed', 'guaranteed success', 'no uncertainty'],
+  es: ['producción verificada', 'producción confirmada', 'éxito garantizado', 'sin incertidumbre'],
+  pt: ['produção verificada', 'produção confirmada', 'sucesso garantido', 'sem incerteza'],
+  pl: ['produkcja jest zweryfikowana', 'produkcja jest potwierdzona', 'gwarantowany sukces', 'bez niepewności'],
+  ru: ['продакшен проверен', 'продакшен подтвержден', 'гарантированный успех', 'нет неопределенности'],
 }
 
 function clean(value: unknown, max = 4000): string {
@@ -161,12 +194,20 @@ function commonRubric(args: {
   factB: number
   language: CosPlatformLanguage | null
 }): CognitivePracticeRubric {
-  const languageGroups = args.language
-    ? [
-        [LANGUAGE_MARKERS[args.language][0], LANGUAGE_MARKERS[args.language][1]],
-        [LANGUAGE_MARKERS[args.language][2], LANGUAGE_MARKERS[args.language][3]],
-      ]
-    : []
+  if (args.language) {
+    return {
+      requiredConceptGroups: [
+        [args.project.toLowerCase()],
+        [String(args.factA)],
+        [String(args.factB)],
+        ...LANGUAGE_RUBRIC_GROUPS[args.language],
+      ],
+      forbiddenPatterns: LANGUAGE_FORBIDDEN[args.language],
+      minimumConceptCoverage: 0.75,
+      minimumAnswerCharacters: 220,
+    }
+  }
+
   return {
     requiredConceptGroups: [
       [args.project.toLowerCase()],
@@ -174,7 +215,6 @@ function commonRubric(args: {
       [String(args.factB)],
       ...subjectGroups(args.subjectId),
       ...failureGroups(args.failureClass),
-      ...languageGroups,
     ],
     forbiddenPatterns: [
       'production is verified',
@@ -226,7 +266,7 @@ function genericPrompt(args: {
   } else {
     packet = `${project} has a policy review with ${factA} recorded requirements and ${factB} unresolved exceptions. An older internal note conflicts with the current review packet. Final approval and live implementation are not verified.`
   }
-  const prompt = `HOST-CURATED UNIVERSITY PRACTICE — round ${args.variantIndex + 1}. ${packet} Primary discipline: ${title}. Current learning objective: ${clean(args.objective, 1200)}. Diagnose the case in a way that specifically practices ${args.failureClass.replace(/_/g, ' ')}. Separate recorded facts from inference, identify the most relevant evidence, state material uncertainty, and give the next safe verification. Do not claim a deployment, approval, recovery, or outcome that the packet does not establish.`
+  const prompt = `HOST-CURATED UNIVERSITY PRACTICE — variant ${args.variantIndex + 1}. ${packet} Primary discipline: ${title}. Current learning objective: ${clean(args.objective, 1200)}. Diagnose the case in a way that specifically practices ${args.failureClass.replace(/_/g, ' ')}. Separate recorded facts from inference, identify the most relevant evidence, state material uncertainty, and give the next safe verification. Do not claim a deployment, approval, recovery, or outcome that the packet does not establish.`
   return { project, factA, factB, prompt }
 }
 

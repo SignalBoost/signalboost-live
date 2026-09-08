@@ -60,8 +60,11 @@ export function generateKnowledgeGaps(signals: KnowledgeGapSignal[]): KnowledgeG
     )
     const expectedReuse = Math.max(1, repeated + (signal.escalated ? 2 : 0) + (signal.succeeded === false ? 1 : 0))
     const expectedAvoidedCostUsd = Math.max(0, Number(signal.externalCostUsd ?? 0)) * expectedReuse
+    const universitySubjectGap = signal.taskId.startsWith('university:')
     const question = missing.length
-      ? `What verified knowledge resolves these missing facts for ${objective}: ${missing.join('; ')}?`
+      ? universitySubjectGap
+        ? `${missing.join('; ')}. ${objective}`
+        : `What verified knowledge resolves these missing facts for ${objective}: ${missing.join('; ')}?`
       : `What verified knowledge would let COS handle ${objective} locally with higher confidence?`
 
     const gap: KnowledgeGap = {

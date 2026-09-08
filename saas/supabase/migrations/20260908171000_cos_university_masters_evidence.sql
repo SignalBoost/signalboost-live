@@ -14,19 +14,22 @@ create table if not exists public.cos_university_masters_evidence (
     'verified_practical_work','masters_capstone'
   )),
   passed boolean not null,
-  variant_hash text not null,
+  variant_hash text not null check (length(btrim(variant_hash)) > 0),
   independent boolean not null default false,
   verified_practical boolean not null default false,
   authority text not null check (authority in (
     'university_coursework','host_private_exam','verified_production','host_capstone'
   )),
-  source_ref text not null,
+  source_ref text not null check (length(btrim(source_ref)) > 0),
   scorer_version text,
   observed_at timestamptz not null,
   valid_until timestamptz not null,
   evidence_snapshot jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   unique (agent_id, evidence_key),
+  constraint cos_university_masters_program_identity check (
+    program_key = 'masters:' || program_id || ':v1'
+  ),
   constraint cos_university_masters_evidence_time_order check (observed_at < valid_until),
   constraint cos_university_masters_authority_stage check (
     (stage = 'graduate_coursework' and authority = 'university_coursework')

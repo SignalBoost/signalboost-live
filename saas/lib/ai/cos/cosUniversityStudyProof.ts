@@ -20,6 +20,8 @@ type StudyPlanRow = {
   id: string
   attempt_count: number
   status: string
+  last_attempt_at: string | null
+  updated_at: string
   evidence: unknown
 }
 
@@ -88,7 +90,7 @@ export async function recordAcceptedCosUniversityStudyAttempts(
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_study_plans')
-    .select('id,attempt_count,status,evidence')
+    .select('id,attempt_count,status,last_attempt_at,updated_at,evidence')
     .eq('agent_id', 'cos')
     .in('id', [...merged.keys()])
   if (result.error) throw result.error
@@ -120,6 +122,7 @@ export async function recordAcceptedCosUniversityStudyAttempts(
     })
       .eq('id', row.id)
       .eq('attempt_count', currentAttempt)
+      .eq('updated_at', row.updated_at)
       .in('status', ['queued', 'studying'])
       .select('id')
       .maybeSingle()

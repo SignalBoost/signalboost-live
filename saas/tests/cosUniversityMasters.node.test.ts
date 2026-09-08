@@ -173,6 +173,18 @@ test('stale, self-scored, wrong-authority, malformed-time, or blank-variant evid
   assert.ok(decision.blockers.includes('masters_capstone_incomplete'))
 })
 
+test('well-formed future-dated evidence cannot graduate before it was observed', () => {
+  const future = completeEvidence().map(row => ({
+    ...row,
+    observedAt: '2027-01-01T00:00:00Z',
+    validUntil: '2028-01-01T00:00:00Z',
+  }))
+  const decision = evaluateCosUniversityMastersGraduation('applied_ai_systems', future, NOW)
+  assert.equal(decision.graduated, false)
+  assert.ok(decision.blockers.includes('graduate_coursework_incomplete'))
+  assert.ok(decision.blockers.includes('independent_specialist_exam_incomplete'))
+})
+
 test('A+ Master’s standing requires exceptional repeated evidence beyond the A minimum', () => {
   const evidence: CosUniversityMastersEvidence[] = [
     ...completeEvidence(),

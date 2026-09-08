@@ -253,16 +253,18 @@ export function selectNextCosUniversityMastersExamTarget(
   const missingModule = program.courseworkModuleKeys.find(key => coursework.get(key) !== true)
   if (missingModule) return { programId, stage: 'graduate_coursework', moduleKey: missingModule }
 
+  // Master’s study targets A+, so host exams continue beyond the A-level graduation minima. The
+  // practical-work lane remains outcome-driven and cannot be manufactured by the examiner.
   const depth = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'independent_specialist_exam', now)
-  if (depth < program.minimumDistinctIndependentPasses) return { programId, stage: 'independent_specialist_exam', moduleKey: null }
+  if (depth < program.aPlusDistinctIndependentPasses) return { programId, stage: 'independent_specialist_exam', moduleKey: null }
 
   const transfer = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'cross_domain_transfer', now)
-  if (transfer < program.minimumDistinctTransferPasses) return { programId, stage: 'cross_domain_transfer', moduleKey: null }
+  if (transfer < program.aPlusDistinctTransferPasses) return { programId, stage: 'cross_domain_transfer', moduleKey: null }
 
   const practical = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'verified_practical_work', now)
   if (practical < program.minimumDistinctPracticalPasses) return null
 
   const capstone = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'masters_capstone', now)
-  if (capstone < program.minimumDistinctCapstonePasses) return { programId, stage: 'masters_capstone', moduleKey: null }
+  if (capstone < program.aPlusDistinctCapstonePasses) return { programId, stage: 'masters_capstone', moduleKey: null }
   return null
 }

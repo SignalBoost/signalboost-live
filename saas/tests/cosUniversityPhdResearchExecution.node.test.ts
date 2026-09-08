@@ -59,41 +59,91 @@ test('candidate can research literature and hypotheses but submitted work waits 
   assert.equal(literature.attemptIndex, 0)
 
   const submitted = decision('primary_literature_synthesis_incomplete', [{
-    workKind: 'primary_literature_research',
-    attemptIndex: 0,
-    status: 'submitted',
-    completedAt: '2027-01-01T00:00:00Z',
+    workKind: 'primary_literature_research', attemptIndex: 0, status: 'submitted', completedAt: '2027-01-01T00:00:00Z',
   }])
   assert.equal(submitted.workKind, null)
   assert.equal(submitted.reason, 'awaiting_independent_evaluation')
-
-  const hypothesis = decision('hypothesis_proposal_incomplete')
-  assert.equal(hypothesis.workKind, 'hypothesis_development')
+  assert.equal(decision('hypothesis_proposal_incomplete').workKind, 'hypothesis_development')
 })
 
-test('a later independent failure reopens candidate research with a new attempt', () => {
-  const retry = decision('hypothesis_proposal_incomplete', [{
-    workKind: 'hypothesis_development',
-    attemptIndex: 0,
-    status: 'submitted',
-    completedAt: '2027-01-01T00:00:00Z',
-  }], [{
-    stage: 'hypothesis_proposal',
-    passed: false,
-    observedAt: '2027-01-02T00:00:00Z',
+test('a later or tied independent failure reopens candidate research with a new attempt', () => {
+  const run: CosUniversityPhdResearchRunState = {
+    workKind: 'hypothesis_development', attemptIndex: 0, status: 'submitted', completedAt: '2027-01-01T00:00:00Z',
+  }
+  const later = decision('hypothesis_proposal_incomplete', [run], [{
+    stage: 'hypothesis_proposal', passed: false, observedAt: '2027-01-02T00:00:00Z',
   }])
-  assert.equal(retry.workKind, 'hypothesis_development')
-  assert.equal(retry.attemptIndex, 1)
+  assert.equal(later.workKind, 'hypothesis_development')
+  assert.equal(later.attemptIndex, 1)
+
+  const tied = decision('hypothesis_proposal_incomplete', [run], [{
+    stage: 'hypothesis_proposal', passed: false, observedAt: '2027-01-01T00:00:00Z',
+  }])
+  assert.equal(tied.workKind, 'hypothesis_development')
+  assert.equal(tied.attemptIndex, 1)
+})
+
+test('global integrity blockers can never be misreported as academic research complete', () => {
+  const unknown = decideNextCosUniversityPhdCandidateResearch({
+    graduationBlockers: ['research_evidence_identity_collision'], runs: [], evidence: [],
+  })
+  assert.equal(unknown.reason, 'research_integrity_repair_required')
+
+  const staleRepair = decideNextCosUniversityPhdCandidateResearch({
+    graduationBlockers: ['research_lineage_link_failed'],
+    integrityRepairStage: 'hypothesis_proposal',
+    integrityRepairAllowedParentEvidenceIds: ['lit-new'],
+    integrityRepairRequiresCandidateWork: true,
+    runs: [{
+      workKind: 'hypothesis_development', attemptIndex: 0, status: 'submitted',
+      completedAt: '2027-01-01T00:00:00Z', parentEvidenceIds: ['lit-old'],
+    }],
+    evidence: [],
+  })
+  assert.equal(staleRepair.workKind, 'hypothesis_development')
+  assert.equal(staleRepair.attemptIndex, 1)
+  assert.equal(staleRepair.reason, 'schedule_candidate_research')
+
+  const freshRepair = decideNextCosUniversityPhdCandidateResearch({
+    graduationBlockers: ['research_lineage_link_failed'],
+    integrityRepairStage: 'hypothesis_proposal',
+    integrityRepairAllowedParentEvidenceIds: ['lit-new'],
+    integrityRepairRequiresCandidateWork: true,
+    runs: [{
+      workKind: 'hypothesis_development', attemptIndex: 1, status: 'submitted',
+      completedAt: '2027-01-03T00:00:00Z', parentEvidenceIds: ['lit-new'],
+    }],
+    evidence: [],
+  })
+  assert.equal(freshRepair.workKind, null)
+  assert.equal(freshRepair.reason, 'awaiting_independent_evaluation')
+})
+
+test('independence repairs never send the candidate back to self-authored work', () => {
+  const experiment = decideNextCosUniversityPhdCandidateResearch({
+    graduationBlockers: ['research_independence_separation_failed'],
+    integrityRepairStage: 'preregistered_experiment',
+    integrityRepairRequiresCandidateWork: false,
+    runs: [], evidence: [],
+  })
+  assert.equal(experiment.workKind, null)
+  assert.equal(experiment.reason, 'governed_experiment_execution_required')
+
+  const dissertation = decideNextCosUniversityPhdCandidateResearch({
+    graduationBlockers: ['research_independence_separation_failed'],
+    integrityRepairStage: 'dissertation_defense',
+    integrityRepairRequiresCandidateWork: false,
+    runs: [], evidence: [],
+  })
+  assert.equal(dissertation.workKind, null)
+  assert.equal(dissertation.reason, 'independent_dissertation_committee_required')
 })
 
 test('protocol design never claims that an experiment was executed', () => {
   const protocol = decision('preregistered_experiment_incomplete')
   assert.equal(protocol.workKind, 'experiment_protocol_design')
   const submitted = decision('preregistered_experiment_incomplete', [{
-    workKind: 'experiment_protocol_design',
-    attemptIndex: 0,
-    status: 'submitted',
-    completedAt: '2027-01-01T00:00:00Z',
+    workKind: 'experiment_protocol_design', attemptIndex: 0, status: 'submitted', completedAt: '2027-01-01T00:00:00Z',
   }])
   assert.equal(submitted.reason, 'governed_experiment_execution_required')
 
@@ -104,32 +154,79 @@ test('protocol design never claims that an experiment was executed', () => {
 })
 
 test('peer critique response requires independent peer review first and cannot self-resolve criticism', () => {
-  const noReview = decision('peer_critique_defense_incomplete')
-  assert.equal(noReview.reason, 'independent_peer_review_required')
-
+  assert.equal(decision('peer_critique_defense_incomplete').reason, 'independent_peer_review_required')
   const afterReview = decision('peer_critique_defense_incomplete', [{
-    workKind: 'peer_review',
-    attemptIndex: 0,
-    status: 'submitted',
-    completedAt: '2027-01-01T00:00:00Z',
+    workKind: 'peer_review', attemptIndex: 0, status: 'submitted', completedAt: '2027-01-01T00:00:00Z',
   }])
   assert.equal(afterReview.workKind, 'peer_critique_response')
-  assert.equal(afterReview.reason, 'schedule_candidate_research')
-
-  const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
-  assert.match(runner, /Do not mark the critique resolved yourself\./)
+  assert.match(file('lib/ai/cos/cosUniversityPhdResearchRunner.ts'), /Do not mark the critique resolved yourself\./)
 })
 
 test('dissertation synthesis remains ungraded and waits for an independent committee', () => {
-  const work = decision('dissertation_defense_incomplete')
-  assert.equal(work.workKind, 'dissertation_synthesis')
+  assert.equal(decision('dissertation_defense_incomplete').workKind, 'dissertation_synthesis')
   const submitted = decision('dissertation_defense_incomplete', [{
-    workKind: 'dissertation_synthesis',
-    attemptIndex: 0,
-    status: 'submitted',
-    completedAt: '2027-01-01T00:00:00Z',
+    workKind: 'dissertation_synthesis', attemptIndex: 0, status: 'submitted', completedAt: '2027-01-01T00:00:00Z',
   }])
   assert.equal(submitted.reason, 'independent_dissertation_committee_required')
+})
+
+test('parent selection uses only current runtime-eligible positive evidence and durable failure resets', () => {
+  const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
+  assert.match(runner, /cosUniversityPhdEvidenceEligible\(row, now\)/)
+  assert.match(runner, /currentEligibleStagePasses/)
+  assert.match(runner, /parentRows = parentStage \? currentEligibleStagePasses\(input\.evidence, parentStage, input\.now\)/)
+  assert.doesNotMatch(runner, /function currentStagePasses\(/)
+})
+
+test('lineage and independence blockers produce parent-aware repair context', () => {
+  const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
+  assert.match(runner, /function integrityRepairStage\(/)
+  assert.match(runner, /function integrityRepairContext\(/)
+  assert.match(runner, /research_lineage_link_failed/)
+  assert.match(runner, /research_replication_target_mismatch/)
+  assert.match(runner, /research_independence_separation_failed/)
+  assert.match(runner, /integrityRepairAllowedParentEvidenceIds: repair\.allowedParentEvidenceIds/)
+  assert.match(runner, /integrityRepairRequiresCandidateWork: repair\.requiresCandidateWork/)
+  assert.match(runner, /parentEvidenceIds: record\.assignment\.parentEvidenceIds/)
+})
+
+test('orphaned assignments recover their run before stale derived context is rejected', () => {
+  const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
+  const recovery = runner.indexOf('await ensureRun(row.assignment_key)')
+  const compare = runner.indexOf('if (row.assignment_key !== assignmentKey)')
+  assert.ok(recovery >= 0)
+  assert.ok(compare > recovery)
+  assert.match(runner, /records\.filter\(item => !item\.run\)/)
+  assert.match(runner, /assignment_context_superseded_before_claim/)
+})
+
+test('product persistence and run submission are one service-only database transaction', () => {
+  const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
+  const migration = file('supabase/migrations/20260908212500_cos_university_phd_research_product_atomic_submit.sql')
+  assert.match(runner, /\.rpc\('cos_university_phd_submit_work_product'/)
+  assert.doesNotMatch(runner, /from\('cos_university_phd_work_products'\)\.insert/)
+  assert.doesNotMatch(runner, /const product = await db\.from\('cos_university_phd_work_products'\)/)
+  assert.match(migration, /security invoker/i)
+  assert.match(migration, /for update/i)
+  assert.match(migration, /grant execute on function public\.cos_university_phd_submit_work_product/i)
+  assert.match(migration, /from anon, authenticated/i)
+  assert.match(migration, /p_local_model_invoked is distinct from true/)
+  assert.match(migration, /p_external_ai_invoked is distinct from false/)
+  assert.match(migration, /p_semantic_cache is distinct from false/)
+})
+
+test('stale recovery reconciles products before failing abandoned claims and prior context uses submitted runs only', () => {
+  const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
+  assert.match(runner, /const productOrphans = records\.filter\(record => record\.product && record\.run && record\.run\.status !== 'submitted'\)/)
+  assert.match(runner, /&& !record\.product/)
+  assert.match(runner, /record\.run\?\.status === 'submitted'/)
+})
+
+test('candidate local-model work can only be attributed to a current AI-model candidate identity', () => {
+  const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
+  assert.match(runner, /candidate\.actorRole !== 'candidate'/)
+  assert.match(runner, /candidate\.principalType !== 'ai_model'/)
+  assert.match(runner, /cosUniversityPhdActorIdentityEligible\(candidate, input\.now\)/)
 })
 
 test('research cron is secret-gated, fail-closed, bounded, and scheduled separately from credential progress', () => {

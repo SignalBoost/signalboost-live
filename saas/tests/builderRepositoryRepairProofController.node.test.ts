@@ -9,7 +9,10 @@ import type { BuilderAiPort, BuilderRunnerPort } from '../lib/builder/contracts.
 class ScriptedAi implements BuilderAiPort {
   calls = 0
   private cursor = 0
-  constructor(private readonly controls: readonly string[]) {}
+  private readonly controls: readonly string[]
+  constructor(controls: readonly string[]) {
+    this.controls = controls
+  }
   async generate() {
     this.calls += 1
     return this.controls[this.cursor++] ?? null

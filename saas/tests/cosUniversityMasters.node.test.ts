@@ -1,3 +1,5 @@
+import './cosUniversityMastersLearning.node.test.ts'
+import './cosUniversityMastersExam.node.test.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {

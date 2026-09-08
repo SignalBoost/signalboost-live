@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityIndependentExamBatch } from '@/lib/ai/cos/cosUniversityIndependentExamRunner'
+import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramGate'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,6 +14,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const programGate = await readCosUniversityUndergraduateAcademicLaneGate()
+    if (!programGate.allowed) {
+      const unavailable = programGate.reason === 'service_database_unavailable'
+      return NextResponse.json({ ok: !unavailable, skipped: true, programGate }, { status: unavailable ? 503 : 200 })
+    }
     const result = await runCosUniversityIndependentExamBatch({ maxExams: 2 })
     return NextResponse.json({
       ok: result.errors.length === 0,

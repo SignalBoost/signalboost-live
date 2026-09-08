@@ -9,7 +9,11 @@ const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'u
 test('failed independent exams create priority remediation without exposing hidden scorer details', () => {
   const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
   assert.match(bridge, /from\('cos_university_exam_runs'\)/)
-  assert.match(bridge, /\.eq\('status', 'failed'\)/)
+  assert.match(bridge, /\.in\('status', \['passed', 'failed'\]\)/)
+  assert.match(bridge, /latestByTarget/)
+  assert.match(bridge, /universityExamValidityDays/)
+  assert.match(bridge, /supersedeResolvedFailurePlans/)
+  assert.match(bridge, /status: 'superseded'/)
   assert.match(bridge, /source_kind: SOURCE_KIND/)
   assert.match(bridge, /SOURCE_KIND = 'recertification'/)
   assert.match(bridge, /priority = isLanguage \? 124 : 122/)
@@ -18,6 +22,15 @@ test('failed independent exams create priority remediation without exposing hidd
   assert.doesNotMatch(bridge, /select\([^)]*reasons/)
   assert.doesNotMatch(bridge, /manifest_hash/)
   assert.doesNotMatch(bridge, /seed/)
+})
+
+test('later terminal pass or expired failure retires obsolete remediation instead of starving current work', () => {
+  const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
+  assert.match(bridge, /Only the latest terminal outcome for a competency may\s*\n \* drive remediation/i)
+  assert.match(bridge, /if \(row\.status === 'failed'\) supersededFailureIds\.push\(row\.id\)/)
+  assert.match(bridge, /if \(!failureIsFresh\(row, target, now\)\)/)
+  assert.match(bridge, /\.in\('source_ref', failureIds\)/)
+  assert.match(bridge, /\.in\('status', \['queued', 'studying', 'ready_for_exam'\]\)/)
 })
 
 test('continuous learner merges failed-exam remediation ahead of generic planning', () => {

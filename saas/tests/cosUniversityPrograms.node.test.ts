@@ -8,7 +8,10 @@ import {
   cosUniversityProgramMayGraduate,
   cosUniversityProgramTimingStatus,
 } from '../lib/ai/cos/cosUniversityPrograms.ts'
-import { applyCosUniversityUndergraduateCalendar } from '../lib/ai/cos/cosUniversityProgramGate.ts'
+import {
+  applyCosUniversityUndergraduateCalendar,
+  evaluateCosUniversityUndergraduateAcademicLane,
+} from '../lib/ai/cos/cosUniversityProgramGate.ts'
 import type { CosUniversityGeneralistGraduationStatus } from '../lib/ai/cos/cosUniversityGraduation.ts'
 import type { CosUniversityCredential } from '../lib/ai/cos/cosUniversityCredentials.ts'
 
@@ -74,6 +77,42 @@ test('calendar blocks instant graduation and ends an uncompleted cohort after it
   assert.equal(cosUniversityProgramTimingStatus(enrollment, new Date('2027-02-01T00:00:00Z')), 'target_date_passed')
   assert.equal(cosUniversityProgramTimingStatus(enrollment, new Date('2027-04-01T00:00:00Z')), 'deadline_expired')
   assert.equal(cosUniversityProgramMayGraduate(enrollment, new Date('2027-04-01T00:00:00Z')), false)
+})
+
+test('the shared undergraduate worker gate permits active study but stops expired or completed cohorts', () => {
+  const enrollment = buildCosUniversityProgramEnrollment({
+    programKey: 'generalist_undergraduate_v1', level: 'undergraduate', enrolledAt: new Date('2026-09-08T07:00:00Z'),
+  })
+  const active = evaluateCosUniversityUndergraduateAcademicLane({ enrollment, now: new Date('2026-10-01T00:00:00Z') })
+  assert.equal(active.allowed, true)
+  assert.equal(active.reason, 'active_undergraduate_program')
+
+  const expired = evaluateCosUniversityUndergraduateAcademicLane({ enrollment, now: new Date('2027-04-01T00:00:00Z') })
+  assert.equal(expired.allowed, false)
+  assert.equal(expired.reason, 'undergraduate_program_deadline_expired')
+
+  const completed = evaluateCosUniversityUndergraduateAcademicLane({ enrollment, credentialAwarded: true, now: new Date('2026-12-02T00:00:00Z') })
+  assert.equal(completed.allowed, false)
+  assert.equal(completed.timingStatus, 'graduated')
+  assert.equal(completed.reason, 'undergraduate_program_graduated')
+})
+
+test('every scheduled undergraduate academic lane checks the shared program gate before doing work', () => {
+  const routes = [
+    'app/api/cron/cos-university-learning/route.ts',
+    'app/api/cron/cos-university-practice/route.ts',
+    'app/api/cron/cos-university-exam/route.ts',
+    'app/api/cron/cos-university-a-range/route.ts',
+    'app/api/cron/cos-university-language-a-range/route.ts',
+  ]
+  for (const route of routes) {
+    const source = file(route)
+    const gateAt = source.indexOf('await readCosUniversityUndergraduateAcademicLaneGate')
+    const workerAt = source.indexOf('await runCosUniversity')
+    assert.ok(gateAt >= 0, `${route} must read the undergraduate program gate`)
+    assert.ok(workerAt > gateAt, `${route} must gate the worker before execution`)
+    assert.match(source, /if \(!programGate\.allowed\)/)
+  }
 })
 
 test('academic competence creates award eligibility inside the window but does not become a degree until host credential issuance', () => {

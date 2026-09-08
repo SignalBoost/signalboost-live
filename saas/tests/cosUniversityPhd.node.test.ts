@@ -43,6 +43,16 @@ const EVALUATORS: Readonly<Record<CosUniversityPhdEvidenceStage, readonly string
   dissertation_defense: Object.freeze(['dissertation-panel-1', 'dissertation-panel-2']),
 })
 
+const STAGE_OBSERVED_AT: Readonly<Record<CosUniversityPhdEvidenceStage, string>> = Object.freeze({
+  research_methodology_exam: '2027-01-01T00:00:00Z',
+  primary_literature_synthesis: '2027-02-01T00:00:00Z',
+  hypothesis_proposal: '2027-03-01T00:00:00Z',
+  preregistered_experiment: '2027-04-01T00:00:00Z',
+  independent_replication: '2027-05-01T00:00:00Z',
+  peer_critique_defense: '2027-06-01T00:00:00Z',
+  dissertation_defense: '2027-07-01T00:00:00Z',
+})
+
 function evidence(
   stage: CosUniversityPhdEvidenceStage,
   variantHash: string,
@@ -64,7 +74,7 @@ function evidence(
     ...(chainParent ? { parentEvidenceIds: chainParent } : {}),
     passed: true,
     variantHash,
-    observedAt: '2027-06-01T00:00:00Z',
+    observedAt: STAGE_OBSERVED_AT[stage],
     validUntil: '2028-06-01T00:00:00Z',
     independent: true,
     authority: cosUniversityPhdExpectedAuthority(stage),
@@ -262,6 +272,40 @@ test('replication must link to the counted preregistered experiment and reproduc
   const mismatch = evaluateCosUniversityPhdGraduation(PROGRAM, CANDIDATE, wrongArtifact, NOW)
   assert.equal(mismatch.graduated, false)
   assert.ok(mismatch.blockers.includes('research_replication_target_mismatch'))
+})
+
+test('dependent research evidence must be strictly later than its counted parent', () => {
+  const tied = completeEvidence()
+  const experiment = tied.find(row => row.stage === 'preregistered_experiment')!
+  const replicationIndex = tied.findIndex(row => row.stage === 'independent_replication')
+  tied[replicationIndex] = { ...tied[replicationIndex], observedAt: experiment.observedAt }
+  const tiedDecision = evaluateCosUniversityPhdGraduation(PROGRAM, CANDIDATE, tied, NOW)
+  assert.equal(tiedDecision.graduated, false)
+  assert.ok(tiedDecision.blockers.includes('research_lineage_link_failed'))
+
+  const reversed = completeEvidence()
+  const reversedExperiment = reversed.find(row => row.stage === 'preregistered_experiment')!
+  const reversedReplicationIndex = reversed.findIndex(row => row.stage === 'independent_replication')
+  reversed[reversedReplicationIndex] = { ...reversed[reversedReplicationIndex], observedAt: '2027-03-15T00:00:00Z' }
+  assert.ok(Date.parse(reversed[reversedReplicationIndex].observedAt) < Date.parse(reversedExperiment.observedAt))
+  const reversedDecision = evaluateCosUniversityPhdGraduation(PROGRAM, CANDIDATE, reversed, NOW)
+  assert.equal(reversedDecision.graduated, false)
+  assert.ok(reversedDecision.blockers.includes('research_lineage_link_failed'))
+})
+
+test('an original co-experimenter cannot perform the counted independent replication', () => {
+  const rows = completeEvidence().map(row => {
+    if (row.stage === 'preregistered_experiment') {
+      return { ...row, performerActorIds: [CANDIDATE, 'original-co-researcher'] }
+    }
+    if (row.stage === 'independent_replication') {
+      return { ...row, performerActorIds: ['original-co-researcher'] }
+    }
+    return row
+  })
+  const decision = evaluateCosUniversityPhdGraduation(PROGRAM, CANDIDATE, rows, NOW)
+  assert.equal(decision.graduated, false)
+  assert.ok(decision.blockers.includes('research_independence_separation_failed'))
 })
 
 test('critical research evaluators and replication actors must be separated across stages', () => {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityDeliberatePractice } from '@/lib/ai/cos/cosUniversityDeliberatePracticeRunner'
+import { reopenCosUniversityStudyAfterFailedPractice } from '@/lib/ai/cos/cosUniversityPracticeFailureRemediation'
 import { disciplineCosUniversityPracticeQueue } from '@/lib/ai/cos/cosUniversityPracticeQueueDiscipline'
 import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
 
@@ -26,9 +27,13 @@ export async function GET(req: NextRequest) {
     // defers lower-priority current work so a fresh academic failure cannot sit behind old backlog.
     const queueDiscipline = await disciplineCosUniversityPracticeQueue({ maxActivePlans: 1 })
     const result = await runCosUniversityDeliberatePractice({ maxPlans: 1, maxExercises: 2 })
+    // Reconcile from durable queue/plan state after every practice sweep. result.runs is only a hint;
+    // failures split across cron invocations are still discovered from persisted practice evidence.
+    const practiceRemediation = await reopenCosUniversityStudyAfterFailedPractice(result.runs)
     return NextResponse.json({
       ok: result.errors.length === 0,
       queueDiscipline,
+      practiceRemediation,
       ...result,
     }, { status: result.errors.length ? 500 : 200 })
   } catch (error) {

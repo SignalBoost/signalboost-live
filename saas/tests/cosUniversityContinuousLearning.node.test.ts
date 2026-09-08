@@ -138,7 +138,7 @@ test('daily cron plans education before acquisition and does not route study pla
   const learningCall = cron.indexOf('learning = await runDailyAutonomousLearning')
   assert.ok(planCall > 0)
   assert.ok(learningCall > planCall)
-  assert.match(cron, /\.\.\.\(university\?\.gapSignals \|\| \[\]\)/)
+  assert.match(cron, /injectedGapSignals: operationalSystemsCurriculumSignals\(\)\.concat\(university\?\.gapSignals \|\| \[\]\)/)
   assert.match(store, /This planner is model-free and does not award grades/)
   const planningBody = store.split('export async function runCosUniversityPlanningCycle')[1] || ''
   assert.doesNotMatch(planningBody, /recordCosUniversityAssessment\(/)

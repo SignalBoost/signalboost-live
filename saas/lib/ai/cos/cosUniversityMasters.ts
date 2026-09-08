@@ -128,6 +128,7 @@ export function evaluateCosUniversityMastersAdmission(
 }
 
 export type CosUniversityMastersEvidence = {
+  programId: CosUniversityMastersProgramId
   stage: CosUniversityMastersEvidenceStage
   passed: boolean
   variantHash: string
@@ -149,7 +150,9 @@ export function cosUniversityMastersEvidenceEligible(
 ): boolean {
   const observedAt = validTime(row.observedAt)
   const validUntil = validTime(row.validUntil)
-  if (!observedAt || !validUntil || validUntil <= observedAt || validUntil <= now.getTime()) return false
+  const variantHash = String(row.variantHash || '').trim()
+  if (!variantHash || !observedAt || !validUntil || validUntil <= observedAt || validUntil <= now.getTime()) return false
+  if (!COS_UNIVERSITY_MASTERS_PROGRAMS[row.programId]) return false
   if (row.authority !== cosUniversityMastersExpectedAuthority(row.stage)) return false
   if (row.stage !== 'graduate_coursework' && !row.independent) return false
   if (row.stage === 'verified_practical_work' && row.verifiedPractical !== true) return false
@@ -158,28 +161,30 @@ export function cosUniversityMastersEvidenceEligible(
 
 function eligibleStageRows(
   evidence: CosUniversityMastersEvidence[],
+  programId: CosUniversityMastersProgramId,
   stage: CosUniversityMastersEvidenceStage,
   now: Date,
 ): CosUniversityMastersEvidence[] {
   return evidence
-    .filter(row => row.stage === stage && cosUniversityMastersEvidenceEligible(row, now))
+    .filter(row => row.programId === programId && row.stage === stage && cosUniversityMastersEvidenceEligible(row, now))
     .slice()
     .sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt))
 }
 
 export function cosUniversityMastersDistinctPassesAfterLatestFailure(
   evidence: CosUniversityMastersEvidence[],
+  programId: CosUniversityMastersProgramId,
   stage: CosUniversityMastersEvidenceStage,
   now = new Date(),
 ): number {
-  const rows = eligibleStageRows(evidence, stage, now)
+  const rows = eligibleStageRows(evidence, programId, stage, now)
   let seen = new Set<string>()
   for (const row of rows) {
     if (!row.passed) {
       seen = new Set<string>()
       continue
     }
-    seen.add(row.variantHash)
+    seen.add(String(row.variantHash).trim())
   }
   return seen.size
 }
@@ -198,11 +203,11 @@ export function evaluateCosUniversityMastersGraduation(
 ): CosUniversityMastersGraduationDecision {
   const program = COS_UNIVERSITY_MASTERS_PROGRAMS[programId]
   const blockers: string[] = []
-  const coursework = eligibleStageRows(evidence, 'graduate_coursework', now).some(row => row.passed)
-  const independentPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, 'independent_specialist_exam', now)
-  const transferPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, 'cross_domain_transfer', now)
-  const practicalPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, 'verified_practical_work', now)
-  const capstonePasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, 'masters_capstone', now)
+  const coursework = eligibleStageRows(evidence, programId, 'graduate_coursework', now).some(row => row.passed)
+  const independentPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'independent_specialist_exam', now)
+  const transferPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'cross_domain_transfer', now)
+  const practicalPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'verified_practical_work', now)
+  const capstonePasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'masters_capstone', now)
 
   if (!coursework) blockers.push('graduate_coursework_incomplete')
   if (independentPasses < program.minimumDistinctIndependentPasses) blockers.push('independent_specialist_exam_incomplete')

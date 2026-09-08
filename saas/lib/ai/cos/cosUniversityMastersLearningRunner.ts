@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
-import { generateKnowledgeGaps } from '@/lib/cos-core/layers/learning/gaps'
+import { generateKnowledgeGaps, knowledgeGapIdForSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { createSupabaseCOSStores, cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   approvedUrlLearningAdapter,
@@ -298,34 +298,36 @@ export async function runCosUniversityMastersLearning(options: {
       ...createLiveLearningAdapters(),
     ]
     const director = new ContinuousLearningDirector(store, ZERO_EXTERNAL_COST_POLICY)
-    const successfulPlanIds: string[] = []
 
-    // Run each module gap independently. The shared learning engine reports admission at cycle level,
-    // so per-plan execution is required to prove that a specific module actually retained durable
-    // accepted study evidence before its coursework exam may unlock.
-    for (const plan of selected) {
+    const plannedSignals = selected.map(plan => {
       const failureClass = failureClassForSubject(plan.subject_id)
       const strategy = selectCosUniversityStudyStrategy({ failureClass })
-      const signal = universityStudyGapSignal({
-        planKey: plan.plan_key,
-        subjectId: plan.subject_id as Parameters<typeof universityStudyGapSignal>[0]['subjectId'],
-        objective: clean(plan.objective),
-        failureClass,
-        strategy,
-        repeatedCount: 1,
-        evidence: [`academic_level=masters`, `program_id=${programId}`, `module_key=${plan.module_key}`],
-      })
-      const gaps = generateKnowledgeGaps([signal])
-      if (!gaps.length) continue
-      const result = await new ContinuousLearningCycle(director, adapters).run(gaps, 0)
-      summary.documentsAcquired += result.documentsAcquired
-      summary.accepted += result.accepted
-      summary.probationary += result.probationary
-      if (result.accepted > 0) successfulPlanIds.push(plan.id)
+      return {
+        planId: plan.id,
+        signal: universityStudyGapSignal({
+          planKey: plan.plan_key,
+          subjectId: plan.subject_id as Parameters<typeof universityStudyGapSignal>[0]['subjectId'],
+          objective: clean(plan.objective),
+          failureClass,
+          strategy,
+          repeatedCount: 1,
+          evidence: [`academic_level=masters`, `program_id=${programId}`, `module_key=${plan.module_key}`],
+        }),
+      }
+    })
+    const gaps = generateKnowledgeGaps(plannedSignals.map(row => row.signal))
+    if (!gaps.length) {
+      await finishSlot(claim.id, summary, new Date())
+      return summary
     }
-
+    const planIdByGapId = new Map(plannedSignals.map(row => [knowledgeGapIdForSignal(row.signal), row.planId]))
+    const result = await new ContinuousLearningCycle(director, adapters).run(gaps, 0)
+    summary.status = result.accepted > 0 ? 'learned' : 'idle'
+    summary.documentsAcquired = result.documentsAcquired
+    summary.accepted = result.accepted
+    summary.probationary = result.probationary
+    const successfulPlanIds = [...new Set(result.acceptedGapIds.map(gapId => planIdByGapId.get(gapId)).filter((id): id is string => Boolean(id)))]
     if (successfulPlanIds.length) {
-      summary.status = 'learned'
       summary.plansAttempted = await markCosUniversityStudyPlansAttempted(successfulPlanIds, new Date())
     }
     await finishSlot(claim.id, summary, new Date())

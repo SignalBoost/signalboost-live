@@ -29,7 +29,7 @@ test('candidate research products can never mint academic credit', () => {
   assert.doesNotMatch(schema, /credential/i)
 })
 
-test('research execution uses a separate service-only assignment, run, and product ledger', () => {
+test('research execution uses service-only ledgers and its trigger guard is not RPC-executable', () => {
   const schema = file('supabase/migrations/20260908210500_cos_university_phd_research_execution.sql')
   for (const table of [
     'cos_university_phd_work_assignments',
@@ -44,6 +44,7 @@ test('research execution uses a separate service-only assignment, run, and produ
   assert.match(schema, /grant select, insert on table public\.cos_university_phd_work_products to service_role/i)
   assert.match(schema, /before update or delete on public\.cos_university_phd_work_assignments/i)
   assert.match(schema, /before update or delete on public\.cos_university_phd_work_products/i)
+  assert.match(schema, /revoke all on function public\.cos_university_phd_work_immutable_guard\(\) from anon, authenticated, service_role/i)
 })
 
 test('methodology and independent stages stop at independent boundaries', () => {

@@ -46,6 +46,37 @@ test('continuous learner plans broadly, prioritizes failed independent exams, ex
   assert.doesNotMatch(runtime, /scoreCosUniversityARangeExam/)
 })
 
+test('University practice queue discards superseded rounds without deleting audit evidence', () => {
+  const discipline = file('lib/ai/cos/cosUniversityPracticeQueueDiscipline.ts')
+  assert.match(discipline, /classifyCosUniversityQueuedPractice/)
+  assert.match(discipline, /Math\.floor\(practiceRound\) !== currentPracticeRound\(plan\)/)
+  assert.match(discipline, /status: 'discarded'/)
+  assert.match(discipline, /university_practice_superseded_by_current_study_round/)
+  assert.match(discipline, /completed_at: nowIso/)
+  assert.doesNotMatch(discipline, /\.delete\(\)/)
+})
+
+test('University practice current academic priority outranks old current backlog without destroying it', () => {
+  const discipline = file('lib/ai/cos/cosUniversityPracticeQueueDiscipline.ts')
+  assert.match(discipline, /order\('priority', \{ ascending: false \}\)/)
+  assert.match(discipline, /order\('last_attempt_at', \{ ascending: false \}\)/)
+  assert.match(discipline, /return 'defer_lower_priority'/)
+  assert.match(discipline, /university_practice_deferred_for_higher_academic_priority/)
+  assert.match(discipline, /LOWER_PRIORITY_DEFERRAL_MS = 14 \* 60_000/)
+  assert.match(discipline, /selectedPlanIds/)
+})
+
+test('University practice preparation cannot outpace the normal two-exercise execution budget', () => {
+  const route = file('app/api/cron/cos-university-practice/route.ts')
+  const disciplineAt = route.indexOf('await disciplineCosUniversityPracticeQueue')
+  const practiceAt = route.indexOf('await runCosUniversityDeliberatePractice')
+  assert.ok(disciplineAt >= 0)
+  assert.ok(practiceAt > disciplineAt)
+  assert.match(route, /disciplineCosUniversityPracticeQueue\(\{ maxActivePlans: 1 \}\)/)
+  assert.match(route, /runCosUniversityDeliberatePractice\(\{ maxPlans: 1, maxExercises: 2 \}\)/)
+  assert.match(route, /queueDiscipline/)
+})
+
 test('exam lanes remain independent from continuous study cadence', () => {
   const vercel = JSON.parse(file('vercel.json')) as { env: Record<string, string>; crons: Array<{ path: string; schedule: string }> }
   assert.equal(vercel.env.COS_UNIVERSITY_CONTINUOUS_ENABLED, 'true')

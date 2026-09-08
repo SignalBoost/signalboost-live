@@ -12,6 +12,7 @@ import {
   buildCosUniversityDeliberatePracticeVariants,
   cosUniversityPracticeSkillKey,
 } from './cosUniversityDeliberatePractice.ts'
+import { cosUniversityStudyProofEligible } from './cosUniversityStudyProof.ts'
 import { type CosUniversityFailureClass } from './cosUniversityStudyStrategy.ts'
 
 const ORIGIN = 'cos_university_deliberate_practice'
@@ -106,7 +107,38 @@ function hasDeliberatePractice(methods: unknown): boolean {
   })
 }
 
-async function recoverStalePractice(): Promise<number> {
+function practiceFenceMetadata(requiredPlanId?: string | null, requiredPracticeRound?: number | null): Record<string, unknown> {
+  const planId = clean(requiredPlanId, 80)
+  const round = Number(requiredPracticeRound)
+  return planId && Number.isFinite(round) && round >= 1
+    ? { origin: ORIGIN, universityPlanId: planId, practiceRound: Math.floor(round) }
+    : { origin: ORIGIN }
+}
+
+async function practiceFenceStillValid(planId: string, practiceRound: number, now = new Date()): Promise<boolean> {
+  const db = cosServiceDb()
+  if (!db) return false
+  const result = await db.from('cos_university_study_plans')
+    .select('id,status,attempt_count,last_attempt_at,evidence,methods')
+    .eq('agent_id', 'cos')
+    .eq('id', planId)
+    .maybeSingle()
+  if (result.error || !result.data) return false
+  const plan = result.data as Pick<CosUniversityPracticePlanRow, 'id' | 'status' | 'attempt_count' | 'last_attempt_at' | 'evidence' | 'methods'>
+  if (plan.status !== 'studying' || !hasDeliberatePractice(plan.methods)) return false
+  if (Math.max(1, Math.floor(Number(plan.attempt_count || 1))) !== practiceRound) return false
+  const evidence = asRecord(plan.evidence)
+  const remediation = asRecord(evidence.practiceRemediation)
+  if (Number(remediation.practiceRound) === practiceRound && remediation.requiresNewStudyAttempt === true) return false
+  return cosUniversityStudyProofEligible({
+    attemptCount: practiceRound,
+    lastAttemptAt: plan.last_attempt_at,
+    evidence,
+    now,
+  })
+}
+
+async function recoverStalePractice(requiredPlanId?: string | null, requiredPracticeRound?: number | null): Promise<number> {
   const db = cosServiceDb()
   if (!db) return 0
   const cutoff = new Date(Date.now() - STALE_RUNNING_AFTER_MS).toISOString()
@@ -120,16 +152,37 @@ async function recoverStalePractice(): Promise<number> {
   })
     .eq('status', 'running')
     .eq('generation_source', 'curated')
-    .contains('metadata', { origin: ORIGIN })
+    .contains('metadata', practiceFenceMetadata(requiredPlanId, requiredPracticeRound))
     .lt('started_at', cutoff)
     .select('id')
   if (result.error) throw result.error
   return result.data?.length || 0
 }
 
-async function loadStudyPlans(limit: number): Promise<CosUniversityPracticePlanRow[]> {
+async function loadStudyPlans(
+  limit: number,
+  requiredPlanId?: string | null,
+  requiredPracticeRound?: number | null,
+): Promise<CosUniversityPracticePlanRow[]> {
   const db = cosServiceDb()
   if (!db) return []
+  const requiredId = clean(requiredPlanId, 80)
+  if (requiredId) {
+    const result = await db.from('cos_university_study_plans')
+      .select('id,plan_key,subject_id,language_code,language_dimension,failure_class,objective,methods,evidence,priority,status,attempt_count,last_attempt_at')
+      .eq('agent_id', 'cos')
+      .eq('id', requiredId)
+      .eq('status', 'studying')
+      .maybeSingle()
+    if (result.error) throw result.error
+    if (!result.data || !hasDeliberatePractice(result.data.methods)) return []
+    const plan = result.data as CosUniversityPracticePlanRow
+    const requiredRound = Number(requiredPracticeRound)
+    if (!Number.isFinite(requiredRound) || Math.max(1, Math.floor(Number(plan.attempt_count || 1))) !== Math.floor(requiredRound)) return []
+    if (!(await practiceFenceStillValid(plan.id, Math.floor(requiredRound)))) return []
+    return [plan]
+  }
+
   const result = await db.from('cos_university_study_plans')
     .select('id,plan_key,subject_id,language_code,language_dimension,failure_class,objective,methods,evidence,priority,status,attempt_count,last_attempt_at')
     .eq('agent_id', 'cos')
@@ -139,9 +192,15 @@ async function loadStudyPlans(limit: number): Promise<CosUniversityPracticePlanR
     .order('last_attempt_at', { ascending: false })
     .limit(Math.max(1, Math.min(20, limit * 4)))
   if (result.error) throw result.error
-  return (result.data || [])
+  const candidates = (result.data || [])
     .filter(row => hasDeliberatePractice(row.methods))
     .slice(0, limit) as CosUniversityPracticePlanRow[]
+  const valid: CosUniversityPracticePlanRow[] = []
+  for (const plan of candidates) {
+    const round = Math.max(1, Math.floor(Number(plan.attempt_count || 1)))
+    if (await practiceFenceStillValid(plan.id, round)) valid.push(plan)
+  }
+  return valid
 }
 
 function universityProcedure(plan: CosUniversityPracticePlanRow): Record<string, unknown> {
@@ -256,14 +315,27 @@ async function queuePracticeRound(plan: CosUniversityPracticePlanRow): Promise<n
   return queued
 }
 
-async function claimPractice(): Promise<PracticeQueueRow | null> {
+async function discardClaimedPractice(item: PracticeQueueRow, reason: string): Promise<void> {
+  const db = cosServiceDb()
+  if (!db) return
+  const nowIso = new Date().toISOString()
+  const result = await db.from('cos_active_practice_queue').update({
+    status: 'discarded',
+    completed_at: nowIso,
+    last_error: clean(reason, 1200),
+    updated_at: nowIso,
+  }).eq('id', item.id).eq('status', 'running')
+  if (result.error) throw result.error
+}
+
+async function claimPractice(requiredPlanId?: string | null, requiredPracticeRound?: number | null): Promise<PracticeQueueRow | null> {
   const db = cosServiceDb()
   if (!db) return null
   const result = await db.from('cos_active_practice_queue')
     .select('id,skill_key,variant_key,prompt,rubric,status,attempt_count,max_attempts,metadata,created_at')
     .eq('status', 'queued')
     .eq('generation_source', 'curated')
-    .contains('metadata', { origin: ORIGIN })
+    .contains('metadata', practiceFenceMetadata(requiredPlanId, requiredPracticeRound))
     .lte('next_attempt_at', new Date().toISOString())
     .order('created_at', { ascending: true })
     .limit(1)
@@ -278,7 +350,16 @@ async function claimPractice(): Promise<PracticeQueueRow | null> {
     .select('id,skill_key,variant_key,prompt,rubric,status,attempt_count,max_attempts,metadata,created_at')
     .maybeSingle()
   if (claimed.error) throw claimed.error
-  return (claimed.data || null) as PracticeQueueRow | null
+  const item = (claimed.data || null) as PracticeQueueRow | null
+  if (!item) return null
+  const metadata = asRecord(item.metadata)
+  const planId = clean(metadata.universityPlanId, 80)
+  const round = Number(metadata.practiceRound)
+  if (!planId || !Number.isFinite(round) || !(await practiceFenceStillValid(planId, Math.floor(round)))) {
+    await discardClaimedPractice(item, 'university_practice_claim_fence_failed')
+    return null
+  }
+  return item
 }
 
 async function deferPractice(item: PracticeQueueRow, reason: string): Promise<void> {
@@ -364,6 +445,11 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
     variantKey: item.variant_key,
   }
 
+  if (!planId || !practiceRound || !(await practiceFenceStillValid(planId, practiceRound))) {
+    await discardClaimedPractice(item, 'university_practice_execution_fence_failed')
+    return { ...base, status: 'blocked', passed: null, score: null, coverage: null, turnId: null, reasons: ['practice_study_proof_or_remediation_fence_failed'] }
+  }
+
   let execution: Awaited<ReturnType<typeof callCosReasoner>>
   try {
     execution = await callCosReasoner({
@@ -439,6 +525,8 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
 export async function runCosUniversityDeliberatePractice(options: {
   maxPlans?: number
   maxExercises?: number
+  requiredPlanId?: string | null
+  requiredPracticeRound?: number | null
 } = {}): Promise<CosUniversityDeliberatePracticeSummary> {
   if (process.env.COS_UNIVERSITY_PRACTICE_ENABLED !== 'true') {
     return {
@@ -476,9 +564,13 @@ export async function runCosUniversityDeliberatePractice(options: {
 
   const maxPlans = positiveInt(options.maxPlans, DEFAULT_MAX_PLANS, 8)
   const maxExercises = positiveInt(options.maxExercises, DEFAULT_MAX_EXERCISES, 3)
+  const requiredPlanId = clean(options.requiredPlanId, 80) || null
+  const requiredPracticeRound = Number.isFinite(Number(options.requiredPracticeRound))
+    ? Math.max(1, Math.floor(Number(options.requiredPracticeRound)))
+    : null
   try {
-    summary.recovered = await recoverStalePractice()
-    const plans = await loadStudyPlans(maxPlans)
+    summary.recovered = await recoverStalePractice(requiredPlanId, requiredPracticeRound)
+    const plans = await loadStudyPlans(maxPlans, requiredPlanId, requiredPracticeRound)
     summary.plansConsidered = plans.length
     for (const plan of plans) {
       try {
@@ -492,7 +584,7 @@ export async function runCosUniversityDeliberatePractice(options: {
     if (!summary.plansPrepared) return summary
     await ensureLocalInferenceRuntimeReady()
     for (let index = 0; index < maxExercises; index += 1) {
-      const item = await claimPractice()
+      const item = await claimPractice(requiredPlanId, requiredPracticeRound)
       if (!item) break
       const run = await executePractice(item)
       summary.runs.push(run)
@@ -500,7 +592,7 @@ export async function runCosUniversityDeliberatePractice(options: {
       if (run.status === 'passed') summary.passed += 1
       else if (run.status === 'failed') summary.failed += 1
       else if (run.status === 'deferred') summary.deferred += 1
-      if (run.planId && run.practiceRound) {
+      if (run.planId && run.practiceRound && run.status !== 'blocked') {
         const ready = await reconcilePlan(run.planId, run.practiceRound)
         if (ready) summary.readyForExam += 1
       }

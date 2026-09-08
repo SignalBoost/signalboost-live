@@ -301,8 +301,8 @@ export async function runCosUniversityMastersLearning(options: {
     const successfulPlanIds: string[] = []
 
     // Run each module gap independently. The shared learning engine reports admission at cycle level,
-    // so per-plan execution is required to prove that a specific module actually retained accepted or
-    // probationary study evidence before its coursework exam may unlock.
+    // so per-plan execution is required to prove that a specific module actually retained durable
+    // accepted study evidence before its coursework exam may unlock.
     for (const plan of selected) {
       const failureClass = failureClassForSubject(plan.subject_id)
       const strategy = selectCosUniversityStudyStrategy({ failureClass })
@@ -321,7 +321,7 @@ export async function runCosUniversityMastersLearning(options: {
       summary.documentsAcquired += result.documentsAcquired
       summary.accepted += result.accepted
       summary.probationary += result.probationary
-      if (result.accepted > 0 || result.probationary > 0) successfulPlanIds.push(plan.id)
+      if (result.accepted > 0) successfulPlanIds.push(plan.id)
     }
 
     if (successfulPlanIds.length) {

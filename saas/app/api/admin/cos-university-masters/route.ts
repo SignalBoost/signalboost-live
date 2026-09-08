@@ -8,6 +8,7 @@ import {
   ensureCosUniversityMastersEnrollment,
   evaluateAndAwardCosUniversityMastersCredential,
   readCosUniversityMastersRuntimeStatus,
+  readCosUniversityMastersSharedAdmissionState,
 } from '@/lib/ai/cos/cosUniversityMastersRuntime'
 
 export const runtime = 'nodejs'
@@ -25,8 +26,12 @@ export async function GET() {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
   try {
+    const now = new Date()
+    const sharedAdmissionState = await readCosUniversityMastersSharedAdmissionState(now)
     const ids = Object.keys(COS_UNIVERSITY_MASTERS_PROGRAMS) as CosUniversityMastersProgramId[]
-    const programs = await Promise.all(ids.map(id => readCosUniversityMastersRuntimeStatus(id)))
+    const programs = await Promise.all(ids.map(id =>
+      readCosUniversityMastersRuntimeStatus(id, now, sharedAdmissionState),
+    ))
     return NextResponse.json({
       ok: true,
       programs,

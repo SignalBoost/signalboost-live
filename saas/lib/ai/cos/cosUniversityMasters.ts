@@ -20,6 +20,12 @@ export type CosUniversityMastersEvidenceStage =
   | 'verified_practical_work'
   | 'masters_capstone'
 
+export type CosUniversityMastersEvidenceAuthority =
+  | 'university_coursework'
+  | 'host_private_exam'
+  | 'verified_production'
+  | 'host_capstone'
+
 export type CosUniversityMastersProgram = Readonly<{
   id: CosUniversityMastersProgramId
   title: string
@@ -28,7 +34,12 @@ export type CosUniversityMastersProgram = Readonly<{
   requiredEvidenceStages: readonly CosUniversityMastersEvidenceStage[]
   minimumDistinctIndependentPasses: number
   minimumDistinctTransferPasses: number
+  minimumDistinctPracticalPasses: number
   minimumDistinctCapstonePasses: number
+  aPlusDistinctIndependentPasses: number
+  aPlusDistinctTransferPasses: number
+  aPlusDistinctPracticalPasses: number
+  aPlusDistinctCapstonePasses: number
 }>
 
 const STANDARD_EVIDENCE: readonly CosUniversityMastersEvidenceStage[] = Object.freeze([
@@ -52,7 +63,12 @@ function program(
     requiredEvidenceStages: STANDARD_EVIDENCE,
     minimumDistinctIndependentPasses: 2,
     minimumDistinctTransferPasses: 2,
+    minimumDistinctPracticalPasses: 1,
     minimumDistinctCapstonePasses: 2,
+    aPlusDistinctIndependentPasses: 3,
+    aPlusDistinctTransferPasses: 3,
+    aPlusDistinctPracticalPasses: 2,
+    aPlusDistinctCapstonePasses: 3,
   })
 }
 
@@ -69,6 +85,21 @@ export const COS_UNIVERSITY_MASTERS_PROGRAMS: Readonly<Record<CosUniversityMaste
   social_behavioral_sciences: program('social_behavioral_sciences', 'Master of Social & Behavioral Sciences', ['social_behavioral_sciences', 'statistics_data_science', 'history_culture_philosophy_religion']),
   language_communication: program('language_communication', 'Master of Language & Communication', ['language_communication', 'social_behavioral_sciences', 'history_culture_philosophy_religion']),
 })
+
+export function cosUniversityMastersProgramKey(programId: CosUniversityMastersProgramId): string {
+  return `masters:${programId}:v1`
+}
+
+export function cosUniversityMastersCredentialKey(agentId: string, programId: CosUniversityMastersProgramId): string {
+  return `${String(agentId || '').trim()}:masters:${programId}:v1`
+}
+
+export function cosUniversityMastersExpectedAuthority(stage: CosUniversityMastersEvidenceStage): CosUniversityMastersEvidenceAuthority {
+  if (stage === 'graduate_coursework') return 'university_coursework'
+  if (stage === 'verified_practical_work') return 'verified_production'
+  if (stage === 'masters_capstone') return 'host_capstone'
+  return 'host_private_exam'
+}
 
 export type CosUniversityMastersAdmissionInput = {
   undergraduateCredentialAwarded: boolean
@@ -101,18 +132,47 @@ export type CosUniversityMastersEvidence = {
   passed: boolean
   variantHash: string
   observedAt: string
+  validUntil: string
   independent: boolean
+  authority: CosUniversityMastersEvidenceAuthority
   verifiedPractical?: boolean
 }
 
-function distinctPassesAfterLatestFailure(
+function validTime(value: string): number | null {
+  const parsed = Date.parse(String(value || ''))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export function cosUniversityMastersEvidenceEligible(
+  row: CosUniversityMastersEvidence,
+  now = new Date(),
+): boolean {
+  const observedAt = validTime(row.observedAt)
+  const validUntil = validTime(row.validUntil)
+  if (!observedAt || !validUntil || validUntil <= observedAt || validUntil <= now.getTime()) return false
+  if (row.authority !== cosUniversityMastersExpectedAuthority(row.stage)) return false
+  if (row.stage !== 'graduate_coursework' && !row.independent) return false
+  if (row.stage === 'verified_practical_work' && row.verifiedPractical !== true) return false
+  return true
+}
+
+function eligibleStageRows(
   evidence: CosUniversityMastersEvidence[],
   stage: CosUniversityMastersEvidenceStage,
-): number {
-  const rows = evidence
-    .filter(row => row.stage === stage && row.independent)
+  now: Date,
+): CosUniversityMastersEvidence[] {
+  return evidence
+    .filter(row => row.stage === stage && cosUniversityMastersEvidenceEligible(row, now))
     .slice()
     .sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt))
+}
+
+export function cosUniversityMastersDistinctPassesAfterLatestFailure(
+  evidence: CosUniversityMastersEvidence[],
+  stage: CosUniversityMastersEvidenceStage,
+  now = new Date(),
+): number {
+  const rows = eligibleStageRows(evidence, stage, now)
   let seen = new Set<string>()
   for (const row of rows) {
     if (!row.passed) {
@@ -126,6 +186,7 @@ function distinctPassesAfterLatestFailure(
 
 export type CosUniversityMastersGraduationDecision = {
   graduated: boolean
+  standing: 'not_graduated' | 'A' | 'A+'
   blockers: string[]
   authorityExpanded: false
 }
@@ -133,15 +194,26 @@ export type CosUniversityMastersGraduationDecision = {
 export function evaluateCosUniversityMastersGraduation(
   programId: CosUniversityMastersProgramId,
   evidence: CosUniversityMastersEvidence[],
+  now = new Date(),
 ): CosUniversityMastersGraduationDecision {
   const program = COS_UNIVERSITY_MASTERS_PROGRAMS[programId]
   const blockers: string[] = []
-  const coursework = evidence.some(row => row.stage === 'graduate_coursework' && row.passed)
+  const coursework = eligibleStageRows(evidence, 'graduate_coursework', now).some(row => row.passed)
+  const independentPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, 'independent_specialist_exam', now)
+  const transferPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, 'cross_domain_transfer', now)
+  const practicalPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, 'verified_practical_work', now)
+  const capstonePasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, 'masters_capstone', now)
+
   if (!coursework) blockers.push('graduate_coursework_incomplete')
-  if (distinctPassesAfterLatestFailure(evidence, 'independent_specialist_exam') < program.minimumDistinctIndependentPasses) blockers.push('independent_specialist_exam_incomplete')
-  if (distinctPassesAfterLatestFailure(evidence, 'cross_domain_transfer') < program.minimumDistinctTransferPasses) blockers.push('cross_domain_transfer_incomplete')
-  const practical = evidence.some(row => row.stage === 'verified_practical_work' && row.passed && row.verifiedPractical === true)
-  if (!practical) blockers.push('verified_practical_work_incomplete')
-  if (distinctPassesAfterLatestFailure(evidence, 'masters_capstone') < program.minimumDistinctCapstonePasses) blockers.push('masters_capstone_incomplete')
-  return { graduated: blockers.length === 0, blockers, authorityExpanded: false }
+  if (independentPasses < program.minimumDistinctIndependentPasses) blockers.push('independent_specialist_exam_incomplete')
+  if (transferPasses < program.minimumDistinctTransferPasses) blockers.push('cross_domain_transfer_incomplete')
+  if (practicalPasses < program.minimumDistinctPracticalPasses) blockers.push('verified_practical_work_incomplete')
+  if (capstonePasses < program.minimumDistinctCapstonePasses) blockers.push('masters_capstone_incomplete')
+
+  if (blockers.length) return { graduated: false, standing: 'not_graduated', blockers, authorityExpanded: false }
+  const aPlus = independentPasses >= program.aPlusDistinctIndependentPasses
+    && transferPasses >= program.aPlusDistinctTransferPasses
+    && practicalPasses >= program.aPlusDistinctPracticalPasses
+    && capstonePasses >= program.aPlusDistinctCapstonePasses
+  return { graduated: true, standing: aPlus ? 'A+' : 'A', blockers: [], authorityExpanded: false }
 }

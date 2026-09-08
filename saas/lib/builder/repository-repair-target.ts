@@ -135,7 +135,7 @@ function failureEvidence(input: string): readonly string[] {
   const failingStart = lines.findIndex(line => /(?:^|\s)✖\s+failing tests\s*:/i.test(line))
   const scoped = failingStart >= 0 ? lines.slice(failingStart) : lines
   const selected = scoped.filter(line =>
-    /(?:^|\s)✖\s|\btest at\s+(?:tests|test)\/|AssertionError|ERR_ASSERTION|Build error occurred|Turbopack build failed|Failed to type check|Type error:|\bError:|doesn['’]t exist|was not found|Cannot find|has no exported member|Import trace:|Command .* exited with [1-9]|\bexpected:|\bactual:|\boperator:/i.test(line),
+    /(?:^|\s)✖\s|\btest at\s+(?:tests|test)\/|AssertionError|ERR_ASSERTION|Build error occurred|Turbopack build failed|Failed to type check|Type error:|\bError:|doesn['’]t exist|was not found|Cannot find|has no exported member|Import trace:|Command .* exited with [1-9]|\bexpected:|\bactual:|\boperator:|operational_learning_[a-z0-9_]+_missing|"ok":\s*false|signalboost-cos-blueprint/i.test(line),
   )
   return unique(selected.map(line => line.slice(0, 900)), MAX_FAILURE_EVIDENCE)
 }
@@ -242,8 +242,15 @@ export function signalBoostRepositoryRepairObjective(target: SignalBoostReposito
   const paths = target.pathHints.map(path => path.replace(/^saas\//, ''))
   const failingTests = paths.filter(path => /^(?:tests|test)\/.+\.test\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/i.test(path))
   const command = target.failedCommand ? `Failed command: ${target.failedCommand}` : 'Failed command: not extracted from the log.'
+  const recordedBuildProof = !failingTests.length
+    && target.failedCommand
+    && /vercel-cos-gates|npm run prebuild|next build|check-cos-blueprint/i.test(target.failedCommand)
+    ? target.failedCommand
+    : null
   const narrowProof = failingTests.length
     ? `Narrow proof command: node --test ${failingTests.join(' ')}. Run this exact command from the mounted workspace root. Do not cd into another directory and do not use npm test -- <file>; this repository's npm test script enumerates the full suite.`
+    : recordedBuildProof
+    ? `Narrow proof command: ${recordedBuildProof}. Re-run this exact recorded failing command from the mounted workspace root. Do not substitute an unrelated unit test file.`
     : 'Commands already start in the mounted saas workspace root. Do not cd into guessed absolute paths; use workspace-relative paths and the narrowest relevant proof command.'
   const evidence = target.failureEvidence.length
     ? target.failureEvidence.join('\n')

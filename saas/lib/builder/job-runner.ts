@@ -178,12 +178,19 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       return
     }
 
-    if (job.metadata.platformRepair === true) {
+    // Owner jobs that carry a failed SignalBoost Vercel clone log must enter Platform Engineer
+    // even if enqueue dropped the platformRepair metadata. Isolated sandbox Builder cannot commit.
+    const parsedLogTarget = job.ownerAuthorized
+      ? parseSignalBoostRepositoryRepairTarget(job.objective)
+      : null
+    const treatAsPlatformRepair = job.metadata.platformRepair === true || Boolean(parsedLogTarget)
+
+    if (treatAsPlatformRepair) {
       if (!job.ownerAuthorized) {
         await terminalFailure(job, 'builder_repository_repair_owner_required')
         return
       }
-      const exactTarget = parseSignalBoostRepositoryRepairTarget(job.objective)
+      const exactTarget = parsedLogTarget ?? parseSignalBoostRepositoryRepairTarget(job.objective)
       const target = exactTarget ?? signalBoostDeployedRepairTarget(job.objective, {
         commitSha: job.metadata.commitSha,
         branch: job.metadata.branch,
@@ -315,7 +322,6 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       })
       return
     }
-
 
     if (verifiedBuilderCognitiveApplication(result)) {
       const successfulRuns = result.trace.filter(item => item.toolId === 'run' && item.ok).length

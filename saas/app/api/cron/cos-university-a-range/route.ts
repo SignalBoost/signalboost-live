@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityARangeBatch } from '@/lib/ai/cos/cosUniversityARangeRunner'
-import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramGate'
+import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

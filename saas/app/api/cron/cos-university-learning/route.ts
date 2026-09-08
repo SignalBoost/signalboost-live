@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityContinuousLearning } from '@/lib/ai/cos/cosUniversityContinuousLearning'
-import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramGate'
+import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

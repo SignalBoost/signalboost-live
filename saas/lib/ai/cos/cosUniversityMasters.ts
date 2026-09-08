@@ -1,10 +1,5 @@
 // saas/lib/ai/cos/cosUniversityMasters.ts
-//
-// COS University Master's layer: the specialist programs an agent may enter AFTER a host-issued
-// undergraduate credential exists. This file owns the academic definition only — which tracks
-// exist, which undergraduate subjects each one deepens, and what evidence a track demands.
-// Enrollment timing lives in cosUniversityPrograms.ts; the admission decision lives in
-// cosUniversityAdmission.ts. Nothing here grants anything.
+// Canonical Master's specialization catalog plus evidence-backed degree semantics.
 
 import type { CosUniversitySubjectId } from './cosUniversity.ts'
 
@@ -15,15 +10,27 @@ export type CosUniversityMastersTrackId =
   | 'enterprise_operations_and_governance'
   | 'scientific_and_physical_systems'
 
+export type CosUniversityMastersProgramId = CosUniversityMastersTrackId
+
+export type CosUniversityMastersEvidenceStage =
+  | 'graduate_coursework'
+  | 'independent_specialist_exam'
+  | 'cross_domain_transfer'
+  | 'verified_practical_work'
+  | 'masters_capstone'
+
+export type CosUniversityMastersEvidenceAuthority =
+  | 'university_coursework'
+  | 'host_private_exam'
+  | 'verified_production'
+  | 'host_capstone'
+
 export type CosUniversityMastersTrack = Readonly<{
   id: CosUniversityMastersTrackId
   title: string
   objective: string
-  /** Undergraduate subjects this track deepens. Order is significance order, strongest first. */
   coreSubjects: readonly CosUniversitySubjectId[]
-  /** Subjects the track leans on but does not examine at Master's depth. */
   supportingSubjects: readonly CosUniversitySubjectId[]
-  /** Distinct independent exam passes required at Master's depth before a thesis may be attempted. */
   requiredDepthPasses: number
 }>
 
@@ -74,18 +81,12 @@ export function cosUniversityMastersTrackById(id: string): CosUniversityMastersT
   return COS_UNIVERSITY_MASTERS_TRACKS.find((track) => track.id === id) ?? null
 }
 
-/** Stable, explicit program key. A repeat or a second Master's must use a different key. */
 export function cosUniversityMastersProgramKey(trackId: CosUniversityMastersTrackId): string {
   return `specialist_masters_${trackId}_v1`
 }
 
 export const COS_UNIVERSITY_MASTERS_PROGRAM_KEY_PREFIX = 'specialist_masters_'
 
-/**
- * Rank tracks for a candidate by the undergraduate standing already demonstrated in their core
- * subjects. This selects WHICH specialization the host offers; it never decides WHETHER to admit.
- * Ties resolve by catalog order so the choice is deterministic and reproducible from evidence.
- */
 export function rankCosUniversityMastersTracks(
   subjectStanding: ReadonlyMap<CosUniversitySubjectId, number>,
 ): ReadonlyArray<{ track: CosUniversityMastersTrack; score: number }> {
@@ -99,4 +100,185 @@ export function rankCosUniversityMastersTracks(
     })
     .sort((a, b) => (b.score - a.score) || (a.index - b.index))
     .map(({ track, score }) => ({ track, score }))
+}
+
+export type CosUniversityMastersProgram = Readonly<{
+  id: CosUniversityMastersProgramId
+  title: string
+  primarySubjects: readonly CosUniversitySubjectId[]
+  admissionMinimumStanding: 'A'
+  requiredEvidenceStages: readonly CosUniversityMastersEvidenceStage[]
+  minimumDistinctIndependentPasses: number
+  minimumDistinctTransferPasses: number
+  minimumDistinctPracticalPasses: number
+  minimumDistinctCapstonePasses: number
+  aPlusDistinctIndependentPasses: number
+  aPlusDistinctTransferPasses: number
+  aPlusDistinctPracticalPasses: number
+  aPlusDistinctCapstonePasses: number
+}>
+
+const STANDARD_EVIDENCE: readonly CosUniversityMastersEvidenceStage[] = Object.freeze([
+  'graduate_coursework',
+  'independent_specialist_exam',
+  'cross_domain_transfer',
+  'verified_practical_work',
+  'masters_capstone',
+])
+
+function academicProgram(track: CosUniversityMastersTrack): CosUniversityMastersProgram {
+  return Object.freeze({
+    id: track.id,
+    title: `Master of ${track.title}`,
+    primarySubjects: track.coreSubjects,
+    admissionMinimumStanding: 'A' as const,
+    requiredEvidenceStages: STANDARD_EVIDENCE,
+    minimumDistinctIndependentPasses: Math.max(2, track.requiredDepthPasses),
+    minimumDistinctTransferPasses: 2,
+    minimumDistinctPracticalPasses: 1,
+    minimumDistinctCapstonePasses: 2,
+    aPlusDistinctIndependentPasses: Math.max(4, track.requiredDepthPasses + 1),
+    aPlusDistinctTransferPasses: 3,
+    aPlusDistinctPracticalPasses: 2,
+    aPlusDistinctCapstonePasses: 3,
+  })
+}
+
+export const COS_UNIVERSITY_MASTERS_PROGRAMS: Readonly<Record<CosUniversityMastersProgramId, CosUniversityMastersProgram>> = Object.freeze(
+  Object.fromEntries(COS_UNIVERSITY_MASTERS_TRACKS.map(track => [track.id, academicProgram(track)])) as Record<CosUniversityMastersProgramId, CosUniversityMastersProgram>,
+)
+
+export function cosUniversityMastersCredentialKey(agentId: string, programId: CosUniversityMastersProgramId): string {
+  return `${String(agentId || '').trim()}:masters:${programId}:v1`
+}
+
+export function cosUniversityMastersExpectedAuthority(stage: CosUniversityMastersEvidenceStage): CosUniversityMastersEvidenceAuthority {
+  if (stage === 'graduate_coursework') return 'university_coursework'
+  if (stage === 'verified_practical_work') return 'verified_production'
+  if (stage === 'masters_capstone') return 'host_capstone'
+  return 'host_private_exam'
+}
+
+export type CosUniversityMastersAdmissionInput = {
+  undergraduateCredentialAwarded: boolean
+  currentGeneralistStanding: 'not_graduated' | 'A' | 'A+'
+  currentSubjectStanding: Partial<Record<CosUniversitySubjectId, string>>
+}
+
+export type CosUniversityMastersAdmissionDecision = {
+  admitted: boolean
+  reasons: string[]
+}
+
+export function evaluateCosUniversityMastersAdmission(
+  programId: CosUniversityMastersProgramId,
+  input: CosUniversityMastersAdmissionInput,
+): CosUniversityMastersAdmissionDecision {
+  const program = COS_UNIVERSITY_MASTERS_PROGRAMS[programId]
+  const reasons: string[] = []
+  if (!input.undergraduateCredentialAwarded) reasons.push('undergraduate_credential_required')
+  if (input.currentGeneralistStanding !== 'A' && input.currentGeneralistStanding !== 'A+') reasons.push('current_generalist_A_required')
+  for (const subjectId of program.primarySubjects) {
+    const standing = input.currentSubjectStanding[subjectId]
+    if (standing !== 'A' && standing !== 'A+') reasons.push(`subject_A_required:${subjectId}`)
+  }
+  return { admitted: reasons.length === 0, reasons }
+}
+
+export type CosUniversityMastersEvidence = {
+  programId: CosUniversityMastersProgramId
+  stage: CosUniversityMastersEvidenceStage
+  passed: boolean
+  variantHash: string
+  observedAt: string
+  validUntil: string
+  independent: boolean
+  authority: CosUniversityMastersEvidenceAuthority
+  verifiedPractical?: boolean
+}
+
+function validTime(value: string): number | null {
+  const parsed = Date.parse(String(value || ''))
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+export function cosUniversityMastersEvidenceEligible(
+  row: CosUniversityMastersEvidence,
+  now = new Date(),
+): boolean {
+  const nowMs = now.getTime()
+  const observedAt = validTime(row.observedAt)
+  const validUntil = validTime(row.validUntil)
+  const variantHash = String(row.variantHash || '').trim()
+  if (!Number.isFinite(nowMs) || !variantHash || observedAt === null || validUntil === null) return false
+  if (observedAt > nowMs || validUntil <= observedAt || validUntil <= nowMs) return false
+  if (!COS_UNIVERSITY_MASTERS_PROGRAMS[row.programId]) return false
+  if (row.authority !== cosUniversityMastersExpectedAuthority(row.stage)) return false
+  if (row.stage !== 'graduate_coursework' && !row.independent) return false
+  if (row.stage === 'verified_practical_work' && row.verifiedPractical !== true) return false
+  return true
+}
+
+function eligibleStageRows(
+  evidence: CosUniversityMastersEvidence[],
+  programId: CosUniversityMastersProgramId,
+  stage: CosUniversityMastersEvidenceStage,
+  now: Date,
+): CosUniversityMastersEvidence[] {
+  return evidence
+    .filter(row => row.programId === programId && row.stage === stage && cosUniversityMastersEvidenceEligible(row, now))
+    .slice()
+    .sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt))
+}
+
+export function cosUniversityMastersDistinctPassesAfterLatestFailure(
+  evidence: CosUniversityMastersEvidence[],
+  programId: CosUniversityMastersProgramId,
+  stage: CosUniversityMastersEvidenceStage,
+  now = new Date(),
+): number {
+  const rows = eligibleStageRows(evidence, programId, stage, now)
+  let seen = new Set<string>()
+  for (const row of rows) {
+    if (!row.passed) {
+      seen = new Set<string>()
+      continue
+    }
+    seen.add(String(row.variantHash).trim())
+  }
+  return seen.size
+}
+
+export type CosUniversityMastersGraduationDecision = {
+  graduated: boolean
+  standing: 'not_graduated' | 'A' | 'A+'
+  blockers: string[]
+  authorityExpanded: false
+}
+
+export function evaluateCosUniversityMastersGraduation(
+  programId: CosUniversityMastersProgramId,
+  evidence: CosUniversityMastersEvidence[],
+  now = new Date(),
+): CosUniversityMastersGraduationDecision {
+  const program = COS_UNIVERSITY_MASTERS_PROGRAMS[programId]
+  const blockers: string[] = []
+  const coursework = eligibleStageRows(evidence, programId, 'graduate_coursework', now).some(row => row.passed)
+  const independentPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'independent_specialist_exam', now)
+  const transferPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'cross_domain_transfer', now)
+  const practicalPasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'verified_practical_work', now)
+  const capstonePasses = cosUniversityMastersDistinctPassesAfterLatestFailure(evidence, programId, 'masters_capstone', now)
+
+  if (!coursework) blockers.push('graduate_coursework_incomplete')
+  if (independentPasses < program.minimumDistinctIndependentPasses) blockers.push('independent_specialist_exam_incomplete')
+  if (transferPasses < program.minimumDistinctTransferPasses) blockers.push('cross_domain_transfer_incomplete')
+  if (practicalPasses < program.minimumDistinctPracticalPasses) blockers.push('verified_practical_work_incomplete')
+  if (capstonePasses < program.minimumDistinctCapstonePasses) blockers.push('masters_capstone_incomplete')
+
+  if (blockers.length) return { graduated: false, standing: 'not_graduated', blockers, authorityExpanded: false }
+  const aPlus = independentPasses >= program.aPlusDistinctIndependentPasses
+    && transferPasses >= program.aPlusDistinctTransferPasses
+    && practicalPasses >= program.aPlusDistinctPracticalPasses
+    && capstonePasses >= program.aPlusDistinctCapstonePasses
+  return { graduated: true, standing: aPlus ? 'A+' : 'A', blockers: [], authorityExpanded: false }
 }

@@ -390,6 +390,13 @@ function normalizedDistinctIds(values: readonly string[] | undefined): { valid: 
   return { valid: true, ids }
 }
 
+function parentIdsEligibleForResearch(row: CosUniversityPhdEvidence): boolean {
+  if (row.parentEvidenceIds === undefined) return true
+  const parents = normalizedDistinctIds(row.parentEvidenceIds)
+  if (!parents.valid) return false
+  return !parents.ids.includes(clean(row.evidenceId, 300))
+}
+
 function failureResetEligibleForResearch(row: CosUniversityPhdEvidence, now: Date): boolean {
   if (row.passed) return false
   const observedAt = Date.parse(row.observedAt)
@@ -400,6 +407,7 @@ function failureResetEligibleForResearch(row: CosUniversityPhdEvidence, now: Dat
     || !clean(row.researchProjectId, 300) || !clean(row.protocolId, 300)) return false
   if (row.identityProvenance !== 'host_identity_ledger' || !row.independent) return false
   if (row.authority !== cosUniversityPhdExpectedAuthority(row.stage)) return false
+  if (!parentIdsEligibleForResearch(row)) return false
 
   const performers = normalizedDistinctIds(row.performerActorIds)
   const evaluators = normalizedDistinctIds(row.evaluatorActorIds)
@@ -1016,6 +1024,7 @@ async function executeCandidateAssignment(
     }
   }
 
+  const completedAt = new Date()
   const turnId = peekEvidenceSourceUseTurnId()
   const semanticCache = result.provenance.responseSource === 'semantic_cache'
     || result.provenance.responseSource === 'semantic_similarity'
@@ -1026,7 +1035,7 @@ async function executeCandidateAssignment(
     candidateIdentity
     && candidateIdentity.actorRole === 'candidate'
     && candidateIdentity.principalType === 'ai_model'
-    && cosUniversityPhdActorIdentityEligible(candidateIdentity, now)
+    && cosUniversityPhdActorIdentityEligible(candidateIdentity, completedAt)
     && reasonerFingerprint
     && clean(candidateIdentity.principalFingerprint, 500) === reasonerFingerprint,
   )
@@ -1044,7 +1053,7 @@ async function executeCandidateAssignment(
     const failureReason = candidateMatchesReasoner
       ? 'fresh_local_research_execution_required'
       : 'research_reasoner_principal_mismatch'
-    await failCandidateAssignment(assignment, failureReason)
+    await failCandidateAssignment(assignment, failureReason, completedAt)
     return {
       enabled: true,
       programId: assignment.programId,
@@ -1062,7 +1071,7 @@ async function executeCandidateAssignment(
     assignment,
     contentText: reply,
     sourceRef: `cos_turn:${turnId}`,
-    submittedAt: new Date(),
+    submittedAt: completedAt,
     turnId,
     responseSource: result.provenance.responseSource,
     localModelInvoked: result.provenance.localModelInvoked,
@@ -1070,7 +1079,7 @@ async function executeCandidateAssignment(
     semanticCache,
   })
   if (!product) {
-    await failCandidateAssignment(assignment, 'research_product_not_persisted')
+    await failCandidateAssignment(assignment, 'research_product_not_persisted', completedAt)
     return {
       enabled: true,
       programId: assignment.programId,

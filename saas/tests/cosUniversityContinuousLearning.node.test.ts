@@ -78,16 +78,22 @@ test('academic state ignores self-scored and expired evidence rather than turnin
   assert.equal(state.subjectTranscript.find(row => row.subjectId === 'mathematics')?.grade, 'unassessed')
 })
 
-test('host-controlled fresh assessment rows can populate the transcript without accepting a caller-supplied grade', () => {
+test('host-controlled transcript requires repeated fresh unseen evidence rather than one lucky exam', () => {
   const state = academicStateFromRows([
     {
       assessment_key: 'math-practice', subject_id: 'mathematics', language_code: null, language_dimension: null,
       assessment_kind: 'practice_checkpoint', passed: true, independent_scorer: true,
       scorer_version: 'host-v1', scorer_authority: 'host_private_exam',
+      observed_at: '2026-09-07T17:00:00Z', valid_until: '2026-10-07T17:00:00Z',
+    },
+    {
+      assessment_key: 'math-exam-1', subject_id: 'mathematics', language_code: null, language_dimension: null,
+      assessment_kind: 'unseen_subject_exam', passed: true, independent_scorer: true,
+      scorer_version: 'host-v1', scorer_authority: 'host_private_exam',
       observed_at: '2026-09-07T18:00:00Z', valid_until: '2026-10-07T18:00:00Z',
     },
     {
-      assessment_key: 'math-exam', subject_id: 'mathematics', language_code: null, language_dimension: null,
+      assessment_key: 'math-exam-2', subject_id: 'mathematics', language_code: null, language_dimension: null,
       assessment_kind: 'unseen_subject_exam', passed: true, independent_scorer: true,
       scorer_version: 'host-v1', scorer_authority: 'host_private_exam',
       observed_at: '2026-09-07T19:00:00Z', valid_until: '2026-10-07T19:00:00Z',

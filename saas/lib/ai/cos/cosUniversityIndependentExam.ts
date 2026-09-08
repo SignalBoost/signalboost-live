@@ -12,7 +12,7 @@ import {
 } from './cosUniversityLanguages.ts'
 
 export const COS_UNIVERSITY_EXAM_PROFILE = 'cos_university_unseen_v1'
-export const COS_UNIVERSITY_EXAM_SCORER = 'university-host-scorer-v1'
+export const COS_UNIVERSITY_EXAM_SCORER = 'university-host-scorer-v2'
 export const COS_UNIVERSITY_MINIMUM_UNSEEN_PASSES = 2
 
 export type CosUniversityExamTarget =
@@ -104,12 +104,17 @@ function exactNumberPattern(value: number): string {
   return `(?:^|[^0-9])${escaped}(?:[^0-9]|$)`
 }
 
+/**
+ * This is only a bounded script/language sanity check after the substantive rubric has passed.
+ * It must recognize valid exam vocabulary rather than demand one arbitrary phrase. Scorer v2 fixes
+ * the first Polish blind-exam defect without changing any required facts or task semantics.
+ */
 function languageMarker(language: CosPlatformLanguage): RegExp {
   if (language === 'ru') return /[А-Яа-яЁё]{3,}/
-  if (language === 'pl') return /\b(?:proszę|dziękuj\w*|jest|będzie|spotkanie|raport|sprawdzenie)\b/i
-  if (language === 'pt') return /\b(?:obrigad\w*|por favor|está|será|reunião|relatório|verificação)\b/i
-  if (language === 'es') return /\b(?:gracias|por favor|está|será|reunión|informe|verificación)\b/i
-  return /\b(?:the|please|is|are|will|meeting|report|check)\b/i
+  if (language === 'pl') return /(?:[ąćęłńóśźż]|\b(?:proszę|dziękuj\w*|jest|będzie|spotkanie|raport|sprawdzenie|projekt|wdrożenia|pozostaje|nieznan\w*)\b)/i
+  if (language === 'pt') return /(?:[ãõçáéíóúâêô]|\b(?:obrigad\w*|por favor|está|será|reunião|relatório|verificação|projeto|implantação|desconhecid\w*)\b)/i
+  if (language === 'es') return /(?:[ñáéíóúü¿¡]|\b(?:gracias|por favor|está|será|reunión|informe|verificación|proyecto|despliegue|desconocid\w*)\b)/i
+  return /\b(?:the|please|is|are|will|meeting|report|check|project|deployment|unknown)\b/i
 }
 
 function manifestHash(input: Omit<CosUniversityBlindExam, 'manifestHash'>): string {

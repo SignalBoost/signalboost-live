@@ -117,6 +117,7 @@ const tests = [
   'tests/cosUniversityContinuousLearning.node.test.ts',
   'tests/cosUniversityIndependentExam.node.test.ts',
   'tests/cosUniversityARange.node.test.ts',
+  'tests/cosUniversityContinuousEducation.node.test.ts',
   'tests/cosCognitiveSkillRetrievalEfficiency.node.test.ts',
   'tests/cognitiveReasoningImperativeTriggers.node.test.ts',
   'tests/releaseSignalSeverity.node.test.ts',

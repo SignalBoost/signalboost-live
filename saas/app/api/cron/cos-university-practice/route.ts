@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityDeliberatePractice } from '@/lib/ai/cos/cosUniversityDeliberatePracticeRunner'
+import { disciplineCosUniversityPracticeQueue } from '@/lib/ai/cos/cosUniversityPracticeQueueDiscipline'
 import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
 
 export const runtime = 'nodejs'
@@ -19,9 +20,15 @@ export async function GET(req: NextRequest) {
       const unavailable = programGate.reason === 'service_database_unavailable'
       return NextResponse.json({ ok: !unavailable, skipped: true, programGate }, { status: unavailable ? 503 : 200 })
     }
-    const result = await runCosUniversityDeliberatePractice({ maxPlans: 4, maxExercises: 2 })
+
+    // One active plan produces exactly two current-round variants, matching the default two-exercise
+    // execution budget. Queue discipline preserves audit evidence, discards superseded rounds, and
+    // defers lower-priority current work so a fresh academic failure cannot sit behind old backlog.
+    const queueDiscipline = await disciplineCosUniversityPracticeQueue({ maxActivePlans: 1 })
+    const result = await runCosUniversityDeliberatePractice({ maxPlans: 1, maxExercises: 2 })
     return NextResponse.json({
       ok: result.errors.length === 0,
+      queueDiscipline,
       ...result,
     }, { status: result.errors.length ? 500 : 200 })
   } catch (error) {

@@ -427,6 +427,7 @@ function researchLineageLinkageBlockers(
       const linkedParents = parentIds(row).ids
         .map(id => previousById.get(id))
         .filter((parent): parent is CosUniversityPhdEvidence => Boolean(parent))
+        .filter(parent => Date.parse(parent.observedAt) < Date.parse(row.observedAt))
       if (!linkedParents.length) return ['research_lineage_link_failed']
       if (stage === 'independent_replication') {
         const replicatedArtifactHash = String(row.replicatedArtifactHash || '').trim()
@@ -447,6 +448,13 @@ function researchIndependenceBlockers(
     const actors = new Set<string>()
     for (const row of passes[stage]) {
       for (const actorId of row.evaluatorActorIds) actors.add(cleanId(actorId))
+      if (stage === 'preregistered_experiment') {
+        const candidateActorId = cleanId(row.candidateActorId)
+        for (const actorId of row.performerActorIds) {
+          const performerActorId = cleanId(actorId)
+          if (performerActorId !== candidateActorId) actors.add(performerActorId)
+        }
+      }
       if (stage === 'independent_replication') {
         for (const actorId of row.performerActorIds) actors.add(cleanId(actorId))
       }

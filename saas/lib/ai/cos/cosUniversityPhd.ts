@@ -234,7 +234,10 @@ function cosUniversityPhdFailureResetEligible(row: CosUniversityPhdEvidence, now
   if (!Number.isFinite(nowMs) || observedAt === null || validUntil === null) return false
   if (!String(row.variantHash || '').trim()) return false
   if (!COS_UNIVERSITY_PHD_PROGRAMS[row.programId]) return false
-  if (observedAt > nowMs || validUntil <= observedAt || validUntil <= nowMs) return false
+  // Failure is an event, not positive mastery credit. Once independently recorded it remains the
+  // reset boundary until fresh passes are earned after it; wall-clock expiry alone cannot resurrect
+  // older passes. The interval still has to have been valid when the failure was observed.
+  if (observedAt > nowMs || validUntil <= observedAt) return false
   if (!row.independent) return false
   if (row.authority !== cosUniversityPhdExpectedAuthority(row.stage)) return false
   return true

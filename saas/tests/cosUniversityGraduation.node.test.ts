@@ -1,4 +1,6 @@
 import './cosUniversityPrograms.node.test.ts'
+import './cosUniversityMasters.node.test.ts'
+import './cosUniversityMastersRuntime.node.test.ts'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'

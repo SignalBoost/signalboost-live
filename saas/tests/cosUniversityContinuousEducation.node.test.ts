@@ -46,6 +46,20 @@ test('continuous learner plans broadly, prioritizes failed independent exams, ex
   assert.doesNotMatch(runtime, /scoreCosUniversityARangeExam/)
 })
 
+test('University study attempts advance only from accepted learning bound to the exact plan', () => {
+  const runtime = file('lib/ai/cos/cosUniversityContinuousLearning.ts')
+  assert.match(runtime, /knowledgeGapIdForSignal/)
+  assert.match(runtime, /export function universityPlansWithAcceptedLearning/)
+  assert.match(runtime, /const accepted = new Set\(acceptedGapIds\)/)
+  assert.match(runtime, /if \(!accepted\.size\) return \[\]/)
+  assert.match(runtime, /signalMatchesPlan\(signal, plan\.planKey\)/)
+  assert.match(runtime, /accepted\.has\(knowledgeGapIdForSignal\(signal\)\)/)
+  assert.match(runtime, /summary\.status = result\.accepted > 0 \? 'learned' : 'idle'/)
+  assert.match(runtime, /universityPlansWithAcceptedLearning\(eligiblePlans, signals, result\.acceptedGapIds\)/)
+  assert.doesNotMatch(runtime, /attemptedPlanIds\.push\(\.\.\.eligiblePlans\.map\(plan => plan\.id\)\)/)
+  assert.doesNotMatch(runtime, /result\.probationary[^\n]*markCosUniversityStudyPlansAttempted/)
+})
+
 test('University practice queue discards superseded rounds without deleting audit evidence', () => {
   const discipline = file('lib/ai/cos/cosUniversityPracticeQueueDiscipline.ts')
   assert.match(discipline, /classifyCosUniversityQueuedPractice/)

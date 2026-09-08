@@ -8,6 +8,7 @@
     "COS_UNIVERSITY_A_RANGE_ENABLED": "true",
     "COS_UNIVERSITY_CONTINUOUS_ENABLED": "true",
     "COS_UNIVERSITY_PRACTICE_ENABLED": "true",
+    "COS_UNIVERSITY_GRADUATION_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ROLLBACK_ENABLED": "true"
   },
@@ -29,6 +30,7 @@
     { "path": "/api/cron/cos-learning-indexer", "schedule": "3,18,33,48 * * * *" },
     { "path": "/api/cron/cos-university-language-a-range", "schedule": "20 7 * * *" },
     { "path": "/api/cron/cos-directed-study-promotion", "schedule": "8,23,38,53 * * * *" },
+    { "path": "/api/cron/cos-university-graduation", "schedule": "30 7 * * *" },
     { "path": "/api/cron/cos-current-world-learning", "schedule": "14 * * * *" },
     { "path": "/api/cron/cos-mining?job=weekly", "schedule": "0 5 * * 0" },
     { "path": "/api/cron/marketing-sales-director", "schedule": "0 7 * * *" },

@@ -1,3 +1,4 @@
+import './cosUniversityExamRemediation.node.test.ts'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -30,8 +31,10 @@ test('study cooldown prevents rereading the same plan continuously without block
   assert.equal(cosUniversityPlanEligibleForContinuousStudy({ id: 'a', status: 'superseded', lastAttemptAt: null }, now), false)
 })
 
-test('continuous learner plans broadly, executes bounded current University work, and never grades itself', () => {
+test('continuous learner plans broadly, prioritizes failed independent exams, executes bounded current University work, and never grades itself', () => {
   const runtime = file('lib/ai/cos/cosUniversityContinuousLearning.ts')
+  assert.match(runtime, /ensureCosUniversityExamFailureRemediationPlans/)
+  assert.match(runtime, /examFailuresPrioritized/)
   assert.match(runtime, /runCosUniversityPlanningCycle\(\{ now, maxPlans: 12 \}\)/)
   assert.match(runtime, /maxStudyPlans \|\| 4/)
   assert.match(runtime, /generateKnowledgeGaps\(signals\)/)

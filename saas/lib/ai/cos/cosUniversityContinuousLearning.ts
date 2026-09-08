@@ -12,6 +12,7 @@ import {
   markCosUniversityStudyPlansAttempted,
   runCosUniversityPlanningCycle,
 } from './cosUniversityStore.ts'
+import { ensureCosUniversityExamFailureRemediationPlans } from './cosUniversityExamRemediation.ts'
 import {
   COS_UNIVERSITY_STUDY_COOLDOWN_MINUTES,
   cosUniversityContinuousSlotKey,
@@ -42,6 +43,7 @@ export type CosUniversityContinuousLearningSummary = {
   slotKey: string
   status: 'disabled' | 'already_claimed' | 'idle' | 'learned' | 'error'
   planned: number
+  examFailuresPrioritized: number
   eligible: number
   gapsConsidered: number
   documentsAcquired: number
@@ -69,6 +71,7 @@ function emptySummary(args: {
     slotKey: args.slotKey,
     status: args.status,
     planned: 0,
+    examFailuresPrioritized: 0,
     eligible: 0,
     gapsConsidered: 0,
     documentsAcquired: 0,
@@ -149,8 +152,9 @@ function signalMatchesPlan(signal: KnowledgeGapSignal, planKey: string): boolean
  *
  * This is intentionally a frequent bounded sweep, not a human study session. It selects current
  * University work, respects a per-plan cooldown to avoid repeatedly rereading the same objective,
- * acquires only the source classes chosen by the Learning Strategist, and persists attempts. The
- * independent exam lanes remain separate and do not share hidden seeds/rubrics with this learner.
+ * acquires only the source classes chosen by the Learning Strategist, and persists attempts. Fresh
+ * independent exam failures get their own high-priority remediation bridge so generic operational
+ * retests cannot starve academic weaknesses. Examiner prompts/rubrics remain hidden from the learner.
  */
 export async function runCosUniversityContinuousLearning(options: {
   now?: Date
@@ -173,15 +177,25 @@ export async function runCosUniversityContinuousLearning(options: {
   const summary = emptySummary({ enabled: true, claimed: true, slotKey, status: 'idle' })
   const attemptedPlanIds: string[] = []
   try {
+    const remediation = await ensureCosUniversityExamFailureRemediationPlans({ maxPlans: 4 })
+    summary.examFailuresPrioritized = remediation.activePlans.length
+
     // Ask for a wider planning window than the execution cap so cooldowns on high-priority work do
     // not starve the rest of the curriculum.
     const planning = await runCosUniversityPlanningCycle({ now, maxPlans: 12 })
-    summary.planned = planning.activePlans.length
     summary.errors.push(...planning.errors)
 
-    const eligibleIds = await loadEligiblePlanIds(planning.activePlans.map(plan => plan.id), now)
+    const activeById = new Map<string, (typeof planning.activePlans)[number]>()
+    for (const plan of [...remediation.activePlans, ...planning.activePlans]) {
+      if (!activeById.has(plan.id)) activeById.set(plan.id, plan)
+    }
+    const activePlans = [...activeById.values()]
+      .sort((a, b) => b.priority - a.priority || a.planKey.localeCompare(b.planKey))
+    summary.planned = activePlans.length
+
+    const eligibleIds = await loadEligiblePlanIds(activePlans.map(plan => plan.id), now)
     const maxStudyPlans = Math.max(1, Math.min(6, Math.floor(options.maxStudyPlans || 4)))
-    const eligiblePlans = planning.activePlans.filter(plan => eligibleIds.has(plan.id)).slice(0, maxStudyPlans)
+    const eligiblePlans = activePlans.filter(plan => eligibleIds.has(plan.id)).slice(0, maxStudyPlans)
     summary.eligible = eligiblePlans.length
     if (!eligiblePlans.length) {
       await finishContinuousSlot(claim.id, new Date(), summary, attemptedPlanIds)
@@ -189,7 +203,8 @@ export async function runCosUniversityContinuousLearning(options: {
     }
 
     const eligibleKeys = new Set(eligiblePlans.map(plan => plan.planKey))
-    const signals = planning.gapSignals.filter(signal =>
+    const allSignals = [...remediation.gapSignals, ...planning.gapSignals]
+    const signals = allSignals.filter(signal =>
       [...eligibleKeys].some(planKey => signalMatchesPlan(signal, planKey)),
     )
     const gaps = generateKnowledgeGaps(signals)

@@ -16,6 +16,15 @@ test('research scheduling applies the canonical-shaped durable failure envelope'
   assert.doesNotMatch(runner, /: Number\.isFinite\(Date\.parse\(row\.observedAt\)\)/)
 })
 
+test('durable failure resets validate normalized parent IDs and reject self-parenting', () => {
+  const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
+  assert.match(runner, /function parentIdsEligibleForResearch\(/)
+  assert.match(runner, /row\.parentEvidenceIds === undefined/)
+  assert.match(runner, /const parents = normalizedDistinctIds\(row\.parentEvidenceIds\)/)
+  assert.match(runner, /!parents\.ids\.includes\(clean\(row\.evidenceId, 300\)\)/)
+  assert.match(runner, /if \(!parentIdsEligibleForResearch\(row\)\) return false/)
+})
+
 test('evidence identity collision repair uses normalized IDs', () => {
   const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
   assert.match(runner, /blockers\.includes\('research_evidence_identity_collision'\)/)
@@ -30,6 +39,14 @@ test('research execution binds the immutable candidate principal to the actual r
   assert.match(runner, /candidateMatchesReasoner/)
   assert.match(runner, /principalFingerprint, 500\) === reasonerFingerprint/)
   assert.match(runner, /research_reasoner_principal_mismatch/)
+})
+
+test('candidate identity is revalidated at the same completion timestamp used for submission', () => {
+  const runner = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
+  assert.match(runner, /const completedAt = new Date\(\)/)
+  assert.match(runner, /cosUniversityPhdActorIdentityEligible\(candidateIdentity, completedAt\)/)
+  assert.match(runner, /submittedAt: completedAt/)
+  assert.match(runner, /failCandidateAssignment\(assignment, failureReason, completedAt\)/)
 })
 
 test('expired orphan assignments recover directly to failed instead of blocking retry forever', () => {

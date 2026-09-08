@@ -178,18 +178,23 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
       return
     }
 
-    // Owner jobs that carry a failed SignalBoost Vercel clone log must enter Platform Engineer
-    // even if enqueue dropped the platformRepair metadata. Isolated sandbox Builder cannot commit.
-    const parsedLogTarget = job.ownerAuthorized
-      ? parseSignalBoostRepositoryRepairTarget(job.objective)
-      : null
-    const treatAsPlatformRepair = job.metadata.platformRepair === true || Boolean(parsedLogTarget)
-
-    if (treatAsPlatformRepair) {
+    // Preserve the explicit metadata lane's authority check before any target parsing. The recovery
+    // path below is owner-only too, so a dropped metadata bit cannot broaden repository authority.
+    let parsedLogTarget = null
+    if (job.metadata.platformRepair === true) {
       if (!job.ownerAuthorized) {
         await terminalFailure(job, 'builder_repository_repair_owner_required')
         return
       }
+      parsedLogTarget = parseSignalBoostRepositoryRepairTarget(job.objective)
+    } else if (job.ownerAuthorized) {
+      // Owner jobs that carry a failed SignalBoost Vercel clone log must enter Platform Engineer
+      // even if enqueue dropped the platformRepair metadata. Isolated sandbox Builder cannot commit.
+      parsedLogTarget = parseSignalBoostRepositoryRepairTarget(job.objective)
+    }
+    const treatAsPlatformRepair = job.metadata.platformRepair === true || Boolean(parsedLogTarget)
+
+    if (treatAsPlatformRepair) {
       const exactTarget = parsedLogTarget ?? parseSignalBoostRepositoryRepairTarget(job.objective)
       const target = exactTarget ?? signalBoostDeployedRepairTarget(job.objective, {
         commitSha: job.metadata.commitSha,

@@ -234,7 +234,7 @@ function cosUniversityPhdFailureResetEligible(row: CosUniversityPhdEvidence, now
   if (!Number.isFinite(nowMs) || observedAt === null || validUntil === null) return false
   if (!String(row.variantHash || '').trim()) return false
   if (!COS_UNIVERSITY_PHD_PROGRAMS[row.programId]) return false
-  if (observedAt > nowMs || validUntil <= observedAt) return false
+  if (observedAt > nowMs || validUntil <= observedAt || validUntil <= nowMs) return false
   if (!row.independent) return false
   if (row.authority !== cosUniversityPhdExpectedAuthority(row.stage)) return false
   return true

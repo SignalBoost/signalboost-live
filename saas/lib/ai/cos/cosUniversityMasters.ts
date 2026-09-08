@@ -206,10 +206,12 @@ export function cosUniversityMastersEvidenceEligible(
   row: CosUniversityMastersEvidence,
   now = new Date(),
 ): boolean {
+  const nowMs = now.getTime()
   const observedAt = validTime(row.observedAt)
   const validUntil = validTime(row.validUntil)
   const variantHash = String(row.variantHash || '').trim()
-  if (!variantHash || !observedAt || !validUntil || validUntil <= observedAt || validUntil <= now.getTime()) return false
+  if (!Number.isFinite(nowMs) || !variantHash || observedAt === null || validUntil === null) return false
+  if (observedAt > nowMs || validUntil <= observedAt || validUntil <= nowMs) return false
   if (!COS_UNIVERSITY_MASTERS_PROGRAMS[row.programId]) return false
   if (row.authority !== cosUniversityMastersExpectedAuthority(row.stage)) return false
   if (row.stage !== 'graduate_coursework' && !row.independent) return false

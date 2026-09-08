@@ -117,10 +117,7 @@ export async function GET(req: NextRequest) {
     try {
       learning = await runDailyAutonomousLearning({
         miningSummary: result.summary,
-        injectedGapSignals: [
-          ...operationalSystemsCurriculumSignals(),
-          ...(university?.gapSignals || []),
-        ],
+        injectedGapSignals: operationalSystemsCurriculumSignals().concat(university?.gapSignals || []),
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Daily learning failed'

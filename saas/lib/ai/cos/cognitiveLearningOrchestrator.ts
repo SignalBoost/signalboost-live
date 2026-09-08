@@ -171,6 +171,40 @@ function mergeCleanup(target: CognitivePracticeCleanup, next: CognitivePracticeC
   if (target.details.length > 40) target.details.splice(0, target.details.length - 40)
 }
 
+function recordProcessedLessonId(target: Set<number>, result: Record<string, unknown>): void {
+  const lessonId = Number(result.lessonId)
+  if (Number.isFinite(lessonId) && lessonId > 0) target.add(lessonId)
+}
+
+function linkedLessonIdsFromProvenance(provenance: unknown): number[] {
+  const record = provenance && typeof provenance === 'object' ? provenance as Record<string, unknown> : {}
+  const ids = [
+    record.teacher_lesson_id,
+    ...(Array.isArray(record.teacher_lesson_ids) ? record.teacher_lesson_ids : []),
+  ]
+    .map(value => Number(value))
+    .filter(value => Number.isFinite(value) && value > 0)
+  return [...new Set(ids)]
+}
+
+/**
+ * Backfill may legitimately reinforce the same owner-directed source again. Candidate identity is
+ * durable in cos_cognitive_skills provenance, including every teacher lesson that deduplicated into
+ * a shared skill key. Exclude that full one-to-many association from the bounded extraction lane so
+ * equivalent sources cannot alternate forever and starve later sources.
+ */
+async function loadLinkedDirectedSoftwareLessonIds(limit = 1000): Promise<number[]> {
+  const db = cosServiceDb()
+  if (!db) return []
+  const result = await db.from('cos_cognitive_skills')
+    .select('provenance')
+    .contains('metadata', { origin: 'owner_directed_study', specialistFamily: 'software' })
+    .limit(Math.max(1, Math.min(5000, Math.floor(limit))))
+  if (result.error) throw result.error
+  const ids = (result.data ?? []).flatMap((row: any) => linkedLessonIdsFromProvenance(row?.provenance))
+  return [...new Set(ids)]
+}
+
 /**
  * Production cognitive-learning orchestration. Candidate reflection remains available, but the
  * active-learning practice loop is allowed to consume reasoner calls only when an independent
@@ -199,6 +233,7 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
     practiceSkippedReason: null,
     errors: [],
   }
+  const processedLessonIds = new Set<number>()
 
   try {
     mergeCleanup(summary.cleanup, await discardUnnecessaryLocalCognitivePractice())
@@ -210,6 +245,7 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
     try {
       const result = await evaluateNextTeacherLesson()
       if (!result) break
+      recordProcessedLessonId(processedLessonIds, result)
       summary.lessons.push(result)
       // evaluateNextTeacherLesson may have produced local practice. Remove it before any practice
       // worker can spend another reasoner call on a candidate that lacks independent promotion.
@@ -218,6 +254,26 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
       summary.errors.push(`lesson:${error instanceof Error ? error.message : String(error)}`)
       break
     }
+  }
+
+  // Preserve the normal general-learning budget above, then give fresh owner-directed software
+  // material one additional bounded evaluation opportunity. It still goes through the exact same
+  // extraction, validation, practice and independent-evidence lifecycle; this lane changes only
+  // queue selection and never promotes a lesson or cognitive skill by itself. Excluding the full
+  // durable one-to-many lesson linkage prevents daily source reinforcement from pinning this lane.
+  try {
+    const linkedLessonIds = await loadLinkedDirectedSoftwareLessonIds()
+    const directedResult = await evaluateNextTeacherLesson({
+      lane: 'owner_directed_software',
+      excludeLessonIds: [...new Set([...processedLessonIds, ...linkedLessonIds])],
+    })
+    if (directedResult) {
+      recordProcessedLessonId(processedLessonIds, directedResult)
+      summary.lessons.push({ ...directedResult, evaluationLane: 'owner_directed_software' })
+      mergeCleanup(summary.cleanup, await discardUnnecessaryLocalCognitivePractice())
+    }
+  } catch (error) {
+    summary.errors.push(`directed-software-lesson:${error instanceof Error ? error.message : String(error)}`)
   }
 
   const externalEnabled = externalEvaluationEnabled()

@@ -286,6 +286,7 @@ export function universityStudyGapSignal(input: {
     confidence: 0,
     escalated: true,
     succeeded: false,
+    missingFacts: [...subject.studyThemes],
     repeatedCount: Math.max(1, Math.floor(Number(input.repeatedCount || 1))),
     evidence: [
       'cos_university_continuous_learning',

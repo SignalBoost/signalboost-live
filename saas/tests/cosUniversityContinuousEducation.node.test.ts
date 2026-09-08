@@ -66,6 +66,20 @@ test('University practice current academic priority outranks old current backlog
   assert.match(discipline, /selectedPlanIds/)
 })
 
+test('University practice queue cleanup uses bounded sequential PostgREST batches', () => {
+  const discipline = file('lib/ai/cos/cosUniversityPracticeQueueDiscipline.ts')
+  assert.match(discipline, /UPDATE_BATCH_SIZE = 50/)
+  assert.match(discipline, /function batches<T>/)
+  assert.match(discipline, /for \(const batch of batches\(ids\)\)/)
+  assert.match(discipline, /async function discardObsoletePractice/)
+  assert.match(discipline, /async function deferLowerPriorityPractice/)
+  assert.match(discipline, /\.in\('id', batch\)/)
+  assert.doesNotMatch(discipline, /\.in\('id', obsoleteIds\)/)
+  assert.doesNotMatch(discipline, /\.in\('id', lowerPriorityIds\)/)
+  assert.match(discipline, /await discardObsoletePractice\(obsoleteIds, nowIso\)/)
+  assert.match(discipline, /await deferLowerPriorityPractice\(lowerPriorityIds, now, nowIso\)/)
+})
+
 test('University practice preparation cannot outpace the normal two-exercise execution budget', () => {
   const route = file('app/api/cron/cos-university-practice/route.ts')
   const disciplineAt = route.indexOf('await disciplineCosUniversityPracticeQueue')

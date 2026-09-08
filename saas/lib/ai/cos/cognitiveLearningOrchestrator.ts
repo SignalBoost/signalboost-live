@@ -176,10 +176,22 @@ function recordProcessedLessonId(target: Set<number>, result: Record<string, unk
   if (Number.isFinite(lessonId) && lessonId > 0) target.add(lessonId)
 }
 
+function linkedLessonIdsFromProvenance(provenance: unknown): number[] {
+  const record = provenance && typeof provenance === 'object' ? provenance as Record<string, unknown> : {}
+  const ids = [
+    record.teacher_lesson_id,
+    ...(Array.isArray(record.teacher_lesson_ids) ? record.teacher_lesson_ids : []),
+  ]
+    .map(value => Number(value))
+    .filter(value => Number.isFinite(value) && value > 0)
+  return [...new Set(ids)]
+}
+
 /**
  * Backfill may legitimately reinforce the same owner-directed source again. Candidate identity is
- * durable in cos_cognitive_skills provenance, so exclude those teacher lesson ids from the bounded
- * extraction lane even if a later reinforcement rewrites the lesson row to captured.
+ * durable in cos_cognitive_skills provenance, including every teacher lesson that deduplicated into
+ * a shared skill key. Exclude that full one-to-many association from the bounded extraction lane so
+ * equivalent sources cannot alternate forever and starve later sources.
  */
 async function loadLinkedDirectedSoftwareLessonIds(limit = 1000): Promise<number[]> {
   const db = cosServiceDb()
@@ -189,9 +201,7 @@ async function loadLinkedDirectedSoftwareLessonIds(limit = 1000): Promise<number
     .contains('metadata', { origin: 'owner_directed_study', specialistFamily: 'software' })
     .limit(Math.max(1, Math.min(5000, Math.floor(limit))))
   if (result.error) throw result.error
-  const ids = (result.data ?? [])
-    .map((row: any) => Number(row?.provenance?.teacher_lesson_id))
-    .filter((lessonId: number) => Number.isFinite(lessonId) && lessonId > 0)
+  const ids = (result.data ?? []).flatMap((row: any) => linkedLessonIdsFromProvenance(row?.provenance))
   return [...new Set(ids)]
 }
 
@@ -249,8 +259,8 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
   // Preserve the normal general-learning budget above, then give fresh owner-directed software
   // material one additional bounded evaluation opportunity. It still goes through the exact same
   // extraction, validation, practice and independent-evidence lifecycle; this lane changes only
-  // queue selection and never promotes a lesson or cognitive skill by itself. Excluding durable
-  // already-linked lesson ids prevents daily source reinforcement from pinning this lane forever.
+  // queue selection and never promotes a lesson or cognitive skill by itself. Excluding the full
+  // durable one-to-many lesson linkage prevents daily source reinforcement from pinning this lane.
   try {
     const linkedLessonIds = await loadLinkedDirectedSoftwareLessonIds()
     const directedResult = await evaluateNextTeacherLesson({

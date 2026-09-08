@@ -78,13 +78,24 @@ function draftFromSkillRow(row: any): CognitiveSkillDraft {
   }
 }
 
+function linkedTeacherLessonIds(row: any): number[] {
+  const provenance = row?.provenance && typeof row.provenance === 'object' ? row.provenance : {}
+  const ids = [
+    provenance.teacher_lesson_id,
+    ...(Array.isArray(provenance.teacher_lesson_ids) ? provenance.teacher_lesson_ids : []),
+  ]
+    .map(value => Number(value))
+    .filter(value => Number.isFinite(value) && value > 0)
+  return [...new Set(ids)]
+}
+
 async function refreshLinkedTeacherStatus(db: NonNullable<ReturnType<typeof cosServiceDb>>, row: any, status: CognitiveSkillStatus): Promise<void> {
-  const lessonId = Number(row?.provenance?.teacher_lesson_id)
-  if (!Number.isFinite(lessonId) || lessonId <= 0) return
+  const lessonIds = linkedTeacherLessonIds(row)
+  if (!lessonIds.length) return
   await db.from('cos_teacher_lessons').update({
     status: STRONG_STATUSES.has(status) ? 'promoted' : 'evaluated',
     updated_at: new Date().toISOString(),
-  }).eq('id', lessonId)
+  }).in('id', lessonIds)
 }
 
 export async function refreshCognitiveSkillStatus(skillKey: string): Promise<{
@@ -153,13 +164,21 @@ async function enqueueVariant(args: {
 }
 
 async function linkedSkillForLesson(db: NonNullable<ReturnType<typeof cosServiceDb>>, lessonId: number): Promise<any | null> {
-  const result = await db.from('cos_cognitive_skills')
+  const linkedSet = await db.from('cos_cognitive_skills')
+    .select('*')
+    .contains('provenance', { teacher_lesson_ids: [lessonId] })
+    .limit(1)
+    .maybeSingle()
+  if (!linkedSet.error && linkedSet.data) return linkedSet.data
+
+  // Legacy rows created before the retained association set used only the scalar latest link.
+  const legacy = await db.from('cos_cognitive_skills')
     .select('*')
     .contains('provenance', { teacher_lesson_id: lessonId })
     .limit(1)
     .maybeSingle()
-  if (result.error) return null
-  return result.data ?? null
+  if (legacy.error) return null
+  return legacy.data ?? null
 }
 
 async function persistDraft(
@@ -172,10 +191,21 @@ async function persistDraft(
   const existing = await db.from('cos_cognitive_skills').select('*').eq('skill_key', skillKey).maybeSingle()
   if (existing.error) throw existing.error
   const now = new Date().toISOString()
+  const existingProvenance = existing.data?.provenance && typeof existing.data.provenance === 'object'
+    ? existing.data.provenance
+    : {}
+  const teacherLessonIds = [...new Set([
+    existingProvenance.teacher_lesson_id,
+    ...(Array.isArray(existingProvenance.teacher_lesson_ids) ? existingProvenance.teacher_lesson_ids : []),
+    lesson.id,
+  ]
+    .map(value => Number(value))
+    .filter(value => Number.isFinite(value) && value > 0))]
   const provenance = {
-    ...(existing.data?.provenance && typeof existing.data.provenance === 'object' ? existing.data.provenance : {}),
+    ...existingProvenance,
     origin: 'teacher_reflection',
     teacher_lesson_id: lesson.id,
+    teacher_lesson_ids: teacherLessonIds,
     teacher_provider: lesson.teacher_provider || null,
     teacher_model: lesson.teacher_model || null,
     local_reflector: reasonerLabel,

@@ -42,6 +42,7 @@ const continuityEmail = readFileSync(new URL('../app/api/cron/cos-learning-conti
 const miningCron = readFileSync(new URL('../app/api/cron/cos-mining/route.ts', import.meta.url), 'utf8')
 const foundationalLearningPage = readFileSync(new URL('../app/dashboard/cos-learning/page.tsx', import.meta.url), 'utf8')
 const cognitiveOrchestrator = readFileSync(new URL('../lib/ai/cos/cognitiveLearningOrchestrator.ts', import.meta.url), 'utf8')
+const cognitiveActiveLearning = readFileSync(new URL('../lib/ai/cos/cognitiveActiveLearning.ts', import.meta.url), 'utf8')
 
 test('owner-directed material is admitted when it is substantive and provenance requirements are present', () => {
   const result = assessDirectedStudy(input, gates)
@@ -107,13 +108,12 @@ test('owner UI reports route, retention, and honest application status after fee
 
 test('directed-study store hands admitted software lessons to the governed cognitive lifecycle', () => {
   const store = readFileSync(new URL('../lib/ai/cos/directedStudyStore.ts', import.meta.url), 'utf8')
-  const activeLearning = readFileSync(new URL('../lib/ai/cos/cognitiveActiveLearning.ts', import.meta.url), 'utf8')
   assert.match(store, /queueProceduralApplication/)
   assert.match(store, /cos_teacher_lessons/)
   assert.match(store, /queued_for_candidate_extraction_practice_and_independent_evaluation/)
   assert.match(store, /authorityGranted: false/)
-  assert.match(activeLearning, /specialistFamily: lesson\.metadata\.specialistFamily/)
-  assert.match(activeLearning, /applicationLifecycle: 'candidate_created_awaiting_evidence'/)
+  assert.match(cognitiveActiveLearning, /specialistFamily: lesson\.metadata\.specialistFamily/)
+  assert.match(cognitiveActiveLearning, /applicationLifecycle: 'candidate_created_awaiting_evidence'/)
 })
 
 test('daily learning backfills pre-loop software lessons idempotently into the governed queue', () => {
@@ -128,23 +128,33 @@ test('daily learning backfills pre-loop software lessons idempotently into the g
 })
 
 test('fresh owner-directed software lessons receive a bounded evaluation lane without promotion shortcuts', () => {
-  const activeLearning = readFileSync(new URL('../lib/ai/cos/cognitiveActiveLearning.ts', import.meta.url), 'utf8')
-  assert.match(activeLearning, /lane\?: 'general' \| 'owner_directed_software'/)
-  assert.match(activeLearning, /\.eq\('status', 'captured'\)/)
-  assert.match(activeLearning, /\.contains\('metadata', \{ origin: 'owner_directed_study', specialistFamily: 'software' \}\)/)
-  assert.match(activeLearning, /excludeLessonIds\?: number\[\]/)
-  assert.match(activeLearning, /lessonQuery = lessonQuery\.neq\('id', lessonId\)/)
+  assert.match(cognitiveActiveLearning, /lane\?: 'general' \| 'owner_directed_software'/)
+  assert.match(cognitiveActiveLearning, /\.eq\('status', 'captured'\)/)
+  assert.match(cognitiveActiveLearning, /\.contains\('metadata', \{ origin: 'owner_directed_study', specialistFamily: 'software' \}\)/)
+  assert.match(cognitiveActiveLearning, /excludeLessonIds\?: number\[\]/)
+  assert.match(cognitiveActiveLearning, /lessonQuery = lessonQuery\.neq\('id', lessonId\)/)
   assert.match(cognitiveOrchestrator, /for \(let i = 0; i < lessonLimit; i \+= 1\)/)
   assert.match(cognitiveOrchestrator, /lane: 'owner_directed_software'/)
   assert.match(cognitiveOrchestrator, /evaluationLane: 'owner_directed_software'/)
   assert.doesNotMatch(cognitiveOrchestrator, /status:\s*'(?:validated|learned|mastered)'/)
 })
 
-test('directed software lane excludes durable already-linked lessons so daily backfill cannot pin one source forever', () => {
+test('candidate provenance retains every teacher lesson that deduplicates into the same skill key', () => {
+  assert.match(cognitiveActiveLearning, /function linkedTeacherLessonIds/)
+  assert.match(cognitiveActiveLearning, /teacher_lesson_ids: teacherLessonIds/)
+  assert.match(cognitiveActiveLearning, /existingProvenance\.teacher_lesson_id/)
+  assert.match(cognitiveActiveLearning, /existingProvenance\.teacher_lesson_ids/)
+  assert.match(cognitiveActiveLearning, /\.contains\('provenance', \{ teacher_lesson_ids: \[lessonId\] \}\)/)
+  assert.match(cognitiveActiveLearning, /\.in\('id', lessonIds\)/)
+})
+
+test('directed software lane excludes the full durable one-to-many lesson linkage across backfill cycles', () => {
   assert.match(cognitiveOrchestrator, /loadLinkedDirectedSoftwareLessonIds/)
+  assert.match(cognitiveOrchestrator, /linkedLessonIdsFromProvenance/)
+  assert.match(cognitiveOrchestrator, /record\.teacher_lesson_id/)
+  assert.match(cognitiveOrchestrator, /record\.teacher_lesson_ids/)
   assert.match(cognitiveOrchestrator, /from\('cos_cognitive_skills'\)/)
   assert.match(cognitiveOrchestrator, /\.contains\('metadata', \{ origin: 'owner_directed_study', specialistFamily: 'software' \}\)/)
-  assert.match(cognitiveOrchestrator, /provenance\?\.teacher_lesson_id/)
   assert.match(cognitiveOrchestrator, /excludeLessonIds: \[\.\.\.new Set\(\[\.\.\.processedLessonIds, \.\.\.linkedLessonIds\]\)\]/)
 })
 

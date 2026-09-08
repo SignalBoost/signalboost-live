@@ -50,6 +50,17 @@ test('continuous learner keeps failed-exam remediation ahead of generic priority
   assert.doesNotMatch(runtime, /markCosUniversityStudyPlansAttempted/)
 })
 
+test('daily mining learning may advance only exact University gaps that were actually accepted', () => {
+  const route = file('app/api/cron/cos-mining/route.ts')
+  assert.match(route, /recordAcceptedCosUniversityStudyAttempts/)
+  assert.match(route, /knowledgeGapIdForSignal/)
+  assert.match(route, /acceptedGapIds/)
+  assert.match(route, /String\(signal\.taskId \|\| ''\)\.endsWith\(plan\.planKey\)/)
+  assert.match(route, /filter\(gapId => accepted\.has\(gapId\)\)/)
+  assert.match(route, /universityStudyPlansAttempted = \(await recordAcceptedCosUniversityStudyAttempts\(proofs, new Date\(\)\)\)\.length/)
+  assert.doesNotMatch(route, /markCosUniversityStudyPlansAttempted/)
+})
+
 test('continuous learner records structured database errors instead of object stringification', () => {
   const runtime = file('lib/ai/cos/cosUniversityContinuousLearning.ts')
   assert.match(runtime, /function describeError\(error: unknown\): string/)

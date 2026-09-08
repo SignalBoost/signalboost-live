@@ -4,6 +4,7 @@ const AGENT_ID = 'cos'
 const ORIGIN = 'cos_university_deliberate_practice'
 const LOWER_PRIORITY_DEFERRAL_MS = 14 * 60_000
 const MAX_QUEUE_ROWS = 1000
+const UPDATE_BATCH_SIZE = 50
 
 type StudyPlanRow = {
   id: string
@@ -42,6 +43,15 @@ function hasAutomaticDeliberatePractice(methods: unknown): boolean {
 
 function currentPracticeRound(plan: Pick<StudyPlanRow, 'attempt_count'>): number {
   return Math.max(1, Math.floor(Number(plan.attempt_count || 1)))
+}
+
+function batches<T>(values: readonly T[], size = UPDATE_BATCH_SIZE): T[][] {
+  const boundedSize = Math.max(1, Math.floor(size))
+  const result: T[][] = []
+  for (let index = 0; index < values.length; index += boundedSize) {
+    result.push(values.slice(index, index + boundedSize))
+  }
+  return result
 }
 
 export function classifyCosUniversityQueuedPractice(args: {
@@ -109,6 +119,43 @@ async function loadReferencedPlans(planIds: string[]): Promise<Map<string, Study
   return new Map(((result.data || []) as StudyPlanRow[]).map(plan => [plan.id, plan] as const))
 }
 
+async function discardObsoletePractice(ids: string[], nowIso: string): Promise<number> {
+  if (!ids.length) return 0
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  let updated = 0
+  for (const batch of batches(ids)) {
+    const result = await db.from('cos_active_practice_queue').update({
+      status: 'discarded',
+      started_at: null,
+      completed_at: nowIso,
+      last_error: 'university_practice_superseded_by_current_study_round',
+      updated_at: nowIso,
+    }).in('id', batch).eq('status', 'queued').select('id')
+    if (result.error) throw result.error
+    updated += result.data?.length || 0
+  }
+  return updated
+}
+
+async function deferLowerPriorityPractice(ids: string[], now: Date, nowIso: string): Promise<number> {
+  if (!ids.length) return 0
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const nextAttemptAt = new Date(now.getTime() + LOWER_PRIORITY_DEFERRAL_MS).toISOString()
+  let updated = 0
+  for (const batch of batches(ids)) {
+    const result = await db.from('cos_active_practice_queue').update({
+      next_attempt_at: nextAttemptAt,
+      last_error: 'university_practice_deferred_for_higher_academic_priority',
+      updated_at: nowIso,
+    }).in('id', batch).eq('status', 'queued').select('id')
+    if (result.error) throw result.error
+    updated += result.data?.length || 0
+  }
+  return updated
+}
+
 export async function disciplineCosUniversityPracticeQueue(options: {
   now?: Date
   maxActivePlans?: number
@@ -140,32 +187,9 @@ export async function disciplineCosUniversityPracticeQueue(options: {
     else if (disposition === 'defer_lower_priority') lowerPriorityIds.push(row.id)
   }
 
-  const db = cosServiceDb()
-  if (!db) throw new Error('service_database_unavailable')
   const nowIso = now.toISOString()
-  let obsoleteDiscarded = 0
-  if (obsoleteIds.length) {
-    const result = await db.from('cos_active_practice_queue').update({
-      status: 'discarded',
-      started_at: null,
-      completed_at: nowIso,
-      last_error: 'university_practice_superseded_by_current_study_round',
-      updated_at: nowIso,
-    }).in('id', obsoleteIds).eq('status', 'queued').select('id')
-    if (result.error) throw result.error
-    obsoleteDiscarded = result.data?.length || 0
-  }
-
-  let lowerPriorityDeferred = 0
-  if (lowerPriorityIds.length) {
-    const result = await db.from('cos_active_practice_queue').update({
-      next_attempt_at: new Date(now.getTime() + LOWER_PRIORITY_DEFERRAL_MS).toISOString(),
-      last_error: 'university_practice_deferred_for_higher_academic_priority',
-      updated_at: nowIso,
-    }).in('id', lowerPriorityIds).eq('status', 'queued').select('id')
-    if (result.error) throw result.error
-    lowerPriorityDeferred = result.data?.length || 0
-  }
+  const obsoleteDiscarded = await discardObsoletePractice(obsoleteIds, nowIso)
+  const lowerPriorityDeferred = await deferLowerPriorityPractice(lowerPriorityIds, now, nowIso)
 
   return {
     selectedPlanIds,

@@ -136,9 +136,16 @@ test('fresh owner-directed software lessons receive a bounded evaluation lane wi
   assert.match(activeLearning, /lessonQuery = lessonQuery\.neq\('id', lessonId\)/)
   assert.match(cognitiveOrchestrator, /for \(let i = 0; i < lessonLimit; i \+= 1\)/)
   assert.match(cognitiveOrchestrator, /lane: 'owner_directed_software'/)
-  assert.match(cognitiveOrchestrator, /excludeLessonIds: \[\.\.\.processedLessonIds\]/)
   assert.match(cognitiveOrchestrator, /evaluationLane: 'owner_directed_software'/)
   assert.doesNotMatch(cognitiveOrchestrator, /status:\s*'(?:validated|learned|mastered)'/)
+})
+
+test('directed software lane excludes durable already-linked lessons so daily backfill cannot pin one source forever', () => {
+  assert.match(cognitiveOrchestrator, /loadLinkedDirectedSoftwareLessonIds/)
+  assert.match(cognitiveOrchestrator, /from\('cos_cognitive_skills'\)/)
+  assert.match(cognitiveOrchestrator, /\.contains\('metadata', \{ origin: 'owner_directed_study', specialistFamily: 'software' \}\)/)
+  assert.match(cognitiveOrchestrator, /provenance\?\.teacher_lesson_id/)
+  assert.match(cognitiveOrchestrator, /excludeLessonIds: \[\.\.\.new Set\(\[\.\.\.processedLessonIds, \.\.\.linkedLessonIds\]\)\]/)
 })
 
 test('foundational learning displays live software application progress', () => {

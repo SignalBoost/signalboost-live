@@ -114,6 +114,7 @@ const tests = [
   'tests/cosFeedbackReasoningGeneralization.node.test.ts',
   'tests/cosCognitiveAutonomousCertification.node.test.ts',
   'tests/cosUniversity.node.test.ts',
+  'tests/cosUniversityContinuousLearning.node.test.ts',
   'tests/cosCognitiveSkillRetrievalEfficiency.node.test.ts',
   'tests/cognitiveReasoningImperativeTriggers.node.test.ts',
   'tests/releaseSignalSeverity.node.test.ts',

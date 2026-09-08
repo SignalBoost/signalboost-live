@@ -1,4 +1,4 @@
-import type { ContinuousLearningSourceKind, KnowledgeGap } from './index'
+import type { ContinuousLearningSourceKind, KnowledgeGap } from './index.ts'
 
 export type KnowledgeGapSignal = {
   taskId: string

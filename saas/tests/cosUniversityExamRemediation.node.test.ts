@@ -45,7 +45,9 @@ test('continuous learner keeps failed-exam remediation ahead of generic priority
   assert.match(runtime, /Number\(remediationPlanIds\.has\(b\.id\)\) - Number\(remediationPlanIds\.has\(a\.id\)\)/)
   assert.match(runtime, /b\.priority - a\.priority/)
   assert.match(runtime, /\[\.\.\.remediation\.gapSignals, \.\.\.planning\.gapSignals\]/)
-  assert.match(runtime, /markCosUniversityStudyPlansAttempted/)
+  assert.match(runtime, /recordAcceptedCosUniversityStudyAttempts/)
+  assert.match(runtime, /universityStudyProofsFromAcceptedLearning/)
+  assert.doesNotMatch(runtime, /markCosUniversityStudyPlansAttempted/)
 })
 
 test('continuous learner records structured database errors instead of object stringification', () => {

@@ -14,6 +14,8 @@ test('Master’s evidence ledger is service-only immutable academic evidence wit
   assert.match(schema, /grant select, insert on table public\.cos_university_masters_evidence to service_role/i)
   assert.match(schema, /before update or delete on public\.cos_university_masters_evidence/i)
   assert.match(schema, /authority_stage/i)
+  assert.match(schema, /program_key = 'masters:' \|\| program_id \|\| ':v1'/i)
+  assert.match(schema, /length\(btrim\(variant_hash\)\) > 0/i)
   assert.match(schema, /verified_practical = true/i)
   assert.match(schema, /stage = 'graduate_coursework' or independent = true/i)
   assert.doesNotMatch(schema, /\bprompt\s+text\b/i)
@@ -35,6 +37,14 @@ test('Master’s runtime reuses the University program and credential ledgers ra
   assert.match(runtime, /academicStateFromRows/)
   assert.match(runtime, /evaluateCosUniversityMastersAdmission/)
   assert.match(runtime, /evaluateCosUniversityMastersGraduation/)
+})
+
+test('Master’s evidence preserves program identity from storage through graduation evaluation', () => {
+  const runtime = file('lib/ai/cos/cosUniversityMastersRuntime.ts')
+  assert.match(runtime, /EVIDENCE_SELECT = 'evidence_key,program_id,/)
+  assert.match(runtime, /program_id: CosUniversityMastersProgramId/)
+  assert.match(runtime, /programId: row\.program_id/)
+  assert.match(runtime, /program_id: input\.programId/)
 })
 
 test('Master’s enrollment is host-computed from current undergraduate and subject prerequisites', () => {

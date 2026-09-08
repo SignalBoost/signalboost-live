@@ -19,6 +19,8 @@ export type CosUniversityUndergraduateAcademicLaneGate = {
     | 'undergraduate_program_deadline_expired'
     | 'undergraduate_program_graduated'
     | 'service_database_unavailable'
+    | 'active_academic_program'
+    | 'no_active_academic_program'
 }
 
 /**
@@ -118,4 +120,37 @@ export function applyCosUniversityUndergraduateCalendar(args: {
       deadlineExpired: credential ? false : deadlineExpired,
     },
   }
+}
+
+/**
+ * Multi-level lane gate. Academic worker lanes belong to the University, not to one cohort: they
+ * must keep running while ANY program enrollment is live, and stop only when the agent holds no
+ * live program at all.
+ *
+ * This is deliberately NOT a relaxation of the undergraduate rule. A finished or expired cohort
+ * still stops its own lanes; what changes is that a NEW program — opened by the admission
+ * authority under a new immutable program key — re-opens them. Without this, issuing the
+ * undergraduate credential permanently silences every University worker.
+ */
+export function evaluateCosUniversityActiveAcademicLane(args: {
+  enrollments: readonly CosUniversityProgramEnrollment[]
+  completedProgramKeys?: readonly string[]
+  now?: Date
+}): CosUniversityUndergraduateAcademicLaneGate {
+  const now = args.now instanceof Date ? args.now : new Date()
+  const completed = new Set(args.completedProgramKeys ?? [])
+
+  for (const enrollment of args.enrollments) {
+    if (completed.has(enrollment.programKey)) continue
+    const timingStatus = cosUniversityProgramTimingStatus(enrollment, now)
+    if (timingStatus === 'not_enrolled' || timingStatus === 'deadline_expired') continue
+    return {
+      allowed: true,
+      programKey: enrollment.programKey,
+      timingStatus,
+      reason: enrollment.programLevel === 'undergraduate' ? 'active_undergraduate_program' : 'active_academic_program',
+    }
+  }
+
+  return { allowed: false, programKey: null, timingStatus: 'not_enrolled', reason: 'no_active_academic_program' }
 }

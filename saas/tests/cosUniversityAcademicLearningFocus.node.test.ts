@@ -47,7 +47,8 @@ test('bounded scholarly discovery receives canonical curriculum content before g
   const connectors = file('lib/cos-core/layers/learning/connectors.ts')
   const publicClients = file('lib/cos-core/layers/learning/publicClients.ts')
   assert.match(connectors, /\[gap\.subject,gap\.question\]\.filter\(Boolean\)\.join\(' '\)\.trim\(\)/)
-  assert.match(publicClients, /compactQuery\(query,maxTerms=10\)/)
+  assert.match(publicClients, /function compactQuery\(query:string,maxTerms=10\)/)
+  assert.match(publicClients, /crossrefScientificSearch:[^\n]+compactQuery\(query\)/)
   assert.match(publicClients, /compactQuery\(query,8\)/)
 })
 

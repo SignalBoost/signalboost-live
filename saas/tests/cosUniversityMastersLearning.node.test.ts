@@ -29,14 +29,18 @@ test('Master’s study plans are module-specific preparation, never academic cre
   assert.match(runner, /cosUniversityMastersCourseworkModulePasses/)
 })
 
-test('coursework study is recorded only when that exact module retained accepted durable evidence', () => {
+test('coursework unlocks only the exact module whose gap retained accepted durable evidence', () => {
   const runner = file('lib/ai/cos/cosUniversityMastersLearningRunner.ts')
-  assert.match(runner, /for \(const plan of selected\)/)
+  const cycle = file('lib/cos-core/layers/learning/cycle.ts')
+  assert.match(runner, /knowledgeGapIdForSignal/)
+  assert.match(runner, /planIdByGapId/)
   assert.match(runner, /new ContinuousLearningCycle\(director, adapters\)\.run\(gaps, 0\)/)
-  assert.match(runner, /if \(result\.accepted > 0\) successfulPlanIds\.push\(plan\.id\)/)
-  assert.doesNotMatch(runner, /result\.accepted > 0 \|\| result\.probationary > 0/)
+  assert.match(runner, /result\.acceptedGapIds\.map/)
   assert.match(runner, /markCosUniversityStudyPlansAttempted\(successfulPlanIds/)
-  assert.doesNotMatch(runner, /markCosUniversityStudyPlansAttempted\(selected\.map/)
+  assert.doesNotMatch(runner, /result\.accepted > 0 \|\| result\.probationary > 0/)
+  assert.doesNotMatch(runner, /for \(const plan of selected\)/)
+  assert.match(cycle, /acceptedGapIds\.add\(gap\.id\)/)
+  assert.match(cycle, /result\.acceptedGapIds=\[\.\.\.acceptedGapIds\]/)
 })
 
 test('Master’s learning sweeps have their own durable idempotency ledger but not a second corpus', () => {

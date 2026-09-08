@@ -39,21 +39,27 @@ function coursework(): CosUniversityMastersEvidence[] {
   )
 }
 
-test('Master’s exam stage selector enforces coursework → depth → transfer → Production → capstone', () => {
+test('Master’s exam stage selector keeps generating host exams toward A+ rather than stopping at A minima', () => {
   const first = selectNextCosUniversityMastersExamTarget('applied_ai_systems', [], NOW)
   assert.equal(first?.stage, 'graduate_coursework')
   assert.equal(first?.moduleKey, COS_UNIVERSITY_MASTERS_PROGRAMS.applied_ai_systems.courseworkModuleKeys[0])
 
-  const afterCoursework = coursework()
-  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', afterCoursework, NOW)?.stage, 'independent_specialist_exam')
-  afterCoursework.push(pass('independent_specialist_exam', 'd1'), pass('independent_specialist_exam', 'd2'), pass('independent_specialist_exam', 'd3'))
-  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', afterCoursework, NOW)?.stage, 'cross_domain_transfer')
-  afterCoursework.push(pass('cross_domain_transfer', 't1'), pass('cross_domain_transfer', 't2'))
-  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', afterCoursework, NOW), null)
-  afterCoursework.push(pass('verified_practical_work', 'prod1'))
-  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', afterCoursework, NOW)?.stage, 'masters_capstone')
-  afterCoursework.push(pass('masters_capstone', 'c1'), pass('masters_capstone', 'c2'))
-  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', afterCoursework, NOW), null)
+  const evidence = coursework()
+  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', evidence, NOW)?.stage, 'independent_specialist_exam')
+  evidence.push(pass('independent_specialist_exam', 'd1'), pass('independent_specialist_exam', 'd2'), pass('independent_specialist_exam', 'd3'))
+  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', evidence, NOW)?.stage, 'independent_specialist_exam')
+  evidence.push(pass('independent_specialist_exam', 'd4'))
+  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', evidence, NOW)?.stage, 'cross_domain_transfer')
+  evidence.push(pass('cross_domain_transfer', 't1'), pass('cross_domain_transfer', 't2'))
+  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', evidence, NOW)?.stage, 'cross_domain_transfer')
+  evidence.push(pass('cross_domain_transfer', 't3'))
+  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', evidence, NOW), null)
+  evidence.push(pass('verified_practical_work', 'prod1'))
+  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', evidence, NOW)?.stage, 'masters_capstone')
+  evidence.push(pass('masters_capstone', 'c1'), pass('masters_capstone', 'c2'))
+  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', evidence, NOW)?.stage, 'masters_capstone')
+  evidence.push(pass('masters_capstone', 'c3'))
+  assert.equal(selectNextCosUniversityMastersExamTarget('applied_ai_systems', evidence, NOW), null)
 })
 
 test('hidden Master’s exam manifests are deterministic per seed and vary with a fresh seed', () => {
@@ -120,6 +126,16 @@ test('Master’s practical evidence accepts only explicit verified Production ou
   assert.match(sync, /core\.has\(subjectId\)/)
   assert.match(sync, /stage: 'verified_practical_work'/)
   assert.match(sync, /authority: 'verified_production'/)
+})
+
+test('Master’s credential surfaces defer an A award while A+ pursuit is active before target date', () => {
+  const progress = file('app/api/cron/cos-university-masters-progress/route.ts')
+  const owner = file('app/api/admin/cos-university-masters/route.ts')
+  assert.match(progress, /current\.graduation\.standing === 'A\+'/)
+  assert.match(progress, /current\.timingStatus === 'target_date_passed'/)
+  assert.match(progress, /deferredForAPlus/)
+  assert.match(owner, /masters_A_plus_pursuit_active_until_target_date/)
+  assert.match(owner, /current\.timingStatus !== 'target_date_passed'/)
 })
 
 test('Master’s admission learning exam and progress crons are secret-gated and ordered', () => {

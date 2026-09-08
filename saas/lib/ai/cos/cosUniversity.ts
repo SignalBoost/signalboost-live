@@ -116,19 +116,19 @@ export function cosUniversitySubjectById(id: CosUniversitySubjectId): CosUnivers
 }
 
 const SUBJECT_RULES: ReadonlyArray<{ id: CosUniversitySubjectId; match: RegExp }> = [
-  { id: 'computer_science', match: /\b(code|coding|software|program(?:ming)?|algorithm|data structure|database|distributed system|operating system|api|devops|debug|typescript|javascript|python|next\.?js|architecture|latenc|observability|computer science)\b/i },
-  { id: 'mathematics', match: /\b(algebra|calculus|linear algebra|discrete math|optimization|numerical|equation|geometry|matrix|vector|mathematics?)\b/i },
-  { id: 'statistics_data_science', match: /\b(statistic|statistics|probability|inference|experiment(?:al)?|forecast|causal|data science|regression|distribution|percentile|p50|p90|p95|p99|measurement)\b/i },
-  { id: 'physics_natural_sciences', match: /\b(physics|chemistry|biology|scientific method|mechanics?|gravity|optics?|semiconductor|quantum|energy|astronomy|astrophysics|space science|materials?|photonics?|natural science)\b/i },
-  { id: 'cybersecurity', match: /\b(cyber|cybersecurity|security|vulnerab|threat|incident response|cryptograph|authentication|authorization|secure coding|network security|identity security)\b/i },
-  { id: 'politics_government_international_relations', match: /\b(politic|government|geopolit|diplom|international relation|public policy|state behavior|election|foreign policy|international organization)\b/i },
-  { id: 'social_behavioral_sciences', match: /\b(psycholog|sociolog|anthropolog|behavioral|organisational behavior|organizational behavior|social system|group behavior|human factors|cognitive science)\b/i },
-  { id: 'economics_finance', match: /\b(economic|economics|finance|financial|accounting|investment|market|macroeconomic|microeconomic|portfolio|capital|fiscal|monetary)\b/i },
+  { id: 'computer_science', match: /\b(code|coding|software|program(?:ming)?|algorithms?|data structures?|databases?|distributed systems?|operating systems?|apis?|devops|debug(?:ging)?|typescript|javascript|python|next\.?js|architecture|latenc(?:y|ies)|observability|computer science)\b/i },
+  { id: 'mathematics', match: /\b(algebra|calculus|linear algebra|discrete math(?:ematics)?|optimization|numerical|equations?|geometry|matri(?:x|ces)|vectors?|mathematics?)\b/i },
+  { id: 'statistics_data_science', match: /\b(statistic(?:s|al)?|probability|inference|experiment(?:al|ation)?|forecast(?:ing)?|causal|data science|regression|distributions?|percentiles?|p50|p90|p95|p99|measurement)\b/i },
+  { id: 'physics_natural_sciences', match: /\b(physics|chemistry|biology|scientific method|mechanics?|gravity|optics?|semiconductors?|quantum|energy|astronomy|astrophysics|space science|materials?|photonics?|natural sciences?)\b/i },
+  { id: 'cybersecurity', match: /\b(cyber|cybersecurity|security|vulnerab(?:ility|ilities|le)|threats?|incident response|cryptograph(?:y|ic)|authentication|authorization|secure coding|network security|identity security)\b/i },
+  { id: 'politics_government_international_relations', match: /\b(politic(?:s|al)?|governments?|geopolit(?:ics|ical|ically)|diplom(?:acy|atic|atically)|international relations?|public policy|state behavior|elections?|foreign policy|international organizations?)\b/i },
+  { id: 'social_behavioral_sciences', match: /\b(psycholog(?:y|ical)|sociolog(?:y|ical)|anthropolog(?:y|ical)|behavioral|organisational behavior|organizational behavior|social systems?|group behavior|human factors|cognitive science)\b/i },
+  { id: 'economics_finance', match: /\b(economic(?:s|al|ally)?|finance|financial|accounting|investment|markets?|macroeconomic(?:s)?|microeconomic(?:s)?|portfolio|capital|fiscal|monetary)\b/i },
   { id: 'business_operations', match: /\b(business|strategy|management|sales|marketing|customer service|procurement|project management|program management|operations|process design|crm|revenue|pricing|pipeline|renewal|commercial)\b/i },
-  { id: 'law_regulation_governance', match: /\b(law|legal|regulat|contract|privacy|compliance|jurisdiction|governance|gdpr|dpa|soc ?2|iso ?27|audit|standard|subprocessor|export control)\b/i },
-  { id: 'language_communication', match: /\b(writing|editing|language|communication|rhetoric|negotiat|persuasion|multilingual|cross-cultural|executive communication|customer communication|translation)\b/i },
-  { id: 'history_culture_philosophy_religion', match: /\b(history|historical|culture|cultural|philosoph|religion|religious|intellectual history|ethics)\b/i },
-  { id: 'reasoning_decision_science', match: /\b(reasoning|logic|evidence|uncertainty|planning|heuristic|decision|counterfactual|priorit|synthesis|ambiguity|context resolution|truthful reporting|follow-through|root cause|falsif|judgment)\b/i },
+  { id: 'law_regulation_governance', match: /\b(law|legal|regulat(?:ion|ory|ed|ing)|contracts?|privacy|compliance|jurisdiction|governance|gdpr|dpa|soc ?2|iso ?27|audit|standards?|subprocessor|export control)\b/i },
+  { id: 'language_communication', match: /\b(writing|editing|languages?|communication|rhetoric|negotiat(?:e|ion|ing)|persuasion|multilingual|cross-cultural|executive communication|customer communication|translation|localization)\b/i },
+  { id: 'history_culture_philosophy_religion', match: /\b(history|historical|culture|cultural|philosoph(?:y|ical)|religion|religious|intellectual history|ethics)\b/i },
+  { id: 'reasoning_decision_science', match: /\b(reasoning|logic|evidence|uncertainty|planning|heuristics?|decision|counterfactual|priorit(?:y|ize|ization|ise|isation)|synthesis|ambiguity|context resolution|truthful reporting|follow-through|root cause|falsif(?:y|ier|iable|ication)|judgment)\b/i },
 ]
 
 /**
@@ -178,6 +178,7 @@ function validAssessment(row: CosUniversityAssessmentEvidence): boolean {
   return Boolean(
     String(row.assessmentId || '').trim()
     && String(row.scorerVersion || '').trim()
+    && Number.isFinite(Date.parse(String(row.observedAt || '')))
     && row.independentScorer === true
     && row.fresh === true,
   )
@@ -314,13 +315,16 @@ function count(value: unknown): number {
  * only then do academic grade gap and observed work volume break ties. This avoids an opaque score
  * that COS could learn to game. If no operational weakness exists, the first not-yet-target-grade
  * subject in the canonical curriculum becomes the continuing-education target.
+ *
+ * Continuous machine learning aims at A+ by default. A caller may explicitly request A when it is
+ * evaluating the minimum graduation threshold rather than the ongoing improvement destination.
  */
 export function selectNextCosUniversityStudyTarget(args: {
   transcript: CosUniversityTranscriptEntry[]
   signals?: CosUniversityStudySignal[]
   targetGrade?: 'A' | 'A+'
 }): CosUniversityStudyTarget | null {
-  const targetGrade = args.targetGrade ?? 'A'
+  const targetGrade = args.targetGrade ?? 'A+'
   const bySubject = new Map<CosUniversitySubjectId, CosUniversityStudyTarget['operational']>()
   for (const subject of COS_UNIVERSITY_SUBJECTS) {
     bySubject.set(subject.id, { productionFailures: 0, userCorrections: 0, negativeFeedback: 0, externalDependencies: 0, attempts: 0 })

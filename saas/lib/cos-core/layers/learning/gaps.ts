@@ -17,6 +17,10 @@ export type KnowledgeGapSignal = {
   portableIds?: string[]
 }
 
+export function knowledgeGapIdForSignal(signal: Pick<KnowledgeGapSignal, 'taskId' | 'capability'>): string {
+  return `auto-gap:${signal.taskId}:${signal.capability}`
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
@@ -61,7 +65,7 @@ export function generateKnowledgeGaps(signals: KnowledgeGapSignal[]): KnowledgeG
       : `What verified knowledge would let COS handle ${objective} locally with higher confidence?`
 
     const gap: KnowledgeGap = {
-      id: `auto-gap:${signal.taskId}:${signal.capability}`,
+      id: knowledgeGapIdForSignal(signal),
       subject,
       question,
       portableIds: [...new Set(signal.portableIds ?? [])],

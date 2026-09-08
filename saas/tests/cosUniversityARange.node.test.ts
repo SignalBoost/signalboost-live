@@ -11,6 +11,15 @@ import {
   scoreCosUniversityARangeExam,
   type CosUniversityARangeRunEvidence,
 } from '../lib/ai/cos/cosUniversityARange.ts'
+import {
+  COS_UNIVERSITY_LANGUAGE_A_RANGE_MINIMUM_DISTINCT_PASSES,
+  buildCosUniversityLanguageARangeExam,
+  languageARangeStagePassesSinceLatestFailure,
+  languageARangeStageThresholdMet,
+  parseCosUniversityVerifiedLanguageProductionSource,
+  scoreCosUniversityLanguageARangeExam,
+  type CosUniversityLanguageARangeRunEvidence,
+} from '../lib/ai/cos/cosUniversityLanguageARange.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
@@ -99,4 +108,95 @@ test('A-range cron is feature-gated and runs after the unseen examiner', () => {
   const route = file('app/api/cron/cos-university-a-range/route.ts')
   assert.match(route, /auth !== `Bearer \$\{secret\}`/)
   assert.match(route, /runCosUniversityARangeBatch/)
+})
+
+test('five-language A-range requires two distinct passes per target and resets on later failure', () => {
+  const rows: CosUniversityLanguageARangeRunEvidence[] = [
+    { stage: 'cross_domain_transfer', language: 'pl', dimension: 'writing', passed: true, variantHash: 'pl-a', observedAt: '2026-09-01T00:00:00Z' },
+    { stage: 'cross_domain_transfer', language: 'pl', dimension: 'writing', passed: true, variantHash: 'pl-a', observedAt: '2026-09-02T00:00:00Z' },
+  ]
+  assert.equal(COS_UNIVERSITY_LANGUAGE_A_RANGE_MINIMUM_DISTINCT_PASSES, 2)
+  assert.equal(languageARangeStagePassesSinceLatestFailure(rows, 'cross_domain_transfer', 'pl', 'writing'), 1)
+  rows.push({ stage: 'cross_domain_transfer', language: 'pl', dimension: 'writing', passed: true, variantHash: 'pl-b', observedAt: '2026-09-03T00:00:00Z' })
+  assert.equal(languageARangeStageThresholdMet(rows, 'cross_domain_transfer', 'pl', 'writing'), true)
+  rows.push({ stage: 'cross_domain_transfer', language: 'pl', dimension: 'writing', passed: false, variantHash: 'pl-c', observedAt: '2026-09-04T00:00:00Z' })
+  assert.equal(languageARangeStageThresholdMet(rows, 'cross_domain_transfer', 'pl', 'writing'), false)
+})
+
+test('language transfer is host-seeded, target-language scored, and integrated capstone is not a single dimension', () => {
+  const transfer = buildCosUniversityLanguageARangeExam({
+    seed: '55555555-5555-4555-8555-555555555555',
+    target: { stage: 'cross_domain_transfer', language: 'pl', dimension: 'writing' },
+  })
+  const same = buildCosUniversityLanguageARangeExam({
+    seed: '55555555-5555-4555-8555-555555555555',
+    target: { stage: 'cross_domain_transfer', language: 'pl', dimension: 'writing' },
+  })
+  const capstone = buildCosUniversityLanguageARangeExam({
+    seed: '66666666-6666-4666-8666-666666666666',
+    target: { stage: 'capstone', language: 'ru', dimension: null },
+  })
+  assert.equal(transfer.manifestHash, same.manifestHash)
+  assert.equal(transfer.rubric.targetLanguage, 'pl')
+  assert.equal(capstone.dimension, null)
+  assert.deepEqual(capstone.rubric.requiredSections, ['[COMPREHENSION]', '[WRITING]', '[ACTIONS]', '[LOCALIZATION]', '[PRAGMATICS]'])
+
+  const body = [
+    ...transfer.rubric.requiredGroups.map(group => group[0]),
+    'Projekt pozostaje nieznany tam, gdzie brak weryfikacji. Wdrożenie produkcyjne wymaga dowodów.',
+  ].join(' ')
+  const score = scoreCosUniversityLanguageARangeExam(transfer, body, {
+    handled: true, localReasoning: true, externalAi: false, semanticCache: false,
+    turnId: '55555555-5555-4555-8555-555555555555',
+  })
+  assert.equal(score.passed, true, score.reasons.join(','))
+})
+
+test('language Production credit requires an explicit verified language and dimension namespace', () => {
+  assert.deepEqual(parseCosUniversityVerifiedLanguageProductionSource('production_verified:language:pl:writing:customer-message-42'), {
+    language: 'pl', dimension: 'writing', reference: 'customer-message-42',
+  })
+  assert.deepEqual(parseCosUniversityVerifiedLanguageProductionSource('production_verified:language:es:cultural_pragmatics:customer-reply-7'), {
+    language: 'es', dimension: 'cultural_pragmatics', reference: 'customer-reply-7',
+  })
+  assert.equal(parseCosUniversityVerifiedLanguageProductionSource('production_verified:language:xx:writing:customer-message-42'), null)
+  assert.equal(parseCosUniversityVerifiedLanguageProductionSource('production_verified:language:pl:writing:synthetic_test-42'), null)
+  assert.equal(parseCosUniversityVerifiedLanguageProductionSource('production_verified:customer_outcome:release-42'), null)
+})
+
+test('language A-range runtime is exact-turn, local-only, bounded, and capstone writes every language dimension', () => {
+  const runner = file('lib/ai/cos/cosUniversityLanguageARangeRunner.ts')
+  assert.match(runner, /\.like\('outcome_source', 'production_verified:language:%'\)/)
+  assert.match(runner, /\.eq\('turn_id', outcome\.turn_id\)/)
+  assert.match(runner, /target_kind: 'language'/)
+  assert.match(runner, /disableCache: true/)
+  assert.match(runner, /language: row\.language_code/)
+  assert.match(runner, /for \(const dimension of dimensions\)/)
+  assert.match(runner, /allProductionDimensionsPassed/)
+  assert.doesNotMatch(runner, /capability_benchmark:/)
+  assert.doesNotMatch(runner, /synthetic_test:/)
+})
+
+test('language A-range migration extends the same service-only ledger without creating a second grade store', () => {
+  const schema = file('supabase/migrations/20260908023500_cos_university_language_a_range.sql')
+  assert.match(schema, /add column if not exists target_kind text not null default 'subject'/i)
+  assert.match(schema, /add column if not exists language_code text/i)
+  assert.match(schema, /add column if not exists language_dimension text/i)
+  assert.match(schema, /target_kind = 'language'/i)
+  assert.match(schema, /stage = 'capstone' and language_dimension is null/i)
+  assert.match(schema, /revoke all on table public\.cos_university_a_range_runs from anon, authenticated/i)
+  assert.match(schema, /grant select, insert, update, delete on table public\.cos_university_a_range_runs to service_role/i)
+  assert.doesNotMatch(schema, /create table/i)
+  assert.doesNotMatch(schema, /\bgrade\b/i)
+})
+
+test('language A-range has an independent bounded cron after subject A-range', () => {
+  const vercel = JSON.parse(file('vercel.json')) as { crons: Array<{ path: string; schedule: string }> }
+  assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-language-a-range'), {
+    path: '/api/cron/cos-university-language-a-range', schedule: '20 7 * * *',
+  })
+  const route = file('app/api/cron/cos-university-language-a-range/route.ts')
+  assert.match(route, /auth !== `Bearer \$\{secret\}`/)
+  assert.match(route, /runCosUniversityLanguageARangeBatch/)
+  assert.match(route, /maxDuration = 300/)
 })

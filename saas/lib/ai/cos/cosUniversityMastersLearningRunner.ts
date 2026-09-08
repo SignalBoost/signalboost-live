@@ -290,25 +290,6 @@ export async function runCosUniversityMastersLearning(options: {
       return summary
     }
 
-    const signals = selected.map(plan => {
-      const failureClass = failureClassForSubject(plan.subject_id)
-      const strategy = selectCosUniversityStudyStrategy({ failureClass })
-      return universityStudyGapSignal({
-        planKey: plan.plan_key,
-        subjectId: plan.subject_id as Parameters<typeof universityStudyGapSignal>[0]['subjectId'],
-        objective: clean(plan.objective),
-        failureClass,
-        strategy,
-        repeatedCount: 1,
-        evidence: [`academic_level=masters`, `program_id=${programId}`, `module_key=${plan.module_key}`],
-      })
-    })
-    const gaps = generateKnowledgeGaps(signals)
-    if (!gaps.length) {
-      await finishSlot(claim.id, summary, new Date())
-      return summary
-    }
-
     const store = createSupabaseCOSStores()?.continuousLearning
     if (!store) throw new Error('persistent_learning_store_unavailable')
     const approvedUrls = parseApprovedLearningUrls()
@@ -317,14 +298,36 @@ export async function runCosUniversityMastersLearning(options: {
       ...createLiveLearningAdapters(),
     ]
     const director = new ContinuousLearningDirector(store, ZERO_EXTERNAL_COST_POLICY)
-    const cycle = new ContinuousLearningCycle(director, adapters)
-    const result = await cycle.run(gaps, 0)
+    const successfulPlanIds: string[] = []
 
-    summary.status = 'learned'
-    summary.documentsAcquired = result.documentsAcquired
-    summary.accepted = result.accepted
-    summary.probationary = result.probationary
-    summary.plansAttempted = await markCosUniversityStudyPlansAttempted(selected.map(row => row.id), new Date())
+    // Run each module gap independently. The shared learning engine reports admission at cycle level,
+    // so per-plan execution is required to prove that a specific module actually retained accepted or
+    // probationary study evidence before its coursework exam may unlock.
+    for (const plan of selected) {
+      const failureClass = failureClassForSubject(plan.subject_id)
+      const strategy = selectCosUniversityStudyStrategy({ failureClass })
+      const signal = universityStudyGapSignal({
+        planKey: plan.plan_key,
+        subjectId: plan.subject_id as Parameters<typeof universityStudyGapSignal>[0]['subjectId'],
+        objective: clean(plan.objective),
+        failureClass,
+        strategy,
+        repeatedCount: 1,
+        evidence: [`academic_level=masters`, `program_id=${programId}`, `module_key=${plan.module_key}`],
+      })
+      const gaps = generateKnowledgeGaps([signal])
+      if (!gaps.length) continue
+      const result = await new ContinuousLearningCycle(director, adapters).run(gaps, 0)
+      summary.documentsAcquired += result.documentsAcquired
+      summary.accepted += result.accepted
+      summary.probationary += result.probationary
+      if (result.accepted > 0 || result.probationary > 0) successfulPlanIds.push(plan.id)
+    }
+
+    if (successfulPlanIds.length) {
+      summary.status = 'learned'
+      summary.plansAttempted = await markCosUniversityStudyPlansAttempted(successfulPlanIds, new Date())
+    }
     await finishSlot(claim.id, summary, new Date())
     return summary
   } catch (error) {

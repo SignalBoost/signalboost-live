@@ -20,7 +20,7 @@ export function cosUniversityPlanEligibleForContinuousStudy(
   now = new Date(),
   cooldownMinutes = COS_UNIVERSITY_STUDY_COOLDOWN_MINUTES,
 ): boolean {
-  if (plan.status === 'completed' || plan.status === 'superseded') return false
+  if (plan.status === 'completed' || plan.status === 'superseded' || plan.status === 'ready_for_exam') return false
   if (!plan.lastAttemptAt) return true
   const attemptedAt = Date.parse(plan.lastAttemptAt)
   if (!Number.isFinite(attemptedAt)) return true

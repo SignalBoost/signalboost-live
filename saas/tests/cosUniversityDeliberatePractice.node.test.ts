@@ -75,12 +75,22 @@ test('runtime reuses cognitive practice evidence but cannot award an academic gr
   assert.match(runner, /cos_active_practice_queue/)
   assert.match(runner, /cos_record_cognitive_practice_result/)
   assert.match(runner, /academicCredit: false/)
-  assert.match(runner, /disableCache: true/)
-  assert.match(runner, /localModelInvoked/)
-  assert.match(runner, /externalAiInvoked/)
+  assert.match(runner, /callCosReasoner/)
+  assert.match(runner, /parseLocalResult/)
+  assert.match(runner, /externalEscalationAllowed: false/)
+  assert.match(runner, /responseSource: 'cos_local_reasoner'/)
   assert.match(runner, /status: ready \? 'ready_for_exam' : 'studying'/)
+  assert.doesNotMatch(runner, /tryCOSFirstAnswer/)
   assert.doesNotMatch(runner, /recordCosUniversityAssessment/)
   assert.doesNotMatch(runner, /from\(['"]cos_university_assessments['"]\)/)
+})
+
+test('practice uses a training-specific local reasoning seam rather than the owner advisory release pipeline', () => {
+  const runner = file('lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts')
+  assert.match(runner, /This is training, not an owner-facing advisory answer/)
+  assert.match(runner, /Return strict JSON only/)
+  assert.doesNotMatch(runner, /SignalBoost's independent PRIMARY reasoning layer/)
+  assert.doesNotMatch(runner, /cosFirstAnswerEnterprise/)
 })
 
 test('practice route is isolated from the learner and scheduled after continuous acquisition', () => {

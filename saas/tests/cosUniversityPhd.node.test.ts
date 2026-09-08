@@ -104,6 +104,38 @@ test('a later failed research stage resets earlier passes until fresh distinct e
   assert.equal(cosUniversityPhdDistinctPassesAfterLatestFailure(rows, PROGRAM, 'independent_replication', NOW), 1)
 })
 
+test('a failed stage resets prior passes even when the failure lacks success-only proof', () => {
+  const rows = [
+    evidence('independent_replication', 'r1'),
+    evidence('independent_replication', 'r2'),
+    evidence('independent_replication', 'failure', {
+      passed: false,
+      observedAt: '2027-07-01T00:00:00Z',
+      independentReplication: false,
+    }),
+    evidence('independent_replication', 'r3', { observedAt: '2027-08-01T00:00:00Z' }),
+  ]
+  assert.equal(cosUniversityPhdDistinctPassesAfterLatestFailure(rows, PROGRAM, 'independent_replication', NOW), 1)
+})
+
+test('an expired failure event cannot resurrect older still-current passes', () => {
+  const rows = [
+    evidence('independent_replication', 'r1', { validUntil: '2029-06-01T00:00:00Z' }),
+    evidence('independent_replication', 'r2', { validUntil: '2029-06-01T00:00:00Z' }),
+    evidence('independent_replication', 'failure', {
+      passed: false,
+      observedAt: '2027-07-01T00:00:00Z',
+      validUntil: '2027-08-01T00:00:00Z',
+      independentReplication: false,
+    }),
+    evidence('independent_replication', 'r3', {
+      observedAt: '2027-08-15T00:00:00Z',
+      validUntil: '2029-06-01T00:00:00Z',
+    }),
+  ]
+  assert.equal(cosUniversityPhdDistinctPassesAfterLatestFailure(rows, PROGRAM, 'independent_replication', NOW), 1)
+})
+
 function completeEvidence(aPlus = false): CosUniversityPhdEvidence[] {
   const program = COS_UNIVERSITY_PHD_PROGRAMS[PROGRAM]
   const thresholds = aPlus ? program.aPlusDistinctPasses : program.minimumDistinctPasses

@@ -106,6 +106,7 @@ begin
 end;
 $$;
 revoke all on function public.cos_university_phd_work_immutable_guard() from public;
+revoke all on function public.cos_university_phd_work_immutable_guard() from anon, authenticated, service_role;
 
 drop trigger if exists cos_university_phd_work_assignment_immutable on public.cos_university_phd_work_assignments;
 create trigger cos_university_phd_work_assignment_immutable

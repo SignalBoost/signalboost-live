@@ -353,7 +353,12 @@ function stageRows(
       ? cosUniversityPhdEvidenceEligible(row, now)
       : cosUniversityPhdFailureResetEligible(row, now))
     .slice()
-    .sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt))
+    .sort((a, b) => {
+      const observedDelta = Date.parse(a.observedAt) - Date.parse(b.observedAt)
+      if (observedDelta !== 0) return observedDelta
+      if (a.passed !== b.passed) return a.passed ? -1 : 1
+      return cleanId(a.evidenceId).localeCompare(cleanId(b.evidenceId))
+    })
 }
 
 function currentStagePassRows(

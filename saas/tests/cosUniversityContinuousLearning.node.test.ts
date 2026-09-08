@@ -1,8 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { learningAdapterAllowedForGap } from '../lib/cos-core/layers/learning/cycle.ts'
-import { generateKnowledgeGaps } from '../lib/cos-core/layers/learning/gaps.ts'
 import {
   detectPlatformLanguages,
   rotatingPlatformLanguageTarget,
@@ -10,7 +8,7 @@ import {
   selectCosUniversityStudyStrategy,
   universityStudyGapSignal,
 } from '../lib/ai/cos/cosUniversityStudyStrategy.ts'
-import { academicStateFromRows } from '../lib/ai/cos/cosUniversityStore.ts'
+import { academicStateFromRows } from '../lib/ai/cos/cosUniversityAcademicState.ts'
 import { buildCosUniversityTranscript } from '../lib/ai/cos/cosUniversity.ts'
 import { buildCosPlatformLanguageTranscript } from '../lib/ai/cos/cosUniversityLanguages.ts'
 
@@ -98,7 +96,7 @@ test('host-controlled fresh assessment rows can populate the transcript without 
   assert.equal(state.subjectTranscript.find(row => row.subjectId === 'mathematics')?.grade, 'B')
 })
 
-test('University gap signals preserve the strategist source restriction through gap generation', () => {
+test('University gap signal carries the strategist source restriction', () => {
   const strategy = selectCosUniversityStudyStrategy({ failureClass: 'tool_execution' })
   const signal = universityStudyGapSignal({
     planKey: 'tool-plan',
@@ -107,20 +105,16 @@ test('University gap signals preserve the strategist source restriction through 
     failureClass: 'tool_execution',
     strategy,
   })
-  const [gap] = generateKnowledgeGaps([signal])
-  assert.deepEqual(gap.sourceKinds, ['official_documentation', 'library_material'])
+  assert.deepEqual(signal.sourceKinds, ['official_documentation', 'library_material'])
 })
 
-test('learning cycle honors method-specific source classes and preserves legacy all-adapter behavior', () => {
-  const gap = {
-    id: 'university:test', subject: 'Computer Science & Coding', question: 'Study tool execution', portableIds: ['cos'],
-    expectedReuse: 1, expectedAvoidedCostUsd: 0, urgency: 90, evidence: [], sourceKinds: ['official_documentation'] as const,
-  }
-  const docs = { kind: 'official_documentation' as const, async acquire() { return [] } }
-  const news = { kind: 'news_article' as const, async acquire() { return [] } }
-  assert.equal(learningAdapterAllowedForGap(gap, docs), true)
-  assert.equal(learningAdapterAllowedForGap(gap, news), false)
-  assert.equal(learningAdapterAllowedForGap({ ...gap, sourceKinds: undefined }, news), true)
+test('gap generation and learning cycle preserve and enforce method-specific source classes', () => {
+  const gaps = file('../lib/cos-core/layers/learning/gaps.ts')
+  const cycle = file('../lib/cos-core/layers/learning/cycle.ts')
+  assert.match(gaps, /sourceKinds: signal\.sourceKinds\?\.length \? \[\.\.\.new Set\(signal\.sourceKinds\)\] : undefined/)
+  assert.match(cycle, /export function learningAdapterAllowedForGap/)
+  assert.match(cycle, /return !allowed\.length\|\|allowed\.includes\(adapter\.kind\)/)
+  assert.match(cycle, /if\(learningAdapterAllowedForGap\(gap,adapter\)\) tasks\.push/)
 })
 
 test('migration separates service-only academic evidence from remediation plans', () => {

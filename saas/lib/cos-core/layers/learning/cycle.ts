@@ -6,7 +6,7 @@ import { classifyTieredAdmission } from '@/lib/ai/cos/tieredLearningAdmission'
 
 export type LearningSourceDocument = { sourceKind:ContinuousLearningSourceKind; sourceUri:string; sourceTitle?:string; observedAt?:string; subject:string; text:string; license?:string|null; evidence?:string[] }
 export interface ContinuousLearningSourceAdapter { readonly kind:ContinuousLearningSourceKind; readonly id?:string; acquire(gap:KnowledgeGap):Promise<LearningSourceDocument[]> }
-export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; probationary:number; acceptedSubjects:string[]; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number; timeBudgetExhausted?:boolean }
+export type LearningCycleResult = { gapsConsidered:number; documentsAcquired:number; accepted:number; probationary:number; acceptedSubjects:string[]; acceptedGapIds:string[]; rejected:Record<string,number>; sourceErrors:Record<string,number>; externalCostUsd:number; timeBudgetExhausted?:boolean }
 
 const STOP_WORDS=new Set(['about','above','after','again','against','because','been','before','being','below','between','both','cannot','could','does','doing','down','during','each','from','further','have','having','here','into','itself','more','most','only','other','over','same','should','some','such','than','that','their','them','then','there','these','they','this','those','through','under','until','very','were','what','when','where','which','while','with','would','your'])
 const GENERIC_DOMAIN_ANCHORS=new Set(['api','apis','architecture','business','database','engineering','enterprise','intelligence','multi','operations','performance','saas','security','site','software','strategy','systems','tenant'])
@@ -73,8 +73,9 @@ export class ContinuousLearningCycle{
 
   async run(gaps:KnowledgeGap[],spentExternalCostUsd=0):Promise<LearningCycleResult>{
     const prioritized=this.director.prioritizeGaps(gaps)
-    const result:LearningCycleResult={gapsConsidered:prioritized.length,documentsAcquired:0,accepted:0,probationary:0,acceptedSubjects:[],rejected:{},sourceErrors:{},externalCostUsd:spentExternalCostUsd}
+    const result:LearningCycleResult={gapsConsidered:prioritized.length,documentsAcquired:0,accepted:0,probationary:0,acceptedSubjects:[],acceptedGapIds:[],rejected:{},sourceErrors:{},externalCostUsd:spentExternalCostUsd}
     const acceptedSubjects=new Set<string>()
+    const acceptedGapIds=new Set<string>()
     const attemptedContentHashes=new Set<string>()
     const floor=minimumRelevance(),minMatches=minimumTermMatches()
     const startedAt=Date.now()
@@ -118,7 +119,11 @@ export class ContinuousLearningCycle{
           try{
             const decision=await this.director.admit(candidate,result.externalCostUsd)
             this.recordDecision(result,decision)
-            if(decision.accepted){const learned=String(gap.subject??'').trim();if(learned)acceptedSubjects.add(learned)}
+            if(decision.accepted){
+              const learned=String(gap.subject??'').trim()
+              if(learned)acceptedSubjects.add(learned)
+              acceptedGapIds.add(gap.id)
+            }
           }catch(error){
             // A real failed write is retryable if another gap discovers the same content later.
             attemptedContentHashes.delete(candidate.contentHash)
@@ -131,6 +136,7 @@ export class ContinuousLearningCycle{
 
     await Promise.all(Array.from({length:Math.min(concurrency,tasks.length||1)},()=>worker()))
     result.acceptedSubjects=[...acceptedSubjects]
+    result.acceptedGapIds=[...acceptedGapIds]
     return result
   }
 

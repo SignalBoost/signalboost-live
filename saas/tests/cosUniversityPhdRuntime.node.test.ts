@@ -97,6 +97,14 @@ test('PhD credential gate requires coherent graduation, principal separation, ca
   assert.match(runtime, /authorityExpanded: false/)
 })
 
+test('owner-visible PhD current competence fails closed when principal independence is not proven', () => {
+  const route = routeSafe()
+  assert.match(route, /const runtimePrograms = await Promise\.all/)
+  assert.match(route, /currentCompetenceStanding: status\.principalIndependence\.ok/)
+  assert.match(route, /\? status\.currentCompetenceStanding/)
+  assert.match(route, /: 'not_graduated' as const/)
+})
+
 test('PhD actor/project/evidence writes remain host-only seams', () => {
   const runtime = file('lib/ai/cos/cosUniversityPhdRuntime.ts')
   const route = routeSafe()

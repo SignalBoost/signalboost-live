@@ -177,6 +177,25 @@ function recordProcessedLessonId(target: Set<number>, result: Record<string, unk
 }
 
 /**
+ * Backfill may legitimately reinforce the same owner-directed source again. Candidate identity is
+ * durable in cos_cognitive_skills provenance, so exclude those teacher lesson ids from the bounded
+ * extraction lane even if a later reinforcement rewrites the lesson row to captured.
+ */
+async function loadLinkedDirectedSoftwareLessonIds(limit = 1000): Promise<number[]> {
+  const db = cosServiceDb()
+  if (!db) return []
+  const result = await db.from('cos_cognitive_skills')
+    .select('provenance')
+    .contains('metadata', { origin: 'owner_directed_study', specialistFamily: 'software' })
+    .limit(Math.max(1, Math.min(5000, Math.floor(limit))))
+  if (result.error) throw result.error
+  const ids = (result.data ?? [])
+    .map((row: any) => Number(row?.provenance?.teacher_lesson_id))
+    .filter((lessonId: number) => Number.isFinite(lessonId) && lessonId > 0)
+  return [...new Set(ids)]
+}
+
+/**
  * Production cognitive-learning orchestration. Candidate reflection remains available, but the
  * active-learning practice loop is allowed to consume reasoner calls only when an independent
  * evaluator path exists. Private certification owns its curated queue exclusively so the one-call
@@ -230,11 +249,13 @@ export async function runGovernedCognitiveLearningCycle(): Promise<GovernedCogni
   // Preserve the normal general-learning budget above, then give fresh owner-directed software
   // material one additional bounded evaluation opportunity. It still goes through the exact same
   // extraction, validation, practice and independent-evidence lifecycle; this lane changes only
-  // queue selection and never promotes a lesson or cognitive skill by itself.
+  // queue selection and never promotes a lesson or cognitive skill by itself. Excluding durable
+  // already-linked lesson ids prevents daily source reinforcement from pinning this lane forever.
   try {
+    const linkedLessonIds = await loadLinkedDirectedSoftwareLessonIds()
     const directedResult = await evaluateNextTeacherLesson({
       lane: 'owner_directed_software',
-      excludeLessonIds: [...processedLessonIds],
+      excludeLessonIds: [...new Set([...processedLessonIds, ...linkedLessonIds])],
     })
     if (directedResult) {
       recordProcessedLessonId(processedLessonIds, directedResult)

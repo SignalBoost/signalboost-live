@@ -58,6 +58,16 @@ function learningErrorMessage(error:unknown):string{
   return String(error)
 }
 
+/**
+ * Method-specific study gaps can narrow which source classes are consulted. Normal gaps preserve
+ * the historical all-adapter behavior. This makes a University strategy such as fresh authoritative
+ * research materially different from library study instead of merely changing a label.
+ */
+export function learningAdapterAllowedForGap(gap:KnowledgeGap,adapter:ContinuousLearningSourceAdapter):boolean{
+  const allowed=gap.sourceKinds?.filter(Boolean)??[]
+  return !allowed.length||allowed.includes(adapter.kind)
+}
+
 export class ContinuousLearningCycle{
   constructor(private readonly director:ContinuousLearningDirector,private readonly adapters:ContinuousLearningSourceAdapter[]){}
 
@@ -72,7 +82,7 @@ export class ContinuousLearningCycle{
     const concurrency=Math.round(envNumber('COS_LEARNING_SOURCE_CONCURRENCY',6,1,12))
 
     const tasks:Array<{gap:KnowledgeGap;adapter:ContinuousLearningSourceAdapter}> = []
-    for(const gap of prioritized) for(const adapter of this.adapters) tasks.push({gap,adapter})
+    for(const gap of prioritized) for(const adapter of this.adapters) if(learningAdapterAllowedForGap(gap,adapter)) tasks.push({gap,adapter})
     let cursor=0
 
     const worker=async()=>{

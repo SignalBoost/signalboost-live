@@ -1,4 +1,4 @@
-import type { KnowledgeGap } from './index'
+import type { ContinuousLearningSourceKind, KnowledgeGap } from './index.ts'
 
 export type KnowledgeGapSignal = {
   taskId: string
@@ -12,6 +12,8 @@ export type KnowledgeGapSignal = {
   repeatedCount?: number
   externalCostUsd?: number
   evidence?: string[]
+  /** Optional host-selected source classes for this study objective. Empty/omitted means normal policy. */
+  sourceKinds?: ContinuousLearningSourceKind[]
   portableIds?: string[]
 }
 
@@ -67,6 +69,7 @@ export function generateKnowledgeGaps(signals: KnowledgeGapSignal[]): KnowledgeG
       expectedAvoidedCostUsd,
       urgency,
       evidence: usefulSignals(signal),
+      sourceKinds: signal.sourceKinds?.length ? [...new Set(signal.sourceKinds)] : undefined,
     }
 
     const previous = byKey.get(key)

@@ -159,11 +159,22 @@ async function deferLowerPriorityPractice(ids: string[], now: Date, nowIso: stri
 export async function disciplineCosUniversityPracticeQueue(options: {
   now?: Date
   maxActivePlans?: number
+  requiredPlanId?: string | null
+  requiredPracticeRound?: number | null
 } = {}): Promise<CosUniversityPracticeQueueDisciplineSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
   const maxActivePlans = Math.max(1, Math.min(4, Math.floor(options.maxActivePlans || 1)))
   const currentPlans = await loadCurrentPlans(maxActivePlans)
-  const selectedPlanIds = currentPlans.slice(0, maxActivePlans).map(plan => plan.id)
+  const requiredPlanId = String(options.requiredPlanId || '').trim()
+  const requiredPracticeRound = Number(options.requiredPracticeRound)
+  const requiredPlan = requiredPlanId
+    ? currentPlans.find(plan => plan.id === requiredPlanId
+      && Number.isFinite(requiredPracticeRound)
+      && currentPracticeRound(plan) === Math.floor(requiredPracticeRound)) || null
+    : null
+  const selectedPlanIds = requiredPlanId
+    ? (requiredPlan ? [requiredPlan.id] : [])
+    : currentPlans.slice(0, maxActivePlans).map(plan => plan.id)
   const selected = new Set(selectedPlanIds)
   const queued = await loadQueuedPractice()
   const referencedPlanIds = queued

@@ -7,7 +7,7 @@ import {
   relevanceOf,
   sourceAwareRelevant,
 } from '../lib/cos-core/layers/learning/cycle.ts'
-import { learningDiscoveryQuery } from '../lib/cos-core/layers/learning/connectors.ts'
+import { SearchLearningConnector } from '../lib/cos-core/layers/learning/connectors.ts'
 import { generateKnowledgeGaps } from '../lib/cos-core/layers/learning/gaps.ts'
 import {
   selectCosUniversityStudyStrategy,
@@ -27,11 +27,11 @@ function physicsGap() {
   return { signal, gap }
 }
 
-test('University study gaps carry host-owned curriculum focus instead of relying on remediation prose', () => {
+test('University study gaps put host-owned curriculum themes before remediation prose', () => {
   const { signal, gap } = physicsGap()
-  assert.ok(signal.focusTerms?.includes('physics and mechanics'))
-  assert.ok(signal.focusTerms?.includes('scientific method'))
-  assert.ok(gap.focusTerms?.includes('physics and mechanics'))
+  assert.ok(signal.missingFacts?.includes('physics and mechanics'))
+  assert.ok(signal.missingFacts?.includes('scientific method'))
+  assert.match(gap.question, /^physics and mechanics; chemistry and biology fundamentals; scientific method;/i)
 
   const terms = gapStudyTerms(gap)
   assert.ok(terms.supporting.includes('mechanics'))
@@ -39,17 +39,23 @@ test('University study gaps carry host-owned curriculum focus instead of relying
   assert.ok(!terms.supporting.includes('weakness'))
 })
 
-test('academic discovery uses canonical subject focus rather than generic confidence/remediation wording', () => {
+test('bounded scholarly discovery sees canonical curriculum content before generic remediation wording', async () => {
   const { gap } = physicsGap()
-  const query = learningDiscoveryQuery(gap)
+  let query = ''
+  const connector = new SearchLearningConnector('scientific_journal', async value => {
+    query = value
+    return []
+  }, 2, 'academic_focus_probe')
+  await connector.acquire(gap)
+  const boundedPrefix = query.split(/\s+/).filter(Boolean).slice(0, 10).join(' ')
   assert.match(query, /Physics & Natural Sciences/i)
-  assert.match(query, /physics and mechanics/i)
+  assert.match(boundedPrefix, /physics and mechanics/i)
   assert.match(query, /scientific method/i)
-  assert.doesNotMatch(query, /higher confidence/i)
-  assert.doesNotMatch(query, /remediate the weakness/i)
+  assert.doesNotMatch(boundedPrefix, /verified knowledge/i)
+  assert.doesNotMatch(boundedPrefix, /higher confidence/i)
 })
 
-test('a substantive scholarly document matching the academic domain clears relevance without lowering the global floor', () => {
+test('substantive scholarly Physics material clears relevance without lowering the global floor', () => {
   const { gap } = physicsGap()
   const terms = gapStudyTerms(gap)
   const document = {

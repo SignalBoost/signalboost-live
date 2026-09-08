@@ -46,6 +46,7 @@ const tests = [
   'tests/conciergeResultDelivery.node.test.ts',
   'tests/fullAssistantConciergeIngress.node.test.ts',
   'tests/builderRepositoryRepairTarget.node.test.ts',
+  'tests/builderRepositoryRepairProofController.node.test.ts',
   'tests/builderRepositoryRepairSecurity.node.test.ts',
   'tests/cosSoftwareSpecialistRouting.node.test.ts',
   'tests/cosConciergeSoftwareArchitecture.node.test.ts',

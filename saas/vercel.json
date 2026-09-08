@@ -4,6 +4,7 @@
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",
     "COS_LIVE_SOURCES_ENABLED": "true",
     "COS_LOCAL_FIRST_ENABLED": "true",
+    "COS_UNIVERSITY_EXAMS_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ROLLBACK_ENABLED": "true"
   },
@@ -17,6 +18,7 @@
     { "path": "/api/cron/cyber-dependency-monitor", "schedule": "15 8 * * *" },
     { "path": "/api/hub/cyber/prepare-github-pr", "schedule": "20 */6 * * *" },
     { "path": "/api/cron/cos-mining", "schedule": "30 6 * * *" },
+    { "path": "/api/cron/cos-university-exam", "schedule": "0 7 * * *" },
     { "path": "/api/cron/cos-knowledge-promotion", "schedule": "15 7 * * *" },
     { "path": "/api/cron/cos-learning-indexer", "schedule": "3,18,33,48 * * * *" },
     { "path": "/api/cron/cos-directed-study-promotion", "schedule": "8,23,38,53 * * * *" },

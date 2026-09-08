@@ -47,6 +47,21 @@ test('Master’s evidence preserves program identity from storage through gradua
   assert.match(runtime, /program_id: input\.programId/)
 })
 
+test('Master’s evidence reads newest rows before the 5,000-row cap, then restores chronological evaluation order', () => {
+  const runtime = file('lib/ai/cos/cosUniversityMastersRuntime.ts')
+  const load = runtime.slice(runtime.indexOf('async function loadEvidence'), runtime.indexOf('export type CosUniversityMastersSharedAdmissionState'))
+  assert.match(load, /order\('observed_at', \{ ascending: false \}\)/)
+  assert.match(load, /\.limit\(5000\)/)
+  assert.match(load, /\.slice\(\)\.reverse\(\)/)
+  assert.ok(load.indexOf("ascending: false") < load.indexOf('.limit(5000)'))
+})
+
+test('Master’s host write rejects future-dated evidence beyond bounded clock skew', () => {
+  const runtime = file('lib/ai/cos/cosUniversityMastersRuntime.ts')
+  assert.match(runtime, /MAX_FUTURE_CLOCK_SKEW_MS = 5 \* 60_000/)
+  assert.match(runtime, /observedMs > Date\.now\(\) \+ MAX_FUTURE_CLOCK_SKEW_MS/)
+})
+
 test('Master’s enrollment is host-computed from current undergraduate and subject prerequisites', () => {
   const runtime = file('lib/ai/cos/cosUniversityMastersRuntime.ts')
   assert.match(runtime, /undergraduateCredentialAwarded: Boolean\(generalist\.credential\)/)
@@ -55,6 +70,15 @@ test('Master’s enrollment is host-computed from current undergraduate and subj
   assert.match(runtime, /if \(!before\.admission\.admitted\)/)
   assert.match(runtime, /state: 'admission_denied'/)
   assert.doesNotMatch(runtime, /admitted\s*:\s*true\s*[,}]/)
+})
+
+test('Master’s catalog loads shared undergraduate admission state only once and reuses it across tracks', () => {
+  const runtime = file('lib/ai/cos/cosUniversityMastersRuntime.ts')
+  const route = file('app/api/admin/cos-university-masters/route.ts')
+  assert.match(runtime, /readCosUniversityMastersSharedAdmissionState/)
+  assert.match(runtime, /sharedAdmissionState \?\? await readCosUniversityMastersSharedAdmissionState\(now\)/)
+  assert.match(route, /const sharedAdmissionState = await readCosUniversityMastersSharedAdmissionState\(now\)/)
+  assert.match(route, /readCosUniversityMastersRuntimeStatus\(id, now, sharedAdmissionState\)/)
 })
 
 test('Master’s runtime honors the canonical single-next-level admission and cannot open a second parallel track', () => {

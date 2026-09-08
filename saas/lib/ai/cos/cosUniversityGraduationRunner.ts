@@ -18,10 +18,15 @@ import {
   deriveCosUniversityGeneralistGraduation,
   scoreCosUniversityGeneralistCapstoneExam,
   type CosUniversityGeneralistCapstoneRunEvidence,
-  type CosUniversityGeneralistGraduationStatus,
 } from './cosUniversityGraduation.ts'
+import {
+  applyCosUniversityUndergraduateCalendar,
+  type CosUniversityTimeBoundedGraduationStatus,
+} from './cosUniversityProgramGate.ts'
+import type { CosUniversityProgramEnrollment } from './cosUniversityPrograms.ts'
 
 const AGENT_ID = 'cos'
+const UNDERGRADUATE_PROGRAM_KEY = 'generalist_undergraduate_v1'
 
 type GeneralistCapstoneRunRow = {
   id: string
@@ -44,9 +49,18 @@ type GeneralistCapstoneRunRow = {
   observed_at: string
 }
 
+type ProgramEnrollmentRow = {
+  program_key: string
+  program_level: 'undergraduate'
+  enrolled_at: string
+  minimum_residence_until: string
+  target_completion_at: string
+  hard_deadline_at: string
+}
+
 export type CosUniversityGraduationGateSummary = {
   enabled: boolean
-  status: CosUniversityGeneralistGraduationStatus
+  status: CosUniversityTimeBoundedGraduationStatus
   capstoneRun: {
     runId: string | null
     state: 'not_eligible' | 'already_graduated' | 'already_terminal' | 'passed' | 'failed' | 'error'
@@ -55,7 +69,7 @@ export type CosUniversityGraduationGateSummary = {
   }
   assessmentRowsRead: number
   errors: string[]
-  semantics: 'graduation_is_derived_and_revocable'
+  semantics: 'graduation_is_derived_revocable_and_time_bounded'
 }
 
 const ASSESSMENT_SELECT = 'assessment_key,subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_version,scorer_authority,observed_at,valid_until'
@@ -73,6 +87,18 @@ function capstoneEvidence(rows: GeneralistCapstoneRunRow[]): CosUniversityGenera
       variantHash: row.variant_hash,
       observedAt: row.observed_at,
     }))
+}
+
+function mapEnrollment(row: ProgramEnrollmentRow | null): CosUniversityProgramEnrollment | null {
+  if (!row) return null
+  return {
+    programKey: row.program_key,
+    programLevel: row.program_level,
+    enrolledAt: row.enrolled_at,
+    minimumResidenceUntil: row.minimum_residence_until,
+    targetCompletionAt: row.target_completion_at,
+    hardDeadlineAt: row.hard_deadline_at,
+  }
 }
 
 async function loadAssessmentRows(): Promise<CosUniversityAssessmentRow[]> {
@@ -99,22 +125,40 @@ async function loadCapstoneRuns(): Promise<GeneralistCapstoneRunRow[]> {
   return (result.data || []) as GeneralistCapstoneRunRow[]
 }
 
+async function loadUndergraduateEnrollment(): Promise<CosUniversityProgramEnrollment | null> {
+  const db = cosServiceDb()
+  if (!db) return null
+  const result = await db.from('cos_university_program_enrollments')
+    .select('program_key,program_level,enrolled_at,minimum_residence_until,target_completion_at,hard_deadline_at')
+    .eq('agent_id', AGENT_ID)
+    .eq('program_key', UNDERGRADUATE_PROGRAM_KEY)
+    .maybeSingle()
+  if (result.error) throw result.error
+  return mapEnrollment((result.data || null) as ProgramEnrollmentRow | null)
+}
+
 async function readGateState(now: Date): Promise<{
   academicState: CosUniversityAcademicState
   rows: CosUniversityAssessmentRow[]
   capstoneRuns: GeneralistCapstoneRunRow[]
-  status: CosUniversityGeneralistGraduationStatus
+  enrollment: CosUniversityProgramEnrollment | null
+  status: CosUniversityTimeBoundedGraduationStatus
 }> {
-  const [rows, capstoneRuns] = await Promise.all([loadAssessmentRows(), loadCapstoneRuns()])
+  const [rows, capstoneRuns, enrollment] = await Promise.all([
+    loadAssessmentRows(),
+    loadCapstoneRuns(),
+    loadUndergraduateEnrollment(),
+  ])
   const academicState = academicStateFromRows(rows, now)
-  const status = deriveCosUniversityGeneralistGraduation({
+  const academicStatus = deriveCosUniversityGeneralistGraduation({
     academicState,
     capstoneRuns: capstoneEvidence(capstoneRuns),
   })
-  return { academicState, rows, capstoneRuns, status }
+  const status = applyCosUniversityUndergraduateCalendar({ academicStatus, enrollment, now })
+  return { academicState, rows, capstoneRuns, enrollment, status }
 }
 
-export async function readCosUniversityGeneralistGraduationStatus(now = new Date()): Promise<CosUniversityGeneralistGraduationStatus> {
+export async function readCosUniversityGeneralistGraduationStatus(now = new Date()): Promise<CosUniversityTimeBoundedGraduationStatus> {
   return (await readGateState(now)).status
 }
 
@@ -254,23 +298,48 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
   }
 }
 
+function disabledStatus(now: Date): CosUniversityTimeBoundedGraduationStatus {
+  const academicState = academicStateFromRows([], now)
+  const academicStatus = deriveCosUniversityGeneralistGraduation({ academicState, capstoneRuns: [] })
+  return applyCosUniversityUndergraduateCalendar({ academicStatus, enrollment: null, now })
+}
+
 export async function runCosUniversityGeneralistGraduationGate(options: { now?: Date } = {}): Promise<CosUniversityGraduationGateSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
-  const disabledAcademicState = academicStateFromRows([], now)
-  const disabledStatus = deriveCosUniversityGeneralistGraduation({ academicState: disabledAcademicState, capstoneRuns: [] })
+  const emptyStatus = disabledStatus(now)
   if (process.env.COS_UNIVERSITY_GRADUATION_ENABLED !== 'true') {
     return {
       enabled: false,
-      status: disabledStatus,
+      status: emptyStatus,
       capstoneRun: { runId: null, state: 'not_eligible', passed: null, reasons: ['graduation_gate_disabled'] },
       assessmentRowsRead: 0,
       errors: [],
-      semantics: 'graduation_is_derived_and_revocable',
+      semantics: 'graduation_is_derived_revocable_and_time_bounded',
     }
   }
 
   try {
     const before = await readGateState(now)
+    if (before.status.program.timingStatus === 'not_enrolled') {
+      return {
+        enabled: true,
+        status: before.status,
+        capstoneRun: { runId: null, state: 'not_eligible', passed: null, reasons: ['undergraduate_program_not_enrolled'] },
+        assessmentRowsRead: before.rows.length,
+        errors: [],
+        semantics: 'graduation_is_derived_revocable_and_time_bounded',
+      }
+    }
+    if (before.status.program.deadlineExpired) {
+      return {
+        enabled: true,
+        status: before.status,
+        capstoneRun: { runId: null, state: 'not_eligible', passed: null, reasons: ['undergraduate_program_deadline_expired'] },
+        assessmentRowsRead: before.rows.length,
+        errors: [],
+        semantics: 'graduation_is_derived_revocable_and_time_bounded',
+      }
+    }
     if (!before.status.prerequisitesReady) {
       return {
         enabled: true,
@@ -278,7 +347,17 @@ export async function runCosUniversityGeneralistGraduationGate(options: { now?: 
         capstoneRun: { runId: null, state: 'not_eligible', passed: null, reasons: ['subject_or_language_prerequisites_incomplete'] },
         assessmentRowsRead: before.rows.length,
         errors: [],
-        semantics: 'graduation_is_derived_and_revocable',
+        semantics: 'graduation_is_derived_revocable_and_time_bounded',
+      }
+    }
+    if (!before.status.program.minimumResidenceSatisfied) {
+      return {
+        enabled: true,
+        status: before.status,
+        capstoneRun: { runId: null, state: 'not_eligible', passed: null, reasons: ['minimum_residence_incomplete'] },
+        assessmentRowsRead: before.rows.length,
+        errors: [],
+        semantics: 'graduation_is_derived_revocable_and_time_bounded',
       }
     }
     if (before.status.graduated) {
@@ -288,7 +367,7 @@ export async function runCosUniversityGeneralistGraduationGate(options: { now?: 
         capstoneRun: { runId: null, state: 'already_graduated', passed: true, reasons: [] },
         assessmentRowsRead: before.rows.length,
         errors: [],
-        semantics: 'graduation_is_derived_and_revocable',
+        semantics: 'graduation_is_derived_revocable_and_time_bounded',
       }
     }
 
@@ -300,7 +379,7 @@ export async function runCosUniversityGeneralistGraduationGate(options: { now?: 
         capstoneRun: { runId: null, state: 'error', passed: null, reasons: ['service_database_unavailable'] },
         assessmentRowsRead: before.rows.length,
         errors: ['service_database_unavailable'],
-        semantics: 'graduation_is_derived_and_revocable',
+        semantics: 'graduation_is_derived_revocable_and_time_bounded',
       }
     }
 
@@ -314,17 +393,17 @@ export async function runCosUniversityGeneralistGraduationGate(options: { now?: 
       capstoneRun,
       assessmentRowsRead: after.rows.length,
       errors: [],
-      semantics: 'graduation_is_derived_and_revocable',
+      semantics: 'graduation_is_derived_revocable_and_time_bounded',
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return {
       enabled: true,
-      status: disabledStatus,
+      status: emptyStatus,
       capstoneRun: { runId: null, state: 'error', passed: null, reasons: [message] },
       assessmentRowsRead: 0,
       errors: [message],
-      semantics: 'graduation_is_derived_and_revocable',
+      semantics: 'graduation_is_derived_revocable_and_time_bounded',
     }
   }
 }

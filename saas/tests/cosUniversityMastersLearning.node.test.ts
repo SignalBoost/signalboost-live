@@ -29,6 +29,16 @@ test('Master’s study plans are module-specific preparation, never academic cre
   assert.match(runner, /cosUniversityMastersCourseworkModulePasses/)
 })
 
+test('coursework study is recorded only when that exact module retained accepted or probationary evidence', () => {
+  const runner = file('lib/ai/cos/cosUniversityMastersLearningRunner.ts')
+  assert.match(runner, /for \(const plan of selected\)/)
+  assert.match(runner, /new ContinuousLearningCycle\(director, adapters\)\.run\(gaps, 0\)/)
+  assert.match(runner, /result\.accepted > 0 \|\| result\.probationary > 0/)
+  assert.match(runner, /successfulPlanIds\.push\(plan\.id\)/)
+  assert.match(runner, /markCosUniversityStudyPlansAttempted\(successfulPlanIds/)
+  assert.doesNotMatch(runner, /markCosUniversityStudyPlansAttempted\(selected\.map/)
+})
+
 test('Master’s learning sweeps have their own durable idempotency ledger but not a second corpus', () => {
   const schema = file('supabase/migrations/20260908175500_cos_university_masters_learning_exam_runtime.sql')
   assert.match(schema, /create table if not exists public\.cos_university_masters_learning_runs/i)

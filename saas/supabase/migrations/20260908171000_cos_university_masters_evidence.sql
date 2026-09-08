@@ -1,6 +1,6 @@
 create table if not exists public.cos_university_masters_evidence (
   id uuid primary key default gen_random_uuid(),
-  evidence_key text not null unique,
+  evidence_key text not null,
   agent_id text not null default 'cos',
   program_key text not null,
   program_id text not null check (program_id in (
@@ -26,6 +26,7 @@ create table if not exists public.cos_university_masters_evidence (
   valid_until timestamptz not null,
   evidence_snapshot jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
+  unique (agent_id, evidence_key),
   constraint cos_university_masters_evidence_time_order check (observed_at < valid_until),
   constraint cos_university_masters_authority_stage check (
     (stage = 'graduate_coursework' and authority = 'university_coursework')

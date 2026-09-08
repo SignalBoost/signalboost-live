@@ -56,6 +56,8 @@ export type KnowledgeGap = {
   expectedAvoidedCostUsd: number
   urgency: number
   evidence: string[]
+  /** Optional study-method constraint. Omitted/empty preserves the normal all-adapter behavior. */
+  sourceKinds?: ContinuousLearningSourceKind[]
   admission?: TieredAdmission
 }
 

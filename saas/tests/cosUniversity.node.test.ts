@@ -103,7 +103,7 @@ test('study volume cannot manufacture a university grade', () => {
   assert.ok(transcript.every(subject => subject.grade === 'unassessed'))
 })
 
-test('self-scored or stale assessment evidence cannot raise a grade', () => {
+test('self-scored stale or malformed-dated assessment evidence cannot raise a grade', () => {
   const selfScored = deriveCosUniversityGrade('reasoning_decision_science', [
     assessment('unseen_subject_exam', true, { independentScorer: false }),
   ])
@@ -113,6 +113,11 @@ test('self-scored or stale assessment evidence cannot raise a grade', () => {
     assessment('unseen_subject_exam', true, { fresh: false }),
   ])
   assert.equal(stale.grade, 'unassessed')
+
+  const malformedDate = deriveCosUniversityGrade('reasoning_decision_science', [
+    assessment('unseen_subject_exam', true, { observedAt: 'not-a-date' }),
+  ])
+  assert.equal(malformedDate.grade, 'unassessed')
 })
 
 test('grades advance only through qualitatively stronger independent evidence', () => {
@@ -165,6 +170,7 @@ test('verified Production failure outranks passive academic coverage when choosi
 
   assert.equal(target?.subjectId, 'cybersecurity')
   assert.equal(target?.currentGrade, 'A')
+  assert.equal(target?.targetGrade, 'A+')
   assert.ok(target?.reasons.includes('verified_production_failures=1'))
 })
 
@@ -181,11 +187,12 @@ test('user corrections outrank negative feedback and external dependency in tran
   assert.ok(target?.reasons.includes('user_corrections=1'))
 })
 
-test('with no failure signal, continuing education starts from the first subject below target grade', () => {
+test('with no failure signal continuous machine education targets A+ by default', () => {
   const target = selectNextCosUniversityStudyTarget({ transcript: buildCosUniversityTranscript([]) })
   assert.equal(target?.subjectId, 'computer_science')
   assert.equal(target?.currentGrade, 'unassessed')
-  assert.ok(target?.reasons.includes('academic_gap=unassessed->A'))
+  assert.equal(target?.targetGrade, 'A+')
+  assert.ok(target?.reasons.includes('academic_gap=unassessed->A+'))
 })
 
 test('SignalBoost platform languages are exactly English Spanish Portuguese Polish and Russian', () => {

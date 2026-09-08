@@ -8,6 +8,8 @@ import { attachTurnOutcome, recordTurnLearningEnrichment } from '@/lib/ai/cos/tu
 import { decideCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
+import type { CosUniversitySubjectId } from './cosUniversity.ts'
+import type { CosPlatformLanguage, CosPlatformLanguageDimension } from './cosUniversityLanguages.ts'
 import {
   COS_UNIVERSITY_EXAM_PROFILE,
   COS_UNIVERSITY_EXAM_SCORER,
@@ -51,9 +53,9 @@ type ExamRunRow = {
   seed: string
   manifest_hash: string
   target_kind: 'subject' | 'language'
-  subject_id: CosUniversityExamTarget extends { kind: 'subject'; subjectId: infer S } ? S : never | null
-  language_code: string | null
-  language_dimension: string | null
+  subject_id: CosUniversitySubjectId | null
+  language_code: CosPlatformLanguage | null
+  language_dimension: CosPlatformLanguageDimension | null
   status: 'created' | 'running' | 'passed' | 'failed' | 'error'
   passed: boolean | null
   reasons: string[] | null
@@ -139,10 +141,10 @@ async function claimCreatedRun(row: ExamRunRow, now: Date): Promise<boolean> {
 
 function targetFromRun(row: ExamRunRow): CosUniversityExamTarget | null {
   if (row.target_kind === 'subject' && row.subject_id) {
-    return { kind: 'subject', subjectId: row.subject_id as CosUniversityExamTarget & never extends never ? never : any }
+    return { kind: 'subject', subjectId: row.subject_id }
   }
   if (row.target_kind === 'language' && row.language_code && row.language_dimension) {
-    return { kind: 'language', language: row.language_code as any, dimension: row.language_dimension as any }
+    return { kind: 'language', language: row.language_code, dimension: row.language_dimension }
   }
   return null
 }
@@ -165,7 +167,12 @@ async function executeExam(row: ExamRunRow, target: CosUniversityExamTarget, now
       await ensureLocalInferenceRuntimeReady()
       await generateLocalEmbedding(exam.prompt)
     }
-    result = await tryCOSFirstAnswer({ prompt: exam.prompt, language: 'en', privileged: true, disableCache: true })
+    result = await tryCOSFirstAnswer({
+      prompt: exam.prompt,
+      language: target.kind === 'language' ? target.language : 'en',
+      privileged: true,
+      disableCache: true,
+    })
   } catch (error) {
     flushCapturedEvidenceSourceUse()
     const reasons = [`execution_error:${error instanceof Error ? error.message : String(error)}`]
@@ -256,8 +263,8 @@ async function executeExam(row: ExamRunRow, target: CosUniversityExamTarget, now
     passed: freshExecution ? score.passed : null,
     turn_id: turnId || null,
     response_source: result.provenance.responseSource,
-    local_model_invoked: result.provenance.localModelInvoked === true,
-    external_ai_invoked: result.provenance.externalAiInvoked === true,
+    local_model_invoked: Boolean(result.provenance.localModelInvoked),
+    external_ai_invoked: Boolean(result.provenance.externalAiInvoked),
     fresh_execution: freshExecution,
     provenance_recorded: Boolean(turnId),
     reasons,

@@ -130,10 +130,15 @@ test('enrollment ledger is service-only and bootstraps COS from the first real U
 
 test('an existing cohort is never silently extended; a later program requires a new explicit enrollment key', () => {
   const schema = file('supabase/migrations/20260908154500_cos_university_program_enrollments.sql')
+  const lockdown = file('supabase/migrations/20260908155500_cos_university_program_enrollment_immutability.sql')
   assert.match(schema, /unique \(agent_id, program_key\)/i)
   assert.match(schema, /on conflict \(agent_id, program_key\) do nothing/i)
   assert.doesNotMatch(schema, /on conflict \(agent_id, program_key\) do update/i)
   assert.doesNotMatch(schema, /hard_deadline_at\s*=\s*excluded/i)
+  assert.match(lockdown, /revoke all on table public\.cos_university_program_enrollments from anon, authenticated, service_role/i)
+  assert.match(lockdown, /grant select, insert on table public\.cos_university_program_enrollments to service_role/i)
+  assert.match(lockdown, /before update or delete on public\.cos_university_program_enrollments/i)
+  assert.match(lockdown, /create a new explicit program enrollment/i)
 })
 
 test('degree credential ledger is immutable, host-issued, and separate from current competency assessment', () => {

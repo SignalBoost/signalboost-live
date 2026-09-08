@@ -227,6 +227,19 @@ export function cosUniversityPhdEvidenceEligible(row: CosUniversityPhdEvidence, 
   return true
 }
 
+function cosUniversityPhdFailureResetEligible(row: CosUniversityPhdEvidence, now: Date): boolean {
+  const observedAt = validTime(row.observedAt)
+  const validUntil = validTime(row.validUntil)
+  const nowMs = now.getTime()
+  if (!Number.isFinite(nowMs) || observedAt === null || validUntil === null) return false
+  if (!String(row.variantHash || '').trim()) return false
+  if (!COS_UNIVERSITY_PHD_PROGRAMS[row.programId]) return false
+  if (observedAt > nowMs || validUntil <= observedAt) return false
+  if (!row.independent) return false
+  if (row.authority !== cosUniversityPhdExpectedAuthority(row.stage)) return false
+  return true
+}
+
 function stageRows(
   evidence: readonly CosUniversityPhdEvidence[],
   programId: CosUniversityPhdProgramId,
@@ -234,7 +247,10 @@ function stageRows(
   now: Date,
 ): CosUniversityPhdEvidence[] {
   return evidence
-    .filter(row => row.programId === programId && row.stage === stage && cosUniversityPhdEvidenceEligible(row, now))
+    .filter(row => row.programId === programId && row.stage === stage)
+    .filter(row => row.passed
+      ? cosUniversityPhdEvidenceEligible(row, now)
+      : cosUniversityPhdFailureResetEligible(row, now))
     .slice()
     .sort((a, b) => Date.parse(a.observedAt) - Date.parse(b.observedAt))
 }

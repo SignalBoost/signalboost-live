@@ -31,6 +31,10 @@ export const maxDuration = 300
 
 const CERTIFICATION_ROUTE_DEADLINE_MS = 210_000
 
+type DailyLearningRuntimeResult = Awaited<ReturnType<typeof runDailyAutonomousLearning>> & {
+  acceptedGapIds?: unknown
+}
+
 export async function GET(req: NextRequest) {
   const routeStartedAt = Date.now()
   const secret = process.env.CRON_SECRET
@@ -133,8 +137,9 @@ export async function GET(req: NextRequest) {
     // same optimistic proof writer as the dedicated University and Master’s learning lanes.
     if (learning?.status === 'learned' && university?.activePlans.length) {
       try {
-        const acceptedGapIds = Array.isArray((learning as { acceptedGapIds?: unknown }).acceptedGapIds)
-          ? ((learning as { acceptedGapIds: unknown[] }).acceptedGapIds.map(value => String(value || '').trim()).filter(Boolean))
+        const runtimeLearning = learning as DailyLearningRuntimeResult
+        const acceptedGapIds = Array.isArray(runtimeLearning.acceptedGapIds)
+          ? runtimeLearning.acceptedGapIds.map(value => String(value || '').trim()).filter(Boolean)
           : []
         const accepted = new Set(acceptedGapIds)
         const proofs = university.activePlans

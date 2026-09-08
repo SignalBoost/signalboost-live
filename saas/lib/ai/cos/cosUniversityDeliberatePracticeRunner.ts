@@ -403,8 +403,9 @@ async function practiceStateForPlan(planId: string, practiceRound: number): Prom
 async function reconcilePlan(planId: string, practiceRound: number): Promise<boolean> {
   const db = cosServiceDb()
   if (!db) return false
-  const current = await db.from('cos_university_study_plans').select('status,evidence').eq('id', planId).maybeSingle()
+  const current = await db.from('cos_university_study_plans').select('status,evidence,attempt_count').eq('id', planId).maybeSingle()
   if (current.error || !current.data) return false
+  if (current.data.status !== 'studying' || Math.max(1, Math.floor(Number(current.data.attempt_count || 1))) !== practiceRound) return false
   const state = await practiceStateForPlan(planId, practiceRound)
   const terminal = state.total >= COS_UNIVERSITY_PRACTICE_VARIANTS_PER_ROUND && state.queued === 0 && state.running === 0
   const ready = terminal && state.failed === 0 && state.passed >= COS_UNIVERSITY_PRACTICE_VARIANTS_PER_ROUND
@@ -428,8 +429,12 @@ async function reconcilePlan(planId: string, practiceRound: number): Promise<boo
     },
     updated_at: new Date().toISOString(),
   }).eq('id', planId)
+    .eq('status', 'studying')
+    .eq('attempt_count', practiceRound)
+    .select('id')
+    .maybeSingle()
   if (update.error) throw update.error
-  return ready
+  return ready && Boolean(update.data?.id)
 }
 
 async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPracticeRun> {
@@ -475,6 +480,11 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
 
   const reply = parsed.answer
   const turnId = execution.turnId
+  if (!(await practiceFenceStillValid(planId, practiceRound))) {
+    await discardClaimedPractice(item, 'university_practice_post_inference_fence_failed')
+    return { ...base, status: 'blocked', passed: null, score: null, coverage: null, turnId, reasons: ['practice_round_advanced_during_inference'] }
+  }
+
   const grade = evaluateAnswerAgainstRubric(reply, item.rubric || {
     requiredConceptGroups: [],
     forbiddenPatterns: [],
@@ -509,8 +519,11 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
     return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId, reasons: ['practice_result_record_failed'] }
   }
 
+  if (!(await practiceFenceStillValid(planId, practiceRound))) {
+    return { ...base, status: 'blocked', passed: null, score: null, coverage: null, turnId, reasons: ['practice_round_advanced_before_reconciliation'] }
+  }
   await refreshCognitiveSkillStatus(item.skill_key)
-  if (planId && practiceRound) await reconcilePlan(planId, practiceRound)
+  const ready = await reconcilePlan(planId, practiceRound)
   return {
     ...base,
     status: grade.pass ? 'passed' : 'failed',
@@ -519,6 +532,7 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
     coverage: grade.coverage,
     turnId,
     reasons: grade.pass ? [] : [grade.reason],
+    ...(ready ? {} : {}),
   }
 }
 

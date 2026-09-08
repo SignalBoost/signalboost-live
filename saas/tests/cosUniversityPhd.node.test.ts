@@ -161,6 +161,17 @@ test('a later failed research stage resets earlier passes until fresh distinct e
   assert.equal(cosUniversityPhdDistinctPassesAfterLatestFailure(rows, PROGRAM, 'independent_replication', LINEAGE, NOW), 1)
 })
 
+test('a pass at the exact failure timestamp is not post-failure evidence', () => {
+  const tiedAt = '2027-07-01T00:00:00Z'
+  const rows = [
+    evidence('independent_replication', 'r1'),
+    evidence('independent_replication', 'failure', { passed: false, observedAt: tiedAt }),
+    evidence('independent_replication', 'same-time-r2', { observedAt: tiedAt }),
+    evidence('independent_replication', 'same-time-r3', { observedAt: tiedAt }),
+  ]
+  assert.equal(cosUniversityPhdDistinctPassesAfterLatestFailure(rows, PROGRAM, 'independent_replication', LINEAGE, NOW), 0)
+})
+
 test('a failed stage resets prior passes even when the failure lacks success-only proof', () => {
   const rows = [
     evidence('independent_replication', 'r1'),

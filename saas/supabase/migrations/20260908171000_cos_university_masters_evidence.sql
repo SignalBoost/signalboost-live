@@ -4,10 +4,8 @@ create table if not exists public.cos_university_masters_evidence (
   agent_id text not null default 'cos',
   program_key text not null,
   program_id text not null check (program_id in (
-    'software_engineering','cybersecurity','mathematics','statistics_data_science',
-    'finance_economics','international_relations','business_operations',
-    'legal_regulatory_analysis','engineering_physical_sciences',
-    'social_behavioral_sciences','language_communication'
+    'applied_ai_systems','security_and_trust','quantitative_decision_science',
+    'enterprise_operations_and_governance','scientific_and_physical_systems'
   )),
   stage text not null check (stage in (
     'graduate_coursework','independent_specialist_exam','cross_domain_transfer',
@@ -28,7 +26,7 @@ create table if not exists public.cos_university_masters_evidence (
   created_at timestamptz not null default now(),
   unique (agent_id, evidence_key),
   constraint cos_university_masters_program_identity check (
-    program_key = 'masters:' || program_id || ':v1'
+    program_key = 'specialist_masters_' || program_id || '_v1'
   ),
   constraint cos_university_masters_evidence_time_order check (observed_at < valid_until),
   constraint cos_university_masters_authority_stage check (

@@ -29,12 +29,12 @@ test('Master’s study plans are module-specific preparation, never academic cre
   assert.match(runner, /cosUniversityMastersCourseworkModulePasses/)
 })
 
-test('coursework study is recorded only when that exact module retained accepted or probationary evidence', () => {
+test('coursework study is recorded only when that exact module retained accepted durable evidence', () => {
   const runner = file('lib/ai/cos/cosUniversityMastersLearningRunner.ts')
   assert.match(runner, /for \(const plan of selected\)/)
   assert.match(runner, /new ContinuousLearningCycle\(director, adapters\)\.run\(gaps, 0\)/)
-  assert.match(runner, /result\.accepted > 0 \|\| result\.probationary > 0/)
-  assert.match(runner, /successfulPlanIds\.push\(plan\.id\)/)
+  assert.match(runner, /if \(result\.accepted > 0\) successfulPlanIds\.push\(plan\.id\)/)
+  assert.doesNotMatch(runner, /result\.accepted > 0 \|\| result\.probationary > 0/)
   assert.match(runner, /markCosUniversityStudyPlansAttempted\(successfulPlanIds/)
   assert.doesNotMatch(runner, /markCosUniversityStudyPlansAttempted\(selected\.map/)
 })

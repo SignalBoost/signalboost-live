@@ -1,6 +1,5 @@
-import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
-import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
-import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
+import { callCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { evaluateAnswerAgainstRubric, type CognitivePracticeRubric } from './cognitiveSkillCandidate.ts'
@@ -19,6 +18,13 @@ const ORIGIN = 'cos_university_deliberate_practice'
 const STALE_RUNNING_AFTER_MS = 8 * 60_000
 const DEFAULT_MAX_PLANS = 4
 const DEFAULT_MAX_EXERCISES = 2
+const PRACTICE_SYSTEM_PROMPT = [
+  'You are COS executing one bounded University deliberate-practice exercise.',
+  'This is training, not an owner-facing advisory answer and not an independent academic exam.',
+  'Use the supplied case faithfully, preserve unknowns, and do not invent live or Production facts.',
+  'Return strict JSON only: {"answer":"...","confidence":0.0}.',
+  'Do not mention or reconstruct the hidden rubric.',
+].join(' ')
 
 export type CosUniversityPracticePlanRow = {
   id: string
@@ -350,7 +356,6 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
   const planId = clean(metadata.universityPlanId, 80) || null
   const planKey = clean(metadata.universityPlanKey, 160) || null
   const practiceRound = Number.isFinite(Number(metadata.practiceRound)) ? Math.max(1, Math.floor(Number(metadata.practiceRound))) : null
-  const language = clean(metadata.languageCode, 10) as CosPlatformLanguage | ''
   const base = {
     queueId: item.id,
     planId,
@@ -359,45 +364,31 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
     variantKey: item.variant_key,
   }
 
-  beginEvidenceSourceUseTurn()
-  let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
+  let execution: Awaited<ReturnType<typeof callCosReasoner>>
   try {
-    result = await tryCOSFirstAnswer({
+    execution = await callCosReasoner({
+      systemPrompt: PRACTICE_SYSTEM_PROMPT,
       prompt: item.prompt,
-      language: language || 'en',
-      privileged: true,
-      disableCache: true,
+      maxTokens: 1800,
+      temperature: 0.1,
     })
   } catch (error) {
-    flushCapturedEvidenceSourceUse()
     await deferPractice(item, `execution_error:${error instanceof Error ? error.message : String(error)}`)
     return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: null, reasons: ['execution_error'] }
   }
 
-  const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
-  const turnId = peekEvidenceSourceUseTurnId()
-  const semanticCache = result.provenance.responseSource === 'semantic_cache' || result.provenance.responseSource === 'semantic_similarity'
-  const freshLocal = Boolean(
-    result.handled
-    && result.provenance.localModelInvoked
-    && !result.provenance.externalAiInvoked
-    && !semanticCache
-    && turnId,
-  )
-  flushCapturedEvidenceSourceUse()
-
-  if (!freshLocal) {
-    const reasons = [
-      ...(result.handled ? [] : ['not_handled']),
-      ...(result.provenance.localModelInvoked ? [] : ['local_reasoning_not_recorded']),
-      ...(result.provenance.externalAiInvoked ? ['external_ai_used'] : []),
-      ...(semanticCache ? ['semantic_cache_used'] : []),
-      ...(turnId ? [] : ['turn_id_missing']),
-    ]
-    await deferPractice(item, reasons.join(';') || 'fresh_local_execution_required')
-    return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: turnId || null, reasons }
+  if (!execution) {
+    await deferPractice(item, 'local_reasoner_unavailable')
+    return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: null, reasons: ['local_reasoner_unavailable'] }
+  }
+  const parsed = parseLocalResult(execution.text)
+  if (!parsed?.answer?.trim()) {
+    await deferPractice(item, 'practice_json_unparseable')
+    return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: execution.turnId, reasons: ['practice_json_unparseable'] }
   }
 
+  const reply = parsed.answer
+  const turnId = execution.turnId
   const grade = evaluateAnswerAgainstRubric(reply, item.rubric || {
     requiredConceptGroups: [],
     forbiddenPatterns: [],
@@ -407,7 +398,7 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
   const db = cosServiceDb()
   if (!db) {
     await deferPractice(item, 'service_database_unavailable')
-    return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: turnId || null, reasons: ['service_database_unavailable'] }
+    return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId, reasons: ['service_database_unavailable'] }
   }
 
   const rpc = await db.rpc('cos_record_cognitive_practice_result', {
@@ -421,14 +412,15 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
       origin: ORIGIN,
       academicCredit: false,
       turnId,
-      responseSource: result.provenance.responseSource,
-      localModelInvoked: result.provenance.localModelInvoked,
-      externalAiInvoked: result.provenance.externalAiInvoked,
+      responseSource: 'cos_local_reasoner',
+      reasonerKind: execution.reasoner.kind,
+      reasonerLabel: execution.reasoner.label,
+      externalEscalationAllowed: false,
     },
   })
   if (rpc.error) {
     await deferPractice(item, `practice_result_record_failed:${rpc.error.message}`)
-    return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: turnId || null, reasons: ['practice_result_record_failed'] }
+    return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId, reasons: ['practice_result_record_failed'] }
   }
 
   await refreshCognitiveSkillStatus(item.skill_key)
@@ -439,7 +431,7 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
     passed: grade.pass,
     score: grade.score,
     coverage: grade.coverage,
-    turnId: turnId || null,
+    turnId,
     reasons: grade.pass ? [] : [grade.reason],
   }
 }

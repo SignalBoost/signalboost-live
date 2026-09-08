@@ -8,6 +8,7 @@ import {
   evaluateCosUniversityMastersAdmission,
   evaluateCosUniversityMastersGraduation,
   type CosUniversityMastersEvidence,
+  type CosUniversityMastersProgramId,
 } from '../lib/ai/cos/cosUniversityMasters.ts'
 
 const NOW = new Date('2026-10-01T00:00:00Z')
@@ -66,8 +67,13 @@ test('a strong generalist cannot enter a specialist Master’s with a weak prima
   assert.ok(decision.reasons.includes('subject_A_required:computer_science'))
 })
 
-function pass(stage: CosUniversityMastersEvidence['stage'], variantHash: string, extra: Partial<CosUniversityMastersEvidence> = {}): CosUniversityMastersEvidence {
+function pass(
+  stage: CosUniversityMastersEvidence['stage'],
+  variantHash: string,
+  extra: Partial<CosUniversityMastersEvidence> = {},
+): CosUniversityMastersEvidence {
   return {
+    programId: 'software_engineering',
     stage,
     passed: true,
     variantHash,
@@ -80,22 +86,34 @@ function pass(stage: CosUniversityMastersEvidence['stage'], variantHash: string,
   }
 }
 
-test('Master’s graduation requires repeated independent exams, transfer, practical proof, and capstone', () => {
-  const evidence: CosUniversityMastersEvidence[] = [
-    pass('graduate_coursework', 'coursework'),
-    pass('independent_specialist_exam', 'exam-a'),
-    pass('independent_specialist_exam', 'exam-b'),
-    pass('cross_domain_transfer', 'transfer-a'),
-    pass('cross_domain_transfer', 'transfer-b'),
-    pass('verified_practical_work', 'production-a'),
-    pass('masters_capstone', 'capstone-a'),
-    pass('masters_capstone', 'capstone-b'),
+function completeEvidence(programId: CosUniversityMastersProgramId = 'software_engineering'): CosUniversityMastersEvidence[] {
+  return [
+    pass('graduate_coursework', 'coursework', { programId }),
+    pass('independent_specialist_exam', 'exam-a', { programId }),
+    pass('independent_specialist_exam', 'exam-b', { programId }),
+    pass('cross_domain_transfer', 'transfer-a', { programId }),
+    pass('cross_domain_transfer', 'transfer-b', { programId }),
+    pass('verified_practical_work', 'production-a', { programId }),
+    pass('masters_capstone', 'capstone-a', { programId }),
+    pass('masters_capstone', 'capstone-b', { programId }),
   ]
-  const decision = evaluateCosUniversityMastersGraduation('software_engineering', evidence, NOW)
+}
+
+test('Master’s graduation requires repeated independent exams, transfer, practical proof, and capstone', () => {
+  const decision = evaluateCosUniversityMastersGraduation('software_engineering', completeEvidence(), NOW)
   assert.equal(decision.graduated, true)
   assert.equal(decision.standing, 'A')
   assert.deepEqual(decision.blockers, [])
   assert.equal(decision.authorityExpanded, false)
+})
+
+test('evidence from one Master’s program cannot graduate another specialization', () => {
+  const softwareEvidence = completeEvidence('software_engineering')
+  const cybersecurity = evaluateCosUniversityMastersGraduation('cybersecurity', softwareEvidence, NOW)
+  assert.equal(cybersecurity.graduated, false)
+  assert.equal(cybersecurity.standing, 'not_graduated')
+  assert.ok(cybersecurity.blockers.includes('independent_specialist_exam_incomplete'))
+  assert.ok(cybersecurity.blockers.includes('masters_capstone_incomplete'))
 })
 
 test('a later failed specialist exam revokes the repeated-pass stage until re-earned', () => {
@@ -116,22 +134,23 @@ test('a later failed specialist exam revokes the repeated-pass stage until re-ea
   assert.ok(decision.blockers.includes('independent_specialist_exam_incomplete'))
 })
 
-test('stale, self-scored, or wrong-authority graduate evidence cannot earn a degree', () => {
+test('stale, self-scored, wrong-authority, malformed-time, or blank-variant evidence cannot earn a degree', () => {
   const evidence: CosUniversityMastersEvidence[] = [
     pass('graduate_coursework', 'coursework'),
     pass('independent_specialist_exam', 'exam-a'),
-    pass('independent_specialist_exam', 'exam-b', { independent: false }),
+    pass('independent_specialist_exam', '   '),
     pass('cross_domain_transfer', 'transfer-a'),
     pass('cross_domain_transfer', 'transfer-b', { authority: 'verified_production' }),
     pass('verified_practical_work', 'production-a', { validUntil: '2026-09-20T00:00:00Z' }),
     pass('masters_capstone', 'capstone-a'),
-    pass('masters_capstone', 'capstone-b'),
+    pass('masters_capstone', 'capstone-b', { observedAt: 'not-a-date' }),
   ]
   const decision = evaluateCosUniversityMastersGraduation('software_engineering', evidence, NOW)
   assert.equal(decision.graduated, false)
   assert.ok(decision.blockers.includes('independent_specialist_exam_incomplete'))
   assert.ok(decision.blockers.includes('cross_domain_transfer_incomplete'))
   assert.ok(decision.blockers.includes('verified_practical_work_incomplete'))
+  assert.ok(decision.blockers.includes('masters_capstone_incomplete'))
 })
 
 test('A+ Master’s standing requires exceptional repeated evidence beyond the A minimum', () => {

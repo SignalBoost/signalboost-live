@@ -14,7 +14,7 @@ test('Master’s evidence ledger is service-only immutable academic evidence wit
   assert.match(schema, /grant select, insert on table public\.cos_university_masters_evidence to service_role/i)
   assert.match(schema, /before update or delete on public\.cos_university_masters_evidence/i)
   assert.match(schema, /authority_stage/i)
-  assert.match(schema, /program_key = 'masters:' \|\| program_id \|\| ':v1'/i)
+  assert.match(schema, /program_key = 'specialist_masters_' \|\| program_id \|\| '_v1'/i)
   assert.match(schema, /length\(btrim\(variant_hash\)\) > 0/i)
   assert.match(schema, /verified_practical = true/i)
   assert.match(schema, /stage = 'graduate_coursework' or independent = true/i)
@@ -55,6 +55,13 @@ test('Master’s enrollment is host-computed from current undergraduate and subj
   assert.match(runtime, /if \(!before\.admission\.admitted\)/)
   assert.match(runtime, /state: 'admission_denied'/)
   assert.doesNotMatch(runtime, /admitted\s*:\s*true\s*[,}]/)
+})
+
+test('Master’s runtime honors the canonical single-next-level admission and cannot open a second parallel track', () => {
+  const runtime = file('lib/ai/cos/cosUniversityMastersRuntime.ts')
+  assert.match(runtime, /loadAnyMastersEnrollment/)
+  assert.match(runtime, /existingMasters\.programKey !== before\.programKey/)
+  assert.match(runtime, /already_enrolled_at_next_level/)
 })
 
 test('Master’s academic write seam enforces active enrollment and host authority and is not browser exposed', () => {

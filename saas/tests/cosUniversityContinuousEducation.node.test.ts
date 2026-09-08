@@ -91,6 +91,23 @@ test('University practice preparation cannot outpace the normal two-exercise exe
   assert.match(route, /queueDiscipline/)
 })
 
+test('terminal failed University practice immediately reopens governed study without awarding academic credit', () => {
+  const bridge = file('lib/ai/cos/cosUniversityPracticeFailureRemediation.ts')
+  const route = file('app/api/cron/cos-university-practice/route.ts')
+  assert.match(bridge, /COS_UNIVERSITY_PRACTICE_VARIANTS_PER_ROUND/)
+  assert.match(bridge, /queue\.every\(row => row\.status !== 'queued' && row\.status !== 'running'\)/)
+  assert.match(bridge, /const failed = queue\.filter\(row => row\.status === 'failed'\)/)
+  assert.match(bridge, /failureReasons: reasons/)
+  assert.match(bridge, /last_attempt_at: null/)
+  assert.match(bridge, /requiresNewStudyAttempt: true/)
+  assert.match(bridge, /requiresIndependentRetest: true/)
+  assert.match(bridge, /academicCredit: false/)
+  assert.doesNotMatch(bridge, /recordCosUniversityAssessment/)
+  assert.doesNotMatch(bridge, /\bgrade\b/i)
+  assert.match(route, /reopenCosUniversityStudyAfterFailedPractice\(result\.runs\)/)
+  assert.ok(route.indexOf('await reopenCosUniversityStudyAfterFailedPractice') > route.indexOf('await runCosUniversityDeliberatePractice'))
+})
+
 test('exam lanes remain independent from continuous study cadence', () => {
   const vercel = JSON.parse(file('vercel.json')) as { env: Record<string, string>; crons: Array<{ path: string; schedule: string }> }
   assert.equal(vercel.env.COS_UNIVERSITY_CONTINUOUS_ENABLED, 'true')

@@ -35,7 +35,13 @@ export async function GET() {
   try {
     const now = new Date()
     const ids = Object.keys(COS_UNIVERSITY_PHD_PROGRAMS) as CosUniversityPhdProgramId[]
-    const programs = await Promise.all(ids.map(id => readCosUniversityPhdRuntimeStatus(id, now)))
+    const runtimePrograms = await Promise.all(ids.map(id => readCosUniversityPhdRuntimeStatus(id, now)))
+    const programs = runtimePrograms.map(status => ({
+      ...status,
+      currentCompetenceStanding: status.principalIndependence.ok
+        ? status.currentCompetenceStanding
+        : 'not_graduated' as const,
+    }))
     return NextResponse.json({
       ok: true,
       enabled: runtimeEnabled(),

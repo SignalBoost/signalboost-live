@@ -352,7 +352,7 @@ async function loadEvidenceRows(programId: CosUniversityPhdProgramId): Promise<E
     .order('observed_at', { ascending: true })
     .limit(10000)
   if (result.error) throw result.error
-  return (result.data || []) as EvidenceRow[]
+  return (result.data || []) as unknown as EvidenceRow[]
 }
 
 export async function readCosUniversityPhdEvidence(programId: CosUniversityPhdProgramId): Promise<CosUniversityPhdEvidence[]> {

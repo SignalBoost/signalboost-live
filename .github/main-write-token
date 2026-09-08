@@ -1,2 +1,2 @@
-base_sha=e8c8cf5ce4033bb5e9ecace6ad7d5dfde8fa57a3
-branch=feat/cos-university-phd-runtime-20260908
+base_sha=f233bcf5283676a8852e8db4964922fd91a83bee
+branch=fix/cos-phd-immutable-guard-rpc-lockdown-20260908

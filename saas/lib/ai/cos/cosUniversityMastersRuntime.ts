@@ -16,6 +16,7 @@ import {
   COS_UNIVERSITY_MASTERS_PROGRAMS,
   cosUniversityMastersCredentialKey,
   cosUniversityMastersExpectedAuthority,
+  cosUniversityMastersModuleByKey,
   cosUniversityMastersProgramKey,
   evaluateCosUniversityMastersAdmission,
   evaluateCosUniversityMastersGraduation,
@@ -31,7 +32,7 @@ import type { CosUniversitySubjectId } from './cosUniversity.ts'
 const AGENT_ID = 'cos'
 const MAX_FUTURE_CLOCK_SKEW_MS = 5 * 60_000
 const ASSESSMENT_SELECT = 'assessment_key,subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_version,scorer_authority,observed_at,valid_until'
-const EVIDENCE_SELECT = 'evidence_key,program_id,stage,passed,variant_hash,independent,verified_practical,authority,observed_at,valid_until'
+const EVIDENCE_SELECT = 'evidence_key,program_id,module_key,stage,passed,variant_hash,independent,verified_practical,authority,observed_at,valid_until'
 
 type EnrollmentRow = {
   program_key: string
@@ -54,6 +55,7 @@ type CredentialRow = {
 type MastersEvidenceRow = {
   evidence_key: string
   program_id: CosUniversityMastersProgramId
+  module_key: string | null
   stage: CosUniversityMastersEvidenceStage
   passed: boolean
   variant_hash: string
@@ -91,6 +93,7 @@ function mapCredential(row: CredentialRow | null): CosUniversityCredential | nul
 function mapEvidence(row: MastersEvidenceRow): CosUniversityMastersEvidence {
   return {
     programId: row.program_id,
+    moduleKey: row.module_key,
     stage: row.stage,
     passed: row.passed,
     variantHash: row.variant_hash,
@@ -165,6 +168,11 @@ async function loadEvidence(programKey: string): Promise<MastersEvidenceRow[]> {
     .limit(5000)
   if (result.error) throw result.error
   return ((result.data || []) as MastersEvidenceRow[]).slice().reverse()
+}
+
+export async function readCosUniversityMastersEvidence(programId: CosUniversityMastersProgramId): Promise<CosUniversityMastersEvidence[]> {
+  const rows = await loadEvidence(cosUniversityMastersProgramKey(programId))
+  return rows.map(mapEvidence)
 }
 
 export type CosUniversityMastersSharedAdmissionState = {
@@ -306,6 +314,7 @@ export async function ensureCosUniversityMastersEnrollment(
 
 export type RecordCosUniversityMastersEvidenceInput = {
   programId: CosUniversityMastersProgramId
+  moduleKey?: string | null
   evidenceKey: string
   stage: CosUniversityMastersEvidenceStage
   passed: boolean
@@ -326,9 +335,19 @@ export async function recordHostCosUniversityMastersEvidence(
   const observedMs = observedAt.getTime()
   if (!Number.isFinite(observedMs) || observedMs > Date.now() + MAX_FUTURE_CLOCK_SKEW_MS) return false
   if (input.authority !== cosUniversityMastersExpectedAuthority(input.stage)) return false
+
+  const moduleKey = String(input.moduleKey || '').trim() || null
+  if (input.stage === 'graduate_coursework') {
+    if (!moduleKey || !cosUniversityMastersModuleByKey(input.programId, moduleKey)) return false
+  } else if (moduleKey) {
+    return false
+  }
+
   const status = await readCosUniversityMastersRuntimeStatus(input.programId, observedAt)
   if (!status.enrollment || status.credential) return false
   if (status.timingStatus === 'deadline_expired' || status.timingStatus === 'not_enrolled') return false
+  const enrolledAt = Date.parse(status.enrollment.enrolledAt)
+  if (!Number.isFinite(enrolledAt) || observedMs < enrolledAt) return false
 
   const evidenceKey = String(input.evidenceKey || '').trim()
   const variantHash = String(input.variantHash || '').trim()
@@ -346,6 +365,7 @@ export async function recordHostCosUniversityMastersEvidence(
     agent_id: AGENT_ID,
     program_key: status.programKey,
     program_id: input.programId,
+    module_key: moduleKey,
     stage: input.stage,
     passed: input.passed,
     variant_hash: variantHash,

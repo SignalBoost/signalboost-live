@@ -54,7 +54,7 @@ test('bounded scholarly discovery receives canonical curriculum content before g
 test('academic focus changes relevance inputs without lowering the global relevance floor', () => {
   const { gap } = physicsGap()
   const cycle = file('lib/cos-core/layers/learning/cycle.ts')
-  assert.match(cycle, /questionTerms\.filter\(term=>!anchorSet\.has\(term\)\)\.slice\(0,12\)/)
-  assert.match(cycle, /process\.env\.COS_LEARNING_MIN_RELEVANCE\?\?'0\.12'/)
+  assert.match(cycle, /distinctTerms\(gap\.question\)\.filter\(term=>!anchorSet\.has\(term\)\)\.slice\(0,12\)/)
+  assert.match(cycle, /envNumber\('COS_LEARNING_MIN_RELEVANCE',0\.12,0,1\)/)
   assert.doesNotMatch(gap.question.slice(0, 160).toLowerCase(), /higher confidence/)
 })

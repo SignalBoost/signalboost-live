@@ -126,6 +126,20 @@ async function loadEnrollment(programKey: string): Promise<CosUniversityProgramE
   return mapEnrollment((result.data || null) as EnrollmentRow | null)
 }
 
+async function loadAnyMastersEnrollment(): Promise<CosUniversityProgramEnrollment | null> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const result = await db.from('cos_university_program_enrollments')
+    .select('program_key,program_level,enrolled_at,minimum_residence_until,target_completion_at,hard_deadline_at')
+    .eq('agent_id', AGENT_ID)
+    .eq('program_level', 'masters')
+    .order('enrolled_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (result.error) throw result.error
+  return mapEnrollment((result.data || null) as EnrollmentRow | null)
+}
+
 async function loadCredential(programId: CosUniversityMastersProgramId): Promise<CosUniversityCredential | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -257,6 +271,11 @@ export async function ensureCosUniversityMastersEnrollment(
   if (before.credential) return { enrolled: false, state: 'already_graduated', status: before, reasons: [] }
   if (!before.admission.admitted) return { enrolled: false, state: 'admission_denied', status: before, reasons: before.admission.reasons }
   if (before.enrollment) return { enrolled: false, state: 'already_enrolled', status: before, reasons: [] }
+
+  const existingMasters = await loadAnyMastersEnrollment()
+  if (existingMasters && existingMasters.programKey !== before.programKey) {
+    return { enrolled: false, state: 'admission_denied', status: before, reasons: ['already_enrolled_at_next_level'] }
+  }
 
   const db = cosServiceDb()
   if (!db) return { enrolled: false, state: 'error', status: null, reasons: ['service_database_unavailable'] }

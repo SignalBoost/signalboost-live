@@ -125,6 +125,7 @@ const tests = [
   'tests/cosUniversityExamRemediation.node.test.ts',
   'tests/cosUniversityMasters.node.test.ts',
   'tests/cosUniversityPhd.node.test.ts',
+  'tests/cosUniversityPhdRuntime.node.test.ts',
   'tests/cosUniversityAdmission.node.test.ts',
   'tests/cosUniversityAdmissionRunner.node.test.ts',
   'tests/cosUniversityActiveAcademicLane.node.test.ts',

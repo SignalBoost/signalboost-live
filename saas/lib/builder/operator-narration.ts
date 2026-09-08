@@ -68,7 +68,10 @@ function isProvingCommand(command: string): boolean {
 export function formatBuilderOperatorRepairReply(result: OperatorRepairResult): string {
   const trace = Array.isArray(result.trace) ? result.trace : []
   const events = builderEvidenceEvents(trace)
-  const failedRun = trace.find((_, index) => events[index].outcome === 'exited_nonzero')
+  // A failed diagnostic command (git log, grep, cat, sed, file view, etc.) is not reproduction
+  // evidence. Only the same test/build/typecheck/lint class accepted for successful verification
+  // may justify telling the owner that Builder reproduced the reported defect.
+  const failedRun = trace.find((entry, index) => events[index].outcome === 'exited_nonzero' && isProvingCommand(commandOf(entry)))
   const successfulRuns = trace.filter((entry, index) => events[index].outcome === 'exited_zero' && isProvingCommand(commandOf(entry)))
   const successfulRun = successfulRuns.at(-1)
   const changedPaths = unique(trace

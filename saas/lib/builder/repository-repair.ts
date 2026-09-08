@@ -4,6 +4,7 @@ import { builderPendingWriteEvidence } from './evidence-events.ts'
 import { createBuilderCodingAiPort } from '../cos/aiPort.ts'
 import { BUILDER_TURN_TIMEOUT_ERROR, createGovernedBuilderAiPort } from './control-adapter.ts'
 import { BuilderToolLoop } from './tool-loop.ts'
+import { createRepositoryRepairProofController, repositoryRepairProofCommand } from './repository-repair-proof-controller.ts'
 import { normalizeBuilderSandboxCommand } from './project-context.ts'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
 import { verifiedRepairLesson } from './verified-lessons.ts'
@@ -174,10 +175,21 @@ export async function executeSignalBoostRepositoryRepair(input: {
       }),
     }
 
+    // Repository repair proof is controller-owned, not a model suggestion. The exact recorded
+    // failing build/test runs on the pinned source before the first model edit and again after
+    // every successful mutation. This makes fail-before/change/pass-after unavoidable even when
+    // the model tries to finish with prose or spends a round on a diagnostic command.
+    const proofController = createRepositoryRepairProofController({
+      ai: createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: aiDeadlineAtMs }),
+      workspace: session,
+      runner: repositoryRunner,
+      proofCommand: repositoryRepairProofCommand(target),
+    })
+
     const result = await new BuilderToolLoop(
-      createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: aiDeadlineAtMs }),
-      session,
-      repositoryRunner,
+      proofController.ai,
+      proofController.workspace,
+      proofController.runner,
     ).run({
       objective,
       workspaceId: input.workspaceId,

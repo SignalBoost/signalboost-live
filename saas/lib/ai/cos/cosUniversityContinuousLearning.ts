@@ -1,7 +1,11 @@
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
-import { generateKnowledgeGaps, type KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
+import {
+  generateKnowledgeGaps,
+  knowledgeGapIdForSignal,
+  type KnowledgeGapSignal,
+} from '@/lib/cos-core/layers/learning/gaps'
 import { createSupabaseCOSStores, cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   approvedUrlLearningAdapter,
@@ -57,6 +61,7 @@ export type CosUniversityContinuousLearningSummary = {
 
 type ContinuousRunRow = { id: string }
 type StudyPlanStateRow = { id: string; status: string; last_attempt_at: string | null }
+type EligiblePlan = Readonly<{ id: string; planKey: string }>
 
 function emptySummary(args: {
   enabled: boolean
@@ -167,14 +172,32 @@ function signalMatchesPlan(signal: KnowledgeGapSignal, planKey: string): boolean
   return String(signal.taskId || '').endsWith(planKey)
 }
 
+export function universityPlansWithAcceptedLearning(
+  eligiblePlans: readonly EligiblePlan[],
+  signals: readonly KnowledgeGapSignal[],
+  acceptedGapIds: readonly string[],
+): string[] {
+  const accepted = new Set(acceptedGapIds)
+  if (!accepted.size) return []
+  return eligiblePlans
+    .filter(plan => signals.some(signal =>
+      signalMatchesPlan(signal, plan.planKey)
+      && accepted.has(knowledgeGapIdForSignal(signal)),
+    ))
+    .map(plan => plan.id)
+}
+
 /**
  * Machine-native COS University learning lane.
  *
  * This is intentionally a frequent bounded sweep, not a human study session. It selects current
  * University work, respects a per-plan cooldown to avoid repeatedly rereading the same objective,
- * acquires only the source classes chosen by the Learning Strategist, and persists attempts. Fresh
- * independent exam failures get their own high-priority remediation bridge so generic operational
- * retests cannot starve academic weaknesses. Examiner prompts/rubrics remain hidden from the learner.
+ * acquires only the source classes chosen by the Learning Strategist, and persists attempts. A study
+ * attempt advances only when the governed learning cycle actually retains accepted evidence for that
+ * exact plan. Retrieved-but-rejected, probationary, duplicate, or otherwise unretained material does
+ * not advance the study round or unlock fresh practice. Fresh independent exam failures get their own
+ * high-priority remediation bridge so generic operational retests cannot starve academic weaknesses.
+ * Examiner prompts/rubrics remain hidden from the learner.
  */
 export async function runCosUniversityContinuousLearning(options: {
   now?: Date
@@ -251,12 +274,12 @@ export async function runCosUniversityContinuousLearning(options: {
     const cycle = new ContinuousLearningCycle(director, adapters)
     const result = await cycle.run(gaps, 0)
 
-    summary.status = 'learned'
+    summary.status = result.accepted > 0 ? 'learned' : 'idle'
     summary.documentsAcquired = result.documentsAcquired
     summary.accepted = result.accepted
     summary.probationary = result.probationary
     summary.sourceErrors = result.sourceErrors
-    attemptedPlanIds.push(...eligiblePlans.map(plan => plan.id))
+    attemptedPlanIds.push(...universityPlansWithAcceptedLearning(eligiblePlans, signals, result.acceptedGapIds))
     summary.plansAttempted = await markCosUniversityStudyPlansAttempted(attemptedPlanIds, new Date())
     await finishContinuousSlot(claim.id, new Date(), summary, attemptedPlanIds)
     return summary

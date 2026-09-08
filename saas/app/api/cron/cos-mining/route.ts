@@ -18,6 +18,7 @@ import { runEvidenceTriggeredRetest } from '@/lib/ai/cos/evidenceTriggeredRetest
 import { recordAutonomousLearningRun } from '@/lib/ai/cos/autonomousLearningHealth.ts'
 import { operationalSystemsCurriculumSignals } from '@/lib/ai/cos/operationalSystemsLearning'
 import { backfillDirectedSoftwareApplications } from '@/lib/ai/cos/directedStudyStore'
+import { markCosUniversityStudyPlansAttempted, runCosUniversityPlanningCycle } from '@/lib/ai/cos/cosUniversityStore'
 import { touchRunpodActivityLease } from '@/lib/ai/cos/runpodActivityLease'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { queueStaleCorpusRecords, runCorpusRefreshBatch } from '@/lib/business-intelligence-corpus/refresh'
@@ -53,6 +54,8 @@ export async function GET(req: NextRequest) {
   }
 
   let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
+  let university: Awaited<ReturnType<typeof runCosUniversityPlanningCycle>> | null = null
+  let universityStudyPlansAttempted = 0
   let cognitive: Awaited<ReturnType<typeof runGovernedCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
   let certification: Awaited<ReturnType<typeof runCognitiveCertificationCycle>> | { enabled: false; errors: string[] } | null = null
   let composition: Awaited<ReturnType<typeof runCognitiveCompositionCycle>> | { enabled: false; errors: string[] } | null = null
@@ -94,15 +97,47 @@ export async function GET(req: NextRequest) {
       certification = { enabled: false, errors: [message] }
     }
 
+    // University planning is model-free and runs before acquisition. It turns independently observed
+    // weaknesses into durable study plans and method-specific gap signals; it never awards grades.
+    try {
+      university = await runCosUniversityPlanningCycle()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'COS University planning failed'
+      console.error('cron COS University planning failed:', message)
+      university = {
+        ok: false,
+        academicState: null,
+        consideredFailures: 0,
+        activePlans: [],
+        gapSignals: [],
+        errors: [message],
+      }
+    }
+
     try {
       learning = await runDailyAutonomousLearning({
         miningSummary: result.summary,
-        injectedGapSignals: operationalSystemsCurriculumSignals(),
+        injectedGapSignals: [
+          ...operationalSystemsCurriculumSignals(),
+          ...(university?.gapSignals || []),
+        ],
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Daily learning failed'
       console.error('cron cos daily learning failed:', message)
       learning = { status: 'error', error: message }
+    }
+
+    if (learning?.status === 'learned' && university?.activePlans.length) {
+      try {
+        universityStudyPlansAttempted = await markCosUniversityStudyPlansAttempted(
+          university.activePlans
+            .filter(plan => plan.acquisitionSourceKinds.length > 0)
+            .map(plan => plan.id),
+        )
+      } catch (error) {
+        console.warn('cron COS University plan-attempt recording failed:', error instanceof Error ? error.message : String(error))
+      }
     }
 
     if (learning?.status === 'error') {
@@ -202,6 +237,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     summary: result.summary,
+    university,
+    universityStudyPlansAttempted,
     learning,
     automaticLearningHealthRecorded,
     directedSoftwareBackfill,

@@ -67,7 +67,9 @@ test('University study attempts advance only from accepted learning bound to the
   assert.match(proof, /observedAt: nowIso/)
   assert.match(proof, /academicCredit: false/)
   assert.match(proof, /last_attempt_at: nowIso/)
+  assert.match(proof, /select\('id,attempt_count,status,last_attempt_at,updated_at,evidence'\)/)
   assert.match(proof, /\.eq\('attempt_count', currentAttempt\)/)
+  assert.match(proof, /\.eq\('updated_at', row\.updated_at\)/)
   assert.match(proof, /\.in\('status', \['queued', 'studying'\]\)/)
 })
 
@@ -75,6 +77,7 @@ test('University practice requires current host accepted-study proof before queu
   const proof = file('lib/ai/cos/cosUniversityStudyProof.ts')
   const gate = file('lib/ai/cos/cosUniversityPracticeStudyGate.ts')
   const route = file('app/api/cron/cos-university-practice/route.ts')
+  const runner = file('lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts')
 
   assert.match(proof, /proof\.studyAttempt !== attemptCount/)
   assert.match(proof, /proof\.source !== COS_UNIVERSITY_ACCEPTED_STUDY_PROOF_SOURCE/)
@@ -96,8 +99,28 @@ test('University practice requires current host accepted-study proof before queu
   assert.ok(gateAt >= 0)
   assert.ok(disciplineAt > gateAt)
   assert.ok(practiceAt > disciplineAt)
-  assert.match(route, /if \(!studyGate\.allowed\)/)
+  assert.match(route, /if \(!studyGate\.allowed \|\| !studyGate\.planId \|\| !studyGate\.studyAttempt\)/)
+  assert.match(route, /requiredPlanId: studyGate\.planId/)
+  assert.match(route, /requiredPracticeRound: studyGate\.studyAttempt/)
   assert.match(route, /skipped: true, programGate, studyGate/)
+
+  assert.match(runner, /function practiceFenceStillValid/)
+  assert.match(runner, /cosUniversityStudyProofEligible/)
+  assert.match(runner, /practiceRemediation/)
+  assert.match(runner, /university_practice_claim_fence_failed/)
+  assert.match(runner, /university_practice_execution_fence_failed/)
+  assert.match(runner, /contains\('metadata', practiceFenceMetadata\(requiredPlanId, requiredPracticeRound\)\)/)
+})
+
+test('Master’s accepted learning emits the same durable study proof before deliberate practice', () => {
+  const masters = file('lib/ai/cos/cosUniversityMastersLearningRunner.ts')
+  assert.match(masters, /recordAcceptedCosUniversityStudyAttempts/)
+  assert.match(masters, /const planIdByGapId = new Map/)
+  assert.match(masters, /for \(const gapId of result\.acceptedGapIds\)/)
+  assert.match(masters, /const proofs: CosUniversityAcceptedStudyProofInput\[\]/)
+  assert.match(masters, /summary\.plansAttempted = \(await recordAcceptedCosUniversityStudyAttempts\(proofs, new Date\(\)\)\)\.length/)
+  assert.match(masters, /summary\.status = summary\.plansAttempted > 0 \? 'learned' : 'idle'/)
+  assert.doesNotMatch(masters, /markCosUniversityStudyPlansAttempted/)
 })
 
 test('University practice queue discards superseded rounds without deleting audit evidence', () => {
@@ -117,6 +140,8 @@ test('University practice current academic priority outranks old current backlog
   assert.match(discipline, /return 'defer_lower_priority'/)
   assert.match(discipline, /university_practice_deferred_for_higher_academic_priority/)
   assert.match(discipline, /LOWER_PRIORITY_DEFERRAL_MS = 14 \* 60_000/)
+  assert.match(discipline, /requiredPlanId/)
+  assert.match(discipline, /requiredPracticeRound/)
   assert.match(discipline, /selectedPlanIds/)
 })
 
@@ -140,8 +165,8 @@ test('University practice preparation cannot outpace the normal two-exercise exe
   const practiceAt = route.indexOf('await runCosUniversityDeliberatePractice')
   assert.ok(disciplineAt >= 0)
   assert.ok(practiceAt > disciplineAt)
-  assert.match(route, /disciplineCosUniversityPracticeQueue\(\{ maxActivePlans: 1 \}\)/)
-  assert.match(route, /runCosUniversityDeliberatePractice\(\{ maxPlans: 1, maxExercises: 2 \}\)/)
+  assert.match(route, /disciplineCosUniversityPracticeQueue\(\{[\s\S]*maxActivePlans: 1,[\s\S]*requiredPlanId: studyGate\.planId,[\s\S]*requiredPracticeRound: studyGate\.studyAttempt/)
+  assert.match(route, /runCosUniversityDeliberatePractice\(\{[\s\S]*maxPlans: 1,[\s\S]*maxExercises: 2,[\s\S]*requiredPlanId: studyGate\.planId,[\s\S]*requiredPracticeRound: studyGate\.studyAttempt/)
   assert.match(route, /queueDiscipline/)
 })
 

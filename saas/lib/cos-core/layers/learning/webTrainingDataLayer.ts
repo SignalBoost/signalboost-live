@@ -6,6 +6,7 @@ type SearchHit = {
   url: string
   title: string
   sourceDate?: string
+  discoveryProvider?: 'brave' | 'duckduckgo_html' | 'duckduckgo_lite' | 'bing'
 }
 
 export type WebTrainingSourceClass =
@@ -48,6 +49,7 @@ const TRANSIENT_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
 const MAX_RAW_PAGE_CHARS = 300_000
 const MAX_RETAINED_PAGE_CHARS = 30_000
 const MIN_READABLE_PAGE_CHARS = 700
+const SEARCH_BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 
 function clean(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -204,29 +206,79 @@ async function requestText(fetcher: FetchLike, url: string, init: RequestInit, t
 
 function decodeDuckHref(href: string): string {
   try {
-    const url = new URL(href, 'https://html.duckduckgo.com')
+    const url = new URL(decodeEntities(href), 'https://html.duckduckgo.com')
     const target = url.searchParams.get('uddg')
-    return target ? decodeURIComponent(target) : href
+    return target ? decodeURIComponent(target) : url.toString()
   } catch {
-    return href
+    return decodeEntities(href)
   }
+}
+
+function pushUniqueHit(found: SearchHit[], seen: Set<string>, url: string, title: string, count: number, discoveryProvider: SearchHit['discoveryProvider']): void {
+  const normalizedUrl = decodeEntities(url).trim()
+  if (found.length >= count || !isSafePublicWebTrainingUrl(normalizedUrl) || seen.has(normalizedUrl)) return
+  seen.add(normalizedUrl)
+  found.push({ url: normalizedUrl, title: stripHtml(title).slice(0, 220) || normalizedUrl, discoveryProvider })
 }
 
 async function discoverDuckDuckGo(fetcher: FetchLike, query: string, count: number): Promise<SearchHit[]> {
   const { text: html } = await requestText(fetcher,
     `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
-    { headers: { accept: 'text/html', 'user-agent': 'iTMounts-COS/1.0' } }, 10_000)
+    { headers: { accept: 'text/html,application/xhtml+xml', 'accept-language': 'en-US,en;q=0.8', 'user-agent': SEARCH_BROWSER_UA } }, 10_000)
   const found: SearchHit[] = []
   const seen = new Set<string>()
-  const linkRe = /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi
+  const linkRe = /<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
   let match: RegExpExecArray | null
   while ((match = linkRe.exec(html)) && found.length < count) {
-    const url = decodeDuckHref(match[1])
-    if (!isSafePublicWebTrainingUrl(url) || seen.has(url)) continue
-    seen.add(url)
-    found.push({ url, title: stripHtml(match[2]).slice(0, 220) || url })
+    pushUniqueHit(found, seen, decodeDuckHref(match[1]), match[2], count, 'duckduckgo_html')
   }
   return found
+}
+
+async function discoverDuckDuckGoLite(fetcher: FetchLike, query: string, count: number): Promise<SearchHit[]> {
+  const { text: html } = await requestText(fetcher,
+    `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`,
+    { headers: { accept: 'text/html,application/xhtml+xml', 'accept-language': 'en-US,en;q=0.8', 'user-agent': SEARCH_BROWSER_UA } }, 10_000)
+  const found: SearchHit[] = []
+  const seen = new Set<string>()
+  const linkRe = /<a[^>]+class=["'][^"']*result-link[^"']*["'][^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  let match: RegExpExecArray | null
+  while ((match = linkRe.exec(html)) && found.length < count) {
+    pushUniqueHit(found, seen, decodeDuckHref(match[1]), match[2], count, 'duckduckgo_lite')
+  }
+  return found
+}
+
+async function discoverBing(fetcher: FetchLike, query: string, count: number): Promise<SearchHit[]> {
+  const { text: html } = await requestText(fetcher,
+    `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=${Math.min(20, Math.max(8, count * 2))}&mkt=en-US`,
+    { headers: { accept: 'text/html,application/xhtml+xml', 'accept-language': 'en-US,en;q=0.8', 'user-agent': SEARCH_BROWSER_UA } }, 10_000)
+  const found: SearchHit[] = []
+  const seen = new Set<string>()
+  const rowRe = /<li\b[^>]*class=["'][^"']*\bb_algo\b[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi
+  let rowMatch: RegExpExecArray | null
+  while ((rowMatch = rowRe.exec(html)) && found.length < count) {
+    const anchor = rowMatch[1].match(/<h2\b[^>]*>[\s\S]*?<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>[\s\S]*?<\/h2>/i)
+    if (!anchor) continue
+    pushUniqueHit(found, seen, anchor[1], anchor[2], count, 'bing')
+  }
+  return found
+}
+
+async function discoverProviderFree(fetcher: FetchLike, query: string, count: number): Promise<SearchHit[]> {
+  const providers = [discoverDuckDuckGo, discoverDuckDuckGoLite, discoverBing] as const
+  let lastError: unknown
+  for (const provider of providers) {
+    try {
+      const hits = await provider(fetcher, query, count)
+      if (hits.length) return hits
+    } catch (error) {
+      lastError = error
+    }
+  }
+  if (lastError instanceof Error) throw lastError
+  if (lastError) throw new Error(String(lastError))
+  return []
 }
 
 async function discoverBrave(fetcher: FetchLike, query: string, count: number, apiKey: string): Promise<SearchHit[]> {
@@ -237,6 +289,7 @@ async function discoverBrave(fetcher: FetchLike, query: string, count: number, a
   const raw = Array.isArray(json?.web?.results) ? json.web.results : []
   return raw.slice(0, count).map((row: any): SearchHit => ({
     url: clean(row?.url), title: clean(row?.title).slice(0, 220), sourceDate: clean(row?.age).slice(0, 100) || undefined,
+    discoveryProvider: 'brave',
   })).filter((row: SearchHit) => isSafePublicWebTrainingUrl(row.url))
 }
 
@@ -265,7 +318,7 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
     if (useBrave) {
       try { hits = await discoverBrave(fetcher, plannedQuery, discoveryLimit, braveKey) } catch { hits = [] }
     }
-    if (!hits.length) hits = await discoverDuckDuckGo(fetcher, plannedQuery, discoveryLimit)
+    if (!hits.length) hits = await discoverProviderFree(fetcher, plannedQuery, discoveryLimit)
 
     const ranked = hits
       .map((hit, index) => ({ hit, index, assessment: assessWebTrainingSource(hit.url, query) }))
@@ -298,6 +351,7 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
             `source_class=${entry.assessment.sourceClass}`,
             `source_credibility=${credibility}`,
             `source_host=${entry.assessment.host}`,
+            ...(entry.hit.discoveryProvider ? [`discovery_provider=${entry.hit.discoveryProvider}`] : []),
             ...(entry.hit.sourceDate ? [`source_date=${entry.hit.sourceDate}`] : []),
           ],
         }

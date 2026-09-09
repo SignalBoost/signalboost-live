@@ -20,6 +20,7 @@ import Link from 'next/link'
 import { FormEvent, useState, type CSSProperties } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { uiText } from '@/lib/i18n/uiText'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 type PressChannel = 'online-newspapers' | 'print-newspapers' | 'trade-press'
 
@@ -37,7 +38,7 @@ export default function DirectPressCampaignPage() {
   const [contact, setContact] = useState('')
   const [headline, setHeadline] = useState('')
   const [notes, setNotes] = useState('')
-  const [ctaUrl, setCtaUrl] = useState('https://saas.signalboostapp.com')
+  const [ctaUrl, setCtaUrl] = useState(PUBLIC_BRAND.siteUrl)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [refusals, setRefusals] = useState<string[]>([])
@@ -63,7 +64,7 @@ export default function DirectPressCampaignPage() {
             contact: contact.trim(),
             headline: headline.trim(),
             article_notes: notes.trim(),
-            cta_url: ctaUrl.trim() || 'https://saas.signalboostapp.com',
+            cta_url: ctaUrl.trim() || PUBLIC_BRAND.siteUrl,
             department: 'marketing',
             audience: 'Publication editors, readers, and business technology buyers reached through the selected press media channel.',
             language: 'en',

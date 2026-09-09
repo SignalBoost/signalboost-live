@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
+import { selectCosUniversityPracticeStudyGate } from '../lib/ai/cos/cosUniversityPracticeStudyGate.ts'
 import { cosUniversityAcceptedStudyClearsRemediationBoundary } from '../lib/ai/cos/cosUniversityStudyProofPolicy.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
@@ -16,6 +17,11 @@ const remediationEvidence = {
     academicCredit: false,
   },
 }
+
+const deliberatePracticeMethods = [{
+  id: 'deliberate_practice',
+  execution: 'automatic_if_certifiable',
+}]
 
 test('accepted study must start strictly after the current same-round remediation boundary', () => {
   assert.equal(cosUniversityAcceptedStudyClearsRemediationBoundary({
@@ -68,6 +74,62 @@ test('a different-round or absent remediation does not block genuinely newer acc
     currentAttempt: 4,
     acceptedAt: '2026-09-09T00:09:00.000Z',
   }), true)
+})
+
+test('a blocked high-priority restudy plan cannot starve the next eligible practice plan', () => {
+  const blockedPhysics = {
+    id: 'physics-plan',
+    plan_key: 'physics-plan-key',
+    priority: 100,
+    status: 'studying',
+    attempt_count: 4,
+    last_attempt_at: null,
+    methods: deliberatePracticeMethods,
+    evidence: {
+      practiceRemediation: {
+        requestedAt: '2026-09-08T21:50:35.246Z',
+        practiceRound: 4,
+        requiresNewStudyAttempt: true,
+        requiresIndependentRetest: true,
+        academicCredit: false,
+      },
+    },
+  }
+  const eligibleEnglish = {
+    id: 'english-writing-plan',
+    plan_key: 'english-writing-plan-key',
+    priority: 100,
+    status: 'studying',
+    attempt_count: 3,
+    last_attempt_at: '2026-09-09T15:30:12.777Z',
+    methods: deliberatePracticeMethods,
+    evidence: {
+      studyProof: {
+        source: 'continuous_learning_accepted_gap',
+        observedAt: '2026-09-09T15:30:12.777Z',
+        evidenceRefs: ['auto-gap:university-language:english-writing'],
+        studyAttempt: 3,
+        academicCredit: false,
+      },
+    },
+  }
+
+  const blockedOnly = selectCosUniversityPracticeStudyGate(
+    [blockedPhysics],
+    new Date('2026-09-09T16:00:00.000Z'),
+  )
+  assert.equal(blockedOnly.allowed, false)
+  assert.equal(blockedOnly.reason, 'restudy_required_after_failed_practice')
+  assert.equal(blockedOnly.planId, 'physics-plan')
+
+  const selected = selectCosUniversityPracticeStudyGate(
+    [blockedPhysics, eligibleEnglish],
+    new Date('2026-09-09T16:00:00.000Z'),
+  )
+  assert.equal(selected.allowed, true)
+  assert.equal(selected.reason, 'accepted_study_proof_verified')
+  assert.equal(selected.planId, 'english-writing-plan')
+  assert.equal(selected.studyAttempt, 3)
 })
 
 test('all University learning writers bind proof to cycle start rather than writer completion time', () => {

@@ -34,11 +34,12 @@ test('durable current-world curriculum excludes high-frequency scalar facts', ()
   assert.doesNotMatch(text, /weather forecast|stock price|sports score|exchange rate/i)
 })
 
-test('current-world acquisition uses general reference/news/official sources, not narrow academic adapters', () => {
+test('current-world acquisition uses reference, news, official and credible-web research without narrow academic adapters', () => {
   assert.equal(isCurrentWorldLearningAdapter({ id: 'reference' }), true)
   assert.equal(isCurrentWorldLearningAdapter({ id: 'gdelt' }), true)
   assert.equal(isCurrentWorldLearningAdapter({ id: 'official_docs' }), true)
   assert.equal(isCurrentWorldLearningAdapter({ id: 'tech_feeds' }), true)
+  assert.equal(isCurrentWorldLearningAdapter({ id: 'credible_web' }), true)
   assert.equal(isCurrentWorldLearningAdapter({ id: 'crossref' }), false)
   assert.equal(isCurrentWorldLearningAdapter({ id: 'openalex' }), false)
   assert.equal(isCurrentWorldLearningAdapter({ id: 'youtube_transcript' }), false)
@@ -47,6 +48,7 @@ test('current-world acquisition uses general reference/news/official sources, no
 test('a persistently failing GDELT is probed periodically while healthy sources continue hourly', () => {
   assert.equal(currentWorldAdapterDue({ id: 'reference' }, new Date('2026-08-22T05:00:00Z')), true)
   assert.equal(currentWorldAdapterDue({ id: 'official_docs' }, new Date('2026-08-22T05:00:00Z')), true)
+  assert.equal(currentWorldAdapterDue({ id: 'credible_web' }, new Date('2026-08-22T05:00:00Z')), true)
   assert.equal(currentWorldAdapterDue({ id: 'gdelt' }, new Date('2026-08-22T05:00:00Z')), false)
   assert.equal(currentWorldAdapterDue({ id: 'gdelt' }, new Date('2026-08-22T06:00:00Z')), true)
   assert.equal(currentWorldAdapterDue({ id: 'gdelt' }, new Date('2026-08-22T12:00:00Z')), true)

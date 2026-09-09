@@ -1,11 +1,12 @@
 import type { ContinuousLearningSourceAdapter } from './cycle.ts'
-import { libraryLearningConnector,newsLearningConnector,officialDocsLearningConnector,referenceLearningConnector,scientificLearningConnector,youtubeLearningConnector } from './connectors.ts'
+import { libraryLearningConnector,newsLearningConnector,officialDocsLearningConnector,referenceLearningConnector,scientificLearningConnector,SearchLearningConnector,youtubeLearningConnector } from './connectors.ts'
 import { createWikipediaSearch } from './referenceClients.ts'
 import { crossrefScientificSearch,europePmcScientificSearch,openAlexScientificSearch,openLibrarySearch } from './publicClients.ts'
 import { createGdeltNewsSearch,createYouTubeMetadataSearch,createYouTubeTranscriptSearch } from './mediaClients.ts'
 import { BUILTIN_OFFICIAL_TECH_FEEDS,createFeedSearch,parseFeedList } from './feedClients.ts'
+import { createWebTrainingResearchSearch,webTrainingMinimumCredibility } from './webTrainingDataLayer.ts'
 
-export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOURCES_ENABLED?:string;COS_TECH_RSS_FEEDS?:string;COS_OFFICIAL_DOC_FEEDS?:string;YOUTUBE_API_KEY?:string;YOUTUBE_TRANSCRIPT_API_URL?:string;YOUTUBE_TRANSCRIPT_API_TOKEN?:string;YOUTUBE_TRANSCRIPT_LANGUAGES?:string;COS_LEARNING_SOURCE_FAILURE_LIMIT?:string;COS_LEARNING_SOURCE_MIN_INTERVAL_MS?:string;LOCAL_AI_BASE_URL?:string;LOCAL_AI_API_KEY?:string }
+export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOURCES_ENABLED?:string;COS_TECH_RSS_FEEDS?:string;COS_OFFICIAL_DOC_FEEDS?:string;COS_WEB_TRAINING_ENABLED?:string;COS_WEB_TRAINING_USE_BRAVE?:string;COS_WEB_TRAINING_MIN_CREDIBILITY?:string;BRAVE_SEARCH_API_KEY?:string;YOUTUBE_API_KEY?:string;YOUTUBE_TRANSCRIPT_API_URL?:string;YOUTUBE_TRANSCRIPT_API_TOKEN?:string;YOUTUBE_TRANSCRIPT_LANGUAGES?:string;COS_LEARNING_SOURCE_FAILURE_LIMIT?:string;COS_LEARNING_SOURCE_MIN_INTERVAL_MS?:string;LOCAL_AI_BASE_URL?:string;LOCAL_AI_API_KEY?:string }
 // THIS IS WHY THE CORPUS BARELY GREW. Every live adapter was wrapped so that it returns NOTHING for
 // a 'daily-mining-' gap — live sources only ever served real queued knowledge gaps. Combined with an
 // empty gap queue (33 of 33 resolved on 2026-08-21), that meant the daily cycle acquired nothing at
@@ -28,7 +29,7 @@ function sourceIntervalMs(adapter:ContinuousLearningSourceAdapter,env:LiveLearni
   const configured=Number(env.COS_LEARNING_SOURCE_MIN_INTERVAL_MS)
   if(String(env.COS_LEARNING_SOURCE_MIN_INTERVAL_MS??'').trim()&&Number.isFinite(configured))return Math.max(0,Math.min(5000,Math.round(configured)))
   const id=adapter.id??adapter.kind
-  if(id.startsWith('youtube_')||id==='gdelt')return 750
+  if(id.startsWith('youtube_')||id==='gdelt'||id==='credible_web')return 750
   if(id==='crossref')return 250
   return 0
 }
@@ -91,11 +92,23 @@ export function resolveYouTubeTranscriptRuntime(env:LiveLearningEnvironment):{ur
  * External learning sources are available by default whenever the autonomous-learning
  * cycle calls this factory. COS_LIVE_SOURCES_ENABLED=false remains an explicit emergency
  * kill switch, but a missing variable no longer silently disables every public source.
+ *
+ * The credible_web adapter is the Web Data Layer training lane. It performs provider-free public
+ * discovery by default, reads only sources that pass a structural credibility threshold, records
+ * source-quality provenance, and then hands the material to the normal learning admission gates.
+ * Paid Brave discovery is opt-in only via COS_WEB_TRAINING_USE_BRAVE=true.
  */
 export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.env):ContinuousLearningSourceAdapter[]{
   if(env.COS_LIVE_SOURCES_ENABLED==='false')return[]
   const configuredTechFeeds=parseFeedList(env.COS_TECH_RSS_FEEDS);const configuredOfficialFeeds=parseFeedList(env.COS_OFFICIAL_DOC_FEEDS);const officialFeeds=[...BUILTIN_OFFICIAL_TECH_FEEDS,...configuredOfficialFeeds]
   const adapters:ContinuousLearningSourceAdapter[]=[scientificLearningConnector(crossrefScientificSearch,2,'crossref'),scientificLearningConnector(openAlexScientificSearch,2,'openalex'),scientificLearningConnector(europePmcScientificSearch,2,'europe_pmc'),libraryLearningConnector(openLibrarySearch,2,'open_library'),newsLearningConnector(createGdeltNewsSearch(),2,'gdelt'),officialDocsLearningConnector(createFeedSearch(officialFeeds,fetch,{fullText:true}),3,'official_docs'),referenceLearningConnector(createWikipediaSearch(),3,'reference')]
+  if(env.COS_WEB_TRAINING_ENABLED!=='false'){
+    adapters.push(new SearchLearningConnector('approved_public_web',createWebTrainingResearchSearch({
+      minCredibility:webTrainingMinimumCredibility(env.COS_WEB_TRAINING_MIN_CREDIBILITY),
+      braveApiKey:String(env.BRAVE_SEARCH_API_KEY||'').trim()||undefined,
+      useBrave:env.COS_WEB_TRAINING_USE_BRAVE==='true',
+    }),3,'credible_web'))
+  }
   if(configuredTechFeeds.length)adapters.push(newsLearningConnector(createFeedSearch(configuredTechFeeds),3,'tech_feeds'))
   if(env.YOUTUBE_API_KEY){
     const transcript=resolveYouTubeTranscriptRuntime(env)

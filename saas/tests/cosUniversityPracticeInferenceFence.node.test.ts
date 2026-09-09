@@ -21,6 +21,26 @@ test('University practice revalidates the exact plan round after inference and f
   assert.match(runner, /return ready && Boolean\(update\.data\?\.id\)/)
 })
 
+test('committed practice failure remains a failure even though the atomic RPC reopens study', () => {
+  const runner = file('lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts')
+  const rpcAt = runner.indexOf("db.rpc('cos_record_cognitive_practice_result'")
+  const statusAt = runner.indexOf('const committedQueueStatus = clean(asRecord(rpc.data).queueStatus')
+  const refreshAt = runner.indexOf('await refreshCognitiveSkillStatus(item.skill_key)', statusAt)
+  const failedAt = runner.indexOf("committedQueueStatus === 'failed'", statusAt)
+  const postCommitFenceAt = runner.indexOf('practice_round_advanced_before_reconciliation', failedAt)
+  assert.ok(rpcAt >= 0)
+  assert.ok(statusAt > rpcAt)
+  assert.ok(refreshAt > statusAt)
+  assert.ok(failedAt > refreshAt)
+  assert.ok(postCommitFenceAt > failedAt)
+  assert.match(runner, /status: 'failed',\s*passed: false/)
+  assert.match(runner, /reasons: \[grade\.reason\]/)
+  assert.match(runner, /committedQueueStatus === 'queued'/)
+  assert.match(runner, /committedQueueStatus !== 'passed'/)
+  assert.match(runner, /if \(run\.planId && run\.practiceRound && run\.status === 'passed'\)/)
+  assert.equal((runner.match(/await reconcilePlan\(/g) || []).length, 1)
+})
+
 test('canonical practice-result transaction locks the University queue and exact accepted-study plan before mutation', () => {
   const migration = file('supabase/migrations/20260908234500_cos_university_practice_atomic_result_fence.sql')
   const queueLockAt = migration.indexOf('from public.cos_active_practice_queue')

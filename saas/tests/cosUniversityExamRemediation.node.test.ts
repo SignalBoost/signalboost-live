@@ -27,6 +27,31 @@ test('failed independent exams create schema-valid priority remediation without 
   assert.doesNotMatch(bridge, /seed/)
 })
 
+test('subject exam remediation adds governed public web without broadening generic unknown study', () => {
+  const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
+  const strategist = file('lib/ai/cos/cosUniversityStudyStrategy.ts')
+
+  assert.match(bridge, /function withGovernedPublicWebForSubjectExamRemediation/)
+  assert.match(bridge, /id: 'live_authoritative_research'/)
+  assert.match(bridge, /execution: 'automatic_acquisition'/)
+  assert.match(bridge, /strategy\.acquisitionSourceKinds\.includes\('approved_public_web'\)/)
+  assert.match(bridge, /const strategy = isLanguage \? baseStrategy : withGovernedPublicWebForSubjectExamRemediation\(baseStrategy\)/)
+
+  const refreshStart = bridge.indexOf("if (!isLanguage && !row.acquisition_source_kinds.includes('approved_public_web'))")
+  const refreshEnd = bridge.indexOf('return { row, strategy }', refreshStart)
+  assert.ok(refreshStart >= 0 && refreshEnd > refreshStart)
+  const refreshBlock = bridge.slice(refreshStart, refreshEnd)
+  assert.match(refreshBlock, /\.update\(\{\s*methods: strategy\.methods,\s*acquisition_source_kinds: strategy\.acquisitionSourceKinds,\s*updated_at: now,\s*\}\)/)
+  assert.match(refreshBlock, /\.in\('status', \['queued', 'studying', 'ready_for_exam'\]\)/)
+
+  const unknownStart = strategist.indexOf("case 'reasoning':")
+  const unknownEnd = strategist.indexOf('const fineTuneCandidate', unknownStart)
+  assert.ok(unknownStart >= 0 && unknownEnd > unknownStart)
+  const unknownBranch = strategist.slice(unknownStart, unknownEnd)
+  assert.match(unknownBranch, /acquisitionSourceKinds = \[\.\.\.RAG_SOURCE_KINDS\]/)
+  assert.doesNotMatch(unknownBranch, /approved_public_web/)
+})
+
 test('later terminal pass or expired failure retires obsolete remediation instead of starving current work', () => {
   const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
   assert.match(bridge, /Only the latest terminal outcome for a competency may\s*\n \* drive remediation/i)

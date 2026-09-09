@@ -1,6 +1,7 @@
 // saas/lib/cos/video-quality/scoring.ts
 import { buildMarketingDecision, defaultMarketingDecisionInput } from '../marketing-decision/index.ts'
 import type { VideoQualityCandidate, VideoQualityComparison, VideoQualityFeature, VideoQualityScore } from './types.ts'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN, BRANDED_URL_PATTERN } from '@/lib/public-brand'
 
 const FEATURES: VideoQualityFeature[] = [
   'hero_selected',
@@ -38,7 +39,7 @@ function passes(candidate: VideoQualityCandidate, feature: VideoQualityFeature) 
     case 'format_selected': return hasText(candidate.format)
     case 'visual_scene_design': return Boolean(candidate.scenes?.some(scene => hasText(scene.visual_direction)))
     case 'non_text_motion': return Boolean(candidate.scenes?.some(scene => /animate|motion|zoom|slide|cards|gauge|wave|transition/i.test(scene.visual_direction || '')))
-    case 'branded_url': return /saas\.signalboostapp\.com/i.test(candidate.destination_url || candidate.call_to_action || '')
+    case 'branded_url': return BRANDED_URL_PATTERN.test(candidate.destination_url || candidate.call_to_action || '')
     case 'traffic_plan': return hasItems(candidate.traffic_plan)
     case 'monetization_plan': return hasItems(candidate.monetization_plan)
     case 'five_languages': return ['en', 'es', 'pt', 'pl', 'ru'].every(language => candidate.languages?.includes(language))
@@ -87,7 +88,7 @@ export function buildVideoQualityComparison(): VideoQualityComparison {
   const cosa: VideoQualityCandidate = {
     id: 'cosa_decision_video',
     label: 'COSA decision-driven video',
-    title: 'SignalBoost marketing-grade test draft',
+    title: `${PUBLIC_BRAND.name} marketing-grade test draft`,
     hero: decision.recommended_hero,
     format: decision.recommended_format,
     scenes: decision.recommended_scene_designs.map(scene => ({
@@ -95,14 +96,14 @@ export function buildVideoQualityComparison(): VideoQualityComparison {
       narration: `Show the viewer why this ${scene.replaceAll('_', ' ')} matters for the selected niche.`,
       visual_direction: `Animate ${scene.replaceAll('_', ' ')} with motion cards, branded transitions, and product proof.`,
     })),
-    destination_url: 'www.saas.signalboostapp.com',
+    destination_url: PUBLIC_BRAND_DOMAIN,
     traffic_plan: decision.traffic_plan,
     monetization_plan: decision.monetization_plan,
     languages: ['en', 'es', 'pt', 'pl', 'ru'],
     approval_gates: decision.approval_required,
     mining_summary: decision.mining_summary,
     prediction_summary: decision.prediction_summary,
-    call_to_action: 'Visit www.saas.signalboostapp.com and explore the SignalBoost console.',
+    call_to_action: `Visit ${PUBLIC_BRAND_DOMAIN} and explore the ${PUBLIC_BRAND.name} console.`,
   }
 
   const baselineScore = scoreVideoCandidate(baseline)

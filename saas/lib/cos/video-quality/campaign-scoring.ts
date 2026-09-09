@@ -7,8 +7,9 @@
 import { buildMarketingDecision } from '../marketing-decision/index.ts'
 import { scoreVideoCandidate } from './scoring.ts'
 import type { VideoQualityCandidate, VideoQualityScore } from './types.ts'
+import { PUBLIC_BRAND_DOMAIN, BRANDED_URL_PATTERN } from '@/lib/public-brand'
 
-const SIGNALBOOST_URL_PATTERN = /saas\.signalboostapp\.com/i
+const SIGNALBOOST_URL_PATTERN = BRANDED_URL_PATTERN
 
 function campaignGoalFor(campaign: any): 'traffic' | 'product_demo' | 'lead_generation' | 'monetization' | 'platform_promo' {
   const text = `${campaign.title || ''} ${campaign.objective || ''}`.toLowerCase()
@@ -50,7 +51,7 @@ export function candidateFromCampaign(campaign: any): VideoQualityCandidate {
     hero: decision.recommended_hero,
     format: decision.recommended_format,
     scenes,
-    destination_url: SIGNALBOOST_URL_PATTERN.test(callToAction) ? callToAction : 'www.saas.signalboostapp.com',
+    destination_url: SIGNALBOOST_URL_PATTERN.test(callToAction) ? callToAction : PUBLIC_BRAND_DOMAIN,
     traffic_plan: decision.traffic_plan,
     monetization_plan: decision.monetization_plan,
     languages: Array.isArray(campaign.languages) && campaign.languages.length ? campaign.languages : ['en'],

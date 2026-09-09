@@ -9,6 +9,7 @@
 // A BUYER of any portable replaces this single file (or points it at their own company record).
 // That is the whole porting story for company identity.
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import type { CompanyFacts } from '@/portable-kernel'
 
 function splitLines(value?: string | null): string[] {
@@ -160,11 +161,11 @@ export async function resolveCompanyFacts(options?: { force?: boolean }): Promis
 // code; on the seller's own deployment it is unset and the platform brand applies.
 // DO NOT use these for a signed-in user's content — use contentBrand() with their facts.
 export function hostBrandName(): string {
-  return String(process.env.PORTABLE_BRAND_NAME || '').trim() || 'SignalBoost'
+  return String(process.env.PORTABLE_BRAND_NAME || '').trim() || PUBLIC_BRAND.name
 }
 
 export function hostBrandUrl(): string {
-  return String(process.env.PORTABLE_BRAND_URL || '').trim() || 'www.' + 'saas.signalboostapp.com'
+  return String(process.env.PORTABLE_BRAND_URL || '').trim() || PUBLIC_BRAND_DOMAIN
 }
 
 // ── SELLABLE BLANK-COPY BRAND ────────────────────────────────────────────────

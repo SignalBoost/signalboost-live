@@ -1,13 +1,14 @@
 // saas/lib/cos/video-compose.ts
 // JSON2Video final campaign composer.
 // Uses a real scene template: 1080x1920 vertical support, 30fps, fixed timed
-// overlays, SignalBoostAi branding, and www.saas.signalboostapp.com text.
+// overlays, public-brand name, and public-brand domain text.
 
 import { fal } from '@fal-ai/client'
 import { BRAND_TEXT } from './brand-schema.ts'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 const J2V_ENDPOINT = 'https://api.json2video.com/v2/movies'
-const SITE = 'https://www.saas.signalboostapp.com'
+const SITE = PUBLIC_BRAND.siteUrl
 const SITE_LABEL = BRAND_TEXT.url
 const METADATA_MODEL = 'fal-ai/ffmpeg-api/metadata'
 const FINAL_SECONDS = 15

@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { isConciergeVisualObjective } from '../lib/visuals/intent.ts'
 import { resolveSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
 import { publicConciergeIdentityReply } from '../lib/ai/cos/publicConciergeIdentity.ts'
+import { resolveSemanticPublicIdentity } from '../lib/ai/cos/publicConciergeIdentityIntent.ts'
 
 const semanticReasoner = (verdict: { visual_request: boolean; anchor_user_turn: number | null }, seen?: any[]) => (async (args: any) => {
   seen?.push(args)
@@ -144,6 +145,29 @@ test('public company identity uses iTMounts and the public model prompt cannot r
   assert.match(legacyRoute, /return publicBrandText\(`You are the \$\{portableBrandName\(\)\} Concierge/)
   assert.match(browserRoute, /\.replace\(\/\\bCOS\\b\/g, PUBLIC_BRAND\.name\)/)
   assert.doesNotMatch(browserRoute, /\.replace\(\/\\bCOS\\b\/g, 'SignalBoost'\)/)
+})
+
+test('deep semantic identity routing separates current identity from naming work', async () => {
+  const currentIdentity = 'Remind me what service I am using right now'
+  assert.equal(publicConciergeIdentityReply(currentIdentity), null)
+  assert.deepEqual(
+    await resolveSemanticPublicIdentity(currentIdentity, async () => ({
+      text: JSON.stringify({ identity_intent: 'platform_identity', language: 'en' }),
+    })),
+    { intent: 'platform_identity', language: 'en' },
+  )
+
+  assert.equal(
+    await resolveSemanticPublicIdentity('Suggest a new name for my platform', async () => ({
+      text: JSON.stringify({ identity_intent: 'other', language: 'en' }),
+    })),
+    null,
+  )
+
+  const route = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /await resolveSemanticPublicIdentity\(prompt\)/)
+  assert.match(route, /publicConciergeIdentityReplyForIntent\(semanticIdentity\.intent, semanticIdentity\.language\)/)
+  assert.match(route, /identity_routing: deterministicIdentity \? 'deterministic' : 'deep-semantic'/)
 })
 
 test('new semantic-only visual requests still reach deep semantic visual detection', async () => {

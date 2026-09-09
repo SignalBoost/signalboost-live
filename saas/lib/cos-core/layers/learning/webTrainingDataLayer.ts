@@ -2,10 +2,9 @@ import type { LearningConnectorResult, LearningConnectorSearch } from './connect
 
 type FetchLike = typeof fetch
 
-type WebTrainingSearchHit = {
+type SearchHit = {
   url: string
   title: string
-  snippet: string
   sourceDate?: string
 }
 
@@ -39,11 +38,11 @@ const SCHOLARLY_HOST = /(?:^|\.)(?:arxiv\.org|europepmc\.org|ncbi\.nlm\.nih\.gov
 const LOW_SIGNAL_HOST = /(?:^|\.)(?:reddit\.com|quora\.com|medium\.com|substack\.com|blogspot\.com|wordpress\.com|facebook\.com|instagram\.com|tiktok\.com|twitter\.com|x\.com|pinterest\.com)$/i
 const TERTIARY_HOST = /(?:^|\.)(?:wikipedia\.org|wikidata\.org|stackoverflow\.com|stackexchange\.com)$/i
 const CODE_FORGE_HOST = /(?:^|\.)(?:github\.com|gitlab\.com|codeberg\.org)$/i
-const GENERIC_QUERY_TERMS = new Set([
-  'about', 'after', 'against', 'architecture', 'business', 'current', 'data', 'documentation',
-  'engineering', 'evidence', 'from', 'general', 'into', 'latest', 'official', 'primary', 'research',
-  'software', 'source', 'standard', 'standards', 'system', 'systems', 'technology', 'training',
-  'university', 'using', 'what', 'when', 'where', 'which', 'with',
+const GENERIC_TERMS = new Set([
+  'about', 'after', 'architecture', 'business', 'current', 'data', 'documentation', 'engineering',
+  'evidence', 'from', 'general', 'latest', 'official', 'primary', 'research', 'software', 'source',
+  'standard', 'standards', 'system', 'systems', 'technology', 'training', 'university', 'using',
+  'what', 'when', 'where', 'which', 'with',
 ])
 const TRANSIENT_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
 const MAX_RAW_PAGE_CHARS = 300_000
@@ -94,12 +93,8 @@ function isPrivateIpv4(host: string): boolean {
   const parts = host.split('.').map(Number)
   if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return false
   const [a, b] = parts
-  return a === 0
-    || a === 10
-    || a === 127
-    || (a === 169 && b === 254)
-    || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168)
+  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
 }
 
 function isPrivateIpv6(host: string): boolean {
@@ -113,9 +108,9 @@ export function isSafePublicWebTrainingUrl(value: string): boolean {
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return false
     if (url.username || url.password) return false
     const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
-    if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.onion')) return false
-    if (isPrivateIpv4(host) || isPrivateIpv6(host)) return false
-    return true
+    if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')
+      || host.endsWith('.internal') || host.endsWith('.onion')) return false
+    return !isPrivateIpv4(host) && !isPrivateIpv6(host)
   } catch {
     return false
   }
@@ -126,7 +121,7 @@ function significantTerms(value: string): string[] {
   const out: string[] = []
   for (const raw of String(value || '').toLowerCase().split(/[^a-z0-9-]+/)) {
     const term = raw.replace(/^-+|-+$/g, '').trim()
-    if (term.length < 3 || term.length > 40 || GENERIC_QUERY_TERMS.has(term) || /^\d+$/.test(term) || seen.has(term)) continue
+    if (term.length < 3 || term.length > 40 || GENERIC_TERMS.has(term) || /^\d+$/.test(term) || seen.has(term)) continue
     seen.add(term)
     out.push(term)
   }
@@ -137,7 +132,8 @@ function authorityTokensFromUrl(value: string): Set<string> {
   try {
     const url = new URL(value)
     const host = url.hostname.toLowerCase().replace(/^www\./, '')
-    const tokens = new Set(host.split('.').map(part => part.trim()).filter(part => part.length >= 3 && !['com', 'org', 'net', 'edu', 'gov', 'mil', 'int', 'io', 'dev', 'app', 'co'].includes(part)))
+    const ignored = new Set(['com', 'org', 'net', 'edu', 'gov', 'mil', 'int', 'io', 'dev', 'app', 'co'])
+    const tokens = new Set(host.split('.').filter(part => part.length >= 3 && !ignored.has(part)))
     if (CODE_FORGE_HOST.test(host)) {
       for (const part of url.pathname.split('/').filter(Boolean).slice(0, 2)) {
         const normalized = part.toLowerCase().replace(/[^a-z0-9-]/g, '')
@@ -152,31 +148,14 @@ function authorityTokensFromUrl(value: string): Set<string> {
 
 export function assessWebTrainingSource(url: string, query: string): WebTrainingSourceAssessment {
   const host = hostOf(url)
-  if (!isSafePublicWebTrainingUrl(url) || !host) {
-    return { sourceClass: 'low_signal', credibility: 0, host, reason: 'unsafe_or_non_public_url' }
-  }
-  if (LOW_SIGNAL_HOST.test(host)) {
-    return { sourceClass: 'low_signal', credibility: 0.2, host, reason: 'community_or_self_publishing_platform' }
-  }
-  if (STANDARDS_HOST.test(host)) {
-    return { sourceClass: 'standards_authority', credibility: 0.99, host, reason: 'standards_or_public_control_authority' }
-  }
-  if (INSTITUTIONAL_HOST.test(host)) {
-    return { sourceClass: 'institutional', credibility: 0.97, host, reason: 'government_academic_or_intergovernmental_domain' }
-  }
-  if (SCHOLARLY_HOST.test(host)) {
-    return { sourceClass: 'scholarly', credibility: 0.95, host, reason: 'scholarly_publisher_or_research_repository' }
-  }
-
-  const queryTerms = significantTerms(query)
-  const authorityTokens = authorityTokensFromUrl(url)
-  const ownerMatch = queryTerms.some(term => authorityTokens.has(term))
-  if (ownerMatch) {
-    return { sourceClass: 'owning_authority', credibility: 0.92, host, reason: 'query_entity_matches_source_domain_or_repository_owner' }
-  }
-  if (TERTIARY_HOST.test(host)) {
-    return { sourceClass: 'tertiary_reference', credibility: 0.66, host, reason: 'tertiary_or_community_reference' }
-  }
+  if (!isSafePublicWebTrainingUrl(url) || !host) return { sourceClass: 'low_signal', credibility: 0, host, reason: 'unsafe_or_non_public_url' }
+  if (LOW_SIGNAL_HOST.test(host)) return { sourceClass: 'low_signal', credibility: 0.2, host, reason: 'community_or_self_publishing_platform' }
+  if (STANDARDS_HOST.test(host)) return { sourceClass: 'standards_authority', credibility: 0.99, host, reason: 'standards_or_public_control_authority' }
+  if (INSTITUTIONAL_HOST.test(host)) return { sourceClass: 'institutional', credibility: 0.97, host, reason: 'government_academic_or_intergovernmental_domain' }
+  if (SCHOLARLY_HOST.test(host)) return { sourceClass: 'scholarly', credibility: 0.95, host, reason: 'scholarly_publisher_or_research_repository' }
+  const ownerMatch = significantTerms(query).some(term => authorityTokensFromUrl(url).has(term))
+  if (ownerMatch) return { sourceClass: 'owning_authority', credibility: 0.92, host, reason: 'query_entity_matches_source_domain_or_repository_owner' }
+  if (TERTIARY_HOST.test(host)) return { sourceClass: 'tertiary_reference', credibility: 0.66, host, reason: 'tertiary_or_community_reference' }
   return { sourceClass: 'credible_secondary', credibility: 0.7, host, reason: 'public_web_without_structural_primary_authority_signal' }
 }
 
@@ -186,17 +165,15 @@ export function webTrainingMinimumCredibility(value: unknown = process.env.COS_W
 }
 
 export function buildWebTrainingResearchQuery(query: string): string {
-  const base = clean(query).split(' ').filter(Boolean).slice(0, 20)
-  const suffix = ['authoritative', 'primary', 'source', 'official', 'documentation', 'university', 'research', 'standard']
+  const words = [...clean(query).split(' ').filter(Boolean).slice(0, 20),
+    'authoritative', 'primary', 'source', 'official', 'documentation', 'university', 'research', 'standard']
   const seen = new Set<string>()
-  const words: string[] = []
-  for (const word of [...base, ...suffix]) {
+  return words.filter(word => {
     const key = word.toLowerCase()
-    if (seen.has(key)) continue
+    if (seen.has(key)) return false
     seen.add(key)
-    words.push(word)
-  }
-  return words.join(' ').slice(0, 380).replace(/\s+\S*$/, match => words.join(' ').length > 380 ? '' : match).trim()
+    return true
+  }).join(' ').slice(0, 380).replace(/\s+\S*$/, match => words.join(' ').length > 380 ? '' : match).trim()
 }
 
 async function requestText(fetcher: FetchLike, url: string, init: RequestInit, timeoutMs: number): Promise<{ text: string; contentType: string }> {
@@ -210,11 +187,11 @@ async function requestText(fetcher: FetchLike, url: string, init: RequestInit, t
         const error = new Error(`web training source failed: ${response.status}`)
         if (!TRANSIENT_STATUS.has(response.status)) throw error
         lastError = error
-      } else {
-        const contentLength = Number(response.headers.get('content-length') || 0)
-        if (contentLength > 2_500_000) throw new Error('web training source too large')
-        return { text: await response.text(), contentType: response.headers.get('content-type') || '' }
+        continue
       }
+      const contentLength = Number(response.headers.get('content-length') || 0)
+      if (contentLength > 2_500_000) throw new Error('web training source too large')
+      return { text: await response.text(), contentType: response.headers.get('content-type') || '' }
     } catch (error) {
       lastError = error
       if (attempt >= 1) throw error
@@ -235,14 +212,11 @@ function decodeDuckHref(href: string): string {
   }
 }
 
-async function discoverDuckDuckGo(fetcher: FetchLike, query: string, count: number): Promise<WebTrainingSearchHit[]> {
-  const { text: html } = await requestText(
-    fetcher,
+async function discoverDuckDuckGo(fetcher: FetchLike, query: string, count: number): Promise<SearchHit[]> {
+  const { text: html } = await requestText(fetcher,
     `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
-    { headers: { accept: 'text/html', 'user-agent': 'iTMounts-COS/1.0' } },
-    10_000,
-  )
-  const found: WebTrainingSearchHit[] = []
+    { headers: { accept: 'text/html', 'user-agent': 'iTMounts-COS/1.0' } }, 10_000)
+  const found: SearchHit[] = []
   const seen = new Set<string>()
   const linkRe = /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi
   let match: RegExpExecArray | null
@@ -250,35 +224,25 @@ async function discoverDuckDuckGo(fetcher: FetchLike, query: string, count: numb
     const url = decodeDuckHref(match[1])
     if (!isSafePublicWebTrainingUrl(url) || seen.has(url)) continue
     seen.add(url)
-    found.push({ url, title: stripHtml(match[2]).slice(0, 220) || url, snippet: '' })
+    found.push({ url, title: stripHtml(match[2]).slice(0, 220) || url })
   }
   return found
 }
 
-async function discoverBrave(fetcher: FetchLike, query: string, count: number, apiKey: string): Promise<WebTrainingSearchHit[]> {
-  const { text } = await requestText(
-    fetcher,
+async function discoverBrave(fetcher: FetchLike, query: string, count: number, apiKey: string): Promise<SearchHit[]> {
+  const { text } = await requestText(fetcher,
     `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${Math.min(12, count)}`,
-    { headers: { accept: 'application/json', 'x-subscription-token': apiKey } },
-    10_000,
-  )
+    { headers: { accept: 'application/json', 'x-subscription-token': apiKey } }, 10_000)
   const json = JSON.parse(text)
   const raw = Array.isArray(json?.web?.results) ? json.web.results : []
-  return raw.slice(0, count).map((row: any): WebTrainingSearchHit => ({
-    url: clean(row?.url),
-    title: clean(row?.title).slice(0, 220),
-    snippet: stripHtml(clean(row?.description)).slice(0, 1200),
-    sourceDate: clean(row?.age).slice(0, 100) || undefined,
-  })).filter((row: WebTrainingSearchHit) => isSafePublicWebTrainingUrl(row.url))
+  return raw.slice(0, count).map((row: any): SearchHit => ({
+    url: clean(row?.url), title: clean(row?.title).slice(0, 220), sourceDate: clean(row?.age).slice(0, 100) || undefined,
+  })).filter((row: SearchHit) => isSafePublicWebTrainingUrl(row.url))
 }
 
-async function readTrainingPage(fetcher: FetchLike, hit: WebTrainingSearchHit): Promise<string> {
-  const { text: raw, contentType } = await requestText(
-    fetcher,
-    hit.url,
-    { headers: { accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,application/xml;q=0.7', 'user-agent': 'iTMounts-COS/1.0' } },
-    12_000,
-  )
+async function readTrainingPage(fetcher: FetchLike, hit: SearchHit): Promise<string> {
+  const { text: raw, contentType } = await requestText(fetcher, hit.url,
+    { headers: { accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,application/xml;q=0.7', 'user-agent': 'iTMounts-COS/1.0' } }, 12_000)
   if (contentType && !/(?:text\/html|application\/xhtml\+xml|text\/plain|application\/xml|text\/xml)/i.test(contentType)) return ''
   const text = stripHtml(raw.slice(0, MAX_RAW_PAGE_CHARS))
   if (/\b(?:access denied|temporarily unavailable|technical difficulties|enable javascript to continue)\b/i.test(text.slice(0, 1500))) return ''
@@ -288,18 +252,16 @@ async function readTrainingPage(fetcher: FetchLike, hit: WebTrainingSearchHit): 
 export function createWebTrainingResearchSearch(options: WebTrainingSearchOptions = {}): LearningConnectorSearch {
   const fetcher = options.fetcher ?? fetch
   const minCredibility = Number.isFinite(options.minCredibility)
-    ? Math.max(0.7, Math.min(0.99, Number(options.minCredibility)))
-    : webTrainingMinimumCredibility()
+    ? Math.max(0.7, Math.min(0.99, Number(options.minCredibility))) : webTrainingMinimumCredibility()
   const discoveryLimit = Number.isFinite(options.maxDiscoveryResults)
-    ? Math.max(3, Math.min(12, Math.floor(Number(options.maxDiscoveryResults))))
-    : 8
+    ? Math.max(3, Math.min(12, Math.floor(Number(options.maxDiscoveryResults)))) : 8
   const braveKey = clean(options.braveApiKey)
   const useBrave = options.useBrave === true && Boolean(braveKey)
 
   return async (query, limit): Promise<LearningConnectorResult[]> => {
     const plannedQuery = buildWebTrainingResearchQuery(query)
     if (!plannedQuery) return []
-    let hits: WebTrainingSearchHit[] = []
+    let hits: SearchHit[] = []
     if (useBrave) {
       try { hits = await discoverBrave(fetcher, plannedQuery, discoveryLimit, braveKey) } catch { hits = [] }
     }
@@ -308,7 +270,8 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
     const ranked = hits
       .map((hit, index) => ({ hit, index, assessment: assessWebTrainingSource(hit.url, query) }))
       .filter(entry => entry.assessment.credibility >= minCredibility)
-      .sort((a, b) => b.assessment.credibility - a.assessment.credibility || Number(Boolean(b.hit.sourceDate)) - Number(Boolean(a.hit.sourceDate)) || a.index - b.index)
+      .sort((a, b) => b.assessment.credibility - a.assessment.credibility
+        || Number(Boolean(b.hit.sourceDate)) - Number(Boolean(a.hit.sourceDate)) || a.index - b.index)
 
     const diverse: typeof ranked = []
     const hosts = new Set<string>()
@@ -319,7 +282,7 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
       if (diverse.length >= Math.min(Math.max(1, limit), 5)) break
     }
 
-    const pages = await Promise.all(diverse.map(async entry => {
+    const pages: Array<LearningConnectorResult | null> = await Promise.all(diverse.map(async entry => {
       try {
         const text = await readTrainingPage(fetcher, entry.hit)
         if (!text) return null
@@ -337,12 +300,12 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
             `source_host=${entry.assessment.host}`,
             ...(entry.hit.sourceDate ? [`source_date=${entry.hit.sourceDate}`] : []),
           ],
-        } satisfies LearningConnectorResult
+        }
       } catch {
         return null
       }
     }))
 
-    return pages.filter((row): row is LearningConnectorResult => Boolean(row))
+    return pages.flatMap(row => row ? [row] : [])
   }
 }

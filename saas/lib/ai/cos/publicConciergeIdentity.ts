@@ -68,7 +68,7 @@ const COMPANY_NAME_QUESTIONS: readonly Readonly<{
   patterns: readonly RegExp[]
 }>[] = [
   { language: 'en', patterns: [
-    /\bwhat (?:is|s) (?:the )?name of (?:our|this) company\b/,
+    /\bwhat (?:is|s) (?:the )?name of (?:our|this) (?:company|platform)\b/,
     /\bwhat (?:is|s) (?:our|this) company(?:s)? name\b/,
     /\bwhat (?:is|s) (?:the )?(?:platform|company) called\b/,
   ] },

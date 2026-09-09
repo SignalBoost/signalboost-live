@@ -337,9 +337,11 @@ export async function runCosUniversityMastersLearning(options: {
       refs.push(gapId)
       refsByPlan.set(planId, refs)
     }
+    const acceptedAt = now.toISOString()
     const proofs: CosUniversityAcceptedStudyProofInput[] = [...refsByPlan.entries()].map(([planId, evidenceRefs]) => ({
       planId,
       evidenceRefs: [...new Set(evidenceRefs)],
+      acceptedAt,
     }))
     if (proofs.length) {
       summary.plansAttempted = (await recordAcceptedCosUniversityStudyAttempts(proofs, new Date())).length

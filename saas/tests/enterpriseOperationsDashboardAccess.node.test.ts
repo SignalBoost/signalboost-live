@@ -11,9 +11,11 @@ const stateCopyUrl = new URL('../lib/i18n/operationsDashboardStateCopy.ts', impo
 const securityUrl = new URL('../lib/outreach/security.ts', import.meta.url)
 const directedStudyUrl = new URL('../app/dashboard/cos-directed-study/page.tsx', import.meta.url)
 const authCookieUrl = new URL('../lib/auth/cookies.ts', import.meta.url)
-const ownerRuntimeRoots = [
-  new URL('../app/dashboard/', import.meta.url),
+const dashboardRoot = new URL('../app/dashboard/', import.meta.url)
+const ownerAccessRoots = [
   new URL('../app/api/admin/', import.meta.url),
+  new URL('../app/auth/', import.meta.url),
+  new URL('../lib/auth/', import.meta.url),
 ]
 
 async function source(url: URL) {
@@ -60,7 +62,7 @@ test('shared admin guard denies unauthenticated and non-admin users before servi
   assert.ok(deniedIndex >= 0 && serviceRoleIndex > deniedIndex)
 })
 
-test('owner and admin runtime surfaces derive their canonical origin from iTMounts', async () => {
+test('owner and admin access seams derive their canonical origin from iTMounts', async () => {
   const [directedStudy, authCookies] = await Promise.all([
     source(directedStudyUrl),
     source(authCookieUrl),
@@ -71,13 +73,18 @@ test('owner and admin runtime surfaces derive their canonical origin from iTMoun
   assert.doesNotMatch(directedStudy, /https:\/\/saas\.signalboostapp\.com/)
   assert.doesNotMatch(authCookies, /https:\/\/saas\.signalboostapp\.com/)
 
-  const files = (await Promise.all(ownerRuntimeRoots.map(runtimeSourceFiles))).flat()
-  files.push(authCookieUrl)
   const legacyOriginLiteral = /['"`]https:\/\/saas\.signalboostapp\.com/
-
-  for (const file of files) {
+  const accessFiles = (await Promise.all(ownerAccessRoots.map(runtimeSourceFiles))).flat()
+  for (const file of accessFiles) {
     const text = await readFile(file, 'utf8')
-    assert.doesNotMatch(text, legacyOriginLiteral, `legacy canonical origin remains in ${file.pathname}`)
+    assert.doesNotMatch(text, legacyOriginLiteral, `legacy access origin remains in ${file.pathname}`)
+  }
+
+  const hostSensitiveMarker = /(?:location\.hostname|\.hostname\b|CANONICAL_HOST|canonicalHost|hostMismatch|canonicalHostAvailable|ownerSessionRequired)/
+  for (const file of await runtimeSourceFiles(dashboardRoot)) {
+    const text = await readFile(file, 'utf8')
+    if (!hostSensitiveMarker.test(text)) continue
+    assert.doesNotMatch(text, legacyOriginLiteral, `legacy host gate remains in ${file.pathname}`)
   }
 })
 

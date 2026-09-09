@@ -2,7 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { detectConciergeVisualIntent, hasVisualActionToken, isConciergeVisualObjective } from '../lib/visuals/intent.ts'
-import { isSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
+import { isSemanticVisualRequest, resolveSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
 import { readRepoFile, requireWiring } from './helpers/requiredWiring.ts'
 
 const reasoner = (verdict: unknown, seen?: string[]) => (async (args: any) => {
@@ -12,30 +12,21 @@ const reasoner = (verdict: unknown, seen?: string[]) => (async (args: any) => {
 
 const offline = (async () => null) as any
 
-// PR #1939 made draw/sketch/paint/illustrate self-sufficient verbs, so the exact
-// production prompt is now admitted deterministically and never reaches the
-// semantic classifier. This pins that outcome directly.
 test('the exact production prompt routes to the visual generator deterministically', async () => {
   const prompt = 'draw 2 kids playing football in the rain'
   assert.equal(isConciergeVisualObjective(prompt), true)
   assert.deepEqual(detectConciergeVisualIntent(prompt), { filename: 'visual.png', mode: 'generate' })
-  // The route consults the network only when the fast path declined, so a prompt
-  // the deterministic list already accepts still costs no model call.
   const route = await readRepoFile('app/api/cos-browser/route.ts')
   requireWiring(route, {
     file: 'saas/app/api/cos-browser/route.ts',
-    purpose: 'Consult the semantic classifier only when the deterministic list declined, so an accepted prompt costs no model call.',
-    expect: /isConciergeVisualObjective\(prompt\) \? false : await isSemanticVisualRequest\(prompt\)/,
-    insert: '    const semanticVisual = isConciergeVisualObjective(prompt) ? false : await isSemanticVisualRequest(prompt)',
-    after: '    // this identical gate, so Concierge and the owner Assistant draw alike.',
-    requiresImport: "import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
+    purpose: 'Keep explicit visual requests on the zero-cost fast path while semantic ambiguity uses the deep conversation classifier.',
+    expect: /const directVisual = isConciergeVisualObjective\(prompt\)/,
+    insert: '    const directVisual = isConciergeVisualObjective(prompt)',
+    after: '    // ambiguous — including follow-up language — is decided by the deep semantic reasoner',
+    requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })
 })
 
-// The verb list closes the draw/paint family. It cannot close the generic verbs,
-// because create/make/design/generate are used for text work just as often as for
-// pictures — the deliverable, not the verb, decides. That is the gap the semantic
-// classifier covers.
 test('a generic verb with a depictable subject is admitted only semantically', async () => {
   for (const prompt of [
     'create a golden retriever wearing sunglasses on a skateboard',
@@ -76,9 +67,6 @@ test('ordinary work keeping the same generic verbs is never turned into a pictur
   }
 })
 
-// The word list no longer gates entry to the network, so inflected and
-// pronoun-attached forms that no constant will ever enumerate are judged on
-// meaning. Every prompt below is invisible to the deterministic verb list.
 test('inflected phrasings the verb list cannot enumerate reach the network and are admitted', async () => {
   for (const prompt of [
     'narysujcie statek kosmiczny',
@@ -95,9 +83,6 @@ test('inflected phrasings the verb list cannot enumerate reach the network and a
   }
 })
 
-// Removing the verb precondition moves the whole safety burden onto the verdict.
-// A negative verdict must still refuse, including for prompts that carry no
-// drawing verb at all and would previously have been refused by the list.
 test('a negative verdict refuses, with or without a drawing verb', async () => {
   for (const prompt of [
     'what is the weather in Merida today',
@@ -119,16 +104,37 @@ test('the classifier fails closed on outage, junk and malformed verdicts', async
   assert.equal(await isSemanticVisualRequest(`create ${'x'.repeat(500)}`, reasoner({ depictable_image: true })), false)
 })
 
-test('the browser ingress uses the semantic gate and forwards its verdict', async () => {
+test('conversation follow-ups are resolved semantically from recent user context', async () => {
+  const messages = [
+    { role: 'user', content: 'design a new logo for iTMounts' },
+    { role: 'assistant', content: 'first version' },
+    { role: 'user', content: 'do something better than that' },
+  ]
+  const seen: string[] = []
+  const result = await resolveSemanticVisualRequest(
+    messages,
+    'do something better than that',
+    reasoner({ visual_request: true, anchor_user_turn: 0 }, seen),
+  )
+  assert.ok(result)
+  assert.equal(result.continuation, true)
+  assert.match(result.objective, /design a new logo for iTMounts/)
+  assert.match(result.objective, /do something better than that/)
+  assert.match(seen[0] || '', /RECENT USER TURNS:/)
+})
+
+test('the browser ingress uses the deep semantic gate and forwards its resolved objective', async () => {
   const route = await readRepoFile('app/api/cos-browser/route.ts')
   requireWiring(route, {
     file: 'saas/app/api/cos-browser/route.ts',
-    purpose: 'Forward the semantic verdict to the visuals route so it can admit a request that named no picture-noun.',
-    expect: /semanticVisual/,
-    insert: "      body: JSON.stringify({ objective: prompt, semanticVisual })",
-    after: '      headers.delete(\'content-length\')',
-    requiresImport: "import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
+    purpose: 'Use the deep semantic conversation verdict and preserve the exact user-authored resolved visual objective.',
+    expect: /const semanticResolution = directVisual \? null : await resolveSemanticVisualRequest\(messages, prompt\)/,
+    insert: '    const semanticResolution = directVisual ? null : await resolveSemanticVisualRequest(messages, prompt)',
+    after: '    const directVisual = isConciergeVisualObjective(prompt)',
+    requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })
+  assert.match(route, /body: JSON\.stringify\(\{ objective: visualObjective, semanticVisual \}\)/)
+
   const visuals = await readRepoFile('app/api/visuals/route.ts')
   requireWiring(visuals, {
     file: 'saas/app/api/visuals/route.ts',

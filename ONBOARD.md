@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.79  
+**Version:** 1.81  
 **Updated:** 2026-09-09  
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)  
 **Canonical public product:** **iTMounts**  
@@ -407,6 +407,18 @@ Repair contract:
 - public Concierge identity questions use deterministic product identity and never invent employment or government affiliation;
 - the exact reported six-turn transcript is a mandatory regression.
 
+# Public Concierge company identity repair — 2026-09-09
+
+The public model prompt still described the retired product name as authoritative after the iTMounts cutover. A live question asking for the company's name therefore returned SignalBoost even though rendered UI branding was correct.
+
+Repair contract:
+
+- public Concierge system prompts pass through the canonical `publicBrandText` seam before inference;
+- internal COS presentation labels resolve to `PUBLIC_BRAND.name`, never a hard-coded legacy brand;
+- direct public company-name questions resolve deterministically to **iTMounts**;
+- legacy repository/service/domain identifiers may remain internal but cannot override public product identity;
+- the reported logo-then-company-name exchange is a mandatory regression.
+
 # Runtime inference / provider source of truth
 
 The model/provider is replaceable compute. **COS is the learner.**
@@ -600,3 +612,15 @@ Success means:
 - Production claims resolve to actual merged code, READY deployment, and the live evidence appropriate to the claim.
 
 **iTMounts is the public product. COS is the brain. Concierge is the public face. Specialists are expert workers.**
+
+
+## Semantic identity routing — 2026-09-09
+
+Public identity is a two-layer contract:
+
+1. Deterministic handling may answer obvious identity wording immediately.
+2. Every unmatched public prompt is classified by the deep COS reasoner before domain naming or other workflows. The classifier distinguishes existing platform identity, Concierge employer identity, and actual naming work.
+3. Identity answers always render canonical static facts from `lib/public-brand.ts`; model output may select intent and language but may never supply the company name.
+4. Malformed or ambiguous semantic verdicts fail closed into normal routing.
+
+This prevents phrasing gaps from sending “What is this platform called?” into name generation while preserving deep-learning interpretation rather than expanding a permanent regex list.

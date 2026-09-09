@@ -1,4 +1,7 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosUniversityAcceptedStudyClearsRemediationBoundary } from './cosUniversityStudyProofPolicy.ts'
+
+export { cosUniversityAcceptedStudyClearsRemediationBoundary } from './cosUniversityStudyProofPolicy.ts'
 
 export const COS_UNIVERSITY_ACCEPTED_STUDY_PROOF_SOURCE = 'continuous_learning_accepted_gap' as const
 const MAX_FUTURE_CLOCK_SKEW_MS = 5 * 60_000
@@ -82,24 +85,6 @@ export function cosUniversityStudyProofEligible(input: {
   return Number.isFinite(observedMs)
     && observedMs <= nowMs + MAX_FUTURE_CLOCK_SKEW_MS
     && observedMs === lastAttemptMs
-}
-
-function remediationBoundaryMs(evidence: Record<string, unknown>, currentAttempt: number): number | null {
-  const remediation = asRecord(evidence.practiceRemediation)
-  if (remediation.requiresNewStudyAttempt !== true || Number(remediation.practiceRound) !== currentAttempt) return null
-  const requestedAt = Date.parse(clean(remediation.requestedAt, 100))
-  return Number.isFinite(requestedAt) ? requestedAt : Number.POSITIVE_INFINITY
-}
-
-export function cosUniversityAcceptedStudyClearsRemediationBoundary(input: {
-  evidence: unknown
-  currentAttempt: number
-  acceptedAt: string
-}): boolean {
-  const timestampMs = acceptedAtMs(input.acceptedAt)
-  if (timestampMs === null) return false
-  const boundaryMs = remediationBoundaryMs(asRecord(input.evidence), Math.max(0, Math.floor(Number(input.currentAttempt || 0))))
-  return boundaryMs === null || timestampMs > boundaryMs
 }
 
 /**

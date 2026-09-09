@@ -60,6 +60,7 @@ export async function GET(req: NextRequest) {
   }
 
   let learning: Awaited<ReturnType<typeof runDailyAutonomousLearning>> | { status: 'error'; error: string } | null = null
+  let dailyLearningStartedAt: string | null = null
   let university: Awaited<ReturnType<typeof runCosUniversityPlanningCycle>> | null = null
   let universityStudyPlansAttempted = 0
   let cognitive: Awaited<ReturnType<typeof runGovernedCognitiveLearningCycle>> | { enabled: false; errors: string[] } | null = null
@@ -121,6 +122,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
+      dailyLearningStartedAt = new Date().toISOString()
       learning = await runDailyAutonomousLearning({
         miningSummary: result.summary,
         injectedGapSignals: operationalSystemsCurriculumSignals().concat(university?.gapSignals || []),
@@ -142,6 +144,7 @@ export async function GET(req: NextRequest) {
           ? runtimeLearning.acceptedGapIds.map(value => String(value || '').trim()).filter(Boolean)
           : []
         const accepted = new Set(acceptedGapIds)
+        const acceptedAt = dailyLearningStartedAt || dailyStartedAt
         const proofs = university.activePlans
           .filter(plan => plan.acquisitionSourceKinds.length > 0)
           .flatMap(plan => {
@@ -149,7 +152,7 @@ export async function GET(req: NextRequest) {
               .filter(signal => String(signal.taskId || '').endsWith(plan.planKey))
               .map(signal => knowledgeGapIdForSignal(signal))
               .filter(gapId => accepted.has(gapId)))]
-            return evidenceRefs.length ? [{ planId: plan.id, evidenceRefs }] : []
+            return evidenceRefs.length ? [{ planId: plan.id, evidenceRefs, acceptedAt }] : []
           })
         universityStudyPlansAttempted = (await recordAcceptedCosUniversityStudyAttempts(proofs, new Date())).length
       } catch (error) {

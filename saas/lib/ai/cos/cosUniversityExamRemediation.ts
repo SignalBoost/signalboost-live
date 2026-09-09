@@ -65,6 +65,26 @@ function key(parts: string[]): string {
   return createHash('sha256').update(parts.join('|')).digest('hex')
 }
 
+function withGovernedPublicWebForSubjectExamRemediation(
+  strategy: CosUniversityStudyStrategy,
+): CosUniversityStudyStrategy {
+  const methods: CosUniversityStudyStrategy['methods'] = strategy.methods.some(item => item.id === 'live_authoritative_research')
+    ? strategy.methods
+    : [
+        ...strategy.methods,
+        {
+          id: 'live_authoritative_research',
+          execution: 'automatic_acquisition',
+          reason: 'Independent subject-exam remediation may use governed authoritative public-web evidence while preserving source admission and examiner isolation.',
+        },
+      ]
+  const acquisitionSourceKinds: CosUniversityStudyStrategy['acquisitionSourceKinds'] = strategy.acquisitionSourceKinds.includes('approved_public_web')
+    ? strategy.acquisitionSourceKinds
+    : [...strategy.acquisitionSourceKinds, 'approved_public_web']
+
+  return { ...strategy, methods, acquisitionSourceKinds }
+}
+
 function examTarget(row: FailedExamRow): CosUniversityExamTarget | null {
   if (row.target_kind === 'subject' && row.subject_id) {
     return { kind: 'subject', subjectId: row.subject_id }
@@ -155,7 +175,8 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
   if (!db) return null
   const isLanguage = failure.target_kind === 'language' && failure.language_code && failure.language_dimension
   const subjectId: CosUniversitySubjectId = isLanguage ? 'language_communication' : failure.subject_id || 'reasoning_decision_science'
-  const strategy = selectCosUniversityStudyStrategy({ failureClass: isLanguage ? 'language' : 'unknown', repeatedFailures: 1, independentRetestFailures: 1 })
+  const baseStrategy = selectCosUniversityStudyStrategy({ failureClass: isLanguage ? 'language' : 'unknown', repeatedFailures: 1, independentRetestFailures: 1 })
+  const strategy = isLanguage ? baseStrategy : withGovernedPublicWebForSubjectExamRemediation(baseStrategy)
   const planKey = key(['independent_exam_failure', failure.id, subjectId, failure.language_code || '', failure.language_dimension || ''])
   const objective = isLanguage
     ? `Remediate the weakness demonstrated by a fresh independent unseen ${failure.language_code} ${String(failure.language_dimension).replaceAll('_', ' ')} examination. Study and practice the competency broadly without access to the hidden exam rubric, then prove improvement on a new independent case.`
@@ -192,13 +213,33 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
   }, { onConflict: 'plan_key', ignoreDuplicates: true })
   if (insert.error) throw insert.error
 
+  const selectFields = 'id,plan_key,subject_id,language_code,language_dimension,failure_class,source_kind,objective,priority,methods,acquisition_source_kinds,fine_tune_candidate,status'
   const result = await db.from('cos_university_study_plans')
-    .select('id,plan_key,subject_id,language_code,language_dimension,failure_class,source_kind,objective,priority,methods,acquisition_source_kinds,fine_tune_candidate,status')
+    .select(selectFields)
     .eq('plan_key', planKey)
     .maybeSingle()
   if (result.error) throw result.error
   if (!result.data || result.data.status === 'completed' || result.data.status === 'superseded') return null
-  return { row: result.data as PlanRow, strategy }
+
+  let row = result.data as PlanRow
+  // Existing remediation plans predate the governed web lane. Refresh only the source policy on an
+  // active subject-remediation plan; never reset its status, attempts, proof fence, or exam lineage.
+  if (!isLanguage && !row.acquisition_source_kinds.includes('approved_public_web')) {
+    const refreshed = await db.from('cos_university_study_plans')
+      .update({
+        methods: strategy.methods,
+        acquisition_source_kinds: strategy.acquisitionSourceKinds,
+        updated_at: now,
+      })
+      .eq('id', row.id)
+      .in('status', ['queued', 'studying', 'ready_for_exam'])
+      .select(selectFields)
+      .maybeSingle()
+    if (refreshed.error) throw refreshed.error
+    if (refreshed.data) row = refreshed.data as PlanRow
+  }
+
+  return { row, strategy }
 }
 
 export async function ensureCosUniversityExamFailureRemediationPlans(options: {

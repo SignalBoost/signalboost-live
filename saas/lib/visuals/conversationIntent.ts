@@ -35,8 +35,10 @@ const VISUAL_REVISION_PATTERNS = [
 
 function isVisualRevisionRequest(prompt: string): boolean {
   const value = String(prompt || '').trim()
-  if (!value || TEXTUAL_DISCUSSION.test(value)) return false
-  return VISUAL_REVISION_PATTERNS.some((pattern) => pattern.test(value))
+  if (!value) return false
+  const explicitRevision = VISUAL_REVISION_PATTERNS.some((pattern) => pattern.test(value))
+  if (TEXTUAL_DISCUSSION.test(value) && !explicitRevision) return false
+  return explicitRevision
 }
 
 /**

@@ -4,11 +4,12 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 
 import { VideoPreviewRenderer } from '@/lib/cos/ui/VideoPreviewRenderer'
 import { uiText } from '@/lib/i18n/uiText'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
-const SAAS_URL = 'www.' + 'saas.signalboostapp.com'
+const SAAS_URL = PUBLIC_BRAND_DOMAIN
 
 const scenes = [
-  { label: uiText('generatedUi.u_e4bb9f1ece9af926'), narration: `Start at ${SAAS_URL} and enter the SignalBoost console.`, visual_direction: 'Show the SignalBoost platform address and the main console.' },
+  { label: uiText('generatedUi.u_e4bb9f1ece9af926'), narration: `Start at ${SAAS_URL} and enter the ${PUBLIC_BRAND.name} console.`, visual_direction: `Show the ${PUBLIC_BRAND.name} platform address and the main console.` },
   { label: uiText('generatedUi.u_29a40861bafe31e7'), narration: 'The console gives the user one place to see current work, metrics, and next steps.', visual_direction: 'Show dashboard cards moving into one clean view.' },
   { label: uiText('generatedUi.u_aff0766a5290e117'), narration: 'The review cockpit shows proposed work before it moves forward.', visual_direction: 'Show a review card and a clear status summary.' },
   { label: uiText('generatedUi.u_a991aed496e3a816'), narration: 'Live service data helps the user see what is working and what needs attention.', visual_direction: 'Show live status cards and a recommended next step.' },

@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { CosaCampaignConfigurator } from '@/components/enterprise'
 import { uiText } from '@/lib/i18n/uiText'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
@@ -61,8 +62,8 @@ function videoStatusText(video: any) {
   if (video.status === 'rendering') return 'Base render is still running.'
   if (video.status === 'failed') return `Base render failed: ${String(video.error || 'unknown error')}`
   if (video.status === 'ready' && video.branded === true && video.voicedUrl) return 'Final branded video is ready.'
-  if (video.status === 'ready' && video.unbrandedVoiced && Object.keys(video.unbrandedVoiced).length) return 'Voice/captions are ready. Waiting for the SignalBoostAi banner worker.'
-  if (video.status === 'ready' && video.url) return 'Raw base video exists. Waiting for voice, captions, and SignalBoostAi banner. The raw 5-second draft is intentionally hidden.'
+  if (video.status === 'ready' && video.unbrandedVoiced && Object.keys(video.unbrandedVoiced).length) return `Voice/captions are ready. Waiting for the ${PUBLIC_BRAND.name} banner worker.`
+  if (video.status === 'ready' && video.url) return `Raw base video exists. Waiting for voice, captions, and the ${PUBLIC_BRAND.name} banner. The raw 5-second draft is intentionally hidden.`
   return 'Waiting for final video preparation.'
 }
 

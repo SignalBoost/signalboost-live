@@ -1,9 +1,11 @@
 'use client'
 
+import { PUBLIC_BRAND } from '@/lib/public-brand'
+
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
 
-export function SignalBoostGuide({ active = false, label = 'SignalBoost AI' }: { active?: boolean; label?: string }) {
+export function SignalBoostGuide({ active = false, label = PUBLIC_BRAND.name }: { active?: boolean; label?: string }) {
   return (
     <div aria-label={label} style={{ position: 'relative', width: 278, minHeight: 284 }}>
       <style>{`

@@ -1,10 +1,10 @@
-// saas/lib/cos/chat-intelligence/build.ts
 import { buildMarketingDecision, defaultMarketingDecisionInput } from '../marketing-decision/index.ts'
 import { buildPresenterVideoDraft } from '../presenter-video/index.ts'
 import type { CosChatIntelligence, CosChatIntelligenceInput } from './types.ts'
 import { hostBrandName } from '@/lib/portable/companyIdentity'
+import { PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
-const DEFAULT_URL = 'www.' + 'saas.signalboostapp.com'
+const DEFAULT_URL = PUBLIC_BRAND_DOMAIN
 
 function inferGoal(text: string) {
   const lower = text.toLowerCase()

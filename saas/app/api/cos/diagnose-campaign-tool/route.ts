@@ -1,4 +1,3 @@
-// saas/app/api/cos/diagnose-campaign-tool/route.ts
 // Deterministic diagnostic v2: exercises the campaign-creation pipeline in
 // separately TIME-BOXED stages so it can never hang the browser — a stage that
 // stalls is reported as 'TIMED OUT' with its name, which IS the answer.
@@ -11,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getAccess } from '@/lib/auth/access'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -125,11 +125,11 @@ export async function GET(req: NextRequest) {
   // full — identical to the chat tool's call
   const { proposeCampaign } = await import('@/lib/ai/proposeCampaign')
   const r = await timebox('proposeCampaign (full, same as chat tool)', proposeCampaign({
-    goal: 'DIAGNOSTIC TEST: YouTube marketing campaign for SignalBoostAi targeting small business owners, hotels and restaurants.',
+    goal: 'DIAGNOSTIC TEST: YouTube marketing campaign for ${PUBLIC_BRAND.name} targeting small business owners, hotels and restaurants.',
     audience: 'Small business owners, hotels, restaurants, entrepreneurs.',
     channel: 'youtube',
     language: 'en',
-    callToAction: 'Visit www.saas.signalboostapp.com',
+    callToAction: `Visit ${PUBLIC_BRAND_DOMAIN}`,
   }))
   return NextResponse.json({
     stage: 'full', tookMs: Date.now() - startedAt, result: r,

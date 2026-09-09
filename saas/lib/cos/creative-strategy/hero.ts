@@ -1,10 +1,10 @@
-// saas/lib/cos/creative-strategy/hero.ts
 import type { CosHeroArchetype, CosHeroStrategy, CosHeroStrategyInput } from './types.ts'
 import { isSoldCopy } from '@/lib/portable/companyIdentity'
 import type { CompanyFacts } from '@/portable-kernel'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 const FIVE_LANGUAGES = ['en', 'es', 'pt', 'pl', 'ru'] as const
-const DESTINATION_URL = 'www.' + 'saas.signalboostapp.com'
+const DESTINATION_URL = PUBLIC_BRAND_DOMAIN
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -75,7 +75,7 @@ export function buildCosHeroStrategy(input: CosHeroStrategyInput): CosHeroStrate
 
 export function defaultCosHeroStrategyInput(facts?: CompanyFacts | null): CosHeroStrategyInput {
   const brand = facts?.brandName?.trim() || (isSoldCopy() ? '[YOUR COMPANY]' : 'SignalBoost')
-  const product = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : 'SignalBoost SaaS console')
+  const product = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : `${PUBLIC_BRAND.name} SaaS console`)
   return {
     company_name: brand,
     product_or_service: product,

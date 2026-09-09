@@ -1,4 +1,3 @@
-// saas/app/api/cos/campaign-queue/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { buildDefaultMarketingRecommendation } from '@/lib/cos/recommendation/engine'
@@ -10,14 +9,22 @@ import type { CosCampaignQueueStatus } from '@/lib/cos/campaign-queue'
 import { startSiteVideo } from '@/lib/operator/video'
 import { computeCampaignContentHash, withApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
 import { callModel } from '@/lib/ai/modelRouter'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 
-const NEW_DESTINATION = ['www', 'saas', 'signalboostapp', 'com'].join('.')
+// Canonical public destination. Older campaign rows still carry retired spellings, so
+// cleanDestination rewrites each to this one. Ordered longest-first: a shorter legacy form
+// must not match inside a longer one and leave a fragment behind.
+const NEW_DESTINATION = PUBLIC_BRAND_DOMAIN
 const OLD_DESTINATION = ['signalboostapp', 'com'].join('.')
-const DUPLICATE_DESTINATION = ['www', 'saas', 'www', 'saas', 'signalboostapp', 'com'].join('.')
-const WWW_OLD_DESTINATION = ['www', 'signalboostapp', 'com'].join('.')
-const SAAS_URL = 'www.saas.signalboostapp.com'
+const LEGACY_DESTINATIONS = [
+  ['www', 'saas', 'www', 'saas', 'signalboostapp', 'com'].join('.'),
+  ['www', 'saas', 'signalboostapp', 'com'].join('.'),
+  ['saas', 'signalboostapp', 'com'].join('.'),
+  ['www', 'signalboostapp', 'com'].join('.'),
+]
+const SAAS_URL = PUBLIC_BRAND_DOMAIN
 const VIDEO_CHANNELS: CosChannel[] = ['youtube', 'short_video']
 
 type OutreachChannel = 'online-newspapers' | 'print-newspapers' | 'trade-press' | 'email-outreach'
@@ -37,9 +44,13 @@ function normalizeStatus(value: unknown): CosCampaignQueueStatus | null {
 
 function cleanDestination(value: any): any {
   if (typeof value === 'string') {
-    return value
-      .split(DUPLICATE_DESTINATION).join(NEW_DESTINATION)
-      .split(WWW_OLD_DESTINATION).join(NEW_DESTINATION)
+    // The bare apex is deliberately rewritten only inside these phrases: a blanket replace
+    // would also rewrite contact addresses that legitimately keep the legacy domain.
+    const rewritten = LEGACY_DESTINATIONS.reduce(
+      (text, legacy) => text.split(legacy).join(NEW_DESTINATION),
+      value,
+    )
+    return rewritten
       .split(`Visit ${OLD_DESTINATION}`).join(`Visit ${NEW_DESTINATION}`)
       .split(`URL on screen: ${OLD_DESTINATION}`).join(`URL on screen: ${NEW_DESTINATION}`)
       .split(`CTA: Visit ${OLD_DESTINATION}`).join(`CTA: Visit ${NEW_DESTINATION}`)
@@ -188,6 +199,7 @@ function secondaryChannelsFromDirective(text: string) {
   if (lower.includes('blog') || lower.includes('seo')) channels.push('blog')
   return channels.length ? Array.from(new Set(channels)) : ['youtube', 'tiktok', 'linkedin']
 }
+
 function requestFromAutonomousDirective(input: unknown) {
   if (typeof input !== 'string') return null
   const directive = input.replace(/\s+/g, ' ').trim().slice(0, 1_200)
@@ -326,7 +338,7 @@ async function draftOutreachEmailForCampaign(campaign: any, outreachChannel: Out
     `Outreach channel: ${outreachChannel.replace(/-/g, ' ')}`,
     `Target audience: ${audience}`,
     `Objective from the Chief of Staff request: ${objective}`,
-    `Sender: SignalBoost (${SAAS_URL})`,
+    `Sender: ${PUBLIC_BRAND.name} (${SAAS_URL})`,
     '',
     'Draft the outreach email now.',
   ].join('\n')
@@ -369,6 +381,7 @@ async function mirrorCosaCampaignToOutreachQueue(admin: any, campaign: any, outr
   if (error) return { mirrored: false, error: error.message }
   return { mirrored: true, outreach_id: data?.id || null, drafted_by: draft.drafted_by, subject: draft.subject }
 }
+
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()
   if (ctx instanceof NextResponse) return ctx
@@ -451,7 +464,7 @@ export async function PATCH(req: NextRequest) {
     if (!kindCheck.ok) return NextResponse.json({ ok: false, error: kindCheck.error, home: kindCheck.home }, { status: 409 })
     const isVideoChannel = ['youtube', 'short_video'].includes(String(existing?.channel || ''))
     const vv: any = (existing?.metadata as any)?.video || {}
-    if (isVideoChannel && (vv.branded !== true || !vv.voicedUrl)) return NextResponse.json({ ok: false, error: 'Approval blocked: preview required. The final branded video (SignalBoostAi + www.saas.signalboostapp.com burned in) is not ready yet — it must be previewable on the dashboard before this campaign can be approved.' }, { status: 409 })
+    if (isVideoChannel && (vv.branded !== true || !vv.voicedUrl)) return NextResponse.json({ ok: false, error: `Approval blocked: preview required. The final branded video (${PUBLIC_BRAND.name} + ${PUBLIC_BRAND_DOMAIN} burned in) is not ready yet — it must be previewable on the dashboard before this campaign can be approved.` }, { status: 409 })
   }
   const patch: Record<string, unknown> = { status }
   if (status === 'approved') { patch.approved_by = ctx.user.id; patch.approved_at = new Date().toISOString() }

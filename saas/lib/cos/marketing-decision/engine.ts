@@ -1,7 +1,7 @@
-// saas/lib/cos/marketing-decision/engine.ts
 import type { MarketingDecision, MarketingDecisionInput, MarketingFormatChoice, MarketingHeroChoice, MarketingSceneDesign, MarketingSignal } from './types.ts'
 import { hostBrandName, isSoldCopy } from '@/lib/portable/companyIdentity'
 import type { CompanyFacts } from '@/portable-kernel'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -94,7 +94,7 @@ export function buildMarketingDecision(input: MarketingDecisionInput = {}): Mark
     prediction_summary: signals.length
       ? `COSA predicts ${format} with ${hero} has the strongest chance to move ${audience} toward the next traffic action.`
       : `COSA has limited data, so it recommends a low-risk starter test: ${format} with ${hero}.`,
-    creative_brief: `Create a short story where the viewer immediately recognizes the problem, sees ${product} solve it, and has a clear reason to visit www.saas.signalboostapp.com.`,
+    creative_brief: `Create a short story where the viewer immediately recognizes the problem, sees ${product} solve it, and has a clear reason to visit ${PUBLIC_BRAND_DOMAIN}.`,
     storyboard_direction: [
       'Open with a niche-specific pain point in the first three seconds.',
       `Introduce the hero style: ${hero}.`,
@@ -103,7 +103,7 @@ export function buildMarketingDecision(input: MarketingDecisionInput = {}): Mark
       'End with branded CTA and destination URL visible on screen.',
     ],
     traffic_plan: [
-      'Drive viewers to www.saas.signalboostapp.com.',
+      `Drive viewers to ${PUBLIC_BRAND_DOMAIN}.`,
       'Use short clips to test attention hooks before investing in longer edits.',
       'Log views, clicks, watch time, and conversions for future mining.',
     ],
@@ -125,8 +125,8 @@ export function buildMarketingDecision(input: MarketingDecisionInput = {}): Mark
 export function defaultMarketingDecisionInput(facts?: CompanyFacts | null): MarketingDecisionInput {
   // The product being marketed comes from the employer's company record when known. A blank
   // sold copy shows a neutral placeholder; SignalBoost's own deployment keeps its literals.
-  const product = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : 'SignalBoost SaaS console')
-  const productShort = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : 'SignalBoost console')
+  const product = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : `${PUBLIC_BRAND.name} SaaS console`)
+  const productShort = facts?.products?.[0]?.trim() || (isSoldCopy() ? '[YOUR PRODUCT]' : `${PUBLIC_BRAND.name} console`)
   return {
     campaign_goal: 'traffic',
     product_or_service: product,

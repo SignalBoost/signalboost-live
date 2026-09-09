@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -52,21 +53,21 @@ const AD_LANDING_LINKS = [
   {
     title: uiText('generatedUi.u_9b08bb7787a20df3'),
     href: '/website-optimizer',
-    url: 'https://www.saas.signalboostapp.com/website-optimizer',
+    url: `${PUBLIC_BRAND.siteUrl}/website-optimizer`,
     badge: uiText('generatedUi.u_62a9d03cb2e245c8'),
     description: uiText('generatedUi.u_b20c20c5ab9377af'),
   },
   {
     title: uiText('generatedUi.u_d87843ad1d95baec'),
     href: '/cybersecurity-check',
-    url: 'https://www.saas.signalboostapp.com/cybersecurity-check',
+    url: `${PUBLIC_BRAND.siteUrl}/cybersecurity-check`,
     badge: uiText('generatedUi.u_62a9d03cb2e245c8'),
     description: uiText('generatedUi.u_3f2358c4b00716ce'),
   },
   {
     title: uiText('generatedUi.u_281ad82f2d803589'),
     href: '/dashboard/audit',
-    url: 'https://www.saas.signalboostapp.com/dashboard/audit',
+    url: `${PUBLIC_BRAND.siteUrl}/dashboard/audit`,
     badge: uiText('generatedUi.u_4807513a2c62c69c'),
     description: uiText('generatedUi.u_205886a4abbf9551'),
   },

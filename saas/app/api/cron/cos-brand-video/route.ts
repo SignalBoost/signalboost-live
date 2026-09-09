@@ -1,9 +1,8 @@
-// saas/app/api/cron/cos-brand-video/route.ts
 // VOICE-ONLY stage. Produces the voiced + captioned (still UNBRANDED) video
 // per language and stores it in metadata.video.unbrandedVoiced[lang]. That is
 // its entire job.
 //
-// THE MANDATORY BRAND BANNER (SignalBoostAi + www.saas.signalboostapp.com,
+// THE MANDATORY BRAND BANNER (public brand name + public brand domain,
 // burned into the pixels) is applied by the FINAL COMPOSITION STEP: the free
 // FFmpeg worker on GitHub Actions (scripts/brand-overlay-worker.mjs). Only
 // that worker writes voiced[lang] / brandedLangs[lang] / voicedUrl.

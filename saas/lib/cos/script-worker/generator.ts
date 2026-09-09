@@ -1,5 +1,5 @@
-// saas/lib/cos/script-worker/generator.ts
 import type { CosContentWorkerInput, CosContentWorkerOutput } from './types.ts'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 // Human-prepared (non-AI) outreach generator. Free, deterministic, never fails,
 // no API key. Upgraded July 2026 to be DYNAMIC: each generation picks different
@@ -9,7 +9,7 @@ import type { CosContentWorkerInput, CosContentWorkerOutput } from './types.ts'
 // This is the "template" mode of the hybrid script generator. The "ai" mode
 // (aiGenerator.ts) writes a bespoke script through the model layer and charges.
 
-const SIGNALBOOST_URL = 'www.' + 'saas.signalboostapp.com'
+const SIGNALBOOST_URL = PUBLIC_BRAND_DOMAIN
 
 function productAngle(input: CosContentWorkerInput): string {
   const explicit = `${input.title} ${input.brief}`.trim()
@@ -97,7 +97,7 @@ export function generateContentDraft(input: CosContentWorkerInput): CosContentWo
   const seed = seedFrom(input)
 
   const title = isTour
-    ? 'SignalBoost platform tour: console, PR cockpit, provider data, and approvals'
+    ? `${PUBLIC_BRAND.name} platform tour: console, PR cockpit, provider data, and approvals`
     : input.channel === 'youtube'
       ? pick([
           `How ${angle} can grow without adding more manual work`,
@@ -107,7 +107,7 @@ export function generateContentDraft(input: CosContentWorkerInput): CosContentWo
       : (input.title || `Outreach for ${angle}`)
 
   const opening = isTour
-    ? `This walkthrough shows how a company can use SignalBoost from ${SIGNALBOOST_URL}: start in the console, review the PR cockpit, inspect provider data, and keep human approval before important action.`
+    ? `This walkthrough shows how a company can use ${PUBLIC_BRAND.name} from ${SIGNALBOOST_URL}: start in the console, review the PR cockpit, inspect provider data, and keep human approval before important action.`
     : pick(OPENINGS(angle, input.channel), seed, 2)
 
   const scenes = isTour ? platformTourScenes() : [
@@ -119,7 +119,7 @@ export function generateContentDraft(input: CosContentWorkerInput): CosContentWo
   ]
 
   const closing = isTour
-    ? `Visit ${SIGNALBOOST_URL} to see how SignalBoost turns platform work, provider data, and approvals into one guided workflow.`
+    ? `Visit ${SIGNALBOOST_URL} to see how ${PUBLIC_BRAND.name} turns platform work, provider data, and approvals into one guided workflow.`
     : pick(CLOSINGS(angle), seed, 17)
 
   const draft = [

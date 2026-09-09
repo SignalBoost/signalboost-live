@@ -129,10 +129,15 @@ test('public employer questions cannot reach model inference in any supported la
 })
 
 test('public company identity uses iTMounts and the public model prompt cannot reintroduce SignalBoost', async () => {
-  assert.deepEqual(publicConciergeIdentityReply('what is the name of our company?'), {
-    reply: 'Our company and public platform are named iTMounts.',
-    source: 'concierge-public-company-identity',
-  })
+  for (const prompt of [
+    'what is the name of our company?',
+    'what is the name of this platform?',
+  ]) {
+    assert.deepEqual(publicConciergeIdentityReply(prompt), {
+      reply: 'Our company and public platform are named iTMounts.',
+      source: 'concierge-public-company-identity',
+    }, prompt)
+  }
 
   const legacyRoute = await readFile(new URL('../app/api/support/routeCoreLegacy.ts', import.meta.url), 'utf8')
   const browserRoute = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')

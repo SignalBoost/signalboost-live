@@ -27,8 +27,7 @@ import { isOperationalLogRepairOffer } from '@/lib/ai/cos/pastedOperationalLog'
 import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
-import { resolveConciergeVisualObjective } from '@/lib/visuals/conversationIntent'
-import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
+import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
 import { publicConciergeIdentityReply } from '@/lib/ai/cos/publicConciergeIdentity'
 import { PUBLIC_BRAND } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
@@ -141,7 +140,7 @@ export async function POST(req: NextRequest) {
   const userMessages = messages.filter((message: any) => message?.role === 'user' && typeof message?.content === 'string')
   const latestUser = userMessages.at(-1)
   const previousUser = userMessages.at(-2)
-  let prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
+  const prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
   const previousUserPrompt = typeof previousUser?.content === 'string' ? previousUser.content : ''
   const latestUserIndex = messages.lastIndexOf(latestUser)
   const immediatePreviousMessage = latestUserIndex > 0 ? messages[latestUserIndex - 1] : null
@@ -155,8 +154,6 @@ export async function POST(req: NextRequest) {
   const auditUserId = access?.userId ?? null
   const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
-  const visualObjective = resolveConciergeVisualObjective(messages, prompt)
-  if (visualObjective) prompt = visualObjective
 
   if (browserSurface === 'concierge') {
     const identity = publicConciergeIdentityReply(prompt)
@@ -288,15 +285,20 @@ export async function POST(req: NextRequest) {
       const response = await withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
       return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
     }
-    // The picture-noun list is the fast path; when it declines, the semantic
-    // classifier decides whether the subject is depictable ("draw 2 kids playing
-    // football in the rain" names no picture-noun). Both surfaces share this gate.
-    const semanticVisual = isConciergeVisualObjective(prompt) ? false : await isSemanticVisualRequest(prompt)
-    if (isConciergeVisualObjective(prompt) || semanticVisual) {
+
+    // Obvious visual requests still take the deterministic zero-cost fast path. Everything
+    // ambiguous — including follow-up language — is decided by the deep semantic reasoner using
+    // bounded recent user-authored conversation context. Deterministic code only validates and
+    // preserves the user's exact words; it does not infer the continuation itself.
+    const directVisual = isConciergeVisualObjective(prompt)
+    const semanticResolution = directVisual ? null : await resolveSemanticVisualRequest(messages, prompt)
+    const visualObjective = directVisual ? prompt : semanticResolution?.objective ?? null
+    if (visualObjective) {
       const headers = new Headers(req.headers)
       headers.set('content-type', 'application/json')
       headers.delete('content-length')
-      const visualRequest = new NextRequest(new URL('/api/visuals', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: prompt, semanticVisual }) })
+      const semanticVisual = !directVisual
+      const visualRequest = new NextRequest(new URL('/api/visuals', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: visualObjective, semanticVisual }) })
       const response = await withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
       return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
     }

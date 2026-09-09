@@ -1,5 +1,8 @@
+import { PUBLIC_BRAND } from '@/lib/public-brand'
+
 type PublicIdentityReply = Readonly<{ reply: string; source: string }>
-type IdentityLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type IdentityLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
+export type PublicIdentityIntent = 'platform_identity' | 'assistant_employer'
 
 function normalizedQuestion(prompt: string): string {
   return String(prompt || '')
@@ -79,11 +82,11 @@ const COMPANY_NAME_QUESTIONS: readonly Readonly<{
 ]
 
 const COMPANY_NAME_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.freeze({
-  en: 'Our company and public platform are named iTMounts.',
-  es: 'Nuestra empresa y plataforma pública se llaman iTMounts.',
-  pt: 'Nossa empresa e plataforma pública se chamam iTMounts.',
-  pl: 'Nasza firma i publiczna platforma nazywają się iTMounts.',
-  ru: 'Наша компания и публичная платформа называются iTMounts.',
+  en: `Our company and public platform are named ${PUBLIC_BRAND.name}.`,
+  es: `Nuestra empresa y plataforma pública se llaman ${PUBLIC_BRAND.name}.`,
+  pt: `Nossa empresa e plataforma pública se chamam ${PUBLIC_BRAND.name}.`,
+  pl: `Nasza firma i publiczna platforma nazywają się ${PUBLIC_BRAND.name}.`,
+  ru: `Наша компания и публичная платформа называются ${PUBLIC_BRAND.name}.`,
 })
 
 const IDENTITY_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.freeze({
@@ -93,6 +96,22 @@ const IDENTITY_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.free
   pl: 'Jestem iTMounts Concierge, asystentem sztucznej inteligencji, a nie osobą, więc nie mam pracodawcy.',
   ru: 'Я — iTMounts Concierge, ИИ-ассистент, а не человек, поэтому у меня нет работодателя.',
 })
+
+export function publicConciergeIdentityReplyForIntent(
+  intent: PublicIdentityIntent,
+  language: IdentityLanguage = 'en',
+): PublicIdentityReply {
+  if (intent === 'platform_identity') {
+    return Object.freeze({
+      reply: COMPANY_NAME_REPLIES[language],
+      source: 'concierge-public-company-identity',
+    })
+  }
+  return Object.freeze({
+    reply: IDENTITY_REPLIES[language],
+    source: 'concierge-public-identity',
+  })
+}
 
 /**
  * Public Concierge has no human employment history. Intercept only direct questions
@@ -105,18 +124,12 @@ export function publicConciergeIdentityReply(prompt: string): PublicIdentityRepl
 
   for (const rule of COMPANY_NAME_QUESTIONS) {
     if (!rule.patterns.some((pattern) => pattern.test(normalized))) continue
-    return Object.freeze({
-      reply: COMPANY_NAME_REPLIES[rule.language],
-      source: 'concierge-public-company-identity',
-    })
+    return publicConciergeIdentityReplyForIntent('platform_identity', rule.language)
   }
 
   for (const rule of EMPLOYER_QUESTIONS) {
     if (!rule.patterns.some((pattern) => pattern.test(normalized))) continue
-    return Object.freeze({
-      reply: IDENTITY_REPLIES[rule.language],
-      source: 'concierge-public-identity',
-    })
+    return publicConciergeIdentityReplyForIntent('assistant_employer', rule.language)
   }
   return null
 }

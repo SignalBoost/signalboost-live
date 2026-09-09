@@ -37,7 +37,8 @@ test('COS is private, Concierge is presentation, and authenticated identity owns
   assert.match(route, /async function publicConciergePresentation/)
   assert.match(route, /replace\(\/\\bCOS Software Specialist\\b\/g, 'Software Specialist'\)/)
   assert.match(route, /replace\(\/\\bCOS Platform Engineer\\b\/g, 'Platform Engineer'\)/)
-  assert.match(route, /replace\(\/\\bCOS\\b\/g, 'SignalBoost'\)/)
+  assert.match(route, /replace\(\/\\bCOS\\b\/g, PUBLIC_BRAND\.name\)/)
+  assert.doesNotMatch(route, /replace\(\/\\bCOS\\b\/g, 'SignalBoost'\)/)
   assert.match(route, /if \(payload\.orchestrator === 'cos'\) delete payload\.orchestrator/)
 })
 

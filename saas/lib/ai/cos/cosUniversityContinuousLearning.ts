@@ -1,4 +1,4 @@
-import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
+import { ContinuousLearningCycle, type LearningCycleResult } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import {
@@ -55,7 +55,9 @@ export type CosUniversityContinuousLearningSummary = {
   accepted: number
   probationary: number
   plansAttempted: number
+  rejected: Record<string, number>
   sourceErrors: Record<string, number>
+  gapDiagnostics: LearningCycleResult['gapDiagnostics']
   errors: string[]
   semantics: 'continuous_machine_learning_no_rest_exam_isolated'
 }
@@ -84,7 +86,9 @@ function emptySummary(args: {
     accepted: 0,
     probationary: 0,
     plansAttempted: 0,
+    rejected: {},
     sourceErrors: {},
+    gapDiagnostics: {},
     errors: args.errors || [],
     semantics: 'continuous_machine_learning_no_rest_exam_isolated',
   }
@@ -143,7 +147,9 @@ async function finishContinuousSlot(
     probationary_count: summary.probationary,
     plans_attempted: summary.plansAttempted,
     plan_ids: planIds,
+    rejected_counts: summary.rejected,
     source_errors: summary.sourceErrors,
+    gap_diagnostics: summary.gapDiagnostics,
     errors: summary.errors,
     completed_at: now.toISOString(),
     updated_at: now.toISOString(),
@@ -201,7 +207,9 @@ export function universityStudyProofsFromAcceptedLearning(
  * retrieved-but-rejected, probationary, duplicate, or otherwise unretained material does not advance
  * the study round or unlock fresh practice. Fresh independent exam failures get their own high-priority
  * remediation bridge so generic operational retests cannot starve academic weaknesses. Examiner
- * prompts/rubrics remain hidden from the learner.
+ * prompts/rubrics remain hidden from the learner. The run ledger stores only bounded per-gap outcome
+ * counts (never source text or hidden exam material) so rejected study can be diagnosed without
+ * weakening admission policy.
  */
 export async function runCosUniversityContinuousLearning(options: {
   now?: Date
@@ -279,7 +287,9 @@ export async function runCosUniversityContinuousLearning(options: {
     summary.documentsAcquired = result.documentsAcquired
     summary.accepted = result.accepted
     summary.probationary = result.probationary
+    summary.rejected = result.rejected
     summary.sourceErrors = result.sourceErrors
+    summary.gapDiagnostics = result.gapDiagnostics
     const proofs = universityStudyProofsFromAcceptedLearning(eligiblePlans, signals, result.acceptedGapIds, now.toISOString())
     attemptedPlanIds.push(...await recordAcceptedCosUniversityStudyAttempts(proofs, new Date()))
     summary.plansAttempted = attemptedPlanIds.length

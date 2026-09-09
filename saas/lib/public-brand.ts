@@ -4,7 +4,7 @@ export const PUBLIC_BRAND = {
   tagline: 'AI software that works for you',
 } as const
 
-const LEGACY_BRAND_TOKENS = ['SignalBoostAi', 'SignalBoost AI', 'SignalBoost'] as const
+const LEGACY_PUBLIC_BRAND_PATTERN = /\bSignalBoost(?:Ai|\s+AI)?\b/gi
 
 /**
  * Keep implementation identifiers stable while presenting the current public brand.
@@ -12,8 +12,5 @@ const LEGACY_BRAND_TOKENS = ['SignalBoostAi', 'SignalBoost AI', 'SignalBoost'] a
  * identifiers, COS/Builder internals, and legacy contact addresses are not rewritten.
  */
 export function publicBrandText(value: string): string {
-  return LEGACY_BRAND_TOKENS.reduce(
-    (text, legacy) => text.replaceAll(legacy, PUBLIC_BRAND.name),
-    value,
-  )
+  return value.replace(LEGACY_PUBLIC_BRAND_PATTERN, PUBLIC_BRAND.name)
 }

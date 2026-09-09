@@ -69,3 +69,11 @@ test('terminal University failure versions and reopens the locked plan before re
   assert.match(migration, /and attempt_count = university_practice_round/)
   assert.match(migration, /university_practice_failure_remediation_fence_failed/)
 })
+
+test('SECURITY DEFINER practice-result mutation is service-role-only', () => {
+  const lockdown = file('supabase/migrations/20260908234600_cos_university_practice_rpc_lockdown.sql')
+  assert.match(lockdown, /revoke all on function public\.cos_record_cognitive_practice_result\(uuid, boolean, double precision, text, jsonb\) from public/i)
+  assert.match(lockdown, /from anon, authenticated/i)
+  assert.match(lockdown, /grant execute on function public\.cos_record_cognitive_practice_result\(uuid, boolean, double precision, text, jsonb\) to service_role/i)
+  assert.match(lockdown, /Service-role-only canonical cognitive practice recorder/)
+})

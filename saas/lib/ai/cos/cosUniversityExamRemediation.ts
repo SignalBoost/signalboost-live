@@ -13,6 +13,7 @@ import {
 
 const AGENT_ID = 'cos'
 const SOURCE_KIND = 'recertification'
+const PLAN_SELECT_FIELDS = 'id,plan_key,subject_id,language_code,language_dimension,failure_class,source_kind,objective,priority,methods,acquisition_source_kinds,fine_tune_candidate,status' as const
 
 type FailedExamRow = {
   id: string
@@ -213,9 +214,8 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
   }, { onConflict: 'plan_key', ignoreDuplicates: true })
   if (insert.error) throw insert.error
 
-  const selectFields = 'id,plan_key,subject_id,language_code,language_dimension,failure_class,source_kind,objective,priority,methods,acquisition_source_kinds,fine_tune_candidate,status'
   const result = await db.from('cos_university_study_plans')
-    .select(selectFields)
+    .select(PLAN_SELECT_FIELDS)
     .eq('plan_key', planKey)
     .maybeSingle()
   if (result.error) throw result.error
@@ -233,7 +233,7 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
       })
       .eq('id', row.id)
       .in('status', ['queued', 'studying', 'ready_for_exam'])
-      .select(selectFields)
+      .select(PLAN_SELECT_FIELDS)
       .maybeSingle()
     if (refreshed.error) throw refreshed.error
     if (refreshed.data) row = refreshed.data as PlanRow

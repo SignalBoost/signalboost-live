@@ -1,6 +1,7 @@
 // SignalBoost's real HostContext for the buyer-portable Self-Healing Supervisor.
 import { sendEmail } from '@/lib/email'
-import { createSignalBoostSupervisorConnectorRuntime } from './signalboost-supervisor-connectors'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
+import { createSignalBoostSupervisorConnectorRuntime } from './signalboost-supervisor-connectors.ts'
 import {
   createStaticApproverDirectory,
   type Approver,
@@ -29,7 +30,7 @@ export function createSignalBoostHostContext(overrides: Partial<HostContext> = {
     secrets: platformSecrets,
     notifications: platformNotifications,
     approvers: createStaticApproverDirectory({ fallback: approvers }),
-    branding: { productName:'SignalBoost Supervisor', locale:platformLocale(), consoleBaseUrl:(process.env.SUPERVISOR_CONSOLE_URL || `${(process.env.NEXT_PUBLIC_APP_URL || 'https://saas.signalboostapp.com').replace(/\/+$/, '')}/dashboard`).replace(/\/+$/,'') },
+    branding: { productName:`${PUBLIC_BRAND.name} Supervisor`, locale:platformLocale(), consoleBaseUrl:(process.env.SUPERVISOR_CONSOLE_URL || `${(process.env.NEXT_PUBLIC_APP_URL || PUBLIC_BRAND.siteUrl).replace(/\/+$/, '')}/dashboard`).replace(/\/+$/,'') },
     // SignalBoost now uses the same permissioned connector boundary buyers receive.
     connectors: createSignalBoostSupervisorConnectorRuntime(),
     ...overrides,

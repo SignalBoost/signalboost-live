@@ -1,8 +1,9 @@
 // saas/lib/ai/tools/getPricing.ts
 // Fetches the live SaaS pricing page and extracts plan/price text.
 // Used by the assistant's getPricing tool so prices are always current.
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
-const PRICING_URL = 'https://saas.signalboostapp.com/pricing'
+const PRICING_URL = `${PUBLIC_BRAND.siteUrl}/pricing`
 
 let cache: { at: number; text: string } | null = null
 const CACHE_MS = 5 * 60 * 1000 // 5 minutes

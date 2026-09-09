@@ -4,6 +4,7 @@ import { getValidSocialToken } from '@/lib/outreach/social-token'
 import { publishSocialPost } from '@/lib/outreach/social-connectors'
 import type { getAdminSupabase } from '@/utils/supabase/server'
 import { createSupabaseObjectStore, type ObjectStorePort } from '@/lib/cos/objectStore'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 type AdminClient = ReturnType<typeof getAdminSupabase>
 
@@ -45,7 +46,7 @@ export async function publishApprovedVideoProductionJob(args: {
   if (!token.ok || !token.accessToken) return { ok: false, error: token.error || 'YouTube is not connected for this user.' }
 
   const videoUrl = await signedVideoUrl(objectStore, String(job.output_url))
-  const destinationUrl = String(job.search_package?.destination_url || 'https://saas.signalboostapp.com')
+  const destinationUrl = String(job.search_package?.destination_url || PUBLIC_BRAND.siteUrl)
   const title = String(job.title || 'Video campaign')
   const description = String(job.search_package?.description || job.hook || title)
   const postText = `${description}\n\nLearn more: ${destinationUrl}`.trim()

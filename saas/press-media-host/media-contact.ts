@@ -24,9 +24,11 @@
 // SignalBoost's own details are the defaults. A buyer running the press portable against
 // their own host sets their own and ships nothing of ours in their releases.
 
+import { PUBLIC_BRAND } from '@/lib/public-brand'
+
 const DEFAULT_TEAM = 'The SignalBoost Sales Team'
 const DEFAULT_EMAIL = 'saassales@signalboostapp.com'
-const DEFAULT_URL = 'https://saas.signalboostapp.com'
+const DEFAULT_URL = PUBLIC_BRAND.siteUrl
 
 export interface MediaContactDetails {
   team: string

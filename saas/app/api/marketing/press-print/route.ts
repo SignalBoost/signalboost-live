@@ -35,6 +35,7 @@ import { sendPressPrintPreviewEmail } from '@/lib/marketing/pressPrintEmail'
 import { checkPressAdmission } from '@/lib/marketing/pressCampaignAdmission'
 import { createAiPort } from '@/press-media-host'
 import { mintApprovalIdentity } from '@/portable-kernel'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,7 +81,7 @@ function readFields(request: any, channel: PressPrintChannel): PressFields {
     submissionFormUrl: str(request.submission_form_url || request.publisher_submission_form_url) || urlIn(contact),
     headline: str(request.headline || request.title),
     articleNotes: str(request.article_notes || request.notes),
-    ctaUrl: str(request.cta_url) || 'https://saas.signalboostapp.com',
+    ctaUrl: str(request.cta_url) || PUBLIC_BRAND.siteUrl,
     audience: str(request.audience) || DEFAULT_AUDIENCE,
     language: str(request.language || request.lang) || 'en',
   }
@@ -227,7 +228,7 @@ async function handleGenerateRelease(ctx: any, campaignId: string) {
     submissionFormUrl: str(meta.publisher_submission_form_url),
     headline: str(meta.headline || existing?.title),
     articleNotes: str(meta.article_notes),
-    ctaUrl: str(meta.cta_url) || 'https://saas.signalboostapp.com',
+    ctaUrl: str(meta.cta_url) || PUBLIC_BRAND.siteUrl,
     audience: str(meta.audience) || DEFAULT_AUDIENCE,
     language: 'en',
   }

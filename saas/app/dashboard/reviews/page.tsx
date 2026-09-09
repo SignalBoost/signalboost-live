@@ -22,6 +22,7 @@ import {
   type ReviewSentiment,
 } from '@/lib/reviews'
 import { uiText } from '@/lib/i18n/uiText'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 const GREEN = '#4ade80'
 const RED = '#f87171'
@@ -269,7 +270,7 @@ export default function ReviewsPage() {
   const localeTelemetry   = summarizeLocaleTelemetry(enrichedReviews)
   const sentimentTrend    = summarizeSentimentTrend(enrichedReviews)
   const positiveCampaigns = enrichedReviews.filter(r => r.sentiment === 'positive' && r.rating >= 4).map(buildTestimonialCampaign).slice(0, 3)
-  const reviewLink        = slug.kind === 'set' ? `https://saas.signalboostapp.com/review/${slug.slug}` : ''
+  const reviewLink        = slug.kind === 'set' ? `${PUBLIC_BRAND.siteUrl}/review/${slug.slug}` : ''
   const summaryLine       = enrichedReviews.length === 0
     ? c('summaryEmpty', l)
     : `${enrichedReviews.length} ${c('total', l)} · ${pendingCount} ${c('pending', l)} · ${approvedCount} ${c('approved', l)} · ${flaggedCount} ${c('flagged', l)} · ${avgRating.toFixed(1)} ★ ${c('avg', l)}`

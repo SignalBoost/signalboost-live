@@ -1,14 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { isConciergeVisualObjective } from '../lib/visuals/intent.ts'
+import { detectConciergeVisualIntent, isConciergeVisualObjective } from '../lib/visuals/intent.ts'
 import { resolveSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
+import { MAX_VISUAL_BATCH_COUNT, resolveRequestedVisualCount } from '../lib/visuals/quantityIntent.ts'
 import { publicConciergeIdentityReply } from '../lib/ai/cos/publicConciergeIdentity.ts'
 import { resolveSemanticPublicIdentity } from '../lib/ai/cos/publicConciergeIdentityIntent.ts'
 
 const semanticReasoner = (verdict: { visual_request: boolean; anchor_user_turn: number | null }, seen?: any[]) => (async (args: any) => {
   seen?.push(args)
   return { text: JSON.stringify(verdict) }
+}) as any
+
+const quantityReasoner = (count: number, seen?: any[]) => (async (args: any) => {
+  seen?.push(args)
+  return { text: JSON.stringify({ requested_count: count }) }
 }) as any
 
 test('the reported iTMounts logo conversation uses deep semantic continuation for ambiguous turns', async () => {
@@ -101,15 +107,62 @@ test('visual continuity intelligence is model-based while deterministic code sta
   assert.doesNotMatch(routeSource, /resolveConciergeVisualObjective/)
 })
 
+test('requested visual quantity is understood semantically and fulfilled as an exact batch', async () => {
+  const cases = [
+    {
+      objective: 'design a new logo for itmounts\n\nFOLLOW-UP USER INSTRUCTIONS:\ni did not like this one, give me two more examples',
+      count: 2,
+    },
+    {
+      objective: 'design a new logo for itmounts\n\nFOLLOW-UP USER INSTRUCTIONS:\ngive me 3 more examples',
+      count: 3,
+    },
+    {
+      objective: 'design a new logo for itmounts\n\nFOLLOW-UP USER INSTRUCTIONS:\ngive me 3 more examples of the logo not one',
+      count: 3,
+    },
+  ] as const
+
+  for (const sample of cases) {
+    const seen: any[] = []
+    assert.equal(
+      await resolveRequestedVisualCount(sample.objective, quantityReasoner(sample.count, seen)),
+      sample.count,
+      sample.objective,
+    )
+    assert.equal(seen.length, 1)
+    assert.match(String(seen[0]?.systemPrompt || ''), /deep-learning quantity interpreter/i)
+    assert.match(String(seen[0]?.systemPrompt || ''), /do not rely on a fixed phrase list or regex matching/i)
+    assert.match(String(seen[0]?.prompt || ''), /FOLLOW-UP USER INSTRUCTIONS:/)
+  }
+
+  assert.equal(await resolveRequestedVisualCount('design a new logo for iTMounts', quantityReasoner(1)), 1)
+  assert.equal(await resolveRequestedVisualCount('design a logo', async () => ({ text: 'not-json' })), 1)
+  assert.equal(MAX_VISUAL_BATCH_COUNT, 4)
+
+  const quantitySource = await readFile(new URL('../lib/visuals/quantityIntent.ts', import.meta.url), 'utf8')
+  const visualRoute = await readFile(new URL('../app/api/visuals/route.ts', import.meta.url), 'utf8')
+  assert.match(quantitySource, /callCosReasoner/)
+  assert.match(visualRoute, /await resolveRequestedVisualCount\(objective\)/)
+  assert.match(visualRoute, /Promise\.all\(Array\.from\(\{ length: requestedVisualCount \}/)
+  assert.match(visualRoute, /visuals\.length !== requestedVisualCount/)
+  assert.match(visualRoute, /requested_visual_count: requestedVisualCount/)
+  assert.match(visualRoute, /delivered_visual_count: visuals\.length/)
+  assert.match(visualRoute, /visual: visuals\.at\(-1\)/)
+  assert.match(visualRoute, /<IMAGE>\$\{visual\.previewUrl\}<\/IMAGE>/)
+  assert.match(visualRoute, /will not claim the batch was delivered/)
+})
+
 test('public employer questions cannot reach model inference in any supported language', () => {
   const cases = [
-    ['what is the name of your employer?', 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.'],
-    ["What's your employer?", 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.'],
-    ['Who is your current employer?', 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.'],
-    ['¿cuál es el nombre de tu empleador?', 'Soy iTMounts Concierge, un asistente de IA, no una persona, así que no tengo empleador.'],
-    ['qual é o nome do seu empregador?', 'Sou o iTMounts Concierge, um assistente de IA, não uma pessoa, portanto não tenho empregador.'],
-    ['jak nazywa się twój pracodawca?', 'Jestem iTMounts Concierge, asystentem sztucznej inteligencji, a nie osobą, więc nie mam pracodawcy.'],
-    ['как называется твой работодатель?', 'Я — iTMounts Concierge, ИИ-ассистент, а не человек, поэтому у меня нет работодателя.'],
+    ['what is the name of your employer?', 'I’m the iTMounts Concierge, the public AI assistant for iTMounts.'],
+    ["What's your employer?", 'I’m the iTMounts Concierge, the public AI assistant for iTMounts.'],
+    ['Who is your current employer?', 'I’m the iTMounts Concierge, the public AI assistant for iTMounts.'],
+    ['who do you work for?', 'I’m the iTMounts Concierge, the public AI assistant for iTMounts.'],
+    ['¿cuál es el nombre de tu empleador?', 'Soy el Concierge de iTMounts, el asistente público de IA de iTMounts.'],
+    ['qual é o nome do seu empregador?', 'Sou o Concierge da iTMounts, o assistente público de IA da iTMounts.'],
+    ['jak nazywa się twój pracodawca?', 'Jestem Concierge iTMounts, publicznym asystentem AI platformy iTMounts.'],
+    ['как называется твой работодатель?', 'Я — Concierge iTMounts, публичный ИИ-ассистент платформы iTMounts.'],
   ] as const
 
   for (const [prompt, reply] of cases) {
@@ -170,11 +223,62 @@ test('deep semantic identity routing separates current identity from naming work
   assert.match(route, /identity_routing: deterministicIdentity \? 'deterministic' : 'deep-semantic'/)
 })
 
-test('new semantic-only visual requests still reach deep semantic visual detection', async () => {
+test('visual requests preserve semantic conversation continuity even when the current turn is directly depictable', async () => {
   const source = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(source, /const directVisual = isConciergeVisualObjective\(prompt\)/)
-  assert.match(source, /const semanticResolution = directVisual \? null : await resolveSemanticVisualRequest\(messages, prompt\)/)
-  assert.match(source, /const visualObjective = directVisual \? prompt : semanticResolution\?\.objective \?\? null/)
+  assert.match(source, /const shouldResolveVisualContext = !directVisual \|\| userMessages\.length > 1/)
+  assert.match(source, /semanticResolution = shouldResolveVisualContext[\s\S]*resolveSemanticVisualRequest\(messages, prompt\)/)
+  assert.match(source, /semanticResolution\?\.objective \?\? \(directVisual \? prompt : null\)/)
+  assert.match(source, /const semanticVisual = Boolean\(semanticResolution\)/)
+  assert.doesNotMatch(source, /const semanticResolution = directVisual \? null : await resolveSemanticVisualRequest/)
+})
+
+
+test('reported four-logo follow-up remains original generation and requests exactly four outputs', async () => {
+  const messages = [
+    { role: 'user' as const, content: 'design a new logo for itmounts' },
+    { role: 'assistant' as const, content: 'Created your visual.' },
+    { role: 'user' as const, content: 'create 4 extra logos for my evaluation' },
+  ]
+  const resolved = await resolveSemanticVisualRequest(
+    messages,
+    'create 4 extra logos for my evaluation',
+    semanticReasoner({ visual_request: true, anchor_user_turn: 0 }),
+  )
+  assert.ok(resolved)
+  assert.equal(resolved.continuation, true)
+  assert.match(resolved.objective, /design a new logo for itmounts/i)
+  assert.match(resolved.objective, /create 4 extra logos for my evaluation/i)
+  assert.equal(
+    detectConciergeVisualIntent(resolved.objective, { semanticVisual: true })?.mode,
+    'generate',
+    'original design context must prevent a direct logo follow-up from becoming reference-mark verification',
+  )
+  assert.equal(await resolveRequestedVisualCount(resolved.objective, quantityReasoner(4)), 4)
+})
+
+test('creative anaphoric follow-up keeps the unresolved four-logo quantity and original-design mode', async () => {
+  const messages = [
+    { role: 'user' as const, content: 'design a new logo for itmounts' },
+    { role: 'assistant' as const, content: 'Created your visual.' },
+    { role: 'user' as const, content: 'create 4 extra logos for my evaluation' },
+    { role: 'assistant' as const, content: 'I could not verify an authoritative image of that mark.' },
+    { role: 'user' as const, content: 'draw them yourself, be creative' },
+  ]
+  const resolved = await resolveSemanticVisualRequest(
+    messages,
+    'draw them yourself, be creative',
+    semanticReasoner({ visual_request: true, anchor_user_turn: 0 }),
+  )
+  assert.ok(resolved)
+  assert.match(resolved.objective, /create 4 extra logos for my evaluation/i)
+  assert.match(resolved.objective, /draw them yourself, be creative/i)
+  assert.equal(detectConciergeVisualIntent(resolved.objective, { semanticVisual: true })?.mode, 'generate')
+
+  const seen: any[] = []
+  assert.equal(await resolveRequestedVisualCount(resolved.objective, quantityReasoner(4, seen)), 4)
+  assert.match(String(seen[0]?.systemPrompt || ''), /plural or anaphoric reference/i)
+  assert.match(String(seen[0]?.systemPrompt || ''), /preserve that prior explicit quantity/i)
 })
 
 test('visual success copy is blocked without a renderable preview', async () => {

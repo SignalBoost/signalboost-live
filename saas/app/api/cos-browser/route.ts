@@ -292,18 +292,21 @@ export async function POST(req: NextRequest) {
       return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
     }
 
-    // Obvious visual requests still take the deterministic zero-cost fast path. Everything
-    // ambiguous — including follow-up language — is decided by the deep semantic reasoner using
-    // bounded recent user-authored conversation context. Deterministic code only validates and
-    // preserves the user's exact words; it does not infer the continuation itself.
+    // Obvious visual requests keep a deterministic fallback, but when there is prior user
+    // conversation we still ask the semantic resolver whether the current direct request belongs
+    // to the active visual thread. A direct visual follow-up must not erase its original-design
+    // context merely because it contains words such as "logo", "draw", or "create".
     const directVisual = isConciergeVisualObjective(prompt)
-    const semanticResolution = directVisual ? null : await resolveSemanticVisualRequest(messages, prompt)
-    const visualObjective = directVisual ? prompt : semanticResolution?.objective ?? null
+    const shouldResolveVisualContext = !directVisual || userMessages.length > 1
+    const semanticResolution = shouldResolveVisualContext
+      ? await resolveSemanticVisualRequest(messages, prompt)
+      : null
+    const visualObjective = semanticResolution?.objective ?? (directVisual ? prompt : null)
     if (visualObjective) {
       const headers = new Headers(req.headers)
       headers.set('content-type', 'application/json')
       headers.delete('content-length')
-      const semanticVisual = !directVisual
+      const semanticVisual = Boolean(semanticResolution)
       const visualRequest = new NextRequest(new URL('/api/visuals', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: visualObjective, semanticVisual }) })
       const response = await withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
       return browserSurface === 'concierge' ? publicConciergePresentation(response) : response

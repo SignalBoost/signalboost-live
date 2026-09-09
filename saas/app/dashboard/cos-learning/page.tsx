@@ -1,8 +1,10 @@
+// saas/app/dashboard/cos-learning/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { COS_LEARNING_COPY, type CosLearningLanguage } from '@/lib/i18n/cosLearningCopy'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 type Readiness = { ok?: boolean; enabled?: boolean; questions?: number; sourceAdapters?: string[]; recommendedBatchSize?: number; retainedKnowledge?: number | null; authRequired?: boolean; error?: string }
 type CycleResult = { gapsConsidered?: number; documentsAcquired?: number; accepted?: number; rejected?: Record<string, number>; sourceErrors?: Record<string, number>; externalCostUsd?: number }
@@ -11,8 +13,8 @@ type EmbeddingResult = { ok?: boolean; completed?: boolean; attempted?: number; 
 type ApplicationProgress = { sources?: number; queued?: number; candidates?: number; validated?: number; rejected?: number; reinforcements?: number }
 type SpecialistResult = { applicationProgress?: ApplicationProgress | null; authRequired?: boolean; error?: string }
 
-const CANONICAL_HOST = 'saas.signalboostapp.com'
-const CANONICAL_URL = `https://${CANONICAL_HOST}/dashboard/cos-learning`
+const CANONICAL_HOST = new URL(PUBLIC_BRAND.siteUrl).hostname.toLowerCase()
+const CANONICAL_URL = `${PUBLIC_BRAND.siteUrl}/dashboard/cos-learning`
 
 async function readResponse(response: Response): Promise<any> {
   const text = await response.text()

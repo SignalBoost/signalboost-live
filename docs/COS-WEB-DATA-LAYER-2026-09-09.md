@@ -54,9 +54,15 @@ Only public HTTP(S) URLs are readable. The layer rejects localhost, private IPv4
 
 Page reads are bounded by response size, content type, timeout, readable-text minimum, and retained-character maximum. Raw web pages are not copied into durable memory; the existing learning cycle retains bounded relevant summaries/facts plus provenance according to source rights policy.
 
+## Discovery resilience
+
+Provider-free discovery is not allowed to depend on one public search endpoint. The bounded fallback order is DuckDuckGo HTML → DuckDuckGo Lite → Bing. A provider failure or anti-bot response therefore does not by itself starve the University learning lane. The first provider that returns usable results ends discovery for that query; the layer does not fan out to every provider merely to increase corpus volume.
+
+Search engines are discovery mechanisms only. Search-result ranking, snippets, or provider identity do not make a source academically credible. Every discovered page must still pass the same public-URL safety check, structural source-credibility floor, diverse-host selection, readable-page acquisition, and existing learning admission gates. The discovery provider is retained in provenance for observability.
+
 ## Cost boundary
 
-Provider-free public discovery is the default. Brave Search may be used only when `COS_WEB_TRAINING_USE_BRAVE=true` and an existing `BRAVE_SEARCH_API_KEY` is available. A configured API key by itself does not authorize background paid search.
+Provider-free public discovery is the default. Brave Search may be used only when `COS_WEB_TRAINING_USE_BRAVE=true` and an existing `BRAVE_SEARCH_API_KEY` is available. A configured API key by itself does not authorize background paid search. If explicitly enabled Brave returns no usable results or fails, the provider-free fallback remains available.
 
 Configuration:
 

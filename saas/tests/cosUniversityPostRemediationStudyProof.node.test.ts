@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { cosUniversityAcceptedStudyClearsRemediationBoundary } from '../lib/ai/cos/cosUniversityStudyProof.ts'
+import { cosUniversityAcceptedStudyClearsRemediationBoundary } from '../lib/ai/cos/cosUniversityStudyProofPolicy.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
@@ -53,6 +53,7 @@ test('all University learning writers bind proof to cycle start rather than writ
   const masters = file('lib/ai/cos/cosUniversityMastersLearningRunner.ts')
   const daily = file('app/api/cron/cos-mining/route.ts')
   const proof = file('lib/ai/cos/cosUniversityStudyProof.ts')
+  const policy = file('lib/ai/cos/cosUniversityStudyProofPolicy.ts')
 
   assert.match(undergraduate, /universityStudyProofsFromAcceptedLearning\([\s\S]*result\.acceptedGapIds, now\.toISOString\(\)\)/)
   assert.match(undergraduate, /return refs\.length \? \[\{ planId: plan\.id, evidenceRefs: refs, acceptedAt \}\] : \[\]/)
@@ -67,7 +68,8 @@ test('all University learning writers bind proof to cycle start rather than writ
   assert.match(daily, /const acceptedAt = dailyLearningStartedAt \|\| dailyStartedAt/)
   assert.match(daily, /\{ planId: plan\.id, evidenceRefs, acceptedAt \}/)
 
-  assert.match(proof, /timestampMs > boundaryMs/)
+  assert.match(policy, /timestampMs > boundaryMs/)
+  assert.match(proof, /cosUniversityAcceptedStudyClearsRemediationBoundary/)
   assert.match(proof, /const proofObservedAt = accepted\[accepted\.length - 1\]\.acceptedAt/)
   assert.match(proof, /updated_at: writerNowIso/)
   assert.doesNotMatch(proof, /observedAt: writerNowIso/)

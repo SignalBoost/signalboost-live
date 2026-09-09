@@ -519,20 +519,57 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
     return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId, reasons: ['practice_result_record_failed'] }
   }
 
+  const committedQueueStatus = clean(asRecord(rpc.data).queueStatus, 32)
+  await refreshCognitiveSkillStatus(item.skill_key)
+
+  if (committedQueueStatus === 'failed') {
+    return {
+      ...base,
+      status: 'failed',
+      passed: false,
+      score: grade.score,
+      coverage: grade.coverage,
+      turnId,
+      reasons: [grade.reason],
+    }
+  }
+
+  if (committedQueueStatus === 'queued') {
+    return {
+      ...base,
+      status: 'deferred',
+      passed: null,
+      score: grade.score,
+      coverage: grade.coverage,
+      turnId,
+      reasons: ['practice_retry_queued'],
+    }
+  }
+
+  if (committedQueueStatus !== 'passed') {
+    return {
+      ...base,
+      status: 'deferred',
+      passed: null,
+      score: grade.score,
+      coverage: grade.coverage,
+      turnId,
+      reasons: ['practice_result_status_unknown'],
+    }
+  }
+
   if (!(await practiceFenceStillValid(planId, practiceRound))) {
     return { ...base, status: 'blocked', passed: null, score: null, coverage: null, turnId, reasons: ['practice_round_advanced_before_reconciliation'] }
   }
-  await refreshCognitiveSkillStatus(item.skill_key)
-  const ready = await reconcilePlan(planId, practiceRound)
+
   return {
     ...base,
-    status: grade.pass ? 'passed' : 'failed',
-    passed: grade.pass,
+    status: 'passed',
+    passed: true,
     score: grade.score,
     coverage: grade.coverage,
     turnId,
-    reasons: grade.pass ? [] : [grade.reason],
-    ...(ready ? {} : {}),
+    reasons: [],
   }
 }
 
@@ -606,7 +643,7 @@ export async function runCosUniversityDeliberatePractice(options: {
       if (run.status === 'passed') summary.passed += 1
       else if (run.status === 'failed') summary.failed += 1
       else if (run.status === 'deferred') summary.deferred += 1
-      if (run.planId && run.practiceRound && run.status !== 'blocked') {
+      if (run.planId && run.practiceRound && run.status === 'passed') {
         const ready = await reconcilePlan(run.planId, run.practiceRound)
         if (ready) summary.readyForExam += 1
       }

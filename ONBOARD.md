@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.79  
+**Version:** 1.80  
 **Updated:** 2026-09-09  
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)  
 **Canonical public product:** **iTMounts**  
@@ -406,6 +406,18 @@ Repair contract:
 - visual delivery success requires a renderable preview/download artifact;
 - public Concierge identity questions use deterministic product identity and never invent employment or government affiliation;
 - the exact reported six-turn transcript is a mandatory regression.
+
+# Public Concierge company identity repair — 2026-09-09
+
+The public model prompt still described the retired product name as authoritative after the iTMounts cutover. A live question asking for the company's name therefore returned SignalBoost even though rendered UI branding was correct.
+
+Repair contract:
+
+- public Concierge system prompts pass through the canonical `publicBrandText` seam before inference;
+- internal COS presentation labels resolve to `PUBLIC_BRAND.name`, never a hard-coded legacy brand;
+- direct public company-name questions resolve deterministically to **iTMounts**;
+- legacy repository/service/domain identifiers may remain internal but cannot override public product identity;
+- the reported logo-then-company-name exchange is a mandatory regression.
 
 # Runtime inference / provider source of truth
 

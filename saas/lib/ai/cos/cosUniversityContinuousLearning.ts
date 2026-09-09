@@ -12,11 +12,12 @@ import {
   autonomousLearningReadiness,
   parseApprovedLearningUrls,
 } from '@/lib/cos/dailyAutonomousLearning'
-import {
-  markCosUniversityStudyPlansAttempted,
-  runCosUniversityPlanningCycle,
-} from './cosUniversityStore.ts'
+import { runCosUniversityPlanningCycle } from './cosUniversityStore.ts'
 import { ensureCosUniversityExamFailureRemediationPlans } from './cosUniversityExamRemediation.ts'
+import {
+  recordAcceptedCosUniversityStudyAttempts,
+  type CosUniversityAcceptedStudyProofInput,
+} from './cosUniversityStudyProof.ts'
 import {
   COS_UNIVERSITY_STUDY_COOLDOWN_MINUTES,
   cosUniversityContinuousSlotKey,
@@ -172,19 +173,20 @@ function signalMatchesPlan(signal: KnowledgeGapSignal, planKey: string): boolean
   return String(signal.taskId || '').endsWith(planKey)
 }
 
-export function universityPlansWithAcceptedLearning(
+export function universityStudyProofsFromAcceptedLearning(
   eligiblePlans: readonly EligiblePlan[],
   signals: readonly KnowledgeGapSignal[],
   acceptedGapIds: readonly string[],
-): string[] {
+): CosUniversityAcceptedStudyProofInput[] {
   const accepted = new Set(acceptedGapIds)
   if (!accepted.size) return []
-  return eligiblePlans
-    .filter(plan => signals.some(signal =>
-      signalMatchesPlan(signal, plan.planKey)
-      && accepted.has(knowledgeGapIdForSignal(signal)),
-    ))
-    .map(plan => plan.id)
+  return eligiblePlans.flatMap(plan => {
+    const refs = [...new Set(signals
+      .filter(signal => signalMatchesPlan(signal, plan.planKey))
+      .map(signal => knowledgeGapIdForSignal(signal))
+      .filter(gapId => accepted.has(gapId)))]
+    return refs.length ? [{ planId: plan.id, evidenceRefs: refs }] : []
+  })
 }
 
 /**
@@ -194,10 +196,11 @@ export function universityPlansWithAcceptedLearning(
  * University work, respects a per-plan cooldown to avoid repeatedly rereading the same objective,
  * acquires only the source classes chosen by the Learning Strategist, and persists attempts. A study
  * attempt advances only when the governed learning cycle actually retains accepted evidence for that
- * exact plan. Retrieved-but-rejected, probationary, duplicate, or otherwise unretained material does
- * not advance the study round or unlock fresh practice. Fresh independent exam failures get their own
- * high-priority remediation bridge so generic operational retests cannot starve academic weaknesses.
- * Examiner prompts/rubrics remain hidden from the learner.
+ * exact plan. Counter advancement and the corresponding durable study proof are one fenced update;
+ * retrieved-but-rejected, probationary, duplicate, or otherwise unretained material does not advance
+ * the study round or unlock fresh practice. Fresh independent exam failures get their own high-priority
+ * remediation bridge so generic operational retests cannot starve academic weaknesses. Examiner
+ * prompts/rubrics remain hidden from the learner.
  */
 export async function runCosUniversityContinuousLearning(options: {
   now?: Date
@@ -223,8 +226,6 @@ export async function runCosUniversityContinuousLearning(options: {
     const remediation = await ensureCosUniversityExamFailureRemediationPlans({ maxPlans: 4 })
     summary.examFailuresPrioritized = remediation.activePlans.length
 
-    // Ask for a wider planning window than the execution cap so cooldowns on high-priority work do
-    // not starve the rest of the curriculum.
     const planning = await runCosUniversityPlanningCycle({ now, maxPlans: 12 })
     summary.errors.push(...planning.errors)
 
@@ -274,13 +275,14 @@ export async function runCosUniversityContinuousLearning(options: {
     const cycle = new ContinuousLearningCycle(director, adapters)
     const result = await cycle.run(gaps, 0)
 
-    summary.status = result.accepted > 0 ? 'learned' : 'idle'
     summary.documentsAcquired = result.documentsAcquired
     summary.accepted = result.accepted
     summary.probationary = result.probationary
     summary.sourceErrors = result.sourceErrors
-    attemptedPlanIds.push(...universityPlansWithAcceptedLearning(eligiblePlans, signals, result.acceptedGapIds))
-    summary.plansAttempted = await markCosUniversityStudyPlansAttempted(attemptedPlanIds, new Date())
+    const proofs = universityStudyProofsFromAcceptedLearning(eligiblePlans, signals, result.acceptedGapIds)
+    attemptedPlanIds.push(...await recordAcceptedCosUniversityStudyAttempts(proofs, new Date()))
+    summary.plansAttempted = attemptedPlanIds.length
+    summary.status = summary.plansAttempted > 0 ? 'learned' : 'idle'
     await finishContinuousSlot(claim.id, new Date(), summary, attemptedPlanIds)
     return summary
   } catch (error) {

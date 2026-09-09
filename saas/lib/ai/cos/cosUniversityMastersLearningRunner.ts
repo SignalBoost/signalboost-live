@@ -9,7 +9,10 @@ import {
   autonomousLearningReadiness,
   parseApprovedLearningUrls,
 } from '@/lib/cos/dailyAutonomousLearning'
-import { markCosUniversityStudyPlansAttempted } from './cosUniversityStore.ts'
+import {
+  recordAcceptedCosUniversityStudyAttempts,
+  type CosUniversityAcceptedStudyProofInput,
+} from './cosUniversityStudyProof.ts'
 import {
   COS_UNIVERSITY_STUDY_COOLDOWN_MINUTES,
   cosUniversityPlanEligibleForContinuousStudy,
@@ -322,14 +325,26 @@ export async function runCosUniversityMastersLearning(options: {
     }
     const planIdByGapId = new Map(plannedSignals.map(row => [knowledgeGapIdForSignal(row.signal), row.planId]))
     const result = await new ContinuousLearningCycle(director, adapters).run(gaps, 0)
-    summary.status = result.accepted > 0 ? 'learned' : 'idle'
     summary.documentsAcquired = result.documentsAcquired
     summary.accepted = result.accepted
     summary.probationary = result.probationary
-    const successfulPlanIds = [...new Set(result.acceptedGapIds.map(gapId => planIdByGapId.get(gapId)).filter((id): id is string => Boolean(id)))]
-    if (successfulPlanIds.length) {
-      summary.plansAttempted = await markCosUniversityStudyPlansAttempted(successfulPlanIds, new Date())
+
+    const refsByPlan = new Map<string, string[]>()
+    for (const gapId of result.acceptedGapIds) {
+      const planId = planIdByGapId.get(gapId)
+      if (!planId) continue
+      const refs = refsByPlan.get(planId) || []
+      refs.push(gapId)
+      refsByPlan.set(planId, refs)
     }
+    const proofs: CosUniversityAcceptedStudyProofInput[] = [...refsByPlan.entries()].map(([planId, evidenceRefs]) => ({
+      planId,
+      evidenceRefs: [...new Set(evidenceRefs)],
+    }))
+    if (proofs.length) {
+      summary.plansAttempted = (await recordAcceptedCosUniversityStudyAttempts(proofs, new Date())).length
+    }
+    summary.status = summary.plansAttempted > 0 ? 'learned' : 'idle'
     await finishSlot(claim.id, summary, new Date())
     return summary
   } catch (error) {

@@ -45,7 +45,20 @@ test('continuous learner keeps failed-exam remediation ahead of generic priority
   assert.match(runtime, /Number\(remediationPlanIds\.has\(b\.id\)\) - Number\(remediationPlanIds\.has\(a\.id\)\)/)
   assert.match(runtime, /b\.priority - a\.priority/)
   assert.match(runtime, /\[\.\.\.remediation\.gapSignals, \.\.\.planning\.gapSignals\]/)
-  assert.match(runtime, /markCosUniversityStudyPlansAttempted/)
+  assert.match(runtime, /recordAcceptedCosUniversityStudyAttempts/)
+  assert.match(runtime, /universityStudyProofsFromAcceptedLearning/)
+  assert.doesNotMatch(runtime, /markCosUniversityStudyPlansAttempted/)
+})
+
+test('daily mining learning may advance only exact University gaps that were actually accepted', () => {
+  const route = file('app/api/cron/cos-mining/route.ts')
+  assert.match(route, /recordAcceptedCosUniversityStudyAttempts/)
+  assert.match(route, /knowledgeGapIdForSignal/)
+  assert.match(route, /acceptedGapIds/)
+  assert.match(route, /String\(signal\.taskId \|\| ''\)\.endsWith\(plan\.planKey\)/)
+  assert.match(route, /filter\(gapId => accepted\.has\(gapId\)\)/)
+  assert.match(route, /universityStudyPlansAttempted = \(await recordAcceptedCosUniversityStudyAttempts\(proofs, new Date\(\)\)\)\.length/)
+  assert.doesNotMatch(route, /markCosUniversityStudyPlansAttempted/)
 })
 
 test('continuous learner records structured database errors instead of object stringification', () => {

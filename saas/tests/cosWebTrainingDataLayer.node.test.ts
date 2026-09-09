@@ -97,9 +97,53 @@ test('credible web research reads diverse high-quality pages and never fetches r
   for (const result of results) {
     assert.ok(result.text.length >= 700)
     assert.ok(result.evidence?.includes('web_data_layer=credible_training_research_v1'))
+    assert.ok(result.evidence?.includes('discovery_provider=duckduckgo_html'))
     assert.ok(result.evidence?.some(item => item.startsWith('source_credibility=')))
     assert.match(String(result.license), /facts_and_summary_only/)
   }
+})
+
+test('provider-free discovery fails over when DuckDuckGo blocks Production traffic', async () => {
+  const discoveryCalls: string[] = []
+  const longNist = `${'Physics scientific method experimental evidence measurement uncertainty. '.repeat(30)} NIST evidence.`
+  const longMit = `${'Physics mechanics energy momentum experimental reasoning and measurement. '.repeat(30)} MIT course evidence.`
+  const bingHtml = [
+    '<html><body><ol id="b_results">',
+    '<li class="b_algo"><h2><a href="https://www.nist.gov/example/measurement-science">NIST measurement science</a></h2><p>Standards evidence.</p></li>',
+    '<li class="b_algo"><h2><a href="https://ocw.mit.edu/example/physics">MIT physics course</a></h2><p>Academic evidence.</p></li>',
+    '<li class="b_algo"><h2><a href="https://medium.com/example/physics">Opinion</a></h2></li>',
+    '</ol></body></html>',
+  ].join('')
+
+  const fetcher: typeof fetch = async (input: any) => {
+    const url = String(input)
+    if (url.includes('duckduckgo.com/')) {
+      discoveryCalls.push(url)
+      return new Response('blocked', { status: 403, headers: { 'content-type': 'text/html' } })
+    }
+    if (url.startsWith('https://www.bing.com/search?')) {
+      discoveryCalls.push(url)
+      return new Response(bingHtml, { status: 200, headers: { 'content-type': 'text/html' } })
+    }
+    if (url.includes('nist.gov')) {
+      return new Response(`<main><p>${longNist}</p></main>`, { status: 200, headers: { 'content-type': 'text/html' } })
+    }
+    if (url.includes('ocw.mit.edu')) {
+      return new Response(`<main><p>${longMit}</p></main>`, { status: 200, headers: { 'content-type': 'text/html' } })
+    }
+    if (url.includes('medium.com')) throw new Error('low-signal page must never be fetched')
+    return new Response('not found', { status: 404, headers: { 'content-type': 'text/plain' } })
+  }
+
+  const search = createWebTrainingResearchSearch({ fetcher, minCredibility: 0.82, maxDiscoveryResults: 8 })
+  const results = await search('Physics Natural Sciences mechanics energy momentum measurement scientific method', 3)
+
+  assert.ok(discoveryCalls.some(url => url.startsWith('https://html.duckduckgo.com/html/')))
+  assert.ok(discoveryCalls.some(url => url.startsWith('https://lite.duckduckgo.com/lite/')))
+  assert.ok(discoveryCalls.some(url => url.startsWith('https://www.bing.com/search?')))
+  assert.equal(results.length, 2)
+  assert.ok(results.every(result => result.evidence?.includes('discovery_provider=bing')))
+  assert.equal(results.some(result => result.uri.includes('medium.com')), false)
 })
 
 test('production bindings make credible web research an additional governed adapter, not a second learning engine', () => {

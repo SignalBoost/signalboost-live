@@ -6,9 +6,10 @@ import { useEffect, useMemo, useState } from 'react'
 import LocalVideoPreviewReview from '@/components/studio/LocalVideoPreviewReview'
 import { VideoPreviewRenderer } from '@/lib/cos/ui/VideoPreviewRenderer'
 import { uiText } from '@/lib/i18n/uiText'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 const GOLD = '#ffc300'
-const SAAS_URL = 'www.' + 'saas.signalboostapp.com'
+const SAAS_URL = PUBLIC_BRAND_DOMAIN
 
 type PresenterScene = {
   label: string
@@ -32,21 +33,21 @@ type PresenterDraft = {
 }
 
 const fallbackDraft: PresenterDraft = {
-  presenter_name: 'SignalBoost AI',
+  presenter_name: PUBLIC_BRAND.name,
   presenter_role: 'official platform guide',
   tone: 'professional_friendly',
   title: uiText('generatedUi.u_30d890def564f1e8'),
   duration_seconds: 25,
-  opening_hook: 'Hi, I am SignalBoost AI. I will give you a quick tour so you can see how we can help your company.',
+  opening_hook: `Hi, I am ${PUBLIC_BRAND.name}. I will give you a quick tour so you can see how we can help your company.`,
   destination_url: SAAS_URL,
   cta: `Visit ${SAAS_URL}`,
   approval_gates: ['Approve presenter style.', 'Approve opening hook.', 'Approve product tour flow.', 'Approve final video before release.'],
   scenes: [
-    { label: uiText('generatedUi.u_e72c89101151faa4'), presenter_line: 'Hi, I am SignalBoost AI. I will give you a quick tour so you can see how we can help your company.', caption: uiText('generatedUi.u_7fa45e631489b427'), visual_direction: 'Show the SignalBoost AI guide with a friendly wave and branded glow.', goal: 'Create attention in the first three seconds.' },
+    { label: uiText('generatedUi.u_e72c89101151faa4'), presenter_line: `Hi, I am ${PUBLIC_BRAND.name}. I will give you a quick tour so you can see how we can help your company.`, caption: uiText('generatedUi.u_7fa45e631489b427'), visual_direction: 'Show the SignalBoost AI guide with a friendly wave and branded glow.', goal: 'Create attention in the first three seconds.' },
     { label: uiText('generatedUi.u_a82746b58c602938'), presenter_line: 'Many companies lose time switching between dashboards, reviews, content tools, and approval steps.', caption: uiText('generatedUi.u_7c35f6b391218e08'), visual_direction: 'Show scattered product cards moving into one clean console.', goal: 'Make the viewer recognize the problem quickly.' },
-    { label: uiText('generatedUi.u_da1b6e6a080c72d5'), presenter_line: 'SignalBoost brings the work into one place so you can see what needs attention and what action should happen next.', caption: uiText('generatedUi.u_5e0bfe84e70e9218'), visual_direction: 'Zoom into the platform console and highlight recommendations, approvals, provider data, and content tools.', goal: 'Show product value visually.' },
+    { label: uiText('generatedUi.u_da1b6e6a080c72d5'), presenter_line: `${PUBLIC_BRAND.name} brings the work into one place so you can see what needs attention and what action should happen next.`, caption: uiText('generatedUi.u_5e0bfe84e70e9218'), visual_direction: 'Zoom into the platform console and highlight recommendations, approvals, provider data, and content tools.', goal: 'Show product value visually.' },
     { label: uiText('generatedUi.u_25d17c7d62dd9581'), presenter_line: 'COSA can prepare the recommendation, draft the campaign, and organize the work while you stay in control of approval.', caption: uiText('generatedUi.u_f4c326e52d26a9e0'), visual_direction: 'Animate approve, reject, queue, and ready cards moving through a clean workflow.', goal: 'Build trust by showing control.' },
-    { label: uiText('generatedUi.u_020620132bbb140f'), presenter_line: `Visit ${SAAS_URL} and see how SignalBoost can help your company turn scattered work into approved action.`, caption: `Visit ${SAAS_URL}`, visual_direction: 'End with the guide beside the branded URL, CTA button, and final product screen.', goal: 'Drive traffic to the SaaS platform.' },
+    { label: uiText('generatedUi.u_020620132bbb140f'), presenter_line: `Visit ${SAAS_URL} and see how ${PUBLIC_BRAND.name} can help your company turn scattered work into approved action.`, caption: `Visit ${SAAS_URL}`, visual_direction: 'End with the guide beside the branded URL, CTA button, and final product screen.', goal: 'Drive traffic to the SaaS platform.' },
   ],
 }
 
@@ -61,17 +62,17 @@ function sceneForPreview(scene: PresenterScene) {
 export default function CosaInstantVideoDraftPage() {
   const [draft, setDraft] = useState<PresenterDraft>(fallbackDraft)
   const [loadedFromEngine, setLoadedFromEngine] = useState(false)
-  const [message, setMessage] = useState('Loading SignalBoost AI presenter draft...')
+  const [message, setMessage] = useState(`Loading ${PUBLIC_BRAND.name} presenter draft...`)
 
   async function loadDraft() {
-    setMessage("Loading SignalBoost AI presenter draft...")
+    setMessage(`Loading ${PUBLIC_BRAND.name} presenter draft...`)
     try {
       const res = await fetch('/api/cos/presenter-video', { cache: 'no-store' })
       const json = await res.json()
       if (!json.ok || !json.draft) throw new Error(json.error || 'No presenter draft returned.')
       setDraft(json.draft)
       setLoadedFromEngine(true)
-      setMessage("SignalBoost AI presenter draft loaded from COSA.")
+      setMessage(`${PUBLIC_BRAND.name} presenter draft loaded from COSA.`)
     } catch (err) {
       setLoadedFromEngine(false)
       setMessage(err instanceof Error ? `Using fallback presenter draft: ${err.message}` : "Using fallback presenter draft.")

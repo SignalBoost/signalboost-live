@@ -1,3 +1,4 @@
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 // saas/lib/cos/campaign-queue/campaign-traffic.ts
 // Real, first-party click counts per campaign — logged directly by /api/track.
 
@@ -68,7 +69,7 @@ export async function getCampaignTraffic(admin: any, campaignId: string): Promis
 }
 
 export function buildTrackingUrl(campaignId: string, platform: string, language?: string | null, targetRegion?: string | null): string {
-  const site = 'https://www.saas.signalboostapp.com'
+  const site = PUBLIC_BRAND.siteUrl
   const params = new URLSearchParams({ c: campaignId, p: platform })
   const lang = String(language || '').trim().toLowerCase()
   const region = String(targetRegion || targetRegionForLanguage(lang) || '').trim().toLowerCase()

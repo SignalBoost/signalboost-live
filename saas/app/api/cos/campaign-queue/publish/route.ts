@@ -1,4 +1,3 @@
-// saas/app/api/cos/campaign-queue/publish/route.ts
 // Publish an APPROVED COS campaign item to a live social platform. The approval
 // gate is enforced here: nothing publishes unless the campaign is approved.
 // Video campaigns publish the exact approved campaign row, using only the final
@@ -14,6 +13,7 @@ import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
 import { sendEmail } from '@/lib/email'
 import { campaignLanguage, resolveFinalVideoForLanguage, verifyApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
 import { recordPublishedCampaignLifecycle } from '@/lib/enterprise/memory/lifecycleRecorder'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: `COSA has not finished producing this video yet (status: ${vmeta.status || 'not started'}).` }, { status: 409 })
     }
     if (vmeta.branded !== true) {
-      return NextResponse.json({ ok: false, error: 'The mandatory SignalBoostAi brand banner is not on this video yet. Publishing is blocked.' }, { status: 409 })
+      return NextResponse.json({ ok: false, error: `The mandatory ${PUBLIC_BRAND.name} brand banner is not on this video yet. Publishing is blocked.` }, { status: 409 })
     }
     const exactFinal = resolveFinalVideoForLanguage(campaign, language)
     if (!exactFinal) {

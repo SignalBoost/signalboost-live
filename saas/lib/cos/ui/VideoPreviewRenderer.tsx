@@ -1,12 +1,12 @@
-// saas/lib/cos/ui/VideoPreviewRenderer.tsx
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatedVideoBackdrop } from './AnimatedVideoBackdrop.tsx'
 import { SignalBoostGuide } from './SignalBoostGuide.tsx'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 const GOLD = '#ffc300'
-const SIGNALBOOST_URL = 'www.saas.signalboostapp.com'
+const SIGNALBOOST_URL = PUBLIC_BRAND_DOMAIN
 const VOICE_ENGINE_KEY = 'speech' + 'Synthesis'
 const VOICE_LINE_KEY = 'Speech' + 'Synthesis' + 'Utterance'
 
@@ -24,7 +24,7 @@ type VideoPreviewRendererProps = {
 
 export function VideoPreviewRenderer({ title, scenes = [], callToAction }: VideoPreviewRendererProps) {
   const safeScenes = useMemo(() => {
-    const base = scenes.length ? scenes : [{ label: 'Campaign', narration: title || 'Generated campaign preview', visual_direction: 'SignalBoost campaign preview' }]
+    const base = scenes.length ? scenes : [{ label: 'Campaign', narration: title || 'Generated campaign preview', visual_direction: `${PUBLIC_BRAND.name} campaign preview` }]
     return base.map((scene, index) => ({
       label: scene.label || `Scene ${index + 1}`,
       narration: scene.narration || 'Narration pending.',

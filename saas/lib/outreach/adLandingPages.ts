@@ -1,3 +1,4 @@
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 // saas/lib/outreach/adLandingPages.ts
 // Canonical landing pages for public outreach/ad placements.
 // Keep newspaper/classified ad CTAs here so they are easy to reuse and audit.
@@ -18,7 +19,7 @@ export const AD_LANDING_PAGES: Record<AdLandingPageGoal, AdLandingPage> = {
   website_optimization: {
     goal: 'website_optimization',
     label: 'Free Website Optimization Scan',
-    url: 'https://www.saas.signalboostapp.com/website-optimizer',
+    url: `${PUBLIC_BRAND.siteUrl}/website-optimizer`,
     route: '/website-optimizer',
     publicSafe: true,
     recommendedForNewspaperAds: true,
@@ -27,7 +28,7 @@ export const AD_LANDING_PAGES: Record<AdLandingPageGoal, AdLandingPage> = {
   cybersecurity_preview: {
     goal: 'cybersecurity_preview',
     label: 'Free Cybersecurity Preview',
-    url: 'https://www.saas.signalboostapp.com/cybersecurity-check',
+    url: `${PUBLIC_BRAND.siteUrl}/cybersecurity-check`,
     route: '/cybersecurity-check',
     publicSafe: true,
     recommendedForNewspaperAds: true,
@@ -36,7 +37,7 @@ export const AD_LANDING_PAGES: Record<AdLandingPageGoal, AdLandingPage> = {
   audit_console: {
     goal: 'audit_console',
     label: 'Audit Console',
-    url: 'https://www.saas.signalboostapp.com/dashboard/audit',
+    url: `${PUBLIC_BRAND.siteUrl}/dashboard/audit`,
     route: '/dashboard/audit',
     publicSafe: false,
     recommendedForNewspaperAds: false,

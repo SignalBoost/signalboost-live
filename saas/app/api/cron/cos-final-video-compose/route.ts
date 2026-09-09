@@ -1,7 +1,6 @@
-// saas/app/api/cron/cos-final-video-compose/route.ts
 // Final scheduled COSA video composer.
 // Picks up campaigns with unbranded voiced/captioned video and renders the final
-// JSON2Video template with SignalBoostAi + www.saas.signalboostapp.com.
+// JSON2Video template with the public brand name + public brand domain.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'

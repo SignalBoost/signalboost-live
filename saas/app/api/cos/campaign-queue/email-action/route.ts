@@ -1,4 +1,3 @@
-// saas/app/api/cos/campaign-queue/email-action/route.ts
 // Secure owner email actions for COSA video approvals.
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -6,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { autoPublishApprovedCampaign } from '@/lib/cos/campaign-queue/publish-core'
 import { recordApprovedCampaignLifecycle } from '@/lib/enterprise/memory/lifecycleRecorder'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -74,7 +74,7 @@ async function loadCampaign(sb: ReturnType<typeof admin>, id: string) {
 
 async function approveCampaign(req: NextRequest, sb: ReturnType<typeof admin>, campaign: any, ownerUserId: string, ownerEmail: string) {
   if (!finalVideoReady(campaign)) {
-    return html('Approval blocked', '<h1 style="margin-top:0">Approval blocked</h1><p>The final branded preview is not ready yet. The campaign must have voice/captions plus the SignalBoostAi and www.saas.signalboostapp.com banner before email approval works.</p>', 409)
+    return html('Approval blocked', `<h1 style="margin-top:0">Approval blocked</h1><p>The final branded preview is not ready yet. The campaign must have voice/captions plus the ${PUBLIC_BRAND.name} and ${PUBLIC_BRAND_DOMAIN} banner before email approval works.</p>`, 409)
   }
 
   const now = new Date().toISOString()

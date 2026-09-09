@@ -1,4 +1,3 @@
-// saas/lib/operator/video.ts
 // Reusable server-side helper for generating website/background/COS videos.
 //
 // COST SAFETY MODE:
@@ -10,6 +9,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { COS_VIDEO_QUEUE_SQL } from '@/lib/operator/videoQueueSchema'
 import { cosVideoRenderBucket, ensureCosVideoRenderBucket, logCosVideoStorageFailure } from '@/lib/cos/video-storage'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 const LOCAL_FFMPEG_MODEL = 'signalboost/local-ffmpeg-preview'
 const SUPABASE_URL_KEY = ['NEXT', 'PUBLIC', 'SUPABASE', 'URL'].join('_')
@@ -47,11 +47,11 @@ const AUDIENCE_BY_LANG: Record<string, string> = {
 }
 
 const LEARN_MORE_BY_LANG: Record<string, string> = {
-  en: 'Learn more at www.saas.signalboostapp.com.',
-  es: 'Más información en www.saas.signalboostapp.com.',
-  pt: 'Saiba mais em www.saas.signalboostapp.com.',
-  pl: 'Dowiedz się więcej na www.saas.signalboostapp.com.',
-  ru: 'Подробнее на www.saas.signalboostapp.com.',
+  en: `Learn more at ${PUBLIC_BRAND_DOMAIN}.`,
+  es: `Más información en ${PUBLIC_BRAND_DOMAIN}.`,
+  pt: `Saiba mais em ${PUBLIC_BRAND_DOMAIN}.`,
+  pl: `Dowiedz się więcej na ${PUBLIC_BRAND_DOMAIN}.`,
+  ru: `Подробнее на ${PUBLIC_BRAND_DOMAIN}.`,
 }
 
 function adminDb() {
@@ -97,7 +97,7 @@ function titleFromPrompt(prompt: string): string {
 
 function hookFromPrompt(prompt: string): string {
   const clean = cleanText(prompt, 160)
-  return clean || 'One command can start a complete SignalBoostAi campaign.'
+  return clean || `One command can start a complete ${PUBLIC_BRAND.name} campaign.`
 }
 
 function needsQueueSetup(message: string): boolean {
@@ -180,13 +180,13 @@ async function startFfmpegPreview(prompt: string, aspectRatio: '9:16' | '16:9' |
       source_image_bucket: source.sourceImageBucket || null,
     },
     search_package: {
-      title_options: [title, `${title} | SignalBoostAi`, 'AI campaign operating system demo'],
+      title_options: [title, `${title} | ${PUBLIC_BRAND.name}`, 'AI campaign operating system demo'],
       description: `${hook} ${LEARN_MORE_BY_LANG[lang] || LEARN_MORE_BY_LANG.en}`,
-      tags: ['SignalBoostAi', 'AI marketing', 'campaign automation', 'business growth', 'SaaS'],
+      tags: [PUBLIC_BRAND.name, 'AI marketing', 'campaign automation', 'business growth', 'SaaS'],
       thumbnail_text: hook.slice(0, 54),
       transcript_required: true,
       captions_required: true,
-      destination_url: 'www.saas.signalboostapp.com',
+      destination_url: PUBLIC_BRAND_DOMAIN,
     },
     approval_state: {
       concept_approved: true,

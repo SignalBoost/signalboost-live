@@ -5,17 +5,18 @@ import { LocalizedText } from '@/components/i18n/LocalizedText'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { SignalBoostGuide } from '@/lib/cos/ui/SignalBoostGuide'
 import { uiText } from '@/lib/i18n/uiText'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 const GOLD = '#ffc300'
 const CYAN = '#1af0ff'
-const SAAS_URL = 'www.' + 'saas.signalboostapp.com'
+const SAAS_URL = PUBLIC_BRAND_DOMAIN
 const VOICE_ENGINE_KEY = 'speech' + 'Synthesis'
 const VOICE_LINE_KEY = 'Speech' + 'Synthesis' + 'Utterance'
 
 const scenes = [
   {
     label: uiText('generatedUi.u_536ff5051d2541c9'),
-    line: 'Hi, I am SignalBoost AI. I will give you a quick tour so you can see how we can help your company.',
+    line: `Hi, I am ${PUBLIC_BRAND.name}. I will give you a quick tour so you can see how we can help your company.`,
     caption: uiText('generatedUi.u_7fa45e631489b427'),
     card: 'Official platform guide',
   },
@@ -27,7 +28,7 @@ const scenes = [
   },
   {
     label: uiText('generatedUi.u_c0323ea228dc7712'),
-    line: 'SignalBoost brings the work into one console so you can see what needs attention and what should happen next.',
+    line: `${PUBLIC_BRAND.name} brings the work into one console so you can see what needs attention and what should happen next.`,
     caption: uiText('generatedUi.u_f84c985f6f8074d2'),
     card: 'Command console',
   },
@@ -39,7 +40,7 @@ const scenes = [
   },
   {
     label: uiText('generatedUi.u_020620132bbb140f'),
-    line: `Visit ${SAAS_URL} and see how SignalBoost can help your company turn scattered work into approved action.`,
+    line: `Visit ${SAAS_URL} and see how ${PUBLIC_BRAND.name} can help your company turn scattered work into approved action.`,
     caption: `Visit ${SAAS_URL}`,
     card: 'Start the tour',
   },
@@ -121,7 +122,11 @@ export default function FreeSignalBoostAiVideoPage() {
 
       <section style={stageWrap}>
         <div style={phoneFrame}>
-          <style>{"\n            @keyframes freeScan { 0%{transform:translateX(-120%);opacity:0} 20%{opacity:1} 100%{transform:translateX(120%);opacity:0} }\n            @keyframes freePop { 0%,100%{transform:scale(.96);opacity:.72} 50%{transform:scale(1.04);opacity:1} }\n            @keyframes freeCard { 0%{transform:translateY(14px);opacity:.45} 100%{transform:translateY(0);opacity:1} }\n          "}</style>
+          <style>{`
+            @keyframes freeScan { 0%{transform:translateX(-120%);opacity:0} 20%{opacity:1} 100%{transform:translateX(120%);opacity:0} }
+            @keyframes freePop { 0%,100%{transform:scale(.96);opacity:.72} 50%{transform:scale(1.04);opacity:1} }
+            @keyframes freeCard { 0%{transform:translateY(14px);opacity:.45} 100%{transform:translateY(0);opacity:1} }
+          `}</style>
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 30% 8%, rgba(255,195,0,.24), transparent 34%), linear-gradient(180deg, #020617, #0f172a)' }} />
           <span style={{ position: 'absolute', left: 0, right: 0, top: 126, height: 3, background: `linear-gradient(90deg, transparent, ${CYAN}, ${GOLD}, transparent)`, animation: 'freeScan 3s linear infinite' }} />
 

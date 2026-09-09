@@ -1,4 +1,3 @@
-// saas/app/api/cron/cos-auto-publish/route.ts
 // The last mile of "AI does everything; the human only starts and approves."
 // Every few minutes: find OWNER-APPROVED campaigns whose video is READY and
 // BRANDED, run the same autonomous quality gate as the manual publish route,
@@ -22,6 +21,7 @@ import { scoreCampaignReadiness } from '@/lib/cos/video-quality/campaign-scoring
 import { buildTrackingUrl } from '@/lib/cos/campaign-queue/campaign-traffic'
 import { verifyApprovalBinding } from '@/lib/cos/campaign-queue/approvalBinding'
 import { sendEmail } from '@/lib/email'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -59,7 +59,7 @@ async function publishOne(sb: any, campaign: any): Promise<{ status: 'published'
   const isVideo = VIDEO_CHANNELS.includes(String(campaign.channel))
   if (isVideo) {
     if (video.status !== 'ready') return { status: 'skipped', note: 'video not ready yet' }
-    if (video.branded !== true || !video.voicedUrl) return { status: 'skipped', note: 'brand banner not burned in yet — auto-publish never ships without SignalBoostAi + www.saas.signalboostapp.com on the video' }
+    if (video.branded !== true || !video.voicedUrl) return { status: 'skipped', note: `brand banner not burned in yet — auto-publish never ships without ${PUBLIC_BRAND.name} + ${PUBLIC_BRAND_DOMAIN} on the video` }
   }
 
   const langs = Array.isArray(campaign.languages) && campaign.languages.length ? campaign.languages : ['en']

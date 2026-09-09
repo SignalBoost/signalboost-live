@@ -1,7 +1,7 @@
-// saas/lib/cos/video-production/planner.ts
 import type { VideoProductionInput, VideoProductionJob, VideoProductionTier } from './types.ts'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
-const DEFAULT_URL = 'www.' + 'saas.signalboostapp.com'
+const DEFAULT_URL = PUBLIC_BRAND_DOMAIN
 
 function id(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -15,7 +15,7 @@ export function buildVideoProductionJob(input: VideoProductionInput = {}): Video
   const productionTier = tier(input.production_tier)
   const destinationUrl = input.destination_url || DEFAULT_URL
   const title = input.title || 'Product video'
-  const hook = input.hook || 'See how SignalBoost turns scattered business work into approved action.'
+  const hook = input.hook || `See how ${PUBLIC_BRAND.name} turns scattered business work into approved action.`
   const audience = input.audience || 'business owners, marketing leaders, and enterprise operators'
   const platforms = input.platforms?.length ? input.platforms : ['YouTube', 'Shorts', 'LinkedIn', 'Google Ads']
   const now = new Date().toISOString()
@@ -40,7 +40,7 @@ export function buildVideoProductionJob(input: VideoProductionInput = {}): Video
     search_package: {
       title_options: [
         title,
-        `${title} | SignalBoost AI business platform`,
+        `${title} | ${PUBLIC_BRAND.name} business platform`,
         `How ${title.toLowerCase()} helps teams move faster`,
       ],
       description: `${hook} Learn more at ${destinationUrl}.`,

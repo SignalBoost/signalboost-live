@@ -66,6 +66,6 @@ test('University run ledger persists aggregate and per-gap diagnostics without c
   assert.match(migration, /never raw study or exam content/i)
 
   assert.match(cycle, /COS_LEARNING_MIN_RELEVANCE',0\.12/)
-  assert.match(cycle, /minimumConfidence: 0\.72/)
+  assert.match(runtime, /minimumConfidence: 0\.72/)
   assert.doesNotMatch(runtime, /record.*assessment|award.*credential|academicCredit:\s*true/i)
 })

@@ -4,10 +4,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 const GOLD = '#ffc300'
-const BRAND = 'SignalBoost'
-const AI_BRAND = 'SignalBoost AI'
 
 type Language = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -127,9 +126,9 @@ export default function Footer() {
         </div>
 
         <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 20, display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>© {year} {BRAND}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>
-            {copy.poweredBy}{' '}<span style={{ color: GOLD }}>{AI_BRAND}</span>
+          <div style={{ fontSize: 12, color: 'var(--text-faint)' }}>© {year} {PUBLIC_BRAND.name}</div>
+          <div style={{ fontSize: 12, color: GOLD, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            {PUBLIC_BRAND.tagline}
           </div>
         </div>
       </div>

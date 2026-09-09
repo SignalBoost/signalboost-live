@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="iTMounts">
+  <defs>
+    <linearGradient id="mount" x1="0" x2="1">
+      <stop offset="0" stop-color="#4c1d95"/>
+      <stop offset="0.55" stop-color="#7c3aed"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#080b18"/>
+  <path d="M14 11h36a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H39v21H25V27H14a4 4 0 0 1-4-4v-8a4 4 0 0 1 4-4Z" fill="#f8fafc"/>
+  <path d="M40 11h10a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H34Z" fill="#8b5cf6"/>
+  <rect x="9" y="48" width="46" height="8" rx="4" fill="url(#mount)"/>
+</svg>

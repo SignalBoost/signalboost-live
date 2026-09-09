@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
+import { selectCosUniversityPracticeGateDecision } from '../lib/ai/cos/cosUniversityPracticeSelectionPolicy.ts'
 import { cosUniversityAcceptedStudyClearsRemediationBoundary } from '../lib/ai/cos/cosUniversityStudyProofPolicy.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
@@ -68,6 +69,31 @@ test('a different-round or absent remediation does not block genuinely newer acc
     currentAttempt: 4,
     acceptedAt: '2026-09-09T00:09:00.000Z',
   }), true)
+})
+
+test('a blocked high-priority restudy decision cannot starve the next eligible practice decision', () => {
+  const blockedPhysics = {
+    allowed: false,
+    reason: 'restudy_required_after_failed_practice',
+    planId: 'physics-plan',
+  }
+  const eligibleEnglish = {
+    allowed: true,
+    reason: 'accepted_study_proof_verified',
+    planId: 'english-writing-plan',
+  }
+
+  assert.equal(selectCosUniversityPracticeGateDecision([blockedPhysics]), blockedPhysics)
+  assert.equal(
+    selectCosUniversityPracticeGateDecision([blockedPhysics, eligibleEnglish]),
+    eligibleEnglish,
+  )
+  assert.equal(selectCosUniversityPracticeGateDecision([]), null)
+
+  const gate = file('lib/ai/cos/cosUniversityPracticeStudyGate.ts')
+  assert.match(gate, /\.filter\(row => hasDeliberatePractice\(row\.methods\)\)/)
+  assert.match(gate, /\.map\(plan => evaluateCosUniversityPracticeStudyGate\(plan, now\)\)/)
+  assert.match(gate, /selectCosUniversityPracticeGateDecision\(decisions\)/)
 })
 
 test('all University learning writers bind proof to cycle start rather than writer completion time', () => {

@@ -14,6 +14,7 @@ import {
 import { generateReferenceConditionedImage, type ReferenceConditionedImageResult } from '@/lib/visuals/referenceImageGeneration'
 import { verifyReferenceConditionedPeopleImage } from '@/lib/visuals/personImageVerification'
 import { isVisualObjectiveError, readVisualObjective } from '@/lib/visuals/request-contract'
+import { MAX_VISUAL_BATCH_COUNT, resolveRequestedVisualCount } from '@/lib/visuals/quantityIntent'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
@@ -27,6 +28,12 @@ const GUEST_VISUAL_TRIAL_ROUTE = 'concierge_visual_guest_trial'
 
 type VisualLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type ImageMime = 'image/png' | 'image/jpeg' | 'image/webp'
+type DeliveredVisual = Readonly<{
+  previewUrl: string
+  downloadUrl: string
+  filename: string
+  alt: string
+}>
 
 function imageMimeType(b64: string): ImageMime {
   const bytes = Buffer.from(b64.slice(0, 96), 'base64')
@@ -55,6 +62,56 @@ function generatedReply(language: VisualLanguage): string {
     pt: 'Criei sua imagem. Ela aparece abaixo e está pronta para baixar.',
     pl: 'Utworzyłem obraz. Jest pokazany poniżej i gotowy do pobrania.',
     ru: 'Изображение создано. Оно показано ниже и готово к скачиванию.',
+  }[language]
+}
+
+function generatedBatchReply(language: VisualLanguage, count: number): string {
+  return {
+    en: `Created ${count} distinct visuals. They are shown below and ready to download.`,
+    es: `Creé ${count} imágenes distintas. Se muestran abajo y están listas para descargar.`,
+    pt: `Criei ${count} imagens distintas. Elas aparecem abaixo e estão prontas para baixar.`,
+    pl: `Utworzyłem ${count} różne obrazy. Są pokazane poniżej i gotowe do pobrania.`,
+    ru: `Создано ${count} разных изображений. Они показаны ниже и готовы к скачиванию.`,
+  }[language]
+}
+
+function batchConceptLabel(language: VisualLanguage, index: number): string {
+  return {
+    en: `Concept ${index}`,
+    es: `Concepto ${index}`,
+    pt: `Conceito ${index}`,
+    pl: `Koncepcja ${index}`,
+    ru: `Вариант ${index}`,
+  }[language]
+}
+
+function batchDownloadLabel(language: VisualLanguage, index: number): string {
+  return {
+    en: `Download concept ${index}`,
+    es: `Descargar concepto ${index}`,
+    pt: `Baixar conceito ${index}`,
+    pl: `Pobierz koncepcję ${index}`,
+    ru: `Скачать вариант ${index}`,
+  }[language]
+}
+
+function batchLimitReply(language: VisualLanguage): string {
+  return {
+    en: `I can create up to ${MAX_VISUAL_BATCH_COUNT} distinct visuals in one request. Ask for the next batch after that.`,
+    es: `Puedo crear hasta ${MAX_VISUAL_BATCH_COUNT} imágenes distintas por solicitud. Después puedes pedir el siguiente lote.`,
+    pt: `Posso criar até ${MAX_VISUAL_BATCH_COUNT} imagens distintas por solicitação. Depois, peça o próximo lote.`,
+    pl: `Mogę utworzyć do ${MAX_VISUAL_BATCH_COUNT} różnych obrazów w jednym żądaniu. Potem poproś o kolejną serię.`,
+    ru: `За один запрос я могу создать до ${MAX_VISUAL_BATCH_COUNT} разных изображений. Затем можно запросить следующую серию.`,
+  }[language]
+}
+
+function guestBatchReply(language: VisualLanguage): string {
+  return {
+    en: 'The free guest trial includes one visual. Sign up to create multiple distinct visuals in one request.',
+    es: 'La prueba gratuita para visitantes incluye una imagen. Regístrate para crear varias imágenes distintas en una sola solicitud.',
+    pt: 'O teste gratuito para visitantes inclui uma imagem. Cadastre-se para criar várias imagens distintas em uma só solicitação.',
+    pl: 'Bezpłatna próba dla gości obejmuje jeden obraz. Zarejestruj się, aby tworzyć wiele różnych obrazów w jednym żądaniu.',
+    ru: 'Бесплатная гостевая проба включает одно изображение. Зарегистрируйтесь, чтобы создавать несколько разных изображений за один запрос.',
   }[language]
 }
 
@@ -258,6 +315,31 @@ async function createVerifiedPeopleVisual(objective: string, references: readonl
   return { attempts, reasonCodes: lastReasons, error: lastError }
 }
 
+function batchFilename(baseFilename: string, index: number, mime: ImageMime): string {
+  const stem = baseFilename.replace(/\.[a-z0-9]+$/i, '') || 'visual'
+  return `${stem}-${index}.${extensionFor(mime)}`
+}
+
+function storedVisual(workspaceId: string, filename: string, alt: string): DeliveredVisual {
+  const encodedPath = filename.split('/').map(encodeURIComponent).join('/')
+  const previewUrl = `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${encodedPath}?preview=1`
+  return Object.freeze({
+    previewUrl,
+    downloadUrl: previewUrl.replace('?preview=1', ''),
+    filename,
+    alt,
+  })
+}
+
+function batchReply(language: VisualLanguage, visuals: readonly DeliveredVisual[]): string {
+  const embedded = visuals.slice(0, -1).map((visual, index) => [
+    `**${batchConceptLabel(language, index + 1)}**`,
+    `<IMAGE>${visual.previewUrl}</IMAGE>`,
+    `[${batchDownloadLabel(language, index + 1)}](${visual.downloadUrl})`,
+  ].join('\n')).join('\n\n')
+  return [generatedBatchReply(language, visuals.length), embedded].filter(Boolean).join('\n\n')
+}
+
 /** Concierge visual tool. Guests receive one metered inline trial; members also receive private durable storage. */
 export async function POST(request: Request) {
   const access = await getAccess().catch(() => null)
@@ -282,6 +364,120 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
     const guestTrial = !access?.userId
+    const requestedVisualCount = intent.mode === 'generate'
+      ? await resolveRequestedVisualCount(objective)
+      : 1
+
+    if (requestedVisualCount > MAX_VISUAL_BATCH_COUNT) {
+      return NextResponse.json({
+        error: 'visual_batch_limit_exceeded',
+        reply: batchLimitReply(language),
+        source: 'concierge-visual-batch-limit',
+        requested_visual_count: requestedVisualCount,
+        max_visual_batch_count: MAX_VISUAL_BATCH_COUNT,
+        execution_allowed: false,
+        external_action_taken: false,
+        goal_completion: blockedGoal([], ['supported_visual_batch_size'], 'ask_user'),
+      }, { status: 400 })
+    }
+
+    if (guestTrial && requestedVisualCount > 1) {
+      return NextResponse.json({
+        error: 'guest_visual_batch_requires_signup',
+        reply: guestBatchReply(language),
+        source: 'concierge-visual-guest-batch-limit',
+        requested_visual_count: requestedVisualCount,
+        signup_required: true,
+        execution_allowed: false,
+        external_action_taken: false,
+        goal_completion: blockedGoal([], ['authenticated_visual_batch_access'], 'ask_user'),
+      }, { status: 401 })
+    }
+
+    // Exact-count batch path for original visuals. The semantic/deep-learning quantity
+    // interpreter decides what the user asked for; deterministic code enforces the execution
+    // ceiling and refuses to claim success unless every requested visual was generated and stored.
+    if (intent.mode === 'generate' && requestedVisualCount > 1) {
+      const imagePort = createPlatformImagePort()
+      const generated = await Promise.all(Array.from({ length: requestedVisualCount }, () =>
+        imagePort.generate({
+          prompt: visualPrompt(objective),
+          size: '1024x1024',
+        }),
+      ))
+      const failed = generated.find((candidate) => !candidate.ok || !candidate.b64)
+      if (failed) {
+        return NextResponse.json({
+          error: failed.error || 'visual_batch_generation_unavailable',
+          reply: `I could not generate all ${requestedVisualCount} requested visuals, so I will not claim the batch was delivered. Please try again.`,
+          source: 'concierge-visual-batch-incomplete',
+          requested_visual_count: requestedVisualCount,
+          delivered_visual_count: 0,
+          execution_allowed: false,
+          external_action_taken: false,
+          goal_completion: blockedGoal([], ['complete_visual_batch_generation'], 'wait'),
+        }, { status: 503 })
+      }
+
+      const workspace = createSupabaseBuilderWorkspace(access!.userId!)
+      if (!workspace) {
+        return NextResponse.json({
+          error: 'visual_storage_unavailable',
+          requested_visual_count: requestedVisualCount,
+          delivered_visual_count: 0,
+          goal_completion: partialGoal(
+            ['visual_batch_generated'],
+            ['durable_visual_storage'],
+            'wait',
+          ),
+        }, { status: 503 })
+      }
+
+      const workspaceId = crypto.randomUUID()
+      await workspace.ensureWorkspace(workspaceId)
+      const stored = generated.map((candidate, index) => {
+        const b64 = candidate.b64!
+        const mime = imageMimeType(b64)
+        const filename = batchFilename(intent.filename, index + 1, mime)
+        return { b64, mime, filename }
+      })
+      await Promise.all(stored.map((item) =>
+        workspace.writeFile(workspaceId, item.filename, `artifact-image-base64:${item.mime}:${item.b64}`),
+      ))
+
+      const visuals = stored.map((item) => storedVisual(workspaceId, item.filename, objective))
+      if (visuals.length !== requestedVisualCount) {
+        return NextResponse.json({
+          error: 'visual_batch_delivery_unverified',
+          reply: 'The requested visual batch could not be verified for display and download, so I will not claim it was delivered. Please try again.',
+          source: 'concierge-visual-batch-delivery-unverified',
+          requested_visual_count: requestedVisualCount,
+          delivered_visual_count: visuals.length,
+          execution_allowed: false,
+          external_action_taken: false,
+          goal_completion: blockedGoal(['visual_batch_generated'], ['verified_visual_batch_delivery'], 'wait'),
+        }, { status: 502 })
+      }
+
+      // The platform image port already applies the canonical fresh-generation directive to each
+      // call. Concierge renders the first N-1 through <IMAGE> slots and the final item through the
+      // existing single-visual contract, preserving backward compatibility while showing N files.
+      return NextResponse.json({
+        reply: batchReply(language, visuals),
+        source: 'concierge-visual-batch',
+        visual: visuals.at(-1),
+        visuals,
+        requested_visual_count: requestedVisualCount,
+        delivered_visual_count: visuals.length,
+        execution_allowed: true,
+        external_action_taken: false,
+        external_retrieval_used: false,
+        goal_completion: completedGoal(
+          ['visual_batch_generated', 'visual_batch_saved', 'visual_batch_delivery_verified'],
+          { attempts: requestedVisualCount },
+        ),
+      })
+    }
 
     let b64: string
     let mime: ImageMime

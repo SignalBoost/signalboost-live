@@ -90,11 +90,11 @@ const COMPANY_NAME_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.
 })
 
 const IDENTITY_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.freeze({
-  en: 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.',
-  es: 'Soy iTMounts Concierge, un asistente de IA, no una persona, así que no tengo empleador.',
-  pt: 'Sou o iTMounts Concierge, um assistente de IA, não uma pessoa, portanto não tenho empregador.',
-  pl: 'Jestem iTMounts Concierge, asystentem sztucznej inteligencji, a nie osobą, więc nie mam pracodawcy.',
-  ru: 'Я — iTMounts Concierge, ИИ-ассистент, а не человек, поэтому у меня нет работодателя.',
+  en: `I’m the ${PUBLIC_BRAND.name} Concierge, the public AI assistant for ${PUBLIC_BRAND.name}.`,
+  es: `Soy el Concierge de ${PUBLIC_BRAND.name}, el asistente público de IA de ${PUBLIC_BRAND.name}.`,
+  pt: `Sou o Concierge da ${PUBLIC_BRAND.name}, o assistente público de IA da ${PUBLIC_BRAND.name}.`,
+  pl: `Jestem Concierge ${PUBLIC_BRAND.name}, publicznym asystentem AI platformy ${PUBLIC_BRAND.name}.`,
+  ru: `Я — Concierge ${PUBLIC_BRAND.name}, публичный ИИ-ассистент платформы ${PUBLIC_BRAND.name}.`,
 })
 
 export function publicConciergeIdentityReplyForIntent(
@@ -114,9 +114,9 @@ export function publicConciergeIdentityReplyForIntent(
 }
 
 /**
- * Public Concierge has no human employment history. Intercept only direct questions
- * about who employs Concierge, across all five supported languages. Third-party topics
- * such as employer branding or hiring continue through normal reasoning.
+ * Fast path for obvious public organizational-identity wording. The deep semantic
+ * identity router handles unmatched wording; deterministic code supplies only the
+ * canonical iTMounts fact once the intent is known.
  */
 export function publicConciergeIdentityReply(prompt: string): PublicIdentityReply | null {
   const normalized = normalizedQuestion(prompt)

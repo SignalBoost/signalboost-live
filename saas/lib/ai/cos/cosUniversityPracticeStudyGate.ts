@@ -1,9 +1,9 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityStudyProofEligible } from './cosUniversityStudyProof.ts'
 
-const PRACTICE_PLAN_SCAN_LIMIT = 4
+const PRACTICE_PLAN_SCAN_LIMIT = 20
 
-type PracticePlanRow = {
+export type CosUniversityPracticePlanGateRow = {
   id: string
   plan_key: string
   priority: number
@@ -38,7 +38,7 @@ function hasDeliberatePractice(methods: unknown): boolean {
 function decision(
   allowed: boolean,
   reason: CosUniversityPracticeStudyGate['reason'],
-  plan: PracticePlanRow | null,
+  plan: CosUniversityPracticePlanGateRow | null,
 ): CosUniversityPracticeStudyGate {
   return {
     allowed,
@@ -51,7 +51,7 @@ function decision(
 }
 
 export function evaluateCosUniversityPracticeStudyGate(
-  plan: PracticePlanRow | null,
+  plan: CosUniversityPracticePlanGateRow | null,
   now = new Date(),
 ): CosUniversityPracticeStudyGate {
   if (!plan) return decision(true, 'no_practice_plan', null)
@@ -72,7 +72,29 @@ export function evaluateCosUniversityPracticeStudyGate(
   return decision(true, 'accepted_study_proof_verified', plan)
 }
 
-/** Match the normal one-plan deliberate-practice runner selection before any queue mutation/execution. */
+/**
+ * Select the highest-ranked eligible deliberate-practice plan from the bounded scan.
+ *
+ * A higher-priority plan may legitimately be blocked while it awaits newer accepted study after a
+ * failed practice round. That block applies to that plan only; it must not starve a later plan that
+ * already has current host-accepted study proof. If no scanned practice plan is eligible, preserve
+ * the first blocking decision for truthful observability rather than pretending there is no work.
+ */
+export function selectCosUniversityPracticeStudyGate(
+  plans: readonly CosUniversityPracticePlanGateRow[],
+  now = new Date(),
+): CosUniversityPracticeStudyGate {
+  let firstBlocked: CosUniversityPracticeStudyGate | null = null
+  for (const plan of plans) {
+    if (!hasDeliberatePractice(plan.methods)) continue
+    const candidate = evaluateCosUniversityPracticeStudyGate(plan, now)
+    if (candidate.allowed) return candidate
+    if (!firstBlocked) firstBlocked = candidate
+  }
+  return firstBlocked ?? decision(true, 'no_practice_plan', null)
+}
+
+/** Match the normal one-plan deliberate-practice runner priority before any queue mutation/execution. */
 export async function readCosUniversityPracticeStudyGate(now = new Date()): Promise<CosUniversityPracticeStudyGate> {
   const db = cosServiceDb()
   if (!db) return decision(false, 'service_database_unavailable', null)
@@ -85,6 +107,8 @@ export async function readCosUniversityPracticeStudyGate(now = new Date()): Prom
     .order('last_attempt_at', { ascending: false })
     .limit(PRACTICE_PLAN_SCAN_LIMIT)
   if (result.error) throw result.error
-  const plan = ((result.data || []) as PracticePlanRow[]).find(row => hasDeliberatePractice(row.methods)) || null
-  return evaluateCosUniversityPracticeStudyGate(plan, now)
+  return selectCosUniversityPracticeStudyGate(
+    (result.data || []) as CosUniversityPracticePlanGateRow[],
+    now,
+  )
 }

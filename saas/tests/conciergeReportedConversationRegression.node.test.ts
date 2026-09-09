@@ -27,12 +27,68 @@ test('the reported iTMounts logo conversation remains in the visual lane', () =>
   assert.equal(resolveConciergeVisualObjective(messages, employer), null)
 })
 
-test('public employer questions cannot reach a model hallucination', () => {
-  assert.deepEqual(publicConciergeIdentityReply('what is the name of your employer?'), {
-    reply: 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.',
-    source: 'concierge-public-identity',
-  })
-  assert.equal(publicConciergeIdentityReply('Who employs the Department of State?'), null)
+test('visual revisions require a contiguous genuine revision thread', () => {
+  const base = [
+    { role: 'user' as const, content: 'design a new logo for iTMounts' },
+    { role: 'assistant' as const, content: 'Here is the first version.' },
+  ]
+
+  assert.ok(resolveConciergeVisualObjective(
+    [...base, { role: 'user', content: 'Can you make it more minimal?' }],
+    'Can you make it more minimal?',
+  ))
+
+  for (const unrelated of [
+    'Explain how it works',
+    'Draft a launch announcement about it',
+    'Tell me what you think about the logo',
+  ]) {
+    assert.equal(
+      resolveConciergeVisualObjective([...base, { role: 'user', content: unrelated }], unrelated),
+      null,
+      unrelated,
+    )
+  }
+
+  const interrupted = [
+    ...base,
+    { role: 'user' as const, content: 'What is the pricing?' },
+    { role: 'assistant' as const, content: 'Pricing answer.' },
+    { role: 'user' as const, content: 'Make it better' },
+  ]
+  assert.equal(resolveConciergeVisualObjective(interrupted, 'Make it better'), null)
+})
+
+test('public employer questions cannot reach model inference in any supported language', () => {
+  const cases = [
+    ['what is the name of your employer?', 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.'],
+    ['¿cuál es el nombre de tu empleador?', 'Soy iTMounts Concierge, un asistente de IA, no una persona, así que no tengo empleador.'],
+    ['qual é o nome do seu empregador?', 'Sou o iTMounts Concierge, um assistente de IA, não uma pessoa, portanto não tenho empregador.'],
+    ['jak nazywa się twój pracodawca?', 'Jestem iTMounts Concierge, asystentem sztucznej inteligencji, a nie osobą, więc nie mam pracodawcy.'],
+    ['как называется твой работодатель?', 'Я — iTMounts Concierge, ИИ-ассистент, а не человек, поэтому у меня нет работодателя.'],
+  ] as const
+
+  for (const [prompt, reply] of cases) {
+    assert.deepEqual(publicConciergeIdentityReply(prompt), {
+      reply,
+      source: 'concierge-public-identity',
+    })
+  }
+
+  for (const prompt of [
+    'Who employs the Department of State?',
+    'What can you tell me about employer branding?',
+    'Who do you think an employer should hire?',
+    'como melhorar a marca de um empregador?',
+  ]) {
+    assert.equal(publicConciergeIdentityReply(prompt), null, prompt)
+  }
+})
+
+test('new semantic-only visual requests still reach semantic visual detection', async () => {
+  const source = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+  assert.match(source, /const semanticVisual = isConciergeVisualObjective\(prompt\) \? false : await isSemanticVisualRequest\(prompt\)/)
+  assert.match(source, /if \(isConciergeVisualObjective\(prompt\) \|\| semanticVisual\)/)
 })
 
 test('visual success copy is blocked without a renderable preview', async () => {

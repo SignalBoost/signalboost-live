@@ -35,7 +35,29 @@ test('accepted study must start strictly after the current same-round remediatio
   }), true)
 })
 
-test('a different-round or absent remediation does not block genuine accepted study', () => {
+test('a delayed older cycle cannot advance a plan after a newer study attempt already landed', () => {
+  const lastAttemptAt = '2026-09-09T00:20:00.000Z'
+  assert.equal(cosUniversityAcceptedStudyClearsRemediationBoundary({
+    evidence: {},
+    currentAttempt: 5,
+    lastAttemptAt,
+    acceptedAt: '2026-09-09T00:19:59.999Z',
+  }), false)
+  assert.equal(cosUniversityAcceptedStudyClearsRemediationBoundary({
+    evidence: {},
+    currentAttempt: 5,
+    lastAttemptAt,
+    acceptedAt: lastAttemptAt,
+  }), false)
+  assert.equal(cosUniversityAcceptedStudyClearsRemediationBoundary({
+    evidence: {},
+    currentAttempt: 5,
+    lastAttemptAt,
+    acceptedAt: '2026-09-09T00:20:00.001Z',
+  }), true)
+})
+
+test('a different-round or absent remediation does not block genuinely newer accepted study', () => {
   assert.equal(cosUniversityAcceptedStudyClearsRemediationBoundary({
     evidence: remediationEvidence,
     currentAttempt: 5,
@@ -68,7 +90,9 @@ test('all University learning writers bind proof to cycle start rather than writ
   assert.match(daily, /const acceptedAt = dailyLearningStartedAt \|\| dailyStartedAt/)
   assert.match(daily, /\{ planId: plan\.id, evidenceRefs, acceptedAt \}/)
 
+  assert.match(policy, /timestampMs <= lastAttemptMs/)
   assert.match(policy, /timestampMs > boundaryMs/)
+  assert.match(proof, /lastAttemptAt: row\.last_attempt_at/)
   assert.match(proof, /cosUniversityAcceptedStudyClearsRemediationBoundary/)
   assert.match(proof, /const proofObservedAt = accepted\[accepted\.length - 1\]\.acceptedAt/)
   assert.match(proof, /updated_at: writerNowIso/)

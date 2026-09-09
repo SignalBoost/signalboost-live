@@ -88,10 +88,9 @@ export function cosUniversityStudyProofEligible(input: {
 }
 
 /**
- * Advances a study plan only from accepted evidence that is causally newer than the plan's current
- * restudy boundary. `acceptedAt` is deliberately the learning-cycle start, not the later database
- * write time. Therefore a cycle that started before a terminal practice failure can never be
- * relabeled as post-failure learning merely because its proof writer runs after the failure.
+ * Advances a study plan only from accepted evidence that is causally newer than every currently
+ * recorded study/remediation boundary. `acceptedAt` is the learning-cycle start, not the later
+ * database write time, so delayed older cycles cannot manufacture another study attempt.
  */
 export async function recordAcceptedCosUniversityStudyAttempts(
   inputs: readonly CosUniversityAcceptedStudyProofInput[],
@@ -135,6 +134,7 @@ export async function recordAcceptedCosUniversityStudyAttempts(
       .filter(observation => cosUniversityAcceptedStudyClearsRemediationBoundary({
         evidence,
         currentAttempt,
+        lastAttemptAt: row.last_attempt_at,
         acceptedAt: observation.acceptedAt,
       }))
       .sort((left, right) => left.acceptedAtMs - right.acceptedAtMs || left.ref.localeCompare(right.ref))

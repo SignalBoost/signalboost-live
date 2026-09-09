@@ -501,11 +501,16 @@ Non-negotiable:
 - Data Center Operations Phase 1 remains advisory/read-only unless a separately governed control phase is explicitly accepted;
 - a branding/domain migration must not weaken security, auth, payment, tenant, or evidence boundaries.
 
+Never weaken evidence gates, private holdouts, authorization, tenant isolation or lifecycle rules merely to make a dashboard green.
+
 ---
 
 # Status language — mandatory precision
 
 Use actual states, not optimistic shorthand.
+
+A branch is not Production. A green build is not capability acceptance.
+Verify implementation and runtime behavior from code plus live evidence before diagnosing or reporting status.
 
 A plan is not execution.  
 A branch is not Production.  

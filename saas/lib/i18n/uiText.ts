@@ -1,6 +1,7 @@
 // saas/lib/i18n/uiText.ts
 import en from '@/locales/en.json' with { type: 'json' }
 import type { Dict } from '@/lib/i18n/loadLanguage'
+import { PUBLIC_BRAND, publicBrandText } from '@/lib/public-brand'
 
 const ENGLISH = en as Dict
 let activeDictionary: Dict = ENGLISH
@@ -21,11 +22,17 @@ export function setRuntimeDictionary(dict: Dict | null | undefined): void {
 }
 
 export function uiText<T extends string = string>(path: string): T {
+  // The auth wordmark used to assemble "signal" + "boost" from two generated
+  // locale slots. Keep those old keys for compatibility but expose one stable
+  // public brand instead of leaking the legacy name into the sign-in surface.
+  if (path === 'generatedUi.u_d041924c15885af6') return PUBLIC_BRAND.name as T
+  if (path === 'generatedUi.u_ca4264faf5970fc6') return '' as T
+
   const active = lookup(activeDictionary, path)
-  if (typeof active === 'string') return active as T
+  if (typeof active === 'string') return publicBrandText(active) as T
 
   const english = lookup(ENGLISH, path)
-  if (typeof english === 'string') return english as T
+  if (typeof english === 'string') return publicBrandText(english) as T
 
   return path as T
 }

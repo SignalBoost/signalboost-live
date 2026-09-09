@@ -7,6 +7,7 @@ import { SUITE_COPY } from '@/lib/i18n/suiteCopy'
 import { WORKSPACE_COPY } from '@/lib/i18n/workspaceCopy'
 import { BANK_COPY } from '@/lib/i18n/bankCopy'
 import { outreachNavLabel } from '@/lib/i18n/outreachCopy'
+import { publicBrandText } from '@/lib/public-brand'
 
 export function t(dict: Dict | null | undefined, path: string, fallback = ''): string {
   const lang = (dict as any)?.__lang
@@ -15,52 +16,52 @@ export function t(dict: Dict | null | undefined, path: string, fallback = ''): s
   // The legacy locale key is intentionally retained so old components keep
   // working, but its old "Email Outreach" value is no longer authoritative.
   // Outreach is the umbrella workflow; email is one governed channel.
-  if (path === 'nav.emailOutreach') return outreachNavLabel(safeLang)
+  if (path === 'nav.emailOutreach') return publicBrandText(outreachNavLabel(safeLang))
 
   const value = lookup(dict, path)
-  if (typeof value === 'string') return value
+  if (typeof value === 'string') return publicBrandText(value)
 
   const dashboardForLang = DASHBOARD_COPY[safeLang]
   if (dashboardForLang && typeof dashboardForLang[path] === 'string') {
-    return dashboardForLang[path]
+    return publicBrandText(dashboardForLang[path])
   }
 
   const studioHubForLang = STUDIO_HUB_COPY[safeLang]
   if (studioHubForLang && typeof studioHubForLang[path] === 'string') {
-    return studioHubForLang[path]
+    return publicBrandText(studioHubForLang[path])
   }
 
   const workspaceForLang = WORKSPACE_COPY[safeLang]
   if (workspaceForLang && typeof workspaceForLang[path] === 'string') {
-    return workspaceForLang[path]
+    return publicBrandText(workspaceForLang[path])
   }
 
   const platformForLang = PLATFORM_COPY[safeLang]
   if (platformForLang && typeof platformForLang[path] === 'string') {
-    return platformForLang[path]
+    return publicBrandText(platformForLang[path])
   }
 
   const suiteForLang = SUITE_COPY[safeLang]
   if (suiteForLang && typeof suiteForLang[path] === 'string') {
-    return suiteForLang[path]
+    return publicBrandText(suiteForLang[path])
   }
 
   const bankForLang = BANK_COPY[safeLang]
   if (bankForLang && typeof bankForLang[path] === 'string') {
-    return bankForLang[path]
+    return publicBrandText(bankForLang[path])
   }
 
   const englishValue = lookup(en as Dict, path)
-  if (typeof englishValue === 'string') return englishValue
+  if (typeof englishValue === 'string') return publicBrandText(englishValue)
 
-  if (typeof DASHBOARD_COPY.en[path] === 'string') return DASHBOARD_COPY.en[path]
-  if (typeof STUDIO_HUB_COPY.en[path] === 'string') return STUDIO_HUB_COPY.en[path]
-  if (typeof WORKSPACE_COPY.en[path] === 'string') return WORKSPACE_COPY.en[path]
-  if (typeof PLATFORM_COPY.en[path] === 'string') return PLATFORM_COPY.en[path]
-  if (typeof SUITE_COPY.en[path] === 'string') return SUITE_COPY.en[path]
-  if (BANK_COPY.en && typeof BANK_COPY.en[path] === 'string') return BANK_COPY.en[path]
+  if (typeof DASHBOARD_COPY.en[path] === 'string') return publicBrandText(DASHBOARD_COPY.en[path])
+  if (typeof STUDIO_HUB_COPY.en[path] === 'string') return publicBrandText(STUDIO_HUB_COPY.en[path])
+  if (typeof WORKSPACE_COPY.en[path] === 'string') return publicBrandText(WORKSPACE_COPY.en[path])
+  if (typeof PLATFORM_COPY.en[path] === 'string') return publicBrandText(PLATFORM_COPY.en[path])
+  if (typeof SUITE_COPY.en[path] === 'string') return publicBrandText(SUITE_COPY.en[path])
+  if (BANK_COPY.en && typeof BANK_COPY.en[path] === 'string') return publicBrandText(BANK_COPY.en[path])
 
-  return fallback || path
+  return publicBrandText(fallback || path)
 }
 
 function lookup(dict: Dict | null | undefined, path: string): unknown {

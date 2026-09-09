@@ -11,8 +11,10 @@ import ProductContextBridge from '@/components/ProductContextBridge'
 import CreditStatusRequestCoordinator from '@/components/runtime/CreditStatusRequestCoordinator'
 import { I18nProvider } from '@/components/i18n/I18nProvider'
 import { Analytics } from '@vercel/analytics/react'
-const SITE_URL = 'https://saas.signalboostapp.com'
-const SITE_TITLE = "SignalBoost — AI Websites, Reviews & Content in Any Language"
+import { PUBLIC_BRAND } from '@/lib/public-brand'
+
+const SITE_URL = PUBLIC_BRAND.siteUrl
+const SITE_TITLE = `${PUBLIC_BRAND.name} — AI Software That Works for You`
 const SITE_DESCRIPTION =
   "AI-powered websites, customer reviews, audio and video content for businesses that want to grow in every language. Build, optimize, and broadcast from one platform."
 
@@ -20,10 +22,10 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
     default: SITE_TITLE,
-    template: '%s · SignalBoost',
+    template: `%s · ${PUBLIC_BRAND.name}`,
   },
   description: SITE_DESCRIPTION,
-  applicationName: 'SignalBoost',
+  applicationName: PUBLIC_BRAND.name,
   keywords: [
     'AI website builder',
     'multilingual marketing',
@@ -37,10 +39,10 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     url: SITE_URL,
-    siteName: 'SignalBoost',
+    siteName: PUBLIC_BRAND.name,
     title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'SignalBoost — grow in every language' }],
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: `${PUBLIC_BRAND.name} — ${PUBLIC_BRAND.tagline}` }],
   },
   twitter: {
     card: 'summary_large_image',
@@ -54,9 +56,9 @@ export const metadata: Metadata = {
 const ORG_JSON_LD = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
-  name: 'SignalBoost',
+  name: PUBLIC_BRAND.name,
   url: SITE_URL,
-  logo: `${SITE_URL}/icon.png`,
+  logo: `${SITE_URL}/icon.svg`,
   description: SITE_DESCRIPTION,
   sameAs: [] as string[],
 }
@@ -85,6 +87,56 @@ body {
 .home .waves {
   visibility: hidden;
   animation: signalboostRevealHomeWaves 1ms 450ms forwards !important;
+}
+
+/* Public iTMounts wordmark. Keep the logo compact in the existing navigation
+   footprint while carrying the approved Roman wordmark + mounted-T direction. */
+.sbnav-brand {
+  gap: 7px !important;
+}
+
+.sbnav-brand .sbnav-brand-mark {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 27px;
+  flex: 0 0 28px;
+  font-size: 0 !important;
+}
+
+.sbnav-brand .sbnav-brand-mark::before {
+  content: 'T';
+  position: absolute;
+  left: 5px;
+  top: -4px;
+  font-family: Georgia, Cambria, 'Times New Roman', Times, serif;
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1;
+  color: #f8fafc;
+  background: linear-gradient(135deg, #f8fafc 0 60%, #a78bfa 61% 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.sbnav-brand .sbnav-brand-mark::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 0;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4c1d95, #8b5cf6, #a78bfa);
+  box-shadow: 0 3px 12px rgba(139, 92, 246, .38);
+}
+
+.sbnav-brand > span:last-child {
+  font-family: Georgia, Cambria, 'Times New Roman', Times, serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -.025em;
 }
 
 @keyframes signalboostRevealHomeWaves {

@@ -2,7 +2,7 @@ export type ConciergeTranscriptLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
 const COPY = {
   en: {
-    chatTitle: 'Your SignalBoost concierge',
+    chatTitle: 'Your iTMounts concierge',
     chatSubtitle: 'Ask anything about building, promoting, reviews, audio, video, or what you want to accomplish.',
     welcomeMorning: 'Good morning.',
     welcomeAfternoon: 'Good afternoon.',
@@ -22,7 +22,7 @@ const COPY = {
     copied: 'Copied',
   },
   es: {
-    chatTitle: 'Tu concierge de SignalBoost',
+    chatTitle: 'Tu concierge de iTMounts',
     chatSubtitle: 'Pregunta sobre creación, promoción, reseñas, audio, video o cualquier objetivo que quieras lograr.',
     welcomeMorning: 'Buenos días.',
     welcomeAfternoon: 'Buenas tardes.',
@@ -42,7 +42,7 @@ const COPY = {
     copied: 'Copiado',
   },
   pt: {
-    chatTitle: 'Seu concierge SignalBoost',
+    chatTitle: 'Seu concierge iTMounts',
     chatSubtitle: 'Pergunte sobre criação, promoção, avaliações, áudio, vídeo ou qualquer objetivo que queira alcançar.',
     welcomeMorning: 'Bom dia.',
     welcomeAfternoon: 'Boa tarde.',
@@ -62,7 +62,7 @@ const COPY = {
     copied: 'Copiado',
   },
   pl: {
-    chatTitle: 'Twój concierge SignalBoost',
+    chatTitle: 'Twój concierge iTMounts',
     chatSubtitle: 'Pytaj o tworzenie, promocję, opinie, audio, wideo albo dowolny cel, który chcesz osiągnąć.',
     welcomeMorning: 'Dzień dobry.',
     welcomeAfternoon: 'Dzień dobry.',
@@ -82,7 +82,7 @@ const COPY = {
     copied: 'Skopiowano',
   },
   ru: {
-    chatTitle: 'Ваш консьерж SignalBoost',
+    chatTitle: 'Ваш консьерж iTMounts',
     chatSubtitle: 'Спрашивайте о создании, продвижении, отзывах, аудио, видео или любой цели, которую хотите достичь.',
     welcomeMorning: 'Доброе утро.',
     welcomeAfternoon: 'Добрый день.',

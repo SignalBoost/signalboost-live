@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 
 async function openSandboxSettings(page: Page) {
   await page.goto('/browser-sandbox/login')
-  await expect(page.getByText(/SignalBoost Browser Sandbox/i)).toBeVisible()
+  await expect(page.getByText(/iTMounts Browser Sandbox/i)).toBeVisible()
   await page.getByLabel('Email').fill('mission001@example.test')
   await page.getByLabel('Password').fill('sandbox-only-password')
   await page.getByRole('button', { name: /Sign in/i }).click()

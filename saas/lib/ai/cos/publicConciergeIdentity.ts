@@ -1,4 +1,4 @@
-import { PUBLIC_BRAND } from '@/lib/public-brand'
+import { PUBLIC_BRAND } from '../../public-brand.ts'
 
 type PublicIdentityReply = Readonly<{ reply: string; source: string }>
 export type IdentityLanguage = 'en' | 'es' | 'pt' | 'pl' | 'ru'

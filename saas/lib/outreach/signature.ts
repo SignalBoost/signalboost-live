@@ -17,9 +17,11 @@ import { getOutreachSecret } from './social-secrets.ts'
 // The function is IDEMPOTENT. It is safe to run on a message that already carries the
 // signature or the link; nothing is duplicated. It is also safe to run twice in one
 // request path, which matters because both senders call it.
-import { PUBLIC_BRAND } from '@/lib/public-brand'
 
-const DEFAULT_SAAS_LINK = PUBLIC_BRAND.siteUrl
+// Keep this portable layer dependency-free. SignalBoost/iTMounts uses the current public
+// origin as the built-in default; buyers override it through NEXT_PUBLIC_SAAS_URL or
+// SAAS_PUBLIC_URL via the portable secrets resolver.
+const DEFAULT_SAAS_LINK = 'https://itmounts.com'
 
 type OutreachLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 

@@ -1,7 +1,7 @@
 // SignalBoost's real HostContext for the buyer-portable Self-Healing Supervisor.
 import { sendEmail } from '@/lib/email'
 import { PUBLIC_BRAND } from '@/lib/public-brand'
-import { createSignalBoostSupervisorConnectorRuntime } from './signalboost-supervisor-connectors'
+import { createSignalBoostSupervisorConnectorRuntime } from './signalboost-supervisor-connectors.ts'
 import {
   createStaticApproverDirectory,
   type Approver,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { selectCosUniversityPracticeStudyGate } from '../lib/ai/cos/cosUniversityPracticeStudyGate.ts'
+import { selectCosUniversityPracticeGateDecision } from '../lib/ai/cos/cosUniversityPracticeSelectionPolicy.ts'
 import { cosUniversityAcceptedStudyClearsRemediationBoundary } from '../lib/ai/cos/cosUniversityStudyProofPolicy.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
@@ -17,11 +17,6 @@ const remediationEvidence = {
     academicCredit: false,
   },
 }
-
-const deliberatePracticeMethods = [{
-  id: 'deliberate_practice',
-  execution: 'automatic_if_certifiable',
-}]
 
 test('accepted study must start strictly after the current same-round remediation boundary', () => {
   assert.equal(cosUniversityAcceptedStudyClearsRemediationBoundary({
@@ -76,60 +71,29 @@ test('a different-round or absent remediation does not block genuinely newer acc
   }), true)
 })
 
-test('a blocked high-priority restudy plan cannot starve the next eligible practice plan', () => {
+test('a blocked high-priority restudy decision cannot starve the next eligible practice decision', () => {
   const blockedPhysics = {
-    id: 'physics-plan',
-    plan_key: 'physics-plan-key',
-    priority: 100,
-    status: 'studying',
-    attempt_count: 4,
-    last_attempt_at: null,
-    methods: deliberatePracticeMethods,
-    evidence: {
-      practiceRemediation: {
-        requestedAt: '2026-09-08T21:50:35.246Z',
-        practiceRound: 4,
-        requiresNewStudyAttempt: true,
-        requiresIndependentRetest: true,
-        academicCredit: false,
-      },
-    },
+    allowed: false,
+    reason: 'restudy_required_after_failed_practice',
+    planId: 'physics-plan',
   }
   const eligibleEnglish = {
-    id: 'english-writing-plan',
-    plan_key: 'english-writing-plan-key',
-    priority: 100,
-    status: 'studying',
-    attempt_count: 3,
-    last_attempt_at: '2026-09-09T15:30:12.777Z',
-    methods: deliberatePracticeMethods,
-    evidence: {
-      studyProof: {
-        source: 'continuous_learning_accepted_gap',
-        observedAt: '2026-09-09T15:30:12.777Z',
-        evidenceRefs: ['auto-gap:university-language:english-writing'],
-        studyAttempt: 3,
-        academicCredit: false,
-      },
-    },
+    allowed: true,
+    reason: 'accepted_study_proof_verified',
+    planId: 'english-writing-plan',
   }
 
-  const blockedOnly = selectCosUniversityPracticeStudyGate(
-    [blockedPhysics],
-    new Date('2026-09-09T16:00:00.000Z'),
+  assert.equal(selectCosUniversityPracticeGateDecision([blockedPhysics]), blockedPhysics)
+  assert.equal(
+    selectCosUniversityPracticeGateDecision([blockedPhysics, eligibleEnglish]),
+    eligibleEnglish,
   )
-  assert.equal(blockedOnly.allowed, false)
-  assert.equal(blockedOnly.reason, 'restudy_required_after_failed_practice')
-  assert.equal(blockedOnly.planId, 'physics-plan')
+  assert.equal(selectCosUniversityPracticeGateDecision([]), null)
 
-  const selected = selectCosUniversityPracticeStudyGate(
-    [blockedPhysics, eligibleEnglish],
-    new Date('2026-09-09T16:00:00.000Z'),
-  )
-  assert.equal(selected.allowed, true)
-  assert.equal(selected.reason, 'accepted_study_proof_verified')
-  assert.equal(selected.planId, 'english-writing-plan')
-  assert.equal(selected.studyAttempt, 3)
+  const gate = file('lib/ai/cos/cosUniversityPracticeStudyGate.ts')
+  assert.match(gate, /\.filter\(row => hasDeliberatePractice\(row\.methods\)\)/)
+  assert.match(gate, /\.map\(plan => evaluateCosUniversityPracticeStudyGate\(plan, now\)\)/)
+  assert.match(gate, /selectCosUniversityPracticeGateDecision\(decisions\)/)
 })
 
 test('all University learning writers bind proof to cycle start rather than writer completion time', () => {

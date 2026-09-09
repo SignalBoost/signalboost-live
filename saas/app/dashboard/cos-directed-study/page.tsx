@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from '@/lib/i18n/useTranslation'
 import { COS_DIRECTED_STUDY_COPY, type CosDirectedStudyLanguage } from '@/lib/i18n/cosDirectedStudyCopy'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 type ChunkVerdict = { index: number; admitted: boolean; reason: string; confidence: number; coverage: number; matchedTerms: string[] }
 type LearningRoute = { orchestrator: 'cos'; specialistFamily: 'software' | null; curriculumTracks: string[]; routingBasis: string; authorityGranted: false }
@@ -16,8 +17,8 @@ type ApiResult = { ok?: boolean; error?: string; dryRun?: boolean; resolvedFrom?
 type HistoryRecord = { content_hash?: string; source_kind?: string; source_uri?: string; source_title?: string | null; subject?: string; confidence?: number; license?: string; created_at?: string }
 type HistoryResult = { ok?: boolean; error?: string; records?: HistoryRecord[]; authRequired?: boolean }
 
-const CANONICAL_HOST = 'saas.signalboostapp.com'
-const CANONICAL_URL = `https://${CANONICAL_HOST}/dashboard/cos-directed-study`
+const CANONICAL_HOST = new URL(PUBLIC_BRAND.siteUrl).hostname.toLowerCase()
+const CANONICAL_URL = `${PUBLIC_BRAND.siteUrl}/dashboard/cos-directed-study`
 
 async function readResponse(response: Response): Promise<any> {
   const text = await response.text()

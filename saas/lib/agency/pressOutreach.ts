@@ -1,6 +1,7 @@
 // saas/lib/agency/pressOutreach.ts
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export type PressCampaignStatus = 'draft' | 'pending_owner_review' | 'approved' | 'published' | 'rejected'
 export type PressCampaignRole = 'owner' | 'staff'
@@ -115,7 +116,7 @@ export function validatePressCampaignInput(body: any): PressCampaignInput {
   const publicationName = clean(body?.publication_name || body?.publication || body?.publicationName, channel === 'trade-press' ? 'IT magazines' : 'Target publication')
   const editorContact = clean(body?.editor_contact || body?.media_contact || body?.contact || body?.editorContact, 'Name, email, phone, media-kit link, or notes to be confirmed by COS')
   const headline = clean(body?.headline || body?.title, `SignalBoost introduces AI-powered business growth tools for ${publicationName}`)
-  const ctaUrl = clean(body?.cta_url || body?.ctaUrl, 'https://saas.signalboostapp.com')
+  const ctaUrl = clean(body?.cta_url || body?.ctaUrl, PUBLIC_BRAND.siteUrl)
   const articleNotes = clean(body?.article_notes || body?.notes || body?.objective || body?.brief, `SignalBoost Client Suite helps businesses create websites, marketing assets, outreach campaigns, reviews, audio, and AI-guided workflows from one platform. Direct readers to ${ctaUrl}.`)
   const publicationContact = clean(body?.publication_contact, `${publicationName} — ${editorContact}`)
   const contentBody = clean(body?.content_body, buildContent({ channel, publication: publicationName, contact: editorContact, headline, notes: articleNotes, cta: ctaUrl }))
@@ -155,7 +156,7 @@ export function ownerOverrideIsValid(token?: string) {
 }
 
 function campaignLink(campaign: PressCampaign) {
-  const base = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://saas.signalboostapp.com').replace(/\/$/, '')
+  const base = (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || PUBLIC_BRAND.siteUrl).replace(/\/$/, '')
   return campaign.published_url || `${base}/dashboard/marketing/press-outreach?campaign=${encodeURIComponent(campaign.id)}`
 }
 

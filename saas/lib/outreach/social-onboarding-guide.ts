@@ -1,5 +1,6 @@
 // saas/lib/outreach/social-onboarding-guide.ts
 import { type SocialPlatform } from './social-connectors.ts'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export type SocialOnboardingProviderId = 'instagram' | 'facebook' | 'youtube' | 'tiktok' | 'linkedin' | 'reddit' | 'twitter_x'
 
@@ -22,7 +23,8 @@ export type SocialOnboardingGuide = {
   steps: SocialOnboardingStep[]
 }
 
-const CALLBACK_URL = 'https://saas.signalboostapp.com/api/outreach/social/oauth/callback'
+export const SOCIAL_OAUTH_CALLBACK_URL = `${PUBLIC_BRAND.siteUrl}/api/outreach/social/oauth/callback`
+const CALLBACK_URL = SOCIAL_OAUTH_CALLBACK_URL
 
 const GUIDES: SocialOnboardingGuide[] = [
   {

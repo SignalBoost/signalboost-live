@@ -17,8 +17,9 @@ import { getOutreachSecret } from './social-secrets.ts'
 // The function is IDEMPOTENT. It is safe to run on a message that already carries the
 // signature or the link; nothing is duplicated. It is also safe to run twice in one
 // request path, which matters because both senders call it.
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
-const DEFAULT_SAAS_LINK = 'https://saas.signalboostapp.com'
+const DEFAULT_SAAS_LINK = PUBLIC_BRAND.siteUrl
 
 type OutreachLocale = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 

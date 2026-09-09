@@ -1,7 +1,7 @@
 // saas/app/api/outreach/social/onboarding/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
-import { allSocialOnboardingGuides, getSocialOnboardingGuide } from '@/lib/outreach/social-onboarding-guide'
+import { allSocialOnboardingGuides, getSocialOnboardingGuide, SOCIAL_OAUTH_CALLBACK_URL } from '@/lib/outreach/social-onboarding-guide'
 
 export const dynamic = 'force-dynamic'
 
@@ -121,5 +121,5 @@ export async function GET(req: NextRequest) {
   }
 
   const guides = allSocialOnboardingGuides().map(guide => buildAssistantCard(guide, capabilities[guide.providerId]))
-  return NextResponse.json({ ok: true, mode: 'social_provider_onboarding_assistant', callbackUrl: 'https://saas.signalboostapp.com/api/outreach/social/oauth/callback', guides })
+  return NextResponse.json({ ok: true, mode: 'social_provider_onboarding_assistant', callbackUrl: SOCIAL_OAUTH_CALLBACK_URL, guides })
 }

@@ -82,7 +82,7 @@ export function currentWorldKnowledgeGaps(now = new Date()): KnowledgeGap[] {
   }))
 }
 
-const CURRENT_WORLD_ADAPTER_IDS = new Set(['reference', 'gdelt', 'official_docs', 'tech_feeds'])
+const CURRENT_WORLD_ADAPTER_IDS = new Set(['reference', 'gdelt', 'official_docs', 'tech_feeds', 'credible_web'])
 
 export function isCurrentWorldLearningAdapter(adapter: { id?: string; kind?: string }): boolean {
   return CURRENT_WORLD_ADAPTER_IDS.has(String(adapter.id ?? adapter.kind ?? '').trim())
@@ -92,8 +92,8 @@ export function isCurrentWorldLearningAdapter(adapter: { id?: string; kind?: str
  * GDELT has been returning 429/fetch failures on every production hourly run. A fresh adapter is
  * created for every cron invocation, so its in-memory circuit breaker otherwise forgets the outage
  * and spends ~100 seconds rediscovering the same failure every hour. Keep it as a periodic probe
- * while healthy keyless reference/official sources continue every hour. This is a cadence control,
- * not a trust bypass: no source/admission threshold changes.
+ * while healthy keyless reference/official/credible-web sources continue every hour. This is a
+ * cadence control, not a trust bypass: no source/admission threshold changes.
  */
 export function currentWorldAdapterDue(adapter: { id?: string; kind?: string }, now = new Date()): boolean {
   const id = String(adapter.id ?? adapter.kind ?? '').trim()

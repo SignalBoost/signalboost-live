@@ -33,10 +33,15 @@ test('visual revisions require a contiguous genuine revision thread', () => {
     { role: 'assistant' as const, content: 'Here is the first version.' },
   ]
 
-  assert.ok(resolveConciergeVisualObjective(
-    [...base, { role: 'user', content: 'Can you make it more minimal?' }],
+  for (const revision of [
     'Can you make it more minimal?',
-  ))
+    'Improve it and explain the changes',
+  ]) {
+    assert.ok(resolveConciergeVisualObjective(
+      [...base, { role: 'user', content: revision }],
+      revision,
+    ), revision)
+  }
 
   for (const unrelated of [
     'Explain how it works',
@@ -62,6 +67,8 @@ test('visual revisions require a contiguous genuine revision thread', () => {
 test('public employer questions cannot reach model inference in any supported language', () => {
   const cases = [
     ['what is the name of your employer?', 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.'],
+    ["What's your employer?", 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.'],
+    ['Who is your current employer?', 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.'],
     ['¿cuál es el nombre de tu empleador?', 'Soy iTMounts Concierge, un asistente de IA, no una persona, así que no tengo empleador.'],
     ['qual é o nome do seu empregador?', 'Sou o iTMounts Concierge, um assistente de IA, não uma pessoa, portanto não tenho empregador.'],
     ['jak nazywa się twój pracodawca?', 'Jestem iTMounts Concierge, asystentem sztucznej inteligencji, a nie osobą, więc nie mam pracodawcy.'],

@@ -6,7 +6,8 @@ function normalizedQuestion(prompt: string): string {
     .trim()
     .toLowerCase()
     .normalize('NFKD')
-    .replace(/\p{M}/gu, '')
+    .replace(/([\p{Script=Latin}])\p{M}+/gu, '$1')
+    .normalize('NFC')
     .replace(/[’']/g, '')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
@@ -19,7 +20,7 @@ const EMPLOYER_QUESTIONS: readonly Readonly<{
   {
     language: 'en',
     patterns: [
-      /\bwho (?:is|s) your employer\b/,
+      /\b(?:who (?:is|s)|what(?: is|s)?) your(?: [a-z]+){0,2} employer\b/,
       /\bwhat (?:is|s) (?:the )?name of your employer\b/,
       /\bwho employs you\b/,
       /\bwho do you work for\b/,

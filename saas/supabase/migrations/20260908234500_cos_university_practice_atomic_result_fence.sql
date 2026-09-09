@@ -1,6 +1,8 @@
 -- COS University deliberate practice: harden the canonical cognitive practice-result RPC.
 -- When the claimed queue row is University-origin, the function locks and validates the exact
 -- study-plan round in the SAME transaction before it mutates the practice queue/experience/skill.
+-- A terminal University failure also atomically versions/reopens the study plan so an accepted-study
+-- write that began before the failure cannot commit afterward with stale pre-failure evidence.
 -- Non-University cognitive practice keeps the pre-existing behavior unchanged.
 
 create or replace function public.cos_record_cognitive_practice_result(
@@ -123,6 +125,36 @@ begin
     else 'queued'
   end;
 
+  -- A terminal University failure is itself the authoritative causal boundary for restudy.
+  -- Version and mark the already-locked plan before the transaction can release it. Therefore a
+  -- proof writer that selected the pre-failure updated_at must fail its optimistic UPDATE after
+  -- waiting for this lock, while later accepted study may legitimately create the next attempt.
+  if university_plan_id is not null and next_status = 'failed' then
+    update public.cos_university_study_plans
+    set status = 'studying',
+        last_attempt_at = null,
+        evidence = coalesce(evidence, '{}'::jsonb) || jsonb_build_object(
+          'practiceRemediation', jsonb_build_object(
+            'practiceRound', university_practice_round,
+            'failureReasons', jsonb_build_array(coalesce(p_evidence->>'reason', 'evaluation_failed')),
+            'requestedAt', now_at,
+            'requiresNewStudyAttempt', true,
+            'requiresIndependentRetest', true,
+            'academicCredit', false,
+            'reconciledAcrossRuntimeBoundary', false
+          )
+        ),
+        updated_at = now_at
+    where id = university_plan_id
+      and agent_id = 'cos'
+      and status = 'studying'
+      and attempt_count = university_practice_round;
+
+    if not found then
+      raise exception 'university_practice_failure_remediation_fence_failed';
+    end if;
+  end if;
+
   update public.cos_active_practice_queue
   set attempt_count = next_attempt,
       status = next_status,
@@ -202,4 +234,4 @@ end;
 $$;
 
 comment on function public.cos_record_cognitive_practice_result(uuid, boolean, double precision, text, jsonb) is
-  'Canonical cognitive practice recorder. University-origin rows are transactionally fenced against the exact accepted-study plan/round before any result mutation.';
+  'Canonical cognitive practice recorder. University-origin rows are transactionally fenced against the exact accepted-study plan/round; terminal failures atomically version/reopen that plan before result commit.';

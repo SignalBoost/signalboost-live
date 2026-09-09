@@ -28,7 +28,8 @@ import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
-import { publicConciergeIdentityReply } from '@/lib/ai/cos/publicConciergeIdentity'
+import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } from '@/lib/ai/cos/publicConciergeIdentity'
+import { resolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
 import { PUBLIC_BRAND } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 
@@ -156,12 +157,17 @@ export async function POST(req: NextRequest) {
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
 
   if (browserSurface === 'concierge') {
-    const identity = publicConciergeIdentityReply(prompt)
+    const deterministicIdentity = publicConciergeIdentityReply(prompt)
+    const semanticIdentity = deterministicIdentity ? null : await resolveSemanticPublicIdentity(prompt)
+    const identity = deterministicIdentity || (semanticIdentity
+      ? publicConciergeIdentityReplyForIntent(semanticIdentity.intent, semanticIdentity.language)
+      : null)
     if (identity) {
       return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
         ...identity,
+        identity_routing: deterministicIdentity ? 'deterministic' : 'deep-semantic',
         external_ai_invoked: false,
-        local_model_invoked: false,
+        local_model_invoked: semanticIdentity !== null,
         execution_allowed: false,
         external_action_taken: false,
       }), prompt, auditUserId))

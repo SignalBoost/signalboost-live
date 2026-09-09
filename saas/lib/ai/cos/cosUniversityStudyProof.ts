@@ -91,6 +91,17 @@ function remediationBoundaryMs(evidence: Record<string, unknown>, currentAttempt
   return Number.isFinite(requestedAt) ? requestedAt : Number.POSITIVE_INFINITY
 }
 
+export function cosUniversityAcceptedStudyClearsRemediationBoundary(input: {
+  evidence: unknown
+  currentAttempt: number
+  acceptedAt: string
+}): boolean {
+  const timestampMs = acceptedAtMs(input.acceptedAt)
+  if (timestampMs === null) return false
+  const boundaryMs = remediationBoundaryMs(asRecord(input.evidence), Math.max(0, Math.floor(Number(input.currentAttempt || 0))))
+  return boundaryMs === null || timestampMs > boundaryMs
+}
+
 /**
  * Advances a study plan only from accepted evidence that is causally newer than the plan's current
  * restudy boundary. `acceptedAt` is deliberately the learning-cycle start, not the later database
@@ -135,26 +146,30 @@ export async function recordAcceptedCosUniversityStudyAttempts(
     if (row.status !== 'queued' && row.status !== 'studying') continue
     const currentAttempt = Math.max(0, Math.floor(Number(row.attempt_count || 0)))
     const evidence = asRecord(row.evidence)
-    const boundaryMs = remediationBoundaryMs(evidence, currentAttempt)
     const accepted = [...(byPlan.get(row.id)?.values() || [])]
-      .filter(observation => boundaryMs === null || observation.acceptedAtMs > boundaryMs)
+      .filter(observation => cosUniversityAcceptedStudyClearsRemediationBoundary({
+        evidence,
+        currentAttempt,
+        acceptedAt: observation.acceptedAt,
+      }))
       .sort((left, right) => left.acceptedAtMs - right.acceptedAtMs || left.ref.localeCompare(right.ref))
     if (!accepted.length) continue
 
     const evidenceRefsForProof = [...new Set(accepted.map(observation => observation.ref))]
     const proofObservedAt = accepted[accepted.length - 1].acceptedAt
+    const nowIso = proofObservedAt
     const nextAttempt = currentAttempt + 1
     const update = await db.from('cos_university_study_plans').update({
       status: 'studying',
       attempt_count: nextAttempt,
-      last_attempt_at: proofObservedAt,
+      last_attempt_at: nowIso,
       evidence: {
         ...evidence,
         studyProof: {
           studyAttempt: nextAttempt,
           evidenceRefs: evidenceRefsForProof,
           source: COS_UNIVERSITY_ACCEPTED_STUDY_PROOF_SOURCE,
-          observedAt: proofObservedAt,
+          observedAt: nowIso,
           academicCredit: false,
         },
       },

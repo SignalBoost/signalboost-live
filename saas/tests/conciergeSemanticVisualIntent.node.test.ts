@@ -123,17 +123,20 @@ test('conversation follow-ups are resolved semantically from recent user context
   assert.match(seen[0] || '', /RECENT USER TURNS:/)
 })
 
-test('the browser ingress uses the deep semantic gate and forwards its resolved objective', async () => {
+test('the browser ingress uses semantic conversation continuity without disabling direct visual fallback', async () => {
   const route = await readRepoFile('app/api/cos-browser/route.ts')
   requireWiring(route, {
     file: 'saas/app/api/cos-browser/route.ts',
-    purpose: 'Use the deep semantic conversation verdict and preserve the exact user-authored resolved visual objective.',
-    expect: /const semanticResolution = directVisual \? null : await resolveSemanticVisualRequest\(messages, prompt\)/,
-    insert: '    const semanticResolution = directVisual ? null : await resolveSemanticVisualRequest(messages, prompt)',
+    purpose: 'Preserve active visual conversation context even when the current follow-up is directly depictable.',
+    expect: /const shouldResolveVisualContext = !directVisual \|\| userMessages\.length > 1[\s\S]*?await resolveSemanticVisualRequest\(messages, prompt\)/,
+    insert: '    const shouldResolveVisualContext = !directVisual || userMessages.length > 1',
     after: '    const directVisual = isConciergeVisualObjective(prompt)',
     requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })
+  assert.match(route, /const visualObjective = semanticResolution\?\.objective \?\? \(directVisual \? prompt : null\)/)
+  assert.match(route, /const semanticVisual = Boolean\(semanticResolution\)/)
   assert.match(route, /body: JSON\.stringify\(\{ objective: visualObjective, semanticVisual \}\)/)
+  assert.doesNotMatch(route, /const semanticResolution = directVisual \? null : await resolveSemanticVisualRequest/)
 
   const visuals = await readRepoFile('app/api/visuals/route.ts')
   requireWiring(visuals, {

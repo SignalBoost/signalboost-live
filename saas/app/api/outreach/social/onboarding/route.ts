@@ -1,9 +1,11 @@
 // saas/app/api/outreach/social/onboarding/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
-import { allSocialOnboardingGuides, getSocialOnboardingGuide, SOCIAL_OAUTH_CALLBACK_URL } from '@/lib/outreach/social-onboarding-guide'
+import { allSocialOnboardingGuides, getSocialOnboardingGuide } from '@/lib/outreach/social-onboarding-guide'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
+const SOCIAL_OAUTH_CALLBACK_URL = `${PUBLIC_BRAND.siteUrl}/api/outreach/social/oauth/callback`
 
 type CapabilityPlatform = {
   providerId: string
@@ -115,11 +117,11 @@ export async function GET(req: NextRequest) {
   const capabilities = await loadCapabilities(ctx.admin, ctx.user.id)
   const provider = req.nextUrl.searchParams.get('provider') || ''
   if (provider) {
-    const guide = getSocialOnboardingGuide(provider)
+    const guide = getSocialOnboardingGuide(provider, SOCIAL_OAUTH_CALLBACK_URL)
     if (!guide) return NextResponse.json({ ok: false, error: 'Unsupported social onboarding provider.' }, { status: 400 })
     return NextResponse.json({ ok: true, callbackUrl: guide.callbackUrl, guide: buildAssistantCard(guide, capabilities[provider]) })
   }
 
-  const guides = allSocialOnboardingGuides().map(guide => buildAssistantCard(guide, capabilities[guide.providerId]))
+  const guides = allSocialOnboardingGuides(SOCIAL_OAUTH_CALLBACK_URL).map(guide => buildAssistantCard(guide, capabilities[guide.providerId]))
   return NextResponse.json({ ok: true, mode: 'social_provider_onboarding_assistant', callbackUrl: SOCIAL_OAUTH_CALLBACK_URL, guides })
 }

@@ -1,6 +1,5 @@
 // saas/lib/outreach/social-onboarding-guide.ts
 import { type SocialPlatform } from './social-connectors.ts'
-import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export type SocialOnboardingProviderId = 'instagram' | 'facebook' | 'youtube' | 'tiktok' | 'linkedin' | 'reddit' | 'twitter_x'
 
@@ -23,8 +22,11 @@ export type SocialOnboardingGuide = {
   steps: SocialOnboardingStep[]
 }
 
-export const SOCIAL_OAUTH_CALLBACK_URL = `${PUBLIC_BRAND.siteUrl}/api/outreach/social/oauth/callback`
-const CALLBACK_URL = SOCIAL_OAUTH_CALLBACK_URL
+// Portable default retained for buyers that consume this module directly. SignalBoost's
+// host route injects the current public-brand callback URL without pulling host imports
+// into the zero-dependency portable boundary.
+const DEFAULT_CALLBACK_URL = 'https://saas.signalboostapp.com/api/outreach/social/oauth/callback'
+const CALLBACK_URL = DEFAULT_CALLBACK_URL
 
 const GUIDES: SocialOnboardingGuide[] = [
   {
@@ -175,11 +177,29 @@ const GUIDES: SocialOnboardingGuide[] = [
   },
 ]
 
-export function allSocialOnboardingGuides(): SocialOnboardingGuide[] {
-  return GUIDES.map((guide) => ({ ...guide, envVars: [...guide.envVars], steps: guide.steps.map((step) => ({ ...step })) }))
+function resolveCallbackUrl(value?: string): string {
+  const callbackUrl = String(value || '').trim() || DEFAULT_CALLBACK_URL
+  return callbackUrl.replace(/\/+$/, '')
 }
 
-export function getSocialOnboardingGuide(providerId: string): SocialOnboardingGuide | null {
+function cloneGuide(guide: SocialOnboardingGuide, callbackUrl?: string): SocialOnboardingGuide {
+  const resolved = resolveCallbackUrl(callbackUrl)
+  return {
+    ...guide,
+    callbackUrl: resolved,
+    envVars: [...guide.envVars],
+    steps: guide.steps.map((step) => ({
+      ...step,
+      detail: step.detail.split(DEFAULT_CALLBACK_URL).join(resolved),
+    })),
+  }
+}
+
+export function allSocialOnboardingGuides(callbackUrl?: string): SocialOnboardingGuide[] {
+  return GUIDES.map((guide) => cloneGuide(guide, callbackUrl))
+}
+
+export function getSocialOnboardingGuide(providerId: string, callbackUrl?: string): SocialOnboardingGuide | null {
   const guide = GUIDES.find((item) => item.providerId === providerId)
-  return guide ? { ...guide, envVars: [...guide.envVars], steps: guide.steps.map((step) => ({ ...step })) } : null
+  return guide ? cloneGuide(guide, callbackUrl) : null
 }

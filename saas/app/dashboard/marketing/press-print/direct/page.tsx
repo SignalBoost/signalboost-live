@@ -38,7 +38,7 @@ export default function DirectPressCampaignPage() {
   const [contact, setContact] = useState('')
   const [headline, setHeadline] = useState('')
   const [notes, setNotes] = useState('')
-  const [ctaUrl, setCtaUrl] = useState(PUBLIC_BRAND.siteUrl)
+  const [ctaUrl, setCtaUrl] = useState<string>(PUBLIC_BRAND.siteUrl)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [refusals, setRefusals] = useState<string[]>([])

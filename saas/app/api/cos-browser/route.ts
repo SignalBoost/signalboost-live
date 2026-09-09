@@ -30,6 +30,7 @@ import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 import { resolveConciergeVisualObjective } from '@/lib/visuals/conversationIntent'
 import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
 import { publicConciergeIdentityReply } from '@/lib/ai/cos/publicConciergeIdentity'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 
 export const runtime = 'nodejs'
@@ -66,7 +67,7 @@ async function publicConciergePresentation(response: Response): Promise<NextResp
     payload.reply = payload.reply
       .replace(/\bCOS Software Specialist\b/g, 'Software Specialist')
       .replace(/\bCOS Platform Engineer\b/g, 'Platform Engineer')
-      .replace(/\bCOS\b/g, 'SignalBoost')
+      .replace(/\bCOS\b/g, PUBLIC_BRAND.name)
   }
   // `orchestrator: cos` is internal execution telemetry. The public mouth may expose the selected
   // specialist and durable job status, but it does not disclose the private reasoning layer.

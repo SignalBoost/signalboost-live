@@ -15,6 +15,8 @@ test('legacy public brand names become iTMounts without rewriting implementation
   assert.equal(publicBrandText('SignalBoostAi'), 'iTMounts')
   assert.equal(publicBrandText('Powered by SignalBoost AI'), 'Powered by iTMounts')
   assert.equal(publicBrandText('Your SignalBoost concierge'), 'Your iTMounts concierge')
+  assert.equal(publicBrandText('YOUR SIGNALBOOST CONCIERGE'), 'YOUR iTMounts CONCIERGE')
+  assert.equal(publicBrandText('signalboost'), 'iTMounts')
   assert.equal(publicBrandText('saas.signalboostapp.com'), 'saas.signalboostapp.com')
   assert.equal(publicBrandText('COS Builder'), 'COS Builder')
 })

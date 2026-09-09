@@ -1,10 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { resolveConciergeVisualObjective } from '../lib/visuals/conversationIntent.ts'
+import { isConciergeVisualObjective } from '../lib/visuals/intent.ts'
+import { resolveSemanticVisualRequest } from '../lib/visuals/semanticIntent.ts'
 import { publicConciergeIdentityReply } from '../lib/ai/cos/publicConciergeIdentity.ts'
 
-test('the reported iTMounts logo conversation remains in the visual lane', () => {
+const semanticReasoner = (verdict: { visual_request: boolean; anchor_user_turn: number | null }, seen?: any[]) => (async (args: any) => {
+  seen?.push(args)
+  return { text: JSON.stringify(verdict) }
+}) as any
+
+test('the reported iTMounts logo conversation uses deep semantic continuation for ambiguous turns', async () => {
   const messages: Array<{ role: 'user' | 'assistant'; content: string }> = []
   const turns = [
     'design the new lname and logo for the plaftorm itmounts',
@@ -14,34 +20,45 @@ test('the reported iTMounts logo conversation remains in the visual lane', () =>
     'i did not ask for your suggestions, i want the design',
   ]
 
-  for (const turn of turns) {
+  for (let index = 0; index < turns.length; index += 1) {
+    const turn = turns[index]
     messages.push({ role: 'user', content: turn })
-    const objective = resolveConciergeVisualObjective(messages, turn)
-    assert.ok(objective, `expected visual objective for: ${turn}`)
-    assert.match(objective, /logo/i)
-    messages.push({ role: 'assistant', content: 'model prose must not control routing' })
+    if (isConciergeVisualObjective(turn)) {
+      assert.equal(isConciergeVisualObjective(turn), true, turn)
+    } else {
+      const seen: any[] = []
+      const resolved = await resolveSemanticVisualRequest(
+        messages,
+        turn,
+        semanticReasoner({ visual_request: true, anchor_user_turn: 0 }, seen),
+      )
+      assert.ok(resolved, `expected semantic visual continuation for: ${turn}`)
+      assert.match(resolved.objective, /itmounts/i)
+      assert.match(resolved.objective, new RegExp(turn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'))
+      assert.equal(seen.length, 1)
+      assert.match(String(seen[0]?.systemPrompt || ''), /Use meaning, not keyword or regex matching/i)
+      assert.match(String(seen[0]?.prompt || ''), /RECENT USER TURNS:/)
+    }
+    messages.push({ role: 'assistant', content: 'assistant prose is not routing authority' })
   }
-
-  const employer = 'what is the name of your employer?'
-  messages.push({ role: 'user', content: employer })
-  assert.equal(resolveConciergeVisualObjective(messages, employer), null)
 })
 
-test('visual revisions require a contiguous genuine revision thread', () => {
+test('deep semantic visual routing fails closed for discussion and topic changes', async () => {
   const base = [
     { role: 'user' as const, content: 'design a new logo for iTMounts' },
     { role: 'assistant' as const, content: 'Here is the first version.' },
   ]
 
-  for (const revision of [
-    'Can you make it more minimal?',
-    'Improve it and explain the changes',
-  ]) {
-    assert.ok(resolveConciergeVisualObjective(
-      [...base, { role: 'user', content: revision }],
-      revision,
-    ), revision)
-  }
+  const revision = 'Can you make it more minimal?'
+  const continued = await resolveSemanticVisualRequest(
+    [...base, { role: 'user', content: revision }],
+    revision,
+    semanticReasoner({ visual_request: true, anchor_user_turn: 0 }),
+  )
+  assert.ok(continued)
+  assert.equal(continued.continuation, true)
+  assert.match(continued.objective, /design a new logo for iTMounts/)
+  assert.match(continued.objective, /Can you make it more minimal\?/)
 
   for (const unrelated of [
     'Explain how it works',
@@ -49,7 +66,11 @@ test('visual revisions require a contiguous genuine revision thread', () => {
     'Tell me what you think about the logo',
   ]) {
     assert.equal(
-      resolveConciergeVisualObjective([...base, { role: 'user', content: unrelated }], unrelated),
+      await resolveSemanticVisualRequest(
+        [...base, { role: 'user', content: unrelated }],
+        unrelated,
+        semanticReasoner({ visual_request: false, anchor_user_turn: null }),
+      ),
       null,
       unrelated,
     )
@@ -61,7 +82,22 @@ test('visual revisions require a contiguous genuine revision thread', () => {
     { role: 'assistant' as const, content: 'Pricing answer.' },
     { role: 'user' as const, content: 'Make it better' },
   ]
-  assert.equal(resolveConciergeVisualObjective(interrupted, 'Make it better'), null)
+  assert.equal(
+    await resolveSemanticVisualRequest(interrupted, 'Make it better', semanticReasoner({ visual_request: false, anchor_user_turn: null })),
+    null,
+  )
+})
+
+test('visual continuity intelligence is model-based while deterministic code stays structural', async () => {
+  const conversationSource = await readFile(new URL('../lib/visuals/conversationIntent.ts', import.meta.url), 'utf8')
+  const semanticSource = await readFile(new URL('../lib/visuals/semanticIntent.ts', import.meta.url), 'utf8')
+  const routeSource = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(conversationSource, /VISUAL_REVISION_PATTERNS|TEXTUAL_DISCUSSION|isVisualRevisionRequest/)
+  assert.match(semanticSource, /callCosReasoner/)
+  assert.match(semanticSource, /resolveSemanticVisualRequest/)
+  assert.match(routeSource, /await resolveSemanticVisualRequest\(messages, prompt\)/)
+  assert.doesNotMatch(routeSource, /resolveConciergeVisualObjective/)
 })
 
 test('public employer questions cannot reach model inference in any supported language', () => {
@@ -105,10 +141,11 @@ test('public company identity uses iTMounts and the public model prompt cannot r
   assert.doesNotMatch(browserRoute, /\.replace\(\/\\bCOS\\b\/g, 'SignalBoost'\)/)
 })
 
-test('new semantic-only visual requests still reach semantic visual detection', async () => {
+test('new semantic-only visual requests still reach deep semantic visual detection', async () => {
   const source = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
-  assert.match(source, /const semanticVisual = isConciergeVisualObjective\(prompt\) \? false : await isSemanticVisualRequest\(prompt\)/)
-  assert.match(source, /if \(isConciergeVisualObjective\(prompt\) \|\| semanticVisual\)/)
+  assert.match(source, /const directVisual = isConciergeVisualObjective\(prompt\)/)
+  assert.match(source, /const semanticResolution = directVisual \? null : await resolveSemanticVisualRequest\(messages, prompt\)/)
+  assert.match(source, /const visualObjective = directVisual \? prompt : semanticResolution\?\.objective \?\? null/)
 })
 
 test('visual success copy is blocked without a renderable preview', async () => {

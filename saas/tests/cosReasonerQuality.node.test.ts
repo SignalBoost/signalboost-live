@@ -51,6 +51,13 @@ const H100_SUBSTANTIVE = JSON.stringify({
   confidence: 0.88,
 })
 
+const UNIVERSITY_PROMPT = 'HOST-CURATED UNIVERSITY PRACTICE — variant 2. Lumen has 48 passing pre-release checks. A customer-facing incident remains open. The proposed repair changed 8 files. Production deployment and customer recovery have not been verified. Primary discipline: Physics & Natural Sciences. Diagnose the case. Separate recorded facts from inference, identify the most relevant evidence, state material uncertainty, and give the next safe verification. Do not claim a deployment, approval, recovery, or outcome that the packet does not establish.'
+
+const UNIVERSITY_GENERIC = JSON.stringify({
+  answer: 'Lumen has recorded checks and unresolved verification gaps. The evidence should be separated from inference, and the next safe step is to verify the unresolved outcome before making a stronger claim.',
+  confidence: 0.7,
+})
+
 test('the currently observed generic benchmark draft triggers one local repair', () => {
   const quality = assessReasonerDraft(PROMPT, GENERIC)
   assert.equal(quality.parseable, true)
@@ -72,11 +79,23 @@ test('the deterministic selector prefers a materially better repaired draft', ()
   assert.equal(preferRepairedDraft(PROMPT, MECHANISTIC, GENERIC), false)
 })
 
-test('repair instruction explicitly preserves read-only diagnosis constraints', () => {
+test('repair instruction preserves diagnostic rigor without injecting a benchmark scenario', () => {
   const repairedPrompt = buildDiagnosticRepairPrompt(PROMPT, GENERIC)
+  assert.match(repairedPrompt, /facts actually supplied/i)
+  assert.match(repairedPrompt, /asymmetries and constraints that are actually supplied/i)
+  assert.match(repairedPrompt, /falsification/i)
   assert.match(repairedPrompt, /do not require a production mutation/i)
-  assert.match(repairedPrompt, /all asymmetries/i)
-  assert.match(repairedPrompt, /falsify/i)
+})
+
+test('repair of unrelated University practice cannot inject the old enterprise-latency case', () => {
+  const repairedPrompt = buildDiagnosticRepairPrompt(UNIVERSITY_PROMPT, UNIVERSITY_GENERIC)
+  assert.match(repairedPrompt, /Lumen has 48 passing pre-release checks/i)
+  assert.match(repairedPrompt, /scenario fidelity is mandatory/i)
+  assert.doesNotMatch(repairedPrompt, /enterprise-only symptom/i)
+  assert.doesNotMatch(repairedPrompt, /unchanged overall traffic/i)
+  assert.doesNotMatch(repairedPrompt, /normal aggregate database CPU\/memory/i)
+  assert.doesNotMatch(repairedPrompt, /If only one tenant class is affected/i)
+  assert.match(repairedPrompt, /Do not reinterpret .* as a software-latency incident/i)
 })
 
 test('non-diagnostic answers are never rewritten merely for style', () => {

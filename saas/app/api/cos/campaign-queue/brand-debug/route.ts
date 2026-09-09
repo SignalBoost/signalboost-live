@@ -13,7 +13,7 @@ import { requireAdmin } from '@/lib/outreach/security'
 
 export const dynamic = 'force-dynamic'
 
-const BRAND_SCHEMA_VERSION = 7
+const BRAND_SCHEMA_VERSION = 8
 
 export async function GET(req: NextRequest) {
   const ctx = await requireAdmin()

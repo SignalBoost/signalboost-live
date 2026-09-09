@@ -1,11 +1,12 @@
 // saas/app/api/brand-overlay/route.tsx
-// Renders the brand banner as a TRANSPARENT PNG (gold "SignalBoostAi" + cyan URL).
+// Renders the brand banner as a TRANSPARENT PNG (gold brand name + cyan URL).
 // JSON2Video overlays this image on the video, so the text is guaranteed to show —
 // it's pixels, not text the video engine can drop. Public (no auth) so JSON2Video
 // can fetch it.
 //   /api/brand-overlay?a=16x9   -> 1920x1080 overlay
 //   /api/brand-overlay?a=9x16   -> 1080x1920 overlay
 import { ImageResponse } from 'next/og'
+import { BRAND_TEXT } from '@/lib/cos/brand-schema'
 
 export const runtime = 'edge'
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
             letterSpacing: -1,
           }}
         >
-          SignalBoostAi
+          {BRAND_TEXT.name}
         </div>
         <div
           style={{
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
             borderRadius: 14,
           }}
         >
-          www.saas.signalboostapp.com
+          {BRAND_TEXT.url}
         </div>
       </div>
     ),

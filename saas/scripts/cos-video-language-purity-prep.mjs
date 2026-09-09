@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// saas/scripts/cos-video-language-purity-prep.mjs
 // Enforce one-language campaign scripts before final video generation.
 //
 // Existing campaign metadata can contain older mixed-language copy. The final
@@ -31,18 +32,18 @@ function isMaintenance(campaign) {
 
 function localizedScript(lang) {
   if (lang === 'pt') {
-    return 'A SignalBoostAi ajuda pequenas e médias empresas brasileiras a gerar mais oportunidades com campanhas profissionais e fáceis de revisar. Organize sua mensagem, prepare os materiais e acompanhe os resultados em um só lugar. Comece grátis em saas.signalboostapp.com.'
+    return 'A iTMounts ajuda pequenas e médias empresas brasileiras a gerar mais oportunidades com campanhas profissionais e fáceis de revisar. Organize sua mensagem, prepare os materiais e acompanhe os resultados em um só lugar. Comece grátis em itmounts.com.'
   }
   if (lang === 'es') {
-    return 'SignalBoostAi ayuda a las pequeñas y medianas empresas a generar más oportunidades con campañas profesionales y fáciles de revisar. Organiza el mensaje, prepara los recursos y controla los resultados en un solo lugar. Comienza gratis en saas.signalboostapp.com.'
+    return 'iTMounts ayuda a las pequeñas y medianas empresas a generar más oportunidades con campañas profesionales y fáciles de revisar. Organiza el mensaje, prepara los recursos y controla los resultados en un solo lugar. Comienza gratis en itmounts.com.'
   }
   if (lang === 'pl') {
-    return 'SignalBoostAi pomaga małym i średnim firmom zdobywać więcej klientów dzięki profesjonalnym kampaniom, które łatwo sprawdzić. Przygotuj przekaz, materiały i wyniki w jednym miejscu. Zacznij bezpłatnie na saas.signalboostapp.com.'
+    return 'iTMounts pomaga małym i średnim firmom zdobywać więcej klientów dzięki profesjonalnym kampaniom, które łatwo sprawdzić. Przygotuj przekaz, materiały i wyniki w jednym miejscu. Zacznij bezpłatnie na itmounts.com.'
   }
   if (lang === 'ru') {
-    return 'SignalBoostAi помогает малому и среднему бизнесу получать больше клиентов с помощью профессиональных кампаний, которые легко проверить. Подготовьте сообщение, материалы и отслеживайте результаты в одном месте. Начните бесплатно на saas.signalboostapp.com.'
+    return 'iTMounts помогает малому и среднему бизнесу получать больше клиентов с помощью профессиональных кампаний, которые легко проверить. Подготовьте сообщение, материалы и отслеживайте результаты в одном месте. Начните бесплатно на itmounts.com.'
   }
-  return 'SignalBoostAi helps small and midsize businesses generate more opportunities with professional campaigns that are easy to review. Organize the message, prepare the assets, and track results in one place. Start free at saas.signalboostapp.com.'
+  return 'iTMounts helps small and midsize businesses generate more opportunities with professional campaigns that are easy to review. Organize the message, prepare the assets, and track results in one place. Start free at itmounts.com.'
 }
 
 const { data: campaigns, error } = await sb

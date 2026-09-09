@@ -1,9 +1,10 @@
 #!/usr/bin/env node
+// saas/scripts/cos-video-fast-final-worker-v2.mjs
 // COSA bounded finalizer v2.
 //
 // Produces one complete review video in a single FFmpeg pass:
 // clean full-screen background + natural narration + solid-panel captions +
-// permanent SignalBoostAi/URL branding. No moving color bars or center strips.
+// permanent iTMounts/URL branding. No moving color bars or center strips.
 
 import { createClient } from '@supabase/supabase-js'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
@@ -24,7 +25,7 @@ if (!bucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required')
 
 const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 const FINAL_SCHEMA = 'signalboost-fast-final-v2-clean-background'
-const BRAND_TEXT = 'SignalBoostAi · www.saas.signalboostapp.com'
+const BRAND_TEXT = 'iTMounts · itmounts.com'
 const VOICES = { en: 'en-us', es: 'es', pt: 'pt-br', pl: 'pl', ru: 'ru' }
 
 function errorText(error) {
@@ -109,19 +110,19 @@ function scriptFor(campaign) {
   const audience = safeAudience(campaign, lang)
   if (lang === 'pt') {
     const goal = subject ? `A campanha ${subject.toLowerCase()} foi criada para` : 'Esta campanha foi criada para'
-    return cleanText(`${goal} ajudar ${audience} a gerar mais oportunidades. A SignalBoostAi organiza a mensagem, prepara os materiais e permite revisar tudo antes da publicação. Comece grátis em saas.signalboostapp.com.`, 420)
+    return cleanText(`${goal} ajudar ${audience} a gerar mais oportunidades. A iTMounts organiza a mensagem, prepara os materiais e permite revisar tudo antes da publicação. Comece grátis em itmounts.com.`, 420)
   }
   if (lang === 'es') {
     const goal = subject ? `La campaña ${subject.toLowerCase()} fue creada para` : 'Esta campaña fue creada para'
-    return cleanText(`${goal} ayudar a ${audience} a generar más oportunidades. SignalBoostAi organiza el mensaje, prepara los recursos y permite revisar todo antes de publicar. Comienza gratis en saas.signalboostapp.com.`, 420)
+    return cleanText(`${goal} ayudar a ${audience} a generar más oportunidades. iTMounts organiza el mensaje, prepara los recursos y permite revisar todo antes de publicar. Comienza gratis en itmounts.com.`, 420)
   }
   if (lang === 'pl') {
-    return cleanText(`Ta kampania pomaga ${audience} zdobywać więcej klientów. SignalBoostAi porządkuje przekaz, przygotowuje materiały i pozwala sprawdzić wszystko przed publikacją. Zacznij bezpłatnie na saas.signalboostapp.com.`, 420)
+    return cleanText(`Ta kampania pomaga ${audience} zdobywać więcej klientów. iTMounts porządkuje przekaz, przygotowuje materiały i pozwala sprawdzić wszystko przed publikacją. Zacznij bezpłatnie na itmounts.com.`, 420)
   }
   if (lang === 'ru') {
-    return cleanText(`Эта кампания помогает ${audience} получать больше клиентов. SignalBoostAi организует сообщение, готовит материалы и позволяет проверить всё до публикации. Начните бесплатно на saas.signalboostapp.com.`, 420)
+    return cleanText(`Эта кампания помогает ${audience} получать больше клиентов. iTMounts организует сообщение, готовит материалы и позволяет проверить всё до публикации. Начните бесплатно на itmounts.com.`, 420)
   }
-  return cleanText(`This campaign helps ${audience} generate more opportunities. SignalBoostAi organizes the message, prepares the assets, and lets you review everything before publishing. Start free at saas.signalboostapp.com.`, 420)
+  return cleanText(`This campaign helps ${audience} generate more opportunities. iTMounts organizes the message, prepares the assets, and lets you review everything before publishing. Start free at itmounts.com.`, 420)
 }
 
 async function narration(text, lang, dir) {
@@ -238,8 +239,8 @@ async function processCampaign(campaign) {
       `fade=t=in:st=0:d=0.45`,
       `fade=t=out:st=${fadeOutStart}:d=0.45`,
       `drawbox=x=0:y=0:w=iw:h=${vertical ? 145 : 116}:color=0x020617@0.94:t=fill`,
-      `drawtext=fontfile=${font}:text='SignalBoostAi':fontcolor=0xffc300:fontsize=${brandSize}:x=(w-text_w)/2:y=${vertical ? 34 : 25}`,
-      `drawtext=fontfile=${font}:text='www.saas.signalboostapp.com':fontcolor=white:fontsize=${urlSize}:x=(w-text_w)/2:y=${vertical ? 88 : 70}`,
+      `drawtext=fontfile=${font}:text='iTMounts':fontcolor=0xffc300:fontsize=${brandSize}:x=(w-text_w)/2:y=${vertical ? 34 : 25}`,
+      `drawtext=fontfile=${font}:text='itmounts.com':fontcolor=white:fontsize=${urlSize}:x=(w-text_w)/2:y=${vertical ? 88 : 70}`,
       `drawbox=x=0:y=${panelY}:w=iw:h=${panelH}:color=0x020617@0.98:t=fill`,
       `ass='${assPath(captionsPath)}'`,
     ].join(',')

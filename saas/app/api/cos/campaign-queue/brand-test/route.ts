@@ -7,11 +7,12 @@
 //
 // Open (as admin):  /api/cos/campaign-queue/brand-test
 // On success it returns { ok:true, url:"...mp4" } — open that URL and check:
-//   - gold "SignalBoostAi" at the TOP
-//   - cyan "www.saas.signalboostapp.com" in the CENTER
+//   - the gold public-brand name at the TOP
+//   - the cyan public-brand domain in the CENTER
 // On failure it returns the exact JSON2Video error so we can see why.
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/outreach/security'
+import { BRAND_TEXT } from '@/lib/cos/brand-schema'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -37,7 +38,7 @@ export async function GET(_req: NextRequest) {
         elements: [
           {
             type: 'text',
-            text: 'SignalBoostAi',
+            text: BRAND_TEXT.name,
             duration: -2,
             settings: {
               'font-family': 'Montserrat',
@@ -50,7 +51,7 @@ export async function GET(_req: NextRequest) {
           },
           {
             type: 'text',
-            text: 'www.saas.signalboostapp.com',
+            text: BRAND_TEXT.url,
             duration: -2,
             settings: {
               'font-family': 'Montserrat',

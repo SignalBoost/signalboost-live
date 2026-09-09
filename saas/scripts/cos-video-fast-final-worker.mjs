@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// saas/scripts/cos-video-fast-final-worker.mjs
 // Bounded COSA video finalizer.
 //
 // Produces one complete review artifact in a single FFmpeg pass:
@@ -25,7 +26,7 @@ if (!bucket) throw new Error('COS_VIDEO_RENDER_BUCKET is required')
 
 const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
 const FINAL_SCHEMA = 'signalboost-fast-final-v1'
-const BRAND_TEXT = 'SignalBoostAi · www.saas.signalboostapp.com'
+const BRAND_TEXT = 'iTMounts · itmounts.com'
 const VOICES = { en: 'en-us', es: 'es', pt: 'pt-br', pl: 'pl', ru: 'ru' }
 
 function errorText(error) {
@@ -105,18 +106,18 @@ function scriptFor(campaign) {
   const subject = safeSubject(campaign)
   const audience = safeAudience(campaign, lang)
   if (lang === 'pt') {
-    return cleanText(`A SignalBoostAi ajuda ${audience} a gerar mais oportunidades com campanhas profissionais e fáceis de revisar. Organize sua mensagem, prepare os materiais e acompanhe os resultados em um só lugar. Comece grátis em saas.signalboostapp.com.`, 360)
+    return cleanText(`A iTMounts ajuda ${audience} a gerar mais oportunidades com campanhas profissionais e fáceis de revisar. Organize sua mensagem, prepare os materiais e acompanhe os resultados em um só lugar. Comece grátis em itmounts.com.`, 360)
   }
   if (lang === 'es') {
-    return cleanText(`SignalBoostAi ayuda a ${audience} a generar más oportunidades con campañas profesionales y fáciles de revisar. Organiza el mensaje, prepara los recursos y controla los resultados en un solo lugar. Comienza gratis en saas.signalboostapp.com.`, 360)
+    return cleanText(`iTMounts ayuda a ${audience} a generar más oportunidades con campañas profesionales y fáciles de revisar. Organiza el mensaje, prepara los recursos y controla los resultados en un solo lugar. Comienza gratis en itmounts.com.`, 360)
   }
   if (lang === 'pl') {
-    return cleanText(`SignalBoostAi pomaga ${audience} zdobywać więcej klientów dzięki profesjonalnym kampaniom, które łatwo sprawdzić. Przygotuj przekaz, materiały i wyniki w jednym miejscu. Zacznij bezpłatnie na saas.signalboostapp.com.`, 360)
+    return cleanText(`iTMounts pomaga ${audience} zdobywać więcej klientów dzięki profesjonalnym kampaniom, które łatwo sprawdzić. Przygotuj przekaz, materiały i wyniki w jednym miejscu. Zacznij bezpłatnie na itmounts.com.`, 360)
   }
   if (lang === 'ru') {
-    return cleanText(`SignalBoostAi помогает ${audience} получать больше клиентов с помощью профессиональных кампаний, которые легко проверить. Подготовьте сообщение, материалы и отслеживайте результаты в одном месте. Начните бесплатно на saas.signalboostapp.com.`, 360)
+    return cleanText(`iTMounts помогает ${audience} получать больше клиентов с помощью профессиональных кампаний, которые легко проверить. Подготовьте сообщение, материалы и отслеживайте результаты в одном месте. Начните бесплатно на itmounts.com.`, 360)
   }
-  return cleanText(`SignalBoostAi helps ${audience} generate more opportunities with professional campaigns that are easy to review. Organize the message, prepare the assets, and track results in one place. Start free at saas.signalboostapp.com.`, 360)
+  return cleanText(`iTMounts helps ${audience} generate more opportunities with professional campaigns that are easy to review. Organize the message, prepare the assets, and track results in one place. Start free at itmounts.com.`, 360)
 }
 
 function isMaintenance(campaign) {
@@ -236,8 +237,8 @@ async function processCampaign(campaign) {
       `drawbox=x='iw-mod(t*39,iw+260)':y=0:w=260:h=ih:color=0x8a6900@0.18:t=fill`,
       'vignette=PI/5',
       `drawbox=x=0:y=0:w=iw:h=${vertical ? 145 : 116}:color=0x020617@0.92:t=fill`,
-      `drawtext=fontfile=${font}:text='SignalBoostAi':fontcolor=0xffc300:fontsize=${brandSize}:x=(w-text_w)/2:y=${vertical ? 34 : 25}`,
-      `drawtext=fontfile=${font}:text='www.saas.signalboostapp.com':fontcolor=white:fontsize=${urlSize}:x=(w-text_w)/2:y=${vertical ? 88 : 70}`,
+      `drawtext=fontfile=${font}:text='iTMounts':fontcolor=0xffc300:fontsize=${brandSize}:x=(w-text_w)/2:y=${vertical ? 34 : 25}`,
+      `drawtext=fontfile=${font}:text='itmounts.com':fontcolor=white:fontsize=${urlSize}:x=(w-text_w)/2:y=${vertical ? 88 : 70}`,
       `drawbox=x=0:y=${panelY}:w=iw:h=${panelH}:color=0x020617@0.97:t=fill`,
       `ass='${assPath(captionsPath)}'`,
     ].join(',')

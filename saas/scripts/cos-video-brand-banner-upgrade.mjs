@@ -1,7 +1,8 @@
 #!/usr/bin/env node
+// saas/scripts/cos-video-brand-banner-upgrade.mjs
 // Upgrade completed COSA videos to a prominent full-width brand banner.
 //
-// The finalizer already burns SignalBoostAi and the URL into the video, but its
+// The finalizer already burns iTMounts and the URL into the video, but its
 // compact header can look like a small card on vertical video. This idempotent
 // pass covers that header with a larger, dedicated top band while preserving
 // narration and captions.
@@ -85,8 +86,8 @@ async function upgrade(campaign) {
     const filter = [
       `drawbox=x=0:y=0:w=iw:h=${bandHeight}:color=0x020617@0.985:t=fill`,
       `drawbox=x=0:y=${dividerY}:w=iw:h=7:color=0xffc300@0.95:t=fill`,
-      `drawtext=fontfile=${font}:text='SignalBoostAi':fontcolor=0xffc300:fontsize=${brandSize}:x=(w-text_w)/2:y=${brandY}`,
-      `drawtext=fontfile=${font}:text='www.saas.signalboostapp.com':fontcolor=white:fontsize=${urlSize}:x=(w-text_w)/2:y=${urlY}`,
+      `drawtext=fontfile=${font}:text='iTMounts':fontcolor=0xffc300:fontsize=${brandSize}:x=(w-text_w)/2:y=${brandY}`,
+      `drawtext=fontfile=${font}:text='itmounts.com':fontcolor=white:fontsize=${urlSize}:x=(w-text_w)/2:y=${urlY}`,
     ].join(',')
 
     await run('ffmpeg', [

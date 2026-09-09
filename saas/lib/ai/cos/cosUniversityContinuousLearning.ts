@@ -177,6 +177,7 @@ export function universityStudyProofsFromAcceptedLearning(
   eligiblePlans: readonly EligiblePlan[],
   signals: readonly KnowledgeGapSignal[],
   acceptedGapIds: readonly string[],
+  acceptedAt: string,
 ): CosUniversityAcceptedStudyProofInput[] {
   const accepted = new Set(acceptedGapIds)
   if (!accepted.size) return []
@@ -185,7 +186,7 @@ export function universityStudyProofsFromAcceptedLearning(
       .filter(signal => signalMatchesPlan(signal, plan.planKey))
       .map(signal => knowledgeGapIdForSignal(signal))
       .filter(gapId => accepted.has(gapId)))]
-    return refs.length ? [{ planId: plan.id, evidenceRefs: refs }] : []
+    return refs.length ? [{ planId: plan.id, evidenceRefs: refs, acceptedAt }] : []
   })
 }
 
@@ -279,7 +280,7 @@ export async function runCosUniversityContinuousLearning(options: {
     summary.accepted = result.accepted
     summary.probationary = result.probationary
     summary.sourceErrors = result.sourceErrors
-    const proofs = universityStudyProofsFromAcceptedLearning(eligiblePlans, signals, result.acceptedGapIds)
+    const proofs = universityStudyProofsFromAcceptedLearning(eligiblePlans, signals, result.acceptedGapIds, now.toISOString())
     attemptedPlanIds.push(...await recordAcceptedCosUniversityStudyAttempts(proofs, new Date()))
     summary.plansAttempted = attemptedPlanIds.length
     summary.status = summary.plansAttempted > 0 ? 'learned' : 'idle'

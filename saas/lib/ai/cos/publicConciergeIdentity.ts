@@ -62,6 +62,30 @@ const EMPLOYER_QUESTIONS: readonly Readonly<{
   },
 ]
 
+
+const COMPANY_NAME_QUESTIONS: readonly Readonly<{
+  language: IdentityLanguage
+  patterns: readonly RegExp[]
+}>[] = [
+  { language: 'en', patterns: [
+    /\bwhat (?:is|s) (?:the )?name of (?:our|this) company\b/,
+    /\bwhat (?:is|s) (?:our|this) company(?:s)? name\b/,
+    /\bwhat (?:is|s) (?:the )?(?:platform|company) called\b/,
+  ] },
+  { language: 'es', patterns: [/\bcual es (?:el )?nombre de (?:nuestra|esta) empresa\b/, /\bcomo se llama (?:nuestra|esta) empresa\b/] },
+  { language: 'pt', patterns: [/\bqual e (?:o )?nome (?:da nossa|desta) empresa\b/, /\bcomo se chama (?:a nossa|esta) empresa\b/] },
+  { language: 'pl', patterns: [/\bjak nazywa sie (?:nasza|ta) firma\b/, /\bjaka jest nazwa (?:naszej|tej) firmy\b/] },
+  { language: 'ru', patterns: [/(?:^| )как называется (?:наша|эта) компания(?: |$)/, /(?:^| )какое название у (?:нашей|этой) компании(?: |$)/] },
+]
+
+const COMPANY_NAME_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.freeze({
+  en: 'Our company and public platform are named iTMounts.',
+  es: 'Nuestra empresa y plataforma pública se llaman iTMounts.',
+  pt: 'Nossa empresa e plataforma pública se chamam iTMounts.',
+  pl: 'Nasza firma i publiczna platforma nazywają się iTMounts.',
+  ru: 'Наша компания и публичная платформа называются iTMounts.',
+})
+
 const IDENTITY_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.freeze({
   en: 'I’m iTMounts Concierge, an AI assistant—not a person—so I do not have an employer.',
   es: 'Soy iTMounts Concierge, un asistente de IA, no una persona, así que no tengo empleador.',
@@ -78,6 +102,14 @@ const IDENTITY_REPLIES: Readonly<Record<IdentityLanguage, string>> = Object.free
 export function publicConciergeIdentityReply(prompt: string): PublicIdentityReply | null {
   const normalized = normalizedQuestion(prompt)
   if (!normalized) return null
+
+  for (const rule of COMPANY_NAME_QUESTIONS) {
+    if (!rule.patterns.some((pattern) => pattern.test(normalized))) continue
+    return Object.freeze({
+      reply: COMPANY_NAME_REPLIES[rule.language],
+      source: 'concierge-public-company-identity',
+    })
+  }
 
   for (const rule of EMPLOYER_QUESTIONS) {
     if (!rule.patterns.some((pattern) => pattern.test(normalized))) continue

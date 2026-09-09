@@ -27,7 +27,9 @@ import { isOperationalLogRepairOffer } from '@/lib/ai/cos/pastedOperationalLog'
 import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'
 import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import { isConciergeVisualObjective } from '@/lib/visuals/intent'
+import { resolveConciergeVisualObjective } from '@/lib/visuals/conversationIntent'
 import { isSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
+import { publicConciergeIdentityReply } from '@/lib/ai/cos/publicConciergeIdentity'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 
 export const runtime = 'nodejs'
@@ -97,11 +99,24 @@ export async function withSuggestedFollowups(response: Response, prompt: string,
 
 function inlineVisualResponse(response: Response): Promise<NextResponse> {
   return response.clone().json().then((payload: any) => {
+    const existingPreview = typeof payload?.visual?.previewUrl === 'string' ? payload.visual.previewUrl : ''
+    if (existingPreview) return NextResponse.json(payload, { status: response.status })
     const workspaceId = typeof payload?.workspaceId === 'string' ? payload.workspaceId : ''
     const imagePath = Array.isArray(payload?.files)
       ? payload.files.find((path: unknown): path is string => typeof path === 'string' && /\.(?:png|jpe?g|webp)$/i.test(path))
       : ''
-    if (!workspaceId || !imagePath || typeof payload?.reply !== 'string') return NextResponse.json(payload, { status: response.status })
+    if (!workspaceId || !imagePath || typeof payload?.reply !== 'string') {
+      if (response.ok && String(payload?.source || '').startsWith('concierge-visual')) {
+        return NextResponse.json({
+          error: 'visual_delivery_unverified',
+          reply: 'The visual could not be verified for inline display and download, so I will not claim it was delivered. Please try again.',
+          source: 'concierge-visual-delivery-unverified',
+          execution_allowed: false,
+          external_action_taken: false,
+        }, { status: 502 })
+      }
+      return NextResponse.json(payload, { status: response.status })
+    }
     const previewUrl = `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${imagePath.split('/').map(encodeURIComponent).join('/')}?preview=1`
     return NextResponse.json({
       ...payload,
@@ -125,7 +140,7 @@ export async function POST(req: NextRequest) {
   const userMessages = messages.filter((message: any) => message?.role === 'user' && typeof message?.content === 'string')
   const latestUser = userMessages.at(-1)
   const previousUser = userMessages.at(-2)
-  const prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
+  let prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
   const previousUserPrompt = typeof previousUser?.content === 'string' ? previousUser.content : ''
   const latestUserIndex = messages.lastIndexOf(latestUser)
   const immediatePreviousMessage = latestUserIndex > 0 ? messages[latestUserIndex - 1] : null
@@ -139,6 +154,21 @@ export async function POST(req: NextRequest) {
   const auditUserId = access?.userId ?? null
   const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
+  const visualObjective = resolveConciergeVisualObjective(messages, prompt)
+  if (visualObjective) prompt = visualObjective
+
+  if (browserSurface === 'concierge') {
+    const identity = publicConciergeIdentityReply(prompt)
+    if (identity) {
+      return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
+        ...identity,
+        external_ai_invoked: false,
+        local_model_invoked: false,
+        execution_allowed: false,
+        external_action_taken: false,
+      }), prompt, auditUserId))
+    }
+  }
 
   const routingContext = builderRoutingContextFromBody(body)
   const attachedOperationalEvidence = readAttachedOperationalEvidence(body?.attachments)

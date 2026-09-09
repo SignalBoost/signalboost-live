@@ -3,8 +3,8 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.78  
-**Updated:** 2026-09-08  
+**Version:** 1.79  
+**Updated:** 2026-09-09  
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)  
 **Canonical public product:** **iTMounts**  
 **Canonical public origin:** `https://itmounts.com`
@@ -391,6 +391,21 @@ Authority remains bounded:
 - repository integration still follows main-write/PR/merge governance.
 
 ---
+
+# Concierge visual-continuity repair — 2026-09-09
+
+Current repair branch: `fix/concierge-visual-continuity-identity-20260909` (not Production until merged and deployed).
+
+The reported iTMounts logo conversation exposed four coupled defects: elliptical visual follow-ups lost their earlier user-supplied logo objective; ordinary text synthesis replaced requested execution; success copy could survive without a renderable preview/download artifact; and a public employer question reached model inference and invented a government affiliation.
+
+Repair contract:
+
+- resolve short visual revisions only from an earlier explicit **user** visual request in the same submitted conversation;
+- never treat assistant prose as authority for follow-up routing;
+- unrelated requests exit the visual lane;
+- visual delivery success requires a renderable preview/download artifact;
+- public Concierge identity questions use deterministic product identity and never invent employment or government affiliation;
+- the exact reported six-turn transcript is a mandatory regression.
 
 # Runtime inference / provider source of truth
 

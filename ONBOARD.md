@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.91
+**Version:** 1.92
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -73,6 +73,13 @@ eligible exams directly rather than only reporting that an exam is due.
 
 The canonical `software-specialist` identity is registered under the software-engineering role and
 therefore enters the common undergraduate curriculum before its advanced specialist program.
+
+## COS University multi-agent remediation — 2026-09-10
+
+The autonomous registered-agent cycle now converts each agent's current failed independent exam
+into an identity-isolated remediation plan. Exam history, plan keys, and durable study-plan rows are
+fenced by agent identity. Remediation creates study work only; it cannot expose hidden exam material,
+award academic credit, or bypass a later fresh independent re-examination.
 
 ---
 

@@ -1,0 +1,46 @@
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import type { CosUniversityAgentRole } from './cosUniversityRoleCurriculum.ts'
+
+export const COS_UNIVERSITY_AGENT_ROLES: readonly CosUniversityAgentRole[] = Object.freeze([
+  'chief_of_staff_generalist', 'software_engineering', 'cybersecurity',
+  'quantitative_data_science', 'enterprise_operations_governance',
+  'scientific_physical_systems', 'aerospace_nuclear_safety',
+  'molecular_biomedical_sciences', 'neuroscience_biophysics',
+  'actuarial_insurance_risk', 'quantum_theoretical_physics',
+])
+
+export function isCosUniversityAgentRole(value: unknown): value is CosUniversityAgentRole {
+  return COS_UNIVERSITY_AGENT_ROLES.includes(value as CosUniversityAgentRole)
+}
+
+export async function readCosUniversityAgentRole(agentId: string): Promise<CosUniversityAgentRole | null> {
+  const id = String(agentId || '').trim()
+  if (!id) throw new Error('agent_id_required')
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const result = await db.from('cos_university_agent_registry')
+    .select('role').eq('agent_id', id).maybeSingle()
+  if (result.error) throw result.error
+  const role = (result.data as { role?: unknown } | null)?.role
+  if (role == null) return null
+  if (!isCosUniversityAgentRole(role)) throw new Error('invalid_persisted_agent_role')
+  return role
+}
+
+/** Host-only identity binding. A role chooses education; it never grants runtime authority. */
+export async function persistCosUniversityAgentRole(input: {
+  agentId: string
+  role: CosUniversityAgentRole
+  assignedBy: string
+}): Promise<void> {
+  const agentId = String(input.agentId || '').trim()
+  const assignedBy = String(input.assignedBy || '').trim()
+  if (!agentId) throw new Error('agent_id_required')
+  if (!assignedBy) throw new Error('assigned_by_required')
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const result = await db.from('cos_university_agent_registry').upsert({
+    agent_id: agentId, role: input.role, assigned_by: assignedBy,
+  }, { onConflict: 'agent_id' })
+  if (result.error) throw result.error
+}

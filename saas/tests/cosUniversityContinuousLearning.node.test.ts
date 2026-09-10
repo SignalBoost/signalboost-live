@@ -32,6 +32,22 @@ test('study method varies by failure class instead of defaulting every weakness 
   assert.ok(reasoning.methods.some(method => method.id === 'deliberate_practice'))
 })
 
+test('owner-directed admitted material has an executable University bridge without receiving academic credit', () => {
+  const language = selectCosUniversityStudyStrategy({ failureClass: 'language' })
+  assert.ok(language.methods.some(method =>
+    method.id === 'owner_directed_material' && method.execution === 'available_on_owner_submission'))
+
+  const directedStore = file('../lib/ai/cos/directedStudyStore.ts')
+  const universityStore = file('../lib/ai/cos/cosUniversityStore.ts')
+  const migration = file('../supabase/migrations/20260910024500_cos_university_owner_directed_study.sql')
+  assert.match(directedStore, /registerOwnerDirectedUniversityStudy/)
+  assert.match(directedStore, /recordAcceptedCosUniversityStudyAttempts/)
+  assert.match(universityStore, /sourceKind: 'owner_directed_material'/)
+  assert.match(universityStore, /academicCredit: false/)
+  assert.match(migration, /'owner_directed_material'/)
+  assert.doesNotMatch(universityStore.split('registerOwnerDirectedUniversityStudy')[1] || '', /recordCosUniversityAssessment\(/)
+})
+
 test('fine-tuning is only a candidate after repeated independently verified failure and never auto-executes', () => {
   const normal = selectCosUniversityStudyStrategy({
     failureClass: 'reasoning', repeatedFailures: 4, independentRetestFailures: 1,

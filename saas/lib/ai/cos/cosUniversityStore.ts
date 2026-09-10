@@ -65,7 +65,7 @@ export type CosUniversityStudyPlanRow = {
   language_dimension: CosPlatformLanguageDimension | null
   failure_class: CosUniversityFailureClass
   target_grade: 'A' | 'A+'
-  source_kind: 'failure_autopsy' | 'operational_weakness' | 'academic_rotation' | 'language_rotation' | 'recertification'
+  source_kind: 'failure_autopsy' | 'operational_weakness' | 'academic_rotation' | 'language_rotation' | 'recertification' | 'owner_directed_material'
   source_ref: string | null
   problem_class: string | null
   objective: string
@@ -428,6 +428,86 @@ async function persistStudyPlan(candidate: PlanCandidate, now: string): Promise<
     .maybeSingle()
   if (result.error) throw result.error
   return (result.data || null) as CosUniversityStudyPlanRow | null
+}
+
+export type OwnerDirectedUniversityStudyInput = Readonly<{
+  topic: string
+  studyIntent: string
+  sourceUri: string
+  evidenceRefs: readonly string[]
+  acceptedAt: string
+}>
+
+/**
+ * Attach newly admitted owner-directed material to the University ledger. This records study only:
+ * the resulting plan and proof carry no academic credit and cannot write assessment evidence.
+ */
+export async function registerOwnerDirectedUniversityStudy(
+  input: OwnerDirectedUniversityStudyInput,
+): Promise<string[]> {
+  const topic = clean(input.topic, 500)
+  const studyIntent = clean(input.studyIntent, 1200)
+  const sourceUri = clean(input.sourceUri, 700)
+  const acceptedAtMs = validTime(input.acceptedAt)
+  const refs = [...new Set(input.evidenceRefs.map(ref => clean(ref, 300)).filter(Boolean))]
+  if (!topic || !studyIntent || !sourceUri || !acceptedAtMs || !refs.length) return []
+
+  const now = new Date(acceptedAtMs).toISOString()
+  const classified = classifyCosUniversitySubjects(`${topic} ${studyIntent}`)
+  const subjects = (classified.length ? classified : ['reasoning_decision_science' as const]).slice(0, 3)
+  const languages = detectPlatformLanguages(`${topic} ${studyIntent}`)
+  const rows: CosUniversityStudyPlanRow[] = []
+
+  for (const subjectId of subjects) {
+    const strategy = selectCosUniversityStudyStrategy({
+      failureClass: subjectId === 'language_communication' ? 'language' : 'unknown',
+    })
+    const row = await persistStudyPlan({
+      planKey: planKey(['owner_directed_material', sourceUri, studyIntent, subjectId]),
+      subjectId,
+      language: null,
+      languageDimension: null,
+      failureClass: subjectId === 'language_communication' ? 'language' : 'unknown',
+      sourceKind: 'owner_directed_material',
+      sourceRef: sourceUri,
+      problemClass: topic,
+      objective: `Study owner-directed material for ${topic}: ${studyIntent}. Prove learning later through independent transfer and retention assessment.`,
+      strategy,
+      priority: 78,
+      repeatedCount: 1,
+      evidence: {
+        origin: 'owner_directed_study',
+        admittedEvidenceRefs: refs,
+        academicCredit: false,
+      },
+    }, now)
+    if (row) rows.push(row)
+  }
+
+  for (const language of languages) {
+    const strategy = selectCosUniversityStudyStrategy({ failureClass: 'language' })
+    const row = await persistStudyPlan({
+      planKey: planKey(['owner_directed_material_language', sourceUri, studyIntent, language]),
+      subjectId: 'language_communication',
+      language,
+      languageDimension: null,
+      failureClass: 'language',
+      sourceKind: 'owner_directed_material',
+      sourceRef: sourceUri,
+      problemClass: topic,
+      objective: `Study owner-directed ${language} material for ${topic}: ${studyIntent}. Prove comprehension and transfer through independent language assessment.`,
+      strategy,
+      priority: 80,
+      repeatedCount: 1,
+      evidence: {
+        origin: 'owner_directed_study',
+        admittedEvidenceRefs: refs,
+        academicCredit: false,
+      },
+    }, now)
+    if (row && !rows.some(existing => existing.id === row.id)) rows.push(row)
+  }
+  return rows.map(row => row.id)
 }
 
 export async function markCosUniversityStudyPlansAttempted(planIds: string[], now = new Date()): Promise<number> {

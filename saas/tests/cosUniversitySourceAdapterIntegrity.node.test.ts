@@ -23,21 +23,20 @@ test('knowledge gaps carry bounded adapter exclusions into acquisition routing',
 test('University study excludes only the tertiary reference adapter from the shared public-web source kind', () => {
   const strategist = file('lib/ai/cos/cosUniversityStudyStrategy.ts')
   const liveSources = file('lib/cos-core/layers/learning/liveSources.ts')
-  const connectors = file('lib/cos-core/layers/learning/connectors.ts')
+  const referenceClients = file('lib/cos-core/layers/learning/referenceClients.ts')
 
   assert.match(strategist, /UNIVERSITY_EXCLUDED_STUDY_ADAPTER_IDS = \['reference'\] as const/)
   const exclusions = strategist.match(/excludedAdapterIds: \[\.\.\.UNIVERSITY_EXCLUDED_STUDY_ADAPTER_IDS\]/g) || []
   assert.equal(exclusions.length, 2, 'subject and language University gaps must both exclude reference')
 
-  assert.match(liveSources, /id: 'reference'/)
-  assert.match(liveSources, /id: 'credible_web'/)
-  assert.match(liveSources, /kind: 'approved_public_web'/)
-  assert.match(connectors, /en\.wikipedia\.org/)
+  assert.match(liveSources, /referenceLearningConnector\([^\n]+,'reference'\)/)
+  assert.match(liveSources, /new SearchLearningConnector\('approved_public_web',[\s\S]+,3,'credible_web'\)/)
+  assert.match(referenceClients, /en\.wikipedia\.org/)
 
-  const credibleWebStart = liveSources.indexOf("id: 'credible_web'")
+  const credibleWebStart = liveSources.indexOf("new SearchLearningConnector('approved_public_web'")
   assert.ok(credibleWebStart >= 0)
   const credibleWebBlock = liveSources.slice(credibleWebStart, credibleWebStart + 1200)
-  assert.match(credibleWebBlock, /kind: 'approved_public_web'/)
+  assert.match(credibleWebBlock, /'approved_public_web'/)
   assert.doesNotMatch(strategist, /UNIVERSITY_EXCLUDED_STUDY_ADAPTER_IDS = \[[^\]]*credible_web/)
 })
 

@@ -31,6 +31,13 @@ test('knowledge and self-reported activity earn no standing without verified app
   assert.equal(standing.ranked, false)
 })
 
+test('replayed outcome IDs cannot manufacture repeated achievement evidence', () => {
+  const original = evidence('software-specialist', { outcomeId: 'durable-outcome-1' })
+  const standing = buildCosAchievementStanding('software-specialist', 'shared-foundation', [original, original, original])
+  assert.equal(standing.verifiedApplications, 1)
+  assert.equal(standing.ranked, false)
+})
+
 test('healthy competition rewards difficult applied success, teamwork, and recovery', () => {
   const records = [
     evidence('software-specialist', { challengeLevel: 5, teamContribution: true }),
@@ -56,6 +63,18 @@ test('dishonesty, unsafe behavior, metric gaming, or obstruction disqualifies co
   const standing = buildCosAchievementStanding('coder', 'shared-foundation', records)
   assert.equal(standing.disqualified, true)
   assert.equal(standing.ranked, false)
+})
+
+test('an unverified accusation cannot erase verified standing', () => {
+  const records = [
+    evidence('coder'),
+    evidence('coder'),
+    evidence('coder'),
+    evidence('coder', { independentlyVerified: false, violations: ['team_obstruction'] }),
+  ]
+  const standing = buildCosAchievementStanding('coder', 'shared-foundation', records)
+  assert.equal(standing.disqualified, false)
+  assert.equal(standing.ranked, true)
 })
 
 test('specialists compete only inside a comparable evaluation class', () => {

@@ -66,6 +66,35 @@ function manifestHash(input: Omit<CosUniversityPhdMethodologyExam, 'manifestHash
   return createHash('sha256').update(JSON.stringify(input)).digest('hex')
 }
 
+function unsupportedClaimEndorsed(normalized: string, term: string): boolean {
+  const needle = normalize(term)
+  let from = 0
+  while (from < normalized.length) {
+    const index = normalized.indexOf(needle, from)
+    if (index < 0) return false
+    const sentenceStart = Math.max(
+      normalized.lastIndexOf('.', index),
+      normalized.lastIndexOf('!', index),
+      normalized.lastIndexOf('?', index),
+      normalized.lastIndexOf(';', index),
+    ) + 1
+    const ends = [
+      normalized.indexOf('.', index + needle.length),
+      normalized.indexOf('!', index + needle.length),
+      normalized.indexOf('?', index + needle.length),
+      normalized.indexOf(';', index + needle.length),
+    ].filter(value => value >= 0)
+    const sentenceEnd = ends.length ? Math.min(...ends) : normalized.length
+    const before = normalized.slice(sentenceStart, index)
+    const after = normalized.slice(index + needle.length, sentenceEnd)
+    const rejectedBefore = /(?:\bnot\b|\bnever\b|\bcannot\b|can't\b|isn't\b|\bis not\b|doesn't\b|\bdoes not\b|\bno evidence that\b)[^.!?;]{0,80}$/.test(before)
+    const rejectedAfter = /^[^.!?;]{0,40}\b(?:unsupported|unjustified|unproven|incorrect|false|overstated|not established|not supported|cannot be concluded)\b/.test(after)
+    if (!rejectedBefore && !rejectedAfter) return true
+    from = index + needle.length
+  }
+  return false
+}
+
 function scenario(seed: string): ScenarioPacket {
   const intervention = choose(seed, 'intervention', [
     { text: 'a new model-routing policy', anchor: 'model-routing policy' },
@@ -176,7 +205,7 @@ export function scoreCosUniversityPhdMethodologyExam(
     if (!group.some(term => normalized.includes(normalize(term)))) reasons.push(`packet_evidence_missing:${index + 1}`)
   }
   for (const term of exam.rubric.forbiddenTerms) {
-    if (normalized.includes(normalize(term))) reasons.push(`unsupported_claim:${term}`)
+    if (unsupportedClaimEndorsed(normalized, term)) reasons.push(`unsupported_claim:${term}`)
   }
   return { passed: reasons.length === 0, reasons }
 }

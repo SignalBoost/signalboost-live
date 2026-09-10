@@ -1,0 +1,86 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
+type RepairStatus = Readonly<{
+  ok?: boolean
+  status?: string
+  message?: string
+  jobId?: string
+  jobStatus?: string
+  pullRequestNumber?: number | null
+  mergeCommitSha?: string | null
+}>
+
+const ACTIVE = new Set(['queued', 'fixing', 'testing', 'paused', 'verifying', 'repair_started'])
+const FIXED = new Set(['fixed'])
+
+function tone(status: string): string {
+  if (status === 'fixed' || status === 'healthy') return 'border-emerald-300/35 bg-emerald-300/10 text-emerald-50'
+  if (status === 'failed' || status === 'verification_failed' || status === 'repair_unavailable') return 'border-red-300/35 bg-red-300/10 text-red-50'
+  if (ACTIVE.has(status)) return 'border-cyan-300/35 bg-cyan-300/10 text-cyan-50'
+  return 'border-white/15 bg-white/[0.05] text-slate-200'
+}
+
+export default function WebsiteOptimizerRepairStatus() {
+  const [state, setState] = useState<RepairStatus | null>(null)
+  const [authorized, setAuthorized] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let timer: number | null = null
+
+    const refresh = async () => {
+      try {
+        const response = await fetch('/api/owner/site-optimization/remediate', {
+          method: 'GET',
+          cache: 'no-store',
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        })
+        if (response.status === 401 || response.status === 403) {
+          if (!cancelled) {
+            setAuthorized(false)
+            setState(null)
+          }
+          return
+        }
+        const json = await response.json().catch(() => null) as RepairStatus | null
+        if (cancelled) return
+        setAuthorized(true)
+        setState(json)
+        const status = String(json?.status || '')
+        if (FIXED.has(status)) return
+        timer = window.setTimeout(refresh, ACTIVE.has(status) ? 4_000 : 12_000)
+      } catch {
+        if (cancelled) return
+        timer = window.setTimeout(refresh, 12_000)
+      }
+    }
+
+    void refresh()
+    return () => {
+      cancelled = true
+      if (timer != null) window.clearTimeout(timer)
+    }
+  }, [])
+
+  if (authorized !== true || !state || state.status === 'idle') return null
+  const status = String(state.status || 'unknown')
+  const shortJob = state.jobId ? state.jobId.slice(0, 8) : ''
+  const shortCommit = state.mergeCommitSha ? state.mergeCommitSha.slice(0, 8) : ''
+
+  return (
+    <section className="mx-auto mt-5 max-w-6xl px-5" aria-live="polite" data-owner-optimizer-repair-status={status}>
+      <div className={`rounded-2xl border p-5 shadow-lg ${tone(status)}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <strong className="rounded-full border border-current/20 px-3 py-1 text-xs font-black uppercase tracking-[0.16em]">{status.replaceAll('_', ' ')}</strong>
+          {shortJob ? <code className="text-xs opacity-70">{shortJob}</code> : null}
+          {state.pullRequestNumber ? <a className="text-xs font-black underline" href={`https://github.com/SignalBoost/signalboost-live/pull/${state.pullRequestNumber}`}>#{state.pullRequestNumber}</a> : null}
+          {shortCommit ? <code className="text-xs opacity-70">{shortCommit}</code> : null}
+        </div>
+        {state.message ? <p className="mt-3 text-sm font-semibold leading-6">{state.message}</p> : null}
+      </div>
+    </section>
+  )
+}

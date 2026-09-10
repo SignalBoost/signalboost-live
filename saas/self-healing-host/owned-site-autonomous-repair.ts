@@ -12,6 +12,17 @@ import {
 } from './owned-site-optimization-monitoring.ts'
 
 const RETRY_SUPPRESSION_MS = 6 * 60 * 60 * 1000
+const OWNED_SITE_REPAIR_STARTING_PATHS = Object.freeze([
+  'saas/app/api/public/site-optimization/route.ts',
+  'saas/next.config.mjs',
+  'saas/app/layout.tsx',
+  'saas/app/page.tsx',
+  'saas/proxy.ts',
+  'saas/app/website-optimizer/page.tsx',
+  'saas/self-healing-host/owned-site-optimization-monitoring.ts',
+  'saas/tests/ownedSiteOptimizationMonitoring.node.test.ts',
+])
+const DIAGNOSTIC_TRANSPORT_FAILURE = /automated diagnosis was unavailable|diagnostic timed out|invalid json payload|generation_config|response_schema|additionalproperties|cannot find field|cos-primary:|gemini:/i
 
 type RepairDisposition = 'queued' | 'already_active' | 'recently_attempted'
 
@@ -35,6 +46,14 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.map(item => String(item || '').trim()).filter(Boolean).slice(0, 12)
     : []
+}
+
+function scopedDiagnosis(value: string): string {
+  const diagnosis = String(value || '').trim()
+  if (!diagnosis || DIAGNOSTIC_TRANSPORT_FAILURE.test(diagnosis)) {
+    return 'Automated diagnosis was unavailable. Use the verified Website Optimizer evidence and current repository state; diagnostic-provider transport/schema errors are not website defects.'
+  }
+  return diagnosis.slice(0, 900)
 }
 
 export function isOwnedSiteOptimizationIncident(incident: SupervisorIncident): boolean {
@@ -80,7 +99,10 @@ function objectiveFor(incident: SupervisorIncident, diagnosis: string): string {
   return [
     `Fix the SignalBoost platform issue detected by the Self-Healing Supervisor on the owned production site ${PUBLIC_BRAND.siteUrl}.`,
     reportLine,
-    `Supervisor diagnosis: ${String(diagnosis || 'No additional diagnosis text was produced.').slice(0, 1200)}`,
+    'Verified finding semantics: missing_csp and missing_nosniff are public HTTP response-header observations; many_scripts is the rendered public HTML script-element workload. Treat these optimizer findings as the repair target, not unrelated model/provider diagnostics.',
+    `Repository starting points (inspect first, not exclusive): ${OWNED_SITE_REPAIR_STARTING_PATHS.join(', ')}.`,
+    `Supervisor diagnosis: ${scopedDiagnosis(diagnosis)}`,
+    'If the diagnostic model/provider failed, ignore its transport/schema error text as repair evidence unless that separate failure is independently reproduced and directly explains the Website Optimizer finding.',
     'Reproduce the current production behavior before editing. Inspect ONBOARD.md and the current repository first. Repair root causes safely; do not hard-code scores, finding lists, responses, or suppress/relax the optimizer to make the check pass.',
     'For performance/security findings, prefer the smallest application or deployment-safe change that preserves product behavior. Run the narrowest relevant tests plus the production build gates required by the repository. If a finding is not safely repairable from repository code, make no risky change and report the verified blocker.',
     `After the repair, verify the public optimizer can scan ${PUBLIC_BRAND.siteUrl} successfully and that the targeted finding(s) are gone or objectively improved.`,

@@ -370,6 +370,11 @@ anthropology, rhetoric, quantum structures, metrology, decoherence, and proof ve
 advanced curricula layered over the common foundation; they never remove or fast-forward the core
 computer science, economics, humanities, history, culture, or communication requirements.
 
+Advanced curricula are assigned from the enrolled agent's host-controlled professional role, not
+guessed from incidental study activity. COS remains the multidisciplinary Chief of Staff and
+continues generalist education; specialist roles map deterministically to their matching Master's
+program. Role assignment cannot bypass the undergraduate credential or expand authority.
+
 A Master's qualification means deep professional/expert application of established knowledge, demonstrated through independent exams, deliberate practice, realistic/real work, retention, and verified outcomes.
 
 A specialist remains part of COS. It does not become a competing brain.

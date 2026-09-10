@@ -23,6 +23,7 @@ import {
   COS_UNIVERSITY_MASTERS_PROGRAM_KEY_PREFIX,
   cosUniversityMastersProgramKey,
   rankCosUniversityMastersTracks,
+  cosUniversityMastersTrackById,
   type CosUniversityMastersTrackId,
 } from './cosUniversityMasters.ts'
 
@@ -58,6 +59,8 @@ export type CosUniversityAdmissionInput = {
   credentials: readonly CosUniversityCredential[]
   /** Current undergraduate subject transcript — used only to choose a specialization. */
   subjectTranscript: readonly CosUniversityTranscriptEntry[]
+  /** Host-assigned role curriculum takes precedence over generic strongest-subject ranking. */
+  assignedMastersTrackId?: CosUniversityMastersTrackId | null
   now?: Date
 }
 
@@ -138,8 +141,13 @@ export function decideCosUniversityAdmission(input: CosUniversityAdmissionInput)
     return { admit: false, reason: 'already_enrolled_at_next_level' }
   }
 
+  const assignedTrack = input.assignedMastersTrackId
+    ? cosUniversityMastersTrackById(input.assignedMastersTrackId)
+    : null
   const ranked = rankCosUniversityMastersTracks(subjectStandingMap(input.subjectTranscript))
-  const best = ranked.find((entry) => entry.score > 0) ?? null
+  const best = assignedTrack
+    ? { track: assignedTrack, score: 1 }
+    : ranked.find((entry) => entry.score > 0) ?? null
   if (!best) return { admit: false, reason: 'no_eligible_specialization' }
 
   const programKey = cosUniversityMastersProgramKey(best.track.id)

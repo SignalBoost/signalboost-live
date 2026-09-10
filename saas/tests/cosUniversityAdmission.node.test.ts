@@ -81,6 +81,17 @@ test('undergraduate credential issued and no Master\'s yet: admits into the stro
   }
 })
 
+test('host-assigned agent role selects its curriculum instead of unrelated score ranking', () => {
+  const decision = decideCosUniversityAdmission({
+    enrollments: [undergraduateEnrollment], credentials: [undergraduateCredential],
+    subjectTranscript: strongCybersecurityTranscript,
+    assignedMastersTrackId: 'molecular_biomedical_sciences',
+    now: new Date('2027-02-01T00:00:00Z'),
+  })
+  assert.equal(decision.admit, true)
+  if (decision.admit) assert.equal(decision.trackId, 'molecular_biomedical_sciences')
+})
+
 test('undergraduate credential issued but no positive subject standing anywhere: refuses, no track fits', () => {
   const decision = decideCosUniversityAdmission({
     enrollments: [undergraduateEnrollment],

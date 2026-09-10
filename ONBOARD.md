@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.87
+**Version:** 1.88
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -41,6 +41,14 @@ quantitative and enterprise programs now explicitly include formal epistemology,
 mechanism design, organizational anthropology, field operations, rhetoric, and crisis leadership.
 Every track retains independent examination, unseen transfer, verified practical work, and capstone
 requirements; document exposure or simulation alone does not graduate an agent.
+
+## COS University role-to-curriculum assignment — 2026-09-10
+
+Host-controlled AI roles now map deterministically to the matching advanced program and its complete
+module list. The role assignment is considered only after the common undergraduate credential is
+awarded, overrides accidental strongest-subject ranking at Master's admission, and never expands
+authority. COS remains on generalist continuing education unless a separate specialist role is
+explicitly assigned.
 
 ---
 

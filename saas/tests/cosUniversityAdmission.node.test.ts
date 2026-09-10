@@ -27,15 +27,20 @@ const strongCybersecurityTranscript: CosUniversityTranscriptEntry[] = [
   { subjectId: 'computer_science', title: 'Computer Science', grade: 'A', evidenceCount: 4, latestAssessmentAt: '2027-01-01T00:00:00.000Z', reasons: [] },
 ]
 
-test('no undergraduate credential yet and no cohort at all: refuses, names the missing credential', () => {
+test('every new AI can enroll directly in the undergraduate curriculum without pre-qualification', () => {
   const decision = decideCosUniversityAdmission({
     enrollments: [],
     credentials: [],
     subjectTranscript: [],
     now: new Date('2027-02-01T00:00:00Z'),
   })
-  assert.equal(decision.admit, false)
-  if (!decision.admit) assert.equal(decision.reason, 'undergraduate_credential_not_issued')
+  assert.equal(decision.admit, true)
+  if (decision.admit) {
+    assert.equal(decision.reason, 'undergraduate_enrollment')
+    assert.equal(decision.programKey, COS_UNIVERSITY_UNDERGRADUATE_PROGRAM_KEY)
+    assert.equal(decision.programLevel, 'undergraduate')
+    assert.equal(decision.trackId, null)
+  }
 })
 
 test('undergraduate cohort still active, no credential yet: refuses as active, never opens a second program', () => {

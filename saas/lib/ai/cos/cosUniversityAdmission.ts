@@ -39,14 +39,13 @@ export type CosUniversityAdmissionDecision =
       programKey: string
       programLevel: CosUniversityProgramLevel
       trackId: CosUniversityMastersTrackId | null
-      reason: 'masters_admission_earned'
+      reason: 'undergraduate_enrollment' | 'masters_admission_earned'
       enrollment: CosUniversityProgramEnrollment
     }
   | {
       admit: false
       reason:
         | 'undergraduate_program_active'
-        | 'undergraduate_credential_not_issued'
         | 'undergraduate_cohort_expired_without_credential'
         | 'already_enrolled_at_next_level'
         | 'no_eligible_specialization'
@@ -103,6 +102,20 @@ export function decideCosUniversityAdmission(input: CosUniversityAdmissionInput)
 
   if (!undergraduateCredential) {
     const undergraduate = enrollmentFor(input.enrollments, COS_UNIVERSITY_UNDERGRADUATE_PROGRAM_KEY)
+    if (!undergraduate) {
+      return {
+        admit: true,
+        programKey: COS_UNIVERSITY_UNDERGRADUATE_PROGRAM_KEY,
+        programLevel: 'undergraduate',
+        trackId: null,
+        reason: 'undergraduate_enrollment',
+        enrollment: buildCosUniversityProgramEnrollment({
+          programKey: COS_UNIVERSITY_UNDERGRADUATE_PROGRAM_KEY,
+          level: 'undergraduate',
+          enrolledAt: now,
+        }),
+      }
+    }
     const timing = cosUniversityProgramTimingStatus(undergraduate, now)
     if (timing === 'deadline_expired') {
       // The cohort ran out of time without earning the degree. Opening a Master's here would launder
@@ -111,7 +124,7 @@ export function decideCosUniversityAdmission(input: CosUniversityAdmissionInput)
     }
     return {
       admit: false,
-      reason: timing === 'not_enrolled' ? 'undergraduate_credential_not_issued' : 'undergraduate_program_active',
+      reason: 'undergraduate_program_active',
     }
   }
 

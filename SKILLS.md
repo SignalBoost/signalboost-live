@@ -59,6 +59,22 @@ A red dashboard that produces no remediation is incomplete.
 
 COS is developed as an **elite multidisciplinary generalist first**.
 
+University enrollment does not require an AI agent to prove that it is already a "qualified
+learning candidate." Every AI agent enrolled in a program is assigned that program's required
+curriculum. It graduates only after passing every required subject and the program's other
+graduation requirements. A failed subject keeps the agent enrolled for targeted remediation,
+practice, and re-examination; it does not disqualify the agent from education.
+
+```text
+enroll agent
+→ assign every required subject
+→ study and practice
+→ independently test each subject
+→ remediate and retest every failure
+→ pass every required subject and capstone
+→ graduate
+```
+
 After the generalist foundation graduates at the required standard, COS specialist assistants may pursue deeper **Master's** and **PhD/research-level** programs in selected subjects.
 
 Canonical topology:

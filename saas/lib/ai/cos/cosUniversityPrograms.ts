@@ -55,6 +55,51 @@ export type CosUniversityProgramTimingStatus =
   | 'target_date_passed'
   | 'deadline_expired'
 
+export type CosUniversityCurriculumAssignment<SubjectId extends string = string> = Readonly<{
+  agentId: string
+  programKey: string
+  requiredSubjectIds: readonly SubjectId[]
+  semantics: 'every_enrolled_agent_must_pass_every_required_subject'
+}>
+
+/** Enrollment assigns the curriculum. Academic weakness causes remediation, never learner rejection. */
+export function assignCosUniversityCurriculum<SubjectId extends string>(args: {
+  agentId: string
+  enrollment: CosUniversityProgramEnrollment
+  requiredSubjectIds: readonly SubjectId[]
+}): CosUniversityCurriculumAssignment<SubjectId> {
+  const agentId = String(args.agentId || '').trim()
+  if (!agentId) throw new Error('University curriculum assignment requires an enrolled agent.')
+  if (!args.enrollment.programKey.trim()) throw new Error('University curriculum assignment requires a program enrollment.')
+  const requiredSubjectIds = [...new Set(args.requiredSubjectIds)]
+  if (requiredSubjectIds.length === 0) throw new Error('University curriculum must contain required subjects.')
+  return Object.freeze({
+    agentId,
+    programKey: args.enrollment.programKey,
+    requiredSubjectIds: Object.freeze(requiredSubjectIds),
+    semantics: 'every_enrolled_agent_must_pass_every_required_subject',
+  })
+}
+
+export function evaluateCosUniversitySubjectCompletion<SubjectId extends string>(args: {
+  assignment: CosUniversityCurriculumAssignment<SubjectId>
+  passedSubjectIds: readonly SubjectId[]
+}): Readonly<{
+  complete: boolean
+  remediationRequired: boolean
+  remainingSubjectIds: readonly SubjectId[]
+  disqualified: false
+}> {
+  const passed = new Set(args.passedSubjectIds)
+  const remainingSubjectIds = args.assignment.requiredSubjectIds.filter(id => !passed.has(id))
+  return Object.freeze({
+    complete: remainingSubjectIds.length === 0,
+    remediationRequired: remainingSubjectIds.length > 0,
+    remainingSubjectIds: Object.freeze(remainingSubjectIds),
+    disqualified: false,
+  })
+}
+
 function validTime(value: string): number | null {
   const parsed = Date.parse(String(value || ''))
   return Number.isFinite(parsed) ? parsed : null

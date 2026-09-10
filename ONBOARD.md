@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.84
+**Version:** 1.85
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -14,6 +14,14 @@
 ## COS University owner-directed study bridge — 2026-09-10
 
 Newly admitted owner-fed books, articles, video transcripts, documentation, and notes are attached to durable COS University study plans and receive non-credit study proof. Duplicate or rejected chunks do not manufacture a new attempt. The owner dashboard reports whether University recording succeeded. This bridge never writes assessment evidence or awards a grade; unseen transfer and delayed-retention gates remain independent.
+
+## COS University enrollment contract — 2026-09-10
+
+Every AI agent may enroll without first proving that it is a qualified learner. Enrollment assigns
+the program's required curriculum. The agent graduates only after passing every required subject
+and the remaining graduation gates. A subject failure triggers remediation and re-examination; it
+never disqualifies the enrolled agent from learning. Fine-tuning readiness applies to a governed
+training method or model artifact, not to the agent's right to attend the University.
 
 ---
 

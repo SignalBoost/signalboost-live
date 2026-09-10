@@ -1,19 +1,18 @@
 'use client'
 
 // saas/components/audit/ActivityReport.tsx
-// Audit Log & Activity Timeline — presentational. Recorded actions, actors, and
-// results from the Hub audit log. Informational (no readiness score). Labels
-// resolve through t('audit.activity.*').
-// Styling: inline fathom-glass, matching the other audit reports.
+// Owner evidence & activity timeline — presents both historical audit events and
+// live autonomous task evidence from Self-Healing/Audit in one read-only surface.
 
 import type { CSSProperties, ReactNode } from 'react'
 import { useTranslation } from '@/components/i18n/useTranslation'
 import { interpolate } from '@/lib/i18n/interpolate'
 const GOLD = '#ffc300'
-const CYAN = '#1af0ff'
 const RED = '#fca5a5'
 const ORANGE = '#fb923c'
 const GREEN = '#86efac'
+const CYAN = '#67e8f9'
+const PURPLE = '#c4b5fd'
 const GREY = 'rgba(255,255,255,.45)'
 
 const glass: CSSProperties = {
@@ -24,6 +23,7 @@ const glass: CSSProperties = {
 
 const STATUS_COLOR: Record<string, string> = {
   success: GREEN, failure: RED, error: RED, config_error: RED, blocked: ORANGE, denied: ORANGE,
+  queued: PURPLE, running: CYAN, testing: GOLD, verifying: CYAN,
 }
 
 export type ActivityReportView = {
@@ -31,7 +31,7 @@ export type ActivityReportView = {
   events: { id: string; createdAt: string; actor: string; action: string; status: string; target: string; message: string }[]
   summary: {
     total: number; success: number; failure: number; blocked: number
-    denied: number; error: number; configError: number; actors: number
+    denied: number; error: number; configError: number; active: number; actors: number
     since: string; until: string
   }
 }
@@ -56,21 +56,20 @@ export default function ActivityReport({ data }: { data: ActivityReportView }) {
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, letterSpacing: '-0.01em' }}>
           {t('audit.activity.title', "Audit Log & Activity Timeline")} <span style={{ color: GOLD }}>·</span>
         </h1>
-        <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 640, lineHeight: 1.5 }}>
-          {t('audit.activity.subtitle', "Recorded actions, actors, and results from the Hub audit log.")}
+        <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 760, lineHeight: 1.5 }}>
+          {t('audit.activity.subtitle', "Recorded actions, actors, and results from the Hub audit log.")} Self-Healing work appears here with its current stage and durable PR / merge evidence when available.
         </p>
       </div>
 
-      {/* Summary stats */}
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
         <Stat label={t('audit.activity.summary.total', "Events")} value={s.total} />
+        <Stat label="Active" value={s.active || 0} color={s.active ? CYAN : undefined} />
         <Stat label={t('audit.activity.summary.success', "Succeeded")} value={s.success} color={s.success ? GREEN : undefined} />
         <Stat label={t('audit.activity.summary.failures', "Failures")} value={failures} color={failures ? RED : undefined} />
         <Stat label={t('audit.activity.summary.denials', "Blocked / denied")} value={denials} color={denials ? ORANGE : undefined} />
         <Stat label={t('audit.activity.summary.actors', "Actors")} value={s.actors} />
       </section>
 
-      {/* Window */}
       <section style={{ ...glass, padding: 16, marginBottom: 16 }}>
         <span style={{ fontSize: 12, color: 'rgba(255,255,255,.6)' }}>
           {tt("audit.activity.window", "Showing {n} most recent events · {since} → {until}", {
@@ -79,7 +78,6 @@ export default function ActivityReport({ data }: { data: ActivityReportView }) {
         </span>
       </section>
 
-      {/* Timeline table */}
       <section style={{ ...glass, padding: 20 }}>
         {data.events.length === 0 ? (
           <div style={{ fontSize: 13, color: GREY }}>{t('audit.activity.empty', "No audit events recorded yet.")}</div>

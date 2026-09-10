@@ -11,7 +11,7 @@ import {
   type CosUniversityStudyStrategy,
 } from './cosUniversityStudyStrategy.ts'
 
-const AGENT_ID = 'cos'
+const DEFAULT_AGENT_ID = 'cos'
 const SOURCE_KIND = 'recertification'
 const PLAN_SELECT_FIELDS = 'id,plan_key,subject_id,language_code,language_dimension,failure_class,source_kind,objective,priority,methods,acquisition_source_kinds,fine_tune_candidate,status' as const
 
@@ -115,7 +115,7 @@ function failureIsFresh(row: FailedExamRow, target: CosUniversityExamTarget, now
  * drive remediation. A newer pass supersedes every older failure; an expired latest failure is also
  * retired instead of permanently occupying the bounded University study window.
  */
-async function loadCurrentFailedExams(limit: number, now: Date): Promise<{
+async function loadCurrentFailedExams(agentId: string, limit: number, now: Date): Promise<{
   failures: FailedExamRow[]
   supersededFailureIds: string[]
 }> {
@@ -124,6 +124,7 @@ async function loadCurrentFailedExams(limit: number, now: Date): Promise<{
   const result = await db.from('cos_university_exam_runs')
     .select('id,target_kind,subject_id,language_code,language_dimension,status,completed_at')
     .in('status', ['passed', 'failed'])
+    .eq('agent_id', agentId)
     .order('completed_at', { ascending: false })
     .limit(Math.max(50, Math.min(500, limit * 30)))
   if (result.error) throw result.error
@@ -157,14 +158,14 @@ async function loadCurrentFailedExams(limit: number, now: Date): Promise<{
   return { failures, supersededFailureIds: [...new Set(supersededFailureIds)] }
 }
 
-async function supersedeResolvedFailurePlans(failureIds: string[]): Promise<number> {
+async function supersedeResolvedFailurePlans(agentId: string, failureIds: string[]): Promise<number> {
   if (!failureIds.length) return 0
   const db = cosServiceDb()
   if (!db) return 0
   const now = new Date().toISOString()
   const result = await db.from('cos_university_study_plans')
     .update({ status: 'superseded', updated_at: now, last_seen_at: now })
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('source_kind', SOURCE_KIND)
     .in('source_ref', failureIds)
     .in('status', ['queued', 'studying', 'ready_for_exam'])
@@ -173,14 +174,14 @@ async function supersedeResolvedFailurePlans(failureIds: string[]): Promise<numb
   return (result.data || []).length
 }
 
-async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; strategy: CosUniversityStudyStrategy } | null> {
+async function persistPlan(agentId: string, failure: FailedExamRow): Promise<{ row: PlanRow; strategy: CosUniversityStudyStrategy } | null> {
   const db = cosServiceDb()
   if (!db) return null
   const isLanguage = failure.target_kind === 'language' && failure.language_code && failure.language_dimension
   const subjectId: CosUniversitySubjectId = isLanguage ? 'language_communication' : failure.subject_id || 'reasoning_decision_science'
   const baseStrategy = selectCosUniversityStudyStrategy({ failureClass: isLanguage ? 'language' : 'unknown', repeatedFailures: 1, independentRetestFailures: 1 })
   const strategy = isLanguage ? baseStrategy : withGovernedPublicWebForSubjectExamRemediation(baseStrategy)
-  const planKey = key(['independent_exam_failure', failure.id, subjectId, failure.language_code || '', failure.language_dimension || ''])
+  const planKey = key(['independent_exam_failure', agentId, failure.id, subjectId, failure.language_code || '', failure.language_dimension || ''])
   const objective = isLanguage
     ? `Remediate the weakness demonstrated by a fresh independent unseen ${failure.language_code} ${String(failure.language_dimension).replaceAll('_', ' ')} examination. Study and practice the competency broadly without access to the hidden exam rubric, then prove improvement on a new independent case.`
     : `Remediate the weakness demonstrated by a fresh independent unseen ${cosUniversitySubjectById(subjectId).title} examination. Study the subject broadly, use deliberate practice, preserve examiner isolation, and prove improvement on a new independent case.`
@@ -190,7 +191,7 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
   const now = new Date().toISOString()
   const insert = await db.from('cos_university_study_plans').upsert({
     plan_key: planKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     subject_id: subjectId,
     language_code: isLanguage ? failure.language_code : null,
     language_dimension: isLanguage ? failure.language_dimension : null,
@@ -219,6 +220,7 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
 
   const result = await db.from('cos_university_study_plans')
     .select(PLAN_SELECT_FIELDS)
+    .eq('agent_id', agentId)
     .eq('plan_key', planKey)
     .maybeSingle()
   if (result.error) throw result.error
@@ -246,20 +248,23 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
 }
 
 export async function ensureCosUniversityExamFailureRemediationPlans(options: {
+  agentId?: string
   maxPlans?: number
   now?: Date
 } = {}): Promise<CosUniversityExamRemediationSummary> {
+  const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
+  if (!agentId) throw new Error('agent_id_required')
   const maxPlans = Math.max(1, Math.min(8, Math.floor(options.maxPlans || 4)))
   const now = options.now instanceof Date ? options.now : new Date()
-  const reconciliation = await loadCurrentFailedExams(maxPlans * 3, now)
-  const supersededPlans = await supersedeResolvedFailurePlans(reconciliation.supersededFailureIds)
+  const reconciliation = await loadCurrentFailedExams(agentId, maxPlans * 3, now)
+  const supersededPlans = await supersedeResolvedFailurePlans(agentId, reconciliation.supersededFailureIds)
   const failures = reconciliation.failures
   const activePlans: CosUniversityExamRemediationPlan[] = []
   const gapSignals: KnowledgeGapSignal[] = []
 
   for (const failure of failures) {
     if (activePlans.length >= maxPlans) break
-    const persisted = await persistPlan(failure)
+    const persisted = await persistPlan(agentId, failure)
     if (!persisted) continue
     const { row, strategy } = persisted
     activePlans.push({

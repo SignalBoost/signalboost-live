@@ -23,7 +23,7 @@ export type SecurityAction =
   | 'verify.defensive'
   | 'verify.retest'
 
-export type SecurityTargetKind = 'host' | 'domain' | 'ip' | 'cidr'
+export type SecurityTargetKind = 'host' | 'domain' | 'ip' | 'cidr' | 'repository'
 
 export interface SecurityTarget {
   kind: SecurityTargetKind
@@ -98,7 +98,7 @@ const KNOWN_POSTURES: readonly SecurityPosture[] = Object.freeze([
   'privileged-insider',
 ])
 
-const TARGET_KINDS: readonly SecurityTargetKind[] = Object.freeze(['host', 'domain', 'ip', 'cidr'])
+const TARGET_KINDS: readonly SecurityTargetKind[] = Object.freeze(['host', 'domain', 'ip', 'cidr', 'repository'])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -129,6 +129,14 @@ function isValidIpv4Cidr(value: string): boolean {
   return Number.isInteger(prefix) && prefix >= 0 && prefix <= 32
 }
 
+function isValidRepositoryName(value: string): boolean {
+  const normalized = value.trim()
+  if (normalized.startsWith('/') || normalized.endsWith('/') || normalized.includes('//')) return false
+  const parts = normalized.split('/')
+  if (parts.length !== 2) return false
+  return parts.every(part => /^[A-Za-z0-9_.-]{1,100}$/.test(part) && part !== '.' && part !== '..')
+}
+
 function validateTarget(value: unknown, index: number, issues: string[]): void {
   if (!isRecord(value)) {
     issues.push(`targets[${index}]:invalid_target`)
@@ -148,6 +156,7 @@ function validateTarget(value: unknown, index: number, issues: string[]): void {
   if ((kind === 'host' || kind === 'domain') && !isValidHostname(target)) issues.push(`targets[${index}].value:invalid_hostname`)
   if (kind === 'ip' && isIP(target) === 0) issues.push(`targets[${index}].value:invalid_ip`)
   if (kind === 'cidr' && !isValidIpv4Cidr(target)) issues.push(`targets[${index}].value:unsupported_or_invalid_cidr`)
+  if (kind === 'repository' && !isValidRepositoryName(target)) issues.push(`targets[${index}].value:invalid_repository`)
 }
 
 function validateStringList(value: unknown, field: string, issues: string[]): void {

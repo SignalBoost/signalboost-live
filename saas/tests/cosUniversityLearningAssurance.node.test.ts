@@ -75,9 +75,21 @@ test('assurance registry covers every scheduled University route explicitly', ()
     '/api/cron/cos-university-phd-methodology-exam': 'phd_methodology_exams',
     '/api/cron/cos-university-phd-research': 'phd_research',
     '/api/cron/cos-university-phd-progress': 'phd_progress',
+    '/api/cron/cos-university-fine-tuning': 'controlled_fine_tuning',
   }
   assert.deepEqual(scheduled.filter((route: string) => !pathByRoute[route]), [])
   for (const route of scheduled) assert.ok(pathByRoute[route] in COS_UNIVERSITY_FEATURE_GATED_PATHS)
+})
+
+test('every scheduled University route records a Production path receipt', () => {
+  const vercel = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'))
+  const scheduled = vercel.crons
+    .map((entry: { path: string }) => entry.path)
+    .filter((route: string) => route.includes('/cos-university-'))
+  for (const route of scheduled) {
+    const source = fs.readFileSync(path.join(ROOT, 'app', ...route.slice(1).split('/'), 'route.ts'), 'utf8')
+    assert.match(source, /recordCosUniversityProductionPath\s*\(/, `${route} must write a Production receipt`)
+  }
 })
 
 test('real-world promotion requires retention, transfer and an improved production outcome', () => {

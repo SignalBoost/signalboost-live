@@ -56,6 +56,8 @@ test('University remediation can rotate discovery focus without changing the cur
 
   assert.equal(base.missingFacts?.[0], 'writing and editing')
   assert.equal(next.missingFacts?.[0], 'multilingual communication')
+  assert.match(base.discoveryQuery || '', /^writing and editing multilingual communication/i)
+  assert.match(next.discoveryQuery || '', /^multilingual communication rhetoric and explanation/i)
   assert.deepEqual(new Set(next.missingFacts), new Set(base.missingFacts))
   assert.equal(next.taskId, base.taskId)
   assert.equal(next.capability, base.capability)
@@ -63,7 +65,7 @@ test('University remediation can rotate discovery focus without changing the cur
 
 test('bounded scholarly discovery receives canonical curriculum content before generic remediation wording', () => {
   const { gap } = physicsGap()
-  const query = `${gap.subject} ${gap.question}`
+  const query = gap.discoveryQuery || `${gap.subject} ${gap.question}`
   const boundedPrefix = query.split(/\s+/).filter(Boolean).slice(0, 10).join(' ')
   assert.match(boundedPrefix, /physics and mechanics/i)
   assert.doesNotMatch(boundedPrefix, /verified knowledge/i)
@@ -71,7 +73,7 @@ test('bounded scholarly discovery receives canonical curriculum content before g
 
   const connectors = file('lib/cos-core/layers/learning/connectors.ts')
   const publicClients = file('lib/cos-core/layers/learning/publicClients.ts')
-  assert.match(connectors, /\[gap\.subject,gap\.question\]\.filter\(Boolean\)\.join\(' '\)\.trim\(\)/)
+  assert.match(connectors, /gap\.discoveryQuery\?\.trim\(\)\|\|\[gap\.subject,gap\.question\]\.filter\(Boolean\)\.join\(' '\)\.trim\(\)/)
   assert.match(publicClients, /function compactQuery\(query:string,maxTerms=10\)/)
   assert.match(publicClients, /crossrefScientificSearch:[^\n]+compactQuery\(query\)/)
   assert.match(publicClients, /compactQuery\(query,8\)/)

@@ -354,6 +354,7 @@ export function universityStudyGapSignal(input: {
     subject: subject.title,
     capability: `cos_university.${input.subjectId}`,
     objective: input.objective,
+    discoveryQuery: [...rotatedThemes.slice(0, 2), subject.title].join(' '),
     confidence: 0,
     escalated: true,
     succeeded: false,

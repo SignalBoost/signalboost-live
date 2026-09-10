@@ -432,6 +432,26 @@ A previously earned A can become stale or weakened when evidence shows performan
 
 # Implementation principles
 
+## Hybrid machine-adapted learning
+
+The University must select the learning approach according to the competency, evidence, and
+outcome—not force every lesson through RAG. Its governed curriculum includes supervised,
+unsupervised, semi-supervised, self-supervised, reinforcement/verified-feedback, retrieval-
+augmented learning, and controlled fine-tuning candidacy. It must learn from structured,
+semi-structured, and unstructured material.
+
+RAG is appropriate for attributable static, historical, private, or durable facts. It is not proof
+of procedural skill or reasoning. Known-answer instruction uses supervised evidence; partially
+labeled corpora may use semi-supervised discovery; pattern discovery may use unsupervised methods;
+raw material may support self-supervised representation; and verified task outcomes supply
+feedback. Fine-tuning remains a separately governed candidate after repeated independently proven
+failure, never an automatic response to ingestion.
+
+Every study plan records its selected paradigms and data structures. Learning promotion requires a
+pre-study baseline, improved post-study comprehension, unseen transfer, practical execution,
+delayed retention, verified source attribution, and independent scoring. Exposure, retrieval,
+embedding, or self-report alone cannot satisfy this contract.
+
 Build this incrementally on the existing COS learning, certification, failure-autopsy, specialist, outcome-correlation, and blind-evaluation architecture. Do not create a disconnected second brain or parallel learning database unless the existing architecture is objectively insufficient.
 
 Preferred progression:

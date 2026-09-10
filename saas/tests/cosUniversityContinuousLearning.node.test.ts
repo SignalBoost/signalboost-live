@@ -11,6 +11,7 @@ import {
 import { academicStateFromRows } from '../lib/ai/cos/cosUniversityAcademicState.ts'
 import { buildCosUniversityTranscript } from '../lib/ai/cos/cosUniversity.ts'
 import { buildCosPlatformLanguageTranscript } from '../lib/ai/cos/cosUniversityLanguages.ts'
+import { evaluateCosUniversityLearning } from '../lib/ai/cos/cosUniversityHybridLearning.ts'
 
 const file = (relative: string) => readFileSync(new URL(relative, import.meta.url), 'utf8')
 
@@ -44,6 +45,48 @@ test('fine-tuning is only a candidate after repeated independently verified fail
   assert.equal(repeated.fineTuneCandidate, true)
   const fineTune = repeated.methods.find(method => method.id === 'fine_tune_candidate')
   assert.equal(fineTune?.execution, 'candidate_only')
+})
+
+test('University uses all machine-adapted learning paradigms across appropriate study cases', () => {
+  const cases = [
+    'retrieval', 'evidence_selection', 'grounding', 'stale_or_missing_knowledge', 'reasoning',
+    'calibration', 'tool_execution', 'language', 'cross_domain', 'retention', 'unknown',
+  ] as const
+  const paradigms = new Set(cases.flatMap(failureClass =>
+    selectCosUniversityStudyStrategy({ failureClass }).learningDesign.paradigms))
+  assert.deepEqual([...paradigms].sort(), [
+    'reinforcement_feedback', 'retrieval_augmented', 'self_supervised', 'semi_supervised',
+    'supervised', 'unsupervised',
+  ])
+
+  const fineTune = selectCosUniversityStudyStrategy({
+    failureClass: 'reasoning', repeatedFailures: 3, independentRetestFailures: 2,
+  })
+  assert.ok(fineTune.learningDesign.paradigms.includes('fine_tune_candidate'))
+})
+
+test('University learns across structured, semi-structured, and unstructured material', () => {
+  const design = selectCosUniversityStudyStrategy({ failureClass: 'retrieval' }).learningDesign
+  assert.deepEqual([...design.dataStructures].sort(), ['semi_structured', 'structured', 'unstructured'])
+  assert.equal(design.promotionRule, 'independent_improvement_and_transfer_required')
+})
+
+test('exposure is not learning: promotion requires measured gain, transfer, execution, retention and attribution', () => {
+  const incomplete = evaluateCosUniversityLearning({
+    baselineScore: 40, postStudyScore: 80, passedUnseenTransfer: true,
+    passedPracticalExecution: true, passedDelayedRetention: false,
+    verifiedSourceAttribution: true, independentScorer: true,
+  })
+  assert.equal(incomplete.normalizedGain, 2 / 3)
+  assert.equal(incomplete.promotionEligible, false)
+  assert.deepEqual(incomplete.missing, ['delayed_retention'])
+
+  const learned = evaluateCosUniversityLearning({
+    baselineScore: 40, postStudyScore: 80, passedUnseenTransfer: true,
+    passedPracticalExecution: true, passedDelayedRetention: true,
+    verifiedSourceAttribution: true, independentScorer: true,
+  })
+  assert.equal(learned.promotionEligible, true)
 })
 
 test('five platform languages are detectable as independent study targets', () => {
@@ -112,6 +155,9 @@ test('University gap signal carries the strategist source restriction', () => {
     strategy,
   })
   assert.deepEqual(signal.sourceKinds, ['official_documentation', 'library_material'])
+  assert.ok(signal.evidence.includes('learning_paradigm=supervised'))
+  assert.ok(signal.evidence.includes('data_structure=structured'))
+  assert.ok(signal.evidence.includes('learning_promotion=independent_improvement_and_transfer_required'))
 })
 
 test('gap generation and learning cycle preserve and enforce method-specific source classes', () => {

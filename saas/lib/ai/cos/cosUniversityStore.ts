@@ -96,6 +96,7 @@ export type CosUniversityPlanningCycleSummary = {
     priority: number
     methods: CosUniversityStudyStrategy['methods']
     acquisitionSourceKinds: CosUniversityStudyStrategy['acquisitionSourceKinds']
+    learningDesign: CosUniversityStudyStrategy['learningDesign']
     fineTuneCandidate: boolean
   }>
   gapSignals: KnowledgeGapSignal[]
@@ -415,7 +416,7 @@ async function persistStudyPlan(candidate: PlanCandidate, now: string): Promise<
     fine_tune_candidate: candidate.strategy.fineTuneCandidate,
     priority: candidate.priority,
     status: 'queued',
-    evidence: candidate.evidence,
+    evidence: { ...candidate.evidence, learningDesign: candidate.strategy.learningDesign },
     last_seen_at: now,
     updated_at: now,
   }, { onConflict: 'plan_key', ignoreDuplicates: true })
@@ -513,6 +514,7 @@ export async function runCosUniversityPlanningCycle(options: {
         priority: candidate.priority,
         methods: candidate.strategy.methods,
         acquisitionSourceKinds: candidate.strategy.acquisitionSourceKinds,
+        learningDesign: candidate.strategy.learningDesign,
         fineTuneCandidate: candidate.strategy.fineTuneCandidate,
       })
 

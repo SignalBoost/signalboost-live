@@ -13,6 +13,10 @@ import {
   type CosPlatformLanguageDimension,
   type CosPlatformLanguageTranscriptEntry,
 } from './cosUniversityLanguages.ts'
+import {
+  cosUniversityHybridLearningDesign,
+  type CosUniversityHybridLearningDesign,
+} from './cosUniversityHybridLearning.ts'
 
 export type CosUniversityFailureClass =
   | 'retrieval'
@@ -57,6 +61,7 @@ export type CosUniversityStudyStrategy = {
   acquisitionSourceKinds: ContinuousLearningSourceKind[]
   fineTuneCandidate: boolean
   requiresIndependentRetest: true
+  learningDesign: CosUniversityHybridLearningDesign
 }
 
 const RAG_SOURCE_KINDS: ContinuousLearningSourceKind[] = [
@@ -258,12 +263,18 @@ export function selectCosUniversityStudyStrategy(input: {
     ))
   }
 
+  const sourceKinds = uniqueKinds(acquisitionSourceKinds)
   return {
     failureClass: input.failureClass,
     methods,
-    acquisitionSourceKinds: uniqueKinds(acquisitionSourceKinds),
+    acquisitionSourceKinds: sourceKinds,
     fineTuneCandidate,
     requiresIndependentRetest: true,
+    learningDesign: cosUniversityHybridLearningDesign({
+      failureClass: input.failureClass,
+      sourceKinds,
+      fineTuneCandidate,
+    }),
   }
 }
 
@@ -348,6 +359,9 @@ export function universityStudyGapSignal(input: {
       `university_subject=${input.subjectId}`,
       `failure_class=${input.failureClass}`,
       ...input.strategy.methods.map(item => `study_method=${item.id}:${item.execution}`),
+      ...input.strategy.learningDesign.paradigms.map(item => `learning_paradigm=${item}`),
+      ...input.strategy.learningDesign.dataStructures.map(item => `data_structure=${item}`),
+      `learning_promotion=${input.strategy.learningDesign.promotionRule}`,
       ...(input.evidence || []),
     ],
     sourceKinds: input.strategy.acquisitionSourceKinds,

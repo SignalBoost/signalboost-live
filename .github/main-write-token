@@ -1,2 +1,2 @@
 base_sha=9bd10bfb2cacf9f3e73393feae2e105c0bed48fd
-branch=feat/security-referee-control-plane-20260910
+branch=fix/audit-approval-race-20260910

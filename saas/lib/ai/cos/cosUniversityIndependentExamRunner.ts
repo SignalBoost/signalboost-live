@@ -62,7 +62,7 @@ type ExamRunRow = {
   latency_ms: number | null
 }
 
-type ReadyStudyPlan = { id: string; target: CosUniversityExamTarget }
+type ReadyStudyPlan = { id: string; attemptCount: number; target: CosUniversityExamTarget }
 
 function targetKey(target: CosUniversityExamTarget): string {
   return target.kind === 'subject'
@@ -94,7 +94,7 @@ async function loadReadyStudyPlans(agentId: string, limit: number): Promise<Read
   const db = cosServiceDb()
   if (!db) return []
   const result = await db.from('cos_university_study_plans')
-    .select('id,subject_id,language_code,language_dimension')
+    .select('id,attempt_count,subject_id,language_code,language_dimension')
     .eq('agent_id', agentId)
     .eq('status', 'ready_for_exam')
     .order('updated_at', { ascending: true })
@@ -103,9 +103,9 @@ async function loadReadyStudyPlans(agentId: string, limit: number): Promise<Read
   const plans: ReadyStudyPlan[] = []
   for (const row of result.data || []) {
     if (row.language_code && row.language_dimension) {
-      plans.push({ id: row.id, target: { kind: 'language', language: row.language_code as CosPlatformLanguage, dimension: row.language_dimension as CosPlatformLanguageDimension } })
+      plans.push({ id: row.id, attemptCount: Number(row.attempt_count || 0), target: { kind: 'language', language: row.language_code as CosPlatformLanguage, dimension: row.language_dimension as CosPlatformLanguageDimension } })
     } else if (row.subject_id) {
-      plans.push({ id: row.id, target: { kind: 'subject', subjectId: row.subject_id as CosUniversitySubjectId } })
+      plans.push({ id: row.id, attemptCount: Number(row.attempt_count || 0), target: { kind: 'subject', subjectId: row.subject_id as CosUniversitySubjectId } })
     }
   }
   return plans
@@ -137,10 +137,11 @@ async function findRun(runKey: string): Promise<ExamRunRow | null> {
   return (result.data || null) as ExamRunRow | null
 }
 
-async function createOrFindRun(agentId: string, target: CosUniversityExamTarget, now: Date): Promise<ExamRunRow | null> {
+async function createOrFindRun(agentId: string, target: CosUniversityExamTarget, now: Date, readyPlan?: Pick<ReadyStudyPlan, 'id' | 'attemptCount'>): Promise<ExamRunRow | null> {
   const db = cosServiceDb()
   if (!db) return null
-  const runKey = `${COS_UNIVERSITY_EXAM_PROFILE}:${agentId}:${dayKey(now)}:${targetKey(target)}`
+  const remediationAttempt = readyPlan ? `:plan:${readyPlan.id}:study-attempt:${readyPlan.attemptCount}` : ''
+  const runKey = `${COS_UNIVERSITY_EXAM_PROFILE}:${agentId}:${dayKey(now)}:${targetKey(target)}${remediationAttempt}`
   const existing = await findRun(runKey)
   if (existing) return existing
 
@@ -325,8 +326,8 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
   }
 }
 
-async function runTarget(agentId: string, target: CosUniversityExamTarget, now: Date): Promise<CosUniversityExamRunSummary> {
-  const row = await createOrFindRun(agentId, target, now)
+async function runTarget(agentId: string, target: CosUniversityExamTarget, now: Date, readyPlan?: ReadyStudyPlan): Promise<CosUniversityExamRunSummary> {
+  const row = await createOrFindRun(agentId, target, now, readyPlan)
   if (!row) return { runId: null, target, status: 'error', passed: null, assessmentRecorded: false, manifestHash: null, reasons: ['service_database_unavailable'], latencyMs: null }
   const canonicalTarget = targetFromRun(row) || target
   if (row.status === 'passed' || row.status === 'failed') {
@@ -377,9 +378,10 @@ export async function runCosUniversityIndependentExamBatch(options: {
   const runs: CosUniversityExamRunSummary[] = []
   for (const [index, target] of targets.entries()) {
     try {
-      const run = await runTarget(agentId, target, now)
+      const readyPlan = options.readyStudyPlansOnly ? readyPlans[index] : undefined
+      const run = await runTarget(agentId, target, now, readyPlan)
       runs.push(run)
-      if (options.readyStudyPlansOnly && readyPlans[index]) await reconcileReadyStudyPlan(readyPlans[index].id, run)
+      if (readyPlan) await reconcileReadyStudyPlan(readyPlan.id, run)
     } catch (error) {
       errors.push(`${targetKey(target)}:${error instanceof Error ? error.message : String(error)}`)
     }

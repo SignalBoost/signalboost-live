@@ -434,7 +434,22 @@ async function persistStudyPlan(candidate: PlanCandidate, now: string, agentId =
     .eq('plan_key', scopedPlanKey)
     .maybeSingle()
   if (result.error) throw result.error
-  return (result.data || null) as CosUniversityStudyPlanRow | null
+  const row = (result.data || null) as CosUniversityStudyPlanRow | null
+  if (!row || row.status !== 'superseded') return row
+
+  // A failed independent exam supersedes only that completed study round. If the academic planner
+  // still selects the same unresolved gap, reopen the durable plan for another evidence-bearing
+  // study attempt. The incremented attempt_count later gives its re-exam a fresh, idempotent key.
+  const reopened = await db.from('cos_university_study_plans').update({
+    status: 'queued',
+    completed_at: null,
+    last_seen_at: now,
+    updated_at: now,
+  }).eq('id', row.id).eq('status', 'superseded')
+    .select('id,plan_key,subject_id,language_code,language_dimension,failure_class,target_grade,source_kind,source_ref,problem_class,objective,methods,acquisition_source_kinds,fine_tune_candidate,priority,status,attempt_count,last_seen_at,last_attempt_at,created_at,updated_at')
+    .maybeSingle()
+  if (reopened.error) throw reopened.error
+  return (reopened.data || row) as CosUniversityStudyPlanRow
 }
 
 export type OwnerDirectedUniversityStudyInput = Readonly<{

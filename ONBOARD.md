@@ -9,6 +9,14 @@
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
+## COS University post-remediation re-examination — 2026-09-10
+
+A failed independent exam now supersedes only the completed study round. If the academic planner
+still observes that unresolved gap, it reopens the durable plan for another evidence-bearing study
+attempt. Ready-plan exam keys include the plan identity and current study-attempt count, so a same-day
+post-remediation exam executes a fresh hidden assessment while retries of that exact round remain
+idempotent. This prevents a prior daily failure from being reused as the remediation result.
+
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
 
 ## COS University live Production-path verification — 2026-09-10

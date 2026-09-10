@@ -211,6 +211,12 @@ const GROUPS: NavGroup[] = [
       { icon: '🧩', labelKey: 'nav.providerHubStatus', fallbackLabel: uiText('generatedUi.u_9a955057059a488c'), href: '/dashboard/provider-hub', requiresOwner: true },
       { icon: '📚', labelKey: 'nav.portableCatalog', fallbackLabel: uiText('generatedUi.u_44a4613ddb65eac0'), href: '/dashboard/portable-products', requiresOwner: true },
       { icon: '📦', labelKey: 'nav.portableReadiness', fallbackLabel: uiText('generatedUi.u_627f029b2aaae158'), href: '/dashboard/portable-products/readiness', requiresOwner: true },
+      // Owner entry points for the three public tools. Same pages, but a signed-in
+      // owner is detected there and the lead-magnet hooks are suppressed, so running
+      // a scan on our own platform never creates a Marketing + Sales lead.
+      { icon: '🔎', labelKey: 'nav.ownerWebsiteOptimizer', fallbackLabel: uiText('generatedUi.u_34c6e246583a97cc'), href: '/website-optimizer', requiresOwner: true },
+      { icon: '🛡️', labelKey: 'nav.ownerCybersecurityCheck', fallbackLabel: uiText('generatedUi.u_324aca0b89853134'), href: '/cybersecurity-check', requiresOwner: true },
+      { icon: '📦', labelKey: 'nav.ownerRepoCheck', fallbackLabel: uiText('generatedUi.u_8651dc793a5300ac'), href: '/repo-check', requiresOwner: true },
       { icon: '📊', labelKey: 'nav.adminOverview', fallbackLabel: uiText('generatedUi.u_9ccfc43a0487068a'), href: '/admin/overview', requiresOwner: true },
       { icon: '💰', labelKey: 'nav.adminRevenue', fallbackLabel: uiText('generatedUi.u_8e2318e66508c35e'), href: '/admin/revenue', requiresOwner: true },
       { icon: '⚙️', labelKey: 'nav.adminSettings', fallbackLabel: uiText('generatedUi.u_1f87f883cc7e9c47'), href: '/admin/settings', requiresOwner: true },

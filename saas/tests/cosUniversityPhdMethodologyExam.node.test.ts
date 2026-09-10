@@ -10,6 +10,7 @@ import {
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
+const clean = (value: unknown) => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
 
 test('PhD methodology exam is seeded, reproducible, bounded, and methodology-focused', () => {
   const first = buildCosUniversityPhdMethodologyExam('seed-a', 'ai_systems_research')
@@ -19,14 +20,17 @@ test('PhD methodology exam is seeded, reproducible, bounded, and methodology-foc
   assert.notEqual(first.manifestHash, other.manifestHash)
   assert.match(first.prompt, /UNSEEN PHD RESEARCH METHODOLOGY EXAM/)
   assert.match(first.prompt, /Do not invent observations/)
+  assert.match(first.prompt, /Ground your analysis in this specific packet/)
   assert.deepEqual(first.rubric.requiredHeadings, ['Claim', 'Design', 'Threats', 'Test', 'Reproducibility'])
+  assert.equal(first.rubric.requiredPacketGroups.length, 5)
   assert.ok(first.rubric.maxWords <= 500)
 })
 
-test('host scorer requires fresh local provenance plus causal, validity, test, and reproducibility reasoning', () => {
+test('host scorer requires fresh local provenance plus packet-specific causal, validity, test, and reproducibility reasoning', () => {
   const exam = buildCosUniversityPhdMethodologyExam('seed-score', 'security_trust_research')
+  const packetEvidence = exam.rubric.requiredPacketGroups.map(group => group[0]).join('; ')
   const reply = [
-    'Claim: The observational association does not prove a causal effect; uncertainty remains.',
+    `Claim: For this packet (${packetEvidence}), the observational association does not prove a causal effect; uncertainty remains.`,
     'Design: Use a randomized comparison or justified control baseline with a falsifiable hypothesis and explicit prediction.',
     'Threats: Address confounding, selection bias, measurement drift, and instrument validity.',
     'Test: Preregister the hypothesis, operationalize each measure, specify the instrument, and define falsification criteria.',
@@ -50,6 +54,31 @@ test('host scorer requires fresh local provenance plus causal, validity, test, a
   })
   assert.equal(cached.passed, false)
   assert.ok(cached.reasons.includes('semantic_cache_used'))
+})
+
+test('generic keyword stuffing cannot earn PhD methodology evidence across unseen packets', () => {
+  const canned = [
+    'Claim: causal uncertain.',
+    'Design: confound control.',
+    'Threats: hypothesis selection bias.',
+    'Test: measure preregister falsifiable prediction.',
+    'Reproducibility: reproducible independent replication.',
+  ].join('\n')
+  for (const seed of ['packet-a', 'packet-b', 'packet-c']) {
+    const exam = buildCosUniversityPhdMethodologyExam(seed, 'ai_systems_research')
+    const score = scoreCosUniversityPhdMethodologyExam(exam, canned, {
+      localReasoning: true,
+      externalAi: false,
+      semanticCache: false,
+      handled: true,
+      turnId: `turn-${seed}`,
+    })
+    assert.equal(score.passed, false)
+    assert.ok(score.reasons.some(reason => reason.startsWith('packet_evidence_missing:')), score.reasons.join(','))
+    for (const group of exam.rubric.requiredPacketGroups) {
+      assert.ok(group.every(anchor => !clean(canned).includes(clean(anchor))))
+    }
+  }
 })
 
 test('examiner is a distinct host-controlled principal and candidate output cannot self-record academic evidence', () => {

@@ -157,12 +157,13 @@ async function finishContinuousSlot(
   if (result.error) throw result.error
 }
 
-async function loadEligiblePlanIds(planIds: string[], now: Date): Promise<Set<string>> {
+async function loadEligiblePlanIds(planIds: string[], now: Date, agentId: string): Promise<Set<string>> {
   if (!planIds.length) return new Set()
   const db = cosServiceDb()
   if (!db) return new Set()
   const result = await db.from('cos_university_study_plans')
     .select('id,status,last_attempt_at')
+    .eq('agent_id', agentId)
     .in('id', planIds)
   if (result.error) throw result.error
   const eligible = (result.data || [] as StudyPlanStateRow[])
@@ -212,11 +213,17 @@ export function universityStudyProofsFromAcceptedLearning(
  * weakening admission policy.
  */
 export async function runCosUniversityContinuousLearning(options: {
+  agentId?: string
   now?: Date
   maxStudyPlans?: number
 } = {}): Promise<CosUniversityContinuousLearningSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
-  const slotKey = cosUniversityContinuousSlotKey(now)
+  const agentId = String(options.agentId || 'cos').trim()
+  const baseSlotKey = cosUniversityContinuousSlotKey(now)
+  const slotKey = agentId === 'cos' ? baseSlotKey : `${baseSlotKey}:${agentId || 'invalid'}`
+  if (!/^[A-Za-z0-9._-]{1,180}$/.test(agentId)) {
+    return emptySummary({ enabled: true, claimed: false, slotKey, status: 'error', errors: ['valid_agent_id_required'] })
+  }
   if (process.env.COS_UNIVERSITY_CONTINUOUS_ENABLED !== 'true') {
     return emptySummary({ enabled: false, claimed: false, slotKey, status: 'disabled' })
   }
@@ -232,10 +239,10 @@ export async function runCosUniversityContinuousLearning(options: {
   const summary = emptySummary({ enabled: true, claimed: true, slotKey, status: 'idle' })
   const attemptedPlanIds: string[] = []
   try {
-    const remediation = await ensureCosUniversityExamFailureRemediationPlans({ maxPlans: 4 })
+    const remediation = await ensureCosUniversityExamFailureRemediationPlans({ agentId, maxPlans: 4 })
     summary.examFailuresPrioritized = remediation.activePlans.length
 
-    const planning = await runCosUniversityPlanningCycle({ now, maxPlans: 12 })
+    const planning = await runCosUniversityPlanningCycle({ now, agentId, maxPlans: 12 })
     summary.errors.push(...planning.errors)
 
     const activeById = new Map<string, (typeof planning.activePlans)[number]>()
@@ -251,7 +258,7 @@ export async function runCosUniversityContinuousLearning(options: {
       )
     summary.planned = activePlans.length
 
-    const eligibleIds = await loadEligiblePlanIds(activePlans.map(plan => plan.id), now)
+    const eligibleIds = await loadEligiblePlanIds(activePlans.map(plan => plan.id), now, agentId)
     const maxStudyPlans = Math.max(1, Math.min(6, Math.floor(options.maxStudyPlans || 4)))
     const eligiblePlans = activePlans.filter(plan => eligibleIds.has(plan.id)).slice(0, maxStudyPlans)
     summary.eligible = eligiblePlans.length
@@ -291,7 +298,7 @@ export async function runCosUniversityContinuousLearning(options: {
     summary.sourceErrors = result.sourceErrors
     summary.gapDiagnostics = result.gapDiagnostics
     const proofs = universityStudyProofsFromAcceptedLearning(eligiblePlans, signals, result.acceptedGapIds, now.toISOString())
-    attemptedPlanIds.push(...await recordAcceptedCosUniversityStudyAttempts(proofs, new Date()))
+    attemptedPlanIds.push(...await recordAcceptedCosUniversityStudyAttempts(proofs, new Date(), agentId))
     summary.plansAttempted = attemptedPlanIds.length
     summary.status = summary.plansAttempted > 0 ? 'learned' : 'idle'
     await finishContinuousSlot(claim.id, new Date(), summary, attemptedPlanIds)

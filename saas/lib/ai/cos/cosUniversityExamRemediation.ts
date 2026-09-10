@@ -11,12 +11,13 @@ import {
   type CosUniversityStudyStrategy,
 } from './cosUniversityStudyStrategy.ts'
 
-const AGENT_ID = 'cos'
+const DEFAULT_AGENT_ID = 'cos'
 const SOURCE_KIND = 'recertification'
 const PLAN_SELECT_FIELDS = 'id,plan_key,subject_id,language_code,language_dimension,failure_class,source_kind,objective,priority,methods,acquisition_source_kinds,fine_tune_candidate,status' as const
 
 type FailedExamRow = {
   id: string
+  run_key: string
   target_kind: 'subject' | 'language'
   subject_id: CosUniversitySubjectId | null
   language_code: CosPlatformLanguage | null
@@ -115,14 +116,15 @@ function failureIsFresh(row: FailedExamRow, target: CosUniversityExamTarget, now
  * drive remediation. A newer pass supersedes every older failure; an expired latest failure is also
  * retired instead of permanently occupying the bounded University study window.
  */
-async function loadCurrentFailedExams(limit: number, now: Date): Promise<{
+async function loadCurrentFailedExams(agentId: string, limit: number, now: Date): Promise<{
   failures: FailedExamRow[]
   supersededFailureIds: string[]
 }> {
   const db = cosServiceDb()
   if (!db) return { failures: [], supersededFailureIds: [] }
   const result = await db.from('cos_university_exam_runs')
-    .select('id,target_kind,subject_id,language_code,language_dimension,status,completed_at')
+    .select('id,run_key,target_kind,subject_id,language_code,language_dimension,status,completed_at')
+    .like('run_key', `%:${agentId}:%`)
     .in('status', ['passed', 'failed'])
     .order('completed_at', { ascending: false })
     .limit(Math.max(50, Math.min(500, limit * 30)))
@@ -157,14 +159,14 @@ async function loadCurrentFailedExams(limit: number, now: Date): Promise<{
   return { failures, supersededFailureIds: [...new Set(supersededFailureIds)] }
 }
 
-async function supersedeResolvedFailurePlans(failureIds: string[]): Promise<number> {
+async function supersedeResolvedFailurePlans(agentId: string, failureIds: string[]): Promise<number> {
   if (!failureIds.length) return 0
   const db = cosServiceDb()
   if (!db) return 0
   const now = new Date().toISOString()
   const result = await db.from('cos_university_study_plans')
     .update({ status: 'superseded', updated_at: now, last_seen_at: now })
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('source_kind', SOURCE_KIND)
     .in('source_ref', failureIds)
     .in('status', ['queued', 'studying', 'ready_for_exam'])
@@ -173,7 +175,7 @@ async function supersedeResolvedFailurePlans(failureIds: string[]): Promise<numb
   return (result.data || []).length
 }
 
-async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; strategy: CosUniversityStudyStrategy } | null> {
+async function persistPlan(agentId: string, failure: FailedExamRow): Promise<{ row: PlanRow; strategy: CosUniversityStudyStrategy } | null> {
   const db = cosServiceDb()
   if (!db) return null
   const isLanguage = failure.target_kind === 'language' && failure.language_code && failure.language_dimension
@@ -190,7 +192,7 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
   const now = new Date().toISOString()
   const insert = await db.from('cos_university_study_plans').upsert({
     plan_key: planKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     subject_id: subjectId,
     language_code: isLanguage ? failure.language_code : null,
     language_dimension: isLanguage ? failure.language_dimension : null,
@@ -246,20 +248,23 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
 }
 
 export async function ensureCosUniversityExamFailureRemediationPlans(options: {
+  agentId?: string
   maxPlans?: number
   now?: Date
 } = {}): Promise<CosUniversityExamRemediationSummary> {
   const maxPlans = Math.max(1, Math.min(8, Math.floor(options.maxPlans || 4)))
+  const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
+  if (!agentId) return { failuresConsidered: 0, supersededPlans: 0, activePlans: [], gapSignals: [] }
   const now = options.now instanceof Date ? options.now : new Date()
-  const reconciliation = await loadCurrentFailedExams(maxPlans * 3, now)
-  const supersededPlans = await supersedeResolvedFailurePlans(reconciliation.supersededFailureIds)
+  const reconciliation = await loadCurrentFailedExams(agentId, maxPlans * 3, now)
+  const supersededPlans = await supersedeResolvedFailurePlans(agentId, reconciliation.supersededFailureIds)
   const failures = reconciliation.failures
   const activePlans: CosUniversityExamRemediationPlan[] = []
   const gapSignals: KnowledgeGapSignal[] = []
 
   for (const failure of failures) {
     if (activePlans.length >= maxPlans) break
-    const persisted = await persistPlan(failure)
+    const persisted = await persistPlan(agentId, failure)
     if (!persisted) continue
     const { row, strategy } = persisted
     activePlans.push({

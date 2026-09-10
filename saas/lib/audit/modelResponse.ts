@@ -12,25 +12,19 @@ export interface ParsedAuditFinding {
 
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info']
 
-function normalizeJsonPayload(raw: string): string {
-  const trimmed = raw.trim()
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
-  return (fenced?.[1] || trimmed).trim()
-}
-
 export function parseAuditFindingsResponse(raw: string | null, file: string): ParsedAuditFinding[] {
   if (raw === null || !raw.trim()) throw new Error(`COS returned no Audit analysis for ${file}.`)
 
   let parsed: unknown
   try {
-    parsed = JSON.parse(normalizeJsonPayload(raw))
+    parsed = JSON.parse(raw.trim())
   } catch {
     throw new Error(`COS returned invalid Audit JSON for ${file}.`)
   }
 
   // The structured local-inference transport enforces a JSON object, so the
   // canonical response is { findings: [...] }. Keep legacy raw arrays readable
-  // for older stored/tests without weakening finding validation.
+  // for older stored/tests without weakening malformed-output validation.
   const findings = Array.isArray(parsed)
     ? parsed
     : parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray((parsed as Record<string, unknown>).findings)

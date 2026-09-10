@@ -3,10 +3,10 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.81  
-**Updated:** 2026-09-09  
-**Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)  
-**Canonical public product:** **iTMounts**  
+**Version:** 1.82
+**Updated:** 2026-09-10
+**Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
+**Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
@@ -481,6 +481,12 @@ Key rules:
 - verified specialist lessons should flow back to COS when generalizable;
 - authority and expertise remain separate axes;
 - A/A+ / Master's / PhD labels require independent evidence defined in `SKILLS.md`.
+- University study plans use an explicit hybrid machine-adapted learning design: supervised,
+  unsupervised, semi-supervised, self-supervised, reinforcement/verified-feedback, RAG where
+  appropriate, and controlled fine-tuning candidacy across structured, semi-structured, and
+  unstructured material;
+- promotion requires independently measured improvement, unseen transfer, practical execution,
+  delayed retention, and source attribution; exposure or embedding never counts as learning.
 
 Feed COS remains the normal owner learning intake. Material may be routed deeper to relevant specialists without requiring the owner to paste the same material into each worker.
 

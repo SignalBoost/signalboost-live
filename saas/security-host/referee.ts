@@ -74,6 +74,18 @@ function validHostname(value: string): boolean {
   ))
 }
 
+function normalizeRepository(value: string): string {
+  return String(value || '').trim().toLowerCase()
+}
+
+function validRepository(value: string): boolean {
+  const normalized = String(value || '').trim()
+  if (!normalized || normalized.length > 256 || normalized.startsWith('/') || normalized.endsWith('/') || normalized.includes('//')) return false
+  const parts = normalized.split('/')
+  if (parts.length !== 2) return false
+  return parts.every(part => /^[A-Za-z0-9_.-]{1,100}$/.test(part) && part !== '.' && part !== '..')
+}
+
 function ipv4ToInteger(value: string): number | null {
   if (isIP(value) !== 4) return null
   const parts = value.split('.').map(Number)
@@ -112,6 +124,7 @@ export function validSecurityActionTarget(target: SecurityTarget): boolean {
   if (target.kind === 'host' || target.kind === 'domain') return validHostname(value)
   if (target.kind === 'ip') return isIP(value) !== 0
   if (target.kind === 'cidr') return validIpv4Cidr(value)
+  if (target.kind === 'repository') return validRepository(value)
   return false
 }
 
@@ -134,6 +147,9 @@ export function securityTargetIsInScope(request: SecurityTarget, scopes: readonl
     }
     if (scope.kind === 'ip' && requestKind === 'ip') return exactIpMatch(requestValue, scopeValue)
     if (scope.kind === 'cidr' && requestKind === 'ip') return ipv4InCidr(requestValue, scopeValue)
+    if (scope.kind === 'repository' && requestKind === 'repository') {
+      return validRepository(scopeValue) && normalizeRepository(requestValue) === normalizeRepository(scopeValue)
+    }
     return false
   })
 }
@@ -152,7 +168,7 @@ function validHostState(state: SecurityHostState): boolean {
     && validCounter(state.distinctTargetsTouched)
 }
 
-const TARGET_KINDS: readonly SecurityTargetKind[] = Object.freeze(['host', 'domain', 'ip', 'cidr'])
+const TARGET_KINDS: readonly SecurityTargetKind[] = Object.freeze(['host', 'domain', 'ip', 'cidr', 'repository'])
 const KNOWN_ACTIONS: readonly SecurityAction[] = Object.freeze([
   ...actionsForSecurityRole('guardian'),
   ...actionsForSecurityRole('stranger').filter(action => !actionsForSecurityRole('guardian').includes(action)),

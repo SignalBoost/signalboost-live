@@ -9,6 +9,13 @@ import type { CosUniversitySubjectId } from './cosUniversity.ts'
 
 export const COS_UNIVERSITY_REAL_WORLD_OUTCOME_PROFILE = 'cos_university_real_world_outcome_v1'
 
+export type CosUniversityRealWorldOutcomeResult = Readonly<{
+  stored: boolean
+  inserted: boolean
+  promotionEligible: boolean
+  evidenceRef: string | null
+}>
+
 function cleanIdentity(value: string, label: string): string {
   const cleaned = String(value ?? '').trim().toLowerCase()
   if (!/^[a-z0-9][a-z0-9._-]{0,119}$/.test(cleaned)) throw new Error(`${label}_invalid`)
@@ -24,7 +31,7 @@ export async function recordCosUniversityRealWorldOutcome(input: {
   subjectId: CosUniversitySubjectId
   evidence: RealWorldLearningEvidence
   observedAt?: Date
-}): Promise<{ stored: boolean; inserted: boolean; promotionEligible: boolean; evidenceRef: string | null }> {
+}): Promise<CosUniversityRealWorldOutcomeResult> {
   const agentId = cleanIdentity(input.agentId, 'agent_id')
   const subjectId = cleanIdentity(input.subjectId, 'subject_id') as CosUniversitySubjectId
   const observedAt = input.observedAt instanceof Date ? input.observedAt : new Date()

@@ -492,6 +492,14 @@ Expertise can influence delegation confidence. It cannot widen permissions.
 
 Graduation is not permanent immunity from becoming stale.
 
+Graduation also does not end the obligation to apply the program. Each graduate remains assigned to
+its host-controlled professional role and must periodically demonstrate that discipline through
+independently verified practical outcomes. Working across disciplines may broaden a specialist, but
+unrelated activity cannot substitute for current application of its assigned specialty. When recent
+applied evidence expires, relevant work is repeatedly avoided, or measured performance declines,
+the current standing weakens and the University assigns continuing education and recertification.
+The historical credential remains immutable; current fitness to practice does not.
+
 Subjects differ in decay rate:
 
 - mathematics fundamentals may decay slowly;

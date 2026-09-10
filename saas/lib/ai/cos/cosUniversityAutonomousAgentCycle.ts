@@ -5,6 +5,7 @@ import { runCosUniversityIndependentExamBatch } from './cosUniversityIndependent
 import { runCosUniversityContinuousLearning } from './cosUniversityContinuousLearning.ts'
 import { runCosUniversityDeliberatePractice } from './cosUniversityDeliberatePracticeRunner.ts'
 import { decideCosUniversityNextAcademicAction, type CosUniversityNextAcademicAction } from './cosUniversityAgentAcademicProgression.ts'
+import { syncCosUniversityAppliedKnowledge } from './cosUniversityAppliedKnowledge.ts'
 
 export type CosUniversityAutonomousAgentCycleSummary = Readonly<{
   enabled: boolean
@@ -28,6 +29,7 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
     try {
       const admission = await runCosUniversityAdmission({ now, agentId: agent.agentId, role: agent.role })
       if (admission.errors.length) throw new Error(admission.errors.join('; '))
+      await syncCosUniversityAppliedKnowledge(agent.agentId, now)
       const record = await readCosUniversityAgentAcademicRecord(agent.agentId)
       let nextAction = decideCosUniversityNextAcademicAction(record)
       const readyExam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2, readyStudyPlansOnly: true })

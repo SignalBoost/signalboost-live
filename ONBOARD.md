@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.89
+**Version:** 1.90
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -56,6 +56,13 @@ module list. The role assignment is considered only after the common undergradua
 awarded, overrides accidental strongest-subject ranking at Master's admission, and never expands
 authority. COS remains on generalist continuing education unless a separate specialist role is
 explicitly assigned.
+
+## COS University autonomous registered-agent cycle — 2026-09-10
+
+A bounded, secret-gated Production cycle now enumerates the durable University agent registry,
+automatically enrolls every registered identity through the same host admission gate, reads its
+evidence-backed academic record, and routes its next action to study, remediation, independent
+examination, or completed graduation. Missing evidence never becomes a pass or credential.
 
 ---
 

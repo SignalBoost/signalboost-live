@@ -76,6 +76,7 @@ export function decideControlledFineTune(input: FineTuneEvidence): FineTuneDecis
 }
 
 export type LearningPathId =
+  | 'registered_agent_cycle'
   | 'continuous_learning'
   | 'deliberate_practice'
   | 'independent_exams'
@@ -95,6 +96,7 @@ export type LearningPathId =
   | 'controlled_fine_tuning'
 
 export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId, string>> = Object.freeze({
+  registered_agent_cycle: 'COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED',
   continuous_learning: 'COS_UNIVERSITY_CONTINUOUS_ENABLED',
   deliberate_practice: 'COS_UNIVERSITY_PRACTICE_ENABLED',
   independent_exams: 'COS_UNIVERSITY_EXAMS_ENABLED',

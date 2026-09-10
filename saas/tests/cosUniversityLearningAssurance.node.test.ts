@@ -52,7 +52,7 @@ test('production verification covers every declared gated learning path at the d
   receipts[0] = { ...receipts[0], commitSha: hash('e') }
   const failed = verifyLearningPathReceipts({ expectedCommitSha: hash('d'), now, receipts })
   assert.equal(failed.verified, false)
-  assert.deepEqual(failed.missingOrInvalid, ['continuous_learning'])
+  assert.deepEqual(failed.missingOrInvalid, ['registered_agent_cycle'])
 })
 
 test('assurance registry covers every scheduled University route explicitly', () => {
@@ -61,6 +61,7 @@ test('assurance registry covers every scheduled University route explicitly', ()
     .map((entry: { path: string }) => entry.path)
     .filter((route: string) => route.includes('/cos-university-'))
   const pathByRoute: Record<string, string> = {
+    '/api/cron/cos-university-agent-cycle': 'registered_agent_cycle',
     '/api/cron/cos-university-learning': 'continuous_learning',
     '/api/cron/cos-university-practice': 'deliberate_practice',
     '/api/cron/cos-university-exam': 'independent_exams',

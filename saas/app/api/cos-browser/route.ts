@@ -37,55 +37,6 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-// The Concierge primary answer is bounded (150s) and returns an honest timeout reply on its own.
-// The deep-semantic ROUTING classifiers that run before it (public identity, visual continuation)
-// were not bounded at all: each is a full reasoner turn (draft + optional repair, up to
-// LOCAL_AI_TIMEOUT_MS per model call). When the model endpoint is slow, those two routing calls
-// alone consumed the time the answer needed, Vercel killed the function at maxDuration, and the
-// browser was left with "the page stopped waiting". A routing classifier is a short JSON verdict;
-// if it has not decided within this window it is abandoned and the request falls through to the
-// normal answer path — exactly what happens today when the classifier returns no verdict.
-const ROUTING_CLASSIFIER_DEFAULT_MS = 15_000
-const ROUTING_CLASSIFIER_MIN_MS = 2_000
-const ROUTING_CLASSIFIER_MAX_MS = 30_000
-
-function routingClassifierDeadlineMs(): number {
-  const configured = Number(process.env.COS_ROUTING_CLASSIFIER_TIMEOUT_MS)
-  if (!Number.isFinite(configured) || configured <= 0) return ROUTING_CLASSIFIER_DEFAULT_MS
-  return Math.min(ROUTING_CLASSIFIER_MAX_MS, Math.max(ROUTING_CLASSIFIER_MIN_MS, Math.floor(configured)))
-}
-
-async function boundedRoutingClassifier<T>(stage: string, run: () => Promise<T | null>): Promise<T | null> {
-  const deadlineMs = routingClassifierDeadlineMs()
-  const startedAt = Date.now()
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const expired = new Promise<'expired'>((resolve) => {
-    timer = setTimeout(() => resolve('expired'), deadlineMs)
-  })
-  try {
-    const outcome = await Promise.race([
-      run().catch(() => null),
-      expired,
-    ])
-    if (outcome === 'expired') {
-      console.warn('[cos-browser-routing-deadline]', JSON.stringify({
-        at: new Date().toISOString(),
-        stage,
-        deadlineMs,
-        action: 'classifier_abandoned_request_continues_to_answer_path',
-      }))
-      return null
-    }
-    const elapsedMs = Date.now() - startedAt
-    if (elapsedMs > deadlineMs / 2) {
-      console.info('[cos-browser-routing-latency]', JSON.stringify({ at: new Date().toISOString(), stage, elapsedMs, deadlineMs }))
-    }
-    return outcome
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
-}
-
 // COS is the private reasoning/orchestration layer. This object represents an authenticated owner
 // capability, not a UI-surface capability. Concierge and Assistant are delivery surfaces; neither
 // is allowed to manufacture authority, and neither is the software execution controller.
@@ -207,9 +158,7 @@ export async function POST(req: NextRequest) {
 
   if (browserSurface === 'concierge') {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
-    const semanticIdentity = deterministicIdentity
-      ? null
-      : await boundedRoutingClassifier('public_identity', () => resolveSemanticPublicIdentity(prompt))
+    const semanticIdentity = deterministicIdentity ? null : await resolveSemanticPublicIdentity(prompt)
     const identity = deterministicIdentity || (semanticIdentity
       ? publicConciergeIdentityReplyForIntent(semanticIdentity.intent, semanticIdentity.language)
       : null)
@@ -348,9 +297,7 @@ export async function POST(req: NextRequest) {
     // bounded recent user-authored conversation context. Deterministic code only validates and
     // preserves the user's exact words; it does not infer the continuation itself.
     const directVisual = isConciergeVisualObjective(prompt)
-    const semanticResolution = directVisual
-      ? null
-      : await boundedRoutingClassifier('visual_continuation', () => resolveSemanticVisualRequest(messages, prompt))
+    const semanticResolution = directVisual ? null : await resolveSemanticVisualRequest(messages, prompt)
     const visualObjective = directVisual ? prompt : semanticResolution?.objective ?? null
     if (visualObjective) {
       const headers = new Headers(req.headers)

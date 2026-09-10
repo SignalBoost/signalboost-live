@@ -3,21 +3,51 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import {
-  COS_UNIVERSITY_PHD_METHODOLOGY_EXAMINER_ACTOR_ID,
   buildCosUniversityPhdMethodologyExam,
   scoreCosUniversityPhdMethodologyExam,
+  validateCosUniversityPhdMethodologyRubric,
 } from '../lib/ai/cos/cosUniversityPhdMethodologyExam.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
-const clean = (value: unknown) => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
 
-function packetEvidenceFor(seed: string) {
+// Deliberately synthetic test-only vocabulary. Production rubric values never live in source control.
+const TEST_RUBRIC = validateCosUniversityPhdMethodologyRubric({
+  maxWords: 500,
+  sections: [
+    { heading: 'Claim', minWords: 12, conceptGroups: [['orchid'], ['granite']] },
+    { heading: 'Design', minWords: 10, conceptGroups: [['amber'], ['quartz']] },
+    { heading: 'Threats', minWords: 10, conceptGroups: [['tundra'], ['cedar']] },
+    { heading: 'Test', minWords: 10, conceptGroups: [['violet'], ['delta']] },
+    { heading: 'Reproducibility', minWords: 10, conceptGroups: [['harbor'], ['linen']] },
+  ],
+  unsupportedAssertions: ['cerulean certainty'],
+  directRejectionPrefixes: ['not true that'],
+  directRejectionSuffixes: ['is rejected', 'is unsupported'],
+})
+
+const provenance = (turnId = 'turn-test') => ({
+  localReasoning: true,
+  externalAi: false,
+  semanticCache: false,
+  handled: true,
+  turnId,
+})
+
+function groundedReply(seed: string, claimExtra = '') {
   const exam = buildCosUniversityPhdMethodologyExam(seed, 'security_trust_research')
-  return { exam, packetEvidence: exam.rubric.requiredPacketGroups.map(group => group[0]).join('; ') }
+  const packet = exam.packet
+  const reply = [
+    `Claim: The ${packet.interventionAnchor} moved the reported metric from ${packet.beforePercent}% to ${packet.afterPercent}% across ${packet.sampleSize} cases. Orchid and granite frame this packet-specific claim ${claimExtra}.`,
+    'Design: Amber and quartz describe a stronger comparison design with enough detail to challenge the reported relationship.',
+    `Threats: The ${packet.changedConditionAnchor} is packet-specific. Tundra and cedar identify why that change matters to validity.`,
+    'Test: Violet and delta define an explicit prospective test with a decision rule and a falsifiable outcome.',
+    'Reproducibility: Harbor and linen require a repeatable procedure, preserved artifacts, and an independently challengeable result.',
+  ].join('\n')
+  return { exam, reply }
 }
 
-test('PhD methodology exam is seeded, reproducible, bounded, and methodology-focused', () => {
+test('PhD methodology exam is seeded, reproducible, and contains only the public case contract', () => {
   const first = buildCosUniversityPhdMethodologyExam('seed-a', 'ai_systems_research')
   const again = buildCosUniversityPhdMethodologyExam('seed-a', 'ai_systems_research')
   const other = buildCosUniversityPhdMethodologyExam('seed-b', 'ai_systems_research')
@@ -26,88 +56,79 @@ test('PhD methodology exam is seeded, reproducible, bounded, and methodology-foc
   assert.match(first.prompt, /UNSEEN PHD RESEARCH METHODOLOGY EXAM/)
   assert.match(first.prompt, /Do not invent observations/)
   assert.match(first.prompt, /Ground your analysis in this specific packet/)
-  assert.deepEqual(first.rubric.requiredHeadings, ['Claim', 'Design', 'Threats', 'Test', 'Reproducibility'])
-  assert.equal(first.rubric.requiredPacketGroups.length, 5)
-  assert.ok(first.rubric.maxWords <= 500)
+  assert.deepEqual(Object.keys(first.packet).sort(), [
+    'afterPercent', 'beforePercent', 'changedConditionAnchor', 'interventionAnchor', 'sampleSize',
+  ])
+  assert.equal(Object.prototype.hasOwnProperty.call(first, 'rubric'), false)
 })
 
-test('host scorer requires fresh local provenance plus packet-specific causal, validity, test, and reproducibility reasoning', () => {
-  const { exam, packetEvidence } = packetEvidenceFor('seed-score')
-  const reply = [
-    `Claim: For this packet (${packetEvidence}), the observational association does not prove a causal effect; uncertainty remains.`,
-    'Design: Use a randomized comparison or justified control baseline with a falsifiable hypothesis and explicit prediction.',
-    'Threats: Address confounding, selection bias, measurement drift, and instrument validity.',
-    'Test: Preregister the hypothesis, operationalize each measure, specify the instrument, and define falsification criteria.',
-    'Reproducibility: Publish reproducible procedures and artifacts, then require independent replication before generalizing.',
-  ].join('\n')
-  const pass = scoreCosUniversityPhdMethodologyExam(exam, reply, {
-    localReasoning: true,
-    externalAi: false,
-    semanticCache: false,
-    handled: true,
-    turnId: 'turn-1',
-  })
+test('host scorer requires fresh provenance and section-bound packet evidence', () => {
+  const { exam, reply } = groundedReply('seed-score')
+  const pass = scoreCosUniversityPhdMethodologyExam(exam, reply, provenance('turn-pass'), TEST_RUBRIC)
   assert.equal(pass.passed, true, pass.reasons.join(','))
 
   const cached = scoreCosUniversityPhdMethodologyExam(exam, reply, {
-    localReasoning: true,
-    externalAi: false,
-    semanticCache: true,
-    handled: true,
-    turnId: 'turn-2',
-  })
+    ...provenance('turn-cache'), semanticCache: true,
+  }, TEST_RUBRIC)
   assert.equal(cached.passed, false)
   assert.ok(cached.reasons.includes('semantic_cache_used'))
+
+  const wrongSection = reply.replace(
+    `Claim: The ${exam.packet.interventionAnchor}`,
+    `Claim: The intervention`,
+  ).replace(
+    'Threats:',
+    `Threats: The ${exam.packet.interventionAnchor} is mentioned here instead.`,
+  )
+  const misplaced = scoreCosUniversityPhdMethodologyExam(exam, wrongSection, provenance('turn-misplaced'), TEST_RUBRIC)
+  assert.equal(misplaced.passed, false)
+  assert.ok(misplaced.reasons.includes('packet_intervention_missing_from_claim'))
 })
 
-test('generic keyword stuffing cannot earn PhD methodology evidence across unseen packets', () => {
-  const canned = [
-    'Claim: causal uncertain.',
-    'Design: confound control.',
-    'Threats: hypothesis selection bias.',
-    'Test: measure preregister falsifiable prediction.',
-    'Reproducibility: reproducible independent replication.',
+test('concatenated values and cross-packet anchor stuffing cannot satisfy public packet binding', () => {
+  const exam = buildCosUniversityPhdMethodologyExam('packet-attack', 'ai_systems_research')
+  const attack = [
+    'Claim: model-routing policy security training intervention production scheduling policy forecasting procedure sensor-calibration procedure 7%8%9%10%11%12%13%14%15%16%17% 18%19%20%21%22%23%24%25%26%27%28%29%30%31%32%33%34%35%36%37%38%39%40%41%42% 180181182183184185186187188189190191192193194195196197198199200 orchid granite.',
+    'Design: amber quartz provide enough synthetic test words to satisfy only the fixture concepts but not substantive packet binding.',
+    'Threats: logging pipeline self-selected measurement threshold workload shift instrument version tundra cedar are all stuffed together without analysis.',
+    'Test: violet delta provide enough synthetic test words for this deliberately adversarial fixture response and nothing more.',
+    'Reproducibility: harbor linen provide enough synthetic test words for this deliberately adversarial fixture response and nothing more.',
   ].join('\n')
-  for (const seed of ['packet-a', 'packet-b', 'packet-c']) {
-    const exam = buildCosUniversityPhdMethodologyExam(seed, 'ai_systems_research')
-    const score = scoreCosUniversityPhdMethodologyExam(exam, canned, {
-      localReasoning: true,
-      externalAi: false,
-      semanticCache: false,
-      handled: true,
-      turnId: `turn-${seed}`,
-    })
-    assert.equal(score.passed, false)
-    assert.ok(score.reasons.some(reason => reason.startsWith('packet_evidence_missing:')), score.reasons.join(','))
-    for (const group of exam.rubric.requiredPacketGroups) {
-      assert.ok(group.every(anchor => !clean(canned).includes(clean(anchor))))
-    }
-  }
+  const score = scoreCosUniversityPhdMethodologyExam(exam, attack, provenance('turn-attack'), TEST_RUBRIC)
+  assert.equal(score.passed, false)
+  assert.ok(score.reasons.some(reason => reason.startsWith('packet_') || reason.startsWith('cross_packet_') || reason === 'suspicious_long_token'), score.reasons.join(','))
 })
 
-test('explicit rejection of an unsupported causal claim is not mis-scored as endorsement', () => {
-  const { exam, packetEvidence } = packetEvidenceFor('seed-negation')
-  const reply = [
-    `Claim: For ${packetEvidence}, the claim that causality is proven is unsupported; uncertainty remains and association is all the current design establishes.`,
-    'Design: A randomized comparison with a control baseline should test a falsifiable hypothesis and prediction.',
-    'Threats: Confounding, selection bias, and measurement or instrument changes threaten validity.',
-    'Test: Preregister the hypothesis, operationalize the measure, and specify falsification criteria.',
-    'Reproducibility: Preserve reproducible artifacts and require independent replication before generalization.',
-  ].join('\n')
-  const score = scoreCosUniversityPhdMethodologyExam(exam, reply, {
-    localReasoning: true,
-    externalAi: false,
-    semanticCache: false,
-    handled: true,
-    turnId: 'turn-negation',
-  })
-  assert.equal(score.passed, true, score.reasons.join(','))
-  assert.ok(!score.reasons.includes('unsupported_claim:causality is proven'))
+test('direct rejection is accepted, but unrelated negation cannot excuse an unsupported assertion', () => {
+  const rejected = groundedReply('seed-negation', 'and the statement cerulean certainty is unsupported')
+  const rejectionScore = scoreCosUniversityPhdMethodologyExam(rejected.exam, rejected.reply, provenance('turn-rejected'), TEST_RUBRIC)
+  assert.equal(rejectionScore.passed, true, rejectionScore.reasons.join(','))
+
+  const endorsed = groundedReply('seed-endorsement', 'and the design is not randomized, but cerulean certainty')
+  const endorsementScore = scoreCosUniversityPhdMethodologyExam(endorsed.exam, endorsed.reply, provenance('turn-endorsed'), TEST_RUBRIC)
+  assert.equal(endorsementScore.passed, false)
+  assert.ok(endorsementScore.reasons.includes('unsupported_assertion:1'), endorsementScore.reasons.join(','))
 })
 
-test('examiner is a distinct host-controlled principal and candidate output cannot self-record academic evidence', () => {
+test('production certification rubric is host-private, immutable to runtime, and has no committed fallback', () => {
+  const scorer = file('lib/ai/cos/cosUniversityPhdMethodologyExam.ts')
   const runner = file('lib/ai/cos/cosUniversityPhdMethodologyExamRunner.ts')
-  assert.equal(COS_UNIVERSITY_PHD_METHODOLOGY_EXAMINER_ACTOR_ID, 'host-phd-methodology-examiner-v1')
+  const schema = file('supabase/migrations/20260910012000_cos_university_phd_methodology_exam_runs.sql')
+
+  assert.doesNotMatch(scorer, /causality is proven|selection bias|confound|preregister/i)
+  assert.match(runner, /from\('cos_university_phd_methodology_exam_rubrics'\)/)
+  assert.match(runner, /validateCosUniversityPhdMethodologyRubric\(row\.rubric_json\)/)
+  assert.match(runner, /methodology_private_rubric_unavailable/)
+  assert.doesNotMatch(runner, /TEST_RUBRIC|fallbackRubric|defaultRubric/)
+  assert.match(schema, /grant select on table public\.cos_university_phd_methodology_exam_rubrics to service_role/i)
+  assert.doesNotMatch(schema, /grant[^;]*(?:insert|update|delete)[^;]*cos_university_phd_methodology_exam_rubrics/i)
+  assert.doesNotMatch(schema, /insert\s+into\s+public\.cos_university_phd_methodology_exam_rubrics/i)
+})
+
+test('examiner identity is bound to the private rubric hash and candidate output cannot self-record evidence', () => {
+  const runner = file('lib/ai/cos/cosUniversityPhdMethodologyExamRunner.ts')
+  assert.match(runner, /examinerActorId\(privateRubric\.hash\)/)
+  assert.match(runner, /principalFingerprint: `\$\{COS_UNIVERSITY_PHD_METHODOLOGY_SCORER\}:\$\{row\.rubric_hash\}`/)
   assert.match(runner, /actorRole: 'methodology_examiner'/)
   assert.match(runner, /principalType: 'system'/)
   assert.match(runner, /recordHostCosUniversityPhdEvidence\(/)
@@ -137,14 +158,16 @@ test('methodology attempts continue only to the existing A+ evidence target and 
   assert.match(runner, /variantHash: row\.variant_hash/)
 })
 
-test('exam run storage is service-only and has no raw hidden-material or degree columns', () => {
+test('exam-run storage carries only rubric identity/hash, not private rubric values or raw answer material', () => {
   const schema = file('supabase/migrations/20260910012000_cos_university_phd_methodology_exam_runs.sql')
+  const runsStart = schema.indexOf('create table if not exists public.cos_university_phd_methodology_exam_runs')
+  const runsEnd = schema.indexOf('create index if not exists cos_university_phd_methodology_program_idx')
+  const runTable = schema.slice(runsStart, runsEnd)
+  assert.match(runTable, /rubric_id text not null references/)
+  assert.match(runTable, /rubric_hash text not null/)
+  assert.doesNotMatch(runTable, /rubric_json|raw_prompt|prompt text|reply text|graduated boolean|degree boolean/i)
   assert.match(schema, /alter table public\.cos_university_phd_methodology_exam_runs enable row level security/i)
-  assert.match(schema, /revoke all on table public\.cos_university_phd_methodology_exam_runs from anon, authenticated, service_role/i)
   assert.match(schema, /grant select, insert, update on table public\.cos_university_phd_methodology_exam_runs to service_role/i)
-  assert.match(schema, /evidence_recorded boolean not null default false/)
-  assert.match(schema, /fresh_execution boolean not null default false/)
-  assert.doesNotMatch(schema, /raw_prompt\s+text|prompt\s+text|rubric\s+jsonb?|reply\s+text|graduated\s+boolean|degree\s+boolean/i)
 })
 
 test('PhD methodology cron is independently gated and cannot bypass the research boundary', () => {

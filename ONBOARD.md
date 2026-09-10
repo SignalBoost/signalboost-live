@@ -11,6 +11,14 @@
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
 
+## COS University live Production-path verification — 2026-09-10
+
+The owner-only assurance endpoint now reads the append-only receipt ledger for the exact running
+Production commit and deployment, verifies every declared University learning path, and reports
+each missing, disabled, failed, stale, or unproven path explicitly. A configured route or successful
+build is never presented as Production proof; all declared paths must have a fresh successful
+host-verifier receipt with their feature gate enabled before the aggregate status becomes verified.
+
 ## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
 
 Owner direction: pursue a company-deployable security capability that combines continuous 24x7 defensive patrol with a separately isolated ethical-hacking assessor. The separation is intentional: a defender that knows its own environment can develop familiarity bias; the assessor must arrive as a stranger and rediscover the environment from the authorized starting position.

@@ -1,11 +1,12 @@
 // saas/lib/audit/activityReport.ts
 //
-// Audit Log & Activity Timeline generator. PURE — takes raw hub_audit_log rows,
+// Audit Log & Activity Timeline generator. PURE — takes raw activity/evidence rows,
 // returns a shaped timeline + status summary. No I/O, no LLM, no React. The
 // route does the query; this only normalizes and aggregates so it's testable.
 
 export type ActivityStatus =
   | 'success' | 'failure' | 'blocked' | 'denied' | 'error' | 'config_error'
+  | 'queued' | 'running' | 'testing' | 'verifying'
 
 export interface ActivityRawRow {
   id?: number | string
@@ -38,18 +39,21 @@ export interface ActivityReportData {
     denied: number
     error: number
     configError: number
+    active: number
     actors: number // distinct actors
     since: string // oldest event in the window
     until: string // newest event in the window
   }
 }
 
-const KNOWN: ActivityStatus[] = ['success', 'failure', 'blocked', 'denied', 'error', 'config_error']
+const KNOWN: ActivityStatus[] = ['success', 'failure', 'blocked', 'denied', 'error', 'config_error', 'queued', 'running', 'testing', 'verifying']
 
 function normStatus(s?: string | null): ActivityStatus {
   const v = String(s || '').toLowerCase()
   if ((KNOWN as string[]).includes(v)) return v as ActivityStatus
-  if (v === 'fail') return 'failure'
+  if (v === 'fail' || v === 'failed') return 'failure'
+  if (v === 'succeeded' || v === 'fixed' || v === 'complete' || v === 'completed' || v === 'merged') return 'success'
+  if (v === 'paused' || v === 'checks_pending' || v === 'auto_merge_queued') return 'testing'
   return 'error'
 }
 
@@ -84,6 +88,7 @@ export function buildActivityReport(rows: ActivityRawRow[]): ActivityReportData 
       denied: count('denied'),
       error: count('error'),
       configError: count('config_error'),
+      active: count('queued') + count('running') + count('testing') + count('verifying'),
       actors,
       since: times[0] || '',
       until: times[times.length - 1] || '',

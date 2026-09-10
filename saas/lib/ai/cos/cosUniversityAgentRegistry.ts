@@ -13,6 +13,20 @@ export function isCosUniversityAgentRole(value: unknown): value is CosUniversity
   return COS_UNIVERSITY_AGENT_ROLES.includes(value as CosUniversityAgentRole)
 }
 
+export type CosUniversityRegisteredAgent = Readonly<{ agentId: string; role: CosUniversityAgentRole }>
+
+export async function listCosUniversityRegisteredAgents(limit = 100): Promise<CosUniversityRegisteredAgent[]> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const result = await db.from('cos_university_agent_registry')
+    .select('agent_id,role').order('agent_id', { ascending: true }).limit(Math.max(1, Math.min(500, limit)))
+  if (result.error) throw result.error
+  return ((result.data || []) as Array<{ agent_id: string; role: unknown }>).map((row) => {
+    if (!isCosUniversityAgentRole(row.role)) throw new Error('invalid_persisted_agent_role')
+    return Object.freeze({ agentId: row.agent_id, role: row.role })
+  })
+}
+
 export async function readCosUniversityAgentRole(agentId: string): Promise<CosUniversityAgentRole | null> {
   const id = String(agentId || '').trim()
   if (!id) throw new Error('agent_id_required')

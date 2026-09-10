@@ -3,6 +3,7 @@ import { runCosUniversityAdmission } from './cosUniversityAdmissionRunner.ts'
 import { listCosUniversityRegisteredAgents } from './cosUniversityAgentRegistry.ts'
 import { runCosUniversityIndependentExamBatch } from './cosUniversityIndependentExamRunner.ts'
 import { runCosUniversityContinuousLearning } from './cosUniversityContinuousLearning.ts'
+import { runCosUniversityDeliberatePractice } from './cosUniversityDeliberatePracticeRunner.ts'
 import { decideCosUniversityNextAcademicAction, type CosUniversityNextAcademicAction } from './cosUniversityAgentAcademicProgression.ts'
 
 export type CosUniversityAutonomousAgentCycleSummary = Readonly<{
@@ -35,6 +36,10 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
       } else if (nextAction === 'study' || nextAction === 'remediate') {
         const learning = await runCosUniversityContinuousLearning({ now, agentId: agent.agentId, maxStudyPlans: 4 })
         if (learning.status === 'error') throw new Error(learning.errors.join('; ') || 'continuous_learning_failed')
+        if (learning.plansAttempted > 0) {
+          const practice = await runCosUniversityDeliberatePractice({ agentId: agent.agentId, maxPlans: 1, maxExercises: 2 })
+          if (practice.errors.length) throw new Error(practice.errors.join('; '))
+        }
       }
       agents.push({ agentId: agent.agentId, role: agent.role, admitted: admission.admitted, nextAction, completionRatio: record.completionRatio, error: null })
     } catch (error) {

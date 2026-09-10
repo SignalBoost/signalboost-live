@@ -130,6 +130,7 @@ const tests = [
   'tests/cosUniversityPhd.node.test.ts',
   'tests/cosUniversityPhdRuntime.node.test.ts',
   'tests/cosUniversityPhdResearchExecution.node.test.ts',
+  'tests/cosUniversityPhdMethodologyExam.node.test.ts',
   'tests/cosUniversityAdmission.node.test.ts',
   'tests/cosUniversityAdmissionRunner.node.test.ts',
   'tests/cosUniversityActiveAcademicLane.node.test.ts',

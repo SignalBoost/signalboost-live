@@ -5,10 +5,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createHash } from 'crypto'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 
-const DESTINATION = 'https://www.saas.signalboostapp.com'
+const DESTINATION = PUBLIC_BRAND.siteUrl
 
 function db() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {

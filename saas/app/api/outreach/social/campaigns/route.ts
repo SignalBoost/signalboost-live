@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin, auditAdminAction } from '@/lib/outreach/security'
 import { mintApprovalIdentity } from '@/portable-kernel'
 import { SOCIAL_CONNECTORS, type SocialPlatform } from '@/lib/outreach/social-connectors'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,9 +43,9 @@ function cleanText(value: any, fallback = '', max = 5000) {
 }
 
 function defaultPostText(args: { platform: SocialPlatform; objective: string; targetAudience: string; targetUrl: string; language: string }) {
-  const base = cleanText(args.objective, 'SignalBoost helps businesses turn scattered marketing, sales, and content work into approved campaigns.', 800)
+  const base = cleanText(args.objective, `${PUBLIC_BRAND.name} helps businesses turn scattered marketing, sales, and content work into approved campaigns.`, 800)
   const audience = cleanText(args.targetAudience, 'business owners and operators', 180)
-  const url = cleanText(args.targetUrl, 'https://www.saas.signalboostapp.com', 220)
+  const url = cleanText(args.targetUrl, PUBLIC_BRAND.siteUrl, 220)
   const platformIntro: Record<string, string> = {
     linkedin_company: `For ${audience}: ${base}`,
     linkedin_member: `For ${audience}: ${base}`,
@@ -61,9 +62,9 @@ function defaultPostText(args: { platform: SocialPlatform; objective: string; ta
 
 function platformDrafts(body: any, platforms: SocialPlatform[]) {
   const draftMap = Array.isArray(body?.drafts) ? body.drafts : []
-  const objective = cleanText(body?.objective, 'Launch a SignalBoost social outreach campaign.', 1200)
+  const objective = cleanText(body?.objective, `Launch a ${PUBLIC_BRAND.name} social outreach campaign.`, 1200)
   const targetAudience = cleanText(body?.target_audience || body?.targetAudience, 'small and mid-size business owners', 240)
-  const targetUrl = cleanText(body?.target_url || body?.targetUrl, 'https://www.saas.signalboostapp.com', 300)
+  const targetUrl = cleanText(body?.target_url || body?.targetUrl, PUBLIC_BRAND.siteUrl, 300)
   const language = cleanText(body?.language, 'en', 12)
   return platforms.map(platform => {
     const supplied = draftMap.find((item: any) => String(item?.platform) === platform) || {}
@@ -71,7 +72,7 @@ function platformDrafts(body: any, platforms: SocialPlatform[]) {
     return {
       platform,
       text,
-      title: cleanText(supplied.title || body?.title || body?.name, 'SignalBoost AI growth campaign', 280),
+      title: cleanText(supplied.title || body?.title || body?.name, `${PUBLIC_BRAND.name} AI growth campaign`, 280),
       accountRef: supplied.account_ref || supplied.accountRef || body?.account_refs?.[platform] || body?.accountRef || null,
       accountName: supplied.account_name || supplied.accountName || body?.account_names?.[platform] || body?.accountName || null,
       imageUrl: supplied.image_url || supplied.imageUrl || body?.image_url || body?.imageUrl || null,
@@ -104,9 +105,9 @@ export async function POST(req: NextRequest) {
   const platforms = normalizePlatforms(body?.platforms || body?.platform)
   if (!platforms.length) return NextResponse.json({ ok: false, error: 'At least one supported platform is required.' }, { status: 400 })
 
-  const name = cleanText(body?.name || body?.title, 'SignalBoost social outreach campaign', 160)
-  const objective = cleanText(body?.objective, 'Generate qualified attention and leads for SignalBoost.', 1500)
-  const targetUrl = cleanText(body?.target_url || body?.targetUrl, 'https://www.saas.signalboostapp.com', 300)
+  const name = cleanText(body?.name || body?.title, `${PUBLIC_BRAND.name} social outreach campaign`, 160)
+  const objective = cleanText(body?.objective, `Generate qualified attention and leads for ${PUBLIC_BRAND.name}.`, 1500)
+  const targetUrl = cleanText(body?.target_url || body?.targetUrl, PUBLIC_BRAND.siteUrl, 300)
   const targetAudience = cleanText(body?.target_audience || body?.targetAudience, 'business owners and operators', 280)
   const language = cleanText(body?.language, 'en', 12)
   const autoApprove = body?.auto_approve === true || body?.autoApprove === true

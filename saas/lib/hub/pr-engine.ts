@@ -279,7 +279,7 @@ export async function closeInfrastructurePR(input: {
 export async function mergeInfrastructurePR(input: {
   id: string
   approvedBy?: string | null
-  origin: string                      // e.g. https://saas.signalboostapp.com
+  origin: string                      // e.g. https://itmounts.com
   cookie: string                      // forwarded so steps run as the owner
 }): Promise<{ ok: boolean; pr?: InfraPR; error?: string }> {
   const db = admin()

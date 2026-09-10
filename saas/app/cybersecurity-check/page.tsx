@@ -1,9 +1,11 @@
+// saas/app/cybersecurity-check/page.tsx
 'use client'
 
 import Link from 'next/link'
 import { FormEvent, useMemo, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Finding = { code: string; category: 'transport' | 'headers' | 'cookies' | 'content' | 'exposure'; severity: 'high' | 'medium' | 'low'; value?: string | number | boolean }
@@ -101,7 +103,7 @@ export default function CybersecurityCheckPage() {
                 <input id="cyber-url" value={url} onChange={event => setUrl(event.target.value)} placeholder={copy.placeholder} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-300/20 focus:ring-4" />
                 <button type="submit" disabled={loading} className="rounded-xl bg-cyan-300 px-5 py-3 font-black text-slate-950 hover:bg-white disabled:opacity-60">{loading ? copy.scanning : copy.scan}</button>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400"><span>{copy.hint}</span><button type="button" onClick={() => setUrl('https://saas.signalboostapp.com')} className="font-bold text-cyan-200 hover:text-white">{copy.trySample}</button></div>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400"><span>{copy.hint}</span><button type="button" onClick={() => setUrl(PUBLIC_BRAND.siteUrl)} className="font-bold text-cyan-200 hover:text-white">{copy.trySample}</button></div>
             </form>
             {error && <div className="mt-4 rounded-xl border border-red-300/30 bg-red-400/10 p-4 text-sm font-semibold text-red-100">{error}</div>}
           </section>

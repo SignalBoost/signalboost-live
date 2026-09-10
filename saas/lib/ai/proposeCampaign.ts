@@ -8,8 +8,9 @@ import { createClient } from '@supabase/supabase-js'
 import { queueItemFromRecommendation } from '@/lib/cos/campaign-queue'
 import type { CosChannel, CosDepartment, CosPriority, CosRecommendation } from '@/lib/cos/recommendation/types'
 import { startSiteVideo } from '@/lib/operator/video'
+import { PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
-const SAAS_URL = 'www.saas.signalboostapp.com'
+const SAAS_URL = PUBLIC_BRAND_DOMAIN
 const VIDEO_CHANNELS = new Set(['youtube', 'short_video'])
 const allowedLanguages = ['en', 'es', 'pt', 'pl', 'ru']
 const GITHUB_OWNER = 'SignalBoost'

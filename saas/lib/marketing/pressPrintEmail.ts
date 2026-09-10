@@ -1,10 +1,12 @@
+// saas/lib/marketing/pressPrintEmail.ts
 import { sendEmail } from '@/lib/email'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 type EmailResult = { ok: boolean; skipped?: boolean; reason?: string; error?: string; id?: string }
 type PreviewArgs = { campaignId: string; title: string; objective: string; channel: string; contact?: string; dashboardUrl?: string }
 type PublishedArgs = PreviewArgs & { liveUrl?: string; publicationDate?: string }
 function ownerEmail() { return String((process.env.OWNER_EMAILS || '').split(',')[0] || process.env.OWNER_EMAIL || process.env.SIGNALBOOST_OWNER_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase() }
-function appBaseUrl() { return (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://saas.signalboostapp.com').replace(/\/$/, '') }
+function appBaseUrl() { return (process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL || PUBLIC_BRAND.siteUrl).replace(/\/$/, '') }
 function dashboardLink(campaignId: string) { return `${appBaseUrl()}/dashboard/marketing/press-print?campaign=${encodeURIComponent(campaignId)}` }
 async function sendOwnerMail(subject: string, html: string): Promise<EmailResult> { const to = ownerEmail(); if (!to) return { ok: false, skipped: true, reason: 'missing_owner_email' }; const sent = await sendEmail({ from: 'saasMarketing', to, subject, html }); if (!sent?.ok) return { ok: false, error: sent?.error || 'send failed' }; return { ok: true, id: sent.id } }
 function escapeHtml(value: string) { return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;') }

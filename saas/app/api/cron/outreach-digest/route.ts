@@ -27,6 +27,7 @@ import { createClient } from '@supabase/supabase-js'
 import { sendEmail } from '@/lib/email'
 import { collectAdsAttention } from '@/lib/ads/ads-attention'
 import { listAccountHealth, listCampaignPositions } from '@/lib/ads/spend-ledger'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -50,7 +51,7 @@ function escapeHtml(value: string): string {
 
 function siteUrl(): string {
   const configured = String(process.env.NEXT_PUBLIC_SAAS_URL || process.env.SAAS_PUBLIC_URL || '').trim()
-  if (!configured) return 'https://saas.signalboostapp.com'
+  if (!configured) return PUBLIC_BRAND.siteUrl
   return /^https?:\/\//i.test(configured) ? configured.replace(/\/+$/, '') : `https://${configured.replace(/^\/+|\/+$/g, '')}`
 }
 

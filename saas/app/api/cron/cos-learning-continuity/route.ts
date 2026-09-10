@@ -1,3 +1,4 @@
+// saas/app/api/cron/cos-learning-continuity/route.ts
 //
 // THE WATCHDOG. Learning stopping is a SILENT failure — there is no error, no red build, no failed
 // deploy. The corpus simply stops growing and every dashboard keeps rendering yesterday's rows. The
@@ -16,6 +17,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sendEmail } from '@/lib/email'
 import { readLearningContinuity } from '@/lib/ai/cos/learningContinuityReport'
 import type { ContinuityReport } from '@/lib/ai/cos/learningContinuity'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,7 +30,7 @@ function ownerEmail(): string {
 
 function siteUrl(): string {
   const configured = String(process.env.NEXT_PUBLIC_SAAS_URL || process.env.SAAS_PUBLIC_URL || '').trim()
-  if (!configured) return 'https://saas.signalboostapp.com'
+  if (!configured) return PUBLIC_BRAND.siteUrl
   return /^https?:\/\//i.test(configured) ? configured.replace(/\/+$/, '') : `https://${configured.replace(/^\/+|\/+$/g, '')}`
 }
 

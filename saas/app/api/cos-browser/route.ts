@@ -30,7 +30,7 @@ import { isConciergeVisualObjective } from '@/lib/visuals/intent'
 import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
 import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } from '@/lib/ai/cos/publicConciergeIdentity'
 import { resolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
-import { PUBLIC_BRAND } from '@/lib/public-brand'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 
 export const runtime = 'nodejs'
@@ -46,7 +46,7 @@ function isSignalBoostDeploymentContext(req: NextRequest): boolean {
   const owner = String(process.env.VERCEL_GIT_REPO_OWNER || '').trim().toLowerCase()
   const repo = String(process.env.VERCEL_GIT_REPO_SLUG || '').trim().toLowerCase()
   const host = String(req.nextUrl.hostname || '').trim().toLowerCase()
-  return (owner === 'signalboost' && repo === 'signalboost-live') || host === 'saas.signalboostapp.com'
+  return (owner === 'signalboost' && repo === 'signalboost-live') || host === PUBLIC_BRAND_DOMAIN || host === 'saas.signalboostapp.com'
 }
 
 /**

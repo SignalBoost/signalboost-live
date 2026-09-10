@@ -1,14 +1,17 @@
+// saas/lib/email.ts
 import { Resend } from 'resend'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
-// Verified sender identities, aligned to the Signal ecosystem.
+// Verified sender identities. The mailbox domain intentionally stays on the legacy
+// corporate domain (DNS/DKIM live there); only the display name carries the public brand.
 // These addresses are used for outbound sending through Resend.
 export const SENDERS = {
-  signalSupport: 'SignalBoost Team <signalsupport@signalboostapp.com>',
-  saasSupport:   'SaaSSignal Team <saassupport@signalboostapp.com>',
-  saasSales:     'SaaSSignal Sales <saassales@signalboostapp.com>',
-  saasMarketing: 'SaaSSignal <saasmarketing@signalboostapp.com>',
-  saasPartners:  'SaaSSignal Partners <saaspartners@signalboostapp.com>',
-  saasContact:   'SaaSSignal <saascontact@signalboostapp.com>',
+  signalSupport: `${PUBLIC_BRAND.name} Team <signalsupport@signalboostapp.com>`,
+  saasSupport:   `${PUBLIC_BRAND.name} Team <saassupport@signalboostapp.com>`,
+  saasSales:     `${PUBLIC_BRAND.name} Sales <saassales@signalboostapp.com>`,
+  saasMarketing: `${PUBLIC_BRAND.name} <saasmarketing@signalboostapp.com>`,
+  saasPartners:  `${PUBLIC_BRAND.name} Partners <saaspartners@signalboostapp.com>`,
+  saasContact:   `${PUBLIC_BRAND.name} <saascontact@signalboostapp.com>`,
 } as const
 
 type SenderKey = keyof typeof SENDERS

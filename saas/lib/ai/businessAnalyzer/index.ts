@@ -1,7 +1,9 @@
+// saas/lib/ai/businessAnalyzer/index.ts
 import { createPlatformAiPort } from '@/lib/cos/aiPort'
 import { safeParseJSON } from '@/lib/ai/validation'
 import { sanitizePublicText, sanitizeUrl } from '@/lib/ai/guardrails'
 import type { BusinessAnalyzerSummary } from '@/lib/outreach/types'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 const ai = createPlatformAiPort()
 
@@ -15,7 +17,7 @@ function fallbackAnalysis(url: string, publicText: string): BusinessAnalyzerSumm
 export async function extractPublicBusinessText(sourceUrl: string): Promise<{ url: string; text: string }> {
   const url = sanitizeUrl(sourceUrl)
   if (!url) throw new Error('A valid public http(s) URL is required.')
-  const response = await fetch(url, { headers: { 'User-Agent': 'SignalBoostGrowthEngine/1.0 (+https://saas.signalboostapp.com)', 'Accept': 'text/html,text/plain;q=0.9,*/*;q=0.1' }, redirect: 'follow' })
+  const response = await fetch(url, { headers: { 'User-Agent': `${PUBLIC_BRAND.name}GrowthEngine/1.0 (+${PUBLIC_BRAND.siteUrl})`, 'Accept': 'text/html,text/plain;q=0.9,*/*;q=0.1' }, redirect: 'follow' })
   if (!response.ok) throw new Error(`Public source returned HTTP ${response.status}`)
   const contentType = response.headers.get('content-type') || ''
   if (!contentType.includes('text/html') && !contentType.includes('text/plain')) throw new Error('Only public text or HTML sources are supported.')

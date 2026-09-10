@@ -1,3 +1,4 @@
+// saas/app/api/cron/native-proactive-monitoring/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { runNativeMonitoring } from '@/self-healing-host/native-monitoring-runtime'
@@ -9,6 +10,7 @@ import { platformHealthNativeMonitoringCollector } from '@/self-healing-host/pla
 import { verifyPendingExactVercelRepairOutcomes } from '@/self-healing-host/vercel-deployment-outcome-verifier'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -19,7 +21,7 @@ const boundedNumber = (name: string, fallback: number, min: number, max: number)
   return Number.isFinite(parsed) ? Math.min(Math.max(parsed, min), max) : fallback
 }
 function authorized(req: NextRequest): boolean { const secret = process.env.CRON_SECRET; return Boolean(secret && req.headers.get('authorization') === `Bearer ${secret}`) }
-function productionBaseUrl(): string { const configured = String(process.env.NEXT_PUBLIC_APP_URL || '').trim(); if (configured) return configured.replace(/\/+$/, ''); const v = String(process.env.VERCEL_PROJECT_PRODUCTION_URL || '').trim(); if (v) return `https://${v.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`; return 'https://saas.signalboostapp.com' }
+function productionBaseUrl(): string { const configured = String(process.env.NEXT_PUBLIC_APP_URL || '').trim(); if (configured) return configured.replace(/\/+$/, ''); const v = String(process.env.VERCEL_PROJECT_PRODUCTION_URL || '').trim(); if (v) return `https://${v.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`; return PUBLIC_BRAND.siteUrl }
 function apiTargetCap(): number { return Math.round(boundedNumber('SELF_HEALING_API_PROBE_TARGET_CAP', 8, 1, 8)) }
 function parseApiUrls(): string[] {
   const configured = String(process.env.SELF_HEALING_API_PROBE_URLS || '').split(',').map(v => v.trim()).filter(Boolean)

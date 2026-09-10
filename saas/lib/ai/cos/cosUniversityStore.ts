@@ -28,7 +28,7 @@ import {
   type CosUniversityStudyStrategy,
 } from './cosUniversityStudyStrategy.ts'
 
-const AGENT_ID = 'cos'
+const DEFAULT_AGENT_ID = 'cos'
 const VALID_SCORER_AUTHORITIES = new Set(['host_private_exam', 'verified_production', 'host_capstone'])
 const AUTOPSY_STATUSES = ['retest_pending', 'retest_failed', 'insufficient_evidence'] as const
 
@@ -214,12 +214,12 @@ export function academicStateFromRows(rows: AssessmentRow[], now = new Date()): 
   }
 }
 
-export async function readCosUniversityAcademicState(now = new Date()): Promise<CosUniversityAcademicState | null> {
+export async function readCosUniversityAcademicState(now = new Date(), agentId = DEFAULT_AGENT_ID): Promise<CosUniversityAcademicState | null> {
   const db = cosServiceDb()
   if (!db) return null
   const result = await db.from('cos_university_assessments')
     .select('assessment_key,subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_version,scorer_authority,observed_at,valid_until')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', clean(agentId, 180))
     .order('observed_at', { ascending: false })
     .limit(2500)
   if (result.error) throw result.error
@@ -235,7 +235,7 @@ export async function recordCosUniversityAssessment(input: RecordCosUniversityAs
   const db = cosServiceDb()
   if (!db) return false
   const key = clean(input.assessmentKey, 300)
-  const agentId = clean(input.agentId || AGENT_ID, 180)
+  const agentId = clean(input.agentId || DEFAULT_AGENT_ID, 180)
   const scorerVersion = clean(input.scorerVersion, 180)
   if (!key || !agentId || !scorerVersion || input.independentScorer !== true) return false
   if (!VALID_SCORER_AUTHORITIES.has(input.scorerAuthority)) return false
@@ -398,12 +398,17 @@ function rotationCandidates(state: CosUniversityAcademicState, now: Date): PlanC
   return candidates
 }
 
-async function persistStudyPlan(candidate: PlanCandidate, now: string): Promise<CosUniversityStudyPlanRow | null> {
+async function persistStudyPlan(candidate: PlanCandidate, now: string, agentId = DEFAULT_AGENT_ID): Promise<CosUniversityStudyPlanRow | null> {
   const db = cosServiceDb()
   if (!db) return null
+  const scopedAgentId = clean(agentId, 180)
+  if (!scopedAgentId) return null
+  const scopedPlanKey = scopedAgentId === DEFAULT_AGENT_ID
+    ? candidate.planKey
+    : planKey(['agent', scopedAgentId, candidate.planKey])
   const insert = await db.from('cos_university_study_plans').upsert({
-    plan_key: candidate.planKey,
-    agent_id: AGENT_ID,
+    plan_key: scopedPlanKey,
+    agent_id: scopedAgentId,
     subject_id: candidate.subjectId,
     language_code: candidate.language,
     language_dimension: candidate.languageDimension,
@@ -426,7 +431,7 @@ async function persistStudyPlan(candidate: PlanCandidate, now: string): Promise<
 
   const result = await db.from('cos_university_study_plans')
     .select('id,plan_key,subject_id,language_code,language_dimension,failure_class,target_grade,source_kind,source_ref,problem_class,objective,methods,acquisition_source_kinds,fine_tune_candidate,priority,status,attempt_count,last_seen_at,last_attempt_at,created_at,updated_at')
-    .eq('plan_key', candidate.planKey)
+    .eq('plan_key', scopedPlanKey)
     .maybeSingle()
   if (result.error) throw result.error
   return (result.data || null) as CosUniversityStudyPlanRow | null
@@ -544,19 +549,31 @@ export async function markCosUniversityStudyPlansAttempted(planIds: string[], no
  * bounded acquisition signals for methods that the existing governed learning pipeline can execute.
  */
 export async function runCosUniversityPlanningCycle(options: {
+  agentId?: string
   now?: Date
   maxPlans?: number
   failureRows?: FailureAutopsyPlanningRow[]
   academicState?: CosUniversityAcademicState
 } = {}): Promise<CosUniversityPlanningCycleSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
+  const agentId = clean(options.agentId || DEFAULT_AGENT_ID, 180)
   const maxPlans = Math.max(1, Math.min(12, Math.floor(options.maxPlans || 4)))
   const errors: string[] = []
+  if (!agentId) {
+    return {
+      ok: false,
+      academicState: academicStateFromRows([], now),
+      consideredFailures: 0,
+      activePlans: [],
+      gapSignals: [],
+      errors: ['agent_id_required'],
+    }
+  }
   let academicState: CosUniversityAcademicState | null = options.academicState || null
   let failures: FailureAutopsyPlanningRow[] = options.failureRows || []
 
   try {
-    if (!academicState) academicState = await readCosUniversityAcademicState(now)
+    if (!academicState) academicState = await readCosUniversityAcademicState(now, agentId)
   } catch (error) {
     errors.push(`academic_state:${error instanceof Error ? error.message : String(error)}`)
   }
@@ -566,7 +583,7 @@ export async function runCosUniversityPlanningCycle(options: {
   }
 
   try {
-    if (!options.failureRows) failures = await loadUnresolvedFailureAutopsies()
+    if (!options.failureRows && agentId === DEFAULT_AGENT_ID) failures = await loadUnresolvedFailureAutopsies()
   } catch (error) {
     errors.push(`failure_autopsies:${error instanceof Error ? error.message : String(error)}`)
   }
@@ -581,10 +598,11 @@ export async function runCosUniversityPlanningCycle(options: {
   const activePlans: CosUniversityPlanningCycleSummary['activePlans'] = []
   const gapSignals: KnowledgeGapSignal[] = []
 
-  for (const candidate of candidates) {
+  for (const baseCandidate of candidates) {
     try {
-      const row = await persistStudyPlan(candidate, now.toISOString())
+      const row = await persistStudyPlan(baseCandidate, now.toISOString(), agentId)
       if (!row || row.status === 'completed' || row.status === 'superseded') continue
+      const candidate = { ...baseCandidate, planKey: row.plan_key }
       activePlans.push({
         id: row.id,
         planKey: candidate.planKey,
@@ -621,7 +639,7 @@ export async function runCosUniversityPlanningCycle(options: {
             evidence: [`source_kind=${candidate.sourceKind}`, `source_ref=${candidate.sourceRef || 'none'}`],
           }))
     } catch (error) {
-      errors.push(`plan:${candidate.planKey.slice(0, 12)}:${error instanceof Error ? error.message : String(error)}`)
+      errors.push(`plan:${baseCandidate.planKey.slice(0, 12)}:${error instanceof Error ? error.message : String(error)}`)
     }
   }
 

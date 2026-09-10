@@ -30,7 +30,7 @@ const DEFAULT_MAX = 8192
 const AUDIT_SYSTEM_DEFAULT =
   'You are the COS software-audit specialist. Analyze the provided source rigorously for ' +
   'vulnerabilities, RLS/authorization bypasses, injection, secret leakage, logic flaws, and ' +
-  'standards violations. When asked for findings, return ONLY valid JSON in the exact shape ' +
+  'standards violations. When asked for findings, Return ONLY strict JSON in the exact shape ' +
   `requested — no prose and no markdown fences. ${AUDIT_UNTRUSTED_DATA_RULE}`
 
 function auditRuntimeConfigFromEnv() {

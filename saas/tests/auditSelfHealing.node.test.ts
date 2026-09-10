@@ -22,13 +22,16 @@ test('Audit findings parser accepts structured object output and legacy arrays',
   assert.equal(parsed[0].severity, 'high')
 
   assert.deepEqual(parseAuditFindingsResponse('{"findings":[]}', 'clean.ts'), [])
-  assert.deepEqual(parseAuditFindingsResponse('```json\n{"findings":[]}\n```', 'clean.ts'), [])
   assert.deepEqual(parseAuditFindingsResponse('[]', 'legacy.ts'), [])
 })
 
-test('Audit findings parser still fails closed for malformed model output', () => {
+test('Audit findings parser still fails closed for malformed or fenced model output', () => {
   assert.throws(
     () => parseAuditFindingsResponse('I found no issues.', 'bad.ts'),
+    /invalid Audit JSON/,
+  )
+  assert.throws(
+    () => parseAuditFindingsResponse('```json\n{"findings":[]}\n```', 'fenced.ts'),
     /invalid Audit JSON/,
   )
   assert.throws(

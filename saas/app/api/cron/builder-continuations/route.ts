@@ -30,13 +30,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   // Original authenticated jobs supply identity and objective. No request-supplied work is accepted.
-  // The only queued job this recovery lane adopts is a server-created, owner-authorized repair tagged
-  // by Self-Healing after its owned-site allowlist and immutable-revision checks. Ordinary Builder
-  // jobs retain their existing after() execution path. Overlapping ticks are safe because claim is atomic.
-  const [continuations, ownedRepair] = await Promise.all([
-    listBuilderContinuations(),
-    queuedOwnedSiteRepair(),
-  ])
+  // Preserve the established Builder continuation contract first; the production gate verifies that
+  // authentication completes before this explicit continuation read. The owned-site recovery lane is
+  // then evaluated separately so it cannot weaken or obscure the normal continuation path.
+  const continuations = await listBuilderContinuations()
+  const ownedRepair = await queuedOwnedSiteRepair()
   const unique = new Map<string, { id: string; userId: string }>()
   for (const job of [...continuations, ...(ownedRepair ? [ownedRepair] : [])]) unique.set(job.id, job)
   const jobs = [...unique.values()]

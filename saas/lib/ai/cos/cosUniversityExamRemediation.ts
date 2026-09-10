@@ -53,6 +53,7 @@ export type CosUniversityExamRemediationPlan = {
   priority: number
   methods: CosUniversityStudyStrategy['methods']
   acquisitionSourceKinds: CosUniversityStudyStrategy['acquisitionSourceKinds']
+  learningDesign: CosUniversityStudyStrategy['learningDesign']
   fineTuneCandidate: boolean
 }
 
@@ -209,6 +210,7 @@ async function persistPlan(failure: FailedExamRow): Promise<{ row: PlanRow; stra
       examRunId: failure.id,
       failedAt: failure.completed_at,
       hiddenExamDetailsExposed: false,
+      learningDesign: strategy.learningDesign,
     },
     last_seen_at: now,
     updated_at: now,
@@ -272,6 +274,7 @@ export async function ensureCosUniversityExamFailureRemediationPlans(options: {
       priority: row.priority,
       methods: strategy.methods,
       acquisitionSourceKinds: strategy.acquisitionSourceKinds,
+      learningDesign: strategy.learningDesign,
       fineTuneCandidate: strategy.fineTuneCandidate,
     })
     if (row.language_code && row.language_dimension) {

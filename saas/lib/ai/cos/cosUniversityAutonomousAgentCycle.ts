@@ -36,10 +36,9 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
       } else if (nextAction === 'study' || nextAction === 'remediate') {
         const learning = await runCosUniversityContinuousLearning({ now, agentId: agent.agentId, maxStudyPlans: 4 })
         if (learning.status === 'error') throw new Error(learning.errors.join('; ') || 'continuous_learning_failed')
-        if (learning.plansAttempted > 0) {
-          const practice = await runCosUniversityDeliberatePractice({ agentId: agent.agentId, maxPlans: 1, maxExercises: 2 })
-          if (practice.errors.length) throw new Error(practice.errors.join('; '))
-        }
+        // Practice follows durable accepted-study proof, not whether this tick acquired material.
+        const practice = await runCosUniversityDeliberatePractice({ agentId: agent.agentId, maxPlans: 1, maxExercises: 2 })
+        if (practice.errors.length) throw new Error(practice.errors.join('; '))
       }
       agents.push({ agentId: agent.agentId, role: agent.role, admitted: admission.admitted, nextAction, completionRatio: record.completionRatio, error: null })
     } catch (error) {

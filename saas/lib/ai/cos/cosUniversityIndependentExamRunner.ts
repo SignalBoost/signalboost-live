@@ -62,6 +62,8 @@ type ExamRunRow = {
   latency_ms: number | null
 }
 
+type ReadyStudyPlan = { id: string; target: CosUniversityExamTarget }
+
 function targetKey(target: CosUniversityExamTarget): string {
   return target.kind === 'subject'
     ? `subject:${target.subjectId}`
@@ -86,6 +88,42 @@ async function loadAssessmentRows(agentId: string): Promise<CosUniversityExamAss
     .limit(5000)
   if (result.error) throw result.error
   return (result.data || []) as CosUniversityExamAssessmentRow[]
+}
+
+async function loadReadyStudyPlans(agentId: string, limit: number): Promise<ReadyStudyPlan[]> {
+  const db = cosServiceDb()
+  if (!db) return []
+  const result = await db.from('cos_university_study_plans')
+    .select('id,subject_id,language_code,language_dimension')
+    .eq('agent_id', agentId)
+    .eq('status', 'ready_for_exam')
+    .order('updated_at', { ascending: true })
+    .limit(limit)
+  if (result.error) throw result.error
+  const plans: ReadyStudyPlan[] = []
+  for (const row of result.data || []) {
+    if (row.language_code && row.language_dimension) {
+      plans.push({ id: row.id, target: { kind: 'language', language: row.language_code as CosPlatformLanguage, dimension: row.language_dimension as CosPlatformLanguageDimension } })
+    } else if (row.subject_id) {
+      plans.push({ id: row.id, target: { kind: 'subject', subjectId: row.subject_id as CosUniversitySubjectId } })
+    }
+  }
+  return plans
+}
+
+async function reconcileReadyStudyPlan(planId: string, run: CosUniversityExamRunSummary): Promise<void> {
+  if (run.status !== 'passed' && run.status !== 'failed' && run.status !== 'already_complete') return
+  if (run.status === 'already_complete' && run.passed === null) return
+  const db = cosServiceDb()
+  if (!db) return
+  const passed = run.status === 'passed' || (run.status === 'already_complete' && run.passed === true)
+  const now = new Date().toISOString()
+  const result = await db.from('cos_university_study_plans').update({
+    status: passed ? 'completed' : 'superseded',
+    completed_at: passed ? now : null,
+    updated_at: now,
+  }).eq('id', planId).eq('status', 'ready_for_exam')
+  if (result.error) throw result.error
 }
 
 async function findRun(runKey: string): Promise<ExamRunRow | null> {
@@ -307,6 +345,7 @@ export async function runCosUniversityIndependentExamBatch(options: {
   now?: Date
   maxExams?: number
   assessmentRows?: CosUniversityExamAssessmentRow[]
+  readyStudyPlansOnly?: boolean
 } = {}): Promise<CosUniversityExamBatchSummary> {
   if (process.env.COS_UNIVERSITY_EXAMS_ENABLED !== 'true') {
     return { enabled: false, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: [], semantics: 'host_seeded_independent_exam_no_self_grading' }
@@ -325,11 +364,22 @@ export async function runCosUniversityIndependentExamBatch(options: {
     return { enabled: true, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors, semantics: 'host_seeded_independent_exam_no_self_grading' }
   }
 
-  const targets = selectCosUniversityExamTargets(rows, now).slice(0, maxExams)
+  let readyPlans: ReadyStudyPlan[] = []
+  try {
+    if (options.readyStudyPlansOnly) readyPlans = await loadReadyStudyPlans(agentId, maxExams)
+  } catch (error) {
+    errors.push(`ready_study_plans:${error instanceof Error ? error.message : String(error)}`)
+    return { enabled: true, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors, semantics: 'host_seeded_independent_exam_no_self_grading' }
+  }
+  const targets = options.readyStudyPlansOnly
+    ? readyPlans.map((plan) => plan.target)
+    : selectCosUniversityExamTargets(rows, now).slice(0, maxExams)
   const runs: CosUniversityExamRunSummary[] = []
-  for (const target of targets) {
+  for (const [index, target] of targets.entries()) {
     try {
-      runs.push(await runTarget(agentId, target, now))
+      const run = await runTarget(agentId, target, now)
+      runs.push(run)
+      if (options.readyStudyPlansOnly && readyPlans[index]) await reconcileReadyStudyPlan(readyPlans[index].id, run)
     } catch (error) {
       errors.push(`${targetKey(target)}:${error instanceof Error ? error.message : String(error)}`)
     }

@@ -29,8 +29,12 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
       const admission = await runCosUniversityAdmission({ now, agentId: agent.agentId, role: agent.role })
       if (admission.errors.length) throw new Error(admission.errors.join('; '))
       const record = await readCosUniversityAgentAcademicRecord(agent.agentId)
-      const nextAction = decideCosUniversityNextAcademicAction(record)
-      if (nextAction === 'independent_exam') {
+      let nextAction = decideCosUniversityNextAcademicAction(record)
+      const readyExam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2, readyStudyPlansOnly: true })
+      if (readyExam.errors.length) throw new Error(readyExam.errors.join('; '))
+      if (readyExam.runs.length > 0) {
+        nextAction = 'independent_exam'
+      } else if (nextAction === 'independent_exam') {
         const exam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2 })
         if (exam.errors.length) throw new Error(exam.errors.join('; '))
       } else if (nextAction === 'study' || nextAction === 'remediate') {

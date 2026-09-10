@@ -8,6 +8,7 @@
 
 import type { OwnerNotifier } from './api-executor.ts'
 import { approvalCopy, categoryLabel } from '../portable/notification-copy.ts'
+import { PUBLIC_BRAND } from '../../public-brand.ts'
 
 function firstOwnerEmail(): string {
   const raw = process.env.OWNER_EMAILS || process.env.OWNER_EMAIL || process.env.SIGNALBOOST_OWNER_EMAIL || ''
@@ -40,7 +41,7 @@ export function createOwnerEmailNotifier(deps: {
       if (!to) return
       const copy = approvalCopy(deps.locale)
       const label = categoryLabel(deps.locale, verdict.category)
-      const dash = deps.dashboardUrl || 'https://saas.signalboostapp.com/dashboard/supervisor'
+      const dash = deps.dashboardUrl || `${PUBLIC_BRAND.siteUrl}/dashboard/supervisor`
       const subject = label + ' — ' + copy.subjectSuffix
 
       const row = (label: string, value: string): string =>

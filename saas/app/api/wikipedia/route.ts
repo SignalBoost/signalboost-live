@@ -1,3 +1,4 @@
+// saas/app/api/wikipedia/route.ts
 // POST /api/wikipedia
 // Body: { query: string }
 //
@@ -10,10 +11,11 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 const WIKI_API   = 'https://en.wikipedia.org/w/api.php'
 const RESULTS    = 10
-const USER_AGENT = 'SignalBoostApp/1.0 (https://saas.signalboostapp.com; support@signalboostapp.com)'
+const USER_AGENT = `${PUBLIC_BRAND.name}/1.0 (${PUBLIC_BRAND.siteUrl}; support@signalboostapp.com)`
 
 function supabase() {
   return createClient(

@@ -1,4 +1,6 @@
+// saas/app/api/agency/checkout/route.ts
 import { NextResponse } from 'next/server'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +17,7 @@ async function createStripeCheckoutSession(request: Request, amountCents: number
   const apiKey = process.env.STRIPE_SECRET_KEY
   if (!apiKey) return null
 
-  const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'https://saas.signalboostapp.com'
+  const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || PUBLIC_BRAND.siteUrl
   const params = new URLSearchParams()
   params.set('mode', 'payment')
   params.set('success_url', origin + '/agency?checkout=success')

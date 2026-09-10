@@ -1,5 +1,6 @@
 // saas/lib/operator/planner.ts
 import { OperatorPlan, WikiContentItem, newId } from './store.ts'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 const WEBSITE_HINTS = ['website', 'homepage', 'landing', 'restaurant', 'real estate', 'colors', 'button', 'reservation', 'polish', 'portuguese']
 
@@ -135,7 +136,7 @@ function extractSearchQuery(request: string): string {
 
 // ── Wikipedia fetch (server-side, no CORS origin param) ──────────────────────
 const WIKI_API   = 'https://en.wikipedia.org/w/api.php'
-const USER_AGENT = 'SignalBoostApp/1.0 (https://saas.signalboostapp.com; support@signalboostapp.com)'
+const USER_AGENT = `${PUBLIC_BRAND.name}/1.0 (${PUBLIC_BRAND.siteUrl}; support@signalboostapp.com)`
 
 async function fetchWikipediaEnrichment(query: string): Promise<WikiContentItem[]> {
   try {

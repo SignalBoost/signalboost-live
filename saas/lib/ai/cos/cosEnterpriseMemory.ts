@@ -1,4 +1,6 @@
+// saas/lib/ai/cos/cosEnterpriseMemory.ts
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 
 export type COSEnterpriseMemoryScope = {
   organizationId: string
@@ -19,7 +21,7 @@ function cleanWorkspace(value: unknown): string | undefined {
 }
 
 function internalDomain(): string {
-  return String(process.env.COS_ENTERPRISE_MEMORY_CANONICAL_DOMAIN || 'saas.signalboostapp.com')
+  return String(process.env.COS_ENTERPRISE_MEMORY_CANONICAL_DOMAIN || PUBLIC_BRAND_DOMAIN)
     .trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
 }
 

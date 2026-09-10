@@ -13,7 +13,7 @@
 //      outreach view can show real delivery state instead of just "sent".
 //
 // Configure once in the Resend dashboard:
-//   Endpoint: https://www.saas.signalboostapp.com/api/webhook/resend
+//   Endpoint: https://itmounts.com/api/webhook/resend
 //   Signing secret -> env RESEND_WEBHOOK_SECRET   (looks like "whsec_...")
 //
 // We verify the signature manually (the `svix` package is not a dependency).

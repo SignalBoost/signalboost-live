@@ -1,4 +1,6 @@
+// saas/lib/credits.ts
 import { createClient } from '@supabase/supabase-js'
+import { isCreditExemptEmail } from '@/lib/auth/ownerEmails'
 
 // Per-plan credit allowances, by meter.
 // Public plan names:
@@ -65,20 +67,10 @@ function adminClient() {
   )
 }
 
-function envList(name: string): string[] {
-  return (process.env[name] || '')
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
-}
-
 export function isPrivilegedCreditEmail(emailValue: string | null | undefined): boolean {
-  const email = String(emailValue || '').trim().toLowerCase()
-  if (!email) return false
-  return (
-    envList('OWNER_EMAILS').includes(email) ||
-    envList('ADMIN_EMAILS').includes(email)
-  )
+  // Delegates to the shared owner definition so authorization and billing can
+  // never disagree about who the owner is.
+  return isCreditExemptEmail(emailValue)
 }
 
 // ── Owner/admin bypass ────────────────────────────────────────────────────────

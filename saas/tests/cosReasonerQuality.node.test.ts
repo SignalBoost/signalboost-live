@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   assessReasonerDraft,
@@ -127,4 +128,28 @@ test('long technical answers that reuse domain terms but add real reasoning are 
     confidence: 0.86,
   })
   assert.equal(promptEchoNonAnswer(prompt, answer), false)
+})
+
+test('managed DeepInfra inference fails capacity queues fast without changing the configured model', () => {
+  const source = readFileSync('lib/ai/local-inference.ts', 'utf8')
+  assert.match(source, /isDeepInfraEndpoint/)
+  assert.match(source, /deepInfra \? \{ fail_fast: true \} : \{\}/)
+  assert.doesNotMatch(source, /LOCAL_AI_(?:FALLBACK|SECONDARY)_MODEL/)
+  assert.doesNotMatch(source, /service_tier:\s*['"]priority['"]/)
+})
+
+test('owner knowledge timeout uses bounded read-only research without replaying the original action', () => {
+  const client = readFileSync('lib/ai/cos/assistantTransportClient.ts', 'utf8')
+  const route = readFileSync('app/api/cos-research/route.ts', 'utf8')
+  const policy = readFileSync('lib/ai/cos/adaptiveResearchPolicy.ts', 'utf8')
+  assert.match(client, /DEFAULT_PRIMARY_RESPONSE_BUDGET_MS = 30_000/)
+  assert.match(client, /source: 'research'/)
+  assert.match(client, /recoverHistoryThenResearch/)
+  assert.match(route, /requireOwner\(\)/)
+  assert.match(route, /getExternalInfo\(query, 6/)
+  assert.match(route, /callLocalModel/)
+  assert.match(route, /external_ai_invoked: false/)
+  assert.match(policy, /isReadOnlyKnowledgePrompt/)
+  assert.doesNotMatch(route, /hotmail/i)
+  assert.doesNotMatch(policy, /hotmail/i)
 })

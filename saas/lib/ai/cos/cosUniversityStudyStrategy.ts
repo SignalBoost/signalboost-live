@@ -75,6 +75,11 @@ const LIVE_SOURCE_KINDS: ContinuousLearningSourceKind[] = [
   'approved_public_web',
 ]
 
+// The generic reference adapter is useful for ordinary learning but currently resolves Wikipedia.
+// University academic study may use the governed credible_web adapter in the same source-kind bucket,
+// but tertiary encyclopedia retrieval must not create accepted study proof or readiness for an exam.
+const UNIVERSITY_EXCLUDED_STUDY_ADAPTER_IDS = ['reference'] as const
+
 function method(
   id: CosUniversityStudyMethodId,
   execution: CosUniversityStudyMethodExecution,
@@ -296,6 +301,7 @@ export function universityStudyGapSignal(input: {
       ...(input.evidence || []),
     ],
     sourceKinds: input.strategy.acquisitionSourceKinds,
+    excludedAdapterIds: [...UNIVERSITY_EXCLUDED_STUDY_ADAPTER_IDS],
     portableIds: ['cos'],
   }
 }
@@ -325,6 +331,7 @@ export function platformLanguageStudyGapSignal(input: {
       ...input.strategy.methods.map(item => `study_method=${item.id}:${item.execution}`),
     ],
     sourceKinds: input.strategy.acquisitionSourceKinds,
+    excludedAdapterIds: [...UNIVERSITY_EXCLUDED_STUDY_ADAPTER_IDS],
     portableIds: ['cos'],
   }
 }

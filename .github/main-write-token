@@ -1,2 +1,2 @@
-base_sha=1fe7f80ee11eaf431b96f75e94d8e0b13422c6e3
-branch=fix/audit-repository-aware-self-healing-20260910
+base_sha=672a709abeb2268dfdaa7f76ea14b45da445c6ba
+branch=fix/builder-pickup-owned-audit-20260910

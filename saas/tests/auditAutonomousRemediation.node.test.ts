@@ -160,3 +160,29 @@ test('completed remediation presents zero active findings while retaining audit 
   assert.match(dashboard, /\{findings\.length\} \{copy\.findings\}/)
   assert.match(dashboard, /status: 'remediated'/)
 })
+
+test('owned iTMounts Audit is a continuous Self-Healing input while customer audits keep their consent boundary', () => {
+  const cron = read('../app/api/cron/audit-self-healing/route.ts')
+  const vercel = read('../vercel.json')
+
+  assert.match(cron, /owned_platform_continuous_self_healing/)
+  assert.match(cron, /VERCEL_GIT_COMMIT_SHA/)
+  assert.match(cron, /approve_audit_run_remediation_v2/)
+  assert.match(cron, /runApprovedAuditRemediationWithRetry/)
+  assert.match(cron, /Customer\/external repository audits remain report-only/)
+  assert.match(vercel, /"AUDIT_SELF_HEALING_ENABLED": "true"/)
+  assert.match(vercel, /\/api\/cron\/audit-self-healing/)
+})
+
+test('owner Activity report aggregates Self-Healing jobs, Audit scans, and remediation evidence', () => {
+  const route = read('../app/api/hub/audit/activity/route.ts')
+  const report = read('../components/audit/ActivityReport.tsx')
+
+  assert.match(route, /builder_jobs/)
+  assert.match(route, /selfHealingOwnedSite/)
+  assert.match(route, /audit_runs/)
+  assert.match(route, /audit_batch_remediation/)
+  assert.match(route, /Self-Healing Supervisor/)
+  assert.match(report, /Self-Healing work appears here/)
+  assert.match(report, /Active/)
+})

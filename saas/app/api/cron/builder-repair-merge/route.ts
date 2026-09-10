@@ -29,6 +29,9 @@ export async function GET(request: Request) {
         mergeCommitSha: outcome.mergeCommitSha,
         baseBranch: outcome.baseBranch,
         detail: outcome.detail,
+        mergeWatchOutcome: outcome.mergeWatchOutcome,
+        deploymentId: outcome.deploymentId,
+        deploymentState: outcome.deploymentState,
       }).catch(error => {
         console.error('[builder_repository_merge_job_reconcile_failed]', {
           pullRequestNumber: outcome.pullRequestNumber,

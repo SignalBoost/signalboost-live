@@ -1,5 +1,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
+import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
+import type { MergeWatchOutcome } from './repository-merge-watch.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SAFE_SHA = /^[0-9a-f]{40}$/i
@@ -98,6 +100,9 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
   mergeCommitSha: string
   baseBranch: string
   detail?: string | null
+  mergeWatchOutcome?: MergeWatchOutcome | null
+  deploymentId?: string | null
+  deploymentState?: string | null
 }): Promise<boolean> {
   if (!Number.isInteger(input.pullRequestNumber) || input.pullRequestNumber < 1 || !SAFE_SHA.test(input.mergeCommitSha) || !SAFE_BRANCH.test(input.baseBranch)) return false
   const db = serviceClient()
@@ -154,6 +159,22 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     mergeCommitSha: input.mergeCommitSha,
     baseBranch: input.baseBranch,
   })
+  await recordBuilderUniversityProductionOutcome({
+    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt },
+    status: input.baseBranch === 'main' && input.mergeWatchOutcome === 'healthy'
+      ? 'success' : input.mergeWatchOutcome === 'rolled_back' ? 'failure' : 'observed',
+    verification: input.mergeWatchOutcome === 'healthy'
+      ? 'generation_fenced_repository_merge_and_production_healthy'
+      : input.mergeWatchOutcome === 'rolled_back'
+        ? 'generation_fenced_repository_merge_rolled_back'
+        : 'generation_fenced_repository_merge_without_healthy_production_proof',
+    facts: { pullRequestNumber: input.pullRequestNumber, mergeCommitSha: input.mergeCommitSha,
+      baseBranch: input.baseBranch, mergeWatchOutcome: input.mergeWatchOutcome ?? null,
+      deploymentId: input.deploymentId ?? null, deploymentState: input.deploymentState ?? null },
+  }).catch(error => console.error('[builder_university_outcome_record_failed]', {
+    jobId: row.id,
+    message: error instanceof Error ? error.message : 'unknown',
+  }))
   return true
 }
 
@@ -225,5 +246,14 @@ export async function failBuilderRepositoryRepairAfterSupersededBase(input: {
     baseBranch: input.baseBranch,
     error: 'builder_repository_target_superseded',
   })
+  await recordBuilderUniversityProductionOutcome({
+    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt },
+    status: 'failure',
+    verification: 'generation_fenced_repository_base_superseded',
+    facts: { pullRequestNumber: input.pullRequestNumber, baseBranch: input.baseBranch, error: 'builder_repository_target_superseded' },
+  }).catch(error => console.error('[builder_university_outcome_record_failed]', {
+    jobId: row.id,
+    message: error instanceof Error ? error.message : 'unknown',
+  }))
   return true
 }

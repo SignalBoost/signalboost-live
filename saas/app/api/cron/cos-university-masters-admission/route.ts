@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityAdmission } from '@/lib/ai/cos/cosUniversityAdmissionRunner'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,7 @@ export async function GET(req: NextRequest) {
   if (!secret || auth !== `Bearer ${secret}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
     const result = await runCosUniversityAdmission({ now: new Date() })
+    await recordCosUniversityProductionPath({ path: 'masters_admission', invocationSucceeded: result.errors.length === 0, evidence: result })
     return NextResponse.json({ ok: result.errors.length === 0, ...result }, { status: result.errors.length ? 500 : 200 })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

@@ -21,9 +21,18 @@ export function parseAuditFindingsResponse(raw: string | null, file: string): Pa
   } catch {
     throw new Error(`COS returned invalid Audit JSON for ${file}.`)
   }
-  if (!Array.isArray(parsed)) throw new Error(`COS Audit response was not an array for ${file}.`)
 
-  return parsed.map((item, index) => {
+  // The structured local-inference transport enforces a JSON object, so the
+  // canonical response is { findings: [...] }. Keep legacy raw arrays readable
+  // for older stored/tests without weakening malformed-output validation.
+  const findings = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === 'object' && !Array.isArray(parsed) && Array.isArray((parsed as Record<string, unknown>).findings)
+      ? (parsed as { findings: unknown[] }).findings
+      : null
+  if (!findings) throw new Error(`COS Audit response did not contain a findings array for ${file}.`)
+
+  return findings.map((item, index) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {
       throw new Error(`COS returned a malformed Audit finding at index ${index} for ${file}.`)
     }

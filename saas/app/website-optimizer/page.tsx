@@ -9,6 +9,7 @@ import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 type Lang = 'en' | 'pt' | 'es' | 'pl' | 'ru'
 type Finding = { code: string; category: 'performance' | 'seo' | 'accessibility' | 'security' | 'conversion'; severity: 'high' | 'medium' | 'low'; value?: string | number | boolean }
+type OwnerWorkflow = { status: string; message?: string }
 
 type Copy = {
   back: string; badge: string; title: string; subtitle: string; urlLabel: string; placeholder: string; scan: string; scanning: string; hint: string; trySample: string; missingUrl: string; scanFailed: string; ready: string; begin: string; score: string; loadTime: string; findings: string; high: string; medium: string; low: string; pageChecked: string; topFindings: string; noFindings: string; metrics: string; html: string; titleLength: string; descriptionLength: string; scripts: string; stylesheets: string; images: string; missingAlt: string; h1: string; lazyImages: string; requestTitle: string; requestBody: string; requestCta: string; safeNote: string; detailLabel: string; fixLabel: string; genericFinding: string; genericDetail: (category: string, value?: string | number | boolean) => string; issueCopy: Record<string, { title: string; detail: (value?: string | number | boolean) => string }>; fixes: Record<string, string>; categories: Record<string, string>; severities: Record<string, string>
@@ -37,6 +38,15 @@ function activeLang(lang: string): Lang { return (['en', 'pt', 'es', 'pl', 'ru']
 function formatMs(ms?: number) { return !ms ? '0 ms' : ms > 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms` }
 function formatBytes(bytes?: number) { return !bytes ? '0 KB' : `${Math.max(1, Math.round(bytes / 1024))} KB` }
 function planHref(target: string) { return `/request-plan?source=website_optimizer&target=${encodeURIComponent(target)}` }
+function isCanonicalOwnedTarget(value: string) {
+  try {
+    const candidate = new URL(value)
+    const canonical = new URL(PUBLIC_BRAND.siteUrl)
+    return candidate.protocol === 'https:' && candidate.host.toLowerCase() === canonical.host.toLowerCase()
+  } catch {
+    return false
+  }
+}
 
 export default function WebsiteOptimizerPage() {
   const { lang } = useI18n()
@@ -45,31 +55,72 @@ export default function WebsiteOptimizerPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [data, setData] = useState<any>(null)
-  // The owner is not a lead. /api/credits already reports isOwner for the
-  // signed-in session, so the public tool can suppress its lead-magnet hooks
-  // without the public Concierge ever inheriting owner identity.
   const [isOwner, setIsOwner] = useState(false)
+  const [ownerResolved, setOwnerResolved] = useState(false)
+  const [ownerWorkflow, setOwnerWorkflow] = useState<OwnerWorkflow | null>(null)
 
   useEffect(() => {
     let cancelled = false
     fetch('/api/credits', { cache: 'no-store', credentials: 'include' })
       .then(response => (response.ok ? response.json() : null))
-      .then(json => { if (!cancelled && json?.isOwner === true) setIsOwner(true) })
+      .then(json => { if (!cancelled) setIsOwner(json?.isOwner === true) })
       .catch(() => {})
+      .finally(() => { if (!cancelled) setOwnerResolved(true) })
     return () => { cancelled = true }
   }, [])
+
+  async function resolveOwnerForScan(): Promise<boolean> {
+    if (ownerResolved) return isOwner
+    try {
+      const response = await fetch('/api/credits', { cache: 'no-store', credentials: 'include' })
+      const json = response.ok ? await response.json().catch(() => null) : null
+      const owner = json?.isOwner === true
+      setIsOwner(owner)
+      setOwnerResolved(true)
+      return owner
+    } catch {
+      setOwnerResolved(true)
+      return false
+    }
+  }
+
+  async function startOwnerWorkflow() {
+    setOwnerWorkflow({ status: 'starting' })
+    try {
+      const response = await fetch('/api/owner/site-optimization/remediate', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const json = await response.json().catch(() => null)
+      const message = typeof json?.message === 'string'
+        ? json.message
+        : typeof json?.remediation?.[0]?.message === 'string'
+          ? json.remediation[0].message
+          : typeof json?.error === 'string'
+            ? json.error
+            : copy.scanFailed
+      setOwnerWorkflow({ status: String(json?.status || (response.ok ? 'repair_started' : 'error')), message })
+    } catch {
+      setOwnerWorkflow({ status: 'error', message: copy.scanFailed })
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!url.trim()) { setError(copy.missingUrl); return }
-    setLoading(true); setError(''); setData(null)
+    setLoading(true); setError(''); setData(null); setOwnerWorkflow(null)
     try {
+      const owner = await resolveOwnerForScan()
       const res = await fetch('/api/public/site-optimization', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url.trim() }) })
       const json = await res.json().catch(() => null)
       if (!res.ok || !json?.ok) { setError(typeof json?.error === 'string' ? json.error : copy.scanFailed); return }
       setData(json)
-      if (!isOwner) {
-        window.localStorage.setItem('signalboost.concierge.utilityContext', JSON.stringify({ source: 'website_optimizer', target: json.finalUrl || json.target || url.trim(), report: `Free Website Optimizer report for ${json.finalUrl || json.target || url.trim()}: score ${json.summary?.score ?? 'n/a'}, findings ${json.summary?.findings ?? 'n/a'}, high ${json.summary?.high ?? 'n/a'}. Top opportunities: ${(json.findings || []).slice(0, 5).map((f: any) => f.code).join(', ') || 'none flagged'}.` }))
+      const scanTarget = String(json.finalUrl || json.target || url.trim())
+      if (owner && isCanonicalOwnedTarget(scanTarget)) {
+        await startOwnerWorkflow()
+      } else if (!owner) {
+        window.localStorage.setItem('signalboost.concierge.utilityContext', JSON.stringify({ source: 'website_optimizer', target: scanTarget, report: `Free Website Optimizer report for ${scanTarget}: score ${json.summary?.score ?? 'n/a'}, findings ${json.summary?.findings ?? 'n/a'}, high ${json.summary?.high ?? 'n/a'}. Top opportunities: ${(json.findings || []).slice(0, 5).map((f: any) => f.code).join(', ') || 'none flagged'}.` }))
         window.dispatchEvent(new Event('signalboost:concierge-utility-context'))
       }
     } catch { setError(copy.scanFailed) } finally { setLoading(false) }
@@ -79,6 +130,7 @@ export default function WebsiteOptimizerPage() {
   const findings: Finding[] = Array.isArray(data?.findings) ? data.findings : []
   const metrics = data?.metrics || {}
   const target = String(data?.finalUrl || data?.target || url || '')
+  const ownerTarget = isOwner && isCanonicalOwnedTarget(target)
   const headlineRows = useMemo(() => ([
     [copy.score, summary?.score ?? '—'],
     [copy.loadTime, summary ? formatMs(summary.loadMs) : '—'],
@@ -149,7 +201,14 @@ export default function WebsiteOptimizerPage() {
               <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-400">{copy.metrics}</h3>
               <div className="mt-4 grid gap-3 text-sm">{reportRows.map(([label, value]) => <div key={String(label)} className="flex justify-between gap-4 border-b border-white/5 pb-2 text-slate-300 last:border-0"><span>{label}</span><strong className="text-white">{String(value)}</strong></div>)}</div>
             </section>
-            {isOwner ? null : (
+            {ownerTarget ? (
+              <section className="rounded-3xl border border-emerald-300/20 bg-emerald-300/10 p-6">
+                <h3 className="text-2xl font-black">{copy.requestTitle}</h3>
+                <p className="mt-3 text-sm leading-6 text-emerald-50/80">{ownerWorkflow?.status === 'starting' ? copy.scanning : ownerWorkflow?.message || copy.safeNote}</p>
+                <button type="button" disabled={ownerWorkflow?.status === 'starting'} onClick={() => void startOwnerWorkflow()} className="mt-6 inline-flex w-full justify-center rounded-xl bg-emerald-300 px-5 py-3 text-center font-black text-slate-950 hover:bg-white disabled:opacity-60">{copy.requestCta}</button>
+                <p className="mt-3 text-center text-xs text-emerald-50/70">{ownerWorkflow?.status || copy.ready}</p>
+              </section>
+            ) : isOwner ? null : (
               <section className="rounded-3xl border border-cyan-300/20 bg-cyan-300/10 p-6"><h3 className="text-2xl font-black">{copy.requestTitle}</h3><p className="mt-3 text-sm leading-6 text-cyan-50/80">{copy.requestBody}</p><Link href={planHref(target)} className="mt-6 inline-flex w-full justify-center rounded-xl bg-cyan-300 px-5 py-3 text-center font-black text-slate-950 hover:bg-white">{copy.requestCta}</Link><p className="mt-3 text-center text-xs text-cyan-50/70">{copy.safeNote}</p></section>
             )}
           </aside>

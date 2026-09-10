@@ -192,6 +192,23 @@ test('Referee fails closed for signature tampering, expiry, kill switch and host
   assert.equal(authorizeSecurityAction({ envelope, trustedKeys, request: baseRequest, hostState: hostState({ concurrentActions: 4 }) }).reason, 'concurrency_limit_reached')
 })
 
+test('Referee rejects malformed runtime requests without throwing or widening scope', () => {
+  const envelope = signedManifest(guardianManifest())
+  const malformedRequests = [
+    null,
+    {},
+    { engagementId: envelope.manifest.engagementId, role: 'guardian', action: 'scan.safe', target: null },
+    { engagementId: envelope.manifest.engagementId, role: 'guardian', action: 'unknown.action', target: { kind: 'host', value: 'corp.example' } },
+    { engagementId: envelope.manifest.engagementId, role: 'guardian', action: 'scan.safe', target: { kind: 'unknown', value: 'corp.example' } },
+  ]
+
+  for (const request of malformedRequests) {
+    const decision = authorizeSecurityAction({ envelope, trustedKeys, request, hostState: hostState() })
+    assert.equal(decision.allowed, false)
+    assert.equal(decision.reason, 'invalid_request')
+  }
+})
+
 test('Stranger session is signed, time-bounded and cannot inherit Guardian private context', () => {
   const taintedManifest = {
     ...strangerManifest(),

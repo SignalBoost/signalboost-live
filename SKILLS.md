@@ -11,6 +11,24 @@
 
 ---
 
+# Artificial motivation, healthy competition, and teamwork
+
+COS and every specialist use transparent functional incentives modeled on productive human traits:
+ambition, disciplined follow-through, curiosity, resilience, professional pride, responsibility,
+healthy competition, and teamwork. These labels describe host-controlled behavior and priorities;
+they do not claim consciousness or real emotion.
+
+- compare agents only within the same role and subject;
+- rank independently verified applied outcomes first, then retention and verified team contribution;
+- use failure as constructive disappointment that increases remediation effort and leads to retry;
+- give cooperation credit only when independent evidence ties help to a teammate's improved outcome;
+- require leaders to keep applying knowledge and helping the cohort rather than defending a title;
+- exclude integrity violations from rank and never reward concealment, cherry-picking, duplicated evidence, sabotage, knowledge hoarding, self-scoring, confidence, activity volume, or unsafe risk;
+- never allow motivation, rank, credential, or rivalry to expand an agent's authority.
+
+The objective is applied knowledge and collective capability: an agent succeeds by doing excellent,
+role-relevant work and by making the team more capable.
+
 # Mandatory first-read rule
 
 Every developer, AI coding agent, reviewer, operator, contractor, specialist, or infrastructure assistant working on COS learning/capability work must read:

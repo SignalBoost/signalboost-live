@@ -4,6 +4,7 @@ import { reopenCosUniversityStudyAfterFailedPractice } from '@/lib/ai/cos/cosUni
 import { disciplineCosUniversityPracticeQueue } from '@/lib/ai/cos/cosUniversityPracticeQueueDiscipline'
 import { readCosUniversityPracticeStudyGate } from '@/lib/ai/cos/cosUniversityPracticeStudyGate'
 import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
     const programGate = await readCosUniversityUndergraduateAcademicLaneGate()
     if (!programGate.allowed) {
       const unavailable = programGate.reason === 'service_database_unavailable'
+      await recordCosUniversityProductionPath({ path: 'deliberate_practice', invocationSucceeded: !unavailable, evidence: { skipped: true, programGate } })
       return NextResponse.json({ ok: !unavailable, skipped: true, programGate }, { status: unavailable ? 503 : 200 })
     }
 
@@ -29,6 +31,7 @@ export async function GET(req: NextRequest) {
     const studyGate = await readCosUniversityPracticeStudyGate()
     if (!studyGate.allowed || !studyGate.planId || !studyGate.studyAttempt) {
       const unavailable = studyGate.reason === 'service_database_unavailable'
+      await recordCosUniversityProductionPath({ path: 'deliberate_practice', invocationSucceeded: !unavailable, evidence: { skipped: true, programGate, studyGate } })
       return NextResponse.json({ ok: !unavailable, skipped: true, programGate, studyGate }, { status: unavailable ? 503 : 200 })
     }
 
@@ -49,6 +52,7 @@ export async function GET(req: NextRequest) {
     // Reconcile from durable queue/plan state after every practice sweep. result.runs is only a hint;
     // failures split across cron invocations are still discovered from persisted practice evidence.
     const practiceRemediation = await reopenCosUniversityStudyAfterFailedPractice(result.runs)
+    await recordCosUniversityProductionPath({ path: 'deliberate_practice', invocationSucceeded: result.errors.length === 0, evidence: { programGate, studyGate, queueDiscipline, practiceRemediation, ...result } })
     return NextResponse.json({
       ok: result.errors.length === 0,
       programGate,

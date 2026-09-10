@@ -65,6 +65,14 @@ function configuredReasoningEffort(): 'none' | 'low' | 'medium' | 'high' | undef
   return undefined
 }
 
+function isDeepInfraEndpoint(baseUrl: string): boolean {
+  try {
+    return normalizeHost(new URL(baseUrl).hostname) === 'api.deepinfra.com'
+  } catch {
+    return false
+  }
+}
+
 /** Align a caller's explicit strict-JSON contract with the transport instead of relying on prose alone. */
 function strictJsonObjectRequested(args: LocalModelCallArgs): boolean {
   if (args.jsonObject === true) return true
@@ -100,6 +108,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     inferenceStartedAt = Date.now()
     const reasoningEffort = configuredReasoningEffort()
     const enforceJsonObject = strictJsonObjectRequested(args)
+    const deepInfra = isDeepInfraEndpoint(config.baseUrl)
     const parsePenalty = (value: string | undefined, fallback: number): number => {
       const n = Number(value)
       return Number.isFinite(n) ? Math.max(0, Math.min(2, n)) : fallback
@@ -120,6 +129,10 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
         temperature: args.temperature ?? 0.2,
         frequency_penalty: frequencyPenalty,
         presence_penalty: presencePenalty,
+        // DeepInfra otherwise permits requests to sit in a capacity queue until the full local
+        // timeout. fail_fast keeps the exact configured model/provider but surfaces saturation
+        // immediately so the caller can use governed retrieval instead of waiting for minutes.
+        ...(deepInfra ? { fail_fast: true } : {}),
         ...(enforceJsonObject ? { response_format: { type: 'json_object' } } : {}),
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         messages: [

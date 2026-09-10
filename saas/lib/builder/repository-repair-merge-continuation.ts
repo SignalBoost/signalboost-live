@@ -1,6 +1,7 @@
 import { attemptSignalBoostRepositoryAutoMerge, evaluateAutoMergeDangerCategory, evaluatePullRequestChecks } from './repository-repair-automerge.ts'
 import { watchMergedDeployment } from './repository-merge-watch.ts'
 import type { StateSnapshotPort } from '../portable/state-snapshot-port.ts'
+import type { MergeWatchOutcome } from './repository-merge-watch.ts'
 
 const GITHUB_API = 'https://api.github.com/repos/SignalBoost/signalboost-live'
 export const REPOSITORY_REPAIR_AUTOMERGE_MARKER = 'Owner-authorized Platform Engineer repair.'
@@ -37,6 +38,9 @@ export type RepositoryRepairMergeContinuationResult = Readonly<{
     baseBranch: string
     detail: string
     mergeCommitSha: string | null
+    mergeWatchOutcome?: MergeWatchOutcome | null
+    deploymentId?: string | null
+    deploymentState?: string | null
   }>>
 }>
 
@@ -166,6 +170,9 @@ export async function completePendingRepositoryRepairMerges(input: {
     baseBranch: string
     detail: string
     mergeCommitSha: string | null
+    mergeWatchOutcome?: MergeWatchOutcome | null
+    deploymentId?: string | null
+    deploymentState?: string | null
   }> = []
 
   for (const pull of pulls) {
@@ -254,6 +261,9 @@ export async function completePendingRepositoryRepairMerges(input: {
     }
 
     let detail = `Merged verified repair PR #${pullRequestNumber} into ${baseBranch} as ${merge.mergeCommitSha}.`
+    let mergeWatchOutcome: MergeWatchOutcome | null = null
+    let deploymentId: string | null = null
+    let deploymentState: string | null = null
     if (productionMerge && merge.preMergeSnapshotId && snapshotPort && Date.now() < deadlineAtMs - 15_000) {
       const watch = await watchMergedDeployment({
         mergeCommitSha: merge.mergeCommitSha,
@@ -264,9 +274,15 @@ export async function completePendingRepositoryRepairMerges(input: {
         token: process.env.VERCEL_TOKEN || process.env.VERCEL_API_TOKEN || '',
         deadlineAtMs,
       }).catch(() => null)
-      if (watch?.detail) detail += ` ${watch.detail}`
+      if (watch) {
+        mergeWatchOutcome = watch.outcome
+        deploymentId = watch.deploymentId
+        deploymentState = watch.deploymentState
+        if (watch.detail) detail += ` ${watch.detail}`
+      }
     }
-    outcomes.push({ pullRequestNumber, outcome: 'merged', reason: null, baseBranch, detail, mergeCommitSha: merge.mergeCommitSha })
+    outcomes.push({ pullRequestNumber, outcome: 'merged', reason: null, baseBranch, detail,
+      mergeCommitSha: merge.mergeCommitSha, mergeWatchOutcome, deploymentId, deploymentState })
   }
 
   return Object.freeze({

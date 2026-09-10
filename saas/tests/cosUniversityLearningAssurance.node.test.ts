@@ -55,6 +55,31 @@ test('production verification covers every declared gated learning path at the d
   assert.deepEqual(failed.missingOrInvalid, ['continuous_learning'])
 })
 
+test('assurance registry covers every scheduled University route explicitly', () => {
+  const vercel = JSON.parse(fs.readFileSync(path.join(ROOT, 'vercel.json'), 'utf8'))
+  const scheduled = vercel.crons
+    .map((entry: { path: string }) => entry.path)
+    .filter((route: string) => route.includes('/cos-university-'))
+  const pathByRoute: Record<string, string> = {
+    '/api/cron/cos-university-learning': 'continuous_learning',
+    '/api/cron/cos-university-practice': 'deliberate_practice',
+    '/api/cron/cos-university-exam': 'independent_exams',
+    '/api/cron/cos-university-a-range': 'subject_a_range_evidence',
+    '/api/cron/cos-university-language-a-range': 'language_a_range_evidence',
+    '/api/cron/cos-university-graduation': 'graduation',
+    '/api/cron/cos-university-masters-learning': 'masters_learning',
+    '/api/cron/cos-university-masters-admission': 'masters_admission',
+    '/api/cron/cos-university-masters-exam': 'masters_exams',
+    '/api/cron/cos-university-masters-progress': 'masters_progress',
+    '/api/cron/cos-university-phd-admission': 'phd_admission',
+    '/api/cron/cos-university-phd-methodology-exam': 'phd_methodology_exams',
+    '/api/cron/cos-university-phd-research': 'phd_research',
+    '/api/cron/cos-university-phd-progress': 'phd_progress',
+  }
+  assert.deepEqual(scheduled.filter((route: string) => !pathByRoute[route]), [])
+  for (const route of scheduled) assert.ok(pathByRoute[route] in COS_UNIVERSITY_FEATURE_GATED_PATHS)
+})
+
 test('real-world promotion requires retention, transfer and an improved production outcome', () => {
   const common = {
     baselineScore: 45, postStudyScore: 85, transferEvidenceRefs: ['exam://transfer/1'],

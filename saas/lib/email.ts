@@ -5,12 +5,12 @@ import { PUBLIC_BRAND } from '@/lib/public-brand'
 // Verified sender identities for the canonical public iTMounts domain.
 // These addresses are used for outbound sending through Resend.
 export const SENDERS = {
-  signalSupport: `${PUBLIC_BRAND.name} Team <signalsupport@itmounts.com>`,
-  saasSupport:   `${PUBLIC_BRAND.name} Team <saassupport@itmounts.com>`,
-  saasSales:     `${PUBLIC_BRAND.name} Sales <saassales@itmounts.com>`,
-  saasMarketing: `${PUBLIC_BRAND.name} <saasmarketing@itmounts.com>`,
-  saasPartners:  `${PUBLIC_BRAND.name} Partners <saaspartners@itmounts.com>`,
-  saasContact:   `${PUBLIC_BRAND.name} <saascontact@itmounts.com>`,
+  signalSupport: `${PUBLIC_BRAND.name} Team <support@itmounts.com>`,
+  saasSupport:   `${PUBLIC_BRAND.name} Team <support@itmounts.com>`,
+  saasSales:     `${PUBLIC_BRAND.name} Sales <sales@itmounts.com>`,
+  saasMarketing: `${PUBLIC_BRAND.name} <marketing@itmounts.com>`,
+  saasPartners:  `${PUBLIC_BRAND.name} Partners <partners@itmounts.com>`,
+  saasContact:   `${PUBLIC_BRAND.name} <contact@itmounts.com>`,
 } as const
 
 type SenderKey = keyof typeof SENDERS
@@ -18,12 +18,12 @@ type SenderKey = keyof typeof SENDERS
 // Business-facing sender aliases must receive replies at the matching business
 // address. Never allow an owner/admin fallback address to leak into customer email.
 const REPLY_TO_BY_SENDER: Record<SenderKey, string> = {
-  signalSupport: 'signalsupport@itmounts.com',
-  saasSupport: 'saassupport@itmounts.com',
-  saasSales: 'saassales@itmounts.com',
-  saasMarketing: 'saasmarketing@itmounts.com',
-  saasPartners: 'saaspartners@itmounts.com',
-  saasContact: 'saascontact@itmounts.com',
+  signalSupport: 'support@itmounts.com',
+  saasSupport: 'support@itmounts.com',
+  saasSales: 'sales@itmounts.com',
+  saasMarketing: 'marketing@itmounts.com',
+  saasPartners: 'partners@itmounts.com',
+  saasContact: 'contact@itmounts.com',
 }
 
 function getResendClient() {

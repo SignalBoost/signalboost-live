@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.96
+**Version:** 1.97
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -609,6 +609,20 @@ Production follow-up found that the first assurance registry grouped or omitted 
 routes. The v1.84 repair enumerates subject and language A-range, Master's admission/progress, and
 PhD admission/progress independently, with a regression that fails whenever any scheduled
 `cos-university-*` route lacks an explicit assurance mapping.
+
+## Builder University Production outcomes — 2026-09-10
+
+Builder now sends every generation-fenced terminal job result into the authoritative verified
+Production-outcome recorder for the enrolled `software-specialist` and `computer_science` subject.
+Host-proven workspace execution or a healthy watched merge/deployment may be recorded as success;
+a completed patch/review artifact without Production proof is only observed, and a terminal job
+failure remains failure. Delivery is idempotent per job claim and evidence-recording failure cannot
+undo the already-persisted Builder result.
+
+This is raw real-world evidence, not an academic grade. Builder never constructs its own University
+baseline, transfer, retention, attribution, or independent-scoring envelope. The University
+controller must correlate those independent records before #2048's promotion path may treat a
+successful Builder outcome as practical learning proof.
 
 ---
 

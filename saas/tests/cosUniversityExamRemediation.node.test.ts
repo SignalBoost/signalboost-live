@@ -52,6 +52,38 @@ test('subject exam remediation adds governed public web without broadening gener
   assert.doesNotMatch(unknownBranch, /approved_public_web/)
 })
 
+test('language exam remediation preserves the exact failed dimension without breaking broad language study', () => {
+  const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
+  const strategist = file('lib/ai/cos/cosUniversityStudyStrategy.ts')
+  const store = file('lib/ai/cos/cosUniversityStore.ts')
+
+  assert.match(bridge, /languageDimension: CosPlatformLanguageDimension \| null/)
+  assert.match(bridge, /languageDimension: row\.language_dimension/)
+  assert.match(bridge, /if \(row\.language_code && row\.language_dimension\)/)
+  assert.match(bridge, /dimension: row\.language_dimension/)
+
+  assert.match(strategist, /dimension\?: CosPlatformLanguageDimension \| null/)
+  assert.match(strategist, /const dimension = input\.dimension \|\| null/)
+  assert.match(strategist, /LANGUAGE_DIMENSION_STUDY_THEMES: Record<CosPlatformLanguageDimension, string\[]>/)
+  assert.match(strategist, /writing: \[/)
+  assert.match(strategist, /written composition and sentence construction/)
+  assert.match(strategist, /editing revision and error correction/)
+  assert.match(strategist, /capability: dimension \? `cos_university\.language\.\$\{language\.id\}\.\$\{dimension\}` : `cos_university\.language\.\$\{language\.id\}`/)
+  assert.match(strategist, /\.\.\.\(dimension \? \{ missingFacts: studyThemes\.map\(theme => `\$\{language\.title\} \$\{theme\}`\) \} : \{\}\)/)
+  assert.match(strategist, /`language_dimension=\$\{dimension\}`/)
+  assert.match(strategist, /language_dimensions=comprehension,writing,instruction_following,translation_localization,cultural_pragmatics/)
+
+  // Broad rotation/autopsy language plans intentionally omit a single dimension and must remain valid.
+  assert.match(store, /languageDimension: null/)
+  assert.match(store, /\? platformLanguageStudyGapSignal\(\{\s*planKey: candidate\.planKey,\s*language: candidate\.language,\s*objective: candidate\.objective,/)
+
+  const dimensionThemesStart = strategist.indexOf('const LANGUAGE_DIMENSION_STUDY_THEMES')
+  const dimensionThemesEnd = strategist.indexOf('const LANGUAGE_DIMENSION_LABELS', dimensionThemesStart)
+  assert.ok(dimensionThemesStart >= 0 && dimensionThemesEnd > dimensionThemesStart)
+  const dimensionThemes = strategist.slice(dimensionThemesStart, dimensionThemesEnd)
+  assert.doesNotMatch(dimensionThemes, /hidden exam|rubric|scorer|manifest_hash|seed/i)
+})
+
 test('later terminal pass or expired failure retires obsolete remediation instead of starving current work', () => {
   const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
   assert.match(bridge, /Only the latest terminal outcome for a competency may\s*\n \* drive remediation/i)

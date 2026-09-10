@@ -32,3 +32,16 @@ test('automatic Audit UI only hides the obsolete approval controls with durable 
   assert.match(lifecycle, /manualControls\.style\.display = 'none'/)
   assert.match(lifecycle, /Absence of durable status evidence never manufactures a success state/)
 })
+
+test('canonical owner audit never exposes a clickable approval race before Self-Healing status loads', () => {
+  const layout = read('../app/dashboard/audit/layout.tsx')
+
+  assert.match(layout, /OWNED_REPOSITORY = 'https:\/\/github\.com\/signalboost\/signalboost-live'/)
+  assert.match(layout, /fetch\('\/api\/credits'/)
+  assert.match(layout, /data\?\.isOwner === true/)
+  assert.match(layout, /canonicalTarget && \(!ownerKnown \|\| isOwner\)/)
+  assert.match(layout, /control\.style\.display = 'none'/)
+  assert.match(layout, /MutationObserver/)
+  assert.match(layout, /root\.addEventListener\('input'/)
+  assert.match(layout, /restoreControl\(control\)/)
+})

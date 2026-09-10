@@ -11,7 +11,12 @@ import { nativeRemediationClass } from './remediation-experience.ts'
 import { recordCouncilOutcomesFromRepairDispatch, type CouncilOutcomeBridgeSummary } from './council-outcome-bridge.ts'
 import { SELF_HEALING_GATEWAY_POLICY } from './self-healing-gateway-policy.ts'
 import { nativeIncidentToNormalized as normalizeNativeIncident } from './native-incident-normalization.ts'
-import { enqueueOwnedSiteOptimizationRepair, isOwnedSiteOptimizationIncident } from './owned-site-autonomous-repair.ts'
+import {
+  enqueueOwnedSiteCybersecurityRepair,
+  enqueueOwnedSiteOptimizationRepair,
+  isOwnedSiteCybersecurityIncident,
+  isOwnedSiteOptimizationIncident,
+} from './owned-site-autonomous-repair.ts'
 import { createSignalBoostGatewayHost } from '@/agent-gateway-host/signalboost-host'
 import { dispatchRepairPlan, type RepairStep } from '@/agent-gateway-host/supervisor-repair'
 import { resolveSupervisorRepairParams, summarizeRepairDispatch } from '@/agent-gateway-host/supervisor-actions'
@@ -52,19 +57,23 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
     const diagnostic = await diagnoseIncident(normalized)
     const repairPlan = Array.isArray(diagnostic.repair_plan) ? diagnostic.repair_plan as RepairStep[] : []
 
-    // The Website Optimizer's public/customer contract remains report-only. An incident from the
-    // separately allowlisted owned-site collector is different: it is first-party production
-    // evidence and is pre-authorized to enter the existing Platform Engineer repair pipeline.
-    // Builder still reproduces the finding before editing, opens a PR, runs CI, and uses the existing
-    // auto-merge/deployment-verification controls. No arbitrary URL or customer scan reaches here.
-    if (isOwnedSiteOptimizationIncident(incident)) {
+    // Public/customer utilities remain report-only. Incidents from separately allowlisted
+    // canonical-owned-site collectors are first-party Production evidence and may enter the
+    // existing Platform Engineer repository-repair pipeline. Builder still reproduces before
+    // editing, opens a PR, runs CI, and relies on governed merge/deployment verification.
+    const optimizerIncident = isOwnedSiteOptimizationIncident(incident)
+    const cybersecurityIncident = isOwnedSiteCybersecurityIncident(incident)
+    if (optimizerIncident || cybersecurityIncident) {
       try {
-        const repair = await enqueueOwnedSiteOptimizationRepair(incident, diagnostic.diagnosis)
+        const repair = optimizerIncident
+          ? await enqueueOwnedSiteOptimizationRepair(incident, diagnostic.diagnosis)
+          : await enqueueOwnedSiteCybersecurityRepair(incident, diagnostic.diagnosis)
+        const surface = optimizerIncident ? 'Website Optimizer' : 'Cybersecurity Preview'
         const action = repair.disposition === 'queued'
-          ? `Autonomous owned-site repair job ${repair.jobId} was queued for Platform Engineer execution.`
+          ? `Autonomous owned-site ${surface} repair job ${repair.jobId} was queued for Platform Engineer execution.`
           : repair.disposition === 'already_active'
-            ? `Owned-site repair job ${repair.jobId} is already active; duplicate execution was suppressed.`
-            : `Owned-site repair job ${repair.jobId} already completed recently for this deployment/finding set; duplicate execution is temporarily suppressed while production is re-observed.`
+            ? `Owned-site ${surface} repair job ${repair.jobId} is already active; duplicate execution was suppressed.`
+            : `Owned-site ${surface} repair job ${repair.jobId} already completed recently for this deployment/finding set; duplicate execution is temporarily suppressed while Production is re-observed.`
         results.push({
           incidentId: incident.incidentId,
           diagnosisConfidence: diagnostic.confidence_score,

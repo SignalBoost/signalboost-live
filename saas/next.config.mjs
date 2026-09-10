@@ -28,6 +28,16 @@ const PUBLIC_SECURITY_HEADERS = [
   { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
 ]
 
+// The public homepage is a same-origin application surface, not a cross-origin API.
+// Do not advertise wildcard CORS there. The explicit canonical origin preserves ordinary
+// same-origin browser behavior while removing an unnecessary wildcard trust signal.
+// `Server` is set empty here as the application-level suppression attempt; Preview/Production
+// verification remains authoritative because the hosting layer may add its own Server header.
+const PUBLIC_ROOT_EXPOSURE_HEADERS = [
+  { key: 'Access-Control-Allow-Origin', value: 'https://itmounts.com' },
+  { key: 'Server', value: '' },
+]
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   turbopack: {},
@@ -39,10 +49,16 @@ const nextConfig = {
     '/api/concierge': ['../cos-core/brain.md'],
   },
   async headers() {
-    return [{
-      source: '/:path*',
-      headers: PUBLIC_SECURITY_HEADERS,
-    }]
+    return [
+      {
+        source: '/:path*',
+        headers: PUBLIC_SECURITY_HEADERS,
+      },
+      {
+        source: '/',
+        headers: PUBLIC_ROOT_EXPOSURE_HEADERS,
+      },
+    ]
   },
 }
 

@@ -8,6 +8,7 @@ import { collectConfigurationDriftIncident } from '@/self-healing-host/configura
 import { persistenceNativeMonitoringCollector } from '@/self-healing-host/native-persistence-monitoring'
 import { platformHealthNativeMonitoringCollector } from '@/self-healing-host/platform-health-monitoring-adapter'
 import { ownedSiteOptimizationMonitoringCollector } from '@/self-healing-host/owned-site-optimization-monitoring'
+import { ownedSiteCybersecurityMonitoringCollector } from '@/self-healing-host/owned-site-cybersecurity-monitoring'
 import { verifyPendingExactVercelRepairOutcomes } from '@/self-healing-host/vercel-deployment-outcome-verifier'
 import { SupabaseNativeProbeStore, createNativeProactiveMonitoringCollectors, type CertificateTarget } from '@/self-healing-host/native-proactive-monitoring'
 import { SupabaseVercelHealthStore } from '@/lib/supervisor/providers/vercel'
@@ -68,8 +69,10 @@ export async function GET(req: NextRequest) {
   const apiUrls = parseApiUrls(); const certificateTargets = parseTlsTargets(apiUrls)
   if (!apiUrls.length || !certificateTargets.length) return NextResponse.json({ ok: false, error: 'native_probe_targets_unavailable', priorRepairVerification }, { status: 503 })
   const quotaBytes = storageQuotaBytes()
+  const baseUrl = productionBaseUrl()
   const collectors = [
-    ownedSiteOptimizationMonitoringCollector({ apiBaseUrl: productionBaseUrl() }),
+    ownedSiteOptimizationMonitoringCollector({ apiBaseUrl: baseUrl }),
+    ownedSiteCybersecurityMonitoringCollector({ apiBaseUrl: baseUrl }),
     ...createNativeProactiveMonitoringCollectors({ db, store, apiUrls, certificateTargets, storageQuotaBytes: quotaBytes }),
     persistenceNativeMonitoringCollector({ db }), livePlatformHealthCollector(db),
   ]
@@ -85,7 +88,7 @@ export async function GET(req: NextRequest) {
   const status = result.collectorErrors.length === collectors.length ? 503 : 200
   return NextResponse.json({
     ok: status === 200,
-    schemaVersion: 'self-healing-native-proactive-monitoring-v7',
+    schemaVersion: 'self-healing-native-proactive-monitoring-v8',
     runAt: new Date().toISOString(), readOnly: result.readOnly, providerMutations: result.providerMutations, mode: result.mode,
     limits: { apiTargets: apiUrls.length, tlsTargets: certificateTargets.length, maxDurationSeconds: maxDuration, storageQuotaConfigured: quotaBytes != null, apiTargetCap: apiTargetCap() },
     collectorsRun: result.collectorsRun, signalsObserved: result.signalsObserved, incidents,

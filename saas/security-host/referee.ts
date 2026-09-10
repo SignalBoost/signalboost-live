@@ -34,13 +34,19 @@ export interface SecurityRefereeDecision {
   target: string
 }
 
-function deny(request: SecurityActionRequest, reason: string): Readonly<SecurityRefereeDecision> {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function deny(request: unknown, reason: string): Readonly<SecurityRefereeDecision> {
+  const record = isRecord(request) ? request : {}
+  const target = isRecord(record.target) ? record.target : {}
   return Object.freeze({
     allowed: false,
     reason,
-    engagementId: String(request?.engagementId || ''),
-    action: String(request?.action || ''),
-    target: String(request?.target?.value || ''),
+    engagementId: typeof record.engagementId === 'string' ? record.engagementId : '',
+    action: typeof record.action === 'string' ? record.action : '',
+    target: typeof target.value === 'string' ? target.value : '',
   })
 }
 
@@ -119,15 +125,33 @@ function validHostState(state: SecurityHostState): boolean {
     && validCounter(state.distinctTargetsTouched)
 }
 
+const TARGET_KINDS: readonly SecurityTargetKind[] = Object.freeze(['host', 'domain', 'ip', 'cidr'])
+const KNOWN_ACTIONS: readonly SecurityAction[] = Object.freeze([
+  ...actionsForSecurityRole('guardian'),
+  ...actionsForSecurityRole('stranger').filter(action => !actionsForSecurityRole('guardian').includes(action)),
+])
+
+function validActionRequest(value: unknown): value is SecurityActionRequest {
+  if (!isRecord(value)) return false
+  if (typeof value.engagementId !== 'string' || value.engagementId.trim().length === 0 || value.engagementId.length > 256) return false
+  if (value.role !== 'guardian' && value.role !== 'stranger') return false
+  if (!KNOWN_ACTIONS.includes(value.action as SecurityAction)) return false
+  if (!isRecord(value.target)) return false
+  if (!TARGET_KINDS.includes(value.target.kind as SecurityTargetKind)) return false
+  if (typeof value.target.value !== 'string' || value.target.value.trim().length === 0 || value.target.value.length > 512) return false
+  return true
+}
+
 export function authorizeSecurityAction(params: {
   envelope: SignedSecurityEngagement | unknown
   trustedKeys: TrustedSecurityEngagementKeys
-  request: SecurityActionRequest
+  request: SecurityActionRequest | unknown
   hostState: SecurityHostState
 }): Readonly<SecurityRefereeDecision> {
   const request = params.request
   const verified = verifySignedSecurityEngagement(params.envelope, params.trustedKeys)
   if (verified.valid === false) return deny(request, verified.reason)
+  if (!validActionRequest(request)) return deny(request, 'invalid_request')
   if (!validHostState(params.hostState)) return deny(request, 'invalid_host_state')
 
   const manifest = verified.manifest

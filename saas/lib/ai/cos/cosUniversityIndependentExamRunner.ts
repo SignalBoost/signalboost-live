@@ -20,6 +20,7 @@ import {
   type CosUniversityExamAssessmentRow,
   type CosUniversityExamTarget,
 } from './cosUniversityIndependentExam.ts'
+import { cosUniversityExamRunKey } from './cosUniversityExamRunIdentity.ts'
 
 const DEFAULT_AGENT_ID = 'cos'
 
@@ -68,10 +69,6 @@ function targetKey(target: CosUniversityExamTarget): string {
   return target.kind === 'subject'
     ? `subject:${target.subjectId}`
     : `language:${target.language}:${target.dimension}`
-}
-
-function dayKey(now: Date): string {
-  return now.toISOString().slice(0, 10)
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -137,10 +134,24 @@ async function findRun(runKey: string): Promise<ExamRunRow | null> {
   return (result.data || null) as ExamRunRow | null
 }
 
-async function createOrFindRun(agentId: string, target: CosUniversityExamTarget, now: Date): Promise<ExamRunRow | null> {
+async function createOrFindRun(
+  agentId: string,
+  target: CosUniversityExamTarget,
+  now: Date,
+  remediationAttemptId?: string,
+): Promise<ExamRunRow | null> {
   const db = cosServiceDb()
   if (!db) return null
-  const runKey = `${COS_UNIVERSITY_EXAM_PROFILE}:${agentId}:${dayKey(now)}:${targetKey(target)}`
+  // Scheduled exams remain idempotent per day. A post-remediation exam is instead bound to the
+  // durable study-plan identity, so newly completed remediation receives a genuinely fresh hidden
+  // exam even when the original failure and restudy happened on the same UTC day.
+  const runKey = cosUniversityExamRunKey({
+    profile: COS_UNIVERSITY_EXAM_PROFILE,
+    agentId,
+    target,
+    now,
+    remediationAttemptId,
+  })
   const existing = await findRun(runKey)
   if (existing) return existing
 
@@ -325,8 +336,13 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
   }
 }
 
-async function runTarget(agentId: string, target: CosUniversityExamTarget, now: Date): Promise<CosUniversityExamRunSummary> {
-  const row = await createOrFindRun(agentId, target, now)
+async function runTarget(
+  agentId: string,
+  target: CosUniversityExamTarget,
+  now: Date,
+  remediationAttemptId?: string,
+): Promise<CosUniversityExamRunSummary> {
+  const row = await createOrFindRun(agentId, target, now, remediationAttemptId)
   if (!row) return { runId: null, target, status: 'error', passed: null, assessmentRecorded: false, manifestHash: null, reasons: ['service_database_unavailable'], latencyMs: null }
   const canonicalTarget = targetFromRun(row) || target
   if (row.status === 'passed' || row.status === 'failed') {
@@ -377,7 +393,12 @@ export async function runCosUniversityIndependentExamBatch(options: {
   const runs: CosUniversityExamRunSummary[] = []
   for (const [index, target] of targets.entries()) {
     try {
-      const run = await runTarget(agentId, target, now)
+      const run = await runTarget(
+        agentId,
+        target,
+        now,
+        options.readyStudyPlansOnly ? readyPlans[index]?.id : undefined,
+      )
       runs.push(run)
       if (options.readyStudyPlansOnly && readyPlans[index]) await reconcileReadyStudyPlan(readyPlans[index].id, run)
     } catch (error) {

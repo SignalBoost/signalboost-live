@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.101
+**Version:** 1.102
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -18,6 +18,18 @@ Production commit and deployment, verifies every declared University learning pa
 each missing, disabled, failed, stale, or unproven path explicitly. A configured route or successful
 build is never presented as Production proof; all declared paths must have a fresh successful
 host-verifier receipt with their feature gate enabled before the aggregate status becomes verified.
+
+## COS University post-remediation independent-exam identity — 2026-09-10
+
+Scheduled undergraduate exams remain idempotent per agent, target, and UTC day. A post-remediation
+exam is instead keyed to the durable remediation study-plan identity. Completing study and deliberate
+practice can therefore launch a genuinely fresh hidden exam on the same day as the original failure;
+it can no longer reuse the original failed result and falsely supersede the completed remediation.
+
+The learner also repairs the specific legacy collision state when the latest failed exam still owns a
+superseded plan that contains both host-accepted study proof and completed deliberate-practice proof.
+The plan is restored only to `ready_for_exam`; no grade or academic credit is manufactured, and the
+new independent examiner remains authoritative.
 
 ## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
 

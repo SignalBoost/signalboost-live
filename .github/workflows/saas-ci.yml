@@ -181,6 +181,8 @@ jobs:
           tests/cosUniversityPrograms.node.test.ts
           tests/cosUniversityGraduation.node.test.ts
           tests/cosUniversityExamRemediation.node.test.ts
+          tests/cosUniversityMultiAgentExam.node.test.ts
+          tests/cosUniversityPostRemediationExamIdentity.node.test.ts
       - name: Verify Master's specialization catalog and host-computed admission
         run: >-
           node --import ./scripts/test-alias-loader.mjs --test
@@ -285,7 +287,6 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify Issue #205 architecture
         run: npm run verify:issue-205
-
 
 
 

@@ -14,7 +14,7 @@ import {
 const DEFAULT_AGENT_ID = 'cos'
 const SOURCE_KIND = 'recertification'
 const REMEDIATION_STUDY_VARIANT_MS = 15 * 60_000
-const PLAN_SELECT_FIELDS = 'id,plan_key,subject_id,language_code,language_dimension,failure_class,source_kind,objective,priority,methods,acquisition_source_kinds,fine_tune_candidate,status' as const
+const PLAN_SELECT_FIELDS = 'id,plan_key,subject_id,language_code,language_dimension,failure_class,source_kind,source_ref,objective,priority,methods,acquisition_source_kinds,fine_tune_candidate,status,evidence' as const
 
 type FailedExamRow = {
   id: string
@@ -35,12 +35,14 @@ type PlanRow = {
   language_dimension: CosPlatformLanguageDimension | null
   failure_class: 'unknown' | 'language'
   source_kind: 'recertification'
+  source_ref: string
   objective: string
   priority: number
   methods: CosUniversityStudyStrategy['methods']
   acquisition_source_kinds: CosUniversityStudyStrategy['acquisitionSourceKinds']
   fine_tune_candidate: boolean
   status: string
+  evidence: Record<string, unknown> | null
 }
 
 export type CosUniversityExamRemediationPlan = {
@@ -73,6 +75,22 @@ export function cosUniversityRemediationStudyVariant(now: Date): number {
 
 function key(parts: string[]): string {
   return createHash('sha256').update(parts.join('|')).digest('hex')
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+}
+
+function hasCompletedRemediationProof(row: PlanRow, failure: FailedExamRow): boolean {
+  if (row.status !== 'superseded' || row.source_ref !== failure.id) return false
+  const evidence = record(row.evidence)
+  const studyProof = record(evidence.studyProof)
+  const practice = record(evidence.deliberatePractice)
+  return Array.isArray(studyProof.evidenceRefs)
+    && studyProof.evidenceRefs.length > 0
+    && practice.readyForIndependentExam === true
 }
 
 function withGovernedPublicWebForSubjectExamRemediation(
@@ -230,9 +248,31 @@ async function persistPlan(agentId: string, failure: FailedExamRow): Promise<{ r
     .eq('plan_key', planKey)
     .maybeSingle()
   if (result.error) throw result.error
-  if (!result.data || result.data.status === 'completed' || result.data.status === 'superseded') return null
+  if (!result.data || result.data.status === 'completed') return null
 
   let row = result.data as PlanRow
+  // Before remediation-specific run identities existed, a same-day retest reused the original
+  // failed run and incorrectly superseded a fully studied/practised plan. Recover only that proven
+  // current-failure state; ordinary superseded plans remain terminal.
+  if (hasCompletedRemediationProof(row, failure)) {
+    const evidence = {
+      ...record(row.evidence),
+      remediationRetestRecovery: {
+        recoveredAt: now,
+        reason: 'same_day_exam_identity_collision',
+        academicCredit: false,
+      },
+    }
+    const recovered = await db.from('cos_university_study_plans')
+      .update({ status: 'ready_for_exam', evidence, updated_at: now, last_seen_at: now })
+      .eq('id', row.id)
+      .eq('status', 'superseded')
+      .select(PLAN_SELECT_FIELDS)
+      .maybeSingle()
+    if (recovered.error) throw recovered.error
+    if (recovered.data) row = recovered.data as PlanRow
+  }
+  if (row.status === 'superseded') return null
   // Existing remediation plans predate the governed web lane. Refresh only the source policy on an
   // active subject-remediation plan; never reset its status, attempts, proof fence, or exam lineage.
   if (!isLanguage && !row.acquisition_source_kinds.includes('approved_public_web')) {

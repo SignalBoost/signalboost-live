@@ -14,6 +14,8 @@ export type KnowledgeGapSignal = {
   evidence?: string[]
   /** Optional host-selected source classes for this study objective. Empty/omitted means normal policy. */
   sourceKinds?: ContinuousLearningSourceKind[]
+  /** Optional adapter-level exclusions when a source class contains multiple acquisition paths. */
+  excludedAdapterIds?: string[]
   portableIds?: string[]
 }
 
@@ -67,6 +69,9 @@ export function generateKnowledgeGaps(signals: KnowledgeGapSignal[]): KnowledgeG
         : `What verified knowledge resolves these missing facts for ${objective}: ${missing.join('; ')}?`
       : `What verified knowledge would let COS handle ${objective} locally with higher confidence?`
 
+    const excludedAdapterIds = [...new Set(
+      (signal.excludedAdapterIds ?? []).map(value => String(value).trim()).filter(Boolean),
+    )]
     const gap: KnowledgeGap = {
       id: knowledgeGapIdForSignal(signal),
       subject,
@@ -77,6 +82,7 @@ export function generateKnowledgeGaps(signals: KnowledgeGapSignal[]): KnowledgeG
       urgency,
       evidence: usefulSignals(signal),
       sourceKinds: signal.sourceKinds?.length ? [...new Set(signal.sourceKinds)] : undefined,
+      excludedAdapterIds: excludedAdapterIds.length ? excludedAdapterIds : undefined,
     }
 
     const previous = byKey.get(key)

@@ -67,10 +67,12 @@ function learningErrorMessage(error:unknown):string{
 
 /**
  * Method-specific study gaps can narrow which source classes are consulted. Normal gaps preserve
- * the historical all-adapter behavior. This makes a University strategy such as fresh authoritative
- * research materially different from library study instead of merely changing a label.
+ * the historical all-adapter behavior. Adapter exclusions add a narrower identity-level boundary
+ * when multiple acquisition paths intentionally share one source kind.
  */
 export function learningAdapterAllowedForGap(gap:KnowledgeGap,adapter:ContinuousLearningSourceAdapter):boolean{
+  const excluded=new Set((gap.excludedAdapterIds??[]).map(value=>String(value).trim()).filter(Boolean))
+  if(adapter.id&&excluded.has(adapter.id))return false
   const allowed=gap.sourceKinds?.filter(Boolean)??[]
   return !allowed.length||allowed.includes(adapter.kind)
 }

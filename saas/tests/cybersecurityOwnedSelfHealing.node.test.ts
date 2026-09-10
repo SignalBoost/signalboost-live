@@ -102,3 +102,14 @@ test('root header policy removes wildcard CORS intent without weakening cybersec
   assert.match(publicRoute, /cors\.trim\(\) === '\*'/)
   assert.match(publicRoute, /if \(server\) add\(findings, 'server_header_exposed'/)
 })
+
+test('Vercel CDN deletes the hosting Server header on the canonical public root', () => {
+  const config = JSON.parse(read('../vercel.json')) as { routes?: Array<{ src?: string; transforms?: Array<{ type?: string; op?: string; target?: { key?: string } }> }> }
+  const root = config.routes?.find(route => route.src === '/')
+  assert.ok(root, 'expected an exact-root CDN transform route')
+  assert.ok(root.transforms?.some(transform =>
+    transform.type === 'response.headers'
+      && transform.op === 'delete'
+      && String(transform.target?.key || '').toLowerCase() === 'server'
+  ), 'expected the root CDN route to delete the Server response header')
+})

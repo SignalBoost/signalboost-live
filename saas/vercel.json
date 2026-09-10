@@ -13,6 +13,7 @@
     "COS_UNIVERSITY_MASTERS_EXAMS_ENABLED": "true",
     "COS_UNIVERSITY_PHD_RUNTIME_ENABLED": "true",
     "COS_UNIVERSITY_PHD_RESEARCH_EXECUTION_ENABLED": "true",
+    "COS_UNIVERSITY_PHD_METHODOLOGY_EXAMS_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ROLLBACK_ENABLED": "true"
   },
@@ -40,6 +41,7 @@
     { "path": "/api/cron/cos-university-masters-exam", "schedule": "41 * * * *" },
     { "path": "/api/cron/cos-university-masters-progress", "schedule": "51 * * * *" },
     { "path": "/api/cron/cos-university-phd-admission", "schedule": "5 8 * * *" },
+    { "path": "/api/cron/cos-university-phd-methodology-exam", "schedule": "11 * * * *" },
     { "path": "/api/cron/cos-university-phd-research", "schedule": "21 * * * *" },
     { "path": "/api/cron/cos-university-phd-progress", "schedule": "56 * * * *" },
     { "path": "/api/cron/cos-current-world-learning", "schedule": "14 * * * *" },

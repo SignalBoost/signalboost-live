@@ -93,6 +93,16 @@ test('later terminal pass or expired failure retires obsolete remediation instea
   assert.match(bridge, /\.in\('status', \['queued', 'studying', 'ready_for_exam'\]\)/)
 })
 
+test('legacy same-day exam collisions recover only fully proven remediation for a fresh retest', () => {
+  const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
+  assert.match(bridge, /row\.status !== 'superseded' \|\| row\.source_ref !== failure\.id/)
+  assert.match(bridge, /Array\.isArray\(studyProof\.evidenceRefs\)/)
+  assert.match(bridge, /practice\.readyForIndependentExam === true/)
+  assert.match(bridge, /status: 'ready_for_exam'/)
+  assert.match(bridge, /reason: 'same_day_exam_identity_collision'/)
+  assert.match(bridge, /academicCredit: false/)
+})
+
 test('continuous learner keeps failed-exam remediation ahead of generic priority-100 planning', () => {
   const runtime = file('lib/ai/cos/cosUniversityContinuousLearning.ts')
   assert.match(runtime, /ensureCosUniversityExamFailureRemediationPlans\(\{ agentId, maxPlans: 4, now \}\)/)

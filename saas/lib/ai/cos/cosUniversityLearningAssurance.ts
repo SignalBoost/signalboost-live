@@ -79,11 +79,16 @@ export type LearningPathId =
   | 'continuous_learning'
   | 'deliberate_practice'
   | 'independent_exams'
-  | 'a_range_evidence'
+  | 'subject_a_range_evidence'
+  | 'language_a_range_evidence'
   | 'graduation'
   | 'masters_learning'
+  | 'masters_admission'
   | 'masters_exams'
+  | 'masters_progress'
   | 'phd_runtime'
+  | 'phd_admission'
+  | 'phd_progress'
   | 'phd_research'
   | 'phd_methodology_exams'
   | 'controlled_fine_tuning'
@@ -92,11 +97,16 @@ export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId,
   continuous_learning: 'COS_UNIVERSITY_CONTINUOUS_ENABLED',
   deliberate_practice: 'COS_UNIVERSITY_PRACTICE_ENABLED',
   independent_exams: 'COS_UNIVERSITY_EXAMS_ENABLED',
-  a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',
+  subject_a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',
+  language_a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',
   graduation: 'COS_UNIVERSITY_GRADUATION_ENABLED',
   masters_learning: 'COS_UNIVERSITY_MASTERS_LEARNING_ENABLED',
+  masters_admission: 'COS_UNIVERSITY_ADMISSION_ENABLED',
   masters_exams: 'COS_UNIVERSITY_MASTERS_EXAMS_ENABLED',
+  masters_progress: 'COS_UNIVERSITY_MASTERS_EXAMS_ENABLED',
   phd_runtime: 'COS_UNIVERSITY_PHD_RUNTIME_ENABLED',
+  phd_admission: 'COS_UNIVERSITY_PHD_RUNTIME_ENABLED',
+  phd_progress: 'COS_UNIVERSITY_PHD_RUNTIME_ENABLED',
   phd_research: 'COS_UNIVERSITY_PHD_RESEARCH_EXECUTION_ENABLED',
   phd_methodology_exams: 'COS_UNIVERSITY_PHD_METHODOLOGY_EXAMS_ENABLED',
   controlled_fine_tuning: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',

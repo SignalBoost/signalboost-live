@@ -615,6 +615,28 @@ routes. The v1.84 repair enumerates subject and language A-range, Master's admis
 PhD admission/progress independently, with a regression that fails whenever any scheduled
 `cos-university-*` route lacks an explicit assurance mapping.
 
+## Builder University Production outcomes — 2026-09-10
+
+Builder now sends every generation-fenced terminal job result into the authoritative verified
+Production-outcome recorder for the enrolled `software-specialist` and `computer_science` subject.
+Host-proven workspace execution with a proving command after the final mutation, or a healthy
+watched Production merge/deployment, may be recorded as success;
+a completed patch/review artifact without Production proof is only observed, and a terminal job
+failure remains failure. Delivery is idempotent per job claim and evidence-recording failure cannot
+undo the already-persisted Builder result.
+
+Repository repairs paused for asynchronous merge reconciliation emit no early outcome. Their
+generation-scoped evidence is written only after the lifecycle's fenced terminal merge or
+superseded-base update, preventing a pre-terminal observation from consuming the final evidence key.
+The runner infers this pending state directly from the raw repository writeback fields, before the
+database transition adds `repository_merge_pending`. A healthy Production watch records success, a
+rolled-back deployment records failure, and an unresolved or non-Production watch remains observed.
+
+This is raw real-world evidence, not an academic grade. Builder never constructs its own University
+baseline, transfer, retention, attribution, or independent-scoring envelope. The University
+controller must correlate those independent records before #2048's promotion path may treat a
+successful Builder outcome as practical learning proof.
+
 ---
 
 # Freshness / evidence rules

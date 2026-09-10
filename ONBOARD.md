@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.102
+**Version:** 1.103
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -252,6 +252,21 @@ The learner also repairs the legacy collision state when the latest failed exam 
 superseded plan containing both host-accepted study proof and completed deliberate-practice proof.
 Recovery restores only `ready_for_exam`; it grants no grade or academic credit, and the new
 independent examiner remains authoritative.
+
+## COS University applied-knowledge qualification — 2026-09-10
+
+Knowledge becomes qualification only when it improves independently verified real work. The
+registered-agent cycle now converts an agent-scoped, independently scored learning-outcome assurance
+event into the existing `production_transfer` stage only after revalidating baseline improvement,
+unseen transfer, practical execution, delayed retention, source attribution, a nonzero real-world
+sample, and a better measured outcome. This applies to COS and every registered specialist.
+
+A degree is not permission to abandon the discipline. The agent's host-assigned role continues to
+control its specialist curriculum and work routing after graduation. Current competence remains
+separate from the immutable historical credential: applied evidence expires, later failure weakens
+standing, and missing recent application triggers continuing education/recertification. Cross-domain
+help is allowed, but it does not replace applying the agent's assigned specialty when relevant,
+authorized work exists.
 
 ---
 

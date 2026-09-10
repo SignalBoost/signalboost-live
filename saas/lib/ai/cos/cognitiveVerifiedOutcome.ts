@@ -11,6 +11,8 @@ import {
   universityEvidenceFromVerifiedOutcome,
   type CosUniversityOutcomeEvidenceEnvelope,
 } from '@/lib/ai/cos/cosUniversityOutcomeCorrelation'
+import { recordCosUniversityTeamContribution } from '@/lib/ai/cos/cosUniversityTeamContribution'
+import { recordCosUniversityIntegrityViolation } from '@/lib/ai/cos/cosUniversityIntegrityViolation'
 
 export const COS_VERIFIED_OUTCOME_DOMAINS = [
   'self_healing',
@@ -242,5 +244,26 @@ export async function recordVerifiedCosProductionOutcome(
   const universityOutcome = universityInput
     ? await recordCosUniversityRealWorldOutcome({ ...universityInput, observedAt: new Date(occurredAt) })
     : null
+  const academic = input.universityEvidence
+  if (academic?.integrityViolation) {
+    await recordCosUniversityIntegrityViolation({
+      agentId: academic.agentId,
+      subjectId: academic.subjectId,
+      evidenceRefs: academic.integrityViolation.evidenceRefs,
+      hostVerified: academic.integrityViolation.hostVerified,
+      observedAt: new Date(occurredAt),
+    })
+  }
+  if (academic?.teamContribution && universityOutcome?.stored && universityOutcome.promotionEligible) {
+    await recordCosUniversityTeamContribution({
+      contributorAgentId: academic.teamContribution.contributorAgentId,
+      beneficiaryAgentId: academic.agentId,
+      subjectId: academic.subjectId,
+      contributionEvidenceRefs: academic.teamContribution.contributionEvidenceRefs,
+      beneficiaryOutcomeEvidenceRef: universityOutcome.evidenceRef || decision.sourceRef,
+      independentScorer: academic.independentScorer,
+      observedAt: new Date(occurredAt),
+    })
+  }
   return { stored: true, inserted, decision, universityOutcome }
 }

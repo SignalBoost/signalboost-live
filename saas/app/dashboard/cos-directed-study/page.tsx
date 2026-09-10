@@ -13,7 +13,7 @@ import { PUBLIC_BRAND } from '@/lib/public-brand'
 type ChunkVerdict = { index: number; admitted: boolean; reason: string; confidence: number; coverage: number; matchedTerms: string[] }
 type LearningRoute = { orchestrator: 'cos'; specialistFamily: 'software' | null; curriculumTracks: string[]; routingBasis: string; authorityGranted: false }
 type Assessment = { ok?: boolean; error?: string; subject?: string; chunks?: ChunkVerdict[]; admitted?: number; rejected?: number; learningRoute?: LearningRoute }
-type ApiResult = { ok?: boolean; error?: string; dryRun?: boolean; resolvedFrom?: string | null; assessment?: Assessment | null; stored?: number; duplicates?: number; errors?: string[]; application?: { status?: string; lessonId?: number; message?: string }; authRequired?: boolean }
+type ApiResult = { ok?: boolean; error?: string; dryRun?: boolean; resolvedFrom?: string | null; assessment?: Assessment | null; stored?: number; duplicates?: number; errors?: string[]; application?: { status?: string; lessonId?: number; message?: string }; university?: { status?: string; planIds?: string[]; message?: string }; authRequired?: boolean }
 type HistoryRecord = { content_hash?: string; source_kind?: string; source_uri?: string; source_title?: string | null; subject?: string; confidence?: number; license?: string; created_at?: string }
 type HistoryResult = { ok?: boolean; error?: string; records?: HistoryRecord[]; authRequired?: boolean }
 
@@ -194,6 +194,7 @@ export default function CosDirectedStudyPage() {
           <p>{copy.retentionOutcome}: <span className="font-semibold text-text">{(result.stored ?? 0) > 0 ? copy.newKnowledgeStored : (result.duplicates ?? 0) > 0 ? copy.knownKnowledgeReinforced : copy.noKnowledgeStored}</span></p>
           <p>{copy.curriculumTracks}: <span className="font-semibold text-text">{learningRoute.curriculumTracks.length ? learningRoute.curriculumTracks.join(', ') : '—'}</span></p>
           <p>{copy.applicationValidation}: <span className="font-semibold text-text">{result.application?.status === 'queued' || result.application?.status === 'reinforced' ? result.application.message : copy.applicationPending}</span></p>
+          <p>{copy.universityStudy}: <span className="font-semibold text-text">{result.university?.message || copy.universityNotRecorded}</span></p>
         </div>
         <p className="mt-3 text-xs text-text-muted">{result.application?.lessonId ? `Evaluation queue #${result.application.lessonId}. ` : ''}{copy.applicationExplanation}</p>
       </div>}

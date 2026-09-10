@@ -11,6 +11,10 @@
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
 
+## COS University owner-directed study bridge — 2026-09-10
+
+Newly admitted owner-fed books, articles, video transcripts, documentation, and notes are attached to durable COS University study plans and receive non-credit study proof. Duplicate or rejected chunks do not manufacture a new attempt. The owner dashboard reports whether University recording succeeded. This bridge never writes assessment evidence or awards a grade; unseen transfer and delayed-retention gates remain independent.
+
 ---
 
 # iTMounts public brand and domain cutover — 2026-09-08

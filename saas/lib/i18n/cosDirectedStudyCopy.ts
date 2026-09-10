@@ -48,6 +48,8 @@ export type CosDirectedStudyCopy = {
   noKnowledgeStored: string
   curriculumTracks: string
   applicationValidation: string
+  universityStudy: string
+  universityNotRecorded: string
   applicationPending: string
   applicationExplanation: string
   dryRunNote: string
@@ -114,6 +116,8 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     noKnowledgeStored: 'No knowledge stored',
     curriculumTracks: 'Curriculum tracks',
     applicationValidation: 'Applied successfully',
+    universityStudy: 'University study',
+    universityNotRecorded: 'No University study proof was recorded.',
     applicationPending: 'Not proven yet',
     applicationExplanation: 'Feeding material does not prove a new competency. COS records mastery only after the knowledge is used and passes an evidence-backed application test.',
     dryRunNote: 'Dry run: nothing was stored. Review the chunks, then press "Feed COS" to store the eligible material.',
@@ -178,6 +182,8 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     noKnowledgeStored: 'No se almacenó conocimiento',
     curriculumTracks: 'Áreas curriculares',
     applicationValidation: 'Aplicado correctamente',
+    universityStudy: 'Estudio universitario',
+    universityNotRecorded: 'No se registró comprobante de estudio universitario.',
     applicationPending: 'Aún no comprobado',
     applicationExplanation: 'Alimentar material no demuestra una nueva competencia. COS solo registra dominio después de usar el conocimiento y aprobar una prueba de aplicación con evidencia.',
     dryRunNote: 'Simulacro: no se almacenó nada. Revise los fragmentos y luego presione "Alimentar COS" para guardar el material elegible.',
@@ -242,6 +248,8 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     noKnowledgeStored: 'Nenhum conhecimento armazenado',
     curriculumTracks: 'Trilhas curriculares',
     applicationValidation: 'Aplicado com sucesso',
+    universityStudy: 'Estudo universitário',
+    universityNotRecorded: 'Nenhum comprovante de estudo universitário foi registrado.',
     applicationPending: 'Ainda não comprovado',
     applicationExplanation: 'Alimentar material não comprova uma nova competência. O COS só registra domínio após usar o conhecimento e passar em um teste de aplicação baseado em evidências.',
     dryRunNote: 'Simulação: nada foi armazenado. Revise os trechos e pressione "Alimentar o COS" para armazenar o material elegível.',
@@ -306,6 +314,8 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     noKnowledgeStored: 'Nie zapisano wiedzy',
     curriculumTracks: 'Ścieżki programu',
     applicationValidation: 'Zastosowano pomyślnie',
+    universityStudy: 'Studia uniwersyteckie',
+    universityNotRecorded: 'Nie zapisano dowodu studiów uniwersyteckich.',
     applicationPending: 'Jeszcze nie potwierdzono',
     applicationExplanation: 'Samo dodanie materiału nie potwierdza nowej kompetencji. COS rejestruje opanowanie dopiero po użyciu wiedzy i zaliczeniu testu zastosowania opartego na dowodach.',
     dryRunNote: 'Próba na sucho: nic nie zostało zapisane. Przejrzyj fragmenty, a następnie naciśnij "Zasil COS", aby zapisać kwalifikujący się materiał.',
@@ -370,6 +380,8 @@ export const COS_DIRECTED_STUDY_COPY: Record<CosDirectedStudyLanguage, CosDirect
     noKnowledgeStored: 'Знания не сохранены',
     curriculumTracks: 'Учебные направления',
     applicationValidation: 'Успешно применено',
+    universityStudy: 'Университетское обучение',
+    universityNotRecorded: 'Подтверждение университетского обучения не зарегистрировано.',
     applicationPending: 'Пока не доказано',
     applicationExplanation: 'Добавление материала не доказывает новую компетенцию. COS отмечает освоение только после применения знаний и успешного прохождения подтверждённого теста.',
     dryRunNote: 'Пробный запуск: ничего не сохранено. Просмотрите фрагменты, затем нажмите «Обучить COS», чтобы сохранить подходящий материал.',

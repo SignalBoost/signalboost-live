@@ -46,6 +46,7 @@ export type CosUniversityStudyMethodId =
 export type CosUniversityStudyMethodExecution =
   | 'automatic_acquisition'
   | 'automatic_if_certifiable'
+  | 'available_on_owner_submission'
   | 'requires_bridge'
   | 'candidate_only'
 
@@ -215,7 +216,7 @@ export function selectCosUniversityStudyStrategy(input: {
       methods.push(
         method('rag_library', 'automatic_acquisition', 'Language study needs high-quality authentic text and reference material.'),
         method('live_authoritative_research', 'automatic_acquisition', 'Living language, terminology, and cultural pragmatics require fresh authentic usage.'),
-        method('owner_directed_material', 'requires_bridge', 'Owner-supplied material is valid directed study with provenance and intent.'),
+        method('owner_directed_material', 'available_on_owner_submission', 'Owner-supplied material enters governed University study with provenance and intent after admission.'),
         method('teacher_agent', 'requires_bridge', 'A language tutor can diagnose grammar, register, localization, and pragmatic errors.'),
         method('peer_agent_a2a', 'requires_bridge', 'Peer dialogue can provide varied conversational and localization practice when A2A peers are connected.'),
         method('deliberate_practice', 'automatic_if_certifiable', 'Comprehension, writing, instruction following, localization, and pragmatics each need separate practice.'),

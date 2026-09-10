@@ -23,6 +23,8 @@ import { candidate0Confidence, distinctTerms, relevanceOf, sourceAwareRelevant }
 import { fetchReadableDocument, isFetchableDocumentUrl } from '@/lib/cos-core/layers/learning/documentFetch'
 import { resolveYouTubeTranscriptRuntime } from '@/lib/cos-core/layers/learning/liveSources'
 import { assessDirectedStudy, chunkDirectedText, directedEvidence, type DirectedStudySubmission } from '@/lib/ai/cos/directedStudy'
+import { registerOwnerDirectedUniversityStudy } from '@/lib/ai/cos/cosUniversityStore'
+import { recordAcceptedCosUniversityStudyAttempts } from '@/lib/ai/cos/cosUniversityStudyProof'
 
 const gates = { candidate0Confidence, distinctTerms, relevanceOf, sourceAwareRelevant }
 const clean = (v: unknown) => String(v ?? '').replace(/\s+/g, ' ').trim()
@@ -38,6 +40,11 @@ export type DirectedStudyResult = {
   application: {
     status: 'not_applicable' | 'not_queued' | 'queued' | 'reinforced' | 'queue_failed'
     lessonId?: number
+    message: string
+  }
+  university: {
+    status: 'not_recorded' | 'recorded' | 'record_failed'
+    planIds: string[]
     message: string
   }
 }
@@ -156,7 +163,17 @@ async function fetchYouTubeTranscript(videoId: string, videoUrl: string): Promis
 }
 
 export async function runDirectedStudy(input: { submission: Omit<DirectedStudySubmission, 'text'> & { text?: string | null }; dryRun?: boolean }): Promise<DirectedStudyResult> {
-  const result: DirectedStudyResult = { ok: false, resolvedFrom: null, assessment: null, stored: 0, duplicates: 0, errors: [], application: { status: 'not_queued', message: 'Application evaluation was not queued.' } }
+  const result: DirectedStudyResult = {
+    ok: false,
+    resolvedFrom: null,
+    assessment: null,
+    stored: 0,
+    duplicates: 0,
+    errors: [],
+    application: { status: 'not_queued', message: 'Application evaluation was not queued.' },
+    university: { status: 'not_recorded', planIds: [], message: 'No University study proof was recorded.' },
+  }
+  const acceptedAt = new Date().toISOString()
 
   let text = String(input.submission.text || '').trim()
   if (text) {
@@ -191,6 +208,7 @@ export async function runDirectedStudy(input: { submission: Omit<DirectedStudySu
   const chunks = chunkDirectedText(text).chunks
   const evidence = directedEvidence(submission)
   const observedAt = submission.observedAt || new Date().toISOString()
+  const newlyStoredRefs: string[] = []
   for (const verdict of assessment.chunks.filter(chunk => chunk.admitted)) {
     const write = await db.from('cos_continuous_learning').insert({
       content_hash: verdict.contentHash,
@@ -210,6 +228,28 @@ export async function runDirectedStudy(input: { submission: Omit<DirectedStudySu
       else result.errors.push(`store:${String(write.error.message || write.error).slice(0, 300)}`)
     } else {
       result.stored += 1
+      newlyStoredRefs.push(verdict.contentHash)
+    }
+  }
+  if (newlyStoredRefs.length) {
+    try {
+      const planIds = await registerOwnerDirectedUniversityStudy({
+        topic: submission.topic,
+        studyIntent: submission.studyIntent,
+        sourceUri: submission.sourceUri,
+        evidenceRefs: newlyStoredRefs,
+        acceptedAt,
+      })
+      const recorded = await recordAcceptedCosUniversityStudyAttempts(
+        planIds.map(planId => ({ planId, evidenceRefs: newlyStoredRefs, acceptedAt })),
+        new Date(),
+      )
+      result.university = recorded.length
+        ? { status: 'recorded', planIds: recorded, message: 'Admitted material was recorded as University study without academic credit.' }
+        : { status: 'not_recorded', planIds: [], message: 'Material was retained, but no University study plan advanced.' }
+    } catch (error) {
+      result.university = { status: 'record_failed', planIds: [], message: 'Material was retained, but University study recording failed.' }
+      result.errors.push(`university-study:${String(error instanceof Error ? error.message : error).slice(0, 300)}`)
     }
   }
   try {

@@ -452,6 +452,11 @@ pre-study baseline, improved post-study comprehension, unseen transfer, practica
 delayed retention, verified source attribution, and independent scoring. Exposure, retrieval,
 embedding, or self-report alone cannot satisfy this contract.
 
+Owner-directed material uses the same boundary. Newly admitted books, articles, videos,
+documentation, and notes create durable University study plans and non-credit study proofs.
+Rejected or duplicate chunks cannot manufacture a new attempt, and directed study never writes a
+grade; independent transfer and delayed retention remain required.
+
 Build this incrementally on the existing COS learning, certification, failure-autopsy, specialist, outcome-correlation, and blind-evaluation architecture. Do not create a disconnected second brain or parallel learning database unless the existing architecture is objectively insufficient.
 
 Preferred progression:

@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.83
+**Version:** 1.84
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -511,6 +511,11 @@ Current branch `feat/cos-university-learning-assurance-20260910` adds three host
 The append-only `cos_university_learning_assurance_events` ledger stores host evidence for these
 decisions. This implementation is the control/evidence foundation; it is not itself a claim that a
 model was fine-tuned or that all Production paths have already produced valid receipts.
+
+Production follow-up found that the first assurance registry grouped or omitted several scheduled
+routes. The v1.84 repair enumerates subject and language A-range, Master's admission/progress, and
+PhD admission/progress independently, with a regression that fails whenever any scheduled
+`cos-university-*` route lacks an explicit assurance mapping.
 
 ---
 

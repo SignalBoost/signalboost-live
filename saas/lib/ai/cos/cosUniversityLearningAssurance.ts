@@ -17,7 +17,7 @@ export type FineTuneStage =
   | 'rolled_back'
 
 export type FineTuneEvidence = Readonly<{
-  candidateId: string
+  trainedArtifactId: string
   baseModel: string
   datasetHash: string
   trainingManifestHash: string
@@ -26,7 +26,7 @@ export type FineTuneEvidence = Readonly<{
   trainingApprovedByHost: boolean
   independentEvaluation: boolean
   baselineScore: number
-  candidateScore: number
+  trainedArtifactScore: number
   passedSafetyRegression: boolean
   passedUnseenTransfer: boolean
   passedDelayedRetention: boolean
@@ -48,7 +48,7 @@ function validHash(value: string): boolean {
 /** Host-owned fine-tuning controller. It evaluates evidence; it never invokes a trainer. */
 export function decideControlledFineTune(input: FineTuneEvidence): FineTuneDecision {
   const blockers: string[] = []
-  if (!input.candidateId.trim()) blockers.push('candidate_id_missing')
+  if (!input.trainedArtifactId.trim()) blockers.push('trained_artifact_id_missing')
   if (!input.baseModel.trim()) blockers.push('base_model_missing')
   if (!validHash(input.datasetHash)) blockers.push('dataset_hash_invalid')
   if (!validHash(input.trainingManifestHash)) blockers.push('training_manifest_hash_invalid')
@@ -59,7 +59,7 @@ export function decideControlledFineTune(input: FineTuneEvidence): FineTuneDecis
 
   const eligibleForTraining = blockers.length === 0
   if (!input.independentEvaluation) blockers.push('independent_evaluation_missing')
-  if (!(input.candidateScore > input.baselineScore)) blockers.push('no_measured_improvement')
+  if (!(input.trainedArtifactScore > input.baselineScore)) blockers.push('no_measured_improvement')
   if (!input.passedSafetyRegression) blockers.push('safety_regression_failed')
   if (!input.passedUnseenTransfer) blockers.push('unseen_transfer_failed')
   if (!input.passedDelayedRetention) blockers.push('delayed_retention_failed')

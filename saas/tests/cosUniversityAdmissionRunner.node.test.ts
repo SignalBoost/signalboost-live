@@ -20,6 +20,21 @@ test('admission runner reads enrollments, credentials, and assessments before de
   assert.match(runner, /decideCosUniversityAdmission/)
 })
 
+test('admission runner accepts any explicit AI agent identity instead of enrolling only COS', () => {
+  const runner = file('lib/ai/cos/cosUniversityAdmissionRunner.ts')
+  assert.match(runner, /options: \{ now\?: Date; agentId\?: string \}/)
+  assert.match(runner, /\.eq\('agent_id', agentId\)/)
+  assert.match(runner, /agent_id: agentId/)
+  assert.doesNotMatch(runner, /const AGENT_ID = 'cos'/)
+})
+
+test('undergraduate enrollment assigns the complete canonical subject curriculum', () => {
+  const runner = file('lib/ai/cos/cosUniversityAdmissionRunner.ts')
+  assert.match(runner, /assignCosUniversityCurriculum/)
+  assert.match(runner, /COS_UNIVERSITY_SUBJECTS\.map\(subject => subject\.id\)/)
+  assert.match(runner, /assignedSubjectIds: assignment\?\.requiredSubjectIds \|\| \[\]/)
+})
+
 test('admission runner only ever inserts a new enrollment row, never updates or deletes one', () => {
   const runner = file('lib/ai/cos/cosUniversityAdmissionRunner.ts')
   assert.match(runner, /\.insert\(\{/)

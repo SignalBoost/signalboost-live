@@ -15,10 +15,10 @@ const ROOT = path.resolve(import.meta.dirname, '..')
 
 test('controlled fine-tuning fails closed without separation, approvals, independent gains and rollback', () => {
   const decision = decideControlledFineTune({
-    candidateId: 'candidate-1', baseModel: 'private-base', datasetHash: hash('a'),
+    trainedArtifactId: 'fine-tune-1', baseModel: 'private-base', datasetHash: hash('a'),
     trainingManifestHash: hash('b'), holdoutManifestHash: hash('b'),
     datasetApprovedByHost: false, trainingApprovedByHost: false, independentEvaluation: false,
-    baselineScore: 70, candidateScore: 70, passedSafetyRegression: false,
+    baselineScore: 70, trainedArtifactScore: 70, passedSafetyRegression: false,
     passedUnseenTransfer: false, passedDelayedRetention: false, productionCanaryHealthy: false,
   })
   assert.equal(decision.eligibleForTraining, false)
@@ -27,12 +27,12 @@ test('controlled fine-tuning fails closed without separation, approvals, indepen
   assert.ok(decision.blockers.includes('rollback_artifact_missing'))
 })
 
-test('controlled fine-tuning promotes only a fully evidenced reversible candidate', () => {
+test('controlled fine-tuning promotes only a fully evidenced reversible trained artifact', () => {
   const decision = decideControlledFineTune({
-    candidateId: 'candidate-1', baseModel: 'private-base', datasetHash: hash('a'),
+    trainedArtifactId: 'fine-tune-1', baseModel: 'private-base', datasetHash: hash('a'),
     trainingManifestHash: hash('b'), holdoutManifestHash: hash('c'),
     datasetApprovedByHost: true, trainingApprovedByHost: true, independentEvaluation: true,
-    baselineScore: 70, candidateScore: 82, passedSafetyRegression: true,
+    baselineScore: 70, trainedArtifactScore: 82, passedSafetyRegression: true,
     passedUnseenTransfer: true, passedDelayedRetention: true, productionCanaryHealthy: true,
     rollbackArtifactRef: 'artifact://candidate-1/base',
   })

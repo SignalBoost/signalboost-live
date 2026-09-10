@@ -9,14 +9,19 @@
 
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { academicStateFromRows, type CosUniversityAssessmentRow } from './cosUniversityAcademicState.ts'
+import { COS_UNIVERSITY_SUBJECTS, type CosUniversitySubjectId } from './cosUniversity.ts'
 import type { CosUniversityCredential, CosUniversityCredentialLevel } from './cosUniversityCredentials.ts'
 import {
   decideCosUniversityAdmission,
   type CosUniversityAdmissionDecision,
 } from './cosUniversityAdmission.ts'
-import type { CosUniversityProgramEnrollment, CosUniversityProgramLevel } from './cosUniversityPrograms.ts'
+import {
+  assignCosUniversityCurriculum,
+  type CosUniversityProgramEnrollment,
+  type CosUniversityProgramLevel,
+} from './cosUniversityPrograms.ts'
 
-const AGENT_ID = 'cos'
+const DEFAULT_AGENT_ID = 'cos'
 
 const ASSESSMENT_SELECT =
   'assessment_key,subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_version,scorer_authority,observed_at,valid_until'
@@ -46,6 +51,7 @@ export type CosUniversityAdmissionSummary = {
   programKey: string | null
   programLevel: CosUniversityProgramLevel | null
   trackId: string | null
+  assignedSubjectIds: readonly CosUniversitySubjectId[]
   errors: string[]
   semantics: 'admission_is_host_computed_from_issued_credentials'
 }
@@ -59,6 +65,7 @@ function summary(
     programKey: null,
     programLevel: null,
     trackId: null,
+    assignedSubjectIds: [],
     errors: [],
     semantics: 'admission_is_host_computed_from_issued_credentials',
     ...partial,
@@ -88,13 +95,16 @@ function mapCredential(row: CredentialRow): CosUniversityCredential {
 }
 
 export async function runCosUniversityAdmission(
-  options: { now?: Date } = {},
+  options: { now?: Date; agentId?: string } = {},
 ): Promise<CosUniversityAdmissionSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
+  const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
 
   if (process.env.COS_UNIVERSITY_ADMISSION_ENABLED !== 'true') {
     return summary({ enabled: false, decision: 'undergraduate_program_active' })
   }
+
+  if (!agentId) return summary({ decision: 'undergraduate_program_active', errors: ['agent_id_required'] })
 
   const db = cosServiceDb()
   if (!db) {
@@ -105,13 +115,13 @@ export async function runCosUniversityAdmission(
     const [enrollmentResult, credentialResult, assessmentResult] = await Promise.all([
       db.from('cos_university_program_enrollments')
         .select('program_key,program_level,enrolled_at,minimum_residence_until,target_completion_at,hard_deadline_at')
-        .eq('agent_id', AGENT_ID),
+        .eq('agent_id', agentId),
       db.from('cos_university_credentials')
         .select('credential_key,program_key,program_level,title,standing,awarded_at')
-        .eq('agent_id', AGENT_ID),
+        .eq('agent_id', agentId),
       db.from('cos_university_assessments')
         .select(ASSESSMENT_SELECT)
-        .eq('agent_id', AGENT_ID)
+        .eq('agent_id', agentId)
         .order('observed_at', { ascending: false })
         .limit(2000),
     ])
@@ -137,7 +147,7 @@ export async function runCosUniversityAdmission(
     }
 
     const insert = await db.from('cos_university_program_enrollments').insert({
-      agent_id: AGENT_ID,
+      agent_id: agentId,
       program_key: decision.enrollment.programKey,
       program_level: decision.enrollment.programLevel,
       enrolled_at: decision.enrollment.enrolledAt,
@@ -151,12 +161,21 @@ export async function runCosUniversityAdmission(
     const code = String((insert.error as { code?: string } | null)?.code || '')
     if (insert.error && code !== '23505') throw insert.error
 
+    const assignment = decision.programLevel === 'undergraduate'
+      ? assignCosUniversityCurriculum({
+          agentId,
+          enrollment: decision.enrollment,
+          requiredSubjectIds: COS_UNIVERSITY_SUBJECTS.map(subject => subject.id),
+        })
+      : null
+
     return summary({
       decision: decision.reason,
       admitted: true,
       programKey: decision.programKey,
       programLevel: decision.programLevel,
       trackId: decision.trackId,
+      assignedSubjectIds: assignment?.requiredSubjectIds || [],
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

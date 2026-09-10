@@ -3,10 +3,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import {
+  assignCosUniversityCurriculum,
   COS_UNIVERSITY_PROGRAMS,
   buildCosUniversityProgramEnrollment,
   cosUniversityProgramMayGraduate,
   cosUniversityProgramTimingStatus,
+  evaluateCosUniversitySubjectCompletion,
 } from '../lib/ai/cos/cosUniversityPrograms.ts'
 import {
   applyCosUniversityUndergraduateCalendar,
@@ -201,4 +203,24 @@ test('graduation runtime checks enrollment/residence/deadline and host-issues a 
   assert.match(runner, /awardUndergraduateCredential/)
   assert.match(runner, /issuedBy: 'host_graduation_gate'/)
   assert.match(runner, /time_bounded_degree_credential_current_competence_separate/)
+})
+
+test('enrollment assigns every required subject and failure routes to remediation, never disqualification', () => {
+  const enrollment = buildCosUniversityProgramEnrollment({
+    programKey: 'generalist_undergraduate_v1', level: 'undergraduate',
+    enrolledAt: new Date('2026-09-10T00:00:00Z'),
+  })
+  const assignment = assignCosUniversityCurriculum({
+    agentId: 'software-specialist', enrollment,
+    requiredSubjectIds: ['computer_science', 'mathematics', 'cybersecurity'] as const,
+  })
+  const incomplete = evaluateCosUniversitySubjectCompletion({ assignment, passedSubjectIds: ['computer_science'] })
+  assert.equal(incomplete.complete, false)
+  assert.equal(incomplete.remediationRequired, true)
+  assert.equal(incomplete.disqualified, false)
+  assert.deepEqual(incomplete.remainingSubjectIds, ['mathematics', 'cybersecurity'])
+
+  const complete = evaluateCosUniversitySubjectCompletion({ assignment, passedSubjectIds: assignment.requiredSubjectIds })
+  assert.equal(complete.complete, true)
+  assert.equal(complete.remediationRequired, false)
 })

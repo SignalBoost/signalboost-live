@@ -22,11 +22,14 @@ test('Platform Engineer always preserves a builder-result.txt deliverable at ter
 })
 
 test('merge cron reconciles the originating paused Builder job only after a merged outcome', () => {
-  assert.match(mergeRoute, /outcome\.outcome !== 'merged'/)
+  assert.match(mergeRoute, /outcome\.outcome === 'merged' && outcome\.mergeCommitSha/)
   assert.match(mergeRoute, /completeBuilderRepositoryRepairAfterMerge/)
+  assert.match(mergeRoute, /mergeWatchOutcome: outcome\.mergeWatchOutcome/)
   assert.match(lifecycle, /\.eq\('status', 'paused'\)/)
   assert.match(lifecycle, /repository_merge_pending: true/)
   assert.match(lifecycle, /status: 'succeeded'/)
   assert.match(lifecycle, /merge_taken: true/)
   assert.match(lifecycle, /builder-result\.txt/)
+  assert.match(lifecycle, /input\.baseBranch === 'main' && input\.mergeWatchOutcome === 'healthy'/)
+  assert.match(lifecycle, /input\.mergeWatchOutcome === 'rolled_back' \? 'failure' : 'observed'/)
 })

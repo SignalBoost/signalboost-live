@@ -20,6 +20,7 @@ import {
   type CosUniversityProgramEnrollment,
   type CosUniversityProgramLevel,
 } from './cosUniversityPrograms.ts'
+import { assignCosUniversityRoleCurriculum, type CosUniversityAgentRole } from './cosUniversityRoleCurriculum.ts'
 
 const DEFAULT_AGENT_ID = 'cos'
 
@@ -95,7 +96,7 @@ function mapCredential(row: CredentialRow): CosUniversityCredential {
 }
 
 export async function runCosUniversityAdmission(
-  options: { now?: Date; agentId?: string } = {},
+  options: { now?: Date; agentId?: string; role?: CosUniversityAgentRole } = {},
 ): Promise<CosUniversityAdmissionSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
   const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
@@ -134,11 +135,17 @@ export async function runCosUniversityAdmission(
       (assessmentResult.data || []) as CosUniversityAssessmentRow[],
       now,
     )
+    const undergraduateCredentialAwarded = ((credentialResult.data || []) as CredentialRow[])
+      .some(row => row.program_level === 'undergraduate')
+    const roleAssignment = options.role
+      ? assignCosUniversityRoleCurriculum({ agentId, role: options.role, undergraduateCredentialAwarded })
+      : null
 
     const decision = decideCosUniversityAdmission({
       enrollments: ((enrollmentResult.data || []) as EnrollmentRow[]).map(mapEnrollment),
       credentials: ((credentialResult.data || []) as CredentialRow[]).map(mapCredential),
       subjectTranscript: academicState.subjectTranscript,
+      assignedMastersTrackId: roleAssignment?.advancedProgramId,
       now,
     })
 

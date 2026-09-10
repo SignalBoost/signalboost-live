@@ -239,6 +239,15 @@ academic routing, examines the exact subject or language dimension, and reconcil
 from the independent result. Passing completes the plan; failure supersedes it so the existing
 failure-remediation path can create a fresh study attempt.
 
+## COS University remediation re-exam identity — 2026-09-10
+
+An independently failed exam and the fresh exam after study/practice must never share the ordinary
+daily run key. Ready-plan examinations use a stable identity scoped to agent, study-plan id, study
+attempt, and exact subject/language target. Retries of the same attempt remain idempotent, while a
+new remediation round receives a new hidden seed and unseen exam. Ordinary scheduled exams retain
+their daily idempotency. A prior terminal exam can therefore no longer complete or supersede newly
+earned `ready_for_exam` evidence without executing the plan-bound re-examination.
+
 ---
 
 # iTMounts public brand and domain cutover — 2026-09-08

@@ -36,6 +36,31 @@ test('University study gaps put host-owned curriculum themes before remediation 
   assert.ok(!boundedQuestionTerms.includes('weakness'))
 })
 
+test('University remediation can rotate discovery focus without changing the curriculum', () => {
+  const base = universityStudyGapSignal({
+    planKey: 'communication-remediation-plan',
+    subjectId: 'language_communication',
+    objective: 'Remediate a failed independent communication examination.',
+    failureClass: 'unknown',
+    strategy: selectCosUniversityStudyStrategy({ failureClass: 'unknown' }),
+    studyVariant: 0,
+  })
+  const next = universityStudyGapSignal({
+    planKey: 'communication-remediation-plan',
+    subjectId: 'language_communication',
+    objective: 'Remediate a failed independent communication examination.',
+    failureClass: 'unknown',
+    strategy: selectCosUniversityStudyStrategy({ failureClass: 'unknown' }),
+    studyVariant: 1,
+  })
+
+  assert.equal(base.missingFacts?.[0], 'writing and editing')
+  assert.equal(next.missingFacts?.[0], 'multilingual communication')
+  assert.deepEqual(new Set(next.missingFacts), new Set(base.missingFacts))
+  assert.equal(next.taskId, base.taskId)
+  assert.equal(next.capability, base.capability)
+})
+
 test('bounded scholarly discovery receives canonical curriculum content before generic remediation wording', () => {
   const { gap } = physicsGap()
   const query = `${gap.subject} ${gap.question}`

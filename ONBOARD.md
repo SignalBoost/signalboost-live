@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.98
+**Version:** 1.99
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -77,6 +77,14 @@ Implementation order for this capability:
 Do not begin with unrestricted exploit execution. Establish the authorization, role isolation, evidence, and fail-closed control plane first.
 
 **Current status:** this section records the accepted architecture/direction. It is not evidence that the Autonomous Security Patrol or Stranger ethical-hacking capability is already implemented or Production-ready.
+
+## COS University remediation source diversification — 2026-09-10
+
+Failed-exam remediation preserves all learning-admission and examiner-isolation gates while rotating
+the leading host-owned curriculum theme on each 15-minute learning slot. A plan that rejects one
+result set as duplicate, irrelevant, or low-confidence therefore searches a materially different
+curriculum focus on its next attempt instead of acquiring the same eleven weak documents forever.
+The gap identity, curriculum, hidden examination, and evidence thresholds do not change.
 
 ## COS University automatic Production-outcome correlation — 2026-09-10
 

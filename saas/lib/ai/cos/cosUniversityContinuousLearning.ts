@@ -239,7 +239,7 @@ export async function runCosUniversityContinuousLearning(options: {
   const summary = emptySummary({ enabled: true, claimed: true, slotKey, status: 'idle' })
   const attemptedPlanIds: string[] = []
   try {
-    const remediation = await ensureCosUniversityExamFailureRemediationPlans({ agentId, maxPlans: 4 })
+    const remediation = await ensureCosUniversityExamFailureRemediationPlans({ agentId, maxPlans: 4, now })
     summary.examFailuresPrioritized = remediation.activePlans.length
 
     const planning = await runCosUniversityPlanningCycle({ now, agentId, maxPlans: 12 })

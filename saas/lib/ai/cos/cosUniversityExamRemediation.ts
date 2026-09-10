@@ -13,6 +13,7 @@ import {
 
 const DEFAULT_AGENT_ID = 'cos'
 const SOURCE_KIND = 'recertification'
+const REMEDIATION_STUDY_VARIANT_MS = 15 * 60_000
 const PLAN_SELECT_FIELDS = 'id,plan_key,subject_id,language_code,language_dimension,failure_class,source_kind,objective,priority,methods,acquisition_source_kinds,fine_tune_candidate,status' as const
 
 type FailedExamRow = {
@@ -63,6 +64,11 @@ export type CosUniversityExamRemediationSummary = {
   supersededPlans: number
   activePlans: CosUniversityExamRemediationPlan[]
   gapSignals: KnowledgeGapSignal[]
+}
+
+/** Rotate the public curriculum theme used for discovery on each learning slot. */
+export function cosUniversityRemediationStudyVariant(now: Date): number {
+  return Math.floor(now.getTime() / REMEDIATION_STUDY_VARIANT_MS)
 }
 
 function key(parts: string[]): string {
@@ -256,6 +262,7 @@ export async function ensureCosUniversityExamFailureRemediationPlans(options: {
   const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
   if (!agentId) return { failuresConsidered: 0, supersededPlans: 0, activePlans: [], gapSignals: [] }
   const now = options.now instanceof Date ? options.now : new Date()
+  const studyVariant = cosUniversityRemediationStudyVariant(now)
   const reconciliation = await loadCurrentFailedExams(agentId, maxPlans * 3, now)
   const supersededPlans = await supersedeResolvedFailurePlans(agentId, reconciliation.supersededFailureIds)
   const failures = reconciliation.failures
@@ -299,6 +306,7 @@ export async function ensureCosUniversityExamFailureRemediationPlans(options: {
         failureClass: row.failure_class,
         strategy,
         repeatedCount: 1,
+        studyVariant,
         evidence: ['independent_unseen_exam_failed', 'hidden_exam_rubric_not_exposed'],
       }))
     }

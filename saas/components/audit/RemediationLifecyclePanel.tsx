@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { uiText } from '@/lib/i18n/uiText'
 
 // Truthful live status for the audit remediation lifecycle. The stage bar is
@@ -63,6 +63,24 @@ type Copy = {
   lastChanged: string
   stage: string
   of: string
+}
+
+type RecentRun = {
+  id?: string
+  created_at?: string
+  status?: string
+  findings_count?: number
+}
+
+const AUTO_STATUS = new Set(['approved', 'remediated'])
+const AUTO_RECENT_MS = 10 * 60 * 1000
+const AUTO_POLL_MS = 10_000
+
+function recentAutomaticRun(run: RecentRun | undefined, findingsApproved: number): run is RecentRun & { id: string } {
+  if (!run?.id || !AUTO_STATUS.has(String(run.status || ''))) return false
+  const createdAt = Date.parse(String(run.created_at || ''))
+  if (!Number.isFinite(createdAt) || Date.now() - createdAt > AUTO_RECENT_MS) return false
+  return Number(run.findings_count || 0) === Math.max(0, Number(findingsApproved || 0))
 }
 
 const COPY: Record<string, Copy> = {
@@ -176,12 +194,15 @@ function activityState(copy: Copy, status: string, heartbeatAge: number | null, 
   return { label: copy.workerActive, color: '#34d399', live: true }
 }
 
-export default function RemediationLifecyclePanel({ state, lang, findingsApproved }: {
+export default function RemediationLifecyclePanel({ state: suppliedState, lang, findingsApproved }: {
   state: RemediationLifecycleState | null
   lang: string
   findingsApproved: number
 }) {
   const [now, setNow] = useState(0)
+  const markerRef = useRef<HTMLDivElement>(null)
+  const [autoRunId, setAutoRunId] = useState('')
+  const [autoState, setAutoState] = useState<RemediationLifecycleState | null>(null)
 
   useEffect(() => {
     setNow(Date.now())
@@ -189,7 +210,74 @@ export default function RemediationLifecyclePanel({ state, lang, findingsApprove
     return () => window.clearInterval(id)
   }, [])
 
-  if (!state) return null
+  const refreshAutomaticState = useCallback(async () => {
+    if (suppliedState) return
+    try {
+      const historyResponse = await fetch('/api/hub/operator/audit/runs', {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      const history = await historyResponse.json().catch(() => null)
+      const latest = Array.isArray(history?.runs) ? history.runs[0] as RecentRun | undefined : undefined
+      if (!historyResponse.ok || !history?.ok || !recentAutomaticRun(latest, findingsApproved)) {
+        setAutoRunId('')
+        setAutoState(null)
+        return
+      }
+
+      const detailResponse = await fetch(`/api/hub/operator/audit/runs?runId=${encodeURIComponent(latest.id)}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      const detail = await detailResponse.json().catch(() => null)
+      if (!detailResponse.ok || !detail?.ok) return
+
+      const lifecycle = (detail.remediation || {
+        lifecycleStatus: detail.run?.status === 'remediated' ? 'merged' : 'preparing',
+        findingsTotal: Number(detail.run?.findings_count || findingsApproved || 0),
+        findingsApplied: 0,
+        merged: detail.run?.status === 'remediated',
+      }) as RemediationLifecycleState
+      setAutoRunId(latest.id)
+      setAutoState(lifecycle)
+    } catch {
+      // Absence of durable status evidence never manufactures a success state.
+    }
+  }, [findingsApproved, suppliedState])
+
+  useEffect(() => {
+    if (suppliedState) {
+      setAutoRunId('')
+      setAutoState(null)
+      return
+    }
+    void refreshAutomaticState()
+    const id = window.setInterval(() => { void refreshAutomaticState() }, AUTO_POLL_MS)
+    return () => window.clearInterval(id)
+  }, [refreshAutomaticState, suppliedState])
+
+  const state = suppliedState || autoState
+  const hideManualControls = Boolean(state)
+
+  useEffect(() => {
+    if (!hideManualControls) return
+    const section = markerRef.current?.closest('section')
+    const manualControls = section?.firstElementChild instanceof HTMLElement
+      ? section.firstElementChild
+      : null
+    if (!manualControls || manualControls === markerRef.current) return
+    const previousDisplay = manualControls.style.display
+    const previousHidden = manualControls.getAttribute('aria-hidden')
+    manualControls.style.display = 'none'
+    manualControls.setAttribute('aria-hidden', 'true')
+    return () => {
+      manualControls.style.display = previousDisplay
+      if (previousHidden === null) manualControls.removeAttribute('aria-hidden')
+      else manualControls.setAttribute('aria-hidden', previousHidden)
+    }
+  }, [hideManualControls])
+
+  if (!state) return <div ref={markerRef} hidden data-audit-automatic-remediation="false" />
   const copy = COPY[lang] || COPY.en
   const status = String(state.lifecycleStatus || (state.merged ? 'merged' : 'preparing'))
   const visual = stateCopy(copy, status)
@@ -204,7 +292,7 @@ export default function RemediationLifecyclePanel({ state, lang, findingsApprove
   const progressColor = status === 'failed' || status === 'checks_failed' ? '#fca5a5' : status === 'partial' ? '#ffc300' : status === 'merged' ? '#34d399' : '#1af0ff'
 
   return (
-    <div className={`mt-3 rounded-md border bg-bg p-3 ${visual.tone}`} aria-live="polite">
+    <div ref={markerRef} data-audit-automatic-remediation={suppliedState ? 'tracked' : autoRunId ? 'automatic' : 'false'} className={`mt-3 rounded-md border bg-bg p-3 ${visual.tone}`} aria-live="polite">
       <div>
         <div className="flex items-center gap-2 text-sm font-semibold">
           <span className={`inline-block h-2 w-2 rounded-full ${status === 'merged' ? 'bg-[#34d399]' : status === 'failed' || status === 'checks_failed' ? 'bg-danger' : 'animate-pulse bg-accent'}`} />

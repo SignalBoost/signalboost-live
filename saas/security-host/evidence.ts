@@ -116,6 +116,7 @@ function copyEvidenceEvent(value: SecurityIncidentEvidenceEvent): Readonly<Secur
   if (new Set(attributionHypotheses.map(item => item.id)).size !== attributionHypotheses.length) {
     throw new Error('security_attribution_ids_must_be_unique')
   }
+  const target = copyTarget(value.target)
 
   return Object.freeze({
     eventId: value.eventId,
@@ -124,7 +125,7 @@ function copyEvidenceEvent(value: SecurityIncidentEvidenceEvent): Readonly<Secur
     actorRole: value.actorRole,
     action: value.action,
     decision: value.decision,
-    target: copyTarget(value.target),
+    ...(target ? { target } : {}),
     observations,
     attributionHypotheses,
   })

@@ -95,6 +95,7 @@ export function cosUniversityStudyProofEligible(input: {
 export async function recordAcceptedCosUniversityStudyAttempts(
   inputs: readonly CosUniversityAcceptedStudyProofInput[],
   now = new Date(),
+  agentId = 'cos',
 ): Promise<string[]> {
   const byPlan = new Map<string, Map<string, AcceptedRefObservation>>()
   const nowMs = now.getTime()
@@ -120,7 +121,7 @@ export async function recordAcceptedCosUniversityStudyAttempts(
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_study_plans')
     .select('id,attempt_count,status,last_attempt_at,updated_at,evidence')
-    .eq('agent_id', 'cos')
+    .eq('agent_id', clean(agentId, 180))
     .in('id', [...byPlan.keys()])
   if (result.error) throw result.error
 

@@ -58,6 +58,8 @@ export type KnowledgeGap = {
   evidence: string[]
   /** Optional study-method constraint. Omitted/empty preserves the normal all-adapter behavior. */
   sourceKinds?: ContinuousLearningSourceKind[]
+  /** Optional adapter-level exclusions for objectives whose source-kind bucket is intentionally broader. */
+  excludedAdapterIds?: string[]
   admission?: TieredAdmission
 }
 

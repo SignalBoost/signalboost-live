@@ -21,6 +21,18 @@
     "BUILDER_AUTO_MERGE_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ROLLBACK_ENABLED": "true"
   },
+  "routes": [
+    {
+      "src": "/",
+      "transforms": [
+        {
+          "type": "response.headers",
+          "op": "delete",
+          "target": { "key": "server" }
+        }
+      ]
+    }
+  ],
   "crons": [
     { "path": "/api/cron/builder-continuations", "schedule": "* * * * *" },
     { "path": "/api/cron/builder-repair-merge", "schedule": "* * * * *" },

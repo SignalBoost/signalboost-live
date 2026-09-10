@@ -21,7 +21,7 @@ import {
   type CosUniversityExamTarget,
 } from './cosUniversityIndependentExam.ts'
 
-const AGENT_ID = 'cos'
+const DEFAULT_AGENT_ID = 'cos'
 
 export type CosUniversityExamRunSummary = {
   runId: string | null
@@ -76,12 +76,12 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
 
-async function loadAssessmentRows(): Promise<CosUniversityExamAssessmentRow[]> {
+async function loadAssessmentRows(agentId: string): Promise<CosUniversityExamAssessmentRow[]> {
   const db = cosServiceDb()
   if (!db) return []
   const result = await db.from('cos_university_assessments')
     .select('subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_authority,observed_at,valid_until')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .order('observed_at', { ascending: false })
     .limit(5000)
   if (result.error) throw result.error
@@ -99,10 +99,10 @@ async function findRun(runKey: string): Promise<ExamRunRow | null> {
   return (result.data || null) as ExamRunRow | null
 }
 
-async function createOrFindRun(target: CosUniversityExamTarget, now: Date): Promise<ExamRunRow | null> {
+async function createOrFindRun(agentId: string, target: CosUniversityExamTarget, now: Date): Promise<ExamRunRow | null> {
   const db = cosServiceDb()
   if (!db) return null
-  const runKey = `${COS_UNIVERSITY_EXAM_PROFILE}:${dayKey(now)}:${targetKey(target)}`
+  const runKey = `${COS_UNIVERSITY_EXAM_PROFILE}:${agentId}:${dayKey(now)}:${targetKey(target)}`
   const existing = await findRun(runKey)
   if (existing) return existing
 
@@ -149,7 +149,7 @@ function targetFromRun(row: ExamRunRow): CosUniversityExamTarget | null {
   return null
 }
 
-async function executeExam(row: ExamRunRow, target: CosUniversityExamTarget, now: Date): Promise<CosUniversityExamRunSummary> {
+async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversityExamTarget, now: Date): Promise<CosUniversityExamRunSummary> {
   const db = cosServiceDb()
   if (!db) return { runId: row.id, target, status: 'error', passed: null, assessmentRecorded: false, manifestHash: row.manifest_hash, reasons: ['service_database_unavailable'], latencyMs: null }
   const exam = buildCosUniversityBlindExam(row.seed, target)
@@ -230,6 +230,7 @@ async function executeExam(row: ExamRunRow, target: CosUniversityExamTarget, now
   if (freshExecution) {
     const observedAt = new Date()
     assessmentRecorded = await recordCosUniversityAssessment({
+      agentId,
       assessmentKey: `cos-university-exam:${row.id}`,
       ...(target.kind === 'subject'
         ? { subjectId: target.subjectId }
@@ -286,8 +287,8 @@ async function executeExam(row: ExamRunRow, target: CosUniversityExamTarget, now
   }
 }
 
-async function runTarget(target: CosUniversityExamTarget, now: Date): Promise<CosUniversityExamRunSummary> {
-  const row = await createOrFindRun(target, now)
+async function runTarget(agentId: string, target: CosUniversityExamTarget, now: Date): Promise<CosUniversityExamRunSummary> {
+  const row = await createOrFindRun(agentId, target, now)
   if (!row) return { runId: null, target, status: 'error', passed: null, assessmentRecorded: false, manifestHash: null, reasons: ['service_database_unavailable'], latencyMs: null }
   const canonicalTarget = targetFromRun(row) || target
   if (row.status === 'passed' || row.status === 'failed') {
@@ -298,10 +299,11 @@ async function runTarget(target: CosUniversityExamTarget, now: Date): Promise<Co
   }
   const claimed = await claimCreatedRun(row, now)
   if (!claimed) return { runId: row.id, target: canonicalTarget, status: 'not_claimed', passed: null, assessmentRecorded: false, manifestHash: row.manifest_hash, reasons: ['concurrent_claim'], latencyMs: null }
-  return executeExam(row, canonicalTarget, now)
+  return executeExam(agentId, row, canonicalTarget, now)
 }
 
 export async function runCosUniversityIndependentExamBatch(options: {
+  agentId?: string
   now?: Date
   maxExams?: number
   assessmentRows?: CosUniversityExamAssessmentRow[]
@@ -311,11 +313,13 @@ export async function runCosUniversityIndependentExamBatch(options: {
   }
 
   const now = options.now instanceof Date ? options.now : new Date()
+  const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
+  if (!agentId) return { enabled: true, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: ['agent_id_required'], semantics: 'host_seeded_independent_exam_no_self_grading' }
   const maxExams = Math.max(1, Math.min(2, Math.floor(options.maxExams || 2)))
   const errors: string[] = []
   let rows = options.assessmentRows || []
   try {
-    if (!options.assessmentRows) rows = await loadAssessmentRows()
+    if (!options.assessmentRows) rows = await loadAssessmentRows(agentId)
   } catch (error) {
     errors.push(`assessment_rows:${error instanceof Error ? error.message : String(error)}`)
     return { enabled: true, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors, semantics: 'host_seeded_independent_exam_no_self_grading' }
@@ -325,7 +329,7 @@ export async function runCosUniversityIndependentExamBatch(options: {
   const runs: CosUniversityExamRunSummary[] = []
   for (const target of targets) {
     try {
-      runs.push(await runTarget(target, now))
+      runs.push(await runTarget(agentId, target, now))
     } catch (error) {
       errors.push(`${targetKey(target)}:${error instanceof Error ? error.message : String(error)}`)
     }

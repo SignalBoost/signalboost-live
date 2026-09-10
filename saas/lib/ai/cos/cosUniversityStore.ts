@@ -35,6 +35,7 @@ const AUTOPSY_STATUSES = ['retest_pending', 'retest_failed', 'insufficient_evide
 export type CosUniversityScorerAuthority = 'host_private_exam' | 'verified_production' | 'host_capstone'
 
 export type RecordCosUniversityAssessmentInput = {
+  agentId?: string
   assessmentKey: string
   subjectId?: CosUniversitySubjectId
   language?: CosPlatformLanguage
@@ -234,8 +235,9 @@ export async function recordCosUniversityAssessment(input: RecordCosUniversityAs
   const db = cosServiceDb()
   if (!db) return false
   const key = clean(input.assessmentKey, 300)
+  const agentId = clean(input.agentId || AGENT_ID, 180)
   const scorerVersion = clean(input.scorerVersion, 180)
-  if (!key || !scorerVersion || input.independentScorer !== true) return false
+  if (!key || !agentId || !scorerVersion || input.independentScorer !== true) return false
   if (!VALID_SCORER_AUTHORITIES.has(input.scorerAuthority)) return false
   if (input.kind === 'production_transfer' && input.scorerAuthority !== 'verified_production') return false
   if (input.kind === 'capstone' && input.scorerAuthority !== 'host_capstone') return false
@@ -249,7 +251,7 @@ export async function recordCosUniversityAssessment(input: RecordCosUniversityAs
 
   const result = await db.from('cos_university_assessments').upsert({
     assessment_key: key,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     subject_id: input.subjectId || null,
     language_code: input.language || null,
     language_dimension: input.languageDimension || null,

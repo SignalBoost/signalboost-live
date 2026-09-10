@@ -188,6 +188,7 @@ jobs:
           tests/cosUniversityAdmission.node.test.ts
           tests/cosUniversityAdmissionRunner.node.test.ts
           tests/cosUniversityActiveAcademicLane.node.test.ts
+          tests/cosUniversityLearningAssurance.node.test.ts
 
   cos-platform-self-knowledge:
     name: COS platform self-knowledge policy

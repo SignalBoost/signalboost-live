@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.96
+**Version:** 1.97
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -107,6 +107,11 @@ Practice remains non-credit and cannot substitute for an independent exam.
 Practice eligibility follows durable accepted-study proof, not whether the same scheduler tick
 acquired another document. A registered agent therefore cannot lose its practice turn merely
 because its prior study is already current.
+
+The registered-agent cycle now gives identity-scoped `ready_for_exam` plans priority over generic
+academic routing, examines the exact subject or language dimension, and reconciles the plan only
+from the independent result. Passing completes the plan; failure supersedes it so the existing
+failure-remediation path can create a fresh study attempt.
 
 ---
 

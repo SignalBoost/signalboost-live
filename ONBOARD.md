@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.94
+**Version:** 1.95
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -96,6 +96,13 @@ reads, study-plan creation, material acquisition, accepted-study proof, and fail
 Specialist plan keys and learning slots are isolated so one agent cannot consume another agent's
 study attempt or remediation. The registered-agent cycle now executes study/remediation work as well
 as independent exams; accepted material remains non-credit until independent assessment succeeds.
+
+## COS University multi-agent deliberate practice — 2026-09-10
+
+The deliberate-practice worker now carries the enrolled agent identity through study-plan reads,
+proof fences, practice-skill provenance, queue metadata, stale recovery, claim validation, and
+execution reconciliation. The registered-agent cycle launches bounded practice after accepted study.
+Practice remains non-credit and cannot substitute for an independent exam.
 
 ---
 

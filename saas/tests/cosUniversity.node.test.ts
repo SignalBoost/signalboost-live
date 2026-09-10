@@ -130,10 +130,16 @@ test('grades advance only through qualitatively stronger independent evidence', 
   const transfer = [...unseen, assessment('cross_domain_transfer', true, { observedAt: observedAt(3) })]
   assert.equal(deriveCosUniversityGrade('reasoning_decision_science', transfer).grade, 'A-')
 
-  const production = [...transfer, assessment('production_transfer', true, { observedAt: observedAt(4) })]
+  const withoutRetention = [...transfer, assessment('production_transfer', true, { observedAt: observedAt(4) })]
+  assert.equal(deriveCosUniversityGrade('reasoning_decision_science', withoutRetention).grade, 'A-')
+
+  const retained = [...transfer, assessment('delayed_retention', true, { observedAt: observedAt(4) })]
+  assert.equal(deriveCosUniversityGrade('reasoning_decision_science', retained).grade, 'A-')
+
+  const production = [...retained, assessment('production_transfer', true, { observedAt: observedAt(5) })]
   assert.equal(deriveCosUniversityGrade('reasoning_decision_science', production).grade, 'A')
 
-  const capstone = [...production, assessment('capstone', true, { observedAt: observedAt(5) })]
+  const capstone = [...production, assessment('capstone', true, { observedAt: observedAt(6) })]
   assert.equal(deriveCosUniversityGrade('reasoning_decision_science', capstone).grade, 'A+')
 })
 
@@ -160,7 +166,8 @@ test('verified Production failure outranks passive academic coverage when choosi
     assessment('practice_checkpoint', true, { subjectId: 'cybersecurity' }),
     assessment('unseen_subject_exam', true, { subjectId: 'cybersecurity', observedAt: observedAt(2) }),
     assessment('cross_domain_transfer', true, { subjectId: 'cybersecurity', observedAt: observedAt(3) }),
-    assessment('production_transfer', true, { subjectId: 'cybersecurity', observedAt: observedAt(4) }),
+    assessment('delayed_retention', true, { subjectId: 'cybersecurity', observedAt: observedAt(4) }),
+    assessment('production_transfer', true, { subjectId: 'cybersecurity', observedAt: observedAt(5) }),
   ])
 
   const target = selectNextCosUniversityStudyTarget({

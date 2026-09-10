@@ -3,13 +3,20 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.88
+**Version:** 1.89
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
+
+## COS University delayed-retention execution — 2026-09-10
+
+University delayed retention is now an explicit independently scored academic stage and scheduled
+Production path. After at least 14 days, the host replays a previously passed hidden cross-domain
+transfer case with cache and external-AI credit prohibited. The replay cannot count as a new
+holdout variant, and a Production pass cannot raise a subject to A without retained transfer.
 
 ## COS University owner-directed study bridge — 2026-09-10
 

@@ -81,6 +81,7 @@ export type LearningPathId =
   | 'independent_exams'
   | 'subject_a_range_evidence'
   | 'language_a_range_evidence'
+  | 'delayed_retention'
   | 'graduation'
   | 'masters_learning'
   | 'masters_admission'
@@ -99,6 +100,7 @@ export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId,
   independent_exams: 'COS_UNIVERSITY_EXAMS_ENABLED',
   subject_a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',
   language_a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',
+  delayed_retention: 'COS_UNIVERSITY_RETENTION_ENABLED',
   graduation: 'COS_UNIVERSITY_GRADUATION_ENABLED',
   masters_learning: 'COS_UNIVERSITY_MASTERS_LEARNING_ENABLED',
   masters_admission: 'COS_UNIVERSITY_ADMISSION_ENABLED',

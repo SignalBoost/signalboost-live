@@ -151,6 +151,7 @@ export type CosUniversityAssessmentKind =
   | 'practice_checkpoint'
   | 'unseen_subject_exam'
   | 'cross_domain_transfer'
+  | 'delayed_retention'
   | 'production_transfer'
   | 'capstone'
 
@@ -233,7 +234,8 @@ export function deriveCosUniversityGrade(
   const practice = stagePassed(rows, 'practice_checkpoint')
   const unseen = stagePassed(rows, 'unseen_subject_exam')
   const transfer = unseen && stagePassed(rows, 'cross_domain_transfer')
-  const production = transfer && stagePassed(rows, 'production_transfer')
+  const retention = transfer && stagePassed(rows, 'delayed_retention')
+  const production = retention && stagePassed(rows, 'production_transfer')
   const capstone = production && stagePassed(rows, 'capstone')
 
   let grade: CosUniversityGrade
@@ -245,7 +247,9 @@ export function deriveCosUniversityGrade(
     reasons.push('Fresh independent unseen exam, cross-domain transfer, and verified Production transfer are passed.')
   } else if (transfer) {
     grade = 'A-'
-    reasons.push('Fresh independent unseen exam and cross-domain transfer are passed; Production transfer is not yet passed.')
+    reasons.push(retention
+      ? 'Fresh independent unseen exam, cross-domain transfer, and delayed retention are passed; Production transfer is not yet passed.'
+      : 'Fresh independent unseen exam and cross-domain transfer are passed; delayed retention is not yet passed.')
   } else if (unseen) {
     grade = 'B'
     reasons.push('Fresh independent unseen subject exam is passed; transfer evidence is not yet sufficient for an A-range grade.')

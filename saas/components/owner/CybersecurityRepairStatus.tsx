@@ -18,7 +18,7 @@ const FIXED = new Set(['fixed', 'healthy'])
 function tone(status: string): string {
   if (status === 'fixed' || status === 'healthy') return 'border-emerald-300/35 bg-emerald-300/10 text-emerald-50'
   if (status === 'failed' || status === 'verification_failed' || status === 'repair_unavailable' || status === 'monitoring_failed') return 'border-red-300/35 bg-red-300/10 text-red-50'
-  if (ACTIVE.has(status)) return 'border-cyan-300/35 bg-cyan-300/10 text-cyan-50'
+  if (ACTIVE.has(status) || status === 'starting') return 'border-cyan-300/35 bg-cyan-300/10 text-cyan-50'
   return 'border-white/15 bg-white/[0.05] text-slate-200'
 }
 
@@ -29,6 +29,36 @@ export default function CybersecurityRepairStatus() {
   useEffect(() => {
     let cancelled = false
     let timer: number | null = null
+    let ownerCheckStarted = false
+
+    const schedule = (status: string) => {
+      if (FIXED.has(status)) return
+      timer = window.setTimeout(refresh, ACTIVE.has(status) ? 4_000 : 12_000)
+    }
+
+    const startProtectedCheck = async () => {
+      if (ownerCheckStarted || cancelled) return
+      ownerCheckStarted = true
+      setState({ status: 'starting', message: 'Self-Healing is verifying the canonical iTMounts cybersecurity findings.' })
+      try {
+        const response = await fetch('/api/owner/cybersecurity/remediate', {
+          method: 'POST',
+          cache: 'no-store',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        })
+        const json = await response.json().catch(() => null) as RepairStatus | null
+        if (cancelled) return
+        setState(json || { status: response.ok ? 'repair_started' : 'repair_unavailable', message: 'Cybersecurity Self-Healing returned no status.' })
+        schedule(String(json?.status || (response.ok ? 'repair_started' : 'repair_unavailable')))
+      } catch {
+        if (!cancelled) {
+          setState({ status: 'monitoring_failed', message: 'The protected cybersecurity verification could not complete.' })
+          schedule('monitoring_failed')
+        }
+      }
+    }
+
     const refresh = async () => {
       try {
         const response = await fetch('/api/owner/cybersecurity/remediate', { method: 'GET', cache: 'no-store', credentials: 'include', headers: { Accept: 'application/json' } })
@@ -39,14 +69,18 @@ export default function CybersecurityRepairStatus() {
         const json = await response.json().catch(() => null) as RepairStatus | null
         if (cancelled) return
         setAuthorized(true)
-        setState(json)
         const status = String(json?.status || '')
-        if (FIXED.has(status)) return
-        timer = window.setTimeout(refresh, ACTIVE.has(status) ? 4_000 : 12_000)
+        if (status === 'idle') {
+          void startProtectedCheck()
+          return
+        }
+        setState(json)
+        schedule(status)
       } catch {
         if (!cancelled) timer = window.setTimeout(refresh, 12_000)
       }
     }
+
     void refresh()
     return () => { cancelled = true; if (timer != null) window.clearTimeout(timer) }
   }, [])
@@ -57,7 +91,7 @@ export default function CybersecurityRepairStatus() {
   const shortCommit = state.mergeCommitSha ? state.mergeCommitSha.slice(0, 8) : ''
 
   return (
-    <section className="mx-auto mt-5 max-w-6xl" aria-live="polite" data-owner-cybersecurity-repair-status={status}>
+    <section className="mx-auto mt-5 max-w-6xl px-5" aria-live="polite" data-owner-cybersecurity-repair-status={status}>
       <div className={`rounded-2xl border p-5 shadow-lg ${tone(status)}`}>
         <div className="flex flex-wrap items-center gap-2">
           <strong className="rounded-full border border-current/20 px-3 py-1 text-xs font-black uppercase tracking-[0.16em]">{status.replaceAll('_', ' ')}</strong>

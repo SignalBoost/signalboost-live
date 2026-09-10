@@ -22,3 +22,12 @@ test('scheduled cycle is secret-gated, bounded and enabled in production', () =>
   assert.match(config, /COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED/)
   assert.match(config, /cos-university-agent-cycle/)
 })
+
+test('autonomous cycle turns each registered agent failure into isolated remediation work', () => {
+  const cycle = readFileSync(new URL('../lib/ai/cos/cosUniversityAutonomousAgentCycle.ts', import.meta.url), 'utf8')
+  const remediation = readFileSync(new URL('../lib/ai/cos/cosUniversityExamRemediation.ts', import.meta.url), 'utf8')
+  assert.match(cycle, /ensureCosUniversityExamFailureRemediationPlans\(\{ now, agentId: agent\.agentId, maxPlans: 4 \}\)/)
+  assert.match(remediation, /\.eq\('agent_id', agentId\)/)
+  assert.match(remediation, /\['independent_exam_failure', agentId, failure\.id/)
+  assert.doesNotMatch(remediation, /const AGENT_ID = 'cos'/)
+})

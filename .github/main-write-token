@@ -1,2 +1,2 @@
-base_sha=ce695245df7e64491992d3ccd75b2fc061d9216c
-branch=fix/university-remediation-collision-recovery-20260910
+base_sha=c2097fbc7dd5d96d750ef209736f3925656584c8
+branch=feat/security-referee-control-plane-20260910

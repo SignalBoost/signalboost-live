@@ -39,4 +39,5 @@ test('deliberate practice preserves agent identity through proof, queue, and exe
   assert.match(runner, /\{ origin: ORIGIN, agentId, universityPlanId:/)
   assert.match(runner, /practiceFenceStillValid\(agentId, planId, practiceRound\)/)
   assert.match(cycle, /runCosUniversityDeliberatePractice\(\{ agentId: agent\.agentId, maxPlans: 1, maxExercises: 2 \}\)/)
+  assert.doesNotMatch(cycle, /if \(learning\.plansAttempted > 0\)/)
 })

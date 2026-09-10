@@ -12,6 +12,11 @@ const ROOT = path.resolve(import.meta.dirname, '..')
 const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
 const clean = (value: unknown) => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
 
+function packetEvidenceFor(seed: string) {
+  const exam = buildCosUniversityPhdMethodologyExam(seed, 'security_trust_research')
+  return { exam, packetEvidence: exam.rubric.requiredPacketGroups.map(group => group[0]).join('; ') }
+}
+
 test('PhD methodology exam is seeded, reproducible, bounded, and methodology-focused', () => {
   const first = buildCosUniversityPhdMethodologyExam('seed-a', 'ai_systems_research')
   const again = buildCosUniversityPhdMethodologyExam('seed-a', 'ai_systems_research')
@@ -27,8 +32,7 @@ test('PhD methodology exam is seeded, reproducible, bounded, and methodology-foc
 })
 
 test('host scorer requires fresh local provenance plus packet-specific causal, validity, test, and reproducibility reasoning', () => {
-  const exam = buildCosUniversityPhdMethodologyExam('seed-score', 'security_trust_research')
-  const packetEvidence = exam.rubric.requiredPacketGroups.map(group => group[0]).join('; ')
+  const { exam, packetEvidence } = packetEvidenceFor('seed-score')
   const reply = [
     `Claim: For this packet (${packetEvidence}), the observational association does not prove a causal effect; uncertainty remains.`,
     'Design: Use a randomized comparison or justified control baseline with a falsifiable hypothesis and explicit prediction.',
@@ -79,6 +83,26 @@ test('generic keyword stuffing cannot earn PhD methodology evidence across unsee
       assert.ok(group.every(anchor => !clean(canned).includes(clean(anchor))))
     }
   }
+})
+
+test('explicit rejection of an unsupported causal claim is not mis-scored as endorsement', () => {
+  const { exam, packetEvidence } = packetEvidenceFor('seed-negation')
+  const reply = [
+    `Claim: For ${packetEvidence}, the claim that causality is proven is unsupported; uncertainty remains and association is all the current design establishes.`,
+    'Design: A randomized comparison with a control baseline should test a falsifiable hypothesis and prediction.',
+    'Threats: Confounding, selection bias, and measurement or instrument changes threaten validity.',
+    'Test: Preregister the hypothesis, operationalize the measure, and specify falsification criteria.',
+    'Reproducibility: Preserve reproducible artifacts and require independent replication before generalization.',
+  ].join('\n')
+  const score = scoreCosUniversityPhdMethodologyExam(exam, reply, {
+    localReasoning: true,
+    externalAi: false,
+    semanticCache: false,
+    handled: true,
+    turnId: 'turn-negation',
+  })
+  assert.equal(score.passed, true, score.reasons.join(','))
+  assert.ok(!score.reasons.includes('unsupported_claim:causality is proven'))
 })
 
 test('examiner is a distinct host-controlled principal and candidate output cannot self-record academic evidence', () => {

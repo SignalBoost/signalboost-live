@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityGeneralistGraduationGate } from '@/lib/ai/cos/cosUniversityGraduationRunner'
 import { runCosUniversityAdmission } from '@/lib/ai/cos/cosUniversityAdmissionRunner'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
     // worker lane goes dark between graduation and admission.
     const admission = await runCosUniversityAdmission()
     const errors = [...result.errors, ...admission.errors]
+    await recordCosUniversityProductionPath({ path: 'graduation', invocationSucceeded: errors.length === 0, evidence: { ...result, admission } })
     return NextResponse.json({ ok: errors.length === 0, ...result, admission }, { status: errors.length ? 500 : 200 })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

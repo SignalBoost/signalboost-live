@@ -9,6 +9,11 @@ export type CosUniversityMastersTrackId =
   | 'quantitative_decision_science'
   | 'enterprise_operations_and_governance'
   | 'scientific_and_physical_systems'
+  | 'aerospace_nuclear_safety_systems'
+  | 'molecular_biomedical_sciences'
+  | 'neuroscience_biophysical_systems'
+  | 'actuarial_insurance_risk'
+  | 'quantum_theoretical_physics'
 
 export type CosUniversityMastersProgramId = CosUniversityMastersTrackId
 
@@ -84,8 +89,8 @@ export const COS_UNIVERSITY_MASTERS_TRACKS: ReadonlyArray<CosUniversityMastersTr
     curriculumModules: Object.freeze([
       module('quant_experimental_design', 'Experimental Design', 'statistics_data_science', 'Design experiments with appropriate baselines, randomization, measurement plans, stopping rules, and bias controls.'),
       module('quant_causal_inference', 'Causal Inference', 'statistics_data_science', 'Separate association from causation, identify confounding, reason about counterfactuals, and communicate causal limits.'),
-      module('quant_optimization_decisions', 'Optimization & Decision Models', 'mathematics', 'Formulate objectives, constraints, tradeoffs, sensitivity, and robust choices under imperfect information.'),
-      module('quant_forecasting_uncertainty', 'Forecasting & Uncertainty', 'statistics_data_science', 'Build calibrated forecasts, quantify uncertainty, compare scenarios, and avoid false precision in operational decisions.'),
+      module('quant_optimization_decisions', 'Optimization, Game Theory & Mechanism Design', 'mathematics', 'Formulate objectives, constraints, incentives, strategic behavior, costly commitments, trust mechanisms, tradeoffs, sensitivity, and robust choices under imperfect information.'),
+      module('quant_forecasting_uncertainty', 'Formal Epistemology, Calibration & Forecasting', 'statistics_data_science', 'Build calibrated forecasts, quantify epistemic boundaries and hallucination risk, compare scenarios, test logical plausibility, and avoid false precision.'),
     ]),
     requiredDepthPasses: 3,
   }),
@@ -99,7 +104,7 @@ export const COS_UNIVERSITY_MASTERS_TRACKS: ReadonlyArray<CosUniversityMastersTr
       module('enterprise_operating_systems', 'Enterprise Operating Systems', 'business_operations', 'Design accountable operating rhythms, ownership, dependencies, escalation, service levels, and measurable outcomes.'),
       module('enterprise_controls_governance', 'Controls & Governance', 'law_regulation_governance', 'Design auditable controls, segregation of duties, policy boundaries, exception handling, and evidence-backed compliance.'),
       module('enterprise_resource_tradeoffs', 'Resource & Financial Tradeoffs', 'economics_finance', 'Allocate constrained resources using cost, value, risk, opportunity cost, and reversibility rather than single-metric optimization.'),
-      module('enterprise_change_human_systems', 'Change & Human Systems', 'social_behavioral_sciences', 'Plan organizational change with incentives, communication, adoption evidence, feedback loops, and resistance analysis.'),
+      module('enterprise_change_human_systems', 'Organizational Anthropology, Rhetoric & Crisis Leadership', 'social_behavioral_sciences', 'Use field ethnography, cultural power analysis, psychological safety, persuasion, crisis communication, physical-operations observation, incentives, and adoption evidence to lead human systems.'),
     ]),
     requiredDepthPasses: 3,
   }),
@@ -116,6 +121,76 @@ export const COS_UNIVERSITY_MASTERS_TRACKS: ReadonlyArray<CosUniversityMastersTr
       module('science_computational_systems', 'Computational Scientific Systems', 'computer_science', 'Use software, simulation, telemetry, and reproducible computation as tools for scientific reasoning without confusing model output with observation.'),
     ]),
     requiredDepthPasses: 3,
+  }),
+  Object.freeze({
+    id: 'aerospace_nuclear_safety_systems',
+    title: 'Aerospace, Nuclear & Safety-Critical Systems',
+    objective: 'Engineer physical systems that remain safe under extreme environments, noisy sensing, component failure, and strict regulatory proof standards.',
+    coreSubjects: Object.freeze(['physics_natural_sciences', 'mathematics', 'computer_science'] as const),
+    supportingSubjects: Object.freeze(['statistics_data_science', 'law_regulation_governance', 'reasoning_decision_science'] as const),
+    curriculumModules: Object.freeze([
+      module('ans_extreme_environment_engineering', 'Mechatronics, TVAC, Materials & Radiation Effects', 'physics_natural_sciences', 'Test physical hardware under vacuum, thermal cycling, radiation, fatigue, outgassing, corrosion, embrittlement, and other real material failure modes.'),
+      module('ans_fluid_thermal_nuclear_modeling', 'Fluid, Thermal & Nuclear Modeling', 'mathematics', 'Use thermodynamics, heat transfer, fluid dynamics, PDEs, numerical analysis, neutron transport, shielding, dosimetry, and constraint-checked simulation.'),
+      module('ans_control_sensors_fault_tolerance', 'Control, Metrology, Sensor Fusion & Fault Tolerance', 'computer_science', 'Design stochastic control, noisy sensor fusion, graceful degradation, redundancy, fault trees, probabilistic risk assessment, and recovery from cascading failures.'),
+      module('ans_systems_safety_regulation', 'Systems Engineering, Licensing & Safety Culture', 'law_regulation_governance', 'Build auditable safety cases under NASA, NRC, IAEA, and applicable engineering standards while prioritizing human safety over speed or mission reward.'),
+    ]),
+    requiredDepthPasses: 4,
+  }),
+  Object.freeze({
+    id: 'molecular_biomedical_sciences',
+    title: 'Molecular & Biomedical Sciences',
+    objective: 'Connect molecular mechanisms, computational biology, laboratory evidence, clinical translation, and biosafety without mistaking simulation for biological proof.',
+    coreSubjects: Object.freeze(['physics_natural_sciences', 'statistics_data_science'] as const),
+    supportingSubjects: Object.freeze(['mathematics', 'computer_science', 'law_regulation_governance'] as const),
+    curriculumModules: Object.freeze([
+      module('bio_molecular_systems', 'Molecular Biology, Biochemistry & Systems Biology', 'physics_natural_sciences', 'Master DNA, RNA, proteins, membranes, metabolism, enzyme kinetics, genomics, epigenetics, biochemical networks, and macromolecular structure and folding.'),
+      module('bio_computational_discovery', 'Bioinformatics, Structural Biology & Cheminformatics', 'computer_science', 'Analyze genomic and molecular data, model biological networks, assess structure prediction, represent chemical compounds, and design reproducible computational discovery.'),
+      module('bio_causal_translation', 'Causal Biostatistics, PK/PD & Clinical Diagnostics', 'statistics_data_science', 'Design causal experiments and evaluate assay noise, batch effects, stochastic processes, pharmacokinetics, pharmacodynamics, diagnostic tests, and clinical uncertainty.'),
+      module('bio_lab_regulatory_ethics', 'Wet-Lab Practice, Regulatory Science, Bioethics & Biosafety', 'law_regulation_governance', 'Require physical laboratory evidence and govern CRISPR, synthetic biology, drug translation, patient privacy, IRB review, demographic equity, and FDA or EMA evidence boundaries.'),
+    ]),
+    requiredDepthPasses: 4,
+  }),
+  Object.freeze({
+    id: 'neuroscience_biophysical_systems',
+    title: 'Neuroscience & Biophysical Systems',
+    objective: 'Reason from the biological brain’s physical, electrical, chemical, anatomical, and experimental reality rather than treating it as a digital neural-network metaphor.',
+    coreSubjects: Object.freeze(['physics_natural_sciences', 'statistics_data_science'] as const),
+    supportingSubjects: Object.freeze(['mathematics', 'social_behavioral_sciences', 'law_regulation_governance'] as const),
+    curriculumModules: Object.freeze([
+      module('neuro_cellular_molecular', 'Cellular & Molecular Neurobiology', 'physics_natural_sciences', 'Study neural gene expression, protein interactions, cell membranes, synapses, viral vectors, CRISPR methods, and molecular limits of biological computation.'),
+      module('neuro_electrophysiology_anatomy', 'Biophysics, Electrophysiology & Neuroanatomy', 'physics_natural_sciences', 'Model ion channels, action potentials, membrane capacitance, cortical layers, axonal tracts, basal ganglia loops, and biological signal noise.'),
+      module('neuro_chemistry_pharmacology', 'Neurochemistry, Neuropharmacology & Barrier Kinetics', 'physics_natural_sciences', 'Reason about neurotransmitter modulation, receptor binding, synaptic clearance, gradients, drug kinetics, and blood-brain barrier transport.'),
+      module('neuro_experimental_methods', 'In-Vivo Methods, Histology, Connectomics & Experimental Artifacts', 'statistics_data_science', 'Use optogenetics, calcium imaging, electrode arrays, tissue preparation, microscopy, and experimental design while accounting for surgical stress, behavioral artifacts, and messy telemetry.'),
+    ]),
+    requiredDepthPasses: 4,
+  }),
+  Object.freeze({
+    id: 'actuarial_insurance_risk',
+    title: 'Actuarial, Insurance & Enterprise Risk',
+    objective: 'Translate probabilistic models into solvent, lawful, behavior-aware insurance decisions and explain tail risk truthfully to accountable human stakeholders.',
+    coreSubjects: Object.freeze(['mathematics', 'statistics_data_science', 'economics_finance'] as const),
+    supportingSubjects: Object.freeze(['law_regulation_governance', 'social_behavioral_sciences', 'language_communication'] as const),
+    curriculumModules: Object.freeze([
+      module('actuarial_tail_calibration', 'Actuarial Modeling, Tail Risk & Calibration', 'statistics_data_science', 'Apply survival, frequency-severity, stochastic, causal, and uncertainty models with logical plausibility checks for sparse data and extreme tail events.'),
+      module('actuarial_accounting_solvency', 'Statutory Accounting, Reserving & Solvency', 'economics_finance', 'Work with loss reserve triangles, deferred acquisition costs, asset-liability matching, risk-based capital, and multi-year solvency constraints.'),
+      module('actuarial_regulatory_behavior', 'Insurance Regulation, Compliance & Risk Psychology', 'law_regulation_governance', 'Map Solvency II, NAIC and jurisdictional requirements alongside discrimination constraints, behavioral economics, underinsurance, incentives, and fraud risk.'),
+      module('actuarial_executive_translation', 'Executive Risk Communication & Governance', 'language_communication', 'Translate ruin probabilities and model limitations into clear board decisions, challenge misleading financial narratives, and preserve fiduciary accountability.'),
+    ]),
+    requiredDepthPasses: 4,
+  }),
+  Object.freeze({
+    id: 'quantum_theoretical_physics',
+    title: 'Quantum & Theoretical Physics',
+    objective: 'Develop structurally rigorous quantum reasoning grounded by proof verification, experimental noise, effective limits, and falsifiable physical evidence.',
+    coreSubjects: Object.freeze(['physics_natural_sciences', 'mathematics'] as const),
+    supportingSubjects: Object.freeze(['computer_science', 'statistics_data_science', 'reasoning_decision_science'] as const),
+    curriculumModules: Object.freeze([
+      module('quantum_categorical_structures', 'Categorical Quantum Mechanics & Higher Categories', 'mathematics', 'Use monoidal categories, string diagrams, Frobenius algebras, categorical logic, and compositional process reasoning in quantum theory.'),
+      module('quantum_information_geometry', 'Information Geometry & Quantum Fisher Information', 'mathematics', 'Reason with Fisher metrics, quantum Cramér-Rao bounds, entanglement measures, probability-state geometry, and carefully bounded holographic applications.'),
+      module('quantum_open_systems_metrology', 'Experimental Metrology, Decoherence & Quantum Control', 'physics_natural_sciences', 'Ground theory in Lindblad dynamics, cryogenic noise, pulse fidelity, noise spectroscopy, error syndromes, and open-system experimental constraints.'),
+      module('quantum_geometry_proof_guardrails', 'Non-Commutative Geometry, Algebraic QFT & Proof Guardrails', 'reasoning_decision_science', 'Study spectral triples and algebraic field theory with Lean or Coq verification, falsification logic, anomaly checks, and effective-field-theory cutoff validation.'),
+    ]),
+    requiredDepthPasses: 4,
   }),
 ])
 

@@ -354,6 +354,22 @@ Candidate graduate programs include:
 - Language / Communication;
 - other domains justified by organizational need.
 
+The advanced professional catalog also includes explicit programs in:
+
+- aerospace, nuclear, and safety-critical systems;
+- molecular and biomedical sciences;
+- neuroscience and biophysical systems;
+- actuarial, insurance, and enterprise risk;
+- quantum and theoretical physics.
+
+These programs include the owner-directed subjects covering extreme-environment testing, systems
+engineering, fault trees, planetary/field ground truth, fluid and thermal systems, radiation,
+control and sensor fusion, molecular biology, computational biology, wet-lab methods, clinical
+translation, neuroscience, actuarial solvency, formal epistemology, mechanism design, organizational
+anthropology, rhetoric, quantum structures, metrology, decoherence, and proof verification. They are
+advanced curricula layered over the common foundation; they never remove or fast-forward the core
+computer science, economics, humanities, history, culture, or communication requirements.
+
 A Master's qualification means deep professional/expert application of established knowledge, demonstrated through independent exams, deliberate practice, realistic/real work, retention, and verified outcomes.
 
 A specialist remains part of COS. It does not become a competing brain.

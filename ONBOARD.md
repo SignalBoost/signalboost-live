@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.94
+**Version:** 1.95
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -95,6 +95,10 @@ The deliberate-practice worker now carries the enrolled agent identity through s
 proof fences, practice-skill provenance, queue metadata, stale recovery, claim validation, and
 execution reconciliation. The registered-agent cycle launches bounded practice after accepted study.
 Practice remains non-credit and cannot substitute for an independent exam.
+
+Practice eligibility follows durable accepted-study proof, not whether the same scheduler tick
+acquired another document. A registered agent therefore cannot lose its practice turn merely
+because another agent claimed a shared acquisition slot or its prior study is already current.
 
 ---
 

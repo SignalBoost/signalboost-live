@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { saasSupabaseCookieOptions } from '@/lib/auth/cookies'
 import { isPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
 import { cookies } from 'next/headers'
+import { ownerEmailList } from '@/lib/auth/ownerEmails'
 
 export type Role = 'owner' | 'admin' | 'member' | 'guest'
 
@@ -24,19 +25,11 @@ export type GuardResult = {
   ctx: AccessContext
 }
 
-function envList(name: string): string[] {
-  return (process.env[name] || '')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-}
-
-// SignalBoost's primary owner must retain access even when deployment configuration
-// is incomplete or has been reset. OWNER_EMAILS may add further owner accounts.
-const DEFAULT_OWNER_EMAILS = ['cadomos@gmail.com']
-
+// The owner list lives in lib/auth/ownerEmails.ts so authorization and credit
+// metering share one definition. The primary owner must retain access even when
+// deployment configuration is incomplete or has been reset.
 function ownerEmails(): string[] {
-  return [...new Set([...DEFAULT_OWNER_EMAILS, ...envList('OWNER_EMAILS')])]
+  return ownerEmailList()
 }
 
 function envRole(email: string): Role {

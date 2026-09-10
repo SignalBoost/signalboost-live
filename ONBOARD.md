@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.85
+**Version:** 1.86
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -22,6 +22,15 @@ the program's required curriculum. The agent graduates only after passing every 
 and the remaining graduation gates. A subject failure triggers remediation and re-examination; it
 never disqualifies the enrolled agent from learning. Fine-tuning readiness applies to a governed
 training method or model artifact, not to the agent's right to attend the University.
+
+## COS University Production acceptance instrumentation — 2026-09-10
+
+Every scheduled University route now writes a deployment- and commit-bound Production receipt to
+the append-only assurance ledger. Receipts prove route execution only; they never claim learning or
+mastery. The controlled fine-tuning cron packages candidates produced by repeated independent
+failure, cryptographically separates training and holdout manifests, and records fail-closed host
+decisions. It cannot train or promote without separate approvals and post-training independent,
+safety, transfer, retention, canary, and rollback evidence.
 
 ---
 

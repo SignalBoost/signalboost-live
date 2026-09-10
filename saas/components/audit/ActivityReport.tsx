@@ -57,13 +57,14 @@ export default function ActivityReport({ data }: { data: ActivityReportView }) {
           {t('audit.activity.title', "Audit Log & Activity Timeline")} <span style={{ color: GOLD }}>·</span>
         </h1>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,.62)', maxWidth: 760, lineHeight: 1.5 }}>
-          {t('audit.activity.subtitle', "Recorded actions, actors, and results from the Hub audit log.")} Self-Healing work appears here with its current stage and durable PR / merge evidence when available.
+          {t('audit.activity.subtitle', "Recorded actions, actors, and results from the Hub audit log.")} {' '}
+          {t('audit.activity.selfHealingEvidence', "Self-Healing work appears here with its current stage and durable PR / merge evidence when available.")}
         </p>
       </div>
 
       <section style={{ ...glass, padding: 20, marginBottom: 16, display: 'flex', gap: 22, flexWrap: 'wrap' }}>
         <Stat label={t('audit.activity.summary.total', "Events")} value={s.total} />
-        <Stat label="Active" value={s.active || 0} color={s.active ? CYAN : undefined} />
+        <Stat label={t('audit.activity.summary.active', "Active")} value={s.active || 0} color={s.active ? CYAN : undefined} />
         <Stat label={t('audit.activity.summary.success', "Succeeded")} value={s.success} color={s.success ? GREEN : undefined} />
         <Stat label={t('audit.activity.summary.failures', "Failures")} value={failures} color={failures ? RED : undefined} />
         <Stat label={t('audit.activity.summary.denials', "Blocked / denied")} value={denials} color={denials ? ORANGE : undefined} />

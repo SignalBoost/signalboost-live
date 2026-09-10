@@ -26,6 +26,11 @@ they do not claim consciousness or real emotion.
 - exclude integrity violations from rank and never reward concealment, cherry-picking, duplicated evidence, sabotage, knowledge hoarding, self-scoring, confidence, activity volume, or unsafe risk;
 - never allow motivation, rank, credential, or rivalry to expand an agent's authority.
 
+Runtime evidence is time-bounded. Expired assessments, team contributions, and integrity findings
+do not affect current standing. A team contribution is credited only after the normal verified
+Production-outcome recorder proves that a different beneficiary improved; an integrity penalty is
+counted only from a host-controller record with referenced evidence.
+
 The objective is applied knowledge and collective capability: an agent succeeds by doing excellent,
 role-relevant work and by making the team more capable.
 

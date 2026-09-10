@@ -18,12 +18,18 @@ export async function recordCosUniversityTeamContribution(input: {
   beneficiaryOutcomeEvidenceRef: string
   independentScorer: boolean
   observedAt?: Date
+  validUntil?: Date
 }): Promise<{ stored: boolean; inserted: boolean; eligible: boolean; evidenceRef: string | null }> {
   const contributorAgentId = identity(input.contributorAgentId, 'contributor_agent_id')
   const beneficiaryAgentId = identity(input.beneficiaryAgentId, 'beneficiary_agent_id')
   if (contributorAgentId === beneficiaryAgentId) throw new Error('self_contribution_prohibited')
   const refs = [...new Set(input.contributionEvidenceRefs.map(String).filter(Boolean))]
   const outcomeRef = String(input.beneficiaryOutcomeEvidenceRef || '').trim()
+  const observedAt = input.observedAt || new Date()
+  const validUntil = input.validUntil || new Date(observedAt.getTime() + 90 * 86_400_000)
+  if (!Number.isFinite(observedAt.getTime()) || !Number.isFinite(validUntil.getTime()) || validUntil <= observedAt) {
+    throw new Error('team_contribution_validity_invalid')
+  }
   const eligible = input.independentScorer === true && refs.length > 0 && outcomeRef.length > 0
   const evidence = {
     profile: COS_UNIVERSITY_TEAM_CONTRIBUTION_PROFILE,
@@ -48,7 +54,8 @@ export async function recordCosUniversityTeamContribution(input: {
     evidence_hash: evidenceHash,
     evidence,
     verifier: input.independentScorer ? 'independent_scorer' : 'host_controller',
-    observed_at: (input.observedAt || new Date()).toISOString(),
+    observed_at: observedAt.toISOString(),
+    expires_at: validUntil.toISOString(),
   })
   if (inserted.error) {
     if (String((inserted.error as { code?: unknown }).code || '') === '23505') return { stored: true, inserted: false, eligible, evidenceRef }

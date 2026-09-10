@@ -14,6 +14,14 @@ export type CosUniversityOutcomeEvidenceEnvelope = Readonly<{
   higherIsBetter: boolean
   sampleSize: number
   independentScorer: boolean
+  teamContribution?: Readonly<{
+    contributorAgentId: string
+    contributionEvidenceRefs: readonly string[]
+  }> | null
+  integrityViolation?: Readonly<{
+    evidenceRefs: readonly string[]
+    hostVerified: boolean
+  }> | null
 }>
 
 export function universityEvidenceFromVerifiedOutcome(

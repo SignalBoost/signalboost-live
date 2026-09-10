@@ -22,6 +22,12 @@ while a stronger comparable peer creates a healthy stretch target. Leadership re
 application and team contribution. Integrity violations remove competitive rank, and no motivational
 state expands authority. These are functional machine incentives, not claims that agents feel emotion.
 
+Motivation evidence is operationally bounded: expired assessments and expired assurance events are
+ignored. Teamwork credit is emitted only by the authoritative verified-outcome path after a
+beneficiary's independently scored improvement passes every learning-outcome gate. Integrity
+penalties likewise require host-controller evidence and expire into review rather than becoming an
+unreviewable permanent label.
+
 ## COS University live Production-path verification — 2026-09-10
 
 The owner-only assurance endpoint now reads the append-only receipt ledger for the exact running

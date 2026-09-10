@@ -10,5 +10,6 @@ test('team credit is independent, outcome-linked, append-only, and rejects self-
   assert.match(source, /beneficiaryOutcomeEvidenceRef/)
   assert.match(source, /independentScorer === true/)
   assert.match(source, /event_type: 'team_contribution'/)
+  assert.match(source, /expires_at: validUntil\.toISOString\(\)/)
   assert.doesNotMatch(source, /\.from\([^)]*\)\.update\(|\.delete\(/)
 })

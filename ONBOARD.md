@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.100
+**Version:** 1.101
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -77,6 +77,47 @@ Implementation order for this capability:
 Do not begin with unrestricted exploit execution. Establish the authorization, role isolation, evidence, and fail-closed control plane first.
 
 **Current status:** this section records the accepted architecture/direction. It is not evidence that the Autonomous Security Patrol or Stranger ethical-hacking capability is already implemented or Production-ready.
+
+## Autonomous Security Patrol expansion: repo, IP and defensive counterintelligence — 2026-09-10
+
+The security mission covers the enterprise **inside and outside the running application**. Guardian must eventually treat the software-development/supply-chain environment and information-exposure surface as first-class patrol zones rather than assuming runtime telemetry is the whole security boundary.
+
+Canonical patrol surfaces:
+
+```text
+1. Runtime / enterprise patrol
+   endpoints, servers, identities, applications, cloud, network, databases, logs and configuration
+
+2. Repository / software-supply-chain patrol
+   repositories, commits, branches, pull requests, dependencies, CI/CD, workflow changes,
+   build artifacts, code-signing/provenance, secrets exposure, IaC/config drift and deployment lineage
+
+3. Intellectual-property / reconnaissance patrol
+   authorized repository access patterns, sensitive-project access, mass clone/download behavior
+   where observable, public metadata and information exposure, roadmap/research leakage,
+   and combinations of benign-looking public signals that reveal protected work
+```
+
+The repository patrol is not merely another application feature. Where architecture permits, its monitoring/evidence path should remain independently observable so compromise of the application does not automatically blind the repository/supply-chain defender. Conversely, runtime Guardian evidence must be able to identify compromise caused by an apparently normal repository or deployment change.
+
+When authorized telemetry indicates a suspected intrusion, intellectual-property theft, insider-risk event, repository compromise, or espionage/reconnaissance attempt, Guardian must open a durable **Incident Evidence Record** and preserve the maximum relevant evidence legitimately observable within scope. Depending on the environment this may include timestamps, source/destination IP and ports, ASN/provider, geolocation estimate, authenticated account/session identity, authentication method, device/client characteristics, failed/successful login activity, targeted systems/files/repos, commands or API calls when recorded, repository clone/download/change activity where observable, process/file hashes, network connections, privilege changes, data-access scope, persistence indicators, containment actions, remediation, and verification results.
+
+Evidence and attribution are separate:
+
+- observed facts are recorded as evidence;
+- inferred identity, affiliation, intent, campaign relationship, or state/organizational attribution is a hypothesis with explicit confidence and competing explanations;
+- IP address, country estimate, language, timezone, ASN, device signal, or account identity alone does not prove who the human intruder is;
+- VPNs, proxies, Tor, cloud relays, compromised hosts, shared infrastructure, stolen credentials, and spoofed indicators must remain live alternative explanations when applicable.
+
+For serious incidents, the evidence system should support a tamper-evident case package suitable for authorized review by company security, counsel, insurers, CERT/CSIRT teams, regulators, law enforcement, or other competent authorities. The package should preserve original timestamps, hashes/integrity proofs, provenance, chain-of-custody events, affected assets, actions taken, and an explicit separation of observation from inference. **Evidence preservation never grants external-disclosure authority by itself.**
+
+Defensive counterintelligence is now a formal University/specialist direction. `SKILLS.md` defines the graduate specialization and `docs/defensive-counterintelligence-adversary-studies.md` defines its detailed curriculum. The learning objective is to study adversary tactics, insider-risk patterns, cyber/industrial espionage cases, repository/supply-chain compromise, social engineering, exfiltration patterns, detection engineering, digital forensics, attribution discipline, and defensive countermeasures so defenders recognize and defeat those behaviors.
+
+Learning adversary tactics never widens operational authority. No learned technique, specialist degree, confidence score, or threat severity grants permission for hack-back, retaliatory intrusion, destructive action, out-of-scope surveillance, credential theft/exfiltration, or targeting third parties. Active Stranger validation remains separately isolated and Referee-governed under the signed engagement manifest.
+
+Defensive deception may later include governed canary documents/tokens, honey services, decoy repository paths/assets, or other non-harmful tripwires. These mechanisms must be designed to detect unauthorized access without harming unrelated people, creating unsafe credentials, or manufacturing attribution.
+
+**Current status:** this section records accepted architecture, curriculum linkage, and evidence requirements. It is not a claim that repo patrol, counterintelligence automation, forensic packaging, or authority-support integrations are already implemented or Production-ready.
 
 ## COS University remediation source diversification — 2026-09-10
 
@@ -750,6 +791,8 @@ Non-negotiable:
 - specialist expertise/degree cannot widen authorization;
 - autonomous security roles remain knowledge- and authority-separated: Guardian familiarity must not contaminate blind Stranger assessments;
 - every Stranger/ethical-hacking engagement requires a host-enforced signed scope with expiry, permitted action classes, rate/blast-radius limits, audit evidence, and kill switch; AI reasoning cannot widen it;
+- defensive counterintelligence/repo patrol may preserve authorized security evidence but may not perform hack-back, retaliatory intrusion, out-of-scope surveillance, or assert identity/affiliation from weak indicators;
+- incident evidence and attribution must remain separate, with confidence-qualified inference and tamper-evident provenance/chain-of-custody support;
 - no hidden chain-of-thought persistence;
 - private certification prompts/rubrics must not be exposed or committed without an explicit protected diagnostic need;
 - public Concierge never inherits owner/admin/private-company context merely because the browser is owner-authenticated;
@@ -820,6 +863,7 @@ Priority themes remain:
 - specialist learning that deepens organizational competence without creating competing brains;
 - Self-Healing Supervisor integration and objective repair/outcome evidence;
 - Autonomous Security Patrol: establish signed authorization/scope, deterministic Referee enforcement, Guardian/Stranger isolation, and evidence controls before active validation capability;
+- Repo/IP/Counterintelligence Patrol: monitor runtime plus repository/supply-chain and information-exposure surfaces, preserve intrusion evidence, and train the Defensive Counterintelligence specialist under `SKILLS.md` without widening authority;
 - provider/integration hardening without widening authority;
 - Data Center Operations remains read-only/advisory until separately governed.
 

@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.82
+**Version:** 1.83
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -489,6 +489,24 @@ Key rules:
   delayed retention, and source attribution; exposure or embedding never counts as learning.
 
 Feed COS remains the normal owner learning intake. Material may be routed deeper to relevant specialists without requiring the owner to paste the same material into each worker.
+
+
+## University learning assurance — 2026-09-10
+
+Current branch `feat/cos-university-learning-assurance-20260910` adds three host-controlled seams:
+
+- controlled fine-tuning remains disabled/candidate-only until dataset and training approvals,
+  cryptographic training/holdout separation, independent improvement, safety and transfer passes,
+  delayed retention, a healthy Production canary, and a rollback artifact are all present;
+- every feature-gated University learning path is declared in one registry and Production proof must
+  match the deployed commit, enabled gate, successful invocation, durable evidence, host verifier,
+  and a fresh observation window;
+- learning promotion requires baseline-to-post-study gain, unseen transfer, practical evidence,
+  delayed retention, source attribution, and an improved real-world outcome with nonzero samples.
+
+The append-only `cos_university_learning_assurance_events` ledger stores host evidence for these
+decisions. This implementation is the control/evidence foundation; it is not itself a claim that a
+model was fine-tuned or that all Production paths have already produced valid receipts.
 
 ---
 

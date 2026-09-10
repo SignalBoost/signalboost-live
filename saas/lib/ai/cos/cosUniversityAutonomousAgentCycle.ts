@@ -2,6 +2,7 @@ import { readCosUniversityAgentAcademicRecord } from './cosUniversityAgentAcadem
 import { runCosUniversityAdmission } from './cosUniversityAdmissionRunner.ts'
 import { listCosUniversityRegisteredAgents } from './cosUniversityAgentRegistry.ts'
 import { runCosUniversityIndependentExamBatch } from './cosUniversityIndependentExamRunner.ts'
+import { ensureCosUniversityExamFailureRemediationPlans } from './cosUniversityExamRemediation.ts'
 import { decideCosUniversityNextAcademicAction, type CosUniversityNextAcademicAction } from './cosUniversityAgentAcademicProgression.ts'
 
 export type CosUniversityAutonomousAgentCycleSummary = Readonly<{
@@ -28,7 +29,9 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
       if (admission.errors.length) throw new Error(admission.errors.join('; '))
       const record = await readCosUniversityAgentAcademicRecord(agent.agentId)
       const nextAction = decideCosUniversityNextAcademicAction(record)
-      if (nextAction === 'independent_exam') {
+      if (nextAction === 'remediate') {
+        await ensureCosUniversityExamFailureRemediationPlans({ now, agentId: agent.agentId, maxPlans: 4 })
+      } else if (nextAction === 'independent_exam') {
         const exam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2 })
         if (exam.errors.length) throw new Error(exam.errors.join('; '))
       }

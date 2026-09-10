@@ -3,13 +3,80 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.97
+**Version:** 1.98
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
+
+## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
+
+Owner direction: pursue a company-deployable security capability that combines continuous 24x7 defensive patrol with a separately isolated ethical-hacking assessor. The separation is intentional: a defender that knows its own environment can develop familiarity bias; the assessor must arrive as a stranger and rediscover the environment from the authorized starting position.
+
+Canonical roles:
+
+- **Guardian Agent** — resident internal defender. It may continuously observe authorized enterprise telemetry, learn the environment, correlate anomalies, investigate incidents, recommend or perform policy-authorized containment/remediation, invoke Self-Healing Supervisor capabilities, and verify recovery. Guardian is expected to know the environment deeply.
+- **Stranger Agent** — independent white-hat assessor. It must not inherit Guardian/COS/Enterprise Memory, topology, prior vulnerabilities, incident history, credentials, remediation knowledge, or earlier assessment discoveries except what the signed engagement manifest explicitly grants. Each engagement receives isolated state so the Stranger must discover the authorized environment rather than being told where weaknesses are.
+- **Referee / Policy Engine** — deterministic host-controlled authorization boundary. It owns target scope, permitted test classes, credentials/access posture, engagement start/end, rate limits, concurrency, safety limits, approver identity, evidence policy, and emergency stop. Neither Guardian, Stranger, COS, learning, nor a specialist may rewrite or expand this authority through reasoning.
+
+Supported assessment postures may include, only when explicitly authorized by the engagement manifest:
+
+1. internet stranger / unauthenticated external perspective;
+2. contractor or vendor with bounded remote access;
+3. ordinary employee identity;
+4. assumed-compromised endpoint;
+5. privileged-insider perspective.
+
+The assessment posture is input to the Referee, not a shortcut around it. A Stranger engagement that models an insider may receive only the exact knowledge/credentials required for that scenario.
+
+Canonical operating loop:
+
+```text
+Guardian: observe -> reason -> investigate -> contain/repair -> verify -> continue patrol
+
+Stranger: receive signed scope -> discover -> assess -> validate authorized findings
+          -> preserve evidence -> report -> end isolated engagement
+
+Referee: authorize/deny every active action and stop the engagement when scope/time/policy expires
+
+After remediation: launch a fresh isolated Stranger retest -> verify the weakness independently
+```
+
+The Guardian and Stranger are deliberately asymmetric: **the defender may know everything it is authorized to know; the attacker starts knowing almost nothing beyond the engagement contract.** This is a product feature, not an inconvenience.
+
+Non-negotiable boundaries:
+
+- no target, identity, network, cloud account, application, tenant, or action outside the signed engagement scope;
+- authorization expires automatically at the engagement boundary and fails closed when ambiguous;
+- no persistence, stealth/evasion, destructive behavior, credential theft/exfiltration, or unrestricted lateral movement by default;
+- active validation must be explicitly permitted by action class and remain bounded/non-destructive;
+- deterministic target/scope matching is authoritative over model reasoning;
+- rate limits, concurrency ceilings, blast-radius limits, and an emergency kill switch are host-enforced;
+- every consequential action and finding produces tamper-evident audit/evidence records sufficient to reconstruct what was attempted, allowed/denied, observed, changed, and verified;
+- learning may improve detection, prioritization, investigation, explanation, remediation, and test selection, but **learning never widens authorization**;
+- Stranger state/memory isolation is mandatory and may not be bypassed merely because Guardian, COS, Self-Healing Supervisor, or Enterprise Memory already knows the answer;
+- Guardian-to-Stranger disclosure is prohibited during a blind engagement unless the manifest explicitly defines that disclosure as part of the scenario;
+- Stranger findings may be released to Guardian/Self-Healing only after the governed evidence boundary permits it, after which remediation and a fresh independent retest may occur;
+- customer deployment may be container, VM, appliance/portable, or another isolated enterprise-hosted form, but deployment form never weakens the authorization boundary.
+
+Implementation order for this capability:
+
+```text
+1. signed engagement + authorization/scope schema
+2. deterministic Referee / policy enforcement + expiry + kill switch
+3. Guardian/Stranger identity and memory isolation
+4. passive inventory/telemetry and evidence pipeline
+5. safe discovery and vulnerability assessment
+6. Self-Healing/Guardian remediation handoff and proof
+7. separately gated controlled validation
+8. fresh isolated Stranger retest and measurable security-improvement evidence
+```
+
+Do not begin with unrestricted exploit execution. Establish the authorization, role isolation, evidence, and fail-closed control plane first.
+
+**Current status:** this section records the accepted architecture/direction. It is not evidence that the Autonomous Security Patrol or Stranger ethical-hacking capability is already implemented or Production-ready.
 
 ## COS University automatic Production-outcome correlation — 2026-09-10
 
@@ -671,6 +738,8 @@ Non-negotiable:
 - routine reversible work should proceed autonomously when already authorized rather than asking for unnecessary approval;
 - learned retrieval/worker/tool/skill preference cannot widen authorization;
 - specialist expertise/degree cannot widen authorization;
+- autonomous security roles remain knowledge- and authority-separated: Guardian familiarity must not contaminate blind Stranger assessments;
+- every Stranger/ethical-hacking engagement requires a host-enforced signed scope with expiry, permitted action classes, rate/blast-radius limits, audit evidence, and kill switch; AI reasoning cannot widen it;
 - no hidden chain-of-thought persistence;
 - private certification prompts/rubrics must not be exposed or committed without an explicit protected diagnostic need;
 - public Concierge never inherits owner/admin/private-company context merely because the browser is owner-authenticated;
@@ -740,6 +809,7 @@ Priority themes remain:
 - current-world evidence/freshness discipline;
 - specialist learning that deepens organizational competence without creating competing brains;
 - Self-Healing Supervisor integration and objective repair/outcome evidence;
+- Autonomous Security Patrol: establish signed authorization/scope, deterministic Referee enforcement, Guardian/Stranger isolation, and evidence controls before active validation capability;
 - provider/integration hardening without widening authority;
 - Data Center Operations remains read-only/advisory until separately governed.
 

@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.101
+**Version:** 1.102
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -247,6 +247,11 @@ attempt, and exact subject/language target. Retries of the same attempt remain i
 new remediation round receives a new hidden seed and unseen exam. Ordinary scheduled exams retain
 their daily idempotency. A prior terminal exam can therefore no longer complete or supersede newly
 earned `ready_for_exam` evidence without executing the plan-bound re-examination.
+
+The learner also repairs the legacy collision state when the latest failed exam still owns a
+superseded plan containing both host-accepted study proof and completed deliberate-practice proof.
+Recovery restores only `ready_for_exam`; it grants no grade or academic credit, and the new
+independent examiner remains authoritative.
 
 ---
 

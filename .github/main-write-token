@@ -1,2 +1,2 @@
-base_sha=9bd10bfb2cacf9f3e73393feae2e105c0bed48fd
-branch=fix/audit-approval-race-20260910
+base_sha=ce695245df7e64491992d3ccd75b2fc061d9216c
+branch=fix/university-remediation-collision-recovery-20260910

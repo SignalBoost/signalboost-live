@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.86
+**Version:** 1.87
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -31,6 +31,16 @@ mastery. The controlled fine-tuning cron packages candidates produced by repeate
 failure, cryptographically separates training and holdout manifests, and records fail-closed host
 decisions. It cannot train or promote without separate approvals and post-training independent,
 safety, transfer, retention, canary, and rollback evidence.
+
+## COS University advanced professional curricula — 2026-09-10
+
+The shared A/A+ generalist foundation remains mandatory. Five additional Master's tracks provide
+advanced education in aerospace/nuclear safety systems, molecular/biomedical sciences,
+neuroscience/biophysics, actuarial/insurance risk, and quantum/theoretical physics. Existing
+quantitative and enterprise programs now explicitly include formal epistemology, calibration,
+mechanism design, organizational anthropology, field operations, rhetoric, and crisis leadership.
+Every track retains independent examination, unseen transfer, verified practical work, and capstone
+requirements; document exposure or simulation alone does not graduate an agent.
 
 ---
 

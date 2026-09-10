@@ -20,9 +20,9 @@ import type { CosUniversitySubjectId } from '../lib/ai/cos/cosUniversity.ts'
 
 const NOW = new Date('2026-10-01T00:00:00Z')
 
-test('five Master’s tracks expose four canonical curriculum modules each', () => {
-  assert.equal(COS_UNIVERSITY_MASTERS_TRACKS.length, 5)
-  assert.equal(Object.keys(COS_UNIVERSITY_MASTERS_PROGRAMS).length, 5)
+test('ten Master’s tracks expose four canonical curriculum modules each', () => {
+  assert.equal(COS_UNIVERSITY_MASTERS_TRACKS.length, 10)
+  assert.equal(Object.keys(COS_UNIVERSITY_MASTERS_PROGRAMS).length, 10)
   const moduleKeys = new Set<string>()
   for (const track of COS_UNIVERSITY_MASTERS_TRACKS) {
     assert.equal(track.curriculumModules.length, 4)
@@ -35,7 +35,23 @@ test('five Master’s tracks expose four canonical curriculum modules each', () 
       moduleKeys.add(module.key)
     }
   }
-  assert.equal(moduleKeys.size, 20)
+  assert.equal(moduleKeys.size, 40)
+})
+
+test('advanced professional curricula preserve the common foundation and require practical proof', () => {
+  const required = [
+    'aerospace_nuclear_safety_systems', 'molecular_biomedical_sciences',
+    'neuroscience_biophysical_systems', 'actuarial_insurance_risk',
+    'quantum_theoretical_physics',
+  ] as const
+  for (const id of required) {
+    const track = cosUniversityMastersTrackById(id)
+    assert.ok(track)
+    assert.equal(track.curriculumModules.length, 4)
+    assert.ok(track.requiredDepthPasses >= 4)
+    assert.ok(COS_UNIVERSITY_MASTERS_PROGRAMS[id].requiredEvidenceStages.includes('verified_practical_work'))
+    assert.ok(COS_UNIVERSITY_MASTERS_PROGRAMS[id].requiredEvidenceStages.includes('cross_domain_transfer'))
+  }
 })
 
 test('canonical ranking still chooses the strongest undergraduate specialization', () => {

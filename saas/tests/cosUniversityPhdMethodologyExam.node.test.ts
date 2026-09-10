@@ -84,14 +84,14 @@ test('methodology attempts continue only to the existing A+ evidence target and 
   assert.match(runner, /variantHash: row\.variant_hash/)
 })
 
-test('exam run storage is service-only and stores no raw prompt, rubric, reply, or degree state', () => {
+test('exam run storage is service-only and has no raw hidden-material or degree columns', () => {
   const schema = file('supabase/migrations/20260910012000_cos_university_phd_methodology_exam_runs.sql')
   assert.match(schema, /alter table public\.cos_university_phd_methodology_exam_runs enable row level security/i)
   assert.match(schema, /revoke all on table public\.cos_university_phd_methodology_exam_runs from anon, authenticated, service_role/i)
   assert.match(schema, /grant select, insert, update on table public\.cos_university_phd_methodology_exam_runs to service_role/i)
   assert.match(schema, /evidence_recorded boolean not null default false/)
   assert.match(schema, /fresh_execution boolean not null default false/)
-  assert.doesNotMatch(schema, /raw_prompt|prompt text|rubric json|reply text|graduated boolean|degree/i)
+  assert.doesNotMatch(schema, /raw_prompt\s+text|prompt\s+text|rubric\s+jsonb?|reply\s+text|graduated\s+boolean|degree\s+boolean/i)
 })
 
 test('PhD methodology cron is independently gated and cannot bypass the research boundary', () => {

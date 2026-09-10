@@ -52,6 +52,32 @@ test('subject exam remediation adds governed public web without broadening gener
   assert.doesNotMatch(unknownBranch, /approved_public_web/)
 })
 
+test('language exam remediation preserves the exact failed dimension through study discovery', () => {
+  const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
+  const strategist = file('lib/ai/cos/cosUniversityStudyStrategy.ts')
+
+  assert.match(bridge, /languageDimension: CosPlatformLanguageDimension \| null/)
+  assert.match(bridge, /languageDimension: row\.language_dimension/)
+  assert.match(bridge, /if \(row\.language_code && row\.language_dimension\)/)
+  assert.match(bridge, /dimension: row\.language_dimension/)
+
+  assert.match(strategist, /dimension: CosPlatformLanguageDimension/)
+  assert.match(strategist, /LANGUAGE_DIMENSION_STUDY_THEMES: Record<CosPlatformLanguageDimension, string\[]>/)
+  assert.match(strategist, /writing: \[/)
+  assert.match(strategist, /written composition and sentence construction/)
+  assert.match(strategist, /editing revision and error correction/)
+  assert.match(strategist, /capability: `cos_university\.language\.\$\{language\.id\}\.\$\{input\.dimension\}`/)
+  assert.match(strategist, /missingFacts: studyThemes\.map\(theme => `\$\{language\.title\} \$\{theme\}`\)/)
+  assert.match(strategist, /`language_dimension=\$\{input\.dimension\}`/)
+  assert.doesNotMatch(strategist, /language_dimensions=comprehension,writing,instruction_following,translation_localization,cultural_pragmatics/)
+
+  const dimensionThemesStart = strategist.indexOf('const LANGUAGE_DIMENSION_STUDY_THEMES')
+  const dimensionThemesEnd = strategist.indexOf('const LANGUAGE_DIMENSION_LABELS', dimensionThemesStart)
+  assert.ok(dimensionThemesStart >= 0 && dimensionThemesEnd > dimensionThemesStart)
+  const dimensionThemes = strategist.slice(dimensionThemesStart, dimensionThemesEnd)
+  assert.doesNotMatch(dimensionThemes, /hidden exam|rubric|scorer|manifest_hash|seed/i)
+})
+
 test('later terminal pass or expired failure retires obsolete remediation instead of starving current work', () => {
   const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
   assert.match(bridge, /Only the latest terminal outcome for a competency may\s*\n \* drive remediation/i)

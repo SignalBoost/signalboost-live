@@ -1,6 +1,7 @@
 import { isIP } from 'node:net'
 import {
   appendSecurityEvidence,
+  verifySecurityEvidenceChain,
   type SecurityEvidenceChainEntry,
   type SecurityEvidenceObservation,
 } from './evidence.ts'
@@ -15,6 +16,7 @@ import {
 } from './referee.ts'
 
 export const REPOSITORY_PATROL_EVENT_SCHEMA = 'itmounts-repository-patrol-event-v1' as const
+const MAX_EVENT_CLOCK_SKEW_MS = 5 * 60 * 1000
 
 export type RepositoryPatrolSource =
   | 'github-audit-log'
@@ -227,10 +229,17 @@ export function ingestRepositoryPatrolEvent(params: {
   event: RepositoryPatrolEvent | unknown
   evidenceChain: readonly SecurityEvidenceChainEntry[]
 }): RepositoryPatrolIngestionResult {
+  if (!verifySecurityEvidenceChain(params.evidenceChain)) return rejectedResult(params.evidenceChain, 'evidence_chain_invalid')
+
   const issues = validateRepositoryPatrolEvent(params.event)
   if (issues.length) return rejectedResult(params.evidenceChain, `repository_event_invalid:${issues.join(',')}`)
 
   const event = params.event as RepositoryPatrolEvent
+  const hostNow = Date.parse(params.hostState.now)
+  if (!Number.isFinite(hostNow)) return rejectedResult(params.evidenceChain, 'invalid_host_state')
+  if (Date.parse(event.occurredAt) > hostNow + MAX_EVENT_CLOCK_SKEW_MS) return rejectedResult(params.evidenceChain, 'repository_event_from_future')
+  if (params.evidenceChain.some(entry => entry.event.eventId === event.eventId)) return rejectedResult(params.evidenceChain, 'repository_event_replayed')
+
   const target = { kind: 'repository' as const, value: normalizeRepositoryPatrolName(event.repository) }
   const engagementRecord = isRecord(params.envelope) && isRecord(params.envelope.manifest) ? params.envelope.manifest : null
   const engagementId = engagementRecord && typeof engagementRecord.engagementId === 'string' ? engagementRecord.engagementId : ''

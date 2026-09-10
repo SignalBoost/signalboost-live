@@ -12,16 +12,46 @@ export interface ParsedAuditFinding {
 
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info']
 
+function parseCandidate(candidate: string): unknown | null {
+  try { return JSON.parse(candidate) } catch { return null }
+}
+
+function structuredPayload(raw: string): unknown | null {
+  const trimmed = raw.trim()
+  const candidates: string[] = [trimmed]
+
+  // Local and hosted reasoners occasionally wrap otherwise-valid JSON in a
+  // markdown fence or a short explanatory prefix despite the JSON-only contract.
+  // Recover the structured payload without weakening the finding schema below.
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  if (fenced?.[1]) candidates.push(fenced[1].trim())
+
+  const arrayStart = trimmed.indexOf('[')
+  const arrayEnd = trimmed.lastIndexOf(']')
+  if (arrayStart >= 0 && arrayEnd > arrayStart) candidates.push(trimmed.slice(arrayStart, arrayEnd + 1))
+
+  const objectStart = trimmed.indexOf('{')
+  const objectEnd = trimmed.lastIndexOf('}')
+  if (objectStart >= 0 && objectEnd > objectStart) candidates.push(trimmed.slice(objectStart, objectEnd + 1))
+
+  for (const candidate of Array.from(new Set(candidates))) {
+    const parsed = parseCandidate(candidate)
+    if (parsed !== null) return parsed
+  }
+  return null
+}
+
 export function parseAuditFindingsResponse(raw: string | null, file: string): ParsedAuditFinding[] {
   if (raw === null || !raw.trim()) throw new Error(`COS returned no Audit analysis for ${file}.`)
 
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw.trim())
-  } catch {
-    throw new Error(`COS returned invalid Audit JSON for ${file}.`)
-  }
-  if (!Array.isArray(parsed)) throw new Error(`COS Audit response was not an array for ${file}.`)
+  const decoded = structuredPayload(raw)
+  if (decoded === null) throw new Error(`COS returned invalid Audit JSON for ${file}.`)
+  const parsed = Array.isArray(decoded)
+    ? decoded
+    : decoded && typeof decoded === 'object' && Array.isArray((decoded as Record<string, unknown>).findings)
+      ? (decoded as { findings: unknown[] }).findings
+      : null
+  if (!parsed) throw new Error(`COS Audit response was not an array for ${file}.`)
 
   return parsed.map((item, index) => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) {

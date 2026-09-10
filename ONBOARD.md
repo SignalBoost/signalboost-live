@@ -3,13 +3,21 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.94
+**Version:** 1.95
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
+
+## COS University automatic Production-outcome correlation — 2026-09-10
+
+Authoritative Production outcome ingestion can now carry agent- and subject-scoped University
+evidence. The existing verified-outcome recorder automatically converts that envelope into the
+immutable learning-assurance ledger, using the authoritative outcome reference as practical proof.
+No University claim is created without an explicit academic envelope, and the normal retention,
+transfer, independent-scoring, source-attribution, sample-size, and measured-improvement gates remain.
 
 ## COS University real-world outcome evidence — 2026-09-10
 

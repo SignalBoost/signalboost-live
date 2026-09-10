@@ -6,6 +6,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 import { PUBLIC_BRAND } from '@/lib/public-brand'
+import { supabase } from '@/utils/supabase/client'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 type Source = 'website_optimizer' | 'repo_check' | 'cybersecurity_check' | 'audit_preview'
@@ -15,6 +16,8 @@ type Copy = {
   badge: string
   title: string
   body: string
+  signedInTitle: string
+  signedInBody: string
   safe: string
   source: string
   targetUrl: string
@@ -43,6 +46,8 @@ const COPY: Record<Lang, Copy> = {
     badge: uiText('generatedUi.u_298a9207a732a11d'),
     title: uiText('generatedUi.u_6355c7c1bd1fe92c'),
     body: uiText('generatedUi.u_e7537dc059c3458d'),
+    signedInTitle: uiText('generatedUi.u_c3f291ae4fe4776c'),
+    signedInBody: uiText('generatedUi.u_178a017a6edec75a'),
     safe: uiText('generatedUi.u_5a47e8e668406538'),
     source: uiText('generatedUi.u_9b41efae340c46c7'),
     targetUrl: uiText('generatedUi.u_b5a9404423a3f5ea'),
@@ -69,6 +74,8 @@ const COPY: Record<Lang, Copy> = {
     badge: 'Siguiente paso',
     title: `Continúa en ${PUBLIC_BRAND.name} para corregir esto.`,
     body: `La herramienta pública gratuita ya mostró la señal. Para corregir el problema o convertirlo en un flujo completo de mejora, continúa a ${PUBLIC_BRAND.name} y regístrate como cualquier otro cliente.`,
+    signedInTitle: 'Envía esto directamente a tu cola.',
+    signedInBody: 'Ya has iniciado sesión, así que no hay nada que registrar. Al enviarlo, el resultado entra en el flujo de Marketing + Ventas para revisión del propietario.',
     safe: 'Sin email automático, sin seguimiento oculto y sin cambios sin aprobación.',
     source: 'Herramienta usada',
     targetUrl: 'Sitio o repo revisado',
@@ -95,6 +102,8 @@ const COPY: Record<Lang, Copy> = {
     badge: 'Próximo passo',
     title: `Continue no ${PUBLIC_BRAND.name} para corrigir isso.`,
     body: `A ferramenta pública gratuita já mostrou o sinal. Para corrigir o problema ou transformá-lo em um fluxo completo de melhoria, continue para o ${PUBLIC_BRAND.name} e cadastre-se como qualquer outro cliente.`,
+    signedInTitle: 'Envie isto direto para a sua fila.',
+    signedInBody: 'Você já está conectado, então não há nada para cadastrar. Ao enviar, o resultado entra no fluxo de Marketing + Vendas para revisão do proprietário.',
     safe: 'Sem email automático, sem follow-up oculto e sem mudanças sem aprovação.',
     source: 'Ferramenta usada',
     targetUrl: 'Site ou repo verificado',
@@ -121,6 +130,8 @@ const COPY: Record<Lang, Copy> = {
     badge: 'Następny krok',
     title: `Kontynuuj w ${PUBLIC_BRAND.name}, aby to naprawić.`,
     body: `Darmowe publiczne narzędzie pokazało już sygnał. Aby naprawić problem albo zmienić go w pełny workflow ulepszeń, przejdź do ${PUBLIC_BRAND.name} i zarejestruj się jak każdy klient.`,
+    signedInTitle: 'Wyślij to prosto do swojej kolejki.',
+    signedInBody: 'Masz już zalogowaną sesję, więc nie trzeba się rejestrować. Wysłanie umieszcza wynik w workflow Marketing + Sprzedaż do przeglądu właściciela.',
     safe: 'Bez automatycznego emaila, ukrytego follow-up i zmian bez akceptacji.',
     source: 'Użyte narzędzie',
     targetUrl: 'Sprawdzona strona lub repo',
@@ -147,6 +158,8 @@ const COPY: Record<Lang, Copy> = {
     badge: 'Следующий шаг',
     title: `Продолжите в ${PUBLIC_BRAND.name}, чтобы это исправить.`,
     body: `Бесплатный публичный инструмент уже показал сигнал. Чтобы исправить проблему или превратить её в полный workflow улучшений, перейдите в ${PUBLIC_BRAND.name} и зарегистрируйтесь как обычный клиент.`,
+    signedInTitle: 'Отправьте это сразу в свою очередь.',
+    signedInBody: 'Вы уже вошли в систему, поэтому регистрация не нужна. Отправка помещает результат в workflow Marketing + Sales для проверки владельцем.',
     safe: 'Без автоматического email, скрытого follow-up и изменений без утверждения.',
     source: 'Использованный инструмент',
     targetUrl: 'Проверенный сайт или repo',
@@ -192,6 +205,18 @@ export default function RequestPlanPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<any>(null)
+  const [signedIn, setSignedIn] = useState(false)
+
+  // A signed-in visitor should never be told to sign up. Their session email is
+  // prefilled so the intake lands under the account they already have.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const sessionEmail = data?.user?.email
+      if (!sessionEmail) return
+      setSignedIn(true)
+      setEmail(current => current.trim() || sessionEmail)
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -234,8 +259,8 @@ export default function RequestPlanPage() {
         <Link href="/" className="text-sm font-semibold text-cyan-200 hover:text-white">← {copy.back}</Link>
         <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.04] p-8 shadow-2xl shadow-cyan-950/30">
           <span className="inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-cyan-100">{copy.badge}</span>
-          <h1 className="mt-5 text-4xl font-black tracking-tight text-white md:text-5xl">{copy.title}</h1>
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">{copy.body}</p>
+          <h1 className="mt-5 text-4xl font-black tracking-tight text-white md:text-5xl">{signedIn ? copy.signedInTitle : copy.title}</h1>
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">{signedIn ? copy.signedInBody : copy.body}</p>
           <p className="mt-4 rounded-2xl border border-cyan-300/20 bg-cyan-300/10 p-4 text-sm font-semibold text-cyan-50">{copy.safe}</p>
 
           <form onSubmit={submit} className="mt-8 grid gap-4">

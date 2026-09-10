@@ -3,10 +3,11 @@
 # SignalBoost COS Education & Capability Blueprint
 ## COS University — Elite Generalist → Graduate Specialists
 
-**Version:** 1.0  
-**Date:** 2026-09-07  
+**Version:** 1.1  
+**Date:** 2026-09-10  
 **Status:** canonical forward-looking COS learning architecture; implementation is progressive and evidence-gated  
 **Companion:** `ONBOARD.md` remains the authoritative operational/runtime history and engineering blueprint. This file defines the newer education, capability-growth, and specialist-development model.
+**Specialist companion:** `docs/defensive-counterintelligence-adversary-studies.md` defines the detailed Defensive Counterintelligence & Adversary Studies curriculum and safeguards.
 
 ---
 
@@ -343,6 +344,7 @@ Candidate graduate programs include:
 
 - Computer Science / Software Engineering;
 - Cybersecurity;
+- **Defensive Counterintelligence & Adversary Studies**;
 - Mathematics;
 - Statistics / Data Science;
 - Finance / Economics;
@@ -374,6 +376,45 @@ Advanced curricula are assigned from the enrolled agent's host-controlled profes
 guessed from incidental study activity. COS remains the multidisciplinary Chief of Staff and
 continues generalist education; specialist roles map deterministically to their matching Master's
 program. Role assignment cannot bypass the undergraduate credential or expand authority.
+
+## Defensive Counterintelligence & Adversary Studies
+
+This is a defensive graduate specialization layered over the common Cybersecurity, Law/Governance,
+Social/Behavioral Sciences, International Relations, Statistics, and Reasoning foundations. Its
+purpose is to improve prevention, detection, investigation, containment, recovery, evidence quality,
+and independent verification against cyber intrusion, intellectual-property theft, repository
+reconnaissance, software-supply-chain compromise, insider-risk indicators, social engineering, and
+other authorized enterprise security threats.
+
+The detailed canonical curriculum is:
+
+`docs/defensive-counterintelligence-adversary-studies.md`
+
+The program must teach agents to study real adversary tactics and historical/current case material,
+but learning adversary behavior is **not authority to perform adversary behavior**. Practical work
+must remain inside authorized laboratories, recorded incident replays, or Referee-governed Stranger
+engagements. No degree, grade, threat severity, or learned technique grants hack-back, destructive,
+retaliatory, surveillance, repository-write, Production, tenant-data, or external-disclosure authority.
+
+Required capability families include:
+
+- adversary TTP and campaign analysis;
+- detection engineering, threat hunting, and incident investigation;
+- runtime, repository, CI/CD, dependency, artifact, provenance, and software-supply-chain security;
+- intellectual-property exposure and external-reconnaissance analysis;
+- authorized insider-risk analysis with privacy and false-positive controls;
+- digital forensics, chain of custody, and tamper-evident evidence packaging;
+- calibrated attribution that clearly separates observation from inference;
+- defensive deception such as canaries/honeypots where governed and non-harmful;
+- Self-Healing remediation handoff followed by independent verification;
+- authority/CERT/CSIRT/law-enforcement-ready technical reporting when disclosure is separately authorized;
+- continuous learning from current authoritative frameworks, primary incident/advisory sources, and independently corroborated research/case studies.
+
+A future host-registered `security-counterintelligence-specialist` may represent this program operationally,
+but documentation of the intended role is not evidence that the identity, routing, tools, or Production
+capability already exist. Guardian and Stranger remain knowledge-separated roles: a specialist may
+learn from completed governed assessments, but it may not contaminate a blind Stranger engagement
+with Guardian, COS, Enterprise Memory, prior vulnerabilities, or remediation history.
 
 A Master's qualification means deep professional/expert application of established knowledge, demonstrated through independent exams, deliberate practice, realistic/real work, retention, and verified outcomes.
 
@@ -456,6 +497,7 @@ Subjects differ in decay rate:
 - mathematics fundamentals may decay slowly;
 - software/tool knowledge may change quickly;
 - cybersecurity changes quickly;
+- defensive counterintelligence/adversary knowledge changes quickly and requires continuing review of current tactics, campaigns, tooling, law, and detection evidence;
 - law/regulation may change quickly;
 - politics/current officeholders can change immediately;
 - scientific consensus can evolve;

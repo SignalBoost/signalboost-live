@@ -3580,7 +3580,9 @@
     "u_7db417fdeea6e106": "Pendiente de aprobación del propietario",
     "u_0e0d544e458d50d6": "Preparado, pero aún no guardado en la cola del propietario",
     "u_3799c5bf2515bba8": "Completa los campos requeridos.",
-    "u_65227385c356ea00": "No se pudo crear esta solicitud."
+    "u_65227385c356ea00": "No se pudo crear esta solicitud.",
+    "u_c3f291ae4fe4776c": "Envía esto directamente a tu cola.",
+    "u_178a017a6edec75a": "Ya has iniciado sesión, así que no hay nada que registrar. Al enviarlo, el resultado entra en el flujo de Marketing + Ventas para revisión del propietario."
   },
   "lab": {
     "somethingWrong": "Algo salió mal",

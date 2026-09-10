@@ -11,7 +11,7 @@ import {
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
 
 test('COS behavioral contract is versioned and preserves the owner-defined decision priority', () => {
-  assert.equal(COS_BEHAVIORAL_CONTRACT_VERSION, 'cos-behavioral-contract-v1')
+  assert.equal(COS_BEHAVIORAL_CONTRACT_VERSION, 'cos-behavioral-contract-v2')
   assert.deepEqual(COS_DECISION_PRIORITY, ['safety', 'accuracy', 'autonomy', 'speed', 'cost', 'convenience'])
   assert.match(COS_BEHAVIORAL_CONTRACT, /safety first, then accuracy, then autonomy, then speed, then cost, then convenience/i)
 })
@@ -53,7 +53,8 @@ test('COS behavioral contract preserves human control for consequential decision
 })
 
 test('global reasoning guidance includes the COS behavioral contract and does not smuggle an unvalidated ambiguity skill into live prompts', () => {
-  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /COS BEHAVIORAL CONTRACT cos-behavioral-contract-v1/i)
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /COS BEHAVIORAL CONTRACT cos-behavioral-contract-v2/i)
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /COS ACHIEVEMENT MOTIVATION cos-achievement-motivation-v1/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /do not invent missing context/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /validated cognitive-skill path/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /do not expose hidden scratchpad or chain-of-thought/i)

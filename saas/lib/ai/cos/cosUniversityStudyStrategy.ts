@@ -342,9 +342,13 @@ export function universityStudyGapSignal(input: {
   failureClass: CosUniversityFailureClass
   strategy: CosUniversityStudyStrategy
   repeatedCount?: number
+  studyVariant?: number
   evidence?: string[]
 }): KnowledgeGapSignal {
   const subject = cosUniversitySubjectById(input.subjectId)
+  const themes = [...subject.studyThemes]
+  const offset = themes.length ? Math.abs(Math.floor(Number(input.studyVariant || 0))) % themes.length : 0
+  const rotatedThemes = [...themes.slice(offset), ...themes.slice(0, offset)]
   return {
     taskId: `university:${input.planKey}`,
     subject: subject.title,
@@ -353,7 +357,7 @@ export function universityStudyGapSignal(input: {
     confidence: 0,
     escalated: true,
     succeeded: false,
-    missingFacts: [...subject.studyThemes],
+    missingFacts: rotatedThemes,
     repeatedCount: Math.max(1, Math.floor(Number(input.repeatedCount || 1))),
     evidence: [
       'cos_university_continuous_learning',

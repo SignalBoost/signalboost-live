@@ -95,7 +95,7 @@ test('later terminal pass or expired failure retires obsolete remediation instea
 
 test('continuous learner keeps failed-exam remediation ahead of generic priority-100 planning', () => {
   const runtime = file('lib/ai/cos/cosUniversityContinuousLearning.ts')
-  assert.match(runtime, /ensureCosUniversityExamFailureRemediationPlans/)
+  assert.match(runtime, /ensureCosUniversityExamFailureRemediationPlans\(\{ agentId, maxPlans: 4, now \}\)/)
   assert.match(runtime, /examFailuresPrioritized/)
   assert.match(runtime, /\[\.\.\.remediation\.activePlans, \.\.\.planning\.activePlans\]/)
   assert.match(runtime, /const remediationPlanIds = new Set\(remediation\.activePlans\.map\(plan => plan\.id\)\)/)
@@ -105,6 +105,17 @@ test('continuous learner keeps failed-exam remediation ahead of generic priority
   assert.match(runtime, /recordAcceptedCosUniversityStudyAttempts/)
   assert.match(runtime, /universityStudyProofsFromAcceptedLearning/)
   assert.doesNotMatch(runtime, /markCosUniversityStudyPlansAttempted/)
+})
+
+test('failed-exam study rotates authoritative discovery instead of repeating one rejected result set forever', () => {
+  const bridge = file('lib/ai/cos/cosUniversityExamRemediation.ts')
+  const strategist = file('lib/ai/cos/cosUniversityStudyStrategy.ts')
+  assert.match(bridge, /REMEDIATION_STUDY_VARIANT_MS = 15 \* 60_000/)
+  assert.match(bridge, /cosUniversityRemediationStudyVariant\(now: Date\)/)
+  assert.match(bridge, /studyVariant,/)
+  assert.match(strategist, /studyVariant\?: number/)
+  assert.match(strategist, /const rotatedThemes = \[\.\.\.themes\.slice\(offset\), \.\.\.themes\.slice\(0, offset\)\]/)
+  assert.match(strategist, /missingFacts: rotatedThemes/)
 })
 
 test('daily mining learning may advance only exact University gaps that were actually accepted', () => {

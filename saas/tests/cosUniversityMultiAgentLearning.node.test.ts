@@ -9,7 +9,7 @@ test('continuous study is scoped to the enrolled agent from planning through acc
   assert.match(learning, /agentId\?: string/)
   assert.match(learning, /\^\[A-Za-z0-9\._-\]\{1,180\}\$/)
   assert.match(learning, /runCosUniversityPlanningCycle\(\{ now, agentId, maxPlans: 12 \}\)/)
-  assert.match(learning, /ensureCosUniversityExamFailureRemediationPlans\(\{ agentId, maxPlans: 4 \}\)/)
+  assert.match(learning, /ensureCosUniversityExamFailureRemediationPlans\(\{ agentId, maxPlans: 4, now \}\)/)
   assert.match(learning, /\.eq\('agent_id', agentId\)/)
   assert.match(learning, /recordAcceptedCosUniversityStudyAttempts\(proofs, new Date\(\), agentId\)/)
 })

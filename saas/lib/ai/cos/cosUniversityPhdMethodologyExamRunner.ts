@@ -25,10 +25,12 @@ import {
 } from './cosUniversityPhdRuntime.ts'
 import {
   COS_UNIVERSITY_PHD_METHODOLOGY_EXAM_PROFILE,
-  COS_UNIVERSITY_PHD_METHODOLOGY_EXAMINER_ACTOR_ID,
   COS_UNIVERSITY_PHD_METHODOLOGY_SCORER,
   buildCosUniversityPhdMethodologyExam,
+  hashCosUniversityPhdMethodologyRubric,
   scoreCosUniversityPhdMethodologyExam,
+  validateCosUniversityPhdMethodologyRubric,
+  type CosUniversityPhdMethodologyRubric,
 } from './cosUniversityPhdMethodologyExam.ts'
 
 const AGENT_ID = 'cos'
@@ -44,6 +46,8 @@ type ExamRunRow = {
   evaluator_actor_id: string
   profile: string
   scorer_version: string
+  rubric_id: string
+  rubric_hash: string
   seed: string
   manifest_hash: string
   variant_hash: string
@@ -53,6 +57,20 @@ type ExamRunRow = {
   latency_ms: number | null
   evidence_recorded: boolean
 }
+
+type RubricRow = {
+  rubric_id: string
+  profile: string
+  scorer_version: string
+  rubric_json: unknown
+  active: boolean
+}
+
+type LoadedRubric = Readonly<{
+  id: string
+  hash: string
+  rubric: CosUniversityPhdMethodologyRubric
+}>
 
 type CandidateIdentityRow = {
   actor_id: string
@@ -123,6 +141,41 @@ function lineage(candidateActorId: string, researchProjectId: string, protocolId
   return { candidateActorId, researchProjectId, protocolId }
 }
 
+function examinerActorId(rubricHash: string): string {
+  return `host-phd-methodology-examiner-${rubricHash.slice(0, 16)}`
+}
+
+function loadedRubric(row: RubricRow | null): LoadedRubric | null {
+  if (!row || !row.active) return null
+  if (row.profile !== COS_UNIVERSITY_PHD_METHODOLOGY_EXAM_PROFILE || row.scorer_version !== COS_UNIVERSITY_PHD_METHODOLOGY_SCORER) return null
+  const rubric = validateCosUniversityPhdMethodologyRubric(row.rubric_json)
+  return Object.freeze({ id: row.rubric_id, hash: hashCosUniversityPhdMethodologyRubric(rubric), rubric })
+}
+
+async function activePrivateRubric(): Promise<LoadedRubric | null> {
+  const result = await dbOrThrow().from('cos_university_phd_methodology_exam_rubrics')
+    .select('rubric_id,profile,scorer_version,rubric_json,active')
+    .eq('profile', COS_UNIVERSITY_PHD_METHODOLOGY_EXAM_PROFILE)
+    .eq('scorer_version', COS_UNIVERSITY_PHD_METHODOLOGY_SCORER)
+    .eq('active', true)
+    .maybeSingle()
+  if (result.error) throw result.error
+  return loadedRubric((result.data || null) as RubricRow | null)
+}
+
+async function privateRubricById(rubricId: string): Promise<LoadedRubric | null> {
+  const result = await dbOrThrow().from('cos_university_phd_methodology_exam_rubrics')
+    .select('rubric_id,profile,scorer_version,rubric_json,active')
+    .eq('rubric_id', rubricId)
+    .maybeSingle()
+  if (result.error) throw result.error
+  const row = (result.data || null) as RubricRow | null
+  if (!row) return null
+  const rubric = validateCosUniversityPhdMethodologyRubric(row.rubric_json)
+  if (row.profile !== COS_UNIVERSITY_PHD_METHODOLOGY_EXAM_PROFILE || row.scorer_version !== COS_UNIVERSITY_PHD_METHODOLOGY_SCORER) return null
+  return Object.freeze({ id: row.rubric_id, hash: hashCosUniversityPhdMethodologyRubric(rubric), rubric })
+}
+
 async function activeProgram(now: Date): Promise<{
   programId: CosUniversityPhdProgramId
   candidateActorId: string
@@ -166,9 +219,11 @@ async function candidateIdentity(actorId: string): Promise<CosUniversityPhdActor
   }
 }
 
+const RUN_SELECT = 'id,run_key,program_id,research_project_id,protocol_id,candidate_actor_id,evaluator_actor_id,profile,scorer_version,rubric_id,rubric_hash,seed,manifest_hash,variant_hash,status,passed,reasons,latency_ms,evidence_recorded'
+
 async function findRun(runKey: string): Promise<ExamRunRow | null> {
   const result = await dbOrThrow().from('cos_university_phd_methodology_exam_runs')
-    .select('id,run_key,program_id,research_project_id,protocol_id,candidate_actor_id,evaluator_actor_id,profile,scorer_version,seed,manifest_hash,variant_hash,status,passed,reasons,latency_ms,evidence_recorded')
+    .select(RUN_SELECT)
     .eq('run_key', runKey)
     .maybeSingle()
   if (result.error) throw result.error
@@ -185,8 +240,11 @@ async function createOrFindRun(input: {
   const runKey = `${COS_UNIVERSITY_PHD_METHODOLOGY_EXAM_PROFILE}:${hourKey(input.now)}:${input.programId}:${input.researchProjectId}:${input.protocolId}`
   const existing = await findRun(runKey)
   if (existing) return existing
+  const privateRubric = await activePrivateRubric()
+  if (!privateRubric) throw new Error('methodology_private_rubric_unavailable')
   const seed = randomUUID()
   const exam = buildCosUniversityPhdMethodologyExam(seed, input.programId)
+  const evaluatorActorId = examinerActorId(privateRubric.hash)
   const insert = await dbOrThrow().from('cos_university_phd_methodology_exam_runs').insert({
     run_key: runKey,
     agent_id: AGENT_ID,
@@ -195,16 +253,18 @@ async function createOrFindRun(input: {
     research_project_id: input.researchProjectId,
     protocol_id: input.protocolId,
     candidate_actor_id: input.candidateActorId,
-    evaluator_actor_id: COS_UNIVERSITY_PHD_METHODOLOGY_EXAMINER_ACTOR_ID,
+    evaluator_actor_id: evaluatorActorId,
     profile: exam.profile,
     scorer_version: exam.scorerVersion,
+    rubric_id: privateRubric.id,
+    rubric_hash: privateRubric.hash,
     seed,
     manifest_hash: exam.manifestHash,
     variant_hash: exam.manifestHash,
     status: 'created',
     observed_at: input.now.toISOString(),
     updated_at: input.now.toISOString(),
-  }).select('id,run_key,program_id,research_project_id,protocol_id,candidate_actor_id,evaluator_actor_id,profile,scorer_version,seed,manifest_hash,variant_hash,status,passed,reasons,latency_ms,evidence_recorded').maybeSingle()
+  }).select(RUN_SELECT).maybeSingle()
   if (!insert.error && insert.data) return insert.data as ExamRunRow
   if (insert.error && String((insert.error as { code?: string }).code || '') !== '23505') throw insert.error
   return findRun(runKey)
@@ -257,12 +317,16 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
     return summary({ programId: row.program_id, runId: row.id, status: 'not_claimed', reasons: ['methodology_exam_claim_not_acquired'] })
   }
 
+  let privateRubric: LoadedRubric | null = null
+  try { privateRubric = await privateRubricById(row.rubric_id) } catch { privateRubric = null }
   const exam = buildCosUniversityPhdMethodologyExam(row.seed, row.program_id)
-  if (exam.manifestHash !== row.manifest_hash
+  if (!privateRubric
+    || privateRubric.hash !== row.rubric_hash
+    || exam.manifestHash !== row.manifest_hash
     || row.profile !== exam.profile
     || row.scorer_version !== exam.scorerVersion
-    || row.evaluator_actor_id !== COS_UNIVERSITY_PHD_METHODOLOGY_EXAMINER_ACTOR_ID) {
-    const reasons = ['exam_manifest_drift']
+    || row.evaluator_actor_id !== examinerActorId(row.rubric_hash)) {
+    const reasons = ['exam_or_private_rubric_drift']
     await finishRun({
       row, status: 'error', passed: null, evidenceRecorded: false, turnId: null,
       responseSource: null, localModelInvoked: null, externalAiInvoked: null,
@@ -272,11 +336,11 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
   }
 
   const examinerReady = await recordHostCosUniversityPhdActorIdentity({
-    actorId: COS_UNIVERSITY_PHD_METHODOLOGY_EXAMINER_ACTOR_ID,
+    actorId: row.evaluator_actor_id,
     actorRole: 'methodology_examiner',
     principalType: 'system',
-    principalFingerprint: COS_UNIVERSITY_PHD_METHODOLOGY_SCORER,
-    sourceRef: `cos_university_phd_methodology_exam:${COS_UNIVERSITY_PHD_METHODOLOGY_EXAM_PROFILE}`,
+    principalFingerprint: `${COS_UNIVERSITY_PHD_METHODOLOGY_SCORER}:${row.rubric_hash}`,
+    sourceRef: `cos_university_phd_methodology_exam:${row.rubric_id}:${row.rubric_hash}`,
     validFrom: now,
     validityDays: 3650,
   })
@@ -327,7 +391,7 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
     semanticCache,
     handled: result.handled,
     turnId,
-  })
+  }, privateRubric.rubric)
   const candidate = await candidateIdentity(row.candidate_actor_id)
   const reasonerFingerprint = String(result.provenance.reasonerLabel || '').trim()
   const candidateMatchesReasoner = Boolean(
@@ -377,11 +441,13 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
           independent: true,
           authority: 'host_private_exam',
         },
-        sourceRef: `cos_university_phd_methodology_exam:${row.id}`,
+        sourceRef: `cos_university_phd_methodology_exam:${row.id}:${row.rubric_hash}`,
         scorerVersion: COS_UNIVERSITY_PHD_METHODOLOGY_SCORER,
         evidenceSnapshot: {
           profile: COS_UNIVERSITY_PHD_METHODOLOGY_EXAM_PROFILE,
           manifestHash: row.manifest_hash,
+          rubricId: row.rubric_id,
+          rubricHash: row.rubric_hash,
           turnId,
           responseSource: result.provenance.responseSource,
           localModelInvoked: result.provenance.localModelInvoked,

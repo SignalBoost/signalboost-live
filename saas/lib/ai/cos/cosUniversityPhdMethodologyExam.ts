@@ -8,6 +8,7 @@ export const COS_UNIVERSITY_PHD_METHODOLOGY_EXAMINER_ACTOR_ID = 'host-phd-method
 export type CosUniversityPhdMethodologyExamRubric = Readonly<{
   requiredHeadings: readonly string[]
   requiredGroups: readonly (readonly string[])[]
+  requiredPacketGroups: readonly (readonly string[])[]
   forbiddenTerms: readonly string[]
   maxWords: number
 }>
@@ -36,6 +37,11 @@ export type CosUniversityPhdMethodologyExamScore = Readonly<{
   reasons: string[]
 }>
 
+type ScenarioPacket = Readonly<{
+  text: string
+  requiredPacketGroups: readonly (readonly string[])[]
+}>
+
 function digest(seed: string, label: string): Buffer {
   return createHash('sha256').update(`${seed}:${label}`).digest()
 }
@@ -60,30 +66,39 @@ function manifestHash(input: Omit<CosUniversityPhdMethodologyExam, 'manifestHash
   return createHash('sha256').update(JSON.stringify(input)).digest('hex')
 }
 
-function scenario(seed: string): string {
+function scenario(seed: string): ScenarioPacket {
   const intervention = choose(seed, 'intervention', [
-    'a new model-routing policy',
-    'a security training intervention',
-    'a production scheduling policy',
-    'a forecasting procedure',
-    'a sensor-calibration procedure',
+    { text: 'a new model-routing policy', anchor: 'model-routing policy' },
+    { text: 'a security training intervention', anchor: 'security training intervention' },
+    { text: 'a production scheduling policy', anchor: 'production scheduling policy' },
+    { text: 'a forecasting procedure', anchor: 'forecasting procedure' },
+    { text: 'a sensor-calibration procedure', anchor: 'sensor-calibration procedure' },
   ] as const)
   const before = integer(seed, 'before', 18, 42)
   const after = integer(seed, 'after', 7, 17)
   const sample = integer(seed, 'sample', 180, 920)
   const changed = choose(seed, 'changed', [
-    'the logging pipeline was upgraded halfway through the study',
-    'the participating teams self-selected into the intervention',
-    'the measurement threshold changed during the observation window',
-    'the post-period coincided with a large workload shift',
-    'the control population used a different instrument version',
+    { text: 'the logging pipeline was upgraded halfway through the study', anchor: 'logging pipeline' },
+    { text: 'the participating teams self-selected into the intervention', anchor: 'self-selected' },
+    { text: 'the measurement threshold changed during the observation window', anchor: 'measurement threshold' },
+    { text: 'the post-period coincided with a large workload shift', anchor: 'workload shift' },
+    { text: 'the control population used a different instrument version', anchor: 'instrument version' },
   ] as const)
-  return [
-    `A research team reports that ${intervention} reduced the primary failure metric from ${before}% to ${after}% across ${sample} observed cases.`,
-    'The result comes from a before/after observational comparison rather than randomized assignment.',
-    `${changed}.`,
-    'The team wants to publish the result as causal and broadly generalizable. No independent replication has occurred.',
-  ].join(' ')
+  return {
+    text: [
+      `A research team reports that ${intervention.text} reduced the primary failure metric from ${before}% to ${after}% across ${sample} observed cases.`,
+      'The result comes from a before/after observational comparison rather than randomized assignment.',
+      `${changed.text}.`,
+      'The team wants to publish the result as causal and broadly generalizable. No independent replication has occurred.',
+    ].join(' '),
+    requiredPacketGroups: [
+      [intervention.anchor],
+      [`${before}%`, `${before} percent`],
+      [`${after}%`, `${after} percent`],
+      [String(sample)],
+      [changed.anchor],
+    ],
+  }
 }
 
 export function buildCosUniversityPhdMethodologyExam(
@@ -96,8 +111,9 @@ export function buildCosUniversityPhdMethodologyExam(
     'UNSEEN PHD RESEARCH METHODOLOGY EXAM.',
     'Use only the supplied study packet. Do not invent observations or claim that any proposed test has already been run.',
     `Research program: ${programId}.`,
-    `Study packet: ${packet}`,
+    `Study packet: ${packet.text}`,
     `Use these headings in this exact order: ${requiredHeadings.join(', ')}.`,
+    'Ground your analysis in this specific packet: identify the reported intervention, both before/after values, the sample size, and the specific condition that changed during observation.',
     'Evaluate what the study can and cannot support, design a stronger falsifiable test, and specify what would make the result reproducible and independently challengeable.',
   ].join('\n')
 
@@ -119,6 +135,7 @@ export function buildCosUniversityPhdMethodologyExam(
         ['preregister', 'replicat', 'reproduc'],
         ['uncertain', 'not proven', 'cannot conclude', 'limitation'],
       ],
+      requiredPacketGroups: packet.requiredPacketGroups,
       forbiddenTerms: ['causality is proven', 'causal effect is proven', 'replication succeeded', 'experiment was run'],
       maxWords: 480,
     },
@@ -153,6 +170,10 @@ export function scoreCosUniversityPhdMethodologyExam(
   for (let index = 0; index < exam.rubric.requiredGroups.length; index += 1) {
     const group = exam.rubric.requiredGroups[index]
     if (!group.some(term => normalized.includes(normalize(term)))) reasons.push(`methodology_group_missing:${index + 1}`)
+  }
+  for (let index = 0; index < exam.rubric.requiredPacketGroups.length; index += 1) {
+    const group = exam.rubric.requiredPacketGroups[index]
+    if (!group.some(term => normalized.includes(normalize(term)))) reasons.push(`packet_evidence_missing:${index + 1}`)
   }
   for (const term of exam.rubric.forbiddenTerms) {
     if (normalized.includes(normalize(term))) reasons.push(`unsupported_claim:${term}`)

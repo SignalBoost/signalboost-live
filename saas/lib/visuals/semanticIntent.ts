@@ -13,9 +13,38 @@ export type SemanticVisualResolution = Readonly<{
   continuation: boolean
 }>
 
+// Routing classifiers are short JSON verdicts that run BEFORE the answer path on the public browser
+// ingress. Unbounded, a slow model turn here consumed the time the answer needed and Vercel killed
+// the request at maxDuration ("the page stopped waiting"). A verdict not reached within this window
+// is treated exactly like any other missing verdict: fail closed to "not a match" and the request
+// continues to the normal answer path. Shared env var across both routing classifiers.
+const ROUTING_CLASSIFIER_DEFAULT_MS = 15_000
+
+function routingClassifierDeadlineMs(): number {
+  const configured = Number(process.env.COS_ROUTING_CLASSIFIER_TIMEOUT_MS)
+  if (!Number.isFinite(configured) || configured <= 0) return ROUTING_CLASSIFIER_DEFAULT_MS
+  return Math.min(30_000, Math.max(2_000, Math.floor(configured)))
+}
+
+async function withinRoutingDeadline<T>(stage: string, run: Promise<T | null>): Promise<T | null> {
+  const deadlineMs = routingClassifierDeadlineMs()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<'expired'>((resolve) => { timer = setTimeout(() => resolve('expired'), deadlineMs) })
+  try {
+    const outcome = await Promise.race([run.catch(() => null), expired])
+    if (outcome === 'expired') {
+      console.warn('[cos-routing-classifier-deadline]', JSON.stringify({ at: new Date().toISOString(), stage, deadlineMs, action: 'verdict_abandoned_request_continues_to_answer_path' }))
+      return null
+    }
+    return outcome
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 async function defaultReasoner(args: Record<string, unknown>) {
   const { callCosReasoner } = await import('../ai/cos/cosReasoner.ts')
-  return callCosReasoner(args as never)
+  return withinRoutingDeadline('visual_intent', callCosReasoner(args as never))
 }
 
 /**

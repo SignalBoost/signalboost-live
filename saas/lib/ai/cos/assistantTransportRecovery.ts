@@ -5,11 +5,11 @@ export type StoredAssistantMessage = {
 }
 
 export const ASSISTANT_TRANSPORT_TIMEOUT_COPY = {
-  en: 'The page stopped waiting before it received the COS response. It could not confirm whether the server completed the request. Check History before retrying an action to avoid duplicates.',
-  es: 'La página dejó de esperar antes de recibir la respuesta de COS. No pudo confirmar si el servidor completó la solicitud. Revisa el Historial antes de repetir una acción para evitar duplicados.',
-  pt: 'A página parou de aguardar antes de receber a resposta do COS. Não foi possível confirmar se o servidor concluiu a solicitação. Verifique o Histórico antes de repetir uma ação para evitar duplicações.',
-  pl: 'Strona przestała czekać, zanim otrzymała odpowiedź COS. Nie można potwierdzić, czy serwer zakończył żądanie. Przed ponowieniem działania sprawdź Historię, aby uniknąć duplikatów.',
-  ru: 'Страница прекратила ожидание до получения ответа COS. Нельзя подтвердить, завершил ли сервер запрос. Перед повтором действия проверьте Историю, чтобы избежать дублирования.',
+  en: 'COS did not finish this turn before the page deadline, and no completed reply was found in History. If this was only a question, you can retry it safely. If it requested an external action, check History before retrying.',
+  es: 'COS no terminó este turno antes del límite de espera de la página y no se encontró una respuesta completada en el Historial. Si solo era una pregunta, puedes repetirla con seguridad. Si solicitaba una acción externa, revisa el Historial antes de repetirla.',
+  pt: 'O COS não concluiu este turno antes do limite de espera da página e nenhuma resposta concluída foi encontrada no Histórico. Se era apenas uma pergunta, você pode repeti-la com segurança. Se solicitava uma ação externa, verifique o Histórico antes de repeti-la.',
+  pl: 'COS nie zakończył tej odpowiedzi przed limitem oczekiwania strony, a w Historii nie znaleziono ukończonej odpowiedzi. Jeśli było to tylko pytanie, można je bezpiecznie ponowić. Jeśli żądano działania zewnętrznego, przed ponowieniem sprawdź Historię.',
+  ru: 'COS не завершил этот ответ до истечения времени ожидания страницы, и в Истории не найден завершённый ответ. Если это был только вопрос, его можно безопасно повторить. Если запрашивалось внешнее действие, перед повтором проверьте Историю.',
 } as const
 
 function normalize(value: unknown): string {

@@ -15,7 +15,7 @@ import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 const WIKI_API   = 'https://en.wikipedia.org/w/api.php'
 const RESULTS    = 10
-const USER_AGENT = `${PUBLIC_BRAND.name}/1.0 (${PUBLIC_BRAND.siteUrl}; support@signalboostapp.com)`
+const USER_AGENT = `${PUBLIC_BRAND.name}/1.0 (${PUBLIC_BRAND.siteUrl}; support@itmounts.com)`
 
 function supabase() {
   return createClient(

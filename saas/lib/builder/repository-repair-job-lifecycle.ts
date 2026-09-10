@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createSupabaseBuilderWorkspace } from './workspace-supabase.ts'
+import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const SAFE_SHA = /^[0-9a-f]{40}$/i
@@ -154,6 +155,15 @@ export async function completeBuilderRepositoryRepairAfterMerge(input: {
     mergeCommitSha: input.mergeCommitSha,
     baseBranch: input.baseBranch,
   })
+  await recordBuilderUniversityProductionOutcome({
+    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt },
+    status: 'success',
+    verification: 'generation_fenced_repository_merge_completed',
+    facts: { pullRequestNumber: input.pullRequestNumber, mergeCommitSha: input.mergeCommitSha, baseBranch: input.baseBranch },
+  }).catch(error => console.error('[builder_university_outcome_record_failed]', {
+    jobId: row.id,
+    message: error instanceof Error ? error.message : 'unknown',
+  }))
   return true
 }
 
@@ -225,5 +235,14 @@ export async function failBuilderRepositoryRepairAfterSupersededBase(input: {
     baseBranch: input.baseBranch,
     error: 'builder_repository_target_superseded',
   })
+  await recordBuilderUniversityProductionOutcome({
+    job: { id: String(row.id), claimGeneration: Number(row.claim_generation), finishedAt: updatedAt },
+    status: 'failure',
+    verification: 'generation_fenced_repository_base_superseded',
+    facts: { pullRequestNumber: input.pullRequestNumber, baseBranch: input.baseBranch, error: 'builder_repository_target_superseded' },
+  }).catch(error => console.error('[builder_university_outcome_record_failed]', {
+    jobId: row.id,
+    message: error instanceof Error ? error.message : 'unknown',
+  }))
   return true
 }

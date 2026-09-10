@@ -116,6 +116,7 @@ test('failed-exam study rotates authoritative discovery instead of repeating one
   assert.match(strategist, /studyVariant\?: number/)
   assert.match(strategist, /const rotatedThemes = \[\.\.\.themes\.slice\(offset\), \.\.\.themes\.slice\(0, offset\)\]/)
   assert.match(strategist, /missingFacts: rotatedThemes/)
+  assert.match(strategist, /discoveryQuery: \[\.\.\.rotatedThemes\.slice\(0, 2\), subject\.title\]\.join\(' '\)/)
 })
 
 test('daily mining learning may advance only exact University gaps that were actually accepted', () => {

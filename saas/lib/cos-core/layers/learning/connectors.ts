@@ -4,7 +4,7 @@ import type { ContinuousLearningSourceAdapter, LearningSourceDocument } from './
 export type LearningConnectorResult={uri:string;title?:string;text:string;observedAt?:string;license?:string;evidence?:string[]}
 export type LearningConnectorSearch=(query:string,limit:number)=>Promise<LearningConnectorResult[]>
 type LearningQueryBuilder=(gap:KnowledgeGap)=>string
-const defaultLearningQuery:LearningQueryBuilder=(gap)=>[gap.subject,gap.question].filter(Boolean).join(' ').trim()
+const defaultLearningQuery:LearningQueryBuilder=(gap)=>gap.discoveryQuery?.trim()||[gap.subject,gap.question].filter(Boolean).join(' ').trim()
 
 export class SearchLearningConnector implements ContinuousLearningSourceAdapter{
   constructor(readonly kind:LearningSourceDocument['sourceKind'],private readonly search:LearningConnectorSearch,private readonly maxResults=5,readonly id?:string,private readonly queryForGap:LearningQueryBuilder=defaultLearningQuery){}

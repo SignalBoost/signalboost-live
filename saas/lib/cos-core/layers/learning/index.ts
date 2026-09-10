@@ -51,6 +51,8 @@ export type KnowledgeGap = {
   id: string
   subject: string
   question: string
+  /** Optional acquisition-only query. Evaluation still uses the complete subject and question. */
+  discoveryQuery?: string
   portableIds: string[]
   expectedReuse: number
   expectedAvoidedCostUsd: number

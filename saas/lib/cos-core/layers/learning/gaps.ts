@@ -5,6 +5,8 @@ export type KnowledgeGapSignal = {
   subject: string
   capability: string
   objective: string
+  /** Optional host-selected acquisition focus; never replaces the competency or scoring question. */
+  discoveryQuery?: string
   confidence?: number
   escalated?: boolean
   succeeded?: boolean
@@ -76,6 +78,7 @@ export function generateKnowledgeGaps(signals: KnowledgeGapSignal[]): KnowledgeG
       id: knowledgeGapIdForSignal(signal),
       subject,
       question,
+      ...(signal.discoveryQuery?.trim() ? { discoveryQuery: signal.discoveryQuery.trim() } : {}),
       portableIds: [...new Set(signal.portableIds ?? [])],
       expectedReuse,
       expectedAvoidedCostUsd,

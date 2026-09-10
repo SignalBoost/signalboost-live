@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.99
+**Version:** 1.100
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -81,10 +81,12 @@ Do not begin with unrestricted exploit execution. Establish the authorization, r
 ## COS University remediation source diversification — 2026-09-10
 
 Failed-exam remediation preserves all learning-admission and examiner-isolation gates while rotating
-the leading host-owned curriculum theme on each 15-minute learning slot. A plan that rejects one
-result set as duplicate, irrelevant, or low-confidence therefore searches a materially different
-curriculum focus on its next attempt instead of acquiring the same eleven weak documents forever.
-The gap identity, curriculum, hidden examination, and evidence thresholds do not change.
+the leading host-owned curriculum theme on each 15-minute learning slot. Acquisition connectors use
+that rotated curriculum focus before the broad subject label, while relevance evaluation continues
+to use the complete subject and question. A plan that rejects one result set as duplicate, irrelevant,
+or low-confidence therefore searches a materially different focus instead of acquiring the same
+eleven weak documents forever. The gap identity, curriculum, hidden examination, and evidence
+thresholds do not change.
 
 ## COS University automatic Production-outcome correlation — 2026-09-10
 

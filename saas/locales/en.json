@@ -3571,7 +3571,16 @@
     "u_e596899f114b5162": "exit",
     "u_3dcd80f1b15f796e": "timed out",
     "u_5d28a90f4498a814": "failed",
-    "u_79a04dc5140b03ef": "Builder certification: level {level}/3 · verified attempts {attempts}"
+    "u_79a04dc5140b03ef": "Builder certification: level {level}/3 · verified attempts {attempts}",
+    "u_932f815786ae75ab": "Work email",
+    "u_4a92b2561177dfe6": "Request improvement plan",
+    "u_eb840f9a77a557b8": "Lead intake created",
+    "u_21fc0682825bbf4a": "The request is now ready for owner review in the Marketing + Sales workflow.",
+    "u_5742f592ac63282f": "Saved to owner queue",
+    "u_7db417fdeea6e106": "Pending owner approval",
+    "u_0e0d544e458d50d6": "Prepared, but not saved to the owner queue yet",
+    "u_3799c5bf2515bba8": "Please complete the required fields.",
+    "u_65227385c356ea00": "Could not create this request."
   },
   "lab": {
     "license": {

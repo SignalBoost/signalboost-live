@@ -3580,7 +3580,9 @@
     "u_7db417fdeea6e106": "Pending owner approval",
     "u_0e0d544e458d50d6": "Prepared, but not saved to the owner queue yet",
     "u_3799c5bf2515bba8": "Please complete the required fields.",
-    "u_65227385c356ea00": "Could not create this request."
+    "u_65227385c356ea00": "Could not create this request.",
+    "u_c3f291ae4fe4776c": "Send this straight to your queue.",
+    "u_178a017a6edec75a": "You are already signed in, so there is nothing to sign up for. Submitting this puts the result into the Marketing + Sales workflow for owner review."
   },
   "lab": {
     "license": {

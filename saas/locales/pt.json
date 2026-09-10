@@ -3571,7 +3571,16 @@
     "u_e596899f114b5162": "saída",
     "u_3dcd80f1b15f796e": "tempo esgotado",
     "u_5d28a90f4498a814": "falhou",
-    "u_79a04dc5140b03ef": "Certificação do Builder: nível {level}/3 · tentativas verificadas {attempts}"
+    "u_79a04dc5140b03ef": "Certificação do Builder: nível {level}/3 · tentativas verificadas {attempts}",
+    "u_932f815786ae75ab": "Email profissional",
+    "u_4a92b2561177dfe6": "Solicitar plano de melhoria",
+    "u_eb840f9a77a557b8": "Lead intake criado",
+    "u_21fc0682825bbf4a": "A solicitação está pronta para revisão do proprietário no fluxo Marketing + Vendas.",
+    "u_5742f592ac63282f": "Salvo na fila do proprietário",
+    "u_7db417fdeea6e106": "Pendente de aprovação do proprietário",
+    "u_0e0d544e458d50d6": "Preparado, mas ainda não salvo na fila do proprietário",
+    "u_3799c5bf2515bba8": "Preencha os campos obrigatórios.",
+    "u_65227385c356ea00": "Não foi possível criar esta solicitação."
   },
   "lab": {
     "somethingWrong": "Algo deu errado",

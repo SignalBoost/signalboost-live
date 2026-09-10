@@ -320,7 +320,7 @@ export function createStrangerSecuritySessionView(
   hostNow: string,
 ): Readonly<StrangerSecuritySessionView> {
   const verified = verifySignedSecurityEngagement(envelope, trustedKeys)
-  if (!verified.valid) throw new Error(`security_engagement_${verified.reason}`)
+  if (verified.valid === false) throw new Error(`security_engagement_${verified.reason}`)
   const manifest = verified.manifest
   if (manifest.role !== 'stranger' || manifest.posture === 'guardian-resident') throw new Error('security_engagement_not_stranger')
 

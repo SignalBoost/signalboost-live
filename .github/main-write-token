@@ -1,2 +1,2 @@
-base_sha=4bcfff91b03a31d9e94a9a7417e856baaf5dc1d5
-branch=feat/security-passive-repo-patrol-20260910
+base_sha=cdc81234454ca39a7933ffb3146c52aed4454887
+branch=feat/security-github-webhook-provenance-20260910

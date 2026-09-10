@@ -1,6 +1,7 @@
 import { readCosUniversityAgentAcademicRecord } from './cosUniversityAgentAcademicRecordRuntime.ts'
 import { runCosUniversityAdmission } from './cosUniversityAdmissionRunner.ts'
 import { listCosUniversityRegisteredAgents } from './cosUniversityAgentRegistry.ts'
+import { runCosUniversityIndependentExamBatch } from './cosUniversityIndependentExamRunner.ts'
 import { decideCosUniversityNextAcademicAction, type CosUniversityNextAcademicAction } from './cosUniversityAgentAcademicProgression.ts'
 
 export type CosUniversityAutonomousAgentCycleSummary = Readonly<{
@@ -26,7 +27,12 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
       const admission = await runCosUniversityAdmission({ now, agentId: agent.agentId, role: agent.role })
       if (admission.errors.length) throw new Error(admission.errors.join('; '))
       const record = await readCosUniversityAgentAcademicRecord(agent.agentId)
-      agents.push({ agentId: agent.agentId, role: agent.role, admitted: admission.admitted, nextAction: decideCosUniversityNextAcademicAction(record), completionRatio: record.completionRatio, error: null })
+      const nextAction = decideCosUniversityNextAcademicAction(record)
+      if (nextAction === 'independent_exam') {
+        const exam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2 })
+        if (exam.errors.length) throw new Error(exam.errors.join('; '))
+      }
+      agents.push({ agentId: agent.agentId, role: agent.role, admitted: admission.admitted, nextAction, completionRatio: record.completionRatio, error: null })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       errors.push(`${agent.agentId}:${message}`)

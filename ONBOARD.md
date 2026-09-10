@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.90
+**Version:** 1.91
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -63,6 +63,16 @@ A bounded, secret-gated Production cycle now enumerates the durable University a
 automatically enrolls every registered identity through the same host admission gate, reads its
 evidence-backed academic record, and routes its next action to study, remediation, independent
 examination, or completed graduation. Missing evidence never becomes a pass or credential.
+
+## COS University multi-agent independent examinations — 2026-09-10
+
+The undergraduate independent-exam worker now accepts a durable agent identity. Exam run keys,
+assessment reads, and assessment writes are isolated by that identity, while host-generated hidden
+exams and independent scoring remain unchanged. The autonomous registered-agent cycle executes
+eligible exams directly rather than only reporting that an exam is due.
+
+The canonical `software-specialist` identity is registered under the software-engineering role and
+therefore enters the common undergraduate curriculum before its advanced specialist program.
 
 ---
 

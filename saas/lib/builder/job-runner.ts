@@ -21,6 +21,7 @@ import { builderAutoMergeSnapshotPort } from './repository-repair-snapshot-host.
 import { retrieveValidatedCognitiveSkills, type CognitiveSkillContextResult } from '@/lib/ai/cos/cognitiveSkillContext'
 import { recordVerifiedCognitiveProductionOutcome } from '@/lib/ai/cos/cognitiveProductionOutcome'
 import { verifiedBuilderCognitiveApplication } from './cognitive-application.ts'
+import { recordBuilderUniversityProductionOutcome } from './university-outcome.ts'
 
 const BUILDER_JOB_BUDGET_MS = 260_000
 const BUILDER_JOB_RESULT_RESERVE_MS = 20_000
@@ -159,6 +160,15 @@ async function terminalFailure(job: BuilderJobRecord, error: string, trace: read
       trace: safeTrace,
     },
   })
+  await recordBuilderUniversityProductionOutcome({
+    job,
+    status: 'failure',
+    verification: 'generation_fenced_terminal_builder_failure',
+    facts: { error },
+  }).catch(outcomeError => console.error('[builder_university_outcome_record_failed]', {
+    jobId: job.id,
+    message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
+  }))
 }
 
 /**
@@ -235,6 +245,25 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         ...(error ? { error } : {}),
         result: { ...payload, jobId: job.id, workspaceId: job.workspaceId, reply },
       })
+      // The database may convert a PR-awaiting-merge result to paused. Its terminal evidence is
+      // recorded only by repository-repair-job-lifecycle after the fenced reconciliation write.
+      if (payload.repository_merge_pending !== true) {
+        await recordBuilderUniversityProductionOutcome({
+          job,
+          status: payload.merge_watch_outcome === 'healthy' ? 'success' : succeeded ? 'observed' : 'failure',
+          verification: payload.merge_watch_outcome === 'healthy'
+            ? 'repository_merge_and_production_deployment_healthy'
+            : succeeded ? 'verified_patch_or_review_artifact_not_production' : 'generation_fenced_terminal_builder_failure',
+          facts: {
+            pullRequestNumber: payload.pull_request_number ?? null,
+            mergeCommitSha: payload.merge_commit_sha ?? null,
+            deploymentId: payload.merge_watch_deployment_id ?? null,
+          },
+        }).catch(outcomeError => console.error('[builder_university_outcome_record_failed]', {
+          jobId: job.id,
+          message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
+        }))
+      }
       return
     }
 
@@ -325,6 +354,15 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
           trace,
         },
       })
+      await recordBuilderUniversityProductionOutcome({
+        job,
+        status: 'failure',
+        verification: 'generation_fenced_terminal_builder_failure',
+        facts: { error: result.checkpoint ? 'builder_continuation_budget_exhausted' : result.error },
+      }).catch(outcomeError => console.error('[builder_university_outcome_record_failed]', {
+        jobId: job.id,
+        message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
+      }))
       return
     }
 
@@ -352,6 +390,17 @@ export async function runBuilderJob(jobId: string, userId: string): Promise<void
         trace,
       },
     })
+    await recordBuilderUniversityProductionOutcome({
+      job,
+      status: verifiedBuilderCognitiveApplication(result) ? 'success' : 'observed',
+      verification: verifiedBuilderCognitiveApplication(result)
+        ? 'workspace_changed_and_host_proving_command_exit_zero'
+        : 'terminal_builder_completion_without_learning_proof',
+      facts: { successfulRuns: result.trace.filter(item => item.toolId === 'run' && item.ok).length },
+    }).catch(outcomeError => console.error('[builder_university_outcome_record_failed]', {
+      jobId: job.id,
+      message: outcomeError instanceof Error ? outcomeError.message : 'unknown',
+    }))
     // Only after the generation-fenced terminal write; learning failure cannot undo task success.
     if (!plan) await workspace.recordJobRepairLesson(job.workspaceId, job.id, job.claimGeneration, result)
       .then(recorded => console.info('[builder_project_lesson_outcome]', { jobId, recorded, retrievedSignals: priorLessons.length }))

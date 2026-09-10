@@ -7,21 +7,38 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-async function queuedOwnedSiteRepair(): Promise<{ id: string; userId: string } | null> {
+type OwnedRepairKind = 'site' | 'audit'
+type QueuedOwnedRepair = { id: string; userId: string; kind: OwnedRepairKind; createdAt: string }
+
+async function queuedOwnedRepair(
+  metadataKey: 'selfHealingOwnedSite' | 'selfHealingOwnedAudit',
+  kind: OwnedRepairKind,
+): Promise<QueuedOwnedRepair | null> {
   const db = getAdminSupabase()
-  const { data, error } = await db.from('builder_jobs').select('id,user_id')
+  const { data, error } = await db.from('builder_jobs').select('id,user_id,created_at')
     .eq('status', 'queued')
     .eq('job_kind', 'standard')
     .eq('owner_authorized', true)
-    .contains('metadata', { selfHealingOwnedSite: true })
+    .contains('metadata', { [metadataKey]: true })
     .order('created_at', { ascending: true })
     .limit(1)
     .maybeSingle()
   if (error) {
-    console.warn('[builder_self_healing_queue_read_failed]', { message: error.message })
+    console.warn('[builder_self_healing_queue_read_failed]', { kind, message: error.message })
     return null
   }
-  return data?.id && data?.user_id ? { id: String(data.id), userId: String(data.user_id) } : null
+  return data?.id && data?.user_id
+    ? { id: String(data.id), userId: String(data.user_id), kind, createdAt: String(data.created_at || '') }
+    : null
+}
+
+async function queuedOwnedSelfHealingRepairs(): Promise<QueuedOwnedRepair[]> {
+  const [site, audit] = await Promise.all([
+    queuedOwnedRepair('selfHealingOwnedSite', 'site'),
+    queuedOwnedRepair('selfHealingOwnedAudit', 'audit'),
+  ])
+  return [site, audit].filter((job): job is QueuedOwnedRepair => Boolean(job))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
 export async function GET(request: Request) {
@@ -31,13 +48,18 @@ export async function GET(request: Request) {
   }
   // Original authenticated jobs supply identity and objective. No request-supplied work is accepted.
   // Preserve the established Builder continuation contract first; the production gate verifies that
-  // authentication completes before this explicit continuation read. The owned-site recovery lane is
-  // then evaluated separately so it cannot weaken or obscure the normal continuation path.
+  // authentication completes before this explicit continuation read. Owned Self-Healing recovery lanes
+  // are then evaluated separately so they cannot weaken or obscure the normal continuation path.
   const continuations = await listBuilderContinuations()
-  const ownedRepair = await queuedOwnedSiteRepair()
+  const ownedRepairs = await queuedOwnedSelfHealingRepairs()
   const unique = new Map<string, { id: string; userId: string }>()
-  for (const job of [...continuations, ...(ownedRepair ? [ownedRepair] : [])]) unique.set(job.id, job)
+  for (const job of [...continuations, ...ownedRepairs]) unique.set(job.id, { id: job.id, userId: job.userId })
   const jobs = [...unique.values()]
   await Promise.all(jobs.map(job => runBuilderJob(job.id, job.userId)))
-  return NextResponse.json({ ok: true, candidates: jobs.length, ownedSiteRepairQueued: Boolean(ownedRepair) })
+  return NextResponse.json({
+    ok: true,
+    candidates: jobs.length,
+    ownedSiteRepairQueued: ownedRepairs.some(job => job.kind === 'site'),
+    ownedAuditRepairQueued: ownedRepairs.some(job => job.kind === 'audit'),
+  })
 }

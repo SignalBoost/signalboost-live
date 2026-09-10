@@ -46,6 +46,7 @@ export type CosUniversityExamRemediationPlan = {
   planKey: string
   subjectId: CosUniversitySubjectId
   language: CosPlatformLanguage | null
+  languageDimension: CosPlatformLanguageDimension | null
   failureClass: 'unknown' | 'language'
   sourceKind: 'recertification'
   objective: string
@@ -264,6 +265,7 @@ export async function ensureCosUniversityExamFailureRemediationPlans(options: {
       planKey: row.plan_key,
       subjectId: row.subject_id,
       language: row.language_code,
+      languageDimension: row.language_dimension,
       failureClass: row.failure_class,
       sourceKind: 'recertification',
       objective: row.objective,
@@ -272,10 +274,11 @@ export async function ensureCosUniversityExamFailureRemediationPlans(options: {
       acquisitionSourceKinds: strategy.acquisitionSourceKinds,
       fineTuneCandidate: strategy.fineTuneCandidate,
     })
-    if (row.language_code) {
+    if (row.language_code && row.language_dimension) {
       gapSignals.push(platformLanguageStudyGapSignal({
         planKey: row.plan_key,
         language: row.language_code,
+        dimension: row.language_dimension,
         objective: row.objective,
         strategy,
         repeatedCount: 1,

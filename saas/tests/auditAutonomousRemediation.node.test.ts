@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { readUiSource } from './helpers/sourceWithUiCopy.mjs'
+import { parseAuditFindingsResponse } from '../lib/audit/modelResponse.ts'
 
 // Audit completion must report active risk, not replay fixed scan findings.
 const url = (path: string) => new URL(path, import.meta.url)
@@ -24,6 +25,15 @@ test('Audit Console exposes one run-scoped approval and the AI performs the rest
   assert.match(system, /queueAutoMerge/)
   assert.match(system, /mergeCleanPullRequest/)
   assert.match(system, /finalize_audit_run_remediation_v2/)
+})
+
+test('audit model response recovers valid JSON from common transport wrappers without weakening schema validation', () => {
+  assert.deepEqual(parseAuditFindingsResponse('```json\n[]\n```', 'app/example.ts'), [])
+  const wrapped = parseAuditFindingsResponse('Analysis complete. {"findings":[{"severity":"medium","category":"security","title":"Example","detail":"Observed issue","recommendation":"Repair it"}]}', 'app/example.ts')
+  assert.equal(wrapped.length, 1)
+  assert.equal(wrapped[0]?.file, 'app/example.ts')
+  assert.equal(wrapped[0]?.severity, 'medium')
+  assert.throws(() => parseAuditFindingsResponse('{"findings":[{"severity":"bogus"}]}', 'app/example.ts'), /invalid Audit severity/)
 })
 
 test('the default AI path has no required duplicate consent or patch UI', () => {

@@ -55,6 +55,7 @@ export async function recordCosUniversityRealWorldOutcome(input: {
     event_key: eventKey,
     event_type: 'learning_outcome',
     subject_id: subjectId,
+    // Existing assurance schema uses candidate_id as the durable evaluated-agent identity.
     candidate_id: agentId,
     evidence_hash: evidenceHash,
     evidence,

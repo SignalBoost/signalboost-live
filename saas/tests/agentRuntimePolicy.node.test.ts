@@ -200,6 +200,7 @@ test('Referee rejects malformed runtime requests without throwing or widening sc
     { engagementId: envelope.manifest.engagementId, role: 'guardian', action: 'scan.safe', target: null },
     { engagementId: envelope.manifest.engagementId, role: 'guardian', action: 'unknown.action', target: { kind: 'host', value: 'corp.example' } },
     { engagementId: envelope.manifest.engagementId, role: 'guardian', action: 'scan.safe', target: { kind: 'unknown', value: 'corp.example' } },
+    { engagementId: envelope.manifest.engagementId, role: 'guardian', action: 'scan.safe', target: { kind: 'host', value: 'https://evil.invalid/.corp.example' } },
   ]
 
   for (const request of malformedRequests) {
@@ -296,6 +297,7 @@ test('incident evidence is hash-chained and keeps observation separate from attr
   })
 
   assert.equal(verifySecurityEvidenceChain(chain), true)
+  assert.equal('target' in chain[1].event, false)
   assert.notEqual(chain[0].hash, chain[1].hash)
   assert.equal(chain[0].event.observations[0].value, '203.0.113.44')
   assert.equal(chain[0].event.attributionHypotheses[0].confidence, 0.25)
@@ -324,7 +326,48 @@ test('incident evidence is hash-chained and keeps observation separate from attr
       hypothesis: 'Unsupported identity claim',
       confidence: 0.9,
       basisObservationIds: ['missing-observation'],
-      alternatives: [],
+      alternatives: ['VPN or proxy'],
     }],
   }), /security_attribution_basis_invalid/)
+
+  const observedIp = {
+    id: 'obs-attribution-ip',
+    kind: 'source_ip',
+    source: 'edge-access-log',
+    collectedAt: '2026-09-10T21:03:30.000Z',
+    value: '203.0.113.55',
+  }
+  assert.throws(() => appendSecurityEvidence([], {
+    eventId: 'empty-attribution-basis',
+    engagementId: 'engagement-guardian-1',
+    recordedAt: '2026-09-10T21:04:00.000Z',
+    actorRole: 'guardian',
+    action: 'evidence.preserve',
+    decision: 'observed',
+    observations: [observedIp],
+    attributionHypotheses: [{
+      id: 'unsupported-empty-basis',
+      hypothesis: 'Identity claim without evidence basis',
+      confidence: 1,
+      basisObservationIds: [],
+      alternatives: ['VPN or proxy'],
+    }],
+  }), /security_attribution_basis_invalid/)
+
+  assert.throws(() => appendSecurityEvidence([], {
+    eventId: 'empty-attribution-alternatives',
+    engagementId: 'engagement-guardian-1',
+    recordedAt: '2026-09-10T21:05:00.000Z',
+    actorRole: 'guardian',
+    action: 'evidence.preserve',
+    decision: 'observed',
+    observations: [observedIp],
+    attributionHypotheses: [{
+      id: 'unsupported-no-alternatives',
+      hypothesis: 'Identity claim without competing explanations',
+      confidence: 0.8,
+      basisObservationIds: ['obs-attribution-ip'],
+      alternatives: [],
+    }],
+  }), /security_attribution_alternatives_invalid/)
 })

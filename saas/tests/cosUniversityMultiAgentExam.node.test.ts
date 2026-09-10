@@ -4,9 +4,11 @@ import { readFileSync } from 'node:fs'
 
 test('independent exam worker isolates reads, run identity, and assessment writes per agent', () => {
   const source = readFileSync(new URL('../lib/ai/cos/cosUniversityIndependentExamRunner.ts', import.meta.url), 'utf8')
+  const runKey = readFileSync(new URL('../lib/ai/cos/cosUniversityExamRunKey.ts', import.meta.url), 'utf8')
   assert.match(source, /agentId\?: string/)
   assert.match(source, /\.eq\('agent_id', agentId\)/)
-  assert.match(source, /EXAM_PROFILE}:\${agentId}/)
+  assert.match(source, /cosUniversityIndependentExamRunKey\(\{ agentId, target, now, readyStudyPlan \}\)/)
+  assert.match(runKey, /EXAM_PROFILE}:\${input\.agentId}/)
   assert.match(source, /recordCosUniversityAssessment\(\{\s*agentId,/)
   assert.doesNotMatch(source, /const AGENT_ID = 'cos'/)
 })

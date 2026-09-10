@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
 
+import { cosUniversityIndependentExamRunKey } from '../lib/ai/cos/cosUniversityExamRunKey.ts'
+
 const read = (path: string) => fs.readFileSync(new URL(path, import.meta.url), 'utf8')
 
 test('continuous study is scoped to the enrolled agent from planning through accepted proof', () => {
@@ -45,4 +47,34 @@ test('deliberate practice preserves agent identity through proof, queue, and exe
   assert.match(examRunner, /\.eq\('agent_id', agentId\)[\s\S]*\.eq\('status', 'ready_for_exam'\)/)
   assert.match(examRunner, /reconcileReadyStudyPlan/)
   assert.match(examRunner, /status: passed \? 'completed' : 'superseded'/)
+})
+
+test('a completed remediation round receives a fresh stable exam identity', () => {
+  const target = { kind: 'subject' as const, subjectId: 'language_communication' as const }
+  const now = new Date('2026-09-10T21:32:00.000Z')
+  const daily = cosUniversityIndependentExamRunKey({ agentId: 'software-specialist', target, now })
+  const firstRemediation = cosUniversityIndependentExamRunKey({
+    agentId: 'software-specialist',
+    target,
+    now,
+    readyStudyPlan: { id: 'plan-123', attemptCount: 1 },
+  })
+  const retry = cosUniversityIndependentExamRunKey({
+    agentId: 'software-specialist',
+    target,
+    now: new Date('2026-09-11T00:01:00.000Z'),
+    readyStudyPlan: { id: 'plan-123', attemptCount: 1 },
+  })
+  const nextRound = cosUniversityIndependentExamRunKey({
+    agentId: 'software-specialist',
+    target,
+    now,
+    readyStudyPlan: { id: 'plan-123', attemptCount: 2 },
+  })
+
+  assert.match(daily, /:software-specialist:2026-09-10:subject:language_communication$/)
+  assert.match(firstRemediation, /:software-specialist:remediation:plan-123:attempt:1:subject:language_communication$/)
+  assert.equal(retry, firstRemediation)
+  assert.notEqual(firstRemediation, daily)
+  assert.notEqual(nextRound, firstRemediation)
 })

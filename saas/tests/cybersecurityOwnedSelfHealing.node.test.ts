@@ -113,3 +113,16 @@ test('Vercel CDN deletes the hosting Server header on the canonical public root'
       && String(transform.target?.key || '').toLowerCase() === 'server'
   ), 'expected the root CDN route to delete the Server response header')
 })
+
+test('owner manual canonical scan starts protected Self-Healing and refreshes visible status', () => {
+  const page = read('../app/cybersecurity-check/page.tsx')
+  const status = read('../components/owner/CybersecurityRepairStatus.tsx')
+
+  assert.match(page, /isOwner && isCanonicalOwnedTarget\(scannedTarget\)/)
+  assert.match(page, /fetch\('\/api\/owner\/cybersecurity\/remediate'/)
+  assert.match(page, /CustomEvent\(OWNER_STATUS_EVENT/)
+  assert.match(page, /\{isOwner \? null : <span>\{copy\.hint\}<\/span>\}/)
+  assert.match(status, /OWNER_STATUS_EVENT = 'itmounts:cybersecurity-owner-status'/)
+  assert.match(status, /window\.addEventListener\(OWNER_STATUS_EVENT, onManualOwnerStatus\)/)
+  assert.match(status, /schedule\(String\(detail\.status \|\| ''\)\)/)
+})

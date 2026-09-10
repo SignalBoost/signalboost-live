@@ -50,9 +50,13 @@ const COPY: Record<Lang, Copy> = {
 }
 
 const SEVERITY_STYLES: Record<string, string> = { high: 'border-red-400/40 bg-red-400/10 text-red-100', medium: 'border-yellow-300/40 bg-yellow-300/10 text-yellow-100', low: 'border-cyan-300/40 bg-cyan-300/10 text-cyan-100' }
+const OWNER_STATUS_EVENT = 'itmounts:cybersecurity-owner-status'
 function activeLang(lang: string): Lang { return (['en', 'es', 'pt', 'pl', 'ru'].includes(lang) ? lang : 'en') as Lang }
 function formatMs(ms?: number) { return !ms ? '0 ms' : ms > 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms` }
 function planHref(target: string) { return `/request-plan?source=cybersecurity_check&target=${encodeURIComponent(target)}` }
+function isCanonicalOwnedTarget(value: string): boolean {
+  try { return new URL(value).origin === new URL(PUBLIC_BRAND.siteUrl).origin } catch { return false }
+}
 
 export default function CybersecurityCheckPage() {
   const { lang } = useI18n()
@@ -84,8 +88,24 @@ export default function CybersecurityCheckPage() {
       const json = await response.json().catch(() => null)
       if (!response.ok || !json?.ok) { setError(copy.scanFailed); return }
       setData(json)
-      if (!isOwner) {
-        window.localStorage.setItem('signalboost.concierge.utilityContext', JSON.stringify({ source: 'cybersecurity_check', target: json.finalUrl || json.target || url.trim(), report: `Free Security Utility report for ${json.finalUrl || json.target || url.trim()}: score ${json.summary?.score ?? 'n/a'}, findings ${json.summary?.findings ?? 'n/a'}, high ${json.summary?.high ?? 'n/a'}. Security signals: ${(json.findings || []).slice(0, 5).map((f: any) => f.code).join(', ') || 'none flagged'}.` }))
+      const scannedTarget = String(json.finalUrl || json.target || url.trim())
+      if (isOwner && isCanonicalOwnedTarget(scannedTarget)) {
+        try {
+          const ownerResponse = await fetch('/api/owner/cybersecurity/remediate', {
+            method: 'POST',
+            cache: 'no-store',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          })
+          const ownerJson = await ownerResponse.json().catch(() => null)
+          window.dispatchEvent(new CustomEvent(OWNER_STATUS_EVENT, {
+            detail: ownerJson || { status: ownerResponse.ok ? 'repair_started' : 'repair_unavailable' },
+          }))
+        } catch {
+          window.dispatchEvent(new CustomEvent(OWNER_STATUS_EVENT, { detail: { status: 'monitoring_failed' } }))
+        }
+      } else if (!isOwner) {
+        window.localStorage.setItem('signalboost.concierge.utilityContext', JSON.stringify({ source: 'cybersecurity_check', target: scannedTarget, report: `Free Security Utility report for ${scannedTarget}: score ${json.summary?.score ?? 'n/a'}, findings ${json.summary?.findings ?? 'n/a'}, high ${json.summary?.high ?? 'n/a'}. Security signals: ${(json.findings || []).slice(0, 5).map((f: any) => f.code).join(', ') || 'none flagged'}.` }))
         window.dispatchEvent(new Event('signalboost:concierge-utility-context'))
       }
     } catch { setError(copy.scanFailed) } finally { setLoading(false) }
@@ -118,7 +138,7 @@ export default function CybersecurityCheckPage() {
                 <input id="cyber-url" value={url} onChange={event => setUrl(event.target.value)} placeholder={copy.placeholder} className="min-w-0 flex-1 rounded-xl border border-white/10 bg-slate-950 px-4 py-3 text-white outline-none ring-cyan-300/20 focus:ring-4" />
                 <button type="submit" disabled={loading} className="rounded-xl bg-cyan-300 px-5 py-3 font-black text-slate-950 hover:bg-white disabled:opacity-60">{loading ? copy.scanning : copy.scan}</button>
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400"><span>{copy.hint}</span><button type="button" onClick={() => setUrl(PUBLIC_BRAND.siteUrl)} className="font-bold text-cyan-200 hover:text-white">{copy.trySample}</button></div>
+              <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-400">{isOwner ? null : <span>{copy.hint}</span>}<button type="button" onClick={() => setUrl(PUBLIC_BRAND.siteUrl)} className="font-bold text-cyan-200 hover:text-white">{copy.trySample}</button></div>
             </form>
             {error && <div className="mt-4 rounded-xl border border-red-300/30 bg-red-400/10 p-4 text-sm font-semibold text-red-100">{error}</div>}
           </section>

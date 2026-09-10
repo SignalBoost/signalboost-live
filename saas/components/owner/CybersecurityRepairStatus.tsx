@@ -14,6 +14,7 @@ type RepairStatus = Readonly<{
 
 const ACTIVE = new Set(['queued', 'fixing', 'testing', 'paused', 'verifying', 'repair_started', 'starting'])
 const FIXED = new Set(['fixed', 'healthy'])
+const OWNER_STATUS_EVENT = 'itmounts:cybersecurity-owner-status'
 
 function tone(status: string): string {
   if (status === 'fixed' || status === 'healthy') return 'border-emerald-300/35 bg-emerald-300/10 text-emerald-50'
@@ -32,6 +33,7 @@ export default function CybersecurityRepairStatus() {
     let ownerCheckStarted = false
 
     const schedule = (status: string) => {
+      if (timer != null) window.clearTimeout(timer)
       if (FIXED.has(status)) return
       timer = window.setTimeout(refresh, ACTIVE.has(status) ? 4_000 : 12_000)
     }
@@ -60,7 +62,7 @@ export default function CybersecurityRepairStatus() {
       }
     }
 
-    const refresh = async () => {
+    async function refresh() {
       try {
         const response = await fetch('/api/owner/cybersecurity/remediate', { method: 'GET', cache: 'no-store', credentials: 'include', headers: { Accept: 'application/json' } })
         if (response.status === 401 || response.status === 403) {
@@ -82,8 +84,21 @@ export default function CybersecurityRepairStatus() {
       }
     }
 
+    const onManualOwnerStatus = (event: Event) => {
+      const detail = (event as CustomEvent<RepairStatus | null>).detail
+      if (cancelled || !detail) return
+      setAuthorized(true)
+      setState(detail)
+      schedule(String(detail.status || ''))
+    }
+
+    window.addEventListener(OWNER_STATUS_EVENT, onManualOwnerStatus)
     void refresh()
-    return () => { cancelled = true; if (timer != null) window.clearTimeout(timer) }
+    return () => {
+      cancelled = true
+      window.removeEventListener(OWNER_STATUS_EVENT, onManualOwnerStatus)
+      if (timer != null) window.clearTimeout(timer)
+    }
   }, [])
 
   if (authorized !== true || !state || state.status === 'idle') return null

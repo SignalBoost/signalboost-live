@@ -1,3 +1,4 @@
+// saas/components/Footer.tsx
 'use client'
 
 import Link from 'next/link'
@@ -91,12 +92,15 @@ export default function Footer() {
     { label: copy.contact, href: '/support' },
   ]
 
+  // prefetch={false}: the footer carries ~16 links, so default Next prefetching
+  // fired a request for every one of them the moment the footer scrolled into
+  // view — including /dashboard routes for signed-out visitors.
   const LinkGroup = ({ title, items }: { title: string; items: Array<{ label: string; href: string }> }) => (
     <div>
       <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-faint)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>{title}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {items.map(item => (
-          <Link key={item.href} href={item.href} style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'none' }} onMouseEnter={event => { event.currentTarget.style.color = '#fff' }} onMouseLeave={event => { event.currentTarget.style.color = 'var(--text-muted)' }}>
+          <Link key={item.href} href={item.href} prefetch={false} style={{ fontSize: 13, color: 'var(--text-muted)', textDecoration: 'none' }} onMouseEnter={event => { event.currentTarget.style.color = '#fff' }} onMouseLeave={event => { event.currentTarget.style.color = 'var(--text-muted)' }}>
             {item.label}
           </Link>
         ))}

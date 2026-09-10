@@ -4,6 +4,7 @@ import {
   evaluateAndAwardCosUniversityMastersCredential,
   readCosUniversityMastersRuntimeStatus,
 } from '@/lib/ai/cos/cosUniversityMastersRuntime'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
       }
     }
     const errors = [...production.errors, ...(credential?.state === 'error' ? credential.reasons : [])]
+    await recordCosUniversityProductionPath({ path: 'masters_progress', invocationSucceeded: errors.length === 0, evidence: { production, credential, deferredForAPlus, errors } })
     return NextResponse.json({ ok: errors.length === 0, production, credential, deferredForAPlus, errors }, { status: errors.length ? 500 : 200 })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

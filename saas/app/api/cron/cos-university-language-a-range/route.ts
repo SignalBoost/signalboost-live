@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityLanguageARangeBatch } from '@/lib/ai/cos/cosUniversityLanguageARangeRunner'
 import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,9 +18,11 @@ export async function GET(req: NextRequest) {
     const programGate = await readCosUniversityUndergraduateAcademicLaneGate()
     if (!programGate.allowed) {
       const unavailable = programGate.reason === 'service_database_unavailable'
+      await recordCosUniversityProductionPath({ path: 'language_a_range_evidence', invocationSucceeded: !unavailable, evidence: { skipped: true, programGate } })
       return NextResponse.json({ ok: !unavailable, skipped: true, programGate }, { status: unavailable ? 503 : 200 })
     }
     const result = await runCosUniversityLanguageARangeBatch()
+    await recordCosUniversityProductionPath({ path: 'language_a_range_evidence', invocationSucceeded: result.errors.length === 0, evidence: result })
     return NextResponse.json({ ok: result.errors.length === 0, ...result }, { status: result.errors.length ? 500 : 200 })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

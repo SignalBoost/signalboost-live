@@ -66,6 +66,7 @@ test('assurance registry covers every scheduled University route explicitly', ()
     '/api/cron/cos-university-exam': 'independent_exams',
     '/api/cron/cos-university-a-range': 'subject_a_range_evidence',
     '/api/cron/cos-university-language-a-range': 'language_a_range_evidence',
+    '/api/cron/cos-university-retention': 'delayed_retention',
     '/api/cron/cos-university-graduation': 'graduation',
     '/api/cron/cos-university-masters-learning': 'masters_learning',
     '/api/cron/cos-university-masters-admission': 'masters_admission',

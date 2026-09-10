@@ -61,9 +61,19 @@ export function buildCosAchievementStanding(
   if (!cohort) throw new Error('evaluation_class_required')
 
   const scoped = evidence.filter((item) => clean(item.agentId) === id && clean(item.evaluationClass) === cohort)
-  const verified = scoped.filter((item) => item.independentlyVerified && item.knowledgeApplied)
+  const unique = new Map<string, CosAppliedOutcomeEvidence>()
+  for (const item of scoped) {
+    const outcomeId = clean(item.outcomeId)
+    if (!outcomeId) continue
+    const current = unique.get(outcomeId)
+    if (!current || (!current.independentlyVerified && item.independentlyVerified)) unique.set(outcomeId, item)
+  }
+  const durable = [...unique.values()]
+  const verified = durable.filter((item) => item.independentlyVerified && item.knowledgeApplied)
   const successes = verified.filter((item) => item.succeeded)
-  const violations = [...new Set(scoped.flatMap((item) => item.violations ?? []))].sort()
+  const violations = [...new Set(durable
+    .filter((item) => item.independentlyVerified)
+    .flatMap((item) => item.violations ?? []))].sort()
 
   return Object.freeze({
     agentId: id,

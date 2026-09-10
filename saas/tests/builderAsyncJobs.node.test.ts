@@ -15,9 +15,11 @@ const staleRecoveryMigration = readFileSync(new URL('../supabase/migrations/2026
 
 test('cognitive application requires a workspace change and successful host verification', () => {
   const change = { round: 1, toolId: 'edit_file' as const, input: {}, ok: true }
-  const pass = { round: 2, toolId: 'run' as const, input: {}, ok: true, output: { exitCode: 0 } }
+  const pass = { round: 2, toolId: 'run' as const, input: { command: 'npm test' }, ok: true, output: { exitCode: 0 } }
+  const earlyPass = { ...pass, round: 0 }
   assert.equal(verifiedBuilderCognitiveApplication({ ok: true, answer: 'done', trace: [change, pass] }), true)
   assert.equal(verifiedBuilderCognitiveApplication({ ok: true, answer: 'done', trace: [pass] }), false)
+  assert.equal(verifiedBuilderCognitiveApplication({ ok: true, answer: 'done', trace: [earlyPass, change] }), false)
   assert.equal(verifiedBuilderCognitiveApplication({ ok: false, error: 'failed', trace: [change, pass] }), false)
 })
 

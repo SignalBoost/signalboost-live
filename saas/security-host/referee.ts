@@ -64,10 +64,27 @@ function normalizeHostname(value: string): string {
   return String(value || '').trim().toLowerCase().replace(/\.$/, '')
 }
 
+function validHostname(value: string): boolean {
+  const normalized = normalizeHostname(value)
+  if (!normalized || normalized.length > 253 || normalized.includes('/') || normalized.includes(':')) return false
+  return normalized.split('.').every(label => (
+    label.length > 0
+    && label.length <= 63
+    && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label)
+  ))
+}
+
 function ipv4ToInteger(value: string): number | null {
   if (isIP(value) !== 4) return null
   const parts = value.split('.').map(Number)
   return ((((parts[0] * 256) + parts[1]) * 256 + parts[2]) * 256 + parts[3]) >>> 0
+}
+
+function validIpv4Cidr(value: string): boolean {
+  const match = String(value || '').trim().match(/^([^/]+)\/(\d{1,2})$/)
+  if (!match || isIP(match[1]) !== 4) return false
+  const prefix = Number(match[2])
+  return Number.isInteger(prefix) && prefix >= 0 && prefix <= 32
 }
 
 function ipv4InCidr(ip: string, cidr: string): boolean {
@@ -88,8 +105,18 @@ function exactIpMatch(requestValue: string, scopeValue: string): boolean {
   return requestValue.trim().toLowerCase() === scopeValue.trim().toLowerCase()
 }
 
+export function validSecurityActionTarget(target: SecurityTarget): boolean {
+  if (!target || typeof target.value !== 'string') return false
+  const value = target.value.trim()
+  if (!value || value.length > 512) return false
+  if (target.kind === 'host' || target.kind === 'domain') return validHostname(value)
+  if (target.kind === 'ip') return isIP(value) !== 0
+  if (target.kind === 'cidr') return validIpv4Cidr(value)
+  return false
+}
+
 export function securityTargetIsInScope(request: SecurityTarget, scopes: readonly SecurityTarget[]): boolean {
-  if (!request || typeof request.value !== 'string') return false
+  if (!validSecurityActionTarget(request)) return false
   const requestKind = request.kind as SecurityTargetKind
   const requestValue = request.value.trim()
 
@@ -139,7 +166,7 @@ function validActionRequest(value: unknown): value is SecurityActionRequest {
   if (!isRecord(value.target)) return false
   if (!TARGET_KINDS.includes(value.target.kind as SecurityTargetKind)) return false
   if (typeof value.target.value !== 'string' || value.target.value.trim().length === 0 || value.target.value.length > 512) return false
-  return true
+  return validSecurityActionTarget(value.target as unknown as SecurityTarget)
 }
 
 export function authorizeSecurityAction(params: {

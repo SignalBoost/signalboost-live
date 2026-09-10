@@ -5,7 +5,7 @@ export type StoredAssistantMessage = {
 }
 
 export const ASSISTANT_TRANSPORT_TIMEOUT_COPY = {
-  en: 'COS did not finish this turn before the page deadline, and no completed reply was found in History. If this was only a question, you can retry it safely. If it requested an external action, check History before retrying.',
+  en: 'COS did not finish this turn before the page deadline, and no completed reply was found in History. If this was only a question, you can retry it safely. If it requested an external action, Check History before retrying.',
   es: 'COS no terminó este turno antes del límite de espera de la página y no se encontró una respuesta completada en el Historial. Si solo era una pregunta, puedes repetirla con seguridad. Si solicitaba una acción externa, revisa el Historial antes de repetirla.',
   pt: 'O COS não concluiu este turno antes do limite de espera da página e nenhuma resposta concluída foi encontrada no Histórico. Se era apenas uma pergunta, você pode repeti-la com segurança. Se solicitava uma ação externa, verifique o Histórico antes de repeti-la.',
   pl: 'COS nie zakończył tej odpowiedzi przed limitem oczekiwania strony, a w Historii nie znaleziono ukończonej odpowiedzi. Jeśli było to tylko pytanie, można je bezpiecznie ponowić. Jeśli żądano działania zewnętrznego, przed ponowieniem sprawdź Historię.',

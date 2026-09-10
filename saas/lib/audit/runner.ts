@@ -70,10 +70,10 @@ function buildPrompt(path: string, content: string, lang?: string): string {
     '',
     'Audit this source for security vulnerabilities (RLS / authorization bypass,',
     'injection, secret leakage, unsafe input handling), logic flaws, and standards',
-    'violations. Return ONLY a JSON array (no prose, no code fences) where each item is:',
-    '{"severity":"critical|high|medium|low|info","category":"string","title":"string",',
-    '"detail":"string","recommendation":"string","line":<number optional>}',
-    'Return [] if the file is clean.',
+    'violations. Return ONLY a strict JSON object (no prose, no code fences) with this shape:',
+    '{"findings":[{"severity":"high","category":"string","title":"string","detail":"string","recommendation":"string","line":1}]}.',
+    'The line field is optional. Severity must be one of critical, high, medium, low, or info.',
+    'Return {"findings":[]} if the file is clean.',
     encodeAuditUntrustedData('repository_source', { path, content }),
   ].join('\n')
 }

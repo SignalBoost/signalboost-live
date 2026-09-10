@@ -10,9 +10,14 @@ import {
   OWNED_SITE_OPTIMIZATION_PROBE,
   OWNED_SITE_OPTIMIZATION_PROBE_FAILED_ERROR,
 } from './owned-site-optimization-monitoring.ts'
+import {
+  OWNED_SITE_CYBERSECURITY_FINDINGS_ERROR,
+  OWNED_SITE_CYBERSECURITY_PROBE,
+  OWNED_SITE_CYBERSECURITY_PROBE_FAILED_ERROR,
+} from './owned-site-cybersecurity-monitoring.ts'
 
 const RETRY_SUPPRESSION_MS = 6 * 60 * 60 * 1000
-const OWNED_SITE_REPAIR_STARTING_PATHS = Object.freeze([
+const OPTIMIZER_STARTING_PATHS = Object.freeze([
   'saas/app/api/public/site-optimization/route.ts',
   'saas/next.config.mjs',
   'saas/app/layout.tsx',
@@ -22,9 +27,19 @@ const OWNED_SITE_REPAIR_STARTING_PATHS = Object.freeze([
   'saas/self-healing-host/owned-site-optimization-monitoring.ts',
   'saas/tests/ownedSiteOptimizationMonitoring.node.test.ts',
 ])
+const CYBERSECURITY_STARTING_PATHS = Object.freeze([
+  'saas/app/api/public/cybersecurity-preview/route.ts',
+  'saas/next.config.mjs',
+  'saas/vercel.json',
+  'saas/proxy.ts',
+  'saas/app/cybersecurity-check/page.tsx',
+  'saas/self-healing-host/owned-site-cybersecurity-monitoring.ts',
+  'saas/tests/cybersecurityOwnedSelfHealing.node.test.ts',
+])
 const DIAGNOSTIC_TRANSPORT_FAILURE = /automated diagnosis was unavailable|diagnostic timed out|invalid json payload|generation_config|response_schema|additionalproperties|cannot find field|cos-primary:|gemini:/i
 
 type RepairDisposition = 'queued' | 'already_active' | 'recently_attempted'
+type OwnedRepairKind = 'website-optimizer' | 'cybersecurity-preview'
 
 export type OwnedSiteAutonomousRepairResult = Readonly<{
   disposition: RepairDisposition
@@ -48,10 +63,14 @@ function stringArray(value: unknown): string[] {
     : []
 }
 
-function scopedDiagnosis(value: string): string {
+function kindLabel(kind: OwnedRepairKind): string {
+  return kind === 'website-optimizer' ? 'Website Optimizer' : 'Cybersecurity Preview'
+}
+
+function scopedDiagnosis(value: string, kind: OwnedRepairKind): string {
   const diagnosis = String(value || '').trim()
   if (!diagnosis || DIAGNOSTIC_TRANSPORT_FAILURE.test(diagnosis)) {
-    return 'Automated diagnosis was unavailable. Use the verified Website Optimizer evidence and current repository state; diagnostic-provider transport/schema errors are not website defects.'
+    return `Automated diagnosis was unavailable. Use the verified ${kindLabel(kind)} evidence and current repository state; diagnostic-provider transport/schema errors are not owned-site defects.`
   }
   return diagnosis.slice(0, 900)
 }
@@ -62,6 +81,14 @@ export function isOwnedSiteOptimizationIncident(incident: SupervisorIncident): b
   if (!incident.affectedResource || !isCanonicalOwnedSite(incident.affectedResource)) return false
   return incident.errorCode === OWNED_SITE_OPTIMIZATION_FINDINGS_ERROR
     || incident.errorCode === OWNED_SITE_OPTIMIZATION_PROBE_FAILED_ERROR
+}
+
+export function isOwnedSiteCybersecurityIncident(incident: SupervisorIncident): boolean {
+  if (incident.metadata?.nativeProbe !== OWNED_SITE_CYBERSECURITY_PROBE) return false
+  if (incident.metadata?.ownedPlatform !== true || incident.metadata?.recoveryPreauthorized !== true) return false
+  if (!incident.affectedResource || !isCanonicalOwnedSite(incident.affectedResource)) return false
+  return incident.errorCode === OWNED_SITE_CYBERSECURITY_FINDINGS_ERROR
+    || incident.errorCode === OWNED_SITE_CYBERSECURITY_PROBE_FAILED_ERROR
 }
 
 async function resolveOwnerUserId(): Promise<string> {
@@ -82,30 +109,38 @@ async function resolveOwnerUserId(): Promise<string> {
   throw new Error('self_healing_owner_identity_unavailable')
 }
 
-function remediationKey(incident: SupervisorIncident): string {
+function remediationKey(incident: SupervisorIncident, kind: OwnedRepairKind): string {
   const report = reportFrom(incident)
   const codes = stringArray(report.findingCodes).sort().join(',') || incident.errorCode || 'unknown'
   const revision = String(process.env.VERCEL_GIT_COMMIT_SHA || '').trim().toLowerCase() || 'unknown'
-  return `${revision}:${codes}`.slice(0, 500)
+  return `${revision}:${kind}:${codes}`.slice(0, 500)
 }
 
-function objectiveFor(incident: SupervisorIncident, diagnosis: string): string {
+function objectiveFor(incident: SupervisorIncident, diagnosis: string, kind: OwnedRepairKind): string {
   const report = reportFrom(incident)
   const codes = stringArray(report.findingCodes)
   const score = Number(report.score)
+  const label = kindLabel(kind)
   const reportLine = codes.length
-    ? `Current Website Optimizer findings: ${codes.join(', ')}${Number.isFinite(score) ? `; score ${score}` : ''}.`
-    : `The owned Website Optimizer probe failed: ${incident.errorMessage}`
+    ? `Current ${label} findings: ${codes.join(', ')}${Number.isFinite(score) ? `; score ${score}` : ''}.`
+    : `The owned ${label} probe failed: ${incident.errorMessage}`
+  const semantics = kind === 'website-optimizer'
+    ? 'Verified finding semantics: missing_csp and missing_nosniff are public HTTP response-header observations; many_scripts is the rendered public HTML script-element workload. Treat these optimizer findings as the repair target, not unrelated model/provider diagnostics.'
+    : 'Verified finding semantics: wildcard_cors is the observed public Access-Control-Allow-Origin wildcard; server_header_exposed is a non-empty public Server response header. Do not suppress these detector checks to raise the score. Repair the response/deployment policy when safely possible; if the hosting platform itself injects an immutable Server header, prove that constraint and report it as a verified blocker rather than fabricating a fix.'
+  const startingPaths = kind === 'website-optimizer' ? OPTIMIZER_STARTING_PATHS : CYBERSECURITY_STARTING_PATHS
+  const verification = kind === 'website-optimizer'
+    ? `After the repair, verify the public optimizer can scan ${PUBLIC_BRAND.siteUrl} successfully and that the targeted finding(s) are gone or objectively improved.`
+    : `After the repair, verify the public cybersecurity preview can scan ${PUBLIC_BRAND.siteUrl} successfully and that the targeted finding(s) are gone. A platform-managed immutable disclosure may remain only when independently proven and explicitly reported.`
   return [
     `Fix the SignalBoost platform issue detected by the Self-Healing Supervisor on the owned production site ${PUBLIC_BRAND.siteUrl}.`,
     reportLine,
-    'Verified finding semantics: missing_csp and missing_nosniff are public HTTP response-header observations; many_scripts is the rendered public HTML script-element workload. Treat these optimizer findings as the repair target, not unrelated model/provider diagnostics.',
-    `Repository starting points (inspect first, not exclusive): ${OWNED_SITE_REPAIR_STARTING_PATHS.join(', ')}.`,
-    `Supervisor diagnosis: ${scopedDiagnosis(diagnosis)}`,
-    'If the diagnostic model/provider failed, ignore its transport/schema error text as repair evidence unless that separate failure is independently reproduced and directly explains the Website Optimizer finding.',
-    'Reproduce the current production behavior before editing. Inspect ONBOARD.md and the current repository first. Repair root causes safely; do not hard-code scores, finding lists, responses, or suppress/relax the optimizer to make the check pass.',
-    'For performance/security findings, prefer the smallest application or deployment-safe change that preserves product behavior. Run the narrowest relevant tests plus the production build gates required by the repository. If a finding is not safely repairable from repository code, make no risky change and report the verified blocker.',
-    `After the repair, verify the public optimizer can scan ${PUBLIC_BRAND.siteUrl} successfully and that the targeted finding(s) are gone or objectively improved.`,
+    semantics,
+    `Repository starting points (inspect first, not exclusive): ${startingPaths.join(', ')}.`,
+    `Supervisor diagnosis: ${scopedDiagnosis(diagnosis, kind)}`,
+    `If the diagnostic model/provider failed, ignore its transport/schema error text as repair evidence unless that separate failure is independently reproduced and directly explains the ${label} finding.`,
+    'Reproduce the current production behavior before editing. Inspect ONBOARD.md and the current repository first. Repair root causes safely; do not hard-code scores, finding lists, responses, or suppress/relax the scanner to make the check pass.',
+    'Prefer the smallest application or deployment-safe change that preserves product behavior. Run the narrowest relevant tests plus the production build gates required by the repository. If a finding is not safely repairable from repository code, make no risky change and report the verified blocker.',
+    verification,
   ].join('\n')
 }
 
@@ -136,16 +171,21 @@ async function findExistingAttempt(key: string): Promise<{ disposition: Exclude<
   return recent?.id ? { disposition: 'recently_attempted', jobId: String(recent.id) } : null
 }
 
-export async function enqueueOwnedSiteOptimizationRepair(
+async function enqueueOwnedSiteRepair(
   incident: SupervisorIncident,
   diagnosis: string,
+  kind: OwnedRepairKind,
 ): Promise<OwnedSiteAutonomousRepairResult> {
-  if (!isOwnedSiteOptimizationIncident(incident)) throw new Error('owned_site_repair_incident_not_authorized')
-  const key = remediationKey(incident)
+  const authorized = kind === 'website-optimizer'
+    ? isOwnedSiteOptimizationIncident(incident)
+    : isOwnedSiteCybersecurityIncident(incident)
+  if (!authorized) throw new Error('owned_site_repair_incident_not_authorized')
+
+  const key = remediationKey(incident, kind)
   const existing = await findExistingAttempt(key)
   if (existing) return Object.freeze({ ...existing, remediationKey: key })
 
-  const objective = objectiveFor(incident, diagnosis)
+  const objective = objectiveFor(incident, diagnosis, kind)
   const target = signalBoostDeployedRepairTarget(objective, {
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
     branch: process.env.VERCEL_GIT_COMMIT_REF || 'main',
@@ -160,8 +200,6 @@ export async function enqueueOwnedSiteOptimizationRepair(
     target,
   })
 
-  // Mark only this server-created, owner-authorized platform repair for the cron recovery lane.
-  // The generic Builder queue remains unchanged and user jobs are never adopted by Self-Healing.
   const admin = getAdminSupabase()
   const { data: row, error: readError } = await admin.from('builder_jobs').select('metadata').eq('id', job.jobId).eq('user_id', userId).maybeSingle()
   if (readError || !row) throw new Error(`self_healing_builder_tag_read_failed:${readError?.message || 'job_not_found'}`)
@@ -172,10 +210,24 @@ export async function enqueueOwnedSiteOptimizationRepair(
       selfHealingOwnedSite: true,
       selfHealingKey: key,
       selfHealingIncidentId: incident.incidentId,
-      selfHealingSource: 'website-optimizer',
+      selfHealingSource: kind,
     },
   }).eq('id', job.jobId).eq('user_id', userId)
   if (tagError) throw new Error(`self_healing_builder_tag_failed:${tagError.message}`)
 
   return Object.freeze({ disposition: 'queued', jobId: job.jobId, remediationKey: key })
+}
+
+export async function enqueueOwnedSiteOptimizationRepair(
+  incident: SupervisorIncident,
+  diagnosis: string,
+): Promise<OwnedSiteAutonomousRepairResult> {
+  return enqueueOwnedSiteRepair(incident, diagnosis, 'website-optimizer')
+}
+
+export async function enqueueOwnedSiteCybersecurityRepair(
+  incident: SupervisorIncident,
+  diagnosis: string,
+): Promise<OwnedSiteAutonomousRepairResult> {
+  return enqueueOwnedSiteRepair(incident, diagnosis, 'cybersecurity-preview')
 }

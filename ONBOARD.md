@@ -3,13 +3,20 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.92
+**Version:** 1.93
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
+
+## COS University real-world outcome evidence — 2026-09-10
+
+The assurance ledger now accepts immutable, agent- and subject-scoped learning-outcome decisions.
+Promotion requires an improved post-study score, unseen transfer, practical execution with a measured
+Production improvement, delayed retention, verified source attribution, and independent scoring.
+Missing or regressed evidence is recorded as a failed decision and cannot be presented as learning.
 
 ## COS University delayed-retention execution — 2026-09-10
 

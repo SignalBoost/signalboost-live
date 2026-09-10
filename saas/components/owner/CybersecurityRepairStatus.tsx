@@ -12,13 +12,13 @@ type RepairStatus = Readonly<{
   mergeCommitSha?: string | null
 }>
 
-const ACTIVE = new Set(['queued', 'fixing', 'testing', 'paused', 'verifying', 'repair_started'])
+const ACTIVE = new Set(['queued', 'fixing', 'testing', 'paused', 'verifying', 'repair_started', 'starting'])
 const FIXED = new Set(['fixed', 'healthy'])
 
 function tone(status: string): string {
   if (status === 'fixed' || status === 'healthy') return 'border-emerald-300/35 bg-emerald-300/10 text-emerald-50'
   if (status === 'failed' || status === 'verification_failed' || status === 'repair_unavailable' || status === 'monitoring_failed') return 'border-red-300/35 bg-red-300/10 text-red-50'
-  if (ACTIVE.has(status) || status === 'starting') return 'border-cyan-300/35 bg-cyan-300/10 text-cyan-50'
+  if (ACTIVE.has(status)) return 'border-cyan-300/35 bg-cyan-300/10 text-cyan-50'
   return 'border-white/15 bg-white/[0.05] text-slate-200'
 }
 
@@ -39,7 +39,7 @@ export default function CybersecurityRepairStatus() {
     const startProtectedCheck = async () => {
       if (ownerCheckStarted || cancelled) return
       ownerCheckStarted = true
-      setState({ status: 'starting', message: 'Self-Healing is verifying the canonical iTMounts cybersecurity findings.' })
+      setState({ status: 'starting' })
       try {
         const response = await fetch('/api/owner/cybersecurity/remediate', {
           method: 'POST',
@@ -49,11 +49,12 @@ export default function CybersecurityRepairStatus() {
         })
         const json = await response.json().catch(() => null) as RepairStatus | null
         if (cancelled) return
-        setState(json || { status: response.ok ? 'repair_started' : 'repair_unavailable', message: 'Cybersecurity Self-Healing returned no status.' })
-        schedule(String(json?.status || (response.ok ? 'repair_started' : 'repair_unavailable')))
+        const status = String(json?.status || (response.ok ? 'repair_started' : 'repair_unavailable'))
+        setState(json || { status })
+        schedule(status)
       } catch {
         if (!cancelled) {
-          setState({ status: 'monitoring_failed', message: 'The protected cybersecurity verification could not complete.' })
+          setState({ status: 'monitoring_failed' })
           schedule('monitoring_failed')
         }
       }

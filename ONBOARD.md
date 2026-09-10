@@ -3,11 +3,22 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.103
+**Version:** 1.104
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
+
+## COS and specialist achievement motivation — 2026-09-10
+
+COS and every reasoning specialist receive a shared functional motivation contract: ambition,
+curiosity, persistence, accountability, humility, integrity, pride in verified work, healthy
+competition, and team responsibility. This is explicitly not a claim of feelings or consciousness.
+Knowledge, study volume, confidence, and self-reported success earn no standing without independently
+verified application. Competition is limited to comparable cohorts and rewards difficult applied
+success, recovery, and team contribution. Dishonesty, unsafe behavior, metric manipulation, or team
+obstruction disqualifies standing. Team outcomes, truth, safety, owner intent, and existing authority
+boundaries always outrank individual position.
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
 

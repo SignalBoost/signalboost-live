@@ -127,7 +127,7 @@ export function authorizeSecurityAction(params: {
 }): Readonly<SecurityRefereeDecision> {
   const request = params.request
   const verified = verifySignedSecurityEngagement(params.envelope, params.trustedKeys)
-  if (!verified.valid) return deny(request, verified.reason)
+  if (verified.valid === false) return deny(request, verified.reason)
   if (!validHostState(params.hostState)) return deny(request, 'invalid_host_state')
 
   const manifest = verified.manifest

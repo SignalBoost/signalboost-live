@@ -359,29 +359,32 @@ export function universityStudyGapSignal(input: {
 export function platformLanguageStudyGapSignal(input: {
   planKey: string
   language: CosPlatformLanguage
-  dimension: CosPlatformLanguageDimension
+  dimension?: CosPlatformLanguageDimension | null
   objective: string
   strategy: CosUniversityStudyStrategy
   repeatedCount?: number
 }): KnowledgeGapSignal {
   const language = COS_PLATFORM_LANGUAGES.find(item => item.id === input.language)
   if (!language) throw new Error(`Unknown platform language: ${input.language}`)
-  const dimensionLabel = LANGUAGE_DIMENSION_LABELS[input.dimension]
-  const studyThemes = LANGUAGE_DIMENSION_STUDY_THEMES[input.dimension]
+  const dimension = input.dimension || null
+  const dimensionLabel = dimension ? LANGUAGE_DIMENSION_LABELS[dimension] : null
+  const studyThemes = dimension ? LANGUAGE_DIMENSION_STUDY_THEMES[dimension] : []
   return {
     taskId: `university-language:${input.planKey}`,
-    subject: `${language.title} ${dimensionLabel}`,
-    capability: `cos_university.language.${language.id}.${input.dimension}`,
+    subject: dimensionLabel ? `${language.title} ${dimensionLabel}` : `${language.title} language and communication`,
+    capability: dimension ? `cos_university.language.${language.id}.${dimension}` : `cos_university.language.${language.id}`,
     objective: input.objective,
     confidence: 0,
     escalated: true,
     succeeded: false,
-    missingFacts: studyThemes.map(theme => `${language.title} ${theme}`),
+    ...(dimension ? { missingFacts: studyThemes.map(theme => `${language.title} ${theme}`) } : {}),
     repeatedCount: Math.max(1, Math.floor(Number(input.repeatedCount || 1))),
     evidence: [
       'cos_university_continuous_learning',
       `platform_language=${language.id}`,
-      `language_dimension=${input.dimension}`,
+      ...(dimension
+        ? [`language_dimension=${dimension}`]
+        : ['language_dimensions=comprehension,writing,instruction_following,translation_localization,cultural_pragmatics']),
       ...input.strategy.methods.map(item => `study_method=${item.id}:${item.execution}`),
     ],
     sourceKinds: input.strategy.acquisitionSourceKinds,

@@ -4,6 +4,7 @@
 // no persistence, no login/private access, no automatic changes.
 
 import { NextResponse } from 'next/server'
+import { PUBLIC_BRAND } from '@/lib/public-brand'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -150,7 +151,7 @@ export async function POST(req: Request) {
       signal: controller.signal,
       cache: 'no-store',
       headers: {
-        'user-agent': 'Mozilla/5.0 (compatible; SignalBoostSiteOptimizer/1.0; +https://saas.signalboostapp.com/website-optimizer)',
+        'user-agent': `Mozilla/5.0 (compatible; ${PUBLIC_BRAND.name}SiteOptimizer/1.0; +${PUBLIC_BRAND.siteUrl}/website-optimizer)`,
         accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'accept-language': 'en-US,en;q=0.9',
       },

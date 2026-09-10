@@ -1,6 +1,26 @@
--- Host-controlled COS University PhD methodology-exam execution ledger.
--- Stores seeded exam identity, scoring/provenance metadata, and durable outcome only.
--- Raw prompts, hidden rubrics, and candidate replies are deliberately not stored here.
+-- Host-controlled COS University PhD methodology examination storage.
+-- Production rubric values are deliberately NOT seeded in source control. They are installed through
+-- the protected host database after deployment and are readable by the runtime service role only.
+
+create table if not exists public.cos_university_phd_methodology_exam_rubrics (
+  rubric_id text primary key check (length(btrim(rubric_id)) > 0),
+  profile text not null check (profile = 'cos_university_phd_methodology_v1'),
+  scorer_version text not null check (scorer_version = 'phd-methodology-host-scorer-v2'),
+  rubric_json jsonb not null check (jsonb_typeof(rubric_json) = 'object'),
+  active boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create unique index if not exists cos_university_phd_methodology_one_active_rubric_idx
+  on public.cos_university_phd_methodology_exam_rubrics (profile, scorer_version)
+  where active;
+
+alter table public.cos_university_phd_methodology_exam_rubrics enable row level security;
+revoke all on table public.cos_university_phd_methodology_exam_rubrics from anon, authenticated, service_role;
+grant select on table public.cos_university_phd_methodology_exam_rubrics to service_role;
+
+comment on table public.cos_university_phd_methodology_exam_rubrics is
+  'Host-private PhD methodology certification rubric. Values are provisioned outside source control; application runtime has SELECT only.';
 
 create table if not exists public.cos_university_phd_methodology_exam_runs (
   id uuid primary key default gen_random_uuid(),
@@ -16,7 +36,9 @@ create table if not exists public.cos_university_phd_methodology_exam_runs (
   candidate_actor_id text not null check (length(btrim(candidate_actor_id)) > 0),
   evaluator_actor_id text not null check (length(btrim(evaluator_actor_id)) > 0),
   profile text not null check (profile = 'cos_university_phd_methodology_v1'),
-  scorer_version text not null check (scorer_version = 'phd-methodology-host-scorer-v1'),
+  scorer_version text not null check (scorer_version = 'phd-methodology-host-scorer-v2'),
+  rubric_id text not null references public.cos_university_phd_methodology_exam_rubrics(rubric_id) on update restrict on delete restrict,
+  rubric_hash text not null check (length(rubric_hash) = 64),
   seed text not null check (length(btrim(seed)) > 0),
   manifest_hash text not null check (length(btrim(manifest_hash)) > 0),
   variant_hash text not null check (length(btrim(variant_hash)) > 0),
@@ -55,4 +77,4 @@ revoke all on table public.cos_university_phd_methodology_exam_runs from anon, a
 grant select, insert, update on table public.cos_university_phd_methodology_exam_runs to service_role;
 
 comment on table public.cos_university_phd_methodology_exam_runs is
-  'Service-only host-seeded PhD methodology exam runs. Stores no raw prompt, hidden rubric, candidate reply, or degree flag.';
+  'Service-only host-seeded PhD methodology exam runs. Stores rubric identity/hash but no rubric values, raw prompt, candidate reply, or degree flag.';

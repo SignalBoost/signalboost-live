@@ -80,10 +80,18 @@ function copyAttribution(
   if (!validText(value?.id, 256)) throw new Error('security_attribution_id_invalid')
   if (!validText(value?.hypothesis, 2048)) throw new Error('security_attribution_hypothesis_invalid')
   if (!Number.isFinite(value?.confidence) || value.confidence < 0 || value.confidence > 1) throw new Error('security_attribution_confidence_invalid')
-  if (!Array.isArray(value.basisObservationIds) || value.basisObservationIds.some(id => !observationIds.has(id))) {
+  if (
+    !Array.isArray(value.basisObservationIds)
+    || value.basisObservationIds.length === 0
+    || value.basisObservationIds.some(id => !observationIds.has(id))
+  ) {
     throw new Error('security_attribution_basis_invalid')
   }
-  if (!Array.isArray(value.alternatives) || value.alternatives.some(item => !validText(item, 1024))) {
+  if (
+    !Array.isArray(value.alternatives)
+    || value.alternatives.length === 0
+    || value.alternatives.some(item => !validText(item, 1024))
+  ) {
     throw new Error('security_attribution_alternatives_invalid')
   }
   return Object.freeze({

@@ -11,6 +11,7 @@ import { nativeRemediationClass } from './remediation-experience.ts'
 import { recordCouncilOutcomesFromRepairDispatch, type CouncilOutcomeBridgeSummary } from './council-outcome-bridge.ts'
 import { SELF_HEALING_GATEWAY_POLICY } from './self-healing-gateway-policy.ts'
 import { nativeIncidentToNormalized as normalizeNativeIncident } from './native-incident-normalization.ts'
+import { enqueueOwnedSiteOptimizationRepair, isOwnedSiteOptimizationIncident } from './owned-site-autonomous-repair.ts'
 import { createSignalBoostGatewayHost } from '@/agent-gateway-host/signalboost-host'
 import { dispatchRepairPlan, type RepairStep } from '@/agent-gateway-host/supervisor-repair'
 import { resolveSupervisorRepairParams, summarizeRepairDispatch } from '@/agent-gateway-host/supervisor-actions'
@@ -50,6 +51,40 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
     const normalized = nativeIncidentToNormalized(incident, evidence)
     const diagnostic = await diagnoseIncident(normalized)
     const repairPlan = Array.isArray(diagnostic.repair_plan) ? diagnostic.repair_plan as RepairStep[] : []
+
+    // The Website Optimizer's public/customer contract remains report-only. An incident from the
+    // separately allowlisted owned-site collector is different: it is first-party production
+    // evidence and is pre-authorized to enter the existing Platform Engineer repair pipeline.
+    // Builder still reproduces the finding before editing, opens a PR, runs CI, and uses the existing
+    // auto-merge/deployment-verification controls. No arbitrary URL or customer scan reaches here.
+    if (isOwnedSiteOptimizationIncident(incident)) {
+      try {
+        const repair = await enqueueOwnedSiteOptimizationRepair(incident, diagnostic.diagnosis)
+        const action = repair.disposition === 'queued'
+          ? `Autonomous owned-site repair job ${repair.jobId} was queued for Platform Engineer execution.`
+          : repair.disposition === 'already_active'
+            ? `Owned-site repair job ${repair.jobId} is already active; duplicate execution was suppressed.`
+            : `Owned-site repair job ${repair.jobId} already completed recently for this deployment/finding set; duplicate execution is temporarily suppressed while production is re-observed.`
+        results.push({
+          incidentId: incident.incidentId,
+          diagnosisConfidence: diagnostic.confidence_score,
+          diagnosis: diagnostic.diagnosis,
+          repairSteps: repairPlan.length || 1,
+          outcome: 'staged',
+          message: action,
+        })
+      } catch (error) {
+        results.push({
+          incidentId: incident.incidentId,
+          diagnosisConfidence: diagnostic.confidence_score,
+          diagnosis: diagnostic.diagnosis,
+          repairSteps: repairPlan.length || 1,
+          outcome: 'unavailable',
+          message: error instanceof Error ? error.message : 'owned-site autonomous repair failed',
+        })
+      }
+      continue
+    }
 
     if (!repairPlan.length) {
       results.push({ incidentId: incident.incidentId, diagnosisConfidence: diagnostic.confidence_score, diagnosis: diagnostic.diagnosis, repairSteps: 0, outcome: 'no_action', message: diagnostic.escalation_reason || 'COS diagnosed the incident and proposed no safe repair.' })

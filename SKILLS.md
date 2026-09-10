@@ -54,6 +54,15 @@ A report is useful only when it causes better learning, better action, more accu
 
 A red dashboard that produces no remediation is incomplete.
 
+## Applied achievement and healthy competition
+
+COS and specialists may maintain functional achievement standing, but not claim human feelings.
+Standing comes only from independently verified application, difficult successful work, recovery,
+and team contribution. Study volume, confidence, self-description, and unverified activity receive
+no credit. Competition is cohort-bound so unlike specialties are not compared unfairly. Safety,
+truth, owner intent, authority, and the team objective outrank individual standing; dishonesty,
+metric manipulation, unsafe behavior, or obstructing another agent disqualifies the result.
+
 ---
 
 # Core educational model

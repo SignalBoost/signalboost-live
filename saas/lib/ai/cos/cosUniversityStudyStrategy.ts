@@ -10,6 +10,7 @@ import {
 import {
   COS_PLATFORM_LANGUAGES,
   type CosPlatformLanguage,
+  type CosPlatformLanguageDimension,
   type CosPlatformLanguageTranscriptEntry,
 } from './cosUniversityLanguages.ts'
 
@@ -74,6 +75,55 @@ const LIVE_SOURCE_KINDS: ContinuousLearningSourceKind[] = [
   'public_dataset',
   'approved_public_web',
 ]
+
+// These are public study/retrieval themes, not hidden exam rubric content. A failed language
+// dimension must remain explicit through acquisition so broad language material cannot silently
+// satisfy a focused weakness such as writing or localization.
+const LANGUAGE_DIMENSION_STUDY_THEMES: Record<CosPlatformLanguageDimension, string[]> = {
+  comprehension: [
+    'reading comprehension and semantic interpretation',
+    'discourse and context comprehension',
+    'ambiguity resolution in language comprehension',
+    'register and nuance comprehension',
+    'evidence-based reading comprehension methods',
+  ],
+  writing: [
+    'written composition and sentence construction',
+    'grammar syntax and punctuation in writing',
+    'coherence organization and paragraph structure',
+    'register tone and audience-aware writing',
+    'editing revision and error correction',
+  ],
+  instruction_following: [
+    'instruction parsing and intent comprehension',
+    'constraint satisfaction in written instructions',
+    'multi-step instruction execution',
+    'format and requirement compliance',
+    'ambiguity handling in instructions',
+  ],
+  translation_localization: [
+    'meaning preservation in translation',
+    'translation accuracy and equivalence',
+    'localization conventions and locale adaptation',
+    'idiom register and culturally appropriate translation',
+    'locale-specific terminology and style',
+  ],
+  cultural_pragmatics: [
+    'pragmatic meaning in communication',
+    'politeness register and social context',
+    'cultural context in language use',
+    'speech acts implicature and conversational norms',
+    'context-sensitive cross-cultural communication',
+  ],
+}
+
+const LANGUAGE_DIMENSION_LABELS: Record<CosPlatformLanguageDimension, string> = {
+  comprehension: 'comprehension',
+  writing: 'writing',
+  instruction_following: 'instruction following',
+  translation_localization: 'translation and localization',
+  cultural_pragmatics: 'cultural pragmatics',
+}
 
 // The generic reference adapter is useful for ordinary learning but currently resolves Wikipedia.
 // University academic study may use the governed credible_web adapter in the same source-kind bucket,
@@ -309,25 +359,29 @@ export function universityStudyGapSignal(input: {
 export function platformLanguageStudyGapSignal(input: {
   planKey: string
   language: CosPlatformLanguage
+  dimension: CosPlatformLanguageDimension
   objective: string
   strategy: CosUniversityStudyStrategy
   repeatedCount?: number
 }): KnowledgeGapSignal {
   const language = COS_PLATFORM_LANGUAGES.find(item => item.id === input.language)
   if (!language) throw new Error(`Unknown platform language: ${input.language}`)
+  const dimensionLabel = LANGUAGE_DIMENSION_LABELS[input.dimension]
+  const studyThemes = LANGUAGE_DIMENSION_STUDY_THEMES[input.dimension]
   return {
     taskId: `university-language:${input.planKey}`,
-    subject: `${language.title} language and communication`,
-    capability: `cos_university.language.${language.id}`,
+    subject: `${language.title} ${dimensionLabel}`,
+    capability: `cos_university.language.${language.id}.${input.dimension}`,
     objective: input.objective,
     confidence: 0,
     escalated: true,
     succeeded: false,
+    missingFacts: studyThemes.map(theme => `${language.title} ${theme}`),
     repeatedCount: Math.max(1, Math.floor(Number(input.repeatedCount || 1))),
     evidence: [
       'cos_university_continuous_learning',
       `platform_language=${language.id}`,
-      'language_dimensions=comprehension,writing,instruction_following,translation_localization,cultural_pragmatics',
+      `language_dimension=${input.dimension}`,
       ...input.strategy.methods.map(item => `study_method=${item.id}:${item.execution}`),
     ],
     sourceKinds: input.strategy.acquisitionSourceKinds,

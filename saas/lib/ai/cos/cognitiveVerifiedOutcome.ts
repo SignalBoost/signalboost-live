@@ -3,6 +3,14 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { classifyProblemClass, knownProblemClasses } from '@/lib/ai/cos/cosProblemClass'
 import { FOUNDATIONAL_KNOWLEDGE_DOMAINS } from '@/lib/cos-core/layers/learning/foundational'
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
+import {
+  recordCosUniversityRealWorldOutcome,
+  type CosUniversityRealWorldOutcomeResult,
+} from '@/lib/ai/cos/cosUniversityRealWorldOutcome'
+import {
+  universityEvidenceFromVerifiedOutcome,
+  type CosUniversityOutcomeEvidenceEnvelope,
+} from '@/lib/ai/cos/cosUniversityOutcomeCorrelation'
 
 export const COS_VERIFIED_OUTCOME_DOMAINS = [
   'self_healing',
@@ -30,6 +38,7 @@ export type CosVerifiedProductionOutcomeInput = {
   correlation?: { kind: string; value: string } | null
   idempotencyKey?: string | null
   occurredAt?: string
+  universityEvidence?: CosUniversityOutcomeEvidenceEnvelope | null
 }
 
 export type CosVerifiedProductionOutcomeDecision = {
@@ -196,10 +205,15 @@ async function attachCorrelatedTurnOutcome(
  */
 export async function recordVerifiedCosProductionOutcome(
   input: CosVerifiedProductionOutcomeInput,
-): Promise<{ stored: boolean; inserted: boolean; decision: CosVerifiedProductionOutcomeDecision }> {
+): Promise<{
+  stored: boolean
+  inserted: boolean
+  decision: CosVerifiedProductionOutcomeDecision
+  universityOutcome: CosUniversityRealWorldOutcomeResult | null
+}> {
   const decision = decideVerifiedCosProductionOutcome(input)
   const db = cosServiceDb()
-  if (!db) return { stored: false, inserted: false, decision }
+  if (!db) return { stored: false, inserted: false, decision, universityOutcome: null }
 
   const occurredAt = normalizedOccurredAt(input.occurredAt)
   const insert = await db.from('cos_cognitive_experiences').insert({
@@ -224,5 +238,9 @@ export async function recordVerifiedCosProductionOutcome(
   }
 
   await attachCorrelatedTurnOutcome(input, decision, occurredAt)
-  return { stored: true, inserted, decision }
+  const universityInput = universityEvidenceFromVerifiedOutcome(input.universityEvidence, decision)
+  const universityOutcome = universityInput
+    ? await recordCosUniversityRealWorldOutcome({ ...universityInput, observedAt: new Date(occurredAt) })
+    : null
+  return { stored: true, inserted, decision, universityOutcome }
 }

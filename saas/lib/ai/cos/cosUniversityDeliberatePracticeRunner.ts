@@ -107,20 +107,20 @@ function hasDeliberatePractice(methods: unknown): boolean {
   })
 }
 
-function practiceFenceMetadata(requiredPlanId?: string | null, requiredPracticeRound?: number | null): Record<string, unknown> {
+function practiceFenceMetadata(agentId: string, requiredPlanId?: string | null, requiredPracticeRound?: number | null): Record<string, unknown> {
   const planId = clean(requiredPlanId, 80)
   const round = Number(requiredPracticeRound)
   return planId && Number.isFinite(round) && round >= 1
-    ? { origin: ORIGIN, universityPlanId: planId, practiceRound: Math.floor(round) }
-    : { origin: ORIGIN }
+    ? { origin: ORIGIN, agentId, universityPlanId: planId, practiceRound: Math.floor(round) }
+    : { origin: ORIGIN, agentId }
 }
 
-async function practiceFenceStillValid(planId: string, practiceRound: number, now = new Date()): Promise<boolean> {
+async function practiceFenceStillValid(agentId: string, planId: string, practiceRound: number, now = new Date()): Promise<boolean> {
   const db = cosServiceDb()
   if (!db) return false
   const result = await db.from('cos_university_study_plans')
     .select('id,status,attempt_count,last_attempt_at,evidence,methods')
-    .eq('agent_id', 'cos')
+    .eq('agent_id', agentId)
     .eq('id', planId)
     .maybeSingle()
   if (result.error || !result.data) return false
@@ -138,7 +138,7 @@ async function practiceFenceStillValid(planId: string, practiceRound: number, no
   })
 }
 
-async function recoverStalePractice(requiredPlanId?: string | null, requiredPracticeRound?: number | null): Promise<number> {
+async function recoverStalePractice(agentId: string, requiredPlanId?: string | null, requiredPracticeRound?: number | null): Promise<number> {
   const db = cosServiceDb()
   if (!db) return 0
   const cutoff = new Date(Date.now() - STALE_RUNNING_AFTER_MS).toISOString()
@@ -152,7 +152,7 @@ async function recoverStalePractice(requiredPlanId?: string | null, requiredPrac
   })
     .eq('status', 'running')
     .eq('generation_source', 'curated')
-    .contains('metadata', practiceFenceMetadata(requiredPlanId, requiredPracticeRound))
+    .contains('metadata', practiceFenceMetadata(agentId, requiredPlanId, requiredPracticeRound))
     .lt('started_at', cutoff)
     .select('id')
   if (result.error) throw result.error
@@ -160,6 +160,7 @@ async function recoverStalePractice(requiredPlanId?: string | null, requiredPrac
 }
 
 async function loadStudyPlans(
+  agentId: string,
   limit: number,
   requiredPlanId?: string | null,
   requiredPracticeRound?: number | null,
@@ -170,7 +171,7 @@ async function loadStudyPlans(
   if (requiredId) {
     const result = await db.from('cos_university_study_plans')
       .select('id,plan_key,subject_id,language_code,language_dimension,failure_class,objective,methods,evidence,priority,status,attempt_count,last_attempt_at')
-      .eq('agent_id', 'cos')
+      .eq('agent_id', agentId)
       .eq('id', requiredId)
       .eq('status', 'studying')
       .maybeSingle()
@@ -179,13 +180,13 @@ async function loadStudyPlans(
     const plan = result.data as CosUniversityPracticePlanRow
     const requiredRound = Number(requiredPracticeRound)
     if (!Number.isFinite(requiredRound) || Math.max(1, Math.floor(Number(plan.attempt_count || 1))) !== Math.floor(requiredRound)) return []
-    if (!(await practiceFenceStillValid(plan.id, Math.floor(requiredRound)))) return []
+    if (!(await practiceFenceStillValid(agentId, plan.id, Math.floor(requiredRound)))) return []
     return [plan]
   }
 
   const result = await db.from('cos_university_study_plans')
     .select('id,plan_key,subject_id,language_code,language_dimension,failure_class,objective,methods,evidence,priority,status,attempt_count,last_attempt_at')
-    .eq('agent_id', 'cos')
+    .eq('agent_id', agentId)
     .eq('status', 'studying')
     .gt('attempt_count', 0)
     .order('priority', { ascending: false })
@@ -198,7 +199,7 @@ async function loadStudyPlans(
   const valid: CosUniversityPracticePlanRow[] = []
   for (const plan of candidates) {
     const round = Math.max(1, Math.floor(Number(plan.attempt_count || 1)))
-    if (await practiceFenceStillValid(plan.id, round)) valid.push(plan)
+    if (await practiceFenceStillValid(agentId, plan.id, round)) valid.push(plan)
   }
   return valid
 }
@@ -229,7 +230,7 @@ function universityProcedure(plan: CosUniversityPracticePlanRow): Record<string,
   }
 }
 
-async function ensurePracticeSkill(plan: CosUniversityPracticePlanRow): Promise<string> {
+async function ensurePracticeSkill(agentId: string, plan: CosUniversityPracticePlanRow): Promise<string> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const skillKey = cosUniversityPracticeSkillKey(plan.plan_key)
@@ -250,12 +251,14 @@ async function ensurePracticeSkill(plan: CosUniversityPracticePlanRow): Promise<
     encounter_count: 1,
     provenance: {
       origin: ORIGIN,
+      agentId,
       universityPlanId: plan.id,
       universityPlanKey: plan.plan_key,
       studyAttempt: plan.attempt_count,
     },
     metadata: {
       origin: ORIGIN,
+      agentId,
       universityPlanId: plan.id,
       universityPlanKey: plan.plan_key,
       academicCredit: false,
@@ -268,10 +271,10 @@ async function ensurePracticeSkill(plan: CosUniversityPracticePlanRow): Promise<
   return skillKey
 }
 
-async function queuePracticeRound(plan: CosUniversityPracticePlanRow): Promise<number> {
+async function queuePracticeRound(agentId: string, plan: CosUniversityPracticePlanRow): Promise<number> {
   const db = cosServiceDb()
   if (!db) return 0
-  const skillKey = await ensurePracticeSkill(plan)
+  const skillKey = await ensurePracticeSkill(agentId, plan)
   const variants = buildCosUniversityDeliberatePracticeVariants({
     planKey: plan.plan_key,
     subjectId: plan.subject_id,
@@ -295,6 +298,7 @@ async function queuePracticeRound(plan: CosUniversityPracticePlanRow): Promise<n
       status: 'queued',
       metadata: {
         origin: ORIGIN,
+        agentId,
         profile: COS_UNIVERSITY_PRACTICE_PROFILE,
         academicCredit: false,
         universityPlanId: plan.id,
@@ -328,14 +332,14 @@ async function discardClaimedPractice(item: PracticeQueueRow, reason: string): P
   if (result.error) throw result.error
 }
 
-async function claimPractice(requiredPlanId?: string | null, requiredPracticeRound?: number | null): Promise<PracticeQueueRow | null> {
+async function claimPractice(agentId: string, requiredPlanId?: string | null, requiredPracticeRound?: number | null): Promise<PracticeQueueRow | null> {
   const db = cosServiceDb()
   if (!db) return null
   const result = await db.from('cos_active_practice_queue')
     .select('id,skill_key,variant_key,prompt,rubric,status,attempt_count,max_attempts,metadata,created_at')
     .eq('status', 'queued')
     .eq('generation_source', 'curated')
-    .contains('metadata', practiceFenceMetadata(requiredPlanId, requiredPracticeRound))
+    .contains('metadata', practiceFenceMetadata(agentId, requiredPlanId, requiredPracticeRound))
     .lte('next_attempt_at', new Date().toISOString())
     .order('created_at', { ascending: true })
     .limit(1)
@@ -355,7 +359,7 @@ async function claimPractice(requiredPlanId?: string | null, requiredPracticeRou
   const metadata = asRecord(item.metadata)
   const planId = clean(metadata.universityPlanId, 80)
   const round = Number(metadata.practiceRound)
-  if (!planId || !Number.isFinite(round) || !(await practiceFenceStillValid(planId, Math.floor(round)))) {
+  if (!planId || !Number.isFinite(round) || !(await practiceFenceStillValid(agentId, planId, Math.floor(round)))) {
     await discardClaimedPractice(item, 'university_practice_claim_fence_failed')
     return null
   }
@@ -437,7 +441,7 @@ async function reconcilePlan(planId: string, practiceRound: number): Promise<boo
   return ready && Boolean(update.data?.id)
 }
 
-async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPracticeRun> {
+async function executePractice(agentId: string, item: PracticeQueueRow): Promise<CosUniversityPracticeRun> {
   const metadata = asRecord(item.metadata)
   const planId = clean(metadata.universityPlanId, 80) || null
   const planKey = clean(metadata.universityPlanKey, 160) || null
@@ -450,7 +454,7 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
     variantKey: item.variant_key,
   }
 
-  if (!planId || !practiceRound || !(await practiceFenceStillValid(planId, practiceRound))) {
+  if (!planId || !practiceRound || !(await practiceFenceStillValid(agentId, planId, practiceRound))) {
     await discardClaimedPractice(item, 'university_practice_execution_fence_failed')
     return { ...base, status: 'blocked', passed: null, score: null, coverage: null, turnId: null, reasons: ['practice_study_proof_or_remediation_fence_failed'] }
   }
@@ -480,7 +484,7 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
 
   const reply = parsed.answer
   const turnId = execution.turnId
-  if (!(await practiceFenceStillValid(planId, practiceRound))) {
+  if (!(await practiceFenceStillValid(agentId, planId, practiceRound))) {
     await discardClaimedPractice(item, 'university_practice_post_inference_fence_failed')
     return { ...base, status: 'blocked', passed: null, score: null, coverage: null, turnId, reasons: ['practice_round_advanced_during_inference'] }
   }
@@ -558,7 +562,7 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
     }
   }
 
-  if (!(await practiceFenceStillValid(planId, practiceRound))) {
+  if (!(await practiceFenceStillValid(agentId, planId, practiceRound))) {
     return { ...base, status: 'blocked', passed: null, score: null, coverage: null, turnId, reasons: ['practice_round_advanced_before_reconciliation'] }
   }
 
@@ -574,6 +578,7 @@ async function executePractice(item: PracticeQueueRow): Promise<CosUniversityPra
 }
 
 export async function runCosUniversityDeliberatePractice(options: {
+  agentId?: string
   maxPlans?: number
   maxExercises?: number
   requiredPlanId?: string | null
@@ -614,18 +619,23 @@ export async function runCosUniversityDeliberatePractice(options: {
   }
 
   const maxPlans = positiveInt(options.maxPlans, DEFAULT_MAX_PLANS, 8)
+  const agentId = clean(options.agentId || 'cos', 180)
+  if (!/^[A-Za-z0-9._-]{1,180}$/.test(agentId)) {
+    summary.errors.push('valid_agent_id_required')
+    return summary
+  }
   const maxExercises = positiveInt(options.maxExercises, DEFAULT_MAX_EXERCISES, 3)
   const requiredPlanId = clean(options.requiredPlanId, 80) || null
   const requiredPracticeRound = Number.isFinite(Number(options.requiredPracticeRound))
     ? Math.max(1, Math.floor(Number(options.requiredPracticeRound)))
     : null
   try {
-    summary.recovered = await recoverStalePractice(requiredPlanId, requiredPracticeRound)
-    const plans = await loadStudyPlans(maxPlans, requiredPlanId, requiredPracticeRound)
+    summary.recovered = await recoverStalePractice(agentId, requiredPlanId, requiredPracticeRound)
+    const plans = await loadStudyPlans(agentId, maxPlans, requiredPlanId, requiredPracticeRound)
     summary.plansConsidered = plans.length
     for (const plan of plans) {
       try {
-        summary.variantsQueued += await queuePracticeRound(plan)
+        summary.variantsQueued += await queuePracticeRound(agentId, plan)
         summary.plansPrepared += 1
       } catch (error) {
         summary.errors.push(`prepare:${plan.id}:${error instanceof Error ? error.message : String(error)}`)
@@ -635,9 +645,9 @@ export async function runCosUniversityDeliberatePractice(options: {
     if (!summary.plansPrepared) return summary
     await ensureLocalInferenceRuntimeReady()
     for (let index = 0; index < maxExercises; index += 1) {
-      const item = await claimPractice(requiredPlanId, requiredPracticeRound)
+      const item = await claimPractice(agentId, requiredPlanId, requiredPracticeRound)
       if (!item) break
-      const run = await executePractice(item)
+      const run = await executePractice(agentId, item)
       summary.runs.push(run)
       summary.exercisesAttempted += 1
       if (run.status === 'passed') summary.passed += 1

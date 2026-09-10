@@ -30,3 +30,13 @@ test('autonomous registered-agent cycle executes study and remediation work dire
   assert.match(cycle, /nextAction === 'study' \|\| nextAction === 'remediate'/)
   assert.match(cycle, /runCosUniversityContinuousLearning\(\{ now, agentId: agent\.agentId, maxStudyPlans: 4 \}\)/)
 })
+
+test('deliberate practice preserves agent identity through proof, queue, and execution', () => {
+  const runner = read('../lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts')
+  const cycle = read('../lib/ai/cos/cosUniversityAutonomousAgentCycle.ts')
+  assert.match(runner, /agentId\?: string/)
+  assert.match(runner, /\.eq\('agent_id', agentId\)/)
+  assert.match(runner, /\{ origin: ORIGIN, agentId, universityPlanId:/)
+  assert.match(runner, /practiceFenceStillValid\(agentId, planId, practiceRound\)/)
+  assert.match(cycle, /runCosUniversityDeliberatePractice\(\{ agentId: agent\.agentId, maxPlans: 1, maxExercises: 2 \}\)/)
+})

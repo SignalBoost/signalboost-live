@@ -109,7 +109,7 @@ test('University practice requires current host accepted-study proof before queu
   assert.match(runner, /practiceRemediation/)
   assert.match(runner, /university_practice_claim_fence_failed/)
   assert.match(runner, /university_practice_execution_fence_failed/)
-  assert.match(runner, /contains\('metadata', practiceFenceMetadata\(requiredPlanId, requiredPracticeRound\)\)/)
+  assert.match(runner, /contains\('metadata', practiceFenceMetadata\(agentId, requiredPlanId, requiredPracticeRound\)\)/)
 })
 
 test('Master’s accepted learning emits the same durable study proof before deliberate practice', () => {

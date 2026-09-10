@@ -1,5 +1,6 @@
 import { recoverMergedApprovedRemediation } from '@/lib/audit/approvedRunMergedRecovery'
 import { recoverTransientPartialAuditWrites } from '@/lib/audit/approvedRunPartialRecovery'
+import { maybeRecoverOwnedAuditWithRepositoryEvidence } from '@/lib/audit/ownedAuditRepositoryRecovery'
 import { recordApprovedRemediationHeartbeat } from '@/lib/audit/remediationHeartbeat'
 import {
   runApprovedAuditRemediationSystem,
@@ -28,6 +29,13 @@ function transientReason(value: string): boolean {
 export function isTransientApprovedRemediationFailure(result: ApprovedRunSystemResult): boolean {
   if (result.ok) return false
   return result.skipped.some(item => transientReason(item.reason)) || transientReason(result.autoMergeError)
+}
+
+function failureReason(result: ApprovedRunSystemResult): string {
+  return [
+    result.autoMergeError,
+    ...result.skipped.map(item => `${item.file}: ${item.reason}`),
+  ].filter(Boolean).join(' | ').slice(0, 4000)
 }
 
 function restoreSafetySkips(
@@ -70,11 +78,35 @@ async function withWorkerHeartbeat(params: {
   return { ...result, activityHeartbeatAt }
 }
 
+async function repositoryAwareRecovery(params: {
+  admin: any
+  runId: string
+  actorUserId: string
+}, failure?: ApprovedRunSystemResult): Promise<HeartbeatResult | null> {
+  try {
+    const recovered = await maybeRecoverOwnedAuditWithRepositoryEvidence({
+      ...params,
+      ...(failure ? { failureReason: failureReason(failure) || 'The narrow Audit remediation failed.' } : {}),
+    })
+    return recovered ? withWorkerHeartbeat(params, recovered) : null
+  } catch (error) {
+    console.error('owned audit repository-aware recovery failed', error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
 export async function runApprovedAuditRemediationWithRetry(params: {
   admin: any
   runId: string
   actorUserId: string
 }): Promise<HeartbeatResult> {
+  // Model-written security and logic findings frequently depend on imported helpers,
+  // cookie/database policy, or deployment configuration. For the canonical owned
+  // repository, verify those with the repository-aware Platform Engineer before a
+  // single-file repair model is allowed to mutate production code.
+  const evidenceRecovery = await repositoryAwareRecovery(params)
+  if (evidenceRecovery) return evidenceRecovery
+
   let last: ApprovedRunSystemResult | null = null
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -85,6 +117,10 @@ export async function runApprovedAuditRemediationWithRetry(params: {
     if (merged) {
       last = merged
       if (merged.ok || !isTransientApprovedRemediationFailure(merged)) {
+        if (!merged.ok) {
+          const escalated = await repositoryAwareRecovery(params, merged)
+          if (escalated) return escalated
+        }
         return withWorkerHeartbeat(params, merged)
       }
       continue
@@ -111,9 +147,15 @@ export async function runApprovedAuditRemediationWithRetry(params: {
     }
 
     if (last.ok || !isTransientApprovedRemediationFailure(last)) {
+      if (!last.ok) {
+        const escalated = await repositoryAwareRecovery(params, last)
+        if (escalated) return escalated
+      }
       return withWorkerHeartbeat(params, last)
     }
   }
 
-  return withWorkerHeartbeat(params, last as ApprovedRunSystemResult)
+  const final = last as ApprovedRunSystemResult
+  const escalated = await repositoryAwareRecovery(params, final)
+  return escalated || withWorkerHeartbeat(params, final)
 }

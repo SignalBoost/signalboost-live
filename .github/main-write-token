@@ -1,2 +1,2 @@
-base_sha=2761bbbd0c974c38f689d361022cc61d339d067c
-branch=fix/cos-motivation-evidence
+base_sha=1fe7f80ee11eaf431b96f75e94d8e0b13422c6e3
+branch=fix/audit-repository-aware-self-healing-20260910

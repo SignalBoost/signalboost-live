@@ -1,4 +1,4 @@
-// saas/app/api/support/route.ts
+// saas/app/api/support/routeCore.ts
 import Anthropic from '@anthropic-ai/sdk'
 import { portableBrandName } from '@/lib/portable/companyIdentity'
 import { NextRequest, NextResponse } from 'next/server'
@@ -218,7 +218,7 @@ GROWTH PLAN WORKFLOW (analysis → proposal → owner approval → execution):
 
    OUTREACH MESSAGE — write the message body for each draft exactly like this:
    • GREET THE COMPANY, never a person. Use "Hi {Company} team," — do NOT invent or guess a first name. A personal name may appear ONLY if the owner explicitly gave you a real contact; otherwise greet the team.
-   • ONE offer and ONE call to action, and it MUST match the link: the only CTA is the free instant site audit at https://saas.signalboostapp.com/website-optimizer (no signup). Lead with that audit as the value to THEM. Never bundle two asks ("run the audit" AND "let's explore") — one ask only.
+   • ONE offer and ONE call to action, and it MUST match the link: the only CTA is the free instant site audit at https://itmounts.com/website-optimizer (no signup). Lead with that audit as the value to THEM. Never bundle two asks ("run the audit" AND "let's explore") — one ask only.
    • Do NOT pitch "we build websites / branded assets" to agencies — they already do that for clients, so it makes us their competitor. Frame SignalBoost as a tool that helps THEIR work (the audit surfaces issues on their or their clients' sites). Match the angle to who they actually are.
    • Keep it short (3-5 sentences), about them not us, specific where you can. Never promise guaranteed results.
    • Do NOT add a signature, sign-off, mailing address, or unsubscribe line yourself — the system appends a compliant footer (real signer, physical address, opt-out) automatically; adding your own duplicates it. End the body at the CTA.

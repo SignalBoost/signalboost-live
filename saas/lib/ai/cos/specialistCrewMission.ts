@@ -1,12 +1,12 @@
 import {
   runCOSMissionGraph,
   type COSMissionGraphResult,
-} from '@/lib/cos-core/orchestration'
+} from '../../cos-core/orchestration/index.ts'
 import {
   consultSpecialistCrew,
   type SpecialistCrewMissionInput,
   type SpecialistCrewMissionResult,
-} from './specialistCrewClient'
+} from './specialistCrewClient.ts'
 
 export type COSSpecialistCrewPlan = Readonly<{
   objective: string

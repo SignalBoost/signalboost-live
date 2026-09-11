@@ -94,11 +94,20 @@ test('Platform Engineer normalizes model run commands and forces exact failed te
   const broadAt = repair.indexOf('/^npm\\s+(?:run\\s+)?test', targetedAt)
   const exactNodeAt = repair.indexOf('node --experimental-strip-types --test', targetedAt)
   const runnerAt = repair.indexOf('const repositoryRunner: BuilderRunnerPort', exactNodeAt)
-  const normalizeAt = repair.indexOf('command: targetedRepositoryCommand(runInput.command, target)', runnerAt)
+  const normalizeAt = repair.indexOf('const command = targetedRepositoryCommand(runInput.command, target)', runnerAt)
   const loopAt = repair.indexOf('repositoryRunner,', normalizeAt)
   assert.ok(importAt >= 0 && targetedAt > importAt && broadAt > targetedAt && exactNodeAt > broadAt)
   assert.ok(runnerAt > exactNodeAt && normalizeAt > runnerAt && loopAt > normalizeAt)
   assert.match(repair.slice(runnerAt, loopAt + 32), /session!\.run/)
+  assert.match(repair, /builder_repository_broad_test_blocked/)
+  assert.match(repair, /complete repository suite runs later in PR CI/)
+})
+
+test('repository exit 137 is resource exhaustion rather than defect reproduction', () => {
+  const session = readFileSync(new URL('../lib/builder/vercel-repository-repair-session.ts', import.meta.url), 'utf8')
+  assert.match(session, /result\.exitCode === 137/)
+  assert.match(session, /exit 137 is not defect-reproduction evidence/)
+  assert.match(session, /timedOut: resourceExhausted/)
 })
 
 test('browser repository repair is owned only by the shared Software Specialist and passive logs cannot exercise owner authority', () => {

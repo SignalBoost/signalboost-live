@@ -46,10 +46,6 @@ async function processWebhookBacklog(input: {
     try {
       const evidence = await input.db.from('security_repository_patrol_evidence')
         .select('evidence_entry').eq('delivery_id', deliveryId).maybeSingle()
-      if (evidence.error || !evidence.data?.evidence_entry) {
-        summary.push({ workItemId: item.workItemId, outcome: 'deferred', reason: 'patrol_evidence_unavailable' })
-        continue
-      }
       lease = await input.coordinationStore.acquireLease({
         workItemId: item.workItemId,
         ownerInstanceId: input.instanceId,
@@ -58,6 +54,15 @@ async function processWebhookBacklog(input: {
       })
       const owner = ownershipIdentity(lease)
       await input.coordinationStore.transitionWorkItem({ workItemId: item.workItemId, from: 'leased', to: 'processing', owner })
+      if (evidence.error) throw new Error('patrol_evidence_lookup_failed')
+      if (!evidence.data?.evidence_entry) {
+        const deliveryUpdated = await input.db.from('github_webhook_deliveries')
+          .update({ status: 'completed' }).eq('delivery_id', deliveryId)
+        if (deliveryUpdated.error) throw new Error('guardian_delivery_completion_failed')
+        await input.coordinationStore.transitionWorkItem({ workItemId: item.workItemId, from: 'processing', to: 'completed', owner })
+        summary.push({ workItemId: item.workItemId, outcome: 'completed', reason: 'no_patrol_observation_required' })
+        continue
+      }
       const materialized = materializeGuardianRepositoryObservation({
         organizationId: item.organizationId || '',
         workItemId: item.workItemId,
@@ -87,8 +92,10 @@ async function processWebhookBacklog(input: {
         schema_version: 'supervisor-audit-event-v1',
       })
       if (audited.error && !String(audited.error.code || '').includes('23505')) throw new Error('guardian_audit_persist_failed')
+      const deliveryUpdated = await input.db.from('github_webhook_deliveries')
+        .update({ status: 'completed' }).eq('delivery_id', deliveryId)
+      if (deliveryUpdated.error) throw new Error('guardian_delivery_completion_failed')
       await input.coordinationStore.transitionWorkItem({ workItemId: item.workItemId, from: 'processing', to: 'completed', owner })
-      await input.db.from('github_webhook_deliveries').update({ status: 'completed' }).eq('delivery_id', deliveryId)
       summary.push({ workItemId: item.workItemId, outcome: 'completed', alertCreated })
     } catch (error: any) {
       if (lease) {

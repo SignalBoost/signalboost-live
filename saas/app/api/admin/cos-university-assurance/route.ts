@@ -27,7 +27,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'host_claim_not_permitted' }, { status: 400 })
   }
   try {
-    const result = await recordFineTuneHostApproval({ candidateId: String(body?.candidateId || ''), subjectId: body?.subjectId ? String(body.subjectId) : null, claim, evidenceRef: String(body?.evidenceRef || '') })
+    const result = await recordFineTuneHostApproval({
+      candidateId: String(body?.candidateId || ''), subjectId: body?.subjectId ? String(body.subjectId) : null,
+      claim, evidenceRef: String(body?.evidenceRef || ''),
+      revision: {
+        baseModel: String(body?.baseModel || ''), datasetHash: String(body?.datasetHash || ''),
+        trainingManifestHash: String(body?.trainingManifestHash || ''), holdoutManifestHash: String(body?.holdoutManifestHash || ''),
+      },
+    })
     return NextResponse.json(result, { status: result.ok ? 200 : 400, headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { status: 500 })

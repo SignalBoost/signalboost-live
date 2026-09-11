@@ -20,6 +20,8 @@ export const FINE_TUNE_CLAIM_VERIFIER: Readonly<Record<FineTuneClaim, string>> =
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const validHash = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
+export type FineTuneRevision = Readonly<{ baseModel: string; datasetHash: string; trainingManifestHash: string; holdoutManifestHash: string }>
+export const fineTuneRevisionKey = (revision: FineTuneRevision) => hash(revision)
 
 async function serviceDb() {
   const mod = await import('@/lib/cos-core/storage/supabase')
@@ -28,16 +30,17 @@ async function serviceDb() {
 
 /** The owner may approve inputs/execution only. Results require separate authoritative producers. */
 export async function recordFineTuneHostApproval(input: {
-  candidateId: string; subjectId?: string | null; claim: FineTuneHostClaim; evidenceRef: string
+  candidateId: string; subjectId?: string | null; claim: FineTuneHostClaim; evidenceRef: string; revision: FineTuneRevision
 }) {
   const candidateId = String(input.candidateId || '').trim()
   const evidenceRef = String(input.evidenceRef || '').trim()
   if (!candidateId) return { ok: false as const, problems: ['candidate_id_missing'] }
   if (!['dataset_approved', 'training_approved'].includes(input.claim)) return { ok: false as const, problems: ['host_claim_not_permitted'] }
   if (!evidenceRef) return { ok: false as const, problems: ['evidence_ref_missing'] }
+  if (!input.revision.baseModel.trim() || !validHash(input.revision.datasetHash) || !validHash(input.revision.trainingManifestHash) || !validHash(input.revision.holdoutManifestHash)) return { ok: false as const, problems: ['candidate_revision_invalid'] }
   const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const evidence = { profile: FINE_TUNE_EVIDENCE_PROFILE, claim: input.claim, candidateId, evidenceRef }
+  const evidence = { profile: FINE_TUNE_EVIDENCE_PROFILE, claim: input.claim, candidateId, evidenceRef, revisionKey: fineTuneRevisionKey(input.revision) }
   const evidenceHash = hash(evidence)
   const eventKey = hash([FINE_TUNE_EVIDENCE_PROFILE, candidateId, input.claim, evidenceHash])
   const result = await db.from('cos_university_learning_assurance_events').upsert({
@@ -56,12 +59,13 @@ export type RecordedFineTuneEvidence = Readonly<{
 
 const EMPTY: RecordedFineTuneEvidence = Object.freeze({ claims: Object.freeze([]), trainedArtifactId: '', rollbackArtifactRef: null, baselineScore: 0, trainedArtifactScore: 0 })
 
-export function foldFineTuneEvidenceRows(rows: readonly any[]): RecordedFineTuneEvidence {
+export function foldFineTuneEvidenceRows(rows: readonly any[], expectedRevisionKey?: string): RecordedFineTuneEvidence {
   const claims = new Set<FineTuneClaim>(); let trainedArtifactId = ''; let rollbackArtifactRef: string | null = null
   let baselineScore = 0; let trainedArtifactScore = 0
   for (const row of [...rows].sort((a, b) => String(a?.observed_at || '').localeCompare(String(b?.observed_at || '')))) {
     const evidence = row?.evidence; const claim = evidence?.claim as FineTuneClaim
     if (evidence?.profile !== FINE_TUNE_EVIDENCE_PROFILE || !FINE_TUNE_CLAIMS.includes(claim)) continue
+    if (expectedRevisionKey && evidence.revisionKey !== expectedRevisionKey) continue
     if (row?.verifier !== FINE_TUNE_CLAIM_VERIFIER[claim] || !String(evidence.evidenceRef || '').trim()) continue
     if (claim === 'trained_artifact_registered' && (!String(evidence.trainedArtifactId || '').trim() || !validHash(evidence.artifactHash))) continue
     if (claim === 'rollback_artifact_registered' && !String(evidence.rollbackArtifactRef || '').trim()) continue
@@ -74,13 +78,13 @@ export function foldFineTuneEvidenceRows(rows: readonly any[]): RecordedFineTune
   return Object.freeze({ claims: Object.freeze([...claims]), trainedArtifactId, rollbackArtifactRef, baselineScore, trainedArtifactScore })
 }
 
-export async function readFineTuneEvidence(candidateId: string): Promise<RecordedFineTuneEvidence> {
+export async function readFineTuneEvidence(candidateId: string, revision: FineTuneRevision): Promise<RecordedFineTuneEvidence> {
   if (!String(candidateId || '').trim()) return EMPTY
   const db = await serviceDb(); if (!db) throw new Error('service_database_unavailable')
   const rows = await db.from('cos_university_learning_assurance_events').select('evidence,verifier,observed_at')
     .eq('event_type', 'fine_tune').eq('candidate_id', candidateId).order('observed_at', { ascending: true }).limit(200)
   if (rows.error) throw rows.error
-  return foldFineTuneEvidenceRows(rows.data || [])
+  return foldFineTuneEvidenceRows(rows.data || [], fineTuneRevisionKey(revision))
 }
 
 export function buildFineTuneEvidenceInput(base: { baseModel: string; datasetHash: string; trainingManifestHash: string; holdoutManifestHash: string }, recorded: RecordedFineTuneEvidence): FineTuneEvidence {

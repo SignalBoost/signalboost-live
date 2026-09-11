@@ -1,12 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildFineTuneEvidenceInput, FINE_TUNE_CLAIM_VERIFIER, FINE_TUNE_EVIDENCE_PROFILE, foldFineTuneEvidenceRows } from '../lib/ai/cos/cosUniversityFineTuneEvidence.ts'
+import { buildFineTuneEvidenceInput, FINE_TUNE_CLAIM_VERIFIER, FINE_TUNE_EVIDENCE_PROFILE, fineTuneRevisionKey, foldFineTuneEvidenceRows } from '../lib/ai/cos/cosUniversityFineTuneEvidence.ts'
 import { decideControlledFineTune } from '../lib/ai/cos/cosUniversityLearningAssurance.ts'
 
 const H = 'a'.repeat(64)
 const base = { baseModel: 'base', datasetHash: H, trainingManifestHash: 'b'.repeat(64), holdoutManifestHash: 'c'.repeat(64) }
-const row = (claim: keyof typeof FINE_TUNE_CLAIM_VERIFIER, evidence: Record<string, unknown> = {}, verifier = FINE_TUNE_CLAIM_VERIFIER[claim]) => ({ evidence: { profile: FINE_TUNE_EVIDENCE_PROFILE, claim, evidenceRef: `proof:${claim}`, ...evidence }, verifier, observed_at: '2026-09-11T00:00:00Z' })
+const revisionKey = fineTuneRevisionKey(base)
+const row = (claim: keyof typeof FINE_TUNE_CLAIM_VERIFIER, evidence: Record<string, unknown> = {}, verifier = FINE_TUNE_CLAIM_VERIFIER[claim]) => ({ evidence: { profile: FINE_TUNE_EVIDENCE_PROFILE, claim, evidenceRef: `proof:${claim}`, revisionKey, ...evidence }, verifier, observed_at: '2026-09-11T00:00:00Z' })
 
 test('absent evidence remains fully blocked', () => {
   const decision = decideControlledFineTune(buildFineTuneEvidenceInput(base, foldFineTuneEvidenceRows([])))
@@ -27,6 +28,11 @@ test('wrong-verifier and evidence-free claims are ignored', () => {
   assert.deepEqual(folded.claims, [])
 })
 
+test('evidence from another candidate revision cannot authorize this revision', () => {
+  const stale = { ...row('dataset_approved'), evidence: { ...row('dataset_approved').evidence, revisionKey: 'stale' } }
+  assert.deepEqual(foldFineTuneEvidenceRows([stale], revisionKey).claims, [])
+})
+
 test('artifact and evaluation claims require concrete hashes and references', () => {
   const folded = foldFineTuneEvidenceRows([
     row('trained_artifact_registered', { trainedArtifactId: 'model-1', artifactHash: H }),
@@ -44,6 +50,11 @@ test('owner HTTP route cannot manufacture independent, canary, artifact, or roll
 
 test('runner reads durable evidence instead of hard-coded passing values', () => {
   const runner = readFileSync('lib/ai/cos/cosUniversityControlledFineTuning.ts', 'utf8')
-  assert.match(runner, /readFineTuneEvidence\(candidateId\)/)
+  assert.match(runner, /readFineTuneEvidence\(candidateId, revision\)/)
   assert.doesNotMatch(runner, /datasetApprovedByHost:\s*true/)
+})
+
+test('database admits the training executor verifier', () => {
+  const migration = readFileSync('supabase/migrations/20260911022000_cos_university_training_executor_verifier.sql', 'utf8')
+  assert.match(migration, /training_executor/)
 })

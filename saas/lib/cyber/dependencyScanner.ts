@@ -25,6 +25,7 @@ export interface DependencyAdvisory {
   aliases: string[]
   fixedVersions?: string[]
   affectedRanges?: string[]
+  detailStatus?: 'available' | 'unavailable'
 }
 
 export interface DependencyScanReport {
@@ -148,90 +149,115 @@ async function collectPackages(target: RepoTarget, maxPackages: number, onProgre
   return { ok: true, branch: target.branch, packages: Array.from(out.values()).slice(0, maxPackages) }
 }
 
-function severityFromVuln(v: any): CyberSeverity {
-  const sev = String(v?.database_specific?.severity || v?.severity?.[0]?.score || '').toLowerCase()
-  if (sev.includes('critical') || sev.startsWith('9') || sev.startsWith('10')) return 'critical'
-  if (sev.includes('high') || /^[78]/.test(sev)) return 'high'
-  if (sev.includes('medium') || /^[456]/.test(sev)) return 'medium'
-  if (sev.includes('low') || /^[123]/.test(sev)) return 'low'
-  return 'unknown'
+// OSV querybatch returns IDs/modified only. Detail records are fetched separately,
+// once per ID, with bounded concurrency and a shared deadline. No external URL
+// or browser-supplied advisory is allowed to provide preparation authority.
+function severityFromVuln(v: any, affected: any[]): CyberSeverity {
+  const levels: Record<string, CyberSeverity> = { critical: 'critical', high: 'high', moderate: 'medium', medium: 'medium', low: 'low' }
+  const candidates = [v?.database_specific?.severity, ...affected.map(a => a?.ecosystem_specific?.severity)]
+  const rank: Record<CyberSeverity, number> = { critical: 4, high: 3, medium: 2, low: 1, unknown: 0 }
+  let found: CyberSeverity = 'unknown'
+  for (const value of candidates) {
+    const severity = typeof value === 'string' ? levels[value.trim().toLowerCase()] : undefined
+    if (severity && rank[severity] > rank[found]) found = severity
+  }
+  // OSV severity[].score is a CVSS vector, not a decimal or a severity label.
+  // Unsupported scoring methods remain unknown; never infer a score from prose.
+  return found
 }
 
-function unique(values: string[]): string[] {
-  return Array.from(new Set(values.map(v => String(v || '').trim()).filter(Boolean)))
-}
+function unique(values: string[]): string[] { return [...new Set(values)] }
 
-function fixedVersionsFromVuln(v: any): string[] {
-  const fixed: string[] = []
-  const affected = Array.isArray(v?.affected) ? v.affected : []
-  for (const a of affected) {
-    const ranges = Array.isArray(a?.ranges) ? a.ranges : []
-    for (const r of ranges) {
-      const events = Array.isArray(r?.events) ? r.events : []
-      for (const e of events) {
-        const version = cleanVersion(e?.fixed)
-        if (version) fixed.push(version)
+function normalizeAdvisory(id: string, pkg: DependencyPackage, detail: any): DependencyAdvisory {
+  const affected = Array.isArray(detail?.affected) ? detail.affected.filter((a: any) =>
+    a?.package?.ecosystem === pkg.ecosystem && a?.package?.name === pkg.name) : []
+  const valid = detail?.id === id && affected.length > 0 && !detail.withdrawn
+  const fallback = `https://osv.dev/vulnerability/${encodeURIComponent(id)}`
+  if (!valid) return { id, packageName: pkg.name, version: pkg.version, sourceFile: pkg.sourceFile,
+    severity: 'unknown', summary: 'Advisory details unavailable or not verified for this package. Severity and patched versions are unconfirmed.',
+    detailsUrl: fallback, aliases: [], fixedVersions: [], affectedRanges: [], detailStatus: 'unavailable' }
+  const fixedVersions: string[] = []
+  const affectedRanges: string[] = []
+  for (const a of affected) for (const range of (Array.isArray(a.ranges) ? a.ranges : [])) {
+    if (!['SEMVER', 'ECOSYSTEM'].includes(range?.type)) continue
+    const pieces: string[] = []
+    for (const event of (Array.isArray(range.events) ? range.events : [])) {
+      if (typeof event?.fixed === 'string' && EXACT_VERSION.test(event.fixed)) fixedVersions.push(event.fixed)
+      for (const key of ['introduced', 'fixed', 'last_affected', 'limit']) {
+        if (typeof event?.[key] === 'string') pieces.push(`${key.replace('_', ' ')} ${event[key]}`)
       }
     }
+    if (pieces.length) affectedRanges.push(pieces.join(' → '))
   }
-  return unique(fixed)
-}
-
-function affectedRangesFromVuln(v: any): string[] {
-  const rangesOut: string[] = []
-  const affected = Array.isArray(v?.affected) ? v.affected : []
-  for (const a of affected) {
-    const ranges = Array.isArray(a?.ranges) ? a.ranges : []
-    for (const r of ranges) {
-      const events = Array.isArray(r?.events) ? r.events : []
-      const pieces: string[] = []
-      for (const e of events) {
-        if (e?.introduced !== undefined) pieces.push(`introduced ${String(e.introduced)}`)
-        if (e?.fixed !== undefined) pieces.push(`fixed ${String(e.fixed)}`)
-        if (e?.last_affected !== undefined) pieces.push(`last affected ${String(e.last_affected)}`)
-        if (e?.limit !== undefined) pieces.push(`limit ${String(e.limit)}`)
-      }
-      if (pieces.length) rangesOut.push(pieces.join(' → '))
-    }
+  const references = Array.isArray(detail.references) ? detail.references : []
+  const safe = (value: unknown): value is string => {
+    if (typeof value !== 'string') return false
+    try { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password } catch { return false }
   }
-  return unique(rangesOut).slice(0, 12)
+  const reference = references.find((r: any) => r?.type === 'ADVISORY' && safe(r.url))
+    || references.find((r: any) => safe(r?.url))
+  const description = [detail.summary, detail.details].find(v => typeof v === 'string' && v.trim())
+  return { id, packageName: pkg.name, version: pkg.version, sourceFile: pkg.sourceFile,
+    severity: severityFromVuln(detail, affected), summary: description ? description.trim().slice(0, 500) : 'The advisory source did not provide a description.',
+    detailsUrl: reference?.url || fallback,
+    aliases: Array.isArray(detail.aliases) ? detail.aliases.filter((v: unknown): v is string => typeof v === 'string').slice(0, 50) : [],
+    fixedVersions: unique(fixedVersions), affectedRanges: unique(affectedRanges).slice(0, 12), detailStatus: 'available' }
 }
 
 async function queryOsv(packages: DependencyPackage[]): Promise<DependencyAdvisory[]> {
   if (packages.length === 0) return []
-  const queries = packages.map(p => ({ package: { ecosystem: 'npm', name: p.name }, version: p.version }))
-  const res = await fetch('https://api.osv.dev/v1/querybatch', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ queries }),
-    cache: 'no-store',
-  })
-  if (!res.ok) throw new Error(`OSV request failed HTTP ${res.status}`)
-  const json = await res.json()
-  const results = Array.isArray(json?.results) ? json.results : []
-  const advisories: DependencyAdvisory[] = []
-
-  results.forEach((r: any, idx: number) => {
-    const pkg = packages[idx]
-    const vulns = Array.isArray(r?.vulns) ? r.vulns : []
-    for (const v of vulns) {
-      const fixedVersions = fixedVersionsFromVuln(v)
-      advisories.push({
-        id: String(v?.id || 'unknown'),
-        packageName: pkg.name,
-        version: pkg.version,
-        sourceFile: pkg.sourceFile,
-        severity: severityFromVuln(v),
-        summary: String(v?.summary || v?.details || 'Dependency advisory found.').slice(0, 500),
-        detailsUrl: Array.isArray(v?.references) && v.references[0]?.url ? String(v.references[0].url) : undefined,
-        aliases: Array.isArray(v?.aliases) ? v.aliases.map((a: any) => String(a)) : [],
-        fixedVersions,
-        affectedRanges: affectedRangesFromVuln(v),
-      })
+  const deadline = Date.now() + 45_000
+  async function request(url: string, init: RequestInit = {}): Promise<any> {
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) throw new Error('OSV lookup deadline exceeded')
+    const res = await fetch(url, { ...init, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(Math.min(10_000, remaining)) })
+    if (!res.ok) throw new Error(`OSV request failed HTTP ${res.status}`)
+    return res.json()
+  }
+  const hits = packages.map(() => new Set<string>())
+  let pending = packages.map((pkg, index) => ({ index, query: { package: { ecosystem: pkg.ecosystem, name: pkg.name }, version: pkg.version, page_token: undefined as string | undefined } }))
+  const tokens = new Set<string>()
+  for (let page = 0; pending.length; page++) {
+    if (page >= 5) throw new Error('OSV pagination limit reached; scan coverage is incomplete')
+    const json = await request('https://api.osv.dev/v1/querybatch', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ queries: pending.map(p => p.query) }),
+    })
+    if (!Array.isArray(json?.results) || json.results.length !== pending.length)
+      throw new Error('OSV batch response is incomplete')
+    const next: typeof pending = []
+    for (let i = 0; i < pending.length; i++) {
+      const r = json.results[i]
+      if (!r || typeof r !== 'object' || Array.isArray(r) || (r.vulns !== undefined && !Array.isArray(r.vulns)))
+        throw new Error('OSV batch response is malformed')
+      for (const v of r.vulns || []) {
+        if (typeof v?.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(v.id))
+          throw new Error('OSV advisory identity is malformed')
+        hits[pending[i].index].add(v.id)
+        if (hits[pending[i].index].size > 500) throw new Error('OSV advisory limit reached; scan coverage is incomplete')
+      }
+      if (r.next_page_token) {
+        if (typeof r.next_page_token !== 'string' || r.next_page_token.length > 4096) throw new Error('OSV page token is malformed')
+        const key = `${pending[i].index}:${r.next_page_token}`
+        if (tokens.has(key)) throw new Error('OSV repeated a page token; scan coverage is incomplete')
+        tokens.add(key)
+        next.push({ index: pending[i].index, query: { ...pending[i].query, page_token: r.next_page_token } })
+      }
     }
-  })
-
-  return advisories
+    pending = next
+  }
+  const ids = unique(hits.flatMap(set => [...set]))
+  const details = new Map<string, any>()
+  // IDs beyond the detail budget remain visible as unknown; no finding is dropped.
+  const boundedIds = ids.slice(0, 250)
+  let cursor = 0
+  await Promise.all(Array.from({ length: Math.min(4, boundedIds.length) }, async () => {
+    while (cursor < boundedIds.length) {
+      const id = boundedIds[cursor++]
+      try { details.set(id, await request(`https://api.osv.dev/v1/vulns/${encodeURIComponent(id)}`)) }
+      catch { details.set(id, null) }
+    }
+  }))
+  return packages.flatMap((pkg, index) => [...hits[index]].map(id => normalizeAdvisory(id, pkg, details.get(id))))
 }
 
 function summarize(packages: DependencyPackage[], advisories: DependencyAdvisory[]): DependencyScanReport['summary'] {

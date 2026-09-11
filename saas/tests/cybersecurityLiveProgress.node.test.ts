@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readUiSource } from './helpers/sourceWithUiCopy.mjs'
 import './cyberRemediationAutonomy.node.test.ts'
+import './cyberAdvisoryDetails.node.test.ts'
+import './cyberLegacyPresentation.node.test.ts'
 
 // Re-run against the current main integration surface, including Press & Media host dependencies.
 const read = (path: string) => readUiSource(new URL(path, import.meta.url))

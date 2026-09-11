@@ -30,10 +30,12 @@ async function runPreparation(req: Request, remediationId?: string) {
   }
   const admin = getAdminSupabase()
   let query = admin.from('remediation_requests')
-    .select('id,user_id,source_area,source_type,source_id,repo,status,fix_plan_status,implementation_status')
+    .select('id,user_id,source_area,source_type,source_id,repo,status,fix_plan_status,implementation_status,human_approval_required,human_approved,fix_plan_approved')
     .eq('source_area', 'cybersecurity').eq('source_type', 'dependency_scan')
     .in('status', ['in_progress', 'approved', 'awaiting_human_review'])
     .eq('implementation_status', 'awaiting_github_pr_preparation')
+    // Filter before limit(1), so a gated legacy row cannot consume the worker slot.
+    .or('human_approval_required.eq.false,and(status.eq.approved,human_approved.eq.true,fix_plan_approved.eq.true,fix_plan_status.eq.approved_for_pr)')
   if (remediationId) query = query.eq('id', remediationId)
   if (!cron) query = query.eq('user_id', userId!)
   const loaded = await query.order('updated_at', { ascending: true }).limit(1).maybeSingle()
@@ -41,20 +43,35 @@ async function runPreparation(req: Request, remediationId?: string) {
   const row = loaded.data
   if (!row) return NextResponse.json({ ok: false, error: 'No queued dependency preparation was found.' }, { status: 409 })
 
+  const approvalFree = row.human_approval_required === false
+  const explicitlyApproved = row.status === 'approved' && row.human_approved === true
+    && row.fix_plan_approved === true && row.fix_plan_status === 'approved_for_pr'
+  if (!approvalFree && !explicitlyApproved) {
+    return NextResponse.json({ ok: false, error: 'Existing approval is still required.', approvalRequired: true }, { status: 409 })
+  }
+
   // Compare-and-set claim: concurrent invocations cannot both mutate the branch.
-  const claim = await admin.from('remediation_requests').update({
+  let claimQuery = admin.from('remediation_requests').update({
     status: 'in_progress', implementation_status: 'github_pr_preparing', updated_at: new Date().toISOString(),
   }).eq('id', row.id).eq('status', row.status).eq('implementation_status', 'awaiting_github_pr_preparation')
-    .select('id').maybeSingle()
+    .eq('user_id', row.user_id).eq('source_id', row.source_id)
+    .eq('source_area', 'cybersecurity').eq('source_type', 'dependency_scan').eq('repo', row.repo)
+  // Recheck the exact authorization lane atomically with the claim. A policy
+  // change or revoked vote after selection must not authorize repository work.
+  claimQuery = approvalFree
+    ? claimQuery.eq('human_approval_required', false)
+    : claimQuery.eq('human_approved', true).eq('fix_plan_approved', true).eq('fix_plan_status', 'approved_for_pr')
+  const claim = await claimQuery.select('id').maybeSingle()
   if (claim.error) return NextResponse.json({ ok: false, error: 'Could not claim preparation work.' }, { status: 500 })
   if (!claim.data) return NextResponse.json({ ok: false, error: 'Preparation state changed; no duplicate work was started.' }, { status: 409 })
 
   async function finish(status: string, notes: string, prUrl?: string) {
     const update = await admin.from('remediation_requests').update({
       implementation_status: status, implementation_notes: notes,
-      human_approval_required: false, ...(prUrl ? { pull_request_url: prUrl } : {}),
+      // Completion/failure is an execution result, never an approval-policy edit.
+      ...(prUrl ? { pull_request_url: prUrl } : {}),
       updated_at: new Date().toISOString(),
-    }).eq('id', row.id).eq('implementation_status', 'github_pr_preparing').select('id').maybeSingle()
+    }).eq('id', row.id).eq('status', 'in_progress').eq('implementation_status', 'github_pr_preparing').select('id').maybeSingle()
     return !update.error && !!update.data
   }
   async function blocked(reason: string, status = 'verification_blocked') {

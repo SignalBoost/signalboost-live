@@ -1,3 +1,4 @@
+import './cyberPreparationApprovalClaim.node.test.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -14,7 +15,7 @@ const routePath = path.join(root, 'app/api/hub/cyber/dependencies/route.ts')
 const user = 'owner-1'
 function fixture() {
   const report = { ok: true, repo: 'SignalBoost/signalboost-live', target: 'https://github.com/SignalBoost/signalboost-live', branch: 'main', generatedAt: new Date().toISOString(), advisories: [{ id: 'GHSA-example', packageName: 'example', version: '1.2.3', sourceFile: 'saas/package.json', severity: 'high', summary: 'Example', fixedVersions: ['1.2.4'] }], summary: { advisories: 1 } }
-  return { report, scan: { id: 'scan-1', user_id: user, report }, row: { id: 'request-1', user_id: user, source_area: 'cybersecurity', source_type: 'dependency_scan', source_id: 'scan-1', repo: report.repo, status: 'in_progress' } }
+  return { report, scan: { id: 'scan-1', user_id: user, report }, row: { id: 'request-1', user_id: user, source_area: 'cybersecurity', source_type: 'dependency_scan', source_id: 'scan-1', repo: report.repo, ...routineDependencyState() } }
 }
 function harness(options: { authorized?: boolean; scan?: any; row?: any; insertError?: boolean; claimLost?: boolean; writerFails?: boolean; manifest?: string; route?: string } = {}) {
   const writes: Array<{ table: string; value: any }> = []
@@ -26,6 +27,7 @@ function harness(options: { authorized?: boolean; scan?: any; row?: any; insertE
     let insertion: any
     const q: any = {
       select() { return q }, eq(k: string, v: unknown) { filters[k] = v; return q }, in() { return q },
+      or(value: string) { filters.or = value; return q },
       order() { return q }, limit() { return q },
       insert(value: any) { insertion = value; writes.push({ table, value }); return q },
       update(value: any) { insertion = value; writes.push({ table, value }); return q },
@@ -220,7 +222,7 @@ test('missing version evidence produces a visible verification blocker, not an a
   assert.equal(response.status, 409)
   assert.equal(h.proposals.length, 0)
   assert.equal(h.writes.at(-1)?.value.implementation_status, 'verification_blocked')
-  assert.equal(h.writes.at(-1)?.value.human_approval_required, false)
+  assert.equal(h.writes.some(w => 'human_approval_required' in w.value), false)
 })
 
 test('worker denies cross-user, Guardian, terminal, stale and changed-manifest proposal execution', async () => {

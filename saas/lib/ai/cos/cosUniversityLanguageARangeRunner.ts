@@ -8,6 +8,8 @@ import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseSt
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
+import { SOFTWARE_CAPSTONE_RUNTIME, type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
+import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { type CosUniversityAssessmentKind } from './cosUniversity.ts'
 import {
@@ -531,32 +533,65 @@ async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: D
   if (!claim.data) return { runId: row.id, ...target, status: row.status, passed: row.passed, assessmentRowsRecorded: 0, reasons: ['not_claimed'] }
 
   const started = Date.now()
-  beginEvidenceSourceUseTurn()
-  let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
-  try {
-    if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
-      await ensureLocalInferenceRuntimeReady()
-      await generateLocalEmbedding(exam.prompt)
-    }
-    result = await tryCOSFirstAnswer({ prompt: exam.prompt, language: row.language_code, privileged: true, disableCache: true })
-  } catch (error) {
-    flushCapturedEvidenceSourceUse()
-    const reasons = [`execution_error:${error instanceof Error ? error.message : String(error)}`]
-    await db.from('cos_university_a_range_runs').update({ status: 'error', reasons, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', row.id)
-    return { runId: row.id, ...target, status: 'error', passed: null, assessmentRowsRecorded: 0, reasons }
+  const failRun = async (reasons: string[]) => {
+    const at = new Date().toISOString()
+    await db.from('cos_university_a_range_runs').update({ status: 'error', reasons, completed_at: at, updated_at: at }).eq('id', row.id)
+    return { runId: row.id, ...target, status: 'error' as const, passed: null, assessmentRowsRecorded: 0, reasons }
   }
 
-  const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
-  const turnId = peekEvidenceSourceUseTurnId()
-  const provenance = {
-    localReasoning: result.provenance.localModelInvoked,
-    externalAi: result.provenance.externalAiInvoked,
-    semanticCache: result.provenance.responseSource === 'semantic_cache' || result.provenance.responseSource === 'semantic_similarity',
-    handled: result.handled,
-    turnId,
+  let reply = ''
+  let turnId: string | null = null
+  let responseSource: string | null = null
+  let localModelInvoked = false
+  let externalAiInvoked = false
+  let semanticCache = false
+  let handled = false
+  let executionProvenance: AgentCapstoneExecution | null = null
+
+  // A registered agent with its own bound executor answers as itself, in the exam language, through
+  // its assigned model. COS keeps its existing reasoner path unchanged.
+  if (agentId !== AGENT_ID) {
+    let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
+    try {
+      bound = await executeBoundAgentExam({ agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: exam.prompt })
+    } catch (error) {
+      return failRun([`execution_error:${error instanceof Error ? error.message : String(error)}`])
+    }
+    const execution = bound.execution
+    if (execution.agentId !== agentId || execution.runId !== row.id || execution.manifestHash !== exam.manifestHash) {
+      return failRun(['agent_execution_identity_mismatch'])
+    }
+    reply = bound.reply
+    turnId = execution.turnId
+    responseSource = SOFTWARE_CAPSTONE_RUNTIME
+    localModelInvoked = true
+    handled = true
+    executionProvenance = execution
+  } else {
+    beginEvidenceSourceUseTurn()
+    let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
+    try {
+      if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
+        await ensureLocalInferenceRuntimeReady()
+        await generateLocalEmbedding(exam.prompt)
+      }
+      result = await tryCOSFirstAnswer({ prompt: exam.prompt, language: row.language_code, privileged: true, disableCache: true })
+    } catch (error) {
+      flushCapturedEvidenceSourceUse()
+      return failRun([`execution_error:${error instanceof Error ? error.message : String(error)}`])
+    }
+    reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
+    turnId = peekEvidenceSourceUseTurnId()
+    responseSource = result.provenance.responseSource
+    localModelInvoked = Boolean(result.provenance.localModelInvoked)
+    externalAiInvoked = Boolean(result.provenance.externalAiInvoked)
+    semanticCache = responseSource === 'semantic_cache' || responseSource === 'semantic_similarity'
+    handled = result.handled
   }
+
+  const provenance = { localReasoning: localModelInvoked, externalAi: externalAiInvoked, semanticCache, handled, turnId }
   const score = scoreCosUniversityLanguageARangeExam(exam, reply, provenance)
-  const freshExecution = Boolean(result.handled && result.provenance.localModelInvoked && !result.provenance.externalAiInvoked && !provenance.semanticCache && turnId)
+  const freshExecution = Boolean(handled && localModelInvoked && !externalAiInvoked && !semanticCache && turnId)
   const passed = freshExecution ? score.passed : null
   const status = freshExecution ? (score.passed ? 'passed' : 'failed') : 'error'
   const reasons = freshExecution ? score.reasons : [...score.reasons, 'fresh_execution_required']
@@ -567,10 +602,11 @@ async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: D
     status,
     passed,
     turn_id: turnId || null,
-    response_source: result.provenance.responseSource,
-    local_model_invoked: Boolean(result.provenance.localModelInvoked),
-    external_ai_invoked: Boolean(result.provenance.externalAiInvoked),
+    response_source: responseSource,
+    local_model_invoked: localModelInvoked,
+    external_ai_invoked: externalAiInvoked,
     fresh_execution: freshExecution,
+    execution_provenance: executionProvenance,
     reasons,
     latency_ms: Date.now() - started,
     completed_at: completedAt,
@@ -582,7 +618,7 @@ async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: D
     await attachTurnOutcome(turnId, {
       verifiedSuccess: score.passed && freshExecution,
       repairNeeded: !score.passed || !freshExecution,
-      escalated: !result.handled,
+      escalated: !handled,
       source: `cos_university_language_a_range:${row.id}`,
     })
   }
@@ -614,7 +650,9 @@ export async function runCosUniversityLanguageARangeBatch(options: { now?: Date;
 
   // Agent-tagged verified Production language outcomes above are that agent's own real work and stay.
   // Transfer and capstone exams below answer through COS's reasoner, so they fail closed.
-  const blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  // COS uses its own reasoner; any other agent needs its own bound executor before it can be graded.
+  let blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  if (blocked && await hasBoundAcademicExecutor(agentId).catch(() => false)) blocked = null
   if (blocked) {
     return {
       enabled: true, blocked, productionCandidates, productionEvidenceRecorded, attempted: 0, passed: 0, failed: 0,

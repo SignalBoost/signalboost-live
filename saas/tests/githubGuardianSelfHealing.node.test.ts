@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createGuardianSelfHealingHandoff } from '../lib/security/github-guardian-self-healing.ts'
+import { createGuardianSelfHealingHandoff, guardianReviewRequest } from '../lib/security/github-guardian-self-healing.ts'
 
 const observation = {
   observed_at: '2026-09-11T12:20:00.000Z',
@@ -33,6 +33,11 @@ test('security-sensitive changes become review-gated Supervisor incidents withou
   assert.equal(handoff.plan.riskLevel, 'medium')
   assert.equal(handoff.policy.outcome, 'approval_required')
   assert.deepEqual(handoff.policy.approvedStepIds, [])
+  const review = guardianReviewRequest({ alertId: '4c9130e8-4049-42fd-8f37-c251927c0180', handoff })
+  assert.equal(review.source_type, 'guardian_repository_change')
+  assert.equal(review.status, 'awaiting_human_review')
+  assert.equal(review.fix_plan_status, 'review_only')
+  assert.equal((review.fix_plan as any).automaticRepairAuthorized, false)
 })
 
 test('Production worker durably records the policy handoff before completing work', () => {
@@ -42,4 +47,12 @@ test('Production worker durably records the policy handoff before completing wor
   assert.match(route, /guardian-self-healing-\$\{deliveryId\}-policy/)
   assert.match(route, /automaticRepairAuthorized: false/)
   assert.match(route, /guardian_self_healing_handoff_failed/)
+  assert.match(route, /guardian_review_persist_failed/)
+})
+
+test('owner review disposition cannot be converted into repair approval', () => {
+  const route = readFileSync(new URL('../app/api/hub/cyber/dependencies/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /source_type === 'guardian_repository_change'/)
+  assert.match(route, /guardian_review_does_not_authorize_repair/)
+  assert.match(route, /review_disposition_recorded/)
 })

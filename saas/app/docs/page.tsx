@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useI18n } from '@/components/i18n/I18nProvider'
 import { uiText } from '@/lib/i18n/uiText'
 import { PUBLIC_BRAND } from '@/lib/public-brand'
+import { SELF_HEALING_MONITOR_LINK } from '@/lib/outreach/adLandingPages'
 
 type Lang = 'en' | 'es' | 'pt' | 'pl' | 'ru'
 
@@ -72,11 +73,7 @@ const AD_LANDING_LINKS = [
     description: uiText('generatedUi.u_205886a4abbf9551'),
   },
   {
-    title: uiText('generatedUi.u_guardian_supervisor_monitor'),
-    href: '/dashboard/cybersecurity',
-    url: `${PUBLIC_BRAND.siteUrl}/dashboard/cybersecurity`,
-    badge: uiText('generatedUi.u_guardian_live_monitoring'),
-    description: uiText('generatedUi.u_guardian_monitor_description'),
+    ...SELF_HEALING_MONITOR_LINK,
   },
 ]
 

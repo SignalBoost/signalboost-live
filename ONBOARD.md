@@ -12,9 +12,10 @@
 ## Guardian to Self-Healing handoff — 2026-09-11
 
 Guardian repository alerts now enter the Self-Healing Supervisor as durable, evidence-linked
-incidents and receive a deterministic policy decision. A signed change to a security-sensitive path
-requires owner review but is not proof of a defect or compromise, so automatic repair and provider
-mutation remain unauthorized. Benign repository observations create no incident. This is
+incidents, receive a deterministic policy decision, and create an owner-visible durable review item.
+A signed change to a security-sensitive path requires review but is not proof of a defect or
+compromise, so the review cannot authorize automatic repair or provider mutation. Benign repository
+observations create no incident. This is
 implementation evidence until merged, deployed, and exercised by a new Production delivery.
 
 ## Durable repository-security incident cases — 2026-09-11

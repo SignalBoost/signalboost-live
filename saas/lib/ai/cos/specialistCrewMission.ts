@@ -17,7 +17,6 @@ export type COSSpecialistCrewPlan = Readonly<{
 }>
 
 export type COSSpecialistCrewMissionResult = COSMissionGraphResult<
-  SpecialistCrewMissionInput,
   COSSpecialistCrewPlan,
   SpecialistCrewMissionResult
 >

@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.115
+**Version:** 1.116
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -132,6 +132,13 @@ derives the provider account identity from the authenticated repository owner fo
 repositories, and persists generic delivery metadata using the columns that exist in the canonical
 Production ledger. These compatibility rules do not create patrol evidence for a ping; only an
 authorized patrol event may enter the append-only evidence chain.
+
+The Guardian repository observation worker now claims authenticated webhook work through the
+Supervisor's fenced lease protocol, materializes only the already-sanitized signed patrol evidence,
+and completes the generic delivery ledger. Benign changes become verified informational observations.
+Changes to security-sensitive repository paths create a bounded review alert that explicitly does
+not assert a vulnerability, compromise, intent, identity, or attribution. A five-minute Production
+cron reconciles queued deliveries without requiring the owner to run the tool manually.
 
 ## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
 

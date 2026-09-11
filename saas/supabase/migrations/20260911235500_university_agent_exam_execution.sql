@@ -3,17 +3,19 @@
 -- Legacy grades, credentials, RLS, grants and every academic gate are unchanged.
 -- The original exam ledger has no agent_id. Derive it from the host-owned run key,
 -- rather than defaulting every historical row to COS or trusting an independent label.
--- Only the recognized pre-multi-agent daily key format belongs to legacy COS.
+-- Recognize legacy COS keys first: their date segment is also a valid digit-leading agent ID.
+-- Explicit IDs match isSoftwareCapstoneIdentity; their scope matches the host run-key generator.
 ALTER TABLE public.cos_university_exam_runs
   ADD COLUMN IF NOT EXISTS agent_id text GENERATED ALWAYS AS (
     CASE
-      WHEN split_part(run_key, ':', 1) = profile
-        AND split_part(run_key, ':', 2) ~ '^[a-z][a-z0-9_-]*$'
-        AND split_part(run_key, ':', 3) <> ''
-        THEN split_part(run_key, ':', 2)
       WHEN profile = 'cos_university_unseen_v1'
         AND run_key ~ '^cos_university_unseen_v1:[0-9]{4}-[0-9]{2}-[0-9]{2}:(subject:[a-z_]+|language:(en|es|pt|pl|ru):[a-z_]+)$'
         THEN 'cos'
+      WHEN split_part(run_key, ':', 1) = profile
+        AND split_part(run_key, ':', 2) ~ '^[a-z0-9][a-z0-9_-]{0,179}$'
+        AND (split_part(run_key, ':', 3) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          OR split_part(run_key, ':', 3) = 'remediation')
+        THEN split_part(run_key, ':', 2)
       ELSE NULL
     END
   ) STORED;

@@ -31,3 +31,13 @@ Vercel Preview `dpl_CLyfYxPYF8CgiNvoXveBF3A4Bhay` failed on PR head `b94251a7bb0
 The exact failing language wiring assertion was reproduced locally against baseline blob `07763654b5689b01726a08b59dc1d4260afabfe0` (one failure), then passed unchanged against main's language runner blob `4ea47e7610f1a3ee92e8058937848c37d7a3a93f`. Both assembled source hashes were verified; the new source also passed Node TypeScript syntax checking. This is one focused source-contract test, not a full local checkout, end-to-end learner execution or database migration proof.
 
 The merge preserves current main's language implementation byte-for-byte, all existing test assertions, and this PR's original independent-exam schema repair. The integration token must name the reconciled main SHA. Current-head CI and Vercel Preview remain required before integration; no Production data or academic records were changed by this dependency repair.
+
+## Bound-agent identity parity — 2026-09-11
+
+Review `3993811674` identified a real schema defect: the initial generated-column predicate rejected digit-leading IDs that `isSoftwareCapstoneIdentity` accepts, including `2d-specialist`. The repaired expression uses the same 1–180-character identity grammar as that existing executor. It recognizes legacy COS keys first, preventing their date segment from becoming an agent ID. Explicit identities also require the existing generator's daily or remediation scope. No identity rule in the executor or registry is loosened.
+
+Six schema tests now include direct parity with the actual pure executor predicate, numeric prefixes, maximum length, legacy precedence and scope checks. Three fail against pre-review migration blob `6ceaed3f761a6d2f604db817274fb7dfb70e3e0c`; all six pass after repair. Together with the unchanged language wiring assertion, seven focused tests pass. The imported executor source was assembled and verified against blob `0b155b860b141a8e51ef2b6c29147a200a119c9b`.
+
+A read-only PostgreSQL check at 22:29:19.528131 UTC exercised 18 identity cases: the old expression passed 11, and the repaired expression passed all 18. Projecting both expressions over the 20 existing exam keys found zero changed owners and zero unrecognized owners. No rows were written. At 22:26:18.700835 UTC the independent-exam migration and both required columns were still absent; this repair has not applied them.
+
+These checks prove the corrected identity expression, not successful migration application or Specialist academic execution. Production application, exact-commit deployment and eligible runtime receipts remain separately required.

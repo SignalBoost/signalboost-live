@@ -7,6 +7,7 @@ import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/a
 import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { type CosUniversityAssessmentKind } from './cosUniversity.ts'
 import {
@@ -87,6 +88,8 @@ type ProductionOutcomeRow = {
 
 export type CosUniversityLanguageARangeBatchSummary = {
   enabled: boolean
+  /** Set when the agent has no bound executor; no exam was created, executed, or graded. */
+  blocked?: string
   productionCandidates: number
   productionEvidenceRecorded: number
   attempted: number
@@ -607,6 +610,17 @@ export async function runCosUniversityLanguageARangeBatch(options: { now?: Date;
     productionEvidenceRecorded = synced.recorded
   } catch (error) {
     errors.push(`production_bridge:${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  // Agent-tagged verified Production language outcomes above are that agent's own real work and stay.
+  // Transfer and capstone exams below answer through COS's reasoner, so they fail closed.
+  const blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  if (blocked) {
+    return {
+      enabled: true, blocked, productionCandidates, productionEvidenceRecorded, attempted: 0, passed: 0, failed: 0,
+      assessmentRowsWritten: productionEvidenceRecorded, runs: [], errors,
+      semantics: 'five_language_repeated_transfer_exact_production_integrated_capstone',
+    }
   }
 
   let assessments: AssessmentRow[] = []

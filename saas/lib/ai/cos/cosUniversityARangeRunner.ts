@@ -6,6 +6,7 @@ import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/a
 import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { COS_UNIVERSITY_SUBJECTS, classifyCosUniversitySubjects, type CosUniversitySubjectId } from './cosUniversity.ts'
 import {
@@ -75,6 +76,8 @@ type ProductionOutcomeRow = {
 
 export type CosUniversityARangeBatchSummary = {
   enabled: boolean
+  /** Set when the agent has no bound executor; no exam was created, executed, or graded. */
+  blocked?: string
   productionCandidates: number
   productionEvidenceRecorded: number
   attempted: number
@@ -459,6 +462,15 @@ export async function runCosUniversityARangeBatch(options: { now?: Date; agentId
       productionEvidenceRecorded = synced.recorded
     } catch (error) {
       errors.push(`production_bridge:${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  const blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  if (blocked) {
+    return {
+      enabled: true, blocked, productionCandidates, productionEvidenceRecorded, attempted: 0, passed: 0, failed: 0,
+      assessmentRowsWritten: productionEvidenceRecorded, runs: [], errors,
+      semantics: 'repeated_distinct_transfer_plus_exact_turn_production_plus_capstone',
     }
   }
 

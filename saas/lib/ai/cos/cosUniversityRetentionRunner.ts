@@ -3,6 +3,7 @@ import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
 import { buildCosUniversityARangeExam, COS_UNIVERSITY_A_RANGE_SCORER, scoreCosUniversityARangeExam, universityARangeValidUntil } from './cosUniversityARange.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { COS_UNIVERSITY_RETENTION_PROFILE, selectDueCosUniversityRetention, type CosUniversityRetentionSource } from './cosUniversityRetention.ts'
@@ -18,6 +19,8 @@ export async function runCosUniversityRetention(options: { now?: Date; agentId?:
   const now = options.now instanceof Date ? options.now : new Date()
   if (process.env.COS_UNIVERSITY_RETENTION_ENABLED !== 'true') return { enabled: false, agentId, attempted: 0 }
   if (!agentId) return { enabled: true, agentId, attempted: 0, errors: ['agent_id_required'] }
+  const blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  if (blocked) return { enabled: true, agentId, attempted: 0, status: 'blocked', blocked }
   const db = cosServiceDb()
   if (!db) return { enabled: true, agentId, attempted: 0, errors: ['service_database_unavailable'] }
 

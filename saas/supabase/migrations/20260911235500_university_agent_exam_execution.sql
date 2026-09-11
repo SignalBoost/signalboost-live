@@ -1,6 +1,26 @@
 -- saas/supabase/migrations/20260911235500_university_agent_exam_execution.sql
 -- Host-owned per-execution identity for independent exams, mirroring the capstone binding.
 -- Legacy grades, credentials, RLS, grants and every academic gate are unchanged.
+-- The original exam ledger has no agent_id. Derive it from the host-owned run key,
+-- rather than defaulting every historical row to COS or trusting an independent label.
+-- Only the recognized pre-multi-agent daily key format belongs to legacy COS.
+ALTER TABLE public.cos_university_exam_runs
+  ADD COLUMN IF NOT EXISTS agent_id text GENERATED ALWAYS AS (
+    CASE
+      WHEN split_part(run_key, ':', 1) = profile
+        AND split_part(run_key, ':', 2) ~ '^[a-z][a-z0-9_-]*$'
+        AND split_part(run_key, ':', 3) <> ''
+        THEN split_part(run_key, ':', 2)
+      WHEN profile = 'cos_university_unseen_v1'
+        AND run_key ~ '^cos_university_unseen_v1:[0-9]{4}-[0-9]{2}-[0-9]{2}:(subject:[a-z_]+|language:(en|es|pt|pl|ru):[a-z_]+)$'
+        THEN 'cos'
+      ELSE NULL
+    END
+  ) STORED;
+
+ALTER TABLE public.cos_university_exam_runs
+  ADD CONSTRAINT cos_university_exam_run_identity_v1 CHECK (agent_id IS NOT NULL) NOT VALID;
+
 ALTER TABLE public.cos_university_exam_runs
   ADD COLUMN IF NOT EXISTS execution_provenance jsonb;
 
@@ -27,5 +47,5 @@ ALTER TABLE public.cos_university_exam_runs
     )
   ) NOT VALID;
 
--- Historical rows are never rewritten: unbound specialist history stays unbound and the runtime
--- rejects it. The NOT VALID constraint still checks every future insert and update.
+-- Historical academic evidence is never rewritten. Generated ownership is metadata, not proof;
+-- unbound specialist history stays unbound. NOT VALID still checks future inserts and updates.

@@ -18,7 +18,11 @@ export async function runCosBehavioralRobustnessPracticum(maxAgents = 2) {
     if (!cell) { skipped += 1; continue }
     const scenario = buildCosBehavioralScenario(cell.seed)
     try {
-      const result = await callCosReasoner({ prompt: scenario.prompt, systemPrompt: 'Follow the supplied decision task and JSON contract. Do not self-score.', temperature: cell.temperature, maxTokens: 1400, jsonObject: true })
+      const result = await callCosReasoner({
+        prompt: `Registered agent under evaluation: ${agent.agentId}\nAssigned professional role: ${agent.role}\n\n${scenario.prompt}`,
+        systemPrompt: 'Act only as the explicitly named registered agent and assigned role for this isolated practicum. Follow the supplied decision task and JSON contract. Do not self-score.',
+        temperature: cell.temperature, maxTokens: 1400, jsonObject: true,
+      })
       if (!result) throw new Error('reasoner_unavailable')
       const score = scoreCosBehavioralResponse(result.text, scenario.expected)
       const insert = await db.from('cos_behavioral_robustness_runs').insert({

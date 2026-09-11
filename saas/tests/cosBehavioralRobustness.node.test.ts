@@ -31,4 +31,7 @@ test('production lane stays non-credit, append-only, secret-gated, and outside a
   assert.match(route, /authorization.*Bearer/)
   assert.match(config, /COS_BEHAVIORAL_ROBUSTNESS_ENABLED/)
   assert.doesNotMatch(route, /recordCosUniversityProductionPath/)
+  const runner = readFileSync('lib/ai/cos/cosBehavioralRobustnessRunner.ts', 'utf8')
+  assert.match(runner, /Registered agent under evaluation: \$\{agent\.agentId\}/)
+  assert.match(runner, /Assigned professional role: \$\{agent\.role\}/)
 })

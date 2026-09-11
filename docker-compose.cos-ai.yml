@@ -43,6 +43,16 @@ services:
     environment:
       COS_AI_ROLE: ethics
     ports: ["8107:8000"]
+  crew-coordinator:
+    <<: *cos-ai-service
+    environment:
+      COS_AI_ROLE: crew-coordinator
+      COS_CREWAI_BASE_URL: ${COS_CREWAI_BASE_URL:-}
+      COS_CREWAI_MODEL: ${COS_CREWAI_MODEL:-}
+      COS_CREWAI_API_KEY: ${COS_CREWAI_API_KEY:-local-private-runtime}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports: ["8108:8000"]
   prometheus:
     image: prom/prometheus:v2.55.1
     volumes:

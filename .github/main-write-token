@@ -1,2 +1,2 @@
-base_sha=53dd85b42e445f8f160683a9500da270c3e86a21
-branch=fix/concierge-provider-fail-fast
+base_sha=40118d483a0dedb6be910d6d17ec50ade46366b6
+branch=feat/guardian-self-healing-handoff-20260911

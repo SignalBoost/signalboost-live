@@ -69,11 +69,11 @@ export const KPI_DASHBOARD = { marketplace: ['Engagement +18%', 'Bookings +12%',
 export const EXECUTIVE_RECOMMENDATIONS = ['Launch a 7-day partner-notification campaign for high-intent marketplace categories.', 'Bundle Promote Business + Reviews for SaaS users with high outreach activity.', 'Schedule an admin review of medium churn-risk partners before the 30-day forecast window closes.']
 
 const localizedFallbacks: Record<SupportedLocale, string> = {
-  en: 'I can guide you across Marketplace partners, categories, bookings, and SaaS modules like Promote Business, Reviews, Calendar, Spreadsheets, and Outreach. Start by telling me your role and goal.',
-  es: 'Puedo orientarte sobre socios, categorías y reservas de Marketplace, además de los módulos SaaS como Promocionar negocio, Reseñas, Calendario, Hojas de cálculo y Outreach. Empieza por decirme cuál es tu función y qué quieres conseguir.',
-  pt: 'Posso orientar você sobre parceiros, categorias e reservas do Marketplace, além dos módulos SaaS, como Promover negócio, Avaliações, Calendário, Planilhas e Outreach. Comece dizendo qual é a sua função e o que você quer alcançar.',
-  pl: 'Mogę pomóc w sprawach dotyczących partnerów, kategorii i rezerwacji w Marketplace, a także modułów SaaS, takich jak Promocja firmy, Opinie, Kalendarz, Arkusze i Outreach. Na początek napisz, jaka jest Twoja rola i co chcesz osiągnąć.',
-  ru: 'Я могу помочь с партнёрами, категориями и бронированиями в Marketplace, а также с SaaS-модулями: продвижением бизнеса, отзывами, календарём, таблицами и Outreach. Для начала расскажите, какова ваша роль и чего вы хотите добиться.',
+  en: 'I could not complete that general request through the reasoning engine. Please try again.',
+  es: 'No pude completar esa solicitud general mediante el motor de razonamiento. Inténtalo de nuevo.',
+  pt: 'Não consegui concluir essa solicitação geral pelo mecanismo de raciocínio. Tente novamente.',
+  pl: 'Nie udało mi się obsłużyć tego ogólnego pytania przez silnik rozumowania. Spróbuj ponownie.',
+  ru: 'Мне не удалось обработать этот общий запрос через механизм рассуждения. Попробуйте ещё раз.',
 }
 
 const textByLocale: Record<SupportedLocale, {
@@ -151,7 +151,7 @@ export function classifyConciergeIntent(input: string, currentPage = '/'): Conci
   if (/export|render|download.*mp4|burn.*caption|ffmpeg|transcod|eksport|renderow|pobierz.*mp4|экспорт|рендер|скача.*mp4|exportar|renderizar|baixar.*mp4|descargar.*mp4/.test(text)) return 'video_export'
   if (/caption|subtitle|srt|vtt|overlay|drag.*text|napis|podpis|субтитр|legenda|subtítulo/.test(text)) return 'caption_overlay'
   if (/video|clip|canvas editor|timeline|film|wideo|klip|видео|ролик|vídeo/.test(text)) return 'video_edit'
-  if (/marketplace|partner|category|booking|rezerwac|kategor|партн|бронир|категор|socio|reserva|categoría|parceiro|categoria/.test(text)) return 'marketplace'
+  if (/marketplace|partner|category|booking|rezerwac|kategor|партн|бронир|категор|socio|reserva|categoría|parceiro|reserva|categoria/.test(text)) return 'marketplace'
   if (/review|calendar|spreadsheet|promote|saas|business|outreach|opini|kalendar|arkusz|promoc|отзыв|календар|таблиц|reseña|calendario|hoja|avaliaç|planilh/.test(text)) return 'saas'
   return 'support'
 }
@@ -200,7 +200,6 @@ export function getConciergeAnswer(input: string, locale?: string, currentPage =
     steps.push(...copy.saas)
   } else {
     steps.push(localizedFallbacks[lang])
-    steps.push(copy.onboarding)
   }
 
   return { role, language: lang, intent, pipeline: ['IntentClassifier','SubscriptionChecker','JobQueueController','StorageController','BillingHandler','ModelCaller','OutputValidator','Translator'], reply: steps.map((step, index) => `${index + 1}. ${step}`).join('\n') }

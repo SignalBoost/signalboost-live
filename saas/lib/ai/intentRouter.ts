@@ -45,7 +45,7 @@ const LOCAL_KEYWORDS = [
   'amateur football', 'amateur soccer', 'amateur teams', 'street food', 'local church',
   'small business', 'community', 'district',
   // Spanish
-  'barrio', 'zona norte', 'zona sur', 'equipo local', 'restaurante local', 'negocio local',
+  'barrio', 'zona norte', 'equipo local', 'restaurante local', 'negocio local',
   // Polish
   'dzielnica', 'lokalne', 'amatorski', 'lokalna drużyna',
   // Russian
@@ -116,14 +116,14 @@ export function routeIntent(input: {
 
   const [intent, topScore] = topIntent
 
-  // Default to business if no strong signal
+  // Unmatched prompts are ordinary general requests, not implicit business intent.
   if (topScore === 0) {
     return {
-      intent:     'business',
+      intent:     'global_knowledge',
       language,
       userPrompt: text,
       confidence: 0.5,
-      reason:     'No strong intent signal — defaulting to business mode',
+      reason:     'No product-specific intent signal — defaulting to general knowledge mode',
     }
   }
 

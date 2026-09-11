@@ -5,7 +5,7 @@ import { ownershipIdentity } from '@/lib/supervisor/coordination'
 import { enqueueGitHubObservation, loadActiveGitHubConnections, runAcceptedGitHubObservation } from '@/lib/provider-framework/github-production'
 import type { GitHubCapability } from '@/lib/provider-framework/github'
 import { materializeGuardianRepositoryObservation } from '@/lib/security/github-guardian-observation'
-import { createGuardianSelfHealingHandoff } from '@/lib/security/github-guardian-self-healing'
+import { createGuardianSelfHealingHandoff, guardianReviewRequest } from '@/lib/security/github-guardian-self-healing'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -75,12 +75,15 @@ async function processWebhookBacklog(input: {
       })
       if (observed.error) throw new Error('guardian_observation_persist_failed')
       let alertCreated = false
+      let alertId: string | null = null
       if (materialized.alert) {
         const existing = await input.db.from('cyber_alerts').select('id').eq('advisory_id', materialized.alert.advisory_id).maybeSingle()
         if (existing.error) throw new Error('guardian_alert_lookup_failed')
-        if (!existing.data) {
-          const inserted = await input.db.from('cyber_alerts').insert(materialized.alert)
+        alertId = existing.data?.id ? String(existing.data.id) : null
+        if (!alertId) {
+          const inserted = await input.db.from('cyber_alerts').insert(materialized.alert).select('id').single()
           if (inserted.error) throw new Error('guardian_alert_persist_failed')
+          alertId = String(inserted.data.id)
           alertCreated = true
         }
       }
@@ -92,6 +95,17 @@ async function processWebhookBacklog(input: {
         alert: materialized.alert,
       })
       if (selfHealing) {
+        if (!alertId) throw new Error('guardian_review_alert_missing')
+        const existingReview = await input.db.from('remediation_requests').select('id')
+          .eq('source_type', 'guardian_repository_change').eq('source_id', alertId).maybeSingle()
+        if (existingReview.error) throw new Error('guardian_review_lookup_failed')
+        let reviewRequestId = existingReview.data?.id ? String(existingReview.data.id) : null
+        if (!reviewRequestId) {
+          const review = await input.db.from('remediation_requests')
+            .insert(guardianReviewRequest({ alertId, handoff: selfHealing })).select('id').single()
+          if (review.error) throw new Error('guardian_review_persist_failed')
+          reviewRequestId = String(review.data.id)
+        }
         const events = [
           {
             event_id: `guardian-self-healing-${deliveryId}-received`,
@@ -116,6 +130,7 @@ async function processWebhookBacklog(input: {
               reason: selfHealing.policy.reason,
               automaticRepairAuthorized: false,
               providerMutations: false,
+              reviewRequestId,
             },
             schema_version: 'supervisor-audit-v1',
           },

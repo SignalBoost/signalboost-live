@@ -110,6 +110,11 @@ function targetedRepositoryCommand(command: string, target: SignalBoostRepositor
   return normalized
 }
 
+function isBroadRepositoryTestCommand(command: string): boolean {
+  const normalized = normalizeBuilderSandboxCommand(command)
+  return /^npm\s+(?:run\s+)?test(?:\s*(?:2?>&?1)?\s*\|.*)?$/i.test(normalized)
+}
+
 export async function executeSignalBoostRepositoryRepair(input: {
   userId: string
   rawObjective: string
@@ -169,10 +174,19 @@ export async function executeSignalBoostRepositoryRepair(input: {
     // sandbox runner. Apply the same command normalization here and force exact failed-test targets
     // when available so a broad npm test cannot OOM the repository sandbox.
     const repositoryRunner: BuilderRunnerPort = {
-      run: runInput => session!.run({
-        ...runInput,
-        command: targetedRepositoryCommand(runInput.command, target),
-      }),
+      run: runInput => {
+        const command = targetedRepositoryCommand(runInput.command, target)
+        if (isBroadRepositoryTestCommand(command)) {
+          return Promise.resolve(Object.freeze({
+            exitCode: 125,
+            stdout: '',
+            stderr: 'builder_repository_broad_test_blocked: select the smallest relevant test file and run it directly; the complete repository suite runs later in PR CI',
+            timedOut: false,
+            executedCommand: command,
+          }))
+        }
+        return session!.run({ ...runInput, command })
+      },
     }
 
     // Repository repair proof is controller-owned, not a model suggestion. The exact recorded

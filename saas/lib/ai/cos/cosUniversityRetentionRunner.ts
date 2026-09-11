@@ -4,6 +4,8 @@ import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/a
 import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
+import { type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
+import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
 import { buildCosUniversityARangeExam, COS_UNIVERSITY_A_RANGE_SCORER, scoreCosUniversityARangeExam, universityARangeValidUntil } from './cosUniversityARange.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { COS_UNIVERSITY_RETENTION_PROFILE, selectDueCosUniversityRetention, type CosUniversityRetentionSource } from './cosUniversityRetention.ts'
@@ -19,7 +21,9 @@ export async function runCosUniversityRetention(options: { now?: Date; agentId?:
   const now = options.now instanceof Date ? options.now : new Date()
   if (process.env.COS_UNIVERSITY_RETENTION_ENABLED !== 'true') return { enabled: false, agentId, attempted: 0 }
   if (!agentId) return { enabled: true, agentId, attempted: 0, errors: ['agent_id_required'] }
-  const blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  // COS uses its own reasoner; any other agent needs its own bound executor before it can be graded.
+  let blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  if (blocked && await hasBoundAcademicExecutor(agentId).catch(() => false)) blocked = null
   if (blocked) return { enabled: true, agentId, attempted: 0, status: 'blocked', blocked }
   const db = cosServiceDb()
   if (!db) return { enabled: true, agentId, attempted: 0, errors: ['service_database_unavailable'] }
@@ -52,23 +56,49 @@ export async function runCosUniversityRetention(options: { now?: Date; agentId?:
   if (inserted.error) throw inserted.error
   if (!inserted.data) return { enabled: true, agentId, attempted: 0, status: 'concurrent_claim' }
 
-  beginEvidenceSourceUseTurn()
-  const result = await tryCOSFirstAnswer({ prompt: exam.prompt, language: 'en', privileged: true, disableCache: true })
-  const turnId = peekEvidenceSourceUseTurnId()
-  const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
+  let reply = ''
+  let turnId: string | null = null
+  let localModelInvoked = false
+  let externalAiInvoked = false
+  let semanticCache = false
+  let handled = false
+  let executionProvenance: AgentCapstoneExecution | null = null
+
+  // A registered agent with its own bound executor re-answers its own passed transfer case as itself,
+  // through its assigned model. COS keeps its existing reasoner path unchanged.
+  if (agentId !== DEFAULT_AGENT_ID) {
+    const bound = await executeBoundAgentExam({ agentId, runId: inserted.data.id, manifestHash: source.manifestHash, prompt: exam.prompt })
+    const execution = bound.execution
+    if (execution.agentId !== agentId || execution.runId !== inserted.data.id || execution.manifestHash !== source.manifestHash) {
+      throw new Error('agent_execution_identity_mismatch')
+    }
+    reply = bound.reply
+    turnId = execution.turnId
+    localModelInvoked = true
+    handled = true
+    executionProvenance = execution
+  } else {
+    beginEvidenceSourceUseTurn()
+    const result = await tryCOSFirstAnswer({ prompt: exam.prompt, language: 'en', privileged: true, disableCache: true })
+    turnId = peekEvidenceSourceUseTurnId()
+    reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
+    localModelInvoked = Boolean(result.provenance.localModelInvoked)
+    externalAiInvoked = Boolean(result.provenance.externalAiInvoked)
+    semanticCache = result.provenance.responseSource === 'semantic_cache' || result.provenance.responseSource === 'semantic_similarity'
+    handled = result.handled
+    flushCapturedEvidenceSourceUse()
+  }
+
   const score = scoreCosUniversityARangeExam(exam, reply, {
-    handled: result.handled, localReasoning: result.provenance.localModelInvoked,
-    externalAi: result.provenance.externalAiInvoked,
-    semanticCache: result.provenance.responseSource === 'semantic_cache' || result.provenance.responseSource === 'semantic_similarity',
-    turnId,
+    handled, localReasoning: localModelInvoked, externalAi: externalAiInvoked, semanticCache, turnId,
   })
-  flushCapturedEvidenceSourceUse()
-  const fresh = Boolean(result.handled && result.provenance.localModelInvoked && !result.provenance.externalAiInvoked && turnId)
+  const fresh = Boolean(handled && localModelInvoked && !externalAiInvoked && !semanticCache && turnId)
   const status = fresh ? (score.passed ? 'passed' : 'failed') : 'error'
   const reasons = fresh ? score.reasons : [...score.reasons, 'fresh_execution_required']
   const observedAt = new Date()
   const update = await db.from('cos_university_retention_runs').update({
     status, passed: fresh ? score.passed : null, turn_id: turnId || null, reasons,
+    execution_provenance: executionProvenance,
     observed_at: observedAt.toISOString(), completed_at: observedAt.toISOString(), updated_at: observedAt.toISOString(),
   }).eq('id', inserted.data.id)
   if (update.error) throw update.error

@@ -1,5 +1,7 @@
+// saas/lib/ai/cos/cosUniversityStore.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { assessmentGradeEligibleForAgent } from './cosUniversityAgentGradeEligibility.ts'
 import type { KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import {
   buildCosUniversityTranscript,
@@ -106,6 +108,8 @@ export type CosUniversityPlanningCycleSummary = {
 
 type AssessmentRow = {
   assessment_key: string
+  agent_id?: string | null
+  evidence?: unknown
   subject_id: CosUniversitySubjectId | null
   language_code: CosPlatformLanguage | null
   language_dimension: CosPlatformLanguageDimension | null
@@ -161,7 +165,9 @@ function defaultSubjectForFailureClass(failureClass: CosUniversityFailureClass):
   return failureClass === 'tool_execution' ? 'computer_science' : 'reasoning_decision_science'
 }
 
-function gradeEligible(row: AssessmentRow, nowMs: number): boolean {
+function gradeEligible(row: AssessmentRow, nowMs: number, agentId: string): boolean {
+  // Rows recorded for another agent before that agent had its own bound executor are COS's work.
+  if (!assessmentGradeEligibleForAgent(row, agentId)) return false
   const validUntil = validTime(row.valid_until)
   const observedAt = validTime(row.observed_at)
   if (!row.independent_scorer || !VALID_SCORER_AUTHORITIES.has(row.scorer_authority)) return false
@@ -171,13 +177,14 @@ function gradeEligible(row: AssessmentRow, nowMs: number): boolean {
   return true
 }
 
-export function academicStateFromRows(rows: AssessmentRow[], now = new Date()): CosUniversityAcademicState {
+export function academicStateFromRows(rows: AssessmentRow[], now = new Date(), agentId = DEFAULT_AGENT_ID): CosUniversityAcademicState {
   const nowMs = now.getTime()
+  const owner = clean(agentId, 180) || DEFAULT_AGENT_ID
   const subjectEvidence: CosUniversityAssessmentEvidence[] = []
   const languageEvidence: CosPlatformLanguageAssessmentEvidence[] = []
 
   for (const row of rows) {
-    if (!gradeEligible(row, nowMs)) continue
+    if (!gradeEligible(row, nowMs, owner)) continue
     if (row.subject_id) {
       subjectEvidence.push({
         assessmentId: row.assessment_key,
@@ -218,12 +225,12 @@ export async function readCosUniversityAcademicState(now = new Date(), agentId =
   const db = cosServiceDb()
   if (!db) return null
   const result = await db.from('cos_university_assessments')
-    .select('assessment_key,subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_version,scorer_authority,observed_at,valid_until')
+    .select('assessment_key,agent_id,evidence,subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_version,scorer_authority,observed_at,valid_until')
     .eq('agent_id', clean(agentId, 180))
     .order('observed_at', { ascending: false })
     .limit(2500)
   if (result.error) throw result.error
-  return academicStateFromRows((result.data || []) as AssessmentRow[], now)
+  return academicStateFromRows((result.data || []) as AssessmentRow[], now, clean(agentId, 180) || DEFAULT_AGENT_ID)
 }
 
 /**

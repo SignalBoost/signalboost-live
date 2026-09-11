@@ -115,7 +115,7 @@ test('issuance rechecks remediation and records the actual check; failure is not
 })
 
 test('database insertion is guarded and serialized with same-agent plan mutations', () => {
-  const sql = read('supabase/migrations/20260911194500_university_graduation_remediation_gate.sql')
+  const sql = read('supabase/migrations/20260911194828_university_graduation_remediation_gate.sql')
   assert.match(sql, /BEFORE INSERT ON public\.cos_university_credentials/)
   assert.match(sql, /BEFORE INSERT OR UPDATE OR DELETE ON public\.cos_university_study_plans/)
   assert.equal((sql.match(/pg_catalog\.pg_advisory_xact_lock/g) || []).length, 2)
@@ -128,7 +128,7 @@ test('database insertion is guarded and serialized with same-agent plan mutation
 })
 
 test('the database scopes legacy null program keys and excludes unrelated and terminal work', () => {
-  const sql = read('supabase/migrations/20260911194500_university_graduation_remediation_gate.sql')
+  const sql = read('supabase/migrations/20260911194828_university_graduation_remediation_gate.sql')
   assert.match(sql, /p\.agent_id = p_agent_id/)
   assert.match(sql, /p\.program_key IS NULL OR p\.program_key = p_program_key/)
   assert.match(sql, /p\.academic_level = 'undergraduate'/)

@@ -49,7 +49,8 @@ import { promptCompilerModule } from '@/lib/ai/promptCompiler'
 import { cosArchitectModule, cosExecuteDirective } from '@/lib/ai/cosArchitect'
 import { proposeCampaign } from '@/lib/ai/proposeCampaign'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
-import { consultSpecialistCrew, COS_SPECIALIST_ROLES } from '@/lib/ai/cos/specialistCrewClient'
+import { COS_SPECIALIST_ROLES } from '@/lib/ai/cos/specialistCrewClient'
+import { runCOSSpecialistCrewMission } from '@/lib/ai/cos/specialistCrewMission'
 
 export const maxDuration = 300
 
@@ -1245,17 +1246,18 @@ if (name === 'consultSpecialistCrew') {
     if (!objective) return 'Specialist crew mission rejected: objective is required.'
     if (invalid.length) return `Specialist crew mission rejected: unsupported role(s): ${invalid.join(', ')}.`
     try {
-      const result = await consultSpecialistCrew({
+      const mission = await runCOSSpecialistCrewMission({
         objective,
         roles: roles as any,
         evidence: typeof args?.evidence === 'string' ? args.evidence : undefined,
         constraints: typeof args?.constraints === 'string' ? args.constraints : undefined,
       })
-      if (!result.ok) {
-        return `Specialist crew unavailable (${result.status}): ${result.error || 'no advisory result returned'}. No hosted fallback or external action was attempted.`
+      const result = mission.result
+      if (mission.status !== 'verified' || !result.ok) {
+        return `Specialist crew unavailable/unverified (${result.status}; LangGraph ${mission.status}): ${mission.reason || result.error || 'no verified advisory result returned'}. No hosted fallback or external action was attempted.`
       }
       return [
-        `CREWAI ADVISORY RECEIPT — mission ${result.mission_id || 'unknown'}; roles ${(result.roles || roles).join(', ')}; side effects: NOT ALLOWED; durable CrewAI memory: NOT USED.`,
+        `CREWAI ADVISORY RECEIPT — LangGraph ${mission.status}; mission ${result.mission_id || 'unknown'}; attempts ${mission.attempts}; roles ${(result.roles || roles).join(', ')}; side effects: NOT ALLOWED; durable CrewAI memory: NOT USED.`,
         result.report || 'The specialist crew returned no report body.',
       ].join('\n\n')
     } catch (error) {

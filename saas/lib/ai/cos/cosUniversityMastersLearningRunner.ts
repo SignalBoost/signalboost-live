@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
@@ -33,7 +32,8 @@ import {
   type CosUniversityFailureClass,
 } from './cosUniversityStudyStrategy.ts'
 
-const AGENT_ID = 'cos'
+import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
+import { requireMastersLearningAgentId, mastersLearningSlotKey, mastersLearningPlanKey, mastersLearningProgramBlocker } from './cosUniversityMastersAgentLearning.ts'
 const ZERO_EXTERNAL_COST_POLICY = {
   allowedSourceKinds: new Set([
     'work_experience',
@@ -66,6 +66,9 @@ type PlanRow = {
 }
 
 export type CosUniversityMastersLearningSummary = {
+  agentId: string
+  acquisitionInvoked: boolean
+  reasons: string[]
   enabled: boolean
   claimed: boolean
   slotKey: string
@@ -96,8 +99,9 @@ function slotKey(now: Date): string {
   return `${now.toISOString().slice(0, 13)}:${minute}Z`
 }
 
-function emptySummary(now: Date, status: CosUniversityMastersLearningSummary['status']): CosUniversityMastersLearningSummary {
+function emptySummary(now: Date, status: CosUniversityMastersLearningSummary['status'], agentId: string): CosUniversityMastersLearningSummary {
   return {
+    agentId, acquisitionInvoked: false, reasons: [],
     enabled: process.env.COS_UNIVERSITY_MASTERS_LEARNING_ENABLED === 'true',
     claimed: false,
     slotKey: slotKey(now),
@@ -115,28 +119,31 @@ function emptySummary(now: Date, status: CosUniversityMastersLearningSummary['st
   }
 }
 
-async function activeProgramId(): Promise<CosUniversityMastersProgramId | null> {
+async function activeProgramId(agentId: string): Promise<CosUniversityMastersProgramId | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_program_enrollments')
     .select('program_key')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_level', 'masters')
     .order('enrolled_at', { ascending: false })
     .limit(1)
     .maybeSingle()
   if (result.error) throw result.error
   const row = (result.data || null) as EnrollmentRow | null
-  return row ? cosUniversityMastersTrackIdFromProgramKey(row.program_key) : null
+  if (!row) return null
+  const programId = cosUniversityMastersTrackIdFromProgramKey(row.program_key)
+  if (!programId) throw new Error('invalid_masters_program_key')
+  return programId
 }
 
-async function claimSlot(programId: CosUniversityMastersProgramId, key: string, now: Date): Promise<RunRow | null> {
+async function claimSlot(programId: CosUniversityMastersProgramId, key: string, now: Date, agentId: string): Promise<RunRow | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const programKey = `specialist_masters_${programId}_v1`
   const result = await db.from('cos_university_masters_learning_runs').insert({
-    slot_key: `${programId}:${key}`,
-    agent_id: AGENT_ID,
+    slot_key: mastersLearningSlotKey(agentId, programId, key),
+    agent_id: agentId,
     program_key: programKey,
     program_id: programId,
     status: 'running',
@@ -146,12 +153,12 @@ async function claimSlot(programId: CosUniversityMastersProgramId, key: string, 
   if (!result.error && result.data) return result.data as RunRow
   if (String((result.error as { code?: string } | null)?.code || '') === '23505') return null
   if (result.error) throw result.error
-  return null
+  throw new Error('masters_learning_claim_not_persisted')
 }
 
 async function finishSlot(runId: string, summary: CosUniversityMastersLearningSummary, now: Date): Promise<void> {
   const db = cosServiceDb()
-  if (!db) return
+  if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_masters_learning_runs').update({
     status: summary.status === 'error' ? 'error' : 'completed',
     plans_considered: summary.plansConsidered,
@@ -161,8 +168,9 @@ async function finishSlot(runId: string, summary: CosUniversityMastersLearningSu
     errors: summary.errors,
     completed_at: now.toISOString(),
     updated_at: now.toISOString(),
-  }).eq('id', runId)
+  }).eq('id', runId).eq('agent_id', summary.agentId).eq('program_id', summary.programId).select('id').maybeSingle()
   if (result.error) throw result.error
+  if (!result.data) throw new Error('masters_learning_run_not_persisted')
 }
 
 function failureClassForSubject(subjectId: string): CosUniversityFailureClass {
@@ -172,14 +180,10 @@ function failureClassForSubject(subjectId: string): CosUniversityFailureClass {
   return 'unknown'
 }
 
-function planKey(programId: CosUniversityMastersProgramId, moduleKey: string): string {
-  return createHash('sha256').update(`masters|${programId}|${moduleKey}`).digest('hex')
-}
-
-async function ensureModulePlans(programId: CosUniversityMastersProgramId, now: Date): Promise<PlanRow[]> {
+async function ensureModulePlans(programId: CosUniversityMastersProgramId, now: Date, agentId: string): Promise<PlanRow[]> {
   const track = cosUniversityMastersTrackById(programId)
-  if (!track) return []
-  const evidence = await readCosUniversityMastersEvidence(programId)
+  if (!track) throw new Error('invalid_masters_program_key')
+  const evidence = await readCosUniversityMastersEvidence(programId, agentId)
   const completed = cosUniversityMastersCourseworkModulePasses(evidence, programId, now)
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -189,18 +193,18 @@ async function ensureModulePlans(programId: CosUniversityMastersProgramId, now: 
     if (completed.get(module.key) === true) continue
     const failureClass = failureClassForSubject(module.subjectId)
     const strategy = selectCosUniversityStudyStrategy({ failureClass })
-    const key = planKey(programId, module.key)
+    const key = mastersLearningPlanKey(agentId, programId, module.key)
     const objective = `${module.title}: ${module.objective} Study current authoritative material, practice transfer, and prepare for a fresh host-controlled Master’s coursework examination.`
     const insert = await db.from('cos_university_study_plans').upsert({
       plan_key: key,
-      agent_id: AGENT_ID,
+      agent_id: agentId,
       subject_id: module.subjectId,
       language_code: null,
       language_dimension: null,
       failure_class: failureClass,
       target_grade: 'A+',
       source_kind: 'academic_rotation',
-      source_ref: `masters:${programId}:${module.key}`,
+      source_ref: agentId === 'cos' ? `masters:${programId}:${module.key}` : `masters:${agentId}:${programId}:${module.key}`,
       problem_class: `masters_${programId}_${module.key}`,
       objective,
       methods: strategy.methods,
@@ -209,6 +213,7 @@ async function ensureModulePlans(programId: CosUniversityMastersProgramId, now: 
       priority: 82,
       status: 'queued',
       evidence: {
+        agentId,
         academicLevel: 'masters',
         programId,
         moduleKey: module.key,
@@ -225,11 +230,13 @@ async function ensureModulePlans(programId: CosUniversityMastersProgramId, now: 
 
     const result = await db.from('cos_university_study_plans')
       .select('id,plan_key,subject_id,objective,priority,status,last_attempt_at,module_key')
-      .eq('agent_id', AGENT_ID)
+      .eq('agent_id', agentId)
       .eq('plan_key', key)
+      .eq('academic_level', 'masters').eq('program_key', `specialist_masters_${programId}_v1`).eq('module_key', module.key)
       .maybeSingle()
     if (result.error) throw result.error
-    if (result.data && result.data.status !== 'completed' && result.data.status !== 'superseded') rows.push(result.data as PlanRow)
+    if (!result.data) throw new Error('masters_learning_plan_scope_conflict')
+    if (result.data.status !== 'completed' && result.data.status !== 'superseded') rows.push(result.data as PlanRow)
   }
   return rows
 }
@@ -247,10 +254,12 @@ function eligiblePlans(plans: PlanRow[], now: Date, maxPlans: number): PlanRow[]
 
 export async function runCosUniversityMastersLearning(options: {
   now?: Date
+  agentId?: string
   maxStudyPlans?: number
 } = {}): Promise<CosUniversityMastersLearningSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
-  const summary = emptySummary(now, 'idle')
+  const agentId = options.agentId === undefined ? 'cos' : options.agentId
+  const summary = emptySummary(now, 'idle', agentId)
   if (process.env.COS_UNIVERSITY_MASTERS_LEARNING_ENABLED !== 'true') {
     summary.status = 'disabled'
     return summary
@@ -263,26 +272,31 @@ export async function runCosUniversityMastersLearning(options: {
 
   let claim: RunRow | null = null
   try {
-    const programId = await activeProgramId()
+    requireMastersLearningAgentId(agentId)
+    const role = await readCosUniversityAgentRole(agentId)
+    if (!role) throw new Error('unregistered_university_agent')
+    const programId = await activeProgramId(agentId)
     if (!programId) {
       summary.status = 'not_enrolled'
       return summary
     }
     summary.programId = programId
-    const runtime = await readCosUniversityMastersRuntimeStatus(programId, now)
-    if (!runtime.enrollment || runtime.credential || runtime.timingStatus === 'deadline_expired' || runtime.timingStatus === 'not_enrolled') {
+    const runtime = await readCosUniversityMastersRuntimeStatus(programId, now, undefined, agentId)
+    const blocker = mastersLearningProgramBlocker(runtime, agentId)
+    if (blocker) {
+      summary.reasons.push(blocker)
       summary.status = 'program_inactive'
       return summary
     }
 
-    claim = await claimSlot(programId, summary.slotKey, now)
+    claim = await claimSlot(programId, summary.slotKey, now, agentId)
     if (!claim) {
       summary.status = 'already_claimed'
       return summary
     }
     summary.claimed = true
 
-    const plans = await ensureModulePlans(programId, now)
+    const plans = await ensureModulePlans(programId, now, agentId)
     summary.modulesIncomplete = plans.length
     summary.plansConsidered = plans.length
     const maxStudyPlans = Math.max(1, Math.min(4, Math.floor(options.maxStudyPlans || 2)))
@@ -314,7 +328,7 @@ export async function runCosUniversityMastersLearning(options: {
           failureClass,
           strategy,
           repeatedCount: 1,
-          evidence: [`academic_level=masters`, `program_id=${programId}`, `module_key=${plan.module_key}`],
+          evidence: [`agent_id=${agentId}`, `academic_level=masters`, `program_id=${programId}`, `module_key=${plan.module_key}`],
         }),
       }
     })
@@ -324,6 +338,7 @@ export async function runCosUniversityMastersLearning(options: {
       return summary
     }
     const planIdByGapId = new Map(plannedSignals.map(row => [knowledgeGapIdForSignal(row.signal), row.planId]))
+    summary.acquisitionInvoked = true
     const result = await new ContinuousLearningCycle(director, adapters).run(gaps, 0)
     summary.documentsAcquired = result.documentsAcquired
     summary.accepted = result.accepted
@@ -344,7 +359,14 @@ export async function runCosUniversityMastersLearning(options: {
       acceptedAt,
     }))
     if (proofs.length) {
-      summary.plansAttempted = (await recordAcceptedCosUniversityStudyAttempts(proofs, new Date())).length
+      // Acquisition can outlive the initial check. Do not advance study under a changed identity/program.
+      if (await readCosUniversityAgentRole(agentId) !== role || await activeProgramId(agentId) !== programId) {
+        throw new Error('masters_learning_identity_or_program_changed')
+      }
+      const current = await readCosUniversityMastersRuntimeStatus(programId, new Date(), undefined, agentId)
+      const currentBlocker = mastersLearningProgramBlocker(current, agentId)
+      if (currentBlocker) throw new Error(currentBlocker)
+      summary.plansAttempted = (await recordAcceptedCosUniversityStudyAttempts(proofs, new Date(), agentId)).length
     }
     summary.status = summary.plansAttempted > 0 ? 'learned' : 'idle'
     await finishSlot(claim.id, summary, new Date())

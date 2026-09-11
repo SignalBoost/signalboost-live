@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process'
 
 const tests = [
+  'tests/cosUniversityFineTuneEvidence.node.test.ts',
   'tests/builderToolLoop.node.test.ts',
   'tests/builderVerificationOrder.node.test.ts',
   'tests/builderProjectLessons.node.test.ts',

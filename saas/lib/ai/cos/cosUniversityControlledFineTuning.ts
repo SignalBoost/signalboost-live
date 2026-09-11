@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { decideControlledFineTune } from './cosUniversityLearningAssurance.ts'
+import { buildFineTuneEvidenceInput, readFineTuneEvidence } from './cosUniversityFineTuneEvidence.ts'
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 
@@ -30,26 +31,17 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
     const datasetHash = hash({ plan: plan.plan_key, subject: plan.subject_id, failure: plan.failure_class, objective: plan.objective, methods: plan.methods, source: plan.source_ref })
     const trainingManifestHash = hash({ candidateId, partition: 'training', datasetHash })
     const holdoutManifestHash = hash({ candidateId, partition: 'independent_holdout', datasetHash })
-    const decision = decideControlledFineTune({
-      trainedArtifactId: '',
+    const recordedEvidence = await readFineTuneEvidence(candidateId)
+    const decision = decideControlledFineTune(buildFineTuneEvidenceInput({
       baseModel: process.env.LOCAL_AI_MODEL || 'runtime-model-unspecified',
       datasetHash,
       trainingManifestHash,
       holdoutManifestHash,
-      datasetApprovedByHost: false,
-      trainingApprovedByHost: false,
-      independentEvaluation: false,
-      baselineScore: 0,
-      trainedArtifactScore: 0,
-      passedSafetyRegression: false,
-      passedUnseenTransfer: false,
-      passedDelayedRetention: false,
-      productionCanaryHealthy: false,
-    })
+    }, recordedEvidence))
     if (decision.eligibleForTraining) eligibleForTraining += 1
     const evidence = {
       claim: 'candidate_packaged_not_trained', candidateId, planId: plan.id, datasetHash,
-      trainingManifestHash, holdoutManifestHash, decision,
+      trainingManifestHash, holdoutManifestHash, decision, recordedClaims: recordedEvidence.claims,
     }
     const evidenceHash = hash(evidence)
     const eventKey = hash(['controlled-fine-tuning-v1', candidateId, plan.updated_at, evidenceHash])

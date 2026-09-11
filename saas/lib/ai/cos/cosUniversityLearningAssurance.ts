@@ -48,7 +48,6 @@ function validHash(value: string): boolean {
 /** Host-owned fine-tuning controller. It evaluates evidence; it never invokes a trainer. */
 export function decideControlledFineTune(input: FineTuneEvidence): FineTuneDecision {
   const blockers: string[] = []
-  if (!input.trainedArtifactId.trim()) blockers.push('trained_artifact_id_missing')
   if (!input.baseModel.trim()) blockers.push('base_model_missing')
   if (!validHash(input.datasetHash)) blockers.push('dataset_hash_invalid')
   if (!validHash(input.trainingManifestHash)) blockers.push('training_manifest_hash_invalid')
@@ -58,6 +57,7 @@ export function decideControlledFineTune(input: FineTuneEvidence): FineTuneDecis
   if (!input.trainingApprovedByHost) blockers.push('training_not_approved')
 
   const eligibleForTraining = blockers.length === 0
+  if (!input.trainedArtifactId.trim()) blockers.push('trained_artifact_id_missing')
   if (!input.independentEvaluation) blockers.push('independent_evaluation_missing')
   if (!(input.trainedArtifactScore > input.baselineScore)) blockers.push('no_measured_improvement')
   if (!input.passedSafetyRegression) blockers.push('safety_regression_failed')
@@ -67,8 +67,13 @@ export function decideControlledFineTune(input: FineTuneEvidence): FineTuneDecis
   if (!input.rollbackArtifactRef?.trim()) blockers.push('rollback_artifact_missing')
 
   const eligibleForPromotion = eligibleForTraining && blockers.length === 0
+  const stage: FineTuneStage = eligibleForPromotion ? 'promoted'
+    : !eligibleForTraining ? 'proposed'
+      : !input.trainedArtifactId.trim() ? 'training_approved'
+        : !input.independentEvaluation ? 'trained'
+          : 'evaluated'
   return {
-    stage: eligibleForPromotion ? 'promoted' : eligibleForTraining ? 'evaluated' : 'proposed',
+    stage,
     eligibleForTraining,
     eligibleForPromotion,
     blockers,

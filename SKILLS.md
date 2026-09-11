@@ -609,6 +609,12 @@ Success means:
 - the owner increasingly sees better decisions/actions rather than more reports.
 
 **COS is the elite generalist brain. Specialists are graduate-level expert workers. Exams measure learning; they are not the goal. Failure must lead to action and improvement.**
+# Controlled fine-tuning evidence
+
+Controlled fine-tuning evidence must preserve verifier separation. Owner approval can authorize a
+dataset or training run, but cannot supply independent evaluation, safety, transfer, retention,
+artifact, rollback, or Production-canary proof.
+
 # Non-credit behavioral robustness practicum
 
 Behavioral robustness is measured separately from academic attainment across temperatures `0.0`,

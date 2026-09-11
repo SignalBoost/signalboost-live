@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { parseAuditFindingsResponse } from '../lib/audit/modelResponse.ts'
+import { parseAuditFindingsResponse, parseAuditFindingsResponseIsolated } from '../lib/audit/modelResponse.ts'
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
@@ -23,6 +23,27 @@ test('Audit findings parser accepts structured object output and legacy arrays',
 
   assert.deepEqual(parseAuditFindingsResponse('{"findings":[]}', 'clean.ts'), [])
   assert.deepEqual(parseAuditFindingsResponse('[]', 'legacy.ts'), [])
+})
+
+test('Audit parser isolates one malformed finding without discarding valid siblings', () => {
+  const parsed = parseAuditFindingsResponseIsolated(JSON.stringify({ findings: [
+    { severity: 'high', category: 'injection', title: 'Valid issue', detail: 'Direct evidence.', recommendation: 'Escape the value.' },
+    { severity: 'medium', category: 'quality', title: 'Missing recommendation', detail: 'Direct evidence.' },
+  ] }), 'app/api/generate/route.ts')
+
+  assert.equal(parsed.findings.length, 1)
+  assert.equal(parsed.findings[0].title, 'Valid issue')
+  assert.equal(parsed.rejected.length, 1)
+  assert.match(parsed.rejected[0], /malformed Audit recommendation at index 1/)
+})
+
+test('Audit runner retries malformed per-file output and preserves partial scan evidence', () => {
+  const runner = read('../lib/audit/runner.ts')
+  const route = read('../app/api/hub/operator/audit/route.ts')
+  assert.match(runner, /Your previous response violated the required finding schema/)
+  assert.match(runner, /analysisErrors\.push/)
+  assert.match(runner, /scanned\.length === 0 && analysisErrors\.length > 0/)
+  assert.match(route, /analysisErrors: result\.analysisErrors \|\| \[\]/)
 })
 
 test('Audit findings parser still fails closed for malformed or fenced model output', () => {
@@ -66,6 +87,9 @@ test('owned canonical audits enter Self-Healing automatically', () => {
   assert.match(selfHealing, /enqueueSignalBoostRepositoryRepairJob/)
   assert.match(selfHealing, /selfHealingOwnedAudit: true/)
   assert.match(selfHealing, /standing-owner-policy/)
+  assert.match(selfHealing, /MAX_AUTOMATIC_ENGINE_RETRIES = 3/)
+  assert.match(selfHealing, /auditEngineRetryClaimedAt/)
+  assert.match(selfHealing, /Automatic Self-Healing retry/)
 })
 
 test('automatic audit writes remain restricted to the owned main repository', () => {

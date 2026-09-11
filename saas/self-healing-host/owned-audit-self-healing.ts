@@ -7,6 +7,7 @@ import { runApprovedAuditRemediationWithRetry } from '@/lib/audit/approvedRunRem
 const REPO = 'SignalBoost/signalboost-live'
 const BASE_BRANCH = 'main'
 const RETRY_SUPPRESSION_MS = 6 * 60 * 60 * 1000
+const MAX_AUTOMATIC_ENGINE_RETRIES = 3
 const AUDIT_ENGINE_STARTING_PATHS = Object.freeze([
   'saas/lib/audit/runner.ts',
   'saas/lib/audit/modelRouter.ts',
@@ -25,6 +26,14 @@ export type OwnedAuditEngineRepair = Readonly<{
   disposition: 'queued' | 'already_active' | 'recently_attempted' | 'not_owned' | 'unavailable'
   jobId: string
   remediationKey: string
+  error: string
+}>
+
+export type OwnedAuditEngineRetry = Readonly<{
+  retried: boolean
+  jobId: string
+  sourceJobId: string
+  attempt: number
   error: string
 }>
 
@@ -250,5 +259,60 @@ export async function enqueueOwnedAuditEngineRepair(params: {
       },
     })
     return { disposition: 'unavailable', jobId: '', remediationKey: key, error: message }
+  }
+}
+
+export async function retryFailedOwnedAuditEngineRepair(admin: any): Promise<OwnedAuditEngineRetry> {
+  const failed = await admin.from('builder_jobs')
+    .select('id,user_id,objective,metadata,error,updated_at')
+    .eq('status', 'failed')
+    .eq('job_kind', 'standard')
+    .eq('owner_authorized', true)
+    .contains('metadata', { selfHealingOwnedAudit: true })
+    .lt('updated_at', new Date(Date.now() - 60_000).toISOString())
+    .order('updated_at', { ascending: true })
+    .limit(10)
+  if (failed.error) return { retried: false, jobId: '', sourceJobId: '', attempt: 0, error: `audit_self_healing_retry_read_failed:${failed.error.message}` }
+
+  const row = (failed.data || []).find((candidate: any) => {
+    const metadata = candidate?.metadata && typeof candidate.metadata === 'object' && !Array.isArray(candidate.metadata) ? candidate.metadata : {}
+    const attempt = Number(metadata.auditEngineRetryAttempt || 0)
+    return attempt < MAX_AUTOMATIC_ENGINE_RETRIES && !metadata.auditEngineRetryClaimedAt
+  })
+  if (!row) return { retried: false, jobId: '', sourceJobId: '', attempt: 0, error: '' }
+
+  const metadata = row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata) ? row.metadata : {}
+  const attempt = Number(metadata.auditEngineRetryAttempt || 0) + 1
+  const claimedMetadata = { ...metadata, auditEngineRetryClaimedAt: new Date().toISOString() }
+  const claimed = await admin.from('builder_jobs').update({ metadata: claimedMetadata })
+    .eq('id', row.id).eq('status', 'failed').eq('metadata', JSON.stringify(metadata)).select('id').maybeSingle()
+  if (claimed.error || !claimed.data) return { retried: false, jobId: '', sourceJobId: String(row.id || ''), attempt, error: claimed.error?.message || '' }
+
+  try {
+    const objective = `${String(row.objective || '')}\n\nAutomatic Self-Healing retry ${attempt}/${MAX_AUTOMATIC_ENGINE_RETRIES}. The prior worker ended with ${String(row.error || 'an execution failure')}. Reproduce narrowly, then continue from current repository truth without repeating inspection.`
+    const target = signalBoostDeployedRepairTarget(objective, {
+      commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
+      branch: process.env.VERCEL_GIT_COMMIT_REF || BASE_BRANCH,
+    }, { ownerDeveloperLogSubmission: true })
+    if (!target) throw new Error('audit_self_healing_deployed_revision_unavailable')
+    const job = await enqueueSignalBoostRepositoryRepairJob({ userId: String(row.user_id), conversationId: crypto.randomUUID(), objective, target })
+    const created = await admin.from('builder_jobs').select('metadata').eq('id', job.jobId).eq('user_id', row.user_id).maybeSingle()
+    if (created.error || !created.data) throw new Error(`audit_self_healing_retry_tag_read_failed:${created.error?.message || 'job_not_found'}`)
+    const createdMetadata = created.data.metadata && typeof created.data.metadata === 'object' && !Array.isArray(created.data.metadata) ? created.data.metadata : {}
+    const tagged = await admin.from('builder_jobs').update({ metadata: {
+      ...createdMetadata,
+      selfHealingOwnedAudit: true,
+      selfHealingKey: String(metadata.selfHealingKey || ''),
+      selfHealingSource: 'audit-console-engine-retry',
+      auditRunId: String(metadata.auditRunId || ''),
+      auditEngineRetryAttempt: attempt,
+      auditEngineRetrySourceJobId: String(row.id),
+    } }).eq('id', job.jobId).eq('user_id', row.user_id)
+    if (tagged.error) throw new Error(`audit_self_healing_retry_tag_failed:${tagged.error.message}`)
+    return { retried: true, jobId: job.jobId, sourceJobId: String(row.id), attempt, error: '' }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'audit_self_healing_retry_failed'
+    await admin.from('builder_jobs').update({ metadata: { ...metadata, auditEngineRetryAttempt: attempt, auditEngineRetryError: message } }).eq('id', row.id)
+    return { retried: false, jobId: '', sourceJobId: String(row.id), attempt, error: message }
   }
 }

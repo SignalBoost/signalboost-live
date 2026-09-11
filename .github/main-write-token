@@ -1,2 +1,2 @@
-base_sha=3c592852eb3ed9a8a7e7e37b901dcba3f36f17c5
-branch=fix/security-patrol-production-migration-20260911
+base_sha=c31bd43d6bf8675eecb0644afb6dbb17d987a79f
+branch=fix/audit-parser-auto-recovery-20260911

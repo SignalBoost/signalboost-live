@@ -63,10 +63,13 @@ test('Audit file analysis distinguishes a valid clean result from unavailable or
   assert.throws(() => parseAuditFindingsResponse('[{"severity":"high"}]', 'partial.ts'), /malformed Audit category/)
 })
 
-test('Audit run fails closed when a file analysis throws', () => {
+test('Audit isolates a malformed file, retries it, and fails only when every selected analysis fails', () => {
   const runner = read('../lib/audit/runner.ts')
-  assert.match(runner, /parseAuditFindingsResponse\(raw, path\)/)
-  assert.match(runner, /catch \(error\)[\s\S]*ok: false,[\s\S]*COS Audit analysis failed/)
+  assert.match(runner, /parseAuditFindingsResponseIsolated\(raw, path\)/)
+  assert.match(runner, /Your previous response violated the required finding schema/)
+  assert.match(runner, /analysisErrors\.push/)
+  assert.match(runner, /scanned\.length === 0 && analysisErrors\.length > 0/)
+  assert.match(runner, /COS Audit analysis failed for every selected file/)
 })
 
 test('untrusted repository instructions remain inert structured data in every Audit model flow', () => {

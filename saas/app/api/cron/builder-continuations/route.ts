@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { listBuilderContinuations } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { retryFailedOwnedAuditEngineRepair } from '@/self-healing-host/owned-audit-self-healing'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -51,6 +52,7 @@ export async function GET(request: Request) {
   // authentication completes before this explicit continuation read. Owned Self-Healing recovery lanes
   // are then evaluated separately so they cannot weaken or obscure the normal continuation path.
   const continuations = await listBuilderContinuations()
+  const auditRetry = await retryFailedOwnedAuditEngineRepair(getAdminSupabase())
   const ownedRepairs = await queuedOwnedSelfHealingRepairs()
   const unique = new Map<string, { id: string; userId: string }>()
   for (const job of [...continuations, ...ownedRepairs]) unique.set(job.id, { id: job.id, userId: job.userId })
@@ -61,5 +63,7 @@ export async function GET(request: Request) {
     candidates: jobs.length,
     ownedSiteRepairQueued: ownedRepairs.some(job => job.kind === 'site'),
     ownedAuditRepairQueued: ownedRepairs.some(job => job.kind === 'audit'),
+    ownedAuditRepairRetried: auditRetry.retried,
+    ownedAuditRepairRetryAttempt: auditRetry.attempt,
   })
 }

@@ -14,6 +14,8 @@ test('Builder continuation cron picks both owned site and owned Audit Self-Heali
   assert.match(route, /\.eq\('owner_authorized', true\)/)
   assert.match(route, /\.eq\('status', 'queued'\)/)
   assert.match(route, /\.eq\('job_kind', 'standard'\)/)
+  assert.match(route, /retryFailedOwnedAuditEngineRepair/)
+  assert.match(route, /ownedAuditRepairRetried:/)
 })
 
 test('Builder continuation auth still precedes all queue reads and execution', () => {

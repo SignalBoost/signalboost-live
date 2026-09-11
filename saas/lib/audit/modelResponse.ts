@@ -12,7 +12,12 @@ export interface ParsedAuditFinding {
 
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info']
 
-export function parseAuditFindingsResponse(raw: string | null, file: string): ParsedAuditFinding[] {
+export type IsolatedAuditParseResult = Readonly<{
+  findings: ParsedAuditFinding[]
+  rejected: string[]
+}>
+
+export function parseAuditFindingsResponseIsolated(raw: string | null, file: string): IsolatedAuditParseResult {
   if (raw === null || !raw.trim()) throw new Error(`COS returned no Audit analysis for ${file}.`)
 
   let parsed: unknown
@@ -32,24 +37,23 @@ export function parseAuditFindingsResponse(raw: string | null, file: string): Pa
       : null
   if (!findings) throw new Error(`COS Audit response did not contain a findings array for ${file}.`)
 
-  return findings.map((item, index) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) {
-      throw new Error(`COS returned a malformed Audit finding at index ${index} for ${file}.`)
-    }
-    const value = item as Record<string, unknown>
+  const accepted: ParsedAuditFinding[] = []
+  const rejected: string[] = []
+  for (const [index, item] of findings.entries()) {
+    let error = ''
+    if (!item || typeof item !== 'object' || Array.isArray(item)) error = `COS returned a malformed Audit finding at index ${index} for ${file}.`
+    const value = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : {}
     const severity = typeof value.severity === 'string' ? value.severity.toLowerCase() as Severity : null
-    if (!severity || !SEVERITIES.includes(severity)) {
-      throw new Error(`COS returned an invalid Audit severity at index ${index} for ${file}.`)
-    }
+    if (!error && (!severity || !SEVERITIES.includes(severity))) error = `COS returned an invalid Audit severity at index ${index} for ${file}.`
     for (const field of ['category', 'title', 'detail', 'recommendation'] as const) {
-      if (typeof value[field] !== 'string' || !value[field].trim()) {
-        throw new Error(`COS returned a malformed Audit ${field} at index ${index} for ${file}.`)
-      }
+      if (!error && (typeof value[field] !== 'string' || !value[field].trim())) error = `COS returned a malformed Audit ${field} at index ${index} for ${file}.`
     }
-    if (value.line !== undefined && (!Number.isInteger(value.line) || Number(value.line) < 1)) {
-      throw new Error(`COS returned an invalid Audit line at index ${index} for ${file}.`)
+    if (!error && value.line !== undefined && (!Number.isInteger(value.line) || Number(value.line) < 1)) error = `COS returned an invalid Audit line at index ${index} for ${file}.`
+    if (error || !severity) {
+      rejected.push(error || `COS returned a malformed Audit finding at index ${index} for ${file}.`)
+      continue
     }
-    return {
+    accepted.push({
       file,
       severity,
       category: value.category as string,
@@ -57,6 +61,13 @@ export function parseAuditFindingsResponse(raw: string | null, file: string): Pa
       detail: value.detail as string,
       recommendation: value.recommendation as string,
       line: value.line as number | undefined,
-    }
-  })
+    })
+  }
+  return Object.freeze({ findings: accepted, rejected })
+}
+
+export function parseAuditFindingsResponse(raw: string | null, file: string): ParsedAuditFinding[] {
+  const parsed = parseAuditFindingsResponseIsolated(raw, file)
+  if (parsed.rejected.length) throw new Error(parsed.rejected[0])
+  return parsed.findings
 }

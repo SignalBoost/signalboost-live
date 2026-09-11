@@ -7,6 +7,7 @@ import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseSt
 import { attachTurnOutcome, recordTurnLearningEnrichment } from '@/lib/ai/cos/turnExperienceStore'
 import { decideCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import type { CosUniversitySubjectId } from './cosUniversity.ts'
 import type { CosPlatformLanguage, CosPlatformLanguageDimension } from './cosUniversityLanguages.ts'
@@ -37,6 +38,8 @@ export type CosUniversityExamRunSummary = {
 
 export type CosUniversityExamBatchSummary = {
   enabled: boolean
+  /** Set when the agent has no bound executor; nothing was created, executed, or graded. */
+  blocked?: string
   attempted: number
   passed: number
   failed: number
@@ -351,6 +354,8 @@ export async function runCosUniversityIndependentExamBatch(options: {
   const now = options.now instanceof Date ? options.now : new Date()
   const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
   if (!agentId) return { enabled: true, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: ['agent_id_required'], semantics: 'host_seeded_independent_exam_no_self_grading' }
+  const blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  if (blocked) return { enabled: true, blocked, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: [], semantics: 'host_seeded_independent_exam_no_self_grading' }
   const maxExams = Math.max(1, Math.min(2, Math.floor(options.maxExams || 2)))
   const errors: string[] = []
   let rows = options.assessmentRows || []

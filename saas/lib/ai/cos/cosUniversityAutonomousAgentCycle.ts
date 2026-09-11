@@ -4,6 +4,7 @@ import { listCosUniversityRegisteredAgents } from './cosUniversityAgentRegistry.
 import { runCosUniversityIndependentExamBatch } from './cosUniversityIndependentExamRunner.ts'
 import { runCosUniversityContinuousLearning } from './cosUniversityContinuousLearning.ts'
 import { runCosUniversityDeliberatePractice } from './cosUniversityDeliberatePracticeRunner.ts'
+import { reopenCosUniversityStudyAfterFailedPractice } from './cosUniversityPracticeFailureRemediation.ts'
 import { decideCosUniversityNextAcademicAction, type CosUniversityNextAcademicAction } from './cosUniversityAgentAcademicProgression.ts'
 import { syncCosUniversityAppliedKnowledge } from './cosUniversityAppliedKnowledge.ts'
 import { readCosUniversityMotivationStandings, selectCosUniversityMotivationalPriority } from './cosUniversityMotivationRuntime.ts'
@@ -49,6 +50,7 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
         // Practice follows durable accepted-study proof, not whether this tick acquired material.
         const practice = await runCosUniversityDeliberatePractice({ agentId: agent.agentId, maxPlans: 1, maxExercises: 2 })
         if (practice.errors.length) throw new Error(practice.errors.join('; '))
+        await reopenCosUniversityStudyAfterFailedPractice(practice.runs, now, agent.agentId)
       }
       agents.push({ agentId: agent.agentId, role: agent.role, admitted: admission.admitted, nextAction, completionRatio: record.completionRatio, motivation: motivation?.state || null, peerRank: motivation?.rank || null, error: null })
     } catch (error) {

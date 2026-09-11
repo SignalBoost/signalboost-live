@@ -37,7 +37,8 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
     }, recordedEvidence || { claims: [], trainedArtifactId: '', trainedArtifactHash: '', rollbackArtifactRef: null, baselineScore: 0, trainedArtifactScore: 0 }))
     if (decision.eligibleForTraining) eligibleForTraining += 1
     const evidence = {
-      claim: 'candidate_packaged_not_trained', candidateId, planId: plan.id, datasetHash,
+      claim: 'candidate_status_observed', candidateId, planId: plan.id, datasetHash,
+      lifecycleStage: decision.stage, trainedArtifactPresent: Boolean(recordedEvidence?.trainedArtifactId),
       trainingManifestHash: revision?.trainingManifestHash || null, holdoutManifestHash: revision?.holdoutManifestHash || null,
       decision, recordedClaims: recordedEvidence?.claims || [],
     }

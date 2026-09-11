@@ -83,6 +83,9 @@ test('runner reads durable evidence instead of hard-coded passing values', () =>
   assert.doesNotMatch(runner, /datasetApprovedByHost:\s*true/)
   assert.match(runner, /readFineTunePartitionRevision\(candidateId, datasetHash, now\)/)
   assert.doesNotMatch(runner, /partition:\s*'training'/)
+  assert.match(runner, /claim:\s*'candidate_status_observed'/)
+  assert.match(runner, /lifecycleStage:\s*decision\.stage/)
+  assert.doesNotMatch(runner, /candidate_packaged_not_trained/)
 })
 
 test('database admits the training executor verifier', () => {

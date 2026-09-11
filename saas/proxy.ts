@@ -1,3 +1,4 @@
+// saas/proxy.ts
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
@@ -124,7 +125,10 @@ function isAutonomousIngress(pathname: string) {
 }
 
 function isPublicModelIngress(pathname: string) {
-  return pathname === '/api/concierge' || pathname === '/api/support'
+  // /api/cos-browser is the canonical browser ingress (agentProgressClient posts there directly
+  // from the homepage dock and the Concierge widget). Without it here, anonymous visitors
+  // bypassed the preview limit entirely and could use the assistant forever without signing in.
+  return pathname === '/api/concierge' || pathname === '/api/support' || pathname === '/api/cos-browser'
 }
 
 function isFullAssistantBrowserRequest(req: NextRequest): boolean {
@@ -226,6 +230,7 @@ export const config = {
   matcher: [
     '/dashboard/operator/:path*',
     '/api/concierge',
+    '/api/cos-browser',
     '/api/support',
     '/api/cos-primary',
     '/api/cron/:path*',

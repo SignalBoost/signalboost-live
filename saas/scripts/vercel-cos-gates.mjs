@@ -134,6 +134,7 @@ const tests = [
   'tests/cosUniversityAdmission.node.test.ts',
   'tests/cosUniversityAdmissionRunner.node.test.ts',
   'tests/cosUniversityActiveAcademicLane.node.test.ts',
+  'tests/cosBehavioralRobustness.node.test.ts',
   'tests/cosCognitiveSkillRetrievalEfficiency.node.test.ts',
   'tests/cognitiveReasoningImperativeTriggers.node.test.ts',
   'tests/releaseSignalSeverity.node.test.ts',

@@ -609,3 +609,9 @@ Success means:
 - the owner increasingly sees better decisions/actions rather than more reports.
 
 **COS is the elite generalist brain. Specialists are graduate-level expert workers. Exams measure learning; they are not the goal. Failure must lead to action and improvement.**
+# Non-credit behavioral robustness practicum
+
+Behavioral robustness is measured separately from academic attainment across temperatures `0.0`,
+`0.4`, and `0.8` and repeated host-generated scenario seeds. Only observable task decisions receive
+host scores. These records cannot satisfy course, residence, graduation, motivation, or authority
+requirements and must never be described as evidence of artificial feelings.

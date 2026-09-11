@@ -18,6 +18,7 @@
     "COS_UNIVERSITY_PHD_METHODOLOGY_EXAMS_ENABLED": "true",
     "COS_UNIVERSITY_FINE_TUNING_ENABLED": "true",
     "COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED": "true",
+    "COS_BEHAVIORAL_ROBUSTNESS_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ROLLBACK_ENABLED": "true"
   },
@@ -45,6 +46,7 @@
     { "path": "/api/cron/cos-university-learning", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/cos-university-agent-cycle", "schedule": "2,17,32,47 * * * *" },
     { "path": "/api/cron/cos-university-practice", "schedule": "5,20,35,50 * * * *" },
+    { "path": "/api/cron/cos-behavioral-robustness", "schedule": "12,42 * * * *" },
     { "path": "/api/cron/cos-university-masters-learning", "schedule": "7,37 * * * *" },
     { "path": "/api/cron/cos-mining", "schedule": "30 6 * * *" },
     { "path": "/api/cron/cos-university-exam", "schedule": "0 7 * * *" },

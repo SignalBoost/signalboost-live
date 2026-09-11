@@ -3,11 +3,15 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.118
+**Version:** 1.119
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
+
+## Guardian review grouping — 2026-09-11
+
+Guardian preserves every authenticated security-sensitive delivery as normalized and audit evidence, while one service-role-only transaction groups concurrent nonterminal observations into one actionable review per repository. The review retains the latest 100 evidence summaries and a monotonic evidence count; completing or cancelling it permits a later change to open a fresh review. Grouping reduces owner noise without suppressing evidence or authorizing repair.
 
 ## Guardian review completion hardening — 2026-09-11
 

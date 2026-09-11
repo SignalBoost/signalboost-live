@@ -3,11 +3,22 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.113
+**Version:** 1.114
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
+
+## Durable repository-security incident cases — 2026-09-11
+
+Repository-patrol evidence with explicit defensive indicators now opens or updates one durable case
+per signed engagement and exact repository inside the same serialized database transaction that
+appends the tamper-evident evidence. Ordinary pushes without indicators remain evidence and do not
+become false incidents. Case severity escalates deterministically for history rewrites, permission
+boundary changes, and branch-protection changes; the append-only timeline references the original
+evidence hash and preserves the indicator observations. No actor attribution is manufactured, and
+browser roles have no case or timeline access. This is implementation evidence until the migration
+is applied, merged, deployed, and a real Production indicator proves the complete path.
 
 ## Non-credit behavioral robustness practicum — 2026-09-11
 

@@ -50,6 +50,7 @@ test('Production worker durably records the policy handoff before completing wor
   assert.match(route, /guardian_self_healing_handoff_failed/)
   assert.match(route, /guardian_review_persist_failed/)
   assert.match(route, /onConflict: 'id', ignoreDuplicates: true/)
+  assert.match(route, /upsert\(\{ \.\.\.materialized\.alert, id: alertId \}/)
 })
 
 test('owner review disposition cannot be converted into repair approval', () => {

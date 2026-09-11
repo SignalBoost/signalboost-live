@@ -3,13 +3,23 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.105
-**Updated:** 2026-09-10
+**Version:** 1.106
+**Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
+
+## Bounded repository-repair verification — 2026-09-11
+
+Platform Engineer repository repair now keeps full-suite validation out of its bounded interactive
+turn. Bare or piped `npm test` requests are blocked unless the host can replace them with exact
+failed-test paths; the complete repository suite remains a PR CI responsibility. Owned-Audit
+recovery seeds its directly relevant regression tests and explicitly requires narrow proof first.
+An exit 137 is classified as execution-resource exhaustion and cannot count as reproduction evidence.
+This preserves the repair investigation for a narrower proof instead of spending the turn rerunning
+the 1,899-test suite.
 
 ## COS University healthy motivation and teamwork — 2026-09-10
 

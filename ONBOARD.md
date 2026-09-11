@@ -84,6 +84,10 @@ and blocks updates or deletes at the database trigger boundary. These controls s
 GitHub webhook or prove live delivery; Production operation requires the migration, secrets, signed
 Guardian engagement, authorized webhook configuration, and observed real delivery evidence.
 
+A forward-only reconciliation migration removes any direct service-role INSERT/sequence grants left by
+an earlier Production application of the original migration, then installs the current RPC-only and
+immutable-row boundary. Editing an already-applied migration is not treated as Production execution.
+
 ## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
 
 Owner direction: pursue a company-deployable security capability that combines continuous 24x7 defensive patrol with a separately isolated ethical-hacking assessor. The separation is intentional: a defender that knows its own environment can develop familiarity bias; the assessor must arrive as a stranger and rediscover the environment from the authorized starting position.

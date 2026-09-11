@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityIndependentExamRunner.ts
 import { randomUUID } from 'node:crypto'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
@@ -8,6 +9,8 @@ import { attachTurnOutcome, recordTurnLearningEnrichment } from '@/lib/ai/cos/tu
 import { decideCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
+import { SOFTWARE_CAPSTONE_RUNTIME } from './cosUniversityAgentCapstone.ts'
+import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import type { CosUniversitySubjectId } from './cosUniversity.ts'
 import type { CosPlatformLanguage, CosPlatformLanguageDimension } from './cosUniversityLanguages.ts'
@@ -187,6 +190,93 @@ function targetFromRun(row: ExamRunRow): CosUniversityExamTarget | null {
   return null
 }
 
+/**
+ * Independent exam answered by the requested agent's own bound executor. Nothing is graded unless the
+ * execution's recorded identity matches this run, so a COS answer can never become this agent's grade.
+ */
+async function executeBoundExam(
+  agentId: string,
+  row: ExamRunRow,
+  target: CosUniversityExamTarget,
+  exam: ReturnType<typeof buildCosUniversityBlindExam>,
+  started: number,
+): Promise<CosUniversityExamRunSummary> {
+  const db = cosServiceDb()
+  if (!db) return { runId: row.id, target, status: 'error', passed: null, assessmentRecorded: false, manifestHash: exam.manifestHash, reasons: ['service_database_unavailable'], latencyMs: null }
+  const fail = async (reasons: string[]): Promise<CosUniversityExamRunSummary> => {
+    const at = new Date().toISOString()
+    await db.from('cos_university_exam_runs').update({ status: 'error', reasons, completed_at: at, updated_at: at }).eq('id', row.id)
+    return { runId: row.id, target, status: 'error', passed: null, assessmentRecorded: false, manifestHash: exam.manifestHash, reasons, latencyMs: Date.now() - started }
+  }
+
+  let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
+  try {
+    bound = await executeBoundAgentExam({ agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: exam.prompt })
+  } catch (error) {
+    return fail([`execution_error:${error instanceof Error ? error.message : String(error)}`])
+  }
+  const execution = bound.execution
+  if (execution.agentId !== agentId || execution.runId !== row.id || execution.manifestHash !== exam.manifestHash) {
+    return fail(['agent_execution_identity_mismatch'])
+  }
+
+  // One direct call to the agent's assigned model: local reasoning, no external AI, no cache replay.
+  const score = scoreCosUniversityBlindExam(exam, bound.reply, {
+    localReasoning: true, externalAi: false, semanticCache: false, handled: true, turnId: execution.turnId,
+  })
+  const latencyMs = Date.now() - started
+  const observedAt = new Date()
+  const assessmentRecorded = await recordCosUniversityAssessment({
+    agentId,
+    assessmentKey: `cos-university-exam:${row.id}`,
+    ...(target.kind === 'subject'
+      ? { subjectId: target.subjectId }
+      : { language: target.language, languageDimension: target.dimension }),
+    kind: 'unseen_subject_exam',
+    passed: score.passed,
+    independentScorer: true,
+    scorerVersion: COS_UNIVERSITY_EXAM_SCORER,
+    scorerAuthority: 'host_private_exam',
+    sourceRef: `cos_university_exam:${row.id}`,
+    evidence: {
+      profile: COS_UNIVERSITY_EXAM_PROFILE,
+      scorerVersion: COS_UNIVERSITY_EXAM_SCORER,
+      manifestHash: exam.manifestHash,
+      turnId: execution.turnId,
+      responseSource: SOFTWARE_CAPSTONE_RUNTIME,
+      localModelInvoked: true,
+      externalAiInvoked: false,
+      executionProvenance: execution,
+      reasons: score.reasons,
+    },
+    observedAt: observedAt.toISOString(),
+    validUntil: universityExamValidUntil(target, observedAt),
+  })
+
+  const completedAt = new Date().toISOString()
+  const update = await db.from('cos_university_exam_runs').update({
+    status: score.passed ? 'passed' : 'failed',
+    passed: score.passed,
+    turn_id: execution.turnId,
+    response_source: SOFTWARE_CAPSTONE_RUNTIME,
+    local_model_invoked: true,
+    external_ai_invoked: false,
+    fresh_execution: true,
+    provenance_recorded: true,
+    execution_provenance: execution,
+    reasons: score.reasons,
+    latency_ms: latencyMs,
+    completed_at: completedAt,
+    updated_at: completedAt,
+  }).eq('id', row.id)
+  if (update.error) throw update.error
+
+  return {
+    runId: row.id, target, status: score.passed ? 'passed' : 'failed', passed: score.passed,
+    assessmentRecorded, manifestHash: exam.manifestHash, reasons: score.reasons, latencyMs,
+  }
+}
+
 async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversityExamTarget, now: Date): Promise<CosUniversityExamRunSummary> {
   const db = cosServiceDb()
   if (!db) return { runId: row.id, target, status: 'error', passed: null, assessmentRecorded: false, manifestHash: row.manifest_hash, reasons: ['service_database_unavailable'], latencyMs: null }
@@ -198,6 +288,11 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
   }
 
   const started = Date.now()
+  // A registered agent with its own bound executor answers as itself, through its assigned model,
+  // and carries verifiable execution identity. COS keeps its existing reasoner path unchanged.
+  if (agentId !== DEFAULT_AGENT_ID) {
+    return executeBoundExam(agentId, row, target, exam, started)
+  }
   beginEvidenceSourceUseTurn()
   let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
   try {
@@ -354,7 +449,9 @@ export async function runCosUniversityIndependentExamBatch(options: {
   const now = options.now instanceof Date ? options.now : new Date()
   const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
   if (!agentId) return { enabled: true, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: ['agent_id_required'], semantics: 'host_seeded_independent_exam_no_self_grading' }
-  const blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  // COS uses its own reasoner; any other agent needs its own bound executor before it can be graded.
+  let blocked = cosUniversityAcademicExecutionBlocker(agentId)
+  if (blocked && await hasBoundAcademicExecutor(agentId).catch(() => false)) blocked = null
   if (blocked) return { enabled: true, blocked, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: [], semantics: 'host_seeded_independent_exam_no_self_grading' }
   const maxExams = Math.max(1, Math.min(2, Math.floor(options.maxExams || 2)))
   const errors: string[] = []

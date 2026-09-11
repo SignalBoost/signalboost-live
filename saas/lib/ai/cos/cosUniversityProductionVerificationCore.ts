@@ -1,6 +1,7 @@
 import {
   COS_UNIVERSITY_FEATURE_GATED_PATHS,
   verifyLearningPathReceipts,
+  universityProductionExecutionBlocker,
   type LearningPathId,
   type ProductionPathReceipt,
 } from './cosUniversityLearningAssurance.ts'
@@ -39,16 +40,22 @@ export function evaluateCosUniversityProductionVerification(input: {
     const invocationSucceeded = evidence.invocationSucceeded === true
     const fresh = Boolean(row?.expires_at) && Date.parse(row!.expires_at!) > input.now.getTime()
     const sameDeployment = row?.deployment_id === input.deploymentId
-    const verified = Boolean(row && featureEnabled && invocationSucceeded && fresh && sameDeployment
-      && row.verifier === 'host_production_verifier')
-    if (row?.deployment_id && row.commit_sha && row.expires_at && row.verifier === 'host_production_verifier') receipts.push({
-      path, deploymentId: row.deployment_id, commitSha: row.commit_sha, observedAt: row.observed_at,
-      expiresAt: row.expires_at, featureEnabled, invocationSucceeded,
-      durableEvidenceRef: `db://cos_university_learning_assurance_events/${row.event_key}`, verifier: row.verifier,
-    })
+    const executionBlocker = universityProductionExecutionBlocker(path, row?.evidence)
+    const receipt: ProductionPathReceipt | null = row?.deployment_id && row.commit_sha && row.expires_at
+      && row.event_key.trim() && row.verifier === 'host_production_verifier' ? {
+        path, deploymentId: row.deployment_id, commitSha: row.commit_sha, observedAt: row.observed_at,
+        expiresAt: row.expires_at, featureEnabled, invocationSucceeded,
+        executionEvidence: row.evidence,
+        durableEvidenceRef: `db://cos_university_learning_assurance_events/${row.event_key}`, verifier: row.verifier,
+      } : null
+    if (receipt) receipts.push(receipt)
+    // Use the same time, identity and execution checks for the row and aggregate status.
+    const verified = Boolean(sameDeployment && receipt && verifyLearningPathReceipts({
+      expectedCommitSha: input.commitSha, now: input.now, receipts: [receipt], requiredPaths: [path],
+    }).verified)
     return {
       path, featureFlag: COS_UNIVERSITY_FEATURE_GATED_PATHS[path], featureEnabled,
-      receiptFound: Boolean(row), sameDeployment, invocationSucceeded, fresh, verified,
+      receiptFound: Boolean(row), sameDeployment, invocationSucceeded, fresh, verified, executionBlocker,
       evidenceRef: row ? `db://cos_university_learning_assurance_events/${row.event_key}` : null,
     }
   })

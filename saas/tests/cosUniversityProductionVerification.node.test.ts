@@ -12,7 +12,8 @@ const deploymentId = 'dpl_current'
 function rows(): ProductionPathEventRow[] {
   return Object.keys(COS_UNIVERSITY_FEATURE_GATED_PATHS).map((path, index) => ({
     event_key: `event-${index}`, path_id: path, deployment_id: deploymentId, commit_sha: commitSha,
-    evidence: { featureEnabled: true, invocationSucceeded: true }, verifier: 'host_production_verifier',
+    evidence: { featureEnabled: true, invocationSucceeded: true, runnerInvoked: true, attempted: 1,
+      status: 'passed', passed: true, runs: [{ runId: `test-${path}`, status: 'passed', passed: true }] }, verifier: 'host_production_verifier',
     observed_at: '2026-09-10T11:00:00Z', expires_at: '2026-09-11T11:00:00Z',
   }))
 }
@@ -31,10 +32,12 @@ test('all declared paths require fresh successful receipts from the exact Produc
   assert.deepEqual(result.missingOrInvalid, result.paths.slice(0, 3).map(item => item.path))
 })
 
-test('owner-only endpoint exposes read-only fail-closed assurance status', () => {
+test('owner-only GET exposes read-only fail-closed assurance status', () => {
   const route = fs.readFileSync(path.resolve(import.meta.dirname, '../app/api/admin/cos-university-assurance/route.ts'), 'utf8')
-  assert.match(route, /requireOwner\(\)/)
-  assert.match(route, /readCosUniversityProductionVerification\(\)/)
-  assert.match(route, /verified: false/)
-  assert.doesNotMatch(route, /export async function (POST|PUT|PATCH|DELETE)/)
+  const get = route.slice(route.indexOf('export async function GET'), route.indexOf('export async function POST'))
+  assert.match(get, /requireOwner\(\)/)
+  assert.match(get, /readCosUniversityProductionVerification\(\)/)
+  assert.match(get, /verified: false/)
+  assert.doesNotMatch(get, /recordFineTuneHostApproval|\.(insert|upsert|update|delete)\(/)
+  assert.match(route, /\['dataset_approved', 'training_approved'\]/, 'separate owner approvals remain supported')
 })

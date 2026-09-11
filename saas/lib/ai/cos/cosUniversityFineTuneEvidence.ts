@@ -78,8 +78,10 @@ export function foldFineTuneEvidenceRows(rows: readonly any[], expectedRevisionK
   const ordered = [...rows].sort((a, b) => String(a?.observed_at || '').localeCompare(String(b?.observed_at || '')))
   const valid = ordered.filter(row => {
     const evidence = row?.evidence; const claim = evidence?.claim as FineTuneClaim
+    const observedAt = Date.parse(String(row?.observed_at || ''))
     return evidence?.profile === FINE_TUNE_EVIDENCE_PROFILE && FINE_TUNE_CLAIMS.includes(claim)
       && (!expectedRevisionKey || evidence.revisionKey === expectedRevisionKey)
+      && Number.isFinite(observedAt) && observedAt <= now.getTime()
       && (!row?.expires_at || Date.parse(row.expires_at) > now.getTime())
       && row?.verifier === FINE_TUNE_CLAIM_VERIFIER[claim] && Boolean(String(evidence.evidenceRef || '').trim())
   })
@@ -123,11 +125,13 @@ export async function readFineTunePartitionRevision(candidateId: string, dataset
   const result = await db.from('cos_university_learning_assurance_events').select('evidence,verifier,observed_at,expires_at')
     .eq('event_type', 'fine_tune').eq('candidate_id', candidateId).order('observed_at', { ascending: false }).limit(200)
   if (result.error) throw result.error
+  const now = Date.now()
   for (const row of result.data || []) {
     const evidence = row?.evidence
+    const observedAt = Date.parse(String(row?.observed_at || ''))
     if (evidence?.profile !== FINE_TUNE_EVIDENCE_PROFILE || evidence.claim !== 'partition_manifests_registered'
       || row.verifier !== 'training_executor' || evidence.datasetHash !== datasetHash || !String(evidence.evidenceRef || '').trim()
-      || (row.expires_at && Date.parse(row.expires_at) <= Date.now())) continue
+      || !Number.isFinite(observedAt) || observedAt > now || (row.expires_at && Date.parse(row.expires_at) <= now)) continue
     const revision = buildFineTunePartitionRevision({ ...evidence, datasetHash })
     if (revision) return revision
   }

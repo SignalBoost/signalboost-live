@@ -58,6 +58,11 @@ test('expired claims are ignored', () => {
   assert.deepEqual(foldFineTuneEvidenceRows([expired], revisionKey, base.holdoutManifestHash, new Date('2026-09-11T00:00:00Z')).claims, [])
 })
 
+test('future-dated claims are ignored', () => {
+  const future = { ...row('dataset_approved'), observed_at: '2026-09-12T00:00:00Z' }
+  assert.deepEqual(foldFineTuneEvidenceRows([future], revisionKey, base.holdoutManifestHash, new Date('2026-09-11T00:00:00Z')).claims, [])
+})
+
 test('partition revision requires real nonempty disjoint item manifests', () => {
   const valid = buildFineTunePartitionRevision({ baseModel: 'base', datasetHash: H, trainingItemHashes: ['1'.repeat(64)], holdoutItemHashes: ['2'.repeat(64)] })
   assert.ok(valid); assert.notEqual(valid.trainingManifestHash, valid.holdoutManifestHash)

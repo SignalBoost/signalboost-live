@@ -171,21 +171,36 @@ test('retention runner replays only the requested agent\'s own passed transfer a
   assert.match(runner, /selectDueCosUniversityRetention\(sources, completed, now\)/)
 })
 
-
-test('language A-range runs for every registered agent with isolated evidence and cadence', () => {
+test('language A-range runs for every registered agent, one agent per tick, through its own gate and cadence', () => {
   const route = fs.readFileSync(path.resolve(import.meta.dirname, '../app/api/cron/cos-university-language-a-range/route.ts'), 'utf8')
   assert.match(route, /listCosUniversityRegisteredAgents\(\)/)
   assert.match(route, /readCosUniversityUndergraduateAcademicLaneGate\(now, agent\.agentId\)/)
   assert.match(route, /readCosUniversityDailyLaneCadence\('language_a_range_evidence', now, agent\.agentId\)/)
   assert.match(route, /runCosUniversityLanguageARangeBatch\(\{ now, agentId: agent\.agentId \}\)/)
   assert.match(route, /evidence: \{ \.\.\.result, agentId: agent\.agentId, programGate \}/)
+  assert.doesNotMatch(route, /subject_a_range_evidence/)
+  const runAt = route.indexOf('runCosUniversityLanguageARangeBatch({')
+  assert.ok(route.indexOf('return NextResponse.json({ ok: result.errors.length === 0', runAt) > runAt, 'a tick returns after one agent batch')
+})
 
+test('language A-range runner accepts only agent-attributed Production evidence and isolates every ledger', () => {
   const runner = fs.readFileSync(path.resolve(import.meta.dirname, '../lib/ai/cos/cosUniversityLanguageARangeRunner.ts'), 'utf8')
   assert.match(runner, /options: \{ now\?: Date; agentId\?: string \}/)
   assert.match(runner, /loadAssessmentRows\(agentId\)/)
   assert.match(runner, /loadRunRows\(agentId\)/)
-  assert.match(runner, /agent_id: agentId,/)
-  assert.match(runner, /if \(agentId === AGENT_ID\)/)
+  assert.doesNotMatch(runner, /\.eq\('agent_id', AGENT_ID\)/, 'evidence reads must use the requested agent')
+  assert.match(runner, /production_verified:language:\$\{agentId\}:/)
+  assert.match(runner, /syncVerifiedLanguageProductionOutcomes\(agentId, now\)/)
+  assert.match(runner, /\$\{COS_UNIVERSITY_LANGUAGE_A_RANGE_PROFILE\}:\$\{input\.stage\}:\$\{input\.day\}:\$\{input\.targetKey\}/)
+  assert.match(runner, /\$\{COS_UNIVERSITY_LANGUAGE_A_RANGE_PROFILE\}:\$\{input\.agentId\}:\$\{input\.stage\}:\$\{input\.day\}:\$\{input\.targetKey\}/)
   assert.match(runner, /cos-university-language-a-range-pass:\$\{args\.agentId\}:/)
   assert.match(runner, /agentId: args\.agentId,/)
+})
+
+test('language A-range scheduling paginates agents and rotates the hourly starting point', () => {
+  const registry = fs.readFileSync(path.resolve(import.meta.dirname, '../lib/ai/cos/cosUniversityAgentRegistry.ts'), 'utf8')
+  const route = fs.readFileSync(path.resolve(import.meta.dirname, '../app/api/cron/cos-university-language-a-range/route.ts'), 'utf8')
+  assert.match(registry, /\.range\(from, from \+ pageSize - 1\)/)
+  assert.match(route, /now\.getUTCHours\(\) % registeredAgents\.length/)
+  assert.match(route, /registeredAgents\.slice\(offset\)/)
 })

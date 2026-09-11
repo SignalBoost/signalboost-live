@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const migration = readFileSync(new URL('../supabase/migrations/20260911024837_security_repository_incident_cases.sql', import.meta.url), 'utf8')
+const migration = readFileSync(new URL('../supabase/migrations/20260911024837_security_repository_incident_cases.sql', import.meta.url), 'utf8')\nconst productionFix = readFileSync(new URL('../supabase/migrations/20260911030200_security_repository_incident_case_sql_expression_fix.sql', import.meta.url), 'utf8')
 
 test('incident cases are derived atomically only from explicit defensive indicators', () => {
   assert.match(migration, /create table if not exists public\.security_repository_incident_cases/)
@@ -29,3 +29,4 @@ test('incident timeline is append-only, evidence-linked and unavailable to brows
   assert.match(migration, /grant select on table public\.security_repository_incident_cases to service_role/)
   assert.match(migration, /set search_path = ''/)
 })
+\n\ntest('Production correction uses PostgreSQL expression syntax without schema-qualifying special forms', () => {\n  assert.doesNotMatch(productionFix, /pg_catalog\\.(coalesce|greatest)/)\n  assert.match(productionFix, /coalesce\\(pg_catalog\\.jsonb_agg/)\n  assert.match(productionFix, /last_observed_at = greatest\\(/)\n})\n

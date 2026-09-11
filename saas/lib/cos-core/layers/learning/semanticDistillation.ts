@@ -95,6 +95,7 @@ export function semanticDistillText(
   let duplicates = 0
   for (const candidate of ranked) {
     if (selected.length >= maxUnits) break
+    if (candidate.score <= 0 && selected.length) continue
     const duplicate = selected.some(existing => overlap(candidate.terms, existing.terms) >= duplicateThreshold)
     if (duplicate) {
       duplicates += 1

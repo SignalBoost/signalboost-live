@@ -23,6 +23,13 @@ import {
 
 const AGENT_ID = 'cos'
 
+/** COS keeps its original run keys; every other registered agent is namespaced so ledgers never collide. */
+export function cosUniversityARangeExamRunKey(input: { agentId: string; stage: string; day: string; subjectId: string }): string {
+  return input.agentId === AGENT_ID
+    ? `${COS_UNIVERSITY_A_RANGE_PROFILE}:${input.stage}:${input.day}:${input.subjectId}`
+    : `${COS_UNIVERSITY_A_RANGE_PROFILE}:${input.agentId}:${input.stage}:${input.day}:${input.subjectId}`
+}
+
 type AssessmentRow = {
   assessment_key: string
   subject_id: CosUniversitySubjectId | null
@@ -148,24 +155,24 @@ function runEvidence(rows: ARangeRunRow[]): CosUniversityARangeRunEvidence[] {
     }))
 }
 
-async function loadAssessmentRows(): Promise<AssessmentRow[]> {
+async function loadAssessmentRows(agentId: string): Promise<AssessmentRow[]> {
   const db = cosServiceDb()
   if (!db) return []
   const result = await db.from('cos_university_assessments')
     .select('assessment_key,subject_id,assessment_kind,passed,independent_scorer,scorer_authority,observed_at,valid_until')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .order('observed_at', { ascending: false })
     .limit(5000)
   if (result.error) throw result.error
   return (result.data || []) as AssessmentRow[]
 }
 
-async function loadRunRows(): Promise<ARangeRunRow[]> {
+async function loadRunRows(agentId: string): Promise<ARangeRunRow[]> {
   const db = cosServiceDb()
   if (!db) return []
   const result = await db.from('cos_university_a_range_runs')
     .select('id,run_key,stage,subject_id,profile,scorer_version,seed,manifest_hash,variant_hash,source_ref,status,passed,turn_id,response_source,local_model_invoked,external_ai_invoked,fresh_execution,reasons,latency_ms,observed_at')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .order('observed_at', { ascending: false })
     .limit(5000)
   if (result.error) throw result.error
@@ -173,6 +180,7 @@ async function loadRunRows(): Promise<ARangeRunRow[]> {
 }
 
 async function recordStageAssessment(args: {
+  agentId: string
   stage: CosUniversityARangeStage
   subjectId: CosUniversitySubjectId
   run: ARangeRunRow
@@ -185,6 +193,7 @@ async function recordStageAssessment(args: {
   if (args.run.passed === false) {
     return recordCosUniversityAssessment({
       assessmentKey: `cos-university-a-range-failure:${args.run.id}`,
+      agentId: args.agentId,
       subjectId: args.subjectId,
       kind: args.stage,
       passed: false,
@@ -205,7 +214,10 @@ async function recordStageAssessment(args: {
     .sort((a, b) => Date.parse(a.observed_at) - Date.parse(b.observed_at))
   const thresholdFingerprint = stableHash(...relevant.slice(-2).map(row => row.variant_hash))
   return recordCosUniversityAssessment({
-    assessmentKey: `cos-university-a-range-pass:${args.stage}:${args.subjectId}:${thresholdFingerprint}`,
+    assessmentKey: args.agentId === AGENT_ID
+      ? `cos-university-a-range-pass:${args.stage}:${args.subjectId}:${thresholdFingerprint}`
+      : `cos-university-a-range-pass:${args.agentId}:${args.stage}:${args.subjectId}:${thresholdFingerprint}`,
+    agentId: args.agentId,
     subjectId: args.subjectId,
     kind: args.stage,
     passed: true,
@@ -278,8 +290,8 @@ async function syncVerifiedProductionOutcomes(now: Date): Promise<{ candidates: 
         .eq('run_key', runKey).maybeSingle()
       if (rowResult.error) throw rowResult.error
       if (!rowResult.data) continue
-      const allRuns = await loadRunRows()
-      const wrote = await recordStageAssessment({ stage: 'production_transfer', subjectId, run: rowResult.data as ARangeRunRow, allRuns })
+      const allRuns = await loadRunRows(AGENT_ID)
+      const wrote = await recordStageAssessment({ agentId: AGENT_ID, stage: 'production_transfer', subjectId, run: rowResult.data as ARangeRunRow, allRuns })
       if (wrote) recorded += 1
     }
   }
@@ -311,10 +323,10 @@ function eligibleTarget(args: {
   return tied[Math.abs(day + (args.stage === 'capstone' ? 17 : 0)) % tied.length]
 }
 
-async function createOrFindExamRun(stage: Extract<CosUniversityARangeStage, 'cross_domain_transfer' | 'capstone'>, subjectId: CosUniversitySubjectId, now: Date): Promise<ARangeRunRow | null> {
+async function createOrFindExamRun(agentId: string, stage: Extract<CosUniversityARangeStage, 'cross_domain_transfer' | 'capstone'>, subjectId: CosUniversitySubjectId, now: Date): Promise<ARangeRunRow | null> {
   const db = cosServiceDb()
   if (!db) return null
-  const runKey = `${COS_UNIVERSITY_A_RANGE_PROFILE}:${stage}:${dayKey(now)}:${subjectId}`
+  const runKey = cosUniversityARangeExamRunKey({ agentId, stage, day: dayKey(now), subjectId })
   const existing = await db.from('cos_university_a_range_runs')
     .select('id,run_key,stage,subject_id,profile,scorer_version,seed,manifest_hash,variant_hash,source_ref,status,passed,turn_id,response_source,local_model_invoked,external_ai_invoked,fresh_execution,reasons,latency_ms,observed_at')
     .eq('run_key', runKey).maybeSingle()
@@ -325,7 +337,7 @@ async function createOrFindExamRun(stage: Extract<CosUniversityARangeStage, 'cro
   const exam = buildCosUniversityARangeExam({ seed, stage, subjectId })
   const insert = await db.from('cos_university_a_range_runs').insert({
     run_key: runKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     stage,
     subject_id: subjectId,
     profile: exam.profile,
@@ -346,7 +358,7 @@ async function createOrFindExamRun(stage: Extract<CosUniversityARangeStage, 'cro
   return (retry.data || null) as ARangeRunRow | null
 }
 
-async function executeExamRun(row: ARangeRunRow, now: Date): Promise<CosUniversityARangeBatchSummary['runs'][number]> {
+async function executeExamRun(agentId: string, row: ARangeRunRow, now: Date): Promise<CosUniversityARangeBatchSummary['runs'][number]> {
   const db = cosServiceDb()
   if (!db || !row.seed) return { runId: row.id, stage: row.stage, subjectId: row.subject_id, status: 'error', passed: null, assessmentRecorded: false, reasons: ['service_database_unavailable_or_seed_missing'] }
   const exam = buildCosUniversityARangeExam({ seed: row.seed, stage: row.stage as 'cross_domain_transfer' | 'capstone', subjectId: row.subject_id })
@@ -421,34 +433,40 @@ async function executeExamRun(row: ARangeRunRow, now: Date): Promise<CosUniversi
     .eq('id', row.id).maybeSingle()
   if (refreshed.error) throw refreshed.error
   const terminal = (refreshed.data || { ...row, status, passed, turn_id: turnId, reasons }) as ARangeRunRow
-  const allRuns = await loadRunRows()
+  const allRuns = await loadRunRows(agentId)
   const assessmentRecorded = freshExecution
-    ? await recordStageAssessment({ stage: row.stage, subjectId: row.subject_id, run: terminal, allRuns })
+    ? await recordStageAssessment({ agentId, stage: row.stage, subjectId: row.subject_id, run: terminal, allRuns })
     : false
   return { runId: row.id, stage: row.stage, subjectId: row.subject_id, status, passed, assessmentRecorded, reasons }
 }
 
-export async function runCosUniversityARangeBatch(options: { now?: Date } = {}): Promise<CosUniversityARangeBatchSummary> {
+export async function runCosUniversityARangeBatch(options: { now?: Date; agentId?: string } = {}): Promise<CosUniversityARangeBatchSummary> {
   if (process.env.COS_UNIVERSITY_A_RANGE_ENABLED !== 'true') {
     return { enabled: false, productionCandidates: 0, productionEvidenceRecorded: 0, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: [], semantics: 'repeated_distinct_transfer_plus_exact_turn_production_plus_capstone' }
   }
   const now = options.now instanceof Date ? options.now : new Date()
+  const agentId = String(options.agentId || AGENT_ID).trim()
   const errors: string[] = []
   let productionCandidates = 0
   let productionEvidenceRecorded = 0
-  try {
-    const synced = await syncVerifiedProductionOutcomes(now)
-    productionCandidates = synced.candidates
-    productionEvidenceRecorded = synced.recorded
-  } catch (error) {
-    errors.push(`production_bridge:${error instanceof Error ? error.message : String(error)}`)
+  // cos_turn_outcomes are COS's own verified Production turns. Attributing them to another agent would
+  // fabricate that agent's practical work, so other agents earn production_transfer from their own
+  // applied-knowledge outcomes (cosUniversityAppliedKnowledge), never from this bridge.
+  if (agentId === AGENT_ID) {
+    try {
+      const synced = await syncVerifiedProductionOutcomes(now)
+      productionCandidates = synced.candidates
+      productionEvidenceRecorded = synced.recorded
+    } catch (error) {
+      errors.push(`production_bridge:${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   let assessments: AssessmentRow[] = []
   let runs: ARangeRunRow[] = []
   try {
-    assessments = await loadAssessmentRows()
-    runs = await loadRunRows()
+    assessments = await loadAssessmentRows(agentId)
+    runs = await loadRunRows(agentId)
   } catch (error) {
     errors.push(`evidence_load:${error instanceof Error ? error.message : String(error)}`)
   }
@@ -462,7 +480,7 @@ export async function runCosUniversityARangeBatch(options: { now?: Date } = {}):
   const results: CosUniversityARangeBatchSummary['runs'] = []
   for (const target of targets) {
     try {
-      const row = await createOrFindExamRun(target.stage, target.subjectId, now)
+      const row = await createOrFindExamRun(agentId, target.stage, target.subjectId, now)
       if (!row) {
         results.push({ runId: null, ...target, status: 'error', passed: null, assessmentRecorded: false, reasons: ['service_database_unavailable'] })
         continue
@@ -471,7 +489,7 @@ export async function runCosUniversityARangeBatch(options: { now?: Date } = {}):
         results.push({ runId: row.id, ...target, status: `already_${row.status}`, passed: row.passed, assessmentRecorded: false, reasons: row.reasons || [] })
         continue
       }
-      results.push(await executeExamRun(row, now))
+      results.push(await executeExamRun(agentId, row, now))
     } catch (error) {
       errors.push(`${target.stage}:${target.subjectId}:${error instanceof Error ? error.message : String(error)}`)
     }

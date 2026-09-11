@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityProgramRuntimeGate.ts
 //
 // Service-side execution gate shared by every scheduled University academic worker lane.
 //
@@ -44,7 +43,9 @@ function mapEnrollment(row: EnrollmentRow): CosUniversityProgramEnrollment {
  */
 export async function readCosUniversityUndergraduateAcademicLaneGate(
   now = new Date(),
+  agentId: string = AGENT_ID,
 ): Promise<CosUniversityUndergraduateAcademicLaneGate> {
+  const id = String(agentId || '').trim() || AGENT_ID
   const db = cosServiceDb()
   if (!db) {
     return {
@@ -58,11 +59,11 @@ export async function readCosUniversityUndergraduateAcademicLaneGate(
   const [enrollmentResult, credentialResult] = await Promise.all([
     db.from('cos_university_program_enrollments')
       .select('program_key,program_level,enrolled_at,minimum_residence_until,target_completion_at,hard_deadline_at')
-      .eq('agent_id', AGENT_ID)
+      .eq('agent_id', id)
       .order('enrolled_at', { ascending: false }),
     db.from('cos_university_credentials')
       .select('program_key')
-      .eq('agent_id', AGENT_ID),
+      .eq('agent_id', id),
   ])
 
   if (enrollmentResult.error) throw enrollmentResult.error

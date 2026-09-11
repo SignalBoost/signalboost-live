@@ -203,6 +203,8 @@ export async function maybeRecoverOwnedAuditWithRepositoryEvidence(params: {
     'saas/lib/audit/approvedRunRemediation.ts',
     'saas/lib/audit/findingFreshness.ts',
     'saas/self-healing-host/owned-audit-self-healing.ts',
+    'saas/tests/auditOwnedRepositoryRecovery.node.test.ts',
+    'saas/tests/builderOwnedSelfHealingQueue.node.test.ts',
   ])].slice(0, 16)
 
   const objective = [
@@ -217,7 +219,9 @@ export async function maybeRecoverOwnedAuditWithRepositoryEvidence(params: {
     'If a finding is real, repair the root cause with the smallest safe repository change and add regression proof.',
     'If a finding is false or unsupported, do not change secure product code merely to satisfy or silence an unsupported Audit finding. Repair the Audit evidence/verification contract so the false positive does not recur, and add a regression that proves why.',
     'Never weaken the Audit scanner, suppress a category globally, hard-code a passing result, or mark a finding fixed without evidence.',
-    'Run the relevant Audit/security tests and Production build gates. Re-run the affected Audit scope after the repair when the environment permits; otherwise leave verification explicitly pending rather than claiming fixed.',
+    'Inside this bounded repair turn, run only narrow directly relevant tests. Never run npm test or the complete repository suite; those full gates belong in PR CI after a candidate patch exists.',
+    'Treat exit 137 as execution-resource exhaustion, not as proof that a source defect reproduced. Preserve the investigation for continuation and choose a narrower proof.',
+    'Run the relevant narrow Audit/security tests. Re-run the affected Audit scope after the repair when the environment permits; otherwise leave verification explicitly pending rather than claiming fixed. Let the normal PR pipeline run the complete Production build gates.',
   ].join('\n')
 
   const target = signalBoostDeployedRepairTarget(objective, {

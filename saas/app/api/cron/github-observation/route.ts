@@ -77,15 +77,13 @@ async function processWebhookBacklog(input: {
       let alertCreated = false
       let alertId: string | null = null
       if (materialized.alert) {
-        const existing = await input.db.from('cyber_alerts').select('id').eq('advisory_id', materialized.alert.advisory_id).maybeSingle()
+        alertId = deliveryId
+        const existing = await input.db.from('cyber_alerts').select('id').eq('id', alertId).maybeSingle()
         if (existing.error) throw new Error('guardian_alert_lookup_failed')
-        alertId = existing.data?.id ? String(existing.data.id) : null
-        if (!alertId) {
-          const inserted = await input.db.from('cyber_alerts').insert(materialized.alert).select('id').single()
-          if (inserted.error) throw new Error('guardian_alert_persist_failed')
-          alertId = String(inserted.data.id)
-          alertCreated = true
-        }
+        const inserted = await input.db.from('cyber_alerts')
+          .upsert({ ...materialized.alert, id: alertId }, { onConflict: 'id', ignoreDuplicates: true })
+        if (inserted.error) throw new Error('guardian_alert_persist_failed')
+        alertCreated = !existing.data
       }
       const selfHealing = createGuardianSelfHealingHandoff({
         deliveryId,

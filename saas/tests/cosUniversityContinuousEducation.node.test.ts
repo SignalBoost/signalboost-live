@@ -174,7 +174,7 @@ test('terminal failed University practice reopens study from durable queue state
   const bridge = file('lib/ai/cos/cosUniversityPracticeFailureRemediation.ts')
   const route = file('app/api/cron/cos-university-practice/route.ts')
   assert.match(bridge, /runs: readonly PracticeRun\[\] = \[\]/)
-  assert.match(bridge, /loadCurrentStudyingPlans\(runPlanIds\)/)
+  assert.match(bridge, /loadCurrentStudyingPlans\(runPlanIds, agentId\)/)
   assert.match(bridge, /loadUniversityPracticeRows\(\)/)
   assert.match(bridge, /from\('cos_active_practice_queue'\)/)
   assert.match(bridge, /const rows = currentRoundRows\(practiceRows, plan\.id, practiceRound\)/)

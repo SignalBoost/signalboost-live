@@ -1,2 +1,2 @@
-base_sha=cdc81234454ca39a7933ffb3146c52aed4454887
-branch=feat/security-github-webhook-provenance-20260910
+base_sha=672a709abeb2268dfdaa7f76ea14b45da445c6ba
+branch=fix/builder-pickup-owned-audit-20260910

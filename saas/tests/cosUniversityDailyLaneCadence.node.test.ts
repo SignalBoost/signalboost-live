@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityDailyLaneCadence.node.test.ts
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -147,4 +148,25 @@ test('A-range runner is agent-scoped and never attributes COS Production turns t
   assert.match(runner, /\$\{COS_UNIVERSITY_A_RANGE_PROFILE\}:\$\{input\.agentId\}:\$\{input\.stage\}:\$\{input\.day\}:\$\{input\.subjectId\}/)
   assert.match(runner, /cos-university-a-range-pass:\$\{args\.agentId\}:/)
   assert.match(runner, /agentId: args\.agentId,/)
+})
+
+test('delayed retention runs for every registered agent, one agent per tick, through per-agent cadence', () => {
+  const route = fs.readFileSync(path.resolve(import.meta.dirname, '../app/api/cron/cos-university-retention/route.ts'), 'utf8')
+  assert.match(route, /listCosUniversityRegisteredAgents\(\)/)
+  assert.match(route, /readCosUniversityDailyLaneCadence\('delayed_retention', now, agent\.agentId\)/)
+  assert.match(route, /runCosUniversityRetention\(\{ now, agentId: agent\.agentId \}\)/)
+  assert.match(route, /evidence: \{ \.\.\.result, agentId: agent\.agentId \}/)
+  const runAt = route.indexOf('runCosUniversityRetention({')
+  assert.ok(route.indexOf('return NextResponse.json({ ok: errors.length === 0', runAt) > runAt, 'a tick returns after one agent batch')
+})
+
+test('retention runner replays only the requested agent\'s own passed transfer and records under that agent', () => {
+  const runner = fs.readFileSync(path.resolve(import.meta.dirname, '../lib/ai/cos/cosUniversityRetentionRunner.ts'), 'utf8')
+  assert.match(runner, /options: \{ now\?: Date; agentId\?: string \}/)
+  assert.doesNotMatch(runner, /\.eq\('agent_id', 'cos'\)/)
+  assert.doesNotMatch(runner, /agent_id: 'cos'/)
+  assert.equal((runner.match(/\.eq\('agent_id', agentId\)/g) || []).length, 2, 'both source transfers and completed retention are agent-scoped')
+  assert.match(runner, /agent_id: agentId, subject_id: source\.subjectId/)
+  assert.match(runner, /assessmentKey: `cos-university-retention:\$\{inserted\.data\.id\}`, agentId,/)
+  assert.match(runner, /selectDueCosUniversityRetention\(sources, completed, now\)/)
 })

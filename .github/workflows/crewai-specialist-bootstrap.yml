@@ -7,6 +7,9 @@ on:
     paths:
       - '.github/workflows/crewai-specialist-bootstrap.yml'
       - 'scripts/patch_crewai_specialist_delegation.py'
+      - 'services/cos-ai-department/**'
+      - 'saas/lib/ai/cos/specialistCrewClient.ts'
+      - 'saas/tests/cosSpecialistCrewClient.node.test.ts'
 
 permissions:
   contents: write

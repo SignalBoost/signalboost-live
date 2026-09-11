@@ -36,6 +36,16 @@ import {
   requireCosUniversityGraduationRuntime,
 } from './cosUniversityGraduationRuntimePolicy.ts'
 
+import {
+  applyCosUniversityGraduationRemediation,
+  parseCosUniversityGraduationRemediation,
+  type CosUniversityGraduationRemediation,
+} from './cosUniversityGraduationRemediation.ts'
+
+export type CosUniversityRemediationGraduationStatus = CosUniversityTimeBoundedGraduationStatus & {
+  remediation: CosUniversityGraduationRemediation | null
+}
+
 const AGENT_ID = 'cos'
 const UNDERGRADUATE_PROGRAM_KEY = 'generalist_undergraduate_v1'
 
@@ -87,7 +97,7 @@ type CredentialRow = {
 
 export type CosUniversityGraduationGateSummary = {
   enabled: boolean
-  status: CosUniversityTimeBoundedGraduationStatus
+  status: CosUniversityRemediationGraduationStatus
   capstoneRun: {
     runId: string | null
     state: 'not_eligible' | 'already_graduated' | 'credential_awarded' | 'already_terminal' | 'passed' | 'failed' | 'error'
@@ -194,30 +204,44 @@ async function loadUndergraduateCredential(agentId: string): Promise<CosUniversi
   return mapCredential((result.data || null) as CredentialRow | null)
 }
 
+async function loadUndergraduateRemediation(agentId: string): Promise<CosUniversityGraduationRemediation> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const result = await db.rpc('read_cos_university_undergraduate_remediation', {
+    p_agent_id: agentId, p_program_key: UNDERGRADUATE_PROGRAM_KEY,
+  })
+  if (result.error) throw result.error
+  return parseCosUniversityGraduationRemediation(result.data, { agentId, programKey: UNDERGRADUATE_PROGRAM_KEY })
+}
+
 async function readGateState(now: Date, agentId: string): Promise<{
   academicState: CosUniversityAcademicState
   rows: CosUniversityAssessmentRow[]
   capstoneRuns: GeneralistCapstoneRunRow[]
   enrollment: CosUniversityProgramEnrollment | null
   credential: CosUniversityCredential | null
-  status: CosUniversityTimeBoundedGraduationStatus
+  status: CosUniversityRemediationGraduationStatus
 }> {
-  const [rows, capstoneRuns, enrollment, credential] = await Promise.all([
+  const [rows, capstoneRuns, enrollment, credential, remediation] = await Promise.all([
     loadAssessmentRows(agentId),
     loadCapstoneRuns(agentId),
     loadUndergraduateEnrollment(agentId),
     loadUndergraduateCredential(agentId),
+    loadUndergraduateRemediation(agentId),
   ])
   const academicState = academicStateFromRows(rows, now)
   const academicStatus = deriveCosUniversityGeneralistGraduation({
     academicState,
     capstoneRuns: capstoneEvidence(capstoneRuns, agentId, now),
   })
-  const status = applyCosUniversityUndergraduateCalendar({ academicStatus, enrollment, credential, now })
+  const status = applyCosUniversityGraduationRemediation(
+    applyCosUniversityUndergraduateCalendar({ academicStatus, enrollment, credential, now }),
+    remediation,
+  )
   return { academicState, rows, capstoneRuns, enrollment, credential, status }
 }
 
-export async function readCosUniversityGeneralistGraduationStatus(now = new Date(), agentId: string = AGENT_ID): Promise<CosUniversityTimeBoundedGraduationStatus> {
+export async function readCosUniversityGeneralistGraduationStatus(now = new Date(), agentId: string = AGENT_ID): Promise<CosUniversityRemediationGraduationStatus> {
   return (await readGateState(now, String(agentId || '').trim() || AGENT_ID)).status
 }
 
@@ -228,6 +252,8 @@ async function awardUndergraduateCredential(agentId: string, status: CosUniversi
   if (standing !== 'A' && standing !== 'A+') return null
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
+  const remediation = await loadUndergraduateRemediation(agentId)
+  if (remediation.pendingCount > 0) throw new Error('unresolved_undergraduate_remediation')
   const result = await db.from('cos_university_credentials').insert({
     credential_key: cosUniversityGeneralistUndergraduateCredentialKey(agentId),
     agent_id: agentId,
@@ -238,6 +264,7 @@ async function awardUndergraduateCredential(agentId: string, status: CosUniversi
     awarded_at: now.toISOString(),
     evidence_snapshot: {
       issuedBy: 'host_graduation_gate',
+      remediation,
       subjectBlockers: status.subjectBlockers.length,
       languageBlockers: status.languageBlockers.length,
       capstoneDistinctPasses: status.capstone.distinctPassesSinceLatestFailure,
@@ -388,10 +415,13 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
   }
 }
 
-function disabledStatus(now: Date): CosUniversityTimeBoundedGraduationStatus {
+function disabledStatus(now: Date): CosUniversityRemediationGraduationStatus {
   const academicState = academicStateFromRows([], now)
   const academicStatus = deriveCosUniversityGeneralistGraduation({ academicState, capstoneRuns: [] })
-  return applyCosUniversityUndergraduateCalendar({ academicStatus, enrollment: null, credential: null, now })
+  return {
+    ...applyCosUniversityUndergraduateCalendar({ academicStatus, enrollment: null, credential: null, now }),
+    remediation: null, // Unavailable or disabled is not proof of zero unresolved plans.
+  }
 }
 
 export async function runCosUniversityGeneralistGraduationGate(options: { now?: Date; agentId?: string } = {}): Promise<CosUniversityGraduationGateSummary> {
@@ -438,6 +468,17 @@ export async function runCosUniversityGeneralistGraduationGate(options: { now?: 
         enabled: true,
         status: before.status,
         capstoneRun: { runId: null, state: 'not_eligible', passed: null, reasons: ['undergraduate_program_deadline_expired'] },
+        assessmentRowsRead: before.rows.length,
+        errors: [],
+        semantics: 'time_bounded_degree_credential_current_competence_separate',
+      }
+    }
+    if (!before.status.remediation) throw new Error('graduation_remediation_not_checked')
+    if (before.status.remediation.pendingCount > 0) {
+      return {
+        enabled: true,
+        status: before.status,
+        capstoneRun: { runId: null, state: 'not_eligible', passed: null, reasons: ['unresolved_undergraduate_remediation'] },
         assessmentRowsRead: before.rows.length,
         errors: [],
         semantics: 'time_bounded_degree_credential_current_competence_separate',

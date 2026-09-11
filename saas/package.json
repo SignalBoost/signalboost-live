@@ -66,15 +66,19 @@
     "test:eae-enterprise-knowledge-graph": "node --test tests/eaeEnterpriseKnowledgeGraph.node.test.ts",
     "translate:i18n-generated-ui": "node scripts/translate-generated-ui-locales.mjs --write",
     "translate:i18n-generated-ui-public": "node scripts/translate-generated-ui-locales-public.mjs --write",
-    "repair:i18n-generated-ui": "node scripts/repair-generated-ui-token-mismatches.mjs"
+    "repair:i18n-generated-ui": "node scripts/repair-generated-ui-token-mismatches.mjs",
+    "test:cos-langgraph": "node --test tests/cosLangGraph.node.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.2",
     "@fal-ai/client": "^1.2.0",
+    "@langchain/core": "1.2.10",
+    "@langchain/langgraph": "1.4.14",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.4",
     "@tanstack/react-virtual": "^3.13.12",
     "@vercel/analytics": "^1.4.1",
+    "@vercel/sandbox": "^3.2.1",
     "autoprefixer": "^10.4.16",
     "bullmq": "^5.58.5",
     "next": "16.2.6",
@@ -85,8 +89,7 @@
     "react-dom": "19.2.6",
     "resend": "^4.0.0",
     "stripe": "^14.25.0",
-    "tailwindcss": "^3.4.1",
-    "@vercel/sandbox": "^3.2.1"
+    "tailwindcss": "^3.4.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.41.0",

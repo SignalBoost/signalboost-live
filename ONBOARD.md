@@ -3,11 +3,17 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.119
+**Version:** 1.120
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
+
+## COS LangGraph + LangChain orchestration — 2026-09-11
+
+COS now includes a bounded LangGraph orchestration seam under `saas/lib/cos-core/orchestration/`. The first governed graph implements `plan -> execute -> verify -> bounded repair -> re-verify`, with a hard maximum of three execution attempts and no authority-expanding behavior. LangGraph coordinates state transitions only; COS governance, Referee/policy enforcement, Enterprise Memory, learning, provider selection, authorization, audit, and Self-Healing remain authoritative outside the graph.
+
+The integration pins `@langchain/langgraph` and `@langchain/core` and uses LangChain `RunnableLambda` as the graph node runtime. It intentionally does not replace COS with LangChain's separate agent abstraction or silently route inference to hosted model providers. This is implementation/test evidence only until merged, deployed, and exercised through a Production COS mission path.
 
 ## Guardian review grouping — 2026-09-11
 

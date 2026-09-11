@@ -18,7 +18,6 @@ test('only COS has a bound academic executor; every other agent fails closed', (
 })
 
 const RUNNERS: Array<{ file: string; blockAt: RegExp; firstWork: string }> = [
-  { file: 'lib/ai/cos/cosUniversityLanguageARangeRunner.ts', blockAt: /if \(blocked\) \{\s*return \{\s*enabled: true, blocked,/, firstWork: 'assessments = await loadAssessmentRows(agentId)' },
   { file: 'lib/ai/cos/cosUniversityRetentionRunner.ts', blockAt: /if \(blocked\) return \{ enabled: true, agentId, attempted: 0, status: 'blocked', blocked \}/, firstWork: "db.from('cos_university_a_range_runs')" },
 ]
 
@@ -93,9 +92,23 @@ test('the A-range execution binding matches the exam and capstone bindings', () 
   assert.match(migration, /NOT VALID/, 'historical rows are never granted fresh provenance')
 })
 
-test('language A-range keeps agent-tagged verified Production evidence but blocks COS-answered exams', () => {
-  const source = file('lib/ai/cos/cosUniversityLanguageARangeRunner.ts')
-  const bridgeAt = source.indexOf('await syncVerifiedLanguageProductionOutcomes(agentId, now)')
-  const blockAt = source.indexOf('const blocked = cosUniversityAcademicExecutionBlocker(agentId)')
+test('language A-range is unblocked only for an agent with its own bound executor, and is answered by it', () => {
+  const runner = file('lib/ai/cos/cosUniversityLanguageARangeRunner.ts')
+  assert.match(runner, /if \(blocked && await hasBoundAcademicExecutor\(agentId\)\.catch\(\(\) => false\)\) blocked = null/)
+  // Agent-tagged verified Production language evidence is that agent's own work and still runs first.
+  const bridgeAt = runner.indexOf('await syncVerifiedLanguageProductionOutcomes(agentId, now)')
+  const blockAt = runner.indexOf('let blocked = cosUniversityAcademicExecutionBlocker(agentId)')
   assert.ok(bridgeAt > 0 && blockAt > bridgeAt, 'the Production bridge runs before the exam block')
+  // The bound branch never reaches the COS reasoner and refuses evidence that is not this run's.
+  const boundAt = runner.indexOf('if (agentId !== AGENT_ID) {')
+  const cosAt = runner.indexOf('} else {', boundAt)
+  assert.ok(boundAt > 0 && cosAt > boundAt)
+  const boundBody = runner.slice(boundAt, cosAt)
+  assert.doesNotMatch(boundBody, /tryCOSFirstAnswer\(/)
+  assert.match(boundBody, /executeBoundAgentExam\(\{ agentId, runId: row\.id, manifestHash: exam\.manifestHash, prompt: exam\.prompt \}\)/)
+  assert.match(boundBody, /return failRun\(\['agent_execution_identity_mismatch'\]\)/)
+  assert.match(runner, /execution_provenance: executionProvenance/)
+  // COS keeps its exact previous call, including the exam language, and grading still needs fresh local work.
+  assert.match(runner.slice(cosAt), /tryCOSFirstAnswer\(\{ prompt: exam\.prompt, language: row\.language_code, privileged: true, disableCache: true \}\)/)
+  assert.match(runner, /const freshExecution = Boolean\(handled && localModelInvoked && !externalAiInvoked && !semanticCache && turnId\)/)
 })

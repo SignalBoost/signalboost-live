@@ -16,10 +16,11 @@ export async function GET(req: NextRequest) {
     if (result.independentExamRuns > 0) {
       await recordCosUniversityProductionPath({
         path: 'independent_exams',
-        invocationSucceeded: result.errors.length === 0,
+        invocationSucceeded: result.independentExamErrors === 0,
         evidence: {
           source: 'registered_agent_cycle',
           independentExamRuns: result.independentExamRuns,
+          independentExamErrors: result.independentExamErrors,
           agents: result.agents.filter(agent => agent.nextAction === 'independent_exam'),
         },
       })

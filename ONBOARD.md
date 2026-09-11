@@ -1,6 +1,14 @@
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint
+## Guardian governed Self-Healing execution — 2026-09-11
+
+Guardian repository incidents now enter the existing COS/Self-Healing diagnostic loop after their
+durable grouped evidence and owner review record are created. The diagnostic outcome is persisted
+to that review and the Supervisor audit timeline. Repository-change observations explicitly disable
+automatic repair: COS may diagnose and stage a recovery, but this evidence alone cannot authorize
+code or provider mutation.
+
 ## COS University per-agent language A-range — 2026-09-11
 
 Language transfer and integrated capstone execution now evaluate every registered University agent
@@ -33,7 +41,7 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.124
+**Version:** 1.125
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**

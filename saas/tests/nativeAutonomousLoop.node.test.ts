@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 import { nativeIncidentToNormalized } from '../self-healing-host/native-autonomous-loop'
 
 const incident: any = {
@@ -17,4 +18,11 @@ test('native incident becomes a generic COS diagnostic incident with connector e
   assert.equal(normalized.trigger, 'NATIVE_HEALTH')
   assert.equal(normalized.context.native_probe, 'api')
   assert.match(normalized.raw_logs, /metrics\.query/)
+})
+
+test('repository incident sources can disable automatic repair while retaining the Self-Healing path', () => {
+  const source = readFileSync(new URL('../self-healing-host/native-autonomous-loop.ts', import.meta.url), 'utf8')
+  assert.match(source, /automaticRepairAllowed\?: boolean/)
+  assert.match(source, /options\.automaticRepairAllowed === false/)
+  assert.match(source, /staged the proposed recovery for governed review/)
 })

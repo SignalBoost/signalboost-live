@@ -98,5 +98,8 @@ test('GitHub route and migration wire authenticated, serialized, service-role-on
   assert.match(route, /SECURITY_PATROL_KILL_SWITCH/)
   assert.match(migration, /pg_advisory_xact_lock/)
   assert.match(migration, /enable row level security/)
+  assert.match(migration, /security invoker/)
+  assert.doesNotMatch(migration, /security definer/)
+  assert.match(migration, /revoke all on table[\s\S]*from public, anon, authenticated/)
   assert.match(migration, /revoke all on function[\s\S]*from public, anon, authenticated/)
 })

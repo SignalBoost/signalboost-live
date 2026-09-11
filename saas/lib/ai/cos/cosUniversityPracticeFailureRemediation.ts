@@ -149,6 +149,7 @@ export async function reopenCosUniversityStudyAfterFailedPractice(
     const priorRemediation = asRecord(evidence.practiceRemediation)
     const alreadyReopened = Number(priorRemediation.practiceRound) === practiceRound
       && priorRemediation.requiresNewStudyAttempt === true
+      && priorRemediation.reconciledAfterTerminalFailure === true
       && plan.last_attempt_at === null
     if (alreadyReopened) continue
 
@@ -164,6 +165,7 @@ export async function reopenCosUniversityStudyAfterFailedPractice(
           requiresNewStudyAttempt: true,
           requiresIndependentRetest: true,
           academicCredit: false,
+          reconciledAfterTerminalFailure: true,
           reconciledAcrossRuntimeBoundary: !runKeys.has(roundKey(plan.id, practiceRound)),
         },
       },

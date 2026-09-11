@@ -118,7 +118,7 @@ test('Master’s accepted learning emits the same durable study proof before del
   assert.match(masters, /const planIdByGapId = new Map/)
   assert.match(masters, /for \(const gapId of result\.acceptedGapIds\)/)
   assert.match(masters, /const proofs: CosUniversityAcceptedStudyProofInput\[\]/)
-  assert.match(masters, /summary\.plansAttempted = \(await recordAcceptedCosUniversityStudyAttempts\(proofs, new Date\(\)\)\)\.length/)
+  assert.match(masters, /summary\.plansAttempted = \(await recordAcceptedCosUniversityStudyAttempts\(proofs, new Date\(\), agentId\)\)\.length/)
   assert.match(masters, /summary\.status = summary\.plansAttempted > 0 \? 'learned' : 'idle'/)
   assert.doesNotMatch(masters, /markCosUniversityStudyPlansAttempted/)
 })

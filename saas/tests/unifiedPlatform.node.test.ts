@@ -51,6 +51,13 @@ test('i18n locales are supported for concierge fallback responses', () => {
   }
 })
 
+test('general knowledge prompts never fall through to SignalBoost onboarding', () => {
+  const answer = getConciergeAnswer('Explain IT networking to me as though I am a child', 'en', '/')
+  assert.equal(answer.intent, 'support')
+  assert.match(answer.reply, /reasoning engine/i)
+  assert.doesNotMatch(answer.reply, /Marketplace|SaaS|HMI|choose role|telemetry/i)
+})
+
 test('intent inference remains under a 2s performance budget', () => {
   const start = performance.now()
   for (let i = 0; i < 1000; i += 1) inferAudienceRole('executive forecast kpi outreach marketplace booking')

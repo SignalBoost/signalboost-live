@@ -28,6 +28,7 @@ import {
   type CosUniversityMastersProgramId,
 } from './cosUniversityMasters.ts'
 import type { CosUniversitySubjectId } from './cosUniversity.ts'
+import { requireMastersLearningAgentId } from './cosUniversityMastersAgentLearning.ts'
 
 const AGENT_ID = 'cos'
 const MAX_FUTURE_CLOCK_SKEW_MS = 5 * 60_000
@@ -105,24 +106,24 @@ function mapEvidence(row: MastersEvidenceRow): CosUniversityMastersEvidence {
   }
 }
 
-async function loadAssessmentRows(): Promise<CosUniversityAssessmentRow[]> {
+async function loadAssessmentRows(agentId: string): Promise<CosUniversityAssessmentRow[]> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_assessments')
     .select(ASSESSMENT_SELECT)
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .order('observed_at', { ascending: false })
     .limit(10000)
   if (result.error) throw result.error
   return (result.data || []) as CosUniversityAssessmentRow[]
 }
 
-async function loadEnrollment(programKey: string): Promise<CosUniversityProgramEnrollment | null> {
+async function loadEnrollment(programKey: string, agentId: string = AGENT_ID): Promise<CosUniversityProgramEnrollment | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_program_enrollments')
     .select('program_key,program_level,enrolled_at,minimum_residence_until,target_completion_at,hard_deadline_at')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_key', programKey)
     .eq('program_level', 'masters')
     .maybeSingle()
@@ -144,25 +145,25 @@ async function loadAnyMastersEnrollment(): Promise<CosUniversityProgramEnrollmen
   return mapEnrollment((result.data || null) as EnrollmentRow | null)
 }
 
-async function loadCredential(programId: CosUniversityMastersProgramId): Promise<CosUniversityCredential | null> {
+async function loadCredential(programId: CosUniversityMastersProgramId, agentId: string = AGENT_ID): Promise<CosUniversityCredential | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_credentials')
     .select('credential_key,program_key,program_level,title,standing,awarded_at')
-    .eq('agent_id', AGENT_ID)
-    .eq('credential_key', cosUniversityMastersCredentialKey(AGENT_ID, programId))
+    .eq('agent_id', agentId)
+    .eq('credential_key', cosUniversityMastersCredentialKey(agentId, programId))
     .eq('program_level', 'masters')
     .maybeSingle()
   if (result.error) throw result.error
   return mapCredential((result.data || null) as CredentialRow | null)
 }
 
-async function loadEvidence(programKey: string): Promise<MastersEvidenceRow[]> {
+async function loadEvidence(programKey: string, agentId: string = AGENT_ID): Promise<MastersEvidenceRow[]> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_masters_evidence')
     .select(EVIDENCE_SELECT)
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_key', programKey)
     .order('observed_at', { ascending: false })
     .limit(5000)
@@ -170,12 +171,15 @@ async function loadEvidence(programKey: string): Promise<MastersEvidenceRow[]> {
   return ((result.data || []) as MastersEvidenceRow[]).slice().reverse()
 }
 
-export async function readCosUniversityMastersEvidence(programId: CosUniversityMastersProgramId): Promise<CosUniversityMastersEvidence[]> {
-  const rows = await loadEvidence(cosUniversityMastersProgramKey(programId))
+export async function readCosUniversityMastersEvidence(programId: CosUniversityMastersProgramId, agentId: string = AGENT_ID): Promise<CosUniversityMastersEvidence[]> {
+  requireMastersLearningAgentId(agentId)
+  const rows = await loadEvidence(cosUniversityMastersProgramKey(programId), agentId)
   return rows.map(mapEvidence)
 }
 
 export type CosUniversityMastersSharedAdmissionState = {
+  agentId: string
+  undergraduateRemediationClear: boolean
   undergraduateCredentialAwarded: boolean
   currentGeneralistStanding: 'not_graduated' | 'A' | 'A+'
   currentSubjectStanding: Partial<Record<CosUniversitySubjectId, string>>
@@ -183,15 +187,19 @@ export type CosUniversityMastersSharedAdmissionState = {
 
 export async function readCosUniversityMastersSharedAdmissionState(
   now = new Date(),
+  agentId: string = AGENT_ID,
 ): Promise<CosUniversityMastersSharedAdmissionState> {
+  requireMastersLearningAgentId(agentId)
   const [generalist, assessmentRows] = await Promise.all([
-    readCosUniversityGeneralistGraduationStatus(now),
-    loadAssessmentRows(),
+    readCosUniversityGeneralistGraduationStatus(now, agentId),
+    loadAssessmentRows(agentId),
   ])
   const academic = academicStateFromRows(assessmentRows, now)
   const currentSubjectStanding: Partial<Record<CosUniversitySubjectId, string>> = {}
   for (const row of academic.subjectTranscript) currentSubjectStanding[row.subjectId] = row.grade
   return {
+    agentId,
+    undergraduateRemediationClear: generalist.remediation?.pendingCount === 0,
     undergraduateCredentialAwarded: Boolean(generalist.credential),
     currentGeneralistStanding: generalist.currentCompetenceStanding,
     currentSubjectStanding,
@@ -199,7 +207,7 @@ export async function readCosUniversityMastersSharedAdmissionState(
 }
 
 export type CosUniversityMastersRuntimeStatus = {
-  agentId: 'cos'
+  agentId: string
   programId: CosUniversityMastersProgramId
   programKey: string
   title: string
@@ -223,15 +231,21 @@ export async function readCosUniversityMastersRuntimeStatus(
   programId: CosUniversityMastersProgramId,
   now = new Date(),
   sharedAdmissionState?: CosUniversityMastersSharedAdmissionState,
+  agentId: string = AGENT_ID,
 ): Promise<CosUniversityMastersRuntimeStatus> {
+  requireMastersLearningAgentId(agentId)
+  if (sharedAdmissionState && sharedAdmissionState.agentId !== agentId) throw new Error('masters_admission_scope_mismatch')
   const program = COS_UNIVERSITY_MASTERS_PROGRAMS[programId]
   const programKey = cosUniversityMastersProgramKey(programId)
-  const admissionInput = sharedAdmissionState ?? await readCosUniversityMastersSharedAdmissionState(now)
-  const admission = evaluateCosUniversityMastersAdmission(programId, admissionInput)
+  const admissionInput = sharedAdmissionState ?? await readCosUniversityMastersSharedAdmissionState(now, agentId)
+  const decision = evaluateCosUniversityMastersAdmission(programId, admissionInput)
+  const admission = admissionInput.undergraduateRemediationClear
+    ? decision
+    : { admitted: false, reasons: [...decision.reasons, 'unresolved_undergraduate_remediation'] }
   const [enrollment, credential, evidenceRows] = await Promise.all([
-    loadEnrollment(programKey),
-    loadCredential(programId),
-    loadEvidence(programKey),
+    loadEnrollment(programKey, agentId),
+    loadCredential(programId, agentId),
+    loadEvidence(programKey, agentId),
   ])
   const evidence = evidenceRows.map(mapEvidence)
   const graduation = evaluateCosUniversityMastersGraduation(programId, evidence, now)
@@ -247,7 +261,7 @@ export async function readCosUniversityMastersRuntimeStatus(
   }
 
   return {
-    agentId: AGENT_ID,
+    agentId,
     programId,
     programKey,
     title: program.title,

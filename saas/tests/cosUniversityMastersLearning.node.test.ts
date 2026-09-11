@@ -1,3 +1,4 @@
+import './cosUniversityMastersAgentLearning.node.test.ts'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -38,7 +39,7 @@ test('coursework unlocks only the exact module whose gap retained accepted durab
   assert.match(runner, /new ContinuousLearningCycle\(director, adapters\)\.run\(gaps, 0\)/)
   assert.match(runner, /for \(const gapId of result\.acceptedGapIds\)/)
   assert.match(runner, /const proofs: CosUniversityAcceptedStudyProofInput\[\]/)
-  assert.match(runner, /recordAcceptedCosUniversityStudyAttempts\(proofs, new Date\(\)\)/)
+  assert.match(runner, /recordAcceptedCosUniversityStudyAttempts\(proofs, new Date\(\), agentId\)/)
   assert.match(runner, /summary\.status = summary\.plansAttempted > 0 \? 'learned' : 'idle'/)
   assert.doesNotMatch(runner, /result\.accepted > 0 \|\| result\.probationary > 0/)
   assert.doesNotMatch(runner, /markCosUniversityStudyPlansAttempted/)

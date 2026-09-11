@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityLanguageARangeRunner.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
@@ -29,6 +30,13 @@ import {
 } from './cosUniversityLanguageARange.ts'
 
 const AGENT_ID = 'cos'
+
+/** COS keeps its original run keys; every other registered agent is namespaced so ledgers never collide. */
+export function cosUniversityLanguageARangeExamRunKey(input: { agentId: string; stage: string; day: string; targetKey: string }): string {
+  return input.agentId === AGENT_ID
+    ? `${COS_UNIVERSITY_LANGUAGE_A_RANGE_PROFILE}:${input.stage}:${input.day}:${input.targetKey}`
+    : `${COS_UNIVERSITY_LANGUAGE_A_RANGE_PROFILE}:${input.agentId}:${input.stage}:${input.day}:${input.targetKey}`
+}
 
 type AssessmentRow = {
   assessment_key: string
@@ -181,12 +189,12 @@ function runEvidence(rows: LanguageARangeRunRow[]): CosUniversityLanguageARangeR
     }))
 }
 
-async function loadAssessmentRows(): Promise<AssessmentRow[]> {
+async function loadAssessmentRows(agentId: string): Promise<AssessmentRow[]> {
   const db = cosServiceDb()
   if (!db) return []
   const result = await db.from('cos_university_assessments')
     .select('assessment_key,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_authority,observed_at,valid_until')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .not('language_code', 'is', null)
     .order('observed_at', { ascending: false })
     .limit(5000)
@@ -194,12 +202,12 @@ async function loadAssessmentRows(): Promise<AssessmentRow[]> {
   return (result.data || []) as AssessmentRow[]
 }
 
-async function loadRunRows(): Promise<LanguageARangeRunRow[]> {
+async function loadRunRows(agentId: string): Promise<LanguageARangeRunRow[]> {
   const db = cosServiceDb()
   if (!db) return []
   const result = await db.from('cos_university_a_range_runs')
     .select(RUN_SELECT)
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('target_kind', 'language')
     .order('observed_at', { ascending: false })
     .limit(5000)
@@ -225,6 +233,7 @@ function matchingPassedRuns(args: {
 }
 
 async function recordOneAssessment(args: {
+  agentId: string
   run: LanguageARangeRunRow
   dimension: CosPlatformLanguageDimension
   passed: boolean
@@ -241,6 +250,7 @@ async function recordOneAssessment(args: {
       : 'host_private_exam'
   const written = await recordCosUniversityAssessment({
     assessmentKey: args.key,
+    agentId: args.agentId,
     language: args.run.language_code,
     languageDimension: args.dimension,
     kind: args.run.stage,
@@ -257,6 +267,7 @@ async function recordOneAssessment(args: {
 }
 
 async function recordStageAssessments(args: {
+  agentId: string
   run: LanguageARangeRunRow
   allRuns: LanguageARangeRunRow[]
 }): Promise<number> {
@@ -271,6 +282,7 @@ async function recordStageAssessments(args: {
     let written = 0
     for (const dimension of dimensions) {
       written += await recordOneAssessment({
+        agentId: args.agentId,
         run: args.run,
         dimension,
         passed: false,
@@ -304,10 +316,13 @@ async function recordStageAssessments(args: {
   let written = 0
   for (const dimension of dimensions) {
     written += await recordOneAssessment({
+      agentId: args.agentId,
       run: args.run,
       dimension,
       passed: true,
-      key: `cos-university-language-a-range-pass:${args.run.stage}:${language}:${dimension}:${thresholdFingerprint}`,
+      key: args.agentId === AGENT_ID
+        ? `cos-university-language-a-range-pass:${args.run.stage}:${language}:${dimension}:${thresholdFingerprint}`
+        : `cos-university-language-a-range-pass:${args.agentId}:${args.run.stage}:${language}:${dimension}:${thresholdFingerprint}`,
       evidence: {
         runId: args.run.id,
         language,
@@ -378,8 +393,8 @@ async function syncVerifiedLanguageProductionOutcomes(now: Date): Promise<{ cand
       .select(RUN_SELECT).eq('run_key', runKey).maybeSingle()
     if (rowResult.error) throw rowResult.error
     if (!rowResult.data) continue
-    const allRuns = await loadRunRows()
-    recorded += await recordStageAssessments({ run: rowResult.data as LanguageARangeRunRow, allRuns })
+    const allRuns = await loadRunRows(AGENT_ID)
+    recorded += await recordStageAssessments({ agentId: AGENT_ID, run: rowResult.data as LanguageARangeRunRow, allRuns })
   }
   return { candidates: outcomes.length, recorded }
 }
@@ -434,11 +449,11 @@ function eligibleCapstoneTarget(args: {
   return tied[Math.abs(day + 41) % tied.length]
 }
 
-async function createOrFindExamRun(target: CosUniversityLanguageARangeTarget, now: Date): Promise<LanguageARangeRunRow | null> {
+async function createOrFindExamRun(agentId: string, target: CosUniversityLanguageARangeTarget, now: Date): Promise<LanguageARangeRunRow | null> {
   const db = cosServiceDb()
   if (!db) return null
   const targetKey = target.dimension ? `${target.language}:${target.dimension}` : `${target.language}:integrated`
-  const runKey = `${COS_UNIVERSITY_LANGUAGE_A_RANGE_PROFILE}:${target.stage}:${dayKey(now)}:${targetKey}`
+  const runKey = cosUniversityLanguageARangeExamRunKey({ agentId, stage: target.stage, day: dayKey(now), targetKey })
   const existing = await db.from('cos_university_a_range_runs').select(RUN_SELECT).eq('run_key', runKey).maybeSingle()
   if (existing.error) throw existing.error
   if (existing.data) return existing.data as LanguageARangeRunRow
@@ -447,7 +462,7 @@ async function createOrFindExamRun(target: CosUniversityLanguageARangeTarget, no
   const exam = buildCosUniversityLanguageARangeExam({ seed, target })
   const insert = await db.from('cos_university_a_range_runs').insert({
     run_key: runKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     target_kind: 'language',
     stage: target.stage,
     subject_id: null,
@@ -480,7 +495,7 @@ function targetFromRow(row: LanguageARangeRunRow): CosUniversityLanguageARangeTa
   return null
 }
 
-async function executeExamRun(row: LanguageARangeRunRow, now: Date): Promise<CosUniversityLanguageARangeBatchSummary['runs'][number]> {
+async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: Date): Promise<CosUniversityLanguageARangeBatchSummary['runs'][number]> {
   const target = targetFromRow(row)
   if (!target || !row.seed || !row.language_code) {
     return { runId: row.id, stage: row.stage as 'cross_domain_transfer' | 'capstone', language: row.language_code || 'en', dimension: row.language_dimension, status: 'error', passed: null, assessmentRowsRecorded: 0, reasons: ['invalid_language_exam_target'] }
@@ -557,32 +572,37 @@ async function executeExamRun(row: LanguageARangeRunRow, now: Date): Promise<Cos
   const refreshed = await db.from('cos_university_a_range_runs').select(RUN_SELECT).eq('id', row.id).maybeSingle()
   if (refreshed.error) throw refreshed.error
   const terminal = (refreshed.data || { ...row, status, passed, turn_id: turnId, reasons }) as LanguageARangeRunRow
-  const allRuns = await loadRunRows()
-  const assessmentRowsRecorded = freshExecution ? await recordStageAssessments({ run: terminal, allRuns }) : 0
+  const allRuns = await loadRunRows(agentId)
+  const assessmentRowsRecorded = freshExecution ? await recordStageAssessments({ agentId, run: terminal, allRuns }) : 0
   return { runId: row.id, ...target, status, passed, assessmentRowsRecorded, reasons }
 }
 
-export async function runCosUniversityLanguageARangeBatch(options: { now?: Date } = {}): Promise<CosUniversityLanguageARangeBatchSummary> {
+export async function runCosUniversityLanguageARangeBatch(options: { now?: Date; agentId?: string } = {}): Promise<CosUniversityLanguageARangeBatchSummary> {
   if (process.env.COS_UNIVERSITY_A_RANGE_ENABLED !== 'true') {
     return { enabled: false, productionCandidates: 0, productionEvidenceRecorded: 0, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: [], semantics: 'five_language_repeated_transfer_exact_production_integrated_capstone' }
   }
   const now = options.now instanceof Date ? options.now : new Date()
+  const agentId = String(options.agentId || AGENT_ID).trim()
   const errors: string[] = []
   let productionCandidates = 0
   let productionEvidenceRecorded = 0
-  try {
-    const synced = await syncVerifiedLanguageProductionOutcomes(now)
-    productionCandidates = synced.candidates
-    productionEvidenceRecorded = synced.recorded
-  } catch (error) {
-    errors.push(`production_bridge:${error instanceof Error ? error.message : String(error)}`)
+  // cos_turn_outcomes are COS's own verified Production language turns. Crediting them to another agent
+  // would fabricate that agent's real-work evidence, so only COS reads this bridge.
+  if (agentId === AGENT_ID) {
+    try {
+      const synced = await syncVerifiedLanguageProductionOutcomes(now)
+      productionCandidates = synced.candidates
+      productionEvidenceRecorded = synced.recorded
+    } catch (error) {
+      errors.push(`production_bridge:${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   let assessments: AssessmentRow[] = []
   let runs: LanguageARangeRunRow[] = []
   try {
-    assessments = await loadAssessmentRows()
-    runs = await loadRunRows()
+    assessments = await loadAssessmentRows(agentId)
+    runs = await loadRunRows(agentId)
   } catch (error) {
     errors.push(`evidence_load:${error instanceof Error ? error.message : String(error)}`)
   }
@@ -596,7 +616,7 @@ export async function runCosUniversityLanguageARangeBatch(options: { now?: Date 
   const results: CosUniversityLanguageARangeBatchSummary['runs'] = []
   for (const target of targets) {
     try {
-      const row = await createOrFindExamRun(target, now)
+      const row = await createOrFindExamRun(agentId, target, now)
       if (!row) {
         results.push({ runId: null, ...target, status: 'error', passed: null, assessmentRowsRecorded: 0, reasons: ['service_database_unavailable'] })
         continue
@@ -605,7 +625,7 @@ export async function runCosUniversityLanguageARangeBatch(options: { now?: Date 
         results.push({ runId: row.id, ...target, status: `already_${row.status}`, passed: row.passed, assessmentRowsRecorded: 0, reasons: row.reasons || [] })
         continue
       }
-      results.push(await executeExamRun(row, now))
+      results.push(await executeExamRun(agentId, row, now))
     } catch (error) {
       errors.push(`${target.stage}:${target.language}:${target.dimension || 'integrated'}:${error instanceof Error ? error.message : String(error)}`)
     }

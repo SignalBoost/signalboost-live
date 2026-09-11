@@ -1,2 +1,2 @@
-base_sha=f71b0466e87e0b81d22b3d219d2d4c31ed773713
-branch=feat/fine-tune-verifier-evidence
+base_sha=d43cea6aa01c6418f9f3e116cb40a7d62083a1c7
+branch=fix/cos-general-question-fallback

@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityLanguageARangeRunner.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
@@ -345,9 +346,13 @@ async function syncVerifiedLanguageProductionOutcomes(agentId: string, now: Date
   const sourcePrefix = agentId === AGENT_ID
     ? 'production_verified:language:'
     : `production_verified:language:${agentId}:`
-  const result = await db.from('cos_turn_outcomes')
+  const outcomesQuery = db.from('cos_turn_outcomes')
     .select('turn_id,verified_success,repair_needed,escalated,outcome_source,outcome_at')
-    .like('outcome_source', `${sourcePrefix}%`)
+  // COS keeps its exact historical filter; other agents read only their own host-tagged namespace.
+  const scopedQuery = agentId === AGENT_ID
+    ? outcomesQuery.like('outcome_source', 'production_verified:language:%')
+    : outcomesQuery.like('outcome_source', `${sourcePrefix}%`)
+  const result = await scopedQuery
     .order('outcome_at', { ascending: true })
     .limit(300)
   if (result.error) throw result.error

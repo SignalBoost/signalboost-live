@@ -123,3 +123,35 @@ test('repeated pagination fails closed and full-detail fetch concurrency stays b
   assert.equal(report.advisories.length, 9)
   assert.ok(peak > 1 && peak <= 4)
 })
+
+
+test('only compatible fixes for the current affected interval reach stored plan evidence', async () => {
+  const record = vuln()
+  record.affected[1].ranges[0].events = [
+    { introduced: '0' }, { fixed: '1.0.9' },
+    { introduced: '1.2.0' }, { fixed: '1.2.4' },
+    { introduced: '1.3.0' }, { fixed: '1.3.1' },
+  ]
+  const report = await scanner((async (input: any) => String(input).endsWith('/querybatch')
+    ? json({ results: [{ vulns: [{ id: record.id }] }] }) : json(record)) as typeof fetch)()
+  assert.equal(report.ok, true)
+  assert.deepEqual(report.advisories[0].fixedVersions, ['1.2.4'])
+  assert.equal(report.advisories[0].fixedVersions[0], '1.2.4')
+  assert.ok(report.advisories[0].affectedRanges[0].includes('1.0.9'))
+})
+
+test('breaking, ambiguous and unclosed advisory intervals cannot supply a routine fix', async () => {
+  for (const events of [
+    [{ introduced: '0' }, { fixed: '2.0.0' }],
+    [{ fixed: '1.2.4' }],
+    [{ introduced: '1.3.0' }, { fixed: '1.3.1' }],
+    [{ introduced: '1.2.0' }, { last_affected: '1.2.3' }],
+    [{ introduced: '1.2.0' }, { limit: '1.2.4' }],
+  ]) {
+    const record = vuln()
+    record.affected[1].ranges[0].events = events as any
+    const report = await scanner((async (input: any) => String(input).endsWith('/querybatch')
+      ? json({ results: [{ vulns: [{ id: record.id }] }] }) : json(record)) as typeof fetch)()
+    assert.deepEqual(report.advisories[0].fixedVersions, [])
+  }
+})

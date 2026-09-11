@@ -50,9 +50,24 @@ export function cyberReportPresentationCopy(lang: string) { return COPY[lang as 
 export function unclassifiedAdvisoryCount(advisories: Array<{ severity?: string }>): number {
   return advisories.filter(a => !['critical', 'high', 'medium', 'low'].includes(a.severity || '')).length
 }
-export function dependencyRescanUrl(row: { source_area?: string; source_type?: string; repo?: string | null }): string | null {
-  return row.source_area === 'cybersecurity' && row.source_type === 'dependency_scan'
-    && typeof row.repo === 'string' && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(row.repo)
-    && row.repo.split('/').every(part => part !== '.' && part !== '..')
-    ? `https://github.com/${row.repo}` : null
+export function dependencyRescanUrl(row: { source_area?: string; source_type?: string; repo?: string | null; target?: string | null }): string | null {
+  if (row.source_area !== 'cybersecurity' || row.source_type !== 'dependency_scan'
+    || typeof row.repo !== 'string' || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(row.repo)
+    || row.repo.split('/').some(part => part === '.' || part === '..')) return null
+  const fallback = `https://github.com/${row.repo}`
+  if (row.target === undefined || row.target === null || row.target === '') return fallback
+  if (typeof row.target !== 'string') return null
+  const target = row.target.trim()
+  if (!target) return fallback
+  if (target.toLowerCase() === row.repo.toLowerCase()) return fallback
+  // Validate the raw path before URL parsing can normalize traversal away.
+  // An explicit invalid/unsupported target must never widen to the whole repo.
+  const match = target.length <= 4096 && target.match(/^https:\/\/github\.com\/(.+)$/i)
+  if (!match) return null
+  const parts = match[1].replace(/\/$/, '').split('/')
+  if (parts.some(part => !/^[A-Za-z0-9_.@+-]+$/.test(part) || part === '.' || part === '..')) return null
+  const repo = parts.slice(0, 2).join('/').replace(/\.git$/, '')
+  if (repo.toLowerCase() !== row.repo.toLowerCase()) return null
+  if (parts.length !== 2 && (parts.length < 4 || !['tree', 'blob'].includes(parts[2]))) return null
+  return `https://github.com/${parts.join('/')}`
 }

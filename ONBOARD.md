@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.107
+**Version:** 1.110
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -76,6 +76,13 @@ This branch is implementation evidence only until merged, migrated, deployed, co
 current signed Guardian engagement/trusted public key, and exercised by a real Production delivery.
 An absent patrol engagement does not fabricate security evidence; generic provider ingestion reports
 `securityPatrol: not_configured` until the governed patrol configuration is installed.
+
+The follow-up hardening keeps this as a single ingestion path and a single evidence ledger. It rejects
+partial or malformed patrol configuration, rejects malformed kill-switch values, bounds evidence-chain
+loading, pins security functions to an empty search path, explicitly removes browser-role table access,
+and blocks updates or deletes at the database trigger boundary. These controls still do not install a
+GitHub webhook or prove live delivery; Production operation requires the migration, secrets, signed
+Guardian engagement, authorized webhook configuration, and observed real delivery evidence.
 
 ## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
 

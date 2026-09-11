@@ -19,8 +19,7 @@ create index if not exists security_repository_patrol_evidence_repo_time_idx
 
 alter table public.security_repository_patrol_evidence enable row level security;
 revoke all on table public.security_repository_patrol_evidence from public, anon, authenticated;
-grant select, insert on table public.security_repository_patrol_evidence to service_role;
-grant usage, select on sequence public.security_repository_patrol_evidence_id_seq to service_role;
+grant select on table public.security_repository_patrol_evidence to service_role;
 
 create or replace function public.append_security_repository_patrol_evidence(
   p_engagement_id text,
@@ -34,14 +33,14 @@ create or replace function public.append_security_repository_patrol_evidence(
   p_evidence_entry jsonb
 ) returns text
 language plpgsql
-security invoker
-set search_path = public
+security definer
+set search_path = ''
 as $$
 declare
   current_index bigint;
   current_hash text;
 begin
-  perform pg_advisory_xact_lock(hashtextextended(p_engagement_id, 0));
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_engagement_id, 0));
 
   if exists (
     select 1 from public.security_repository_patrol_evidence
@@ -57,7 +56,7 @@ begin
   limit 1;
 
   if current_index is null then
-    if p_chain_index <> 0 or p_previous_hash <> repeat('0', 64) then return 'conflict'; end if;
+    if p_chain_index <> 0 or p_previous_hash <> pg_catalog.repeat('0', 64) then return 'conflict'; end if;
   elsif p_chain_index <> current_index + 1 or p_previous_hash <> current_hash then
     return 'conflict';
   end if;
@@ -75,7 +74,7 @@ begin
     engagement_id, event_id, delivery_id, repository, event_type, chain_index,
     previous_hash, entry_hash, evidence_entry, recorded_at
   ) values (
-    p_engagement_id, p_event_id, p_delivery_id, lower(p_repository), p_event_type, p_chain_index,
+    p_engagement_id, p_event_id, p_delivery_id, pg_catalog.lower(p_repository), p_event_type, p_chain_index,
     p_previous_hash, p_entry_hash, p_evidence_entry,
     (p_evidence_entry#>>'{event,recordedAt}')::timestamptz
   );
@@ -85,6 +84,24 @@ $$;
 
 revoke all on function public.append_security_repository_patrol_evidence(text,text,text,text,text,bigint,text,text,jsonb) from public, anon, authenticated;
 grant execute on function public.append_security_repository_patrol_evidence(text,text,text,text,text,bigint,text,text,jsonb) to service_role;
+
+create or replace function public.reject_security_repository_patrol_evidence_mutation()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  raise exception 'security_repository_patrol_evidence_is_append_only';
+end;
+$$;
+
+drop trigger if exists security_repository_patrol_evidence_immutable
+  on public.security_repository_patrol_evidence;
+create trigger security_repository_patrol_evidence_immutable
+before update or delete on public.security_repository_patrol_evidence
+for each row execute function public.reject_security_repository_patrol_evidence_mutation();
+
+revoke all on function public.reject_security_repository_patrol_evidence_mutation() from public, anon, authenticated;
 
 comment on table public.security_repository_patrol_evidence is
   'Append-only Referee-authorized repository patrol evidence. Raw webhook bodies and secrets are never stored.';

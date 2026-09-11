@@ -5,6 +5,8 @@ import {
   type SecurityEvidenceChainEntry,
 } from '@/security-host/index'
 
+const MAX_EVIDENCE_CHAIN_ENTRIES = 10_000
+
 export function createSupabaseRepositoryPatrolStore(db: SupabaseClient): DurableRepositoryPatrolStore {
   return Object.freeze({
     async loadEvidenceChain(engagementId: string) {
@@ -13,7 +15,9 @@ export function createSupabaseRepositoryPatrolStore(db: SupabaseClient): Durable
         .select('evidence_entry')
         .eq('engagement_id', engagementId)
         .order('chain_index', { ascending: true })
+        .limit(MAX_EVIDENCE_CHAIN_ENTRIES + 1)
       if (result.error) throw result.error
+      if ((result.data?.length ?? 0) > MAX_EVIDENCE_CHAIN_ENTRIES) throw new Error('security_evidence_chain_limit_reached')
       const chain = (result.data ?? []).map(row => row.evidence_entry as SecurityEvidenceChainEntry)
       if (!verifySecurityEvidenceChain(chain)) throw new Error('security_evidence_chain_invalid')
       return chain

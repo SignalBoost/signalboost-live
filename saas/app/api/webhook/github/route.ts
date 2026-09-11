@@ -20,17 +20,27 @@ const patrolEvents = new Set(['push', 'branch_protection_rule', 'release'])
 function repositoryPatrolConfiguration(): {
   envelope: SignedSecurityEngagement
   trustedKeys: TrustedSecurityEngagementKeys
-} | null {
+  killSwitchActive: boolean
+} | null | 'invalid' {
   const envelopeJson = process.env.SECURITY_REPOSITORY_PATROL_ENGAGEMENT_JSON
   const trustedKeysJson = process.env.SECURITY_REPOSITORY_PATROL_TRUSTED_KEYS_JSON
-  if (!envelopeJson || !trustedKeysJson) return null
+  if (!envelopeJson && !trustedKeysJson) return null
+  if (!envelopeJson || !trustedKeysJson) return 'invalid'
   try {
+    const envelope = JSON.parse(envelopeJson) as SignedSecurityEngagement
+    const trustedKeys = JSON.parse(trustedKeysJson) as unknown
+    if (!trustedKeys || typeof trustedKeys !== 'object' || Array.isArray(trustedKeys)) return 'invalid'
+    const keyEntries = Object.entries(trustedKeys)
+    if (keyEntries.length === 0 || keyEntries.some(([keyId, publicKey]) => !keyId || typeof publicKey !== 'string' || !publicKey)) return 'invalid'
+    const killSwitch = process.env.SECURITY_PATROL_KILL_SWITCH
+    if (killSwitch !== undefined && killSwitch !== 'true' && killSwitch !== 'false') return 'invalid'
     return {
-      envelope: JSON.parse(envelopeJson) as SignedSecurityEngagement,
-      trustedKeys: JSON.parse(trustedKeysJson) as TrustedSecurityEngagementKeys,
+      envelope,
+      trustedKeys: Object.freeze(Object.fromEntries(keyEntries)) as TrustedSecurityEngagementKeys,
+      killSwitchActive: killSwitch === 'true',
     }
   } catch {
-    return null
+    return 'invalid'
   }
 }
 
@@ -75,7 +85,10 @@ export async function POST(req: NextRequest) {
   const db = getAdminSupabase()
   let securityPatrol: 'not_configured' | 'persisted' | 'duplicate' = 'not_configured'
   const patrolConfiguration = repositoryPatrolConfiguration()
-  if (verified.accepted && patrolConfiguration) {
+  if (patrolEvents.has(event) && patrolConfiguration === 'invalid') {
+    return NextResponse.json({ ok: false, outcome: 'deferred', error: { code: 'security_patrol_configuration_invalid' } }, { status: 503 })
+  }
+  if (verified.accepted && patrolConfiguration && patrolConfiguration !== 'invalid') {
     const engagementId = patrolConfiguration.envelope.manifest.engagementId
     const minuteStart = new Date(Date.parse(receivedAt) - 60_000).toISOString()
     const [recent, targets, existingTarget] = await Promise.all([
@@ -91,7 +104,7 @@ export async function POST(req: NextRequest) {
       trustedKeys: patrolConfiguration.trustedKeys,
       hostState: {
         now: receivedAt,
-        killSwitchActive: process.env.SECURITY_PATROL_KILL_SWITCH === 'true',
+        killSwitchActive: patrolConfiguration.killSwitchActive,
         requestsInCurrentMinute: recent.count ?? 0,
         concurrentActions: 0,
         distinctTargetsTouched: new Set((targets.data ?? []).map(row => row.repository)).size,

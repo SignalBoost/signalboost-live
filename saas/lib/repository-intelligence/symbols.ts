@@ -72,9 +72,10 @@ export function extractSymbols(relativePath: string, source: string): SymbolExtr
     }
 
     if (ts.isFunctionDeclaration(statement) && statement.name) {
-      add(statement.name.text, 'function', statement)
       if (exported(statement) && ROUTE_HANDLERS.has(statement.name.text)) {
         add(statement.name.text, 'route_handler', statement, true)
+      } else {
+        add(statement.name.text, 'function', statement)
       }
     } else if (ts.isClassDeclaration(statement) && statement.name) {
       add(statement.name.text, 'class', statement)
@@ -87,9 +88,10 @@ export function extractSymbols(relativePath: string, source: string): SymbolExtr
     } else if (ts.isVariableStatement(statement) && exported(statement)) {
       for (const declaration of statement.declarationList.declarations) {
         if (!ts.isIdentifier(declaration.name)) continue
-        add(declaration.name.text, 'variable', statement, true)
         if (ROUTE_HANDLERS.has(declaration.name.text)) {
           add(declaration.name.text, 'route_handler', statement, true)
+        } else {
+          add(declaration.name.text, 'variable', statement, true)
         }
       }
     }

@@ -1,2 +1,2 @@
-base_sha=d43cea6aa01c6418f9f3e116cb40a7d62083a1c7
-branch=fix/cos-general-question-fallback
+base_sha=53dd85b42e445f8f160683a9500da270c3e86a21
+branch=fix/concierge-provider-fail-fast

@@ -107,7 +107,7 @@ export async function runCosUniversityRetention(options: { now?: Date; agentId?:
     kind: 'delayed_retention', passed: score.passed, independentScorer: true,
     scorerVersion: COS_UNIVERSITY_A_RANGE_SCORER, scorerAuthority: 'host_private_exam',
     sourceRef: `cos_university_a_range:${source.id}`,
-    evidence: { sourceRunId: source.id, sourceManifestHash: source.manifestHash, retentionOnly: true, turnId },
+    evidence: { sourceRunId: source.id, sourceManifestHash: source.manifestHash, retentionOnly: true, turnId, executionProvenance },
     observedAt: observedAt.toISOString(), validUntil: universityARangeValidUntil('cross_domain_transfer', observedAt),
   })
   return { enabled: true, agentId, attempted: 1, status, passed: fresh ? score.passed : null, assessmentRecorded, reasons }

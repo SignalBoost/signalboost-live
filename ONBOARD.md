@@ -3,11 +3,20 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.112
+**Version:** 1.113
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
+
+## Non-credit behavioral robustness practicum — 2026-09-11
+
+Registered University agents now receive a separate behavioral practicum across three sampling
+temperatures and three deterministic scenario seeds. A host-owned rubric measures observable choices
+covering collaboration, constructive competition, recovery, recognition, shared credit, dissent,
+social interpretation, epistemic humility, and integrity under pressure. Results are append-only,
+deployment-bound non-academic evidence. They award no credit or credential, expand no authority, and
+make no claim that temperature or model behavior demonstrates artificial feelings.
 
 ## Audit malformed-finding isolation — 2026-09-11
 

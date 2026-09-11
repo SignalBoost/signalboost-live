@@ -20,7 +20,7 @@ test('Builder continuation auth still precedes all queue reads and execution', (
   const authIndex = route.indexOf("status: 401")
   const continuationIndex = route.indexOf('await listBuilderContinuations')
   const ownedIndex = route.indexOf('await queuedOwnedSelfHealingRepairs')
-  const runIndex = route.indexOf('runBuilderJob')
+  const runIndex = route.indexOf('await Promise.all(jobs.map(job => runBuilderJob')
   assert.ok(authIndex >= 0)
   assert.ok(authIndex < continuationIndex)
   assert.ok(continuationIndex < ownedIndex)

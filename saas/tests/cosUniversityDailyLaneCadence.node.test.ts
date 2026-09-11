@@ -104,3 +104,47 @@ test('the original once-daily academic order is preserved by the cadence windows
   for (let i = 1; i < order.length; i += 1) assert.ok(minute(order[i]) > minute(order[i - 1]), `${order[i]} must follow ${order[i - 1]}`)
   assert.equal(minute('independent_exams'), 7 * 60, 'exams keep their 07:00 UTC slot after the 06:30 mining lane')
 })
+
+test('per-agent lanes: one agent\'s batch never satisfies another agent\'s daily batch', () => {
+  const now = new Date('2026-09-12T08:10:00Z')
+  const cosRun = row('2026-09-12T07:10:30Z', { ...executed, agentId: 'cos' }, 'cos-1')
+  const specialist = decideCosUniversityDailyLaneCadence({ path: 'subject_a_range_evidence', now, rows: [cosRun], agentId: 'software-specialist' })
+  assert.equal(specialist.due, true)
+  assert.equal(specialist.agentId, 'software-specialist')
+  const cos = decideCosUniversityDailyLaneCadence({ path: 'subject_a_range_evidence', now, rows: [cosRun], agentId: 'cos' })
+  assert.equal(cos.due, false)
+  assert.equal(cos.priorExecutionRef, 'db://cos_university_learning_assurance_events/cos-1')
+})
+
+test('per-agent lanes: receipts written before agent tagging count only as COS executions', () => {
+  const legacy = { ...executed }
+  assert.equal(isCosUniversityDailyBatchExecution(legacy, 'cos'), true)
+  assert.equal(isCosUniversityDailyBatchExecution(legacy, 'software-specialist'), false)
+  assert.equal(isCosUniversityDailyBatchExecution(legacy), true, 'path-level lanes keep their original behavior')
+})
+
+test('A-range runs for every registered agent, one agent per tick, each through its own program gate and cadence', () => {
+  const route = fs.readFileSync(path.resolve(import.meta.dirname, '../app/api/cron/cos-university-a-range/route.ts'), 'utf8')
+  assert.match(route, /listCosUniversityRegisteredAgents\(\)/)
+  assert.match(route, /readCosUniversityUndergraduateAcademicLaneGate\(now, agent\.agentId\)/)
+  assert.match(route, /readCosUniversityDailyLaneCadence\('subject_a_range_evidence', now, agent\.agentId\)/)
+  assert.match(route, /runCosUniversityARangeBatch\(\{ now, agentId: agent\.agentId \}\)/)
+  assert.match(route, /evidence: \{ \.\.\.result, agentId: agent\.agentId, programGate \}/)
+  const runAt = route.indexOf('runCosUniversityARangeBatch({')
+  assert.ok(route.indexOf('return NextResponse.json({ ok: result.errors.length === 0', runAt) > runAt, 'a tick returns after one agent batch')
+})
+
+test('A-range runner is agent-scoped and never attributes COS Production turns to another agent', () => {
+  const runner = fs.readFileSync(path.resolve(import.meta.dirname, '../lib/ai/cos/cosUniversityARangeRunner.ts'), 'utf8')
+  assert.match(runner, /options: \{ now\?: Date; agentId\?: string \}/)
+  assert.match(runner, /loadAssessmentRows\(agentId\)/)
+  assert.match(runner, /loadRunRows\(agentId\)/)
+  assert.match(runner, /agent_id: agentId,/)
+  assert.doesNotMatch(runner, /\.eq\('agent_id', AGENT_ID\)/, 'evidence reads must use the requested agent')
+  assert.match(runner, /if \(agentId === AGENT_ID\) \{\s*try \{\s*const synced = await syncVerifiedProductionOutcomes/)
+  // COS keeps its historical run and assessment keys; other agents are namespaced so ledgers never collide.
+  assert.match(runner, /\$\{COS_UNIVERSITY_A_RANGE_PROFILE\}:\$\{input\.stage\}:\$\{input\.day\}:\$\{input\.subjectId\}/)
+  assert.match(runner, /\$\{COS_UNIVERSITY_A_RANGE_PROFILE\}:\$\{input\.agentId\}:\$\{input\.stage\}:\$\{input\.day\}:\$\{input\.subjectId\}/)
+  assert.match(runner, /cos-university-a-range-pass:\$\{args\.agentId\}:/)
+  assert.match(runner, /agentId: args\.agentId,/)
+})

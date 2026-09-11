@@ -1,6 +1,14 @@
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint
+## COS University per-agent A-range transfer eligibility — 2026-09-11
+
+Subject A-range execution now evaluates every registered University agent against that agent's own
+current academic program. A transfer exam becomes eligible only after two fresh unseen passes in the
+same subject with no intervening failure. The 14-day retention clock begins with the first verified
+transfer pass. Hourly work remains bounded to one agent's daily batch in stable order; credentials
+and authority are unchanged.
+
 ## COS University exact-deployment daily-lane cadence — 2026-09-11
 
 Daily academic batches remain limited to one successful execution per UTC day, but their Production
@@ -11,7 +19,7 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.121
+**Version:** 1.122
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**

@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityDailyLaneCadenceCore.ts
 import type { LearningPathId } from './cosUniversityLearningAssurance.ts'
 
 /**
@@ -29,6 +28,7 @@ export type CosUniversityDailyLaneReceiptRow = Readonly<{
 
 export type CosUniversityDailyLaneCadence = Readonly<{
   path: LearningPathId
+  agentId: string | null
   due: boolean
   reason: 'before_daily_window' | 'daily_batch_already_executed' | 'daily_batch_due'
   utcDay: string
@@ -38,9 +38,19 @@ export type CosUniversityDailyLaneCadence = Readonly<{
   semantics: 'hourly_receipt_once_per_utc_day_academic_batch'
 }>
 
-/** A receipt counts as today's batch only if the runner really executed with the feature on and succeeded. */
-export function isCosUniversityDailyBatchExecution(evidence: Record<string, unknown> | null | undefined): boolean {
+/** Receipts written before per-agent lanes existed carry no agentId and were always COS's batch. */
+export const COS_UNIVERSITY_DAILY_LANE_LEGACY_AGENT_ID = 'cos'
+
+/**
+ * A receipt counts as today's batch only if the runner really executed with the feature on and succeeded.
+ * When an agentId is given (per-agent lanes), the execution must also belong to that agent.
+ */
+export function isCosUniversityDailyBatchExecution(evidence: Record<string, unknown> | null | undefined, agentId?: string): boolean {
   if (!evidence) return false
+  if (agentId !== undefined) {
+    const owner = typeof evidence.agentId === 'string' && evidence.agentId ? evidence.agentId : COS_UNIVERSITY_DAILY_LANE_LEGACY_AGENT_ID
+    if (owner !== agentId) return false
+  }
   return evidence.invocationSucceeded === true
     && evidence.featureEnabled === true
     && evidence.dailyCadence !== 'not_due'
@@ -52,6 +62,7 @@ export function decideCosUniversityDailyLaneCadence(input: {
   path: LearningPathId
   now: Date
   rows: readonly CosUniversityDailyLaneReceiptRow[]
+  agentId?: string
 }): CosUniversityDailyLaneCadence {
   const window = COS_UNIVERSITY_DAILY_LANE_WINDOWS[input.path]
   if (!window) throw new Error(`not_a_daily_lane:${input.path}`)
@@ -61,7 +72,7 @@ export function decideCosUniversityDailyLaneCadence(input: {
   const dayStartMs = Date.parse(`${utcDay}T00:00:00.000Z`)
   const windowOpensMs = dayStartMs + window.hourUtc * 3_600_000 + window.minuteUtc * 60_000
   const windowOpensAt = new Date(windowOpensMs).toISOString()
-  const base = { path: input.path, utcDay, windowOpensAt, semantics: 'hourly_receipt_once_per_utc_day_academic_batch' as const }
+  const base = { path: input.path, agentId: input.agentId ?? null, utcDay, windowOpensAt, semantics: 'hourly_receipt_once_per_utc_day_academic_batch' as const }
 
   if (nowMs < windowOpensMs) {
     return Object.freeze({ ...base, due: false, reason: 'before_daily_window', priorExecutionRef: null, runnerInvoked: false })
@@ -69,7 +80,7 @@ export function decideCosUniversityDailyLaneCadence(input: {
   const executed = input.rows
     .filter(row => {
       const at = Date.parse(row.observed_at)
-      return Number.isFinite(at) && at >= windowOpensMs && at <= nowMs && isCosUniversityDailyBatchExecution(row.evidence)
+      return Number.isFinite(at) && at >= windowOpensMs && at <= nowMs && isCosUniversityDailyBatchExecution(row.evidence, input.agentId)
     })
     .sort((a, b) => Date.parse(b.observed_at) - Date.parse(a.observed_at))[0]
   if (executed) {

@@ -104,11 +104,20 @@ function uniqueChangedPaths(payload: Record<string, unknown>): readonly string[]
         if (typeof value !== 'string' || value.length === 0 || value.length > 512) continue
         if (value.startsWith('/') || value.split('/').includes('..')) continue
         paths.push(value)
-        if (paths.length >= 100) return Object.freeze([...new Set(paths)].slice(0, 100))
       }
     }
   }
-  return Object.freeze([...new Set(paths)].slice(0, 100))
+  const sensitive = (path: string) =>
+    /^\.github\/(?:workflows\/|CODEOWNERS$|main-write-token$)/.test(path)
+    || /(^|\/)security-host\//.test(path)
+    || /(^|\/)supabase\/migrations\//.test(path)
+    || /(^|\/)app\/api\/webhook\/github\/route\.ts$/.test(path)
+    || /(^|\/)(?:package-lock\.json|pnpm-lock\.yaml|yarn\.lock)$/.test(path)
+  const unique = [...new Set(paths)]
+  return Object.freeze([
+    ...unique.filter(sensitive),
+    ...unique.filter(path => !sensitive(path)),
+  ].slice(0, 100))
 }
 
 function repositoryName(payload: Record<string, unknown>): string {

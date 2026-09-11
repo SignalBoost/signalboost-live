@@ -1,7 +1,13 @@
 // saas/lib/ai/cos/learnedCorpusSemantic.ts
 //
-// Semantic retrieval + governed embedding backfill for the learned corpus.
+// Semantic retrieval + governed semantic/embedding backfill for the learned corpus.
 // Vector compatibility is model-specific: equal dimensions do not imply equal semantic space.
+
+import {
+  distillSemanticKnowledge,
+  SEMANTIC_DISTILLATION_VERSION,
+  type SemanticLearningFact,
+} from '@/lib/cos-core/layers/learning/semanticDistillation.ts'
 
 type ServiceDb = NonNullable<Awaited<ReturnType<typeof import('@/lib/cos-core/storage/supabase')['cosServiceDb']>>>
 
@@ -75,6 +81,68 @@ export type LearnedCorpusEmbeddingStats = {
   eligibleEmbedded: number | null
   pending: number | null
   model?: string | null
+}
+
+export type LearnedCorpusSemanticDistillationPlan = Readonly<{
+  changed: boolean
+  summary: string
+  facts: unknown
+}>
+
+export type LearnedCorpusSemanticDistillationBackfillResult = Readonly<{
+  status: 'backfilled' | 'skipped' | 'error'
+  version: string
+  attempted: number
+  changed: number
+  unchanged: number
+  queuedForReembedding: number
+  failed: number
+  remaining: number | null
+  errors: string[]
+}>
+
+type SemanticBackfillRow = {
+  content_hash: string
+  subject: string | null
+  summary: string | null
+  facts: unknown
+  fact_extraction_error: string | null
+  semantic_distillation_version: string | null
+  observed_at: string
+}
+
+function retainedSemanticFacts(value: unknown): SemanticLearningFact[] | null {
+  if (!Array.isArray(value)) return null
+  const facts: SemanticLearningFact[] = []
+  for (const item of value) {
+    if (!item || typeof item !== 'object') return null
+    const row = item as Record<string, unknown>
+    const predicate = String(row.predicate ?? '').trim()
+    const object = String(row.object ?? '').trim()
+    const confidence = Number(row.confidence)
+    if (!predicate || !object || !Number.isFinite(confidence)) return null
+    facts.push({ predicate, object, confidence })
+  }
+  return facts
+}
+
+/**
+ * Pure planning helper used by the historical backfill and regression tests. Unknown legacy fact
+ * shapes are left byte-for-byte untouched rather than guessed at; the summary can still be safely
+ * distilled because extraction is source-authored and deterministic.
+ */
+export function planLearnedCorpusSemanticDistillation(row: {
+  subject?: unknown
+  summary?: unknown
+  facts?: unknown
+}): LearnedCorpusSemanticDistillationPlan {
+  const subject = String(row.subject ?? '')
+  const summary = String(row.summary ?? '')
+  const parsedFacts = retainedSemanticFacts(row.facts)
+  const distilled = distillSemanticKnowledge({ subject, summary, facts: parsedFacts ?? [] })
+  const facts = parsedFacts === null ? row.facts : distilled.facts
+  const factsChanged = parsedFacts !== null && JSON.stringify(facts) !== JSON.stringify(parsedFacts)
+  return Object.freeze({ changed: distilled.summary !== summary || factsChanged, summary: distilled.summary, facts })
 }
 
 export function learnedCorpusEmbeddingText(row: {
@@ -172,6 +240,115 @@ export async function embedLearnedCorpusRow(row: {
     console.warn('learnedCorpusSemantic: embedding unavailable; row stored without current-model vector', { contentHash: row.content_hash, error: message })
     return { embedded: false, error: message }
   }
+}
+
+function semanticVersionFilter(): string {
+  return `semantic_distillation_version.is.null,semantic_distillation_version.neq.${SEMANTIC_DISTILLATION_VERSION}`
+}
+
+async function countPendingSemanticDistillation(): Promise<number | null> {
+  const db = await serviceDb()
+  if (!db) return null
+  const result = await db.from('cos_continuous_learning')
+    .select('content_hash', { count: 'exact', head: true })
+    .or(ELIGIBLE_FILTER)
+    .or(semanticVersionFilter())
+  if (result.error) return null
+  return Math.max(0, Number(result.count ?? 0))
+}
+
+/**
+ * Bounded historical semantic backfill.
+ *
+ * Raw evidence/provenance columns are deliberately absent from both SELECT and UPDATE payloads.
+ * A row whose canonical semantic fields change has its vector invalidated atomically with that
+ * change, so active-model retrieval cannot serve a stale vector. The existing indexer then embeds
+ * only those invalidated rows. Unchanged rows merely receive the version marker and never re-embed.
+ */
+export async function backfillRetainedCorpusSemanticDistillation(options: {
+  limit?: number
+  concurrency?: number
+} = {}): Promise<LearnedCorpusSemanticDistillationBackfillResult> {
+  const db = await serviceDb()
+  if (!db) {
+    return Object.freeze({
+      status: 'skipped', version: SEMANTIC_DISTILLATION_VERSION, attempted: 0, changed: 0,
+      unchanged: 0, queuedForReembedding: 0, failed: 0, remaining: null,
+      errors: ['COS Supabase service store is not configured'],
+    })
+  }
+
+  const limit = Math.max(1, Math.min(128, Math.floor(options.limit ?? 32)))
+  const concurrency = Math.max(1, Math.min(8, Math.floor(options.concurrency ?? 4)))
+  const select = 'content_hash,subject,summary,facts,fact_extraction_error,semantic_distillation_version,observed_at'
+  const pending = await db.from('cos_continuous_learning')
+    .select(select)
+    .or(ELIGIBLE_FILTER)
+    .or(semanticVersionFilter())
+    .order('observed_at', { ascending: true })
+    .limit(limit)
+
+  if (pending.error) {
+    return Object.freeze({
+      status: 'error', version: SEMANTIC_DISTILLATION_VERSION, attempted: 0, changed: 0,
+      unchanged: 0, queuedForReembedding: 0, failed: 0, remaining: null,
+      errors: [pending.error.message || String(pending.error)],
+    })
+  }
+
+  const rows = (pending.data ?? []) as SemanticBackfillRow[]
+  let cursor = 0
+  let changed = 0
+  let unchanged = 0
+  let queuedForReembedding = 0
+  let failed = 0
+  const errors: string[] = []
+
+  const worker = async () => {
+    while (true) {
+      const index = cursor++
+      if (index >= rows.length) return
+      const row = rows[index]
+      try {
+        const plan = planLearnedCorpusSemanticDistillation(row)
+        const payload: Record<string, unknown> = {
+          semantic_distillation_version: SEMANTIC_DISTILLATION_VERSION,
+          semantic_distilled_at: new Date().toISOString(),
+        }
+        if (plan.changed) {
+          payload.summary = plan.summary
+          payload.facts = plan.facts
+          payload.embedding = null
+          payload.embedding_model = null
+        }
+        const update = await db.from('cos_continuous_learning').update(payload).eq('content_hash', row.content_hash)
+        if (update.error) throw update.error
+        if (plan.changed) {
+          changed += 1
+          queuedForReembedding += 1
+        } else {
+          unchanged += 1
+        }
+      } catch (error) {
+        failed += 1
+        errors.push(error instanceof Error ? error.message : String(error))
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, rows.length || 1) }, () => worker()))
+  const remaining = await countPendingSemanticDistillation()
+  return Object.freeze({
+    status: rows.length === 0 ? 'skipped' : failed === rows.length ? 'error' : 'backfilled',
+    version: SEMANTIC_DISTILLATION_VERSION,
+    attempted: rows.length,
+    changed,
+    unchanged,
+    queuedForReembedding,
+    failed,
+    remaining,
+    errors: [...new Set(errors)].slice(0, 8),
+  })
 }
 
 const CORPUS_SELECT = 'content_hash,subject,summary,facts,confidence,fact_extraction_error,embedding_model'

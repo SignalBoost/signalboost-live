@@ -1,4 +1,3 @@
-// saas/lib/ai/cos/cosUniversityLanguageARangeRunner.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
@@ -31,8 +30,8 @@ import {
 
 const AGENT_ID = 'cos'
 
-/** COS keeps its original run keys; every other registered agent is namespaced so ledgers never collide. */
-export function cosUniversityLanguageARangeExamRunKey(input: { agentId: string; stage: string; day: string; targetKey: string }): string {
+/** COS keeps historical keys; every other agent is namespaced to prevent evidence collisions. */
+export function cosUniversityLanguageARangeRunKey(input: { agentId: string; stage: string; day: string; targetKey: string }): string {
   return input.agentId === AGENT_ID
     ? `${COS_UNIVERSITY_LANGUAGE_A_RANGE_PROFILE}:${input.stage}:${input.day}:${input.targetKey}`
     : `${COS_UNIVERSITY_LANGUAGE_A_RANGE_PROFILE}:${input.agentId}:${input.stage}:${input.day}:${input.targetKey}`
@@ -337,12 +336,18 @@ async function recordStageAssessments(args: {
   return written
 }
 
-async function syncVerifiedLanguageProductionOutcomes(now: Date): Promise<{ candidates: number; recorded: number }> {
+async function syncVerifiedLanguageProductionOutcomes(agentId: string, now: Date): Promise<{ candidates: number; recorded: number }> {
   const db = cosServiceDb()
   if (!db) return { candidates: 0, recorded: 0 }
+  // Specialist outcomes carry a host-written agent segment:
+  // production_verified:language:<agentId>:<language>:<dimension>.
+  // COS retains its historical production_verified:language:<language>:<dimension> form.
+  const sourcePrefix = agentId === AGENT_ID
+    ? 'production_verified:language:'
+    : `production_verified:language:${agentId}:`
   const result = await db.from('cos_turn_outcomes')
     .select('turn_id,verified_success,repair_needed,escalated,outcome_source,outcome_at')
-    .like('outcome_source', 'production_verified:language:%')
+    .like('outcome_source', `${sourcePrefix}%`)
     .order('outcome_at', { ascending: true })
     .limit(300)
   if (result.error) throw result.error
@@ -351,7 +356,10 @@ async function syncVerifiedLanguageProductionOutcomes(now: Date): Promise<{ cand
 
   for (const outcome of outcomes) {
     const source = clean(outcome.outcome_source, 240)
-    const parsed = parseCosUniversityVerifiedLanguageProductionSource(source)
+    const normalizedSource = agentId === AGENT_ID
+      ? source
+      : source.replace(sourcePrefix, 'production_verified:language:')
+    const parsed = parseCosUniversityVerifiedLanguageProductionSource(normalizedSource)
     const outcomeAt = clean(outcome.outcome_at, 80)
     if (outcome.verified_success === null || !parsed || !outcomeAt || !Number.isFinite(Date.parse(outcomeAt))) continue
 
@@ -359,11 +367,13 @@ async function syncVerifiedLanguageProductionOutcomes(now: Date): Promise<{ cand
     if (experience.error) throw experience.error
     if (!experience.data?.turn_id) continue
 
-    const runKey = `language-production:${outcome.turn_id}:${parsed.language}:${parsed.dimension}:${outcomeAt}`
+    const runKey = agentId === AGENT_ID
+      ? `language-production:${outcome.turn_id}:${parsed.language}:${parsed.dimension}:${outcomeAt}`
+      : `language-production:${agentId}:${outcome.turn_id}:${parsed.language}:${parsed.dimension}:${outcomeAt}`
     const variantHash = stableHash(outcome.turn_id, source, outcomeAt, parsed.language, parsed.dimension)
     const insert = await db.from('cos_university_a_range_runs').upsert({
       run_key: runKey,
-      agent_id: AGENT_ID,
+      agent_id: agentId,
       target_kind: 'language',
       stage: 'production_transfer',
       subject_id: null,
@@ -393,8 +403,8 @@ async function syncVerifiedLanguageProductionOutcomes(now: Date): Promise<{ cand
       .select(RUN_SELECT).eq('run_key', runKey).maybeSingle()
     if (rowResult.error) throw rowResult.error
     if (!rowResult.data) continue
-    const allRuns = await loadRunRows(AGENT_ID)
-    recorded += await recordStageAssessments({ agentId: AGENT_ID, run: rowResult.data as LanguageARangeRunRow, allRuns })
+    const allRuns = await loadRunRows(agentId)
+    recorded += await recordStageAssessments({ agentId, run: rowResult.data as LanguageARangeRunRow, allRuns })
   }
   return { candidates: outcomes.length, recorded }
 }
@@ -453,7 +463,7 @@ async function createOrFindExamRun(agentId: string, target: CosUniversityLanguag
   const db = cosServiceDb()
   if (!db) return null
   const targetKey = target.dimension ? `${target.language}:${target.dimension}` : `${target.language}:integrated`
-  const runKey = cosUniversityLanguageARangeExamRunKey({ agentId, stage: target.stage, day: dayKey(now), targetKey })
+  const runKey = cosUniversityLanguageARangeRunKey({ agentId, stage: target.stage, day: dayKey(now), targetKey })
   const existing = await db.from('cos_university_a_range_runs').select(RUN_SELECT).eq('run_key', runKey).maybeSingle()
   if (existing.error) throw existing.error
   if (existing.data) return existing.data as LanguageARangeRunRow
@@ -578,24 +588,20 @@ async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: D
 }
 
 export async function runCosUniversityLanguageARangeBatch(options: { now?: Date; agentId?: string } = {}): Promise<CosUniversityLanguageARangeBatchSummary> {
+  const now = options.now instanceof Date ? options.now : new Date()
+  const agentId = String(options.agentId || AGENT_ID).trim()
   if (process.env.COS_UNIVERSITY_A_RANGE_ENABLED !== 'true') {
     return { enabled: false, productionCandidates: 0, productionEvidenceRecorded: 0, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: [], semantics: 'five_language_repeated_transfer_exact_production_integrated_capstone' }
   }
-  const now = options.now instanceof Date ? options.now : new Date()
-  const agentId = String(options.agentId || AGENT_ID).trim()
   const errors: string[] = []
   let productionCandidates = 0
   let productionEvidenceRecorded = 0
-  // cos_turn_outcomes are COS's own verified Production language turns. Crediting them to another agent
-  // would fabricate that agent's real-work evidence, so only COS reads this bridge.
-  if (agentId === AGENT_ID) {
-    try {
-      const synced = await syncVerifiedLanguageProductionOutcomes(now)
-      productionCandidates = synced.candidates
-      productionEvidenceRecorded = synced.recorded
-    } catch (error) {
-      errors.push(`production_bridge:${error instanceof Error ? error.message : String(error)}`)
-    }
+  try {
+    const synced = await syncVerifiedLanguageProductionOutcomes(agentId, now)
+    productionCandidates = synced.candidates
+    productionEvidenceRecorded = synced.recorded
+  } catch (error) {
+    errors.push(`production_bridge:${error instanceof Error ? error.message : String(error)}`)
   }
 
   let assessments: AssessmentRow[] = []

@@ -15,13 +15,21 @@ export function isCosUniversityAgentRole(value: unknown): value is CosUniversity
 
 export type CosUniversityRegisteredAgent = Readonly<{ agentId: string; role: CosUniversityAgentRole }>
 
-export async function listCosUniversityRegisteredAgents(limit = 100): Promise<CosUniversityRegisteredAgent[]> {
+export async function listCosUniversityRegisteredAgents(limit?: number): Promise<CosUniversityRegisteredAgent[]> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const result = await db.from('cos_university_agent_registry')
-    .select('agent_id,role').order('agent_id', { ascending: true }).limit(Math.max(1, Math.min(500, limit)))
-  if (result.error) throw result.error
-  return ((result.data || []) as Array<{ agent_id: string; role: unknown }>).map((row) => {
+  const requested = limit == null ? Number.POSITIVE_INFINITY : Math.max(1, limit)
+  const pageSize = Math.min(500, requested)
+  const rows: Array<{ agent_id: string; role: unknown }> = []
+  for (let from = 0; rows.length < requested; from += pageSize) {
+    const result = await db.from('cos_university_agent_registry')
+      .select('agent_id,role').order('agent_id', { ascending: true }).range(from, from + pageSize - 1)
+    if (result.error) throw result.error
+    const page = (result.data || []) as Array<{ agent_id: string; role: unknown }>
+    rows.push(...page.slice(0, requested - rows.length))
+    if (page.length < pageSize) break
+  }
+  return rows.map((row) => {
     if (!isCosUniversityAgentRole(row.role)) throw new Error('invalid_persisted_agent_role')
     return Object.freeze({ agentId: row.agent_id, role: row.role })
   })

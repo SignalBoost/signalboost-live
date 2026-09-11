@@ -1,4 +1,3 @@
-// saas/app/api/cron/cos-university-language-a-range/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityLanguageARangeBatch } from '@/lib/ai/cos/cosUniversityLanguageARangeRunner'
 import { listCosUniversityRegisteredAgents } from '@/lib/ai/cos/cosUniversityAgentRegistry'
@@ -10,7 +9,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-// Every registered University agent (COS and each specialist) earns its own five-language transfer and capstone
+// Every registered University agent (COS and each specialist) earns its own transfer and capstone
 // evidence. Each hourly tick runs at most ONE agent's daily batch, in stable agent order, so the
 // function keeps the original single-batch duration envelope and each agent keeps once-per-UTC-day.
 export async function GET(req: NextRequest) {
@@ -22,7 +21,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const now = new Date()
-    const agents = await listCosUniversityRegisteredAgents()
+    const registeredAgents = await listCosUniversityRegisteredAgents()
+    // Rotate the stable registry order hourly so a persistently failing agent cannot starve peers.
+    const offset = registeredAgents.length ? now.getUTCHours() % registeredAgents.length : 0
+    const agents = [...registeredAgents.slice(offset), ...registeredAgents.slice(0, offset)]
     const gated: Array<Record<string, unknown>> = []
     const notDue: Array<Record<string, unknown>> = []
     for (const agent of agents) {

@@ -60,11 +60,16 @@ test('Production worker durably records the policy handoff before completing wor
   assert.match(groupingMigration, /status in \('awaiting_human_review', 'in_progress'\)/)
   assert.match(groupingMigration, /limit 100/)
   assert.match(groupingMigration, /grant execute .* service_role/)
+  // Retry identity remains durable after an evidence summary leaves the bounded 100-item review window.
   const retryMigration = readFileSync(new URL('../supabase/migrations/20260911163127_guardian_review_evidence_dedupe.sql', import.meta.url), 'utf8')
   assert.match(retryMigration, /guardian_repository_review_evidence/)
   assert.match(retryMigration, /where finding_id = p_finding->>'id'/)
   assert.match(retryMigration, /jsonb_build_array\(p_finding\) \|\| coalesce/)
   assert.match(retryMigration, /limit 100/)
+  const backfillMigration = readFileSync(new URL('../supabase/migrations/20260911164011_guardian_review_evidence_backfill.sql', import.meta.url), 'utf8')
+  assert.match(backfillMigration, /cross join lateral/)
+  assert.match(backfillMigration, /event\.event_type = 'policy_evaluated'/)
+  assert.match(backfillMigration, /on conflict \(finding_id\) do nothing/)
 })
 
 test('owner review disposition cannot be converted into repair approval', () => {

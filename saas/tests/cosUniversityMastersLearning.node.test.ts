@@ -1,3 +1,4 @@
+import './cosUniversityMastersFailureReceipt.node.test.ts'
 import './cosUniversityMastersAgentLearning.node.test.ts'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'

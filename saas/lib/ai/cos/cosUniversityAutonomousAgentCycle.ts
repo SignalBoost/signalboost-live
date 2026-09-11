@@ -14,6 +14,7 @@ export type CosUniversityAutonomousAgentCycleSummary = Readonly<{
   enabled: boolean
   registered: number
   processed: number
+  independentExamRuns: number
   agents: readonly Readonly<{ agentId: string; role: string; admitted: boolean; nextAction: CosUniversityNextAcademicAction | 'error'; completionRatio: number | null; motivation: CosUniversityMotivationalState | null; peerRank: number | null; error: string | null }>[]
   errors: readonly string[]
   semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed'
@@ -22,13 +23,14 @@ export type CosUniversityAutonomousAgentCycleSummary = Readonly<{
 /** Bounded host cycle. It enrolls every registered identity and routes its next academic action. */
 export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date; maxAgents?: number } = {}): Promise<CosUniversityAutonomousAgentCycleSummary> {
   if (process.env.COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED !== 'true') {
-    return { enabled: false, registered: 0, processed: 0, agents: [], errors: [], semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed' }
+    return { enabled: false, registered: 0, processed: 0, independentExamRuns: 0, agents: [], errors: [], semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed' }
   }
   const now = options.now instanceof Date ? options.now : new Date()
   const registered = await listCosUniversityRegisteredAgents(options.maxAgents ?? 25)
   const motivationStandings = await readCosUniversityMotivationStandings(registered)
   const agents: Array<CosUniversityAutonomousAgentCycleSummary['agents'][number]> = []
   const errors: string[] = []
+  let independentExamRuns = 0
   for (const agent of registered) {
     try {
       const motivation = selectCosUniversityMotivationalPriority(motivationStandings, agent.agentId)
@@ -39,11 +41,13 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
       let nextAction = decideCosUniversityNextAcademicAction(record)
       const readyExam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2, readyStudyPlansOnly: true })
       if (readyExam.errors.length) throw new Error(readyExam.errors.join('; '))
+      independentExamRuns += readyExam.runs.length
       if (readyExam.runs.length > 0) {
         nextAction = 'independent_exam'
       } else if (nextAction === 'independent_exam') {
         const exam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2 })
         if (exam.errors.length) throw new Error(exam.errors.join('; '))
+        independentExamRuns += exam.runs.length
       } else if (nextAction === 'study' || nextAction === 'remediate') {
         const learning = await runCosUniversityContinuousLearning({ now, agentId: agent.agentId, maxStudyPlans: motivation?.studyPlanLimit || 4 })
         if (learning.status === 'error') throw new Error(learning.errors.join('; ') || 'continuous_learning_failed')
@@ -59,5 +63,5 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
       agents.push({ agentId: agent.agentId, role: agent.role, admitted: false, nextAction: 'error', completionRatio: null, motivation: null, peerRank: null, error: message })
     }
   }
-  return { enabled: true, registered: registered.length, processed: agents.length, agents, errors, semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed' }
+  return { enabled: true, registered: registered.length, processed: agents.length, independentExamRuns, agents, errors, semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed' }
 }

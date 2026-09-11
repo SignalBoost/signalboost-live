@@ -11,7 +11,7 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.121
+**Version:** 1.122
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -22,6 +22,12 @@ graduation decisions, admissions, or fine-tuning work.
 COS now includes a bounded LangGraph orchestration seam under `saas/lib/cos-core/orchestration/`. The first governed graph implements `plan -> execute -> verify -> bounded repair -> re-verify`, with a hard maximum of three execution attempts and no authority-expanding behavior. LangGraph coordinates state transitions only; COS governance, Referee/policy enforcement, Enterprise Memory, learning, provider selection, authorization, audit, and Self-Healing remain authoritative outside the graph.
 
 The integration pins `@langchain/langgraph` and `@langchain/core` and uses LangChain `RunnableLambda` as the graph node runtime. It intentionally does not replace COS with LangChain's separate agent abstraction or silently route inference to hosted model providers. This is implementation/test evidence only until merged, deployed, and exercised through a Production COS mission path.
+
+## COS specialist crews with CrewAI — 2026-09-11
+
+CrewAI `1.15.21` is integrated underneath COS as the specialist-collaboration layer, not as a second control plane. The existing Python `cos-ai-department` now has a `crew-coordinator` service that can assemble 1–5 registered specialists for bounded analysis/review/recommendation missions. COS exposes this through the private `consultSpecialistCrew` tool. CrewAI has no owner tools and may not deploy, change permissions, access secrets, spend money, contact third parties, override Referee/COS governance, award University credit, or persist its own durable memory. Enterprise Memory and the existing COS/Referee/audit stack remain authoritative.
+
+The CrewAI coordinator fails closed unless explicitly configured with a private/internal inference endpoint and model. Public hosted coordinator/model endpoints are rejected and no silent OpenAI/Anthropic fallback is permitted. Crew memory and cache are disabled; mission context is ephemeral. Repository implementation and CI are not Production proof: a Production claim additionally requires the coordinator image/service, private inference configuration, the COS bridge configuration, and a real recorded owner/admin specialist-crew receipt from the running deployment.
 
 ## Guardian review grouping — 2026-09-11
 

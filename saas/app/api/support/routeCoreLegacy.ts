@@ -49,6 +49,7 @@ import { promptCompilerModule } from '@/lib/ai/promptCompiler'
 import { cosArchitectModule, cosExecuteDirective } from '@/lib/ai/cosArchitect'
 import { proposeCampaign } from '@/lib/ai/proposeCampaign'
 import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'
+import { consultSpecialistCrew, COS_SPECIALIST_ROLES } from '@/lib/ai/cos/specialistCrewClient'
 
 export const maxDuration = 300
 
@@ -816,6 +817,31 @@ const TOOL_GET_AUDIT_FINDINGS: ChatTool = {
   },
 }
 
+const TOOL_CONSULT_SPECIALIST_CREW: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'consultSpecialistCrew',
+    description: 'Delegate a bounded READ-ONLY analysis/review mission to 1-5 registered COS specialists working together through CrewAI. Use this when a question materially benefits from multiple specialties or independent specialist review. This tool cannot deploy, change permissions, spend money, contact third parties, approve actions, override Referee/COS governance, or persist CrewAI memory. Its output is advisory evidence for COS, not authority.',
+    parameters: {
+      type: 'object',
+      properties: {
+        objective: { type: 'string', description: 'The exact question or review objective the specialist crew should analyze.' },
+        roles: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 5,
+          uniqueItems: true,
+          items: { type: 'string', enum: [...COS_SPECIALIST_ROLES] },
+          description: 'Registered specialists to consult. Choose only roles materially relevant to the objective.',
+        },
+        evidence: { type: 'string', description: 'Optional host-verified evidence/context to give the specialists. Do not invent evidence.' },
+        constraints: { type: 'string', description: 'Optional constraints the specialists must respect.' },
+      },
+      required: ['objective', 'roles'],
+    },
+  },
+}
+
 const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_GET_PRICING,
   TOOL_GET_BUSINESS_METRICS,
@@ -827,6 +853,7 @@ const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [
   TOOL_READ_REPO_FILE,
   TOOL_RUN_AUDIT,
   TOOL_GET_AUDIT_FINDINGS,
+  TOOL_CONSULT_SPECIALIST_CREW,
   TOOL_COMMIT_CODE,
   TOOL_LIST_AI_BRANCHES,
   TOOL_LIST_CLEANUP_BRANCHES,
@@ -1205,6 +1232,35 @@ if (name === 'listProviderActions') {
       return `• ${id} — ${t.label}\n    required: ${req.length ? req.join(', ') : '(none)'}${opt.length ? `\n    optional: ${opt.join(', ')}` : ''}`
     })
     return `Templates for "${provider}". Use the exact templateId and fill every required field in your proposeInfrastructurePR payload:\n${lines.join('\n')}`
+  }
+if (name === 'consultSpecialistCrew') {
+    if (!isPrivileged) {
+      return 'PERMISSION DENIED: specialist crews are available only to the private COS owner/admin channel. Do not retry.'
+    }
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const objective = String(args?.objective || '').trim()
+    const roles = Array.isArray(args?.roles) ? args.roles.map((role: any) => String(role).trim()) : []
+    const invalid = roles.filter((role: string) => !(COS_SPECIALIST_ROLES as readonly string[]).includes(role))
+    if (!objective) return 'Specialist crew mission rejected: objective is required.'
+    if (invalid.length) return `Specialist crew mission rejected: unsupported role(s): ${invalid.join(', ')}.`
+    try {
+      const result = await consultSpecialistCrew({
+        objective,
+        roles: roles as any,
+        evidence: typeof args?.evidence === 'string' ? args.evidence : undefined,
+        constraints: typeof args?.constraints === 'string' ? args.constraints : undefined,
+      })
+      if (!result.ok) {
+        return `Specialist crew unavailable (${result.status}): ${result.error || 'no advisory result returned'}. No hosted fallback or external action was attempted.`
+      }
+      return [
+        `CREWAI ADVISORY RECEIPT — mission ${result.mission_id || 'unknown'}; roles ${(result.roles || roles).join(', ')}; side effects: NOT ALLOWED; durable CrewAI memory: NOT USED.`,
+        result.report || 'The specialist crew returned no report body.',
+      ].join('\n\n')
+    } catch (error) {
+      return `Specialist crew mission failed closed: ${error instanceof Error ? error.message : 'unknown error'}. No hosted fallback or external action was attempted.`
+    }
   }
 if (name === 'listAiBranches') {
     if (!isPrivileged) {

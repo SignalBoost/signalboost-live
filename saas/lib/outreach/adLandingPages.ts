@@ -47,6 +47,14 @@ export const AD_LANDING_PAGES: Record<AdLandingPageGoal, AdLandingPage> = {
 
 export const DEFAULT_NEWSPAPER_AD_LANDING_GOAL: AdLandingPageGoal = 'website_optimization'
 
+export const SELF_HEALING_MONITOR_LINK = Object.freeze({
+  title: 'Self-Healing Supervisor Monitor',
+  href: '/dashboard/cybersecurity',
+  url: `${PUBLIC_BRAND.siteUrl}/dashboard/cybersecurity`,
+  badge: 'Live monitoring',
+  description: 'Watch Guardian observations, Supervisor decisions, escalations, and remediation outcomes in the Cybersecurity Center.',
+})
+
 export function getAdLandingPage(goal?: string | null): AdLandingPage {
   if (goal && goal in AD_LANDING_PAGES) {
     return AD_LANDING_PAGES[goal as AdLandingPageGoal]

@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/crewai-langgraph-verification.yml'
       - 'scripts/patch_crewai_langgraph_delegation.py'
+      - 'saas/lib/cos-core/orchestration/index.ts'
       - 'saas/lib/ai/cos/specialistCrewMission.ts'
       - 'saas/tests/cosSpecialistCrewMission.node.test.ts'
 

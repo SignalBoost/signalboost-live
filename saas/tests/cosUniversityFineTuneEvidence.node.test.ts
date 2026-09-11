@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { buildFineTuneEvidenceInput, FINE_TUNE_CLAIM_VERIFIER, FINE_TUNE_EVIDENCE_PROFILE, fineTuneRevisionKey, foldFineTuneEvidenceRows } from '../lib/ai/cos/cosUniversityFineTuneEvidence.ts'
+import { buildFineTuneEvidenceInput, buildFineTunePartitionRevision, FINE_TUNE_CLAIM_VERIFIER, FINE_TUNE_EVIDENCE_PROFILE, fineTuneRevisionKey, foldFineTuneEvidenceRows } from '../lib/ai/cos/cosUniversityFineTuneEvidence.ts'
 import { decideControlledFineTune } from '../lib/ai/cos/cosUniversityLearningAssurance.ts'
 
 const H = 'a'.repeat(64)
@@ -56,6 +56,13 @@ test('post-training claims cannot be mixed between artifacts or holdouts', () =>
 test('expired claims are ignored', () => {
   const expired = { ...row('dataset_approved'), expires_at: '2026-09-10T00:00:00Z' }
   assert.deepEqual(foldFineTuneEvidenceRows([expired], revisionKey, base.holdoutManifestHash, new Date('2026-09-11T00:00:00Z')).claims, [])
+})
+
+test('partition revision requires real nonempty disjoint item manifests', () => {
+  const valid = buildFineTunePartitionRevision({ baseModel: 'base', datasetHash: H, trainingItemHashes: ['1'.repeat(64)], holdoutItemHashes: ['2'.repeat(64)] })
+  assert.ok(valid); assert.notEqual(valid.trainingManifestHash, valid.holdoutManifestHash)
+  assert.equal(buildFineTunePartitionRevision({ baseModel: 'base', datasetHash: H, trainingItemHashes: [H], holdoutItemHashes: [H] }), null)
+  assert.equal(buildFineTunePartitionRevision({ baseModel: 'base', datasetHash: H, trainingItemHashes: [], holdoutItemHashes: ['2'.repeat(64)] }), null)
 })
 
 test('owner HTTP route cannot manufacture independent, canary, artifact, or rollback proof', () => {

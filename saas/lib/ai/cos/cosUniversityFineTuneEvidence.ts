@@ -25,6 +25,19 @@ export type FineTuneRevision = Readonly<{ baseModel: string; datasetHash: string
 export const fineTuneRevisionKey = (revision: FineTuneRevision) => hash(revision)
 const manifestHash = (items: readonly string[]) => hash({ items: [...items].sort() })
 
+export function buildFineTunePartitionRevision(input: {
+  baseModel: unknown; datasetHash: unknown; trainingItemHashes: unknown; holdoutItemHashes: unknown
+}): FineTuneRevision | null {
+  const training = Array.isArray(input.trainingItemHashes) ? input.trainingItemHashes : []
+  const holdout = Array.isArray(input.holdoutItemHashes) ? input.holdoutItemHashes : []
+  if (!training.length || !holdout.length || !training.every(validHash) || !holdout.every(validHash)) return null
+  const holdoutSet = new Set(holdout)
+  if (training.some((item: string) => holdoutSet.has(item))) return null
+  const baseModel = String(input.baseModel || '').trim()
+  if (!baseModel || !validHash(input.datasetHash)) return null
+  return { baseModel, datasetHash: String(input.datasetHash), trainingManifestHash: manifestHash(training), holdoutManifestHash: manifestHash(holdout) }
+}
+
 async function serviceDb() {
   const mod = await import('@/lib/cos-core/storage/supabase')
   return mod.cosServiceDb()
@@ -115,12 +128,8 @@ export async function readFineTunePartitionRevision(candidateId: string, dataset
     if (evidence?.profile !== FINE_TUNE_EVIDENCE_PROFILE || evidence.claim !== 'partition_manifests_registered'
       || row.verifier !== 'training_executor' || evidence.datasetHash !== datasetHash || !String(evidence.evidenceRef || '').trim()
       || (row.expires_at && Date.parse(row.expires_at) <= Date.now())) continue
-    const training = Array.isArray(evidence.trainingItemHashes) ? evidence.trainingItemHashes : []
-    const holdout = Array.isArray(evidence.holdoutItemHashes) ? evidence.holdoutItemHashes : []
-    if (!training.length || !holdout.length || !training.every(validHash) || !holdout.every(validHash)) continue
-    if (training.some((item: string) => new Set(holdout).has(item))) continue
-    const baseModel = String(evidence.baseModel || '').trim(); if (!baseModel) continue
-    return { baseModel, datasetHash, trainingManifestHash: manifestHash(training), holdoutManifestHash: manifestHash(holdout) }
+    const revision = buildFineTunePartitionRevision({ ...evidence, datasetHash })
+    if (revision) return revision
   }
   return null
 }

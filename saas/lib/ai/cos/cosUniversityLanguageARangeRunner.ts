@@ -239,6 +239,7 @@ function matchingPassedRuns(args: {
 
 async function recordOneAssessment(args: {
   agentId: string
+  executionProvenance?: AgentCapstoneExecution | null
   run: LanguageARangeRunRow
   dimension: CosPlatformLanguageDimension
   passed: boolean
@@ -264,7 +265,7 @@ async function recordOneAssessment(args: {
     scorerVersion: COS_UNIVERSITY_LANGUAGE_A_RANGE_SCORER,
     scorerAuthority: authority,
     sourceRef: `cos_university_language_a_range:${args.run.id}`,
-    evidence: args.evidence,
+    evidence: { ...args.evidence, executionProvenance: args.executionProvenance || null },
     observedAt: observedAt.toISOString(),
     validUntil: universityLanguageARangeValidUntil(args.run.stage, observedAt),
   })
@@ -273,6 +274,7 @@ async function recordOneAssessment(args: {
 
 async function recordStageAssessments(args: {
   agentId: string
+  executionProvenance?: AgentCapstoneExecution | null
   run: LanguageARangeRunRow
   allRuns: LanguageARangeRunRow[]
 }): Promise<number> {
@@ -288,6 +290,7 @@ async function recordStageAssessments(args: {
     for (const dimension of dimensions) {
       written += await recordOneAssessment({
         agentId: args.agentId,
+        executionProvenance: args.executionProvenance,
         run: args.run,
         dimension,
         passed: false,
@@ -322,6 +325,7 @@ async function recordStageAssessments(args: {
   for (const dimension of dimensions) {
     written += await recordOneAssessment({
       agentId: args.agentId,
+      executionProvenance: args.executionProvenance,
       run: args.run,
       dimension,
       passed: true,
@@ -627,7 +631,7 @@ async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: D
   if (refreshed.error) throw refreshed.error
   const terminal = (refreshed.data || { ...row, status, passed, turn_id: turnId, reasons }) as LanguageARangeRunRow
   const allRuns = await loadRunRows(agentId)
-  const assessmentRowsRecorded = freshExecution ? await recordStageAssessments({ agentId, run: terminal, allRuns }) : 0
+  const assessmentRowsRecorded = freshExecution ? await recordStageAssessments({ agentId, executionProvenance, run: terminal, allRuns }) : 0
   return { runId: row.id, ...target, status, passed, assessmentRowsRecorded, reasons }
 }
 

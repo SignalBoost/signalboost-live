@@ -35,6 +35,7 @@ test('security-sensitive changes become review-gated Supervisor incidents withou
   assert.deepEqual(handoff.policy.approvedStepIds, [])
   const review = guardianReviewRequest({ alertId: '4c9130e8-4049-42fd-8f37-c251927c0180', handoff })
   assert.equal(review.source_type, 'guardian_repository_change')
+  assert.equal(review.id, '4c9130e8-4049-42fd-8f37-c251927c0180')
   assert.equal(review.status, 'awaiting_human_review')
   assert.equal(review.fix_plan_status, 'review_only')
   assert.equal((review.fix_plan as any).automaticRepairAuthorized, false)
@@ -48,6 +49,7 @@ test('Production worker durably records the policy handoff before completing wor
   assert.match(route, /automaticRepairAuthorized: false/)
   assert.match(route, /guardian_self_healing_handoff_failed/)
   assert.match(route, /guardian_review_persist_failed/)
+  assert.match(route, /onConflict: 'id', ignoreDuplicates: true/)
 })
 
 test('owner review disposition cannot be converted into repair approval', () => {
@@ -57,7 +59,11 @@ test('owner review disposition cannot be converted into repair approval', () => 
   assert.match(route, /source_type === 'guardian_repository_change'/)
   assert.match(route, /guardian_review_does_not_authorize_repair/)
   assert.match(route, /review_disposition_recorded/)
+  assert.match(route, /if \(alertUpdate\.error\)/)
   assert.match(approveRoute, /source\.data\.source_type === 'guardian_repository_change'/)
   assert.match(approveRoute, /guardian_review_does_not_authorize_repair/)
   assert.match(page, /reviewOnly = r\.source_type === 'guardian_repository_change'/)
+  assert.match(page, /onDisposition\('completed', 'expected'\)/)
+  assert.match(page, /guardianFinding\.sensitivePaths/)
+  assert.match(page, /Could not record review disposition/)
 })

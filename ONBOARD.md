@@ -3,11 +3,20 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.111
+**Version:** 1.112
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
+
+## Audit malformed-finding isolation — 2026-09-11
+
+Audit retries a file once when COS returns a malformed finding schema. If the retry still fails,
+that file is recorded as an analysis error while valid results from other files are preserved; a run
+fails only when every selected file fails analysis. Malformed findings are never accepted, silently
+repaired, or allowed to erase valid sibling findings. The existing one-minute Builder continuation
+worker also re-enqueues failed owned-Audit engine repairs up to three times with durable attempt and
+source-job evidence, so terminal worker stalls do not require the owner to rerun Audit manually.
 
 ## COS University terminal-practice reconciliation — 2026-09-11
 

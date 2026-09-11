@@ -7,7 +7,7 @@
 // Public repos only (private repos return a clear error from repoTarget).
 
 import { callAuditModel } from '@/lib/audit/modelRouter'
-import { parseAuditFindingsResponse } from '@/lib/audit/modelResponse'
+import { parseAuditFindingsResponseIsolated } from '@/lib/audit/modelResponse'
 import { synthesizeReport } from '@/lib/audit/synthesize'
 import { runUxDetector } from '@/lib/audit/uxDetector'
 import { parseRepoUrl, listRepoTree, readRepoFileFrom, type RepoTarget } from '@/lib/audit/repoTarget'
@@ -32,6 +32,7 @@ export interface AuditRunResult {
   filesScanned: string[]
   repo?:        string
   narrative?:   string
+  analysisErrors?: ReadonlyArray<{ file: string; error: string }>
   error?:       string
 }
 
@@ -109,14 +110,26 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise
   return results
 }
 
-async function scanOne(target: RepoTarget, path: string, lang?: string): Promise<{ path: string; scanned: boolean; findings: AuditFinding[] }> {
+async function scanOne(target: RepoTarget, path: string, lang?: string): Promise<{ path: string; scanned: boolean; findings: AuditFinding[]; error?: string }> {
   const file = await readRepoFileFrom(target.repo, target.branch, path)
   if (!file.ok || !file.content) return { path, scanned: false, findings: [] }
+  const prompt = buildPrompt(path, file.content, lang)
   const raw = await callAuditModel({
-    prompt:          buildPrompt(path, file.content, lang),
+    prompt,
     maxTokens:       4096,
   })
-  return { path, scanned: true, findings: parseAuditFindingsResponse(raw, path).map(f => localizeKnownFinding(f, lang)) }
+  let parsed = parseAuditFindingsResponseIsolated(raw, path)
+  if (parsed.rejected.length) {
+    const retryRaw = await callAuditModel({
+      prompt: `${prompt}\n\nYour previous response violated the required finding schema: ${parsed.rejected[0]} Return the complete analysis again as strict JSON; every finding must include a non-empty recommendation.`,
+      maxTokens: 4096,
+    })
+    parsed = parseAuditFindingsResponseIsolated(retryRaw, path)
+  }
+  if (parsed.rejected.length) {
+    return { path, scanned: false, findings: [], error: parsed.rejected.join(' ') }
+  }
+  return { path, scanned: true, findings: parsed.findings.map(f => localizeKnownFinding(f, lang)) }
 }
 
 export async function runAudit(opts?: {
@@ -153,7 +166,7 @@ export async function runAudit(opts?: {
 
   opts?.onProgress?.(0, targets.length)
   let done = 0
-  let per: Array<{ path: string; scanned: boolean; findings: AuditFinding[] }>
+  let per: Array<{ path: string; scanned: boolean; findings: AuditFinding[]; error?: string }>
   try {
     per = await mapPool(targets, CONCURRENCY, async (path) => {
       const r = await scanOne(target, path, lang)
@@ -173,9 +186,14 @@ export async function runAudit(opts?: {
 
   const findings: AuditFinding[] = []
   const scanned: string[] = []
+  const analysisErrors: Array<{ file: string; error: string }> = []
   for (const r of per) {
     if (r.scanned) scanned.push(r.path)
+    if (r.error) analysisErrors.push({ file: r.path, error: r.error })
     findings.push(...r.findings)
+  }
+  if (scanned.length === 0 && analysisErrors.length > 0) {
+    return { ok: false, findings: [], filesScanned: [], repo: target.repo, analysisErrors, error: 'COS Audit analysis failed for every selected file.' }
   }
   try {
     const uxFindings = await runUxDetector(target, allFiles)
@@ -196,5 +214,5 @@ export async function runAudit(opts?: {
     })),
   })
 
-  return { ok: true, findings, filesScanned: scanned, repo: target.repo, narrative }
+  return { ok: true, findings, filesScanned: scanned, repo: target.repo, narrative, analysisErrors }
 }

@@ -206,6 +206,7 @@ export async function POST(req: NextRequest) {
           findingsCount: result.findings.length,
           findings: result.findings,
           narrative: result.narrative || '',
+          analysisErrors: result.analysisErrors || [],
           lang,
           selfHealing: {
             source: 'self-healing-supervisor',

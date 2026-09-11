@@ -1,6 +1,9 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase.ts'
 import { embeddingModelName } from '@/lib/ai/cos/embeddingEndpoint.ts'
-import { embedLearnedCorpusRow } from '@/lib/ai/cos/learnedCorpusSemantic.ts'
+import {
+  backfillRetainedCorpusSemanticDistillation,
+  embedLearnedCorpusRow,
+} from '@/lib/ai/cos/learnedCorpusSemantic.ts'
 
 const ELIGIBLE_FILTER = 'fact_extraction_error.is.null,fact_extraction_error.not.ilike.relevance_rejected:%'
 
@@ -90,10 +93,14 @@ export async function countPendingLearnedCorpusIndexing(options: { createdAfter?
 
 /**
  * Index the newest admitted knowledge first so fresh learning becomes semantically retrievable
- * within minutes rather than waiting behind older maintenance work. Rows carrying vectors from a
- * previous embedding model are also re-indexed because active retrieval intentionally excludes
- * vectors from incompatible semantic spaces. Retention is never rolled back if embedding is
- * unavailable; failures remain visible and are retried by the next bounded run.
+ * within minutes rather than waiting behind older maintenance work. Before selecting vectors, each
+ * bounded run advances the versioned historical semantic-distillation backfill. Only rows whose
+ * canonical summary/facts actually change have their old vectors invalidated, so unchanged retained
+ * knowledge is never re-embedded merely because the backfill inspected it.
+ *
+ * Rows carrying vectors from a previous embedding model are also re-indexed because active retrieval
+ * intentionally excludes vectors from incompatible semantic spaces. Retention is never rolled back if
+ * embedding is unavailable; failures remain visible and are retried by the next bounded run.
  */
 export async function indexRecentUnembeddedLearnedCorpus(options: {
   limit?: number
@@ -102,6 +109,17 @@ export async function indexRecentUnembeddedLearnedCorpus(options: {
 } = {}): Promise<LearnedCorpusIndexingResult> {
   const limit = Math.max(1, Math.min(32, Math.floor(options.limit ?? 16)))
   const concurrency = Math.max(1, Math.min(4, Math.floor(options.concurrency ?? 4)))
+  const distillation = await backfillRetainedCorpusSemanticDistillation({
+    limit: Math.max(limit, 32),
+    concurrency,
+  })
+  if (distillation.status === 'error') {
+    console.warn('learnedCorpusIndexing: semantic distillation backfill failed closed; vector maintenance continues', {
+      errors: distillation.errors,
+      remaining: distillation.remaining,
+    })
+  }
+
   const rows = await pendingRows(limit, options.createdAfter)
   let cursor = 0
   let embedded = 0

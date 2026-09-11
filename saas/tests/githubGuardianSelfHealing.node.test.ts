@@ -60,6 +60,11 @@ test('Production worker durably records the policy handoff before completing wor
   assert.match(groupingMigration, /status in \('awaiting_human_review', 'in_progress'\)/)
   assert.match(groupingMigration, /limit 100/)
   assert.match(groupingMigration, /grant execute .* service_role/)
+  const retryMigration = readFileSync(new URL('../supabase/migrations/20260911163127_guardian_review_evidence_dedupe.sql', import.meta.url), 'utf8')
+  assert.match(retryMigration, /guardian_repository_review_evidence/)
+  assert.match(retryMigration, /where finding_id = p_finding->>'id'/)
+  assert.match(retryMigration, /jsonb_build_array\(p_finding\) \|\| coalesce/)
+  assert.match(retryMigration, /limit 100/)
 })
 
 test('owner review disposition cannot be converted into repair approval', () => {

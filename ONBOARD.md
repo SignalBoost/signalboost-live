@@ -114,6 +114,13 @@ repositories, and persists generic delivery metadata using the columns that exis
 Production ledger. These compatibility rules do not create patrol evidence for a ping; only an
 authorized patrol event may enter the append-only evidence chain.
 
+The Guardian repository observation worker now claims authenticated webhook work through the
+Supervisor's fenced lease protocol, materializes only the already-sanitized signed patrol evidence,
+and completes the generic delivery ledger. Benign changes become verified informational observations.
+Changes to security-sensitive repository paths create a bounded review alert that explicitly does
+not assert a vulnerability, compromise, intent, identity, or attribution. A five-minute Production
+cron reconciles queued deliveries without requiring the owner to run the tool manually.
+
 ## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
 
 Owner direction: pursue a company-deployable security capability that combines continuous 24x7 defensive patrol with a separately isolated ethical-hacking assessor. The separation is intentional: a defender that knows its own environment can develop familiarity bias; the assessor must arrive as a stranger and rediscover the environment from the authorized starting position.

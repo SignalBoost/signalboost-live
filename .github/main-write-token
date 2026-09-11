@@ -1,2 +1,2 @@
-base_sha=7427a9374f5df9927e61fb4710fae575c35beded
-branch=fix/security-webhook-production-activation-20260911
+base_sha=52d7ae58bf52827eaf040143173734cb1b53475a
+branch=feat/security-guardian-webhook-processing-20260911

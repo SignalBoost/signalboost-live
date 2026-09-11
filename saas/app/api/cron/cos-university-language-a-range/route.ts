@@ -21,7 +21,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const now = new Date()
-    const agents = await listCosUniversityRegisteredAgents()
+    const registeredAgents = await listCosUniversityRegisteredAgents()
+    // Rotate the stable registry order hourly so a persistently failing agent cannot starve peers.
+    const offset = registeredAgents.length ? now.getUTCHours() % registeredAgents.length : 0
+    const agents = [...registeredAgents.slice(offset), ...registeredAgents.slice(0, offset)]
     const gated: Array<Record<string, unknown>> = []
     const notDue: Array<Record<string, unknown>> = []
     for (const agent of agents) {
@@ -39,7 +42,7 @@ export async function GET(req: NextRequest) {
         notDue.push({ agentId: agent.agentId, cadence })
         continue
       }
-      const result = await runCosUniversityARangeBatch({ now, agentId: agent.agentId })
+      const result = await runCosUniversityLanguageARangeBatch({ now, agentId: agent.agentId })
       await recordCosUniversityProductionPath({ path: 'language_a_range_evidence', invocationSucceeded: result.errors.length === 0, evidence: { ...result, agentId: agent.agentId, programGate } })
       return NextResponse.json({ ok: result.errors.length === 0, agentId: agent.agentId, ...result }, { status: result.errors.length ? 500 : 200 })
     }

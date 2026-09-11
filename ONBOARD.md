@@ -1,6 +1,13 @@
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint
+## COS University per-agent delayed retention — 2026-09-11
+
+Delayed retention now runs independently for every registered University agent against only that
+agent's own passed transfer evidence. Each hourly tick executes at most one due agent in stable order,
+and per-agent cadence receipts prevent duplicate daily work. Retention remains independently scored,
+writes no credential by itself, and cannot transfer evidence between agents.
+
 ## COS University per-agent A-range transfer eligibility — 2026-09-11
 
 Subject A-range execution now evaluates every registered University agent against that agent's own
@@ -19,7 +26,7 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.122
+**Version:** 1.123
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**

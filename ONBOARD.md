@@ -1,6 +1,13 @@
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint
+## COS University per-agent language A-range — 2026-09-11
+
+Language transfer and integrated capstone execution now evaluate every registered University agent
+against only that agent's language assessments and run ledger. Non-COS run and assessment keys are
+agent-namespaced. COS Production turns remain attributable only to COS; specialists must earn their
+own verified applied-language outcomes. Each hourly tick executes at most one due agent.
+
 ## COS University per-agent delayed retention — 2026-09-11
 
 Delayed retention now runs independently for every registered University agent against only that
@@ -26,7 +33,7 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.123
+**Version:** 1.124
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**

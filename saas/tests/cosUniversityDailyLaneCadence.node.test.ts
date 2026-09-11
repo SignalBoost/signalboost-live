@@ -170,3 +170,22 @@ test('retention runner replays only the requested agent\'s own passed transfer a
   assert.match(runner, /assessmentKey: `cos-university-retention:\$\{inserted\.data\.id\}`, agentId,/)
   assert.match(runner, /selectDueCosUniversityRetention\(sources, completed, now\)/)
 })
+
+
+test('language A-range runs for every registered agent with isolated evidence and cadence', () => {
+  const route = fs.readFileSync(path.resolve(import.meta.dirname, '../app/api/cron/cos-university-language-a-range/route.ts'), 'utf8')
+  assert.match(route, /listCosUniversityRegisteredAgents\(\)/)
+  assert.match(route, /readCosUniversityUndergraduateAcademicLaneGate\(now, agent\.agentId\)/)
+  assert.match(route, /readCosUniversityDailyLaneCadence\('language_a_range_evidence', now, agent\.agentId\)/)
+  assert.match(route, /runCosUniversityLanguageARangeBatch\(\{ now, agentId: agent\.agentId \}\)/)
+  assert.match(route, /evidence: \{ \.\.\.result, agentId: agent\.agentId, programGate \}/)
+
+  const runner = fs.readFileSync(path.resolve(import.meta.dirname, '../lib/ai/cos/cosUniversityLanguageARangeRunner.ts'), 'utf8')
+  assert.match(runner, /options: \{ now\?: Date; agentId\?: string \}/)
+  assert.match(runner, /loadAssessmentRows\(agentId\)/)
+  assert.match(runner, /loadRunRows\(agentId\)/)
+  assert.match(runner, /agent_id: agentId,/)
+  assert.match(runner, /if \(agentId === AGENT_ID\)/)
+  assert.match(runner, /cos-university-language-a-range-pass:\$\{args\.agentId\}:/)
+  assert.match(runner, /agentId: args\.agentId,/)
+})

@@ -576,13 +576,12 @@ async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: D
   return { runId: row.id, ...target, status, passed, assessmentRowsRecorded, reasons }
 }
 
-export async function runCosUniversityLanguageARangeBatch(options: { now?: Date } = {}): Promise<CosUniversityLanguageARangeBatchSummary> {
+export async function runCosUniversityLanguageARangeBatch(options: { now?: Date; agentId?: string } = {}): Promise<CosUniversityLanguageARangeBatchSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
   const agentId = String(options.agentId || AGENT_ID).trim()
   if (process.env.COS_UNIVERSITY_A_RANGE_ENABLED !== 'true') {
     return { enabled: false, productionCandidates: 0, productionEvidenceRecorded: 0, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: [], semantics: 'five_language_repeated_transfer_exact_production_integrated_capstone' }
   }
-  const now = options.now instanceof Date ? options.now : new Date()
   const errors: string[] = []
   let productionCandidates = 0
   let productionEvidenceRecorded = 0

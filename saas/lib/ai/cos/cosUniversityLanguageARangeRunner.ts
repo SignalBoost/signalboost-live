@@ -631,7 +631,7 @@ export async function runCosUniversityLanguageARangeBatch(options: { now?: Date;
         results.push({ runId: row.id, ...target, status: `already_${row.status}`, passed: row.passed, assessmentRowsRecorded: 0, reasons: row.reasons || [] })
         continue
       }
-      results.push(await executeExamRun(agentId, row, now)
+      results.push(await executeExamRun(agentId, row, now))
     } catch (error) {
       errors.push(`${target.stage}:${target.language}:${target.dimension || 'integrated'}:${error instanceof Error ? error.message : String(error)}`)
     }

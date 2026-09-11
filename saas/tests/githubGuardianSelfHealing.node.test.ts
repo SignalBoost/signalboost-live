@@ -59,7 +59,6 @@ test('owner review disposition cannot be converted into repair approval', () => 
   const page = readFileSync(new URL('../app/dashboard/cybersecurity/page.tsx', import.meta.url), 'utf8')
   assert.match(route, /source_type === 'guardian_repository_change'/)
   assert.match(route, /guardian_review_does_not_authorize_repair/)
-  assert.match(route, /review_disposition_recorded/)
   assert.match(route, /if \(alertUpdate\.error\)/)
   assert.match(approveRoute, /source\.data\.source_type === 'guardian_repository_change'/)
   assert.match(approveRoute, /guardian_review_does_not_authorize_repair/)

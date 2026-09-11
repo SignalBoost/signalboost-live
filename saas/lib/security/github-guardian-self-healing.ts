@@ -11,6 +11,46 @@ export type GuardianSelfHealingHandoff = Readonly<{
   policy: PolicyDecision
 }>
 
+export function guardianReviewRequest(input: {
+  alertId: string
+  handoff: GuardianSelfHealingHandoff
+}): Readonly<Record<string, unknown>> {
+  const incident = input.handoff.incident
+  const paths = Array.isArray(incident.metadata.sensitivePaths) ? incident.metadata.sensitivePaths : []
+  return Object.freeze({
+    user_id: null,
+    source_area: 'cybersecurity',
+    source_type: 'guardian_repository_change',
+    source_id: input.alertId,
+    repo: incident.affectedResource,
+    target: `https://github.com/${incident.affectedResource}`,
+    title: 'Guardian repository change review',
+    summary: 'Review authenticated activity affecting security-sensitive repository paths. This is not a repair authorization or a finding of compromise.',
+    severity_summary: { warning: 1, paths: paths.length },
+    findings: [{
+      id: incident.incidentId,
+      severity: 'warning',
+      summary: incident.errorMessage,
+      sensitivePaths: paths,
+      evidenceReference: incident.evidence[0]?.reference || '',
+    }],
+    status: 'awaiting_human_review',
+    human_approval_required: true,
+    human_approved: false,
+    fix_plan: {
+      planVersion: 1,
+      disposition: 'review_only',
+      summary: input.handoff.plan.diagnosis,
+      automaticRepairAuthorized: false,
+      nextStep: 'Record whether this authenticated change is expected, needs investigation, or should be escalated. No code change is authorized by this review.',
+    },
+    fix_plan_status: 'review_only',
+    fix_plan_created_at: incident.detectedAt,
+    fix_plan_approved: false,
+    implementation_status: 'not_applicable',
+  })
+}
+
 export function createGuardianSelfHealingHandoff(input: {
   deliveryId: string
   workItemId: string

@@ -186,6 +186,8 @@ test('terminal failed University practice reopens study from durable queue state
   assert.match(bridge, /requiresNewStudyAttempt: true/)
   assert.match(bridge, /requiresIndependentRetest: true/)
   assert.match(bridge, /academicCredit: false/)
+  assert.match(bridge, /priorRemediation\.reconciledAfterTerminalFailure === true/)
+  assert.match(bridge, /reconciledAfterTerminalFailure: true/)
   assert.match(bridge, /reconciledAcrossRuntimeBoundary: !runKeys\.has/)
   assert.doesNotMatch(bridge, /if \(!runKeys\.size\)[^{]*return/)
   assert.doesNotMatch(bridge, /recordCosUniversityAssessment/)

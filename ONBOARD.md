@@ -9,6 +9,14 @@
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
+## COS University terminal-practice reconciliation — 2026-09-11
+
+Practice remediation now distinguishes a request to begin a practice round from confirmation that
+the round later ended in failure. Only an explicit terminal-failure reconciliation marker makes the
+reopen operation idempotent. A round whose pre-practice remediation request already matches the
+current attempt can therefore still reopen study after its exercises fail, without awarding academic
+credit or bypassing the fresh independent re-examination requirement.
+
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
 
 ## Bounded repository-repair verification — 2026-09-11

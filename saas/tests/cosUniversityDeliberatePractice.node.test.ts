@@ -33,6 +33,28 @@ test('University deliberate practice is deterministic per round but materially v
   assert.ok(first.every(variant => !/rubric|requiredConceptGroups|minimumConceptCoverage/i.test(variant.prompt)))
 })
 
+test('Language & Communication practice rehearses fact-preserving audience rewrites before independent retest', () => {
+  const variants = buildCosUniversityDeliberatePracticeVariants({
+    ...basePlan,
+    subjectId: 'language_communication',
+    failureClass: 'unknown',
+    objective: 'Improve executive and customer communication while preserving supplied facts and uncertainty.',
+  })
+
+  assert.equal(variants.length, COS_UNIVERSITY_PRACTICE_VARIANTS_PER_ROUND)
+  for (const variant of variants) {
+    assert.match(variant.prompt, /Rewrite this source packet/i)
+    assert.match(variant.prompt, /Preserve every supplied fact and exact quantity/i)
+    assert.match(variant.prompt, /preserve the unresolved status/i)
+    assert.doesNotMatch(variant.prompt, /Diagnose the case/i)
+    assert.equal(variant.rubric.minimumConceptCoverage, 1)
+    const numericGroups = variant.rubric.requiredConceptGroups.filter(group => group.length === 1 && /^\d+$/.test(group[0]))
+    assert.equal(numericGroups.length, 2)
+    assert.ok(variant.rubric.requiredConceptGroups.some(group => group.includes('release record')))
+    assert.ok(variant.rubric.requiredConceptGroups.some(group => group.includes('health')))
+  }
+})
+
 test('a new study round creates new deliberate-practice variants instead of retrying memorized prompts', () => {
   const round1 = buildCosUniversityDeliberatePracticeVariants(basePlan)
   const round2 = buildCosUniversityDeliberatePracticeVariants({ ...basePlan, practiceRound: 2 })

@@ -13,6 +13,17 @@ export async function GET(req: NextRequest) {
   }
   try {
     const result = await runCosUniversityAutonomousAgentCycle({ maxAgents: 25 })
+    if (result.independentExamRuns > 0) {
+      await recordCosUniversityProductionPath({
+        path: 'independent_exams',
+        invocationSucceeded: result.errors.length === 0,
+        evidence: {
+          source: 'registered_agent_cycle',
+          independentExamRuns: result.independentExamRuns,
+          agents: result.agents.filter(agent => agent.nextAction === 'independent_exam'),
+        },
+      })
+    }
     await recordCosUniversityProductionPath({ path: 'registered_agent_cycle', invocationSucceeded: result.errors.length === 0, evidence: result })
     return NextResponse.json({ ok: result.errors.length === 0, ...result }, { status: result.errors.length ? 500 : 200 })
   } catch (error) {

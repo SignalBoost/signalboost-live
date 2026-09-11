@@ -13,5 +13,7 @@ export function isPlatformOperator(
   if (role === 'owner' || role === 'platform_operator') return true
 
   const email = String(user.email ?? '').trim().toLowerCase()
-  return Boolean(email && ownerEmails.includes(email))
+  // Normalize ownerEmails for case-insensitive comparison to prevent access denial due to casing mismatches
+  const normalizedOwnerEmails = ownerEmails.map(e => e.trim().toLowerCase())
+  return Boolean(email && normalizedOwnerEmails.includes(email))
 }

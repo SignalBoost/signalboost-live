@@ -1,10 +1,18 @@
 export const COS_SPECIALIST_ROLES = [
+  // Canonical specialist families from ONBOARD.md.
+  'software',
+  'security',
+  'marketing-sales',
+  'design',
+  'finance',
+  'operations',
+  'research',
+  // Existing AI-department sub-specialties for narrower missions.
   'ml-engineer',
   'ai-engineer',
   'architect',
   'data-scientist',
   'data-engineer',
-  'research',
   'ethics',
 ] as const
 

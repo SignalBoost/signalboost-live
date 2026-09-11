@@ -14,7 +14,7 @@ import {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 const MAX_BODY_BYTES = 256 * 1024
-const supportedEvents = new Set(['push','pull_request','pull_request_review','workflow_run','check_suite','check_run','repository','installation','installation_repositories','branch_protection_rule','release'])
+const supportedEvents = new Set(['ping','push','pull_request','pull_request_review','workflow_run','check_suite','check_run','repository','installation','installation_repositories','branch_protection_rule','release'])
 const patrolEvents = new Set(['push', 'branch_protection_rule', 'release'])
 
 function repositoryPatrolConfiguration(): {
@@ -71,6 +71,9 @@ export async function POST(req: NextRequest) {
   })
   if (!deliveryId) return NextResponse.json({ ok: false, error: { code: 'missing_delivery' } }, { status: 400 })
   if (!event || !supportedEvents.has(event)) return NextResponse.json({ ok: false, error: { code: 'unsupported_event' } }, { status: 400 })
+  if (event === 'ping') {
+    return NextResponse.json({ ok: true, outcome: 'ping', deliveryId, readOnly: true, repairAttempted: false }, { status: 200 })
+  }
   if (patrolEvents.has(event) && verified.accepted === false) {
     const status = verified.reason === 'github_signature_invalid' || verified.reason === 'github_user_agent_invalid' ? 401 : 400
     return NextResponse.json({ ok: false, error: { code: verified.reason } }, { status })
@@ -79,7 +82,14 @@ export async function POST(req: NextRequest) {
   let payload: any
   try { payload = JSON.parse(body) } catch { return NextResponse.json({ ok: false, error: { code: 'malformed_body' } }, { status: 400 }) }
   const repositoryFullName = String(payload?.repository?.full_name || '')
-  const organizationId = String(payload?.installation?.account?.id || payload?.organization?.id || process.env.GITHUB_PROVIDER_ORGANIZATION_ID || '')
+  const organizationId = String(
+    payload?.installation?.account?.id
+      || payload?.organization?.id
+      || payload?.repository?.owner?.id
+      || deliveryHeaders.installationTargetId
+      || process.env.GITHUB_PROVIDER_ORGANIZATION_ID
+      || '',
+  )
   if (!repositoryFullName || !organizationId) return NextResponse.json({ ok: false, error: { code: 'provider_identity_not_authorized' } }, { status: 400 })
 
   const db = getAdminSupabase()
@@ -118,14 +128,15 @@ export async function POST(req: NextRequest) {
     }
     securityPatrol = patrol.duplicate ? 'duplicate' : 'persisted'
   }
+  const payloadHash = createHash('sha256').update(body).digest('hex')
   const delivery = {
     delivery_id: deliveryId,
     event_type: event,
     organization_id: organizationId,
-    repository_full_name: repositoryFullName,
-    payload_digest: createHash('sha256').update(body).digest('hex'),
+    payload_hash: payloadHash,
     status: 'accepted_not_processed_yet',
     received_at: receivedAt,
+    safe_metadata: { repositoryFullName, payloadDigest: payloadHash },
   }
   const inserted = await db.from('github_webhook_deliveries').insert(delivery)
   if (inserted.error) {
@@ -163,7 +174,7 @@ export async function POST(req: NextRequest) {
     })
   } catch (error: any) {
     if (!String(error?.code || error?.message).includes('conflict')) {
-      await db.from('github_webhook_deliveries').update({ status: 'deferred', reason_code: 'coordination_unavailable' }).eq('delivery_id', deliveryId)
+      await db.from('github_webhook_deliveries').update({ status: 'deferred', safe_metadata: { repositoryFullName, payloadDigest: payloadHash, reasonCode: 'coordination_unavailable' } }).eq('delivery_id', deliveryId)
       return NextResponse.json({ ok: false, outcome: 'deferred', error: { code: 'coordination_unavailable' } }, { status: 503 })
     }
   }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, List
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -81,7 +81,10 @@ def _normalize_roles(raw_roles: Any) -> List[str]:
             continue
         if role == "crew-coordinator":
             raise CrewMissionRejected("crew-coordinator is the orchestration service, not a selectable specialist.")
-        get_role_config(role)  # canonical registry check; raises for invented specialists.
+        try:
+            get_role_config(role)
+        except ValueError as exc:
+            raise CrewMissionRejected(str(exc)) from exc
         if role not in roles:
             roles.append(role)
 

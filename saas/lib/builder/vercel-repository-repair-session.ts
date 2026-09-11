@@ -376,7 +376,15 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
         Promise.all([result.stdout(), result.stderr()]),
         this.deadlineAtMs,
       )
-      return Object.freeze({ exitCode: result.exitCode, stdout: bounded(stdout), stderr: bounded(stderr), timedOut: false })
+      const resourceExhausted = result.exitCode === 137
+      return Object.freeze({
+        exitCode: result.exitCode,
+        stdout: bounded(stdout),
+        stderr: bounded(resourceExhausted
+          ? `builder_command_resource_exhausted: exit 137 is not defect-reproduction evidence. Choose a narrower command.\n${stderr}`
+          : stderr),
+        timedOut: resourceExhausted,
+      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'sandbox_command_failed'
       if (message === BUILDER_TURN_TIMEOUT_ERROR) throw error

@@ -28,8 +28,12 @@ test('repository-aware recovery verifies claims instead of score-gaming product 
   const recovery = read('../lib/audit/ownedAuditRepositoryRecovery.ts')
   assert.match(recovery, /Verify every Audit finding against related imports, helpers, configuration, tests, and available authoritative runtime evidence before editing/)
   assert.match(recovery, /Do not infer service-role use, database policy, cookie policy, CSRF posture, deployment configuration, or client disclosure/)
-  assert.match(recovery, /Do not change secure product code merely to satisfy or silence an unsupported Audit finding/)
+  assert.match(recovery, /do not change secure product code merely to satisfy or silence an unsupported Audit finding/i)
   assert.match(recovery, /Never weaken the Audit scanner, suppress a category globally, hard-code a passing result/)
+  assert.match(recovery, /run only narrow directly relevant tests/)
+  assert.match(recovery, /Never run npm test or the complete repository suite/)
+  assert.match(recovery, /Treat exit 137 as execution-resource exhaustion/)
+  assert.match(recovery, /auditOwnedRepositoryRecovery\.node\.test\.ts/)
   assert.match(recovery, /Re-run the affected Audit scope after the repair/)
 })
 

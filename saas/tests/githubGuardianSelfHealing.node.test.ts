@@ -67,4 +67,7 @@ test('owner review disposition cannot be converted into repair approval', () => 
   assert.match(page, /onDisposition\('completed', 'expected'\)/)
   assert.match(page, /guardianFinding\.sensitivePaths/)
   assert.match(page, /Could not record review disposition/)
+  assert.match(page, /reviewOnly && r\.status === 'in_progress'/)
+  assert.match(route, /disposition_retry_required/)
+  assert.match(route, /retryable: !restored\.error/)
 })

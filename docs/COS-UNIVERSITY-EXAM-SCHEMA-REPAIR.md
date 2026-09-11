@@ -23,3 +23,11 @@ Existing provenance checks, role/agent/run/turn/manifest binding, local executio
 These are schema/predicate checks, not academic results, full-repository test coverage or Production execution receipts. Required current-head CI and Preview remain mandatory before merge. Recheck the live schema/migration history before application, then verify the generated-column definition and reject invalid bindings with rollback-only probes. Do not manufacture study prerequisites, change cadence or award credit to obtain runtime proof.
 
 The separate subject A-range schema and actual eligible Specialist execution still require their own verification. Record post-application and exact-deployment findings in the PR release notes rather than claiming them from these preflight checks.
+
+## Preview dependency reconciliation — 2026-09-11
+
+Vercel Preview `dpl_CLyfYxPYF8CgiNvoXveBF3A4Bhay` failed on PR head `b94251a7bb00e8eccf957503b77d2d15aeca7a2e`: the existing language academic-execution test expected a bound executor that was not yet present in that head's language runner. The newer main commit `1784f0975acf72c4c383ac1cb67ebe68e18d4748` supplies that implementation. Reconcile it into the task branch rather than deleting or relaxing the assertion.
+
+The exact failing language wiring assertion was reproduced locally against baseline blob `07763654b5689b01726a08b59dc1d4260afabfe0` (one failure), then passed unchanged against main's language runner blob `4ea47e7610f1a3ee92e8058937848c37d7a3a93f`. Both assembled source hashes were verified; the new source also passed Node TypeScript syntax checking. This is one focused source-contract test, not a full local checkout, end-to-end learner execution or database migration proof.
+
+The merge preserves current main's language implementation byte-for-byte, all existing test assertions, and this PR's original independent-exam schema repair. The integration token must name the reconciled main SHA. Current-head CI and Vercel Preview remain required before integration; no Production data or academic records were changed by this dependency repair.

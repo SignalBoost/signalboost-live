@@ -53,29 +53,44 @@ export async function recordFineTuneHostApproval(input: {
 }
 
 export type RecordedFineTuneEvidence = Readonly<{
-  claims: readonly FineTuneClaim[]; trainedArtifactId: string; rollbackArtifactRef: string | null;
+  claims: readonly FineTuneClaim[]; trainedArtifactId: string; trainedArtifactHash: string; rollbackArtifactRef: string | null;
   baselineScore: number; trainedArtifactScore: number
 }>
 
-const EMPTY: RecordedFineTuneEvidence = Object.freeze({ claims: Object.freeze([]), trainedArtifactId: '', rollbackArtifactRef: null, baselineScore: 0, trainedArtifactScore: 0 })
+const EMPTY: RecordedFineTuneEvidence = Object.freeze({ claims: Object.freeze([]), trainedArtifactId: '', trainedArtifactHash: '', rollbackArtifactRef: null, baselineScore: 0, trainedArtifactScore: 0 })
 
-export function foldFineTuneEvidenceRows(rows: readonly any[], expectedRevisionKey?: string): RecordedFineTuneEvidence {
-  const claims = new Set<FineTuneClaim>(); let trainedArtifactId = ''; let rollbackArtifactRef: string | null = null
-  let baselineScore = 0; let trainedArtifactScore = 0
-  for (const row of [...rows].sort((a, b) => String(a?.observed_at || '').localeCompare(String(b?.observed_at || '')))) {
+export function foldFineTuneEvidenceRows(rows: readonly any[], expectedRevisionKey?: string, expectedHoldoutManifestHash?: string): RecordedFineTuneEvidence {
+  const ordered = [...rows].sort((a, b) => String(a?.observed_at || '').localeCompare(String(b?.observed_at || '')))
+  const valid = ordered.filter(row => {
     const evidence = row?.evidence; const claim = evidence?.claim as FineTuneClaim
-    if (evidence?.profile !== FINE_TUNE_EVIDENCE_PROFILE || !FINE_TUNE_CLAIMS.includes(claim)) continue
-    if (expectedRevisionKey && evidence.revisionKey !== expectedRevisionKey) continue
-    if (row?.verifier !== FINE_TUNE_CLAIM_VERIFIER[claim] || !String(evidence.evidenceRef || '').trim()) continue
+    return evidence?.profile === FINE_TUNE_EVIDENCE_PROFILE && FINE_TUNE_CLAIMS.includes(claim)
+      && (!expectedRevisionKey || evidence.revisionKey === expectedRevisionKey)
+      && row?.verifier === FINE_TUNE_CLAIM_VERIFIER[claim] && Boolean(String(evidence.evidenceRef || '').trim())
+  })
+  const artifactRow = [...valid].reverse().find(row => row.evidence.claim === 'trained_artifact_registered'
+    && String(row.evidence.trainedArtifactId || '').trim() && validHash(row.evidence.artifactHash))
+  const trainedArtifactId = String(artifactRow?.evidence?.trainedArtifactId || '')
+  const trainedArtifactHash = String(artifactRow?.evidence?.artifactHash || '')
+  const artifactObservedAt = String(artifactRow?.observed_at || '')
+  const postTrainingClaims = new Set<FineTuneClaim>([
+    'independent_evaluation', 'safety_regression_passed', 'unseen_transfer_passed',
+    'delayed_retention_passed', 'production_canary_healthy', 'rollback_artifact_registered',
+  ])
+  const claims = new Set<FineTuneClaim>(); let rollbackArtifactRef: string | null = null
+  let baselineScore = 0; let trainedArtifactScore = 0
+  for (const row of valid) {
+    const evidence = row?.evidence; const claim = evidence?.claim as FineTuneClaim
     if (claim === 'trained_artifact_registered' && (!String(evidence.trainedArtifactId || '').trim() || !validHash(evidence.artifactHash))) continue
+    if (postTrainingClaims.has(claim) && (!trainedArtifactId || evidence.trainedArtifactId !== trainedArtifactId
+      || evidence.artifactHash !== trainedArtifactHash || String(row?.observed_at || '') < artifactObservedAt)) continue
     if (claim === 'rollback_artifact_registered' && !String(evidence.rollbackArtifactRef || '').trim()) continue
-    if (claim === 'independent_evaluation' && (!Number.isFinite(evidence.baselineScore) || !Number.isFinite(evidence.trainedArtifactScore) || !validHash(evidence.holdoutManifestHash))) continue
+    if (claim === 'independent_evaluation' && (!Number.isFinite(evidence.baselineScore) || !Number.isFinite(evidence.trainedArtifactScore)
+      || !validHash(evidence.holdoutManifestHash) || (expectedHoldoutManifestHash && evidence.holdoutManifestHash !== expectedHoldoutManifestHash))) continue
     claims.add(claim)
-    if (claim === 'trained_artifact_registered') trainedArtifactId = evidence.trainedArtifactId
     if (claim === 'rollback_artifact_registered') rollbackArtifactRef = evidence.rollbackArtifactRef
     if (claim === 'independent_evaluation') { baselineScore = evidence.baselineScore; trainedArtifactScore = evidence.trainedArtifactScore }
   }
-  return Object.freeze({ claims: Object.freeze([...claims]), trainedArtifactId, rollbackArtifactRef, baselineScore, trainedArtifactScore })
+  return Object.freeze({ claims: Object.freeze([...claims]), trainedArtifactId, trainedArtifactHash, rollbackArtifactRef, baselineScore, trainedArtifactScore })
 }
 
 export async function readFineTuneEvidence(candidateId: string, revision: FineTuneRevision): Promise<RecordedFineTuneEvidence> {
@@ -84,7 +99,7 @@ export async function readFineTuneEvidence(candidateId: string, revision: FineTu
   const rows = await db.from('cos_university_learning_assurance_events').select('evidence,verifier,observed_at')
     .eq('event_type', 'fine_tune').eq('candidate_id', candidateId).order('observed_at', { ascending: true }).limit(200)
   if (rows.error) throw rows.error
-  return foldFineTuneEvidenceRows(rows.data || [], fineTuneRevisionKey(revision))
+  return foldFineTuneEvidenceRows(rows.data || [], fineTuneRevisionKey(revision), revision.holdoutManifestHash)
 }
 
 export function buildFineTuneEvidenceInput(base: { baseModel: string; datasetHash: string; trainingManifestHash: string; holdoutManifestHash: string }, recorded: RecordedFineTuneEvidence): FineTuneEvidence {

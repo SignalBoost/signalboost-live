@@ -36,9 +36,21 @@ test('evidence from another candidate revision cannot authorize this revision', 
 test('artifact and evaluation claims require concrete hashes and references', () => {
   const folded = foldFineTuneEvidenceRows([
     row('trained_artifact_registered', { trainedArtifactId: 'model-1', artifactHash: H }),
-    row('independent_evaluation', { baselineScore: 0.5, trainedArtifactScore: 0.7, holdoutManifestHash: H }),
-  ])
+    row('independent_evaluation', { trainedArtifactId: 'model-1', artifactHash: H, baselineScore: 0.5, trainedArtifactScore: 0.7, holdoutManifestHash: base.holdoutManifestHash }),
+  ], revisionKey, base.holdoutManifestHash)
   assert.equal(folded.trainedArtifactId, 'model-1'); assert.equal(folded.trainedArtifactScore, 0.7)
+})
+
+test('post-training claims cannot be mixed between artifacts or holdouts', () => {
+  const folded = foldFineTuneEvidenceRows([
+    row('trained_artifact_registered', { trainedArtifactId: 'model-1', artifactHash: H }),
+    row('independent_evaluation', { trainedArtifactId: 'model-2', artifactHash: 'd'.repeat(64), baselineScore: 0.5, trainedArtifactScore: 0.9, holdoutManifestHash: base.holdoutManifestHash }),
+    row('safety_regression_passed', { trainedArtifactId: 'model-1', artifactHash: 'd'.repeat(64) }),
+    row('unseen_transfer_passed', { trainedArtifactId: 'model-1', artifactHash: H }),
+    row('independent_evaluation', { trainedArtifactId: 'model-1', artifactHash: H, baselineScore: 0.5, trainedArtifactScore: 0.8, holdoutManifestHash: 'e'.repeat(64) }),
+  ], revisionKey, base.holdoutManifestHash)
+  assert.deepEqual(folded.claims, ['trained_artifact_registered', 'unseen_transfer_passed'])
+  assert.equal(folded.trainedArtifactScore, 0)
 })
 
 test('owner HTTP route cannot manufacture independent, canary, artifact, or rollback proof', () => {

@@ -4,11 +4,12 @@ import os
 from time import perf_counter
 from typing import Any, Dict
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 from .compliance import assess_compliance, build_audit_event
+from .crewai_runtime import CrewMissionRejected, CrewRuntimeUnavailable, run_specialist_crew
 from .monitoring import REQUEST_COUNT, REQUEST_LATENCY
 from .roles import get_role_config, supported_roles
 
@@ -18,7 +19,7 @@ try:
 except ValueError as exc:
     raise RuntimeError(str(exc)) from exc
 
-app = FastAPI(title=f"COS AI Department - {CONFIG['title']}", version="1.0.0")
+app = FastAPI(title=f"COS AI Department - {CONFIG['title']}", version="1.1.0")
 
 
 @app.middleware("http")
@@ -54,6 +55,27 @@ def create_task(payload: Dict[str, Any]) -> Dict[str, Any]:
         "compliance": compliance,
         "audit_event": audit_event,
     }
+
+
+@app.post("/crew/missions")
+def create_crew_mission(payload: Dict[str, Any]):
+    if ROLE != "crew-coordinator":
+        raise HTTPException(status_code=404, detail="Crew missions are available only on the crew-coordinator service.")
+    try:
+        return run_specialist_crew(payload)
+    except CrewMissionRejected as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except CrewRuntimeUnavailable as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "ok": False,
+                "status": "private_inference_unavailable",
+                "framework": "crewai",
+                "side_effects_allowed": False,
+                "error": str(exc),
+            },
+        )
 
 
 @app.post("/compliance/check")

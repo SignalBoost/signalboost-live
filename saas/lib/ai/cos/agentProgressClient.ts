@@ -1,6 +1,7 @@
 import { isConciergeBuilderObjective } from './cosReasoningRolePolicy.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
 import { ASSISTANT_TRANSPORT_TIMEOUT_COPY } from './assistantTransportRecovery.ts'
+import { planResearchTask } from './researchBudget.ts'
 
 export type AgentProgressEvent = {
   phase: 'accepted' | 'running' | 'complete'
@@ -11,6 +12,7 @@ export type AgentProgressEvent = {
 
 const JOB_POLL_DELAY_MS = 1_500
 const JOB_POLL_ATTEMPTS = 180
+const PUBLIC_CONCIERGE_TRANSPORT_DEADLINE_MS = 45_000
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
 const MAX_CLIENT_FILE_BYTES = 512 * 1024
 const FENCED_SOURCE = /```([A-Za-z0-9_+#.-]*)\s*\n?([\s\S]*?)```/m
@@ -218,6 +220,12 @@ export async function postWithAgentProgress(args: {
   const repairRequest = isOperatorRepairRequest(requestBody)
   const progressTarget = args.target
   const builderActive = Boolean(builderRequest)
+  const requestRecord = bodyRecord(requestBody)
+  const researchRequest = requestRecord ? planResearchTask(latestUserText(requestRecord)) : null
+  const boundedPublicTransport = args.target === 'concierge' && !builderRequest && !researchRequest
+  const responseSignal = boundedPublicTransport
+    ? AbortSignal.any([args.signal, AbortSignal.timeout(PUBLIC_CONCIERGE_TRANSPORT_DEADLINE_MS)])
+    : args.signal
 
   report('accepted', repairRequest
     ? operatorProgressMessage({ stage: 'accepted', target: progressTarget, builder: builderActive })
@@ -249,9 +257,23 @@ export async function postWithAgentProgress(args: {
           'x-signalboost-surface': args.target,
         },
         body: JSON.stringify(requestBody),
-        signal: args.signal,
+        signal: responseSignal,
       })
     } catch (error) {
+      if (args.signal.aborted) throw error
+      if (boundedPublicTransport && responseSignal.aborted) {
+        report('complete', 'Concierge stopped waiting for the unavailable response')
+        return {
+          ok: false,
+          status: 504,
+          data: {
+            reply: transportFailureReply(requestBody),
+            source: 'concierge-browser-deadline',
+            execution_allowed: false,
+            external_action_taken: false,
+          },
+        }
+      }
       if (deliberateAbort(error, args.signal)) throw error
       report('complete', operatorProgressMessage({ stage: 'blocked', target: progressTarget, builder: builderActive }))
       return {

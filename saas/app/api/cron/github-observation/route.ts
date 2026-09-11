@@ -6,6 +6,7 @@ import { enqueueGitHubObservation, loadActiveGitHubConnections, runAcceptedGitHu
 import type { GitHubCapability } from '@/lib/provider-framework/github'
 import { materializeGuardianRepositoryObservation } from '@/lib/security/github-guardian-observation'
 import { createGuardianSelfHealingHandoff, guardianReviewRequest } from '@/lib/security/github-guardian-self-healing'
+import { remediateNativeIncidents } from '@/self-healing-host/native-autonomous-loop'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -100,6 +101,18 @@ async function processWebhookBacklog(input: {
         alertId = String(disposition.alertId || deliveryId)
         alertCreated = disposition.alertCreated === true
         const reviewRequestId = String(disposition.reviewRequestId || alertId)
+        const [supervisorResult] = await remediateNativeIncidents([selfHealing.incident], {
+          maxIncidents: 1,
+          automaticRepairAllowed: false,
+        })
+        if (!supervisorResult) throw new Error('guardian_supervisor_diagnosis_missing')
+        const reviewUpdate = await input.db.from('remediation_requests').update({
+          summary: supervisorResult.diagnosis,
+          implementation_status: supervisorResult.outcome === 'staged' ? 'supervisor_review_staged' : supervisorResult.outcome,
+          implementation_notes: supervisorResult.message,
+          updated_at: new Date().toISOString(),
+        }).eq('id', reviewRequestId)
+        if (reviewUpdate.error) throw new Error('guardian_supervisor_result_persist_failed')
         const events = [
           {
             event_id: `guardian-self-healing-${deliveryId}-received`,
@@ -125,6 +138,10 @@ async function processWebhookBacklog(input: {
               automaticRepairAuthorized: false,
               providerMutations: false,
               reviewRequestId,
+              supervisorOutcome: supervisorResult.outcome,
+              diagnosisConfidence: supervisorResult.diagnosisConfidence,
+              repairSteps: supervisorResult.repairSteps,
+              supervisorMessage: supervisorResult.message,
             },
             schema_version: 'supervisor-audit-v1',
           },

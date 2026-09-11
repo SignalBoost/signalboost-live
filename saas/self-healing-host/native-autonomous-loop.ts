@@ -38,7 +38,7 @@ export interface NativeRemediationResult {
   objectiveOutcomes?: CouncilOutcomeBridgeSummary
 }
 
-export async function remediateNativeIncidents(incidents: readonly SupervisorIncident[], options: { maxIncidents?: number; remediationMemory?: RemediationMemoryStore } = {}): Promise<NativeRemediationResult[]> {
+export async function remediateNativeIncidents(incidents: readonly SupervisorIncident[], options: { maxIncidents?: number; remediationMemory?: RemediationMemoryStore; automaticRepairAllowed?: boolean } = {}): Promise<NativeRemediationResult[]> {
   const max = Math.max(1, Math.min(options.maxIncidents ?? 4, 8))
   const remediationMemory = options.remediationMemory ?? (cosServiceDb() ? new SupabaseRemediationMemoryStore(cosServiceDb()!) : undefined)
   const runtime = createSignalBoostSupervisorConnectorRuntime()
@@ -97,6 +97,18 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
 
     if (!repairPlan.length) {
       results.push({ incidentId: incident.incidentId, diagnosisConfidence: diagnostic.confidence_score, diagnosis: diagnostic.diagnosis, repairSteps: 0, outcome: 'no_action', message: diagnostic.escalation_reason || 'COS diagnosed the incident and proposed no safe repair.' })
+      continue
+    }
+
+    if (options.automaticRepairAllowed === false) {
+      results.push({
+        incidentId: incident.incidentId,
+        diagnosisConfidence: diagnostic.confidence_score,
+        diagnosis: diagnostic.diagnosis,
+        repairSteps: repairPlan.length,
+        outcome: 'staged',
+        message: 'COS diagnosed the incident and staged the proposed recovery for governed review; automatic repair is disabled for this incident source.',
+      })
       continue
     }
 

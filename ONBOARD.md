@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.107
+**Version:** 1.108
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -18,6 +18,22 @@ current attempt can therefore still reopen study after its exercises fail, witho
 credit or bypassing the fresh independent re-examination requirement.
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
+
+## Governed live GitHub repository telemetry ingestion — 2026-09-11
+
+The next Autonomous Security Patrol slice adds a Node.js webhook endpoint that retains the exact raw
+GitHub request body for HMAC verification, accepts only the supported repository-security events,
+and passes normalized provider provenance through the signed Guardian engagement and deterministic
+Referee before evidence can be appended. The durable Supabase ledger is service-only, append-only,
+delivery-idempotent, transactionally serialized, and linked by the existing tamper-evident evidence
+hash chain. Corrupted chains, invalid signatures, scope mismatches, expired engagements, the kill
+switch, rate/target ceilings, concurrent chain movement, and unavailable persistence all fail closed.
+
+This slice does not install or modify a GitHub webhook, grant repository access, infer network or
+human identity, perform repository mutations, trigger containment, or enable Stranger/offensive
+activity. Production operation additionally requires the migration, webhook secret, trusted Ed25519
+public keys, a currently valid exact-repository Guardian engagement, and separately authorized GitHub
+webhook configuration. Code or Preview readiness alone is not live-delivery proof.
 
 ## Bounded repository-repair verification — 2026-09-11
 

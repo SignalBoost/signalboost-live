@@ -1,3 +1,4 @@
+import './securityGitHubWebhookIngestion.node.test.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHmac, generateKeyPairSync, sign as signEd25519 } from 'node:crypto'

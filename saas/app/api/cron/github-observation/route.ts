@@ -5,6 +5,7 @@ import { ownershipIdentity } from '@/lib/supervisor/coordination'
 import { enqueueGitHubObservation, loadActiveGitHubConnections, runAcceptedGitHubObservation } from '@/lib/provider-framework/github-production'
 import type { GitHubCapability } from '@/lib/provider-framework/github'
 import { materializeGuardianRepositoryObservation } from '@/lib/security/github-guardian-observation'
+import { createGuardianSelfHealingHandoff } from '@/lib/security/github-guardian-self-healing'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -83,6 +84,45 @@ async function processWebhookBacklog(input: {
           alertCreated = true
         }
       }
+      const selfHealing = createGuardianSelfHealingHandoff({
+        deliveryId,
+        workItemId: item.workItemId,
+        organizationId: item.organizationId || '',
+        observation: materialized.observation,
+        alert: materialized.alert,
+      })
+      if (selfHealing) {
+        const events = [
+          {
+            event_id: `guardian-self-healing-${deliveryId}-received`,
+            incident_id: selfHealing.incident.incidentId,
+            event_type: 'incident_received',
+            occurred_at: new Date().toISOString(),
+            payload: {
+              provider: 'github',
+              environment: 'production',
+              evidenceReference: materialized.observation.correlation_id,
+            },
+            schema_version: 'supervisor-audit-v1',
+          },
+          {
+            event_id: `guardian-self-healing-${deliveryId}-policy`,
+            incident_id: selfHealing.incident.incidentId,
+            event_type: 'policy_evaluated',
+            occurred_at: new Date().toISOString(),
+            payload: {
+              planId: selfHealing.plan.planId,
+              outcome: selfHealing.policy.outcome,
+              reason: selfHealing.policy.reason,
+              automaticRepairAuthorized: false,
+              providerMutations: false,
+            },
+            schema_version: 'supervisor-audit-v1',
+          },
+        ]
+        const handedOff = await input.db.from('supervisor_audit_events').upsert(events, { onConflict: 'event_id', ignoreDuplicates: true })
+        if (handedOff.error) throw new Error('guardian_self_healing_handoff_failed')
+      }
       const audited = await input.db.from('supervisor_audit_events').insert({
         event_id: `guardian-github-${deliveryId}`,
         incident_id: item.incidentId,
@@ -96,7 +136,7 @@ async function processWebhookBacklog(input: {
         .update({ status: 'completed' }).eq('delivery_id', deliveryId)
       if (deliveryUpdated.error) throw new Error('guardian_delivery_completion_failed')
       await input.coordinationStore.transitionWorkItem({ workItemId: item.workItemId, from: 'processing', to: 'completed', owner })
-      summary.push({ workItemId: item.workItemId, outcome: 'completed', alertCreated })
+      summary.push({ workItemId: item.workItemId, outcome: 'completed', alertCreated, selfHealing: selfHealing?.policy.outcome || 'not_required' })
     } catch (error: any) {
       if (lease) {
         try { await input.coordinationStore.releaseLease(ownershipIdentity(lease)) } catch { /* lease expiry will recover ownership */ }

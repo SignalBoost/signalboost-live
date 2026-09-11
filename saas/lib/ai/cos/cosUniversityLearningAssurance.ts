@@ -132,7 +132,50 @@ export type ProductionPathReceipt = Readonly<{
   invocationSucceeded: boolean
   durableEvidenceRef: string
   verifier: 'host_production_verifier'
+  /** Original host runner payload. Missing legacy payload is not execution proof. */
+  executionEvidence?: unknown
 }>
+
+/**
+ * Additional execution veto, not a grade or a complete capability certification. Scheduler health
+ * is retained in the ledger but cannot stand in for a worker. Undergraduate exam paths additionally
+ * require a fresh scored attempt; a genuine failed exam still proves execution, never mastery.
+ */
+export function universityProductionExecutionBlocker(path: LearningPathId, value: unknown): string | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 'execution_evidence_missing'
+  const evidence = value as Record<string, unknown>
+  for (const flag of ['runnerInvoked', 'enabled', 'skipped']) {
+    if (flag in evidence && typeof evidence[flag] !== 'boolean') return 'execution_evidence_malformed'
+  }
+  if (evidence.dailyCadence === 'not_due' || evidence.runnerInvoked === false || evidence.skipped === true) return 'runner_not_invoked'
+  if (evidence.enabled === false) return 'runner_disabled'
+  if (evidence.blocked != null && evidence.blocked !== false) return 'runner_blocked'
+  if (['blocked', 'skipped', 'not_due', 'nothing_due', 'deferred', 'not_claimed'].includes(String(evidence.status))) return 'runner_did_no_work'
+  if (evidence.error != null && evidence.error !== '') return 'runner_failed'
+  if ('errors' in evidence && (!Array.isArray(evidence.errors) || evidence.errors.length !== 0)) return 'runner_failed'
+
+  const academic = ['independent_exams', 'subject_a_range_evidence', 'language_a_range_evidence', 'delayed_retention'].includes(path)
+  if (academic) {
+    const attempted = evidence.attempted
+    if (typeof attempted !== 'number' || !Number.isSafeInteger(attempted) || attempted < 1) return 'fresh_academic_execution_missing'
+    const scored = (row: Record<string, unknown>) =>
+      (row.status === 'passed' && row.passed === true) || (row.status === 'failed' && row.passed === false)
+    if (path === 'delayed_retention') return attempted === 1 && scored(evidence) ? null : 'fresh_academic_execution_missing'
+    if (!Array.isArray(evidence.runs)) return 'fresh_academic_execution_missing'
+    const terminal = evidence.runs.filter((row): row is Record<string, unknown> =>
+      Boolean(row && typeof row === 'object' && !Array.isArray(row) && scored(row as Record<string, unknown>)))
+    const ids = terminal.map(row => typeof row.runId === 'string' ? row.runId.trim() : '')
+    return terminal.length === attempted && ids.every(Boolean) && new Set(ids).size === ids.length
+      ? null : 'fresh_academic_execution_missing'
+  }
+
+  // Other lanes retain their existing invocation semantics. An explicit host invocation or an
+  // enabled structured runner result is needed; receipt metadata alone cannot attest execution.
+  // This does not prove training, graduate completion, practical success, retention or improvement.
+  const metadata = new Set(['claim', 'featureFlag', 'featureEnabled', 'invocationSucceeded', 'runnerInvoked', 'enabled', 'skipped', 'errors', 'error', 'blocked', 'semantics', 'agentId'])
+  const hasRunnerResult = evidence.enabled === true && Object.keys(evidence).some(key => !metadata.has(key))
+  return evidence.runnerInvoked === true || hasRunnerResult ? null : 'execution_evidence_missing'
+}
 
 export function verifyLearningPathReceipts(input: {
   expectedCommitSha: string
@@ -144,8 +187,9 @@ export function verifyLearningPathReceipts(input: {
   const valid = new Set(input.receipts.filter(receipt =>
     receipt.commitSha === input.expectedCommitSha
     && Boolean(receipt.deploymentId.trim())
-    && receipt.featureEnabled
-    && receipt.invocationSucceeded
+    && receipt.featureEnabled === true
+    && receipt.invocationSucceeded === true
+    && universityProductionExecutionBlocker(receipt.path, receipt.executionEvidence) === null
     && Boolean(receipt.durableEvidenceRef.trim())
     && receipt.verifier === 'host_production_verifier'
     && Number.isFinite(Date.parse(receipt.observedAt))

@@ -47,6 +47,8 @@ test('production verification covers every declared gated learning path at the d
     path, deploymentId: 'dpl_1', commitSha: hash('d'), observedAt: '2026-09-10T11:00:00Z',
     expiresAt: '2026-09-11T11:00:00Z', featureEnabled: true, invocationSucceeded: true,
     durableEvidenceRef: `db://learning-path/${path}`, verifier: 'host_production_verifier',
+    executionEvidence: { runnerInvoked: true, attempted: 1, status: 'passed', passed: true,
+      runs: [{ runId: `test-${path}`, status: 'passed', passed: true }] },
   })) as ProductionPathReceipt[]
   assert.equal(verifyLearningPathReceipts({ expectedCommitSha: hash('d'), now, receipts }).verified, true)
   receipts[0] = { ...receipts[0], commitSha: hash('e') }

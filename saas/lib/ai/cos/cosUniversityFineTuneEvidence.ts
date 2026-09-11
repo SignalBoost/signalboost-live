@@ -111,21 +111,21 @@ export function foldFineTuneEvidenceRows(rows: readonly any[], expectedRevisionK
   return Object.freeze({ claims: Object.freeze([...claims]), trainedArtifactId, trainedArtifactHash, rollbackArtifactRef, baselineScore, trainedArtifactScore })
 }
 
-export async function readFineTuneEvidence(candidateId: string, revision: FineTuneRevision): Promise<RecordedFineTuneEvidence> {
+export async function readFineTuneEvidence(candidateId: string, revision: FineTuneRevision, now = new Date()): Promise<RecordedFineTuneEvidence> {
   if (!String(candidateId || '').trim()) return EMPTY
   const db = await serviceDb(); if (!db) throw new Error('service_database_unavailable')
   const rows = await db.from('cos_university_learning_assurance_events').select('evidence,verifier,observed_at,expires_at')
     .eq('event_type', 'fine_tune').eq('candidate_id', candidateId).order('observed_at', { ascending: false }).limit(200)
   if (rows.error) throw rows.error
-  return foldFineTuneEvidenceRows(rows.data || [], fineTuneRevisionKey(revision), revision.holdoutManifestHash)
+  return foldFineTuneEvidenceRows(rows.data || [], fineTuneRevisionKey(revision), revision.holdoutManifestHash, now)
 }
 
-export async function readFineTunePartitionRevision(candidateId: string, datasetHash: string): Promise<FineTuneRevision | null> {
+export async function readFineTunePartitionRevision(candidateId: string, datasetHash: string, decisionTime = new Date()): Promise<FineTuneRevision | null> {
   const db = await serviceDb(); if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_learning_assurance_events').select('evidence,verifier,observed_at,expires_at')
     .eq('event_type', 'fine_tune').eq('candidate_id', candidateId).order('observed_at', { ascending: false }).limit(200)
   if (result.error) throw result.error
-  const now = Date.now()
+  const now = decisionTime.getTime()
   for (const row of result.data || []) {
     const evidence = row?.evidence
     const observedAt = Date.parse(String(row?.observed_at || ''))

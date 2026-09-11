@@ -29,8 +29,8 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
   for (const plan of plans.data || []) {
     const candidateId = `study-plan:${plan.id}`
     const datasetHash = hash({ plan: plan.plan_key, subject: plan.subject_id, failure: plan.failure_class, objective: plan.objective, methods: plan.methods, source: plan.source_ref })
-    const revision = await readFineTunePartitionRevision(candidateId, datasetHash)
-    const recordedEvidence = revision ? await readFineTuneEvidence(candidateId, revision) : null
+    const revision = await readFineTunePartitionRevision(candidateId, datasetHash, now)
+    const recordedEvidence = revision ? await readFineTuneEvidence(candidateId, revision, now) : null
     const decision = decideControlledFineTune(buildFineTuneEvidenceInput(revision || {
       baseModel: process.env.LOCAL_AI_MODEL || 'runtime-model-unspecified', datasetHash,
       trainingManifestHash: '', holdoutManifestHash: '',

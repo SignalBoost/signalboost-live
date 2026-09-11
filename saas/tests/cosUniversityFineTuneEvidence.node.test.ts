@@ -79,9 +79,9 @@ test('owner HTTP route cannot manufacture independent, canary, artifact, or roll
 
 test('runner reads durable evidence instead of hard-coded passing values', () => {
   const runner = readFileSync('lib/ai/cos/cosUniversityControlledFineTuning.ts', 'utf8')
-  assert.match(runner, /readFineTuneEvidence\(candidateId, revision\)/)
+  assert.match(runner, /readFineTuneEvidence\(candidateId, revision, now\)/)
   assert.doesNotMatch(runner, /datasetApprovedByHost:\s*true/)
-  assert.match(runner, /readFineTunePartitionRevision\(candidateId, datasetHash\)/)
+  assert.match(runner, /readFineTunePartitionRevision\(candidateId, datasetHash, now\)/)
   assert.doesNotMatch(runner, /partition:\s*'training'/)
 })
 

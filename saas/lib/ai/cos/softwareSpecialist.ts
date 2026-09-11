@@ -14,7 +14,7 @@ import { createSupabaseBuilderWorkspace } from '@/lib/builder/workspace-supabase
 import { extractBuilderSourceFiles, planDebugFileJob } from '@/lib/builder/debug-file-job'
 import { enqueueBuilderJob } from '@/lib/builder/job-store'
 import { readBuilderEvidenceJob } from '@/lib/builder/job-store'
-import { builderEvidenceReply } from '@/lib/builder/execution-evidence'
+import { builderEvidenceReply, isBuilderEvidenceRequest, isBuilderProjectQuestion } from '@/lib/builder/execution-evidence'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import {
   parseSignalBoostRepositoryRepairTarget,
@@ -120,12 +120,34 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
 
   const context = routingContext(input.body)
   const sourceAttached = hasSourceAttachment(context)
+  const mediaAttached = hasImageOrPdfAttachment(input.body)
+  const roleMatched = isConciergeBuilderObjective(objective, context)
+  const designMatched = DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective)
+  const importRequested = builderRepositoryImportIntent(objective)
+  const specialistRelevant = sourceAttached
+    || mediaAttached
+    || roleMatched
+    || designMatched
+    || importRequested
+    || isBuilderProposalApproval(objective)
+    || wantsBuilderProposal(objective)
+    || isBuilderEvidenceRequest(objective)
+    || isBuilderProjectQuestion(objective)
+    || (input.allowRepositoryRepair === true && isOperationalLogEvidence(objective))
+
+  // Ordinary Concierge conversation must never pay the Builder/project-state admission cost.
+  // In Production this mattered during a local-inference outage: a simple educational question was
+  // forced through Software Specialist storage/evidence lookups before COS could fail closed, leaving
+  // the browser displaying "connection active" for minutes. Only software-shaped requests may cross
+  // this boundary; general questions continue directly to the ordinary COS answer path.
+  if (!specialistRelevant) return null
+
   const access = await getAccess().catch(() => null)
 
   const priorAnswer = (Array.isArray(input.body?.messages) ? input.body.messages : [])
     .filter((message: any) => message?.role === 'assistant' && typeof message.content === 'string').at(-1)?.content || ''
   let explanationModelInvoked = false
-  if (isBuilderProposalApproval(objective) && !sourceAttached && !(Array.isArray(input.body?.files) && input.body.files.length) && !hasImageOrPdfAttachment(input.body)) {
+  if (isBuilderProposalApproval(objective) && !sourceAttached && !(Array.isArray(input.body?.files) && input.body.files.length) && !mediaAttached) {
     const userId = access?.userId || publicAuditUserId()
     const conversationId = conversationIdFrom(input.body)
     if (userId && conversationId) {
@@ -156,7 +178,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     userId: access?.userId || publicAuditUserId(),
     conversationId: conversationIdFrom(input.body),
     priorAnswer,
-    hasNewSource: sourceAttached || (Array.isArray(input.body?.files) && input.body.files.length > 0) || hasImageOrPdfAttachment(input.body),
+    hasNewSource: sourceAttached || (Array.isArray(input.body?.files) && input.body.files.length > 0) || mediaAttached,
     allowRepositoryEvidence: input.surface === 'assistant' && access?.isOwner === true,
   }, readBuilderEvidenceJob, async job => {
     const ai = createGovernedBuilderAiPort(createBuilderCodingAiPort(), { deadlineAtMs: Date.now() + 45_000 })
@@ -201,7 +223,6 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
     }
   }
 
-  const importRequested = builderRepositoryImportIntent(objective)
   let repositoryTarget
   try { repositoryTarget = importRequested ? builderRepositoryTarget(objective, input.body?.repositoryUrl) : null }
   catch (error) { return NextResponse.json({ reply: builderRepositoryErrorReply((error as Error).message), execution_allowed: false }, { status: 400 }) }
@@ -214,9 +235,7 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
   }, readBuilderEvidenceJob)
   if (project.blocked) return NextResponse.json({ reply: builderProjectBlockedReply(project.blocked), execution_allowed: false }, { status: project.blocked === 'busy' ? 409 : 503 })
 
-  const roleMatched = isConciergeBuilderObjective(objective, context)
-  const designMatched = DESIGN_ARTIFACT.test(objective) && DESIGN_REQUEST.test(objective)
-  if (hasImageOrPdfAttachment(input.body) || !(roleMatched || designMatched || repositoryTarget || project.context)) return null
+  if (mediaAttached || !(roleMatched || designMatched || repositoryTarget || project.context)) return null
 
   // Public Concierge intentionally receives guest access under public-delivery scope. Its server-
   // captured audit identity may own an isolated workspace, but it never gains owner repository authority.
@@ -297,7 +316,6 @@ export async function tryCosSoftwareSpecialist(input: CosSoftwareSpecialistReque
       ...softwareSpecialistFields(specialistSkill),
     }, { status: 422 })
   }
-
   after(async () => { await runBuilderJob(jobId, builderUserId) })
 
   return NextResponse.json({

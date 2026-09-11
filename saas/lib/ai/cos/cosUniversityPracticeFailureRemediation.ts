@@ -52,12 +52,12 @@ function runCandidateKeys(runs: readonly PracticeRun[]): Set<string> {
   return keys
 }
 
-async function loadCurrentStudyingPlans(runPlanIds: string[]): Promise<PlanRow[]> {
+async function loadCurrentStudyingPlans(runPlanIds: string[], agentId: string): Promise<PlanRow[]> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_study_plans')
     .select('id,status,attempt_count,last_attempt_at,evidence,priority')
-    .eq('agent_id', 'cos')
+    .eq('agent_id', agentId)
     .eq('status', 'studying')
     .gt('attempt_count', 0)
     .order('priority', { ascending: false })
@@ -70,7 +70,7 @@ async function loadCurrentStudyingPlans(runPlanIds: string[]): Promise<PlanRow[]
   if (missingRunPlanIds.length) {
     const extra = await db.from('cos_university_study_plans')
       .select('id,status,attempt_count,last_attempt_at,evidence,priority')
-      .eq('agent_id', 'cos')
+      .eq('agent_id', agentId)
       .eq('status', 'studying')
       .in('id', missingRunPlanIds)
     if (extra.error) throw extra.error
@@ -113,6 +113,7 @@ function currentRoundRows(rows: QueueStateRow[], planId: string, practiceRound: 
 export async function reopenCosUniversityStudyAfterFailedPractice(
   runs: readonly PracticeRun[] = [],
   now = new Date(),
+  agentId = 'cos',
 ): Promise<CosUniversityPracticeFailureRemediationSummary> {
   const summary: CosUniversityPracticeFailureRemediationSummary = {
     terminalFailedRounds: 0,
@@ -126,7 +127,7 @@ export async function reopenCosUniversityStudyAfterFailedPractice(
   const runKeys = runCandidateKeys(runs)
   const runPlanIds = [...runKeys].map(key => key.split(':', 1)[0]).filter(Boolean)
   const [plans, practiceRows] = await Promise.all([
-    loadCurrentStudyingPlans(runPlanIds),
+    loadCurrentStudyingPlans(runPlanIds, agentId),
     loadUniversityPracticeRows(),
   ])
   if (!plans.length || !practiceRows.length) return summary

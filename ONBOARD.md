@@ -3,13 +3,30 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.103
+**Version:** 1.104
 **Updated:** 2026-09-10
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
 > This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
+
+## COS University healthy motivation and teamwork — 2026-09-10
+
+Every registered agent now receives a transparent, host-derived motivational state from verified
+academic and Production evidence. Comparable agents compete only inside the same professional role
+and subject. Verified application, retention, and independently evidenced help that improves a
+teammate's outcome determine standing; activity volume, confidence, self-report, and unrelated
+specialties do not. Failure creates constructive recovery and additional bounded study capacity,
+while a stronger comparable peer creates a healthy stretch target. Leadership requires continued
+application and team contribution. Integrity violations remove competitive rank, and no motivational
+state expands authority. These are functional machine incentives, not claims that agents feel emotion.
+
+Motivation evidence is operationally bounded: expired assessments and expired assurance events are
+ignored. Teamwork credit is emitted only by the authoritative verified-outcome path after a
+beneficiary's independently scored improvement passes every learning-outcome gate. Integrity
+penalties likewise require host-controller evidence and expire into review rather than becoming an
+unreviewable permanent label.
 
 ## COS University live Production-path verification — 2026-09-10
 

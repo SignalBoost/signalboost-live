@@ -30,7 +30,7 @@ test('study plans and remediation cannot collide or transfer across agent identi
 test('autonomous registered-agent cycle executes study and remediation work directly', () => {
   const cycle = read('../lib/ai/cos/cosUniversityAutonomousAgentCycle.ts')
   assert.match(cycle, /nextAction === 'study' \|\| nextAction === 'remediate'/)
-  assert.match(cycle, /runCosUniversityContinuousLearning\(\{ now, agentId: agent\.agentId, maxStudyPlans: 4 \}\)/)
+  assert.match(cycle, /runCosUniversityContinuousLearning\(\{ now, agentId: agent\.agentId, maxStudyPlans: motivation\?\.studyPlanLimit \|\| 4 \}\)/)
 })
 
 test('deliberate practice preserves agent identity through proof, queue, and execution', () => {

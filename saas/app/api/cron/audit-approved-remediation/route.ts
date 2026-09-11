@@ -1,18 +1,30 @@
-// Recover the newest owner-approved audit run that has not yet produced its
-// governed remediation PR. This never approves a run; durable approval must
-// already exist in Supabase.
+// Recover the newest owner-approved audit run that has not yet completed its
+// governed remediation. This never approves a run; durable approval must already
+// exist in Supabase.
 //
-// SAFETY: scheduled recovery is disabled by default. It may be re-enabled only
-// with AUDIT_APPROVED_REMEDIATION_CRON_ENABLED=true after durable run-level
-// idempotency is available independently of audit log payload shape.
+// The general-purpose recovery lane remains feature-gated. The canonical owned
+// SignalBoost repository is different: its standing owner policy already granted
+// Self-Healing authority, and repository-aware recovery is run-level idempotent via
+// builder metadata. That owned lane therefore stays autonomous even when the
+// general recovery flag is off.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runApprovedAuditRemediationWithRetry } from '@/lib/audit/approvedRunRemediationRetry'
+import { parseRepoUrl } from '@/lib/audit/repoTarget'
 import { getAdminSupabase } from '@/utils/supabase/server'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+const REPO = 'SignalBoost/signalboost-live'
+const BASE_BRANCH = 'main'
+
+function isCanonicalOwnedTarget(value: string): boolean {
+  const parsed = parseRepoUrl(String(value || '').trim())
+  if (!parsed || parsed.repo.toLowerCase() !== REPO.toLowerCase()) return false
+  return !parsed.branch || parsed.branch === BASE_BRANCH
+}
 
 function hasProducedRemediation(rows: any[]): boolean {
   return (rows || []).some((row) => {
@@ -28,14 +40,6 @@ function hasProducedRemediation(rows: any[]): boolean {
 }
 
 export async function GET(req: NextRequest) {
-  if (process.env.AUDIT_APPROVED_REMEDIATION_CRON_ENABLED !== 'true') {
-    return NextResponse.json({
-      ok: true,
-      recovered: false,
-      reason: 'Audit approved remediation cron is disabled by default.',
-    })
-  }
-
   const secret = process.env.CRON_SECRET
   const authorization = req.headers.get('authorization') || ''
   if (!secret || authorization !== `Bearer ${secret}`) {
@@ -45,7 +49,7 @@ export async function GET(req: NextRequest) {
   const admin = getAdminSupabase()
   const latest = await admin
     .from('audit_runs')
-    .select('id')
+    .select('id,prefix')
     .eq('status', 'approved')
     .order('created_at', { ascending: false })
     .limit(1)
@@ -53,6 +57,16 @@ export async function GET(req: NextRequest) {
 
   if (latest.error) return NextResponse.json({ ok: false, error: latest.error.message }, { status: 500 })
   if (!latest.data?.id) return NextResponse.json({ ok: true, recovered: false, reason: 'No approved audit run found.' })
+
+  const owned = isCanonicalOwnedTarget(String(latest.data.prefix || ''))
+  if (!owned && process.env.AUDIT_APPROVED_REMEDIATION_CRON_ENABLED !== 'true') {
+    return NextResponse.json({
+      ok: true,
+      recovered: false,
+      runId: latest.data.id,
+      reason: 'General audit approved remediation recovery is disabled.',
+    })
+  }
 
   const priorLogs = await admin
     .from('audit_logs')

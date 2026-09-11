@@ -6,12 +6,14 @@ import { runCosUniversityContinuousLearning } from './cosUniversityContinuousLea
 import { runCosUniversityDeliberatePractice } from './cosUniversityDeliberatePracticeRunner.ts'
 import { decideCosUniversityNextAcademicAction, type CosUniversityNextAcademicAction } from './cosUniversityAgentAcademicProgression.ts'
 import { syncCosUniversityAppliedKnowledge } from './cosUniversityAppliedKnowledge.ts'
+import { readCosUniversityMotivationStandings, selectCosUniversityMotivationalPriority } from './cosUniversityMotivationRuntime.ts'
+import type { CosUniversityMotivationalState } from './cosUniversityMotivation.ts'
 
 export type CosUniversityAutonomousAgentCycleSummary = Readonly<{
   enabled: boolean
   registered: number
   processed: number
-  agents: readonly Readonly<{ agentId: string; role: string; admitted: boolean; nextAction: CosUniversityNextAcademicAction | 'error'; completionRatio: number | null; error: string | null }>[]
+  agents: readonly Readonly<{ agentId: string; role: string; admitted: boolean; nextAction: CosUniversityNextAcademicAction | 'error'; completionRatio: number | null; motivation: CosUniversityMotivationalState | null; peerRank: number | null; error: string | null }>[]
   errors: readonly string[]
   semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed'
 }>
@@ -23,10 +25,12 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
   }
   const now = options.now instanceof Date ? options.now : new Date()
   const registered = await listCosUniversityRegisteredAgents(options.maxAgents ?? 25)
+  const motivationStandings = await readCosUniversityMotivationStandings(registered)
   const agents: Array<CosUniversityAutonomousAgentCycleSummary['agents'][number]> = []
   const errors: string[] = []
   for (const agent of registered) {
     try {
+      const motivation = selectCosUniversityMotivationalPriority(motivationStandings, agent.agentId)
       const admission = await runCosUniversityAdmission({ now, agentId: agent.agentId, role: agent.role })
       if (admission.errors.length) throw new Error(admission.errors.join('; '))
       await syncCosUniversityAppliedKnowledge(agent.agentId, now)
@@ -40,17 +44,17 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
         const exam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2 })
         if (exam.errors.length) throw new Error(exam.errors.join('; '))
       } else if (nextAction === 'study' || nextAction === 'remediate') {
-        const learning = await runCosUniversityContinuousLearning({ now, agentId: agent.agentId, maxStudyPlans: 4 })
+        const learning = await runCosUniversityContinuousLearning({ now, agentId: agent.agentId, maxStudyPlans: motivation?.studyPlanLimit || 4 })
         if (learning.status === 'error') throw new Error(learning.errors.join('; ') || 'continuous_learning_failed')
         // Practice follows durable accepted-study proof, not whether this tick acquired material.
         const practice = await runCosUniversityDeliberatePractice({ agentId: agent.agentId, maxPlans: 1, maxExercises: 2 })
         if (practice.errors.length) throw new Error(practice.errors.join('; '))
       }
-      agents.push({ agentId: agent.agentId, role: agent.role, admitted: admission.admitted, nextAction, completionRatio: record.completionRatio, error: null })
+      agents.push({ agentId: agent.agentId, role: agent.role, admitted: admission.admitted, nextAction, completionRatio: record.completionRatio, motivation: motivation?.state || null, peerRank: motivation?.rank || null, error: null })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       errors.push(`${agent.agentId}:${message}`)
-      agents.push({ agentId: agent.agentId, role: agent.role, admitted: false, nextAction: 'error', completionRatio: null, error: message })
+      agents.push({ agentId: agent.agentId, role: agent.role, admitted: false, nextAction: 'error', completionRatio: null, motivation: null, peerRank: null, error: message })
     }
   }
   return { enabled: true, registered: registered.length, processed: agents.length, agents, errors, semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed' }

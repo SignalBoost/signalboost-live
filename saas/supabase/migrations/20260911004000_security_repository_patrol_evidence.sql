@@ -18,6 +18,8 @@ create index if not exists security_repository_patrol_evidence_repo_time_idx
   on public.security_repository_patrol_evidence (repository, recorded_at desc);
 
 alter table public.security_repository_patrol_evidence enable row level security;
+revoke all on table public.security_repository_patrol_evidence from public, anon, authenticated;
+grant select on table public.security_repository_patrol_evidence to service_role;
 
 create or replace function public.append_security_repository_patrol_evidence(
   p_engagement_id text,
@@ -82,9 +84,6 @@ $$;
 
 revoke all on function public.append_security_repository_patrol_evidence(text,text,text,text,text,bigint,text,text,jsonb) from public, anon, authenticated;
 grant execute on function public.append_security_repository_patrol_evidence(text,text,text,text,text,bigint,text,text,jsonb) to service_role;
-
-revoke all on table public.security_repository_patrol_evidence from public, anon, authenticated;
-grant select on table public.security_repository_patrol_evidence to service_role;
 
 create or replace function public.reject_security_repository_patrol_evidence_mutation()
 returns trigger

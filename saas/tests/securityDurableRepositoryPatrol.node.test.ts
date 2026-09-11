@@ -107,5 +107,6 @@ test('GitHub route and migration wire authenticated, serialized, service-role-on
   assert.match(migration, /before update or delete/)
   assert.match(migration, /security_repository_patrol_evidence_is_append_only/)
   assert.match(migration, /revoke all on table[\s\S]*from public, anon, authenticated/)
+  assert.doesNotMatch(migration, /grant select, insert|grant usage, select on sequence/)
   assert.match(migration, /revoke all on function[\s\S]*from public, anon, authenticated/)
 })

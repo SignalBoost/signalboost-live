@@ -71,6 +71,13 @@ const AD_LANDING_LINKS = [
     badge: uiText('generatedUi.u_4807513a2c62c69c'),
     description: uiText('generatedUi.u_205886a4abbf9551'),
   },
+  {
+    title: uiText('generatedUi.u_guardian_supervisor_monitor'),
+    href: '/dashboard/cybersecurity',
+    url: `${PUBLIC_BRAND.siteUrl}/dashboard/cybersecurity`,
+    badge: uiText('generatedUi.u_guardian_live_monitoring'),
+    description: uiText('generatedUi.u_guardian_monitor_description'),
+  },
 ]
 
 function c(obj: any, lang: string): string {

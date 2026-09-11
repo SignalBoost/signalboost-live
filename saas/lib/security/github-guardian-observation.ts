@@ -64,7 +64,7 @@ export function materializeGuardianRepositoryObservation(input: {
     severity: 'medium',
     advisory_id: `guardian-repository-change:${input.deliveryId}`,
     title: 'Security-sensitive repository change observed',
-    message: `Authenticated repository activity changed ${sensitivePaths.length} security-sensitive path${sensitivePaths.length === 1 ? '' : 's'}. Review is required; this observation is not an attribution or vulnerability finding.`,
+    message: `Authenticated repository activity changed ${sensitivePaths.length} security-sensitive path${sensitivePaths.length === 1 ? '' : 's'}. The Self-Healing Supervisor will classify this observation; it is not an attribution or vulnerability finding.`,
     status: 'open',
   } : null
   return Object.freeze({ observation: Object.freeze(observation), alert: alert ? Object.freeze(alert) : null })

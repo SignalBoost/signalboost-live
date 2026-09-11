@@ -1,6 +1,11 @@
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint
+## Permanent Self-Healing monitor navigation — 2026-09-11
+
+The signed-in Security navbar now names `/dashboard/cybersecurity` explicitly as the
+Self-Healing Supervisor monitoring surface. Owners no longer need to remember or retrieve its URL.
+
 ## Guardian Supervisor autonomous disposition — 2026-09-11
 
 Authenticated repository observations now enter the Self-Healing Supervisor as read-only,

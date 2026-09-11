@@ -123,7 +123,7 @@ const GROUPS: NavGroup[] = [
     labelKey: 'nav.security',
     fallbackLabel: uiText('generatedUi.u_8f6fb4eb7f42c0e2'),
     items: [
-      { icon: '🛡️', labelKey: 'nav.cybersecurity', fallbackLabel: uiText('generatedUi.u_23b2d5dae0a87cf9'), href: '/dashboard/cybersecurity' },
+      { icon: '🛡️', labelKey: 'nav.selfHealingMonitor', fallbackLabel: `${uiText('generatedUi.u_31d02dcac4164cd3')} — ${uiText('generatedUi.u_1dc83f605edf0ae2')}`, href: '/dashboard/cybersecurity' },
       { icon: '📋', labelKey: 'nav.auditConsole', fallbackLabel: uiText('generatedUi.u_281ad82f2d803589'), href: '/dashboard/audit' },
       { icon: '🎛️', labelKey: 'nav.auditCockpit', fallbackLabel: uiText('generatedUi.u_c0c52c1e72197d6d'), href: '/hub/audit' },
     ],

@@ -18,6 +18,7 @@ export function guardianReviewRequest(input: {
   const incident = input.handoff.incident
   const paths = Array.isArray(incident.metadata.sensitivePaths) ? incident.metadata.sensitivePaths : []
   return Object.freeze({
+    id: input.alertId,
     user_id: null,
     source_area: 'cybersecurity',
     source_type: 'guardian_repository_change',

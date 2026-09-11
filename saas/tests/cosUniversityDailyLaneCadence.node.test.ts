@@ -1,4 +1,3 @@
-// saas/tests/cosUniversityDailyLaneCadence.node.test.ts
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -203,4 +202,30 @@ test('language A-range scheduling paginates agents and rotates the hourly starti
   assert.match(registry, /\.range\(from, from \+ pageSize - 1\)/)
   assert.match(route, /now\.getUTCHours\(\) % registeredAgents\.length/)
   assert.match(route, /registeredAgents\.slice\(offset\)/)
+})
+
+test('graduation runs for every registered agent, one agent per tick, with admission for that same agent and role', () => {
+  const route = fs.readFileSync(path.resolve(import.meta.dirname, '../app/api/cron/cos-university-graduation/route.ts'), 'utf8')
+  assert.match(route, /listCosUniversityRegisteredAgents\(\)/)
+  assert.match(route, /readCosUniversityDailyLaneCadence\('graduation', now, agent\.agentId\)/)
+  const gradAt = route.indexOf('runCosUniversityGeneralistGraduationGate({ now, agentId: agent.agentId })')
+  const admitAt = route.indexOf('runCosUniversityAdmission({ now, agentId: agent.agentId, role: agent.role })')
+  assert.ok(gradAt > 0 && admitAt > gradAt, 'admission follows graduation for the same agent')
+  assert.match(route, /evidence: \{ \.\.\.result, admission, agentId: agent\.agentId \}/)
+  assert.ok(route.indexOf('return NextResponse.json({ ok: errors.length === 0', admitAt) > admitAt, 'a tick returns after one agent batch')
+})
+
+test('graduation runner is agent-scoped: own enrollment, residence, evidence, capstone and credential', () => {
+  const runner = fs.readFileSync(path.resolve(import.meta.dirname, '../lib/ai/cos/cosUniversityGraduationRunner.ts'), 'utf8')
+  assert.match(runner, /options: \{ now\?: Date; agentId\?: string \}/)
+  assert.doesNotMatch(runner, /\.eq\('agent_id', AGENT_ID\)/, 'every ledger read uses the requested agent')
+  assert.equal((runner.match(/\.eq\('agent_id', agentId\)/g) || []).length, 4)
+  assert.doesNotMatch(runner, /agent_id: AGENT_ID/, 'credentials and capstone runs are written under the requested agent')
+  assert.match(runner, /credential_key: cosUniversityGeneralistUndergraduateCredentialKey\(agentId\)/)
+  assert.match(runner, /cosUniversityGeneralistCapstoneRunKey\(agentId, dayKey\(now\)\)/)
+  assert.match(runner, /\$\{COS_UNIVERSITY_GENERALIST_CAPSTONE_PROFILE\}:\$\{day\}/, 'COS keeps its historical capstone key')
+  // The residence and deadline gates are still evaluated before any credential for every agent.
+  const residenceAt = runner.indexOf("reasons: ['minimum_residence_incomplete']")
+  const awardAt = runner.indexOf('await awardUndergraduateCredential(agentId, before.status, now)')
+  assert.ok(residenceAt > 0 && awardAt > residenceAt)
 })

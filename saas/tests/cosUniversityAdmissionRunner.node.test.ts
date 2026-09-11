@@ -1,4 +1,3 @@
-// saas/tests/cosUniversityAdmissionRunner.node.test.ts
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -57,8 +56,8 @@ test('the University graduation cron runs admission in the same tick right after
   const route = file('app/api/cron/cos-university-graduation/route.ts')
   assert.match(route, /runCosUniversityGeneralistGraduationGate/)
   assert.match(route, /runCosUniversityAdmission/)
-  const graduationAt = route.indexOf('runCosUniversityGeneralistGraduationGate()')
-  const admissionAt = route.indexOf('runCosUniversityAdmission()')
+  const graduationAt = route.indexOf('runCosUniversityGeneralistGraduationGate({ now, agentId: agent.agentId })')
+  const admissionAt = route.indexOf('runCosUniversityAdmission({ now, agentId: agent.agentId, role: agent.role })')
   assert.ok(graduationAt >= 0 && admissionAt >= 0 && graduationAt < admissionAt)
 })
 

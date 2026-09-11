@@ -7,6 +7,7 @@ import {
   COS_UNIVERSITY_ACADEMIC_EXECUTOR_UNAVAILABLE,
   cosUniversityAcademicExecutionBlocker,
 } from '../lib/ai/cos/cosUniversityAcademicExecutionPolicy.ts'
+import './cosUniversityExamSchema.node.test.ts'
 
 const file = (relative: string) => fs.readFileSync(path.resolve(import.meta.dirname, '..', relative), 'utf8')
 

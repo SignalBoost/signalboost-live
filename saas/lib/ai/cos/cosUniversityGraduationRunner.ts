@@ -30,6 +30,12 @@ import {
   type CosUniversityCredential,
 } from './cosUniversityCredentials.ts'
 
+import {
+  cosUniversityGraduationRuntimeBlocker,
+  isCosUniversityGraduationExecutionEvidence,
+  requireCosUniversityGraduationRuntime,
+} from './cosUniversityGraduationRuntimePolicy.ts'
+
 const AGENT_ID = 'cos'
 const UNDERGRADUATE_PROGRAM_KEY = 'generalist_undergraduate_v1'
 
@@ -100,9 +106,15 @@ function dayKey(now: Date): string {
   return now.toISOString().slice(0, 10)
 }
 
-function capstoneEvidence(rows: GeneralistCapstoneRunRow[]): CosUniversityGeneralistCapstoneRunEvidence[] {
+function capstoneEvidence(rows: GeneralistCapstoneRunRow[], agentId: string, now: Date): CosUniversityGeneralistCapstoneRunEvidence[] {
   return rows
-    .filter(row => (row.status === 'passed' || row.status === 'failed') && row.passed !== null)
+    .filter(row => (row.status === 'passed' || row.status === 'failed')
+      && row.passed !== null
+      && isCosUniversityGraduationExecutionEvidence(row, agentId)
+      && row.profile === COS_UNIVERSITY_GENERALIST_CAPSTONE_PROFILE
+      && row.scorer_version === COS_UNIVERSITY_GENERALIST_CAPSTONE_SCORER
+      && Number.isFinite(Date.parse(row.observed_at))
+      && Date.parse(row.observed_at) <= now.getTime())
     .map(row => ({
       passed: row.passed === true,
       variantHash: row.variant_hash,
@@ -136,7 +148,7 @@ function mapCredential(row: CredentialRow | null): CosUniversityCredential | nul
 
 async function loadAssessmentRows(agentId: string): Promise<CosUniversityAssessmentRow[]> {
   const db = cosServiceDb()
-  if (!db) return []
+  if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_assessments')
     .select(ASSESSMENT_SELECT)
     .eq('agent_id', agentId)
@@ -148,7 +160,7 @@ async function loadAssessmentRows(agentId: string): Promise<CosUniversityAssessm
 
 async function loadCapstoneRuns(agentId: string): Promise<GeneralistCapstoneRunRow[]> {
   const db = cosServiceDb()
-  if (!db) return []
+  if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_generalist_capstone_runs')
     .select(RUN_SELECT)
     .eq('agent_id', agentId)
@@ -160,7 +172,7 @@ async function loadCapstoneRuns(agentId: string): Promise<GeneralistCapstoneRunR
 
 async function loadUndergraduateEnrollment(agentId: string): Promise<CosUniversityProgramEnrollment | null> {
   const db = cosServiceDb()
-  if (!db) return null
+  if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_program_enrollments')
     .select('program_key,program_level,enrolled_at,minimum_residence_until,target_completion_at,hard_deadline_at')
     .eq('agent_id', agentId)
@@ -172,7 +184,7 @@ async function loadUndergraduateEnrollment(agentId: string): Promise<CosUniversi
 
 async function loadUndergraduateCredential(agentId: string): Promise<CosUniversityCredential | null> {
   const db = cosServiceDb()
-  if (!db) return null
+  if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_credentials')
     .select('credential_key,program_key,program_level,title,standing,awarded_at')
     .eq('agent_id', agentId)
@@ -199,7 +211,7 @@ async function readGateState(now: Date, agentId: string): Promise<{
   const academicState = academicStateFromRows(rows, now)
   const academicStatus = deriveCosUniversityGeneralistGraduation({
     academicState,
-    capstoneRuns: capstoneEvidence(capstoneRuns),
+    capstoneRuns: capstoneEvidence(capstoneRuns, agentId, now),
   })
   const status = applyCosUniversityUndergraduateCalendar({ academicStatus, enrollment, credential, now })
   return { academicState, rows, capstoneRuns, enrollment, credential, status }
@@ -210,11 +222,12 @@ export async function readCosUniversityGeneralistGraduationStatus(now = new Date
 }
 
 async function awardUndergraduateCredential(agentId: string, status: CosUniversityTimeBoundedGraduationStatus, now: Date): Promise<CosUniversityCredential | null> {
+  requireCosUniversityGraduationRuntime(agentId)
   if (!status.awardEligible || !status.program.programKey) return null
   const standing = status.currentCompetenceStanding
   if (standing !== 'A' && standing !== 'A+') return null
   const db = cosServiceDb()
-  if (!db) return null
+  if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_credentials').insert({
     credential_key: cosUniversityGeneralistUndergraduateCredentialKey(agentId),
     agent_id: agentId,
@@ -238,8 +251,9 @@ async function awardUndergraduateCredential(agentId: string, status: CosUniversi
 }
 
 async function createOrFindCapstoneRun(agentId: string, now: Date): Promise<GeneralistCapstoneRunRow | null> {
+  requireCosUniversityGraduationRuntime(agentId)
   const db = cosServiceDb()
-  if (!db) return null
+  if (!db) throw new Error('service_database_unavailable')
   const runKey = cosUniversityGeneralistCapstoneRunKey(agentId, dayKey(now))
   const existing = await db.from('cos_university_generalist_capstone_runs')
     .select(RUN_SELECT).eq('run_key', runKey).maybeSingle()
@@ -268,6 +282,7 @@ async function createOrFindCapstoneRun(agentId: string, now: Date): Promise<Gene
 }
 
 async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Promise<CosUniversityGraduationGateSummary['capstoneRun']> {
+  requireCosUniversityGraduationRuntime(row.agent_id)
   const db = cosServiceDb()
   if (!db) return { runId: row.id, state: 'error', passed: null, reasons: ['service_database_unavailable'] }
   const exam = buildCosUniversityGeneralistCapstoneExam(row.seed)
@@ -288,9 +303,9 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
   if (!claim.data) {
     return {
       runId: row.id,
-      state: 'already_terminal',
-      passed: row.passed,
-      reasons: row.reasons || ['not_claimed'],
+      state: 'error',
+      passed: null,
+      reasons: ['capstone_run_not_claimed'],
     }
   }
 
@@ -448,9 +463,22 @@ export async function runCosUniversityGeneralistGraduationGate(options: { now?: 
         semantics: 'time_bounded_degree_credential_current_competence_separate',
       }
     }
+    const runtimeBlocker = cosUniversityGraduationRuntimeBlocker(agentId)
+    if (runtimeBlocker) {
+      return {
+        enabled: true,
+        status: before.status,
+        capstoneRun: { runId: null, state: 'error', passed: null, reasons: [runtimeBlocker] },
+        assessmentRowsRead: before.rows.length,
+        errors: [runtimeBlocker],
+        semantics: 'time_bounded_degree_credential_current_competence_separate',
+      }
+    }
     if (before.status.awardEligible) {
-      await awardUndergraduateCredential(agentId, before.status, now)
+      const credential = await awardUndergraduateCredential(agentId, before.status, now)
+      if (!credential) throw new Error('undergraduate_credential_not_persisted')
       const awarded = await readGateState(new Date(), agentId)
+      if (!awarded.status.graduated) throw new Error('undergraduate_credential_not_verified')
       return {
         enabled: true,
         status: awarded.status,
@@ -475,10 +503,26 @@ export async function runCosUniversityGeneralistGraduationGate(options: { now?: 
 
     const capstoneRun = row.status === 'created'
       ? await executeCapstoneRun(row, now)
-      : { runId: row.id, state: 'already_terminal' as const, passed: row.passed, reasons: row.reasons || [] }
+      : row.status === 'error' || row.status === 'running'
+        ? { runId: row.id, state: 'error' as const, passed: null, reasons: row.reasons?.length ? row.reasons : ['capstone_run_unavailable'] }
+        : { runId: row.id, state: 'already_terminal' as const, passed: row.passed, reasons: row.reasons || [] }
+    if (capstoneRun.state === 'error') {
+      return {
+        enabled: true,
+        status: before.status,
+        capstoneRun,
+        assessmentRowsRead: before.rows.length,
+        errors: capstoneRun.reasons.length ? capstoneRun.reasons : ['capstone_execution_failed'],
+        semantics: 'time_bounded_degree_credential_current_competence_separate',
+      }
+    }
     const provisional = await readGateState(new Date(), agentId)
-    if (provisional.status.awardEligible) await awardUndergraduateCredential(agentId, provisional.status, new Date())
+    if (provisional.status.awardEligible) {
+      const credential = await awardUndergraduateCredential(agentId, provisional.status, new Date())
+      if (!credential) throw new Error('undergraduate_credential_not_persisted')
+    }
     const after = await readGateState(new Date(), agentId)
+    if (provisional.status.awardEligible && !after.status.graduated) throw new Error('undergraduate_credential_not_verified')
     return {
       enabled: true,
       status: after.status,

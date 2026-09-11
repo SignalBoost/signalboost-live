@@ -45,6 +45,12 @@ ROLE_CONFIGS: Dict[str, dict] = {
         "capabilities": ["risk-assessment", "fairness-review", "policy-review", "incident-escalation"],
         "compliance_controls": ["risk-tiering", "appeals-path", "audit-evidence-retention"],
     },
+    "crew-coordinator": {
+        "title": "Specialist Crew Coordinator",
+        "mission": "Coordinate temporary CrewAI specialist working groups underneath COS and synthesize advisory findings.",
+        "capabilities": ["specialist-coordination", "finding-synthesis", "disagreement-surfacing", "evidence-gap-reporting"],
+        "compliance_controls": ["analysis-only", "registered-specialists-only", "no-authority-expansion", "ephemeral-memory-only"],
+    },
 }
 
 

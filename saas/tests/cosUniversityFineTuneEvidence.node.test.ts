@@ -23,6 +23,13 @@ test('host approvals authorize training but cannot manufacture a trained artifac
   assert.ok(decision.blockers.includes('trained_artifact_id_missing'))
 })
 
+test('dataset approval is reported before training approval', () => {
+  const recorded = foldFineTuneEvidenceRows([row('dataset_approved')])
+  const decision = decideControlledFineTune(buildFineTuneEvidenceInput(base, recorded))
+  assert.equal(decision.stage, 'dataset_approved')
+  assert.equal(decision.eligibleForTraining, false)
+})
+
 test('wrong-verifier and evidence-free claims are ignored', () => {
   const folded = foldFineTuneEvidenceRows([row('safety_regression_passed', {}, 'host_controller'), { ...row('unseen_transfer_passed'), evidence: { profile: FINE_TUNE_EVIDENCE_PROFILE, claim: 'unseen_transfer_passed' } }])
   assert.deepEqual(folded.claims, [])

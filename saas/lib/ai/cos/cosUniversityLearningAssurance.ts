@@ -53,6 +53,7 @@ export function decideControlledFineTune(input: FineTuneEvidence): FineTuneDecis
   if (!validHash(input.trainingManifestHash)) blockers.push('training_manifest_hash_invalid')
   if (!validHash(input.holdoutManifestHash)) blockers.push('holdout_manifest_hash_invalid')
   if (input.trainingManifestHash === input.holdoutManifestHash) blockers.push('training_holdout_not_separated')
+  const foundationValid = blockers.length === 0
   if (!input.datasetApprovedByHost) blockers.push('dataset_not_approved')
   if (!input.trainingApprovedByHost) blockers.push('training_not_approved')
 
@@ -68,7 +69,7 @@ export function decideControlledFineTune(input: FineTuneEvidence): FineTuneDecis
 
   const eligibleForPromotion = eligibleForTraining && blockers.length === 0
   const stage: FineTuneStage = eligibleForPromotion ? 'promoted'
-    : !eligibleForTraining ? 'proposed'
+    : !eligibleForTraining ? foundationValid && input.datasetApprovedByHost ? 'dataset_approved' : 'proposed'
       : !input.trainedArtifactId.trim() ? 'training_approved'
         : !input.independentEvaluation ? 'trained'
           : 'evaluated'

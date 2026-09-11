@@ -108,6 +108,12 @@ revoked, the append RPC is the sole write path, browser execution remains denied
 empty, and update/delete attempts are blocked by the immutable trigger. The ledger contained zero
 evidence rows when this correction was verified.
 
+Production webhook activation now treats GitHub's signed `ping` delivery as a successful no-op,
+derives the provider account identity from the authenticated repository owner for user-owned
+repositories, and persists generic delivery metadata using the columns that exist in the canonical
+Production ledger. These compatibility rules do not create patrol evidence for a ping; only an
+authorized patrol event may enter the append-only evidence chain.
+
 ## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
 
 Owner direction: pursue a company-deployable security capability that combines continuous 24x7 defensive patrol with a separately isolated ethical-hacking assessor. The separation is intentional: a defender that knows its own environment can develop familiarity bias; the assessor must arrive as a stranger and rediscover the environment from the authorized starting position.

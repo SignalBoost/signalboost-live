@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.108
+**Version:** 1.109
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -34,6 +34,14 @@ human identity, perform repository mutations, trigger containment, or enable Str
 activity. Production operation additionally requires the migration, webhook secret, trusted Ed25519
 public keys, a currently valid exact-repository Guardian engagement, and separately authorized GitHub
 webhook configuration. Code or Preview readiness alone is not live-delivery proof.
+## Audit zero-finding scope honesty — 2026-09-11
+
+Audit Console zero-finding states are explicitly bounded to the displayed number of scanned files.
+They disclose that unscanned files and external controls were not assessed and never describe a
+repository as clean or secure. A zero is an absence of supported findings in sampled scope, not a
+security certification. The original brand-profile claims are guarded by narrow repository evidence
+covering the session-bound anon client, owner RLS, same-origin mutation checks, SameSite cookies, and
+generic client-facing database errors.
 
 ## Bounded repository-repair verification — 2026-09-11
 

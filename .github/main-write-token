@@ -1,2 +1,2 @@
-base_sha=6b64cb948f7f8e150e797680321e3f0fb573b522
-branch=feat/security-live-github-ingestion-20260911
+base_sha=3c592852eb3ed9a8a7e7e37b901dcba3f36f17c5
+branch=fix/security-patrol-production-migration-20260911

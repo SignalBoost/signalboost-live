@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.110
+**Version:** 1.111
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -83,6 +83,12 @@ loading, pins security functions to an empty search path, explicitly removes bro
 and blocks updates or deletes at the database trigger boundary. These controls still do not install a
 GitHub webhook or prove live delivery; Production operation requires the migration, secrets, signed
 Guardian engagement, authorized webhook configuration, and observed real delivery evidence.
+
+Production database migration `20260911012329` now records and verifies the RPC-only hardening that
+was applied after the original ledger migration: service-role direct writes and sequence access are
+revoked, the append RPC is the sole write path, browser execution remains denied, its search path is
+empty, and update/delete attempts are blocked by the immutable trigger. The ledger contained zero
+evidence rows when this correction was verified.
 
 ## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
 

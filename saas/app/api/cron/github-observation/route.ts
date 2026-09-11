@@ -5,6 +5,7 @@ import { ownershipIdentity } from '@/lib/supervisor/coordination'
 import { enqueueGitHubObservation, loadActiveGitHubConnections, runAcceptedGitHubObservation } from '@/lib/provider-framework/github-production'
 import type { GitHubCapability } from '@/lib/provider-framework/github'
 import { materializeGuardianRepositoryObservation } from '@/lib/security/github-guardian-observation'
+import { createGuardianSelfHealingHandoff, guardianReviewRequest } from '@/lib/security/github-guardian-self-healing'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -74,14 +75,60 @@ async function processWebhookBacklog(input: {
       })
       if (observed.error) throw new Error('guardian_observation_persist_failed')
       let alertCreated = false
+      let alertId: string | null = null
       if (materialized.alert) {
-        const existing = await input.db.from('cyber_alerts').select('id').eq('advisory_id', materialized.alert.advisory_id).maybeSingle()
+        alertId = deliveryId
+        const existing = await input.db.from('cyber_alerts').select('id').eq('id', alertId).maybeSingle()
         if (existing.error) throw new Error('guardian_alert_lookup_failed')
-        if (!existing.data) {
-          const inserted = await input.db.from('cyber_alerts').insert(materialized.alert)
-          if (inserted.error) throw new Error('guardian_alert_persist_failed')
-          alertCreated = true
-        }
+        const inserted = await input.db.from('cyber_alerts')
+          .upsert({ ...materialized.alert, id: alertId }, { onConflict: 'id', ignoreDuplicates: true })
+        if (inserted.error) throw new Error('guardian_alert_persist_failed')
+        alertCreated = !existing.data
+      }
+      const selfHealing = createGuardianSelfHealingHandoff({
+        deliveryId,
+        workItemId: item.workItemId,
+        organizationId: item.organizationId || '',
+        observation: materialized.observation,
+        alert: materialized.alert,
+      })
+      if (selfHealing) {
+        if (!alertId) throw new Error('guardian_review_alert_missing')
+        const reviewRequestId = alertId
+        const review = await input.db.from('remediation_requests')
+          .upsert(guardianReviewRequest({ alertId, handoff: selfHealing }), { onConflict: 'id', ignoreDuplicates: true })
+        if (review.error) throw new Error('guardian_review_persist_failed')
+        const events = [
+          {
+            event_id: `guardian-self-healing-${deliveryId}-received`,
+            incident_id: selfHealing.incident.incidentId,
+            event_type: 'incident_received',
+            occurred_at: new Date().toISOString(),
+            payload: {
+              provider: 'github',
+              environment: 'production',
+              evidenceReference: materialized.observation.correlation_id,
+            },
+            schema_version: 'supervisor-audit-v1',
+          },
+          {
+            event_id: `guardian-self-healing-${deliveryId}-policy`,
+            incident_id: selfHealing.incident.incidentId,
+            event_type: 'policy_evaluated',
+            occurred_at: new Date().toISOString(),
+            payload: {
+              planId: selfHealing.plan.planId,
+              outcome: selfHealing.policy.outcome,
+              reason: selfHealing.policy.reason,
+              automaticRepairAuthorized: false,
+              providerMutations: false,
+              reviewRequestId,
+            },
+            schema_version: 'supervisor-audit-v1',
+          },
+        ]
+        const handedOff = await input.db.from('supervisor_audit_events').upsert(events, { onConflict: 'event_id', ignoreDuplicates: true })
+        if (handedOff.error) throw new Error('guardian_self_healing_handoff_failed')
       }
       const audited = await input.db.from('supervisor_audit_events').insert({
         event_id: `guardian-github-${deliveryId}`,
@@ -96,7 +143,7 @@ async function processWebhookBacklog(input: {
         .update({ status: 'completed' }).eq('delivery_id', deliveryId)
       if (deliveryUpdated.error) throw new Error('guardian_delivery_completion_failed')
       await input.coordinationStore.transitionWorkItem({ workItemId: item.workItemId, from: 'processing', to: 'completed', owner })
-      summary.push({ workItemId: item.workItemId, outcome: 'completed', alertCreated })
+      summary.push({ workItemId: item.workItemId, outcome: 'completed', alertCreated, selfHealing: selfHealing?.policy.outcome || 'not_required' })
     } catch (error: any) {
       if (lease) {
         try { await input.coordinationStore.releaseLease(ownershipIdentity(lease)) } catch { /* lease expiry will recover ownership */ }

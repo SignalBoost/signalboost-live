@@ -41,6 +41,16 @@ export async function POST(req: Request) {
   if (!remediationId) return NextResponse.json({ ok: false, error: 'remediationId is required.' }, { status: 400 })
 
   const admin = getAdminSupabase()
+  const source = await admin.from('remediation_requests')
+    .select('source_type')
+    .eq('id', remediationId)
+    .maybeSingle()
+  if (source.error || !source.data) {
+    return NextResponse.json({ ok: false, error: source.error?.message || 'Remediation request not found.' }, { status: 404 })
+  }
+  if (source.data.source_type === 'guardian_repository_change') {
+    return NextResponse.json({ ok: false, error: 'guardian_review_does_not_authorize_repair' }, { status: 409 })
+  }
   const now = new Date().toISOString()
   const { error } = await admin.from('remediation_requests').update({
     status: 'approved',

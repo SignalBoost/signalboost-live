@@ -3,11 +3,20 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.116
+**Version:** 1.117
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
+
+## Guardian to Self-Healing handoff — 2026-09-11
+
+Guardian repository alerts now enter the Self-Healing Supervisor as durable, evidence-linked
+incidents, receive a deterministic policy decision, and create an owner-visible durable review item.
+A signed change to a security-sensitive path requires review but is not proof of a defect or
+compromise, so the review cannot authorize automatic repair or provider mutation. Benign repository
+observations create no incident. This is
+implementation evidence until merged, deployed, and exercised by a new Production delivery.
 
 ## Durable repository-security incident cases — 2026-09-11
 

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { decideControlledFineTune } from './cosUniversityLearningAssurance.ts'
+import { buildFineTuneEvidenceInput, readFineTuneEvidence, readFineTunePartitionRevision } from './cosUniversityFineTuneEvidence.ts'
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 
@@ -28,28 +29,18 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
   for (const plan of plans.data || []) {
     const candidateId = `study-plan:${plan.id}`
     const datasetHash = hash({ plan: plan.plan_key, subject: plan.subject_id, failure: plan.failure_class, objective: plan.objective, methods: plan.methods, source: plan.source_ref })
-    const trainingManifestHash = hash({ candidateId, partition: 'training', datasetHash })
-    const holdoutManifestHash = hash({ candidateId, partition: 'independent_holdout', datasetHash })
-    const decision = decideControlledFineTune({
-      trainedArtifactId: '',
-      baseModel: process.env.LOCAL_AI_MODEL || 'runtime-model-unspecified',
-      datasetHash,
-      trainingManifestHash,
-      holdoutManifestHash,
-      datasetApprovedByHost: false,
-      trainingApprovedByHost: false,
-      independentEvaluation: false,
-      baselineScore: 0,
-      trainedArtifactScore: 0,
-      passedSafetyRegression: false,
-      passedUnseenTransfer: false,
-      passedDelayedRetention: false,
-      productionCanaryHealthy: false,
-    })
+    const revision = await readFineTunePartitionRevision(candidateId, datasetHash, now)
+    const recordedEvidence = revision ? await readFineTuneEvidence(candidateId, revision, now) : null
+    const decision = decideControlledFineTune(buildFineTuneEvidenceInput(revision || {
+      baseModel: process.env.LOCAL_AI_MODEL || 'runtime-model-unspecified', datasetHash,
+      trainingManifestHash: '', holdoutManifestHash: '',
+    }, recordedEvidence || { claims: [], trainedArtifactId: '', trainedArtifactHash: '', rollbackArtifactRef: null, baselineScore: 0, trainedArtifactScore: 0 }))
     if (decision.eligibleForTraining) eligibleForTraining += 1
     const evidence = {
-      claim: 'candidate_packaged_not_trained', candidateId, planId: plan.id, datasetHash,
-      trainingManifestHash, holdoutManifestHash, decision,
+      claim: 'candidate_status_observed', candidateId, planId: plan.id, datasetHash,
+      lifecycleStage: decision.stage, trainedArtifactPresent: Boolean(recordedEvidence?.trainedArtifactId),
+      trainingManifestHash: revision?.trainingManifestHash || null, holdoutManifestHash: revision?.holdoutManifestHash || null,
+      decision, recordedClaims: recordedEvidence?.claims || [],
     }
     const evidenceHash = hash(evidence)
     const eventKey = hash(['controlled-fine-tuning-v1', candidateId, plan.updated_at, evidenceHash])

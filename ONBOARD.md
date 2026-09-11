@@ -20,6 +20,14 @@ evidence hash and preserves the indicator observations. No actor attribution is 
 browser roles have no case or timeline access. This is implementation evidence until the migration
 is applied, merged, deployed, and a real Production indicator proves the complete path.
 
+## Controlled fine-tuning verifier separation — 2026-09-11
+
+Fine-tuning candidate decisions now fold durable evidence instead of hard-coded failure values. The
+owner API may record only dataset and training approvals with an evidence reference. Training
+artifacts and rollback packages require the training executor; evaluation, safety, transfer and
+retention require an independent scorer; canary health requires the Production verifier. Merely
+posting a claim cannot impersonate those authorities or promote a candidate.
+
 ## Non-credit behavioral robustness practicum — 2026-09-11
 
 Registered University agents now receive a separate behavioral practicum across three sampling

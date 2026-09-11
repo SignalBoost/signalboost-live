@@ -270,6 +270,51 @@ function genericPrompt(args: {
   return { project, factA, factB, prompt }
 }
 
+/**
+ * Language & Communication is a production skill, not a generic diagnosis exercise. Its practice
+ * must rehearse audience-aware rewriting while preserving every supplied material fact. This is
+ * intentionally broader than any hidden exam case: varied projects, quantities, audiences, and
+ * unresolved states are generated from the practice seed, while the independent examiner remains
+ * isolated and authoritative.
+ */
+function communicationRewritePrompt(args: {
+  seed: string
+  objective: string
+  variantIndex: number
+}): { project: string; factA: number; factB: number; prompt: string; rubric: CognitivePracticeRubric } {
+  const project = choose(args.seed, 'communication:project', ['Atlas', 'Orion', 'Lumen', 'Cedar', 'Harbor'] as const)
+  const audience = choose(args.seed, 'communication:audience', ['executive leadership', 'customer-success leadership', 'operations leadership'] as const)
+  const factA = integer(args.seed, 'communication:fact-a', 21, 87)
+  const factB = integer(args.seed, 'communication:fact-b', 2, 15)
+  const packet = `${project} completed ${factA} validation checks. ${factB} customer follow-ups remain open. The release record is unavailable. Live service health has not been checked. The next routine step is to verify the release record and then run the health check.`
+  const prompt = `HOST-CURATED UNIVERSITY PRACTICE — variant ${args.variantIndex + 1}. Rewrite this source packet for ${audience} in no more than 80 words. Preserve every supplied fact and exact quantity, preserve the unresolved status, and preserve the stated action order. Do not add facts or infer that release or service recovery succeeded or failed. Source packet: "${packet}" Current learning objective: ${clean(args.objective, 1200)}.`
+  return {
+    project,
+    factA,
+    factB,
+    prompt,
+    rubric: {
+      requiredConceptGroups: [
+        [project.toLowerCase()],
+        [String(factA)],
+        [String(factB)],
+        ['release record', 'release evidence'],
+        ['health', 'service health'],
+        ['verify', 'check'],
+      ],
+      forbiddenPatterns: [
+        'release failed',
+        'release succeeded',
+        'service recovered',
+        'production is verified',
+        'production is confirmed',
+      ],
+      minimumConceptCoverage: 1,
+      minimumAnswerCharacters: 100,
+    },
+  }
+}
+
 function finishVariant(input: Omit<CosUniversityDeliberatePracticeVariant, 'manifestHash'>): CosUniversityDeliberatePracticeVariant {
   const manifestHash = createHash('sha256').update(JSON.stringify(input)).digest('hex')
   return Object.freeze({ ...input, manifestHash })
@@ -286,7 +331,10 @@ export function buildCosUniversityDeliberatePracticeVariants(
 
   for (let index = 0; index < COS_UNIVERSITY_PRACTICE_VARIANTS_PER_ROUND; index += 1) {
     const seed = practiceSeed({ ...plan, planKey, practiceRound, objective }, index)
-    const base = genericPrompt({
+    const communicationPractice = plan.subjectId === 'language_communication' && !plan.language
+      ? communicationRewritePrompt({ seed, objective, variantIndex: index })
+      : null
+    const base = communicationPractice || genericPrompt({
       seed,
       subjectId: plan.subjectId,
       failureClass: plan.failureClass,
@@ -297,7 +345,7 @@ export function buildCosUniversityDeliberatePracticeVariants(
     const prompt = plan.language
       ? localizedInstruction(plan.language, base.prompt, subjectTitle, objective)
       : base.prompt
-    const rubric = commonRubric({
+    const rubric = communicationPractice?.rubric || commonRubric({
       subjectId: plan.subjectId,
       failureClass: plan.failureClass,
       project: base.project,

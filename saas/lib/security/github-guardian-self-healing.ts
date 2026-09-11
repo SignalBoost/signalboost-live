@@ -34,6 +34,8 @@ export function guardianReviewRequest(input: {
       summary: incident.errorMessage,
       sensitivePaths: paths,
       evidenceReference: incident.evidence[0]?.reference || '',
+      ref: String(incident.metadata.ref || ''),
+      commitSha: String(incident.metadata.commitSha || ''),
     }],
     status: 'awaiting_human_review',
     human_approval_required: true,
@@ -95,6 +97,8 @@ export function createGuardianSelfHealingHandoff(input: {
       automaticRepairAuthorized: false,
       changedPathCount: sensitivePaths.length,
       sensitivePaths,
+      ref: typeof metadata.ref === 'string' ? metadata.ref : null,
+      commitSha: typeof metadata.commitSha === 'string' ? metadata.commitSha : null,
     },
   })
   const plan = repairPlanSchema.parse({

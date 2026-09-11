@@ -10,6 +10,8 @@ const observation = {
   safe_metadata: {
     sensitivePaths: ['saas/app/api/webhook/github/route.ts'],
     evidenceEntryHash: 'a'.repeat(64),
+    ref: 'refs/heads/main',
+    commitSha: 'b'.repeat(40),
   },
 }
 
@@ -39,6 +41,8 @@ test('security-sensitive changes become review-gated Supervisor incidents withou
   assert.equal(review.status, 'awaiting_human_review')
   assert.equal(review.fix_plan_status, 'review_only')
   assert.equal((review.fix_plan as any).automaticRepairAuthorized, false)
+  assert.equal((review.findings as any[])[0].ref, 'refs/heads/main')
+  assert.equal((review.findings as any[])[0].commitSha, 'b'.repeat(40))
 })
 
 test('Production worker durably records the policy handoff before completing work', () => {
@@ -49,8 +53,13 @@ test('Production worker durably records the policy handoff before completing wor
   assert.match(route, /automaticRepairAuthorized: false/)
   assert.match(route, /guardian_self_healing_handoff_failed/)
   assert.match(route, /guardian_review_persist_failed/)
-  assert.match(route, /onConflict: 'id', ignoreDuplicates: true/)
-  assert.match(route, /upsert\(\{ \.\.\.materialized\.alert, id: alertId \}/)
+  assert.match(route, /record_guardian_repository_review_observation/)
+  assert.match(route, /guardian-repository-change:/)
+  const groupingMigration = readFileSync(new URL('../supabase/migrations/20260911160707_guardian_review_grouping.sql', import.meta.url), 'utf8')
+  assert.match(groupingMigration, /pg_advisory_xact_lock/)
+  assert.match(groupingMigration, /status in \('awaiting_human_review', 'in_progress'\)/)
+  assert.match(groupingMigration, /limit 100/)
+  assert.match(groupingMigration, /grant execute .* service_role/)
 })
 
 test('owner review disposition cannot be converted into repair approval', () => {

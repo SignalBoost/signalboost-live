@@ -53,6 +53,11 @@ test('post-training claims cannot be mixed between artifacts or holdouts', () =>
   assert.equal(folded.trainedArtifactScore, 0)
 })
 
+test('expired claims are ignored', () => {
+  const expired = { ...row('dataset_approved'), expires_at: '2026-09-10T00:00:00Z' }
+  assert.deepEqual(foldFineTuneEvidenceRows([expired], revisionKey, base.holdoutManifestHash, new Date('2026-09-11T00:00:00Z')).claims, [])
+})
+
 test('owner HTTP route cannot manufacture independent, canary, artifact, or rollback proof', () => {
   const route = readFileSync('app/api/admin/cos-university-assurance/route.ts', 'utf8')
   assert.match(route, /requireOwner\(\)/); assert.match(route, /dataset_approved.*training_approved/)
@@ -64,6 +69,8 @@ test('runner reads durable evidence instead of hard-coded passing values', () =>
   const runner = readFileSync('lib/ai/cos/cosUniversityControlledFineTuning.ts', 'utf8')
   assert.match(runner, /readFineTuneEvidence\(candidateId, revision\)/)
   assert.doesNotMatch(runner, /datasetApprovedByHost:\s*true/)
+  assert.match(runner, /readFineTunePartitionRevision\(candidateId, datasetHash\)/)
+  assert.doesNotMatch(runner, /partition:\s*'training'/)
 })
 
 test('database admits the training executor verifier', () => {

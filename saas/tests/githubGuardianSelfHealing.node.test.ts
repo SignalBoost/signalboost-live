@@ -59,6 +59,8 @@ test('Production worker durably records the policy handoff before completing wor
   assert.match(groupingMigration, /pg_advisory_xact_lock/)
   assert.match(groupingMigration, /status in \('awaiting_human_review', 'in_progress'\)/)
   assert.match(groupingMigration, /limit 100/)
+  assert.match(groupingMigration, /existing\.item->>'id' = p_finding->>'id'/)
+  assert.match(groupingMigration, /jsonb_build_array\(p_finding\) \|\| coalesce/)
   assert.match(groupingMigration, /grant execute .* service_role/)
 })
 

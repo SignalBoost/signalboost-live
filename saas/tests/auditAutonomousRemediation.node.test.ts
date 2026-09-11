@@ -146,7 +146,36 @@ test('completed remediation presents zero active findings while retaining audit 
   assert.match(dashboard, /const findings = \(data\.findings as Finding\[\]\) \|\| \(log\?\.findings as Finding\[\]\) \|\| \[\]/)
   assert.match(dashboard, /filter\(finding => !finding\.fixed\)/)
   assert.match(dashboard, /value=\{String\(findings\.length\)\}/)
-  assert.match(dashboard, /view\.status === 'remediated' \? copy\.remediatedClean : copy\.clean/)
+  assert.match(dashboard, /withScanCount\(view\.status === 'remediated' \? copy\.remediatedClean : copy\.clean, view\.filesScanned\)/)
   assert.match(dashboard, /\{findings\.length\} \{copy\.findings\}/)
   assert.match(dashboard, /status: 'remediated'/)
+})
+
+test('zero findings is bounded to scanned files and never claims repository security', () => {
+  const dashboard = read('../app/dashboard/audit/page.tsx')
+
+  assert.match(dashboard, /message\.replace\('\{files\}', String\(filesScanned\)\)/)
+  assert.match(dashboard, /Unscanned files and external controls were not assessed/)
+  assert.match(dashboard, /this is not proof that the repository is secure/i)
+  assert.doesNotMatch(dashboard, /scan came back clean|this scan is clean/i)
+})
+
+test('brand profile security findings require repository evidence', () => {
+  const route = read('../../app/api/brand-profile/route.ts')
+  const client = read('../../lib/auth/supabaseServer.ts')
+  const cookies = read('../../lib/auth/supabaseCookies.ts')
+  const sameOrigin = read('../../lib/http/sameOrigin.ts')
+  const migration = read('../supabase/migrations/20260513_create_brand_profiles_table.sql')
+
+  assert.match(client, /NEXT_PUBLIC_SUPABASE_ANON_KEY/)
+  assert.doesNotMatch(client, /SERVICE_ROLE/)
+  assert.match(migration, /alter table brand_profiles\s+enable row level security/i)
+  assert.match(migration, /for select using \(auth\.uid\(\) = user_id\)/i)
+  assert.match(migration, /for insert with check \(auth\.uid\(\) = user_id\)/i)
+  assert.match(route, /if \(!sameOriginOk\(req\)\)/)
+  assert.match(sameOrigin, /if \(!candidate\) return false/)
+  assert.match(cookies, /sameSite: 'lax'/)
+  assert.match(route, /console\.error\('brand-profile (?:GET|POST) error:', error\.message\)/)
+  assert.match(route, /error: 'Failed to (?:load|save) profile'/)
+  assert.doesNotMatch(route, /NextResponse\.json\([^\n]*error\.message/)
 })

@@ -1,0 +1,37 @@
+name: University LangGraph Research
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/cos-core/orchestration/university-research.ts'
+      - 'saas/lib/cos-core/orchestration/index.ts'
+      - 'saas/tests/cosUniversityLangGraphResearch.node.test.ts'
+      - '.github/workflows/university-langgraph-research.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/lib/cos-core/orchestration/university-research.ts'
+      - 'saas/lib/cos-core/orchestration/index.ts'
+      - 'saas/tests/cosUniversityLangGraphResearch.node.test.ts'
+      - '.github/workflows/university-langgraph-research.yml'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: saas
+
+jobs:
+  research-graph:
+    name: Bounded research, provenance, contradiction, resume, and authority gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run University LangGraph research regressions
+        run: npx --yes tsx --test tests/cosUniversityLangGraphResearch.node.test.ts

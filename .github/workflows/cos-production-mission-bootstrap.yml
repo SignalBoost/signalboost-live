@@ -1,0 +1,194 @@
+name: COS production LangGraph mission bootstrap
+
+on:
+  push:
+    branches:
+      - feat/cos-langgraph-production-mission-20260911
+    paths:
+      - '.github/workflows/cos-production-mission-bootstrap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  wire-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/cos-langgraph-production-mission-20260911
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+
+      - name: Install dependencies
+        working-directory: saas
+        run: npm ci
+
+      - name: Wire live COS reasoning and grounding through LangGraph
+        shell: python
+        run: |
+          from pathlib import Path
+
+          core_path = Path('saas/app/api/support/routeCoreLegacy.ts')
+          text = core_path.read_text()
+
+          decl_old = """    let cosVerdict: any = null
+    let cosEvidence: string | undefined = undefined
+"""
+          decl_new = """    let cosVerdict: any = null
+    let cosEvidence: string | undefined = undefined
+    let cosMissionReceipt: any = null
+"""
+          if decl_old not in text:
+              raise SystemExit('COS mission declaration anchor not found')
+          text = text.replace(decl_old, decl_new, 1)
+
+          start_marker = """    if (isPrivileged && latestUserMessage.trim()) {
+"""
+          end_marker = """    const anthropicTools = toAnthropicTools(tools)
+"""
+          start = text.index(start_marker, text.index('// ── COS KNOWLEDGE LAYER continues below ──'))
+          end = text.index(end_marker, start)
+          replacement = """    if (isPrivileged && latestUserMessage.trim()) {
+      try {
+        const { runCOSProductionGroundingMission } = await import('@/lib/ai/cos/productionMission')
+        const mission = await runCOSProductionGroundingMission(latestUserMessage)
+        const verdict = mission.plan
+        cosVerdict = verdict
+        cosMissionReceipt = {
+          framework: 'langgraph',
+          mission: 'cos_production_grounding',
+          status: mission.status,
+          attempts: mission.attempts,
+          trace: mission.trace,
+          decision_id: verdict.decisionId,
+          required_source: verdict.sourceRouting.requiredSource,
+          must_use_tool: verdict.sourceRouting.mustUseTool,
+          authority_state: verdict.executionPlan.state,
+          required_approval: verdict.executionPlan.requiredApproval,
+        }
+
+        // Log only substantive decisions — skip conversational filler and bare
+        // continuations that classify as no-tool/no-action.
+        if (verdict.ok && (verdict.sourceRouting.mustUseTool || verdict.executionPlan.proposesAction)) {
+          void (async () => {
+            try {
+              const { logCosDecision } = await import('@/lib/ai/cos/decisionLog')
+              await logCosDecision(verdict, userId)
+            } catch {}
+          })()
+        }
+
+        if (verdict.ok && verdict.sourceRouting.mustUseTool) {
+          const ev = mission.result?.evidence
+          if (ev && ev.fetched && ev.summary) {
+            cosEvidence = ev.summary
+            systemContent += `\n\n── VERIFIED LIVE DATA (fetched just now from ${ev.source}; LangGraph mission ${mission.status}; treat this as the source of truth and do NOT answer this question from memory) ──\n${ev.summary}`
+          } else if (ev && ev.connectorWired === false) {
+            systemContent += `\n\n── SOURCE-OF-TRUTH NOTE ── Answering this accurately needs live data from ${ev.source}, which is not connected yet. Tell the owner you can't confirm the current figure rather than guessing from memory.`
+          } else {
+            systemContent += `\n\n── SOURCE-OF-TRUTH NOTE ── COS required live data from ${verdict.sourceRouting.requiredSource}, but the bounded LangGraph grounding mission could not verify a successful fetch after ${mission.attempts} attempt(s). Do not answer the current fact from memory; say the live source could not be confirmed.`
+          }
+        }
+      } catch (error) {
+        // Grounding remains fail-closed for current facts: if orchestration itself
+        // fails, tell the model not to invent a current value from memory.
+        cosMissionReceipt = {
+          framework: 'langgraph',
+          mission: 'cos_production_grounding',
+          status: 'error',
+          attempts: 0,
+          trace: [],
+          error: error instanceof Error ? error.message : 'production grounding mission failed',
+        }
+        systemContent += `\n\n── SOURCE-OF-TRUTH NOTE ── COS production grounding orchestration failed. Do not guess any current fact from memory; say live verification was unavailable.`
+      }
+    }
+
+"""
+          text = text[:start] + replacement + text[end:]
+
+          response_old = """    return NextResponse.json({
+      reply,
+      telemetry: local,
+      source: isPrivileged ? 'anthropic-chief' : 'anthropic-concierge',
+    })
+"""
+          response_new = """    return NextResponse.json({
+      reply,
+      telemetry: local,
+      source: isPrivileged ? 'anthropic-chief' : 'anthropic-concierge',
+      cos_mission: cosMissionReceipt || undefined,
+    })
+"""
+          if response_old not in text:
+              raise SystemExit('support response anchor not found')
+          text = text.replace(response_old, response_new, 1)
+          core_path.write_text(text)
+
+          wrapper_path = Path('saas/app/api/support/route.ts')
+          wrapper = wrapper_path.read_text()
+          prov_old = """    provenance.external_ai = {
+      ...(provenance.external_ai || {}),
+      necessary: explicitAction,
+      escalation_reason_code: explicitAction ? 'explicit_external_action' : 'legacy_route_missing_escalation_trace',
+      escalation_reason: explicitAction
+        ? 'The user explicitly requested an external action that requires the governed executor.'
+        : 'The legacy provider route did not embed its COS escalation decision in the response; this invocation is recorded as not justified until that trace is present.',
+    }
+    return provenance as RecordedTurnProvenance
+"""
+          prov_new = """    provenance.external_ai = {
+      ...(provenance.external_ai || {}),
+      necessary: explicitAction,
+      escalation_reason_code: explicitAction ? 'explicit_external_action' : 'legacy_route_missing_escalation_trace',
+      escalation_reason: explicitAction
+        ? 'The user explicitly requested an external action that requires the governed executor.'
+        : 'The legacy provider route did not embed its COS escalation decision in the response; this invocation is recorded as not justified until that trace is present.',
+    }
+    if (payload?.cos_mission && typeof payload.cos_mission === 'object' && !Array.isArray(payload.cos_mission)) {
+      provenance.cos_mission = payload.cos_mission
+    }
+    return provenance as RecordedTurnProvenance
+"""
+          if prov_old not in wrapper:
+              raise SystemExit('support provenance anchor not found')
+          wrapper = wrapper.replace(prov_old, prov_new, 1)
+          wrapper_path.write_text(wrapper)
+
+          onboard_path = Path('ONBOARD.md')
+          onboard = onboard_path.read_text()
+          onboard = onboard.replace('**Version:** 1.121', '**Version:** 1.122', 1)
+          old = """The integration pins `@langchain/langgraph` and `@langchain/core` and uses LangChain `RunnableLambda` as the graph node runtime. It intentionally does not replace COS with LangChain's separate agent abstraction or silently route inference to hosted model providers. This is implementation/test evidence only until merged, deployed, and exercised through a Production COS mission path.
+"""
+          new = """The integration pins `@langchain/langgraph` and `@langchain/core` and uses LangChain `RunnableLambda` as the graph node runtime. It intentionally does not replace COS with LangChain's separate agent abstraction or silently route inference to hosted model providers.
+
+The live privileged COS support path now routes its existing deterministic reasoning and source-of-truth grounding stage through `runCOSProductionGroundingMission`. The graph may retry a failed read-only source fetch once, but it cannot alter the host-owned decision, source selection, approval state, or execution authority. The resulting mission status/attempts/trace are attached to the response provenance so a real owner/admin turn can produce durable Production evidence. Merge/deployment evidence is not the same as a live owner-turn receipt; claim end-to-end Production exercise only after such a recorded turn exists.
+"""
+          if old not in onboard:
+              raise SystemExit('ONBOARD LangGraph status anchor not found')
+          onboard = onboard.replace(old, new, 1)
+          onboard_path.write_text(onboard)
+
+      - name: Verify LangGraph mission tests
+        working-directory: saas
+        run: node --test tests/cosLangGraph.node.test.ts tests/cosProductionMission.node.test.ts
+
+      - name: Typecheck
+        working-directory: saas
+        run: npm run typecheck
+
+      - name: Commit verified production wiring
+        run: |
+          rm .github/workflows/cos-production-mission-bootstrap.yml
+          git config user.name 'SignalBoost Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add saas/app/api/support/routeCoreLegacy.ts saas/app/api/support/route.ts ONBOARD.md .github/workflows/cos-production-mission-bootstrap.yml
+          git commit -m 'feat(cos): route production grounding through LangGraph'
+          git push origin HEAD:feat/cos-langgraph-production-mission-20260911

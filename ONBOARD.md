@@ -3,11 +3,15 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.117
+**Version:** 1.118
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
+
+## Guardian review completion hardening — 2026-09-11
+
+Guardian investigations remain actionable until an owner records a terminal disposition. If the linked alert update fails, the review returns to a retryable state instead of disappearing from the owner queue.
 
 ## Guardian to Self-Healing handoff — 2026-09-11
 

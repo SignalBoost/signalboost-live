@@ -3,11 +3,18 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.119
+**Version:** 1.120
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
+
+## COS University infrastructure-error exam recovery — 2026-09-11
+
+An independent exam that terminated because host or inference infrastructure failed may receive exactly
+one fresh recovery run identity after the infrastructure is restored. Genuine scored failures and
+provenance failures remain terminal and require academic remediation. Recovery creates no credit;
+only a fresh independently scored pass may write academic evidence.
 
 ## Guardian review grouping — 2026-09-11
 

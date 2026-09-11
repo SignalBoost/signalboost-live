@@ -139,12 +139,22 @@ async function createOrFindRun(agentId: string, target: CosUniversityExamTarget,
   if (!db) return null
   const runKey = cosUniversityIndependentExamRunKey({ agentId, target, now, readyStudyPlan })
   const existing = await findRun(runKey)
-  if (existing) return existing
+  const retryableInfrastructureError = Boolean(
+    existing?.status === 'error'
+    && existing.reasons?.some(reason => reason.startsWith('execution_error:')),
+  )
+  if (existing && !retryableInfrastructureError) return existing
+
+  // Permit exactly one fresh run after a host/inference infrastructure failure.
+  // Academic failures and provenance failures remain terminal and cannot be retried here.
+  const effectiveRunKey = existing ? `${runKey}:infrastructure-retry:${existing.id}` : runKey
+  const retryExisting = existing ? await findRun(effectiveRunKey) : null
+  if (retryExisting) return retryExisting
 
   const seed = randomUUID()
   const exam = buildCosUniversityBlindExam(seed, target)
   const insert = await db.from('cos_university_exam_runs').insert({
-    run_key: runKey,
+    run_key: effectiveRunKey,
     profile: COS_UNIVERSITY_EXAM_PROFILE,
     scorer_version: COS_UNIVERSITY_EXAM_SCORER,
     seed,
@@ -159,7 +169,7 @@ async function createOrFindRun(agentId: string, target: CosUniversityExamTarget,
 
   if (!insert.error && insert.data) return insert.data as ExamRunRow
   if (insert.error && String((insert.error as { code?: string }).code || '') !== '23505') throw insert.error
-  return findRun(runKey)
+  return findRun(effectiveRunKey)
 }
 
 async function claimCreatedRun(row: ExamRunRow, now: Date): Promise<boolean> {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityControlledFineTuning } from '@/lib/ai/cos/cosUniversityControlledFineTuning'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { readCosUniversityDailyLaneCadence } from '@/lib/ai/cos/cosUniversityDailyLaneCadence'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
+    const cadence = await readCosUniversityDailyLaneCadence('controlled_fine_tuning')
+    if (!cadence.due) {
+      await recordCosUniversityProductionPath({ path: 'controlled_fine_tuning', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, cadence } })
+      return NextResponse.json({ ok: true, skipped: true, cadence })
+    }
     const result = await runCosUniversityControlledFineTuning(new Date())
     await recordCosUniversityProductionPath({ path: 'controlled_fine_tuning', invocationSucceeded: true, evidence: result })
     return NextResponse.json({ ok: true, ...result })

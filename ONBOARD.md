@@ -1,9 +1,17 @@
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint
+## COS University exact-deployment daily-lane cadence — 2026-09-11
+
+Daily academic batches remain limited to one successful execution per UTC day, but their Production
+routes now run hourly. Before the configured academic window, or after today's batch has executed,
+the route records an honest `not_due` receipt without invoking the academic runner. This lets the
+exact running deployment prove route operation without duplicating exams, retention checks,
+graduation decisions, admissions, or fine-tuning work.
+
 ## Cognitive Operating System (COS)
 
-**Version:** 1.120
+**Version:** 1.121
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**

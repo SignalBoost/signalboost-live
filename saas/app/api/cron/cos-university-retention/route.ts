@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { readCosUniversityDailyLaneCadence } from '@/lib/ai/cos/cosUniversityDailyLaneCadence'
 import { runCosUniversityRetention } from '@/lib/ai/cos/cosUniversityRetentionRunner'
 
 export const runtime = 'nodejs'
@@ -12,6 +13,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   try {
+    const cadence = await readCosUniversityDailyLaneCadence('delayed_retention')
+    if (!cadence.due) {
+      await recordCosUniversityProductionPath({ path: 'delayed_retention', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, cadence } })
+      return NextResponse.json({ ok: true, skipped: true, cadence })
+    }
     const result = await runCosUniversityRetention()
     const errors = Array.isArray(result.errors) ? result.errors : []
     await recordCosUniversityProductionPath({ path: 'delayed_retention', invocationSucceeded: errors.length === 0, evidence: result })

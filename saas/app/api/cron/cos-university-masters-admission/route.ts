@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityAdmission } from '@/lib/ai/cos/cosUniversityAdmissionRunner'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { readCosUniversityDailyLaneCadence } from '@/lib/ai/cos/cosUniversityDailyLaneCadence'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,11 @@ export async function GET(req: NextRequest) {
   const auth = req.headers.get('authorization') || ''
   if (!secret || auth !== `Bearer ${secret}`) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
+    const cadence = await readCosUniversityDailyLaneCadence('masters_admission')
+    if (!cadence.due) {
+      await recordCosUniversityProductionPath({ path: 'masters_admission', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, cadence } })
+      return NextResponse.json({ ok: true, skipped: true, cadence })
+    }
     const result = await runCosUniversityAdmission({ now: new Date() })
     await recordCosUniversityProductionPath({ path: 'masters_admission', invocationSucceeded: result.errors.length === 0, evidence: result })
     return NextResponse.json({ ok: result.errors.length === 0, ...result }, { status: result.errors.length ? 500 : 200 })

@@ -206,13 +206,13 @@ test('graduation cron is secret protected and scheduled after subject/language A
   const vercel = JSON.parse(file('vercel.json')) as { env: Record<string, string>; crons: Array<{ path: string; schedule: string }> }
   assert.equal(vercel.env.COS_UNIVERSITY_GRADUATION_ENABLED, 'true')
   assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-a-range'), {
-    path: '/api/cron/cos-university-a-range', schedule: '10 7 * * *',
+    path: '/api/cron/cos-university-a-range', schedule: '10 * * * *',
   })
   assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-language-a-range'), {
-    path: '/api/cron/cos-university-language-a-range', schedule: '20 7 * * *',
+    path: '/api/cron/cos-university-language-a-range', schedule: '20 * * * *',
   })
   assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-graduation'), {
-    path: '/api/cron/cos-university-graduation', schedule: '30 7 * * *',
+    path: '/api/cron/cos-university-graduation', schedule: '30 * * * *',
   })
   const route = file('app/api/cron/cos-university-graduation/route.ts')
   assert.match(route, /CRON_SECRET/)

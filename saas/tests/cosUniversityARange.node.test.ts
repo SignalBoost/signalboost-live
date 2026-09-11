@@ -103,8 +103,8 @@ test('A-range ledger is service-only and stores no prompt, rubric, reply, or gra
 test('A-range cron is feature-gated and runs after the unseen examiner', () => {
   const vercel = JSON.parse(file('vercel.json')) as { env: Record<string, string>; crons: Array<{ path: string; schedule: string }> }
   assert.equal(vercel.env.COS_UNIVERSITY_A_RANGE_ENABLED, 'true')
-  assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-exam'), { path: '/api/cron/cos-university-exam', schedule: '0 7 * * *' })
-  assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-a-range'), { path: '/api/cron/cos-university-a-range', schedule: '10 7 * * *' })
+  assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-exam'), { path: '/api/cron/cos-university-exam', schedule: '0 * * * *' })
+  assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-a-range'), { path: '/api/cron/cos-university-a-range', schedule: '10 * * * *' })
   const route = file('app/api/cron/cos-university-a-range/route.ts')
   assert.match(route, /auth !== `Bearer \$\{secret\}`/)
   assert.match(route, /runCosUniversityARangeBatch/)
@@ -193,7 +193,7 @@ test('language A-range migration extends the same service-only ledger without cr
 test('language A-range has an independent bounded cron after subject A-range', () => {
   const vercel = JSON.parse(file('vercel.json')) as { crons: Array<{ path: string; schedule: string }> }
   assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-language-a-range'), {
-    path: '/api/cron/cos-university-language-a-range', schedule: '20 7 * * *',
+    path: '/api/cron/cos-university-language-a-range', schedule: '20 * * * *',
   })
   const route = file('app/api/cron/cos-university-language-a-range/route.ts')
   assert.match(route, /auth !== `Bearer \$\{secret\}`/)

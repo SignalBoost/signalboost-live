@@ -3,7 +3,7 @@
 # iTMounts Engineering Blueprint
 ## Cognitive Operating System (COS)
 
-**Version:** 1.106
+**Version:** 1.107
 **Updated:** 2026-09-11
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
@@ -45,6 +45,20 @@ Production commit and deployment, verifies every declared University learning pa
 each missing, disabled, failed, stale, or unproven path explicitly. A configured route or successful
 build is never presented as Production proof; all declared paths must have a fresh successful
 host-verifier receipt with their feature gate enabled before the aggregate status becomes verified.
+
+## Durable authenticated repository-patrol ingestion — 2026-09-11
+
+Current branch `feat/security-durable-webhook-ingestion-20260911` connects the authenticated GitHub
+webhook adapter to the signed Referee and an append-only Supabase evidence ledger. Supported patrol
+events are accepted only after exact-body HMAC verification, signed engagement verification, exact
+repository scope, expiry, kill-switch and host-limit checks. The database serializes each engagement
+chain, rejects predecessor conflicts, deduplicates deliveries, stores no raw webhook body or secret,
+and exposes no public RLS policy. Existing read-only GitHub provider queueing remains intact.
+
+This branch is implementation evidence only until merged, migrated, deployed, configured with a
+current signed Guardian engagement/trusted public key, and exercised by a real Production delivery.
+An absent patrol engagement does not fabricate security evidence; generic provider ingestion reports
+`securityPatrol: not_configured` until the governed patrol configuration is installed.
 
 ## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
 

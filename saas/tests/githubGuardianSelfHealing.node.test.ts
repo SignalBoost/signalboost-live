@@ -52,7 +52,12 @@ test('Production worker durably records the policy handoff before completing wor
 
 test('owner review disposition cannot be converted into repair approval', () => {
   const route = readFileSync(new URL('../app/api/hub/cyber/dependencies/route.ts', import.meta.url), 'utf8')
+  const approveRoute = readFileSync(new URL('../app/api/hub/cyber/approve-and-prepare/route.ts', import.meta.url), 'utf8')
+  const page = readFileSync(new URL('../app/dashboard/cybersecurity/page.tsx', import.meta.url), 'utf8')
   assert.match(route, /source_type === 'guardian_repository_change'/)
   assert.match(route, /guardian_review_does_not_authorize_repair/)
   assert.match(route, /review_disposition_recorded/)
+  assert.match(approveRoute, /source\.data\.source_type === 'guardian_repository_change'/)
+  assert.match(approveRoute, /guardian_review_does_not_authorize_repair/)
+  assert.match(page, /reviewOnly = r\.source_type === 'guardian_repository_change'/)
 })

@@ -37,11 +37,16 @@ test('opens a bounded review alert for security-sensitive paths without assertin
 
 test('Production cron is scheduled and claims webhook backlog through fenced coordination', () => {
   const cron = readFileSync(new URL('../app/api/cron/github-observation/route.ts', import.meta.url), 'utf8')
+  const webhook = readFileSync(new URL('../security-host/github-webhook.ts', import.meta.url), 'utf8')
   const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
   assert.match(cron, /listAvailableWork\(\{ provider: 'github'/)
   assert.match(cron, /acquireLease/)
   assert.match(cron, /from: 'processing', to: 'completed'/)
   assert.match(cron, /github_normalized_observations/)
   assert.match(cron, /guardian_repository_observation_completed/)
+  assert.match(cron, /no_patrol_observation_required/)
+  assert.match(cron, /guardian_delivery_completion_failed/)
+  assert.doesNotMatch(webhook, /paths\.length >= 100/)
+  assert.match(webhook, /unique\.filter\(sensitive\)/)
   assert.match(vercel, /\/api\/cron\/github-observation/)
 })

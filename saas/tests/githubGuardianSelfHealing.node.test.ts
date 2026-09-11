@@ -60,6 +60,7 @@ test('Production worker durably records the policy handoff before completing wor
   assert.match(groupingMigration, /status in \('awaiting_human_review', 'in_progress'\)/)
   assert.match(groupingMigration, /limit 100/)
   assert.match(groupingMigration, /grant execute .* service_role/)
+  // Retry identity remains durable after an evidence summary leaves the bounded 100-item review window.
   const retryMigration = readFileSync(new URL('../supabase/migrations/20260911163127_guardian_review_evidence_dedupe.sql', import.meta.url), 'utf8')
   assert.match(retryMigration, /guardian_repository_review_evidence/)
   assert.match(retryMigration, /where finding_id = p_finding->>'id'/)

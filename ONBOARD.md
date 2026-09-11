@@ -11,7 +11,7 @@
 
 ## Guardian review completion hardening — 2026-09-11
 
-Guardian investigations remain actionable until an owner records a terminal disposition. If the linked alert update fails, the review returns to a retryable state instead of disappearing from the owner queue.
+Guardian investigations remain actionable until an owner records a terminal disposition. Guardian review and linked-alert terminal dispositions are committed by one service-role-only database transaction, so both records change together or neither changes.
 
 ## Guardian to Self-Healing handoff — 2026-09-11
 

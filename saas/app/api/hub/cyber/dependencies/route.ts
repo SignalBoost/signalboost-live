@@ -1,12 +1,14 @@
 // saas/app/api/hub/cyber/dependencies/route.ts
 // Cybersecurity Center: manual dependency scans + monitor configuration + alert inbox
-// + remediation requests where the fix plan is prepared before human approval.
-// No fixes, commits, PRs, or merges are performed automatically.
+// + routine plan preparation from owned server-recorded scan evidence.
+// Branch proposals use a separate bounded worker; this route never merges or deploys.
 
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { scanDependencyAdvisories } from '@/lib/cyber/dependencyScanner'
+import { routineDependencyState, isTerminalRemediation, sameOriginCyberMutation } from '@/lib/cyber/dependencyRemediationPolicy'
+import { remediationAutonomyCopy } from '@/lib/cyber/remediationAutonomyCopy'
 import { normalizeReportLang, reportLangFromCookie, type ReportLang } from '@/lib/i18n/reportLanguage'
 
 export const dynamic = 'force-dynamic'
@@ -28,63 +30,48 @@ function langFromRequest(req: Request, body?: { lang?: string }): ReportLang {
 }
 
 function cyberPlanCopy(lang: ReportLang) {
-  return {
+  const legacy = {
     en: {
       title: (repo: string) => `Fix plan for ${repo}`,
-      summary: (count: number) => `SignalBoost prepared a remediation plan for ${count} detected dependency advisory finding(s). This is a plan only; no code has been changed and no pull request has been opened.`,
       updateAction: (target: string) => `Update this dependency to ${target}, regenerate the lockfile, and run the build/test suite before deployment.`,
       confirmAction: 'Confirm the patched compatible version, update this dependency, regenerate the lockfile, and run the build/test suite before deployment.',
       validation: ['Confirm the recommended patched version for each affected package.', 'Update package.json and the lockfile in a dedicated branch.', 'Run npm install or the project package-manager equivalent.', 'Run npm run build and the available test/lint commands.', 'Review the diff manually before opening or merging a pull request.'],
-      safety: ['The fix plan is shown before the first human approval.', 'Approving this plan does not automatically edit code, commit changes, open a pull request, or merge anything.', 'Creating a PR or assisted code change requires a separate product layer and explicit human authorization.'],
-      nextStep: 'Review this plan. Approving it only authorizes SignalBoost to move the request toward PR preparation; it does not change code automatically.',
       requestTitle: (repo: string) => `Dependency remediation plan: ${repo}`,
-      requestSummary: (count: number) => `SignalBoost prepared a proposed remediation plan for ${count} dependency advisory finding(s). Human approval is required before PR preparation or any code change.`,
     },
     es: {
       title: (repo: string) => `Plan de corrección para ${repo}`,
-      summary: (count: number) => `SignalBoost preparó un plan de remediación para ${count} hallazgo(s) de avisos de dependencias. Es solo un plan; no se cambió código ni se abrió ningún pull request.`,
       updateAction: (target: string) => `Actualiza esta dependencia a ${target}, regenera el lockfile y ejecuta la compilación/pruebas antes del despliegue.`,
       confirmAction: 'Confirma la versión compatible corregida, actualiza esta dependencia, regenera el lockfile y ejecuta la compilación/pruebas antes del despliegue.',
       validation: ['Confirma la versión corregida recomendada para cada paquete afectado.', 'Actualiza package.json y el lockfile en una rama dedicada.', 'Ejecuta npm install o el equivalente del gestor de paquetes del proyecto.', 'Ejecuta npm run build y los comandos de prueba/lint disponibles.', 'Revisa el diff manualmente antes de abrir o fusionar un pull request.'],
-      safety: ['El plan se muestra antes de la primera aprobación humana.', 'Aprobar este plan no edita código, no hace commits, no abre pull requests ni fusiona nada automáticamente.', 'Crear un PR o cambio asistido requiere una capa de producto separada y autorización humana explícita.'],
-      nextStep: 'Revisa este plan. Aprobarlo solo autoriza a SignalBoost a avanzar hacia la preparación del PR; no cambia el código automáticamente.',
       requestTitle: (repo: string) => `Plan de remediación de dependencias: ${repo}`,
-      requestSummary: (count: number) => `SignalBoost preparó un plan propuesto para ${count} hallazgo(s) de avisos de dependencias. Se requiere aprobación humana antes de preparar un PR o cambiar código.`,
     },
     pt: {
       title: (repo: string) => `Plano de correção para ${repo}`,
-      summary: (count: number) => `O SignalBoost preparou um plano de remediação para ${count} constatação(ões) de avisos de dependência. Isto é apenas um plano; nenhum código foi alterado e nenhum pull request foi aberto.`,
       updateAction: (target: string) => `Atualize esta dependência para ${target}, regenere o lockfile e execute a build/suíte de testes antes do deploy.`,
       confirmAction: 'Confirme a versão corrigida compatível, atualize esta dependência, regenere o lockfile e execute a build/suíte de testes antes do deploy.',
       validation: ['Confirme a versão corrigida recomendada para cada pacote afetado.', 'Atualize o package.json e o lockfile em um branch dedicado.', 'Execute npm install ou o equivalente do gerenciador de pacotes do projeto.', 'Execute npm run build e os comandos de teste/lint disponíveis.', 'Revise o diff manualmente antes de abrir ou mesclar um pull request.'],
-      safety: ['O plano de correção é mostrado antes da primeira aprovação humana.', 'Aprovar este plano não edita código, não faz commit, não abre pull request e não mescla nada automaticamente.', 'Criar um PR ou mudança assistida exige uma camada de produto separada e autorização humana explícita.'],
-      nextStep: 'Revise este plano. Aprovar apenas autoriza o SignalBoost a avançar para a preparação do PR; não altera código automaticamente.',
       requestTitle: (repo: string) => `Plano de remediação de dependências: ${repo}`,
-      requestSummary: (count: number) => `O SignalBoost preparou um plano proposto para ${count} constatação(ões) de avisos de dependência. Aprovação humana é obrigatória antes da preparação de PR ou qualquer alteração de código.`,
     },
     pl: {
       title: (repo: string) => `Plan naprawczy dla ${repo}`,
-      summary: (count: number) => `SignalBoost przygotował plan naprawczy dla ${count} wykrytych ostrzeżeń zależności. To tylko plan; kod nie został zmieniony i nie otwarto pull requesta.`,
       updateAction: (target: string) => `Zaktualizuj tę zależność do ${target}, wygeneruj ponownie lockfile i uruchom build/testy przed wdrożeniem.`,
       confirmAction: 'Potwierdź zgodną poprawioną wersję, zaktualizuj zależność, wygeneruj ponownie lockfile i uruchom build/testy przed wdrożeniem.',
       validation: ['Potwierdź zalecaną poprawioną wersję każdego dotkniętego pakietu.', 'Zaktualizuj package.json i lockfile w osobnej gałęzi.', 'Uruchom npm install albo odpowiednik menedżera pakietów projektu.', 'Uruchom npm run build oraz dostępne testy/lint.', 'Przejrzyj diff ręcznie przed otwarciem lub scaleniem pull requesta.'],
-      safety: ['Plan jest pokazany przed pierwszą ludzką akceptacją.', 'Akceptacja planu nie edytuje kodu, nie tworzy commitów, nie otwiera pull requestów i niczego nie scala automatycznie.', 'Utworzenie PR lub asystowanej zmiany wymaga osobnej warstwy produktu i jawnej autoryzacji człowieka.'],
-      nextStep: 'Przejrzyj ten plan. Akceptacja tylko pozwala SignalBoost przejść do przygotowania PR; kod nie zmienia się automatycznie.',
       requestTitle: (repo: string) => `Plan naprawy zależności: ${repo}`,
-      requestSummary: (count: number) => `SignalBoost przygotował proponowany plan dla ${count} ostrzeżeń zależności. Przed przygotowaniem PR lub zmianą kodu wymagana jest akceptacja człowieka.`,
     },
     ru: {
       title: (repo: string) => `План исправления для ${repo}`,
-      summary: (count: number) => `SignalBoost подготовил план исправления для ${count} обнаруженных предупреждений по зависимостям. Это только план; код не изменён и pull request не открыт.`,
       updateAction: (target: string) => `Обновите эту зависимость до ${target}, пересоздайте lockfile и запустите сборку/тесты перед деплоем.`,
       confirmAction: 'Подтвердите совместимую исправленную версию, обновите зависимость, пересоздайте lockfile и запустите сборку/тесты перед деплоем.',
       validation: ['Подтвердите рекомендуемую исправленную версию для каждого затронутого пакета.', 'Обновите package.json и lockfile в отдельной ветке.', 'Запустите npm install или эквивалентный менеджер пакетов проекта.', 'Запустите npm run build и доступные команды test/lint.', 'Вручную проверьте diff перед открытием или слиянием pull request.'],
-      safety: ['План показывается до первого человеческого утверждения.', 'Утверждение плана не редактирует код, не создаёт коммиты, не открывает pull request и ничего не сливает автоматически.', 'Создание PR или ассистированного изменения требует отдельного продуктового слоя и явного разрешения человека.'],
-      nextStep: 'Проверьте этот план. Утверждение только разрешает SignalBoost перейти к подготовке PR; код не меняется автоматически.',
       requestTitle: (repo: string) => `План исправления зависимостей: ${repo}`,
-      requestSummary: (count: number) => `SignalBoost подготовил предложенный план для ${count} предупреждений по зависимостям. Перед подготовкой PR или изменением кода требуется человеческое утверждение.`,
     },
   }[lang]
+  const policyCopy = remediationAutonomyCopy(lang)
+  return { ...legacy, summary: (_count: number) => policyCopy.planSummary,
+    requestSummary: (_count: number) => policyCopy.remediationPrepared,
+    validation: [...legacy.validation.slice(0, -1), policyCopy.validateDiff],
+    safety: policyCopy.safety, nextStep: policyCopy.prepareDescription }
 }
 
 function summarizeReport(report: any) {
@@ -174,25 +161,78 @@ function streamDependencyScan(body: { url?: string; maxPackages?: number }, user
   })
 }
 
-async function prepareFixPlan(admin: any, remediationId: string, lang: ReportLang) { const { data: row, error } = await admin.from('remediation_requests').select('id,repo,target,findings,severity_summary,status,human_approved').eq('id', remediationId).single(); if (error || !row) return { ok: false, error: error?.message || 'Remediation request not found.' }; const plan = buildFixPlan(row, lang); const now = new Date().toISOString(); const update = await admin.from('remediation_requests').update({ fix_plan: plan, fix_plan_status: 'ready_for_review', fix_plan_created_at: now, implementation_status: 'not_started', updated_at: now }).eq('id', remediationId).select('id,fix_plan,fix_plan_status,fix_plan_created_at').single(); if (update.error) return { ok: false, error: update.error.message }; return { ok: true, remediationRequest: update.data } }
+async function prepareFixPlan(admin: any, remediationId: string, lang: ReportLang, userId: string | null) {
+  if (!userId) return { ok: false, error: 'Authenticated user identity is required.' }
+  const { data: row, error } = await admin.from('remediation_requests')
+    .select('id,user_id,source_area,source_type,source_id,repo,target,status,human_approved,implementation_status')
+    .eq('id', remediationId).eq('user_id', userId).single()
+  if (error || !row) return { ok: false, error: 'Remediation request not found.' }
+  if (row.source_type === 'guardian_repository_change') return { ok: false, error: 'guardian_review_does_not_authorize_repair' }
+  if (row.source_area !== 'cybersecurity' || row.source_type !== 'dependency_scan' || isTerminalRemediation(row))
+    return { ok: false, error: 'Only an active dependency request can be prepared.' }
+  if (['github_pr_preparing', 'github_pr_prepared'].includes(row.implementation_status)) return { ok: false, error: 'Preparation is already running or has produced a proposal.' }
+  if (row.human_approved) return { ok: false, error: 'Preserve the existing approval record; use the preparation worker.' }
+  const scan = await admin.from('cyber_dependency_scans').select('id,user_id,report')
+    .eq('id', row.source_id).eq('user_id', userId).maybeSingle()
+  if (scan.error || scan.data?.report?.ok !== true) return { ok: false, error: 'Owned server scan evidence is required.' }
+  const findings = remediationFindings(scan.data.report)
+  const plan = buildFixPlan({ ...row, findings }, lang)
+  const now = new Date().toISOString()
+  const update = await admin.from('remediation_requests').update({ ...routineDependencyState(),
+    findings, fix_plan: plan, fix_plan_created_at: now, updated_at: now,
+  }).eq('id', remediationId).eq('user_id', userId).eq('status', row.status).eq('implementation_status', row.implementation_status)
+    .select('id,status,human_approval_required,fix_plan,fix_plan_status,implementation_status').single()
+  if (update.error || !update.data) return { ok: false, error: 'Could not persist the preparation plan.' }
+  return { ok: true, remediationRequest: update.data }
+}
 
 export async function GET() { const guard = await requireAdmin(); if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status }); try { return NextResponse.json({ ok: true, ...(await loadDashboardData()) }) } catch { return NextResponse.json({ ok: true, scans: [], monitors: [], alerts: [], remediationRequests: [] }) } }
 
 export async function POST(req: Request) {
   const guard = await requireAdmin(); if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status }); const userId = userIdFromGuard(guard)
+  if (!sameOriginCyberMutation(req)) return NextResponse.json({ ok: false, error: 'cross_origin_mutation_denied' }, { status: 403 })
   let body: { action?: string; url?: string; label?: string; frequency?: string; maxPackages?: number; scanId?: string | null; report?: any; notes?: string; remediationId?: string; lang?: string; stream?: boolean } = {}
   try { body = await req.json() } catch { /* defaults */ }
   const lang = langFromRequest(req, body)
 
   if (body.stream === true && !body.action) return streamDependencyScan(body, userId)
   if (body.action === 'create_monitor') { const repoUrl = String(body.url || '').trim(); if (!repoUrl) return NextResponse.json({ ok: false, error: 'Repository URL is required.' }, { status: 400 }); try { const admin = getAdminSupabase(); const { data, error } = await admin.from('cyber_monitored_repositories').insert({ user_id: userId, label: String(body.label || '').trim() || null, repo_url: repoUrl, frequency: safeFrequency(body.frequency), is_enabled: true }).select('id,label,repo_url,frequency,is_enabled,created_at').single(); if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); return NextResponse.json({ ok: true, monitor: data }) } catch (err) { const message = err instanceof Error ? err.message : 'Could not create monitor.'; return NextResponse.json({ ok: false, error: message }, { status: 500 }) } }
-  if (body.action === 'prepare_fix_plan') { if (!body.remediationId) return NextResponse.json({ ok: false, error: 'remediationId is required.' }, { status: 400 }); const result = await prepareFixPlan(getAdminSupabase(), body.remediationId, lang); return NextResponse.json(result, { status: result.ok ? 200 : 400 }) }
-  if (body.action === 'request_remediation') { const report = body.report || {}; const findings = remediationFindings(report); if (findings.length === 0) return NextResponse.json({ ok: false, error: 'No detected findings were supplied for remediation.' }, { status: 400 }); try { const summary = summarizeReport(report); const repo = report.repo || report.target || null; const target = report.target || null; const copy = cyberPlanCopy(lang); const repoLabel = repo || 'repository'; const plan = buildFixPlan({ repo, target, findings, severity_summary: summary }, lang); const now = new Date().toISOString(); const admin = getAdminSupabase(); const { data, error } = await admin.from('remediation_requests').insert({ user_id: userId, source_area: 'cybersecurity', source_type: 'dependency_scan', source_id: body.scanId || null, repo, target, title: copy.requestTitle(repoLabel), summary: copy.requestSummary(summary.advisories), severity_summary: summary, findings, status: 'awaiting_human_review', human_approval_required: true, human_approved: false, approval_notes: String(body.notes || '').trim() || null, fix_plan: plan, fix_plan_status: 'ready_for_review', fix_plan_created_at: now, fix_plan_approved: false, implementation_status: 'not_started' }).select('id,title,status,fix_plan,fix_plan_status,created_at').single(); if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); return NextResponse.json({ ok: true, remediationRequest: data }) } catch (err) { const message = err instanceof Error ? err.message : 'Could not create remediation plan.'; return NextResponse.json({ ok: false, error: message }, { status: 500 }) } }
+  if (body.action === 'prepare_fix_plan') { if (!body.remediationId) return NextResponse.json({ ok: false, error: 'remediationId is required.' }, { status: 400 }); const result = await prepareFixPlan(getAdminSupabase(), body.remediationId, lang, userId); return NextResponse.json(result, { status: result.ok ? 200 : 400 }) }
+  if (body.action === 'request_remediation') {
+    // Browser reports are display data, never authority for autonomous changes.
+    if (!userId || !body.scanId) return NextResponse.json({ ok: false, error: 'A saved, owned scan is required.' }, { status: 400 })
+    try {
+      const admin = getAdminSupabase()
+      const scan = await admin.from('cyber_dependency_scans').select('id,user_id,report')
+        .eq('id', body.scanId).eq('user_id', userId).maybeSingle()
+      if (scan.error || scan.data?.report?.ok !== true)
+        return NextResponse.json({ ok: false, error: 'Owned server scan evidence is required.' }, { status: 400 })
+      const report = scan.data.report
+      const findings = remediationFindings(report)
+      if (!findings.length) return NextResponse.json({ ok: false, error: 'No detected dependency findings.' }, { status: 400 })
+      const summary = summarizeReport(report)
+      const repo = report.repo || report.target || null
+      const target = report.target || null
+      const copy = cyberPlanCopy(lang)
+      const plan = buildFixPlan({ repo, target, findings }, lang)
+      const now = new Date().toISOString()
+      const { data, error } = await admin.from('remediation_requests').insert({
+        user_id: userId, source_area: 'cybersecurity', source_type: 'dependency_scan',
+        source_id: scan.data.id, repo, target, title: copy.requestTitle(repo || 'repository'),
+        summary: copy.requestSummary(summary.advisories), severity_summary: summary, findings,
+        ...routineDependencyState(), approval_notes: String(body.notes || '').trim() || null,
+        fix_plan: plan, fix_plan_created_at: now,
+      }).select('id,title,status,human_approval_required,fix_plan,fix_plan_status,implementation_status,created_at').single()
+      if (error || !data) return NextResponse.json({ ok: false, error: 'Could not persist the preparation plan.' }, { status: 500 })
+      return NextResponse.json({ ok: true, remediationRequest: data })
+    } catch { return NextResponse.json({ ok: false, error: 'Could not create remediation plan.' }, { status: 500 }) }
+  }
   const report = await scanDependencyAdvisories({ url: body.url, maxPackages: body.maxPackages }); const stored = await storeScan(report, userId); const alertsCreated = await createAlertsForReport({ report, userId, scanId: stored.id }); return NextResponse.json({ ok: report.ok, report, scanId: stored.id, alertsCreated, error: report.error })
 }
 
 export async function PATCH(req: Request) {
   const guard = await requireAdmin(); if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status }); const userId = userIdFromGuard(guard)
+  if (!sameOriginCyberMutation(req)) return NextResponse.json({ ok: false, error: 'cross_origin_mutation_denied' }, { status: 403 })
   let body: { alertId?: string; monitorId?: string; remediationId?: string; status?: string; isEnabled?: boolean; approvalNotes?: string; planAction?: string; lang?: string } = {}; try { body = await req.json() } catch { /* defaults */ }
   const lang = langFromRequest(req, body)
   try { const admin = getAdminSupabase(); if (body.alertId) { const status = ['open', 'resolved', 'ignored'].includes(String(body.status)) ? String(body.status) : 'resolved'; const { error } = await admin.from('cyber_alerts').update({ status, resolved_at: status === 'open' ? null : new Date().toISOString() }).eq('id', body.alertId); if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); return NextResponse.json({ ok: true }) } if (body.monitorId) { const { error } = await admin.from('cyber_monitored_repositories').update({ is_enabled: !!body.isEnabled, updated_at: new Date().toISOString() }).eq('id', body.monitorId); if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); return NextResponse.json({ ok: true }) } if (body.remediationId) { const source = await admin.from('remediation_requests').select('source_type,source_id').eq('id', body.remediationId).maybeSingle(); if (source.error || !source.data) return NextResponse.json({ ok: false, error: source.error?.message || 'Remediation request not found.' }, { status: 404 }); if (source.data.source_type === 'guardian_repository_change') { if (body.planAction === 'approve_fix_plan' || String(body.status) === 'approved') return NextResponse.json({ ok: false, error: 'guardian_review_does_not_authorize_repair' }, { status: 409 }); const status = ['awaiting_human_review', 'in_progress', 'rejected', 'completed', 'cancelled'].includes(String(body.status)) ? String(body.status) : 'awaiting_human_review'; const disposition = await admin.rpc('record_guardian_review_disposition', { p_remediation_id: body.remediationId, p_status: status, p_approval_notes: String(body.approvalNotes || '').trim() || null }); if (disposition.error) return NextResponse.json({ ok: false, error: disposition.error.message }, { status: 500 }); return NextResponse.json(disposition.data || { ok: true, reviewOnly: true, status }) } if (body.planAction === 'approve_fix_plan') { const now = new Date().toISOString(); const { error } = await admin.from('remediation_requests').update({ status: 'approved', human_approved: true, approved_by: userId, approved_at: now, fix_plan_status: 'approved_for_pr', fix_plan_approved: true, fix_plan_approved_at: now, implementation_status: 'awaiting_github_pr_preparation', updated_at: now }).eq('id', body.remediationId); if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); return NextResponse.json({ ok: true }) } const status = ['awaiting_human_review', 'approved', 'rejected', 'in_progress', 'completed', 'cancelled'].includes(String(body.status)) ? String(body.status) : 'awaiting_human_review'; const now = new Date().toISOString(); if (status === 'approved') { const row = await admin.from('remediation_requests').select('id,repo,target,findings,severity_summary,fix_plan').eq('id', body.remediationId).single(); const existingPlan = row.data?.fix_plan && Object.keys(row.data.fix_plan).length > 0 ? row.data.fix_plan : buildFixPlan(row.data, lang); const { error } = await admin.from('remediation_requests').update({ status: 'approved', human_approved: true, approved_by: userId, approved_at: now, approval_notes: String(body.approvalNotes || '').trim() || null, fix_plan: existingPlan, fix_plan_status: 'approved_for_pr', fix_plan_approved: true, fix_plan_approved_at: now, implementation_status: 'awaiting_github_pr_preparation', updated_at: now }).eq('id', body.remediationId); if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); return NextResponse.json({ ok: true }) } const { error } = await admin.from('remediation_requests').update({ status, human_approved: false, approved_by: null, approved_at: null, approval_notes: String(body.approvalNotes || '').trim() || null, fix_plan_status: status === 'rejected' ? 'rejected' : undefined, fix_plan_approved: false, updated_at: now }).eq('id', body.remediationId); if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 }); return NextResponse.json({ ok: true }) } return NextResponse.json({ ok: false, error: 'No alertId, monitorId, or remediationId supplied.' }, { status: 400 }) } catch (err) { const message = err instanceof Error ? err.message : 'Update failed.'; return NextResponse.json({ ok: false, error: message }, { status: 500 }) }

@@ -187,6 +187,7 @@ async function loadRunRows(agentId: string): Promise<ARangeRunRow[]> {
 
 async function recordStageAssessment(args: {
   agentId: string
+  executionProvenance?: AgentCapstoneExecution | null
   stage: CosUniversityARangeStage
   subjectId: CosUniversitySubjectId
   run: ARangeRunRow
@@ -207,7 +208,7 @@ async function recordStageAssessment(args: {
       scorerVersion: COS_UNIVERSITY_A_RANGE_SCORER,
       scorerAuthority: authority,
       sourceRef: `cos_university_a_range:${args.run.id}`,
-      evidence: { runId: args.run.id, variantHash: args.run.variant_hash, turnId: args.run.turn_id, threshold: 2 },
+      evidence: { runId: args.run.id, variantHash: args.run.variant_hash, turnId: args.run.turn_id, threshold: 2, executionProvenance: args.executionProvenance || null },
       observedAt: observedAt.toISOString(),
       validUntil: universityARangeValidUntil(args.stage, observedAt),
     })
@@ -237,6 +238,7 @@ async function recordStageAssessment(args: {
       distinctPassesSinceLatestFailure: aRangeStagePassesSinceLatestFailure(evidence, args.stage, args.subjectId),
       variantHashes: relevant.slice(-2).map(row => row.variant_hash),
       turnId: args.run.turn_id,
+      executionProvenance: args.executionProvenance || null,
     },
     observedAt: observedAt.toISOString(),
     validUntil: universityARangeValidUntil(args.stage, observedAt),
@@ -475,7 +477,7 @@ async function executeExamRun(agentId: string, row: ARangeRunRow, now: Date): Pr
   const terminal = (refreshed.data || { ...row, status, passed, turn_id: turnId, reasons }) as ARangeRunRow
   const allRuns = await loadRunRows(agentId)
   const assessmentRecorded = freshExecution
-    ? await recordStageAssessment({ agentId, stage: row.stage, subjectId: row.subject_id, run: terminal, allRuns })
+    ? await recordStageAssessment({ agentId, executionProvenance, stage: row.stage, subjectId: row.subject_id, run: terminal, allRuns })
     : false
   return { runId: row.id, stage: row.stage, subjectId: row.subject_id, status, passed, assessmentRecorded, reasons }
 }

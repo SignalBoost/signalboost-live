@@ -1,5 +1,7 @@
 import type { LearningCandidate } from './index.ts'
 
+export const SEMANTIC_DISTILLATION_VERSION = 'semantic_v2_20260911'
+
 const STOP_WORDS = new Set([
   'about', 'above', 'after', 'again', 'against', 'because', 'been', 'before', 'being', 'below',
   'between', 'both', 'cannot', 'could', 'does', 'doing', 'down', 'during', 'each', 'from', 'further',
@@ -13,12 +15,20 @@ const RELATION_MARKERS = /\b(because|therefore|thus|hence|causes?|caused|leads? 
 const CONDITION_MARKERS = /\b(if|unless|except|excepting|provided|provided that|when|whenever|only if|subject to)\b/i
 const CONTRAST_MARKERS = /\b(however|although|though|but|despite|whereas|instead|rather than|nevertheless|nonetheless)\b/i
 const NEGATION_MARKERS = /\b(no|not|never|cannot|must not|should not|without)\b/i
+const NUMERIC_ANCHORS = /\b\d+(?:[.,]\d+)?%?\b/g
+
+export type SemanticLearningFact = LearningCandidate['facts'][number]
 
 export type SemanticDistillationResult = Readonly<{
   text: string
   sourceUnits: number
   retainedUnits: number
   duplicateUnitsRemoved: number
+}>
+
+export type DistilledSemanticKnowledge = Readonly<{
+  summary: string
+  facts: SemanticLearningFact[]
 }>
 
 function normalize(text: unknown): string {
@@ -43,6 +53,26 @@ function overlap(left: Set<string>, right: Set<string>): number {
   let hits = 0
   for (const term of left) if (right.has(term)) hits += 1
   return hits / Math.max(1, Math.min(left.size, right.size))
+}
+
+function numericAnchors(text: string): string[] {
+  return [...normalize(text).matchAll(NUMERIC_ANCHORS)].map(match => match[0].replace(',', '.')).sort()
+}
+
+/**
+ * Vocabulary overlap alone is unsafe for deduplication. The sentences “access is allowed” and
+ * “access is not allowed”, or “retain for 14 days” and “retain for 30 days”, can otherwise look
+ * nearly identical. Distillation may remove repetition, never a semantic qualifier or conflict.
+ */
+function meaningCompatible(left: string, right: string): boolean {
+  if (NEGATION_MARKERS.test(left) !== NEGATION_MARKERS.test(right)) return false
+  if (CONDITION_MARKERS.test(left) !== CONDITION_MARKERS.test(right)) return false
+  const leftNumbers = numericAnchors(left)
+  const rightNumbers = numericAnchors(right)
+  if (leftNumbers.length || rightNumbers.length) {
+    if (leftNumbers.join('|') !== rightNumbers.join('|')) return false
+  }
+  return true
 }
 
 function splitMeaningUnits(text: string): string[] {
@@ -71,9 +101,9 @@ function meaningScore(unit: string, subjectTerms: Set<string>, index: number): n
  * Meaning-preserving extraction, not generative summarization.
  *
  * The distiller keeps source-authored sentences, prioritizes topical relationships, conditions,
- * exceptions, negation and causal statements, removes near-duplicate meaning, and restores source
- * order. It never rewrites a claim or changes provenance. The result is therefore safe to embed and
- * retrieve as a compact learned representation while the original source remains the evidence.
+ * exceptions, negation and causal statements, removes only semantically compatible near-duplicates,
+ * and restores source order. It never rewrites a claim or changes provenance. The result is safe to
+ * embed and retrieve as a compact learned representation while the original source remains evidence.
  */
 export function semanticDistillText(
   text: string,
@@ -96,7 +126,10 @@ export function semanticDistillText(
   for (const candidate of ranked) {
     if (selected.length >= maxUnits) break
     if (candidate.score <= 0 && selected.length) continue
-    const duplicate = selected.some(existing => overlap(candidate.terms, existing.terms) >= duplicateThreshold)
+    const duplicate = selected.some(existing =>
+      meaningCompatible(candidate.unit, existing.unit)
+      && overlap(candidate.terms, existing.terms) >= duplicateThreshold,
+    )
     if (duplicate) {
       duplicates += 1
       continue
@@ -133,19 +166,21 @@ export function semanticDistillText(
   })
 }
 
-function semanticallyEquivalentFact(
-  left: LearningCandidate['facts'][number],
-  right: LearningCandidate['facts'][number],
-): boolean {
+function semanticallyEquivalentFact(left: SemanticLearningFact, right: SemanticLearningFact): boolean {
   if (normalize(left.predicate).toLowerCase() !== normalize(right.predicate).toLowerCase()) return false
+  if (!meaningCompatible(left.object, right.object)) return false
   return overlap(semanticTerms(left.object), semanticTerms(right.object)) >= 0.82
 }
 
-export function distillLearningCandidate(candidate: LearningCandidate): LearningCandidate {
-  const distilled = semanticDistillText(candidate.summary, candidate.subject)
-  const facts: LearningCandidate['facts'] = []
+export function distillSemanticKnowledge(input: {
+  subject: string
+  summary: string
+  facts: SemanticLearningFact[]
+}): DistilledSemanticKnowledge {
+  const distilled = semanticDistillText(input.summary, input.subject)
+  const facts: SemanticLearningFact[] = []
 
-  for (const fact of candidate.facts) {
+  for (const fact of input.facts) {
     const duplicateIndex = facts.findIndex(existing => semanticallyEquivalentFact(existing, fact))
     if (duplicateIndex < 0) {
       facts.push(fact)
@@ -154,10 +189,17 @@ export function distillLearningCandidate(candidate: LearningCandidate): Learning
     if (fact.confidence > facts[duplicateIndex].confidence) facts[duplicateIndex] = fact
   }
 
-  const summary = distilled.text || normalize(candidate.summary)
+  return Object.freeze({
+    summary: distilled.text || normalize(input.summary),
+    facts: facts.length ? facts : input.facts,
+  })
+}
+
+export function distillLearningCandidate(candidate: LearningCandidate): LearningCandidate {
+  const distilled = distillSemanticKnowledge(candidate)
   return {
     ...candidate,
-    summary,
-    facts: facts.length ? facts : candidate.facts,
+    summary: distilled.summary,
+    facts: distilled.facts,
   }
 }

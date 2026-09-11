@@ -1,6 +1,17 @@
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint
+## Guardian Supervisor autonomous disposition — 2026-09-11
+
+Authenticated repository observations now enter the Self-Healing Supervisor as read-only,
+low-risk classification work. Routine security-sensitive path observations are retained in the
+Supervisor audit timeline and automatically dispositioned as expected activity; they no longer
+create owner approval work merely because a sensitive path changed. A human queue remains reserved
+for a separate policy outcome backed by concrete consequential or suspicious evidence. Observation
+alone still grants no code repair, rollback, merge, deployment, or provider-mutation authority.
+Existing review-only Guardian backlog rows are closed by migration while retaining their evidence.
+The `/docs` landing-page list now links directly to the live Cybersecurity Center monitor.
+
 ## Guardian governed Self-Healing execution — 2026-09-11
 
 Guardian repository incidents now enter the existing COS/Self-Healing diagnostic loop after their

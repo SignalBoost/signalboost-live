@@ -86,33 +86,36 @@ async function processWebhookBacklog(input: {
       })
       if (selfHealing) {
         if (!materialized.alert) throw new Error('guardian_review_alert_missing')
-        const reviewPayload = guardianReviewRequest({ alertId: deliveryId, handoff: selfHealing })
-        const finding = Array.isArray(reviewPayload.findings) ? reviewPayload.findings[0] : null
-        const groupKey = `guardian-repository-change:${String(materialized.observation.resource_id || '').toLowerCase()}`
-        const review = await input.db.rpc('record_guardian_repository_review_observation', {
-          p_alert_id: deliveryId,
-          p_group_key: groupKey,
-          p_alert: materialized.alert,
-          p_review: reviewPayload,
-          p_finding: finding,
-        })
-        if (review.error) throw new Error('guardian_review_persist_failed')
-        const disposition = review.data && typeof review.data === 'object' ? review.data as Record<string, unknown> : {}
-        alertId = String(disposition.alertId || deliveryId)
-        alertCreated = disposition.alertCreated === true
-        const reviewRequestId = String(disposition.reviewRequestId || alertId)
         const [supervisorResult] = await remediateNativeIncidents([selfHealing.incident], {
           maxIncidents: 1,
           automaticRepairAllowed: false,
         })
         if (!supervisorResult) throw new Error('guardian_supervisor_diagnosis_missing')
-        const reviewUpdate = await input.db.from('remediation_requests').update({
-          summary: supervisorResult.diagnosis,
-          implementation_status: supervisorResult.outcome === 'staged' ? 'supervisor_review_staged' : supervisorResult.outcome,
-          implementation_notes: supervisorResult.message,
-          updated_at: new Date().toISOString(),
-        }).eq('id', reviewRequestId)
-        if (reviewUpdate.error) throw new Error('guardian_supervisor_result_persist_failed')
+        let reviewRequestId: string | null = null
+        if (selfHealing.policy.outcome === 'approval_required' || selfHealing.policy.outcome === 'blocked') {
+          const reviewPayload = guardianReviewRequest({ alertId: deliveryId, handoff: selfHealing })
+          const finding = Array.isArray(reviewPayload.findings) ? reviewPayload.findings[0] : null
+          const groupKey = `guardian-repository-change:${String(materialized.observation.resource_id || '').toLowerCase()}`
+          const review = await input.db.rpc('record_guardian_repository_review_observation', {
+            p_alert_id: deliveryId,
+            p_group_key: groupKey,
+            p_alert: materialized.alert,
+            p_review: reviewPayload,
+            p_finding: finding,
+          })
+          if (review.error) throw new Error('guardian_review_persist_failed')
+          const disposition = review.data && typeof review.data === 'object' ? review.data as Record<string, unknown> : {}
+          alertId = String(disposition.alertId || deliveryId)
+          alertCreated = disposition.alertCreated === true
+          reviewRequestId = String(disposition.reviewRequestId || alertId)
+          const reviewUpdate = await input.db.from('remediation_requests').update({
+            summary: supervisorResult.diagnosis,
+            implementation_status: supervisorResult.outcome === 'staged' ? 'supervisor_review_staged' : supervisorResult.outcome,
+            implementation_notes: supervisorResult.message,
+            updated_at: new Date().toISOString(),
+          }).eq('id', reviewRequestId)
+          if (reviewUpdate.error) throw new Error('guardian_supervisor_result_persist_failed')
+        }
         const events = [
           {
             event_id: `guardian-self-healing-${deliveryId}-received`,
@@ -138,6 +141,7 @@ async function processWebhookBacklog(input: {
               automaticRepairAuthorized: false,
               providerMutations: false,
               reviewRequestId,
+              disposition: reviewRequestId ? 'human_review' : 'expected_activity',
               supervisorOutcome: supervisorResult.outcome,
               diagnosisConfidence: supervisorResult.diagnosisConfidence,
               repairSteps: supervisorResult.repairSteps,

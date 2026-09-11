@@ -21,7 +21,7 @@ test('benign repository observations do not fabricate Self-Healing incidents', (
   }), null)
 })
 
-test('security-sensitive changes become review-gated Supervisor incidents without repair authority', () => {
+test('routine security-sensitive observations are classified autonomously without repair authority', () => {
   const handoff = createGuardianSelfHealingHandoff({
     deliveryId: 'delivery-1',
     workItemId: 'work-1',
@@ -32,9 +32,10 @@ test('security-sensitive changes become review-gated Supervisor incidents withou
   assert.ok(handoff)
   assert.equal(handoff.incident.metadata.observationOnly, true)
   assert.equal(handoff.incident.metadata.automaticRepairAuthorized, false)
-  assert.equal(handoff.plan.riskLevel, 'medium')
-  assert.equal(handoff.policy.outcome, 'approval_required')
-  assert.deepEqual(handoff.policy.approvedStepIds, [])
+  assert.equal(handoff.incident.metadata.reviewRequired, false)
+  assert.equal(handoff.plan.riskLevel, 'low')
+  assert.equal(handoff.policy.outcome, 'approved')
+  assert.deepEqual(handoff.policy.approvedStepIds, ['classify-repository-observation'])
   const review = guardianReviewRequest({ alertId: '4c9130e8-4049-42fd-8f37-c251927c0180', handoff })
   assert.equal(review.source_type, 'guardian_repository_change')
   assert.equal(review.id, '4c9130e8-4049-42fd-8f37-c251927c0180')
@@ -58,6 +59,8 @@ test('Production worker durably records the policy handoff before completing wor
   assert.match(route, /guardian_supervisor_result_persist_failed/)
   assert.match(route, /supervisorOutcome: supervisorResult\.outcome/)
   assert.match(route, /record_guardian_repository_review_observation/)
+  assert.match(route, /selfHealing\.policy\.outcome === 'approval_required'/)
+  assert.match(route, /disposition: reviewRequestId \? 'human_review' : 'expected_activity'/)
   assert.match(route, /guardian-repository-change:/)
   const groupingMigration = readFileSync(new URL('../supabase/migrations/20260911160707_guardian_review_grouping.sql', import.meta.url), 'utf8')
   assert.match(groupingMigration, /pg_advisory_xact_lock/)

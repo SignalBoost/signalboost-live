@@ -3,7 +3,7 @@ import { repairPlanSchema, type RepairPlan } from '../supervisor/repair-plan-sch
 import { DefaultSupervisorPolicyEngine } from '../supervisor/policy-engine.ts'
 import type { PolicyDecision } from '../supervisor/execution-contracts.ts'
 
-export const GUARDIAN_REPOSITORY_REVIEW_CODE = 'guardian_repository_change_review_required'
+export const GUARDIAN_REPOSITORY_OBSERVATION_CODE = 'guardian_repository_change_observed'
 
 export type GuardianSelfHealingHandoff = Readonly<{
   incident: SupervisorIncident
@@ -78,8 +78,8 @@ export function createGuardianSelfHealingHandoff(input: {
     severity: 'warning',
     detectedAt: at,
     source: 'webhook',
-    errorCode: GUARDIAN_REPOSITORY_REVIEW_CODE,
-    errorMessage: 'Authenticated activity changed security-sensitive repository paths and requires review.',
+    errorCode: GUARDIAN_REPOSITORY_OBSERVATION_CODE,
+    errorMessage: 'Authenticated activity changed security-sensitive repository paths and requires Supervisor classification.',
     affectedResource: repository,
     evidence: [{
       evidenceId: `${incidentId}:signed-patrol-evidence`,
@@ -92,7 +92,7 @@ export function createGuardianSelfHealingHandoff(input: {
     metadata: {
       organizationId: input.organizationId,
       observationOnly: true,
-      reviewRequired: true,
+      reviewRequired: false,
       recoveryPreauthorized: false,
       automaticRepairAuthorized: false,
       changedPathCount: sensitivePaths.length,
@@ -104,33 +104,33 @@ export function createGuardianSelfHealingHandoff(input: {
   const plan = repairPlanSchema.parse({
     planId: `${incidentId}:review-plan`,
     incidentId,
-    diagnosis: 'A signed repository change is review evidence, not proof that the repository is defective or compromised.',
+    diagnosis: 'A signed repository change is observation evidence, not proof that the repository is defective or compromised.',
     confidenceScore: 100,
     requiresBrowser: false,
-    riskLevel: 'medium',
+    riskLevel: 'low',
     targetProvider: 'github',
     targetEnvironment: 'production',
     approvalRequirements: {
-      requiredApprovalsCount: 1,
-      requiredRoles: ['owner'],
-      rationale: 'Repository repair or rollback requires owner review and stronger fault evidence.',
+      requiredApprovalsCount: 0,
+      requiredRoles: [],
+      rationale: 'Routine authenticated observations are classified automatically; consequential repair still requires separate evidence and governance.',
     },
     steps: [{
-      stepId: 'owner-security-review',
-      action: 'request_approval',
-      description: 'Review the authenticated security-sensitive repository change.',
-      protectedAction: true,
+      stepId: 'classify-repository-observation',
+      action: 'verify',
+      description: 'Classify the authenticated repository observation without changing code or provider state.',
+      protectedAction: false,
       parameters: { repository, sensitivePaths },
     }],
     verificationSteps: [{
       stepId: 'verify-review-decision',
       action: 'verify',
-      description: 'Verify that the review disposition is durably recorded before any repair is considered.',
+      description: 'Verify that the autonomous disposition is durably recorded before any repair is considered.',
       protectedAction: false,
       parameters: { incidentId },
     }],
     generatedAt: at,
-    schemaVersion: 'guardian-self-healing-review-v1',
+    schemaVersion: 'guardian-self-healing-observation-v2',
   })
   const policy = new DefaultSupervisorPolicyEngine().evaluate({ incident, plan, mode: 'autopilot', context: {} })
   return Object.freeze({ incident, plan, policy })

@@ -1,4 +1,5 @@
 import { PROBATIONARY_MINIMUM_CONFIDENCE, type TieredAdmission } from '@/lib/ai/cos/tieredLearningAdmission'
+import { distillLearningCandidate } from './semanticDistillation.ts'
 // saas/lib/cos-core/layers/learning/index.ts
 export type LearningObservation = {
   taskId: string
@@ -131,6 +132,12 @@ export const DEFAULT_CONTINUOUS_LEARNING_POLICY: ContinuousLearningPolicy = {
  * transcripts, but this director decides whether the result is trustworthy and reusable
  * enough to become COS knowledge. Duplicate content is rejected before storage and no
  * provider is called here.
+ *
+ * Accepted material is semantically distilled immediately before durable retention. Distillation
+ * is extractive: it removes redundant meaning while preserving source-authored conditions,
+ * exceptions, negation, causal relationships, provenance and the original content hash. The
+ * downstream semantic embedding path therefore indexes a compact learned representation without
+ * replacing or rewriting the evidence that justified admission.
  */
 export class ContinuousLearningDirector {
   constructor(
@@ -185,7 +192,7 @@ export class ContinuousLearningDirector {
     )
     if (!reusableFacts.length) return { accepted: false, reason: 'no_reusable_facts' }
     if (await this.store.hasContent(candidate.contentHash)) return { accepted: false, reason: 'duplicate' }
-    const admitted = { ...candidate, facts: reusableFacts }
+    const admitted = distillLearningCandidate({ ...candidate, facts: reusableFacts })
     if (probationaryEligible) {
       if (!this.store.rememberProbationary) return { accepted: false, reason: 'probationary_storage_unavailable' }
       return (await this.store.rememberProbationary(admitted))

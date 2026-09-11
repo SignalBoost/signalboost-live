@@ -98,7 +98,7 @@ test('graduation preserves prerequisite and residence gates before runtime or aw
 test('missing database access is not converted into an empty successful evidence read', () => {
   const runner = file('lib/ai/cos/cosUniversityGraduationRunner.ts')
   assert.doesNotMatch(runner, /if \(!db\) return (\[\]|null)/)
-  assert.equal((runner.match(/if \(!db\) throw new Error\('service_database_unavailable'\)/g) || []).length, 6)
+  assert.equal((runner.match(/if \(!db\) throw new Error\('service_database_unavailable'\)/g) || []).length, 7)
 })
 
 test('historical capstone credit requires agent-bound execution, current scorer and non-future observation', () => {

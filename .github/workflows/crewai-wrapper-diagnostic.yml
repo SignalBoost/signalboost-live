@@ -1,0 +1,53 @@
+name: CrewAI wrapper diagnostic
+
+on:
+  push:
+    branches:
+      - feat/cos-crewai-specialist-crew-20260911
+    paths:
+      - '.github/workflows/crewai-wrapper-diagnostic.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/cos-crewai-specialist-crew-20260911
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+
+      - name: Apply intended LangGraph wiring
+        run: python scripts/patch_crewai_langgraph_delegation.py
+
+      - name: Install dependencies
+        working-directory: saas
+        run: npm ci
+
+      - name: Capture exact focused test output
+        working-directory: saas
+        shell: bash
+        run: |
+          set +e
+          node --test tests/cosLangGraph.node.test.ts tests/cosSpecialistCrewClient.node.test.ts tests/cosSpecialistCrewMission.node.test.ts > ../crew-wrapper-test.log 2>&1
+          code=$?
+          printf '%s\n' "$code" > ../crew-wrapper-test.exit
+          cat ../crew-wrapper-test.log
+          exit 0
+
+      - name: Persist diagnostic evidence
+        run: |
+          git config user.name 'SignalBoost Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add crew-wrapper-test.log crew-wrapper-test.exit
+          git commit -m 'chore(cos): persist CrewAI wrapper test diagnostic' || true
+          git push origin HEAD:feat/cos-crewai-specialist-crew-20260911

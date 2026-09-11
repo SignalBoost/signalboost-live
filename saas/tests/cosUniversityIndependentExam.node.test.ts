@@ -168,3 +168,13 @@ test('cron is secret-gated, scheduled after study, and never returns prompt, rep
   assert.match(vercel, /"COS_UNIVERSITY_EXAMS_ENABLED": "true"/)
   assert.match(vercel, /"\/api\/cron\/cos-university-exam", "schedule": "0 7 \* \* \*"/)
 })
+
+
+test('infrastructure-error exams receive one fresh identity without reopening academic failures', () => {
+  const runner = file('../lib/ai/cos/cosUniversityIndependentExamRunner.ts')
+  assert.match(runner, /existing\?\.status === 'error'/)
+  assert.match(runner, /reason\.startsWith\('execution_error:'\)/)
+  assert.match(runner, /infrastructure-retry:\$\{existing\.id\}/)
+  assert.match(runner, /if \(existing && !retryableInfrastructureError\) return existing/)
+  assert.match(runner, /if \(retryExisting\) return retryExisting/)
+})

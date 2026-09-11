@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { generateKeyPairSync, sign as signEd25519 } from 'node:crypto'
+import { createHmac, generateKeyPairSync, sign as signEd25519 } from 'node:crypto'
 import { mkdtemp, writeFile, mkdir, rm, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,7 +10,10 @@ import {
   REPOSITORY_PATROL_EVENT_SCHEMA,
   SECURITY_ENGAGEMENT_SCHEMA,
   ingestRepositoryPatrolEvent,
+  normalizeAuthenticatedGitHubRepositoryWebhook,
   serializeSecurityEngagementManifest,
+  verifyGitHubWebhookDelivery,
+  type GitHubWebhookDeliveryHeaders,
   type RepositoryPatrolEvent,
   type SecurityEngagementManifest,
   type SecurityEvidenceChainEntry,
@@ -124,6 +127,7 @@ test('passive repository patrol records only authorized supplied telemetry as ev
   assert.equal(event.attributionHypotheses.length, 0)
   assert.equal(event.observations.some(item => item.kind === 'source_ip' && item.value === '203.0.113.44'), true)
   assert.equal(event.observations.some(item => item.kind === 'country_estimate' && item.value === 'US'), true)
+  assert.equal(event.observations.some(item => item.kind === 'provider_reported_actor' && item.value === 'developer-17'), true)
   assert.equal(result.indicators.some(item => item.code === 'workflow_control_change_observed'), true)
   assert.equal(result.indicators.some(item => item.code === 'workflow_path_changed'), true)
   assert.equal(result.indicators.some(item => item.code === 'dependency_lock_changed'), true)
@@ -201,4 +205,137 @@ test('repository patrol refuses to append to a tampered evidence chain', () => {
   assert.equal(second.accepted, false)
   assert.equal(second.reason, 'evidence_chain_invalid')
   assert.equal(second.evidenceChain, tampered)
+})
+
+const GITHUB_TEST_SECRET = "It's a Secret to Everybody"
+
+function githubSignature(rawBody: string, secret = GITHUB_TEST_SECRET): string {
+  return `sha256=${createHmac('sha256', secret).update(Buffer.from(rawBody, 'utf8')).digest('hex')}`
+}
+
+function githubHeaders(rawBody: string, overrides: Partial<GitHubWebhookDeliveryHeaders> = {}): GitHubWebhookDeliveryHeaders {
+  return {
+    signature256: githubSignature(rawBody),
+    deliveryId: '72d3162e-cc78-11e3-81ab-4c9367dc0958',
+    eventName: 'push',
+    userAgent: 'GitHub-Hookshot/044aadd',
+    hookId: '292430182',
+    installationTargetType: 'repository',
+    installationTargetId: '1193214194',
+    ...overrides,
+  }
+}
+
+test('GitHub webhook verifier matches the published HMAC-SHA256 test vector', () => {
+  const verified = verifyGitHubWebhookDelivery({
+    rawBody: 'Hello, World!',
+    secret: GITHUB_TEST_SECRET,
+    headers: {
+      signature256: 'sha256=757107ea0eb2509fc211221cce984b8a37570b6d7586c22c46f4379c8b043e17',
+      deliveryId: '72d3162e-cc78-11e3-81ab-4c9367dc0958',
+      eventName: 'push',
+      userAgent: 'GitHub-Hookshot/044aadd',
+    },
+  })
+  assert.equal(verified.valid, true)
+})
+
+test('authenticated GitHub push becomes provider-proven repository evidence without inventing actor IP', () => {
+  const rawBody = JSON.stringify({
+    forced: true,
+    ref: 'refs/heads/main',
+    after: 'abcdef1234567890abcdef1234567890abcdef12',
+    repository: { full_name: 'SignalBoost/signalboost-live' },
+    sender: { login: 'ghost' },
+    commits: [{
+      added: ['saas/security-host/new-control.ts'],
+      modified: ['.github/workflows/pipeline-integrity.yml', 'package-lock.json'],
+      removed: [],
+    }],
+  })
+  const normalized = normalizeAuthenticatedGitHubRepositoryWebhook({
+    rawBody,
+    secret: GITHUB_TEST_SECRET,
+    headers: githubHeaders(rawBody),
+    receivedAt: '2026-09-10T21:00:00.000Z',
+  })
+  assert.equal(normalized.accepted, true)
+  if (!normalized.accepted) return
+
+  assert.equal(normalized.event.eventId, 'github:72d3162e-cc78-11e3-81ab-4c9367dc0958')
+  assert.equal(normalized.event.eventType, 'repository.force_push')
+  assert.equal(normalized.event.actorId, 'ghost')
+  assert.equal(normalized.event.sourceIp, undefined)
+  assert.equal(normalized.event.countryEstimate, undefined)
+  assert.equal(normalized.event.sourceProvenance?.payloadSha256.length, 64)
+
+  const ingested = ingestRepositoryPatrolEvent({
+    envelope: signManifest(repositoryManifest()),
+    trustedKeys,
+    hostState,
+    event: normalized.event,
+    evidenceChain: [],
+  })
+  assert.equal(ingested.accepted, true)
+  const observations = ingested.evidenceChain[0].event.observations
+  assert.equal(observations.some(item => item.kind === 'provider_delivery_id' && item.value === normalized.provenance.deliveryId), true)
+  assert.equal(observations.some(item => item.kind === 'provider_payload_sha256' && item.value === normalized.provenance.payloadSha256), true)
+  assert.equal(observations.some(item => item.kind === 'provider_reported_actor' && item.value === 'ghost'), true)
+  assert.equal(observations.some(item => item.kind === 'source_ip'), false)
+  assert.equal(ingested.evidenceChain[0].event.attributionHypotheses.length, 0)
+  assert.equal(ingested.indicators.some(item => item.code === 'history_rewrite_observed'), true)
+  assert.equal(ingested.indicators.some(item => item.code === 'workflow_path_changed'), true)
+})
+
+test('GitHub webhook authentication fails closed on body tampering or spoofed delivery headers', () => {
+  const originalBody = JSON.stringify({ repository: { full_name: 'SignalBoost/signalboost-live' }, forced: false })
+  const headers = githubHeaders(originalBody)
+
+  const tampered = verifyGitHubWebhookDelivery({
+    rawBody: `${originalBody} `,
+    secret: GITHUB_TEST_SECRET,
+    headers,
+  })
+  assert.deepEqual(tampered, { valid: false, reason: 'github_signature_invalid' })
+
+  const spoofedAgent = verifyGitHubWebhookDelivery({
+    rawBody: originalBody,
+    secret: GITHUB_TEST_SECRET,
+    headers: { ...headers, userAgent: 'curl/8.0' },
+  })
+  assert.deepEqual(spoofedAgent, { valid: false, reason: 'github_user_agent_invalid' })
+
+  const missingDelivery = verifyGitHubWebhookDelivery({
+    rawBody: originalBody,
+    secret: GITHUB_TEST_SECRET,
+    headers: { ...headers, deliveryId: '' },
+  })
+  assert.deepEqual(missingDelivery, { valid: false, reason: 'github_delivery_id_invalid' })
+})
+
+test('signed but unsupported GitHub webhook events are not mislabeled as repository patrol activity', () => {
+  const rawBody = JSON.stringify({
+    action: 'opened',
+    repository: { full_name: 'SignalBoost/signalboost-live' },
+    sender: { login: 'developer-17' },
+  })
+  const result = normalizeAuthenticatedGitHubRepositoryWebhook({
+    rawBody,
+    secret: GITHUB_TEST_SECRET,
+    headers: githubHeaders(rawBody, { eventName: 'issues' }),
+    receivedAt: '2026-09-10T21:00:00.000Z',
+  })
+  assert.deepEqual(result, { accepted: false, reason: 'github_event_not_supported_for_repository_patrol' })
+})
+
+test('direct GitHub-webhook events without authenticated source provenance are refused', () => {
+  const result = ingestRepositoryPatrolEvent({
+    envelope: signManifest(repositoryManifest()),
+    trustedKeys,
+    hostState,
+    event: repoEvent({ source: 'github-webhook', sourceProvenance: undefined }),
+    evidenceChain: [],
+  })
+  assert.equal(result.accepted, false)
+  assert.match(result.reason, /sourceProvenance:required_for_github_webhook/)
 })

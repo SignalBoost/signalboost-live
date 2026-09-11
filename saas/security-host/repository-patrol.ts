@@ -37,6 +37,16 @@ export type RepositoryPatrolEventType =
   | 'repository.artifact_download'
   | 'repository.dependency_change'
 
+export interface RepositoryPatrolSourceProvenance {
+  deliveryId: string
+  eventName: string
+  payloadSha256: string
+  hookId?: string
+  hookUserAgent?: string
+  installationTargetType?: string
+  installationTargetId?: string
+}
+
 export interface RepositoryPatrolEvent {
   schema: typeof REPOSITORY_PATROL_EVENT_SCHEMA
   eventId: string
@@ -52,6 +62,7 @@ export interface RepositoryPatrolEvent {
   ref?: string
   commitSha?: string
   changedPaths?: readonly string[]
+  sourceProvenance?: Readonly<RepositoryPatrolSourceProvenance>
 }
 
 export interface RepositoryPatrolIndicator {
@@ -124,6 +135,21 @@ function validChangedPath(value: unknown): value is string {
     && !value.split('/').includes('..')
 }
 
+function validateSourceProvenance(value: unknown, issues: string[]): void {
+  if (value === undefined) return
+  if (!isRecord(value)) {
+    issues.push('sourceProvenance:invalid')
+    return
+  }
+  if (!validText(value.deliveryId, 128)) issues.push('sourceProvenance.deliveryId:invalid')
+  if (!validText(value.eventName, 128)) issues.push('sourceProvenance.eventName:invalid')
+  if (!validText(value.payloadSha256, 64) || !/^[a-fA-F0-9]{64}$/.test(String(value.payloadSha256 || ''))) issues.push('sourceProvenance.payloadSha256:invalid')
+  if (!validOptionalText(value.hookId, 64)) issues.push('sourceProvenance.hookId:invalid')
+  if (!validOptionalText(value.hookUserAgent, 256)) issues.push('sourceProvenance.hookUserAgent:invalid')
+  if (!validOptionalText(value.installationTargetType, 128)) issues.push('sourceProvenance.installationTargetType:invalid')
+  if (!validOptionalText(value.installationTargetId, 128)) issues.push('sourceProvenance.installationTargetId:invalid')
+}
+
 export function validateRepositoryPatrolEvent(value: unknown): readonly string[] {
   const issues: string[] = []
   if (!isRecord(value)) return Object.freeze(['event:invalid'])
@@ -147,6 +173,8 @@ export function validateRepositoryPatrolEvent(value: unknown): readonly string[]
       issues.push('changedPaths:duplicates_not_permitted')
     }
   }
+  validateSourceProvenance(value.sourceProvenance, issues)
+  if (value.source === 'github-webhook' && value.sourceProvenance === undefined) issues.push('sourceProvenance:required_for_github_webhook')
   return Object.freeze(issues)
 }
 
@@ -192,13 +220,22 @@ function repositoryPatrolObservations(
   const observations: SecurityEvidenceObservation[] = []
   pushObservation(observations, 'repository', 'repository', event.source, event.occurredAt, normalizeRepositoryPatrolName(event.repository))
   pushObservation(observations, 'event-type', 'repository_event_type', event.source, event.occurredAt, event.eventType)
-  if (event.actorId) pushObservation(observations, 'actor-id', 'authenticated_actor', event.source, event.occurredAt, event.actorId)
+  if (event.actorId) pushObservation(observations, 'actor-id', 'provider_reported_actor', event.source, event.occurredAt, event.actorId)
   if (event.sourceIp) pushObservation(observations, 'source-ip', 'source_ip', event.source, event.occurredAt, event.sourceIp)
   if (event.countryEstimate) pushObservation(observations, 'country-estimate', 'country_estimate', event.source, event.occurredAt, event.countryEstimate)
   if (event.asn) pushObservation(observations, 'asn', 'asn_or_provider', event.source, event.occurredAt, event.asn)
   if (event.userAgent) pushObservation(observations, 'user-agent', 'user_agent', event.source, event.occurredAt, event.userAgent)
   if (event.ref) pushObservation(observations, 'ref', 'repository_ref', event.source, event.occurredAt, event.ref)
   if (event.commitSha) pushObservation(observations, 'commit-sha', 'commit_sha', event.source, event.occurredAt, event.commitSha.toLowerCase())
+  if (event.sourceProvenance) {
+    pushObservation(observations, 'provider-delivery-id', 'provider_delivery_id', event.source, event.occurredAt, event.sourceProvenance.deliveryId)
+    pushObservation(observations, 'provider-event-name', 'provider_event_name', event.source, event.occurredAt, event.sourceProvenance.eventName)
+    pushObservation(observations, 'provider-payload-sha256', 'provider_payload_sha256', event.source, event.occurredAt, event.sourceProvenance.payloadSha256.toLowerCase())
+    if (event.sourceProvenance.hookId) pushObservation(observations, 'provider-hook-id', 'provider_hook_id', event.source, event.occurredAt, event.sourceProvenance.hookId)
+    if (event.sourceProvenance.hookUserAgent) pushObservation(observations, 'provider-hook-user-agent', 'provider_hook_user_agent', event.source, event.occurredAt, event.sourceProvenance.hookUserAgent)
+    if (event.sourceProvenance.installationTargetType) pushObservation(observations, 'provider-installation-target-type', 'provider_installation_target_type', event.source, event.occurredAt, event.sourceProvenance.installationTargetType)
+    if (event.sourceProvenance.installationTargetId) pushObservation(observations, 'provider-installation-target-id', 'provider_installation_target_id', event.source, event.occurredAt, event.sourceProvenance.installationTargetId)
+  }
   for (const [index, path] of (event.changedPaths ?? []).entries()) {
     pushObservation(observations, `changed-path-${index + 1}`, 'changed_path', event.source, event.occurredAt, path)
   }

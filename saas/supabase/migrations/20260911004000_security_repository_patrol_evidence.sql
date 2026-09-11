@@ -18,6 +18,9 @@ create index if not exists security_repository_patrol_evidence_repo_time_idx
   on public.security_repository_patrol_evidence (repository, recorded_at desc);
 
 alter table public.security_repository_patrol_evidence enable row level security;
+revoke all on table public.security_repository_patrol_evidence from public, anon, authenticated;
+grant select, insert on table public.security_repository_patrol_evidence to service_role;
+grant usage, select on sequence public.security_repository_patrol_evidence_id_seq to service_role;
 
 create or replace function public.append_security_repository_patrol_evidence(
   p_engagement_id text,
@@ -31,7 +34,7 @@ create or replace function public.append_security_repository_patrol_evidence(
   p_evidence_entry jsonb
 ) returns text
 language plpgsql
-security definer
+security invoker
 set search_path = public
 as $$
 declare

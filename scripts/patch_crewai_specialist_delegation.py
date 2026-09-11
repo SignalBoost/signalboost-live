@@ -1,0 +1,119 @@
+from pathlib import Path
+
+ROUTE = Path('saas/app/api/support/routeCoreLegacy.ts')
+ONBOARD = Path('ONBOARD.md')
+
+
+def patch_route() -> None:
+    text = ROUTE.read_text()
+
+    import_anchor = "import { buildProductCatalogSummary } from '@/lib/portable-products/cos-summary'\n"
+    specialist_import = "import { consultSpecialistCrew, COS_SPECIALIST_ROLES } from '@/lib/ai/cos/specialistCrewClient'\n"
+    if specialist_import not in text:
+        if import_anchor not in text:
+            raise SystemExit('specialist import anchor not found')
+        text = text.replace(import_anchor, import_anchor + specialist_import, 1)
+
+    tool_anchor = "const CHIEF_OF_STAFF_TOOLS: ChatTool[] = [\n"
+    tool_block = """const TOOL_CONSULT_SPECIALIST_CREW: ChatTool = {
+  type: 'function',
+  function: {
+    name: 'consultSpecialistCrew',
+    description: 'Delegate a bounded READ-ONLY analysis/review mission to 1-5 registered COS specialists working together through CrewAI. Use this when a question materially benefits from multiple specialties or independent specialist review. This tool cannot deploy, change permissions, spend money, contact third parties, approve actions, override Referee/COS governance, or persist CrewAI memory. Its output is advisory evidence for COS, not authority.',
+    parameters: {
+      type: 'object',
+      properties: {
+        objective: { type: 'string', description: 'The exact question or review objective the specialist crew should analyze.' },
+        roles: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 5,
+          uniqueItems: true,
+          items: { type: 'string', enum: [...COS_SPECIALIST_ROLES] },
+          description: 'Registered specialists to consult. Choose only roles materially relevant to the objective.',
+        },
+        evidence: { type: 'string', description: 'Optional host-verified evidence/context to give the specialists. Do not invent evidence.' },
+        constraints: { type: 'string', description: 'Optional constraints the specialists must respect.' },
+      },
+      required: ['objective', 'roles'],
+    },
+  },
+}
+
+"""
+    if "name: 'consultSpecialistCrew'" not in text:
+        if tool_anchor not in text:
+            raise SystemExit('chief tool array anchor not found')
+        text = text.replace(tool_anchor, tool_block + tool_anchor, 1)
+
+    list_anchor = "  TOOL_GET_AUDIT_FINDINGS,\n"
+    if "  TOOL_CONSULT_SPECIALIST_CREW,\n" not in text:
+        if list_anchor not in text:
+            raise SystemExit('chief tool list insertion anchor not found')
+        text = text.replace(list_anchor, list_anchor + "  TOOL_CONSULT_SPECIALIST_CREW,\n", 1)
+
+    run_anchor = "if (name === 'listAiBranches') {\n"
+    run_block = """if (name === 'consultSpecialistCrew') {
+    if (!isPrivileged) {
+      return 'PERMISSION DENIED: specialist crews are available only to the private COS owner/admin channel. Do not retry.'
+    }
+    let args: any = {}
+    try { args = JSON.parse(rawArgs || '{}') } catch {}
+    const objective = String(args?.objective || '').trim()
+    const roles = Array.isArray(args?.roles) ? args.roles.map((role: any) => String(role).trim()) : []
+    const invalid = roles.filter((role: string) => !(COS_SPECIALIST_ROLES as readonly string[]).includes(role))
+    if (!objective) return 'Specialist crew mission rejected: objective is required.'
+    if (invalid.length) return `Specialist crew mission rejected: unsupported role(s): ${invalid.join(', ')}.`
+    try {
+      const result = await consultSpecialistCrew({
+        objective,
+        roles: roles as any,
+        evidence: typeof args?.evidence === 'string' ? args.evidence : undefined,
+        constraints: typeof args?.constraints === 'string' ? args.constraints : undefined,
+      })
+      if (!result.ok) {
+        return `Specialist crew unavailable (${result.status}): ${result.error || 'no advisory result returned'}. No hosted fallback or external action was attempted.`
+      }
+      return [
+        `CREWAI ADVISORY RECEIPT — mission ${result.mission_id || 'unknown'}; roles ${(result.roles || roles).join(', ')}; side effects: NOT ALLOWED; durable CrewAI memory: NOT USED.`,
+        result.report || 'The specialist crew returned no report body.',
+      ].join('\\n\\n')
+    } catch (error) {
+      return `Specialist crew mission failed closed: ${error instanceof Error ? error.message : 'unknown error'}. No hosted fallback or external action was attempted.`
+    }
+  }
+"""
+    if "if (name === 'consultSpecialistCrew') {" not in text:
+        if run_anchor not in text:
+            raise SystemExit('runTool insertion anchor not found')
+        text = text.replace(run_anchor, run_block + run_anchor, 1)
+
+    ROUTE.write_text(text)
+
+
+def patch_onboard() -> None:
+    onboard = ONBOARD.read_text()
+    if '**Version:** 1.121' in onboard:
+        onboard = onboard.replace('**Version:** 1.121', '**Version:** 1.122', 1)
+    elif '**Version:** 1.122' not in onboard:
+        raise SystemExit('unexpected ONBOARD version')
+
+    crew_section = """## COS specialist crews with CrewAI — 2026-09-11
+
+CrewAI `1.15.21` is integrated underneath COS as the specialist-collaboration layer, not as a second control plane. The existing Python `cos-ai-department` now has a `crew-coordinator` service that can assemble 1–5 registered specialists for bounded analysis/review/recommendation missions. COS exposes this through the private `consultSpecialistCrew` tool. CrewAI has no owner tools and may not deploy, change permissions, access secrets, spend money, contact third parties, override Referee/COS governance, award University credit, or persist its own durable memory. Enterprise Memory and the existing COS/Referee/audit stack remain authoritative.
+
+The CrewAI coordinator fails closed unless explicitly configured with a private/internal inference endpoint and model. Public hosted coordinator/model endpoints are rejected and no silent OpenAI/Anthropic fallback is permitted. Crew memory and cache are disabled; mission context is ephemeral. Repository implementation and CI are not Production proof: a Production claim additionally requires the coordinator image/service, private inference configuration, the COS bridge configuration, and a real recorded owner/admin specialist-crew receipt from the running deployment.
+
+"""
+    guardian_anchor = '## Guardian review grouping — 2026-09-11\n'
+    if '## COS specialist crews with CrewAI — 2026-09-11' not in onboard:
+        if guardian_anchor not in onboard:
+            raise SystemExit('ONBOARD CrewAI insertion anchor not found')
+        onboard = onboard.replace(guardian_anchor, crew_section + guardian_anchor, 1)
+
+    ONBOARD.write_text(onboard)
+
+
+if __name__ == '__main__':
+    patch_route()
+    patch_onboard()

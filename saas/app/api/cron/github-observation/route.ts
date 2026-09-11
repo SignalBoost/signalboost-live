@@ -96,16 +96,10 @@ async function processWebhookBacklog(input: {
       })
       if (selfHealing) {
         if (!alertId) throw new Error('guardian_review_alert_missing')
-        const existingReview = await input.db.from('remediation_requests').select('id')
-          .eq('source_type', 'guardian_repository_change').eq('source_id', alertId).maybeSingle()
-        if (existingReview.error) throw new Error('guardian_review_lookup_failed')
-        let reviewRequestId = existingReview.data?.id ? String(existingReview.data.id) : null
-        if (!reviewRequestId) {
-          const review = await input.db.from('remediation_requests')
-            .insert(guardianReviewRequest({ alertId, handoff: selfHealing })).select('id').single()
-          if (review.error) throw new Error('guardian_review_persist_failed')
-          reviewRequestId = String(review.data.id)
-        }
+        const reviewRequestId = alertId
+        const review = await input.db.from('remediation_requests')
+          .upsert(guardianReviewRequest({ alertId, handoff: selfHealing }), { onConflict: 'id', ignoreDuplicates: true })
+        if (review.error) throw new Error('guardian_review_persist_failed')
         const events = [
           {
             event_id: `guardian-self-healing-${deliveryId}-received`,

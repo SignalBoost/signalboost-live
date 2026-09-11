@@ -33,7 +33,6 @@ import {
 import {
   cosUniversityGraduationRuntimeBlocker,
   isCosUniversityGraduationExecutionEvidence,
-  requireCosUniversityGraduationRuntime,
 } from './cosUniversityGraduationRuntimePolicy.ts'
 
 import {
@@ -45,6 +44,10 @@ import {
 export type CosUniversityRemediationGraduationStatus = CosUniversityTimeBoundedGraduationStatus & {
   remediation: CosUniversityGraduationRemediation | null
 }
+
+import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
+import { executeSoftwareCapstoneRuntime, requireRegisteredCapstoneRuntime } from './cosUniversityAgentCapstoneRuntime.ts'
+import { SOFTWARE_CAPSTONE_RUNTIME, type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
 
 const AGENT_ID = 'cos'
 const UNDERGRADUATE_PROGRAM_KEY = 'generalist_undergraduate_v1'
@@ -60,6 +63,7 @@ type GeneralistCapstoneRunRow = {
   id: string
   run_key: string
   agent_id: string
+  execution_provenance: AgentCapstoneExecution | null
   profile: string
   scorer_version: string
   seed: string
@@ -103,6 +107,7 @@ export type CosUniversityGraduationGateSummary = {
     state: 'not_eligible' | 'already_graduated' | 'credential_awarded' | 'already_terminal' | 'passed' | 'failed' | 'error'
     passed: boolean | null
     reasons: string[]
+    execution?: AgentCapstoneExecution
   }
   assessmentRowsRead: number
   errors: string[]
@@ -110,17 +115,17 @@ export type CosUniversityGraduationGateSummary = {
 }
 
 const ASSESSMENT_SELECT = 'assessment_key,subject_id,language_code,language_dimension,assessment_kind,passed,independent_scorer,scorer_version,scorer_authority,observed_at,valid_until'
-const RUN_SELECT = 'id,run_key,agent_id,profile,scorer_version,seed,manifest_hash,variant_hash,status,passed,turn_id,response_source,local_model_invoked,external_ai_invoked,fresh_execution,reasons,latency_ms,observed_at'
+const RUN_SELECT = 'id,run_key,agent_id,execution_provenance,profile,scorer_version,seed,manifest_hash,variant_hash,status,passed,turn_id,response_source,local_model_invoked,external_ai_invoked,fresh_execution,reasons,latency_ms,observed_at'
 
 function dayKey(now: Date): string {
   return now.toISOString().slice(0, 10)
 }
 
-function capstoneEvidence(rows: GeneralistCapstoneRunRow[], agentId: string, now: Date): CosUniversityGeneralistCapstoneRunEvidence[] {
+function capstoneEvidence(rows: GeneralistCapstoneRunRow[], agentId: string, now: Date, registeredRole: string | null): CosUniversityGeneralistCapstoneRunEvidence[] {
   return rows
     .filter(row => (row.status === 'passed' || row.status === 'failed')
       && row.passed !== null
-      && isCosUniversityGraduationExecutionEvidence(row, agentId)
+      && isCosUniversityGraduationExecutionEvidence(row, agentId, registeredRole, now)
       && row.profile === COS_UNIVERSITY_GENERALIST_CAPSTONE_PROFILE
       && row.scorer_version === COS_UNIVERSITY_GENERALIST_CAPSTONE_SCORER
       && Number.isFinite(Date.parse(row.observed_at))
@@ -221,24 +226,26 @@ async function readGateState(now: Date, agentId: string): Promise<{
   enrollment: CosUniversityProgramEnrollment | null
   credential: CosUniversityCredential | null
   status: CosUniversityRemediationGraduationStatus
+  registeredRole: string | null
 }> {
-  const [rows, capstoneRuns, enrollment, credential, remediation] = await Promise.all([
+  const [rows, capstoneRuns, enrollment, credential, remediation, registeredRole] = await Promise.all([
     loadAssessmentRows(agentId),
     loadCapstoneRuns(agentId),
     loadUndergraduateEnrollment(agentId),
     loadUndergraduateCredential(agentId),
     loadUndergraduateRemediation(agentId),
+    readCosUniversityAgentRole(agentId),
   ])
   const academicState = academicStateFromRows(rows, now)
   const academicStatus = deriveCosUniversityGeneralistGraduation({
     academicState,
-    capstoneRuns: capstoneEvidence(capstoneRuns, agentId, now),
+    capstoneRuns: capstoneEvidence(capstoneRuns, agentId, now, registeredRole),
   })
   const status = applyCosUniversityGraduationRemediation(
     applyCosUniversityUndergraduateCalendar({ academicStatus, enrollment, credential, now }),
     remediation,
   )
-  return { academicState, rows, capstoneRuns, enrollment, credential, status }
+  return { academicState, rows, capstoneRuns, enrollment, credential, status, registeredRole }
 }
 
 export async function readCosUniversityGeneralistGraduationStatus(now = new Date(), agentId: string = AGENT_ID): Promise<CosUniversityRemediationGraduationStatus> {
@@ -246,7 +253,7 @@ export async function readCosUniversityGeneralistGraduationStatus(now = new Date
 }
 
 async function awardUndergraduateCredential(agentId: string, status: CosUniversityTimeBoundedGraduationStatus, now: Date): Promise<CosUniversityCredential | null> {
-  requireCosUniversityGraduationRuntime(agentId)
+  await requireRegisteredCapstoneRuntime(agentId)
   if (!status.awardEligible || !status.program.programKey) return null
   const standing = status.currentCompetenceStanding
   if (standing !== 'A' && standing !== 'A+') return null
@@ -278,12 +285,12 @@ async function awardUndergraduateCredential(agentId: string, status: CosUniversi
 }
 
 async function createOrFindCapstoneRun(agentId: string, now: Date): Promise<GeneralistCapstoneRunRow | null> {
-  requireCosUniversityGraduationRuntime(agentId)
+  await requireRegisteredCapstoneRuntime(agentId)
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const runKey = cosUniversityGeneralistCapstoneRunKey(agentId, dayKey(now))
   const existing = await db.from('cos_university_generalist_capstone_runs')
-    .select(RUN_SELECT).eq('run_key', runKey).maybeSingle()
+    .select(RUN_SELECT).eq('run_key', runKey).eq('agent_id', agentId).maybeSingle()
   if (existing.error) throw existing.error
   if (existing.data) return existing.data as GeneralistCapstoneRunRow
 
@@ -303,13 +310,13 @@ async function createOrFindCapstoneRun(agentId: string, now: Date): Promise<Gene
   if (!insert.error && insert.data) return insert.data as GeneralistCapstoneRunRow
   if (insert.error && String((insert.error as { code?: string }).code || '') !== '23505') throw insert.error
   const retry = await db.from('cos_university_generalist_capstone_runs')
-    .select(RUN_SELECT).eq('run_key', runKey).maybeSingle()
+    .select(RUN_SELECT).eq('run_key', runKey).eq('agent_id', agentId).maybeSingle()
   if (retry.error) throw retry.error
   return (retry.data || null) as GeneralistCapstoneRunRow | null
 }
 
 async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Promise<CosUniversityGraduationGateSummary['capstoneRun']> {
-  requireCosUniversityGraduationRuntime(row.agent_id)
+  await requireRegisteredCapstoneRuntime(row.agent_id)
   const db = cosServiceDb()
   if (!db) return { runId: row.id, state: 'error', passed: null, reasons: ['service_database_unavailable'] }
   const exam = buildCosUniversityGeneralistCapstoneExam(row.seed)
@@ -337,21 +344,35 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
   }
 
   const started = Date.now()
-  beginEvidenceSourceUseTurn()
-  let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
+  if (row.agent_id === AGENT_ID) beginEvidenceSourceUseTurn()
+  let execution: AgentCapstoneExecution | undefined
+  let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>> | {
+    handled: true; reply: string
+    provenance: { localModelInvoked: boolean; externalAiInvoked: boolean; responseSource: string }
+  }
   try {
-    if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
-      await ensureLocalInferenceRuntimeReady()
-      await generateLocalEmbedding(exam.prompt)
+    if (row.agent_id !== AGENT_ID) {
+      const specialist = await executeSoftwareCapstoneRuntime({
+        agentId: row.agent_id, runId: row.id, manifestHash: row.manifest_hash, prompt: exam.prompt,
+      })
+      execution = specialist.execution
+      result = { handled: true, reply: specialist.reply, provenance: {
+        localModelInvoked: true, externalAiInvoked: false, responseSource: SOFTWARE_CAPSTONE_RUNTIME,
+      } }
+    } else {
+      if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
+        await ensureLocalInferenceRuntimeReady()
+        await generateLocalEmbedding(exam.prompt)
+      }
+      result = await tryCOSFirstAnswer({
+        prompt: exam.prompt,
+        language: 'en',
+        privileged: true,
+        disableCache: true,
+      })
     }
-    result = await tryCOSFirstAnswer({
-      prompt: exam.prompt,
-      language: 'en',
-      privileged: true,
-      disableCache: true,
-    })
   } catch (error) {
-    flushCapturedEvidenceSourceUse()
+    if (row.agent_id === AGENT_ID) flushCapturedEvidenceSourceUse()
     const reasons = [`execution_error:${error instanceof Error ? error.message : String(error)}`]
     const completedAt = new Date().toISOString()
     await db.from('cos_university_generalist_capstone_runs').update({
@@ -361,7 +382,7 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
   }
 
   const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
-  const turnId = peekEvidenceSourceUseTurnId()
+  const turnId = execution?.turnId ?? peekEvidenceSourceUseTurnId()
   const provenance = {
     localReasoning: result.provenance.localModelInvoked,
     externalAi: result.provenance.externalAiInvoked,
@@ -381,12 +402,13 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
   const status = freshExecution ? (score.passed ? 'passed' : 'failed') : 'error'
   const reasons = freshExecution ? score.reasons : [...score.reasons, 'fresh_execution_required']
   const completedAt = new Date().toISOString()
-  flushCapturedEvidenceSourceUse()
+  if (row.agent_id === AGENT_ID) flushCapturedEvidenceSourceUse()
 
   const update = await db.from('cos_university_generalist_capstone_runs').update({
     status,
     passed,
     turn_id: turnId || null,
+    execution_provenance: execution ?? null,
     response_source: result.provenance.responseSource,
     local_model_invoked: Boolean(result.provenance.localModelInvoked),
     external_ai_invoked: Boolean(result.provenance.externalAiInvoked),
@@ -398,7 +420,7 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
   }).eq('id', row.id)
   if (update.error) throw update.error
 
-  if (turnId) {
+  if (turnId && row.agent_id === AGENT_ID) {
     await attachTurnOutcome(turnId, {
       verifiedSuccess: score.passed && freshExecution,
       repairNeeded: !score.passed || !freshExecution,
@@ -412,6 +434,7 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
     state: status === 'passed' ? 'passed' : status === 'failed' ? 'failed' : 'error',
     passed,
     reasons,
+    ...(execution ? { execution } : {}),
   }
 }
 
@@ -504,7 +527,7 @@ export async function runCosUniversityGeneralistGraduationGate(options: { now?: 
         semantics: 'time_bounded_degree_credential_current_competence_separate',
       }
     }
-    const runtimeBlocker = cosUniversityGraduationRuntimeBlocker(agentId)
+    const runtimeBlocker = cosUniversityGraduationRuntimeBlocker(agentId, before.registeredRole)
     if (runtimeBlocker) {
       return {
         enabled: true,

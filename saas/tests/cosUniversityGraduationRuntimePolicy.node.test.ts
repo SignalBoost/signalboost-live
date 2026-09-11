@@ -78,9 +78,12 @@ test('runtime identity is enforced at both mutation boundaries and before infere
     assert.ok(start >= 0)
     const end = runner.indexOf('\nasync function ', start + 1)
     const body = runner.slice(start, end < 0 ? undefined : end)
-    const guardAt = body.indexOf('requireCosUniversityGraduationRuntime(')
+    const guardAt = body.indexOf('await requireRegisteredCapstoneRuntime(')
     assert.ok(guardAt > 0 && guardAt < body.indexOf('cosServiceDb()'), `${name} must guard identity before database access`)
-    if (name === 'executeCapstoneRun') assert.ok(guardAt < body.indexOf('await tryCOSFirstAnswer('))
+    if (name === 'executeCapstoneRun') {
+      assert.ok(guardAt < body.indexOf('await tryCOSFirstAnswer('))
+      assert.ok(guardAt < body.indexOf('await executeSoftwareCapstoneRuntime('))
+    }
   }
 })
 
@@ -90,7 +93,7 @@ test('graduation preserves prerequisite and residence gates before runtime or aw
   const body = runner.slice(start)
   const prerequisitesAt = body.indexOf('if (!before.status.prerequisitesReady)')
   const residenceAt = body.indexOf('if (!before.status.program.minimumResidenceSatisfied)')
-  const runtimeAt = body.indexOf('const runtimeBlocker = cosUniversityGraduationRuntimeBlocker(agentId)')
+  const runtimeAt = body.indexOf('const runtimeBlocker = cosUniversityGraduationRuntimeBlocker(agentId, before.registeredRole)')
   const awardAt = body.indexOf('await awardUndergraduateCredential(agentId, before.status, now)')
   assert.ok(prerequisitesAt > 0 && residenceAt > prerequisitesAt && runtimeAt > residenceAt && awardAt > runtimeAt)
 })
@@ -103,7 +106,7 @@ test('missing database access is not converted into an empty successful evidence
 
 test('historical capstone credit requires agent-bound execution, current scorer and non-future observation', () => {
   const runner = file('lib/ai/cos/cosUniversityGraduationRunner.ts')
-  assert.match(runner, /isCosUniversityGraduationExecutionEvidence\(row, agentId\)/)
+  assert.match(runner, /isCosUniversityGraduationExecutionEvidence\(row, agentId, registeredRole, now\)/)
   assert.match(runner, /row\.profile === COS_UNIVERSITY_GENERALIST_CAPSTONE_PROFILE/)
   assert.match(runner, /row\.scorer_version === COS_UNIVERSITY_GENERALIST_CAPSTONE_SCORER/)
   assert.match(runner, /Date\.parse\(row\.observed_at\) <= now\.getTime\(\)/)

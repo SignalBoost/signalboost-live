@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityRetentionRunner.ts
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { beginEvidenceSourceUseTurn, peekEvidenceSourceUseTurnId } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
@@ -6,17 +7,26 @@ import { buildCosUniversityARangeExam, COS_UNIVERSITY_A_RANGE_SCORER, scoreCosUn
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { COS_UNIVERSITY_RETENTION_PROFILE, selectDueCosUniversityRetention, type CosUniversityRetentionSource } from './cosUniversityRetention.ts'
 
-export async function runCosUniversityRetention(): Promise<Record<string, unknown>> {
-  if (process.env.COS_UNIVERSITY_RETENTION_ENABLED !== 'true') return { enabled: false, attempted: 0 }
+const DEFAULT_AGENT_ID = 'cos'
+
+/**
+ * Delayed retention for one registered agent. It replays only that agent's own previously passed
+ * transfer case, after the fixed delay, and records the result under that agent's identity.
+ */
+export async function runCosUniversityRetention(options: { now?: Date; agentId?: string } = {}): Promise<Record<string, unknown>> {
+  const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
+  const now = options.now instanceof Date ? options.now : new Date()
+  if (process.env.COS_UNIVERSITY_RETENTION_ENABLED !== 'true') return { enabled: false, agentId, attempted: 0 }
+  if (!agentId) return { enabled: true, agentId, attempted: 0, errors: ['agent_id_required'] }
   const db = cosServiceDb()
-  if (!db) return { enabled: true, attempted: 0, errors: ['service_database_unavailable'] }
+  if (!db) return { enabled: true, agentId, attempted: 0, errors: ['service_database_unavailable'] }
 
   const [sourceResult, completedResult] = await Promise.all([
     db.from('cos_university_a_range_runs')
       .select('id,subject_id,seed,manifest_hash,passed,observed_at')
-      .eq('agent_id', 'cos').eq('target_kind', 'subject').eq('stage', 'cross_domain_transfer')
+      .eq('agent_id', agentId).eq('target_kind', 'subject').eq('stage', 'cross_domain_transfer')
       .eq('status', 'passed').order('observed_at', { ascending: true }).limit(5000),
-    db.from('cos_university_retention_runs').select('source_run_id').eq('agent_id', 'cos').limit(5000),
+    db.from('cos_university_retention_runs').select('source_run_id').eq('agent_id', agentId).limit(5000),
   ])
   if (sourceResult.error) throw sourceResult.error
   if (completedResult.error) throw completedResult.error
@@ -25,19 +35,19 @@ export async function runCosUniversityRetention(): Promise<Record<string, unknow
     passed: row.passed, observedAt: row.observed_at,
   })) as CosUniversityRetentionSource[]
   const completed = new Set((completedResult.data || []).map(row => String(row.source_run_id)))
-  const source = selectDueCosUniversityRetention(sources, completed, new Date())
-  if (!source) return { enabled: true, attempted: 0, status: 'nothing_due' }
+  const source = selectDueCosUniversityRetention(sources, completed, now)
+  if (!source) return { enabled: true, agentId, attempted: 0, status: 'nothing_due' }
 
   const exam = buildCosUniversityARangeExam({ seed: source.seed, stage: 'cross_domain_transfer', subjectId: source.subjectId })
   if (exam.manifestHash !== source.manifestHash) throw new Error('retention_source_manifest_drift')
   const inserted = await db.from('cos_university_retention_runs').insert({
     run_key: `${COS_UNIVERSITY_RETENTION_PROFILE}:${source.id}`,
-    agent_id: 'cos', subject_id: source.subjectId, source_run_id: source.id,
+    agent_id: agentId, subject_id: source.subjectId, source_run_id: source.id,
     profile: COS_UNIVERSITY_RETENTION_PROFILE, scorer_version: COS_UNIVERSITY_A_RANGE_SCORER,
     source_manifest_hash: source.manifestHash, status: 'running',
   }).select('id').maybeSingle()
   if (inserted.error) throw inserted.error
-  if (!inserted.data) return { enabled: true, attempted: 0, status: 'concurrent_claim' }
+  if (!inserted.data) return { enabled: true, agentId, attempted: 0, status: 'concurrent_claim' }
 
   beginEvidenceSourceUseTurn()
   const result = await tryCOSFirstAnswer({ prompt: exam.prompt, language: 'en', privileged: true, disableCache: true })
@@ -60,12 +70,12 @@ export async function runCosUniversityRetention(): Promise<Record<string, unknow
   }).eq('id', inserted.data.id)
   if (update.error) throw update.error
   const assessmentRecorded = fresh && await recordCosUniversityAssessment({
-    assessmentKey: `cos-university-retention:${inserted.data.id}`, subjectId: source.subjectId,
+    assessmentKey: `cos-university-retention:${inserted.data.id}`, agentId, subjectId: source.subjectId,
     kind: 'delayed_retention', passed: score.passed, independentScorer: true,
     scorerVersion: COS_UNIVERSITY_A_RANGE_SCORER, scorerAuthority: 'host_private_exam',
     sourceRef: `cos_university_a_range:${source.id}`,
     evidence: { sourceRunId: source.id, sourceManifestHash: source.manifestHash, retentionOnly: true, turnId },
     observedAt: observedAt.toISOString(), validUntil: universityARangeValidUntil('cross_domain_transfer', observedAt),
   })
-  return { enabled: true, attempted: 1, status, passed: fresh ? score.passed : null, assessmentRecorded, reasons }
+  return { enabled: true, agentId, attempted: 1, status, passed: fresh ? score.passed : null, assessmentRecorded, reasons }
 }

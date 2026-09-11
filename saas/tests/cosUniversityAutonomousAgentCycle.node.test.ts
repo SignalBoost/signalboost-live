@@ -16,12 +16,16 @@ test('routes enrollment, study, remediation, exam and completed graduation deter
 
 test('scheduled cycle is secret-gated, bounded and enabled in production', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-agent-cycle/route.ts', import.meta.url), 'utf8')
+  const runner = readFileSync(new URL('../lib/ai/cos/cosUniversityAutonomousAgentCycle.ts', import.meta.url), 'utf8')
   const config = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
   assert.match(route, /CRON_SECRET/)
   assert.match(route, /maxAgents: 25/)
   assert.match(route, /result\.independentExamRuns > 0/)
   assert.match(route, /path: 'independent_exams'/)
   assert.match(route, /source: 'registered_agent_cycle'/)
+  assert.match(route, /result\.independentExamErrors === 0/)
+  assert.match(runner, /independentExamRuns \+= readyExam\.attempted/)
+  assert.doesNotMatch(runner, /independentExamRuns \+= readyExam\.runs\.length/)
   assert.match(config, /COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED/)
   assert.match(config, /cos-university-agent-cycle/)
 })

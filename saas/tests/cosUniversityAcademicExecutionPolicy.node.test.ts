@@ -19,7 +19,6 @@ test('only COS has a bound academic executor; every other agent fails closed', (
 })
 
 const RUNNERS: Array<{ file: string; blockAt: RegExp; firstWork: string }> = [
-  { file: 'lib/ai/cos/cosUniversityRetentionRunner.ts', blockAt: /if \(blocked\) return \{ enabled: true, agentId, attempted: 0, status: 'blocked', blocked \}/, firstWork: "db.from('cos_university_a_range_runs')" },
 ]
 
 test('every credit-bearing runner that answers through the COS reasoner blocks other agents before any evidence work', () => {
@@ -112,4 +111,38 @@ test('language A-range is unblocked only for an agent with its own bound executo
   // COS keeps its exact previous call, including the exam language, and grading still needs fresh local work.
   assert.match(runner.slice(cosAt), /tryCOSFirstAnswer\(\{ prompt: exam\.prompt, language: row\.language_code, privileged: true, disableCache: true \}\)/)
   assert.match(runner, /const freshExecution = Boolean\(handled && localModelInvoked && !externalAiInvoked && !semanticCache && turnId\)/)
+})
+
+test('delayed retention is unblocked only for an agent with its own bound executor, and is answered by it', () => {
+  const runner = file('lib/ai/cos/cosUniversityRetentionRunner.ts')
+  assert.match(runner, /if \(blocked && await hasBoundAcademicExecutor\(agentId\)\.catch\(\(\) => false\)\) blocked = null/)
+  // The bound branch never reaches the COS reasoner and refuses evidence that is not this run's.
+  const boundAt = runner.indexOf('if (agentId !== DEFAULT_AGENT_ID) {')
+  const cosAt = runner.indexOf('} else {', boundAt)
+  assert.ok(boundAt > 0 && cosAt > boundAt)
+  const boundBody = runner.slice(boundAt, cosAt)
+  assert.doesNotMatch(boundBody, /tryCOSFirstAnswer\(/)
+  assert.match(boundBody, /executeBoundAgentExam\(\{ agentId, runId: inserted\.data\.id, manifestHash: source\.manifestHash, prompt: exam\.prompt \}\)/)
+  assert.match(boundBody, /throw new Error\('agent_execution_identity_mismatch'\)/)
+  assert.match(runner, /execution_provenance: executionProvenance/)
+  // COS keeps its exact previous call, and grading still requires a fresh local, non-cached execution.
+  assert.match(runner.slice(cosAt), /tryCOSFirstAnswer\(\{ prompt: exam\.prompt, language: 'en', privileged: true, disableCache: true \}\)/)
+  assert.match(runner, /const fresh = Boolean\(handled && localModelInvoked && !externalAiInvoked && !semanticCache && turnId\)/)
+})
+
+test('every credit-bearing University lane now has an execution binding in the database', () => {
+  const bindings = [
+    ['supabase/migrations/20260911201757_university_agent_capstone_execution.sql', 'cos_university_generalist_capstone_runs'],
+    ['supabase/migrations/20260911235500_university_agent_exam_execution.sql', 'cos_university_exam_runs'],
+    ['supabase/migrations/20260912001500_university_agent_a_range_execution.sql', 'cos_university_a_range_runs'],
+    ['supabase/migrations/20260912013000_university_agent_retention_execution.sql', 'cos_university_retention_runs'],
+  ] as const
+  for (const [migration, table] of bindings) {
+    const sql = file(migration)
+    assert.match(sql, new RegExp(`ALTER TABLE public\\.${table}`))
+    assert.match(sql, /execution_provenance->>'agentId' = agent_id/)
+    assert.match(sql, /execution_provenance->>'runId' = id::text/)
+    assert.match(sql, /execution_provenance->>'academicAuthority' = 'none'/)
+    assert.match(sql, /NOT VALID/, `${migration}: historical rows are never granted fresh provenance`)
+  }
 })

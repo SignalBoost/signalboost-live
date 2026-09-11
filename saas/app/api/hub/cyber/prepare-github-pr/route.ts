@@ -1,183 +1,133 @@
-// saas/app/api/hub/cyber/prepare-github-pr/route.ts
-// Prepares an owner-reviewable code proposal for approved dependency remediations.
-// Guardrails:
-// - only handles this platform repo for now
-// - only edits direct package.json dependency entries
-// - only edits when OSV supplied a concrete targetVersion
-// - uses the existing repoWriter, which writes to ai/* branches only
-
+// Routine, isolated dependency proposals. A proposal is not a verified repair.
+// No merge, deployment, arbitrary repository, or Guardian mutation authority.
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { readRepoFileFrom } from '@/lib/audit/repoTarget'
-import { commitFileToBranch } from '@/lib/ai/tools/repoWriter'
+import { commitFileToBranch, ensureBranch } from '@/lib/ai/tools/repoWriter'
+import { DEPENDENCY_REPOSITORY, DEPENDENCY_PREPARATION_POLICY, sameOriginCyberMutation,
+  trustedDependencyChanges, updateVerifiedPackageJson } from '@/lib/cyber/dependencyRemediationPolicy'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 120
 
-const PLATFORM_REPO = process.env.AUDIT_GITHUB_REPO || 'SignalBoost/signalboost-live'
-
-type Change = {
-  packageName?: string
-  currentVersion?: string
-  targetVersion?: string | null
-  sourceFile?: string
-  advisoryId?: string
-}
-
 function authorizedCron(req: Request): boolean {
   const secret = process.env.CRON_SECRET
-  if (!secret) return false
-  const auth = req.headers.get('authorization') || ''
-  return auth === `Bearer ${secret}`
+  return !!secret && req.headers.get('authorization') === `Bearer ${secret}`
 }
 
-function branchFor(id: string) {
-  return `cyber-${String(id || '').slice(0, 8)}`
-}
-
-function versionSpec(currentSpec: string, targetVersion: string) {
-  const prefix = String(currentSpec || '').trim().startsWith('^') ? '^' : String(currentSpec || '').trim().startsWith('~') ? '~' : ''
-  return `${prefix}${targetVersion}`
-}
-
-function groupDirectPackageJsonChanges(plan: any): Map<string, Change[]> {
-  const out = new Map<string, Change[]>()
-  const changes = Array.isArray(plan?.proposedChanges) ? plan.proposedChanges : []
-  for (const c of changes) {
-    const sourceFile = String(c?.sourceFile || '').trim()
-    const targetVersion = String(c?.targetVersion || '').trim()
-    const packageName = String(c?.packageName || '').trim()
-    if (!sourceFile.endsWith('package.json')) continue
-    if (!packageName || !targetVersion) continue
-    const arr = out.get(sourceFile) || []
-    arr.push({ ...c, sourceFile, targetVersion, packageName })
-    out.set(sourceFile, arr)
-  }
-  return out
-}
-
-function updatePackageJson(content: string, changes: Change[]) {
-  const json = JSON.parse(content)
-  let changed = false
-  for (const c of changes) {
-    const name = String(c.packageName || '').trim()
-    const targetVersion = String(c.targetVersion || '').trim()
-    if (!name || !targetVersion) continue
-    for (const group of ['dependencies', 'devDependencies', 'optionalDependencies']) {
-      if (json?.[group]?.[name]) {
-        json[group][name] = versionSpec(String(json[group][name]), targetVersion)
-        changed = true
-      }
-    }
-  }
-  if (!changed) return { ok: false, content, changed: false, error: 'No matching direct package.json dependency entry was found.' }
-  return { ok: true, content: `${JSON.stringify(json, null, 2)}\n`, changed: true, error: '' }
-}
-
-async function loadNextRow(admin: any, remediationId?: string | null) {
-  let query = admin.from('remediation_requests')
-    .select('id,repo,target,title,fix_plan,implementation_status')
-    .eq('source_area', 'cybersecurity')
-    .eq('source_type', 'dependency_scan')
-    .eq('status', 'approved')
-    .eq('fix_plan_status', 'approved_for_pr')
-    .eq('implementation_status', 'awaiting_github_pr_preparation')
-
-  if (remediationId) query = query.eq('id', remediationId)
-  const { data, error } = await query.order('updated_at', { ascending: true }).limit(1).maybeSingle()
-  if (error) return { ok: false, row: null, error: error.message }
-  if (!data) return { ok: false, row: null, error: 'No approved remediation is waiting for GitHub PR preparation.' }
-  return { ok: true, row: data, error: '' }
-}
-
-async function runPreparation(req: Request, remediationId?: string | null) {
-  if (!authorizedCron(req)) {
+async function runPreparation(req: Request, remediationId?: string) {
+  const cron = authorizedCron(req)
+  let userId: string | null = null
+  if (!cron) {
     const guard = await requireAdmin()
     if (!guard.ok) return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status })
+    if (!sameOriginCyberMutation(req)) return NextResponse.json({ ok: false, error: 'cross_origin_mutation_denied' }, { status: 403 })
+    const ctx = guard.ctx as any
+    userId = ctx?.userId ?? ctx?.user?.id ?? ctx?.id ?? null
+    if (!userId) return NextResponse.json({ ok: false, error: 'Authenticated user identity is required.' }, { status: 403 })
   }
-
   const admin = getAdminSupabase()
-  const loaded = await loadNextRow(admin, remediationId || null)
-  if (!loaded.ok || !loaded.row) return NextResponse.json({ ok: false, error: loaded.error }, { status: 400 })
+  let query = admin.from('remediation_requests')
+    .select('id,user_id,source_area,source_type,source_id,repo,status,fix_plan_status,implementation_status,human_approval_required,human_approved,fix_plan_approved')
+    .eq('source_area', 'cybersecurity').eq('source_type', 'dependency_scan')
+    .in('status', ['in_progress', 'approved', 'awaiting_human_review'])
+    .eq('implementation_status', 'awaiting_github_pr_preparation')
+    // Filter before limit(1), so a gated legacy row cannot consume the worker slot.
+    .or('human_approval_required.eq.false,and(status.eq.approved,human_approved.eq.true,fix_plan_approved.eq.true,fix_plan_status.eq.approved_for_pr)')
+  if (remediationId) query = query.eq('id', remediationId)
+  if (!cron) query = query.eq('user_id', userId!)
+  const loaded = await query.order('updated_at', { ascending: true }).limit(1).maybeSingle()
+  if (loaded.error) return NextResponse.json({ ok: false, error: 'Could not load preparation work.' }, { status: 500 })
+  const row = loaded.data
+  if (!row) return NextResponse.json({ ok: false, error: 'No queued dependency preparation was found.' }, { status: 409 })
 
-  const row = loaded.row
-  const repo = String(row.repo || '').trim() || PLATFORM_REPO
-  const now = new Date().toISOString()
-
-  if (repo !== PLATFORM_REPO) {
-    await admin.from('remediation_requests').update({
-      implementation_status: 'manual_repository_connection_required',
-      implementation_notes: `Automatic PR preparation currently supports ${PLATFORM_REPO}. Connect write access for ${repo} before preparing this PR.`,
-      updated_at: now,
-    }).eq('id', row.id)
-    return NextResponse.json({ ok: false, error: `Repository ${repo} is not connected for write preparation yet.` }, { status: 400 })
+  const approvalFree = row.human_approval_required === false
+  const explicitlyApproved = row.status === 'approved' && row.human_approved === true
+    && row.fix_plan_approved === true && row.fix_plan_status === 'approved_for_pr'
+  if (!approvalFree && !explicitlyApproved) {
+    return NextResponse.json({ ok: false, error: 'Existing approval is still required.', approvalRequired: true }, { status: 409 })
   }
 
-  const grouped = groupDirectPackageJsonChanges(row.fix_plan)
-  if (grouped.size === 0) {
-    await admin.from('remediation_requests').update({
-      implementation_status: 'manual_version_confirmation_required',
-      implementation_notes: 'No direct package.json change with a known targetVersion was found. Transitive or lockfile-only findings require manual version confirmation first.',
-      updated_at: now,
-    }).eq('id', row.id)
-    return NextResponse.json({ ok: false, error: 'No safe direct package.json update was available.' }, { status: 400 })
-  }
+  // Compare-and-set claim: concurrent invocations cannot both mutate the branch.
+  let claimQuery = admin.from('remediation_requests').update({
+    status: 'in_progress', implementation_status: 'github_pr_preparing', updated_at: new Date().toISOString(),
+  }).eq('id', row.id).eq('status', row.status).eq('implementation_status', 'awaiting_github_pr_preparation')
+    .eq('user_id', row.user_id).eq('source_id', row.source_id)
+    .eq('source_area', 'cybersecurity').eq('source_type', 'dependency_scan').eq('repo', row.repo)
+  // Recheck the exact authorization lane atomically with the claim. A policy
+  // change or revoked vote after selection must not authorize repository work.
+  claimQuery = approvalFree
+    ? claimQuery.eq('human_approval_required', false)
+    : claimQuery.eq('human_approved', true).eq('fix_plan_approved', true).eq('fix_plan_status', 'approved_for_pr')
+  const claim = await claimQuery.select('id').maybeSingle()
+  if (claim.error) return NextResponse.json({ ok: false, error: 'Could not claim preparation work.' }, { status: 500 })
+  if (!claim.data) return NextResponse.json({ ok: false, error: 'Preparation state changed; no duplicate work was started.' }, { status: 409 })
 
-  const branch = branchFor(row.id)
-  let prUrl = ''
-  let prNumber = 0
-  const touched: string[] = []
-  const errors: string[] = []
-
-  for (const [path, changes] of grouped.entries()) {
-    const current = await readRepoFileFrom(repo, 'main', path)
-    if (!current.ok || !current.content) { errors.push(`${path}: could not read file`); continue }
-    let updated: { ok: boolean; content: string; changed: boolean; error: string }
-    try { updated = updatePackageJson(current.content, changes) } catch (err) {
-      errors.push(`${path}: ${err instanceof Error ? err.message : 'invalid package.json'}`)
-      continue
-    }
-    if (!updated.ok || !updated.changed) { errors.push(`${path}: ${updated.error}`); continue }
-
-    const result = await commitFileToBranch({
-      branch,
-      path,
-      content: updated.content,
-      message: `Cyber remediation: update dependencies for ${row.id}`,
-    })
-    if (!result.ok) { errors.push(`${path}: ${result.error}`); continue }
-    touched.push(path)
-    if (result.prUrl) prUrl = result.prUrl
-    if (result.prNumber) prNumber = result.prNumber
-  }
-
-  if (touched.length === 0) {
-    await admin.from('remediation_requests').update({
-      implementation_status: 'github_pr_preparation_failed',
-      implementation_notes: errors.join('\n') || 'No files were updated.',
+  async function finish(status: string, notes: string, prUrl?: string) {
+    const update = await admin.from('remediation_requests').update({
+      implementation_status: status, implementation_notes: notes,
+      // Completion/failure is an execution result, never an approval-policy edit.
+      ...(prUrl ? { pull_request_url: prUrl } : {}),
       updated_at: new Date().toISOString(),
-    }).eq('id', row.id)
-    return NextResponse.json({ ok: false, error: errors.join('\n') || 'No files were updated.' }, { status: 400 })
+    }).eq('id', row.id).eq('status', 'in_progress').eq('implementation_status', 'github_pr_preparing').select('id').maybeSingle()
+    return !update.error && !!update.data
+  }
+  async function blocked(reason: string, status = 'verification_blocked') {
+    const saved = await finish(status, `${reason}. No verified repair, merge or deployment is claimed.`)
+    return NextResponse.json({ ok: false, remediationId: row.id, error: saved ? reason : 'Could not persist preparation outcome.', approvalRequired: false }, { status: saved ? 409 : 500 })
   }
 
-  await admin.from('remediation_requests').update({
-    implementation_status: 'github_pr_prepared',
-    implementation_notes: `Prepared ${touched.length} file update(s) on ai/${branch}.${errors.length ? ` Warnings: ${errors.join(' | ')}` : ''}`,
-    pull_request_url: prUrl || null,
-    updated_at: new Date().toISOString(),
-  }).eq('id', row.id)
+  try {
+    const scan = await admin.from('cyber_dependency_scans').select('id,user_id,report')
+      .eq('id', row.source_id).eq('user_id', row.user_id).maybeSingle()
+    if (scan.error) return blocked('owned_scan_evidence_unavailable')
+    const verdict = trustedDependencyChanges(row, scan.data)
+    if (verdict.ok === false) return blocked(verdict.reason)
 
-  return NextResponse.json({ ok: true, remediationId: row.id, branch: `ai/${branch}`, prUrl, prNumber, touched, warnings: errors })
+    const grouped = new Map<string, typeof verdict.changes>()
+    for (const change of verdict.changes) grouped.set(change.sourceFile, [...(grouped.get(change.sourceFile) || []), change])
+    const branch = `cyber-${row.id}`
+    const preparedBranch = await ensureBranch(branch)
+    if (!preparedBranch.ok) return blocked('isolated_branch_unavailable', 'github_pr_preparation_failed')
+    // Read the actual proposal branch, not a moving main snapshot. Validate every
+    // manifest before the first file write; never overwrite unrelated main changes.
+    const staged: Array<{ path: string; content: string }> = []
+    for (const [path, changes] of grouped) {
+      const current = await readRepoFileFrom(DEPENDENCY_REPOSITORY, preparedBranch.branch, path)
+      if (!current.ok || !current.content) return blocked('repository_manifest_unavailable')
+      staged.push({ path, content: updateVerifiedPackageJson(current.content, changes) })
+    }
+
+    const touched: string[] = []
+    let prUrl = ''
+    let prNumber = 0
+    for (const file of staged) {
+      const result = await commitFileToBranch({ branch, path: file.path, content: file.content,
+        message: `Cyber dependency proposal (${DEPENDENCY_PREPARATION_POLICY}): ${row.id}` })
+      if (!result.ok || !result.prUrl)
+        return blocked('branch_proposal_incomplete_check_branch_evidence', 'github_pr_preparation_failed')
+      touched.push(file.path)
+      prUrl = result.prUrl
+      prNumber = result.prNumber || 0
+    }
+    const saved = await finish('github_pr_prepared',
+      `Prepared ${touched.length} manifest proposal(s) on ai/${branch}. Lockfile regeneration, tests and required CI remain outstanding; no merge or deployment was performed.`, prUrl)
+    if (!saved) return NextResponse.json({ ok: false, error: 'Proposal exists but its outcome could not be persisted.', prUrl }, { status: 500 })
+    return NextResponse.json({ ok: true, remediationId: row.id, branch: `ai/${branch}`, prUrl, prNumber, touched, approvalRequired: false, verifiedRepair: false })
+  } catch {
+    return blocked('preparation_failed_check_current_evidence', 'github_pr_preparation_failed')
+  }
 }
 
 export async function GET(req: Request) {
-  return runPreparation(req, null)
+  if (!authorizedCron(req)) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  return runPreparation(req)
 }
 
 export async function POST(req: Request) {
   let body: { remediationId?: string } = {}
-  try { body = await req.json() } catch { /* optional body */ }
-  return runPreparation(req, body.remediationId || null)
+  try { body = await req.json() } catch { /* authenticated worker selects the next queued item */ }
+  return runPreparation(req, body.remediationId)
 }

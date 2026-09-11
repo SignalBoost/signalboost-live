@@ -1,8 +1,8 @@
-// saas/app/api/cron/cos-university-graduation/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityGeneralistGraduationGate } from '@/lib/ai/cos/cosUniversityGraduationRunner'
 import { runCosUniversityAdmission } from '@/lib/ai/cos/cosUniversityAdmissionRunner'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { readCosUniversityDailyLaneCadence } from '@/lib/ai/cos/cosUniversityDailyLaneCadence'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,6 +16,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const cadence = await readCosUniversityDailyLaneCadence('graduation')
+    if (!cadence.due) {
+      await recordCosUniversityProductionPath({ path: 'graduation', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, cadence } })
+      return NextResponse.json({ ok: true, skipped: true, cadence })
+    }
     const result = await runCosUniversityGeneralistGraduationGate()
     // Admission runs in the same pass and immediately after, so the tick that issues the
     // undergraduate credential is the tick that opens the next program. Otherwise every academic

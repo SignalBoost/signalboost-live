@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityIndependentExamBatch } from '@/lib/ai/cos/cosUniversityIndependentExamRunner'
 import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { readCosUniversityDailyLaneCadence } from '@/lib/ai/cos/cosUniversityDailyLaneCadence'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,6 +21,11 @@ export async function GET(req: NextRequest) {
       const unavailable = programGate.reason === 'service_database_unavailable'
       await recordCosUniversityProductionPath({ path: 'independent_exams', invocationSucceeded: !unavailable, evidence: { skipped: true, programGate } })
       return NextResponse.json({ ok: !unavailable, skipped: true, programGate }, { status: unavailable ? 503 : 200 })
+    }
+    const cadence = await readCosUniversityDailyLaneCadence('independent_exams')
+    if (!cadence.due) {
+      await recordCosUniversityProductionPath({ path: 'independent_exams', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, cadence } })
+      return NextResponse.json({ ok: true, skipped: true, cadence })
     }
     const result = await runCosUniversityIndependentExamBatch({ maxExams: 2 })
     await recordCosUniversityProductionPath({ path: 'independent_exams', invocationSucceeded: result.errors.length === 0, evidence: result })

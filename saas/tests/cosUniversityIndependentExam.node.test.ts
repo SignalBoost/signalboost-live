@@ -166,5 +166,5 @@ test('cron is secret-gated, scheduled after study, and never returns prompt, rep
   assert.doesNotMatch(route, /reply:/)
   assert.doesNotMatch(route, /rubric:/)
   assert.match(vercel, /"COS_UNIVERSITY_EXAMS_ENABLED": "true"/)
-  assert.match(vercel, /"\/api\/cron\/cos-university-exam", "schedule": "0 7 \* \* \*"/)
+  assert.match(vercel, /"\/api\/cron\/cos-university-exam", "schedule": "0 \* \* \* \*"/)
 })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityPhdAdmission } from '@/lib/ai/cos/cosUniversityPhdRuntime'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { readCosUniversityDailyLaneCadence } from '@/lib/ai/cos/cosUniversityDailyLaneCadence'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,6 +17,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, enabled: false, admitted: false, semantics: 'phd_runtime_fail_closed' })
   }
   try {
+    const cadence = await readCosUniversityDailyLaneCadence('phd_admission')
+    if (!cadence.due) {
+      await recordCosUniversityProductionPath({ path: 'phd_admission', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, cadence } })
+      await recordCosUniversityProductionPath({ path: 'phd_runtime', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, cadence } })
+      return NextResponse.json({ ok: true, skipped: true, cadence })
+    }
     const result = await runCosUniversityPhdAdmission(new Date())
     await recordCosUniversityProductionPath({ path: 'phd_runtime', invocationSucceeded: result.errors.length === 0, evidence: result })
     await recordCosUniversityProductionPath({ path: 'phd_admission', invocationSucceeded: result.errors.length === 0, evidence: result })

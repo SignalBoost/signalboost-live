@@ -143,7 +143,7 @@ test('PhD admission and progress crons are secret-gated, fail closed, and bounde
   }
   assert.equal(vercel.env.COS_UNIVERSITY_PHD_RUNTIME_ENABLED, 'true')
   assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-phd-admission'), {
-    path: '/api/cron/cos-university-phd-admission', schedule: '5 8 * * *',
+    path: '/api/cron/cos-university-phd-admission', schedule: '5 * * * *',
   })
   assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-phd-progress'), {
     path: '/api/cron/cos-university-phd-progress', schedule: '56 * * * *',

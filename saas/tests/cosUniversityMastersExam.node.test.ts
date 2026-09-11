@@ -147,7 +147,7 @@ test('Master’s admission learning exam and progress crons are secret-gated and
   }
   assert.equal(vercel.env.COS_UNIVERSITY_MASTERS_EXAMS_ENABLED, 'true')
   assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-masters-admission'), {
-    path: '/api/cron/cos-university-masters-admission', schedule: '35 7 * * *',
+    path: '/api/cron/cos-university-masters-admission', schedule: '35 * * * *',
   })
   assert.deepEqual(vercel.crons.find(row => row.path === '/api/cron/cos-university-masters-exam'), {
     path: '/api/cron/cos-university-masters-exam', schedule: '41 * * * *',

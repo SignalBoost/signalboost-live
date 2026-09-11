@@ -208,10 +208,10 @@ test('exam lanes remain independent from continuous study cadence', () => {
     path: '/api/cron/cos-university-learning', schedule: '*/15 * * * *',
   })
   assert.deepEqual(vercel.crons.find(item => item.path === '/api/cron/cos-university-exam'), {
-    path: '/api/cron/cos-university-exam', schedule: '0 7 * * *',
+    path: '/api/cron/cos-university-exam', schedule: '0 * * * *',
   })
   assert.deepEqual(vercel.crons.find(item => item.path === '/api/cron/cos-university-a-range'), {
-    path: '/api/cron/cos-university-a-range', schedule: '10 7 * * *',
+    path: '/api/cron/cos-university-a-range', schedule: '10 * * * *',
   })
 })
 

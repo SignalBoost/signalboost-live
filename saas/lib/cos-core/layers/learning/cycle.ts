@@ -6,6 +6,7 @@ import { gapCurriculumAligned } from './gaps.ts'
 import { minimumConfidenceForKind } from './sourceCatalog.ts'
 import {
   incrementDiagnosticCount,
+  recordAcceptedLearningContent,
   initializeLearningGapDiagnostics,
   learningGapDiagnostic,
   type LearningGapDiagnostic,
@@ -157,6 +158,7 @@ export class ContinuousLearningCycle{
               const learned=String(gap.subject??'').trim()
               if(learned)acceptedSubjects.add(learned)
               acceptedGapIds.add(gap.id)
+              recordAcceptedLearningContent(diagnostic,candidate.contentHash)
             }
           }catch(error){
             // A real failed write is retryable if another gap discovers the same content later.

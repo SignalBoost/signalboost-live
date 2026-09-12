@@ -9,10 +9,10 @@ permissions:
   contents: read
 
 jobs:
-  baseline:
+  resolve:
     if: github.repository == 'SignalBoost/signalboost-live' && github.ref == 'refs/heads/fix/cyber-dependencies-20260912'
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,55 +20,148 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Collect exact lockfiles and live npm advisory evidence without installation
+      - name: Resolve bounded dependency repairs and verify fresh lockfile audits
         run: |
           node --input-type=module <<'NODE'
           import { mkdirSync, copyFileSync, writeFileSync, readFileSync } from 'node:fs';
           import { spawnSync, execFileSync } from 'node:child_process';
           import { createHash } from 'node:crypto';
+          import assert from 'node:assert/strict';
           const out = 'dependency-repair-evidence';
           mkdirSync(out, { recursive: true });
-          const receipt = { commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), observedAt: new Date().toISOString(), node: process.version, npm: execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(), files: {}, audits: {} };
+          const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+          const receipt = { commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), observedAt: new Date().toISOString(), node: process.version, npm: execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(), before: {}, after: {}, audits: {}, commands: [] };
+          const registry = '--registry=https://registry.npmjs.org/';
           let failed = false;
+          function run(label, cwd, args, allowed = [0]) {
+            const r = spawnSync('npm', args, { cwd, encoding: 'utf8', timeout: 180000, maxBuffer: 10000000 });
+            writeFileSync(`${out}/${label}.stdout`, r.stdout || '');
+            writeFileSync(`${out}/${label}.stderr`, r.stderr || '');
+            receipt.commands.push({ label, args, exitCode: r.status, signal: r.signal });
+            if (!allowed.includes(r.status)) throw new Error(`${label} failed (exit ${r.status})`);
+            return r.stdout;
+          }
+          function audit(label, cwd) {
+            const a = JSON.parse(run(label, cwd, ['audit', '--json', '--ignore-scripts', registry], [0, 1]));
+            assert.equal(a.auditReportVersion, 2);
+            assert.ok(a.vulnerabilities && a.metadata && !a.error, 'invalid advisory response');
+            writeFileSync(`${out}/${label}.json`, JSON.stringify(a, null, 2));
+            receipt.audits[label] = a.metadata;
+            console.log(label, JSON.stringify(a.metadata));
+            return a;
+          }
+          function snapshot(scope, cwd, stage) {
+            for (const name of ['package.json', 'package-lock.json']) {
+              const bytes = readFileSync(`${cwd}/${name}`);
+              const path = cwd === '.' ? name : `${cwd}/${name}`;
+              receipt[stage][path] = { sha256: hash(bytes), bytes: bytes.length };
+              copyFileSync(`${cwd}/${name}`, `${out}/${scope}.${stage}.${name}`);
+            }
+          }
           try {
-            for (const [label, cwd] of [['root', '.'], ['saas', 'saas']]) {
+            for (const [scope, cwd] of [['root', '.'], ['saas', 'saas']]) {
+              snapshot(scope, cwd, 'before');
+              audit(`${scope}.before.audit`, cwd);
+              const manifestPath = `${cwd}/package.json`;
+              const original = JSON.parse(readFileSync(manifestPath, 'utf8'));
+              const revised = structuredClone(original);
+              assert.equal(original.dependencies.postcss, '^8.4.31');
+              revised.dependencies.postcss = '^8.5.23';
+              if (scope === 'root') {
+                assert.equal(original.dependencies.next, '16.2.6');
+                revised.dependencies.next = '16.3.5';
+              } else assert.equal(original.dependencies.next, '16.3.5');
+              writeFileSync(manifestPath, JSON.stringify(revised, null, 2) + '\n');
+              run(`${scope}.resolve`, cwd, ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', registry]);
+              run(`${scope}.update`, cwd, ['update', 'baseline-browser-mapping', 'browserslist', 'form-data', 'nanoid', 'postcss-selector-parser', 'brace-expansion', 'js-yaml', 'qs', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', registry]);
+              assert.deepEqual(JSON.parse(readFileSync(manifestPath, 'utf8')), revised, 'resolver changed unrelated manifest fields');
+              const lock = JSON.parse(readFileSync(`${cwd}/package-lock.json`, 'utf8'));
+              for (const field of ['dependencies', 'devDependencies']) assert.deepEqual(lock.packages[''][field], revised[field], `${scope}: manifest/lock mismatch`);
+              snapshot(scope, cwd, 'after');
+              const after = audit(`${scope}.after.audit`, cwd);
+              assert.equal(after.metadata.vulnerabilities.total, 0, `${scope}: unresolved advisories`);
+              run(`${scope}.clean-install`, cwd, ['ci', '--ignore-scripts', '--no-audit', '--no-fund', registry]);
               for (const name of ['package.json', 'package-lock.json']) {
-                const source = `${cwd}/${name}`;
-                const bytes = readFileSync(source);
-                receipt.files[source] = { sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length };
-                copyFileSync(source, `${out}/${label}.${name}`);
+                const path = cwd === '.' ? name : `${cwd}/${name}`;
+                assert.equal(hash(readFileSync(`${cwd}/${name}`)), receipt.after[path].sha256, 'clean install changed candidate bytes');
               }
-              const result = spawnSync('npm', ['audit', '--json', '--ignore-scripts', '--registry=https://registry.npmjs.org/'], { cwd, encoding: 'utf8', timeout: 120000, maxBuffer: 10000000 });
-              writeFileSync(`${out}/${label}.audit.json`, result.stdout || '{}');
-              const audit = JSON.parse(result.stdout || '{}');
-              if (![0, 1].includes(result.status) || audit.error || audit.auditReportVersion !== 2 || !audit.vulnerabilities) throw new Error(`${label}: audit collection failed (exit ${result.status})`);
-              receipt.audits[label] = audit.metadata;
-              console.log(label, JSON.stringify(audit.metadata));
-              console.log(label, Object.entries(audit.vulnerabilities).map(([name, v]) => ({ name, severity: v.severity, range: v.range, nodes: v.nodes, fixAvailable: v.fixAvailable })));
             }
-            const targets = ['next@16.3.5', 'postcss@8.5.23', 'browserslist@4.28.7', 'baseline-browser-mapping@2.11.0', 'form-data@4.0.6', 'nanoid@3.3.18', 'postcss-selector-parser@6.1.3', 'brace-expansion@1.1.18', 'js-yaml@3.15.2', 'qs@6.15.4'];
-            const registry = {};
-            for (const target of targets) {
-              const result = spawnSync('npm', ['view', target, 'version', 'dist', 'dependencies', 'engines', '--json', '--registry=https://registry.npmjs.org/'], { encoding: 'utf8', timeout: 15000, maxBuffer: 1000000 });
-              registry[target] = { exitCode: result.status, data: JSON.parse(result.stdout || '{}') };
-            }
-            writeFileSync(`${out}/registry.json`, JSON.stringify(registry, null, 2));
-            receipt.collectionSucceeded = true;
+            writeFileSync(`${out}/candidate.diff`, execFileSync('git', ['diff', '--', 'package.json', 'package-lock.json', 'saas/package.json', 'saas/package-lock.json'], { maxBuffer: 10000000 }));
+            receipt.validationSucceeded = true;
           } catch (error) {
             failed = true;
-            receipt.collectionSucceeded = false;
+            receipt.validationSucceeded = false;
             receipt.error = String(error.message).slice(0, 1000);
+            console.error(receipt.error);
           } finally {
             receipt.finishedAt = new Date().toISOString();
             writeFileSync(`${out}/receipt.json`, JSON.stringify(receipt, null, 2));
           }
           if (failed) process.exitCode = 1;
           NODE
-      - name: Preserve success or failed collection evidence
+      - name: Preserve bounded dependency evidence, including failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cyber-dependency-baseline-${{ github.sha }}
+          name: cyber-dependency-candidate-${{ github.sha }}
           path: dependency-repair-evidence/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-blobs:
+    needs: resolve
+    if: github.repository == 'SignalBoost/signalboost-live' && github.ref == 'refs/heads/fix/cyber-dependencies-20260912'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyber-dependency-candidate-${{ github.sha }}
+          path: candidate
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Store only four verified Git blobs; no ref, PR, merge or deployment operations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          import assert from 'node:assert/strict';
+          assert.equal(process.env.GITHUB_REPOSITORY, 'SignalBoost/signalboost-live');
+          assert.equal(process.env.GITHUB_REF, 'refs/heads/fix/cyber-dependencies-20260912');
+          const receipt = JSON.parse(readFileSync('candidate/receipt.json', 'utf8'));
+          assert.equal(receipt.commit, process.env.GITHUB_SHA);
+          assert.equal(receipt.validationSucceeded, true);
+          const blobs = {};
+          for (const [scope, prefix] of [['root', ''], ['saas', 'saas/']]) {
+            for (const name of ['package.json', 'package-lock.json']) {
+              const path = prefix + name;
+              const bytes = readFileSync(`candidate/${scope}.after.${name}`);
+              assert.ok(bytes.length > 0 && bytes.length < 2000000);
+              assert.equal(createHash('sha256').update(bytes).digest('hex'), receipt.after[path].sha256);
+              JSON.parse(bytes.toString('utf8'));
+              const expected = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
+              const response = await fetch('https://api.github.com/repos/SignalBoost/signalboost-live/git/blobs', {
+                method: 'POST', redirect: 'error', signal: AbortSignal.timeout(20000),
+                headers: { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
+                body: JSON.stringify({ content: bytes.toString('base64'), encoding: 'base64' })
+              });
+              assert.equal(response.status, 201, `blob upload failed: HTTP ${response.status}`);
+              const result = await response.json();
+              assert.equal(result.sha, expected, 'stored blob hash mismatch');
+              blobs[path] = { sha: result.sha, sha256: receipt.after[path].sha256, bytes: bytes.length };
+            }
+          }
+          writeFileSync('uploaded-blobs.json', JSON.stringify({ sourceCommit: receipt.commit, blobs }, null, 2));
+          console.log(JSON.stringify(blobs, null, 2));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyber-dependency-blobs-${{ github.sha }}
+          path: uploaded-blobs.json
           if-no-files-found: error
           retention-days: 7

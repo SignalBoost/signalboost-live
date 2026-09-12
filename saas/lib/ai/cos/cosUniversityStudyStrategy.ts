@@ -95,22 +95,6 @@ const LIVE_SOURCE_KINDS: ContinuousLearningSourceKind[] = [
   'approved_public_web',
 ]
 
-/**
- * Language study needs authentic usage, reference works and living text. Research-paper and
- * scientific-journal indexes hold papers ABOUT language, not material to learn a language from,
- * and official documentation holds neither. Measured over one production window, the two language
- * subjects rejected 82-83% of everything retrieved as not_relevant against 19-46% for every other
- * subject, and the adapters producing that noise were exactly the academic indexes. Restricting
- * the language lane stops spending retrieval budget on sources that structurally cannot serve it;
- * it changes no relevance floor and no admission threshold.
- */
-const LANGUAGE_SOURCE_KINDS: ContinuousLearningSourceKind[] = [
-  'library_material',
-  'news_article',
-  'approved_public_web',
-  'video_transcript',
-]
-
 // These are public study/retrieval themes, not hidden exam rubric content. A failed language
 // dimension must remain explicit through acquisition so broad language material cannot silently
 // satisfy a focused weakness such as writing or localization.
@@ -251,7 +235,15 @@ export function selectCosUniversityStudyStrategy(input: {
         method('deliberate_practice', 'automatic_if_certifiable', 'Comprehension, writing, instruction following, localization, and pragmatics each need separate practice.'),
         method('independent_retest', 'automatic_if_certifiable', 'Each platform language and dimension requires its own unseen evidence.'),
       )
-      acquisitionSourceKinds = [...LANGUAGE_SOURCE_KINDS]
+      // The language lane was narrowed to non-academic kinds after the two language subjects
+      // rejected 82-83% of retrieved documents as irrelevant. That measurement was taken while the
+      // scholarly adapters could only return abstracts, which are metadata-class and structurally
+      // incapable of durable admission whatever their subject. Full-text reading changed that:
+      // education research and university repositories are now among the strongest language
+      // sources available. The narrow lane also left language depending on two adapters that are
+      // currently dead, and Polish retrieved 6 documents in two hours as a result. Restored to the
+      // full set, which now includes the credible-web reader as well.
+      acquisitionSourceKinds = uniqueKinds([...RAG_SOURCE_KINDS, ...LIVE_SOURCE_KINDS])
       break
     case 'cross_domain':
       methods.push(

@@ -1,4 +1,4 @@
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosServiceDb } from '../cos-core/storage/supabase.ts'
 
 export type LocalInferenceUsageContext = Readonly<{
   feature: string

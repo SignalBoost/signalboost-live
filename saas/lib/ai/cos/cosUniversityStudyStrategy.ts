@@ -432,6 +432,7 @@ export function platformLanguageStudyGapSignal(input: {
   const rotatedThemes = [...baseThemes.slice(offset), ...baseThemes.slice(0, offset)]
   const studyThemes = rotatedThemes.map(theme => `${language.title} ${theme}`)
   return {
+    targetLanguage: language.id,
     taskId: `university-language:${input.planKey}`,
     subject: dimensionLabel ? `${language.title} ${dimensionLabel}` : `${language.title} language and communication`,
     capability: dimension ? `cos_university.language.${language.id}.${dimension}` : `cos_university.language.${language.id}`,

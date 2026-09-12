@@ -7,6 +7,8 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 
 export type AgentCapstoneRequest = Readonly<{
   agentId: string; runId: string; manifestHash: string; prompt: string
+  /** Host-selected non-credit training; absence preserves the existing assessment prompt. */
+  purpose?: 'practice'
 }>
 export type AgentCapstoneExecution = Readonly<{
   runtime: typeof SOFTWARE_CAPSTONE_RUNTIME
@@ -64,6 +66,7 @@ export async function executeBoundSoftwareCapstone(request: AgentCapstoneRequest
   if (!UUID.test(request.runId) || !SHA256.test(request.manifestHash) || !request.prompt.trim()) {
     throw new Error('invalid_agent_capstone_request')
   }
+  if (request.purpose !== undefined && request.purpose !== 'practice') throw new Error('invalid_agent_execution_purpose')
   const model = ports.model.trim()
   if (!model) throw new Error('builder_model_not_configured')
   const procedures = await ports.loadProcedures(request.agentId)
@@ -74,7 +77,9 @@ export async function executeBoundSoftwareCapstone(request: AgentCapstoneRequest
   const context = JSON.stringify(procedures)
   const systemPrompt = [
     `You are the registered Software Specialist ${request.agentId}, not the COS generalist.`,
-    'Complete this multidisciplinary undergraduate capstone as yourself using the supplied case.',
+    request.purpose === 'practice'
+      ? 'Complete this bounded deliberate-practice exercise as yourself. This is non-credit training, not an independent exam. Return strict JSON only: {"answer":"...","confidence":0.0}.'
+      : 'Complete this multidisciplinary undergraduate capstone as yourself using the supplied case.',
     'Your host role is software_engineering. It does not waive any generalist requirements.',
     'Preserve unknowns. Do not claim actions, live facts, grades, credentials or authority you do not have.',
     'Provide only your final response in the format requested by the case. Do not self-grade.',
@@ -83,7 +88,7 @@ export async function executeBoundSoftwareCapstone(request: AgentCapstoneRequest
   ].join('\n')
   const turnId = randomUUID(), startedAt = new Date().toISOString()
   // Exactly one call through the assigned specialist model. No cache, generalist or external fallback.
-  const reply = await ports.infer({ prompt: request.prompt, systemPrompt, maxTokens: 4096 }, model)
+  const reply = await ports.infer({ prompt: request.prompt, systemPrompt, maxTokens: request.purpose === 'practice' ? 1800 : 4096 }, model)
   if (typeof reply !== 'string' || !reply.trim()) throw new Error('agent_capstone_inference_failed')
   if (await ports.readRole(request.agentId) !== role) throw new Error('agent_capstone_identity_changed')
   const execution: AgentCapstoneExecution = Object.freeze({

@@ -98,7 +98,7 @@ test('a declared range is never scanned as an installed version', () => {
   assert.match(source, /function resolvedVersion\(value: unknown\): string \| null \{[\s\S]*?return EXACT_VERSION\.test\(v\) \? v : null/)
   // package.json contributes only exactly pinned specs; everything else waits for the lockfile.
   assert.match(source, /const exact = resolvedVersion\(spec\)\s*\n\s*if \(exact\) addPackage\(out, name, exact, sourceFile\)/)
-  assert.match(source, /else if \(String\(spec \|\| ''\)\.trim\(\)\)\) ranged\.set\(name/)
+  assert.match(source, /else if \(String\(spec \|\| ''\)\.trim\(\)\) ranged\.set\(name/)
   // The lockfile still supplies resolved versions for both of its shapes.
   assert.equal((source.match(/addPackage\(out, name, resolvedVersion\(meta\?\.version\), sourceFile\)/g) || []).length, 2)
 })

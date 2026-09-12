@@ -117,6 +117,10 @@ function fakeDb(tables: Record<string, QueryResult>) {
   }
 }
 
+function queriedAgentIds(calls: Array<{ filters: Array<[string, string, unknown]> }>): string[] {
+  return calls.map(call => String(call.filters.find(([op, key]) => op === 'eq' && key === 'agent_id')?.[2] ?? '')).sort()
+}
+
 test('Supabase qualification adapter consumes durable scoped unexpired decisions only', async () => {
   const db = fakeDb({
     a2a_specialist_qualifications: { data: [
@@ -125,10 +129,11 @@ test('Supabase qualification adapter consumes durable scoped unexpired decisions
   })
   const adapters = createSupabaseSpecialistMeshProductionAdapters(db.client, { now: () => new Date('2026-09-12T20:30:00Z') })
   assert.deepEqual(await adapters.qualifications.snapshot(scope), { a: { qualified: true, evidenceRef: 'db://qualification/a' } })
-  const call = db.calls[0]
-  assert.equal(call.table, 'a2a_specialist_qualifications')
-  assert.ok(call.filters.some(([op, key]) => op === 'gt' && key === 'valid_until'))
-  assert.ok(call.filters.some(([op, key]) => op === 'lte' && key === 'valid_from'))
+  const calls = db.calls.filter(call => call.table === 'a2a_specialist_qualifications')
+  assert.equal(calls.length, 2)
+  assert.deepEqual(queriedAgentIds(calls), ['a', 'b'])
+  assert.ok(calls.every(call => call.filters.some(([op, key]) => op === 'gt' && key === 'valid_until')))
+  assert.ok(calls.every(call => call.filters.some(([op, key]) => op === 'lte' && key === 'valid_from')))
 })
 
 test('Supabase telemetry uses newest current row per agent, rejects future evidence, and preserves explicit unavailable', async () => {
@@ -145,8 +150,11 @@ test('Supabase telemetry uses newest current row per agent, rejects future evide
     a: { available: false, latencyScore: 9, costScore: 12, loadScore: 15, reliabilityScore: 98, qualityScore: 97 },
     b: { available: true, latencyScore: 25, costScore: 20, loadScore: 30, reliabilityScore: 95, qualityScore: 96 },
   })
-  assert.ok(db.calls[0].filters.some(([op, key]) => op === 'gt' && key === 'expires_at'))
-  assert.ok(db.calls[0].filters.some(([op, key]) => op === 'lte' && key === 'observed_at'))
+  const calls = db.calls.filter(call => call.table === 'a2a_specialist_mesh_telemetry')
+  assert.equal(calls.length, 2)
+  assert.deepEqual(queriedAgentIds(calls), ['a', 'b'])
+  assert.ok(calls.every(call => call.filters.some(([op, key]) => op === 'gt' && key === 'expires_at')))
+  assert.ok(calls.every(call => call.filters.some(([op, key]) => op === 'lte' && key === 'observed_at')))
 })
 
 test('Supabase telemetry read error degrades to neutral routing evidence', async () => {

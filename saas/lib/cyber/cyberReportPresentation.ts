@@ -112,6 +112,7 @@ const LEGACY_TECHNICAL_IDENTIFIERS = new Set([
   'signalboost-a2a-client-v1', 'signalboost-a2a-delegation-runtime-v1',
   'signalboost-a2a-host-activation-v1', 'signalboost-a2a-http-jsonrpc-v1',
   'signalboost-a2a-live-acceptance-v1', 'signalboost-a2a-runtime-observation-v1',
+  'signalboost-a2a-runtime-observation-v2',
   'signalboost-android-build-evidence-manifest-v1', 'signalboost-android-build-evidence-v1',
   'signalboost-android-build-plan-v1', 'signalboost-android-buyer-handoff-manifest-v1',
   'signalboost-android-packaging-evidence-chain-v1', 'signalboost-android-packaging-v1',

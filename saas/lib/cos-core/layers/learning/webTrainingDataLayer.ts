@@ -1,3 +1,4 @@
+// saas/lib/cos-core/layers/learning/webTrainingDataLayer.ts
 import type { LearningConnectorResult, LearningConnectorSearch } from './connectors.ts'
 
 type FetchLike = typeof fetch
@@ -360,6 +361,22 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
       }
     }))
 
-    return pages.flatMap(row => row ? [row] : [])
+    const results = pages.flatMap(row => row ? [row] : [])
+    // credible_web is attempted on every eligible gap and has returned zero documents on every
+    // attempt in Production, which is invisible downstream because a source that yields nothing
+    // produces nothing to reject. There are four distinct ways to arrive at empty and they need
+    // different fixes, so name the stage that emptied rather than the outcome.
+    if (!results.length) {
+      console.warn('cosWebTraining: discovery yielded no usable page', {
+        query: plannedQuery.slice(0, 120),
+        discovered: hits.length,
+        passedCredibility: ranked.length,
+        afterHostDiversity: diverse.length,
+        pagesRead: pages.filter(Boolean).length,
+        minCredibility,
+        usedBrave: useBrave,
+      })
+    }
+    return results
   }
 }

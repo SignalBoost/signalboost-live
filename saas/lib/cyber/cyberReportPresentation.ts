@@ -4,8 +4,8 @@ import { publicBrandText } from '../public-brand.ts'
 const COPY = {
   en: {
     brandDisplayNotice: "Product names are displayed as iTMounts. Stored records and approval history are unchanged.",
-    savedPlanNotice: 'Saved dependency plan. Product names in this view are displayed as iTMounts; stored records and approval history are unchanged. Its original wording and approval history are retained below. Reassess current dependencies before preparing new work; this does not approve or change the saved request.',
-    savedPlanArchive: 'Original saved plan and policy wording (historical)',
+    savedPlanNotice: 'Saved dependency plan. Product names in this view are displayed as iTMounts; the stored source record and approval history are unchanged. Reassess current dependencies before preparing new work; this does not approve or change the saved request.',
+    savedPlanArchive: 'Saved plan and policy context (historical display)',
     recordedApproval: 'Recorded plan approval', reassess: 'Reassess current dependencies',
     unknownSeverity: 'Unclassified severity',
     severityWarning: 'Some advisories have unclassified severity. Zero critical/high counts do not mean these findings are harmless. Review the source details before remediation.',
@@ -14,8 +14,8 @@ const COPY = {
   },
   es: {
     brandDisplayNotice: "Los nombres del producto se muestran como iTMounts. Los registros guardados y el historial de aprobación no cambian.",
-    savedPlanNotice: 'Plan de dependencias guardado. Los nombres del producto en esta vista se muestran como iTMounts; los registros guardados y el historial de aprobación no cambian. El texto original y el historial de aprobación se conservan abajo. Vuelve a analizar las dependencias antes de preparar trabajo nuevo; esto no aprueba ni cambia la solicitud guardada.',
-    savedPlanArchive: 'Plan guardado y política originales (históricos)',
+    savedPlanNotice: 'Plan de dependencias guardado. Los nombres del producto en esta vista se muestran como iTMounts; el registro fuente guardado y el historial de aprobación no cambian. Vuelve a analizar las dependencias antes de preparar trabajo nuevo; esto no aprueba ni cambia la solicitud guardada.',
+    savedPlanArchive: 'Plan y contexto de política guardados (vista histórica)',
     recordedApproval: 'Aprobación del plan registrada', reassess: 'Volver a analizar las dependencias',
     unknownSeverity: 'Severidad sin clasificar',
     severityWarning: 'Algunos avisos tienen severidad sin clasificar. Cero hallazgos críticos/altos no significa que sean inofensivos. Revisa los detalles de la fuente antes de remediar.',
@@ -24,8 +24,8 @@ const COPY = {
   },
   pt: {
     brandDisplayNotice: "O nome do produto é exibido como iTMounts. Os registros salvos e o histórico de aprovação permanecem inalterados.",
-    savedPlanNotice: 'Plano de dependências salvo. Os nomes do produto nesta visualização são exibidos como iTMounts; os registros salvos e o histórico de aprovação permanecem inalterados. O texto original e o histórico de aprovação estão preservados abaixo. Reavalie as dependências antes de preparar novo trabalho; isso não aprova nem altera a solicitação salva.',
-    savedPlanArchive: 'Plano salvo e política originais (históricos)',
+    savedPlanNotice: 'Plano de dependências salvo. Os nomes do produto nesta visualização são exibidos como iTMounts; o registro-fonte salvo e o histórico de aprovação permanecem inalterados. Reavalie as dependências antes de preparar novo trabalho; isso não aprova nem altera a solicitação salva.',
+    savedPlanArchive: 'Plano salvo e contexto de política (visualização histórica)',
     recordedApproval: 'Aprovação do plano registrada', reassess: 'Reavaliar as dependências atuais',
     unknownSeverity: 'Severidade não classificada',
     severityWarning: 'Alguns avisos têm severidade não classificada. Zero achados críticos/altos não significa que sejam inofensivos. Revise os detalhes da fonte antes da correção.',
@@ -34,8 +34,8 @@ const COPY = {
   },
   pl: {
     brandDisplayNotice: "Nazwa produktu jest wyświetlana jako iTMounts. Zapisane rekordy i historia akceptacji pozostają bez zmian.",
-    savedPlanNotice: 'Zapisany plan zależności. Nazwy produktu w tym widoku są wyświetlane jako iTMounts; zapisane rekordy i historia akceptacji pozostają bez zmian. Oryginalna treść i historia akceptacji są zachowane poniżej. Przed nową pracą ponownie sprawdź zależności; nie zatwierdza to ani nie zmienia zapisanego wniosku.',
-    savedPlanArchive: 'Oryginalny zapisany plan i zasady (historyczne)',
+    savedPlanNotice: 'Zapisany plan zależności. Nazwy produktu w tym widoku są wyświetlane jako iTMounts; zapisany rekord źródłowy i historia akceptacji pozostają bez zmian. Przed nową pracą ponownie sprawdź zależności; nie zatwierdza to ani nie zmienia zapisanego wniosku.',
+    savedPlanArchive: 'Zapisany plan i kontekst zasad (widok historyczny)',
     recordedApproval: 'Zapisana akceptacja planu', reassess: 'Sprawdź aktualne zależności',
     unknownSeverity: 'Nieokreślona istotność',
     severityWarning: 'Część ostrzeżeń ma nieokreśloną istotność. Brak krytycznych/poważnych wyników nie oznacza, że są nieszkodliwe. Przed naprawą sprawdź dane źródłowe.',
@@ -44,8 +44,8 @@ const COPY = {
   },
   ru: {
     brandDisplayNotice: "Название продукта отображается как iTMounts. Сохранённые записи и история одобрений не изменены.",
-    savedPlanNotice: 'Сохранённый план зависимостей. Названия продукта в этом представлении отображаются как iTMounts; сохранённые записи и история одобрений не изменены. Исходный текст и история одобрений сохранены ниже. Перед новой работой повторно проверьте зависимости; это не одобряет и не изменяет сохранённый запрос.',
-    savedPlanArchive: 'Исходный сохранённый план и правила (история)',
+    savedPlanNotice: 'Сохранённый план зависимостей. Названия продукта в этом представлении отображаются как iTMounts; сохранённая исходная запись и история одобрений не изменены. Перед новой работой повторно проверьте зависимости; это не одобряет и не изменяет сохранённый запрос.',
+    savedPlanArchive: 'Сохранённый план и контекст правил (историческое представление)',
     recordedApproval: 'Записанное одобрение плана', reassess: 'Проверить текущие зависимости',
     unknownSeverity: 'Тяжесть не определена',
     severityWarning: 'Тяжесть некоторых предупреждений не определена. Нулевые критические/высокие значения не означают отсутствие риска. Перед исправлением проверьте исходные данные.',
@@ -143,9 +143,12 @@ const LEGACY_TECHNICAL_PREFIXES = [
   'signalboost-video-', 'signalboost-voice-', 'signalboost-provider-hub-',
 ]
 
-function bareSignalBoostIsTechnicalContext(source: string, offset: number): boolean {
+function bareSignalBoostIsTechnicalContext(source: string, offset: number, tokenLength: number): boolean {
   const before = source.slice(Math.max(0, offset - 96), offset)
-  return /(?:\bhost\s+id|\bprovider(?:[_\s-]+host)?(?:[_\s-]+id)?)["']?\s*[:=]\s*["']?$/i.test(before)
+  const after = source.slice(offset + tokenLength, offset + tokenLength + 96)
+  const technicalKey = /(?:\bhost\s*id|\bhostId|\bprovider(?:[_\s-]+host)?(?:[_\s-]+id)?)["']?\s*[:=]\s*["']?$/i.test(before)
+  if (!technicalKey) return false
+  return /^(?:["'])?(?:\s*$|\s*[,;}\]\r\n]|\s+[A-Za-z_][A-Za-z0-9_.-]*\s*[:=])/.test(after)
 }
 
 /** Display product prose only; never pass the result to persistence or authorization. */
@@ -161,7 +164,7 @@ export function cyberProductText(value: string | null | undefined): string {
       const identity = token.toLowerCase()
       if (LEGACY_TECHNICAL_IDENTIFIERS.has(identity)
         || LEGACY_TECHNICAL_PREFIXES.some(prefix => identity.startsWith(prefix))
-        || (identity === 'signalboost' && bareSignalBoostIsTechnicalContext(source, offset))) return token
+        || (identity === 'signalboost' && bareSignalBoostIsTechnicalContext(source, offset, token.length))) return token
       return publicBrandText(brand) + (suffix || '')
     },
   )

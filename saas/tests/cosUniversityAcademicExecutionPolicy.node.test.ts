@@ -105,7 +105,7 @@ test('language A-range is unblocked only for an agent with its own bound executo
   assert.ok(boundAt > 0 && cosAt > boundAt)
   const boundBody = runner.slice(boundAt, cosAt)
   assert.doesNotMatch(boundBody, /tryCOSFirstAnswer\(/)
-  assert.match(boundBody, /executeBoundAgentExam\(\{ agentId, runId: row\.id, manifestHash: exam\.manifestHash, prompt: exam\.prompt \}\)/)
+  assert.match(boundBody, /executeBoundAgentExam\(\s*\{ agentId, runId: row\.id, manifestHash: exam\.manifestHash, prompt: exam\.prompt \},\s*\{ domain: 'generalist' \},\s*\)/)
   assert.match(boundBody, /return failRun\(\['agent_execution_identity_mismatch'\]\)/)
   assert.match(runner, /execution_provenance: executionProvenance/)
   // COS keeps its exact previous call, including the exam language, and grading still needs fresh local work.
@@ -122,7 +122,7 @@ test('delayed retention is unblocked only for an agent with its own bound execut
   assert.ok(boundAt > 0 && cosAt > boundAt)
   const boundBody = runner.slice(boundAt, cosAt)
   assert.doesNotMatch(boundBody, /tryCOSFirstAnswer\(/)
-  assert.match(boundBody, /executeBoundAgentExam\(\{ agentId, runId: inserted\.data\.id, manifestHash: source\.manifestHash, prompt: exam\.prompt \}\)/)
+  assert.match(boundBody, /executeBoundAgentExam\(\s*\{ agentId, runId: inserted\.data\.id, manifestHash: source\.manifestHash, prompt: exam\.prompt \},\s*\{ subjectId: source\.subjectId \},\s*\)/)
   assert.match(boundBody, /throw new Error\('agent_execution_identity_mismatch'\)/)
   assert.match(runner, /execution_provenance: executionProvenance/)
   // COS keeps its exact previous call, and grading still requires a fresh local, non-cached execution.

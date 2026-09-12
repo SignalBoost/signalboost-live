@@ -49,6 +49,37 @@ function qualificationEvidence(decision: SpecialistQualificationDecision | undef
   return required(decision.evidenceRef, `qualification evidenceRef for ${agentId}`)
 }
 
+function pinnedQualificationPort(input: {
+  tenantId: string
+  environmentId: string
+  portableId: string
+  skillId: string
+  primaryAgentId: string
+  fallbackAgentId: string
+  primaryEvidenceRef: string
+  fallbackEvidenceRef: string
+}): SpecialistQualificationPort {
+  const expectedAgentIds = [input.primaryAgentId, input.fallbackAgentId].sort()
+  const decisions = Object.freeze({
+    [input.primaryAgentId]: Object.freeze({ qualified: true, evidenceRef: input.primaryEvidenceRef }),
+    [input.fallbackAgentId]: Object.freeze({ qualified: true, evidenceRef: input.fallbackEvidenceRef }),
+  })
+  return Object.freeze({
+    async snapshot(request) {
+      const requestedAgentIds = [...request.agentIds].sort()
+      if (
+        request.tenantId !== input.tenantId
+        || request.environmentId !== input.environmentId
+        || request.portableId !== input.portableId
+        || request.skillId !== input.skillId
+        || requestedAgentIds.length !== expectedAgentIds.length
+        || requestedAgentIds.some((agentId, index) => agentId !== expectedAgentIds[index])
+      ) return Object.freeze({})
+      return decisions
+    },
+  })
+}
+
 /**
  * Prove one bounded advisory failover across exactly two independently qualified specialists.
  * This is an acceptance harness, not an authority source: it consumes an existing exact registry,
@@ -124,6 +155,16 @@ export async function runSpecialistMeshLiveFailoverAcceptance(options: {
   const primaryEvidenceRef = qualificationEvidence(qualificationSnapshot[primaryAgentId], primaryAgentId)
   const fallbackEvidenceRef = qualificationEvidence(qualificationSnapshot[fallbackAgentId], fallbackAgentId)
   if (primaryEvidenceRef === fallbackEvidenceRef) throw new Error('specialist_mesh_failover_independent_qualification_evidence_required')
+  const qualifications = pinnedQualificationPort({
+    tenantId,
+    environmentId,
+    portableId,
+    skillId,
+    primaryAgentId,
+    fallbackAgentId,
+    primaryEvidenceRef,
+    fallbackEvidenceRef,
+  })
 
   const memory = createInMemoryA2ARuntimeObserver()
   const observer: A2ARuntimeObservationPort = Object.freeze({
@@ -138,7 +179,7 @@ export async function runSpecialistMeshLiveFailoverAcceptance(options: {
   const activated = await activatePortableA2AHost({
     registry: options.registry,
     transportFactory: options.transportFactory,
-    qualifications: options.qualifications,
+    qualifications,
     meshSignals: options.meshSignals,
     observe: observer,
     timeoutMs: options.timeoutMs,

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import test from 'node:test'
 import { createInMemoryA2AAgentRegistry } from '../a2a-host/a2a-agent-registry.ts'
 import { runSpecialistMeshLiveFailoverAcceptance } from '../a2a-host/specialist-mesh-live-failover-acceptance.ts'
@@ -9,6 +10,10 @@ const portableId = 'cos'
 const skillId = 'marketing.research'
 const primaryAgentId = 'pin-primary'
 const fallbackAgentId = 'pin-fallback'
+
+function fingerprint(value: string) {
+  return `sha256:${createHash('sha256').update(value, 'utf8').digest('hex')}`
+}
 
 function card(name: string) {
   return {
@@ -82,7 +87,9 @@ test('delegation uses the exact qualification snapshot already validated by acce
   assert.equal(qualificationReads, 1)
   assert.equal(primarySends, 1)
   assert.equal(fallbackSends, 1)
-  assert.equal(record.primaryQualificationEvidenceRef, 'qualification://primary/original')
-  assert.equal(record.fallbackQualificationEvidenceRef, 'qualification://fallback/original')
-  assert.notEqual(record.primaryQualificationEvidenceRef, record.fallbackQualificationEvidenceRef)
+  assert.equal(record.primaryQualificationEvidenceFingerprint, fingerprint('qualification://primary/original'))
+  assert.equal(record.fallbackQualificationEvidenceFingerprint, fingerprint('qualification://fallback/original'))
+  assert.notEqual(record.primaryQualificationEvidenceFingerprint, record.fallbackQualificationEvidenceFingerprint)
+  const serialized = JSON.stringify(record)
+  assert.ok(!serialized.includes('qualification://'))
 })

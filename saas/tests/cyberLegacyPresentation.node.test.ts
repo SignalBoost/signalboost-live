@@ -118,3 +118,29 @@ test('routine verification blockers stay visible and Guardian review controls ar
   assert.equal(buttons(card(guardian)).length, 3)
   assert.equal(buttons(card(guardian)).some(x => text(x) === copy.reassess), false)
 })
+
+
+test('reassessment retains the exact saved branch and subpath without rewriting its record', () => {
+  for (const suffix of ['/tree/release/packages/app', '/blob/release/package.json', '/tree/release']) {
+    const target = `https://github.com/SignalBoost/signalboost-live${suffix}`
+    const row = { ...legacy(), target }
+    const before = JSON.stringify(row)
+    assert.equal(dependencyRescanUrl(row), target)
+    assert.equal(JSON.stringify(row), before)
+  }
+  assert.equal(dependencyRescanUrl({ ...legacy(), target: 'SignalBoost/signalboost-live' }), 'https://github.com/SignalBoost/signalboost-live')
+})
+
+test('an invalid explicit reassessment target fails closed instead of falling back to the full repository', () => {
+  for (const target of [
+    'https://github.com/other/repo/tree/release',
+    'https://github.com/SignalBoost/signalboost-live/tree/release/../private',
+    'https://github.com/SignalBoost/signalboost-live/tree/release/%2e%2e/private',
+    'https://github.com/SignalBoost/signalboost-live/tree',
+    'https://github.com/SignalBoost/signalboost-live/issues/1',
+    'https://user:secret@github.com/SignalBoost/signalboost-live',
+    'https://github.com.evil.example/SignalBoost/signalboost-live',
+    'https://itmounts.com',
+  ]) assert.equal(dependencyRescanUrl({ ...legacy(), target }), null, target)
+  assert.equal(dependencyRescanUrl({ ...legacy(), target: null }), 'https://github.com/SignalBoost/signalboost-live')
+})

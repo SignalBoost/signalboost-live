@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   SUBSTANTIVE_ABSTRACT_CHARS,
   abstractFromInvertedIndex,
+  abstractFromJats,
   openAlexAbstractIsSubstantive,
 } from '../lib/cos-core/layers/learning/openAlexAbstract.ts'
 
@@ -46,4 +47,24 @@ test('a real abstract counts as substantive, a one-line stub does not', () => {
 
   assert.equal(openAlexAbstractIsSubstantive('A short note on locks.'), false)
   assert.equal(openAlexAbstractIsSubstantive(''), false)
+})
+
+test('JATS markup is stripped so tags are not counted as evidence text', () => {
+  const jats = '<jats:p>Deadlock detection in <jats:italic>concurrent</jats:italic> systems.</jats:p>'
+  assert.equal(abstractFromJats(jats), 'Deadlock detection in concurrent systems.')
+  assert.equal(abstractFromJats('<jats:title>Abstract</jats:title><jats:p>Body text here.</jats:p>'), 'Body text here.')
+  assert.equal(abstractFromJats('Plain abstract with no markup.'), 'Plain abstract with no markup.')
+  for (const empty of [null, undefined, '', '   ', '<jats:p></jats:p>']) {
+    assert.equal(abstractFromJats(empty), '', JSON.stringify(empty))
+  }
+})
+
+test('a document only clears the confidence floor once it carries real prose', () => {
+  // substanceOf saturates at 900 characters and groundedConfidence floors at 0.48, so a title-only
+  // record of roughly 200 characters lands at 0.55 — exactly the production cluster — while a real
+  // abstract saturates substance and clears 0.60 without any threshold moving.
+  const stub = 'Deadlock detection in concurrent systems. Publisher: ACM. Subject: Computer Science.'
+  assert.ok(stub.length < 300)
+  const abstract = abstractFromJats(`<jats:p>${'Deadlock detection under contention. '.repeat(30)}</jats:p>`)
+  assert.ok(abstract.length > 900, String(abstract.length))
 })

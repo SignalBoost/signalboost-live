@@ -256,6 +256,14 @@ function genericPrompt(args: {
   const factA = integer(args.seed, 'fact-a', 17, 79)
   const factB = integer(args.seed, 'fact-b', 3, 16)
   const title = cosUniversitySubjectById(args.subjectId).title
+
+  if (args.subjectId === 'history_culture_philosophy_religion') {
+    const period = choose(args.seed, 'humanities:period', ['postwar', 'industrial-era', 'late-twentieth-century', 'decolonization-era'] as const)
+    const packet = `${project} is reviewing a ${period} civic controversy using ${factA} participant accounts and ${factB} institutional records. The participant accounts preserve lived experience and cultural memory; the institutional records explain formal policy but may omit community perspectives. A later scholarly synthesis disagrees with some participant explanations. No single source establishes the full causal account.`
+    const prompt = `HOST-CURATED UNIVERSITY PRACTICE — variant ${args.variantIndex + 1}. ${packet} Primary discipline: ${title}. Current learning objective: ${clean(args.objective, 1200)}. Analyze the sources as historical evidence. Explain how cultural context, institutional perspective, and ethical interpretation affect what each source can support. Separate recorded facts from inference, identify material uncertainty, and state what additional corroboration or check would verify the strongest causal claim. Do not treat a primary source as automatically definitive or a later synthesis as automatically correct.`
+    return { project, factA, factB, prompt }
+  }
+
   let packet: string
   if (family === 'reliability') {
     packet = `${project} has ${factA} passing pre-release checks. A customer-facing incident remains open. The proposed repair changed ${factB} files. Production deployment and customer recovery have not been verified.`

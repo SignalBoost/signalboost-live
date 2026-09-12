@@ -1,6 +1,6 @@
 // saas/lib/cos-core/layers/learning/publicClients.ts
 import type { LearningConnectorSearch, LearningConnectorResult } from './connectors'
-import { abstractFromInvertedIndex, openAlexAbstractIsSubstantive } from './openAlexAbstract.ts'
+import { abstractFromInvertedIndex, abstractFromJats, openAlexAbstractIsSubstantive } from './openAlexAbstract.ts'
 
 type FetchLike=typeof fetch
 const TRANSIENT_STATUS=new Set([408,425,429,500,502,503,504])
@@ -12,9 +12,14 @@ function clean(value:unknown):string{return decodeEntities(String(value??'').rep
 function cleanXmlArticle(xml:string):string{return clean(xml.replace(/<ref-list\b[\s\S]*?<\/ref-list>/gi,' ').replace(/<table-wrap\b[\s\S]*?<\/table-wrap>/gi,' ').replace(/<fig\b[\s\S]*?<\/fig>/gi,' ')).slice(0,60000)}
 function compactQuery(query:string,maxTerms=10):string{return clean(query).split(/\s+/).filter(Boolean).slice(0,maxTerms).join(' ')}
 
-/** Crossref: use bibliographic search instead of a long natural-language query and avoid select,
- * which can fail as Crossref evolves its permitted field list. */
-export const crossrefScientificSearch:LearningConnectorSearch=async(query,limit)=>{const q=compactQuery(query);const json=await getJson(`https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(q)}&rows=${Math.min(limit,10)}`);return(json?.message?.items??[]).map((item:any):LearningConnectorResult=>({uri:item.URL||(item.DOI?`https://doi.org/${item.DOI}`:''),title:clean(item.title?.[0]),text:clean(item.abstract||`${item.title?.[0]??''}. Publisher: ${item.publisher??''}. Subject: ${(item.subject??[]).slice(0,6).join(', ')}.`),license:'metadata/abstract as supplied by Crossref'})).filter((x:LearningConnectorResult)=>x.uri&&x.text)}
+/**
+ * Crossref: bibliographic search instead of a long natural-language query, and no select, which can
+ * fail as Crossref evolves its permitted field list. The abstract, when the publisher deposited one,
+ * arrives as JATS XML; it was passed through with its tags intact and labelled "metadata" regardless,
+ * which forced every Crossref result into the metadata evidence class and capped its confidence at the
+ * metadata ceiling even when a full abstract was present. The label now states what came back.
+ */
+export const crossrefScientificSearch:LearningConnectorSearch=async(query,limit)=>{const q=compactQuery(query);const json=await getJson(`https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(q)}&rows=${Math.min(limit,10)}`);return(json?.message?.items??[]).map((item:any):LearningConnectorResult=>{const title=clean(item.title?.[0]),abstract=clean(abstractFromJats(item.abstract)),substantive=openAlexAbstractIsSubstantive(abstract);return{uri:item.URL||(item.DOI?`https://doi.org/${item.DOI}`:''),title,text:clean(abstract?`${title}. ${abstract}`:`${title}. Publisher: ${item.publisher??''}. Subject: ${(item.subject??[]).slice(0,6).join(', ')}.`),license:substantive?'abstract as deposited with Crossref by the publisher; COS retains only facts, summary, and provenance':'metadata/abstract as supplied by Crossref'}}).filter((x:LearningConnectorResult)=>x.uri&&x.text)}
 
 /**
  * OpenAlex: compact search terms reduce 400s from oversized curriculum questions. The response

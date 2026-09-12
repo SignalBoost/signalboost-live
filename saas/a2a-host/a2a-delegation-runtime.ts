@@ -1,4 +1,4 @@
-import { createA2AClient, type A2AScope } from '../a2a-core/a2a-client.ts'
+import { createA2AClient, type A2AScope, type A2ATransport } from '../a2a-core/a2a-client.ts'
 import {
   A2A_AGENT_REGISTRY_VERSION,
   type A2AAgentRegistryPort,
@@ -154,6 +154,7 @@ export function createA2ADelegationRuntime(options: {
     transportRef?: string
     risk?: A2ADelegationRisk
     approval?: A2AApprovalEvidence | null
+    executionAttempted?: boolean
   }): Promise<void> {
     if (!options.observe) return
     const endedAt = now()
@@ -173,6 +174,7 @@ export function createA2ADelegationRuntime(options: {
         risk: input.risk,
         approvalId: input.approval?.approvalId,
         traceId: input.invocation.traceId,
+        executionAttempted: input.executionAttempted === true,
         ok: input.result.ok,
         mode: input.result.mode || (input.result.ok ? 'delegated' : 'blocked'),
         errorCode: input.result.ok ? undefined : (input.result.mode || 'a2a_failed'),
@@ -243,8 +245,15 @@ export function createA2ADelegationRuntime(options: {
     })
 
     let result: A2ADelegationResult
+    let executionAttempted = false
     try {
-      const transport = options.transportFactory.create({ agentId: agent.agentId, transportRef: agent.transportRef, scope })
+      const rawTransport = options.transportFactory.create({ agentId: agent.agentId, transportRef: agent.transportRef, scope })
+      const transport: A2ATransport = Object.freeze({
+        async send(input) {
+          executionAttempted = true
+          return rawTransport.send(input)
+        },
+      })
       const client = createA2AClient({ agentId: agent.agentId, transportRef: agent.transportRef, scope, transport, timeoutMs: options.timeoutMs })
       const data = await client.sendMessage({
         messageId: invocation.messageId,
@@ -270,7 +279,7 @@ export function createA2ADelegationRuntime(options: {
       })
     }
 
-    await appendObservation({ invocation, startedAtMs, result, assignmentId: assignment.assignmentId, transportRef: agent.transportRef, risk: skill.risk, approval })
+    await appendObservation({ invocation, startedAtMs, result, assignmentId: assignment.assignmentId, transportRef: agent.transportRef, risk: skill.risk, approval, executionAttempted })
     await appendAudit({ invocation, assignmentId: assignment.assignmentId, risk: skill.risk, approval, result })
     return result
   }

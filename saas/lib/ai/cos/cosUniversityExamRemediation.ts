@@ -1,5 +1,7 @@
 // saas/lib/ai/cos/cosUniversityExamRemediation.ts
 import { createHash } from 'node:crypto'
+import { loadUniversityPublicExamFeedback } from './cosUniversityPublicExamFeedbackRuntime.ts'
+import { withUniversityPublicExamFeedback } from './cosUniversityPublicExamFeedback.ts'
 import type { KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversitySubjectById, type CosUniversitySubjectId } from './cosUniversity.ts'
@@ -208,9 +210,11 @@ async function persistPlan(agentId: string, failure: FailedExamRow): Promise<{ r
   const baseStrategy = selectCosUniversityStudyStrategy({ failureClass: isLanguage ? 'language' : 'unknown', repeatedFailures: 1, independentRetestFailures: 1 })
   const strategy = isLanguage ? baseStrategy : withGovernedPublicWebForSubjectExamRemediation(baseStrategy)
   const planKey = key(['independent_exam_failure', failure.id, subjectId, failure.language_code || '', failure.language_dimension || ''])
-  const objective = isLanguage
+  const baseObjective = isLanguage
     ? `Remediate the weakness demonstrated by a fresh independent unseen ${failure.language_code} ${String(failure.language_dimension).replaceAll('_', ' ')} examination. Study and practice the competency broadly without access to the hidden exam rubric, then prove improvement on a new independent case.`
     : `Remediate the weakness demonstrated by a fresh independent unseen ${cosUniversitySubjectById(subjectId).title} examination. Study the subject broadly, use deliberate practice, preserve examiner isolation, and prove improvement on a new independent case.`
+  const feedback = await loadUniversityPublicExamFeedback({ agentId, runId: failure.id })
+  const objective = withUniversityPublicExamFeedback(baseObjective, feedback)
   // The durable study-plan schema caps priority at 100. Runtime ordering separately keeps
   // independent-exam remediation ahead of generic plans that may also carry priority 100.
   const priority = 100
@@ -273,6 +277,22 @@ async function persistPlan(agentId: string, failure: FailedExamRow): Promise<{ r
     if (recovered.data) row = recovered.data as PlanRow
   }
   if (row.status === 'superseded') return null
+  // Refresh only the additive teaching objective on an unexamined active plan. This neither
+  // clears remediation nor changes its accepted-study evidence, attempts, status or exam identity.
+  const guidedObjective = withUniversityPublicExamFeedback(row.objective, feedback)
+  if (guidedObjective !== row.objective && ['queued', 'studying'].includes(row.status)) {
+    const guided = await db.from('cos_university_study_plans')
+      .update({ objective: guidedObjective, updated_at: now })
+      .eq('id', row.id)
+      .eq('agent_id', agentId)
+      .eq('source_ref', failure.id)
+      .eq('objective', row.objective)
+      .in('status', ['queued', 'studying'])
+      .select(PLAN_SELECT_FIELDS)
+      .maybeSingle()
+    if (guided.error) throw guided.error
+    if (guided.data) row = guided.data as PlanRow
+  }
   // Existing remediation plans predate the governed web lane. Refresh only the source policy on an
   // active subject-remediation plan; never reset its status, attempts, proof fence, or exam lineage.
   if (!isLanguage && !row.acquisition_source_kinds.includes('approved_public_web')) {
@@ -337,8 +357,6 @@ export async function ensureCosUniversityExamFailureRemediationPlans(options: {
         objective: row.objective,
         strategy,
         repeatedCount: 1,
-        // Same rotation the subject lane already receives, so a language plan does not re-issue one
-        // fixed acquisition query on every cycle.
         studyVariant,
       }))
     } else {

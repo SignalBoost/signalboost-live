@@ -56,6 +56,32 @@ test('Language & Communication practice rehearses fact-preserving audience rewri
   }
 })
 
+test('History, Culture, Philosophy & Religion practice uses genuine humanities evidence cases rather than generic vendor operations', () => {
+  const variants = buildCosUniversityDeliberatePracticeVariants({
+    ...basePlan,
+    subjectId: 'history_culture_philosophy_religion',
+    failureClass: 'unknown',
+    objective: 'Remediate a fresh independent humanities examination through broad study and evidence analysis.',
+    practiceRound: 11,
+  })
+
+  assert.equal(variants.length, COS_UNIVERSITY_PRACTICE_VARIANTS_PER_ROUND)
+  for (const variant of variants) {
+    assert.match(variant.prompt, /participant accounts/i)
+    assert.match(variant.prompt, /institutional records/i)
+    assert.match(variant.prompt, /historical evidence/i)
+    assert.match(variant.prompt, /cultural context/i)
+    assert.match(variant.prompt, /ethical interpretation/i)
+    assert.match(variant.prompt, /additional corroboration/i)
+    assert.doesNotMatch(variant.prompt, /evaluating a vendor|support resolved|pre-release checks/i)
+    assert.equal(variant.rubric.minimumConceptCoverage, 0.68)
+    assert.equal(variant.rubric.minimumAnswerCharacters, 260)
+    assert.ok(variant.rubric.requiredConceptGroups.some(group => group.includes('historical')))
+    assert.ok(variant.rubric.requiredConceptGroups.some(group => group.includes('ethical')))
+    assert.ok(variant.rubric.requiredConceptGroups.some(group => group.includes('uncertainty')))
+  }
+})
+
 test('a new study round creates new deliberate-practice variants instead of retrying memorized prompts', () => {
   const round1 = buildCosUniversityDeliberatePracticeVariants(basePlan)
   const round2 = buildCosUniversityDeliberatePracticeVariants({ ...basePlan, practiceRound: 2 })

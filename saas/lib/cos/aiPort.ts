@@ -57,6 +57,7 @@ export function createBuilderCodingAiPort(): CosAiPort {
         // The control object must be JSON. Provider-enforced JSON mode removes the class of
         // failures where source quoting or escaping breaks the surrounding envelope.
         jsonObject: true,
+        usageContext: { feature: 'builder', purpose: 'coding_harness' },
       }, {
         ...config,
         model: builderCodingModelFromEnv(),
@@ -71,7 +72,6 @@ export function createLocalApplianceAiPort(): CosAiPort {
   }
 }
 
-/** SignalBoost-host adapter for optional frontier teacher/evaluator work. */
 export function createExternalTeacherAiPort(provider: ExternalTeacherProvider): CosAiPort {
   return {
     generate: async (input) => requireText(

@@ -1,11 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { A2A_AGENT_REGISTRY_VERSION, type A2AAgentRegistryPort, type A2ATransportFactory } from './a2a-agent-registry.ts'
-import { installCOSA2ARuntimeHost } from './cos-runtime-host.ts'
+import { installCOSA2AQualificationAssessmentPort, installCOSA2ARuntimeHost } from './cos-runtime-host.ts'
 import { createCOSSpecialistOrchestrator } from './cos-specialist-orchestrator.ts'
 import { createPortableA2AHost, type PortableA2AHost, type PortableA2AHostOptions } from './portable-a2a-host.ts'
 import { createSupabaseSpecialistMeshProductionAdapters } from './specialist-mesh-production-adapters.ts'
+import {
+  createSpecialistQualificationAssessmentPort,
+  type SpecialistQualificationProbeProvider,
+  type SpecialistQualificationVerifier,
+} from './specialist-qualification-assessment.ts'
 
-export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v3' as const
+export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v4' as const
 
 export interface A2AHostActivationSummary {
   version: typeof A2A_HOST_ACTIVATION_VERSION
@@ -13,6 +18,12 @@ export interface A2AHostActivationSummary {
   enabledAgentCount: number
   enabledAssignmentCount: number
   transportRefs: readonly string[]
+}
+
+export interface ProductionSpecialistQualificationAssessmentOptions {
+  probes: SpecialistQualificationProbeProvider
+  verifier: SpecialistQualificationVerifier
+  validForMs?: number
 }
 
 function required(value: unknown, name: string): string {
@@ -62,14 +73,31 @@ export async function activateCOSA2AHost(options: PortableA2AHostOptions & { now
 
 /**
  * Production composition root for a fully constructed host. Durable specialist qualification and
- * routing telemetry replace caller-supplied mesh evidence; registry/transport authority is unchanged.
+ * routing telemetry replace caller-supplied mesh evidence. The same exact registry/transport authority
+ * is also used to install the host-owned qualification assessor with hidden probes + independent verifier.
  */
 export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHostOptions, 'qualifications' | 'meshSignals'> & {
   db: SupabaseClient
+  qualificationAssessment: ProductionSpecialistQualificationAssessmentOptions
   now?: () => Date
 }) {
   const mesh = createSupabaseSpecialistMeshProductionAdapters(options.db, { now: options.now })
-  return activateCOSA2AHost({ ...options, qualifications: mesh.qualifications, meshSignals: mesh.meshSignals, now: options.now })
+  const activated = await activateCOSA2AHost({ ...options, qualifications: mesh.qualifications, meshSignals: mesh.meshSignals, now: options.now })
+  const assessmentPort = createSpecialistQualificationAssessmentPort({
+    registry: options.registry,
+    transportFactory: options.transportFactory,
+    probes: options.qualificationAssessment.probes,
+    verifier: options.qualificationAssessment.verifier,
+    timeoutMs: options.timeoutMs,
+    validForMs: options.qualificationAssessment.validForMs,
+    now: options.now,
+  })
+  const disposeAssessment = installCOSA2AQualificationAssessmentPort(assessmentPort)
+  const dispose = () => {
+    disposeAssessment()
+    activated.dispose()
+  }
+  return Object.freeze({ ...activated, assessmentPort, dispose })
 }
 
 /**

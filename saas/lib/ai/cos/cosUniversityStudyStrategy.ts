@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityStudyStrategy.ts
 import type { ContinuousLearningSourceKind } from '@/lib/cos-core/layers/learning'
 import type { KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import {
@@ -372,6 +373,9 @@ export function universityStudyGapSignal(input: {
     ],
     sourceKinds: input.strategy.acquisitionSourceKinds,
     excludedAdapterIds: [...UNIVERSITY_EXCLUDED_STUDY_ADAPTER_IDS],
+    // Governed University study objective, declared at the source. Admission tiering reads this
+    // instead of inferring alignment from the gap id, which never matched this lane.
+    curriculumAligned: true,
     portableIds: ['cos'],
   }
 }
@@ -409,6 +413,9 @@ export function platformLanguageStudyGapSignal(input: {
     ],
     sourceKinds: input.strategy.acquisitionSourceKinds,
     excludedAdapterIds: [...UNIVERSITY_EXCLUDED_STUDY_ADAPTER_IDS],
+    // Governed University study objective, declared at the source. Admission tiering reads this
+    // instead of inferring alignment from the gap id, which never matched this lane.
+    curriculumAligned: true,
     portableIds: ['cos'],
   }
 }

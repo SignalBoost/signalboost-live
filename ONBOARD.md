@@ -1,6 +1,16 @@
 # ONBOARD.md
 
 # iTMounts Engineering Blueprint
+
+## Cybersecurity saved-message branding — 2026-09-12
+
+Cybersecurity remediation titles, summaries, plan prose and implementation notes must render the
+current iTMounts product name, including saved historical records. The read-only cyberProductText
+helper preserves repository identifiers, URLs, email addresses, paths and inline code. Only the
+display changes: original evidence, approval history, action payloads and authorization remain
+untouched. Historical views disclose the display normalization in all five supported languages.
+The real-card regression suite is required in unit CI and the Vercel deployment gate.
+
 ## Permanent Self-Healing monitor navigation — 2026-09-11
 
 The signed-in Security navbar now names `/dashboard/cybersecurity` explicitly as the

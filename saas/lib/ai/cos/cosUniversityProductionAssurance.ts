@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityProductionAssurance.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
@@ -5,6 +6,7 @@ import {
   COS_UNIVERSITY_FEATURE_GATED_PATHS,
   type LearningPathId,
 } from './cosUniversityLearningAssurance.ts'
+import { batchExecutedNothing } from './cosUniversityDailyLaneCadenceCore.ts'
 
 function cleanEvidence(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return { result: String(value ?? '') }
@@ -25,9 +27,18 @@ export async function recordCosUniversityProductionPath(input: {
   const featureEnabled = process.env[featureFlag] === 'true'
   if (!db || process.env.VERCEL_ENV !== 'production' || !deploymentId || !commitSha) return null
   const now = input.now || new Date()
+  const suppliedEvidence = cleanEvidence(input.evidence)
+  // Every caller computes invocationSucceeded from its runner's `errors` array, but the runners
+  // record an execution failure as a run with status `error` and return rather than throw, so a
+  // batch in which nothing was examined still arrives here claiming success. The cadence already
+  // refuses to count such a batch as the day's work; the receipt must say the same thing, because
+  // this ledger is what the execution audit reads. One check here covers all nine lanes.
+  const examinedNothing = batchExecutedNothing(suppliedEvidence)
   const evidence = {
     claim: 'path_executed_not_learning_improved', featureFlag, featureEnabled,
-    invocationSucceeded: input.invocationSucceeded, ...cleanEvidence(input.evidence),
+    invocationSucceeded: input.invocationSucceeded && !examinedNothing,
+    ...(examinedNothing ? { invocationDowngraded: 'all_runs_ended_in_error' } : {}),
+    ...suppliedEvidence,
   }
   const evidenceHash = createHash('sha256').update(JSON.stringify(evidence)).digest('hex')
   // Each recording is a distinct invocation observation, not an hourly content summary.

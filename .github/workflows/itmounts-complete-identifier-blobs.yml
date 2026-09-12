@@ -1,0 +1,82 @@
+name: iTMounts complete identifier blobs
+on:
+  push:
+    branches: [fix/itmounts-brand-final-proof-20260912]
+    paths: [.github/workflows/itmounts-complete-identifier-blobs.yml]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  prepare:
+    if: github.repository == 'SignalBoost/signalboost-live' && github.ref == 'refs/heads/fix/itmounts-brand-final-proof-20260912'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 444abd2efb29467846102461ebdbd6472016b94d
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: itmounts-complete-source-tokens
+          run-id: 34702941637
+          github-token: ${{ github.token }}
+          path: inventory
+      - name: Verify exact source and output hashes before publishing only two blobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,re,os,urllib.request
+          def gh(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+          hp='saas/lib/cyber/cyberReportPresentation.ts'; tp='saas/tests/cyberLegacyPresentation.node.test.ts'
+          s=Path(hp).read_text(); u=Path(tp).read_text()
+          assert gh(s.encode())=='5c72605d92b2930761fc9ba7fc183af63b57b9fd'
+          assert gh(u.encode())=='31cdf181843b3e728816a8130bb5a8b5ead83964'
+          raw=Path('inventory/brand-token-inventory.json').read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='521e9c6861f1f44a882d017fc76471edc61eab9633f550dc2271ab90055df8e1'
+          inv=json.loads(raw)
+          assert inv['commit']=='444abd2efb29467846102461ebdbd6472016b94d'
+          prose={'signalboost-specific','signalboost-owned','signalboost-selected','signalboost-coupled'}
+          tech=sorted({k.lower() for k in inv['tokens'] if k.lower() not in prose})
+          regs=set(re.findall(r"'(signalboost-[^']+)'",s)); prefs=[r for r in regs if r.endswith('-')]
+          extra=[t for t in tech if t not in regs and not any(t.startswith(p) for p in prefs)]
+          insert='  // Additional portable/host modules from the full source inventory.\n'+''.join('  '+json.dumps(t)+',\n' for t in extra)
+          needle='])\n// Runtime-generated names'
+          assert s.count(needle)==1
+          s=s.replace(needle,insert+needle)
+          s=s.replace("  'signalboost-video-', 'signalboost-voice-',", "  'signalboost-video-', 'signalboost-voice-', 'signalboost-provider-hub-',")
+          old=r'const url = /(?:[a-z][a-z0-9+.-]*:\/\/|git@|mailto:)[^\s<>"`]+/'
+          new=r'const url = /(?:[a-z][a-z0-9+.-]*:|git@)[^\s<>"`]+/'
+          assert old in s
+          s=s.replace(old,new).replace('// Preserve the complete lexical URI (including mailto headers) byte-for-byte.', '// Preserve hierarchical and opaque scheme: URI tokens byte-for-byte.')
+          u+='''
+          test('portable-host technical identifiers remain exact alongside current product prose', () => {
+            for (const token of ['signalboost-a2a-agent-registry-v1', 'SignalBoost-Self-Healing-Native-Probe']) {
+              assert.equal(cyberProductText(token), token)
+              assert.equal(cyberProductText(`SignalBoost recorded ${token}.`), `iTMounts recorded ${token}.`)
+            }
+          })
+
+          test('opaque URI schemes protect their payloads without protecting ordinary prose labels', () => {
+            for (const uri of ['urn:SignalBoost:artifact', 'tel:SignalBoost', 'data:text/plain,SignalBoost', 'custom+trace:SignalBoost;artifact', 'did:example:SignalBoost']) {
+              assert.equal(cyberProductText(uri), uri)
+              assert.equal(cyberProductText(`${uri} — SignalBoost prepared a plan`), `${uri} — iTMounts prepared a plan`)
+            }
+            assert.equal(cyberProductText('SignalBoost: prepared a plan'), 'iTMounts: prepared a plan')
+          })
+          '''
+          u+='\ntest(\'all source-inventoried technical tokens preserve their recorded identity\', () => {\n'
+          u+='  const technicalTokens = '+json.dumps(tech,ensure_ascii=False,indent=4)+'\n'
+          u+='  for (const token of technicalTokens) {\n    assert.equal(cyberProductText(token), token)\n    assert.equal(cyberProductText(`SignalBoost recorded ${token}.`), `iTMounts recorded ${token}.`)\n  }\n'
+          u+='  assert.equal(cyberProductText(\'SignalBoost-coupled remediation\'), \'iTMounts-coupled remediation\')\n})\n'
+          candidates={hp:(s,'ecf814e3957b792c45c83f187709d6b0ff2fff8d'),tp:(u,'c0c031f2334bf2280a22a27e992278fe576c4f4d')}
+          for path,(content,expected) in candidates.items(): assert gh(content.encode())==expected, path
+          for path,(content,expected) in candidates.items():
+              req=urllib.request.Request('https://api.github.com/repos/SignalBoost/signalboost-live/git/blobs',data=json.dumps({'content':content,'encoding':'utf-8'}).encode(),method='POST',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=30) as r: result=json.load(r)
+              assert result['sha']==expected
+              print(path,result['sha'])
+          # No branch, PR, merge, deployment, provider or database operations.
+          PY

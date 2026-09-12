@@ -2,7 +2,7 @@
 
 Read root `ONBOARD.md` first, then Phases 1–12 under `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE*-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
 
-Current workstream: **A2A Agent Fabric — Specialist Mesh routing/failover foundation and durable Production evidence schema are in Production. Governed qualification assessment/operator wiring and genuine two-specialist live failover acceptance are the active next milestone.**
+Current workstream: **A2A Agent Fabric — Specialist Mesh routing/failover foundation, durable Production evidence schema, and governed qualification operator are in Production. A two-specialist live failover acceptance harness is the active milestone; genuine buyer/Production evidence remains required before calling buyer-live failover proven.**
 
 Direction:
 
@@ -21,6 +21,10 @@ Direction:
 - `activateProductionCOSA2AHost` is the Production composition root: it injects the durable qualification and telemetry adapters into COS rather than permitting implicit metadata-based qualification.
 - Live mesh telemetry is routing evidence only. Telemetry failure may fall back to safe static routing evidence; telemetry cannot grant skill, scope, risk, credential, or permission.
 - Advisory/read-only work may automatically fail over after a clearly recoverable unavailable/runtime failure. Automatic write/consequential replay remains prohibited until idempotency and side-effect reconciliation are proven.
+- The two-specialist failover acceptance harness consumes, but never creates, exact registry assignments, distinct per-agent qualification evidence, routing evidence, Agent Cards, endpoint resolution, and transport credentials. It requires exactly two eligible specialists for the same exact advisory skill/scope, automatic mesh routing, an actual first transport attempt ending specifically in `a2a_transport_unavailable`, and an actual second transport attempt ending in `delegated`.
+- A valid failover acceptance must record exactly two attempt observations in order, both with `executionAttempted=true`. It rejects shared qualification evidence, non-advisory skills, extra eligible candidates, unsupported Agent Card transport, absent advertised skill, deterministic runtime/protocol errors, fan-out beyond the bounded pair, and any result whose selected fallback or attempt order differs from the declared acceptance pair.
+- Failover acceptance evidence is metadata-only. Endpoint URLs, credentials, request text, and response payloads are not included in the acceptance record. An optional external observation sink is evidence only and cannot grant authority.
+- The loopback regression proves the harness mechanics with two real HTTP/JSON-RPC server interactions, but loopback test evidence is not buyer-live or Production failover proof. Buyer-live requires two real independently qualified buyer/Production specialists and observed governed failover on the deployed path.
 - Durable mesh ownership reuses Supervisor coordination leases and fencing. A replacement specialist must acquire the current lease; stale owners are rejected. The lifecycle remains `queued -> leased -> processing -> verification_pending -> completed`.
 - A2A is agent-to-agent interoperability/delegation; MCP/Provider Hub is agent-to-tools/data compatibility.
 - SignalBoost governance remains authoritative above both protocols.
@@ -38,5 +42,5 @@ Direction:
 - Phase 10 adds bounded reference health/availability evidence; health never grants authority and never changes buyer-host precedence.
 - Phase 11 compiles validated buyer Agent Cards + exact scope + explicit skill/risk approvals into existing registry entries only after health proof; it stores no credentials or endpoint secrets.
 - Phase 12 adds a versioned buyer onboarding manifest + dry-run install plan. Dry runs have zero activation/delegation side effects and reject secret-like or unknown fields.
-- `buyer-ready`, `signalboost-reference-live`, and `buyer-live` are distinct labels. Only a future authorized buyer-owned endpoint with observed governed delegation satisfies buyer-live acceptance.
+- `buyer-ready`, `signalboost-reference-live`, and `buyer-live` are distinct labels. Only an authorized buyer-owned endpoint with observed governed delegation satisfies buyer-live acceptance.
 - Specialist Mesh University coverage may use operational coverage gaps to prioritize cross-training, but credentials, academic passes, retention evidence, and authority remain per-agent and never transfer from one specialist to another.

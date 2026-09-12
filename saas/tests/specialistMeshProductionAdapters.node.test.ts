@@ -95,20 +95,21 @@ test('telemetry outages never grant authority and degrade to neutral evidence', 
 })
 
 type QueryResult = { data: any[] | null; error: unknown }
+type QueryCall = { table: string; filters: Array<[string, string, unknown]>; orders: Array<[string, unknown]>; selected: string }
 function fakeDb(tables: Record<string, QueryResult>) {
-  const calls: Array<{ table: string; filters: Array<[string, string, unknown]>; selected: string }> = []
+  const calls: QueryCall[] = []
   return {
     calls,
     client: {
       from(table: string) {
-        const call = { table, filters: [] as Array<[string, string, unknown]>, selected: '' }; calls.push(call)
+        const call: QueryCall = { table, filters: [], orders: [], selected: '' }; calls.push(call)
         const q: any = {
           select(value: string) { call.selected = value; return q },
           eq(key: string, value: unknown) { call.filters.push(['eq', key, value]); return q },
           in(key: string, value: unknown) { call.filters.push(['in', key, value]); return q },
           lte(key: string, value: unknown) { call.filters.push(['lte', key, value]); return q },
           gt(key: string, value: unknown) { call.filters.push(['gt', key, value]); return q },
-          order() { return q },
+          order(key: string, options?: unknown) { call.orders.push([key, options]); return q },
           limit() { return Promise.resolve(tables[table] ?? { data: [], error: null }) },
         }
         return q
@@ -134,15 +135,29 @@ test('Supabase qualification adapter consumes durable scoped unexpired decisions
   assert.deepEqual(queriedAgentIds(calls), ['a', 'b'])
   assert.ok(calls.every(call => call.filters.some(([op, key]) => op === 'gt' && key === 'valid_until')))
   assert.ok(calls.every(call => call.filters.some(([op, key]) => op === 'lte' && key === 'valid_from')))
+  assert.ok(calls.every(call => call.filters.some(([op, key]) => op === 'lte' && key === 'observed_at')))
+  assert.ok(calls.every(call => call.orders.some(([key, options]) => key === 'qualified' && (options as { ascending?: boolean })?.ascending === true)))
+})
+
+test('Supabase qualification rejects future-dated grants before they can outrank current revocation', async () => {
+  const db = fakeDb({
+    a2a_specialist_qualifications: { data: [
+      { agent_id: 'a', skill_id: scope.skillId, qualified: true, evidence_ref: 'future:grant', tenant_id: scope.tenantId, environment_id: scope.environmentId, portable_id: scope.portableId, observed_at: '2026-09-12T20:35:00Z' },
+      { agent_id: 'a', skill_id: scope.skillId, qualified: false, evidence_ref: 'current:revoke', tenant_id: scope.tenantId, environment_id: scope.environmentId, portable_id: scope.portableId, observed_at: '2026-09-12T20:10:00Z' },
+    ], error: null },
+  })
+  const adapters = createSupabaseSpecialistMeshProductionAdapters(db.client, { now: () => new Date('2026-09-12T20:30:00Z') })
+  assert.deepEqual(await adapters.qualifications.snapshot({ ...scope, agentIds: ['a'] }), {})
+  assert.ok(db.calls[0].filters.some(([op, key, value]) => op === 'lte' && key === 'observed_at' && value === '2026-09-12T20:31:00.000Z'))
 })
 
 test('Supabase telemetry uses newest current row per agent, rejects future evidence, and preserves explicit unavailable', async () => {
   const db = fakeDb({
     a2a_specialist_mesh_telemetry: { data: [
-      { agent_id: 'a', available: true, latency_score: 1, cost_score: 1, load_score: 1, reliability_score: 100, quality_score: 100, observed_at: '2026-09-12T20:35:00Z' },
-      { agent_id: 'a', available: false, latency_score: 9, cost_score: 12, load_score: 15, reliability_score: 98, quality_score: 97, observed_at: '2026-09-12T20:10:00Z' },
-      { agent_id: 'a', available: true, latency_score: 2, cost_score: 2, load_score: 2, reliability_score: 99, quality_score: 99, observed_at: '2026-09-12T20:00:00Z' },
-      { agent_id: 'b', available: true, latency_score: 25, cost_score: 20, load_score: 30, reliability_score: 95, quality_score: 96, observed_at: '2026-09-12T20:05:00Z' },
+      { event_key: 'future', agent_id: 'a', available: true, latency_score: 1, cost_score: 1, load_score: 1, reliability_score: 100, quality_score: 100, observed_at: '2026-09-12T20:35:00Z' },
+      { event_key: 'current-unavailable', agent_id: 'a', available: false, latency_score: 9, cost_score: 12, load_score: 15, reliability_score: 98, quality_score: 97, observed_at: '2026-09-12T20:10:00Z' },
+      { event_key: 'older', agent_id: 'a', available: true, latency_score: 2, cost_score: 2, load_score: 2, reliability_score: 99, quality_score: 99, observed_at: '2026-09-12T20:00:00Z' },
+      { event_key: 'b-current', agent_id: 'b', available: true, latency_score: 25, cost_score: 20, load_score: 30, reliability_score: 95, quality_score: 96, observed_at: '2026-09-12T20:05:00Z' },
     ], error: null },
   })
   const adapters = createSupabaseSpecialistMeshProductionAdapters(db.client, { now: () => new Date('2026-09-12T20:30:00Z') })
@@ -155,6 +170,21 @@ test('Supabase telemetry uses newest current row per agent, rejects future evide
   assert.deepEqual(queriedAgentIds(calls), ['a', 'b'])
   assert.ok(calls.every(call => call.filters.some(([op, key]) => op === 'gt' && key === 'expires_at')))
   assert.ok(calls.every(call => call.filters.some(([op, key]) => op === 'lte' && key === 'observed_at')))
+  assert.ok(calls.every(call => call.orders.some(([key, options]) => key === 'available' && (options as { ascending?: boolean })?.ascending === true)))
+  assert.ok(calls.every(call => call.orders.some(([key]) => key === 'event_key')))
+})
+
+test('equal-time telemetry fails toward unavailable deterministically', async () => {
+  const db = fakeDb({
+    a2a_specialist_mesh_telemetry: { data: [
+      { event_key: 'z-available', agent_id: 'a', available: true, latency_score: 1, cost_score: 1, load_score: 1, reliability_score: 100, quality_score: 100, observed_at: '2026-09-12T20:10:00Z' },
+      { event_key: 'a-unavailable', agent_id: 'a', available: false, latency_score: 9, cost_score: 9, load_score: 9, reliability_score: 90, quality_score: 90, observed_at: '2026-09-12T20:10:00Z' },
+    ], error: null },
+  })
+  const adapters = createSupabaseSpecialistMeshProductionAdapters(db.client, { now: () => new Date('2026-09-12T20:30:00Z') })
+  assert.deepEqual(await adapters.meshSignals.snapshot({ ...scope, agentIds: ['a'] }), {
+    a: { available: false, latencyScore: 9, costScore: 9, loadScore: 9, reliabilityScore: 90, qualityScore: 90 },
+  })
 })
 
 test('Supabase telemetry read error degrades to neutral routing evidence', async () => {

@@ -3,7 +3,7 @@ import type { A2ARuntimeObservationEvent } from './a2a-runtime-observability.ts'
 import type { SpecialistQualificationDecision, SpecialistQualificationPort, SpecialistQualificationRequest } from './cos-specialist-orchestrator.ts'
 import type { SpecialistMeshLiveSignal, SpecialistMeshSignalPort, SpecialistMeshSignalRequest } from './specialist-mesh-router.ts'
 
-export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v4' as const
+export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v5' as const
 
 export interface SpecialistQualificationEvidenceRecord {
   agentId: string
@@ -139,6 +139,7 @@ type QualificationRow = {
 }
 
 type TelemetryRow = {
+  event_key: string
   agent_id: string
   available: boolean | null
   latency_score: number | null
@@ -156,13 +157,15 @@ export function createSupabaseSpecialistMeshProductionAdapters(db: SupabaseClien
     async read(input) {
       const agentIds = [...new Set(input.agentIds)]
       if (!agentIds.length) return []
-      const at = now().toISOString()
+      const current = now()
+      const at = current.toISOString()
+      const futureCutoff = new Date(current.getTime() + 60_000).toISOString()
       const batches = await Promise.all(agentIds.map(async agentId => {
         const { data, error } = await db.from('a2a_specialist_qualifications')
           .select('agent_id,skill_id,qualified,evidence_ref,tenant_id,environment_id,portable_id,observed_at')
           .eq('tenant_id', input.tenantId).eq('environment_id', input.environmentId).eq('portable_id', input.portableId)
           .eq('skill_id', input.skillId).eq('agent_id', agentId)
-          .lte('valid_from', at).gt('valid_until', at)
+          .lte('valid_from', at).gt('valid_until', at).lte('observed_at', futureCutoff)
           .order('observed_at', { ascending: false })
           .order('qualified', { ascending: true })
           .order('evidence_ref', { ascending: true })
@@ -170,6 +173,7 @@ export function createSupabaseSpecialistMeshProductionAdapters(db: SupabaseClien
         if (error) throw error
         return ((data ?? []) as QualificationRow[])
           .filter(row => row.agent_id === agentId)
+          .filter(row => evidenceTime(row.observed_at) <= current.getTime() + 60_000)
           .map(row => ({
             agentId: row.agent_id, skillId: row.skill_id, qualified: row.qualified, evidenceRef: row.evidence_ref,
             tenantId: row.tenant_id, environmentId: row.environment_id, portableId: row.portable_id, observedAt: row.observed_at,
@@ -188,17 +192,29 @@ export function createSupabaseSpecialistMeshProductionAdapters(db: SupabaseClien
       const futureCutoff = new Date(current.getTime() + 60_000).toISOString()
       const batches = await Promise.all(agentIds.map(async agentId => {
         const { data, error } = await db.from('a2a_specialist_mesh_telemetry')
-          .select('agent_id,available,latency_score,cost_score,load_score,reliability_score,quality_score,observed_at')
+          .select('event_key,agent_id,available,latency_score,cost_score,load_score,reliability_score,quality_score,observed_at')
           .eq('tenant_id', input.tenantId).eq('environment_id', input.environmentId).eq('portable_id', input.portableId)
           .eq('skill_id', input.skillId).eq('agent_id', agentId)
           .gt('expires_at', at).lte('observed_at', futureCutoff)
           .order('observed_at', { ascending: false })
+          .order('available', { ascending: true })
+          .order('event_key', { ascending: true })
           .limit(1)
         if (error) return [] as TelemetryRow[]
         return ((data ?? []) as TelemetryRow[])
           .filter(row => row.agent_id === agentId)
           .filter(row => evidenceTime(row.observed_at) <= current.getTime() + 60_000)
-          .sort((a, b) => evidenceTime(b.observed_at) - evidenceTime(a.observed_at))
+          .sort((a, b) => {
+            const time = evidenceTime(b.observed_at) - evidenceTime(a.observed_at)
+            if (time !== 0) return time
+            if (a.available !== b.available) {
+              if (a.available === false) return -1
+              if (b.available === false) return 1
+              if (a.available === true) return -1
+              if (b.available === true) return 1
+            }
+            return String(a.event_key ?? '').localeCompare(String(b.event_key ?? ''))
+          })
           .slice(0, 1)
       }))
       const out: Record<string, SpecialistMeshLiveSignal> = {}

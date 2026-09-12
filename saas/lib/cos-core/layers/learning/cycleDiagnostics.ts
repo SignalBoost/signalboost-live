@@ -2,6 +2,8 @@ export type LearningGapDiagnostic = {
   subject: string
   documentsAcquired: number
   accepted: number
+  /** Optional for historical receipts; exact durable admissions, never source text. */
+  acceptedContentHashes?: string[]
   probationary: number
   rejected: Record<string, number>
   sourceErrors: Record<string, number>
@@ -47,4 +49,12 @@ export function incrementDiagnosticCount(
   const normalized = clean(key, 160)
   if (!normalized) return
   counts[normalized] = Math.max(0, Math.floor(Number(counts[normalized] || 0))) + Math.max(0, Math.floor(Number(amount || 0)))
+}
+
+/** Called only after director.admit returned accepted:true; never changes admission or counts. */
+export function recordAcceptedLearningContent(diagnostic: LearningGapDiagnostic | null, contentHash: string): void {
+  if (!diagnostic || !/^[a-f0-9]{64}$/.test(contentHash)) return
+  const hashes = diagnostic.acceptedContentHashes || []
+  if (hashes.includes(contentHash) || hashes.length >= 64) return
+  diagnostic.acceptedContentHashes = [...hashes, contentHash]
 }

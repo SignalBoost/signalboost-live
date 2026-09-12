@@ -2,6 +2,7 @@
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { loadUniversityPracticeStudyMaterial } from './cosUniversityPracticeStudyMaterialRuntime.ts'
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
 import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import {
@@ -41,6 +42,8 @@ export async function executeBoundAgentExam(request: AgentCapstoneRequest) {
   const model = requireBuilderCodingModel()
   return executeBoundSoftwareCapstone(request, {
     readRole: readCosUniversityAgentRole, loadProcedures: loadAgentOwnProcedures, model,
+    // Independent assessments never acquire source packets or study text through this port.
+    ...(request.purpose === 'practice' ? { loadStudyMaterial: () => loadUniversityPracticeStudyMaterial(request) } : {}),
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
     deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
     infer: (input, selectedModel) => callLocalModel({ ...input, frequencyPenalty: 0, presencePenalty: 0 }, {

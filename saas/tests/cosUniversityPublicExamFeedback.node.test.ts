@@ -1,4 +1,5 @@
 import './cosUniversityExamResponseContract.node.test.ts'
+import './cosUniversityDisclosedFeedback.node.test.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -13,7 +14,17 @@ const root = path.resolve(import.meta.dirname, '..')
 const read = (relative: string) => fs.readFileSync(path.join(root, relative), 'utf8')
 const identity = { agentId: 'software-specialist', runId: '10000000-0000-4000-8000-000000000001' }
 const now = new Date('2026-09-12T06:00:00Z')
+const disclosure = {
+  assessment_key: `cos-university-exam:${identity.runId}`, agent_id: identity.agentId,
+  assessment_kind: 'unseen_subject_exam', passed: false, independent_scorer: true,
+  scorer_authority: 'host_private_exam', source_ref: `cos_university_exam:${identity.runId}`,
+  observed_at: '2026-09-12T03:59:59Z', response_contract: {
+    version: 'university_response_contract_v1', maxWords: 260,
+    counting: 'whitespace_separated_tokens', scope: 'entire_final_response',
+  },
+}
 const observation = {
+  response_contract_evidence: disclosure,
   id: identity.runId, agent_id: identity.agentId, status: 'failed', passed: false,
   completed_at: '2026-09-12T04:00:00Z', fresh_execution: true, provenance_recorded: true,
   local_model_invoked: true, external_ai_invoked: false,
@@ -43,7 +54,8 @@ test('feedback rejects wrong identity, borrowed execution, nonterminal outcomes 
 
 test('COS feedback stays bound to COS execution rather than another learner', () => {
   const cosIdentity = { ...identity, agentId: 'cos' }
-  const cosRow = { ...observation, agent_id: 'cos', response_source: 'local_cos_reasoning' }
+  const cosRow = { ...observation, agent_id: 'cos', response_source: 'local_cos_reasoning',
+    response_contract_evidence: { ...disclosure, agent_id: 'cos' } }
   assert.equal(publicUniversityExamFeedback(cosRow, cosIdentity, now), 'response_length')
   assert.equal(publicUniversityExamFeedback({ ...cosRow, response_source: 'university_software_specialist_v1' }, cosIdentity, now), null)
 })
@@ -168,7 +180,41 @@ test('planner retains its raw-scorer isolation and host feedback uses exact iden
   assert.doesNotMatch(bridge, /manifest_hash|seed/)
   assert.match(adapter, /\.eq\('id', identity\.runId\)/)
   assert.match(adapter, /\.eq\('agent_id', identity\.agentId\)/)
-  assert.match(adapter, /return publicUniversityExamFeedback\(result\.data, identity\)/)
-  assert.match(adapter, /if \(result\.error\) return null/)
+  assert.match(adapter, /return publicUniversityExamFeedback\(\{ \.\.\.result\.data, response_contract_evidence: disclosure\.data \}, identity\)/)
+  assert.match(adapter, /if \(result\.error \|\| !result\.data\) return null/)
+  assert.match(adapter, /response_contract:evidence->responseContract/)
   assert.doesNotMatch(adapter, /manifest_hash|rubric|prompt|seed|\.update\(|\.insert\(/)
+})
+
+
+test('actual planner restores only unsupported legacy coaching on active plans without changing study state', async () => {
+  for (const status of ['queued', 'studying']) {
+    const before = { ...activePlan, status, objective: withUniversityPublicExamFeedback(activePlan.objective, 'response_length') }
+    const port = database(before)
+    await persistence(port.db, 'undisclosed_response_length')(identity.agentId, failure)
+    assert.equal(port.row()!.objective, activePlan.objective)
+    assert.equal(port.writes.length, 1)
+    assert.deepEqual(Object.keys(port.writes[0]).sort(), ['objective', 'updated_at'])
+    const { objective: ignoredObjective, updated_at: ignoredTime, ...after } = port.row()!
+    const { objective: oldObjective, updated_at: oldTime, ...original } = before
+    assert.deepEqual(after, original)
+    await persistence(port.db, 'undisclosed_response_length')(identity.agentId, failure)
+    assert.equal(port.writes.length, 1, 'legacy cleanup must be idempotent')
+  }
+})
+
+test('legacy cleanup cannot rewrite ready, terminal, concurrent or unavailable-evidence objectives', async () => {
+  const guided = { ...activePlan, objective: withUniversityPublicExamFeedback(activePlan.objective, 'response_length') }
+  for (const status of ['ready_for_exam', 'completed', 'superseded']) {
+    const port = database({ ...guided, status })
+    await persistence(port.db, 'undisclosed_response_length')(identity.agentId, failure)
+    assert.equal(port.writes.length, 0)
+    assert.equal(port.row()!.objective, guided.objective)
+  }
+  const concurrent = database(guided, row => { row.status = 'ready_for_exam' })
+  await persistence(concurrent.db, 'undisclosed_response_length')(identity.agentId, failure)
+  assert.equal(concurrent.writes.length, 0)
+  const unavailable = database(guided)
+  await persistence(unavailable.db, null)(identity.agentId, failure)
+  assert.equal(unavailable.writes.length, 0)
 })

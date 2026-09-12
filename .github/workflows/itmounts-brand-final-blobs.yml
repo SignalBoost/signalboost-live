@@ -1,0 +1,118 @@
+name: iTMounts exact branding blobs
+on:
+  push:
+    branches: [fix/itmounts-brand-final-proof-20260912]
+    paths: [.github/workflows/itmounts-brand-final-blobs.yml]
+permissions:
+  contents: write
+jobs:
+  blobs:
+    if: github.repository == 'SignalBoost/signalboost-live' && github.ref == 'refs/heads/fix/itmounts-brand-final-proof-20260912'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify exact inputs and prepare only content-addressed blobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, urllib.request
+          def git_hash(data):
+              return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+          inputs = {
+              'saas/app/dashboard/cybersecurity/page.tsx': 'a0fe95d76c6009f1c116fecf24722682766de8dc',
+              'saas/lib/cyber/cyberReportPresentation.ts': 'b9832bd298f3e3cc9dda73a57e3ad09c8bfd56e2',
+              'saas/tests/cyberLegacyPresentation.node.test.ts': '69ae9177d16e2f99dba42cf010898e41770d388c',
+          }
+          outputs = {
+              'saas/app/dashboard/cybersecurity/page.tsx': '8a2083f1f1b83aefe4bcd2df9f5584212be29674',
+              'saas/lib/cyber/cyberReportPresentation.ts': '227ded2f518f1f07eaa2131c35e860d05daa12ab',
+              'saas/tests/cyberLegacyPresentation.node.test.ts': '686e4de2e71a9b55b5c90b72d3d827777dea1ca1',
+          }
+          prepared = {}
+          for path, expected in inputs.items():
+              raw = pathlib.Path(path).read_bytes()
+              assert git_hash(raw) == expected, 'Unexpected source revision: ' + path
+              prepared[path] = raw.decode('utf-8')
+          page = 'saas/app/dashboard/cybersecurity/page.tsx'
+          for old, new in [('{plan.nextStep}', '{cyberProductText(plan.nextStep)}'), ('{guardianFinding.summary}', '{cyberProductText(guardianFinding.summary)}')]:
+              assert prepared[page].count(old) == 1
+              prepared[page] = prepared[page].replace(old, new)
+          helper = 'saas/lib/cyber/cyberReportPresentation.ts'
+          old = '''    rendered += prose(value.slice(cursor, match.index)) + match[0]
+              cursor = match.index + match[0].length'''
+          new = r'''    let protectedLength = match[0].length
+              // In bare URL prose, an ASCII delimiter followed by a brand and another word
+              // starts a sentence fragment. Query/fragment data and standalone URIs remain
+              // opaque: these punctuation characters are also legal inside real URLs.
+              if (/^(?:[a-z][a-z0-9+.-]*:\/\/|git@|mailto:)/i.test(match[0])
+                && /^\s+\p{L}/u.test(value.slice(match.index + match[0].length))) {
+                const boundary = match[0].search(/[,;!?)](?=SignalBoost(?:Ai)?(?:-[\p{L}\p{N}-]+)?$)/iu)
+                if (boundary >= 0 && !/[?#]/.test(match[0].slice(0, boundary))) protectedLength = boundary
+              }
+              rendered += prose(value.slice(cursor, match.index)) + match[0].slice(0, protectedLength)
+              cursor = match.index + protectedLength'''
+          assert prepared[helper].count(old) == 1
+          prepared[helper] = prepared[helper].replace(old, new)
+          tests = 'saas/tests/cyberLegacyPresentation.node.test.ts'
+          prepared[tests] += r'''
+
+          test('ASCII sentence punctuation after a bare URL does not swallow product prose', () => {
+            for (const link of ['https://example.com', 'https://github.com/SignalBoost/signalboost-live']) {
+              for (const punctuation of [',', ';', '!', '?', ')']) {
+                for (const name of ['SignalBoost', 'SignalBoostAi', 'SignalBoost AI', 'SignalBoost-created']) {
+                  const branded = name.endsWith('-created') ? 'iTMounts-created' : 'iTMounts'
+                  assert.equal(cyberProductText(`${link}${punctuation}${name} prepared a plan`), `${link}${punctuation}${branded} prepared a plan`)
+                }
+              }
+            }
+            // URI data, not sentence prose: preserve standalone tokens and query/fragment values.
+            for (const link of ['https://example.com?SignalBoost', 'https://example.com/path/SignalBoost,SignalBoost', 'https://example.com?tags=SignalBoost,SignalBoost', 'https://example.com#SignalBoost,SignalBoost']) {
+              assert.equal(cyberProductText(link), link)
+            }
+            for (const link of ['https://example.com?tags=SignalBoost,SignalBoost', 'https://example.com#SignalBoost,SignalBoost']) {
+              assert.equal(cyberProductText(`${link} reference for SignalBoost`), `${link} reference for iTMounts`)
+            }
+          })
+
+          test('the reported recipient-free mailto header stops before dash-separated prose', () => {
+            assert.equal(cyberProductText('mailto:?subject=Status—SignalBoost prepared a plan'), 'mailto:?subject=Status—iTMounts prepared a plan')
+          })
+
+          test('Guardian next steps and finding prose normalize without rewriting technical evidence or decisions', () => {
+            for (const status of ['in_progress', 'completed']) {
+              const row = { ...legacy(), source_type: 'guardian_repository_change', status,
+                human_approval_required: false, human_approved: false,
+                findings: [{ summary: 'SignalBoost observed an authorized change.', sensitivePaths: ['src/SignalBoost.ts'], evidenceReference: 'github:SignalBoost/signalboost-live' }],
+                fix_plan: { nextStep: 'SignalBoost must review SignalBoost/signalboost-live; not a code-change authorization.' },
+              }
+              const before = JSON.stringify(row)
+              const tree = card(row)
+              const visible = text(tree, true)
+              assert.match(visible, /iTMounts must review SignalBoost\/signalboost-live/)
+              assert.match(visible, /iTMounts observed an authorized change/)
+              assert.match(visible, /src\/SignalBoost\.ts/)
+              assert.match(visible, /github:SignalBoost\/signalboost-live/)
+              assert.equal(buttons(tree).length, status === 'in_progress' ? 3 : 0)
+              if (status === 'completed') assert.match(visible, /Stored records and approval history are unchanged/)
+              assert.equal(JSON.stringify(row), before)
+            }
+          })
+          '''
+          # Nothing is published until all outputs exactly match the locally tested blobs.
+          for path, content in prepared.items():
+              assert git_hash(content.encode('utf-8')) == outputs[path], 'Output hash mismatch: ' + path
+          result = {}
+          for path, content in prepared.items():
+              body = json.dumps({'content': content, 'encoding': 'utf-8'}).encode()
+              req = urllib.request.Request('https://api.github.com/repos/SignalBoost/signalboost-live/git/blobs', data=body, method='POST', headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  blob = json.load(response)
+              assert blob['sha'] == outputs[path]
+              result[path] = blob['sha']
+          print('VERIFIED_BLOBS=' + json.dumps(result, sort_keys=True))
+          # No ref, tree, PR, merge, deployment, provider or database write exists in this job.
+          PY

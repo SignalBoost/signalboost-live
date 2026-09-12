@@ -1,8 +1,10 @@
+// saas/tests/cosUniversityProductionReceiptIdentity.node.test.ts
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { stripTypeScriptTypes } from 'node:module'
 import test from 'node:test'
+import { batchExecutedNothing } from '../lib/ai/cos/cosUniversityDailyLaneCadenceCore.ts'
 import {
   COS_UNIVERSITY_ASSURANCE_PROFILE,
   COS_UNIVERSITY_FEATURE_GATED_PATHS,
@@ -49,11 +51,14 @@ function harness(options: {
     VERCEL_ENV: 'production', VERCEL_DEPLOYMENT_ID: DEPLOYMENT, VERCEL_GIT_COMMIT_SHA: COMMIT,
     COS_UNIVERSITY_MASTERS_LEARNING_ENABLED: 'true', ...options.env,
   }
+  // The harness strips imports, so every module dependency the recorder uses must be injected here.
+  // batchExecutedNothing is the real implementation: a receipt claiming success for a batch whose
+  // runs all ended in error is downgraded, and this harness must exercise that rather than stub it.
   const record = new Function('createHash', 'randomUUID', 'cosServiceDb',
-    'COS_UNIVERSITY_ASSURANCE_PROFILE', 'COS_UNIVERSITY_FEATURE_GATED_PATHS', 'process',
+    'COS_UNIVERSITY_ASSURANCE_PROFILE', 'COS_UNIVERSITY_FEATURE_GATED_PATHS', 'batchExecutedNothing', 'process',
     `${js}\nreturn recordCosUniversityProductionPath;`)(
     createHash, randomUUID, () => options.databaseAvailable === false ? null : db,
-    COS_UNIVERSITY_ASSURANCE_PROFILE, COS_UNIVERSITY_FEATURE_GATED_PATHS, { env },
+    COS_UNIVERSITY_ASSURANCE_PROFILE, COS_UNIVERSITY_FEATURE_GATED_PATHS, batchExecutedNothing, { env },
   ) as RecordPath
   return { record, rows, writes: () => writes }
 }

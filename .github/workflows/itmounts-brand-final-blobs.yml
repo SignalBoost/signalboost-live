@@ -59,7 +59,6 @@ jobs:
           prepared[helper] = prepared[helper].replace(old, new)
           tests = 'saas/tests/cyberLegacyPresentation.node.test.ts'
           prepared[tests] += r'''
-
           test('ASCII sentence punctuation after a bare URL does not swallow product prose', () => {
             for (const link of ['https://example.com', 'https://github.com/SignalBoost/signalboost-live']) {
               for (const punctuation of [',', ';', '!', '?', ')']) {

@@ -29,6 +29,8 @@ test('bare provider host identifier stays exact only as a bounded technical key-
     'Detected hostId=signalboost)',
     'Detected hostId=signalboost!',
     'Detected hostId=signalboost?',
+    'Configured hostId="signalboost" remains active.',
+    "Configured provider='signalboost' remains active.",
   ]) assert.equal(cyberProductText(value), value, value)
 
   for (const [before, after] of [

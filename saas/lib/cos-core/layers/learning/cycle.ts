@@ -120,6 +120,16 @@ export class ContinuousLearningCycle{
         try{documents=await adapter.acquire(gap)}catch(error){const key=adapter.id??adapter.kind;incrementDiagnosticCount(result.sourceErrors,key);if(diagnostic)incrementDiagnosticCount(diagnostic.sourceErrors,key);console.warn('cosLearning: source acquisition failed',{source:key,gapId:gap.id,error:learningErrorMessage(error)});continue}
         result.documentsAcquired+=documents.length
         if(diagnostic)diagnostic.documentsAcquired+=documents.length
+        // Every other diagnostic here is rejection-attributed, so an adapter that returns NOTHING is
+        // invisible: "this source was never asked", "this source is not deployed" and "this source
+        // found nothing" all look identical downstream. Record attempts and yield per adapter so the
+        // question is answerable from the run row instead of from a deployment dashboard.
+        {
+          const attempted=adapter.id??adapter.kind
+          incrementDiagnosticCount(result.rejected,`attempted_by_source:${attempted}`)
+          if(documents.length===0)incrementDiagnosticCount(result.rejected,`zero_results_by_source:${attempted}`)
+          else incrementDiagnosticCount(result.rejected,`retrieved_by_source:${attempted}`,documents.length)
+        }
         for(const document of documents){
           if(document.sourceKind!==adapter.kind){this.recordDecision(result,{accepted:false,reason:'source_not_allowed'},diagnostic);continue}
           const source=adapter.id??adapter.kind,score=relevanceOf(document,terms)

@@ -1,4 +1,6 @@
+// saas/lib/cos-core/layers/learning/publicClients.ts
 import type { LearningConnectorSearch, LearningConnectorResult } from './connectors'
+import { abstractFromInvertedIndex, openAlexAbstractIsSubstantive } from './openAlexAbstract.ts'
 
 type FetchLike=typeof fetch
 const TRANSIENT_STATUS=new Set([408,425,429,500,502,503,504])
@@ -14,8 +16,31 @@ function compactQuery(query:string,maxTerms=10):string{return clean(query).split
  * which can fail as Crossref evolves its permitted field list. */
 export const crossrefScientificSearch:LearningConnectorSearch=async(query,limit)=>{const q=compactQuery(query);const json=await getJson(`https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(q)}&rows=${Math.min(limit,10)}`);return(json?.message?.items??[]).map((item:any):LearningConnectorResult=>({uri:item.URL||(item.DOI?`https://doi.org/${item.DOI}`:''),title:clean(item.title?.[0]),text:clean(item.abstract||`${item.title?.[0]??''}. Publisher: ${item.publisher??''}. Subject: ${(item.subject??[]).slice(0,6).join(', ')}.`),license:'metadata/abstract as supplied by Crossref'})).filter((x:LearningConnectorResult)=>x.uri&&x.text)}
 
-/** OpenAlex: compact search terms reduce 400s from oversized curriculum questions. */
-export const openAlexScientificSearch:LearningConnectorSearch=async(query,limit)=>{const q=compactQuery(query,8);const json=await getJson(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=${Math.min(limit,10)}&mailto=hello%40signalboostapp.com`);return(json?.results??[]).map((item:any):LearningConnectorResult=>({uri:item.doi||item.id,title:clean(item.title),text:clean(`${item.title??''}. ${item.primary_topic?.display_name??''}. ${(item.keywords??[]).slice(0,6).map((k:any)=>k.display_name).join(', ')}. Cited by ${item.cited_by_count??0}.`),license:item.open_access?.is_oa?'open-access metadata':'metadata only'})).filter((x:LearningConnectorResult)=>x.uri&&x.text)}
+/**
+ * OpenAlex: compact search terms reduce 400s from oversized curriculum questions. The response
+ * already carries the abstract as an inverted index, so it is reconstructed here rather than
+ * discarded — the previous text was title, topic, keywords and a citation count, which reads as a
+ * bibliographic stub and fails the confidence floor no matter how relevant the work is. No extra
+ * request, no new source, and the licence label still states what the evidence actually is.
+ */
+export const openAlexScientificSearch:LearningConnectorSearch=async(query,limit)=>{
+  const q=compactQuery(query,8)
+  const json=await getJson(`https://api.openalex.org/works?search=${encodeURIComponent(q)}&per-page=${Math.min(limit,10)}&mailto=hello%40signalboostapp.com`)
+  return(json?.results??[]).map((item:any):LearningConnectorResult=>{
+    const title=clean(item.title)
+    const abstract=clean(abstractFromInvertedIndex(item.abstract_inverted_index))
+    const descriptor=clean(`${item.primary_topic?.display_name??''}. ${(item.keywords??[]).slice(0,6).map((k:any)=>k.display_name).join(', ')}. Cited by ${item.cited_by_count??0}.`)
+    const substantive=openAlexAbstractIsSubstantive(abstract)
+    return{
+      uri:item.doi||item.id,
+      title,
+      text:clean(abstract?`${title}. ${abstract} ${descriptor}`:`${title}. ${descriptor}`),
+      license:substantive
+        ?'OpenAlex CC0 abstract read for grounded learning; COS retains only facts, summary, and provenance'
+        :(item.open_access?.is_oa?'open-access metadata':'metadata only'),
+    }
+  }).filter((x:LearningConnectorResult)=>x.uri&&x.text)
+}
 
 export const openLibrarySearch:LearningConnectorSearch=async(query,limit)=>{const json=await getJson(`https://openlibrary.org/search.json?q=${encodeURIComponent(compactQuery(query,8))}&limit=${Math.min(limit,10)}`);return(json?.docs??[]).map((item:any):LearningConnectorResult=>({uri:item.key?`https://openlibrary.org${item.key}`:'',title:clean(item.title),text:clean(`${item.title??''}. ${item.author_name?.join(', ')??''}. First published ${item.first_publish_year??'unknown'}. Subjects: ${item.subject?.slice(0,8).join(', ')??''}.`),license:'Open Library metadata'})).filter((x:LearningConnectorResult)=>x.uri&&x.text)}
 

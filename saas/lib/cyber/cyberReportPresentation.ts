@@ -82,17 +82,28 @@ export function dependencyRescanUrl(row: { source_area?: string; source_type?: s
 /** Display product prose only; never pass the result to persistence or authorization. */
 export function cyberProductText(value: string | null | undefined): string {
   if (!value) return ''
-  // Keep complete email tokens (including tags/quoted local parts), URLs and code
-  // byte-for-byte. This shields technical text, not an email validator. Adjacent path,
-  // package, email and identifier characters also distinguish technical names from prose.
-  return value.split(/((?:[a-z][a-z0-9+.-]*:\/\/|mailto:|git@)[^\s<>"`]+|(?:"(?:[^"\\\r\n]|\\.)*"|[^\s<>"@]+)@[^\s<>"@]+|`[^`]*`)/gi)
-    .map((part, index) => index % 2 ? part : part.replace(
-      // Descriptive compounds are product prose, not generic hyphenated identifiers.
-      // Paths, filenames, email addresses, URLs and code remain protected.
-      /(?<![\p{L}\p{N}_./\\@-])SignalBoost(?:Ai|\s+AI)?(?=-(?:powered|assisted|driven|generated|managed|enabled|based|backed|led)(?![\p{L}\p{N}_/\\@-]|\.[\p{L}\p{N}]))/giu,
-      name => publicBrandText(name),
-    ).replace(
-      /(?<![\p{L}\p{N}_./\\@-])SignalBoost(?:Ai|\s+AI)?(?![\p{L}\p{N}_/\\@-]|\.[\p{L}\p{N}])/giu,
-      name => publicBrandText(name),
-    )).join('')
+  // Preserve matching code delimiters of any length, not just one-backtick spans.
+  const code = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/
+  const url = /(?:[a-z][a-z0-9+.-]*:\/\/|git@)[^\s<>"`]+/
+  // This is token shielding, not address validation. A DNS name/domain literal ends
+  // before sentence punctuation; it must not swallow adjacent product prose.
+  const email = /(?:mailto:)?(?:"(?:[^"\\\r\n]|\\.)*"|[\p{L}\p{N}\p{M}!#$%&'*+\/=?^_`{|}~.-]+)@(?:\[[^\]\r\n]+\]|[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?)*)/u
+  const protectedTokens = new RegExp(`${code.source}|${url.source}|${email.source}`, 'giu')
+  const prose = (text: string) => text.replace(
+    /(?<![\p{L}\p{N}_./\\@-])(SignalBoost(?:Ai|\s+AI)?)(-[\p{L}][\p{L}\p{N}-]*)?(?![\p{L}\p{N}_/\\@-]|\.[\p{L}\p{N}])/giu,
+    (token: string, brand: string, suffix: string | undefined) => {
+      // Known bare implementation identifiers remain exact. All other descriptive
+      // compounds use the current brand, without maintaining an adjective allowlist.
+      // Paths, filenames, URLs, email and code have separate structural protection.
+      if (/^SignalBoost-(?:live|api|worker)(?:-|$)/i.test(token)) return token
+      return publicBrandText(brand) + (suffix || '')
+    },
+  )
+  let rendered = ''
+  let cursor = 0
+  for (const match of value.matchAll(protectedTokens)) {
+    rendered += prose(value.slice(cursor, match.index)) + match[0]
+    cursor = match.index + match[0].length
+  }
+  return rendered + prose(value.slice(cursor))
 }

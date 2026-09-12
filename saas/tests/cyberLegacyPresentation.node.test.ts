@@ -260,3 +260,44 @@ test('complete tagged and quoted email tokens are preserved before prose normali
     assert.equal(cyberProductText(`SignalBoost prepared a message for ${address}.`), `iTMounts prepared a message for ${address}.`)
   }
 })
+
+test('email shielding ends at sentence punctuation before adjacent product prose', () => {
+  for (const address of ['SignalBoost@example.com', 'SignalBoost+alerts@przykład.pl', '"SignalBoost Alerts"@[IPv6:2001:db8::1]', 'mailto:SignalBoost@example.com']) {
+    for (const separator of ['—', '–', ',', ';', '!', '?', ')', '。']) {
+      assert.equal(cyberProductText(`${address}${separator}SignalBoost prepared a plan`), `${address}${separator}iTMounts prepared a plan`)
+    }
+  }
+})
+
+test('unlisted descriptive product compounds normalize while known technical names stay exact', () => {
+  for (const suffix of ['created', 'provided', 'verified', 'supported', 'authored', 'created-and-verified', 'gerado', 'generado', 'wygenerowany']) {
+    for (const name of ['SignalBoost', 'SIGNALBOOST AI', 'SignalBoostAi']) {
+      assert.equal(cyberProductText(`${name}-${suffix} remediation`), `iTMounts-${suffix} remediation`)
+    }
+  }
+  for (const technical of ['SignalBoost-live', 'SIGNALBOOST-API', 'signalboost-worker', 'signalboost-live-worker', 'src/SignalBoost-created', 'SignalBoost-created.ts', 'SIGNALBOOST_CREATED', '`SignalBoost-created`']) {
+    assert.equal(cyberProductText(technical), technical)
+  }
+})
+
+test('matching multi-backtick code spans protect their entire contents', () => {
+  for (const delimiter of ['`', '``', '```', '````']) {
+    const code = `${delimiter}SignalBoost${delimiter}`
+    assert.equal(cyberProductText(`${code} — SignalBoost prepared a plan`), `${code} — iTMounts prepared a plan`)
+  }
+  for (const code of ['``SignalBoost `example` SignalBoost-created``', '```\nSignalBoost\n```', '````SignalBoost ``` inner``` SignalBoost````']) {
+    assert.equal(cyberProductText(code), code)
+  }
+})
+
+test('saved-card rendering applies edge-case branding without mutating evidence or technical tokens', () => {
+  const row = { ...legacy(),
+    summary: 'SignalBoost@example.com—SignalBoost-created remediation with ``SignalBoost`` code.',
+    implementation_notes: 'SignalBoost-provided guidance for SignalBoost/signalboost-live.',
+  }
+  const before = JSON.stringify(row)
+  const visible = text(card(row), true)
+  assert.match(visible, /SignalBoost@example\.com—iTMounts-created remediation with ``SignalBoost`` code\./)
+  assert.match(visible, /iTMounts-provided guidance for SignalBoost\/signalboost-live\./)
+  assert.equal(JSON.stringify(row), before)
+})

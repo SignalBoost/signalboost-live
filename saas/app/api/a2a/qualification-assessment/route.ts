@@ -2,7 +2,10 @@ import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { getCOSA2AQualificationAssessmentPort } from '@/a2a-host/cos-runtime-host'
-import { persistSupabaseSpecialistQualificationAssessment } from '@/a2a-host/specialist-qualification-assessment'
+import {
+  assertSpecialistQualificationAssessmentCorrelation,
+  persistSupabaseSpecialistQualificationAssessment,
+} from '@/a2a-host/specialist-qualification-assessment'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,7 +47,9 @@ export async function POST(req: NextRequest) {
 
   const assessmentId = crypto.randomUUID()
   try {
-    const record = await port.assess({ ...input, assessmentId })
+    const expected = { ...input, assessmentId }
+    const record = await port.assess(expected)
+    assertSpecialistQualificationAssessmentCorrelation(record, expected)
     const db = createClient(url, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
     await persistSupabaseSpecialistQualificationAssessment(db, record)
     return NextResponse.json({

@@ -31,6 +31,14 @@ function registry(risk: 'advisory' | 'write' = 'advisory') {
   })
 }
 
+const qualifications = {
+  async snapshot(input: { skillId: string; agentIds: readonly string[] }) {
+    return input.agentIds.includes('marketing-agent')
+      ? { 'marketing-agent': { qualified: true, evidenceRef: `test-qualification:${input.skillId}:marketing-agent` } }
+      : {}
+  },
+}
+
 function transport(counter: { calls: number }): A2ATransport {
   return {
     async send(input) {
@@ -52,7 +60,7 @@ function transport(counter: { calls: number }): A2ATransport {
 
 test('portable A2A host composes Phase 3 orchestration over Phase 2 governed delegation', async () => {
   const counter = { calls: 0 }
-  const host = createPortableA2AHost({ registry: registry(), transportFactory: { create: () => transport(counter) } })
+  const host = createPortableA2AHost({ registry: registry(), transportFactory: { create: () => transport(counter) }, qualifications })
   const result = await host.orchestrator.orchestrate({
     tenantId,
     environmentId,
@@ -68,7 +76,7 @@ test('portable A2A host composes Phase 3 orchestration over Phase 2 governed del
 
 test('portable host preserves write approval boundary before transport creation', async () => {
   const counter = { calls: 0 }
-  const host = createPortableA2AHost({ registry: registry('write'), transportFactory: { create: () => transport(counter) } })
+  const host = createPortableA2AHost({ registry: registry('write'), transportFactory: { create: () => transport(counter) }, qualifications })
   const blocked = await host.orchestrator.orchestrate({
     tenantId,
     environmentId,
@@ -83,8 +91,8 @@ test('portable host preserves write approval boundary before transport creation'
 
 test('COS runtime host installation is explicit, replaceable, and reversible', () => {
   const counter = { calls: 0 }
-  const first = createPortableA2AHost({ registry: registry(), transportFactory: { create: () => transport(counter) } })
-  const second = createPortableA2AHost({ registry: registry(), transportFactory: { create: () => transport(counter) } })
+  const first = createPortableA2AHost({ registry: registry(), transportFactory: { create: () => transport(counter) }, qualifications })
+  const second = createPortableA2AHost({ registry: registry(), transportFactory: { create: () => transport(counter) }, qualifications })
   const restoreFirst = installCOSA2ARuntimeHost(first)
   assert.equal(getCOSA2ARuntimeHost(), first)
   const restoreSecond = installCOSA2ARuntimeHost(second)

@@ -28,6 +28,15 @@ function registry(risk: 'advisory' | 'write' = 'advisory') {
   })
 }
 
+const qualifications = {
+  async snapshot(input: { tenantId: string; environmentId: string; portableId: string; skillId: string; agentIds: readonly string[] }) {
+    if (input.tenantId !== 'buyer-a' || input.environmentId !== 'prod' || input.portableId !== 'portable-marketing' || input.skillId !== 'marketing.research') return {}
+    return input.agentIds.includes('marketing-agent')
+      ? { 'marketing-agent': { qualified: true, evidenceRef: 'test-live-qualification:marketing.research:marketing-agent' } }
+      : {}
+  },
+}
+
 async function withRemoteServer(run: (baseUrl: string, evidence: { authSeen: boolean; sends: number }) => Promise<void>) {
   const evidence = { authSeen: false, sends: 0 }
   const server = http.createServer(async (req, res) => {
@@ -91,6 +100,7 @@ test('Phase 7 performs an end-to-end remote JSON-RPC delegation and emits secret
     const record = await runA2ALiveAcceptance({
       registry: registry(),
       transportFactory,
+      qualifications,
       fetchAgentCard: () => fetchA2AAgentCard({ url: `${baseUrl}/.well-known/agent-card.json`, allowInsecureLoopbackForTests: true }),
       tenantId: 'buyer-a',
       environmentId: 'prod',
@@ -148,6 +158,7 @@ test('Phase 7 live acceptance refuses non-advisory assignments before remote exe
   await assert.rejects(() => runA2ALiveAcceptance({
     registry: registry('write'),
     transportFactory,
+    qualifications,
     fetchAgentCard: async () => ({
       protocolVersion: '0.3.0', name: 'External Marketing Specialist', description: 'Buyer-hosted', url: 'https://buyer.example/a2a', preferredTransport: 'JSONRPC',
       defaultInputModes: ['text/plain'], defaultOutputModes: ['text/plain'],

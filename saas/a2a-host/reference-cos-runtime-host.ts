@@ -4,9 +4,10 @@ import { createPortableA2AHost, type PortableA2AHost } from './portable-a2a-host
 import { referenceDiagnosticEndpoint } from './reference-a2a-config.ts'
 import type { A2ASpecialistFamilyId } from './a2a-specialist-catalog.ts'
 
-export const REFERENCE_COS_A2A_HOST_VERSION = 'signalboost-reference-cos-a2a-host-v1' as const
+export const REFERENCE_COS_A2A_HOST_VERSION = 'signalboost-reference-cos-a2a-host-v2' as const
 export const REFERENCE_DIAGNOSTIC_AGENT_ID = 'signalboost-reference-self-healing-diagnostic' as const
 const REFERENCE_TRANSPORT_REF = 'signalboost-reference-https-jsonrpc' as const
+const REFERENCE_QUALIFICATION_EVIDENCE = 'signalboost-reference:self-healing.diagnose:v1' as const
 
 export interface ExactA2AScope {
   tenantId: string
@@ -69,7 +70,19 @@ export function createReferenceCOSA2AHost(scope: ExactA2AScope, env: NodeJS.Proc
     },
   })
 
-  return createPortableA2AHost({ registry, transportFactory, timeoutMs: 10_000 })
+  return createPortableA2AHost({
+    registry,
+    transportFactory,
+    timeoutMs: 10_000,
+    qualifications: {
+      async snapshot(input) {
+        if (input.tenantId !== tenantId || input.environmentId !== environmentId || input.portableId !== portableId || input.skillId !== 'self-healing.diagnose') return {}
+        return input.agentIds.includes(REFERENCE_DIAGNOSTIC_AGENT_ID)
+          ? { [REFERENCE_DIAGNOSTIC_AGENT_ID]: { qualified: true, evidenceRef: REFERENCE_QUALIFICATION_EVIDENCE } }
+          : {}
+      },
+    },
+  })
 }
 
 export function selectCOSA2AHostForPlan(input: {

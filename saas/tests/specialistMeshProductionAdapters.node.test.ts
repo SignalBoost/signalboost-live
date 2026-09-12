@@ -5,12 +5,12 @@ import { createProductionSpecialistMeshSignalPort, createProductionSpecialistQua
 
 const scope = { tenantId: 'tenant-1', environmentId: 'production', portableId: 'cos', skillId: 'self-healing.diagnose', agentIds: ['a', 'b'] as const }
 
-test('production qualification adapter fails closed and latest exact-scope decision wins', async () => {
+test('production qualification adapter fails closed and latest exact-scope decision wins independent of reader order', async () => {
   const port = createProductionSpecialistQualificationPort({
     async read() {
       return [
-        { ...scope, agentId: 'a', qualified: false, evidenceRef: 'revoked:a', observedAt: '2026-09-12T20:00:00Z' },
         { ...scope, agentId: 'a', qualified: true, evidenceRef: 'older:a', observedAt: '2026-09-12T19:00:00Z' },
+        { ...scope, agentId: 'a', qualified: false, evidenceRef: 'revoked:a', observedAt: '2026-09-12T20:00:00Z' },
         { ...scope, agentId: 'b', qualified: true, evidenceRef: 'credential:b', observedAt: '2026-09-12T20:00:00Z' },
         { ...scope, agentId: 'c', qualified: true, evidenceRef: 'other' },
         { ...scope, portableId: 'other', agentId: 'b', qualified: true, evidenceRef: 'wrong-scope' },
@@ -18,6 +18,18 @@ test('production qualification adapter fails closed and latest exact-scope decis
     },
   })
   assert.deepEqual(await port.snapshot(scope), { b: { qualified: true, evidenceRef: 'credential:b' } })
+})
+
+test('same-timestamp qualification conflict fails toward revocation', async () => {
+  const port = createProductionSpecialistQualificationPort({
+    async read() {
+      return [
+        { ...scope, agentId: 'a', qualified: true, evidenceRef: 'grant:a', observedAt: '2026-09-12T20:00:00Z' },
+        { ...scope, agentId: 'a', qualified: false, evidenceRef: 'revoke:a', observedAt: '2026-09-12T20:00:00Z' },
+      ]
+    },
+  })
+  assert.deepEqual(await port.snapshot(scope), {})
 })
 
 test('production telemetry adapter ranks only scoped fresh specialist-execution evidence', async () => {
@@ -119,11 +131,12 @@ test('Supabase qualification adapter consumes durable scoped unexpired decisions
   assert.ok(call.filters.some(([op, key]) => op === 'lte' && key === 'valid_from'))
 })
 
-test('Supabase telemetry uses newest unexpired row per agent and preserves explicit unavailable', async () => {
+test('Supabase telemetry uses newest current row per agent, rejects future evidence, and preserves explicit unavailable', async () => {
   const db = fakeDb({
     a2a_specialist_mesh_telemetry: { data: [
+      { agent_id: 'a', available: true, latency_score: 1, cost_score: 1, load_score: 1, reliability_score: 100, quality_score: 100, observed_at: '2026-09-12T20:35:00Z' },
       { agent_id: 'a', available: false, latency_score: 9, cost_score: 12, load_score: 15, reliability_score: 98, quality_score: 97, observed_at: '2026-09-12T20:10:00Z' },
-      { agent_id: 'a', available: true, latency_score: 1, cost_score: 1, load_score: 1, reliability_score: 100, quality_score: 100, observed_at: '2026-09-12T20:00:00Z' },
+      { agent_id: 'a', available: true, latency_score: 2, cost_score: 2, load_score: 2, reliability_score: 99, quality_score: 99, observed_at: '2026-09-12T20:00:00Z' },
       { agent_id: 'b', available: true, latency_score: 25, cost_score: 20, load_score: 30, reliability_score: 95, quality_score: 96, observed_at: '2026-09-12T20:05:00Z' },
     ], error: null },
   })
@@ -133,6 +146,7 @@ test('Supabase telemetry uses newest unexpired row per agent and preserves expli
     b: { available: true, latencyScore: 25, costScore: 20, loadScore: 30, reliabilityScore: 95, qualityScore: 96 },
   })
   assert.ok(db.calls[0].filters.some(([op, key]) => op === 'gt' && key === 'expires_at'))
+  assert.ok(db.calls[0].filters.some(([op, key]) => op === 'lte' && key === 'observed_at'))
 })
 
 test('Supabase telemetry read error degrades to neutral routing evidence', async () => {

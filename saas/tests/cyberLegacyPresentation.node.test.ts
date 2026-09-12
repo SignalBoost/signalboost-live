@@ -322,3 +322,45 @@ test('natural-language punctuation after a URL does not shield following product
   const encoded = 'https://example.com/SignalBoost%E2%80%94SignalBoost?q=SignalBoost%EF%BC%8CSignalBoost'
   assert.equal(cyberProductText(encoded), encoded)
 })
+
+test('ASCII sentence punctuation after a bare URL does not swallow product prose', () => {
+  for (const link of ['https://example.com', 'https://github.com/SignalBoost/signalboost-live']) {
+    for (const punctuation of [',', ';', '!', '?', ')']) {
+      for (const name of ['SignalBoost', 'SignalBoostAi', 'SignalBoost AI', 'SignalBoost-created']) {
+        const branded = name.endsWith('-created') ? 'iTMounts-created' : 'iTMounts'
+        assert.equal(cyberProductText(`${link}${punctuation}${name} prepared a plan`), `${link}${punctuation}${branded} prepared a plan`)
+      }
+    }
+  }
+  // URI data, not sentence prose: preserve standalone tokens and query/fragment values.
+  for (const link of ['https://example.com?SignalBoost', 'https://example.com/path/SignalBoost,SignalBoost', 'https://example.com?tags=SignalBoost,SignalBoost', 'https://example.com#SignalBoost,SignalBoost']) {
+    assert.equal(cyberProductText(link), link)
+  }
+  for (const link of ['https://example.com?tags=SignalBoost,SignalBoost', 'https://example.com#SignalBoost,SignalBoost']) {
+    assert.equal(cyberProductText(`${link} reference for SignalBoost`), `${link} reference for iTMounts`)
+  }
+})
+
+test('the reported recipient-free mailto header stops before dash-separated prose', () => {
+  assert.equal(cyberProductText('mailto:?subject=Status—SignalBoost prepared a plan'), 'mailto:?subject=Status—iTMounts prepared a plan')
+})
+
+test('Guardian next steps and finding prose normalize without rewriting technical evidence or decisions', () => {
+  for (const status of ['in_progress', 'completed']) {
+    const row = { ...legacy(), source_type: 'guardian_repository_change', status,
+      human_approval_required: false, human_approved: false,
+      findings: [{ summary: 'SignalBoost observed an authorized change.', sensitivePaths: ['src/SignalBoost.ts'], evidenceReference: 'github:SignalBoost/signalboost-live' }],
+      fix_plan: { nextStep: 'SignalBoost must review SignalBoost/signalboost-live; not a code-change authorization.' },
+    }
+    const before = JSON.stringify(row)
+    const tree = card(row)
+    const visible = text(tree, true)
+    assert.match(visible, /iTMounts must review SignalBoost\/signalboost-live/)
+    assert.match(visible, /iTMounts observed an authorized change/)
+    assert.match(visible, /src\/SignalBoost\.ts/)
+    assert.match(visible, /github:SignalBoost\/signalboost-live/)
+    assert.equal(buttons(tree).length, status === 'in_progress' ? 3 : 0)
+    if (status === 'completed') assert.match(visible, /Stored records and approval history are unchanged/)
+    assert.equal(JSON.stringify(row), before)
+  }
+})

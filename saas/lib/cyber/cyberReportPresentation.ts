@@ -104,8 +104,17 @@ export function cyberProductText(value: string | null | undefined): string {
   let rendered = ''
   let cursor = 0
   for (const match of value.matchAll(protectedTokens)) {
-    rendered += prose(value.slice(cursor, match.index)) + match[0]
-    cursor = match.index + match[0].length
+    let protectedLength = match[0].length
+    // In bare URL prose, an ASCII delimiter followed by a brand and another word
+    // starts a sentence fragment. Query/fragment data and standalone URIs remain
+    // opaque: these punctuation characters are also legal inside real URLs.
+    if (/^(?:[a-z][a-z0-9+.-]*:\/\/|git@|mailto:)/i.test(match[0])
+      && /^\s+\p{L}/u.test(value.slice(match.index + match[0].length))) {
+      const boundary = match[0].search(/[,;!?)](?=SignalBoost(?:Ai)?(?:-[\p{L}\p{N}-]+)?$)/iu)
+      if (boundary >= 0 && !/[?#]/.test(match[0].slice(0, boundary))) protectedLength = boundary
+    }
+    rendered += prose(value.slice(cursor, match.index)) + match[0].slice(0, protectedLength)
+    cursor = match.index + protectedLength
   }
   return rendered + prose(value.slice(cursor))
 }

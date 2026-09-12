@@ -1,0 +1,60 @@
+name: iTMounts visible historical notice
+on:
+  push:
+    branches: [fix/itmounts-brand-final-proof-20260912]
+    paths: [.github/workflows/itmounts-visible-notice-blobs.yml]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.repository == 'SignalBoost/signalboost-live' && github.ref == 'refs/heads/fix/itmounts-brand-final-proof-20260912'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: b9f3d5c3860f0829b57af54e2c4e28d564ec9c1f
+          persist-credentials: false
+      - name: Publish two content-addressed blobs after exact-hash verification only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os,urllib.request
+          def gh(b): return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+          pp='saas/app/dashboard/cybersecurity/page.tsx'; tp='saas/tests/cyberLegacyPresentation.node.test.ts'
+          p=Path(pp).read_text(); t=Path(tp).read_text()
+          assert gh(p.encode())=='8a2083f1f1b83aefe4bcd2df9f5584212be29674'
+          assert gh(t.encode())=='c0c031f2334bf2280a22a27e992278fe576c4f4d'
+          notice='<p className="mt-2 text-xs text-text-muted" data-cyber-brand-notice>{copy.brandDisplayNotice}</p>'
+          old='!historicalDependency && terminal ? '+notice
+          assert p.count(old)==1
+          p=p.replace(old,'historicalDependency || terminal ? '+notice)
+          old='{copy.savedPlanArchive}</summary>'+notice
+          assert p.count(old)==1
+          p=p.replace(old,'{copy.savedPlanArchive}</summary>')
+          t+='''
+          test('historical cards disclose the current brand before the saved archive is expanded', () => {
+            for (const status of ['approved', 'completed']) {
+              const row = { ...legacy(), status, title: 'SignalBoost remediation plan' }
+              const before = JSON.stringify(row)
+              const tree = card(row)
+              assert.match(text(tree), /iTMounts remediation plan/)
+              assert.ok(text(tree).includes(copy.brandDisplayNotice), 'Visible renamed title must have a visible display-only disclosure')
+              assert.equal(text(tree, true).split(copy.brandDisplayNotice).length - 1, 1, 'Do not duplicate the disclosure inside the archive')
+              assert.doesNotMatch(text(tree), /Human approval is required before PR preparation/)
+              assert.match(text(tree, true), /Human approval is required before PR preparation/)
+              assert.equal(JSON.stringify(row), before)
+            }
+          })
+          '''
+          candidates={pp:(p,'557f19f292ce1f60d4c563f806a94d8d8d74b4e4'),tp:(t,'ede27810f9230dea20e31e679a39b471f8e10b1c')}
+          for path,(content,expected) in candidates.items(): assert gh(content.encode())==expected, path
+          for path,(content,expected) in candidates.items():
+              req=urllib.request.Request('https://api.github.com/repos/SignalBoost/signalboost-live/git/blobs',data=json.dumps({'content':content,'encoding':'utf-8'}).encode(),method='POST',headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=30) as r: blob=json.load(r)
+              assert blob['sha']==expected
+              print(path,blob['sha'])
+          # No refs, PRs, deployment, provider or database mutation.
+          PY

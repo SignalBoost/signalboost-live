@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   COS_UNIVERSITY_ASSURANCE_PROFILE,
@@ -30,9 +30,12 @@ export async function recordCosUniversityProductionPath(input: {
     invocationSucceeded: input.invocationSucceeded, ...cleanEvidence(input.evidence),
   }
   const evidenceHash = createHash('sha256').update(JSON.stringify(evidence)).digest('hex')
+  // Each recording is a distinct invocation observation, not an hourly content summary.
+  // Keep identical outcomes (including recovery) append-only, even at the same clock instant.
+  // Salt only the event identity: evidence hashes and execution/academic proof remain unchanged.
   const eventKey = createHash('sha256').update([
     COS_UNIVERSITY_ASSURANCE_PROFILE, input.path, deploymentId, commitSha,
-    now.toISOString().slice(0, 13), evidenceHash,
+    now.toISOString(), randomUUID(), evidenceHash,
   ].join('|')).digest('hex')
   const inserted = await db.from('cos_university_learning_assurance_events').upsert({
     event_key: eventKey, event_type: 'production_path', path_id: input.path,

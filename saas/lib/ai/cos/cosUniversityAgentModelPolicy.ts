@@ -15,9 +15,8 @@ import { currentPlatformModelTopology } from './platformIdentityContext.ts'
  * The agent's identity, provenance and academic authority are unchanged; only the engine behind one
  * non-credit training answer moves.
  *
- * Neither graded model is ever substituted silently. An unset variable raises, as the builder model
- * already does, so a misconfiguration is visible to the operator instead of quietly changing who
- * answered an independent assessment.
+ * No paid managed model is selected from a source-code default. DeepInfra practice requires an
+ * explicit operator-controlled UNIVERSITY_PRACTICE_MODEL value and fails closed when it is absent.
  */
 
 export type AgentWorkDomain = 'role_domain' | 'generalist'
@@ -25,7 +24,7 @@ export type AgentWorkPurpose = 'assessment' | 'practice'
 
 export const PRIMARY_REASONER_NOT_CONFIGURED = 'primary_reasoner_model_not_configured'
 export const BUILDER_MODEL_NOT_CONFIGURED_FOR_ROLE = 'builder_model_not_configured'
-export const DEEPINFRA_ECONOMY_PRACTICE_MODEL = 'deepseek-ai/DeepSeek-V4-Flash-0731'
+export const UNIVERSITY_PRACTICE_MODEL_NOT_CONFIGURED = 'university_practice_model_not_configured'
 
 /**
  * University subjects that belong to a registered role's own field. A role absent from this map has
@@ -59,14 +58,14 @@ function isDeepInfraRuntime(): boolean {
 }
 
 /**
- * Economy routing is training-only. Operators may set UNIVERSITY_PRACTICE_MODEL explicitly; when
- * the configured managed runtime is DeepInfra, the default is its low-cost Flash model. Self-hosted
- * or other managed runtimes keep their existing model unless an explicit practice model is supplied.
+ * Economy routing is training-only. Paid DeepInfra practice requires an explicit configured model;
+ * self-hosted/non-DeepInfra runtimes may keep their existing primary model by returning null.
  */
 export function universityPracticeModelFromEnv(): string | null {
   const explicit = String(process.env.UNIVERSITY_PRACTICE_MODEL ?? '').trim()
   if (explicit) return explicit
-  return isDeepInfraRuntime() ? DEEPINFRA_ECONOMY_PRACTICE_MODEL : null
+  if (isDeepInfraRuntime()) throw new Error(UNIVERSITY_PRACTICE_MODEL_NOT_CONFIGURED)
+  return null
 }
 
 /**

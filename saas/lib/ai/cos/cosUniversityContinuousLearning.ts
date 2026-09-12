@@ -14,6 +14,10 @@ import {
   parseApprovedLearningUrls,
 } from '@/lib/cos/dailyAutonomousLearning'
 import {
+  cooledDownSourceIds,
+  withoutCooledDownSources,
+} from './cosUniversityLearningSourceCooldown.ts'
+import {
   orderStudyPlansBySupply,
   studyGapHistoryFromDiagnostics,
 } from './cosUniversityStudySupplyPriority.ts'
@@ -167,16 +171,20 @@ async function finishContinuousSlot(
  * bounded per-gap counts, never study text. A read failure degrades to "no history", which restores
  * the previous ordering rather than blocking the cycle.
  */
-async function loadRecentGapDiagnostics(agentId: string, limit = 8): Promise<ReturnType<typeof studyGapHistoryFromDiagnostics>> {
+async function loadRecentLaneHistory(agentId: string, limit = 8): Promise<{
+  gaps: ReturnType<typeof studyGapHistoryFromDiagnostics>
+  sourceErrors: unknown[]
+}> {
+  const empty = { gaps: studyGapHistoryFromDiagnostics([]), sourceErrors: [] as unknown[] }
   const db = cosServiceDb()
-  if (!db) return studyGapHistoryFromDiagnostics([])
+  if (!db) return empty
   const result = await db.from('cos_university_continuous_runs')
-    .select('slot_key,gap_diagnostics')
+    .select('slot_key,gap_diagnostics,source_errors')
     .eq('status', 'completed')
     .order('started_at', { ascending: false })
     .limit(Math.max(2, Math.min(80, Math.floor(limit) * 2)))
-  if (result.error) return studyGapHistoryFromDiagnostics([])
-  const rows = (result.data || []) as Array<{ slot_key: string; gap_diagnostics: unknown }>
+  if (result.error) return empty
+  const rows = (result.data || []) as Array<{ slot_key: string; gap_diagnostics: unknown; source_errors: unknown }>
   // COS writes `<window>`; every other agent writes `<window>:<agentId>`. Matching the suffix keeps
   // one agent's barren history from reordering another agent's plans.
   const lane = rows.filter(row => {
@@ -184,7 +192,11 @@ async function loadRecentGapDiagnostics(agentId: string, limit = 8): Promise<Ret
     // `2026-09-12T01:45` is COS's own window; `2026-09-12T01:45:<agentId>` belongs to another agent.
     return agentId === 'cos' ? slotKey.split(':').length === 2 : slotKey.endsWith(`:${agentId}`)
   })
-  return studyGapHistoryFromDiagnostics(lane.slice(0, Math.max(1, Math.floor(limit))).map(row => row.gap_diagnostics))
+  const window = lane.slice(0, Math.max(1, Math.floor(limit)))
+  return {
+    gaps: studyGapHistoryFromDiagnostics(window.map(row => row.gap_diagnostics)),
+    sourceErrors: window.map(row => row.source_errors),
+  }
 }
 
 async function loadEligiblePlanIds(planIds: string[], now: Date, agentId: string): Promise<Set<string>> {
@@ -293,10 +305,10 @@ export async function runCosUniversityContinuousLearning(options: {
     // Many more plans are eligible than there are study slots, so the slots are the scarce resource.
     // Gaps whose sources keep returning an already-consumed pool move behind gaps that can still
     // yield. Nothing is excluded and no admission threshold changes; only the queue order does.
-    const supplyHistory = await loadRecentGapDiagnostics(agentId)
+    const laneHistory = await loadRecentLaneHistory(agentId)
     const eligiblePlans = orderStudyPlansBySupply(
       activePlans.filter(plan => eligibleIds.has(plan.id)),
-      supplyHistory,
+      laneHistory.gaps,
     ).slice(0, maxStudyPlans)
     summary.eligible = eligiblePlans.length
     if (!eligiblePlans.length) {
@@ -320,10 +332,14 @@ export async function runCosUniversityContinuousLearning(options: {
     if (!store) throw new Error('persistent_learning_store_unavailable')
     const approvedUrls = parseApprovedLearningUrls()
     const liveAdapters = createLiveLearningAdapters()
-    const adapters = [
+    // The in-process circuit breaker is rebuilt with the adapters every cycle, so a source that is
+    // down all day is retried in full on every tick. Recent recorded failures are the only durable
+    // memory of that, and a probe cycle re-admits a cooled-down source so recovery needs no deploy.
+    const cooledSources = cooledDownSourceIds({ runs: laneHistory.sourceErrors, slotKey })
+    const adapters = withoutCooledDownSources([
       ...(approvedUrls.length ? [approvedUrlLearningAdapter(approvedUrls)] : []),
       ...liveAdapters,
-    ]
+    ], cooledSources)
     const director = new ContinuousLearningDirector(store, ZERO_EXTERNAL_COST_POLICY)
     const cycle = new ContinuousLearningCycle(director, adapters)
     const result = await cycle.run(gaps, 0)

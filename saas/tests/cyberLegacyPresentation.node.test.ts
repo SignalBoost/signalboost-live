@@ -312,3 +312,13 @@ test('mailto link query parameters remain technical text rather than product pro
     assert.equal(cyberProductText(`${link} — SignalBoost prepared a plan`), `${link} — iTMounts prepared a plan`)
   }
 })
+
+test('natural-language punctuation after a URL does not shield following product prose', () => {
+  for (const link of ['https://example.com', 'https://example.com/SignalBoost?label=SignalBoost#SignalBoost', 'mailto:SignalBoost@example.com?subject=SignalBoost']) {
+    for (const punctuation of ['—', '–', '，', '；', '。', '！', '？']) {
+      assert.equal(cyberProductText(`${link}${punctuation}SignalBoost prepared a plan`), `${link}${punctuation}iTMounts prepared a plan`)
+    }
+  }
+  const encoded = 'https://example.com/SignalBoost%E2%80%94SignalBoost?q=SignalBoost%EF%BC%8CSignalBoost'
+  assert.equal(cyberProductText(encoded), encoded)
+})

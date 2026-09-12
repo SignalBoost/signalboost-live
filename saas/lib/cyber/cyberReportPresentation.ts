@@ -84,8 +84,9 @@ export function cyberProductText(value: string | null | undefined): string {
   if (!value) return ''
   // Preserve matching code delimiters of any length, not just one-backtick spans.
   const code = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/
-  // Mailto headers are part of the URI, not prose after an email address.
-  const url = /(?:[a-z][a-z0-9+.-]*:\/\/|git@)[^\s<>"`]+|mailto:[^\s<>"`?]*\?(?=[^\s<>"`&=]+=)[^\s<>"`]*/
+  // Mailto headers are part of the URI. Natural-language dash/fullwidth punctuation
+  // ends bare URL text; percent-encoded URI characters stay protected.
+  const url = /(?:[a-z][a-z0-9+.-]*:\/\/|git@)[^\s<>"`—–，；。！？]+|mailto:[^\s<>"`—–，；。！？?]*\?(?=[^\s<>"`—–，；。！？&=]+=)[^\s<>"`—–，；。！？]*/
   // This is token shielding, not address validation. A DNS name/domain literal ends
   // before sentence punctuation; it must not swallow adjacent product prose.
   const email = /(?:mailto:)?(?:"(?:[^"\\\r\n]|\\.)*"|[\p{L}\p{N}\p{M}!#$%&'*+\/=?^_`{|}~.-]+)@(?:\[[^\]\r\n]+\]|[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?)*)/u

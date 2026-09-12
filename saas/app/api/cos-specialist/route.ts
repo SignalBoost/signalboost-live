@@ -1,12 +1,30 @@
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { getAccess } from '@/lib/auth/access'
+import { attachProductionSpecialistMeshEvidence } from '@/a2a-host/a2a-host-activation'
 import { getCOSA2ARuntimeHost } from '@/a2a-host/cos-runtime-host'
 import { planCOSSpecialistFromText } from '@/a2a-host/cos-specialist-planner'
 import { selectCOSA2AHostForPlan } from '@/a2a-host/reference-cos-runtime-host'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+let meshEvidenceDb: SupabaseClient | null | undefined
+
+function productionMeshEvidenceDb(): SupabaseClient | null {
+  if (meshEvidenceDb !== undefined) return meshEvidenceDb
+  const url = String(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').trim()
+  const serviceRoleKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+  if (!url || !serviceRoleKey) {
+    meshEvidenceDb = null
+    return meshEvidenceDb
+  }
+  meshEvidenceDb = createClient(url, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+  return meshEvidenceDb
+}
 
 function text(value: unknown): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim()
@@ -43,8 +61,10 @@ function exactScope(body: any): { tenantId: string; environmentId: string; porta
 
 /**
  * COS specialist runtime bridge.
- * Buyer-installed hosts take precedence. When none is installed, privileged exact-scope COS
- * may use the real SignalBoost reference host for canonical advisory self-healing diagnosis only.
+ * Buyer-installed hosts take precedence. In Production-capable server environments an installed host is
+ * enriched with service-role durable qualification/telemetry evidence before orchestration. When none is
+ * installed, privileged exact-scope COS may use the real SignalBoost reference host for canonical advisory
+ * self-healing diagnosis only. This route never fabricates a registry or transport authority on cold start.
  */
 export async function POST(req: NextRequest) {
   const body: any = await req.clone().json().catch(() => ({}))
@@ -77,7 +97,12 @@ export async function POST(req: NextRequest) {
     skillId: inferredPlan!.skillId,
   }
 
-  const selected = selectCOSA2AHostForPlan({ installedHost: getCOSA2ARuntimeHost(), scope, plan })
+  const installedHost = getCOSA2ARuntimeHost()
+  const durableEvidenceDb = installedHost ? productionMeshEvidenceDb() : null
+  const productionHost = installedHost && durableEvidenceDb
+    ? attachProductionSpecialistMeshEvidence(installedHost, durableEvidenceDb)
+    : installedHost
+  const selected = selectCOSA2AHostForPlan({ installedHost: productionHost, scope, plan })
   if (!selected.host) {
     if (!hasSuppliedPlan) return cosPrimaryPost(req)
     return NextResponse.json({ ok: false, reply: 'No governed A2A specialist host is available for this specialist plan.', source: 'cos-a2a-host-unavailable', execution_allowed: false, external_action_taken: false }, { status: 503 })
@@ -102,6 +127,7 @@ export async function POST(req: NextRequest) {
     source: result.ok ? 'cos-a2a-specialist' : 'cos-a2a-specialist-blocked',
     a2a: result,
     a2a_host_source: selected.source,
+    a2a_mesh_evidence_source: installedHost && durableEvidenceDb ? 'supabase-service-role' : 'host-configured',
     specialist_plan_source: hasSuppliedPlan ? 'supplied' : 'natural_language',
     specialist_planner: hasSuppliedPlan ? undefined : inferredPlan,
     execution_allowed: result.ok,

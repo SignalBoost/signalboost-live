@@ -1,5 +1,7 @@
 // saas/lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts
 import { callCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
+import { executeUniversityPractice, universityPracticeExecutionKey, universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -113,8 +115,8 @@ function practiceFenceMetadata(agentId: string, requiredPlanId?: string | null, 
   const planId = clean(requiredPlanId, 80)
   const round = Number(requiredPracticeRound)
   return planId && Number.isFinite(round) && round >= 1
-    ? { origin: ORIGIN, agentId, universityPlanId: planId, practiceRound: Math.floor(round) }
-    : { origin: ORIGIN, agentId }
+    ? { origin: ORIGIN, agentId, universityPlanId: planId, practiceRound: Math.floor(round), ...universityPracticeExecutionFence(agentId) }
+    : { origin: ORIGIN, agentId, ...universityPracticeExecutionFence(agentId) }
 }
 
 async function practiceFenceStillValid(agentId: string, planId: string, practiceRound: number, now = new Date()): Promise<boolean> {
@@ -232,7 +234,7 @@ function universityProcedure(plan: CosUniversityPracticePlanRow): Record<string,
 async function ensurePracticeSkill(agentId: string, plan: CosUniversityPracticePlanRow): Promise<string> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const skillKey = cosUniversityPracticeSkillKey(plan.plan_key)
+  const skillKey = cosUniversityPracticeSkillKey(universityPracticeExecutionKey(agentId, plan.plan_key))
   const existing = await db.from('cos_cognitive_skills').select('id').eq('skill_key', skillKey).maybeSingle()
   if (existing.error) throw existing.error
   if (existing.data?.id) return skillKey
@@ -251,6 +253,7 @@ async function ensurePracticeSkill(agentId: string, plan: CosUniversityPracticeP
     provenance: {
       origin: ORIGIN,
       agentId,
+      ...universityPracticeExecutionFence(agentId),
       universityPlanId: plan.id,
       universityPlanKey: plan.plan_key,
       studyAttempt: plan.attempt_count,
@@ -258,6 +261,7 @@ async function ensurePracticeSkill(agentId: string, plan: CosUniversityPracticeP
     metadata: {
       origin: ORIGIN,
       agentId,
+      ...universityPracticeExecutionFence(agentId),
       universityPlanId: plan.id,
       universityPlanKey: plan.plan_key,
       academicCredit: false,
@@ -275,7 +279,7 @@ async function queuePracticeRound(agentId: string, plan: CosUniversityPracticePl
   if (!db) return 0
   const skillKey = await ensurePracticeSkill(agentId, plan)
   const variants = buildCosUniversityDeliberatePracticeVariants({
-    planKey: plan.plan_key,
+    planKey: universityPracticeExecutionKey(agentId, plan.plan_key),
     subjectId: plan.subject_id,
     language: plan.language_code,
     failureClass: plan.failure_class,
@@ -298,6 +302,7 @@ async function queuePracticeRound(agentId: string, plan: CosUniversityPracticePl
       metadata: {
         origin: ORIGIN,
         agentId,
+        ...universityPracticeExecutionFence(agentId),
         profile: COS_UNIVERSITY_PRACTICE_PROFILE,
         academicCredit: false,
         universityPlanId: plan.id,
@@ -379,7 +384,7 @@ async function deferPractice(item: PracticeQueueRow, reason: string): Promise<vo
   if (result.error) throw result.error
 }
 
-async function practiceStateForPlan(planId: string, practiceRound: number): Promise<{
+async function practiceStateForPlan(agentId: string, planId: string, practiceRound: number): Promise<{
   total: number
   passed: number
   failed: number
@@ -391,7 +396,7 @@ async function practiceStateForPlan(planId: string, practiceRound: number): Prom
   const result = await db.from('cos_active_practice_queue')
     .select('status')
     .eq('generation_source', 'curated')
-    .contains('metadata', { origin: ORIGIN, universityPlanId: planId, practiceRound })
+    .contains('metadata', practiceFenceMetadata(agentId, planId, practiceRound))
   if (result.error) throw result.error
   const statuses = (result.data || []).map(row => String(row.status || ''))
   return {
@@ -403,13 +408,13 @@ async function practiceStateForPlan(planId: string, practiceRound: number): Prom
   }
 }
 
-async function reconcilePlan(planId: string, practiceRound: number): Promise<boolean> {
+async function reconcilePlan(agentId: string, planId: string, practiceRound: number): Promise<boolean> {
   const db = cosServiceDb()
   if (!db) return false
-  const current = await db.from('cos_university_study_plans').select('status,evidence,attempt_count').eq('id', planId).maybeSingle()
+  const current = await db.from('cos_university_study_plans').select('status,evidence,attempt_count').eq('agent_id', agentId).eq('id', planId).maybeSingle()
   if (current.error || !current.data) return false
   if (current.data.status !== 'studying' || Math.max(1, Math.floor(Number(current.data.attempt_count || 1))) !== practiceRound) return false
-  const state = await practiceStateForPlan(planId, practiceRound)
+  const state = await practiceStateForPlan(agentId, planId, practiceRound)
   const terminal = state.total >= COS_UNIVERSITY_PRACTICE_VARIANTS_PER_ROUND && state.queued === 0 && state.running === 0
   const ready = terminal && state.failed === 0 && state.passed >= COS_UNIVERSITY_PRACTICE_VARIANTS_PER_ROUND
   const evidence = asRecord(current.data.evidence)
@@ -419,6 +424,7 @@ async function reconcilePlan(planId: string, practiceRound: number): Promise<boo
       ...evidence,
       deliberatePractice: {
         profile: COS_UNIVERSITY_PRACTICE_PROFILE,
+        ...universityPracticeExecutionFence(agentId),
         practiceRound,
         total: state.total,
         passed: state.passed,
@@ -431,7 +437,7 @@ async function reconcilePlan(planId: string, practiceRound: number): Promise<boo
       },
     },
     updated_at: new Date().toISOString(),
-  }).eq('id', planId)
+  }).eq('agent_id', agentId).eq('id', planId)
     .eq('status', 'studying')
     .eq('attempt_count', practiceRound)
     .select('id')
@@ -453,18 +459,25 @@ async function executePractice(agentId: string, item: PracticeQueueRow): Promise
     variantKey: item.variant_key,
   }
 
-  if (!planId || !practiceRound || !(await practiceFenceStillValid(agentId, planId, practiceRound))) {
+  if (metadata.agentId !== agentId || metadata.origin !== ORIGIN
+    || (agentId !== 'cos' && metadata.executionBinding !== universityPracticeExecutionFence(agentId).executionBinding)
+    || !planId || !practiceRound || !(await practiceFenceStillValid(agentId, planId, practiceRound))) {
     await discardClaimedPractice(item, 'university_practice_execution_fence_failed')
     return { ...base, status: 'blocked', passed: null, score: null, coverage: null, turnId: null, reasons: ['practice_study_proof_or_remediation_fence_failed'] }
   }
 
-  let execution: Awaited<ReturnType<typeof callCosReasoner>>
+  let execution: Awaited<ReturnType<typeof executeUniversityPractice>>
   try {
-    execution = await callCosReasoner({
-      systemPrompt: PRACTICE_SYSTEM_PROMPT,
-      prompt: item.prompt,
-      maxTokens: 1800,
-      temperature: 0.1,
+    execution = await executeUniversityPractice({
+      agentId, runId: item.id, manifestHash: typeof metadata.manifestHash === 'string' ? metadata.manifestHash : '', prompt: item.prompt,
+    }, {
+      cos: () => callCosReasoner({
+        systemPrompt: PRACTICE_SYSTEM_PROMPT,
+        prompt: item.prompt,
+        maxTokens: 1800,
+        temperature: 0.1,
+      }),
+      bound: executeBoundAgentExam,
     })
   } catch (error) {
     await deferPractice(item, `execution_error:${error instanceof Error ? error.message : String(error)}`)
@@ -518,7 +531,8 @@ async function executePractice(agentId: string, item: PracticeQueueRow): Promise
       origin: ORIGIN,
       academicCredit: false,
       turnId,
-      responseSource: 'cos_local_reasoner',
+      responseSource: execution.responseSource,
+      executionProvenance: execution.executionProvenance,
       answerFormat,
       reasonerKind: execution.reasoner.kind,
       reasonerLabel: execution.reasoner.label,
@@ -637,6 +651,10 @@ export async function runCosUniversityDeliberatePractice(options: {
     ? Math.max(1, Math.floor(Number(options.requiredPracticeRound)))
     : null
   try {
+    if (agentId !== 'cos' && !(await hasBoundAcademicExecutor(agentId))) {
+      summary.errors.push('agent_practice_runtime_unavailable')
+      return summary
+    }
     summary.recovered = await recoverStalePractice(agentId, requiredPlanId, requiredPracticeRound)
     const plans = await loadStudyPlans(agentId, maxPlans, requiredPlanId, requiredPracticeRound)
     summary.plansConsidered = plans.length
@@ -661,7 +679,7 @@ export async function runCosUniversityDeliberatePractice(options: {
       else if (run.status === 'failed') summary.failed += 1
       else if (run.status === 'deferred') summary.deferred += 1
       if (run.planId && run.practiceRound && run.status === 'passed') {
-        const ready = await reconcilePlan(run.planId, run.practiceRound)
+        const ready = await reconcilePlan(agentId, run.planId, run.practiceRound)
         if (ready) summary.readyForExam += 1
       }
     }

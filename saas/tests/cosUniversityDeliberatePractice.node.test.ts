@@ -101,7 +101,9 @@ test('runtime reuses cognitive practice evidence but cannot award an academic gr
   assert.match(runner, /callCosReasoner/)
   assert.match(runner, /parseLocalResult/)
   assert.match(runner, /externalEscalationAllowed: false/)
-  assert.match(runner, /responseSource: 'cos_local_reasoner'/)
+  assert.match(runner, /responseSource: execution\.responseSource/)
+  assert.match(runner, /executionProvenance: execution\.executionProvenance/)
+  assert.match(file('lib/ai/cos/cosUniversityPracticeExecution.ts'), /responseSource: 'cos_local_reasoner'/)
   assert.match(runner, /status: ready \? 'ready_for_exam' : 'studying'/)
   assert.doesNotMatch(runner, /tryCOSFirstAnswer/)
   assert.doesNotMatch(runner, /recordCosUniversityAssessment/)
@@ -197,3 +199,6 @@ test('practice selection runtime preserves bounded agent-scoped reads and the ex
   assert.match(loader, /practiceFenceStillValid\(agentId, plan\.id, Math\.floor\(requiredRound\)\)/)
   assert.doesNotMatch(loader, /\.slice\(0, limit\)/)
 })
+
+// Bound-executor regressions run with the existing mandatory practice deployment gate.
+import './cosUniversityBoundPractice.node.test.ts'

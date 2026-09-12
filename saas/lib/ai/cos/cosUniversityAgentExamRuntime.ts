@@ -3,6 +3,7 @@ import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-infe
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
+import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import {
   executeBoundSoftwareCapstone,
   isBoundSoftwareCapstoneEvidence,
@@ -21,8 +22,8 @@ export async function loadAgentOwnProcedures(agentId: string): Promise<string[]>
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_cognitive_skills')
     .select('status,procedure,metadata,provenance,evaluator_approved,understanding_approved,last_validated_at')
-    .contains('metadata', { origin: 'cos_university_deliberate_practice', agentId })
-    .contains('provenance', { origin: 'cos_university_deliberate_practice', agentId })
+    .contains('metadata', { origin: 'cos_university_deliberate_practice', agentId, ...universityPracticeExecutionFence(agentId) })
+    .contains('provenance', { origin: 'cos_university_deliberate_practice', agentId, ...universityPracticeExecutionFence(agentId) })
     .in('status', ['validated', 'learned', 'mastered'])
     .order('last_validated_at', { ascending: false }).order('id', { ascending: true }).limit(24)
   if (result.error) throw result.error

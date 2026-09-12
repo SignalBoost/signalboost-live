@@ -1,6 +1,8 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { COS_UNIVERSITY_PRACTICE_VARIANTS_PER_ROUND } from './cosUniversityDeliberatePractice.ts'
 
+import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
+
 const ORIGIN = 'cos_university_deliberate_practice'
 const MAX_STUDY_PLANS_TO_RECONCILE = 100
 const MAX_PRACTICE_ROWS_TO_RECONCILE = 2000
@@ -79,13 +81,13 @@ async function loadCurrentStudyingPlans(runPlanIds: string[], agentId: string): 
   return [...byId.values()]
 }
 
-async function loadUniversityPracticeRows(): Promise<QueueStateRow[]> {
+async function loadUniversityPracticeRows(agentId: string): Promise<QueueStateRow[]> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_active_practice_queue')
     .select('status,last_error,metadata')
     .eq('generation_source', 'curated')
-    .contains('metadata', { origin: ORIGIN })
+    .contains('metadata', { origin: ORIGIN, ...(agentId === 'cos' ? {} : { agentId, ...universityPracticeExecutionFence(agentId) }) })
     .order('created_at', { ascending: false })
     .limit(MAX_PRACTICE_ROWS_TO_RECONCILE)
   if (result.error) throw result.error
@@ -128,7 +130,7 @@ export async function reopenCosUniversityStudyAfterFailedPractice(
   const runPlanIds = [...runKeys].map(key => key.split(':', 1)[0]).filter(Boolean)
   const [plans, practiceRows] = await Promise.all([
     loadCurrentStudyingPlans(runPlanIds, agentId),
-    loadUniversityPracticeRows(),
+    loadUniversityPracticeRows(agentId),
   ])
   if (!plans.length || !practiceRows.length) return summary
 
@@ -171,6 +173,7 @@ export async function reopenCosUniversityStudyAfterFailedPractice(
       },
       updated_at: nowIso,
     })
+      .eq('agent_id', agentId)
       .eq('id', plan.id)
       .eq('status', 'studying')
       .eq('attempt_count', practiceRound)

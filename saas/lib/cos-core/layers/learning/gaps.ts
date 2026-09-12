@@ -21,6 +21,8 @@ export type KnowledgeGapSignal = {
   excludedAdapterIds?: string[]
   /** Declared by the producing lane: this signal is a governed curriculum/study objective. */
   curriculumAligned?: boolean
+  /** Target language code for language study lanes (see KnowledgeGap.targetLanguage). */
+  targetLanguage?: string
   portableIds?: string[]
 }
 
@@ -98,6 +100,7 @@ export function generateKnowledgeGaps(signals: KnowledgeGapSignal[]): KnowledgeG
       sourceKinds: signal.sourceKinds?.length ? [...new Set(signal.sourceKinds)] : undefined,
       excludedAdapterIds: excludedAdapterIds.length ? excludedAdapterIds : undefined,
       ...(signal.curriculumAligned === true ? { curriculumAligned: true } : {}),
+      ...(signal.targetLanguage?.trim() ? { targetLanguage: signal.targetLanguage.trim().toLowerCase() } : {}),
     }
 
     const previous = byKey.get(key)

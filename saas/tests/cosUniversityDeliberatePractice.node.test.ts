@@ -121,6 +121,7 @@ test('ready-for-exam plans stop passive rereading while failed/studying plans ca
 
 test('runtime reuses cognitive practice evidence but cannot award an academic grade', () => {
   const runner = file('lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts')
+  const practiceExecution = file('lib/ai/cos/cosUniversityPracticeExecution.ts')
   assert.match(runner, /cos_active_practice_queue/)
   assert.match(runner, /cos_record_cognitive_practice_result/)
   assert.match(runner, /academicCredit: false/)
@@ -129,7 +130,8 @@ test('runtime reuses cognitive practice evidence but cannot award an academic gr
   assert.match(runner, /externalEscalationAllowed: false/)
   assert.match(runner, /responseSource: execution\.responseSource/)
   assert.match(runner, /executionProvenance: execution\.executionProvenance/)
-  assert.match(file('lib/ai/cos/cosUniversityPracticeExecution.ts'), /responseSource: 'cos_local_reasoner'/)
+  assert.match(practiceExecution, /responseSource: economy \? 'cos_university_practice_model' : 'cos_local_reasoner'/)
+  assert.match(practiceExecution, /await enforceCommonPracticeCostGuard/)
   assert.match(runner, /status: ready \? 'ready_for_exam' : 'studying'/)
   assert.doesNotMatch(runner, /tryCOSFirstAnswer/)
   assert.doesNotMatch(runner, /recordCosUniversityAssessment/)

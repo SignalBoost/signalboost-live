@@ -96,12 +96,12 @@ export async function ensureLocalInferenceRuntimeReady(_config = localInferenceC
 }
 
 function providerFor(config: LocalInferenceConfig): string {
-  const explicit = process.env.LOCAL_AI_MANAGED_PROVIDER?.trim().toLowerCase()
-  if (explicit) return explicit.replace(/[^a-z0-9._-]+/g, '-')
   try {
     const host = normalizeHost(new URL(config.baseUrl).hostname)
     if (host === 'api.deepinfra.com' || host.endsWith('.deepinfra.com')) return 'deepinfra'
-    return isLoopbackOrInternalHost(host) ? 'self_hosted' : host
+    if (isLoopbackOrInternalHost(host)) return 'self_hosted'
+    const explicit = process.env.LOCAL_AI_MANAGED_PROVIDER?.trim().toLowerCase()
+    return explicit ? explicit.replace(/[^a-z0-9._-]+/g, '-') : host
   } catch {
     return 'unknown'
   }
@@ -212,13 +212,15 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       success, httpStatus, error: errorText, finishReason, requestedMaxTokens,
       promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
     })
-    await recordLocalInferenceUsage({
-      requestId, provider, model: config.model, context: usageContext,
-      promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
-      success, httpStatus, latencyMs, finishReason,
-    }).catch(error => {
-      console.warn('[provider-inference-usage-write-failed]', error instanceof Error ? error.message : String(error))
-    })
+    if (provider === 'deepinfra') {
+      await recordLocalInferenceUsage({
+        requestId, provider, model: config.model, context: usageContext,
+        promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
+        success, httpStatus, latencyMs, finishReason,
+      }).catch(error => {
+        console.warn('[provider-inference-usage-write-failed]', error instanceof Error ? error.message : String(error))
+      })
+    }
   }
 
   if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)

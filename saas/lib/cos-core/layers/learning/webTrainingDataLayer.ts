@@ -162,6 +162,10 @@ export function assessWebTrainingSource(url: string, query: string): WebTraining
   return { sourceClass: 'credible_secondary', credibility: 0.7, host, reason: 'public_web_without_structural_primary_authority_signal' }
 }
 
+// Scopes chosen to match INSTITUTIONAL_HOST, STANDARDS_HOST and SCHOLARLY_HOST above; a scope that
+// the scorer would not recognise is wasted budget, so these track that classification directly.
+const AUTHORITATIVE_DISCOVERY_SCOPES = ['site:.edu', 'site:.gov', 'site:.ac.uk'] as const
+
 export function webTrainingMinimumCredibility(value: unknown = process.env.COS_WEB_TRAINING_MIN_CREDIBILITY): number {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? Math.max(0.7, Math.min(0.99, parsed)) : 0.82
@@ -320,6 +324,29 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
       try { hits = await discoverBrave(fetcher, plannedQuery, discoveryLimit, braveKey) } catch { hits = [] }
     }
     if (!hits.length) hits = await discoverProviderFree(fetcher, plannedQuery, discoveryLimit)
+
+    // Measured in Production: unscoped discovery returned 8 results on every call and NONE of them
+    // ever cleared the credibility bar, for every subject, indefinitely. The bar is not the problem
+    // - assessWebTrainingSource emits 0.66/0.70 for ordinary web and then jumps to 0.92+ for
+    // structural authority, so no threshold between those admits anything new. The gap is that a
+    // generic keyword search surfaces almost no institutional hosts. Retry once per scope against
+    // the domains the scorer actually recognises, and only when the unscoped pass produced nothing
+    // admissible, so the common path still costs exactly one request.
+    const admissible = (candidates: SearchHit[]) =>
+      candidates.some(candidate => assessWebTrainingSource(candidate.url, query).credibility >= minCredibility)
+    if (!admissible(hits)) {
+      for (const scope of AUTHORITATIVE_DISCOVERY_SCOPES) {
+        try {
+          const scoped = await discoverProviderFree(fetcher, `${plannedQuery} ${scope}`, discoveryLimit)
+          if (scoped.length) {
+            hits = [...hits, ...scoped]
+            if (admissible(scoped)) break
+          }
+        } catch {
+          // A scoped pass is best-effort: the unscoped hits above remain the result.
+        }
+      }
+    }
 
     const ranked = hits
       .map((hit, index) => ({ hit, index, assessment: assessWebTrainingSource(hit.url, query) }))

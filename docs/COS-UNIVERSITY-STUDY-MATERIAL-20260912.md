@@ -20,7 +20,8 @@ No causal claim is made that missing context alone explains the scored failure.
 - For practice only, resolve the exact claimed queue, same-agent current study plan, accepted proof,
   matching completed acquisition run and exact retained content hashes. No title/time guesswork.
 - Read at most four admitted public-source excerpts. Source text remains untrusted reference data,
-  not validated procedures, case facts, tool instructions, grading evidence or authority.
+  not validated procedures, case facts, tool instructions, grading evidence or authority. Excerpts
+  are serialized only in the lower-trust user/data message; system instructions contain no source text.
 - Hash the actual source packet into execution context/prompt provenance and retain the source
   hashes, acquisition run, plan and attempt identifiers in the existing execution evidence.
 - Keep independent exams/capstones byte-equivalent in their input framing and token budget. Their
@@ -37,7 +38,7 @@ it is not proof of permanent model learning, improved retention, transfer or gra
 Five reconstructed existing files were checked against their exact Git blob hashes before editing.
 The actual baseline practice composer ignored the admitted-material port; the same regression
 passes on the repair and verifies that the material reaches inference with recorded provenance.
-Thirteen focused tests cover receipt/identity/time/round/source validation, bounded source packets,
+Fourteen focused tests cover receipt/identity/time/round/source validation, bounded source packets,
 actual practice delivery, unchanged independent examination, unavailable study, and actual cycle
 admission outcomes using injected I/O. All pass, zero failed/skipped. Pure modules pass strict tsc.
 The existing seven inference/atomic-fence tests remain unchanged and import the new suite.
@@ -46,3 +47,14 @@ Full repository CI/Preview and exact-merge Production are separate release gates
 requires an actual new source-hash receipt, a Specialist practice execution carrying that packet,
 and an independently scored subsequent examination/remediation. Idle or skipped cron calls cannot
 substitute. No live successful full learning/retest cycle is claimed by these local tests.
+
+
+## Review correction
+
+The first candidate embedded source excerpts in the system message. The review correctly identified
+that prose labels alone do not create message-role isolation. Source text now travels only in the
+user/data message, before the explicit host practice case; system instructions reject commands from
+source titles, excerpts or URLs. A hostile-source regression checks that none of its content enters
+the system message and that provenance hashes the actual composed user message. Independent exam
+inputs remain byte-equivalent. This is structural isolation, not a claim that all prompt-injection
+risk or every possible model response has been eliminated.

@@ -1,6 +1,6 @@
 import type { A2ADelegationRisk } from './a2a-agent-registry.ts'
 
-export const A2A_RUNTIME_OBSERVATION_VERSION = 'signalboost-a2a-runtime-observation-v1' as const
+export const A2A_RUNTIME_OBSERVATION_VERSION = 'signalboost-a2a-runtime-observation-v2' as const
 
 export interface A2ARuntimeObservationEvent {
   schemaVersion: typeof A2A_RUNTIME_OBSERVATION_VERSION
@@ -17,6 +17,8 @@ export interface A2ARuntimeObservationEvent {
   risk?: A2ADelegationRisk
   approvalId?: string
   traceId?: string
+  /** True only after the host-owned transport `send` method has actually been entered. */
+  executionAttempted?: boolean
   ok: boolean
   mode: string
   errorCode?: string

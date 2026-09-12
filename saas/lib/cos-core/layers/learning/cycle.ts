@@ -112,7 +112,10 @@ export class ContinuousLearningCycle{
         for(const document of documents){
           if(document.sourceKind!==adapter.kind){this.recordDecision(result,{accepted:false,reason:'source_not_allowed'},diagnostic);continue}
           const source=adapter.id??adapter.kind,score=relevanceOf(document,terms)
-          if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){incrementDiagnosticCount(result.rejected,'not_relevant');if(diagnostic)incrementDiagnosticCount(diagnostic.rejected,'not_relevant');continue}
+          // Relevance is judged after fetching, so a poorly matched adapter burns budget silently.
+          // The unattributed 'not_relevant' total cannot say WHICH adapter is mismatched, so an
+          // attributed companion key is recorded next to it. The original keys are unchanged.
+          if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){incrementDiagnosticCount(result.rejected,'not_relevant');incrementDiagnosticCount(result.rejected,`not_relevant_by_source:${source}`);if(diagnostic)incrementDiagnosticCount(diagnostic.rejected,'not_relevant');continue}
           const kindFloor=admissionFloorFor(document)
           const admission=classifyTieredAdmission({ rawRelevance: score.coverage, confidence: candidate0Confidence(document,score), sourceFloor: kindFloor ?? 0, gapAligned: gapCurriculumAligned(gap) })
           const candidate={...this.toCandidate(document,allTerms,score),admission}
@@ -127,6 +130,7 @@ export class ContinuousLearningCycle{
           // the winning copy was retained. Reserve the hash before the first awaited admission.
           if(attemptedContentHashes.has(candidate.contentHash)){
             incrementDiagnosticCount(result.rejected,'duplicate')
+            incrementDiagnosticCount(result.rejected,`duplicate_by_source:${source}`)
             if(diagnostic)incrementDiagnosticCount(diagnostic.rejected,'duplicate')
             continue
           }

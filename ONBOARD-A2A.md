@@ -2,7 +2,7 @@
 
 Read root `ONBOARD.md` first, then Phases 1–12 under `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE*-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
 
-Current workstream: **A2A Agent Fabric — Specialist Mesh routing/failover foundation is in Production. Durable Production qualification/telemetry adapters and end-to-end live failover acceptance are the active next milestone.**
+Current workstream: **A2A Agent Fabric — Specialist Mesh routing/failover foundation and durable Production evidence schema are in Production. Governed qualification assessment and genuine two-specialist live failover acceptance are the active next milestone.**
 
 Direction:
 
@@ -12,6 +12,8 @@ Direction:
 - When several specialists are independently eligible for the same exact task, the mesh may rank them automatically by availability, cost, load, latency, reliability, and quality instead of requiring a fixed primary/backup pair. Ranking never expands eligibility or authority.
 - There are no permanent primary/backup specialist pairs. Every independently qualified and authorized specialist may provide backup capacity for work in its proven scope.
 - Qualification is a host-controlled hard gate. Registry assignment and Agent Card advertised skills are not qualification evidence; portable hosts must inject a qualification adapter with durable evidence references.
+- A new specialist may earn qualification only through the dedicated advisory qualification-assessment path: exact registry scope must already authorize the candidate, the host-owned transport send must actually be entered, and an independently injected verifier must judge the returned work and provide a durable evidence reference. Self-verification is rejected. Raw qualification probe prompts/responses are not written to the qualification table.
+- The qualification-assessment path is not ordinary mesh delegation and does not bypass write/consequential controls: it invokes only skills whose registry risk is `advisory`. A failed resolution or pre-send failure creates no qualification decision.
 - Production qualification decisions live in service-role-only durable evidence and are time-bounded. The newest exact-scope decision wins, so a current revocation cannot be bypassed by an older positive record.
 - Production mesh telemetry is service-role-only, exact-scope, time-bounded routing evidence. Expired or unavailable telemetry becomes neutral and never grants eligibility or authority.
 - `activateProductionCOSA2AHost` is the Production composition root: it injects the durable qualification and telemetry adapters into COS rather than permitting implicit metadata-based qualification.

@@ -63,14 +63,14 @@ test('automatic mesh routes to the closest eligible specialist', async () => {
   assert.deepEqual(calls, ['closest'])
 })
 
-test('advisory mesh fails over to the next eligible specialist after recoverable runtime failure', async () => {
+test('advisory mesh fails over to the next eligible specialist after proven transport unavailability', async () => {
   const calls: string[] = []
   const orchestrator = createCOSSpecialistOrchestrator({
     registry: meshRegistry(), qualifications: qualifications(),
     delegation: {
       async invoke(input) {
         calls.push(input.agentId)
-        if (input.agentId === 'closest') return { ok: false, agentId: input.agentId, skillId: input.skillId, risk: 'advisory' as const, mode: 'a2a_runtime_error', error: 'temporary' }
+        if (input.agentId === 'closest') return { ok: false, agentId: input.agentId, skillId: input.skillId, risk: 'advisory' as const, mode: 'a2a_transport_unavailable', error: 'a2a_http_timeout' }
         return { ok: true, agentId: input.agentId, skillId: input.skillId, risk: 'advisory' as const, mode: 'delegated' }
       },
     },
@@ -80,6 +80,23 @@ test('advisory mesh fails over to the next eligible specialist after recoverable
   assert.equal(result.selectedAgentId, 'busy')
   assert.deepEqual(result.meshAttemptedAgentIds, ['closest', 'busy'])
   assert.deepEqual(calls, ['closest', 'busy'])
+})
+
+test('advisory mesh does not fan out deterministic runtime or application errors', async () => {
+  const calls: string[] = []
+  const orchestrator = createCOSSpecialistOrchestrator({
+    registry: meshRegistry(), qualifications: qualifications(),
+    delegation: {
+      async invoke(input) {
+        calls.push(input.agentId)
+        return { ok: false, agentId: input.agentId, skillId: input.skillId, risk: 'advisory' as const, mode: 'a2a_runtime_error', error: 'a2a_response_id_mismatch' }
+      },
+    },
+  })
+  const result = await orchestrator.orchestrate({ ...scope, messageId: 'm-2b', text: 'Research.', plan: { familyId: 'marketing', skillId: 'marketing.research' } })
+  assert.equal(result.ok, false)
+  assert.deepEqual(result.meshAttemptedAgentIds, ['closest'])
+  assert.deepEqual(calls, ['closest'])
 })
 
 test('automatic mesh does not replay non-advisory work after ambiguous runtime failure', async () => {

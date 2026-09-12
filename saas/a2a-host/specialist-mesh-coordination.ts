@@ -70,8 +70,8 @@ export async function registerSpecialistMeshWorker(store: CoordinationStore, wor
   return store.registerInstance({
     instanceId: required(worker.instanceId, 'worker.instanceId'),
     runtimeId: required(worker.runtimeId, 'worker.runtimeId'),
-    region: input.region,
-    availabilityZone: input.availabilityZone,
+    ...(input.region === undefined ? {} : { region: input.region }),
+    ...(input.availabilityZone === undefined ? {} : { availabilityZone: input.availabilityZone }),
     startedAt: at.toISOString(),
     heartbeatAt: at.toISOString(),
     softwareVersion: required(input.softwareVersion, 'softwareVersion'),

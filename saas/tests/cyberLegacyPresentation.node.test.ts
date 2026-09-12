@@ -198,6 +198,7 @@ test('routine and completed remediation prose also uses the current brand withou
     assert.match(visible, /iTMounts prepared the proposal, not a deployment/)
     assert.equal(JSON.stringify(row), before)
     assert.equal(buttons(tree).length, status === 'completed' ? 0 : 1)
+    if (status === 'completed') assert.match(visible, /Stored records and approval history are unchanged/)
   }
 })
 
@@ -225,4 +226,16 @@ test('display branding handles legacy casing and prose in all five supported lan
   assert.equal(cyberProductText(null), '')
   assert.equal(cyberProductText('iTMounts'), 'iTMounts')
   for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(cyberReportPresentationCopy(lang).brandDisplayNotice, /iTMounts/)
+})
+
+
+test('product adjectives normalize without rewriting hyphenated technical identifiers', () => {
+  for (const adjective of ['powered', 'assisted', 'driven', 'generated', 'managed', 'enabled', 'based', 'backed', 'led']) {
+    for (const name of ['SignalBoost', 'SIGNALBOOST AI', 'SignalBoostAi']) {
+      assert.equal(cyberProductText(`${name}-${adjective} remediation`), `iTMounts-${adjective} remediation`)
+    }
+  }
+  for (const technical of ['signalboost-live', 'signalboost-api', 'signalboost-worker', 'signalboost-powered.ts', 'src/SignalBoost-powered', '`SignalBoost-powered`', 'https://example.com/SignalBoost-powered']) {
+    assert.equal(cyberProductText(technical), technical)
+  }
 })

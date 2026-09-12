@@ -86,6 +86,11 @@ export function cyberProductText(value: string | null | undefined): string {
   // package, email and identifier characters also distinguish technical names from prose.
   return value.split(/(`[^`]*`|(?:[a-z][a-z0-9+.-]*:\/\/|mailto:|git@)[^\s<>"`]+)/gi)
     .map((part, index) => index % 2 ? part : part.replace(
+      // Descriptive compounds are product prose, not generic hyphenated identifiers.
+      // Paths, filenames, email addresses, URLs and code remain protected.
+      /(?<![\p{L}\p{N}_./\\@-])SignalBoost(?:Ai|\s+AI)?(?=-(?:powered|assisted|driven|generated|managed|enabled|based|backed|led)(?![\p{L}\p{N}_/\\@-]|\.[\p{L}\p{N}]))/giu,
+      name => publicBrandText(name),
+    ).replace(
       /(?<![\p{L}\p{N}_./\\@-])SignalBoost(?:Ai|\s+AI)?(?![\p{L}\p{N}_/\\@-]|\.[\p{L}\p{N}])/giu,
       name => publicBrandText(name),
     )).join('')

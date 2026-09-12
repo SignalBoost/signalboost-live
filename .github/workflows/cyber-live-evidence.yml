@@ -1,0 +1,42 @@
+name: Cyber Live Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'saas/lib/cyber/dependencyScanner.ts'
+      - 'saas/lib/audit/repoTarget.ts'
+      - 'saas/scripts/cyber-live-evidence.mjs'
+      - '.github/workflows/cyber-live-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    name: Collect live advisory evidence (not security clearance)
+    if: github.repository == 'SignalBoost/signalboost-live' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read exact-revision manifests, lockfiles and OSV details
+        run: node saas/scripts/cyber-live-evidence.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CYBER_EVIDENCE_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Preserve evidence including failed or partial collection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyber-live-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .cyber-evidence/report.json
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: true

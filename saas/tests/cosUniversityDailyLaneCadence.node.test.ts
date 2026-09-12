@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityDailyLaneCadence.node.test.ts
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -5,6 +6,7 @@ import test from 'node:test'
 import { COS_UNIVERSITY_FEATURE_GATED_PATHS } from '../lib/ai/cos/cosUniversityLearningAssurance.ts'
 import {
   COS_UNIVERSITY_DAILY_LANE_WINDOWS,
+  batchExecutedNothing,
   decideCosUniversityDailyLaneCadence,
   isCosUniversityDailyBatchExecution,
 } from '../lib/ai/cos/cosUniversityDailyLaneCadenceCore.ts'
@@ -229,4 +231,50 @@ test('graduation runner is agent-scoped: own enrollment, residence, evidence, ca
   const residenceAt = runner.indexOf("reasons: ['minimum_residence_incomplete']")
   const awardAt = runner.indexOf('await awardUndergraduateCredential(agentId, before.status, now)')
   assert.ok(residenceAt > 0 && awardAt > residenceAt)
+})
+test('a batch whose runs all ended in error does not consume the daily academic window', () => {
+  // Production 2026-09-11T07:00Z: both exam runs failed with an embeddings HTTP 402 and were recorded
+  // as status 'error'. The runner returns those rather than throwing, so errors[] was empty and the
+  // receipt claimed success — the day's exam window was spent without a single exam being answered.
+  const errorOnlyBatch = {
+    invocationSucceeded: true,
+    featureEnabled: true,
+    attempted: 0,
+    passed: 0,
+    failed: 0,
+    runs: [
+      { status: 'error', reasons: ['execution_error:localEmbeddings: HTTP 402'] },
+      { status: 'error', reasons: ['execution_error:localEmbeddings: HTTP 402'] },
+    ],
+  }
+  assert.equal(batchExecutedNothing(errorOnlyBatch), true)
+  assert.equal(isCosUniversityDailyBatchExecution(errorOnlyBatch), false)
+
+  const windowOpen = new Date('2026-09-11T07:00:00.000Z')
+  const cadence = decideCosUniversityDailyLaneCadence({
+    path: 'independent_exams',
+    now: new Date('2026-09-11T08:00:00.000Z'),
+    rows: [{ event_key: 'error-only', observed_at: windowOpen.toISOString(), evidence: errorOnlyBatch }],
+  })
+  assert.equal(cadence.due, true)
+  assert.equal(cadence.reason, 'daily_batch_due')
+})
+
+test('one real run in the batch still counts as the day, and an empty batch is unaffected', () => {
+  const mixed = {
+    invocationSucceeded: true,
+    featureEnabled: true,
+    runs: [{ status: 'error', reasons: [] }, { status: 'failed', reasons: ['required_group_1_missing'] }],
+  }
+  assert.equal(batchExecutedNothing(mixed), false)
+  assert.equal(isCosUniversityDailyBatchExecution(mixed), true)
+
+  // A genuinely failed exam is an academic outcome, not an execution failure.
+  const allFailed = { invocationSucceeded: true, featureEnabled: true, runs: [{ status: 'failed' }] }
+  assert.equal(isCosUniversityDailyBatchExecution(allFailed), true)
+
+  // Lanes whose receipts carry no runs array keep their previous behaviour exactly.
+  assert.equal(batchExecutedNothing({ invocationSucceeded: true, featureEnabled: true }), false)
+  assert.equal(isCosUniversityDailyBatchExecution({ invocationSucceeded: true, featureEnabled: true }), true)
+  assert.equal(batchExecutedNothing({ invocationSucceeded: true, featureEnabled: true, runs: [] }), false)
 })

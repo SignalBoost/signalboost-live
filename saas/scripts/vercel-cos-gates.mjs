@@ -8,6 +8,7 @@ const tests = [
   'tests/cosUniversityGraduationRuntimePolicy.node.test.ts',
   'tests/cosUniversityAcademicExecutionPolicy.node.test.ts',
   'tests/cosUniversityAgentGradeEligibility.node.test.ts',
+  'tests/cyberDependencyScanCoverage.node.test.ts',
   'tests/cosUniversityExecutionReceipt.node.test.ts',
   'tests/cosUniversityGraduationRemediation.node.test.ts',
   'tests/cosUniversityAgentCapstone.node.test.ts',

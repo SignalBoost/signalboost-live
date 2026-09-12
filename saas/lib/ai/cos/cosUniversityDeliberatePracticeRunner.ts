@@ -477,13 +477,20 @@ async function executePractice(agentId: string, item: PracticeQueueRow): Promise
     await deferPractice(item, 'local_reasoner_unavailable')
     return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: null, reasons: ['local_reasoner_unavailable'] }
   }
+  // Practice is graded by the deterministic rubric against ANSWER TEXT only; the JSON
+  // `confidence` field is never read on this path. A model that reasons correctly but omits
+  // the JSON envelope must therefore be graded on what it said, not deferred forever. The
+  // envelope is still requested and still preferred when present; the raw draft is only a
+  // fallback, and the chosen format is recorded on the result so envelope drift stays visible.
   const parsed = parseLocalResult(execution.text)
-  if (!parsed?.answer?.trim()) {
-    await deferPractice(item, `practice_json_unparseable raw=${clean(execution.text, 900)}`)
-    return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: execution.turnId, reasons: ['practice_json_unparseable'] }
+  const parsedAnswer = parsed?.answer?.trim() || ''
+  const rawAnswer = String(execution.text ?? '').trim().slice(0, 20000)
+  const reply = parsedAnswer || rawAnswer
+  const answerFormat = parsedAnswer ? 'json_contract' : 'plain_text_fallback'
+  if (!reply) {
+    await deferPractice(item, 'practice_empty_response')
+    return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: execution.turnId, reasons: ['practice_empty_response'] }
   }
-
-  const reply = parsed.answer
   const turnId = execution.turnId
   if (!(await practiceFenceStillValid(agentId, planId, practiceRound))) {
     await discardClaimedPractice(item, 'university_practice_post_inference_fence_failed')
@@ -514,6 +521,7 @@ async function executePractice(agentId: string, item: PracticeQueueRow): Promise
       academicCredit: false,
       turnId,
       responseSource: 'cos_local_reasoner',
+      answerFormat,
       reasonerKind: execution.reasoner.kind,
       reasonerLabel: execution.reasoner.label,
       externalEscalationAllowed: false,

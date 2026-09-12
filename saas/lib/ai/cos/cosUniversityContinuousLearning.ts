@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityContinuousLearning.ts
 import { ContinuousLearningCycle, type LearningCycleResult } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
@@ -12,6 +13,10 @@ import {
   autonomousLearningReadiness,
   parseApprovedLearningUrls,
 } from '@/lib/cos/dailyAutonomousLearning'
+import {
+  orderStudyPlansBySupply,
+  studyGapHistoryFromDiagnostics,
+} from './cosUniversityStudySupplyPriority.ts'
 import { runCosUniversityPlanningCycle } from './cosUniversityStore.ts'
 import { ensureCosUniversityExamFailureRemediationPlans } from './cosUniversityExamRemediation.ts'
 import {
@@ -157,6 +162,31 @@ async function finishContinuousSlot(
   if (result.error) throw result.error
 }
 
+/**
+ * Recent completed cycles for this agent's own lane, newest first. Only gap_diagnostics is read:
+ * bounded per-gap counts, never study text. A read failure degrades to "no history", which restores
+ * the previous ordering rather than blocking the cycle.
+ */
+async function loadRecentGapDiagnostics(agentId: string, limit = 8): Promise<ReturnType<typeof studyGapHistoryFromDiagnostics>> {
+  const db = cosServiceDb()
+  if (!db) return studyGapHistoryFromDiagnostics([])
+  const result = await db.from('cos_university_continuous_runs')
+    .select('slot_key,gap_diagnostics')
+    .eq('status', 'completed')
+    .order('started_at', { ascending: false })
+    .limit(Math.max(2, Math.min(80, Math.floor(limit) * 2)))
+  if (result.error) return studyGapHistoryFromDiagnostics([])
+  const rows = (result.data || []) as Array<{ slot_key: string; gap_diagnostics: unknown }>
+  // COS writes `<window>`; every other agent writes `<window>:<agentId>`. Matching the suffix keeps
+  // one agent's barren history from reordering another agent's plans.
+  const lane = rows.filter(row => {
+    const slotKey = String(row.slot_key || '')
+    // `2026-09-12T01:45` is COS's own window; `2026-09-12T01:45:<agentId>` belongs to another agent.
+    return agentId === 'cos' ? slotKey.split(':').length === 2 : slotKey.endsWith(`:${agentId}`)
+  })
+  return studyGapHistoryFromDiagnostics(lane.slice(0, Math.max(1, Math.floor(limit))).map(row => row.gap_diagnostics))
+}
+
 async function loadEligiblePlanIds(planIds: string[], now: Date, agentId: string): Promise<Set<string>> {
   if (!planIds.length) return new Set()
   const db = cosServiceDb()
@@ -260,7 +290,14 @@ export async function runCosUniversityContinuousLearning(options: {
 
     const eligibleIds = await loadEligiblePlanIds(activePlans.map(plan => plan.id), now, agentId)
     const maxStudyPlans = Math.max(1, Math.min(6, Math.floor(options.maxStudyPlans || 4)))
-    const eligiblePlans = activePlans.filter(plan => eligibleIds.has(plan.id)).slice(0, maxStudyPlans)
+    // Many more plans are eligible than there are study slots, so the slots are the scarce resource.
+    // Gaps whose sources keep returning an already-consumed pool move behind gaps that can still
+    // yield. Nothing is excluded and no admission threshold changes; only the queue order does.
+    const supplyHistory = await loadRecentGapDiagnostics(agentId)
+    const eligiblePlans = orderStudyPlansBySupply(
+      activePlans.filter(plan => eligibleIds.has(plan.id)),
+      supplyHistory,
+    ).slice(0, maxStudyPlans)
     summary.eligible = eligiblePlans.length
     if (!eligiblePlans.length) {
       await finishContinuousSlot(claim.id, new Date(), summary, attemptedPlanIds)

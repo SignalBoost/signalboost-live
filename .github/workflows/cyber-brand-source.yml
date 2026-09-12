@@ -1,0 +1,28 @@
+name: Cyber Brand Source Snapshot
+on:
+  push:
+    branches: [fix/itmounts-cyber-display-brand-20260912]
+    paths: [.github/workflows/cyber-brand-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    if: github.repository == 'SignalBoost/signalboost-live' && github.ref == 'refs/heads/fix/itmounts-cyber-display-brand-20260912'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive only tracked source at the exact checked-out commit
+        run: |
+          mkdir source-evidence
+          git rev-parse HEAD > source-evidence/commit.txt
+          git archive --format=tar.gz HEAD > source-evidence/source.tar.gz
+          sha256sum source-evidence/source.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cyber-brand-source-${{ github.sha }}
+          path: source-evidence/
+          if-no-files-found: error
+          retention-days: 2

@@ -4,6 +4,8 @@ import { readUiSource } from './helpers/sourceWithUiCopy.mjs'
 import './cyberRemediationAutonomy.node.test.ts'
 import './cyberAdvisoryDetails.node.test.ts'
 import './cyberLegacyPresentation.node.test.ts'
+import './cyberCrossRangeFixes.node.test.ts'
+import './cyberLiveEvidenceFailures.node.test.ts'
 
 // Re-run against the current main integration surface, including Press & Media host dependencies.
 const read = (path: string) => readUiSource(new URL(path, import.meta.url))

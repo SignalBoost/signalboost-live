@@ -20,7 +20,7 @@ test('production qualification adapter fails closed and latest exact-scope decis
   assert.deepEqual(await port.snapshot(scope), { b: { qualified: true, evidenceRef: 'credential:b' } })
 })
 
-test('production telemetry adapter ranks only scoped fresh metadata evidence', async () => {
+test('production telemetry adapter ranks only scoped fresh specialist-execution evidence', async () => {
   const now = Date.parse('2026-09-12T20:00:00Z')
   const port = createProductionSpecialistMeshSignalPort({
     now: () => now,
@@ -30,6 +30,9 @@ test('production telemetry adapter ranks only scoped fresh metadata evidence', a
         return [
           { schemaVersion: A2A_RUNTIME_OBSERVATION_VERSION, eventId: '1', occurredAt: '2026-09-12T19:59:00Z', durationMs: 3000, tenantId: 'tenant-1', environmentId: 'production', portableId: 'cos', agentId: 'a', skillId: 'self-healing.diagnose', ok: true, mode: 'delegated' },
           { schemaVersion: A2A_RUNTIME_OBSERVATION_VERSION, eventId: '2', occurredAt: '2026-09-12T19:58:00Z', durationMs: 9000, tenantId: 'tenant-1', environmentId: 'production', portableId: 'cos', agentId: 'a', skillId: 'self-healing.diagnose', ok: false, mode: 'a2a_transport_unavailable' },
+          { schemaVersion: A2A_RUNTIME_OBSERVATION_VERSION, eventId: 'denied-approval', occurredAt: '2026-09-12T19:57:30Z', durationMs: 2, tenantId: 'tenant-1', environmentId: 'production', portableId: 'cos', agentId: 'a', skillId: 'self-healing.diagnose', ok: false, mode: 'approval_required' },
+          { schemaVersion: A2A_RUNTIME_OBSERVATION_VERSION, eventId: 'denied-audit', occurredAt: '2026-09-12T19:57:00Z', durationMs: 2, tenantId: 'tenant-1', environmentId: 'production', portableId: 'cos', agentId: 'a', skillId: 'self-healing.diagnose', ok: false, mode: 'audit_required' },
+          { schemaVersion: A2A_RUNTIME_OBSERVATION_VERSION, eventId: 'denied-skill', occurredAt: '2026-09-12T19:56:30Z', durationMs: 2, tenantId: 'tenant-1', environmentId: 'production', portableId: 'cos', agentId: 'a', skillId: 'self-healing.diagnose', ok: false, mode: 'skill_not_authorized' },
           { schemaVersion: A2A_RUNTIME_OBSERVATION_VERSION, eventId: 'old', occurredAt: '2026-09-12T18:00:00Z', durationMs: 1, tenantId: 'tenant-1', environmentId: 'production', portableId: 'cos', agentId: 'a', skillId: 'self-healing.diagnose', ok: true, mode: 'delegated' },
           { schemaVersion: A2A_RUNTIME_OBSERVATION_VERSION, eventId: 'wrong', occurredAt: '2026-09-12T19:59:00Z', durationMs: 1, tenantId: 'other', environmentId: 'production', portableId: 'cos', agentId: 'b', skillId: 'self-healing.diagnose', ok: true, mode: 'delegated' },
         ]
@@ -44,6 +47,31 @@ test('production telemetry adapter ranks only scoped fresh metadata evidence', a
   assert.equal(result.a.loadScore, 5)
   assert.equal(result.a.latencyScore, 20)
   assert.deepEqual(result.b, { available: false, latencyScore: 3.333 })
+})
+
+test('pre-execution governance denials alone cannot create negative worker telemetry', async () => {
+  const now = Date.parse('2026-09-12T20:00:00Z')
+  const port = createProductionSpecialistMeshSignalPort({
+    now: () => now,
+    observations: {
+      async read() {
+        return ['approval_required', 'audit_required', 'skill_not_authorized', 'agent_unavailable'].map((mode, index) => ({
+          schemaVersion: A2A_RUNTIME_OBSERVATION_VERSION,
+          eventId: `blocked-${index}`,
+          occurredAt: '2026-09-12T19:59:00Z',
+          durationMs: 1,
+          tenantId: scope.tenantId,
+          environmentId: scope.environmentId,
+          portableId: scope.portableId,
+          agentId: 'a',
+          skillId: scope.skillId,
+          ok: false,
+          mode,
+        }))
+      },
+    },
+  })
+  assert.deepEqual(await port.snapshot(scope), {})
 })
 
 test('telemetry outages never grant authority and degrade to neutral evidence', async () => {

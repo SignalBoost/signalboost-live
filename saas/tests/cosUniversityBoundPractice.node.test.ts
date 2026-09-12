@@ -27,6 +27,11 @@ function ports(overrides: Partial<AgentCapstonePorts> = {}): AgentCapstonePorts 
 }
 const neverCos = async (): Promise<never> => assert.fail('a specialist must never execute through COS')
 
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) delete process.env[name]
+  else process.env[name] = value
+}
+
 test('bound practice invokes only the registered specialist with non-credit framing and bounded output', async () => {
   let calls = 0
   const result = await executeUniversityPractice(request, {
@@ -50,15 +55,49 @@ test('bound practice invokes only the registered specialist with non-credit fram
   assert.equal(result?.executionProvenance?.responseHash, createHash('sha256').update(answer).digest('hex'))
 })
 
-test('COS practice retains its own reasoner and never enters the specialist runtime', async () => {
-  const cos = { text: answer, turnId: 'cos-turn', reasoner: { kind: 'local', label: 'cos-config' } }
-  const result = await executeUniversityPractice({ ...request, agentId: 'cos' }, {
-    cos: async () => cos, bound: async () => assert.fail('COS is not the specialist'),
-  })
-  assert.deepEqual(result, { ...cos, responseSource: 'cos_local_reasoner', executionProvenance: null })
-  assert.equal(await executeUniversityPractice({ ...request, agentId: 'cos' }, {
-    cos: async () => null, bound: async () => assert.fail('no fallback'),
-  }), null)
+test('COS practice retains its own reasoner on non-DeepInfra runtimes and never enters the specialist runtime', async () => {
+  const priorProvider = process.env.LOCAL_AI_MANAGED_PROVIDER
+  const priorBase = process.env.LOCAL_AI_BASE_URL
+  const priorPracticeModel = process.env.UNIVERSITY_PRACTICE_MODEL
+  delete process.env.LOCAL_AI_MANAGED_PROVIDER
+  delete process.env.LOCAL_AI_BASE_URL
+  delete process.env.UNIVERSITY_PRACTICE_MODEL
+  try {
+    const cos = { text: answer, turnId: 'cos-turn', reasoner: { kind: 'local', label: 'cos-config' } }
+    const result = await executeUniversityPractice({ ...request, agentId: 'cos' }, {
+      cos: async () => cos, bound: async () => assert.fail('COS is not the specialist'),
+    })
+    assert.deepEqual(result, { ...cos, responseSource: 'cos_local_reasoner', executionProvenance: null })
+    assert.equal(await executeUniversityPractice({ ...request, agentId: 'cos' }, {
+      cos: async () => null, bound: async () => assert.fail('no fallback'),
+    }), null)
+  } finally {
+    restoreEnv('LOCAL_AI_MANAGED_PROVIDER', priorProvider)
+    restoreEnv('LOCAL_AI_BASE_URL', priorBase)
+    restoreEnv('UNIVERSITY_PRACTICE_MODEL', priorPracticeModel)
+  }
+})
+
+test('DeepInfra COS practice fails closed when the economy practice model is not explicitly configured', async () => {
+  const priorProvider = process.env.LOCAL_AI_MANAGED_PROVIDER
+  const priorBase = process.env.LOCAL_AI_BASE_URL
+  const priorPracticeModel = process.env.UNIVERSITY_PRACTICE_MODEL
+  process.env.LOCAL_AI_MANAGED_PROVIDER = 'deepinfra'
+  delete process.env.LOCAL_AI_BASE_URL
+  delete process.env.UNIVERSITY_PRACTICE_MODEL
+  try {
+    await assert.rejects(
+      executeUniversityPractice({ ...request, agentId: 'cos' }, {
+        cos: async () => ({ text: answer, turnId: 'must-not-run', reasoner: { kind: 'local', label: 'expensive-fallback' } }),
+        bound: async () => assert.fail('COS is not the specialist'),
+      }),
+      /university_practice_model_not_configured/,
+    )
+  } finally {
+    restoreEnv('LOCAL_AI_MANAGED_PROVIDER', priorProvider)
+    restoreEnv('LOCAL_AI_BASE_URL', priorBase)
+    restoreEnv('UNIVERSITY_PRACTICE_MODEL', priorPracticeModel)
+  }
 })
 
 test('unknown role, blank model, inference failure, and role change fail closed without COS fallback', async () => {

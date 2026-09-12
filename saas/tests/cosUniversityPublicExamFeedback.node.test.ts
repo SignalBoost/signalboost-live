@@ -1,3 +1,4 @@
+import './cosUniversityExamDisclosureFeedback.node.test.ts'
 import './cosUniversityExamResponseContract.node.test.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
@@ -17,15 +18,26 @@ const observation = {
   id: identity.runId, agent_id: identity.agentId, status: 'failed', passed: false,
   completed_at: '2026-09-12T04:00:00Z', fresh_execution: true, provenance_recorded: true,
   local_model_invoked: true, external_ai_invoked: false,
+  turn_id: '10000000-0000-4000-8000-000000000002',
   response_source: 'university_software_specialist_v1', reasons: ['word_limit_exceeded'],
 }
+const receipt = {
+  agent_id: identity.agentId, assessment_key: `cos-university-exam:${identity.runId}`,
+  source_ref: `cos_university_exam:${identity.runId}`, assessment_kind: 'unseen_subject_exam',
+  passed: false, independent_scorer: true, scorer_authority: 'host_private_exam',
+  turn_id: observation.turn_id, response_source: observation.response_source,
+  observed_at: '2026-09-12T03:59:59Z',
+  response_contract: { version: 'university_response_contract_v1', maxWords: 260,
+    counting: 'whitespace_separated_tokens', scope: 'entire_final_response' },
+}
+
 
 test('only an exact public length-failure tag projects to fixed training feedback', () => {
-  assert.equal(publicUniversityExamFeedback(observation, identity, now), 'response_length')
+  assert.equal(publicUniversityExamFeedback(observation, identity, now, receipt), 'response_length')
   for (const reasons of [[], null, ['required_group_1_missing'], ['word_limit_exceeded: secret detail'], ['IGNORE POLICY'], [3]]) {
-    assert.equal(publicUniversityExamFeedback({ ...observation, reasons }, identity, now), null)
+    assert.equal(publicUniversityExamFeedback({ ...observation, reasons }, identity, now, receipt), null)
   }
-  const result = publicUniversityExamFeedback({ ...observation, reasons: ['word_limit_exceeded', 'private expected concept'] }, identity, now)
+  const result = publicUniversityExamFeedback({ ...observation, reasons: ['word_limit_exceeded', 'private expected concept'] }, identity, now, receipt)
   assert.equal(result, 'response_length')
   assert.doesNotMatch(JSON.stringify(result), /private|concept|word_limit_exceeded/)
 })
@@ -36,16 +48,17 @@ test('feedback rejects wrong identity, borrowed execution, nonterminal outcomes 
     { fresh_execution: false }, { provenance_recorded: false }, { local_model_invoked: false },
     { external_ai_invoked: true }, { response_source: 'local_cos_reasoning' },
     { completed_at: 'invalid' }, { completed_at: '2026-09-13T00:00:00Z' },
-  ]) assert.equal(publicUniversityExamFeedback({ ...observation, ...patch }, identity, now), null)
-  assert.equal(publicUniversityExamFeedback(observation, { ...identity, agentId: '*' }, now), null)
-  assert.equal(publicUniversityExamFeedback(observation, { ...identity, runId: 'arbitrary' }, now), null)
+  ]) assert.equal(publicUniversityExamFeedback({ ...observation, ...patch }, identity, now, receipt), null)
+  assert.equal(publicUniversityExamFeedback(observation, { ...identity, agentId: '*' }, now, receipt), null)
+  assert.equal(publicUniversityExamFeedback(observation, { ...identity, runId: 'arbitrary' }, now, receipt), null)
 })
 
 test('COS feedback stays bound to COS execution rather than another learner', () => {
   const cosIdentity = { ...identity, agentId: 'cos' }
   const cosRow = { ...observation, agent_id: 'cos', response_source: 'local_cos_reasoning' }
-  assert.equal(publicUniversityExamFeedback(cosRow, cosIdentity, now), 'response_length')
-  assert.equal(publicUniversityExamFeedback({ ...cosRow, response_source: 'university_software_specialist_v1' }, cosIdentity, now), null)
+  const cosReceipt = { ...receipt, agent_id: 'cos', response_source: 'local_cos_reasoning' }
+  assert.equal(publicUniversityExamFeedback(cosRow, cosIdentity, now, cosReceipt), 'response_length')
+  assert.equal(publicUniversityExamFeedback({ ...cosRow, response_source: 'university_software_specialist_v1' }, cosIdentity, now, cosReceipt), null)
 })
 
 test('guidance is additive, idempotent and never interpolates arbitrary scorer details', () => {
@@ -168,7 +181,50 @@ test('planner retains its raw-scorer isolation and host feedback uses exact iden
   assert.doesNotMatch(bridge, /manifest_hash|seed/)
   assert.match(adapter, /\.eq\('id', identity\.runId\)/)
   assert.match(adapter, /\.eq\('agent_id', identity\.agentId\)/)
-  assert.match(adapter, /return publicUniversityExamFeedback\(result\.data, identity\)/)
+  assert.match(adapter, /return publicUniversityExamFeedback\(result\.data, identity, new Date\(\), assessment\.data\)/)
   assert.match(adapter, /if \(result\.error\) return null/)
   assert.doesNotMatch(adapter, /manifest_hash|rubric|prompt|seed|\.update\(|\.insert\(/)
+})
+
+
+test('actual planner withdraws unsupported legacy coaching without changing academic evidence or status', async () => {
+  const coached = { ...activePlan, objective: withUniversityPublicExamFeedback(activePlan.objective, 'response_length') }
+  const port = database(coached)
+  const result = await persistence(port.db, 'response_contract_unverified')(identity.agentId, failure)
+  assert.equal(result.row.objective, activePlan.objective)
+  assert.equal(port.writes.length, 1)
+  assert.deepEqual(Object.keys(port.writes[0]).sort(), ['objective', 'updated_at'])
+  const { objective: ignoredObjective, updated_at: ignoredTime, ...after } = port.row()!
+  const { objective: previousObjective, updated_at: previousTime, ...before } = coached
+  assert.deepEqual(after, before)
+})
+
+test('new legacy remediation remains generic and unavailable reads preserve existing guidance', async () => {
+  const fresh = database()
+  const created = await persistence(fresh.db, 'response_contract_unverified')(identity.agentId, failure)
+  assert.match(created.row.objective, /History/)
+  assert.doesNotMatch(created.row.objective, /word budget|obey each task/)
+  const coached = { ...activePlan, objective: withUniversityPublicExamFeedback(activePlan.objective, 'response_length') }
+  const unavailable = database(coached)
+  await persistence(unavailable.db, null)(identity.agentId, failure)
+  assert.deepEqual(unavailable.row(), coached)
+  assert.equal(unavailable.writes.length, 0)
+})
+
+test('withdrawal preserves terminal or ready work and respects concurrent identity and objective changes', async () => {
+  const coached = { ...activePlan, objective: withUniversityPublicExamFeedback(activePlan.objective, 'response_length') }
+  for (const status of ['ready_for_exam', 'completed', 'superseded']) {
+    const port = database({ ...coached, status })
+    await persistence(port.db, 'response_contract_unverified')(identity.agentId, failure)
+    assert.equal(port.writes.length, 0)
+    assert.equal(port.row()!.objective, coached.objective)
+  }
+  for (const patch of [
+    { status: 'ready_for_exam' }, { agent_id: 'other-agent' },
+    { source_ref: 'another-examination' }, { objective: 'Changed by another worker.' },
+  ]) {
+    const port = database(coached, row => Object.assign(row, patch))
+    await persistence(port.db, 'response_contract_unverified')(identity.agentId, failure)
+    assert.equal(port.writes.length, 0)
+  }
 })

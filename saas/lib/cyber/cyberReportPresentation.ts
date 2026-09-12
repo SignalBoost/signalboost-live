@@ -82,9 +82,10 @@ export function dependencyRescanUrl(row: { source_area?: string; source_type?: s
 /** Display product prose only; never pass the result to persistence or authorization. */
 export function cyberProductText(value: string | null | undefined): string {
   if (!value) return ''
-  // Keep URLs (including query values) and inline code byte-for-byte. Adjacent path,
+  // Keep complete email tokens (including tags/quoted local parts), URLs and code
+  // byte-for-byte. This shields technical text, not an email validator. Adjacent path,
   // package, email and identifier characters also distinguish technical names from prose.
-  return value.split(/(`[^`]*`|(?:[a-z][a-z0-9+.-]*:\/\/|mailto:|git@)[^\s<>"`]+)/gi)
+  return value.split(/((?:[a-z][a-z0-9+.-]*:\/\/|mailto:|git@)[^\s<>"`]+|(?:"(?:[^"\\\r\n]|\\.)*"|[^\s<>"@]+)@[^\s<>"@]+|`[^`]*`)/gi)
     .map((part, index) => index % 2 ? part : part.replace(
       // Descriptive compounds are product prose, not generic hyphenated identifiers.
       // Paths, filenames, email addresses, URLs and code remain protected.

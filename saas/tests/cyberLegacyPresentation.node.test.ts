@@ -239,3 +239,24 @@ test('product adjectives normalize without rewriting hyphenated technical identi
     assert.equal(cyberProductText(technical), technical)
   }
 })
+
+
+test('complete tagged and quoted email tokens are preserved before prose normalization', () => {
+  const addresses = [
+    'SignalBoost+alerts@example.com', 'SignalBoost!alerts@example.com',
+    'SignalBoost%alerts@example.com', 'SignalBoost=alerts@example.com',
+    'SignalBoost#alerts@example.com', 'SignalBoost$alerts@example.com',
+    'SignalBoost&alerts@example.com', "SignalBoost'alerts@example.com",
+    'SignalBoost*alerts@example.com', 'SignalBoost/alerts@example.com',
+    'SignalBoost?alerts@example.com', 'SignalBoost^alerts@example.com',
+    'SignalBoost`alerts@example.com', 'SignalBoost{alerts}@example.com',
+    'SignalBoost|alerts@example.com', 'SignalBoost~alerts@example.com',
+    'SignalBoost.alerts@example.com', 'SignalBoost+alerts@przykład.pl',
+    '"SignalBoost Alerts"@example.com', '"SignalBoost+alerts"@[127.0.0.1]',
+    'mailto:SignalBoost+alerts@example.com',
+  ]
+  for (const address of addresses) {
+    assert.equal(cyberProductText(address), address)
+    assert.equal(cyberProductText(`SignalBoost prepared a message for ${address}.`), `iTMounts prepared a message for ${address}.`)
+  }
+})

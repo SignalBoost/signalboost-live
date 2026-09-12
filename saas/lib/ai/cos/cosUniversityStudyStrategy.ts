@@ -66,12 +66,24 @@ export type CosUniversityStudyStrategy = {
   learningDesign: CosUniversityHybridLearningDesign
 }
 
+/**
+ * `approved_public_web` was missing here, which quietly capped what the RAG lanes could ever learn.
+ * Confidence is 0.48 + 0.58 x (0.55 x coverage + 0.45 x substance), and substance is length against
+ * COS_LEARNING_FULL_TEXT_CHARS; a document under 40% of that is metadata-class and ceilinged at 0.70,
+ * below the 0.72 durable policy floor. The scientific-journal and research-paper connectors return
+ * search payloads (abstracts), so they are structurally incapable of durable admission no matter how
+ * relevant they are — measured: Computer Science retrieved 170 documents at the best relevance rate
+ * of any subject and admitted zero, with 60% of its rejections on confidence. The credible-web
+ * adapter reads whole pages behind the Web Data Layer credibility screen, so it clears the substance
+ * term and can actually be admitted. Added, not substituted: the academic indexes still run.
+ */
 const RAG_SOURCE_KINDS: ContinuousLearningSourceKind[] = [
   'official_documentation',
   'research_paper',
   'scientific_journal',
   'library_material',
   'video_transcript',
+  'approved_public_web',
 ]
 
 const LIVE_SOURCE_KINDS: ContinuousLearningSourceKind[] = [

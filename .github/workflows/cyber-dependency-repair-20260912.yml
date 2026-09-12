@@ -1,0 +1,67 @@
+name: Cyber Dependency Repair Evidence
+
+on:
+  push:
+    branches: [fix/cyber-dependencies-20260912]
+    paths: [.github/workflows/cyber-dependency-repair-20260912.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    if: github.repository == 'SignalBoost/signalboost-live' && github.ref == 'refs/heads/fix/cyber-dependencies-20260912'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Collect exact lockfiles and live npm advisory evidence without installation
+        run: |
+          node --input-type=module <<'NODE'
+          import { mkdirSync, copyFileSync, writeFileSync, readFileSync } from 'node:fs';
+          import { spawnSync, execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          const out = '.dependency-repair-evidence';
+          mkdirSync(out, { recursive: true });
+          const receipt = { commit: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), observedAt: new Date().toISOString(), node: process.version, npm: execFileSync('npm', ['--version'], { encoding: 'utf8' }).trim(), files: {}, audits: {} };
+          let failed = false;
+          try {
+            for (const [label, cwd] of [['root', '.'], ['saas', 'saas']]) {
+              for (const name of ['package.json', 'package-lock.json']) {
+                const source = `${cwd}/${name}`;
+                const bytes = readFileSync(source);
+                receipt.files[source] = { sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length };
+                copyFileSync(source, `${out}/${label}.${name}`);
+              }
+              const result = spawnSync('npm', ['audit', '--json', '--ignore-scripts', '--registry=https://registry.npmjs.org/'], { cwd, encoding: 'utf8', timeout: 120000, maxBuffer: 10000000 });
+              writeFileSync(`${out}/${label}.audit.json`, result.stdout || '{}');
+              const audit = JSON.parse(result.stdout || '{}');
+              if (![0, 1].includes(result.status) || audit.error || audit.auditReportVersion !== 2 || !audit.vulnerabilities) throw new Error(`${label}: audit collection failed (exit ${result.status})`);
+              receipt.audits[label] = audit.metadata;
+              console.log(label, JSON.stringify(audit.metadata));
+              console.log(label, Object.entries(audit.vulnerabilities).map(([name, v]) => ({ name, severity: v.severity, range: v.range, nodes: v.nodes, fixAvailable: v.fixAvailable })));
+            }
+            receipt.collectionSucceeded = true;
+          } catch (error) {
+            failed = true;
+            receipt.collectionSucceeded = false;
+            receipt.error = String(error.message).slice(0, 1000);
+          } finally {
+            receipt.finishedAt = new Date().toISOString();
+            writeFileSync(`${out}/receipt.json`, JSON.stringify(receipt, null, 2));
+          }
+          if (failed) process.exitCode = 1;
+          NODE
+      - name: Preserve success or failed collection evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyber-dependency-baseline-${{ github.sha }}
+          path: .dependency-repair-evidence/
+          if-no-files-found: error
+          retention-days: 7

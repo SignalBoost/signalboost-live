@@ -2,7 +2,7 @@
 
 Read root `ONBOARD.md` first, then Phases 1–12 under `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE*-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
 
-Current workstream: **A2A Agent Fabric — Phase 12 buyer onboarding manifest active; buyer-live acceptance still pending. Specialist Mesh routing/failover implementation is active on PR #2154; Production end-to-end acceptance is pending.**
+Current workstream: **A2A Agent Fabric — Specialist Mesh routing/failover foundation is in Production. Durable Production qualification/telemetry adapters and end-to-end live failover acceptance are the active next milestone.**
 
 Direction:
 
@@ -12,6 +12,9 @@ Direction:
 - When several specialists are independently eligible for the same exact task, the mesh may rank them automatically by availability, cost, load, latency, reliability, and quality instead of requiring a fixed primary/backup pair. Ranking never expands eligibility or authority.
 - There are no permanent primary/backup specialist pairs. Every independently qualified and authorized specialist may provide backup capacity for work in its proven scope.
 - Qualification is a host-controlled hard gate. Registry assignment and Agent Card advertised skills are not qualification evidence; portable hosts must inject a qualification adapter with durable evidence references.
+- Production qualification decisions live in service-role-only durable evidence and are time-bounded. The newest exact-scope decision wins, so a current revocation cannot be bypassed by an older positive record.
+- Production mesh telemetry is service-role-only, exact-scope, time-bounded routing evidence. Expired or unavailable telemetry becomes neutral and never grants eligibility or authority.
+- `activateProductionCOSA2AHost` is the Production composition root: it injects the durable qualification and telemetry adapters into COS rather than permitting implicit metadata-based qualification.
 - Live mesh telemetry is routing evidence only. Telemetry failure may fall back to safe static routing evidence; telemetry cannot grant skill, scope, risk, credential, or permission.
 - Advisory/read-only work may automatically fail over after a clearly recoverable unavailable/runtime failure. Automatic write/consequential replay remains prohibited until idempotency and side-effect reconciliation are proven.
 - Durable mesh ownership reuses Supervisor coordination leases and fencing. A replacement specialist must acquire the current lease; stale owners are rejected. The lifecycle remains `queued -> leased -> processing -> verification_pending -> completed`.

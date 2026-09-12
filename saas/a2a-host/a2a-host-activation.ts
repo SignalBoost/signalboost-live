@@ -1,8 +1,11 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { A2A_AGENT_REGISTRY_VERSION, type A2AAgentRegistryPort, type A2ATransportFactory } from './a2a-agent-registry.ts'
 import { installCOSA2ARuntimeHost } from './cos-runtime-host.ts'
-import { createPortableA2AHost, type PortableA2AHostOptions } from './portable-a2a-host.ts'
+import { createCOSSpecialistOrchestrator } from './cos-specialist-orchestrator.ts'
+import { createPortableA2AHost, type PortableA2AHost, type PortableA2AHostOptions } from './portable-a2a-host.ts'
+import { createSupabaseSpecialistMeshProductionAdapters } from './specialist-mesh-production-adapters.ts'
 
-export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v1' as const
+export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v3' as const
 
 export interface A2AHostActivationSummary {
   version: typeof A2A_HOST_ACTIVATION_VERSION
@@ -55,6 +58,38 @@ export async function activateCOSA2AHost(options: PortableA2AHostOptions & { now
   const activated = await activatePortableA2AHost(options)
   const dispose = installCOSA2ARuntimeHost(activated.host)
   return Object.freeze({ ...activated, dispose })
+}
+
+/**
+ * Production composition root for a fully constructed host. Durable specialist qualification and
+ * routing telemetry replace caller-supplied mesh evidence; registry/transport authority is unchanged.
+ */
+export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHostOptions, 'qualifications' | 'meshSignals'> & {
+  db: SupabaseClient
+  now?: () => Date
+}) {
+  const mesh = createSupabaseSpecialistMeshProductionAdapters(options.db, { now: options.now })
+  return activateCOSA2AHost({ ...options, qualifications: mesh.qualifications, meshSignals: mesh.meshSignals, now: options.now })
+}
+
+/**
+ * Deployed-route composition for an already installed governed host. This preserves its registry,
+ * transport runtime, audit boundaries, and authorization while replacing only qualification/routing
+ * evidence with service-role durable Production evidence. No host is fabricated on a cold start.
+ */
+export function attachProductionSpecialistMeshEvidence(
+  host: PortableA2AHost,
+  db: SupabaseClient,
+  options: { now?: () => Date } = {},
+): PortableA2AHost {
+  const mesh = createSupabaseSpecialistMeshProductionAdapters(db, { now: options.now })
+  const orchestrator = createCOSSpecialistOrchestrator({
+    registry: host.registry,
+    delegation: host.delegation,
+    qualifications: mesh.qualifications,
+    meshSignals: mesh.meshSignals,
+  })
+  return Object.freeze({ ...host, orchestrator })
 }
 
 export type A2AHostActivationOptions = {

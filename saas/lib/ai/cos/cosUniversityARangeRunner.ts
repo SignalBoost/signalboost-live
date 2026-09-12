@@ -400,7 +400,10 @@ async function executeExamRun(agentId: string, row: ARangeRunRow, now: Date): Pr
   if (agentId !== AGENT_ID) {
     let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
     try {
-      bound = await executeBoundAgentExam({ agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: exam.prompt })
+      bound = await executeBoundAgentExam(
+        { agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: exam.prompt },
+        { subjectId: row.subject_id },
+      )
     } catch (error) {
       return failRun([`execution_error:${error instanceof Error ? error.message : String(error)}`])
     }

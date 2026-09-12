@@ -11,6 +11,10 @@ export interface RepoTarget {
 }
 
 const MAX_FILE_CHARS = 50000
+// Manifests must be parsed whole: a truncated package-lock.json is invalid JSON and would be
+// silently dropped, leaving a scan that reports on nothing. GitHub's contents endpoint serves
+// files below 1 MB, so this cap only has to clear a large lockfile.
+export const MAX_MANIFEST_FILE_CHARS = 4_000_000
 
 export function parseRepoUrl(input?: string): RepoTarget | null {
   const s = String(input || '').trim()
@@ -105,7 +109,9 @@ export async function readRepoFileFrom(
   repo: string,
   branch: string,
   path: string,
+  options?: { maxChars?: number },
 ): Promise<{ ok: boolean; content: string; truncated: boolean }> {
+  const limit = Math.max(1, Math.floor(Number(options?.maxChars) || MAX_FILE_CHARS))
   try {
     const clean = String(path || '').trim().replace(/^\/+/, '')
     if (!clean || clean.includes('..')) return { ok: false, content: '', truncated: false }
@@ -119,8 +125,8 @@ export async function readRepoFileFrom(
       return { ok: false, content: '', truncated: false }
     }
     const text = data.encoding === 'base64' ? decodeBase64(data.content) : String(data.content)
-    const truncated = text.length > MAX_FILE_CHARS
-    return { ok: true, content: truncated ? text.slice(0, MAX_FILE_CHARS) : text, truncated }
+    const truncated = text.length > limit
+    return { ok: true, content: truncated ? text.slice(0, limit) : text, truncated }
   } catch {
     return { ok: false, content: '', truncated: false }
   }

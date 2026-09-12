@@ -8,6 +8,7 @@ import {
   cosUniversityPracticeSkillKey,
 } from '../lib/ai/cos/cosUniversityDeliberatePractice.ts'
 import { cosUniversityPlanEligibleForContinuousStudy } from '../lib/ai/cos/cosUniversityContinuousCadence.ts'
+import { selectEligibleCosUniversityPracticePlans } from '../lib/ai/cos/cosUniversityPracticeSelection.ts'
 
 function file(relative: string): string {
   return fs.readFileSync(path.join(process.cwd(), relative), 'utf8')
@@ -129,4 +130,70 @@ test('practice route is isolated from the learner and scheduled after continuous
 test('deliberate-practice regression is part of the mandatory COS deployment gate', () => {
   const gate = file('scripts/vercel-cos-gates.mjs')
   assert.match(gate, /cosUniversityDeliberatePractice\.node\.test\.ts/)
+})
+
+test('practice selection skips a blocked first plan without excluding the next eligible plan', async () => {
+  const plans = [
+    { id: 'portuguese-restudy', allowed: false },
+    { id: 'polish-accepted-study', allowed: true },
+  ]
+  const selected = await selectEligibleCosUniversityPracticePlans(plans, 1, async plan => plan.allowed)
+  assert.deepEqual(selected.map(plan => plan.id), ['polish-accepted-study'])
+})
+
+test('practice selection counts eligible plans, preserves priority, and stops at the host limit', async () => {
+  const checked: string[] = []
+  const plans = [
+    { id: 'first', allowed: true },
+    { id: 'blocked', allowed: false },
+    { id: 'second', allowed: true },
+    { id: 'outside-budget', allowed: true },
+  ]
+  const selected = await selectEligibleCosUniversityPracticePlans(plans, 2, async plan => {
+    checked.push(plan.id)
+    return plan.allowed
+  })
+  assert.deepEqual(selected.map(plan => plan.id), ['first', 'second'])
+  assert.deepEqual(checked, ['first', 'blocked', 'second'])
+})
+
+test('practice selection never promotes blocked plans or changes their study evidence', async () => {
+  const plans = [Object.freeze({ id: 'needs-restudy', requiresNewStudyAttempt: true })]
+  const before = JSON.stringify(plans)
+  const selected = await selectEligibleCosUniversityPracticePlans(Object.freeze(plans), 1, async () => false)
+  assert.deepEqual(selected, [])
+  assert.equal(JSON.stringify(plans), before)
+  assert.deepEqual(await selectEligibleCosUniversityPracticePlans([], 1, async () => true), [])
+})
+
+test('practice selection fails closed when an eligibility check throws', async () => {
+  await assert.rejects(
+    selectEligibleCosUniversityPracticePlans([{ id: 'unverified' }], 1, async () => {
+      throw new Error('study_database_unavailable')
+    }),
+    /study_database_unavailable/,
+  )
+})
+
+test('practice selection rejects invalid limits without invoking eligibility checks', async () => {
+  for (const limit of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    const selected = await selectEligibleCosUniversityPracticePlans([{}], limit, async () => {
+      assert.fail('invalid limits must not invoke the eligibility checker')
+    })
+    assert.deepEqual(selected, [])
+  }
+})
+
+test('practice selection runtime preserves bounded agent-scoped reads and the existing study fence', () => {
+  const runner = file('lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts')
+  const start = runner.indexOf('async function loadStudyPlans(')
+  const end = runner.indexOf('\nfunction universityProcedure(', start)
+  assert.ok(start >= 0 && end > start)
+  const loader = runner.slice(start, end)
+  assert.match(loader, /\.eq\('agent_id', agentId\)/)
+  assert.match(loader, /\.limit\(Math\.max\(1, Math\.min\(20, limit \* 4\)\)\)/)
+  assert.match(loader, /return selectEligibleCosUniversityPracticePlans\(candidates, limit, async plan =>/)
+  assert.match(loader, /return practiceFenceStillValid\(agentId, plan\.id, round\)/)
+  assert.match(loader, /practiceFenceStillValid\(agentId, plan\.id, Math\.floor\(requiredRound\)\)/)
+  assert.doesNotMatch(loader, /\.slice\(0, limit\)/)
 })

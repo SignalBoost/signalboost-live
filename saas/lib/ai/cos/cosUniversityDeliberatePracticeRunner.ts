@@ -1,5 +1,7 @@
+// saas/lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts
 import { callCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
+import { describeUnparseablePractice } from './practiceOutputDiagnostics.ts'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { evaluateAnswerAgainstRubric, type CognitivePracticeRubric } from './cognitiveSkillCandidate.ts'
@@ -478,7 +480,11 @@ async function executePractice(agentId: string, item: PracticeQueueRow): Promise
   }
   const parsed = parseLocalResult(execution.text)
   if (!parsed?.answer?.trim()) {
-    await deferPractice(item, 'practice_json_unparseable')
+    // parseLocalResult already tries a direct parse, balanced-object extraction, loose recovery and
+    // truncated salvage, so reaching here means none of the four could find an answer. Recording only
+    // the code leaves the next reader with a count and no cause, and the raw reply is not persisted
+    // anywhere else — so carry a bounded, whitespace-collapsed sample of what actually came back.
+    await deferPractice(item, describeUnparseablePractice(execution.text))
     return { ...base, status: 'deferred', passed: null, score: null, coverage: null, turnId: execution.turnId, reasons: ['practice_json_unparseable'] }
   }
 

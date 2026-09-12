@@ -2,12 +2,18 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { A2ATransport } from '../a2a-core/a2a-client.ts'
 import { createInMemoryA2AAgentRegistry } from '../a2a-host/a2a-agent-registry.ts'
+import { activateProductionCOSA2AHost } from '../a2a-host/a2a-host-activation.ts'
 import {
+  assertSpecialistQualificationAssessmentCorrelation,
   createSpecialistQualificationAssessmentPort,
   persistSupabaseSpecialistQualificationAssessment,
   runSpecialistQualificationAssessment,
 } from '../a2a-host/specialist-qualification-assessment.ts'
-import { getCOSA2AQualificationAssessmentPort, installCOSA2AQualificationAssessmentPort } from '../a2a-host/cos-runtime-host.ts'
+import {
+  getCOSA2AQualificationAssessmentPort,
+  getCOSA2ARuntimeHost,
+  installCOSA2AQualificationAssessmentPort,
+} from '../a2a-host/cos-runtime-host.ts'
 
 const tenantId = 'tenant-a'
 const environmentId = 'production'
@@ -82,6 +88,45 @@ test('host assessment port owns the hidden probe and installs through the COS ru
     dispose()
   }
   assert.equal(getCOSA2AQualificationAssessmentPort(), null)
+})
+
+test('Production composition installs the governed assessor beside the runtime host and disposes both', async () => {
+  let observedProbe = ''
+  const activated = await activateProductionCOSA2AHost({
+    registry: registry(),
+    transportFactory: { create: () => successfulTransport(request => { observedProbe = String((request.params as any)?.message?.parts?.[0]?.text ?? '') }) },
+    db: {} as any,
+    qualificationAssessment: {
+      probes: { async issue() { return { messageId: 'production-hidden-message', probeText: 'HOST-OWNED-PRODUCTION-PROBE' } } },
+      verifier: { async verify() { return { qualified: true, verifierId: 'production-independent-verifier', evidenceRef: 'heldout://production/proof' } } },
+    },
+    now: () => new Date('2026-09-12T22:30:00Z'),
+  })
+  try {
+    assert.equal(getCOSA2ARuntimeHost(), activated.host)
+    const assessor = getCOSA2AQualificationAssessmentPort()
+    assert.ok(assessor)
+    const record = await assessor.assess({ tenantId, environmentId, portableId, agentId, skillId, assessmentId: 'production-assessment' })
+    assert.equal(record.evidenceRef, 'heldout://production/proof')
+    assert.match(observedProbe, /HOST-OWNED-PRODUCTION-PROBE/)
+  } finally {
+    activated.dispose()
+  }
+  assert.equal(getCOSA2ARuntimeHost(), null)
+  assert.equal(getCOSA2AQualificationAssessmentPort(), null)
+})
+
+test('qualification evidence must correlate exactly to the server-owned assessment request', async () => {
+  const record = await runSpecialistQualificationAssessment(baseOptions())
+  const expected = { tenantId, environmentId, portableId, agentId, skillId, assessmentId: 'assessment-1' }
+  assert.doesNotThrow(() => assertSpecialistQualificationAssessmentCorrelation(record, expected))
+  for (const field of ['assessmentId', 'tenantId', 'environmentId', 'portableId', 'agentId', 'skillId'] as const) {
+    const mismatched = { ...record, [field]: `${record[field]}-other` }
+    assert.throws(
+      () => assertSpecialistQualificationAssessmentCorrelation(mismatched, expected),
+      new RegExp(`specialist_qualification_correlation_mismatch:${field}`),
+    )
+  }
 })
 
 test('qualification rejects self-verification even after successful advisory execution', async () => {

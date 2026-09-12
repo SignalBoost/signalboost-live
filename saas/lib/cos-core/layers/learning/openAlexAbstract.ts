@@ -45,3 +45,18 @@ export const SUBSTANTIVE_ABSTRACT_CHARS = 300
 export function openAlexAbstractIsSubstantive(abstract: string): boolean {
   return abstract.trim().length >= SUBSTANTIVE_ABSTRACT_CHARS
 }
+
+/**
+ * Crossref returns abstracts as JATS XML. Left as-is the tags are counted as text and matched as
+ * terms, so they inflate length while contributing nothing; stripped, what remains is the prose.
+ */
+export function abstractFromJats(raw: unknown): string {
+  const text = String(raw ?? '')
+  if (!text.trim()) return ''
+  return text
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s*abstract[:\s]+/i, '')
+    .trim()
+}

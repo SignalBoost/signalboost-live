@@ -1,4 +1,4 @@
-import { cosServiceDb } from '../cos-core/storage/supabase.ts'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export type LocalInferenceUsageContext = Readonly<{
   feature: string
@@ -23,6 +23,16 @@ export type LocalInferenceUsageRecord = Readonly<{
   finishReason: string | null
 }>
 
+let usageDb: SupabaseClient | null | undefined
+
+function serviceDb(): SupabaseClient | null {
+  if (usageDb !== undefined) return usageDb
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  usageDb = url && key ? createClient(url, key, { auth: { persistSession: false } }) : null
+  return usageDb
+}
+
 function clean(value: unknown, max = 240): string | null {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
   return text || null
@@ -41,9 +51,12 @@ function nonNegativeNumber(value: unknown): number | null {
 /**
  * Best-effort billing telemetry only. A failed telemetry write must never change an inference result,
  * academic verdict, Builder result, or authorization decision.
+ *
+ * This small recorder deliberately does not import COS storage: local-inference is also exercised by
+ * direct Node tests that must not depend on Next.js path aliases or the rest of the COS persistence graph.
  */
 export async function recordLocalInferenceUsage(record: LocalInferenceUsageRecord): Promise<void> {
-  const db = cosServiceDb()
+  const db = serviceDb()
   if (!db) return
   const row = {
     request_id: clean(record.requestId, 120),

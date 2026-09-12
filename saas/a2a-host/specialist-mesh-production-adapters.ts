@@ -3,7 +3,7 @@ import type { A2ARuntimeObservationEvent } from './a2a-runtime-observability.ts'
 import type { SpecialistQualificationDecision, SpecialistQualificationPort, SpecialistQualificationRequest } from './cos-specialist-orchestrator.ts'
 import type { SpecialistMeshLiveSignal, SpecialistMeshSignalPort, SpecialistMeshSignalRequest } from './specialist-mesh-router.ts'
 
-export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v2' as const
+export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v3' as const
 
 export interface SpecialistQualificationEvidenceRecord {
   agentId: string
@@ -33,22 +33,34 @@ function boundedScore(value: number): number {
   return Math.max(0, Math.min(100, Number(value.toFixed(3))))
 }
 
+function evidenceTime(value: unknown): number {
+  const parsed = Date.parse(String(value ?? ''))
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY
+}
+
 /** Only observations created after a specialist execution attempt may affect worker quality/reliability. */
 function attemptedSpecialistExecution(event: A2ARuntimeObservationEvent): boolean {
   return event.mode === 'delegated' || event.mode === 'a2a_transport_unavailable' || event.mode === 'a2a_runtime_error'
 }
 
-/** Host-owned durable qualification evidence only; latest exact-scope decision wins. */
+/** Host-owned durable qualification evidence only; newest exact-scope decision wins independent of reader order. */
 export function createProductionSpecialistQualificationPort(reader: SpecialistQualificationEvidenceReader): SpecialistQualificationPort {
   return Object.freeze({
     async snapshot(input) {
       const requested = new Set(input.agentIds)
-      const rows = await reader.read(input)
+      const rows = (await reader.read(input))
+        .filter(row => requested.has(row.agentId))
+        .filter(row => row.tenantId === input.tenantId && row.environmentId === input.environmentId && row.portableId === input.portableId && row.skillId === input.skillId)
+        .sort((a, b) => {
+          const time = evidenceTime(b.observedAt) - evidenceTime(a.observedAt)
+          if (time !== 0) return time
+          if (a.qualified !== b.qualified) return a.qualified ? 1 : -1
+          return String(a.evidenceRef ?? '').localeCompare(String(b.evidenceRef ?? ''))
+        })
       const out: Record<string, SpecialistQualificationDecision> = {}
       const decided = new Set<string>()
       for (const row of rows) {
-        if (!requested.has(row.agentId) || decided.has(row.agentId)) continue
-        if (row.tenantId !== input.tenantId || row.environmentId !== input.environmentId || row.portableId !== input.portableId || row.skillId !== input.skillId) continue
+        if (decided.has(row.agentId)) continue
         decided.add(row.agentId)
         const evidenceRef = String(row.evidenceRef || '').trim()
         if (row.qualified !== true || !evidenceRef) continue
@@ -78,13 +90,14 @@ export function createProductionSpecialistMeshSignalPort(options: {
         options.availability?.read(input).catch(() => ({})) ?? Promise.resolve({}),
       ])
       const requested = new Set(input.agentIds)
-      const cutoff = now() - windowMs
+      const current = now()
+      const cutoff = current - windowMs
       const grouped = new Map<string, A2ARuntimeObservationEvent[]>()
       for (const event of events) {
         if (!requested.has(event.agentId)) continue
         if (event.tenantId !== input.tenantId || event.environmentId !== input.environmentId || event.portableId !== input.portableId || event.skillId !== input.skillId) continue
         const at = Date.parse(event.occurredAt)
-        if (!Number.isFinite(at) || at < cutoff || at > now() + 60_000) continue
+        if (!Number.isFinite(at) || at < cutoff || at > current + 60_000) continue
         if (!attemptedSpecialistExecution(event)) continue
         const bucket = grouped.get(event.agentId) ?? []
         bucket.push(event)
@@ -160,16 +173,22 @@ export function createSupabaseSpecialistMeshProductionAdapters(db: SupabaseClien
   const meshSignals: SpecialistMeshSignalPort = Object.freeze({
     async snapshot(input) {
       if (!input.agentIds.length) return {}
-      const at = now().toISOString()
+      const current = now()
+      const at = current.toISOString()
+      const futureCutoff = new Date(current.getTime() + 60_000).toISOString()
       const { data, error } = await db.from('a2a_specialist_mesh_telemetry')
         .select('agent_id,available,latency_score,cost_score,load_score,reliability_score,quality_score,observed_at')
         .eq('tenant_id', input.tenantId).eq('environment_id', input.environmentId).eq('portable_id', input.portableId)
         .eq('skill_id', input.skillId).in('agent_id', [...input.agentIds])
-        .gt('expires_at', at).order('observed_at', { ascending: false }).limit(Math.max(20, input.agentIds.length * 4))
+        .gt('expires_at', at).lte('observed_at', futureCutoff)
+        .order('observed_at', { ascending: false }).limit(Math.max(20, input.agentIds.length * 4))
       if (error) return {}
       const out: Record<string, SpecialistMeshLiveSignal> = {}
       const seen = new Set<string>()
-      for (const row of (data ?? []) as TelemetryRow[]) {
+      const rows = ((data ?? []) as TelemetryRow[])
+        .filter(row => evidenceTime(row.observed_at) <= current.getTime() + 60_000)
+        .sort((a, b) => evidenceTime(b.observed_at) - evidenceTime(a.observed_at) || a.agent_id.localeCompare(b.agent_id))
+      for (const row of rows) {
         if (seen.has(row.agent_id)) continue
         seen.add(row.agent_id)
         out[row.agent_id] = Object.freeze({

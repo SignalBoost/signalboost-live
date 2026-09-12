@@ -112,6 +112,63 @@ const LEGACY_TECHNICAL_IDENTIFIERS = new Set([
   'signalboost-reference-self-healing-diagnostic-http', 'signalboost-repair',
   'signalboost-saas-api', 'signalboost-self-healing-supervisor',
   'signalboost-supervisor-signature', 'signalboost-surface', 'signalboost-vector-space',
+  // Additional portable/host modules from the full source inventory.
+  "signalboost-a2a-agent-registry-v1",
+  "signalboost-a2a-availability-v1",
+  "signalboost-a2a-buyer-manifest-v1",
+  "signalboost-a2a-buyer-onboarding-v1",
+  "signalboost-a2a-client-v1",
+  "signalboost-a2a-delegation-runtime-v1",
+  "signalboost-a2a-host-activation-v1",
+  "signalboost-a2a-http-jsonrpc-v1",
+  "signalboost-a2a-live-acceptance-v1",
+  "signalboost-a2a-runtime-observation-v1",
+  "signalboost-android-build-evidence-manifest-v1",
+  "signalboost-android-build-evidence-v1",
+  "signalboost-android-build-plan-v1",
+  "signalboost-android-buyer-handoff-manifest-v1",
+  "signalboost-android-packaging-evidence-chain-v1",
+  "signalboost-android-packaging-v1",
+  "signalboost-android-play-console-release-evidence-v1",
+  "signalboost-android-production-publication-evidence-v1",
+  "signalboost-android-publication-evidence-v1",
+  "signalboost-android-publication-readiness-v1",
+  "signalboost-android-scaffold-review-bundle-v1",
+  "signalboost-android-scaffold-v1",
+  "signalboost-android-signed-bundle-evidence-v1",
+  "signalboost-brand-overlay-v4",
+  "signalboost-cos-a2a-runtime-host-v1",
+  "signalboost-cos-specialist-orchestrator-v1",
+  "signalboost-cos-specialist-planner-v1",
+  "signalboost-google-play-readiness-v1",
+  "signalboost-host-adapter-factory",
+  "signalboost-internal",
+  "signalboost-platform-health",
+  "signalboost-portable-a2a-host-v1",
+  "signalboost-provider-config-adapter",
+  "signalboost-provider-hub",
+  "signalboost-provider-hub-",
+  "signalboost-provider-hub-build-readiness-v1",
+  "signalboost-provider-hub-dependency-review-v1",
+  "signalboost-provider-hub-host-factory-v1",
+  "signalboost-provider-hub-runtime-assembly-v1",
+  "signalboost-provider-hub-runtime-registry-v1",
+  "signalboost-provider-hub-unsigned-build-evidence-bundle-v1",
+  "signalboost-provider-hub-unsigned-build-provenance-v1",
+  "signalboost-provider-hub-v1",
+  "signalboost-readonly-host-ports",
+  "signalboost-readonly-host-ports-v1",
+  "signalboost-reference-cos-a2a-host-v1",
+  "signalboost-reference-https-jsonrpc",
+  "signalboost-reference-self-healing-diagnostic",
+  "signalboost-runtime-assembly",
+  "signalboost-self-healing-native-probe",
+  "signalboost-self-healing-website-optimizer",
+  "signalboost-staging-live-data-read-host-v1",
+  "signalboost-supervisor",
+  "signalboost-supervisor-connectors",
+  "signalboost-v1",
+  "signalboost-vercel",
 ])
 // Runtime-generated names append IDs/version labels to these observed prefixes.
 const LEGACY_TECHNICAL_PREFIXES = [
@@ -119,7 +176,7 @@ const LEGACY_TECHNICAL_PREFIXES = [
   'signalboost-console-', 'signalboost-vault-rotated-', 'signalboost-banner-upgrade-',
   'signalboost-base-video-', 'signalboost-creative-', 'signalboost-deck-',
   'signalboost-fast-final-', 'signalboost-self-healing-supervisor-',
-  'signalboost-video-', 'signalboost-voice-',
+  'signalboost-video-', 'signalboost-voice-', 'signalboost-provider-hub-',
 ]
 
 /** Display product prose only; never pass the result to persistence or authorization. */
@@ -128,9 +185,9 @@ export function cyberProductText(value: string | null | undefined): string {
   // Preserve matching code delimiters of any length, not just one-backtick spans.
   const code = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/
   // Punctuation is legal URL/IRI path or query data, not a reliable prose boundary.
-  // Preserve the complete lexical URI (including mailto headers) byte-for-byte.
+  // Preserve hierarchical and opaque scheme: URI tokens byte-for-byte.
   // Ambiguous adjacent text stays technical; clearly separated prose is normalized.
-  const url = /(?:[a-z][a-z0-9+.-]*:\/\/|git@|mailto:)[^\s<>"`]+/
+  const url = /(?:[a-z][a-z0-9+.-]*:|git@)[^\s<>"`]+/
   // This is token shielding, not address validation. A DNS name/domain literal ends
   // before sentence punctuation; it must not swallow adjacent product prose.
   const email = /(?:mailto:)?(?:"(?:[^"\\\r\n]|\\.)*"|[\p{L}\p{N}\p{M}!#$%&'*+\/=?^_`{|}~.-]+)@(?:\[[^\]\r\n]+\]|[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?)*)/u

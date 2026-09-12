@@ -32,6 +32,15 @@ export interface SpecialistQualificationProbeProvider {
   }): Promise<{ messageId: string; probeText: string }>
 }
 
+export interface SpecialistQualificationAssessmentRequest {
+  tenantId: string
+  environmentId: string
+  portableId: string
+  agentId: string
+  skillId: string
+  assessmentId: string
+}
+
 export interface SpecialistQualificationAssessmentRecord {
   schemaVersion: typeof SPECIALIST_QUALIFICATION_ASSESSMENT_VERSION
   assessmentId: string
@@ -49,14 +58,7 @@ export interface SpecialistQualificationAssessmentRecord {
 }
 
 export interface SpecialistQualificationAssessmentPort {
-  assess(input: {
-    tenantId: string
-    environmentId: string
-    portableId: string
-    agentId: string
-    skillId: string
-    assessmentId: string
-  }): Promise<SpecialistQualificationAssessmentRecord>
+  assess(input: SpecialistQualificationAssessmentRequest): Promise<SpecialistQualificationAssessmentRecord>
 }
 
 function required(value: unknown, name: string): string {
@@ -70,6 +72,19 @@ function boundedValidityMs(value: number | undefined): number {
   const resolved = value ?? 86_400_000
   if (!Number.isFinite(resolved) || resolved < 60_000 || resolved > 30 * 86_400_000) throw new Error('specialist_qualification_validity_invalid')
   return Math.floor(resolved)
+}
+
+/** Fail closed unless the verifier record is correlated to the exact server-owned assessment request. */
+export function assertSpecialistQualificationAssessmentCorrelation(
+  record: SpecialistQualificationAssessmentRecord,
+  expected: SpecialistQualificationAssessmentRequest,
+): void {
+  const fields = ['assessmentId', 'tenantId', 'environmentId', 'portableId', 'agentId', 'skillId'] as const
+  for (const field of fields) {
+    const actual = required(record?.[field], `record.${field}`)
+    const wanted = required(expected?.[field], `expected.${field}`)
+    if (actual !== wanted) throw new Error(`specialist_qualification_correlation_mismatch:${field}`)
+  }
 }
 
 /**

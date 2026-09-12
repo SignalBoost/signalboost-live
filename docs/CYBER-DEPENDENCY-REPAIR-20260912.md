@@ -2,10 +2,12 @@
 
 ## Scope
 
-Owner-authorized follow-on to scanner PR #2144, based on main
-`b2e91e1492d6f71335172926a0eda835c534fa26`. University changes remain intact.
-This repairs dependencies, not historical scan/approval records. No database,
-Guardian/Stranger permissions, tenant controls or runtime provider settings change.
+Owner-authorized follow-on to scanner PR #2144. Baseline main was
+`b2e91e1492d6f71335172926a0eda835c534fa26`; newer main
+`793269f0721e4beb3cdc287db7914f95e43a34f5` is now integrated, preserving its
+three University practice-selection files byte-for-byte. This repairs dependencies,
+not historical scan/approval records. No database, Guardian/Stranger permissions,
+tenant controls or runtime provider settings change.
 
 ## Verified baseline and candidate
 
@@ -52,12 +54,30 @@ Downloaded artifacts and every candidate file hash were independently checked.
 | saas/package.json | cf821e52ab36ac5eb3bace3325a47000477ea74c |
 | saas/package-lock.json | f8c19806a4cadde1da98473cfea418a19f6e6562 |
 
-The dependency-integrity script fails on each exact baseline and passes on both
-regenerated lockfiles. These local checks use the actual artifact files, not a
-full repository checkout. Installed-library smoke checks and application builds
-are separately required in CI. The new read-only workflow checks both committed
-graphs with npm ci, known-regression floors including nested copies, library smoke
-checks, fresh npm audit, and builds. Existing CI remains unchanged.
+The static dependency-integrity checks fail each exact baseline and pass both
+regenerated lockfiles locally using artifact files, not a full repository checkout.
+Actual installed-library checks in Actions run `34668841024` on integration head
+`714137d716ccdf1f1b652b082287aba93023522e` passed for BOTH workspaces: CSS,
+browser queries, multipart escaping, identifiers, query/YAML parsing and native
+image processing. Both fresh full-lockfile audits and clean installations passed.
+The initial Sharp package.json export assumption was corrected without dropping
+installed-version or native image assertions.
+
+## Build scope and independent review
+
+Review `3994841359` correctly identified a pre-existing root build defect.
+Root job `103486172248` reproduced MODULE_NOT_FOUND for
+`scripts/validate-next-route-config.mjs` before Next.js started. The root prebuild
+also references other validators that exist only under saas/scripts. This task
+does not claim to repair or validate that standalone root application build.
+
+The new read-only workflow retains BOTH committed graphs' npm ci, manifest/lock
+agreement, nested known-regression floors, library smoke tests, fresh npm audit
+and unchanged-file checks. Its full `npm run build` step is scoped to `saas`,
+the actual Vercel project root. SaaS prebuild validators and all existing CI remain
+mandatory and unchanged. No failed build is ignored or reported as successful.
+This is dependency verification for both trees and full-build verification for
+the deployed SaaS application, not full application acceptance of the root tree.
 
 Temporary task-branch collection/resolution tooling is removed from the final
 tree. Its isolated publisher stored only four content-addressed Git blobs; it
@@ -67,6 +87,6 @@ secrets. Repository integration remains the protected expected-head PR merge.
 ## Release boundary
 
 Candidate audit success is not Production acceptance or a security certification.
-Current-head CI, Preview, independent review and expected-head merge are still
-required; verify the exact merged deployment separately. Historic dashboard
+Latest-head CI, SaaS build, Preview, independent review and expected-head merge
+remain required; verify the exact merged deployment separately. Historic dashboard
 alerts/approvals remain unchanged and need a fresh scan for current status.

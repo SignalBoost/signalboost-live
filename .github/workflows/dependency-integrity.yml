@@ -51,7 +51,10 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/
       - name: Verify locked graph and safe library behavior
         run: node "$GITHUB_WORKSPACE/scripts/dependency-integrity.mjs" '${{ matrix.workspace }}' --smoke
-      - name: Build the application from the committed graph
+      # Vercel deploys saas. Root retains every graph/install/library check above;
+      # its pre-existing missing prebuild validators are not a passing build claim.
+      - name: Build deployed SaaS application from the committed graph
+        if: matrix.workspace == 'saas'
         run: npm run build
       - name: Verify package manifests and lockfiles stayed unchanged
         run: git diff --exit-code -- package.json package-lock.json

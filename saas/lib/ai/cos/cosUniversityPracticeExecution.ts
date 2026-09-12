@@ -75,7 +75,7 @@ async function executeCosPracticeOnConfiguredEconomyModel(request: AgentCapstone
       purpose: 'non_credit_training',
     },
   }, { ...config, model: practiceModel, timeoutMs: Math.min(config.timeoutMs, 90_000) })
-  if (!text) return null
+  if (!text) throw new Error('university_practice_economy_inference_unavailable')
   return {
     text,
     turnId: randomUUID(),
@@ -94,10 +94,15 @@ export async function executeUniversityPractice(
   await enforceCommonPracticeCostGuard({ ...request, purpose: 'practice' })
   if (request.agentId === 'cos') {
     const economy = await executeCosPracticeOnConfiguredEconomyModel(request)
-    const result = economy || await ports.cos()
+    if (economy) return {
+      ...economy,
+      responseSource: 'cos_university_practice_model',
+      executionProvenance: null,
+    }
+    const result = await ports.cos()
     return result ? {
       ...result,
-      responseSource: economy ? 'cos_university_practice_model' : 'cos_local_reasoner',
+      responseSource: 'cos_local_reasoner',
       executionProvenance: null,
     } : null
   }

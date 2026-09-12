@@ -1,3 +1,4 @@
+// saas/lib/cos-core/layers/learning/index.ts
 import { PROBATIONARY_MINIMUM_CONFIDENCE, type TieredAdmission } from '@/lib/ai/cos/tieredLearningAdmission'
 import { distillLearningCandidate } from './semanticDistillation.ts'
 // saas/lib/cos-core/layers/learning/index.ts
@@ -63,6 +64,12 @@ export type KnowledgeGap = {
   sourceKinds?: ContinuousLearningSourceKind[]
   /** Optional adapter-level exclusions for objectives whose source-kind bucket is intentionally broader. */
   excludedAdapterIds?: string[]
+  /**
+   * Declared by the lane that produced this gap: true when the gap is a governed study objective
+   * from a curriculum or study plan rather than opportunistic mining. Admission tiering reads this
+   * declaration instead of inferring alignment from the shape of the gap id.
+   */
+  curriculumAligned?: boolean
   admission?: TieredAdmission
 }
 

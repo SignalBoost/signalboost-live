@@ -4,6 +4,7 @@ import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { loadUniversityPracticeStudyMaterial } from './cosUniversityPracticeStudyMaterialRuntime.ts'
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
+import { agentWorkDomain, modelForAgentWork, type AgentWorkDomain } from './cosUniversityAgentModelPolicy.ts'
 import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import {
   executeBoundSoftwareCapstone,
@@ -37,9 +38,19 @@ export async function hasBoundAcademicExecutor(agentId: string): Promise<boolean
   return isSoftwareCapstoneIdentity(agentId, await readCosUniversityAgentRole(agentId))
 }
 
-export async function executeBoundAgentExam(request: AgentCapstoneRequest) {
+export async function executeBoundAgentExam(
+  request: AgentCapstoneRequest,
+  /**
+   * The University subject this work belongs to, when the caller knows it. Work inside the agent's
+   * registered domain runs on its role model; the generalist foundation, languages and retention run
+   * on the platform reasoner. Callers that pass nothing get generalist routing, which is the safe
+   * direction: a specialist never answers outside its field on a model tuned for that field.
+   */
+  work?: { subjectId?: string | null; domain?: AgentWorkDomain },
+) {
   const config = localInferenceConfigFromEnv()
-  const model = requireBuilderCodingModel()
+  const domain = work?.domain ?? agentWorkDomain(await readCosUniversityAgentRole(request.agentId), work?.subjectId)
+  const model = modelForAgentWork({ domain, roleModel: requireBuilderCodingModel() })
   return executeBoundSoftwareCapstone(request, {
     readRole: readCosUniversityAgentRole, loadProcedures: loadAgentOwnProcedures, model,
     // Independent assessments never acquire source packets or study text through this port.

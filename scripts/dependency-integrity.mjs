@@ -53,7 +53,8 @@ console.log(`${workspace}: manifest/lock agreement and ${checked} reviewed depen
 if (process.argv.includes('--smoke')) {
   const require = createRequire(resolve(directory, 'package.json'));
   for (const name of ['next', 'postcss', 'browserslist', 'form-data', 'nanoid', 'sharp']) {
-    const installed = readJson(require.resolve(`${name}/package.json`));
+    // Inspect the installed lockfile path, not an optional package.json export.
+    const installed = readJson(resolve(directory, 'node_modules', name, 'package.json'));
     assert.equal(installed.version, lock.packages[`node_modules/${name}`].version, `${name}: installed/locked version mismatch`);
   }
   const browsers = require('browserslist')('last 1 Chrome version');

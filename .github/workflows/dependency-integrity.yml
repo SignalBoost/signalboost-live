@@ -45,12 +45,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Collect fresh complete lockfile advisory evidence
+        run: npm audit --json --ignore-scripts --registry=https://registry.npmjs.org/ > dependency-audit.json
       - name: Install the committed graph without dependency lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/
       - name: Verify locked graph and safe library behavior
         run: node "$GITHUB_WORKSPACE/scripts/dependency-integrity.mjs" '${{ matrix.workspace }}' --smoke
-      - name: Collect fresh complete lockfile advisory evidence
-        run: npm audit --json --ignore-scripts --registry=https://registry.npmjs.org/ > dependency-audit.json
       - name: Build the application from the committed graph
         run: npm run build
       - name: Verify package manifests and lockfiles stayed unchanged

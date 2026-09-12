@@ -3,9 +3,11 @@ import test from 'node:test'
 import type { A2ATransport } from '../a2a-core/a2a-client.ts'
 import { createInMemoryA2AAgentRegistry } from '../a2a-host/a2a-agent-registry.ts'
 import {
+  createSpecialistQualificationAssessmentPort,
   persistSupabaseSpecialistQualificationAssessment,
   runSpecialistQualificationAssessment,
 } from '../a2a-host/specialist-qualification-assessment.ts'
+import { getCOSA2AQualificationAssessmentPort, installCOSA2AQualificationAssessmentPort } from '../a2a-host/cos-runtime-host.ts'
 
 const tenantId = 'tenant-a'
 const environmentId = 'production'
@@ -16,66 +18,28 @@ const transportRef = 'software-a2a'
 
 function registry(risk: 'advisory' | 'write' = 'advisory') {
   return createInMemoryA2AAgentRegistry({
-    agents: [{
-      agentId,
-      displayName: 'Software Specialist',
-      description: 'Qualification candidate',
-      transportRef,
-      enabled: true,
-      advertisedSkillIds: [skillId],
-    }],
-    assignments: [{
-      assignmentId: 'software-assignment',
-      agentId,
-      tenantId,
-      environmentId,
-      portableId,
-      enabled: true,
-      allowedSkills: [{ skillId, risk }],
-    }],
+    agents: [{ agentId, displayName: 'Software Specialist', description: 'Qualification candidate', transportRef, enabled: true, advertisedSkillIds: [skillId] }],
+    assignments: [{ assignmentId: 'software-assignment', agentId, tenantId, environmentId, portableId, enabled: true, allowedSkills: [{ skillId, risk }] }],
   })
 }
 
-function successfulTransport(onSend?: () => void): A2ATransport {
+function successfulTransport(onSend?: (request: Record<string, any>) => void): A2ATransport {
   return {
     async send(input) {
-      onSend?.()
       const request = input.request as Record<string, any>
-      return {
-        jsonrpc: '2.0',
-        id: request.id,
-        result: {
-          kind: 'task',
-          id: 'qualification-task',
-          contextId: 'qualification-context',
-          status: { state: 'completed' },
-          artifacts: [{ artifactId: 'analysis', name: 'analysis', parts: [{ kind: 'text', text: 'Verified analysis output.' }] }],
-        },
-      }
+      onSend?.(request)
+      return { jsonrpc: '2.0', id: request.id, result: { kind: 'task', id: 'qualification-task', contextId: 'qualification-context', status: { state: 'completed' }, artifacts: [{ artifactId: 'analysis', name: 'analysis', parts: [{ kind: 'text', text: 'Verified analysis output.' }] }] } }
     },
   }
 }
 
 function baseOptions(overrides: Record<string, unknown> = {}) {
   return {
-    registry: registry(),
-    transportFactory: { create: () => successfulTransport() },
-    verifier: {
-      async verify() {
-        return { qualified: true, verifierId: 'host-independent-verifier', evidenceRef: 'assessment://heldout/software-analyze/1' }
-      },
-    },
-    tenantId,
-    environmentId,
-    portableId,
-    agentId,
-    skillId,
-    assessmentId: 'assessment-1',
-    messageId: 'message-1',
-    probeText: 'Analyze the supplied held-out software case and return the bounded diagnosis.',
-    validForMs: 86_400_000,
-    now: () => new Date('2026-09-12T22:30:00Z'),
-    ...overrides,
+    registry: registry(), transportFactory: { create: () => successfulTransport() },
+    verifier: { async verify() { return { qualified: true, verifierId: 'host-independent-verifier', evidenceRef: 'assessment://heldout/software-analyze/1' } } },
+    tenantId, environmentId, portableId, agentId, skillId, assessmentId: 'assessment-1', messageId: 'message-1',
+    probeText: 'Analyze the supplied held-out software case and return the bounded diagnosis.', validForMs: 86_400_000,
+    now: () => new Date('2026-09-12T22:30:00Z'), ...overrides,
   } as any
 }
 
@@ -84,14 +48,8 @@ test('qualification requires a real advisory transport attempt plus an independe
   let verifiedResponse: unknown
   const record = await runSpecialistQualificationAssessment(baseOptions({
     transportFactory: { create: () => successfulTransport(() => { sends += 1 }) },
-    verifier: {
-      async verify(input: any) {
-        verifiedResponse = input.response
-        return { qualified: true, verifierId: 'host-independent-verifier', evidenceRef: 'assessment://heldout/software-analyze/1' }
-      },
-    },
+    verifier: { async verify(input: any) { verifiedResponse = input.response; return { qualified: true, verifierId: 'host-independent-verifier', evidenceRef: 'assessment://heldout/software-analyze/1' } } },
   }))
-
   assert.equal(sends, 1)
   assert.equal((verifiedResponse as any).kind, 'task')
   assert.equal(record.qualified, true)
@@ -103,50 +61,50 @@ test('qualification requires a real advisory transport attempt plus an independe
   assert.equal('response' in record, false)
 })
 
+test('host assessment port owns the hidden probe and installs through the COS runtime seam', async () => {
+  let observedProbe = ''
+  const port = createSpecialistQualificationAssessmentPort({
+    registry: registry(),
+    transportFactory: { create: () => successfulTransport(request => { observedProbe = String((request.params as any)?.message?.parts?.[0]?.text ?? '') }) },
+    probes: { async issue(input) { assert.equal(input.assessmentId, 'assessment-hidden'); return { messageId: 'hidden-message', probeText: 'HOST-OWNED-HELD-OUT-PROBE' } } },
+    verifier: { async verify() { return { qualified: true, verifierId: 'independent-verifier', evidenceRef: 'heldout://proof/assessment-hidden' } } },
+    now: () => new Date('2026-09-12T22:30:00Z'),
+  })
+  const dispose = installCOSA2AQualificationAssessmentPort(port)
+  try {
+    const installed = getCOSA2AQualificationAssessmentPort()
+    assert.ok(installed)
+    const record = await installed.assess({ tenantId, environmentId, portableId, agentId, skillId, assessmentId: 'assessment-hidden' })
+    assert.equal(record.qualified, true)
+    assert.match(observedProbe, /HOST-OWNED-HELD-OUT-PROBE/)
+    assert.equal((record as any).probeText, undefined)
+  } finally {
+    dispose()
+  }
+  assert.equal(getCOSA2AQualificationAssessmentPort(), null)
+})
+
 test('qualification rejects self-verification even after successful advisory execution', async () => {
-  await assert.rejects(() => runSpecialistQualificationAssessment(baseOptions({
-    verifier: { async verify() { return { qualified: true, verifierId: agentId, evidenceRef: 'self://claim' } } },
-  })), /self_verification_rejected/)
+  await assert.rejects(() => runSpecialistQualificationAssessment(baseOptions({ verifier: { async verify() { return { qualified: true, verifierId: agentId, evidenceRef: 'self://claim' } } } })), /self_verification_rejected/)
 })
 
 test('qualification cannot probe a write skill through the advisory assessment path', async () => {
   let sends = 0
-  await assert.rejects(() => runSpecialistQualificationAssessment(baseOptions({
-    registry: registry('write'),
-    transportFactory: { create: () => successfulTransport(() => { sends += 1 }) },
-  })), /a2a_phase1_non_advisory_delegation_blocked/)
+  await assert.rejects(() => runSpecialistQualificationAssessment(baseOptions({ registry: registry('write'), transportFactory: { create: () => successfulTransport(() => { sends += 1 }) } })), /a2a_phase1_non_advisory_delegation_blocked/)
   assert.equal(sends, 0)
 })
 
 test('pre-send resolution failures create no verifier decision', async () => {
   let verifierCalls = 0
-  await assert.rejects(() => runSpecialistQualificationAssessment(baseOptions({
-    tenantId: 'wrong-tenant',
-    verifier: { async verify() { verifierCalls += 1; return { qualified: true, verifierId: 'verifier', evidenceRef: 'evidence' } } },
-  })), /specialist_qualification_agent_unavailable/)
+  await assert.rejects(() => runSpecialistQualificationAssessment(baseOptions({ tenantId: 'wrong-tenant', verifier: { async verify() { verifierCalls += 1; return { qualified: true, verifierId: 'verifier', evidenceRef: 'evidence' } } } })), /specialist_qualification_agent_unavailable/)
   assert.equal(verifierCalls, 0)
 })
 
 test('a successful probe may be independently rejected and persists the negative decision without raw response', async () => {
-  const record = await runSpecialistQualificationAssessment(baseOptions({
-    assessmentId: 'assessment-negative',
-    verifier: {
-      async verify() {
-        return { qualified: false, verifierId: 'host-independent-verifier', evidenceRef: 'assessment://heldout/software-analyze/fail-1' }
-      },
-    },
-  }))
+  const record = await runSpecialistQualificationAssessment(baseOptions({ assessmentId: 'assessment-negative', verifier: { async verify() { return { qualified: false, verifierId: 'host-independent-verifier', evidenceRef: 'assessment://heldout/software-analyze/fail-1' } } } }))
   assert.equal(record.qualified, false)
-
   const writes: any[] = []
-  const db = {
-    from(table: string) {
-      assert.equal(table, 'a2a_specialist_qualifications')
-      return {
-        async insert(payload: any) { writes.push(payload); return { error: null } },
-      }
-    },
-  } as any
+  const db = { from(table: string) { assert.equal(table, 'a2a_specialist_qualifications'); return { async insert(payload: any) { writes.push(payload); return { error: null } } } } } as any
   await persistSupabaseSpecialistQualificationAssessment(db, record)
   assert.equal(writes.length, 1)
   assert.equal(writes[0].qualification_key, 'qualification:assessment-negative')

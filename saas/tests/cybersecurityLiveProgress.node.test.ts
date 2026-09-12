@@ -4,6 +4,7 @@ import { readUiSource } from './helpers/sourceWithUiCopy.mjs'
 import './cyberRemediationAutonomy.node.test.ts'
 import './cyberAdvisoryDetails.node.test.ts'
 import './cyberLegacyPresentation.node.test.ts'
+import './cyberBrandDisplayReviewRegressions.node.test.ts'
 import './cyberCrossRangeFixes.node.test.ts'
 import './cyberLiveEvidenceFailures.node.test.ts'
 

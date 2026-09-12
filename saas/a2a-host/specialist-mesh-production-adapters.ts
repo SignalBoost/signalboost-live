@@ -3,7 +3,7 @@ import type { A2ARuntimeObservationEvent } from './a2a-runtime-observability.ts'
 import type { SpecialistQualificationDecision, SpecialistQualificationPort, SpecialistQualificationRequest } from './cos-specialist-orchestrator.ts'
 import type { SpecialistMeshLiveSignal, SpecialistMeshSignalPort, SpecialistMeshSignalRequest } from './specialist-mesh-router.ts'
 
-export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v5' as const
+export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v6' as const
 
 export interface SpecialistQualificationEvidenceRecord {
   agentId: string
@@ -38,8 +38,9 @@ function evidenceTime(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY
 }
 
-/** Only observations created after a specialist execution attempt may affect worker quality/reliability. */
+/** Only observations created after the host-owned transport send method is entered may affect worker quality/reliability. */
 function attemptedSpecialistExecution(event: A2ARuntimeObservationEvent): boolean {
+  if (event.executionAttempted !== true) return false
   return event.mode === 'delegated' || event.mode === 'a2a_transport_unavailable' || event.mode === 'a2a_runtime_error'
 }
 

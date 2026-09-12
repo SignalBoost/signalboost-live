@@ -155,3 +155,21 @@ test('breaking, ambiguous and unclosed advisory intervals cannot supply a routin
     assert.deepEqual(report.advisories[0].fixedVersions, [])
   }
 })
+
+for (const [name, events] of [
+  ['consecutive introduced boundaries', [{ introduced: '0' }, { introduced: '1.2.0' }, { fixed: '1.2.4' }]],
+  ['malformed trailing interval', [{ introduced: '0' }, { fixed: '1.2.4' }, { introduced: '1.3.0' }, { introduced: '1.3.1' }, { fixed: '1.3.2' }]],
+  ['multiple keys after a valid interval', [{ introduced: '0' }, { fixed: '1.2.4' }, { introduced: '1.3.0', fixed: '1.3.2' }]],
+  ['orphan fixed boundary before a valid interval', [{ fixed: '1.0.0' }, { introduced: '1.2.0' }, { fixed: '1.2.4' }]],
+  ['a fix that is immediately reintroduced', [{ introduced: '0' }, { fixed: '1.2.4' }, { introduced: '1.2.4' }, { fixed: '1.2.5' }]],
+] as const) {
+  test(`the entire advisory range fails closed for ${name}`, async () => {
+    const record = vuln()
+    record.affected[1].ranges[0].events = events as any
+    const report = await scanner((async (input: any) => String(input).endsWith('/querybatch')
+      ? json({ results: [{ vulns: [{ id: record.id }] }] }) : json(record)) as typeof fetch)()
+    assert.equal(report.ok, true)
+    assert.equal(report.advisories[0].severity, 'high', 'The finding remains visible')
+    assert.deepEqual(report.advisories[0].fixedVersions, [], 'Ambiguous data never grants patch evidence')
+  })
+}

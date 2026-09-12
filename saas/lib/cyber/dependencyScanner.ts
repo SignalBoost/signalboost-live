@@ -211,6 +211,105 @@ function severityFromVuln(v: any, affected: any[]): CyberSeverity {
 
 function unique(values: string[]): string[] { return [...new Set(values)] }
 
+function stableParts(value: unknown): number[] | null {
+  if (typeof value !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value)) return null
+  const parts = value.split('.').map(Number)
+  return parts.every(Number.isSafeInteger) ? parts : null
+}
+
+function compareStable(a: number[], b: number[]): number {
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1
+  return 0
+}
+
+type StableAdvisoryInterval = {
+  lower: number[]
+  upper: number[] | null
+  inclusive: boolean
+  fixed: string | null
+}
+
+// Parse once for both candidate selection and the all-range exclusion check.
+// Unsupported or malformed evidence cannot establish a safe proposal target.
+function stableAdvisoryIntervals(events: unknown): StableAdvisoryInterval[] | null {
+  if (!Array.isArray(events) || events.length === 0) return null
+  const intervals: StableAdvisoryInterval[] = []
+  let lower: number[] | null = null
+  let previousEnd: number[] | null = null
+  let hasFixed = false
+  let hasLastAffected = false
+  for (const event of events) {
+    if (!event || typeof event !== 'object' || Array.isArray(event)) return null
+    const keys = Object.keys(event)
+    if (keys.length !== 1 || !['introduced', 'fixed', 'last_affected', 'limit'].includes(keys[0])) return null
+    const key = keys[0]
+    const value = event[key]
+    if (key === 'introduced') {
+      if (lower !== null) return null
+      const next = value === '0' ? [0, 0, 0] : stableParts(value)
+      if (!next || (previousEnd && compareStable(next, previousEnd) <= 0)) return null
+      lower = next
+      continue
+    }
+    const upper = stableParts(value)
+    if (!lower || !upper || compareStable(lower, upper) > 0
+      || (key !== 'last_affected' && compareStable(lower, upper) === 0)) return null
+    hasFixed ||= key === 'fixed'
+    hasLastAffected ||= key === 'last_affected'
+    if (hasFixed && hasLastAffected) return null
+    intervals.push({ lower, upper, inclusive: key === 'last_affected', fixed: key === 'fixed' ? value : null })
+    previousEnd = upper
+    lower = null
+  }
+  // A final introduced event remains affected indefinitely; do not drop it.
+  if (lower) intervals.push({ lower, upper: null, inclusive: false, fixed: null })
+  return intervals.length ? intervals : null
+}
+
+function intervalContains(interval: StableAdvisoryInterval, version: number[]): boolean {
+  return compareStable(version, interval.lower) >= 0
+    && (!interval.upper || compareStable(version, interval.upper) < 0
+      || (interval.inclusive && compareStable(version, interval.upper) === 0))
+}
+
+// Fixed boundaries from older/future intervals are descriptive history, not
+// targets for the queried version. Unknown boundaries never grant plan evidence.
+function applicableFixedVersions(events: unknown, currentVersion: string): string[] {
+  const current = stableParts(currentVersion)
+  const intervals = stableAdvisoryIntervals(events)
+  if (!current || !intervals) return []
+  return intervals.filter(interval => interval.fixed && interval.upper
+    && intervalContains(interval, current)
+    && interval.upper[0] === current[0] && (current[0] !== 0 || interval.upper[1] === current[1]))
+    .map(interval => interval.fixed!)
+}
+
+// OSV affected entries, sibling ranges and explicit versions are a UNION.
+// A fixed boundary in one range is not a fix if any matching evidence still
+// includes it. Uninterpretable sibling evidence fails closed for recommendations
+// only; the advisory, severity and descriptive ranges remain visible.
+function outsideAllAffectedEvidence(candidate: string, affected: any[]): boolean {
+  const version = stableParts(candidate)
+  if (!version) return false
+  for (const entry of affected) {
+    if (entry.ranges !== undefined && !Array.isArray(entry.ranges)) return false
+    if (entry.versions !== undefined && !Array.isArray(entry.versions)) return false
+    const ranges = entry.ranges || []
+    const versions = entry.versions || []
+    if (ranges.length === 0 && versions.length === 0) return false
+    for (const value of versions) {
+      const listed = stableParts(value)
+      if (!listed || compareStable(listed, version) === 0) return false
+    }
+    for (const range of ranges) {
+      if (!['SEMVER', 'ECOSYSTEM'].includes(range?.type)) return false
+      const intervals = stableAdvisoryIntervals(range.events)
+      if (!intervals || intervals.some(interval => intervalContains(interval, version))) return false
+    }
+  }
+  return true
+}
+
 function normalizeAdvisory(id: string, pkg: DependencyPackage, detail: any): DependencyAdvisory {
   const affected = Array.isArray(detail?.affected) ? detail.affected.filter((a: any) =>
     a?.package?.ecosystem === pkg.ecosystem && a?.package?.name === pkg.name) : []
@@ -223,9 +322,10 @@ function normalizeAdvisory(id: string, pkg: DependencyPackage, detail: any): Dep
   const affectedRanges: string[] = []
   for (const a of affected) for (const range of (Array.isArray(a.ranges) ? a.ranges : [])) {
     if (!['SEMVER', 'ECOSYSTEM'].includes(range?.type)) continue
+    const events = Array.isArray(range.events) ? range.events : []
+    fixedVersions.push(...applicableFixedVersions(events, pkg.version))
     const pieces: string[] = []
-    for (const event of (Array.isArray(range.events) ? range.events : [])) {
-      if (typeof event?.fixed === 'string' && EXACT_VERSION.test(event.fixed)) fixedVersions.push(event.fixed)
+    for (const event of events) {
       for (const key of ['introduced', 'fixed', 'last_affected', 'limit']) {
         if (typeof event?.[key] === 'string') pieces.push(`${key.replace('_', ' ')} ${event[key]}`)
       }
@@ -244,7 +344,8 @@ function normalizeAdvisory(id: string, pkg: DependencyPackage, detail: any): Dep
     severity: severityFromVuln(detail, affected), summary: description ? description.trim().slice(0, 500) : 'The advisory source did not provide a description.',
     detailsUrl: reference?.url || fallback,
     aliases: Array.isArray(detail.aliases) ? detail.aliases.filter((v: unknown): v is string => typeof v === 'string').slice(0, 50) : [],
-    fixedVersions: unique(fixedVersions), affectedRanges: unique(affectedRanges).slice(0, 12), detailStatus: 'available' }
+    fixedVersions: unique(fixedVersions).filter(candidate => outsideAllAffectedEvidence(candidate, affected))
+      .sort((a, b) => compareStable(stableParts(a)!, stableParts(b)!)), affectedRanges: unique(affectedRanges).slice(0, 12), detailStatus: 'available' }
 }
 
 async function queryOsv(packages: DependencyPackage[]): Promise<DependencyAdvisory[]> {

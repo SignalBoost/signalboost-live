@@ -1,6 +1,8 @@
+// saas/lib/cos-core/layers/learning/cycle.ts
 import { createHash } from 'node:crypto'
 import type { ContinuousLearningDecision, ContinuousLearningSourceKind, KnowledgeGap, LearningCandidate } from './index.ts'
 import { ContinuousLearningDirector } from './index.ts'
+import { gapCurriculumAligned } from './gaps.ts'
 import { minimumConfidenceForKind } from './sourceCatalog.ts'
 import {
   incrementDiagnosticCount,
@@ -112,7 +114,7 @@ export class ContinuousLearningCycle{
           const source=adapter.id??adapter.kind,score=relevanceOf(document,terms)
           if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){incrementDiagnosticCount(result.rejected,'not_relevant');if(diagnostic)incrementDiagnosticCount(diagnostic.rejected,'not_relevant');continue}
           const kindFloor=admissionFloorFor(document)
-          const admission=classifyTieredAdmission({ rawRelevance: score.coverage, confidence: candidate0Confidence(document,score), sourceFloor: kindFloor ?? 0, gapAligned: gap.id.startsWith('curriculum:') })
+          const admission=classifyTieredAdmission({ rawRelevance: score.coverage, confidence: candidate0Confidence(document,score), sourceFloor: kindFloor ?? 0, gapAligned: gapCurriculumAligned(gap) })
           const candidate={...this.toCandidate(document,allTerms,score),admission}
           if(kindFloor!==null&&candidate.confidence<kindFloor&&admission.tier!=='probationary'){
             incrementDiagnosticCount(result.rejected,'below_source_confidence_floor')

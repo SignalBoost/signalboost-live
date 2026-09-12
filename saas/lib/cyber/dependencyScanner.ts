@@ -51,6 +51,8 @@ export interface DependencyScanReport {
     complete: boolean
     unreadableManifests: string[]
     capped: boolean
+    /** Declared as a range with no lockfile entry: requirement known, installed version unknown. */
+    unresolvedRanges: string[]
     maxPackages: number
     note?: string
   }
@@ -82,11 +84,21 @@ function targetFromInput(input?: string): RepoTarget {
   return parsed || { repo: DEFAULT_REPO, branch: '', subPath: '', raw: raw || `https://github.com/${DEFAULT_REPO}` }
 }
 
-function cleanVersion(value: unknown): string | null {
+/**
+ * A resolved version is a version that is actually installed, as recorded in a lockfile.
+ * Only an exact version qualifies: "8.5.20" is installed, "^8.4.31" is a range whose floor may be
+ * years old and is very likely NOT what the tree resolves to. Scanning a range floor as if it were
+ * installed produces advisories against a version the repository does not have.
+ */
+function resolvedVersion(value: unknown): string | null {
   const v = String(value || '').trim()
   if (!v) return null
-  const cleaned = v.replace(/^[~^=<>\s]+/, '').trim()
-  return EXACT_VERSION.test(cleaned) ? cleaned : null
+  return EXACT_VERSION.test(v) ? v : null
+}
+
+/** True when the declared spec pins one exact version, so the manifest alone states what is installed. */
+export function isExactVersionSpec(value: unknown): boolean {
+  return resolvedVersion(value) !== null
 }
 
 function addPackage(out: Map<string, DependencyPackage>, name: string, version: string | null, sourceFile: string) {
@@ -95,13 +107,21 @@ function addPackage(out: Map<string, DependencyPackage>, name: string, version: 
   if (!out.has(key)) out.set(key, { name, version, sourceFile, ecosystem: 'npm' })
 }
 
-function fromPackageJson(content: string, sourceFile: string, out: Map<string, DependencyPackage>) {
+/**
+ * package.json states requirements, not installations. Only an exactly pinned spec is scannable;
+ * every range is left to the lockfile, and reported as unresolved when no lockfile supplies it.
+ */
+function fromPackageJson(content: string, sourceFile: string, out: Map<string, DependencyPackage>, ranged: Map<string, string>) {
   try {
     const pkg = JSON.parse(content)
     for (const group of ['dependencies', 'devDependencies', 'optionalDependencies']) {
       const deps = pkg?.[group]
       if (!deps || typeof deps !== 'object') continue
-      for (const [name, spec] of Object.entries(deps)) addPackage(out, name, cleanVersion(spec), sourceFile)
+      for (const [name, spec] of Object.entries(deps)) {
+        const exact = resolvedVersion(spec)
+        if (exact) addPackage(out, name, exact, sourceFile)
+        else if (String(spec || '').trim()) ranged.set(name, String(spec).trim().slice(0, 100))
+      }
     }
   } catch { /* malformed package.json is ignored by dependency scanner */ }
 }
@@ -114,20 +134,20 @@ function fromPackageLock(content: string, sourceFile: string, out: Map<string, D
       for (const [path, meta] of Object.entries(packages as Record<string, any>)) {
         if (!String(path).startsWith('node_modules/')) continue
         const name = String(path).replace(/^node_modules\//, '')
-        addPackage(out, name, cleanVersion(meta?.version), sourceFile)
+        addPackage(out, name, resolvedVersion(meta?.version), sourceFile)
       }
     }
     const deps = lock?.dependencies
     if (deps && typeof deps === 'object') {
-      for (const [name, meta] of Object.entries(deps as Record<string, any>)) addPackage(out, name, cleanVersion(meta?.version), sourceFile)
+      for (const [name, meta] of Object.entries(deps as Record<string, any>)) addPackage(out, name, resolvedVersion(meta?.version), sourceFile)
     }
   } catch { /* ignore */ }
 }
 
-async function collectPackages(target: RepoTarget, maxPackages: number, onProgress?: DependencyScanProgressHandler): Promise<{ ok: boolean; branch: string; packages: DependencyPackage[]; error?: string; unreadableManifests: string[]; capped: boolean }> {
+async function collectPackages(target: RepoTarget, maxPackages: number, onProgress?: DependencyScanProgressHandler): Promise<{ ok: boolean; branch: string; packages: DependencyPackage[]; error?: string; unreadableManifests: string[]; capped: boolean; unresolvedRanges: string[] }> {
   emitProgress(onProgress, { stage: 'repository', progress: 10, message: 'Connecting to GitHub and reading the repository tree.' })
   const tree = await listRepoTree(target.repo, target.branch)
-  if (!tree.ok) return { ok: false, branch: tree.branch, packages: [], error: tree.error, unreadableManifests: [], capped: false }
+  if (!tree.ok) return { ok: false, branch: tree.branch, packages: [], error: tree.error, unreadableManifests: [], capped: false, unresolvedRanges: [] }
   target.branch = tree.branch
 
   const scoped = target.subPath ? tree.files.filter(f => f.startsWith(target.subPath)) : tree.files
@@ -141,13 +161,15 @@ async function collectPackages(target: RepoTarget, maxPackages: number, onProgre
   // A manifest that cannot be read whole is reported, never silently skipped: a partial inventory
   // would otherwise be summarised as a clean scan.
   const unreadableManifests: string[] = []
+  // Ranges seen in package.json; any name the lockfile later resolves is removed below.
+  const ranged = new Map<string, string>()
   for (let index = 0; index < manifests.length; index += 1) {
     const file = manifests[index]
     const res = await readRepoFileFrom(target.repo, target.branch, file, { maxChars: MAX_MANIFEST_FILE_CHARS })
     if (!res.ok || !res.content || res.truncated) { unreadableManifests.push(file); continue }
     const before = out.size
     if (file.endsWith('package-lock.json')) fromPackageLock(res.content, file, out)
-    else if (file.endsWith('package.json')) fromPackageJson(res.content, file, out)
+    else if (file.endsWith('package.json')) fromPackageJson(res.content, file, out, ranged)
     if (out.size === before && file.endsWith('package-lock.json')) unreadableManifests.push(file)
     emitProgress(onProgress, {
       stage: 'manifests',
@@ -159,9 +181,14 @@ async function collectPackages(target: RepoTarget, maxPackages: number, onProgre
     if (out.size >= maxPackages) break
   }
 
+  const resolvedNames = new Set(Array.from(out.values()).map(pkg => pkg.name))
+  const unresolvedRanges = Array.from(ranged.entries())
+    .filter(([name]) => !resolvedNames.has(name))
+    .map(([name, spec]) => `${name}@${spec}`)
+    .sort()
   return {
     ok: true, branch: target.branch, packages: Array.from(out.values()).slice(0, maxPackages),
-    unreadableManifests, capped: out.size > maxPackages,
+    unreadableManifests, capped: out.size > maxPackages, unresolvedRanges,
   }
 }
 
@@ -280,16 +307,23 @@ async function queryOsv(packages: DependencyPackage[]): Promise<DependencyAdviso
  * Coverage is reported, never assumed. An unread manifest or a capped inventory means the advisory
  * result describes part of the dependency tree, and the report says so instead of implying a clean scan.
  */
-function buildCoverage(unreadableManifests: string[], capped: boolean, maxPackages: number): DependencyScanReport['coverage'] {
-  const complete = unreadableManifests.length === 0 && !capped
+function buildCoverage(
+  unreadableManifests: string[],
+  capped: boolean,
+  maxPackages: number,
+  unresolvedRanges: string[],
+): DependencyScanReport['coverage'] {
+  const complete = unreadableManifests.length === 0 && !capped && unresolvedRanges.length === 0
   const notes: string[] = []
   if (unreadableManifests.length) notes.push(`${unreadableManifests.length} manifest(s) could not be read in full: ${unreadableManifests.slice(0, 5).join(', ')}.`)
   if (capped) notes.push(`The inventory reached the ${maxPackages}-package limit for this scan, so later packages were not checked.`)
+  if (unresolvedRanges.length) notes.push(`${unresolvedRanges.length} dependency range(s) have no lockfile entry, so the installed version is unknown and they were not checked: ${unresolvedRanges.slice(0, 5).join(', ')}.`)
   return {
     complete,
     unreadableManifests,
     capped,
     maxPackages,
+    unresolvedRanges,
     note: complete ? undefined : `${notes.join(' ')} These findings cover part of the dependency tree, not all of it.`,
   }
 }
@@ -321,7 +355,7 @@ export async function scanDependencyAdvisories(opts?: { url?: string; maxPackage
       return rank[a.severity] - rank[b.severity] || a.packageName.localeCompare(b.packageName)
     })
     emitProgress(opts?.onProgress, { stage: 'report', progress: 90, message: 'Building the cybersecurity report.' })
-    const coverage = buildCoverage(collected.unreadableManifests, collected.capped, maxPackages)
+    const coverage = buildCoverage(collected.unreadableManifests, collected.capped, maxPackages, collected.unresolvedRanges)
     return { ok: true, generatedAt, target: targetLabel, repo: target.repo, branch: collected.branch, packages: collected.packages, advisories, summary: summarize(collected.packages, advisories), coverage }
   } catch (err) {
     return { ok: false, generatedAt, target: targetLabel, repo: target.repo, branch: target.branch, packages: [], advisories: [], summary: summarize([], []), error: err instanceof Error ? err.message : 'Dependency advisory scan failed.' }

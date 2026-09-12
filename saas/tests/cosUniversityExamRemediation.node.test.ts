@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityExamRemediation.node.test.ts
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -69,7 +70,12 @@ test('language exam remediation preserves the exact failed dimension without bre
   assert.match(strategist, /written composition and sentence construction/)
   assert.match(strategist, /editing revision and error correction/)
   assert.match(strategist, /capability: dimension \? `cos_university\.language\.\$\{language\.id\}\.\$\{dimension\}` : `cos_university\.language\.\$\{language\.id\}`/)
-  assert.match(strategist, /\.\.\.\(dimension \? \{ missingFacts: studyThemes\.map\(theme => `\$\{language\.title\} \$\{theme\}`\) \} : \{\}\)/)
+  // A dimension-scoped plan still studies exactly its own dimension's themes; a broad plan now draws
+  // one theme per dimension instead of carrying none, which is what left Portuguese acquisition
+  // scoring against the generic question and rejecting 733 of 883 documents as not relevant.
+  assert.match(strategist, /const baseThemes = dimension \? LANGUAGE_DIMENSION_STUDY_THEMES\[dimension\] : wholeLanguageStudyThemes\(\)/)
+  assert.match(strategist, /const studyThemes = rotatedThemes\.map\(theme => `\$\{language\.title\} \$\{theme\}`\)/)
+  assert.match(strategist, /\.\.\.\(studyThemes\.length \? \{ missingFacts: studyThemes \} : \{\}\)/)
   assert.match(strategist, /`language_dimension=\$\{dimension\}`/)
   assert.match(strategist, /language_dimensions=comprehension,writing,instruction_following,translation_localization,cultural_pragmatics/)
 

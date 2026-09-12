@@ -2,7 +2,7 @@
 
 Read root `ONBOARD.md` first, then Phases 1–12 under `docs/HANDOFF-A2A-AGENT-FABRIC-PHASE*-2026-08-31.md` before changing A2A, COS delegation, specialist-agent, Agent Operations, Agent Gateway, MCP/Provider Hub interaction, or portable agent-integration code.
 
-Current workstream: **A2A Agent Fabric — Specialist Mesh routing/failover foundation and durable Production evidence schema are in Production. Governed qualification assessment and genuine two-specialist live failover acceptance are the active next milestone.**
+Current workstream: **A2A Agent Fabric — Specialist Mesh routing/failover foundation and durable Production evidence schema are in Production. Governed qualification assessment/operator wiring and genuine two-specialist live failover acceptance are the active next milestone.**
 
 Direction:
 
@@ -13,6 +13,8 @@ Direction:
 - There are no permanent primary/backup specialist pairs. Every independently qualified and authorized specialist may provide backup capacity for work in its proven scope.
 - Qualification is a host-controlled hard gate. Registry assignment and Agent Card advertised skills are not qualification evidence; portable hosts must inject a qualification adapter with durable evidence references.
 - A new specialist may earn qualification only through the dedicated advisory qualification-assessment path: exact registry scope must already authorize the candidate, the host-owned transport send must actually be entered, and an independently injected verifier must judge the returned work and provide a durable evidence reference. Self-verification is rejected. Raw qualification probe prompts/responses are not written to the qualification table.
+- The owner-only qualification operator accepts only exact tenant/environment/portable + candidate/skill identifiers. Probe content and scoring are never caller inputs: the host assessment port owns the hidden probe, transport, and independent verifier. The returned decision must exactly correlate to the server-generated assessment ID plus requested tenant/environment/portable/agent/skill before any durable write; mismatches fail closed.
+- `activateProductionCOSA2AHost` installs the governed runtime host and qualification assessment port together from the same exact registry/transport authority only when the host supplies its hidden probe provider and independent verifier. Missing host-owned assessment configuration is not fabricated or silently substituted; the operator remains unavailable/fail-closed.
 - The qualification-assessment path is not ordinary mesh delegation and does not bypass write/consequential controls: it invokes only skills whose registry risk is `advisory`. A failed resolution or pre-send failure creates no qualification decision.
 - Production qualification decisions live in service-role-only durable evidence and are time-bounded. The newest exact-scope decision wins, so a current revocation cannot be bypassed by an older positive record.
 - Production mesh telemetry is service-role-only, exact-scope, time-bounded routing evidence. Expired or unavailable telemetry becomes neutral and never grants eligibility or authority.

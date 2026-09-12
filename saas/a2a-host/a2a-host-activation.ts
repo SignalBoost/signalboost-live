@@ -81,16 +81,17 @@ export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHost
   qualificationAssessment: ProductionSpecialistQualificationAssessmentOptions
   now?: () => Date
 }) {
-  const mesh = createSupabaseSpecialistMeshProductionAdapters(options.db, { now: options.now })
-  const activated = await activateCOSA2AHost({ ...options, qualifications: mesh.qualifications, meshSignals: mesh.meshSignals, now: options.now })
+  const { db, qualificationAssessment, ...hostOptions } = options
+  const mesh = createSupabaseSpecialistMeshProductionAdapters(db, { now: options.now })
+  const activated = await activateCOSA2AHost({ ...hostOptions, qualifications: mesh.qualifications, meshSignals: mesh.meshSignals })
   const assessmentPort = createSpecialistQualificationAssessmentPort({
-    registry: options.registry,
-    transportFactory: options.transportFactory,
-    probes: options.qualificationAssessment.probes,
-    verifier: options.qualificationAssessment.verifier,
-    timeoutMs: options.timeoutMs,
-    validForMs: options.qualificationAssessment.validForMs,
-    now: options.now,
+    registry: hostOptions.registry,
+    transportFactory: hostOptions.transportFactory,
+    probes: qualificationAssessment.probes,
+    verifier: qualificationAssessment.verifier,
+    timeoutMs: hostOptions.timeoutMs,
+    validForMs: qualificationAssessment.validForMs,
+    now: hostOptions.now,
   })
   const disposeAssessment = installCOSA2AQualificationAssessmentPort(assessmentPort)
   const dispose = () => {

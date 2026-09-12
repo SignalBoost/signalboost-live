@@ -33,6 +33,11 @@ function boundedScore(value: number): number {
   return Math.max(0, Math.min(100, Number(value.toFixed(3))))
 }
 
+/** Only observations created after a specialist execution attempt may affect worker quality/reliability. */
+function attemptedSpecialistExecution(event: A2ARuntimeObservationEvent): boolean {
+  return event.mode === 'delegated' || event.mode === 'a2a_transport_unavailable' || event.mode === 'a2a_runtime_error'
+}
+
 /** Host-owned durable qualification evidence only; latest exact-scope decision wins. */
 export function createProductionSpecialistQualificationPort(reader: SpecialistQualificationEvidenceReader): SpecialistQualificationPort {
   return Object.freeze({
@@ -80,6 +85,7 @@ export function createProductionSpecialistMeshSignalPort(options: {
         if (event.tenantId !== input.tenantId || event.environmentId !== input.environmentId || event.portableId !== input.portableId || event.skillId !== input.skillId) continue
         const at = Date.parse(event.occurredAt)
         if (!Number.isFinite(at) || at < cutoff || at > now() + 60_000) continue
+        if (!attemptedSpecialistExecution(event)) continue
         const bucket = grouped.get(event.agentId) ?? []
         bucket.push(event)
         grouped.set(event.agentId, bucket)

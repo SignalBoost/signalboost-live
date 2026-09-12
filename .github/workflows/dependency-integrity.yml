@@ -1,0 +1,65 @@
+name: Dependency Integrity
+
+on:
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'saas/package.json'
+      - 'saas/package-lock.json'
+      - 'scripts/dependency-integrity.mjs'
+      - '.github/workflows/dependency-integrity.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'saas/package.json'
+      - 'saas/package-lock.json'
+      - 'scripts/dependency-integrity.mjs'
+      - '.github/workflows/dependency-integrity.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Locked dependencies (${{ matrix.workspace }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ['.', 'saas']
+    defaults:
+      run:
+        working-directory: ${{ matrix.workspace }}
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co'
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install the committed graph without dependency lifecycle scripts
+        run: npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/
+      - name: Verify locked graph and safe library behavior
+        run: node "$GITHUB_WORKSPACE/scripts/dependency-integrity.mjs" '${{ matrix.workspace }}' --smoke
+      - name: Collect fresh complete lockfile advisory evidence
+        run: npm audit --json --ignore-scripts --registry=https://registry.npmjs.org/ > dependency-audit.json
+      - name: Build the application from the committed graph
+        run: npm run build
+      - name: Verify package manifests and lockfiles stayed unchanged
+        run: git diff --exit-code -- package.json package-lock.json
+      - name: Preserve advisory evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-${{ strategy.job-index }}-${{ github.sha }}
+          path: '${{ matrix.workspace }}/dependency-audit.json'
+          if-no-files-found: error
+          retention-days: 14

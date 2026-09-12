@@ -47,6 +47,8 @@ const GENERIC_TERMS = new Set([
   'what', 'when', 'where', 'which', 'with',
 ])
 const TRANSIENT_STATUS = new Set([408, 425, 429, 500, 502, 503, 504])
+import { pdfBufferToText } from './pdfText.ts'
+
 const MAX_RAW_PAGE_CHARS = 300_000
 const MAX_RETAINED_PAGE_CHARS = 30_000
 const MIN_READABLE_PAGE_CHARS = 700
@@ -179,7 +181,7 @@ export function buildWebTrainingResearchQuery(query: string): string {
   }).join(' ').slice(0, 380).replace(/\s+\S*$/, match => words.join(' ').length > 380 ? '' : match).trim()
 }
 
-async function requestText(fetcher: FetchLike, url: string, init: RequestInit, timeoutMs: number): Promise<{ text: string; contentType: string }> {
+async function requestText(fetcher: FetchLike, url: string, init: RequestInit, timeoutMs: number): Promise<{ text: string; bytes: Buffer; contentType: string }> {
   let lastError: unknown
   for (let attempt = 0; attempt < 2; attempt++) {
     const controller = new AbortController()
@@ -194,7 +196,10 @@ async function requestText(fetcher: FetchLike, url: string, init: RequestInit, t
       }
       const contentLength = Number(response.headers.get('content-length') || 0)
       if (contentLength > 2_500_000) throw new Error('web training source too large')
-      return { text: await response.text(), contentType: response.headers.get('content-type') || '' }
+      // Read the body once as bytes. response.text() UTF-8 decodes, which silently corrupts binary
+      // payloads, and PDF is now the majority content type reaching this reader.
+      const bytes = Buffer.from(await response.arrayBuffer())
+      return { text: bytes.toString('utf8'), bytes, contentType: response.headers.get('content-type') || '' }
     } catch (error) {
       lastError = error
       if (attempt >= 1) throw error
@@ -303,8 +308,16 @@ function reportUnreadablePage(url: string, reason: string, detail: Record<string
 }
 
 async function readTrainingPage(fetcher: FetchLike, hit: SearchHit): Promise<string> {
-  const { text: raw, contentType } = await requestText(fetcher, hit.url,
-    { headers: { accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,application/xml;q=0.7', 'user-agent': 'iTMounts-COS/1.0' } }, 12_000)
+  const { text: raw, bytes, contentType } = await requestText(fetcher, hit.url,
+    { headers: { accept: 'text/html,application/xhtml+xml,application/pdf;q=0.95,text/plain;q=0.9,application/xml;q=0.7', 'user-agent': 'iTMounts-COS/1.0' } }, 12_000)
+  if (/application\/pdf/i.test(contentType) || bytes.subarray(0, 5).toString('latin1') === '%PDF-') {
+    const extracted = pdfBufferToText(bytes)
+    if (!extracted) return reportUnreadablePage(hit.url, 'pdf_text_layer_unreadable', { contentType, rawLength: bytes.length })
+    if (extracted.length < MIN_READABLE_PAGE_CHARS) {
+      return reportUnreadablePage(hit.url, 'pdf_below_minimum_readable', { textLength: extracted.length, minimum: MIN_READABLE_PAGE_CHARS })
+    }
+    return extracted.slice(0, MAX_RETAINED_PAGE_CHARS)
+  }
   if (contentType && !/(?:text\/html|application\/xhtml\+xml|text\/plain|application\/xml|text\/xml)/i.test(contentType)) {
     return reportUnreadablePage(hit.url, 'content_type_rejected', { contentType, rawLength: raw.length })
   }

@@ -8,10 +8,12 @@ const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'u
 
 test('University practice revalidates the exact plan round after inference and fences reconciliation', () => {
   const runner = file('lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts')
-  const inferenceAt = runner.indexOf('execution = await callCosReasoner')
+  const inferenceAt = runner.indexOf('execution = await executeUniversityPractice')
   const postInferenceFenceAt = runner.indexOf("university_practice_post_inference_fence_failed")
   const resultRpcAt = runner.indexOf("db.rpc('cos_record_cognitive_practice_result'")
   assert.ok(inferenceAt >= 0)
+  assert.match(runner, /bound: executeBoundAgentExam/)
+  assert.match(runner, /cos: \(\) => callCosReasoner/)
   assert.ok(postInferenceFenceAt > inferenceAt)
   assert.ok(resultRpcAt > postInferenceFenceAt)
   assert.match(runner, /practice_round_advanced_during_inference/)

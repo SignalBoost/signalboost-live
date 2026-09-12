@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto'
 import { validateA2AAgentCard } from '../a2a-core/a2a-client.ts'
-import { A2A_AGENT_REGISTRY_VERSION, type A2AAgentRegistryPort, type A2ATransportFactory } from './a2a-agent-registry.ts'
+import {
+  A2A_AGENT_REGISTRY_VERSION,
+  normalizeA2AAgentRegistrySnapshot,
+  type A2AAgentRegistryPort,
+  type A2AAgentRegistrySnapshot,
+  type A2ATransportFactory,
+} from './a2a-agent-registry.ts'
 import { activatePortableA2AHost } from './a2a-host-activation.ts'
 import { createInMemoryA2ARuntimeObserver, type A2ARuntimeObservationEvent, type A2ARuntimeObservationPort } from './a2a-runtime-observability.ts'
 import type { A2ASpecialistFamilyId } from './a2a-specialist-catalog.ts'
@@ -45,13 +51,25 @@ function required(value: unknown, name: string): string {
   return normalized
 }
 
+function positiveQualificationEvidence(decision: SpecialistQualificationDecision | undefined): string | undefined {
+  if (decision?.qualified !== true) return undefined
+  const evidenceRef = String(decision.evidenceRef ?? '').trim()
+  return evidenceRef || undefined
+}
+
 function qualificationEvidence(decision: SpecialistQualificationDecision | undefined, agentId: string): string {
-  if (decision?.qualified !== true) throw new Error(`specialist_mesh_failover_candidate_unqualified:${agentId}`)
-  return required(decision.evidenceRef, `qualification evidenceRef for ${agentId}`)
+  const evidenceRef = positiveQualificationEvidence(decision)
+  if (!evidenceRef) throw new Error(`specialist_mesh_failover_candidate_unqualified:${agentId}`)
+  return evidenceRef
 }
 
 function evidenceFingerprint(evidenceRef: string): string {
   return `sha256:${createHash('sha256').update(evidenceRef, 'utf8').digest('hex')}`
+}
+
+function pinnedRegistryPort(snapshot: A2AAgentRegistrySnapshot): A2AAgentRegistryPort {
+  const pinned = normalizeA2AAgentRegistrySnapshot({ agents: snapshot.agents, assignments: snapshot.assignments })
+  return Object.freeze({ async snapshot() { return pinned } })
 }
 
 function pinnedQualificationPort(input: {
@@ -59,19 +77,17 @@ function pinnedQualificationPort(input: {
   environmentId: string
   portableId: string
   skillId: string
-  primaryAgentId: string
-  fallbackAgentId: string
-  primaryEvidenceRef: string
-  fallbackEvidenceRef: string
+  agentIds: readonly string[]
+  decisions: Readonly<Record<string, SpecialistQualificationDecision>>
 }): SpecialistQualificationPort {
-  const expectedAgentIds = [input.primaryAgentId, input.fallbackAgentId].sort()
-  const decisions = Object.freeze({
-    [input.primaryAgentId]: Object.freeze({ qualified: true, evidenceRef: input.primaryEvidenceRef }),
-    [input.fallbackAgentId]: Object.freeze({ qualified: true, evidenceRef: input.fallbackEvidenceRef }),
-  })
+  const expectedAgentIds = [...new Set(input.agentIds)].sort()
+  const decisions = Object.freeze(Object.fromEntries(expectedAgentIds.flatMap(agentId => {
+    const evidenceRef = positiveQualificationEvidence(input.decisions[agentId])
+    return evidenceRef ? [[agentId, Object.freeze({ qualified: true, evidenceRef })]] : []
+  })))
   return Object.freeze({
     async snapshot(request) {
-      const requestedAgentIds = [...request.agentIds].sort()
+      const requestedAgentIds = [...new Set(request.agentIds)].sort()
       if (
         request.tenantId !== input.tenantId
         || request.environmentId !== input.environmentId
@@ -132,31 +148,34 @@ export async function runSpecialistMeshLiveFailoverAcceptance(options: {
     if (!card.skills.some(skill => skill.id === skillId)) throw new Error(`specialist_mesh_failover_skill_not_advertised:${agentId}:${skillId}`)
   }
 
-  const snapshot = await options.registry.snapshot()
-  if (snapshot.schemaVersion !== A2A_AGENT_REGISTRY_VERSION) throw new Error('a2a_registry_schema_version_mismatch')
+  const liveSnapshot = await options.registry.snapshot()
+  if (liveSnapshot.schemaVersion !== A2A_AGENT_REGISTRY_VERSION) throw new Error('a2a_registry_schema_version_mismatch')
+  const registrySnapshot = normalizeA2AAgentRegistrySnapshot({ agents: liveSnapshot.agents, assignments: liveSnapshot.assignments })
+  const registry = pinnedRegistryPort(registrySnapshot)
   const expectedAgentIds = [primaryAgentId, fallbackAgentId]
-  const enabledAgents = new Map(snapshot.agents.filter(agent => agent.enabled).map(agent => [agent.agentId, agent] as const))
-  const exactAssignments = snapshot.assignments.filter(assignment =>
+  const enabledAgents = new Map(registrySnapshot.agents.filter(agent => agent.enabled).map(agent => [agent.agentId, agent] as const))
+  const exactAssignments = registrySnapshot.assignments.filter(assignment =>
     assignment.enabled && assignment.tenantId === tenantId && assignment.environmentId === environmentId && assignment.portableId === portableId &&
     assignment.allowedSkills.some(skill => skill.skillId === skillId),
   )
+  for (const assignment of exactAssignments) {
+    const configured = assignment.allowedSkills.find(skill => skill.skillId === skillId)
+    if (configured?.risk !== 'advisory') throw new Error(`specialist_mesh_failover_advisory_only:${assignment.agentId}:${configured?.risk ?? 'missing'}`)
+  }
   const exactCandidates = exactAssignments.filter(assignment => {
     const agent = enabledAgents.get(assignment.agentId)
     return Boolean(agent?.advertisedSkillIds.includes(skillId))
   })
   const exactCandidateIds = [...new Set(exactCandidates.map(assignment => assignment.agentId))].sort()
-  const expectedSorted = [...expectedAgentIds].sort()
-  if (exactCandidateIds.length !== 2 || exactCandidateIds.some((agentId, index) => agentId !== expectedSorted[index])) {
-    throw new Error(`specialist_mesh_failover_exact_two_candidates_required:${exactCandidateIds.join(',') || 'none'}`)
-  }
-  for (const assignment of exactCandidates) {
-    const configured = assignment.allowedSkills.find(skill => skill.skillId === skillId)
-    if (configured?.risk !== 'advisory') throw new Error(`specialist_mesh_failover_advisory_only:${assignment.agentId}:${configured?.risk ?? 'missing'}`)
-  }
 
   const qualificationSnapshot = await options.qualifications.snapshot({
-    tenantId, environmentId, portableId, skillId, agentIds: Object.freeze([...expectedAgentIds]),
+    tenantId, environmentId, portableId, skillId, agentIds: Object.freeze([...exactCandidateIds]),
   })
+  const qualifiedCandidateIds = exactCandidateIds.filter(agentId => Boolean(positiveQualificationEvidence(qualificationSnapshot[agentId])))
+  const expectedSorted = [...expectedAgentIds].sort()
+  if (qualifiedCandidateIds.length !== 2 || qualifiedCandidateIds.some((agentId, index) => agentId !== expectedSorted[index])) {
+    throw new Error(`specialist_mesh_failover_exact_two_qualified_candidates_required:${qualifiedCandidateIds.join(',') || 'none'}`)
+  }
   const primaryEvidenceRef = qualificationEvidence(qualificationSnapshot[primaryAgentId], primaryAgentId)
   const fallbackEvidenceRef = qualificationEvidence(qualificationSnapshot[fallbackAgentId], fallbackAgentId)
   if (primaryEvidenceRef === fallbackEvidenceRef) throw new Error('specialist_mesh_failover_independent_qualification_evidence_required')
@@ -165,10 +184,8 @@ export async function runSpecialistMeshLiveFailoverAcceptance(options: {
     environmentId,
     portableId,
     skillId,
-    primaryAgentId,
-    fallbackAgentId,
-    primaryEvidenceRef,
-    fallbackEvidenceRef,
+    agentIds: exactCandidateIds,
+    decisions: qualificationSnapshot,
   })
 
   const memory = createInMemoryA2ARuntimeObserver()
@@ -182,7 +199,7 @@ export async function runSpecialistMeshLiveFailoverAcceptance(options: {
   })
 
   const activated = await activatePortableA2AHost({
-    registry: options.registry,
+    registry,
     transportFactory: options.transportFactory,
     qualifications,
     meshSignals: options.meshSignals,

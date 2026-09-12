@@ -10,33 +10,45 @@ const scope = { tenantId: 'buyer-a', environmentId: 'prod', portableId: 'portabl
 const skillId = 'marketing.research'
 const primaryAgentId = 'marketing-primary'
 const fallbackAgentId = 'marketing-fallback'
+const thirdAgentId = 'marketing-third'
 
-function registry(risk: 'advisory' | 'write' = 'advisory') {
+function registry(risk: 'advisory' | 'write' = 'advisory', includeThird = false) {
+  const agentIds = includeThird ? [primaryAgentId, fallbackAgentId, thirdAgentId] : [primaryAgentId, fallbackAgentId]
   return createInMemoryA2AAgentRegistry({
-    agents: [
-      {
-        agentId: primaryAgentId, displayName: 'Buyer Marketing Primary', description: 'Buyer-owned specialist',
-        transportRef: 'buyer-marketing-primary', enabled: true, advertisedSkillIds: [skillId],
-        metadata: { meshCostScore: 5, meshLoadScore: 5, meshLatencyScore: 5, meshReliabilityScore: 99, meshQualityScore: 99 },
-      },
-      {
-        agentId: fallbackAgentId, displayName: 'Buyer Marketing Fallback', description: 'Buyer-owned specialist',
-        transportRef: 'buyer-marketing-fallback', enabled: true, advertisedSkillIds: [skillId],
-        metadata: { meshCostScore: 30, meshLoadScore: 20, meshLatencyScore: 20, meshReliabilityScore: 98, meshQualityScore: 98 },
-      },
-    ],
-    assignments: [primaryAgentId, fallbackAgentId].map(agentId => ({
+    agents: agentIds.map(agentId => {
+      if (agentId === primaryAgentId) {
+        return {
+          agentId, displayName: 'Buyer Marketing Primary', description: 'Buyer-owned specialist',
+          transportRef: 'buyer-marketing-primary', enabled: true, advertisedSkillIds: [skillId],
+          metadata: { meshCostScore: 5, meshLoadScore: 5, meshLatencyScore: 5, meshReliabilityScore: 99, meshQualityScore: 99 },
+        }
+      }
+      if (agentId === fallbackAgentId) {
+        return {
+          agentId, displayName: 'Buyer Marketing Fallback', description: 'Buyer-owned specialist',
+          transportRef: 'buyer-marketing-fallback', enabled: true, advertisedSkillIds: [skillId],
+          metadata: { meshCostScore: 30, meshLoadScore: 20, meshLatencyScore: 20, meshReliabilityScore: 98, meshQualityScore: 98 },
+        }
+      }
+      return {
+        agentId, displayName: 'Buyer Marketing Third', description: 'Buyer-owned specialist',
+        transportRef: 'buyer-marketing-third', enabled: true, advertisedSkillIds: [skillId],
+        metadata: { meshCostScore: 1, meshLoadScore: 1, meshLatencyScore: 1, meshReliabilityScore: 100, meshQualityScore: 100 },
+      }
+    }),
+    assignments: agentIds.map(agentId => ({
       assignmentId: `assignment-${agentId}`, agentId, ...scope, enabled: true, allowedSkills: [{ skillId, risk }],
     })),
   })
 }
 
-function qualifications(shared = false) {
+function qualifications(shared = false, unqualifiedAgentIds: readonly string[] = []) {
+  const unqualified = new Set(unqualifiedAgentIds)
   return {
     async snapshot(input: { tenantId: string; environmentId: string; portableId: string; skillId: string; agentIds: readonly string[] }) {
       if (input.tenantId !== scope.tenantId || input.environmentId !== scope.environmentId || input.portableId !== scope.portableId || input.skillId !== skillId) return {}
       return Object.fromEntries(input.agentIds.map(agentId => [agentId, {
-        qualified: true,
+        qualified: !unqualified.has(agentId),
         evidenceRef: shared ? 'qualification://shared' : `qualification://${agentId}/${skillId}`,
       }]))
     },
@@ -183,4 +195,46 @@ test('deterministic protocol/runtime errors do not fan out to the fallback speci
   })), /specialist_mesh_failover_delegation_failed:a2a_runtime_error/)
   assert.equal(primarySends, 1)
   assert.equal(fallbackSends, 0)
+})
+
+test('an unqualified third advertised agent does not block an exact-two qualified failover', async () => {
+  await withTwoRemoteSpecialists(async ({ baseUrl, evidence }) => {
+    const record = await runSpecialistMeshLiveFailoverAcceptance(acceptanceInput(baseUrl, {
+      registry: registry('advisory', true),
+      qualifications: qualifications(false, [thirdAgentId]),
+    }))
+    assert.deepEqual(record.attemptedAgentIds, [primaryAgentId, fallbackAgentId])
+    assert.equal(evidence.primarySends, 1)
+    assert.equal(evidence.fallbackSends, 1)
+  })
+})
+
+test('a third qualified candidate fails the exact-two eligibility boundary before any remote send', async () => {
+  await withTwoRemoteSpecialists(async ({ baseUrl, evidence }) => {
+    await assert.rejects(() => runSpecialistMeshLiveFailoverAcceptance(acceptanceInput(baseUrl, {
+      registry: registry('advisory', true),
+      qualifications: qualifications(),
+    })), /specialist_mesh_failover_exact_two_qualified_candidates_required/)
+    assert.equal(evidence.primarySends, 0)
+    assert.equal(evidence.fallbackSends, 0)
+  })
+})
+
+test('the validated registry snapshot is pinned for the entire acceptance run', async () => {
+  await withTwoRemoteSpecialists(async ({ baseUrl, evidence }) => {
+    const initialSnapshot = await registry().snapshot()
+    const changedSnapshot = await registry('advisory', true).snapshot()
+    let registryReads = 0
+    const changingRegistry = {
+      async snapshot() {
+        registryReads += 1
+        return registryReads === 1 ? initialSnapshot : changedSnapshot
+      },
+    }
+    const record = await runSpecialistMeshLiveFailoverAcceptance(acceptanceInput(baseUrl, { registry: changingRegistry }))
+    assert.equal(registryReads, 1)
+    assert.deepEqual(record.attemptedAgentIds, [primaryAgentId, fallbackAgentId])
+    assert.equal(evidence.primarySends, 1)
+    assert.equal(evidence.fallbackSends, 1)
+  })
 })

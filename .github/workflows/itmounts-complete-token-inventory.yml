@@ -1,0 +1,41 @@
+name: iTMounts complete source token inventory
+on:
+  push:
+    branches: [fix/itmounts-brand-final-proof-20260912]
+    paths: [.github/workflows/itmounts-complete-token-inventory.yml]
+permissions:
+  contents: read
+jobs:
+  inventory:
+    if: github.repository == 'SignalBoost/signalboost-live' && github.ref == 'refs/heads/fix/itmounts-brand-final-proof-20260912'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 444abd2efb29467846102461ebdbd6472016b94d
+          persist-credentials: false
+      - name: Collect literal name occurrences from all tracked source modules
+        run: |
+          python3 - <<'PY'
+          import pathlib,re,json,subprocess
+          result={}
+          for name in subprocess.check_output(['git','ls-files'],text=True).splitlines():
+              p=pathlib.Path(name)
+              if p.suffix not in {'.ts','.tsx','.js','.mjs','.cjs','.json','.sh','.yaml','.yml'}: continue
+              if any(x in p.parts for x in ['node_modules','tests','test','fixtures','__tests__','.github','docs']): continue
+              if any(x in p.name for x in ['.test.','.spec.','package-lock','cyberReportPresentation']): continue
+              if not p.is_file(): continue
+              for n,line in enumerate(p.read_text(errors='replace').splitlines(),1):
+                  for token in re.findall(r'\bSignalBoost-[A-Za-z0-9_-]+',line,re.I):
+                      rows=result.setdefault(token,[])
+                      if len(rows)<3: rows.append(f'{name}:{n}')
+          pathlib.Path('brand-token-inventory.json').write_text(json.dumps({'commit':'444abd2efb29467846102461ebdbd6472016b94d','tokens':result},sort_keys=True,indent=2)+'\n')
+          print('Distinct literal tokens:',len(result))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: itmounts-complete-source-tokens
+          path: brand-token-inventory.json
+          if-no-files-found: error
+          retention-days: 7

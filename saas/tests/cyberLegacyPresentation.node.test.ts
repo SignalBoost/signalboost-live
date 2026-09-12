@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { cyberReportPresentationCopy, dependencyRescanUrl, unclassifiedAdvisoryCount } from '../lib/cyber/cyberReportPresentation.ts'
+import { cyberReportPresentationCopy, dependencyRescanUrl, unclassifiedAdvisoryCount, cyberProductText } from '../lib/cyber/cyberReportPresentation.ts'
 const require = createRequire(import.meta.url)
 const ts = require('typescript')
 const copy = { ...cyberReportPresentationCopy('en'), statuses: {}, approvePlan: 'Approve plan', approvalNotRequired: 'No approval pending', yes: 'yes', no: 'no', humanApproved: 'Human approved', approvedLabel: 'Approved', fixPlan: 'Fix plan', planFirst: 'Plan first', prepareDescription: 'Current routine preparation policy', planSummary: 'Saved dependency plan', noTargetVersion: 'Target not confirmed', prepareFixPlan: 'Prepare fix plan' }
@@ -27,7 +27,7 @@ function page(report: any = null, history: any[] = []) {
       eligibleDependencyTarget: (a: string, b: string) => /^\d+\.\d+\.\d+$/.test(b) && a.split('.')[0] === b.split('.')[0] && b.localeCompare(a, undefined, { numeric: true }) > 0,
       partitionRemediationRequests: () => ({ pending: [], active: [], history: [] }),
     }
-    if (spec === '@/lib/cyber/cyberReportPresentation') return { cyberReportPresentationCopy, dependencyRescanUrl, unclassifiedAdvisoryCount }
+    if (spec === '@/lib/cyber/cyberReportPresentation') return { cyberReportPresentationCopy, dependencyRescanUrl, unclassifiedAdvisoryCount, cyberProductText }
     throw new Error(`Unexpected import ${spec}`)
   }
   new Function('require', 'module', 'exports', output)(imports, module, module.exports)
@@ -143,4 +143,86 @@ test('an invalid explicit reassessment target fails closed instead of falling ba
     'https://itmounts.com',
   ]) assert.equal(dependencyRescanUrl({ ...legacy(), target }), null, target)
   assert.equal(dependencyRescanUrl({ ...legacy(), target: null }), 'https://github.com/SignalBoost/signalboost-live')
+})
+
+
+test('saved remediation prose displays iTMounts without changing the historical record or links', () => {
+  const row = {
+    ...legacy(),
+    title: 'SignalBoost remediation plan: SignalBoost/signalboost-live',
+    summary: 'SignalBoost prepared a proposed remediation plan for 1 dependency advisory finding(s). Human approval is required before PR preparation or any code change.',
+    implementation_notes: 'SignalBoost prepared https://github.com/SignalBoost/signalboost-live/pull/1',
+    pull_request_url: 'https://github.com/SignalBoost/signalboost-live/pull/1',
+    fix_plan: {
+      summary: 'SignalBoost prepared a remediation plan. No code has been changed.',
+      proposedChanges: [{ packageName: 'postcss', currentVersion: '8.4.31', proposedAction: 'SignalBoost will verify the compatible version.' }],
+      validationSteps: ['SignalBoost must run the tests.'],
+      safetyControls: ['SignalBoost must preserve the approval boundary.'],
+    },
+  }
+  const freeze = (value: any): any => {
+    if (value && typeof value === 'object') { Object.values(value).forEach(freeze); Object.freeze(value) }
+    return value
+  }
+  freeze(row)
+  const before = JSON.stringify(row)
+  const tree = card(row)
+  const visible = text(tree, true)
+  assert.match(visible, /iTMounts prepared a proposed remediation plan/)
+  assert.match(visible, /iTMounts prepared a remediation plan/)
+  assert.match(visible, /iTMounts remediation plan: SignalBoost\/signalboost-live/)
+  assert.match(visible, /iTMounts will verify/)
+  assert.match(visible, /iTMounts must run the tests/)
+  assert.match(visible, /iTMounts must preserve the approval boundary/)
+  assert.match(visible, /iTMounts prepared https:\/\/github.com\/SignalBoost\/signalboost-live\/pull\/1/)
+  assert.match(visible, /Human approval is required before PR preparation/)
+  assert.match(visible, /Stored records and approval history are unchanged/)
+  assert.doesNotMatch(visible, /SignalBoost prepared|SignalBoost must|SignalBoost will/)
+  const links = (n: any): any[] => Array.isArray(n) ? n.flatMap(links) : !n || typeof n !== 'object' ? [] : [...(n.type === 'a' ? [n.props.href] : []), ...links(n.props?.children)]
+  assert.ok(links(tree).includes(row.pull_request_url))
+  assert.equal(JSON.stringify(row), before)
+  assert.equal(buttons(tree).some(n => text(n) === 'Approve plan'), false)
+})
+
+test('routine and completed remediation prose also uses the current brand without changing decisions', () => {
+  for (const status of ['in_progress', 'completed']) {
+    const row = { ...legacy(), status, human_approval_required: false, human_approved: false,
+      summary: 'User requested SignalBoost remediation assistance.',
+      implementation_notes: 'SignalBoost prepared the proposal, not a deployment.',
+      fix_plan: { summary: 'SIGNALBOOST AI prepared a plan.' } }
+    const before = JSON.stringify(row)
+    const tree = card(row)
+    const visible = text(tree, true)
+    assert.match(visible, /User requested iTMounts remediation assistance/)
+    assert.match(visible, /iTMounts prepared a plan/)
+    assert.match(visible, /iTMounts prepared the proposal, not a deployment/)
+    assert.equal(JSON.stringify(row), before)
+    assert.equal(buttons(tree).length, status === 'completed' ? 0 : 1)
+  }
+})
+
+test('display branding preserves technical identities, URLs, email addresses and code', () => {
+  for (const technical of [
+    'SignalBoost/signalboost-live', 'signalboost/signalboost-live',
+    'https://github.com/SignalBoost/signalboost-live?label=SignalBoost#SignalBoost',
+    'https://saas.signalboostapp.com', 'mailto:SignalBoost@example.com',
+    'SignalBoost@example.com', 'ops@SignalBoost.com', 'git@github.com:SignalBoost/signalboost-live.git',
+    'signalboost-live', 'SIGNALBOOST_API_KEY', 'SignalBoost.ts', 'SignalBoost.com',
+    'src/SignalBoost', 'C:\\SignalBoost\\project', '`SignalBoost`',
+  ]) assert.equal(cyberProductText(technical), technical, technical)
+  const prose = 'SignalBoost prepared SignalBoost/signalboost-live; SignalBoost AI verified https://github.com/SignalBoost/signalboost-live.'
+  assert.equal(cyberProductText(prose), 'iTMounts prepared SignalBoost/signalboost-live; iTMounts verified https://github.com/SignalBoost/signalboost-live.')
+})
+
+test('display branding handles legacy casing and prose in all five supported languages', () => {
+  for (const legacyName of ['SignalBoost', 'SIGNALBOOST', 'signalboost', 'SignalBoostAi', 'SignalBoost AI', 'signalboost ai']) {
+    for (const [before, after] of [['', ' prepared a plan.'], ['', ' preparó un plan.'], ['', ' preparou um plano.'], ['', ' przygotował plan.'], ['Платформа ', ' подготовила план.']]) {
+      assert.equal(cyberProductText(`${before}${legacyName}${after}`), `${before}iTMounts${after}`)
+    }
+  }
+  assert.equal(cyberProductText('(SignalBoost). SignalBoost: plan'), '(iTMounts). iTMounts: plan')
+  assert.equal(cyberProductText(undefined), '')
+  assert.equal(cyberProductText(null), '')
+  assert.equal(cyberProductText('iTMounts'), 'iTMounts')
+  for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(cyberReportPresentationCopy(lang).brandDisplayNotice, /iTMounts/)
 })

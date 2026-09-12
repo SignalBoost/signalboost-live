@@ -1,6 +1,9 @@
+import { publicBrandText } from '../public-brand.ts'
+
 // Read-only presentation helpers. Never mutate a saved request or its approval fields.
 const COPY = {
   en: {
+    brandDisplayNotice: "Product names are displayed as iTMounts. Stored records and approval history are unchanged.",
     savedPlanNotice: 'Saved dependency plan. Its original wording and approval history are retained below. Reassess current dependencies before preparing new work; this does not approve or change the saved request.',
     savedPlanArchive: 'Original saved plan and policy wording (historical)',
     recordedApproval: 'Recorded plan approval', reassess: 'Reassess current dependencies',
@@ -10,6 +13,7 @@ const COPY = {
     monitorSeverityNotice: 'Critical/high counts exclude unclassified findings. Run a fresh scan to see the full severity breakdown.',
   },
   es: {
+    brandDisplayNotice: "Los nombres del producto se muestran como iTMounts. Los registros guardados y el historial de aprobación no cambian.",
     savedPlanNotice: 'Plan de dependencias guardado. El texto original y el historial de aprobación se conservan abajo. Vuelve a analizar las dependencias antes de preparar trabajo nuevo; esto no aprueba ni cambia la solicitud guardada.',
     savedPlanArchive: 'Plan guardado y política originales (históricos)',
     recordedApproval: 'Aprobación del plan registrada', reassess: 'Volver a analizar las dependencias',
@@ -19,6 +23,7 @@ const COPY = {
     monitorSeverityNotice: 'Los recuentos críticos/altos excluyen hallazgos sin clasificar. Ejecuta un nuevo análisis para ver todas las severidades.',
   },
   pt: {
+    brandDisplayNotice: "O nome do produto é exibido como iTMounts. Os registros salvos e o histórico de aprovação permanecem inalterados.",
     savedPlanNotice: 'Plano de dependências salvo. O texto original e o histórico de aprovação estão preservados abaixo. Reavalie as dependências antes de preparar novo trabalho; isso não aprova nem altera a solicitação salva.',
     savedPlanArchive: 'Plano salvo e política originais (históricos)',
     recordedApproval: 'Aprovação do plano registrada', reassess: 'Reavaliar as dependências atuais',
@@ -28,6 +33,7 @@ const COPY = {
     monitorSeverityNotice: 'As contagens críticas/altas excluem achados não classificados. Execute uma nova análise para ver todas as severidades.',
   },
   pl: {
+    brandDisplayNotice: "Nazwa produktu jest wyświetlana jako iTMounts. Zapisane rekordy i historia akceptacji pozostają bez zmian.",
     savedPlanNotice: 'Zapisany plan zależności. Oryginalna treść i historia akceptacji są zachowane poniżej. Przed nową pracą ponownie sprawdź zależności; nie zatwierdza to ani nie zmienia zapisanego wniosku.',
     savedPlanArchive: 'Oryginalny zapisany plan i zasady (historyczne)',
     recordedApproval: 'Zapisana akceptacja planu', reassess: 'Sprawdź aktualne zależności',
@@ -37,6 +43,7 @@ const COPY = {
     monitorSeverityNotice: 'Liczby krytycznych/poważnych wyników pomijają nieokreślone ostrzeżenia. Uruchom nowy skan, aby zobaczyć pełny podział.',
   },
   ru: {
+    brandDisplayNotice: "Название продукта отображается как iTMounts. Сохранённые записи и история одобрений не изменены.",
     savedPlanNotice: 'Сохранённый план зависимостей. Исходный текст и история одобрений сохранены ниже. Перед новой работой повторно проверьте зависимости; это не одобряет и не изменяет сохранённый запрос.',
     savedPlanArchive: 'Исходный сохранённый план и правила (история)',
     recordedApproval: 'Записанное одобрение плана', reassess: 'Проверить текущие зависимости',
@@ -70,4 +77,16 @@ export function dependencyRescanUrl(row: { source_area?: string; source_type?: s
   if (repo.toLowerCase() !== row.repo.toLowerCase()) return null
   if (parts.length !== 2 && (parts.length < 4 || !['tree', 'blob'].includes(parts[2]))) return null
   return `https://github.com/${parts.join('/')}`
+}
+
+/** Display product prose only; never pass the result to persistence or authorization. */
+export function cyberProductText(value: string | null | undefined): string {
+  if (!value) return ''
+  // Keep URLs (including query values) and inline code byte-for-byte. Adjacent path,
+  // package, email and identifier characters also distinguish technical names from prose.
+  return value.split(/(`[^`]*`|(?:[a-z][a-z0-9+.-]*:\/\/|mailto:|git@)[^\s<>"`]+)/gi)
+    .map((part, index) => index % 2 ? part : part.replace(
+      /(?<![\p{L}\p{N}_./\\@-])SignalBoost(?:Ai|\s+AI)?(?![\p{L}\p{N}_/\\@-]|\.[\p{L}\p{N}])/giu,
+      name => publicBrandText(name),
+    )).join('')
 }

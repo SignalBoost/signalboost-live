@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversity.ts
 // COS University: host-owned academic taxonomy, transcript grading, and study-target selection.
 //
 // This layer deliberately does NOT treat corpus volume, embeddings, self-confidence, or ordinary
@@ -97,7 +98,12 @@ export const COS_UNIVERSITY_SUBJECTS: ReadonlyArray<CosUniversitySubject> = [
     id: 'history_culture_philosophy_religion',
     title: 'History, Culture, Philosophy & Religion',
     objective: 'Use historical, cultural, philosophical, and religious context where it materially improves understanding or decisions.',
-    studyThemes: ['world history', 'cultural systems', 'philosophy and intellectual history', 'religion and institutions', 'historical context for current systems'],
+    // The independent exam for this subject tests historical METHOD — how a primary diary and a
+    // scholarly synthesis differ evidentially, what corroboration is needed, how bias and context
+    // limit each. Every theme here was a content theme, so acquisition studied world history and
+    // religion while the exam asked about source criticism, and the subject accepted almost nothing
+    // it could use. Method is now studied alongside content rather than assumed.
+    studyThemes: ['historiography and source criticism', 'world history', 'cultural systems', 'philosophy and intellectual history', 'religion and institutions', 'historical context for current systems'],
   },
   {
     id: 'reasoning_decision_science',

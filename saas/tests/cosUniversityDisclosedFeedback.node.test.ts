@@ -89,7 +89,7 @@ function runtime(options: { exam?: Row | null; assessment?: Row | null; errorTab
         if (options.throwTable === table) throw new Error('isolated_read_failure')
         if (options.errorTable === table) return { data: null, error: new Error('isolated_read_failure') }
         assert.ok(['cos_university_exam_runs', 'cos_university_assessments'].includes(table))
-        const row = table === 'cos_university_exam_runs'
+        const row: Row | null | undefined = table === 'cos_university_exam_runs'
           ? (Object.hasOwn(options, 'exam') ? options.exam : observation)
           : (Object.hasOwn(options, 'assessment') ? options.assessment : proof)
         const data = row && call.filters.every(([key, value]) => row[key] === value) ? structuredClone(row) : null

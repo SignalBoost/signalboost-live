@@ -1,6 +1,10 @@
 // saas/lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts
 import { callCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
+import {
+  decidePracticeDeferral,
+  practiceDeferralMetadata,
+} from './cosUniversityPracticeDeferralPolicy.ts'
 import { executeUniversityPractice, universityPracticeExecutionKey, universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
@@ -373,12 +377,17 @@ async function claimPractice(agentId: string, requiredPlanId?: string | null, re
 async function deferPractice(item: PracticeQueueRow, reason: string): Promise<void> {
   const db = cosServiceDb()
   if (!db) return
+  // A deferral still costs no attempt, so a transient outage is free. A row that keeps failing the
+  // same way is not transient: after the ceiling it becomes a real failure instead of cycling every
+  // fifteen minutes forever, which is what held the specialist's round-1 practice for hours.
+  const decision = decidePracticeDeferral({ metadata: item.metadata, reason })
   const result = await db.from('cos_active_practice_queue').update({
-    status: 'queued',
+    status: decision.retry ? 'queued' : 'failed',
     started_at: null,
-    completed_at: null,
-    last_error: clean(reason, 1200),
-    next_attempt_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+    completed_at: decision.retry ? null : new Date().toISOString(),
+    last_error: clean(decision.reason, 1200),
+    metadata: practiceDeferralMetadata(item.metadata, decision.deferrals),
+    next_attempt_at: decision.retry ? new Date(Date.now() + 15 * 60_000).toISOString() : null,
     updated_at: new Date().toISOString(),
   }).eq('id', item.id).eq('status', 'running')
   if (result.error) throw result.error

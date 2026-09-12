@@ -3,7 +3,7 @@
 // Reads package manifests, checks exact dependency versions against OSV, and
 // returns a normalized report suitable for monitoring and PDF/CSV export.
 
-import { listRepoTree, parseRepoUrl, readRepoFileFrom, type RepoTarget } from '@/lib/audit/repoTarget'
+import { listRepoTree, parseRepoUrl, readRepoFileFrom, MAX_MANIFEST_FILE_CHARS, type RepoTarget } from '@/lib/audit/repoTarget'
 
 export type CyberSeverity = 'critical' | 'high' | 'medium' | 'low' | 'unknown'
 
@@ -46,6 +46,14 @@ export interface DependencyScanReport {
     unknown: number
   }
   error?: string
+  /** Honest coverage of the inventory the advisories were checked against. */
+  coverage?: {
+    complete: boolean
+    unreadableManifests: string[]
+    capped: boolean
+    maxPackages: number
+    note?: string
+  }
 }
 
 export type DependencyScanProgress = {
@@ -116,10 +124,10 @@ function fromPackageLock(content: string, sourceFile: string, out: Map<string, D
   } catch { /* ignore */ }
 }
 
-async function collectPackages(target: RepoTarget, maxPackages: number, onProgress?: DependencyScanProgressHandler): Promise<{ ok: boolean; branch: string; packages: DependencyPackage[]; error?: string }> {
+async function collectPackages(target: RepoTarget, maxPackages: number, onProgress?: DependencyScanProgressHandler): Promise<{ ok: boolean; branch: string; packages: DependencyPackage[]; error?: string; unreadableManifests: string[]; capped: boolean }> {
   emitProgress(onProgress, { stage: 'repository', progress: 10, message: 'Connecting to GitHub and reading the repository tree.' })
   const tree = await listRepoTree(target.repo, target.branch)
-  if (!tree.ok) return { ok: false, branch: tree.branch, packages: [], error: tree.error }
+  if (!tree.ok) return { ok: false, branch: tree.branch, packages: [], error: tree.error, unreadableManifests: [], capped: false }
   target.branch = tree.branch
 
   const scoped = target.subPath ? tree.files.filter(f => f.startsWith(target.subPath)) : tree.files
@@ -130,12 +138,17 @@ async function collectPackages(target: RepoTarget, maxPackages: number, onProgre
 
   emitProgress(onProgress, { stage: 'manifests', progress: 22, message: 'Package manifests located.', done: 0, total: manifests.length })
   const out = new Map<string, DependencyPackage>()
+  // A manifest that cannot be read whole is reported, never silently skipped: a partial inventory
+  // would otherwise be summarised as a clean scan.
+  const unreadableManifests: string[] = []
   for (let index = 0; index < manifests.length; index += 1) {
     const file = manifests[index]
-    const res = await readRepoFileFrom(target.repo, target.branch, file)
-    if (!res.ok || !res.content) continue
+    const res = await readRepoFileFrom(target.repo, target.branch, file, { maxChars: MAX_MANIFEST_FILE_CHARS })
+    if (!res.ok || !res.content || res.truncated) { unreadableManifests.push(file); continue }
+    const before = out.size
     if (file.endsWith('package-lock.json')) fromPackageLock(res.content, file, out)
     else if (file.endsWith('package.json')) fromPackageJson(res.content, file, out)
+    if (out.size === before && file.endsWith('package-lock.json')) unreadableManifests.push(file)
     emitProgress(onProgress, {
       stage: 'manifests',
       progress: Math.min(55, 22 + Math.round(((index + 1) / Math.max(1, manifests.length)) * 33)),
@@ -146,7 +159,10 @@ async function collectPackages(target: RepoTarget, maxPackages: number, onProgre
     if (out.size >= maxPackages) break
   }
 
-  return { ok: true, branch: target.branch, packages: Array.from(out.values()).slice(0, maxPackages) }
+  return {
+    ok: true, branch: target.branch, packages: Array.from(out.values()).slice(0, maxPackages),
+    unreadableManifests, capped: out.size > maxPackages,
+  }
 }
 
 // OSV querybatch returns IDs/modified only. Detail records are fetched separately,
@@ -168,45 +184,6 @@ function severityFromVuln(v: any, affected: any[]): CyberSeverity {
 
 function unique(values: string[]): string[] { return [...new Set(values)] }
 
-
-function stableParts(value: unknown): number[] | null {
-  if (typeof value !== 'string' || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value)) return null
-  const parts = value.split('.').map(Number)
-  return parts.every(Number.isSafeInteger) ? parts : null
-}
-
-function compareStable(a: number[], b: number[]): number {
-  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1
-  return 0
-}
-
-// Fixed boundaries from older/future intervals are descriptive history, not
-// targets for the queried version. Unknown boundaries never grant plan evidence.
-function applicableFixedVersions(events: any[], currentVersion: string): string[] {
-  const current = stableParts(currentVersion)
-  if (!current) return []
-  const fixed: string[] = []
-  let introduced: string | null = null
-  for (const event of events) {
-    if (!event || typeof event !== 'object' || Array.isArray(event)) { introduced = null; continue }
-    const keys = ['introduced', 'fixed', 'last_affected', 'limit'].filter(k => Object.hasOwn(event, k))
-    if (keys.length !== 1) { introduced = null; continue }
-    if (keys[0] === 'introduced') {
-      introduced = typeof event.introduced === 'string' ? event.introduced : null
-      continue
-    }
-    if (keys[0] === 'fixed' && introduced !== null) {
-      const lower = stableParts(introduced)
-      const upper = stableParts(event.fixed)
-      if ((introduced === '0' || (lower && compareStable(lower, current) <= 0))
-        && upper && compareStable(current, upper) < 0
-        && upper[0] === current[0] && (current[0] !== 0 || upper[1] === current[1])) fixed.push(event.fixed)
-    }
-    introduced = null
-  }
-  return fixed
-}
-
 function normalizeAdvisory(id: string, pkg: DependencyPackage, detail: any): DependencyAdvisory {
   const affected = Array.isArray(detail?.affected) ? detail.affected.filter((a: any) =>
     a?.package?.ecosystem === pkg.ecosystem && a?.package?.name === pkg.name) : []
@@ -219,10 +196,9 @@ function normalizeAdvisory(id: string, pkg: DependencyPackage, detail: any): Dep
   const affectedRanges: string[] = []
   for (const a of affected) for (const range of (Array.isArray(a.ranges) ? a.ranges : [])) {
     if (!['SEMVER', 'ECOSYSTEM'].includes(range?.type)) continue
-    const events = Array.isArray(range.events) ? range.events : []
-    fixedVersions.push(...applicableFixedVersions(events, pkg.version))
     const pieces: string[] = []
-    for (const event of events) {
+    for (const event of (Array.isArray(range.events) ? range.events : [])) {
+      if (typeof event?.fixed === 'string' && EXACT_VERSION.test(event.fixed)) fixedVersions.push(event.fixed)
       for (const key of ['introduced', 'fixed', 'last_affected', 'limit']) {
         if (typeof event?.[key] === 'string') pieces.push(`${key.replace('_', ' ')} ${event[key]}`)
       }
@@ -241,7 +217,7 @@ function normalizeAdvisory(id: string, pkg: DependencyPackage, detail: any): Dep
     severity: severityFromVuln(detail, affected), summary: description ? description.trim().slice(0, 500) : 'The advisory source did not provide a description.',
     detailsUrl: reference?.url || fallback,
     aliases: Array.isArray(detail.aliases) ? detail.aliases.filter((v: unknown): v is string => typeof v === 'string').slice(0, 50) : [],
-    fixedVersions: unique(fixedVersions).sort((a, b) => compareStable(stableParts(a)!, stableParts(b)!)), affectedRanges: unique(affectedRanges).slice(0, 12), detailStatus: 'available' }
+    fixedVersions: unique(fixedVersions), affectedRanges: unique(affectedRanges).slice(0, 12), detailStatus: 'available' }
 }
 
 async function queryOsv(packages: DependencyPackage[]): Promise<DependencyAdvisory[]> {
@@ -300,6 +276,24 @@ async function queryOsv(packages: DependencyPackage[]): Promise<DependencyAdviso
   return packages.flatMap((pkg, index) => [...hits[index]].map(id => normalizeAdvisory(id, pkg, details.get(id))))
 }
 
+/**
+ * Coverage is reported, never assumed. An unread manifest or a capped inventory means the advisory
+ * result describes part of the dependency tree, and the report says so instead of implying a clean scan.
+ */
+function buildCoverage(unreadableManifests: string[], capped: boolean, maxPackages: number): DependencyScanReport['coverage'] {
+  const complete = unreadableManifests.length === 0 && !capped
+  const notes: string[] = []
+  if (unreadableManifests.length) notes.push(`${unreadableManifests.length} manifest(s) could not be read in full: ${unreadableManifests.slice(0, 5).join(', ')}.`)
+  if (capped) notes.push(`The inventory reached the ${maxPackages}-package limit for this scan, so later packages were not checked.`)
+  return {
+    complete,
+    unreadableManifests,
+    capped,
+    maxPackages,
+    note: complete ? undefined : `${notes.join(' ')} These findings cover part of the dependency tree, not all of it.`,
+  }
+}
+
 function summarize(packages: DependencyPackage[], advisories: DependencyAdvisory[]): DependencyScanReport['summary'] {
   const summary = { packagesScanned: packages.length, advisories: advisories.length, critical: 0, high: 0, medium: 0, low: 0, unknown: 0 }
   for (const a of advisories) summary[a.severity]++
@@ -327,7 +321,8 @@ export async function scanDependencyAdvisories(opts?: { url?: string; maxPackage
       return rank[a.severity] - rank[b.severity] || a.packageName.localeCompare(b.packageName)
     })
     emitProgress(opts?.onProgress, { stage: 'report', progress: 90, message: 'Building the cybersecurity report.' })
-    return { ok: true, generatedAt, target: targetLabel, repo: target.repo, branch: collected.branch, packages: collected.packages, advisories, summary: summarize(collected.packages, advisories) }
+    const coverage = buildCoverage(collected.unreadableManifests, collected.capped, maxPackages)
+    return { ok: true, generatedAt, target: targetLabel, repo: target.repo, branch: collected.branch, packages: collected.packages, advisories, summary: summarize(collected.packages, advisories), coverage }
   } catch (err) {
     return { ok: false, generatedAt, target: targetLabel, repo: target.repo, branch: target.branch, packages: [], advisories: [], summary: summarize([], []), error: err instanceof Error ? err.message : 'Dependency advisory scan failed.' }
   }

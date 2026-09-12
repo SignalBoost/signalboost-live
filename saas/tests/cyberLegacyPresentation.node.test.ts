@@ -301,3 +301,14 @@ test('saved-card rendering applies edge-case branding without mutating evidence 
   assert.match(visible, /iTMounts-provided guidance for SignalBoost\/signalboost-live\./)
   assert.equal(JSON.stringify(row), before)
 })
+
+test('mailto link query parameters remain technical text rather than product prose', () => {
+  for (const link of [
+    'mailto:SignalBoost@example.com?subject=SignalBoost&body=SignalBoost-created',
+    'mailto:?subject=SignalBoost',
+    'mailto:SignalBoost@example.com,SignalBoost+alerts@example.net?subject=SignalBoost',
+  ]) {
+    assert.equal(cyberProductText(link), link)
+    assert.equal(cyberProductText(`${link} — SignalBoost prepared a plan`), `${link} — iTMounts prepared a plan`)
+  }
+})

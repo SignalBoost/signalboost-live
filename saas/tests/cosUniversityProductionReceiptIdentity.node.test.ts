@@ -161,3 +161,59 @@ test('a disabled feature remains unverified even with a unique successful receip
   assert.equal(verify(h.rows).featureEnabled, false)
   assert.equal(verify(h.rows).verified, false)
 })
+
+test('opposite outcomes at the same clock fail closed regardless of database row order', async () => {
+  const h = harness()
+  await h.record({ path: 'masters_learning', invocationSucceeded: true, evidence: success, now: at(10) })
+  const failed = await h.record({ path: 'masters_learning', invocationSucceeded: false, evidence: failure, now: at(10) })
+  for (const rows of [h.rows, [...h.rows].reverse()]) {
+    assert.equal(verify(rows).verified, false)
+    assert.equal(verify(rows).invocationSucceeded, false)
+    assert.equal(verify(rows).evidenceRef, failed)
+  }
+})
+
+test('a same-clock conflict requires a later successful observation to establish recovery', async () => {
+  const h = harness()
+  await h.record({ path: 'masters_learning', invocationSucceeded: true, evidence: success, now: at(10) })
+  await h.record({ path: 'masters_learning', invocationSucceeded: false, evidence: failure, now: at(10) })
+  assert.equal(verify(h.rows).verified, false)
+  const recovered = await h.record({ path: 'masters_learning', invocationSucceeded: true, evidence: success, now: at(11) })
+  assert.equal(verify(h.rows).verified, true)
+  assert.equal(verify(h.rows).evidenceRef, recovered)
+})
+
+test('equally valid tied receipts select deterministic evidence without inventing chronology', async () => {
+  const h = harness()
+  const input = { path: 'masters_learning' as const, invocationSucceeded: true, evidence: success, now: at(10) }
+  await h.record(input); await h.record(input)
+  assert.equal(verify(h.rows).verified, true)
+  assert.deepEqual(verify(h.rows), verify([...h.rows].reverse()))
+})
+
+test('a tied metadata-only receipt cannot be hidden by an execution receipt', async () => {
+  const h = harness()
+  await h.record({ path: 'masters_learning', invocationSucceeded: true, evidence: success, now: at(10) })
+  const missing = await h.record({ path: 'masters_learning', invocationSucceeded: true, evidence: { enabled: true }, now: at(10) })
+  for (const rows of [h.rows, [...h.rows].reverse()]) {
+    assert.equal(verify(rows).verified, false)
+    assert.equal(verify(rows).executionBlocker, 'execution_evidence_missing')
+    assert.equal(verify(rows).evidenceRef, missing)
+  }
+})
+
+test('an untrusted verifier at a tied timestamp cannot disappear behind a valid receipt', async () => {
+  const h = harness()
+  await h.record({ path: 'masters_learning', invocationSucceeded: true, evidence: success, now: at(10) })
+  const untrusted: StoredRow = { ...h.rows[0], event_key: 'untrusted-test-receipt', verifier: 'self_report' }
+  for (const rows of [[h.rows[0], untrusted], [untrusted, h.rows[0]]]) assert.equal(verify(rows).verified, false)
+})
+
+test('older failures do not veto later successful tied observations', async () => {
+  const h = harness()
+  await h.record({ path: 'masters_learning', invocationSucceeded: false, evidence: failure, now: at(9) })
+  await h.record({ path: 'masters_learning', invocationSucceeded: true, evidence: success, now: at(10) })
+  await h.record({ path: 'masters_learning', invocationSucceeded: true, evidence: success, now: at(10) })
+  assert.equal(verify(h.rows).verified, true)
+  assert.deepEqual(verify(h.rows), verify([...h.rows].reverse()))
+})

@@ -148,7 +148,7 @@ function bareSignalBoostIsTechnicalContext(source: string, offset: number, token
   const after = source.slice(offset + tokenLength, offset + tokenLength + 96)
   const technicalKey = /(?:\bhost\s*id|\bhostId|\bprovider(?:[_\s-]+host)?(?:[_\s-]+id)?)["']?\s*[:=]\s*["']?$/i.test(before)
   if (!technicalKey) return false
-  return /^(?:["'])?(?:\s*$|\s*[,;}\]\r\n]|\s+[A-Za-z_][A-Za-z0-9_.-]*\s*[:=])/.test(after)
+  return /^(?:["'])?(?:\s*$|\s*[,;.!?)}\]\r\n]|\s+[A-Za-z_][A-Za-z0-9_.-]*\s*[:=])/.test(after)
 }
 
 /** Display product prose only; never pass the result to persistence or authorization. */

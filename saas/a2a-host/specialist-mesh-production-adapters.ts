@@ -1,8 +1,9 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { A2ARuntimeObservationEvent } from './a2a-runtime-observability.ts'
 import type { SpecialistQualificationDecision, SpecialistQualificationPort, SpecialistQualificationRequest } from './cos-specialist-orchestrator.ts'
 import type { SpecialistMeshLiveSignal, SpecialistMeshSignalPort, SpecialistMeshSignalRequest } from './specialist-mesh-router.ts'
 
-export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v1' as const
+export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v2' as const
 
 export interface SpecialistQualificationEvidenceRecord {
   agentId: string
@@ -12,6 +13,7 @@ export interface SpecialistQualificationEvidenceRecord {
   tenantId: string
   environmentId: string
   portableId: string
+  observedAt?: string
 }
 
 export interface SpecialistQualificationEvidenceReader {
@@ -31,16 +33,18 @@ function boundedScore(value: number): number {
   return Math.max(0, Math.min(100, Number(value.toFixed(3))))
 }
 
-/** Host-owned durable qualification evidence only; missing or malformed proof fails closed. */
+/** Host-owned durable qualification evidence only; latest exact-scope decision wins. */
 export function createProductionSpecialistQualificationPort(reader: SpecialistQualificationEvidenceReader): SpecialistQualificationPort {
   return Object.freeze({
     async snapshot(input) {
       const requested = new Set(input.agentIds)
       const rows = await reader.read(input)
       const out: Record<string, SpecialistQualificationDecision> = {}
+      const decided = new Set<string>()
       for (const row of rows) {
-        if (!requested.has(row.agentId)) continue
+        if (!requested.has(row.agentId) || decided.has(row.agentId)) continue
         if (row.tenantId !== input.tenantId || row.environmentId !== input.environmentId || row.portableId !== input.portableId || row.skillId !== input.skillId) continue
+        decided.add(row.agentId)
         const evidenceRef = String(row.evidenceRef || '').trim()
         if (row.qualified !== true || !evidenceRef) continue
         out[row.agentId] = Object.freeze({ qualified: true, evidenceRef })
@@ -102,4 +106,78 @@ export function createProductionSpecialistMeshSignalPort(options: {
       return Object.freeze(out)
     },
   })
+}
+
+type QualificationRow = {
+  agent_id: string
+  skill_id: string
+  qualified: boolean
+  evidence_ref: string
+  tenant_id: string
+  environment_id: string
+  portable_id: string
+  observed_at: string
+}
+
+type TelemetryRow = {
+  agent_id: string
+  available: boolean | null
+  latency_score: number | null
+  cost_score: number | null
+  load_score: number | null
+  reliability_score: number | null
+  quality_score: number | null
+  observed_at: string
+}
+
+/** Service-role Production adapter. Browser clients receive no policies for these tables. */
+export function createSupabaseSpecialistMeshProductionAdapters(db: SupabaseClient, options: { now?: () => Date } = {}) {
+  const now = options.now ?? (() => new Date())
+  const qualifications = createProductionSpecialistQualificationPort({
+    async read(input) {
+      if (!input.agentIds.length) return []
+      const at = now().toISOString()
+      const { data, error } = await db.from('a2a_specialist_qualifications')
+        .select('agent_id,skill_id,qualified,evidence_ref,tenant_id,environment_id,portable_id,observed_at')
+        .eq('tenant_id', input.tenantId).eq('environment_id', input.environmentId).eq('portable_id', input.portableId)
+        .eq('skill_id', input.skillId).in('agent_id', [...input.agentIds])
+        .lte('valid_from', at).gt('valid_until', at)
+        .order('observed_at', { ascending: false }).limit(Math.max(20, input.agentIds.length * 4))
+      if (error) throw error
+      return ((data ?? []) as QualificationRow[]).map(row => ({
+        agentId: row.agent_id, skillId: row.skill_id, qualified: row.qualified, evidenceRef: row.evidence_ref,
+        tenantId: row.tenant_id, environmentId: row.environment_id, portableId: row.portable_id, observedAt: row.observed_at,
+      }))
+    },
+  })
+
+  const meshSignals: SpecialistMeshSignalPort = Object.freeze({
+    async snapshot(input) {
+      if (!input.agentIds.length) return {}
+      const at = now().toISOString()
+      const { data, error } = await db.from('a2a_specialist_mesh_telemetry')
+        .select('agent_id,available,latency_score,cost_score,load_score,reliability_score,quality_score,observed_at')
+        .eq('tenant_id', input.tenantId).eq('environment_id', input.environmentId).eq('portable_id', input.portableId)
+        .eq('skill_id', input.skillId).in('agent_id', [...input.agentIds])
+        .gt('expires_at', at).order('observed_at', { ascending: false }).limit(Math.max(20, input.agentIds.length * 4))
+      if (error) return {}
+      const out: Record<string, SpecialistMeshLiveSignal> = {}
+      const seen = new Set<string>()
+      for (const row of (data ?? []) as TelemetryRow[]) {
+        if (seen.has(row.agent_id)) continue
+        seen.add(row.agent_id)
+        out[row.agent_id] = Object.freeze({
+          ...(typeof row.available === 'boolean' ? { available: row.available } : {}),
+          ...(row.latency_score === null ? {} : { latencyScore: boundedScore(Number(row.latency_score)) }),
+          ...(row.cost_score === null ? {} : { costScore: boundedScore(Number(row.cost_score)) }),
+          ...(row.load_score === null ? {} : { loadScore: boundedScore(Number(row.load_score)) }),
+          ...(row.reliability_score === null ? {} : { reliabilityScore: boundedScore(Number(row.reliability_score)) }),
+          ...(row.quality_score === null ? {} : { qualityScore: boundedScore(Number(row.quality_score)) }),
+        })
+      }
+      return Object.freeze(out)
+    },
+  })
+
+  return Object.freeze({ qualifications, meshSignals })
 }

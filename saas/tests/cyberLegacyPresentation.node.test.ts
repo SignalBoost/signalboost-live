@@ -262,7 +262,7 @@ test('complete tagged and quoted email tokens are preserved before prose normali
 })
 
 test('email shielding ends at sentence punctuation before adjacent product prose', () => {
-  for (const address of ['SignalBoost@example.com', 'SignalBoost+alerts@przykład.pl', '"SignalBoost Alerts"@[IPv6:2001:db8::1]', 'mailto:SignalBoost@example.com']) {
+  for (const address of ['SignalBoost@example.com', 'SignalBoost+alerts@przykład.pl', '"SignalBoost Alerts"@[IPv6:2001:db8::1]']) {
     for (const separator of ['—', '–', ',', ';', '!', '?', ')', '。']) {
       assert.equal(cyberProductText(`${address}${separator}SignalBoost prepared a plan`), `${address}${separator}iTMounts prepared a plan`)
     }
@@ -313,22 +313,24 @@ test('mailto link query parameters remain technical text rather than product pro
   }
 })
 
-test('natural-language punctuation after a URL does not shield following product prose', () => {
+test('Unicode punctuation stays in URI tokens while clearly separated prose normalizes', () => {
   for (const link of ['https://example.com', 'https://example.com/SignalBoost?label=SignalBoost#SignalBoost', 'mailto:SignalBoost@example.com?subject=SignalBoost']) {
     for (const punctuation of ['—', '–', '，', '；', '。', '！', '？']) {
-      assert.equal(cyberProductText(`${link}${punctuation}SignalBoost prepared a plan`), `${link}${punctuation}iTMounts prepared a plan`)
+      assert.equal(cyberProductText(`${link}${punctuation}SignalBoost prepared a plan`), `${link}${punctuation}SignalBoost prepared a plan`)
+      assert.equal(cyberProductText(`${link}${punctuation} SignalBoost prepared a plan`), `${link}${punctuation} iTMounts prepared a plan`)
     }
   }
   const encoded = 'https://example.com/SignalBoost%E2%80%94SignalBoost?q=SignalBoost%EF%BC%8CSignalBoost'
   assert.equal(cyberProductText(encoded), encoded)
 })
 
-test('ASCII sentence punctuation after a bare URL does not swallow product prose', () => {
+test('ASCII punctuation does not reclassify valid URI suffixes as product prose', () => {
   for (const link of ['https://example.com', 'https://github.com/SignalBoost/signalboost-live']) {
     for (const punctuation of [',', ';', '!', '?', ')']) {
       for (const name of ['SignalBoost', 'SignalBoostAi', 'SignalBoost AI', 'SignalBoost-created']) {
         const branded = name.endsWith('-created') ? 'iTMounts-created' : 'iTMounts'
-        assert.equal(cyberProductText(`${link}${punctuation}${name} prepared a plan`), `${link}${punctuation}${branded} prepared a plan`)
+        assert.equal(cyberProductText(`${link}${punctuation}${name} prepared a plan`), `${link}${punctuation}${name} prepared a plan`)
+        assert.equal(cyberProductText(`${link}${punctuation} ${name} prepared a plan`), `${link}${punctuation} ${branded} prepared a plan`)
       }
     }
   }
@@ -341,8 +343,11 @@ test('ASCII sentence punctuation after a bare URL does not swallow product prose
   }
 })
 
-test('the reported recipient-free mailto header stops before dash-separated prose', () => {
-  assert.equal(cyberProductText('mailto:?subject=Status—SignalBoost prepared a plan'), 'mailto:?subject=Status—iTMounts prepared a plan')
+test('the reported recipient-free mailto header is preserved until an unambiguous separator', () => {
+  const ambiguous = 'mailto:?subject=Status—SignalBoost prepared a plan'
+  assert.equal(cyberProductText(ambiguous), ambiguous)
+  assert.equal(cyberProductText('mailto:?subject=Status — SignalBoost prepared a plan'), 'mailto:?subject=Status — iTMounts prepared a plan')
+  assert.equal(cyberProductText('mailto:SignalBoost@example.com?subject=SignalBoost'), 'mailto:SignalBoost@example.com?subject=SignalBoost')
 })
 
 test('Guardian next steps and finding prose normalize without rewriting technical evidence or decisions', () => {
@@ -362,5 +367,33 @@ test('Guardian next steps and finding prose normalize without rewriting technica
     assert.equal(buttons(tree).length, status === 'in_progress' ? 3 : 0)
     if (status === 'completed') assert.match(visible, /Stored records and approval history are unchanged/)
     assert.equal(JSON.stringify(row), before)
+  }
+})
+
+test('actual technical User-Agent and schema identifiers stay exact in saved prose', () => {
+  const identifiers = [
+    'SignalBoost-COS-Builder', 'signalboost-audit', 'SignalBoost-COS-Platform-Engineer',
+    'SignalBoost-COS-Business-Intelligence-Corpus', 'SignalBoost-Provider-Version',
+    'SignalBoost-Request-Id', 'SignalBoost-URL-Intelligence', 'SignalBoost-UniversalProvider',
+    'SignalBoost-Verified-Person-Visual', 'SignalBoost-Locale-Completion',
+    'signalboost-builder-job-v1', 'signalboost-cos-brain-v1', 'signalboost-cloud',
+    'signalboost-host-context', 'signalboost-self-healing-supervisor', 'signalboost-clean',
+    'signalboost-reference-diagnostic-assignment', 'signalboost-assistant-transport',
+    'signalboost-aws-access-key', 'SignalBoost-Console-123', 'SignalBoost-Vault-Rotated-123',
+  ]
+  for (const identity of identifiers) {
+    assert.equal(cyberProductText(identity), identity)
+    assert.equal(cyberProductText(`SignalBoost recorded ${identity} as a technical identifier.`), `iTMounts recorded ${identity} as a technical identifier.`)
+  }
+  for (const adjective of ['owned', 'selected', 'specific', 'created', 'provided', 'verified', 'assisted']) {
+    assert.equal(cyberProductText(`SignalBoost-${adjective} remediation`), `iTMounts-${adjective} remediation`)
+  }
+})
+
+test('legal punctuation inside URL paths is never rewritten based on the following word', () => {
+  for (const separator of [',', ';', '!', ')', '—', '–', '，', '。']) {
+    const url = `https://example.com/path/SignalBoost${separator}SignalBoost`
+    assert.equal(cyberProductText(`${url} reference`), `${url} reference`)
+    assert.equal(cyberProductText(`${url} reference for SignalBoost`), `${url} reference for iTMounts`)
   }
 })

@@ -79,14 +79,58 @@ export function dependencyRescanUrl(row: { source_area?: string; source_type?: s
   return `https://github.com/${parts.join('/')}`
 }
 
+// Exact runtime identifiers observed in the current repository source inventory.
+// These are evidence values (User-Agents, schema names and runtime IDs), not product
+// adjectives. Keep this list reconciled when implementation identifiers are added.
+const LEGACY_TECHNICAL_IDENTIFIERS = new Set([
+  'signalboost-api', 'signalboost-worker', 'signalboost-live', 'signalboost-clean',
+  'signalboost-assistant', 'signalboost-cos', 'signalboost-cos-builder',
+  'signalboost-cos-business-intelligence-corpus', 'signalboost-cos-platform-engineer',
+  'signalboost-locale-completion', 'signalboost-provider-version', 'signalboost-request-id',
+  'signalboost-url-intelligence', 'signalboost-universalprovider',
+  'signalboost-verified-person-visual', 'signalboost-verified-visual',
+  'signalboost-host', 'signalboost-anon', 'signalboost-assistant-transport',
+  'signalboost-audio', 'signalboost-audit', 'signalboost-aws-access-key',
+  'signalboost-aws-secret-key', 'signalboost-backup-cos-v1',
+  'signalboost-base-v2-clean-background', 'signalboost-base-v3-fast-720p',
+  'signalboost-base-v4-clean-full-screen', 'signalboost-brand-banner-v2-prominent-full-width',
+  'signalboost-builder-job-v1', 'signalboost-campaign-copy-v2-clean',
+  'signalboost-captions-v2-solid-panel', 'signalboost-captions-v3-solid-panel',
+  'signalboost-captions-v4-solid-panel', 'signalboost-chief-of-staff', 'signalboost-cloud',
+  'signalboost-concierge-panel', 'signalboost-copy-v3-customer-only',
+  'signalboost-copy-v4-customer-only', 'signalboost-cos-blueprint',
+  'signalboost-cos-blueprint-v1', 'signalboost-cos-brain-v1',
+  'signalboost-cos-continuity-v1', 'signalboost-cos-engineering',
+  'signalboost-cos-integrity-v3', 'signalboost-cos-verify',
+  'signalboost-data-center-diagnostic-error-v1', 'signalboost-data-center-diagnostic-v1',
+  'signalboost-dc-simulator', 'signalboost-demo', 'signalboost-demo-drill',
+  'signalboost-external-ai', 'signalboost-host-context', 'signalboost-i18n-sweep',
+  'signalboost-identity', 'signalboost-language-purity-v1', 'signalboost-learning-admission',
+  'signalboost-memory-vs-cache', 'signalboost-operator', 'signalboost-platform',
+  'signalboost-reference', 'signalboost-reference-acceptance',
+  'signalboost-reference-diagnostic-assignment', 'signalboost-reference-live',
+  'signalboost-reference-self-healing-diagnostic-http', 'signalboost-repair',
+  'signalboost-saas-api', 'signalboost-self-healing-supervisor',
+  'signalboost-supervisor-signature', 'signalboost-surface', 'signalboost-vector-space',
+])
+// Runtime-generated names append IDs/version labels to these observed prefixes.
+const LEGACY_TECHNICAL_PREFIXES = [
+  'signalboost-live-', 'signalboost-api-', 'signalboost-worker-',
+  'signalboost-console-', 'signalboost-vault-rotated-', 'signalboost-banner-upgrade-',
+  'signalboost-base-video-', 'signalboost-creative-', 'signalboost-deck-',
+  'signalboost-fast-final-', 'signalboost-self-healing-supervisor-',
+  'signalboost-video-', 'signalboost-voice-',
+]
+
 /** Display product prose only; never pass the result to persistence or authorization. */
 export function cyberProductText(value: string | null | undefined): string {
   if (!value) return ''
   // Preserve matching code delimiters of any length, not just one-backtick spans.
   const code = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/
-  // Mailto headers are part of the URI. Natural-language dash/fullwidth punctuation
-  // ends bare URL text; percent-encoded URI characters stay protected.
-  const url = /(?:[a-z][a-z0-9+.-]*:\/\/|git@)[^\s<>"`—–，；。！？]+|mailto:[^\s<>"`—–，；。！？?]*\?(?=[^\s<>"`—–，；。！？&=]+=)[^\s<>"`—–，；。！？]*/
+  // Punctuation is legal URL/IRI path or query data, not a reliable prose boundary.
+  // Preserve the complete lexical URI (including mailto headers) byte-for-byte.
+  // Ambiguous adjacent text stays technical; clearly separated prose is normalized.
+  const url = /(?:[a-z][a-z0-9+.-]*:\/\/|git@|mailto:)[^\s<>"`]+/
   // This is token shielding, not address validation. A DNS name/domain literal ends
   // before sentence punctuation; it must not swallow adjacent product prose.
   const email = /(?:mailto:)?(?:"(?:[^"\\\r\n]|\\.)*"|[\p{L}\p{N}\p{M}!#$%&'*+\/=?^_`{|}~.-]+)@(?:\[[^\]\r\n]+\]|[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?(?:\.[\p{L}\p{N}](?:[\p{L}\p{N}\p{M}-]*[\p{L}\p{N}\p{M}])?)*)/u
@@ -94,27 +138,17 @@ export function cyberProductText(value: string | null | undefined): string {
   const prose = (text: string) => text.replace(
     /(?<![\p{L}\p{N}_./\\@-])(SignalBoost(?:Ai|\s+AI)?)(-[\p{L}][\p{L}\p{N}-]*)?(?![\p{L}\p{N}_/\\@-]|\.[\p{L}\p{N}])/giu,
     (token: string, brand: string, suffix: string | undefined) => {
-      // Known bare implementation identifiers remain exact. All other descriptive
-      // compounds use the current brand, without maintaining an adjective allowlist.
-      // Paths, filenames, URLs, email and code have separate structural protection.
-      if (/^SignalBoost-(?:live|api|worker)(?:-|$)/i.test(token)) return token
+      const identity = token.toLowerCase()
+      if (LEGACY_TECHNICAL_IDENTIFIERS.has(identity)
+        || LEGACY_TECHNICAL_PREFIXES.some(prefix => identity.startsWith(prefix))) return token
       return publicBrandText(brand) + (suffix || '')
     },
   )
   let rendered = ''
   let cursor = 0
   for (const match of value.matchAll(protectedTokens)) {
-    let protectedLength = match[0].length
-    // In bare URL prose, an ASCII delimiter followed by a brand and another word
-    // starts a sentence fragment. Query/fragment data and standalone URIs remain
-    // opaque: these punctuation characters are also legal inside real URLs.
-    if (/^(?:[a-z][a-z0-9+.-]*:\/\/|git@|mailto:)/i.test(match[0])
-      && /^\s+\p{L}/u.test(value.slice(match.index + match[0].length))) {
-      const boundary = match[0].search(/[,;!?)](?=SignalBoost(?:Ai)?(?:-[\p{L}\p{N}-]+)?$)/iu)
-      if (boundary >= 0 && !/[?#]/.test(match[0].slice(0, boundary))) protectedLength = boundary
-    }
-    rendered += prose(value.slice(cursor, match.index)) + match[0].slice(0, protectedLength)
-    cursor = match.index + protectedLength
+    rendered += prose(value.slice(cursor, match.index)) + match[0]
+    cursor = match.index + match[0].length
   }
   return rendered + prose(value.slice(cursor))
 }

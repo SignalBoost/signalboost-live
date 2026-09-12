@@ -50,14 +50,28 @@ export async function executeBoundAgentExam(
 ) {
   const config = localInferenceConfigFromEnv()
   const domain = work?.domain ?? agentWorkDomain(await readCosUniversityAgentRole(request.agentId), work?.subjectId)
-  const model = modelForAgentWork({ domain, roleModel: requireBuilderCodingModel() })
+  const model = modelForAgentWork({
+    domain,
+    roleModel: requireBuilderCodingModel(),
+    purpose: request.purpose === 'practice' ? 'practice' : 'assessment',
+  })
   return executeBoundSoftwareCapstone(request, {
     readRole: readCosUniversityAgentRole, loadProcedures: loadAgentOwnProcedures, model,
     // Independent assessments never acquire source packets or study text through this port.
     ...(request.purpose === 'practice' ? { loadStudyMaterial: () => loadUniversityPracticeStudyMaterial(request) } : {}),
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
     deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
-    infer: (input, selectedModel) => callLocalModel({ ...input, frequencyPenalty: 0, presencePenalty: 0 }, {
+    infer: (input, selectedModel) => callLocalModel({
+      ...input,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+      usageContext: {
+        feature: request.purpose === 'practice' ? 'university_practice' : 'university_independent_exam',
+        correlationId: request.runId,
+        agentId: request.agentId,
+        purpose: request.purpose === 'practice' ? 'non_credit_training' : 'independent_assessment',
+      },
+    }, {
       ...config, model: selectedModel, timeoutMs: Math.min(config.timeoutMs, 90_000),
     }),
   })

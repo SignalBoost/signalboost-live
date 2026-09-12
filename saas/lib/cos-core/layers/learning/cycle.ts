@@ -6,7 +6,6 @@ import { gapCurriculumAligned } from './gaps.ts'
 import { minimumConfidenceForKind } from './sourceCatalog.ts'
 import {
   incrementDiagnosticCount,
-  recordAcceptedLearningContent,
   initializeLearningGapDiagnostics,
   learningGapDiagnostic,
   type LearningGapDiagnostic,
@@ -80,6 +79,16 @@ export function learningAdapterAllowedForGap(gap:KnowledgeGap,adapter:Continuous
   return !allowed.length||allowed.includes(adapter.kind)
 }
 
+/**
+ * Admission rejections were counted but never measured: a candidate failing a 0.72 floor at 0.70 is a
+ * threshold that is slightly too strict, while one failing at 0.15 is a scoring problem. The bucket is
+ * coarse (0.05) on purpose so the key space stays small and the counters remain cheap to aggregate.
+ */
+export function learningConfidenceBucket(value:number):string{
+  const bounded=Math.max(0,Math.min(1,Number(value)||0))
+  return (Math.floor(bounded*20)/20).toFixed(2)
+}
+
 export class ContinuousLearningCycle{
   constructor(private readonly director:ContinuousLearningDirector,private readonly adapters:ContinuousLearningSourceAdapter[]){}
 
@@ -122,6 +131,8 @@ export class ContinuousLearningCycle{
           const candidate={...this.toCandidate(document,allTerms,score),admission}
           if(kindFloor!==null&&candidate.confidence<kindFloor&&admission.tier!=='probationary'){
             incrementDiagnosticCount(result.rejected,'below_source_confidence_floor')
+            incrementDiagnosticCount(result.rejected,`below_floor_confidence:${learningConfidenceBucket(candidate.confidence)}`)
+            incrementDiagnosticCount(result.rejected,`below_floor_required:${learningConfidenceBucket(kindFloor)}`)
             if(diagnostic)incrementDiagnosticCount(diagnostic.rejected,'below_source_confidence_floor')
             continue
           }
@@ -139,11 +150,13 @@ export class ContinuousLearningCycle{
           try{
             const decision=await this.director.admit(candidate,result.externalCostUsd)
             this.recordDecision(result,decision,diagnostic)
+            if(!decision.accepted&&!('deferred' in decision&&decision.deferred)&&decision.reason){
+              incrementDiagnosticCount(result.rejected,`${decision.reason}_confidence:${learningConfidenceBucket(candidate.confidence)}`)
+            }
             if(decision.accepted){
               const learned=String(gap.subject??'').trim()
               if(learned)acceptedSubjects.add(learned)
               acceptedGapIds.add(gap.id)
-              recordAcceptedLearningContent(diagnostic,candidate.contentHash)
             }
           }catch(error){
             // A real failed write is retryable if another gap discovers the same content later.

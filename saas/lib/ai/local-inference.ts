@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from '@/lib/ai/localInferenceUsage'
+import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 
 export interface LocalModelCallArgs {
   prompt: string
@@ -185,8 +185,6 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       cachedPromptTokens = nonNegativeNumber(data.usage?.prompt_tokens_details?.cached_tokens)
       providerEstimatedCostUsd = nonNegativeNumber(data.usage?.estimated_cost)
       const content = data.choices?.[0]?.message?.content
-      // A provider that stops on max_tokens returns HTTP 200 with a half-finished answer. Without
-      // this a truncated result is indistinguishable from one the model chose to end.
       if (finishReason && finishReason !== 'stop') {
         console.warn('[cos-local-inference-incomplete]', {
           model: config.model,
@@ -223,8 +221,6 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     })
   }
 
-  // Raised after telemetry so the caller can retry with a larger budget instead of parsing a
-  // fragment. Partial output is discarded even when it happens to parse.
   if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
   return text
 }

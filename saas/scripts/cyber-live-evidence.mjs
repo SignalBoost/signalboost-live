@@ -13,17 +13,6 @@ const output = new URL('../../.cyber-evidence/', import.meta.url)
 mkdirSync(output, { recursive: true })
 const blobHash = text => createHash('sha1').update(`blob ${Buffer.byteLength(text)}\0`).update(text).digest('hex')
 const moduleUrl = text => `data:text/javascript;base64,${Buffer.from(stripTypeScriptTypes(text)).toString('base64')}`
-const readerSource = readFileSync(new URL('../lib/audit/repoTarget.ts', import.meta.url), 'utf8')
-const scannerSource = readFileSync(new URL('../lib/cyber/dependencyScanner.ts', import.meta.url), 'utf8')
-const readerUrl = moduleUrl(readerSource)
-const alias = "'@/lib/audit/repoTarget'"
-if (scannerSource.split(alias).length !== 2) throw new Error('Scanner reader import changed; update this evidence harness')
-// Export the existing private lookup for exact lockfile-version checks in this
-// process only. Neither a production route nor scanner behavior is modified.
-const scannerUrl = moduleUrl(scannerSource.replace(alias, JSON.stringify(readerUrl))
-  + '\nexport { queryOsv as queryLockedVersions };\n')
-const reader = await import(readerUrl)
-const scanner = await import(scannerUrl)
 const originalFetch = globalThis.fetch
 // Only the authoritative GitHub/OSV APIs are contacted. No source reference URL
 // is followed, no hosted model is used, and no mutation endpoint is invoked.
@@ -45,7 +34,7 @@ globalThis.fetch = (input, init = {}) => {
 const evidence = {
   repository: repo, commit: ref, observedAt: new Date().toISOString(),
   execution: 'read-only GitHub Actions; not a signed-in Production scan',
-  scannerBlob: blobHash(scannerSource), readerBlob: blobHash(readerSource),
+  scannerBlob: null, readerBlob: null,
   reports: [], lockedPackages: [], lockedAdvisories: [], limitations: [
     'Repository scans are capped at 250 packages. Unresolved ranges and unreadable manifests remain explicit coverage limitations; a lockfile does not establish runtime installation.',
     'The separate Next.js/PostCSS focus uses exact lockfile versions. Lockfiles are not proof of runtime reachability or exploitation.',
@@ -54,6 +43,21 @@ const evidence = {
 }
 let failure
 try {
+  // Source reads, parsing, alias validation and imports are collection work too.
+  // Their failures must retain a commit-bound report and restore the fetch guard.
+  const readerSource = readFileSync(new URL('../lib/audit/repoTarget.ts', import.meta.url), 'utf8')
+  evidence.readerBlob = blobHash(readerSource)
+  const scannerSource = readFileSync(new URL('../lib/cyber/dependencyScanner.ts', import.meta.url), 'utf8')
+  evidence.scannerBlob = blobHash(scannerSource)
+  const readerUrl = moduleUrl(readerSource)
+  const alias = "'@/lib/audit/repoTarget'"
+  if (scannerSource.split(alias).length !== 2) throw new Error('Scanner reader import changed; update this evidence harness')
+  // Export the existing private lookup for exact lockfile-version checks in this
+  // process only. Neither a production route nor scanner behavior is modified.
+  const scannerUrl = moduleUrl(scannerSource.replace(alias, JSON.stringify(readerUrl))
+    + '\nexport { queryOsv as queryLockedVersions };\n')
+  const reader = await import(readerUrl)
+  const scanner = await import(scannerUrl)
   for (const suffix of ['', '/saas']) {
     const report = await scanner.scanDependencyAdvisories({
       url: `https://github.com/${repo}/tree/${ref}${suffix}`, maxPackages: 250,

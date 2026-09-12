@@ -15,16 +15,34 @@ failure/remediation path, including fresh identities across deployments. It is N
 independent exam, proof of permanent learning, an A grade, or graduation. The word-limit failure
 is retained and must not be hidden by trimming/rescoring an answer or weakening the limit.
 
+## Root cause correction: the response ceiling was undisclosed
+
+The history exam enforced a 260-word maximum but its learner-facing prompt did not state a word
+limit. The existing independent runner passed only that prompt to the Specialist. The recorded
+length failure is therefore NOT proof that the learner ignored a stated instruction.
+
+A host-controlled execution projection now appends the existing numeric ceiling and the scorer's
+whitespace-token counting convention to the prompt for BOTH COS and Specialist examinations.
+The ceiling is localized in all five supported languages. Only the public output constraint is
+projected: expected concepts, forbidden answer terms, private criteria and scoring instructions
+remain isolated. Invalid constraints fail before inference; absent constraints leave input alone.
+The existing case/rubric/manifest objects and scoring code are unchanged, so historical records do
+not drift. The bound executor hashes the actual augmented prompt, and each newly recorded
+assessment carries the explicit response-contract version, ceiling, counting rule and scope.
+
+The old failure remains in the ledger without silent trimming, rescoring or fabricated credit.
+Only a fresh correctly specified examination can establish performance under the disclosed limit.
+
 ## Remaining teaching gap and repair
 
 The new plan contained only the generic subject objective. The planner intentionally did not read
 raw scorer reasons. Preserve that isolation while a separate host-only read projects exactly one
-public response-constraint failure into the fixed category `response_length`.
+response-length failure into the fixed category `response_length`.
 
 The projection checks exact agent/run identity, terminal failed status, genuine execution flags,
 source ownership and completion time. Unknown, malformed, private-concept or instruction-like tags
-are not forwarded. No case, rubric, required concepts, numeric exam limits, answer, or other hidden
-examination content is loaded. A read failure yields no targeted feedback, not invented evidence.
+are not forwarded. The feedback adapter reads no case, rubric, required concepts, numeric limits, answer, or other
+hidden examination content. Numeric response limits are disclosed separately by the executor. A read failure yields no targeted feedback, not invented evidence.
 
 The original subject objective gets additive non-credit guidance on budgeting, counting and
 revising concise answers without losing facts or uncertainty. That objective feeds the existing
@@ -43,6 +61,13 @@ state preservation and concurrent readiness. All pass locally with injected I/O;
 database is used by those tests. The existing mandatory post-remediation test imports the suite;
 its five original test bodies remain unchanged. Full CI and Preview remain separate release gates.
 
-No migration, Production data edit, examination/scorer change, acceptance-threshold relaxation,
-external inference provider or added authority is introduced. A subsequent independent retest is
-still needed to establish whether this guidance improves performance.
+Seven additional response-contract tests exercise the actual unchanged scorer and actual COS and
+Specialist execution functions with injected I/O. The identical baseline proof has three failures
+(missing disclosure on both paths and invalid-constraint execution); the repair passes all seven.
+Together with the nine feedback tests, all 16 pass locally, zero failed/skipped. The independent
+runner baseline was reconstructed byte-identically to blob 82dec69c686b06e99652746a1ed560869f66cc34.
+
+No migration, direct Production data edit, scorer change, acceptance-threshold relaxation, external
+inference provider or added authority is introduced. Learner-facing exam input intentionally gains
+the formerly undisclosed limit; it is no longer claimed byte-equivalent. Fresh CI/Preview and a
+subsequent independent retest remain necessary for release and performance acceptance.

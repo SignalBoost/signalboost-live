@@ -1,5 +1,6 @@
 // saas/lib/ai/cos/cosUniversityIndependentExamRunner.ts
 import { randomUUID } from 'node:crypto'
+import { universityExamResponseContract, universityIndependentLearnerPrompt } from './cosUniversityExamResponseContract.ts'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
 import { generateLocalEmbedding } from '@/lib/ai/cos/localEmbeddings'
@@ -211,7 +212,7 @@ async function executeBoundExam(
 
   let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
   try {
-    bound = await executeBoundAgentExam({ agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: exam.prompt })
+    bound = await executeBoundAgentExam({ agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: universityIndependentLearnerPrompt(exam) })
   } catch (error) {
     return fail([`execution_error:${error instanceof Error ? error.message : String(error)}`])
   }
@@ -242,6 +243,7 @@ async function executeBoundExam(
       profile: COS_UNIVERSITY_EXAM_PROFILE,
       scorerVersion: COS_UNIVERSITY_EXAM_SCORER,
       manifestHash: exam.manifestHash,
+      responseContract: universityExamResponseContract(exam),
       turnId: execution.turnId,
       responseSource: SOFTWARE_CAPSTONE_RUNTIME,
       localModelInvoked: true,
@@ -295,13 +297,15 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
   }
   beginEvidenceSourceUseTurn()
   let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
+  let learnerPrompt = exam.prompt
   try {
+    learnerPrompt = universityIndependentLearnerPrompt(exam)
     if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
       await ensureLocalInferenceRuntimeReady()
-      await generateLocalEmbedding(exam.prompt)
+      await generateLocalEmbedding(learnerPrompt)
     }
     result = await tryCOSFirstAnswer({
-      prompt: exam.prompt,
+      prompt: learnerPrompt,
       language: target.kind === 'language' ? target.language : 'en',
       privileged: true,
       disableCache: true,
@@ -328,7 +332,7 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
 
   if (turnId) {
     const learningDecision = decideCosTurnExperience({
-      prompt: exam.prompt,
+      prompt: learnerPrompt,
       handled: result.handled,
       confidence: result.confidence,
       provenance: result.provenance,
@@ -378,6 +382,7 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
         profile: COS_UNIVERSITY_EXAM_PROFILE,
         scorerVersion: COS_UNIVERSITY_EXAM_SCORER,
         manifestHash: exam.manifestHash,
+        responseContract: universityExamResponseContract(exam),
         turnId,
         responseSource: result.provenance.responseSource,
         localModelInvoked: result.provenance.localModelInvoked,

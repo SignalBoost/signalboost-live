@@ -229,21 +229,34 @@ function applicableFixedVersions(events: any[], currentVersion: string): string[
   if (!current) return []
   const fixed: string[] = []
   let introduced: string | null = null
+  let previousEnd: number[] | null = null
   for (const event of events) {
-    if (!event || typeof event !== 'object' || Array.isArray(event)) { introduced = null; continue }
-    const keys = ['introduced', 'fixed', 'last_affected', 'limit'].filter(k => Object.hasOwn(event, k))
-    if (keys.length !== 1) { introduced = null; continue }
-    if (keys[0] === 'introduced') {
-      introduced = typeof event.introduced === 'string' ? event.introduced : null
+    // Validate the entire range, not only the interval that looks useful. A
+    // malformed later event also invalidates any earlier proposed boundary.
+    if (!event || typeof event !== 'object' || Array.isArray(event)) return []
+    const keys = Object.keys(event)
+    if (keys.length !== 1 || !['introduced', 'fixed', 'last_affected', 'limit'].includes(keys[0])) return []
+    const key = keys[0]
+    const value = event[key]
+    if (key === 'introduced') {
+      if (introduced !== null || typeof value !== 'string') return []
+      const lower = stableParts(value)
+      if (value !== '0' && !lower) return []
+      // Touching/overlapping ranges cannot establish that a fixed boundary is
+      // actually outside every affected interval. Leave those to investigation.
+      if (previousEnd && (value === '0' || !lower || compareStable(lower, previousEnd) <= 0)) return []
+      introduced = value
       continue
     }
-    if (keys[0] === 'fixed' && introduced !== null) {
-      const lower = stableParts(introduced)
-      const upper = stableParts(event.fixed)
-      if ((introduced === '0' || (lower && compareStable(lower, current) <= 0))
-        && upper && compareStable(current, upper) < 0
-        && upper[0] === current[0] && (current[0] !== 0 || upper[1] === current[1])) fixed.push(event.fixed)
-    }
+    if (introduced === null) return []
+    const lower = stableParts(introduced)
+    const upper = stableParts(value)
+    if (!upper || (introduced !== '0' && (!lower || compareStable(lower, upper) >= 0))) return []
+    if (key === 'fixed'
+      && (introduced === '0' || (lower && compareStable(lower, current) <= 0))
+      && compareStable(current, upper) < 0
+      && upper[0] === current[0] && (current[0] !== 0 || upper[1] === current[1])) fixed.push(value)
+    previousEnd = upper
     introduced = null
   }
   return fixed

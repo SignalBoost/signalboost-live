@@ -1,3 +1,4 @@
+// saas/lib/cos-core/layers/learning/gaps.ts
 import type { ContinuousLearningSourceKind, KnowledgeGap } from './index.ts'
 
 export type KnowledgeGapSignal = {
@@ -18,8 +19,18 @@ export type KnowledgeGapSignal = {
   sourceKinds?: ContinuousLearningSourceKind[]
   /** Optional adapter-level exclusions when a source class contains multiple acquisition paths. */
   excludedAdapterIds?: string[]
+  /** Declared by the producing lane: this signal is a governed curriculum/study objective. */
+  curriculumAligned?: boolean
   portableIds?: string[]
 }
+
+/**
+ * Curriculum alignment is a declaration made by the lane that produced the gap, not a guess from the
+ * gap id. University study gaps are minted as `auto-gap:university:...`, so the original literal
+ * prefix test silently excluded the entire University lane from the probationary tier that was built
+ * to hold its metadata-class evidence. Lanes that have not yet declared keep the legacy behaviour.
+ */
+export function gapCurriculumAligned(gap:KnowledgeGap):boolean{return gap.curriculumAligned===true||gap.id.startsWith('curriculum:')}
 
 export function knowledgeGapIdForSignal(signal: Pick<KnowledgeGapSignal, 'taskId' | 'capability'>): string {
   return `auto-gap:${signal.taskId}:${signal.capability}`
@@ -86,6 +97,7 @@ export function generateKnowledgeGaps(signals: KnowledgeGapSignal[]): KnowledgeG
       evidence: usefulSignals(signal),
       sourceKinds: signal.sourceKinds?.length ? [...new Set(signal.sourceKinds)] : undefined,
       excludedAdapterIds: excludedAdapterIds.length ? excludedAdapterIds : undefined,
+      ...(signal.curriculumAligned === true ? { curriculumAligned: true } : {}),
     }
 
     const previous = byKey.get(key)

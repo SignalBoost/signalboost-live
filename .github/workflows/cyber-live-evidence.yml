@@ -7,6 +7,10 @@ on:
       - 'saas/lib/audit/repoTarget.ts'
       - 'saas/scripts/cyber-live-evidence.mjs'
       - '.github/workflows/cyber-live-evidence.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'saas/package.json'
+      - 'saas/package-lock.json'
   workflow_dispatch:
 
 permissions:

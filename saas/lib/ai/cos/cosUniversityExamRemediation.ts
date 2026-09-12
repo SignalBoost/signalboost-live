@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityExamRemediation.ts
 import { createHash } from 'node:crypto'
 import type { KnowledgeGapSignal } from '@/lib/cos-core/layers/learning/gaps'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -336,6 +337,9 @@ export async function ensureCosUniversityExamFailureRemediationPlans(options: {
         objective: row.objective,
         strategy,
         repeatedCount: 1,
+        // Same rotation the subject lane already receives, so a language plan does not re-issue one
+        // fixed acquisition query on every cycle.
+        studyVariant,
       }))
     } else {
       gapSignals.push(universityStudyGapSignal({

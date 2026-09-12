@@ -67,7 +67,10 @@ export async function runCosUniversityRetention(options: { now?: Date; agentId?:
   // A registered agent with its own bound executor re-answers its own passed transfer case as itself,
   // through its assigned model. COS keeps its existing reasoner path unchanged.
   if (agentId !== DEFAULT_AGENT_ID) {
-    const bound = await executeBoundAgentExam({ agentId, runId: inserted.data.id, manifestHash: source.manifestHash, prompt: exam.prompt })
+    const bound = await executeBoundAgentExam(
+      { agentId, runId: inserted.data.id, manifestHash: source.manifestHash, prompt: exam.prompt },
+      { subjectId: source.subjectId },
+    )
     const execution = bound.execution
     if (execution.agentId !== agentId || execution.runId !== inserted.data.id || execution.manifestHash !== source.manifestHash) {
       throw new Error('agent_execution_identity_mismatch')

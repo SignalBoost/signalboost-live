@@ -557,7 +557,11 @@ async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: D
   if (agentId !== AGENT_ID) {
     let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
     try {
-      bound = await executeBoundAgentExam({ agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: exam.prompt })
+      // A language assessment is never a role's own field, whatever the role.
+      bound = await executeBoundAgentExam(
+        { agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: exam.prompt },
+        { domain: 'generalist' },
+      )
     } catch (error) {
       return failRun([`execution_error:${error instanceof Error ? error.message : String(error)}`])
     }

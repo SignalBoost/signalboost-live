@@ -212,7 +212,11 @@ async function executeBoundExam(
 
   let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
   try {
-    bound = await executeBoundAgentExam({ agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: universityIndependentLearnerPrompt(exam) })
+    bound = await executeBoundAgentExam(
+      { agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: universityIndependentLearnerPrompt(exam) },
+      // A language exam is generalist work; a subject exam may or may not be this role's own field.
+      { subjectId: target.kind === 'subject' ? target.subjectId : null },
+    )
   } catch (error) {
     return fail([`execution_error:${error instanceof Error ? error.message : String(error)}`])
   }

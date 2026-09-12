@@ -1,4 +1,6 @@
+// saas/lib/cos-core/layers/learning/liveSources.ts
 import type { ContinuousLearningSourceAdapter } from './cycle.ts'
+import { DEFAULT_LEARNING_SOURCE_CAPS, learningSourceCap } from './learningSourceCaps.ts'
 import { libraryLearningConnector,newsLearningConnector,officialDocsLearningConnector,referenceLearningConnector,scientificLearningConnector,SearchLearningConnector,youtubeLearningConnector } from './connectors.ts'
 import { createWikipediaSearch } from './referenceClients.ts'
 import { crossrefScientificSearch,europePmcScientificSearch,openAlexScientificSearch,openLibrarySearch } from './publicClients.ts'
@@ -101,7 +103,16 @@ export function resolveYouTubeTranscriptRuntime(env:LiveLearningEnvironment):{ur
 export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.env):ContinuousLearningSourceAdapter[]{
   if(env.COS_LIVE_SOURCES_ENABLED==='false')return[]
   const configuredTechFeeds=parseFeedList(env.COS_TECH_RSS_FEEDS);const configuredOfficialFeeds=parseFeedList(env.COS_OFFICIAL_DOC_FEEDS);const officialFeeds=[...BUILTIN_OFFICIAL_TECH_FEEDS,...configuredOfficialFeeds]
-  const adapters:ContinuousLearningSourceAdapter[]=[scientificLearningConnector(crossrefScientificSearch,2,'crossref'),scientificLearningConnector(openAlexScientificSearch,2,'openalex'),scientificLearningConnector(europePmcScientificSearch,2,'europe_pmc'),libraryLearningConnector(openLibrarySearch,2,'open_library'),newsLearningConnector(createGdeltNewsSearch(),2,'gdelt'),officialDocsLearningConnector(createFeedSearch(officialFeeds,fetch,{fullText:true}),3,'official_docs'),referenceLearningConnector(createWikipediaSearch(),3,'reference')]
+  // Per-adapter result caps. Measured over six production hours: official_docs alone produced 377
+  // not-relevant rejections and open_library 58, while crossref, openalex and europe_pmc retrieved
+  // six documents each — the sources that can return substantive, query-targeted text were the
+  // smallest part of the pool while the feeds filled their quota every tick regardless of the query.
+  // Rebalancing the caps changes only which candidates are offered; every admission gate is untouched.
+  // europe_pmc stays lower than its peers because each of its results may trigger a full-text XML
+  // fetch, so its cost per result is several times the others'.
+  const cap={ crossref:learningSourceCap(env.COS_LEARNING_CAP_CROSSREF,DEFAULT_LEARNING_SOURCE_CAPS.crossref), openalex:learningSourceCap(env.COS_LEARNING_CAP_OPENALEX,DEFAULT_LEARNING_SOURCE_CAPS.openalex), europePmc:learningSourceCap(env.COS_LEARNING_CAP_EUROPE_PMC,DEFAULT_LEARNING_SOURCE_CAPS.europe_pmc), openLibrary:learningSourceCap(env.COS_LEARNING_CAP_OPEN_LIBRARY,DEFAULT_LEARNING_SOURCE_CAPS.open_library), gdelt:learningSourceCap(env.COS_LEARNING_CAP_GDELT,DEFAULT_LEARNING_SOURCE_CAPS.gdelt), officialDocs:learningSourceCap(env.COS_LEARNING_CAP_OFFICIAL_DOCS,DEFAULT_LEARNING_SOURCE_CAPS.official_docs), reference:learningSourceCap(env.COS_LEARNING_CAP_REFERENCE,DEFAULT_LEARNING_SOURCE_CAPS.reference) }
+  const adapters:ContinuousLearningSourceAdapter[]=[scientificLearningConnector(crossrefScientificSearch,cap.crossref,'crossref'),scientificLearningConnector(openAlexScientificSearch,cap.openalex,'openalex'),scientificLearningConnector(europePmcScientificSearch,cap.europePmc,'europe_pmc'),libraryLearningConnector(openLibrarySearch,cap.openLibrary,'open_library'),newsLearningConnector(createGdeltNewsSearch(),cap.gdelt,'gdelt'),officialDocsLearningConnector(createFeedSearch(officialFeeds,fetch,{fullText:true}),cap.officialDocs,'official_docs'),referenceLearningConnector(createWikipediaSearch(),cap.reference,'reference')]
+
   if(env.COS_WEB_TRAINING_ENABLED!=='false'){
     adapters.push(new SearchLearningConnector('approved_public_web',createWebTrainingResearchSearch({
       minCredibility:webTrainingMinimumCredibility(env.COS_WEB_TRAINING_MIN_CREDIBILITY),

@@ -112,6 +112,7 @@ test('runtime observation proves exact delegated metadata without prompt or resp
   assert.ok(event)
   assert.equal(event.durationMs, 125)
   assert.equal(event.mode, 'delegated')
+  assert.equal(event.executionAttempted, true)
   assert.equal(event.transportRef, 'buyer-sales-primary')
   assert.equal(event.traceId, 'trace-1')
   assert.equal(event.assignmentId, 'assignment-1')
@@ -145,7 +146,34 @@ test('blocked write emits observation before transport creation and preserves ap
   const [event] = observer.snapshot()
   assert.equal(event?.mode, 'approval_required')
   assert.equal(event?.risk, 'write')
+  assert.equal(event?.executionAttempted, false)
   assert.equal(event?.ok, false)
+})
+
+test('pre-send validation error does not claim a specialist execution attempt', async () => {
+  const observer = createInMemoryA2ARuntimeObserver()
+  const counter = { creates: 0, sends: 0 }
+  const runtime = createA2ADelegationRuntime({
+    registry: registry(),
+    transportFactory: successfulTransport(counter),
+    observe: observer,
+  })
+  const result = await runtime.invoke({
+    tenantId,
+    environmentId,
+    portableId,
+    agentId: 'sales-agent',
+    skillId: 'sales.account-research',
+    messageId: 'message-too-large',
+    text: 'x'.repeat(32_001),
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.mode, 'a2a_runtime_error')
+  assert.equal(counter.creates, 1)
+  assert.equal(counter.sends, 0)
+  const [event] = observer.snapshot()
+  assert.equal(event?.mode, 'a2a_runtime_error')
+  assert.equal(event?.executionAttempted, false)
 })
 
 test('telemetry sink failure never becomes execution authority', async () => {

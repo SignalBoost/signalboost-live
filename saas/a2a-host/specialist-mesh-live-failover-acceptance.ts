@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { validateA2AAgentCard } from '../a2a-core/a2a-client.ts'
 import { A2A_AGENT_REGISTRY_VERSION, type A2AAgentRegistryPort, type A2ATransportFactory } from './a2a-agent-registry.ts'
 import { activatePortableA2AHost } from './a2a-host-activation.ts'
@@ -24,8 +25,8 @@ export interface SpecialistMeshLiveFailoverAcceptanceRecord {
   traceId: string
   primaryAgentId: string
   fallbackAgentId: string
-  primaryQualificationEvidenceRef: string
-  fallbackQualificationEvidenceRef: string
+  primaryQualificationEvidenceFingerprint: string
+  fallbackQualificationEvidenceFingerprint: string
   attemptedAgentIds: readonly [string, string]
   primaryMode: 'a2a_transport_unavailable'
   fallbackMode: 'delegated'
@@ -47,6 +48,10 @@ function required(value: unknown, name: string): string {
 function qualificationEvidence(decision: SpecialistQualificationDecision | undefined, agentId: string): string {
   if (decision?.qualified !== true) throw new Error(`specialist_mesh_failover_candidate_unqualified:${agentId}`)
   return required(decision.evidenceRef, `qualification evidenceRef for ${agentId}`)
+}
+
+function evidenceFingerprint(evidenceRef: string): string {
+  return `sha256:${createHash('sha256').update(evidenceRef, 'utf8').digest('hex')}`
 }
 
 function pinnedQualificationPort(input: {
@@ -223,8 +228,8 @@ export async function runSpecialistMeshLiveFailoverAcceptance(options: {
     traceId,
     primaryAgentId,
     fallbackAgentId,
-    primaryQualificationEvidenceRef: primaryEvidenceRef,
-    fallbackQualificationEvidenceRef: fallbackEvidenceRef,
+    primaryQualificationEvidenceFingerprint: evidenceFingerprint(primaryEvidenceRef),
+    fallbackQualificationEvidenceFingerprint: evidenceFingerprint(fallbackEvidenceRef),
     attemptedAgentIds: Object.freeze([primaryAgentId, fallbackAgentId]) as readonly [string, string],
     primaryMode: 'a2a_transport_unavailable',
     fallbackMode: 'delegated',

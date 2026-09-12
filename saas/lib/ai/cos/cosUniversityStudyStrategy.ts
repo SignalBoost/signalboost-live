@@ -83,6 +83,22 @@ const LIVE_SOURCE_KINDS: ContinuousLearningSourceKind[] = [
   'approved_public_web',
 ]
 
+/**
+ * Language study needs authentic usage, reference works and living text. Research-paper and
+ * scientific-journal indexes hold papers ABOUT language, not material to learn a language from,
+ * and official documentation holds neither. Measured over one production window, the two language
+ * subjects rejected 82-83% of everything retrieved as not_relevant against 19-46% for every other
+ * subject, and the adapters producing that noise were exactly the academic indexes. Restricting
+ * the language lane stops spending retrieval budget on sources that structurally cannot serve it;
+ * it changes no relevance floor and no admission threshold.
+ */
+const LANGUAGE_SOURCE_KINDS: ContinuousLearningSourceKind[] = [
+  'library_material',
+  'news_article',
+  'approved_public_web',
+  'video_transcript',
+]
+
 // These are public study/retrieval themes, not hidden exam rubric content. A failed language
 // dimension must remain explicit through acquisition so broad language material cannot silently
 // satisfy a focused weakness such as writing or localization.
@@ -223,7 +239,7 @@ export function selectCosUniversityStudyStrategy(input: {
         method('deliberate_practice', 'automatic_if_certifiable', 'Comprehension, writing, instruction following, localization, and pragmatics each need separate practice.'),
         method('independent_retest', 'automatic_if_certifiable', 'Each platform language and dimension requires its own unseen evidence.'),
       )
-      acquisitionSourceKinds = uniqueKinds([...RAG_SOURCE_KINDS, ...LIVE_SOURCE_KINDS])
+      acquisitionSourceKinds = [...LANGUAGE_SOURCE_KINDS]
       break
     case 'cross_domain':
       methods.push(

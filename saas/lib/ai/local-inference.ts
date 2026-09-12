@@ -1,4 +1,5 @@
-// saas/lib/ai/local-inference.ts
+import { randomUUID } from 'node:crypto'
+import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 
 export interface LocalModelCallArgs {
   prompt: string
@@ -14,6 +15,8 @@ export interface LocalModelCallArgs {
   presencePenalty?: number
   /** Ask the provider to enforce a JSON object response. Required for control-object generation. */
   jsonObject?: boolean
+  /** Billing attribution only. Never changes routing, grading, authorization, or model output. */
+  usageContext?: LocalInferenceUsageContext
 }
 
 /**
@@ -25,7 +28,10 @@ export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?:
 
 export interface LocalInferenceTelemetry {
   at: string
+  requestId: string
+  provider: string
   model: string
+  feature: string
   latencyMs: number
   startupLatencyMs: number
   inferenceLatencyMs: number
@@ -35,7 +41,11 @@ export interface LocalInferenceTelemetry {
   /** Provider stop reason. 'length' means the answer was cut off by max_tokens, not finished. */
   finishReason: string | null
   requestedMaxTokens: number
+  promptTokens: number | null
   completionTokens: number | null
+  totalTokens: number | null
+  cachedPromptTokens: number | null
+  providerEstimatedCostUsd: number | null
 }
 
 function emitLocalInferenceTelemetry(event: LocalInferenceTelemetry): void {
@@ -85,13 +95,37 @@ export async function ensureLocalInferenceRuntimeReady(_config = localInferenceC
   return
 }
 
+function providerFor(config: LocalInferenceConfig): string {
+  try {
+    const host = normalizeHost(new URL(config.baseUrl).hostname)
+    if (host === 'api.deepinfra.com' || host.endsWith('.deepinfra.com')) return 'deepinfra'
+    if (isLoopbackOrInternalHost(host)) return 'self_hosted'
+    const explicit = process.env.LOCAL_AI_MANAGED_PROVIDER?.trim().toLowerCase()
+    return explicit ? explicit.replace(/[^a-z0-9._-]+/g, '-') : host
+  } catch {
+    return 'unknown'
+  }
+}
+
+function nonNegativeNumber(value: unknown): number | null {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
 export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
   const startedAt = Date.now()
+  const requestId = randomUUID()
+  const provider = providerFor(config)
+  const usageContext: LocalInferenceUsageContext = args.usageContext || { feature: 'unattributed_local_inference' }
   let inferenceStartedAt: number | null = null
   let httpStatus: number | null = null
   let errorText: string | null = null
   let finishReason: string | null = null
+  let promptTokens: number | null = null
   let completionTokens: number | null = null
+  let totalTokens: number | null = null
+  let cachedPromptTokens: number | null = null
+  let providerEstimatedCostUsd: number | null = null
   let text: string | null = null
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
@@ -135,14 +169,22 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     } else {
       const data = await response.json() as {
         choices?: Array<{ message?: { content?: string }; finish_reason?: string }>
-        usage?: { completion_tokens?: number }
+        usage?: {
+          prompt_tokens?: number
+          completion_tokens?: number
+          total_tokens?: number
+          estimated_cost?: number
+          prompt_tokens_details?: { cached_tokens?: number }
+        }
       }
       const rawFinishReason = data.choices?.[0]?.finish_reason
       finishReason = typeof rawFinishReason === 'string' ? rawFinishReason : null
-      completionTokens = typeof data.usage?.completion_tokens === 'number' ? data.usage.completion_tokens : null
+      promptTokens = nonNegativeNumber(data.usage?.prompt_tokens)
+      completionTokens = nonNegativeNumber(data.usage?.completion_tokens)
+      totalTokens = nonNegativeNumber(data.usage?.total_tokens)
+      cachedPromptTokens = nonNegativeNumber(data.usage?.prompt_tokens_details?.cached_tokens)
+      providerEstimatedCostUsd = nonNegativeNumber(data.usage?.estimated_cost)
       const content = data.choices?.[0]?.message?.content
-      // A provider that stops on max_tokens returns HTTP 200 with a half-finished answer. Without
-      // this a truncated result is indistinguishable from one the model chose to end.
       if (finishReason && finishReason !== 'stop') {
         console.warn('[cos-local-inference-incomplete]', {
           model: config.model,
@@ -163,23 +205,24 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     clearTimeout(timeout)
     const latencyMs = Date.now() - startedAt
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
+    const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300
     emitLocalInferenceTelemetry({
-      at: new Date().toISOString(),
-      model: config.model,
-      latencyMs,
-      startupLatencyMs: 0,
-      inferenceLatencyMs,
-      success: errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300,
-      httpStatus,
-      error: errorText,
-      finishReason,
-      requestedMaxTokens,
-      completionTokens,
+      at: new Date().toISOString(), requestId, provider, model: config.model,
+      feature: usageContext.feature, latencyMs, startupLatencyMs: 0, inferenceLatencyMs,
+      success, httpStatus, error: errorText, finishReason, requestedMaxTokens,
+      promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
     })
+    if (provider === 'deepinfra') {
+      await recordLocalInferenceUsage({
+        requestId, provider, model: config.model, context: usageContext,
+        promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
+        success, httpStatus, latencyMs, finishReason,
+      }).catch(error => {
+        console.warn('[provider-inference-usage-write-failed]', error instanceof Error ? error.message : String(error))
+      })
+    }
   }
 
-  // Raised after telemetry so the caller can retry with a larger budget instead of parsing a
-  // fragment. Partial output is discarded even when it happens to parse.
   if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
   return text
 }

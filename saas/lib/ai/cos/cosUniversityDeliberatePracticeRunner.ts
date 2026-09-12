@@ -14,6 +14,7 @@ import {
   cosUniversityPracticeSkillKey,
 } from './cosUniversityDeliberatePractice.ts'
 import { cosUniversityStudyProofEligible } from './cosUniversityStudyProof.ts'
+import { selectEligibleCosUniversityPracticePlans } from './cosUniversityPracticeSelection.ts'
 import { type CosUniversityFailureClass } from './cosUniversityStudyStrategy.ts'
 
 const ORIGIN = 'cos_university_deliberate_practice'
@@ -195,14 +196,11 @@ async function loadStudyPlans(
     .limit(Math.max(1, Math.min(20, limit * 4)))
   if (result.error) throw result.error
   const candidates = (result.data || [])
-    .filter(row => hasDeliberatePractice(row.methods))
-    .slice(0, limit) as CosUniversityPracticePlanRow[]
-  const valid: CosUniversityPracticePlanRow[] = []
-  for (const plan of candidates) {
+    .filter(row => hasDeliberatePractice(row.methods)) as CosUniversityPracticePlanRow[]
+  return selectEligibleCosUniversityPracticePlans(candidates, limit, async plan => {
     const round = Math.max(1, Math.floor(Number(plan.attempt_count || 1)))
-    if (await practiceFenceStillValid(agentId, plan.id, round)) valid.push(plan)
-  }
-  return valid
+    return practiceFenceStillValid(agentId, plan.id, round)
+  })
 }
 
 function universityProcedure(plan: CosUniversityPracticePlanRow): Record<string, unknown> {

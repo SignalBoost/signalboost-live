@@ -23,7 +23,19 @@ Existing restudy requirements remain in force. COS retains its existing practice
 identity, prompt, and limits. Default independent assessment prompts and limits
 are unchanged. Rubrics, admission standards, and academic credit are unchanged.
 
-## Verification
+## Atomic persistence follow-up
+
+Review identified the repository's older COS-only atomic recorder. Direct
+Production inspection then found an earlier unfenced recorder instead, with no
+practice migrations in the migration history. The new
+20260912034000_university_bound_practice_atomic_result.sql supersedes both:
+queue-owned learner identity selects the exact locked study plan, current accepted
+study is mandatory, non-COS execution and owned skill context are checked against
+the registered role, and terminal failure reopens study in the result transaction.
+The existing RPC remains service-only and its search path is empty. No historical
+practice, assessment, credential or study record is rewritten by applying it.
+
+## Verification and release boundary
 
 The actual pre-repair executePractice function reproduces the defect under
 injected I/O: one COS call for software-specialist where zero is required.
@@ -32,8 +44,13 @@ routing, role changes, invalid evidence, rubric failure, persistence failure,
 queue identity, study revocation, and historical namespace isolation. The pure
 execution modules also pass standalone strict TypeScript checking.
 
-These are local implementation tests, not a full repository build or academic
-attainment. Current-head CI and Vercel Preview must pass before merge. Production
-acceptance requires new deployment-bound Specialist practice evidence followed by
-its own independently scored exam and correct remediation transition. No fixture
-results, direct database score edits, or credentials are introduced by this repair.
+Old structural tests now check the new function signatures without dropping their
+original ordering, SQL locking, failure, role restriction or no-credit assertions.
+Two further tests guard the new atomic RPC. A separate SQL proof exercises fifteen
+valid/invalid database cases and deliberately rolls back every fixture write.
+That proof must actually run after schema application; its presence is not a pass.
+
+Current-head CI and Vercel Preview must pass before merge. Production acceptance
+requires the applied migration, new deployment-bound Specialist practice evidence,
+and its own independently scored exam/remediation transition. None of these local
+tests, SQL fixtures or successful deployments is academic attainment by itself.

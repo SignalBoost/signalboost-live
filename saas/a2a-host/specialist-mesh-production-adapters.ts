@@ -3,7 +3,7 @@ import type { A2ARuntimeObservationEvent } from './a2a-runtime-observability.ts'
 import type { SpecialistQualificationDecision, SpecialistQualificationPort, SpecialistQualificationRequest } from './cos-specialist-orchestrator.ts'
 import type { SpecialistMeshLiveSignal, SpecialistMeshSignalPort, SpecialistMeshSignalRequest } from './specialist-mesh-router.ts'
 
-export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v3' as const
+export const SPECIALIST_MESH_PRODUCTION_ADAPTER_VERSION = 'signalboost-specialist-mesh-production-adapter-v4' as const
 
 export interface SpecialistQualificationEvidenceRecord {
   agentId: string
@@ -154,43 +154,55 @@ export function createSupabaseSpecialistMeshProductionAdapters(db: SupabaseClien
   const now = options.now ?? (() => new Date())
   const qualifications = createProductionSpecialistQualificationPort({
     async read(input) {
-      if (!input.agentIds.length) return []
+      const agentIds = [...new Set(input.agentIds)]
+      if (!agentIds.length) return []
       const at = now().toISOString()
-      const { data, error } = await db.from('a2a_specialist_qualifications')
-        .select('agent_id,skill_id,qualified,evidence_ref,tenant_id,environment_id,portable_id,observed_at')
-        .eq('tenant_id', input.tenantId).eq('environment_id', input.environmentId).eq('portable_id', input.portableId)
-        .eq('skill_id', input.skillId).in('agent_id', [...input.agentIds])
-        .lte('valid_from', at).gt('valid_until', at)
-        .order('observed_at', { ascending: false }).limit(Math.max(20, input.agentIds.length * 4))
-      if (error) throw error
-      return ((data ?? []) as QualificationRow[]).map(row => ({
-        agentId: row.agent_id, skillId: row.skill_id, qualified: row.qualified, evidenceRef: row.evidence_ref,
-        tenantId: row.tenant_id, environmentId: row.environment_id, portableId: row.portable_id, observedAt: row.observed_at,
+      const batches = await Promise.all(agentIds.map(async agentId => {
+        const { data, error } = await db.from('a2a_specialist_qualifications')
+          .select('agent_id,skill_id,qualified,evidence_ref,tenant_id,environment_id,portable_id,observed_at')
+          .eq('tenant_id', input.tenantId).eq('environment_id', input.environmentId).eq('portable_id', input.portableId)
+          .eq('skill_id', input.skillId).eq('agent_id', agentId)
+          .lte('valid_from', at).gt('valid_until', at)
+          .order('observed_at', { ascending: false })
+          .order('qualified', { ascending: true })
+          .order('evidence_ref', { ascending: true })
+          .limit(1)
+        if (error) throw error
+        return ((data ?? []) as QualificationRow[])
+          .filter(row => row.agent_id === agentId)
+          .map(row => ({
+            agentId: row.agent_id, skillId: row.skill_id, qualified: row.qualified, evidenceRef: row.evidence_ref,
+            tenantId: row.tenant_id, environmentId: row.environment_id, portableId: row.portable_id, observedAt: row.observed_at,
+          }))
       }))
+      return batches.flat()
     },
   })
 
   const meshSignals: SpecialistMeshSignalPort = Object.freeze({
     async snapshot(input) {
-      if (!input.agentIds.length) return {}
+      const agentIds = [...new Set(input.agentIds)]
+      if (!agentIds.length) return {}
       const current = now()
       const at = current.toISOString()
       const futureCutoff = new Date(current.getTime() + 60_000).toISOString()
-      const { data, error } = await db.from('a2a_specialist_mesh_telemetry')
-        .select('agent_id,available,latency_score,cost_score,load_score,reliability_score,quality_score,observed_at')
-        .eq('tenant_id', input.tenantId).eq('environment_id', input.environmentId).eq('portable_id', input.portableId)
-        .eq('skill_id', input.skillId).in('agent_id', [...input.agentIds])
-        .gt('expires_at', at).lte('observed_at', futureCutoff)
-        .order('observed_at', { ascending: false }).limit(Math.max(20, input.agentIds.length * 4))
-      if (error) return {}
+      const batches = await Promise.all(agentIds.map(async agentId => {
+        const { data, error } = await db.from('a2a_specialist_mesh_telemetry')
+          .select('agent_id,available,latency_score,cost_score,load_score,reliability_score,quality_score,observed_at')
+          .eq('tenant_id', input.tenantId).eq('environment_id', input.environmentId).eq('portable_id', input.portableId)
+          .eq('skill_id', input.skillId).eq('agent_id', agentId)
+          .gt('expires_at', at).lte('observed_at', futureCutoff)
+          .order('observed_at', { ascending: false })
+          .limit(1)
+        if (error) return [] as TelemetryRow[]
+        return ((data ?? []) as TelemetryRow[])
+          .filter(row => row.agent_id === agentId)
+          .filter(row => evidenceTime(row.observed_at) <= current.getTime() + 60_000)
+          .sort((a, b) => evidenceTime(b.observed_at) - evidenceTime(a.observed_at))
+          .slice(0, 1)
+      }))
       const out: Record<string, SpecialistMeshLiveSignal> = {}
-      const seen = new Set<string>()
-      const rows = ((data ?? []) as TelemetryRow[])
-        .filter(row => evidenceTime(row.observed_at) <= current.getTime() + 60_000)
-        .sort((a, b) => evidenceTime(b.observed_at) - evidenceTime(a.observed_at) || a.agent_id.localeCompare(b.agent_id))
-      for (const row of rows) {
-        if (seen.has(row.agent_id)) continue
-        seen.add(row.agent_id)
+      for (const row of batches.flat()) {
         out[row.agent_id] = Object.freeze({
           ...(typeof row.available === 'boolean' ? { available: row.available } : {}),
           ...(row.latency_score === null ? {} : { latencyScore: boundedScore(Number(row.latency_score)) }),

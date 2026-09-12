@@ -4,8 +4,9 @@ import { A2A_AGENT_REGISTRY_VERSION } from './a2a-agent-registry.ts'
 import { activatePortableA2AHost } from './a2a-host-activation.ts'
 import { createInMemoryA2ARuntimeObserver, type A2ARuntimeObservationEvent, type A2ARuntimeObservationPort } from './a2a-runtime-observability.ts'
 import type { A2ASpecialistFamilyId } from './a2a-specialist-catalog.ts'
+import type { SpecialistQualificationPort } from './cos-specialist-orchestrator.ts'
 
-export const A2A_LIVE_ACCEPTANCE_VERSION = 'signalboost-a2a-live-acceptance-v1' as const
+export const A2A_LIVE_ACCEPTANCE_VERSION = 'signalboost-a2a-live-acceptance-v2' as const
 
 export interface A2ALiveAcceptanceRecord {
   schemaVersion: typeof A2A_LIVE_ACCEPTANCE_VERSION
@@ -35,6 +36,7 @@ function required(value: unknown, name: string): string {
 export async function runA2ALiveAcceptance(options: {
   registry: A2AAgentRegistryPort
   transportFactory: A2ATransportFactory
+  qualifications: SpecialistQualificationPort
   fetchAgentCard: () => Promise<unknown>
   tenantId: string
   environmentId: string
@@ -86,6 +88,7 @@ export async function runA2ALiveAcceptance(options: {
   const activated = await activatePortableA2AHost({
     registry: options.registry,
     transportFactory: options.transportFactory,
+    qualifications: options.qualifications,
     observe: observer,
     timeoutMs: options.timeoutMs,
     now: options.now,

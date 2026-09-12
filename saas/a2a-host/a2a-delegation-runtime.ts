@@ -10,7 +10,7 @@ import {
   type A2ARuntimeObservationPort,
 } from './a2a-runtime-observability.ts'
 
-export const A2A_DELEGATION_RUNTIME_VERSION = 'signalboost-a2a-delegation-runtime-v1' as const
+export const A2A_DELEGATION_RUNTIME_VERSION = 'signalboost-a2a-delegation-runtime-v2' as const
 
 export interface A2AApprovalEvidence {
   approvalId: string
@@ -87,6 +87,22 @@ function randomId(): string {
   const cryptoLike = globalThis.crypto
   if (cryptoLike?.randomUUID) return cryptoLike.randomUUID()
   return `a2a_${Date.now()}_${Math.random().toString(36).slice(2)}`
+}
+
+const TRANSIENT_HTTP_STATUS = /a2a_http_status_(408|425|429|500|502|503|504)$/
+const NETWORK_UNAVAILABLE = /(?:fetch failed|network(?: error)?|socket hang up|econnreset|econnrefused|enotfound|eai_again|etimedout|connection reset|connection refused)/i
+
+/**
+ * Only failures that prove transport unavailability are recoverable by the specialist mesh.
+ * Protocol, auth, validation, application, response-correlation, and malformed-result errors remain terminal.
+ */
+function delegationFailure(error: unknown): { mode: 'a2a_transport_unavailable' | 'a2a_runtime_error'; message: string } {
+  const message = error instanceof Error ? error.message : 'A2A delegation failed'
+  const name = error instanceof Error ? error.name : ''
+  if (message === 'a2a_http_timeout' || TRANSIENT_HTTP_STATUS.test(message) || name === 'AbortError' || NETWORK_UNAVAILABLE.test(message)) {
+    return { mode: 'a2a_transport_unavailable', message }
+  }
+  return { mode: 'a2a_runtime_error', message }
 }
 
 export function createA2ADelegationRuntime(options: {
@@ -243,13 +259,14 @@ export function createA2ADelegationRuntime(options: {
       })
       result = Object.freeze({ ok: true, agentId: invocation.agentId, skillId: invocation.skillId, risk: skill.risk, data, mode: 'delegated' })
     } catch (error) {
+      const failure = delegationFailure(error)
       result = Object.freeze({
         ok: false,
         agentId: invocation.agentId,
         skillId: invocation.skillId,
         risk: skill.risk,
-        mode: 'a2a_runtime_error',
-        error: error instanceof Error ? error.message : 'A2A delegation failed',
+        mode: failure.mode,
+        error: failure.message,
       })
     }
 

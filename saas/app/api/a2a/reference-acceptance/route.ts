@@ -4,6 +4,7 @@ import { createA2AHttpJsonRpcTransportFactory, fetchA2AAgentCard } from '@/a2a-h
 import { runA2ALiveAcceptance } from '@/a2a-host/a2a-live-acceptance'
 import { referenceDiagnosticEndpoint } from '@/a2a-host/reference-a2a-config'
 import { REFERENCE_DIAGNOSTIC_AGENT_ID, REFERENCE_DIAGNOSTIC_SKILL_ID } from '@/a2a-host/reference-self-healing-diagnostic'
+import { createReferenceDiagnosticQualificationPort } from '@/a2a-host/reference-cos-runtime-host'
 import { requireOwner } from '@/lib/auth/access'
 
 export const runtime = 'nodejs'
@@ -46,11 +47,13 @@ export async function POST() {
   const transportFactory = createA2AHttpJsonRpcTransportFactory({
     connectionResolver: { resolve: () => ({ endpoint }) },
   })
+  const qualifications = createReferenceDiagnosticQualificationPort({ tenantId, environmentId, portableId })
 
   try {
     const record = await runA2ALiveAcceptance({
       registry,
       transportFactory,
+      qualifications,
       fetchAgentCard: async () => {
         const card = await fetchA2AAgentCard({ url: endpoint }) as Record<string, unknown>
         if (card.url !== endpoint) throw new Error('a2a_reference_agent_card_endpoint_mismatch')

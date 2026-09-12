@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityDailyLaneCadenceCore.ts
 import type { LearningPathId } from './cosUniversityLearningAssurance.ts'
 
 /**
@@ -42,11 +43,28 @@ export type CosUniversityDailyLaneCadence = Readonly<{
 export const COS_UNIVERSITY_DAILY_LANE_LEGACY_AGENT_ID = 'cos'
 
 /**
+ * A batch in which every run ended in `error` examined nothing. The runners record an execution
+ * failure as a run with status `error` and return rather than throw, so the batch-level `errors`
+ * array stays empty and `invocationSucceeded` reports true — a few seconds of provider outage would
+ * otherwise consume a whole 24-hour academic window and leave a receipt claiming the lane ran.
+ * A batch with no runs at all is untouched: that is a legitimate "nothing was due" outcome.
+ */
+export function batchExecutedNothing(evidence: Record<string, unknown> | null | undefined): boolean {
+  const runs = evidence && Array.isArray(evidence.runs) ? evidence.runs : null
+  if (!runs || runs.length === 0) return false
+  return runs.every(run => {
+    if (!run || typeof run !== 'object' || Array.isArray(run)) return false
+    return (run as Record<string, unknown>).status === 'error'
+  })
+}
+
+/**
  * A receipt counts as today's batch only if the runner really executed with the feature on and succeeded.
  * When an agentId is given (per-agent lanes), the execution must also belong to that agent.
  */
 export function isCosUniversityDailyBatchExecution(evidence: Record<string, unknown> | null | undefined, agentId?: string): boolean {
   if (!evidence) return false
+  if (batchExecutedNothing(evidence)) return false
   if (agentId !== undefined) {
     const owner = typeof evidence.agentId === 'string' && evidence.agentId ? evidence.agentId : COS_UNIVERSITY_DAILY_LANE_LEGACY_AGENT_ID
     if (owner !== agentId) return false

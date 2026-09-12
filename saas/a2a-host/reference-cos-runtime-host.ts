@@ -3,11 +3,12 @@ import { createA2AHttpJsonRpcTransportFactory } from './a2a-http-jsonrpc-transpo
 import { createPortableA2AHost, type PortableA2AHost } from './portable-a2a-host.ts'
 import { referenceDiagnosticEndpoint } from './reference-a2a-config.ts'
 import type { A2ASpecialistFamilyId } from './a2a-specialist-catalog.ts'
+import type { SpecialistQualificationPort } from './cos-specialist-orchestrator.ts'
 
 export const REFERENCE_COS_A2A_HOST_VERSION = 'signalboost-reference-cos-a2a-host-v2' as const
 export const REFERENCE_DIAGNOSTIC_AGENT_ID = 'signalboost-reference-self-healing-diagnostic' as const
 const REFERENCE_TRANSPORT_REF = 'signalboost-reference-https-jsonrpc' as const
-const REFERENCE_QUALIFICATION_EVIDENCE = 'signalboost-reference:self-healing.diagnose:v1' as const
+export const REFERENCE_QUALIFICATION_EVIDENCE = 'signalboost-reference:self-healing.diagnose:v1' as const
 
 export interface ExactA2AScope {
   tenantId: string
@@ -23,6 +24,21 @@ function exact(value: string, name: string): string {
 
 export function isReferenceDiagnosticPlan(plan: { familyId?: unknown; skillId?: unknown } | null | undefined): boolean {
   return String(plan?.familyId ?? '') === 'self-healing-diagnostic' && String(plan?.skillId ?? '') === 'self-healing.diagnose'
+}
+
+/** Host-owned qualification proof for the SignalBoost reference diagnostic specialist. */
+export function createReferenceDiagnosticQualificationPort(scope: ExactA2AScope): SpecialistQualificationPort {
+  const tenantId = exact(scope.tenantId, 'tenantId')
+  const environmentId = exact(scope.environmentId, 'environmentId')
+  const portableId = exact(scope.portableId, 'portableId')
+  return Object.freeze({
+    async snapshot(input) {
+      if (input.tenantId !== tenantId || input.environmentId !== environmentId || input.portableId !== portableId || input.skillId !== 'self-healing.diagnose') return {}
+      return input.agentIds.includes(REFERENCE_DIAGNOSTIC_AGENT_ID)
+        ? { [REFERENCE_DIAGNOSTIC_AGENT_ID]: { qualified: true, evidenceRef: REFERENCE_QUALIFICATION_EVIDENCE } }
+        : {}
+    },
+  })
 }
 
 /**
@@ -74,14 +90,7 @@ export function createReferenceCOSA2AHost(scope: ExactA2AScope, env: NodeJS.Proc
     registry,
     transportFactory,
     timeoutMs: 10_000,
-    qualifications: {
-      async snapshot(input) {
-        if (input.tenantId !== tenantId || input.environmentId !== environmentId || input.portableId !== portableId || input.skillId !== 'self-healing.diagnose') return {}
-        return input.agentIds.includes(REFERENCE_DIAGNOSTIC_AGENT_ID)
-          ? { [REFERENCE_DIAGNOSTIC_AGENT_ID]: { qualified: true, evidenceRef: REFERENCE_QUALIFICATION_EVIDENCE } }
-          : {}
-      },
-    },
+    qualifications: createReferenceDiagnosticQualificationPort({ tenantId, environmentId, portableId }),
   })
 }
 

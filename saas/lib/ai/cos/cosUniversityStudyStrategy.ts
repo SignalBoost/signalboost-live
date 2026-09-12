@@ -380,6 +380,20 @@ export function universityStudyGapSignal(input: {
   }
 }
 
+/**
+ * Study themes for a whole-language plan. A plan with no dimension previously carried no themes at
+ * all, so its acquisition query fell back to the subject plus the generic "what verified knowledge
+ * would let COS handle X locally" question, and relevance was scored against that boilerplate. In
+ * production that produced 733 of 883 Portuguese documents rejected as not relevant, with nothing
+ * ever accepted. Taking the leading theme of each dimension keeps the terms inside the existing
+ * curriculum rather than inventing a vocabulary list.
+ */
+function wholeLanguageStudyThemes(): string[] {
+  return Object.values(LANGUAGE_DIMENSION_STUDY_THEMES)
+    .map(themes => themes?.[0])
+    .filter((theme): theme is string => Boolean(theme))
+}
+
 export function platformLanguageStudyGapSignal(input: {
   planKey: string
   language: CosPlatformLanguage
@@ -387,12 +401,16 @@ export function platformLanguageStudyGapSignal(input: {
   objective: string
   strategy: CosUniversityStudyStrategy
   repeatedCount?: number
+  studyVariant?: number
 }): KnowledgeGapSignal {
   const language = COS_PLATFORM_LANGUAGES.find(item => item.id === input.language)
   if (!language) throw new Error(`Unknown platform language: ${input.language}`)
   const dimension = input.dimension || null
   const dimensionLabel = dimension ? LANGUAGE_DIMENSION_LABELS[dimension] : null
-  const studyThemes = dimension ? LANGUAGE_DIMENSION_STUDY_THEMES[dimension] : []
+  const baseThemes = dimension ? LANGUAGE_DIMENSION_STUDY_THEMES[dimension] : wholeLanguageStudyThemes()
+  const offset = baseThemes.length ? Math.abs(Math.floor(Number(input.studyVariant || 0))) % baseThemes.length : 0
+  const rotatedThemes = [...baseThemes.slice(offset), ...baseThemes.slice(0, offset)]
+  const studyThemes = rotatedThemes.map(theme => `${language.title} ${theme}`)
   return {
     taskId: `university-language:${input.planKey}`,
     subject: dimensionLabel ? `${language.title} ${dimensionLabel}` : `${language.title} language and communication`,
@@ -401,7 +419,10 @@ export function platformLanguageStudyGapSignal(input: {
     confidence: 0,
     escalated: true,
     succeeded: false,
-    ...(dimension ? { missingFacts: studyThemes.map(theme => `${language.title} ${theme}`) } : {}),
+    // Acquisition searches the language and what is being studied about it, never the boilerplate
+    // question; evaluation still uses the complete subject and question, unchanged.
+    discoveryQuery: [language.title, ...rotatedThemes.slice(0, 2)].join(' '),
+    ...(studyThemes.length ? { missingFacts: studyThemes } : {}),
     repeatedCount: Math.max(1, Math.floor(Number(input.repeatedCount || 1))),
     evidence: [
       'cos_university_continuous_learning',

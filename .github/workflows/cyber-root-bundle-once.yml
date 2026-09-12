@@ -1,0 +1,34 @@
+name: Cyber root dependency bundle
+on:
+  push:
+    branches: ['prep/cyber-root-patches-20260911']
+permissions:
+  contents: write
+jobs:
+  prepare:
+    if: github.repository == 'SignalBoost/signalboost-live' && github.ref == 'refs/heads/prep/cyber-root-patches-20260911'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Prepare and verify root dependency files only
+        run: node .github/cyber-root-bundle-once.mjs prepare
+      - name: Upload verified unreachable Git blobs only
+        run: node .github/cyber-root-bundle-once.mjs upload
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cyber-root-bundle-${{ github.run_id }}
+          path: .cyber-root-bundle/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7

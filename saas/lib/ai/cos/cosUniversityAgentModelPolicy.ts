@@ -10,17 +10,22 @@ import { currentPlatformModelTopology } from './platformIdentityContext.ts'
  * and `word_limit_exceeded` — coverage and instruction-following, not software.
  *
  * Hybrid: work inside the agent's registered domain runs on that domain's model; everything else —
- * the generalist foundation, languages, retention — runs on the platform reasoner. The agent's
- * identity, provenance and academic authority are unchanged; only the engine behind one answer moves.
+ * the generalist foundation, languages, retention — runs on the platform reasoner. Non-credit
+ * deliberate practice may use a cheaper managed open model, but independent exams never do.
+ * The agent's identity, provenance and academic authority are unchanged; only the engine behind one
+ * non-credit training answer moves.
  *
- * Neither model is ever substituted silently. An unset variable raises, as the builder model already
- * does, so a misconfiguration is visible to the operator instead of quietly changing who answered.
+ * Neither graded model is ever substituted silently. An unset variable raises, as the builder model
+ * already does, so a misconfiguration is visible to the operator instead of quietly changing who
+ * answered an independent assessment.
  */
 
 export type AgentWorkDomain = 'role_domain' | 'generalist'
+export type AgentWorkPurpose = 'assessment' | 'practice'
 
 export const PRIMARY_REASONER_NOT_CONFIGURED = 'primary_reasoner_model_not_configured'
 export const BUILDER_MODEL_NOT_CONFIGURED_FOR_ROLE = 'builder_model_not_configured'
+export const DEEPINFRA_ECONOMY_PRACTICE_MODEL = 'deepseek-ai/DeepSeek-V4-Flash-0731'
 
 /**
  * University subjects that belong to a registered role's own field. A role absent from this map has
@@ -42,6 +47,28 @@ export function agentWorkDomain(role: string | null | undefined, subjectId?: str
   return domainSubjects?.includes(subject) ? 'role_domain' : 'generalist'
 }
 
+function isDeepInfraRuntime(): boolean {
+  const explicit = process.env.LOCAL_AI_MANAGED_PROVIDER?.trim().toLowerCase()
+  if (explicit === 'deepinfra') return true
+  try {
+    const host = new URL(process.env.LOCAL_AI_BASE_URL || '').hostname.toLowerCase()
+    return host === 'api.deepinfra.com' || host.endsWith('.deepinfra.com')
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Economy routing is training-only. Operators may set UNIVERSITY_PRACTICE_MODEL explicitly; when
+ * the configured managed runtime is DeepInfra, the default is its low-cost Flash model. Self-hosted
+ * or other managed runtimes keep their existing model unless an explicit practice model is supplied.
+ */
+export function universityPracticeModelFromEnv(): string | null {
+  const explicit = String(process.env.UNIVERSITY_PRACTICE_MODEL ?? '').trim()
+  if (explicit) return explicit
+  return isDeepInfraRuntime() ? DEEPINFRA_ECONOMY_PRACTICE_MODEL : null
+}
+
 /**
  * Resolves the model for one piece of work. `roleModel` is supplied by the caller so this module
  * stays free of any particular role's configuration lookup.
@@ -49,7 +76,12 @@ export function agentWorkDomain(role: string | null | undefined, subjectId?: str
 export function modelForAgentWork(input: {
   domain: AgentWorkDomain
   roleModel: string | null | undefined
+  purpose?: AgentWorkPurpose
 }): string {
+  if (input.purpose === 'practice') {
+    const practiceModel = universityPracticeModelFromEnv()
+    if (practiceModel) return practiceModel
+  }
   if (input.domain === 'role_domain') {
     const model = String(input.roleModel ?? '').trim()
     if (!model) throw new Error(BUILDER_MODEL_NOT_CONFIGURED_FOR_ROLE)

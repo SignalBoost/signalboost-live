@@ -294,13 +294,28 @@ async function discoverBrave(fetcher: FetchLike, query: string, count: number, a
   })).filter((row: SearchHit) => isSafePublicWebTrainingUrl(row.url))
 }
 
+// Every empty return below is indistinguishable downstream, and in Production this stage discards
+// 100% of the credible pages discovery finds. Name the branch that emptied so the fix targets the
+// actual cause instead of the outcome; the reason is logged, never returned into learning material.
+function reportUnreadablePage(url: string, reason: string, detail: Record<string, unknown> = {}): '' {
+  console.warn('cosWebTraining: page not readable', { url: url.slice(0, 160), reason, ...detail })
+  return ''
+}
+
 async function readTrainingPage(fetcher: FetchLike, hit: SearchHit): Promise<string> {
   const { text: raw, contentType } = await requestText(fetcher, hit.url,
     { headers: { accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,application/xml;q=0.7', 'user-agent': 'iTMounts-COS/1.0' } }, 12_000)
-  if (contentType && !/(?:text\/html|application\/xhtml\+xml|text\/plain|application\/xml|text\/xml)/i.test(contentType)) return ''
+  if (contentType && !/(?:text\/html|application\/xhtml\+xml|text\/plain|application\/xml|text\/xml)/i.test(contentType)) {
+    return reportUnreadablePage(hit.url, 'content_type_rejected', { contentType, rawLength: raw.length })
+  }
   const text = stripHtml(raw.slice(0, MAX_RAW_PAGE_CHARS))
-  if (/\b(?:access denied|temporarily unavailable|technical difficulties|enable javascript to continue)\b/i.test(text.slice(0, 1500))) return ''
-  return text.length >= MIN_READABLE_PAGE_CHARS ? text.slice(0, MAX_RETAINED_PAGE_CHARS) : ''
+  if (/\b(?:access denied|temporarily unavailable|technical difficulties|enable javascript to continue)\b/i.test(text.slice(0, 1500))) {
+    return reportUnreadablePage(hit.url, 'blocked_or_js_required', { rawLength: raw.length, textLength: text.length })
+  }
+  if (text.length < MIN_READABLE_PAGE_CHARS) {
+    return reportUnreadablePage(hit.url, 'below_minimum_readable', { rawLength: raw.length, textLength: text.length, minimum: MIN_READABLE_PAGE_CHARS })
+  }
+  return text.slice(0, MAX_RETAINED_PAGE_CHARS)
 }
 
 export function createWebTrainingResearchSearch(options: WebTrainingSearchOptions = {}): LearningConnectorSearch {
@@ -356,7 +371,13 @@ export function createWebTrainingResearchSearch(options: WebTrainingSearchOption
             ...(entry.hit.sourceDate ? [`source_date=${entry.hit.sourceDate}`] : []),
           ],
         }
-      } catch {
+      } catch (error) {
+        // A throw here is a transport failure (DNS, TLS, timeout, non-2xx) and was previously
+        // indistinguishable from a page that simply read short.
+        console.warn('cosWebTraining: page fetch failed', {
+          url: entry.hit.url.slice(0, 160),
+          error: error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200),
+        })
         return null
       }
     }))

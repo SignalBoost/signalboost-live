@@ -1,3 +1,5 @@
+import { isUniversitySpecialistRuntime } from './cosUniversitySpecialistRuntimes.ts'
+
 /** Host-owned projection of public response-constraint failures. Never return arbitrary scorer text. */
 export type UniversityPublicExamFeedback = 'response_length' | 'undisclosed_response_length'
 export type UniversityExamFeedbackIdentity = Readonly<{ agentId: string; runId: string }>
@@ -23,7 +25,7 @@ export function publicUniversityExamFeedback(
     || row.local_model_invoked !== true || row.external_ai_invoked !== false) return null
   const completed = typeof row.completed_at === 'string' ? Date.parse(row.completed_at) : Number.NaN
   if (!Number.isFinite(completed) || completed > now.getTime()) return null
-  if (expected.agentId !== 'cos' && row.response_source !== 'university_software_specialist_v1') return null
+  if (expected.agentId !== 'cos' && !isUniversitySpecialistRuntime(row.response_source)) return null
   if (expected.agentId === 'cos' && row.response_source !== 'local_cos_reasoning') return null
   if (!Array.isArray(row.reasons) || row.reasons.length > 64 || !row.reasons.every(reason => typeof reason === 'string')) return null
   if (!row.reasons.includes('word_limit_exceeded')) return null

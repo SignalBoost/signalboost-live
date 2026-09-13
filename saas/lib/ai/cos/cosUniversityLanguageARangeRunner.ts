@@ -8,7 +8,7 @@ import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseSt
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
-import { SOFTWARE_CAPSTONE_RUNTIME, type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
+import type { AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { type CosUniversityAssessmentKind } from './cosUniversity.ts'
@@ -349,15 +349,11 @@ async function recordStageAssessments(args: {
 async function syncVerifiedLanguageProductionOutcomes(agentId: string, now: Date): Promise<{ candidates: number; recorded: number }> {
   const db = cosServiceDb()
   if (!db) return { candidates: 0, recorded: 0 }
-  // Specialist outcomes carry a host-written agent segment:
-  // production_verified:language:<agentId>:<language>:<dimension>.
-  // COS retains its historical production_verified:language:<language>:<dimension> form.
   const sourcePrefix = agentId === AGENT_ID
     ? 'production_verified:language:'
     : `production_verified:language:${agentId}:`
   const outcomesQuery = db.from('cos_turn_outcomes')
     .select('turn_id,verified_success,repair_needed,escalated,outcome_source,outcome_at')
-  // COS keeps its exact historical filter; other agents read only their own host-tagged namespace.
   const scopedQuery = agentId === AGENT_ID
     ? outcomesQuery.like('outcome_source', 'production_verified:language:%')
     : outcomesQuery.like('outcome_source', `${sourcePrefix}%`)
@@ -552,12 +548,9 @@ async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: D
   let handled = false
   let executionProvenance: AgentCapstoneExecution | null = null
 
-  // A registered agent with its own bound executor answers as itself, in the exam language, through
-  // its assigned model. COS keeps its existing reasoner path unchanged.
   if (agentId !== AGENT_ID) {
     let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
     try {
-      // A language assessment is never a role's own field, whatever the role.
       bound = await executeBoundAgentExam(
         { agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: exam.prompt },
         { domain: 'generalist' },
@@ -571,7 +564,7 @@ async function executeExamRun(agentId: string, row: LanguageARangeRunRow, now: D
     }
     reply = bound.reply
     turnId = execution.turnId
-    responseSource = SOFTWARE_CAPSTONE_RUNTIME
+    responseSource = execution.runtime
     localModelInvoked = true
     handled = true
     executionProvenance = execution
@@ -656,9 +649,6 @@ export async function runCosUniversityLanguageARangeBatch(options: { now?: Date;
     errors.push(`production_bridge:${error instanceof Error ? error.message : String(error)}`)
   }
 
-  // Agent-tagged verified Production language outcomes above are that agent's own real work and stay.
-  // Transfer and capstone exams below answer through COS's reasoner, so they fail closed.
-  // COS uses its own reasoner; any other agent needs its own bound executor before it can be graded.
   let blocked = cosUniversityAcademicExecutionBlocker(agentId)
   if (blocked && await hasBoundAcademicExecutor(agentId).catch(() => false)) blocked = null
   if (blocked) {

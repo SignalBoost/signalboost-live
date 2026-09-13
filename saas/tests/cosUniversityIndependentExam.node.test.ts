@@ -50,13 +50,24 @@ function academicRow(key: string): CosUniversityAssessmentRow {
 test('every undergraduate subject has a deterministic server-seeded unseen exam', () => {
   const seed = '12345678-1234-4234-8234-123456789abc'
   const exams = COS_UNIVERSITY_SUBJECTS.map(subject => buildCosUniversityBlindExam(seed, { kind: 'subject', subjectId: subject.id }))
-  assert.equal(exams.length, 13)
+  assert.equal(exams.length, 14)
   assert.ok(exams.every(exam => exam.profile === COS_UNIVERSITY_EXAM_PROFILE))
   assert.ok(exams.every(exam => exam.scorerVersion === COS_UNIVERSITY_EXAM_SCORER))
   assert.ok(exams.every(exam => exam.assessmentKind === 'unseen_subject_exam'))
   assert.ok(exams.every(exam => exam.prompt.length > 80))
-  assert.equal(new Set(exams.map(exam => exam.caseId)).size, 13)
-  assert.equal(new Set(exams.map(exam => exam.manifestHash)).size, 13)
+  assert.equal(new Set(exams.map(exam => exam.caseId)).size, 14)
+  assert.equal(new Set(exams.map(exam => exam.manifestHash)).size, 14)
+})
+
+test('Quantum Computing receives a quantum exam rather than the generic reasoning fallback', () => {
+  const exam = buildCosUniversityBlindExam('12345678-1234-4234-8234-123456789abc', { kind: 'subject', subjectId: 'quantum_computing' })
+  assert.match(exam.title, /Quantum Computing/)
+  assert.match(exam.prompt, /Hadamard/)
+  assert.match(exam.prompt, /CNOT/)
+  assert.match(exam.prompt, /quantum advantage/)
+  assert.match(exam.prompt, /decoherence/)
+  assert.doesNotMatch(exam.prompt, /red widgets/)
+  assert.equal(universityExamValidityDays({ kind: 'subject', subjectId: 'quantum_computing' }), 180)
 })
 
 test('fresh seeds alter hidden exam manifests instead of recycling one fixture', () => {
@@ -129,6 +140,7 @@ test('durable transcript requires two fresh independent unseen passes before B',
 test('recertification windows decay faster for current technical/governance domains than slow fundamentals', () => {
   assert.equal(universityExamValidityDays({ kind: 'subject', subjectId: 'cybersecurity' }), 90)
   assert.equal(universityExamValidityDays({ kind: 'subject', subjectId: 'mathematics' }), 365)
+  assert.equal(universityExamValidityDays({ kind: 'subject', subjectId: 'quantum_computing' }), 180)
   assert.equal(universityExamValidityDays({ kind: 'language', language: 'pl', dimension: 'writing' }), 120)
 })
 

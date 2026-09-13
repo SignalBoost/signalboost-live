@@ -207,6 +207,27 @@ function subjectExam(seed: string, subjectId: CosUniversitySubjectId): CosUniver
     })
   }
 
+  if (subjectId === 'quantum_computing') {
+    const extraQubits = integer(seed, 'quantum:extra-qubits', 1, 5)
+    return finishExam({ ...base,
+      prompt: `UNSEEN UNIVERSITY EXAM. Use only this packet and standard quantum-computing concepts. A ${2 + extraQubits}-qubit register starts in |0...0>. On the first two qubits, apply a Hadamard gate to qubit 0 followed by a CNOT with qubit 0 as control and qubit 1 as target. The remaining qubits are untouched. Explain the ideal relationship between the first two measured bits, distinguish superposition from entanglement, and explain why repeated hardware measurements plus a classical baseline are required before claiming practical quantum advantage. State one effect of noise or decoherence and one error-mitigation, error-correction, or fault-tolerance direction.`,
+      rubric: {
+        requiredGroups: [
+          ['hadamard', 'superposition'],
+          ['cnot', 'controlled-not', 'controlled not'],
+          ['entangl', 'correlat'],
+          ['00', '11'],
+          ['measurement', 'shots', 'repeated'],
+          ['classical baseline', 'classical comparison', 'benchmark'],
+          ['noise', 'decoherence'],
+          ['error correction', 'error mitigation', 'fault tolerance'],
+        ],
+        forbiddenTerms: ['proves quantum advantage', 'guaranteed quantum advantage'],
+        maxWords: 320,
+      },
+    })
+  }
+
   if (subjectId === 'cybersecurity') {
     const count = integer(seed, 'cyber:count', 4, 11)
     return finishExam({ ...base,
@@ -534,7 +555,7 @@ export function selectCosUniversityExamTargets(
 export function universityExamValidityDays(target: CosUniversityExamTarget): number {
   if (target.kind === 'language') return 120
   if (target.subjectId === 'mathematics' || target.subjectId === 'history_culture_philosophy_religion') return 365
-  if (target.subjectId === 'physics_natural_sciences' || target.subjectId === 'statistics_data_science' || target.subjectId === 'social_behavioral_sciences' || target.subjectId === 'reasoning_decision_science') return 180
+  if (target.subjectId === 'physics_natural_sciences' || target.subjectId === 'quantum_computing' || target.subjectId === 'statistics_data_science' || target.subjectId === 'social_behavioral_sciences' || target.subjectId === 'reasoning_decision_science') return 180
   if (target.subjectId === 'business_operations' || target.subjectId === 'economics_finance' || target.subjectId === 'language_communication') return 120
   return 90
 }

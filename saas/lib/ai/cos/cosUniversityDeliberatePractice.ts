@@ -35,6 +35,7 @@ const SUBJECT_TERMS: Record<CosUniversitySubjectId, readonly string[]> = {
   mathematics: ['model', 'constraint', 'equation', 'quantitative', 'optimization'],
   statistics_data_science: ['measurement', 'uncertainty', 'sample', 'confidence', 'statistical'],
   physics_natural_sciences: ['physical', 'scientific', 'experiment', 'energy', 'measurement'],
+  quantum_computing: ['qubit', 'quantum', 'circuit', 'measurement', 'error correction'],
   cybersecurity: ['security', 'identity', 'threat', 'containment', 'evidence'],
   politics_government_international_relations: ['policy', 'government', 'diplomatic', 'international', 'geopolitical'],
   social_behavioral_sciences: ['behavior', 'people', 'human', 'organization', 'stakeholder'],
@@ -256,6 +257,14 @@ function genericPrompt(args: {
   const factA = integer(args.seed, 'fact-a', 17, 79)
   const factB = integer(args.seed, 'fact-b', 3, 16)
   const title = cosUniversitySubjectById(args.subjectId).title
+
+  if (args.subjectId === 'quantum_computing') {
+    const qubits = integer(args.seed, 'quantum:qubits', 4, 12)
+    const depth = integer(args.seed, 'quantum:depth', 20, 80)
+    const packet = `${project} is evaluating a ${qubits}-qubit variational circuit with depth ${depth}. A simulator baseline exists, but hardware noise, calibration drift, and any practical advantage over the classical baseline have not been established. Measurement results vary across repeated hardware runs.`
+    const prompt = `HOST-CURATED UNIVERSITY PRACTICE — variant ${args.variantIndex + 1}. ${packet} Primary discipline: ${title}. Current learning objective: ${clean(args.objective, 1200)}. Explain the roles of qubits, circuit depth, measurement, noise/decoherence, and error mitigation or correction. Separate what the packet establishes from what remains unknown, identify a fair quantum-versus-classical benchmark, and state the next verification needed before claiming quantum advantage.`
+    return { project, factA: qubits, factB: depth, prompt }
+  }
 
   if (args.subjectId === 'history_culture_philosophy_religion') {
     const period = choose(args.seed, 'humanities:period', ['postwar', 'industrial-era', 'late-twentieth-century', 'decolonization-era'] as const)

@@ -98,6 +98,7 @@ const DOMAIN_TERMS: Record<CosUniversitySubjectId, readonly string[]> = {
   mathematics: ['model', 'equation', 'optimization', 'constraint', 'quantitative'],
   statistics_data_science: ['uncertainty', 'sample', 'confidence', 'measurement', 'statistical'],
   physics_natural_sciences: ['physical', 'energy', 'material', 'scientific', 'experiment'],
+  quantum_computing: ['qubit', 'quantum', 'circuit', 'measurement', 'error correction'],
   cybersecurity: ['security', 'threat', 'vulnerability', 'identity', 'containment'],
   politics_government_international_relations: ['government', 'policy', 'geopolitical', 'diplomatic', 'international'],
   social_behavioral_sciences: ['behavior', 'people', 'organization', 'human', 'stakeholder'],

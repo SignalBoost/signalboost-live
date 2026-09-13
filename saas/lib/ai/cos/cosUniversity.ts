@@ -10,6 +10,7 @@ export type CosUniversitySubjectId =
   | 'mathematics'
   | 'statistics_data_science'
   | 'physics_natural_sciences'
+  | 'quantum_computing'
   | 'cybersecurity'
   | 'politics_government_international_relations'
   | 'social_behavioral_sciences'
@@ -51,6 +52,12 @@ export const COS_UNIVERSITY_SUBJECTS: ReadonlyArray<CosUniversitySubject> = [
     title: 'Physics & Natural Sciences',
     objective: 'Apply scientific method, physical reasoning, and evidence discipline across natural sciences and engineering fundamentals.',
     studyThemes: ['physics and mechanics', 'chemistry and biology fundamentals', 'scientific method', 'materials energy optics and sensing', 'scientific computing'],
+  },
+  {
+    id: 'quantum_computing',
+    title: 'Quantum Computing',
+    objective: 'Reason rigorously about quantum information and computation, distinguish physical capability from hype, and design or evaluate quantum-classical approaches with explicit evidence and limits.',
+    studyThemes: ['qubits gates circuits and measurement', 'quantum algorithms and complexity', 'entanglement interference and quantum information', 'noise decoherence error correction and fault tolerance', 'quantum hardware modalities and control', 'hybrid quantum-classical workflows and benchmarking', 'quantum cryptography and post-quantum implications'],
   },
   {
     id: 'cybersecurity',
@@ -125,7 +132,8 @@ const SUBJECT_RULES: ReadonlyArray<{ id: CosUniversitySubjectId; match: RegExp }
   { id: 'computer_science', match: /\b(code|coding|software|program(?:ming)?|algorithms?|data structures?|databases?|distributed systems?|operating systems?|apis?|devops|debug(?:ging)?|typescript|javascript|python|next\.?js|architecture|latenc(?:y|ies)|observability|computer science)\b/i },
   { id: 'mathematics', match: /\b(algebra|calculus|linear algebra|discrete math(?:ematics)?|optimization|numerical|equations?|geometry|matri(?:x|ces)|vectors?|mathematics?)\b/i },
   { id: 'statistics_data_science', match: /\b(statistic(?:s|al)?|probability|inference|experiment(?:al|ation)?|forecast(?:ing)?|causal|data science|regression|distributions?|percentiles?|p50|p90|p95|p99|measurement)\b/i },
-  { id: 'physics_natural_sciences', match: /\b(physics|chemistry|biology|scientific method|mechanics?|gravity|optics?|semiconductors?|quantum|energy|astronomy|astrophysics|space science|materials?|photonics?|natural sciences?)\b/i },
+  { id: 'physics_natural_sciences', match: /\b(physics|chemistry|biology|scientific method|mechanics?|gravity|optics?|semiconductors?|energy|astronomy|astrophysics|space science|materials?|photonics?|natural sciences?)\b/i },
+  { id: 'quantum_computing', match: /\b(quantum computing|quantum computer|qubits?|quantum gates?|quantum circuits?|quantum algorithms?|quantum information|quantum error correction|fault[- ]tolerant quantum|quantum supremacy|quantum advantage|quantum anneal(?:ing)?|qaoa|vqe|shor(?:'s)? algorithm|grover(?:'s)? algorithm|post[- ]quantum|quantum cryptograph(?:y|ic)|decoherence|superconducting qubits?|trapped ions?|neutral atoms?)\b/i },
   { id: 'cybersecurity', match: /\b(cyber|cybersecurity|security|vulnerab(?:ility|ilities|le)|threats?|incident response|cryptograph(?:y|ic)|authentication|authorization|secure coding|network security|identity security)\b/i },
   { id: 'politics_government_international_relations', match: /\b(politic(?:s|al)?|governments?|geopolit(?:ics|ical|ically)|diplom(?:acy|atic|atically)|international relations?|public policy|state behavior|elections?|foreign policy|international organizations?)\b/i },
   { id: 'social_behavioral_sciences', match: /\b(psycholog(?:y|ical)|sociolog(?:y|ical)|anthropolog(?:y|ical)|behavioral|organisational behavior|organizational behavior|social systems?|group behavior|human factors|cognitive science)\b/i },

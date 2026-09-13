@@ -9,7 +9,7 @@
 // Keep materially different constructs, populations, denominators, time windows distinct.
 // Synthesize the strongest relevant evidence into the answer without hard-coded verdicts.
 
-export * from './cosFreshGroundingBase'
+export * from './cosFreshGroundingBase.ts'
 
 import {
   freshEvidenceGroundingBlock as baseFreshEvidenceGroundingBlock,
@@ -18,7 +18,7 @@ import {
   freshEvidenceSearchQueries as baseFreshEvidenceSearchQueries,
   freshEvidenceSearchQuery,
   type FreshEvidenceSource,
-} from './cosFreshGroundingBase'
+} from './cosFreshGroundingBase.ts'
 
 const EVALUATIVE_RANKING = /\b(?:best|greatest|top|worst|worse|most\s+successful|least\s+successful|rank(?:ing|ings|ed)?|overrated|underrated|melhor|maior|pior|mais\s+bem[- ]?sucedid[oa]|mejor|peor|m[aá]s\s+exitos[oa]|najlepsz\w*|najgorsz\w*|ranking\w*|лучший|лучшая|лучшие|худший|худшая|рейтинг\w*)\b/iu
 const OFFICE_OR_EXECUTIVE_ROLE = /\b(?:president|vice\s+president|prime\s+minister|premier|chancellor|governor|mayor|secretary\s+of\s+state|attorney\s+general|speaker|minister|monarch|king|queen|pope|chief\s+executive\s+officer|ceo|chief\s+financial\s+officer|cfo|chief\s+information\s+officer|cio|chief\s+technology\s+officer|cto|chair(?:man|woman)?)\b/i

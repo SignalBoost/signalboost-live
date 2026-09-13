@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityPracticeExecution.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
 import { universityPracticeModelFromEnv } from './cosUniversityAgentModelPolicy.ts'
@@ -104,14 +105,16 @@ export async function executeUniversityPractice(
     || !isBoundSoftwareCapstoneEvidence(execution, {
       id: request.runId, agent_id: request.agentId, manifest_hash: request.manifestHash,
       turn_id: execution.turnId,
-    }, SOFTWARE_CAPSTONE_ROLE)
+      // Verify against the role the receipt itself declares, so a cybersecurity specialist is
+      // checked as cybersecurity rather than against software's constants.
+    }, execution.role)
     || execution.responseHash !== createHash('sha256').update(reply).digest('hex')) {
     throw new Error('university_practice_execution_binding_invalid')
   }
   return {
     text: reply, turnId: execution.turnId,
-    reasoner: { kind: SOFTWARE_CAPSTONE_RUNTIME, label: execution.model },
-    responseSource: SOFTWARE_CAPSTONE_RUNTIME,
+    reasoner: { kind: execution.runtime, label: execution.model },
+    responseSource: execution.runtime,
     executionProvenance: execution,
   }
 }

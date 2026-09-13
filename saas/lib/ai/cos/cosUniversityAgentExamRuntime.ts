@@ -9,17 +9,25 @@ import { enforceUniversityPracticeCostGuard } from './cosUniversityPracticeBudge
 import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import { currentUniversityPracticeModelOverride } from './cosUniversityPracticeModelContext.ts'
 import {
-  executeBoundSoftwareCapstone,
-  isBoundSoftwareCapstoneEvidence,
-  isSoftwareCapstoneIdentity,
   selectAgentCapstoneProcedures,
+  SOFTWARE_CAPSTONE_ROLE,
   type AgentCapstoneRequest,
 } from './cosUniversityAgentCapstone.ts'
+import {
+  executeBoundRegisteredSpecialist,
+  isBoundRegisteredSpecialistEvidence,
+  isRegisteredSpecialistIdentity,
+  type BoundAgentExecution,
+  type CosUniversitySpecialistRole,
+} from './cosUniversityRegisteredSpecialistExecutor.ts'
+
+export const COS_UNIVERSITY_ROLE_MODELS_SETTING_KEY = 'cos_university_role_models'
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,179}$/
 
 /**
- * Independent exams executed as the registered learner, not as the COS generalist. This reuses the
- * host-owned bound executor and its identity/provenance contract exactly; only the case text differs,
- * so an exam answer carries the same verifiable execution identity as a bound capstone.
+ * Independent exams executed as the registered learner, not as the COS generalist. Software keeps
+ * its historical executor identity; every other declared specialist role uses the generic bound
+ * executor with the same exact learner/run/manifest/turn provenance contract.
  */
 export async function loadAgentOwnProcedures(agentId: string): Promise<string[]> {
   const db = cosServiceDb()
@@ -34,27 +42,66 @@ export async function loadAgentOwnProcedures(agentId: string): Promise<string[]>
   return selectAgentCapstoneProcedures(result.data || [], agentId)
 }
 
-/** True only for an agent that has its own bound executor for graded University work. */
+function roleModelFromSetting(value: unknown, role: CosUniversitySpecialistRole): string | null {
+  const root = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+  const nested = root.models && typeof root.models === 'object' && !Array.isArray(root.models)
+    ? root.models as Record<string, unknown>
+    : root
+  const raw = typeof nested[role] === 'string' ? String(nested[role]).trim() : ''
+  if (!raw) return null
+  if (!MODEL_ID.test(raw)) throw new Error(`university_role_model_invalid:${role}`)
+  return raw
+}
+
+async function readRoleDomainModel(role: CosUniversitySpecialistRole): Promise<string> {
+  if (role === SOFTWARE_CAPSTONE_ROLE) return requireBuilderCodingModel()
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const result = await db.from('system_settings')
+    .select('value')
+    .eq('key', COS_UNIVERSITY_ROLE_MODELS_SETTING_KEY)
+    .maybeSingle()
+  if (result.error) throw result.error
+  const model = roleModelFromSetting(result.data?.value ?? null, role)
+  if (!model) throw new Error(`university_role_model_not_configured:${role}`)
+  return model
+}
+
+/** True only for a registered non-COS specialist identity. Model availability is checked at dispatch. */
 export async function hasBoundAcademicExecutor(agentId: string): Promise<boolean> {
-  if (!agentId.trim() || agentId === 'cos') return false
-  return isSoftwareCapstoneIdentity(agentId, await readCosUniversityAgentRole(agentId))
+  const id = agentId.trim()
+  if (!id || id === 'cos') return false
+  return isRegisteredSpecialistIdentity(id, await readCosUniversityAgentRole(id))
+}
+
+export function isBoundAgentExecutionEvidence(
+  value: unknown,
+  expected: { id?: string; agent_id: string; manifest_hash?: string; turn_id: string | null },
+  role: unknown,
+  now = new Date(),
+): boolean {
+  return isBoundRegisteredSpecialistEvidence(value, expected, role, now)
 }
 
 export async function executeBoundAgentExam(
   request: AgentCapstoneRequest,
   /**
    * The University subject this work belongs to, when the caller knows it. Work inside the agent's
-   * registered domain runs on its role model; the generalist foundation, languages and retention run
-   * on the platform reasoner. Callers that pass nothing get generalist routing, which is the safe
-   * direction: a specialist never answers outside its field on a model tuned for that field.
+   * registered domain runs on its explicitly configured role model; the common foundation,
+   * languages and retention run on the platform reasoner. Graduate specialization may pass
+   * `domain: 'role_domain'` directly.
    */
   work?: { subjectId?: string | null; domain?: AgentWorkDomain },
   /** Host-resolved, buyer-controlled override for non-credit practice only. */
   practiceModelOverride?: string | null,
-) {
+): Promise<{ reply: string; execution: BoundAgentExecution }> {
   await enforceUniversityPracticeCostGuard(request)
+  const role = await readCosUniversityAgentRole(request.agentId)
+  if (!isRegisteredSpecialistIdentity(request.agentId, role)) {
+    throw new Error('agent_capstone_runtime_unavailable')
+  }
   const config = localInferenceConfigFromEnv()
-  const domain = work?.domain ?? agentWorkDomain(await readCosUniversityAgentRole(request.agentId), work?.subjectId)
+  const domain = work?.domain ?? agentWorkDomain(role, work?.subjectId)
   const contextualPracticeModel = request.purpose === 'practice'
     ? currentUniversityPracticeModelOverride()
     : undefined
@@ -62,13 +109,18 @@ export async function executeBoundAgentExam(
     ? practiceModelOverride
     : contextualPracticeModel
   const practiceOverride = request.purpose === 'practice' ? String(selectedPracticeOverride ?? '').trim() : ''
+  const roleModel = domain === 'role_domain' && !practiceOverride
+    ? await readRoleDomainModel(role as CosUniversitySpecialistRole)
+    : null
   const model = practiceOverride || modelForAgentWork({
     domain,
-    roleModel: requireBuilderCodingModel(),
+    roleModel,
     purpose: request.purpose === 'practice' ? 'practice' : 'assessment',
   })
-  return executeBoundSoftwareCapstone(request, {
-    readRole: readCosUniversityAgentRole, loadProcedures: loadAgentOwnProcedures, model,
+  return executeBoundRegisteredSpecialist(request, {
+    readRole: readCosUniversityAgentRole,
+    loadProcedures: loadAgentOwnProcedures,
+    model,
     // Independent assessments never acquire source packets or study text through this port.
     ...(request.purpose === 'practice' ? { loadStudyMaterial: () => loadUniversityPracticeStudyMaterial(request) } : {}),
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
@@ -89,4 +141,4 @@ export async function executeBoundAgentExam(
   })
 }
 
-export { isBoundSoftwareCapstoneEvidence }
+export { isBoundRegisteredSpecialistEvidence }

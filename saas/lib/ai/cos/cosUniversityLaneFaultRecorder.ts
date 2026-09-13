@@ -15,12 +15,16 @@
  *     here can make a lane look verified.
  *   - Identity is bucketed by hour, so a fault persisting across ticks writes once per hour rather
  *     than on every sweep, and a fault that clears and returns is recorded again.
+ *   - A fresh deployment gets one bounded schedule grace before an absent receipt becomes a durable
+ *     dark-lane fault. Verification remains strict during the grace; only the incident record waits.
  */
 
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { COS_UNIVERSITY_ASSURANCE_PROFILE, type LearningPathId } from './cosUniversityLearningAssurance.ts'
 import type { CosUniversityLaneStatus } from './cosUniversityLaneExpectation.ts'
+
+const FIRST_SCHEDULE_GRACE_MS = 65 * 60_000
 
 export type CosUniversityLaneFault = Readonly<{
   path: LearningPathId
@@ -67,9 +71,47 @@ export async function recordCosUniversityLaneFaults(input: {
   }
 
   const now = input.now || new Date()
+  let effectiveFaults = faults
+  let startupGraceActive = false
+
+  // All current University schedules recur at least hourly. A deployment that becomes READY just
+  // after an hourly slot can therefore owe no receipt for almost sixty minutes. Use the first exact-
+  // deployment Production receipt as the deployment-live lower bound and add five minutes of
+  // scheduler tolerance. Only absence (`unexpectedly_dark`) is deferred: a receipt that explicitly
+  // reports a disabled flag, failed execution, staging drift, or undeclared lane is still recorded
+  // immediately. If this lookup fails, fail toward visibility and keep the original faults.
+  if (faults.some(fault => fault.laneStatus === 'unexpectedly_dark')) {
+    const firstReceipt = await db.from('cos_university_learning_assurance_events')
+      .select('observed_at')
+      .eq('event_type', 'production_path')
+      .eq('deployment_id', deploymentId)
+      .eq('commit_sha', commitSha)
+      .order('observed_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+    if (!firstReceipt.error && firstReceipt.data?.observed_at) {
+      const firstObservedMs = Date.parse(String(firstReceipt.data.observed_at))
+      const ageMs = now.getTime() - firstObservedMs
+      startupGraceActive = Number.isFinite(firstObservedMs)
+        && ageMs >= 0
+        && ageMs < FIRST_SCHEDULE_GRACE_MS
+      if (startupGraceActive) {
+        effectiveFaults = faults.filter(fault => fault.laneStatus !== 'unexpectedly_dark')
+      }
+    }
+  }
+
+  if (!effectiveFaults.length) {
+    return {
+      recorded: 0,
+      faults: [],
+      skipped: startupGraceActive ? 'fresh_deployment_schedule_grace' : null,
+    }
+  }
+
   const hourBucket = now.toISOString().slice(0, 13)
   const observedAt = now.toISOString()
-  const rows = faults.map(fault => {
+  const rows = effectiveFaults.map(fault => {
     const evidence = {
       claim: 'expected_lane_not_running_not_academic_evidence',
       path: fault.path,
@@ -104,7 +146,7 @@ export async function recordCosUniversityLaneFaults(input: {
 
   return {
     recorded: rows.length,
-    faults: faults.map(fault => `${fault.path}:${fault.laneStatus}`),
+    faults: effectiveFaults.map(fault => `${fault.path}:${fault.laneStatus}`),
     skipped: null,
   }
 }

@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityPracticeStudyGate.ts
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { selectCosUniversityPracticeGateDecision } from './cosUniversityPracticeSelectionPolicy.ts'
 import { cosUniversityStudyProofEligible } from './cosUniversityStudyProof.ts'
@@ -78,12 +79,21 @@ export function evaluateCosUniversityPracticeStudyGate(
  * A blocked higher-ranked plan remains blocked for itself, but cannot starve a later plan in the
  * same bounded scan that already has current host-accepted study proof.
  */
-export async function readCosUniversityPracticeStudyGate(now = new Date()): Promise<CosUniversityPracticeStudyGate> {
+export async function readCosUniversityPracticeStudyGate(
+  now = new Date(),
+  /**
+   * The learner being gated. COS remains the default so the existing lane is unchanged, but the gate
+   * is no longer COS-only: every agent that practises must clear the same accepted-study proof, or a
+   * specialist's practice record would carry a weaker guarantee than COS's for the same stage.
+   */
+  agentId: string = 'cos',
+): Promise<CosUniversityPracticeStudyGate> {
   const db = cosServiceDb()
   if (!db) return decision(false, 'service_database_unavailable', null)
+  const learner = String(agentId || '').trim() || 'cos'
   const result = await db.from('cos_university_study_plans')
     .select('id,plan_key,priority,status,attempt_count,last_attempt_at,methods,evidence')
-    .eq('agent_id', 'cos')
+    .eq('agent_id', learner)
     .eq('status', 'studying')
     .gt('attempt_count', 0)
     .order('priority', { ascending: false })

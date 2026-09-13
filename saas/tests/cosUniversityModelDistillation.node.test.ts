@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { cosUniversityHybridLearningDesign } from '../lib/ai/cos/cosUniversityHybridLearning.ts'
 import {
   decideModelDistillationCandidate,
   decideModelDistillationPromotion,
@@ -26,6 +27,17 @@ test('model distillation is candidate-only even after repeated independent failu
   assert.equal(decision.eligibleForTrainingDataset, true)
   assert.equal(decision.autoExecuteTraining, false)
   assert.deepEqual(decision.blockers, [])
+})
+
+test('University represents model distillation separately from generic fine tuning', () => {
+  const design = cosUniversityHybridLearningDesign({
+    failureClass: 'reasoning',
+    sourceKinds: [],
+    fineTuneCandidate: true,
+    modelDistillationCandidate: true,
+  })
+  assert.ok(design.paradigms.includes('fine_tune_candidate'))
+  assert.ok(design.paradigms.includes('model_distillation_candidate'))
 })
 
 test('unknown or prohibited teacher-output rights fail closed', () => {

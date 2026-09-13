@@ -117,7 +117,7 @@ test('COS historical keys remain stable and same-module learners cannot collide'
   assert.equal(mastersLearningPlanKey('cos', PROGRAM, 'module_1'), createHash('sha256').update(`masters|${PROGRAM}|module_1`).digest('hex'))
   const ids = ['cos', AGENT, 'software-2']
   assert.equal(new Set(ids.map(id => mastersLearningSlotKey(id, PROGRAM, slot))).size, ids.length)
-  assert.equal(new Set(ids.map(id => mastersLearningPlanKey(id, PROGRAM, 'module_1')).size, ids.length)
+  assert.equal(new Set(ids.map(id => mastersLearningPlanKey(id, PROGRAM, 'module_1'))).size, ids.length)
   assert.equal(mastersLearningPlanKey(AGENT, PROGRAM, 'module_1'), mastersLearningPlanKey(AGENT, PROGRAM, 'module_1'))
 })
 

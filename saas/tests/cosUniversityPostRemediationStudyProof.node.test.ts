@@ -93,7 +93,9 @@ test('a blocked high-priority restudy decision cannot starve the next eligible p
 
   const gate = file('lib/ai/cos/cosUniversityPracticeStudyGate.ts')
   assert.match(gate, /\.filter\(row => hasDeliberatePractice\(row\.methods\)\)/)
-  assert.match(gate, /\.map\(plan => evaluateCosUniversityPracticeStudyGate\(plan, now\)\)/)
+  assert.match(gate, /const studyDecision = evaluateCosUniversityPracticeStudyGate\(plan, now\)/)
+  assert.match(gate, /const practiceBudget = await readUniversityPracticeBudget/)
+  assert.match(gate, /practiceBudget\.allowed/)
   assert.match(gate, /selectCosUniversityPracticeGateDecision\(decisions\)/)
 })
 

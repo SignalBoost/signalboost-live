@@ -85,7 +85,9 @@ test('University practice requires current host accepted-study proof before queu
   assert.match(proof, /observedMs === lastAttemptMs/)
 
   assert.match(gate, /readCosUniversityPracticeStudyGate/)
-  assert.match(gate, /PRACTICE_PLAN_SCAN_LIMIT = 4/)
+  assert.match(gate, /COS_UNIVERSITY_PRACTICE_PLAN_SCAN_LIMIT = 20/)
+  assert.match(gate, /readUniversityPracticeBudget/)
+  assert.match(gate, /practice_budget_exhausted/)
   assert.match(gate, /practiceRemediation/)
   assert.match(gate, /Number\(remediation\.practiceRound\) === studyAttempt/)
   assert.match(gate, /restudy_required_after_failed_practice/)

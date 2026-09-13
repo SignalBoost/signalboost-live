@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runCosUniversityDeliberatePractice } from '@/lib/ai/cos/cosUniversityDeliberatePracticeRunner'
+import { runConfiguredCosUniversityDeliberatePractice } from '@/lib/ai/cos/cosUniversityConfiguredPracticeRunner'
 import { reopenCosUniversityStudyAfterFailedPractice } from '@/lib/ai/cos/cosUniversityPracticeFailureRemediation'
 import { disciplineCosUniversityPracticeQueue } from '@/lib/ai/cos/cosUniversityPracticeQueueDiscipline'
 import { readCosUniversityPracticeStudyGate } from '@/lib/ai/cos/cosUniversityPracticeStudyGate'
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       requiredPlanId: studyGate.planId,
       requiredPracticeRound: studyGate.studyAttempt,
     })
-    const result = await runCosUniversityDeliberatePractice({
+    const result = await runConfiguredCosUniversityDeliberatePractice({
       maxPlans: 1,
       maxExercises: 2,
       requiredPlanId: studyGate.planId,

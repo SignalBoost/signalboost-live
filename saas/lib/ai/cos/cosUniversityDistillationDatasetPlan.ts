@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { buildDistillationDatasetBinding, type DistillationDatasetBindingInput } from './cosUniversityDistillationPreparation.ts'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -12,16 +11,21 @@ function hash(parts: readonly unknown[]): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex')
 }
 
-function candidateUuid(candidateId: string): string {
-  const match = /^study-plan:([0-9a-f-]+)$/i.exec(clean(candidateId, 100))
-  if (!match || !UUID.test(match[1])) throw new Error('distillation_dataset_candidate_id_invalid')
-  return match[1]
-}
-
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {}
+}
+
+async function serviceDb() {
+  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
+  return cosServiceDb()
+}
+
+function candidateUuid(candidateId: string): string {
+  const match = /^study-plan:([0-9a-f-]+)$/i.exec(clean(candidateId, 100))
+  if (!match || !UUID.test(match[1])) throw new Error('distillation_dataset_candidate_id_invalid')
+  return match[1]
 }
 
 export type DistillationTrainingPlanSource = Readonly<{
@@ -41,6 +45,10 @@ export type DistillationTrainingPlanSource = Readonly<{
   evidence: unknown
 }>
 
+/**
+ * Build a dedicated training row instead of rewriting the remediation row. The remediation source
+ * remains the failed exam/run lineage; the training row receives the immutable hf:// dataset source.
+ */
 export function buildDistillationTrainingPlan(input: Omit<DistillationDatasetBindingInput, 'plan'> & {
   sourcePlan: DistillationTrainingPlanSource
 }) {
@@ -98,14 +106,13 @@ export function buildDistillationTrainingPlan(input: Omit<DistillationDatasetBin
 }
 
 /**
- * Register a dedicated training plan without changing the remediation plan's source_ref. This keeps
- * exam/failure lineage intact while giving the training executor the explicit hf:// dataset source
- * it requires. Registration writes metadata only; it never submits or enables a paid Job.
+ * Register metadata for a pre-existing teacher-output dataset. This cannot enable dispatch, approve
+ * training, submit a Hugging Face Job, or spend credits.
  */
 export async function registerCosUniversityDistillationTrainingPlan(input: Omit<DistillationDatasetBindingInput, 'plan'> & {
   candidateId: string
 }) {
-  const db = cosServiceDb()
+  const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
   const sourceId = candidateUuid(input.candidateId)
   const result = await db.from('cos_university_study_plans')
@@ -122,12 +129,12 @@ export async function registerCosUniversityDistillationTrainingPlan(input: Omit<
     throw new Error(`distillation_dataset_blocked:${built.blockers.join(',')}`)
   }
   const now = new Date().toISOString()
-  const insert = await db.from('cos_university_study_plans').upsert({
+  const inserted = await db.from('cos_university_study_plans').upsert({
     ...built.plan,
     last_seen_at: now,
     updated_at: now,
   }, { onConflict: 'plan_key', ignoreDuplicates: true })
-  if (insert.error) throw insert.error
+  if (inserted.error) throw inserted.error
 
   const created = await db.from('cos_university_study_plans')
     .select('id,plan_key,source_ref,fine_tune_candidate,status,evidence')

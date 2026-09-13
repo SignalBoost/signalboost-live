@@ -449,7 +449,7 @@ function languageExam(seed: string, language: CosPlatformLanguage, dimension: Co
       requiredGroups: [['12'], ['14:30'], language === 'ru' ? ['риск'] : language === 'pl' ? ['ryzyk'] : language === 'pt' ? ['risco'] : language === 'es' ? ['riesgo'] : ['risk']],
     } })
   }
-  return finishExam({ ...base, prompt: localized[language].culturalPragmatics, rubric: {
+  return finishExam({ ...base, prompt: localized[language].cultural_pragmatics, rubric: {
     ...common,
     requiredGroups: [
       language === 'ru' ? ['пожалуйста', 'прошу', 'можно'] : language === 'pl' ? ['proszę', 'czy możemy', 'czy moglibyśmy'] : language === 'pt' ? ['por favor', 'poderíamos', 'podemos'] : language === 'es' ? ['por favor', 'podríamos', 'podemos'] : ['please', 'could we', 'would it be possible'],

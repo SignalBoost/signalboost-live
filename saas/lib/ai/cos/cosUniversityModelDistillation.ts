@@ -1,3 +1,8 @@
+import {
+  decideControlledFineTune,
+  type FineTuneEvidence,
+} from './cosUniversityLearningAssurance.ts'
+
 export const COS_UNIVERSITY_MODEL_DISTILLATION_VERSION = 'cos-university-model-distillation-v1' as const
 
 export type ModelDistillationTrainingRights =
@@ -28,14 +33,9 @@ export type ModelDistillationCandidateDecision = Readonly<{
 
 export type ModelDistillationPromotionInput = Readonly<{
   candidate: ModelDistillationCandidateInput
-  trainedArtifactId?: string | null
-  independentEvaluatorId?: string | null
-  teacherModelIdUsedAsEvaluator?: boolean
-  baselineScore?: number | null
-  studentScore?: number | null
-  unseenTransferPassed: boolean
-  delayedRetentionPassed: boolean
-  safetyRegressionPassed: boolean
+  controlledFineTuneEvidence: FineTuneEvidence
+  independentEvaluatorId: string
+  teacherModelIdUsedAsEvaluator: boolean
   verifiedSourceAttribution: boolean
   authorityExpanded: boolean
 }>
@@ -64,8 +64,8 @@ function finiteCount(value: unknown): number {
 /**
  * Distillation is a governed training candidate, not an automatic learning shortcut. A teacher output
  * may enter a training dataset only when rights and provenance are explicit, the student remains under
- * buyer control, private Production material is excluded, and ordinary study has already failed on
- * repeated independently scored retests.
+ * buyer control, private Production material is explicitly proven absent, and ordinary study has
+ * already failed on repeated independently scored retests.
  */
 export function decideModelDistillationCandidate(input: ModelDistillationCandidateInput): ModelDistillationCandidateDecision {
   const blockers: string[] = []
@@ -83,6 +83,7 @@ export function decideModelDistillationCandidate(input: ModelDistillationCandida
   if (!PERMITTED_RIGHTS.has(input.trainingRights)) blockers.push('training_rights_not_proven')
   if (input.studentControlledByBuyer !== true) blockers.push('student_not_buyer_controlled')
   if (input.containsPrivateProductionData === true) blockers.push('private_production_data_present')
+  else if (input.containsPrivateProductionData !== false) blockers.push('private_production_data_absence_not_proven')
   if (repeatedFailures < 3) blockers.push('repeated_failure_threshold_not_met')
   if (independentRetestFailures < 2) blockers.push('independent_retest_threshold_not_met')
 
@@ -96,29 +97,29 @@ export function decideModelDistillationCandidate(input: ModelDistillationCandida
 }
 
 /**
- * A distilled artifact is promoted only by independent evidence. Teacher imitation alone is never
- * treated as mastery, academic credit, Production proof, or expanded authority.
+ * Distillation does not create a parallel promotion authority. The existing controlled fine-tuning
+ * gate remains authoritative for dataset/training approval, train/holdout separation, trained
+ * artifact identity, independent improvement, safety, transfer, retention, Production canary, and
+ * rollback proof. Teacher/evaluator separation, teacher-output provenance, and authority preservation
+ * are additional distillation-specific gates.
  */
 export function decideModelDistillationPromotion(input: ModelDistillationPromotionInput): ModelDistillationPromotionDecision {
   const blockers = [...decideModelDistillationCandidate(input.candidate).blockers]
-  const artifact = text(input.trainedArtifactId)
+  const evidence = input.controlledFineTuneEvidence
   const evaluator = text(input.independentEvaluatorId)
-  const baseline = Number(input.baselineScore)
-  const score = Number(input.studentScore)
 
-  if (!artifact) blockers.push('trained_artifact_missing')
+  if (text(evidence.datasetHash) !== text(input.candidate.datasetHash)) blockers.push('controlled_dataset_mismatch')
+  if (text(evidence.baseModel) !== text(input.candidate.studentModelId)) blockers.push('controlled_student_model_mismatch')
+
+  const controlled = decideControlledFineTune(evidence)
+  if (!controlled.eligibleForPromotion) blockers.push(...controlled.blockers)
+
   if (!evaluator) blockers.push('independent_evaluator_missing')
-  if (input.teacherModelIdUsedAsEvaluator === true || (evaluator && evaluator === text(input.candidate.teacherModelId))) {
+  if (input.teacherModelIdUsedAsEvaluator !== false || (evaluator && evaluator === text(input.candidate.teacherModelId))) {
     blockers.push('teacher_cannot_be_independent_evaluator')
   }
-  if (!Number.isFinite(baseline) || !Number.isFinite(score) || baseline < 0 || baseline > 1 || score < 0 || score > 1 || score <= baseline) {
-    blockers.push('independent_improvement_not_proven')
-  }
-  if (input.unseenTransferPassed !== true) blockers.push('unseen_transfer_missing')
-  if (input.delayedRetentionPassed !== true) blockers.push('delayed_retention_missing')
-  if (input.safetyRegressionPassed !== true) blockers.push('safety_regression_missing')
   if (input.verifiedSourceAttribution !== true) blockers.push('source_attribution_missing')
-  if (input.authorityExpanded === true) blockers.push('authority_expansion_forbidden')
+  if (input.authorityExpanded !== false) blockers.push('authority_expansion_forbidden')
 
   return Object.freeze({
     eligibleForPromotion: blockers.length === 0,

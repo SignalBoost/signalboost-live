@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { stripTypeScriptTypes } from 'node:module'
 import { universityExamResponseContract, universityIndependentLearnerPrompt } from '../lib/ai/cos/cosUniversityExamResponseContract.ts'
+import { boundExecutionBindingFailure, scoredReplyHash } from '../lib/ai/cos/cosUniversityExecutionBinding.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const read = (relative: string) => fs.readFileSync(path.join(root, relative), 'utf8')
@@ -95,8 +96,9 @@ async function runActualExam(agentId: string, selectedExam: Record<string, any> 
     buildCosUniversityBlindExam: () => selectedExam,
     executeBoundAgentExam: async (input: any) => {
       sent.push(input)
-      return { reply, execution: { agentId, runId: row.id, manifestHash: exam.manifestHash, turnId: 'fixture-turn' } }
+      return { reply, execution: { agentId, runId: row.id, manifestHash: exam.manifestHash, turnId: 'fixture-turn', responseHash: scoredReplyHash(reply) } }
     },
+    boundExecutionBindingFailure,
     scoreCosUniversityBlindExam: (scoredExam: unknown, ...args: any[]) => {
       assert.equal(scoredExam, selectedExam, 'do not change the object supplied to the real scorer')
       return actualScorer()(scoredExam, ...args)

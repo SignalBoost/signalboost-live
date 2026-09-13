@@ -3,15 +3,16 @@ import test from 'node:test'
 import {
   decideModelDistillationCandidate,
   decideModelDistillationPromotion,
+  type ModelDistillationCandidateInput,
 } from '../lib/ai/cos/cosUniversityModelDistillation.ts'
 
 const H = 'a'.repeat(64)
-const candidate = (patch: Record<string, unknown> = {}) => ({
+const candidate = (patch: Partial<ModelDistillationCandidateInput> = {}): ModelDistillationCandidateInput => ({
   teacherModelId: 'teacher-model',
   studentModelId: 'buyer-local-student',
   datasetHash: H,
   provenanceRefs: ['teacher-output-batch:sha256:abc'],
-  trainingRights: 'contractually_permitted' as const,
+  trainingRights: 'contractually_permitted',
   studentControlledByBuyer: true,
   containsPrivateProductionData: false,
   repeatedFailures: 3,

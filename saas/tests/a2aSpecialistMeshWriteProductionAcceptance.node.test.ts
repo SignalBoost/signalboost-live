@@ -87,7 +87,7 @@ test('public reference write endpoints require signed task-bound control before 
     const verify = source.indexOf('verifySpecialistMeshWriteAcceptanceControlToken')
     const valid = source.indexOf('if (!control.valid)')
     const preApply = source.indexOf("control.mode === 'before_apply_unavailable'")
-    const apply = source.indexOf('applyReferenceWriteAcceptanceEffect')
+    const apply = source.indexOf('const effect = await applyReferenceWriteAcceptanceEffect')
     const postApply = source.indexOf("control.mode === 'after_apply_unavailable'")
     assert.ok(verify >= 0)
     assert.ok(valid > verify)

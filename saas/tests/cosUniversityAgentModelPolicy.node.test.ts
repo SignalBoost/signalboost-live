@@ -5,9 +5,11 @@ import {
   BUILDER_MODEL_NOT_CONFIGURED_FOR_ROLE,
   PRIMARY_REASONER_NOT_CONFIGURED,
   ROLE_DOMAIN_SUBJECTS,
+  UNIVERSITY_PRACTICE_MODEL_INVALID,
   UNIVERSITY_PRACTICE_MODEL_NOT_CONFIGURED,
   agentWorkDomain,
   modelForAgentWork,
+  universityPracticeModelFromConfiguration,
   universityPracticeModelFromEnv,
 } from '../lib/ai/cos/cosUniversityAgentModelPolicy.ts'
 
@@ -61,6 +63,51 @@ test('DeepInfra deliberate practice requires an explicit configured economy mode
     if (beforeProvider === undefined) delete process.env.LOCAL_AI_MANAGED_PROVIDER; else process.env.LOCAL_AI_MANAGED_PROVIDER = beforeProvider
     if (beforePractice === undefined) delete process.env.UNIVERSITY_PRACTICE_MODEL; else process.env.UNIVERSITY_PRACTICE_MODEL = beforePractice
     if (beforePrimary === undefined) delete process.env.LOCAL_AI_MODEL; else process.env.LOCAL_AI_MODEL = beforePrimary
+  }
+})
+
+test('buyer-controlled runtime configuration can satisfy the DeepInfra practice guard', () => {
+  const beforeBase = process.env.LOCAL_AI_BASE_URL
+  const beforeProvider = process.env.LOCAL_AI_MANAGED_PROVIDER
+  const beforePractice = process.env.UNIVERSITY_PRACTICE_MODEL
+  process.env.LOCAL_AI_BASE_URL = 'https://api.deepinfra.com/v1/openai'
+  process.env.LOCAL_AI_MANAGED_PROVIDER = 'deepinfra'
+  delete process.env.UNIVERSITY_PRACTICE_MODEL
+  try {
+    assert.equal(universityPracticeModelFromConfiguration('buyer/economy-model'), 'buyer/economy-model')
+    assert.equal(universityPracticeModelFromConfiguration({ model: 'buyer/economy-model-v2' }), 'buyer/economy-model-v2')
+    assert.throws(() => universityPracticeModelFromConfiguration(null), new RegExp(UNIVERSITY_PRACTICE_MODEL_NOT_CONFIGURED))
+  } finally {
+    if (beforeBase === undefined) delete process.env.LOCAL_AI_BASE_URL; else process.env.LOCAL_AI_BASE_URL = beforeBase
+    if (beforeProvider === undefined) delete process.env.LOCAL_AI_MANAGED_PROVIDER; else process.env.LOCAL_AI_MANAGED_PROVIDER = beforeProvider
+    if (beforePractice === undefined) delete process.env.UNIVERSITY_PRACTICE_MODEL; else process.env.UNIVERSITY_PRACTICE_MODEL = beforePractice
+  }
+})
+
+test('environment practice configuration remains authoritative over runtime configuration', () => {
+  const beforeProvider = process.env.LOCAL_AI_MANAGED_PROVIDER
+  const beforePractice = process.env.UNIVERSITY_PRACTICE_MODEL
+  process.env.LOCAL_AI_MANAGED_PROVIDER = 'deepinfra'
+  process.env.UNIVERSITY_PRACTICE_MODEL = 'operator/env-model'
+  try {
+    assert.equal(universityPracticeModelFromConfiguration('buyer/db-model'), 'operator/env-model')
+  } finally {
+    if (beforeProvider === undefined) delete process.env.LOCAL_AI_MANAGED_PROVIDER; else process.env.LOCAL_AI_MANAGED_PROVIDER = beforeProvider
+    if (beforePractice === undefined) delete process.env.UNIVERSITY_PRACTICE_MODEL; else process.env.UNIVERSITY_PRACTICE_MODEL = beforePractice
+  }
+})
+
+test('malformed runtime practice model identifiers fail closed', () => {
+  const beforeProvider = process.env.LOCAL_AI_MANAGED_PROVIDER
+  const beforePractice = process.env.UNIVERSITY_PRACTICE_MODEL
+  process.env.LOCAL_AI_MANAGED_PROVIDER = 'deepinfra'
+  delete process.env.UNIVERSITY_PRACTICE_MODEL
+  try {
+    assert.throws(() => universityPracticeModelFromConfiguration('model name with spaces'), new RegExp(UNIVERSITY_PRACTICE_MODEL_INVALID))
+    assert.throws(() => universityPracticeModelFromConfiguration({ model: '../bad model' }), new RegExp(UNIVERSITY_PRACTICE_MODEL_INVALID))
+  } finally {
+    if (beforeProvider === undefined) delete process.env.LOCAL_AI_MANAGED_PROVIDER; else process.env.LOCAL_AI_MANAGED_PROVIDER = beforeProvider
+    if (beforePractice === undefined) delete process.env.UNIVERSITY_PRACTICE_MODEL; else process.env.UNIVERSITY_PRACTICE_MODEL = beforePractice
   }
 })
 

@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { ensureAnswerExecutionProvenance } from './answerProvenance.ts'
+import { provenanceBoundarySecret } from './provenanceBoundarySecret.ts'
 import { extractPublicRecordedProvenance } from './publicRecordedProvenance.ts'
 import { normalizeAssistantContent, type RecordedTurnProvenance } from './supportTurnProvenance.ts'
 
@@ -9,8 +10,8 @@ export type PublicAnswerProvenanceRecord = {
   answer_hash: string
   response_source: string | null
   lineage_completeness: string | null
-  local_reasoning: { invoked: boolean; model: string | null }
-  external_ai: { invoked: boolean; provider: string | null; model: string | null }
+  local_reasoning: { invoked: boolean; model: null }
+  external_ai: { invoked: boolean; provider: null; model: null }
   deterministic_utility: { used: boolean; utility: string | null }
   cache: { used: boolean }
   live_evidence: { used: boolean; sources: Array<{ title: string; url: string }> }
@@ -23,14 +24,6 @@ export type PublicAnswerProvenanceCapsule = {
   signed: boolean
 }
 
-function signingKey(): string | null {
-  return process.env.COS_PROVENANCE_SIGNING_KEY?.trim()
-    || process.env.COS_TURN_EXPERIENCE_HASH_KEY?.trim()
-    || process.env.NEXTAUTH_SECRET?.trim()
-    || process.env.CRON_SECRET?.trim()
-    || null
-}
-
 function cleanText(value: unknown, max = 160): string | null {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim()
   return text ? text.slice(0, max) : null
@@ -41,12 +34,11 @@ function answerHash(answer: string): string {
 }
 
 function canonicalRecord(record: PublicAnswerProvenanceRecord): string {
-  // Field insertion order is fixed by the constructor below; do not sign arbitrary input shapes.
   return JSON.stringify(record)
 }
 
 function signRecord(record: PublicAnswerProvenanceRecord): string | null {
-  const key = signingKey()
+  const key = provenanceBoundarySecret()
   if (!key) return null
   return createHmac('sha256', key).update(canonicalRecord(record)).digest('base64url')
 }
@@ -80,14 +72,16 @@ export function createPublicAnswerProvenanceCapsule(payload: any, assistantReply
     answer_hash: answerHash(assistantReply),
     response_source: cleanText((provenance as any)?.response_source ?? (provenance as any)?.responseSource ?? payload?.source, 180),
     lineage_completeness: cleanText((provenance as any)?.lineage_completeness, 80),
+    // Public provenance proves the execution class without publishing private model/provider IDs.
+    // Authorized internal telemetry retains those identifiers separately.
     local_reasoning: {
       invoked: Boolean((provenance as any)?.local_reasoning?.invoked),
-      model: cleanText((provenance as any)?.local_reasoning?.model, 140),
+      model: null,
     },
     external_ai: {
       invoked: Boolean((provenance as any)?.external_ai?.invoked),
-      provider: cleanText((provenance as any)?.external_ai?.provider, 100),
-      model: cleanText((provenance as any)?.external_ai?.model, 140),
+      provider: null,
+      model: null,
     },
     deterministic_utility: {
       used: Boolean((provenance as any)?.deterministic_utility?.used),

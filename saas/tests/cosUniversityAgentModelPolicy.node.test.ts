@@ -24,7 +24,15 @@ test('a subject inside the role field is domain work; everything else is general
 })
 
 test('an unknown role or missing subject falls to generalist, never to the role model', () => {
-  assert.equal(agentWorkDomain('quantum_theoretical_physics', 'physics_natural_sciences'), 'generalist')
+  // Roles are declared over time. This asserts the RULE — an undeclared role stays generalist — using
+  // whichever role is currently undeclared, so declaring one never turns this test red.
+  const undeclared = ['aerospace_nuclear_safety', 'molecular_biomedical_sciences',
+    'neuroscience_biophysics', 'actuarial_insurance_risk'].filter(role => !(role in ROLE_DOMAIN_SUBJECTS))
+  assert.ok(undeclared.length, 'every registry role now declares a domain; pick a new example')
+  for (const role of undeclared) {
+    assert.equal(agentWorkDomain(role, 'physics_natural_sciences'), 'generalist', role)
+    assert.equal(agentWorkDomain(role, 'computer_science'), 'generalist', role)
+  }
   assert.equal(agentWorkDomain(null, 'computer_science'), 'generalist')
   assert.equal(agentWorkDomain('software_engineering', null), 'generalist')
   assert.equal(agentWorkDomain('software_engineering', ''), 'generalist')
@@ -173,6 +181,7 @@ test('every declared domain subject belongs to a registered role', () => {
     'molecular_biomedical_sciences', 'neuroscience_biophysics', 'actuarial_insurance_risk',
     'quantum_theoretical_physics',
   ])
+
   for (const role of Object.keys(ROLE_DOMAIN_SUBJECTS)) {
     assert.ok(registered.has(role), `${role} is not a registry role`)
     assert.ok(ROLE_DOMAIN_SUBJECTS[role].length > 0, `${role} declares no subjects`)

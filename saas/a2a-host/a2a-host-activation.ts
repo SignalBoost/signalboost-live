@@ -6,6 +6,10 @@ import { createPortableA2AHost, type PortableA2AHost, type PortableA2AHostOption
 import { createSupabaseSpecialistMeshProductionAdapters } from './specialist-mesh-production-adapters.ts'
 import { createSupabaseSpecialistMeshCheckpointStore } from './specialist-mesh-checkpoint.ts'
 import { createDurableSpecialistMeshDelegationPort } from './specialist-mesh-execution-ownership.ts'
+import {
+  createSupabaseSpecialistMeshWriteRecoveryStore,
+  type SpecialistMeshWriteRecoveryProviderRegistry,
+} from './specialist-mesh-write-recovery.ts'
 import { createSupervisorCoordinationStore } from '../lib/supervisor/coordination/durable-coordination-store.ts'
 import {
   createSpecialistQualificationAssessmentPort,
@@ -13,7 +17,7 @@ import {
   type SpecialistQualificationVerifier,
 } from './specialist-qualification-assessment.ts'
 
-export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v6' as const
+export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v7' as const
 
 export interface A2AHostActivationSummary {
   version: typeof A2A_HOST_ACTIVATION_VERSION
@@ -36,10 +40,19 @@ function required(value: unknown, name: string): string {
   return normalized
 }
 
-function productionMeshCoordination(db: SupabaseClient) {
+function productionMeshCoordination(
+  db: SupabaseClient,
+  writeRecoveryProviders?: SpecialistMeshWriteRecoveryProviderRegistry,
+) {
   return Object.freeze({
     store: createSupervisorCoordinationStore({ supabase: db, runtime: 'production' }),
     checkpoints: createSupabaseSpecialistMeshCheckpointStore(db),
+    ...(writeRecoveryProviders ? {
+      writeRecovery: Object.freeze({
+        providers: writeRecoveryProviders,
+        store: createSupabaseSpecialistMeshWriteRecoveryStore(db),
+      }),
+    } : {}),
     environment: 'production' as const,
     policyVersion: A2A_HOST_ACTIVATION_VERSION,
     softwareVersion: A2A_HOST_ACTIVATION_VERSION,
@@ -86,22 +99,23 @@ export async function activateCOSA2AHost(options: PortableA2AHostOptions & { now
 
 /**
  * Production composition root for a fully constructed host. Durable specialist qualification,
- * routing telemetry, execution ownership, and bounded advisory checkpoints replace caller-supplied
- * mesh evidence/coordination. The same exact registry/transport authority is also used to install
- * the host-owned qualification assessor with hidden probes + independent verifier.
+ * routing telemetry, execution ownership, bounded advisory checkpoints, and optional provider-specific
+ * write recovery replace caller-supplied mesh evidence/coordination. Provider adapters are buyer/host
+ * controlled; absent an exact adapter, automatic non-advisory takeover remains disabled.
  */
 export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHostOptions, 'qualifications' | 'meshSignals' | 'meshCoordination'> & {
   db: SupabaseClient
   qualificationAssessment: ProductionSpecialistQualificationAssessmentOptions
+  writeRecoveryProviders?: SpecialistMeshWriteRecoveryProviderRegistry
   now?: () => Date
 }) {
-  const { db, qualificationAssessment, ...hostOptions } = options
+  const { db, qualificationAssessment, writeRecoveryProviders, ...hostOptions } = options
   const mesh = createSupabaseSpecialistMeshProductionAdapters(db, { now: options.now })
   const activated = await activateCOSA2AHost({
     ...hostOptions,
     qualifications: mesh.qualifications,
     meshSignals: mesh.meshSignals,
-    meshCoordination: productionMeshCoordination(db),
+    meshCoordination: productionMeshCoordination(db, writeRecoveryProviders),
   })
   const assessmentPort = createSpecialistQualificationAssessmentPort({
     registry: hostOptions.registry,
@@ -123,19 +137,19 @@ export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHost
 /**
  * Deployed-route composition for an already installed governed host. This preserves its registry,
  * transport runtime, audit boundaries, and authorization while replacing qualification/routing
- * evidence and adding durable fenced execution ownership plus bounded advisory checkpoint/resume.
- * No host is fabricated on a cold start.
+ * evidence and adding durable fenced execution ownership, bounded advisory checkpoint/resume, and
+ * optional provider-reconciled write recovery. No host is fabricated on a cold start.
  */
 export function attachProductionSpecialistMeshEvidence(
   host: PortableA2AHost,
   db: SupabaseClient,
-  options: { now?: () => Date } = {},
+  options: { now?: () => Date; writeRecoveryProviders?: SpecialistMeshWriteRecoveryProviderRegistry } = {},
 ): PortableA2AHost {
   const mesh = createSupabaseSpecialistMeshProductionAdapters(db, { now: options.now })
   const specialistDelegation = createDurableSpecialistMeshDelegationPort({
     registry: host.registry,
     delegation: host.delegation,
-    coordination: productionMeshCoordination(db),
+    coordination: productionMeshCoordination(db, options.writeRecoveryProviders),
   })
   const orchestrator = createCOSSpecialistOrchestrator({
     registry: host.registry,

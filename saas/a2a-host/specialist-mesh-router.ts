@@ -1,6 +1,6 @@
 import type { RegisteredA2AAgent } from './a2a-agent-registry.ts'
 
-export const SPECIALIST_MESH_ROUTER_VERSION = 'signalboost-specialist-mesh-router-v4' as const
+export const SPECIALIST_MESH_ROUTER_VERSION = 'signalboost-specialist-mesh-router-v5' as const
 
 export interface SpecialistMeshCandidate {
   agentId: string
@@ -83,7 +83,12 @@ export function rankSpecialistMeshCandidates(
     .sort((a, b) => a.meshScore - b.meshScore || a.agentId.localeCompare(b.agentId)))
 }
 
-/** Only absence, proven transient transport failure, or a fenced advisory checkpoint yield can trigger failover. */
+/** Only absence, proven transient transport failure, or a fenced advisory checkpoint yield can trigger advisory failover. */
 export function isRecoverableMeshDelegationFailure(mode: string | undefined): boolean {
   return mode === 'agent_unavailable' || mode === 'a2a_transport_unavailable' || mode === 'a2a_checkpoint_handoff'
+}
+
+/** Non-advisory takeover is narrower: the prior provider must durably prove that no side effect was applied. */
+export function isProviderReconciledMeshWriteFailover(mode: string | undefined): boolean {
+  return mode === 'a2a_write_failover_safe'
 }

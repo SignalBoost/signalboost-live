@@ -1,9 +1,14 @@
 import { A2A_AGENT_REGISTRY_VERSION, type A2AAgentRegistryPort } from './a2a-agent-registry.ts'
 import type { A2AApprovalEvidence, A2ADelegationInvocation, A2ADelegationResult } from './a2a-delegation-runtime.ts'
 import { getA2ASpecialistFamily, type A2ASpecialistFamilyId } from './a2a-specialist-catalog.ts'
-import { isRecoverableMeshDelegationFailure, rankSpecialistMeshCandidates, type SpecialistMeshSignalPort } from './specialist-mesh-router.ts'
+import {
+  isProviderReconciledMeshWriteFailover,
+  isRecoverableMeshDelegationFailure,
+  rankSpecialistMeshCandidates,
+  type SpecialistMeshSignalPort,
+} from './specialist-mesh-router.ts'
 
-export const COS_SPECIALIST_ORCHESTRATOR_VERSION = 'signalboost-cos-specialist-orchestrator-v4' as const
+export const COS_SPECIALIST_ORCHESTRATOR_VERSION = 'signalboost-cos-specialist-orchestrator-v5' as const
 
 export interface COSSpecialistPlan {
   familyId: A2ASpecialistFamilyId
@@ -154,7 +159,10 @@ export function createCOSSpecialistOrchestrator(options: {
         attempted.push(selected.agentId)
         const delegated = await options.delegation.invoke({ tenantId, environmentId, portableId, agentId: selected.agentId, skillId, messageId, text, contextId: raw.contextId, taskId: raw.taskId, traceId: raw.traceId, actor: raw.actor, approval: raw.approval })
         last = delegated
-        if (delegated.ok || requestedAgentId || canonicalSkill.risk !== 'advisory' || !isRecoverableMeshDelegationFailure(delegated.mode)) {
+        const safeAutomaticTakeover = canonicalSkill.risk === 'advisory'
+          ? isRecoverableMeshDelegationFailure(delegated.mode)
+          : isProviderReconciledMeshWriteFailover(delegated.mode)
+        if (delegated.ok || requestedAgentId || !safeAutomaticTakeover) {
           return Object.freeze({ ...delegated, familyId: family.familyId, selectedAgentId: selected.agentId, meshAttemptedAgentIds: Object.freeze([...attempted]), routingMode: requestedAgentId ? 'explicit_agent' : 'automatic_mesh', orchestratorVersion: COS_SPECIALIST_ORCHESTRATOR_VERSION })
         }
       }

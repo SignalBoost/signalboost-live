@@ -8,8 +8,10 @@ on:
       - 'saas/app/api/a2a/**'
       - 'saas/app/api/cos-specialist/**'
       - 'saas/app/api/cron/specialist-mesh-production-acceptance/**'
+      - 'saas/app/api/cron/specialist-mesh-write-production-acceptance/**'
       - 'saas/tests/a2a*.node.test.ts'
       - 'saas/tests/specialistMesh*.node.test.ts'
+      - 'saas/supabase/migrations/**specialist_mesh**'
       - 'saas/vercel.json'
       - 'ONBOARD-A2A.md'
       - 'docs/HANDOFF-A2A-AGENT-FABRIC-*.md'
@@ -22,8 +24,10 @@ on:
       - 'saas/app/api/a2a/**'
       - 'saas/app/api/cos-specialist/**'
       - 'saas/app/api/cron/specialist-mesh-production-acceptance/**'
+      - 'saas/app/api/cron/specialist-mesh-write-production-acceptance/**'
       - 'saas/tests/a2a*.node.test.ts'
       - 'saas/tests/specialistMesh*.node.test.ts'
+      - 'saas/supabase/migrations/**specialist_mesh**'
       - 'saas/vercel.json'
       - 'ONBOARD-A2A.md'
       - 'docs/HANDOFF-A2A-AGENT-FABRIC-PHASE*-2026-08-31.md'
@@ -49,6 +53,6 @@ jobs:
           cache-dependency-path: saas/package-lock.json
       - run: npm ci --no-audit --no-fund
       - name: Run A2A regressions
-        run: node --test tests/a2aAgentFabric.node.test.ts tests/a2aCosSpecialistOrchestration.node.test.ts tests/a2aRuntimeHost.node.test.ts tests/a2aNaturalLanguagePlanner.node.test.ts tests/a2aRuntimeActivationObservability.node.test.ts tests/a2aLiveExternalAcceptance.node.test.ts tests/a2aReferenceSpecialist.node.test.ts tests/a2aReferenceCosRouting.node.test.ts tests/a2aAvailability.node.test.ts tests/a2aBuyerOnboarding.node.test.ts tests/a2aBuyerManifest.node.test.ts tests/a2aProductionSpecialistComposition.node.test.ts tests/a2aSpecialistQualificationAssessment.node.test.ts tests/a2aSpecialistMeshLiveFailoverAcceptance.node.test.ts tests/a2aSpecialistMeshQualificationPin.node.test.ts tests/a2aSpecialistMeshDurableOwnership.node.test.ts tests/a2aSpecialistMeshCheckpointResume.node.test.ts tests/a2aSpecialistMeshProductionLiveAcceptance.node.test.ts tests/specialistMeshRouting.node.test.ts tests/specialistMeshLiveSignals.node.test.ts tests/specialistMeshCoordination.node.test.ts tests/specialistMeshProductionAdapters.node.test.ts
+        run: node --test tests/a2aAgentFabric.node.test.ts tests/a2aCosSpecialistOrchestration.node.test.ts tests/a2aRuntimeHost.node.test.ts tests/a2aNaturalLanguagePlanner.node.test.ts tests/a2aRuntimeActivationObservability.node.test.ts tests/a2aLiveExternalAcceptance.node.test.ts tests/a2aReferenceSpecialist.node.test.ts tests/a2aReferenceCosRouting.node.test.ts tests/a2aAvailability.node.test.ts tests/a2aBuyerOnboarding.node.test.ts tests/a2aBuyerManifest.node.test.ts tests/a2aProductionSpecialistComposition.node.test.ts tests/a2aSpecialistQualificationAssessment.node.test.ts tests/a2aSpecialistMeshLiveFailoverAcceptance.node.test.ts tests/a2aSpecialistMeshQualificationPin.node.test.ts tests/a2aSpecialistMeshDurableOwnership.node.test.ts tests/a2aSpecialistMeshCheckpointResume.node.test.ts tests/a2aSpecialistMeshWriteRecovery.node.test.ts tests/a2aSpecialistMeshWriteProductionAcceptance.node.test.ts tests/a2aSpecialistMeshProductionLiveAcceptance.node.test.ts tests/specialistMeshRouting.node.test.ts tests/specialistMeshLiveSignals.node.test.ts tests/specialistMeshCoordination.node.test.ts tests/specialistMeshProductionAdapters.node.test.ts
       - name: Typecheck A2A integration
         run: npm run typecheck

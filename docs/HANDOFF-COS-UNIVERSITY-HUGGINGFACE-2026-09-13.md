@@ -15,7 +15,7 @@ This increment connects the existing governed COS University training-executor c
 - Every cost-bearing dispatch still requires the existing owner-authenticated per-request `confirmDispatch=true` intent.
 - Dataset preparation accepts only explicit `hf://datasets/<owner>/<repo>[@revision]#<split>` source references and runs on CPU hardware by default.
 - Training accepts only immutable/materialized Hugging Face dataset references produced by the governed partition path.
-- The default training flavor is one L4 (`l4x1`) and remains configurable by environment policy before any paid run.
+- The default training flavor is **NVIDIA T4 Small (`t4-small`)**, currently $0.40/hour on Hugging Face Jobs. The adapter never auto-upgrades after an out-of-memory/failure condition; any larger GPU must be deliberately configured after review.
 - The worker performs QLoRA/LoRA adapter training and reports only executor-owned evidence: partition manifests, trained artifact identity/hash, and rollback artifact reference.
 - Independent evaluation, safety regression, unseen transfer, delayed retention, Production canary, and promotion remain controlled by their existing independent authorities.
 - Models and prepared datasets are created private by default under the authenticated Hugging Face namespace.
@@ -50,7 +50,8 @@ Mandatory University fine-tuning regression imports `cosUniversityHuggingFaceJob
 - derived-secret separation;
 - strict Hugging Face dataset references;
 - CPU-only preparation defaults;
-- bounded L4 training defaults;
+- bounded T4 Small training defaults;
+- no automatic hardware escalation;
 - token placement in encrypted Job secrets rather than plain environment values;
 - owner confirmation, dispatch switch, signed callbacks, and executor claim separation.
 

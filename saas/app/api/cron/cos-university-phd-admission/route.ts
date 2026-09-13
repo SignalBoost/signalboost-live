@@ -38,10 +38,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: result.errors.length === 0, enabled: true, ...evidence }, { status: result.errors.length ? 500 : 200 })
     }
 
-    const evidence = { dailyCadence: 'not_due', runnerInvoked: false, agents: notDue }
-    await recordCosUniversityProductionPath({ path: 'phd_admission', invocationSucceeded: true, evidence })
-    await recordCosUniversityProductionPath({ path: 'phd_runtime', invocationSucceeded: true, evidence })
-    return NextResponse.json({ ok: true, skipped: true, ...evidence })
+    await recordCosUniversityProductionPath({ path: 'phd_admission', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, agents: notDue } })
+    await recordCosUniversityProductionPath({ path: 'phd_runtime', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, agents: notDue } })
+    return NextResponse.json({ ok: true, skipped: true, dailyCadence: 'not_due', runnerInvoked: false, agents: notDue })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ ok: false, enabled: true, error: message }, { status: 500 })

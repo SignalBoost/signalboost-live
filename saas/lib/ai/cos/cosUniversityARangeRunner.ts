@@ -8,8 +8,9 @@ import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseSt
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
-import { SOFTWARE_CAPSTONE_RUNTIME, type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
+import { type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
+import { boundExecutionBindingFailure } from './cosUniversityExecutionBinding.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { COS_UNIVERSITY_SUBJECTS, classifyCosUniversitySubjects, type CosUniversitySubjectId } from './cosUniversity.ts'
 import {
@@ -411,9 +412,11 @@ async function executeExamRun(agentId: string, row: ARangeRunRow, now: Date): Pr
     if (execution.agentId !== agentId || execution.runId !== row.id || execution.manifestHash !== exam.manifestHash) {
       return failRun(['agent_execution_identity_mismatch'])
     }
+    const bindingFailure = boundExecutionBindingFailure(bound.reply, execution)
+    if (bindingFailure) return failRun([bindingFailure])
     reply = bound.reply
     turnId = execution.turnId
-    responseSource = SOFTWARE_CAPSTONE_RUNTIME
+    responseSource = execution.runtime
     localModelInvoked = true
     handled = true
     executionProvenance = execution

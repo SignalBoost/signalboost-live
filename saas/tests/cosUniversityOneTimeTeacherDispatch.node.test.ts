@@ -120,3 +120,12 @@ test('provider acceptance is never downgraded to a replayable failed receipt by 
   assert.match(route, /reconciliationRequired:\s*true/)
   assert.doesNotMatch(route, /isOneTimeTeacherProviderAcceptedAuditError[\s\S]{0,1200}status:\s*'failed'/)
 })
+
+test('claim timestamp preserves PostgreSQL microseconds for the exact finalize fence', () => {
+  const approvalModule = readFileSync('lib/ai/cos/cosUniversityOneTimeTeacherDispatch.ts', 'utf8')
+  assert.match(approvalModule, /claimedAt,\s*\n\s*operation:/)
+  assert.doesNotMatch(approvalModule, /claimedAt:\s*new Date\(claimedAt\)\.toISOString\(\)/)
+  const migration = readFileSync('supabase/migrations/20260913224000_cos_university_one_time_teacher_dispatch_column_qualification.sql', 'utf8')
+  assert.match(migration, /approval\.expires_at > v_now/)
+  assert.match(migration, /approval\.claimed_at = p_claimed_at/)
+})

@@ -135,7 +135,9 @@ export async function claimOneTimeTeacherDispatchApproval(rawToken: unknown): Pr
     maxHourlyCostUsd,
     maxEstimatedCostUsd,
     expiresAt: new Date(expiresAt).toISOString(),
-    claimedAt: new Date(claimedAt).toISOString(),
+    // Preserve PostgreSQL's full microsecond timestamp text. JavaScript Date -> ISO truncates to
+    // milliseconds and breaks the exact optimistic-concurrency fence used by the finalize RPC.
+    claimedAt,
     operation: 'generate_teacher_dataset',
     studentTrainingAuthorized: false,
     authorityExpanded: false,

@@ -4,6 +4,8 @@ const ORIGIN = 'cos_university_deliberate_practice'
 export const DEFAULT_UNIVERSITY_MAX_PRACTICE_ROUNDS = 12
 const MAX_BUDGET_HISTORY_ROWS = 200
 
+type PracticeBudgetEnv = { UNIVERSITY_MAX_PRACTICE_ROUNDS?: string }
+
 export type UniversityPracticeBudgetDecision = Readonly<{
   allowed: boolean
   reason: 'within_budget' | 'current_round_already_metered' | 'practice_budget_exhausted' | 'practice_round_invalid'
@@ -18,7 +20,7 @@ function boundedRound(value: unknown): number | null {
 }
 
 export function configuredUniversityMaxPracticeRounds(
-  env: Pick<NodeJS.ProcessEnv, 'UNIVERSITY_MAX_PRACTICE_ROUNDS'> = process.env,
+  env: PracticeBudgetEnv = process.env,
 ): number {
   const configured = Number(env.UNIVERSITY_MAX_PRACTICE_ROUNDS || DEFAULT_UNIVERSITY_MAX_PRACTICE_ROUNDS)
   return Number.isSafeInteger(configured)

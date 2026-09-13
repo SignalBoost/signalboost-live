@@ -9,6 +9,7 @@ import {
   buildHuggingFaceJobSpec,
   huggingFaceJobsConfigFromEnv,
   installHuggingFaceTrainingExecutorEnv,
+  resolveHuggingFaceHardwareRate,
   resolveHuggingFaceNamespace,
   submitHuggingFaceJob,
 } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
@@ -92,6 +93,15 @@ export async function POST(req: NextRequest) {
       callbackSecret: executor.secret,
       config: hf,
     })
+
+    // Price is checked from Hugging Face immediately before submission. Configuration may lower the
+    // owner-defined $1/hour ceiling, but cannot raise it. There is no automatic hardware escalation.
+    const hardware = await resolveHuggingFaceHardwareRate({ flavor: spec.flavor, token: hf.token })
+    if (hardware.hourlyCostUsd > hf.maxHourlyCostUsd) {
+      throw new Error('huggingface_training_hourly_cost_cap_exceeded')
+    }
+    const maxEstimatedCostUsd = Number((hardware.hourlyCostUsd * spec.timeoutSeconds / 3600).toFixed(6))
+
     const namespace = await resolveHuggingFaceNamespace({ token: hf.token })
     const submitted = await submitHuggingFaceJob({ namespace, token: hf.token, spec })
     return signedResponse({
@@ -100,6 +110,9 @@ export async function POST(req: NextRequest) {
         jobId: submitted.jobId,
         provider: 'huggingface-jobs',
         jobUrl: submitted.jobUrl,
+        flavor: hardware.flavor,
+        hourlyCostUsd: hardware.hourlyCostUsd,
+        maxEstimatedCostUsd,
       },
       idempotencyKey,
       secret: executor.secret,

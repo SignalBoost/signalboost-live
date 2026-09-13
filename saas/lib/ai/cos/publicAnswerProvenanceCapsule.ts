@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { ensureAnswerExecutionProvenance } from './answerProvenance.ts'
+import { provenanceBoundarySecret } from './provenanceBoundarySecret.ts'
 import { extractPublicRecordedProvenance } from './publicRecordedProvenance.ts'
 import { normalizeAssistantContent, type RecordedTurnProvenance } from './supportTurnProvenance.ts'
 
@@ -23,14 +24,6 @@ export type PublicAnswerProvenanceCapsule = {
   signed: boolean
 }
 
-function signingKey(): string | null {
-  return process.env.COS_PROVENANCE_SIGNING_KEY?.trim()
-    || process.env.COS_TURN_EXPERIENCE_HASH_KEY?.trim()
-    || process.env.NEXTAUTH_SECRET?.trim()
-    || process.env.CRON_SECRET?.trim()
-    || null
-}
-
 function cleanText(value: unknown, max = 160): string | null {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim()
   return text ? text.slice(0, max) : null
@@ -45,7 +38,7 @@ function canonicalRecord(record: PublicAnswerProvenanceRecord): string {
 }
 
 function signRecord(record: PublicAnswerProvenanceRecord): string | null {
-  const key = signingKey()
+  const key = provenanceBoundarySecret()
   if (!key) return null
   return createHmac('sha256', key).update(canonicalRecord(record)).digest('base64url')
 }

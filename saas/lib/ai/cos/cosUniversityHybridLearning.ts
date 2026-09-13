@@ -8,6 +8,7 @@ export type CosUniversityLearningParadigm =
   | 'reinforcement_feedback'
   | 'retrieval_augmented'
   | 'fine_tune_candidate'
+  | 'model_distillation_candidate'
 
 export type CosUniversityDataStructure = 'structured' | 'semi_structured' | 'unstructured'
 
@@ -56,12 +57,15 @@ function unique<T>(values: readonly T[]): T[] {
  * Converts a study objective into an explicit machine-adapted pedagogy. No single paradigm is
  * treated as universal: RAG grounds durable/static facts, labels teach known answers, discovery
  * methods expose latent structure, and verified outcomes provide feedback. Reading alone never
- * satisfies the promotion rule.
+ * satisfies the promotion rule. Model distillation is represented separately from generic
+ * fine-tuning because teacher-output rights/provenance and teacher/evaluator separation are distinct
+ * assurance requirements.
  */
 export function cosUniversityHybridLearningDesign(input: {
   failureClass: string
   sourceKinds: readonly ContinuousLearningSourceKind[]
   fineTuneCandidate?: boolean
+  modelDistillationCandidate?: boolean
 }): CosUniversityHybridLearningDesign {
   const paradigms: CosUniversityLearningParadigm[] = ['supervised', 'self_supervised']
 
@@ -75,6 +79,7 @@ export function cosUniversityHybridLearningDesign(input: {
     paradigms.push('reinforcement_feedback')
   }
   if (input.fineTuneCandidate) paradigms.push('fine_tune_candidate')
+  if (input.modelDistillationCandidate) paradigms.push('model_distillation_candidate')
 
   const structures = unique(input.sourceKinds.flatMap(kind => STRUCTURE_BY_SOURCE[kind] || []))
   // A method with no acquisition source (for example a sandbox lab) still has structured outcomes,

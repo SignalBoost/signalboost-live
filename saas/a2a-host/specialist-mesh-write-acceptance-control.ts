@@ -10,21 +10,22 @@ interface TokenPayload {
   version: typeof SPECIALIST_MESH_WRITE_ACCEPTANCE_CONTROL_VERSION
   agentId: string
   taskId: string
+  operationKey: string
   mode: SpecialistMeshWriteAcceptanceMode
   expiresAt: number
   nonce: string
 }
 
-function required(value: unknown, name: string): string {
+function required(value: unknown, name: string, max = 2048): string {
   const normalized = String(value ?? '').trim()
-  if (!normalized || normalized === '*' || normalized.length > 512 || /[\u0000-\u001f\u007f]/.test(normalized)) {
+  if (!normalized || normalized === '*' || normalized.length > max || /[\u0000-\u001f\u007f]/.test(normalized)) {
     throw new Error(`specialist_mesh_write_acceptance_${name}_invalid`)
   }
   return normalized
 }
 
 function secret(explicit?: string): string {
-  return explicit === undefined ? resolveSpecialistMeshAcceptanceControlSecret() : required(explicit, 'secret')
+  return explicit === undefined ? resolveSpecialistMeshAcceptanceControlSecret() : required(explicit, 'secret', 512)
 }
 
 function encode(value: TokenPayload): string {
@@ -38,6 +39,7 @@ function sign(payload: string, signingSecret: string): string {
 export function createSpecialistMeshWriteAcceptanceControlToken(input: {
   agentId: string
   taskId: string
+  operationKey: string
   mode: SpecialistMeshWriteAcceptanceMode
   signingSecret?: string
   now?: Date
@@ -52,11 +54,12 @@ export function createSpecialistMeshWriteAcceptanceControlToken(input: {
   const ttlMs = Math.max(5_000, Math.min(300_000, Math.floor(input.ttlMs ?? 60_000)))
   const body: TokenPayload = {
     version: SPECIALIST_MESH_WRITE_ACCEPTANCE_CONTROL_VERSION,
-    agentId: required(input.agentId, 'agent_id'),
-    taskId: required(input.taskId, 'task_id'),
+    agentId: required(input.agentId, 'agent_id', 512),
+    taskId: required(input.taskId, 'task_id', 512),
+    operationKey: required(input.operationKey, 'operation_key'),
     mode: input.mode,
     expiresAt: now.getTime() + ttlMs,
-    nonce: required(input.nonce ?? randomBytes(12).toString('hex'), 'nonce'),
+    nonce: required(input.nonce ?? randomBytes(12).toString('hex'), 'nonce', 512),
   }
   const payload = encode(body)
   return `${payload}.${sign(payload, secret(input.signingSecret))}`
@@ -66,6 +69,7 @@ export function verifySpecialistMeshWriteAcceptanceControlToken(input: {
   token: string | null | undefined
   agentId: string
   taskId: string
+  operationKey: string
   signingSecret?: string
   now?: Date
 }): { valid: true; mode: SpecialistMeshWriteAcceptanceMode } | { valid: false } {
@@ -79,7 +83,9 @@ export function verifySpecialistMeshWriteAcceptanceControlToken(input: {
     if (!left.length || left.length !== right.length || !timingSafeEqual(left, right)) return { valid: false }
     const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as Partial<TokenPayload>
     if (parsed.version !== SPECIALIST_MESH_WRITE_ACCEPTANCE_CONTROL_VERSION) return { valid: false }
-    if (parsed.agentId !== required(input.agentId, 'agent_id') || parsed.taskId !== required(input.taskId, 'task_id')) return { valid: false }
+    if (parsed.agentId !== required(input.agentId, 'agent_id', 512)) return { valid: false }
+    if (parsed.taskId !== required(input.taskId, 'task_id', 512)) return { valid: false }
+    if (parsed.operationKey !== required(input.operationKey, 'operation_key')) return { valid: false }
     if (!['normal', 'before_apply_unavailable', 'after_apply_unavailable'].includes(String(parsed.mode))) return { valid: false }
     const expiresAt = Number(parsed.expiresAt)
     const now = (input.now ?? new Date()).getTime()

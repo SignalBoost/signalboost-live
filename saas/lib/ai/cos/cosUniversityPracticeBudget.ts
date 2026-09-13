@@ -1,4 +1,3 @@
-import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import {
   decideUniversityPracticeBudget,
   type UniversityPracticeBudgetDecision,
@@ -13,6 +12,11 @@ export {
 
 const ORIGIN = 'cos_university_deliberate_practice'
 const MAX_BUDGET_HISTORY_ROWS = 200
+
+async function serviceDb() {
+  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
+  return cosServiceDb()
+}
 
 function boundedRound(value: unknown): number | null {
   const parsed = Number(value)
@@ -29,7 +33,7 @@ export async function readUniversityPracticeBudget(input: {
   planId: string
   currentRound: unknown
 }): Promise<UniversityPracticeBudgetDecision> {
-  const db = cosServiceDb()
+  const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
   const currentRound = boundedRound(input.currentRound)
   if (!currentRound) return decideUniversityPracticeBudget({ currentRound, executedRounds: [] })
@@ -47,7 +51,9 @@ export async function readUniversityPracticeBudget(input: {
     .limit(MAX_BUDGET_HISTORY_ROWS)
   if (result.error) throw result.error
 
-  const executedRounds = (result.data || []).map(row => asRecord(row.metadata).practiceRound)
+  const executedRounds = [...new Set<number>((result.data || [])
+    .map(row => boundedRound(asRecord(row.metadata).practiceRound))
+    .filter((round): round is number => round !== null))]
   return decideUniversityPracticeBudget({ currentRound, executedRounds })
 }
 
@@ -58,7 +64,7 @@ export async function enforceUniversityPracticeCostGuard(request: {
   purpose?: string | null
 }): Promise<void> {
   if (request.purpose !== 'practice' || process.env.COS_UNIVERSITY_PRACTICE_ENABLED !== 'true') return
-  const db = cosServiceDb()
+  const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
   const current = await db.from('cos_active_practice_queue')
     .select('metadata')

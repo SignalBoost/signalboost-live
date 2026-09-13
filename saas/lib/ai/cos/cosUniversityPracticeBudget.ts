@@ -99,7 +99,7 @@ export async function enforceUniversityPracticeCostGuard(request: {
   runId: string
   purpose?: string | null
 }): Promise<void> {
-  if (request.purpose !== 'practice') return
+  if (request.purpose !== 'practice' || process.env.COS_UNIVERSITY_PRACTICE_ENABLED !== 'true') return
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const current = await db.from('cos_active_practice_queue')

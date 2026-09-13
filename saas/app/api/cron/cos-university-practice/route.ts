@@ -10,6 +10,10 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+// Preserve the scheduled-lane worker contract: this is still the University deliberate-practice
+// worker, now with buyer-controlled host configuration resolved before the underlying runner begins.
+const runCosUniversityDeliberatePractice = runConfiguredCosUniversityDeliberatePractice
+
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get('authorization') || ''
@@ -43,7 +47,7 @@ export async function GET(req: NextRequest) {
       requiredPlanId: studyGate.planId,
       requiredPracticeRound: studyGate.studyAttempt,
     })
-    const result = await runConfiguredCosUniversityDeliberatePractice({
+    const result = await runCosUniversityDeliberatePractice({
       maxPlans: 1,
       maxExercises: 2,
       requiredPlanId: studyGate.planId,

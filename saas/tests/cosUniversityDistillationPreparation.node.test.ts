@@ -143,7 +143,7 @@ test('dedicated training plan preserves remediation lineage and binds the HF dat
   const built = buildDistillationTrainingPlan({ ...datasetInput, sourcePlan })
   assert.equal(built.eligible, true)
   assert.ok(built.plan)
-  assert.equal(sourcePlan.source_ref, 'b333a2be-6826-452c-89c-6d72ab9e007a5'.replace('6d72', '6d72'))
+  assert.equal(sourcePlan.source_ref, 'b333a2be-6826-452c-89c6-d72ab9e007a5')
   assert.equal(built.plan?.source_ref, datasetInput.sourceRef)
   assert.equal((built.plan?.evidence as any).sourceCandidateId, `study-plan:${sourcePlan.id}`)
   assert.equal(built.candidate?.datasetHash, controlledFineTuneDatasetHash(built.plan!))

@@ -8,6 +8,7 @@ import { bindPracticeStudy, practiceStudyContentHashes, buildPracticeStudyMateri
   type PracticeStudyMaterial } from '../lib/ai/cos/cosUniversityPracticeStudyMaterial.ts'
 import { executeBoundSoftwareCapstone } from '../lib/ai/cos/cosUniversityAgentCapstone.ts'
 import * as diagnostics from '../lib/cos-core/layers/learning/cycleDiagnostics.ts'
+import { documentMatchesTargetLanguage } from '../lib/cos-core/layers/learning/learningLanguage.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const file = (name: string) => fs.readFileSync(path.join(root, name), 'utf8')
@@ -163,9 +164,11 @@ test('actual acquisition cycle records only successfully admitted hashes, never 
   const js = stripTypeScriptTypes(source, { mode: 'transform' })
   const make = new Function('createHash', 'minimumConfidenceForKind', 'gapCurriculumAligned', 'classifyTieredAdmission',
     'incrementDiagnosticCount', 'recordAcceptedLearningContent', 'initializeLearningGapDiagnostics', 'learningGapDiagnostic',
+    'documentMatchesTargetLanguage',
     `${js}\nreturn ContinuousLearningCycle`)
   const Cycle = make(createHash, () => 0, () => true, () => ({ tier: 'standard' }), diagnostics.incrementDiagnosticCount,
-    diagnostics.recordAcceptedLearningContent, diagnostics.initializeLearningGapDiagnostics, diagnostics.learningGapDiagnostic)
+    diagnostics.recordAcceptedLearningContent, diagnostics.initializeLearningGapDiagnostics, diagnostics.learningGapDiagnostic,
+    documentMatchesTargetLanguage)
   const documents = ['accepted', 'duplicate', 'probationary', 'storage'].map(kind => ({ sourceKind: 'scientific_journal',
     sourceUri: `https://example.org/${kind}`, sourceTitle: 'Historical evidence and culture', subject: 'History', text: 'Historical evidence and culture. '.repeat(80) }))
   const director = { prioritizeGaps: (gaps: unknown[]) => gaps, admit: async (candidate: { sourceUri: string }) => {

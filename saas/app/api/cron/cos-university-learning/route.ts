@@ -1,7 +1,10 @@
+// saas/app/api/cron/cos-university-learning/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityContinuousLearning } from '@/lib/ai/cos/cosUniversityContinuousLearning'
 import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { readCosUniversityProductionVerification } from '@/lib/ai/cos/cosUniversityProductionVerification'
+import { recordCosUniversityLaneFaults } from '@/lib/ai/cos/cosUniversityLaneFaultRecorder'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -23,10 +26,36 @@ export async function GET(req: NextRequest) {
     }
     const result = await runCosUniversityContinuousLearning()
     await recordCosUniversityProductionPath({ path: 'continuous_learning', invocationSucceeded: result.status !== 'error', evidence: result })
-    return NextResponse.json({ ok: result.status !== 'error', ...result }, { status: result.status === 'error' ? 500 : 200 })
+    // A lane the calendar expects to be running, that is not, leaves no trace anywhere else. Sweep
+    // after the receipt is written so this tick's own receipt is part of what is judged. It never
+    // affects this route's status: an audit failure must not fail continuous learning.
+    const laneAudit = await sweepLaneFaults()
+    return NextResponse.json({ ok: result.status !== 'error', ...result, laneAudit }, { status: result.status === 'error' ? 500 : 200 })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('cron COS University continuous learning failed:', message)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
+  }
+}
+
+/**
+ * Reads the production verification board and records any lane that should be running but is not.
+ * Isolated and non-throwing by design: this is an observer, and an observer must never be able to
+ * break the lane it rides on.
+ */
+async function sweepLaneFaults(): Promise<Record<string, unknown>> {
+  try {
+    const board = await readCosUniversityProductionVerification()
+    // The reader returns a union: outside Production it short-circuits before reading enrollments,
+    // so that arm carries no expectation context at all. Read the flag union-safely and treat its
+    // absence exactly like an unavailable context — never as a clean board.
+    const contextAvailable = (board as { expectationContextAvailable?: boolean }).expectationContextAvailable === true
+    if (!contextAvailable) return { skipped: 'expectation_context_unavailable' }
+    if (!board.faults.length) return { recorded: 0, faults: [] }
+    return { ...(await recordCosUniversityLaneFaults({ faults: board.faults, agentId: 'cos' })) }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('cron COS University lane audit failed:', message)
+    return { error: message }
   }
 }

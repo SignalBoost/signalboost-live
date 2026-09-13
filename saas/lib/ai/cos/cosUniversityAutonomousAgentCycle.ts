@@ -1,71 +1,45 @@
-import { readCosUniversityAgentAcademicRecord } from './cosUniversityAgentAcademicRecordRuntime.ts'
-import { runCosUniversityAdmission } from './cosUniversityAdmissionRunner.ts'
-import { listCosUniversityRegisteredAgents } from './cosUniversityAgentRegistry.ts'
-import { runCosUniversityIndependentExamBatch } from './cosUniversityIndependentExamRunner.ts'
-import { runCosUniversityContinuousLearning } from './cosUniversityContinuousLearning.ts'
-import { runCosUniversityDeliberatePractice } from './cosUniversityDeliberatePracticeRunner.ts'
-import { reopenCosUniversityStudyAfterFailedPractice } from './cosUniversityPracticeFailureRemediation.ts'
-import { decideCosUniversityNextAcademicAction, type CosUniversityNextAcademicAction } from './cosUniversityAgentAcademicProgression.ts'
-import { syncCosUniversityAppliedKnowledge } from './cosUniversityAppliedKnowledge.ts'
-import { readCosUniversityMotivationStandings, selectCosUniversityMotivationalPriority } from './cosUniversityMotivationRuntime.ts'
-import type { CosUniversityMotivationalState } from './cosUniversityMotivation.ts'
+// saas/tests/cosUniversityPracticeGateParity.node.test.ts
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import test from 'node:test'
 
-export type CosUniversityAutonomousAgentCycleSummary = Readonly<{
-  enabled: boolean
-  registered: number
-  processed: number
-  independentExamRuns: number
-  independentExamErrors: number
-  agents: readonly Readonly<{ agentId: string; role: string; admitted: boolean; nextAction: CosUniversityNextAcademicAction | 'error'; completionRatio: number | null; motivation: CosUniversityMotivationalState | null; peerRank: number | null; error: string | null }>[]
-  errors: readonly string[]
-  semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed'
-}>
+const gate = fs.readFileSync(path.join(process.cwd(), 'lib/ai/cos/cosUniversityPracticeStudyGate.ts'), 'utf8')
+const cycle = fs.readFileSync(path.join(process.cwd(), 'lib/ai/cos/cosUniversityAutonomousAgentCycle.ts'), 'utf8')
+const cosLane = fs.readFileSync(path.join(process.cwd(), 'app/api/cron/cos-university-practice/route.ts'), 'utf8')
 
-/** Bounded host cycle. It enrolls every registered identity and routes its next academic action. */
-export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date; maxAgents?: number } = {}): Promise<CosUniversityAutonomousAgentCycleSummary> {
-  if (process.env.COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED !== 'true') {
-    return { enabled: false, registered: 0, processed: 0, independentExamRuns: 0, independentExamErrors: 0, agents: [], errors: [], semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed' }
-  }
-  const now = options.now instanceof Date ? options.now : new Date()
-  const registered = await listCosUniversityRegisteredAgents(options.maxAgents ?? 25)
-  const motivationStandings = await readCosUniversityMotivationStandings(registered)
-  const agents: Array<CosUniversityAutonomousAgentCycleSummary['agents'][number]> = []
-  const errors: string[] = []
-  let independentExamRuns = 0
-  let independentExamErrors = 0
-  for (const agent of registered) {
-    try {
-      const motivation = selectCosUniversityMotivationalPriority(motivationStandings, agent.agentId)
-      const admission = await runCosUniversityAdmission({ now, agentId: agent.agentId, role: agent.role })
-      if (admission.errors.length) throw new Error(admission.errors.join('; '))
-      await syncCosUniversityAppliedKnowledge(agent.agentId, now)
-      const record = await readCosUniversityAgentAcademicRecord(agent.agentId)
-      let nextAction = decideCosUniversityNextAcademicAction(record)
-      const readyExam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2, readyStudyPlansOnly: true })
-      independentExamRuns += readyExam.attempted
-      independentExamErrors += readyExam.errors.length + readyExam.runs.filter(run => run.status === 'error').length
-      if (readyExam.errors.length) throw new Error(readyExam.errors.join('; '))
-      if (readyExam.runs.length > 0) {
-        nextAction = 'independent_exam'
-      } else if (nextAction === 'independent_exam') {
-        const exam = await runCosUniversityIndependentExamBatch({ now, agentId: agent.agentId, maxExams: 2 })
-        independentExamRuns += exam.attempted
-        independentExamErrors += exam.errors.length + exam.runs.filter(run => run.status === 'error').length
-        if (exam.errors.length) throw new Error(exam.errors.join('; '))
-      } else if (nextAction === 'study' || nextAction === 'remediate') {
-        const learning = await runCosUniversityContinuousLearning({ now, agentId: agent.agentId, maxStudyPlans: motivation?.studyPlanLimit || 4 })
-        if (learning.status === 'error') throw new Error(learning.errors.join('; ') || 'continuous_learning_failed')
-        // Practice follows durable accepted-study proof, not whether this tick acquired material.
-        const practice = await runCosUniversityDeliberatePractice({ agentId: agent.agentId, maxPlans: 1, maxExercises: 2 })
-        if (practice.errors.length) throw new Error(practice.errors.join('; '))
-        await reopenCosUniversityStudyAfterFailedPractice(practice.runs, now, agent.agentId)
-      }
-      agents.push({ agentId: agent.agentId, role: agent.role, admitted: admission.admitted, nextAction, completionRatio: record.completionRatio, motivation: motivation?.state || null, peerRank: motivation?.rank || null, error: null })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      errors.push(`${agent.agentId}:${message}`)
-      agents.push({ agentId: agent.agentId, role: agent.role, admitted: false, nextAction: 'error', completionRatio: null, motivation: null, peerRank: null, error: message })
-    }
-  }
-  return { enabled: true, registered: registered.length, processed: agents.length, independentExamRuns, independentExamErrors, agents, errors, semantics: 'registered_agents_are_automatically_enrolled_and_academically_routed' }
-}
+test('the study gate reads the learner being gated, not COS for everyone', () => {
+  assert.ok(!/\.eq\('agent_id', 'cos'\)/.test(gate), 'the gate is still pinned to COS')
+  assert.match(gate, /agentId: string = 'cos'/)
+  assert.match(gate, /\.eq\('agent_id', learner\)/)
+})
+
+test('COS stays the default so its dedicated lane is unchanged', () => {
+  assert.match(cosLane, /readCosUniversityPracticeStudyGate\(\)/)
+  assert.match(gate, /const learner = String\(agentId \|\| ''\)\.trim\(\) \|\| 'cos'/)
+})
+
+test('every agent clears the same accepted-study proof before practising', () => {
+  // Previously the cycle called the practice runner directly, so a specialist could practise with no
+  // host-written proof of accepted study for the current attempt — the exact check COS must pass.
+  assert.match(cycle, /readCosUniversityPracticeStudyGate\(now, agent\.agentId\)/)
+  const gateAt = cycle.indexOf('readCosUniversityPracticeStudyGate(now, agent.agentId)')
+  const runAt = cycle.indexOf('runCosUniversityDeliberatePractice({')
+  assert.ok(gateAt > 0 && gateAt < runAt, 'the gate must precede execution')
+})
+
+test('practice is bound to the exact plan and round the gate approved', () => {
+  assert.match(cycle, /requiredPlanId: studyGate\.planId,/)
+  assert.match(cycle, /requiredPracticeRound: studyGate\.studyAttempt,/)
+})
+
+test('a learner without current proof does not practise, and that is not an error', () => {
+  assert.match(cycle, /if \(studyGate\.allowed && studyGate\.planId && studyGate\.studyAttempt\) \{/)
+  // No throw on a closed gate: the agent simply moves on this tick.
+  const branch = cycle.slice(cycle.indexOf('if (studyGate.allowed'), cycle.indexOf('agents.push('))
+  assert.ok(!/throw new Error\('practice/.test(branch), branch)
+})
+
+test('failed practice still reopens study for that same learner', () => {
+  assert.match(cycle, /reopenCosUniversityStudyAfterFailedPractice\(practice\.runs, now, agent\.agentId\)/)
+})

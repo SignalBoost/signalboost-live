@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityIndependentExam.ts
 import { createHash } from 'node:crypto'
 import {
   COS_UNIVERSITY_SUBJECTS,
@@ -492,7 +493,18 @@ export function scoreCosUniversityBlindExam(
   for (const pattern of exam.rubric.exactPatterns ?? []) {
     if (!new RegExp(pattern, 'i').test(text)) reasons.push(`exact_pattern_missing:${pattern}`)
   }
-  if (exam.rubric.maxWords && words(text) > exam.rubric.maxWords) reasons.push('word_limit_exceeded')
+  if (exam.rubric.maxWords && words(text) > exam.rubric.maxWords) {
+    // Six consecutive reasoning_decision_science failures were all word_limit_exceeded on the same
+    // model that passed language and history in the same window. `reasons` recorded only the code, so
+    // there is no way to tell a genuinely long answer from one whose visible answer fits and whose
+    // shown working does not. The measured count is carried with the failure; the limit itself is
+    // unchanged, and nothing else about scoring moves.
+    // The exact tag stays first and unchanged: the public feedback path matches it literally, and a
+    // tagged string would silently stop length failures becoming study guidance. The measurement is
+    // a separate, additive reason.
+    reasons.push('word_limit_exceeded')
+    reasons.push(`word_limit_measured:words=${words(text)}:limit=${exam.rubric.maxWords}`)
+  }
   if (exam.rubric.numberedActions) {
     const actions = [...text.matchAll(/^\s*(\d+)[.)]\s+/gm)].map(match => Number(match[1]))
     if (actions.length !== exam.rubric.numberedActions || actions.some((value, index) => value !== index + 1)) {

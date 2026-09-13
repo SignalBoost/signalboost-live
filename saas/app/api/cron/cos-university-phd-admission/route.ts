@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runCosUniversityPhdAdmission } from '@/lib/ai/cos/cosUniversityPhdRuntime'
+import { runCosUniversityPhdAdmissionForAgent } from '@/lib/ai/cos/cosUniversityPhdAgentRunner'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { readCosUniversityDailyLaneCadence } from '@/lib/ai/cos/cosUniversityDailyLaneCadence'
+import { listCosUniversityRegisteredAgents } from '@/lib/ai/cos/cosUniversityAgentRegistry'
+import { rotatePhdAgents } from '@/lib/ai/cos/cosUniversityPhdAgentScope'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,16 +19,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, enabled: false, admitted: false, semantics: 'phd_runtime_fail_closed' })
   }
   try {
-    const cadence = await readCosUniversityDailyLaneCadence('phd_admission')
-    if (!cadence.due) {
-      await recordCosUniversityProductionPath({ path: 'phd_admission', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, cadence } })
-      await recordCosUniversityProductionPath({ path: 'phd_runtime', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, cadence } })
-      return NextResponse.json({ ok: true, skipped: true, cadence })
+    const now = new Date()
+    const agents = rotatePhdAgents(await listCosUniversityRegisteredAgents(), now, 1)
+    if (!agents.length) throw new Error('no_registered_phd_agents')
+
+    const notDue: Array<Record<string, unknown>> = []
+    for (const agent of agents) {
+      const cadence = await readCosUniversityDailyLaneCadence('phd_admission', now, agent.agentId)
+      if (!cadence.due) {
+        notDue.push({ agentId: agent.agentId, role: agent.role, cadence })
+        continue
+      }
+
+      const result = await runCosUniversityPhdAdmissionForAgent(now, agent.agentId)
+      const evidence = { agentId: agent.agentId, role: agent.role, cadence, ...result }
+      await recordCosUniversityProductionPath({ path: 'phd_runtime', invocationSucceeded: result.errors.length === 0, evidence })
+      await recordCosUniversityProductionPath({ path: 'phd_admission', invocationSucceeded: result.errors.length === 0, evidence })
+      return NextResponse.json({ ok: result.errors.length === 0, enabled: true, ...evidence }, { status: result.errors.length ? 500 : 200 })
     }
-    const result = await runCosUniversityPhdAdmission(new Date())
-    await recordCosUniversityProductionPath({ path: 'phd_runtime', invocationSucceeded: result.errors.length === 0, evidence: result })
-    await recordCosUniversityProductionPath({ path: 'phd_admission', invocationSucceeded: result.errors.length === 0, evidence: result })
-    return NextResponse.json({ ok: result.errors.length === 0, enabled: true, ...result }, { status: result.errors.length ? 500 : 200 })
+
+    await recordCosUniversityProductionPath({ path: 'phd_admission', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, agents: notDue } })
+    await recordCosUniversityProductionPath({ path: 'phd_runtime', invocationSucceeded: true, evidence: { dailyCadence: 'not_due', runnerInvoked: false, agents: notDue } })
+    return NextResponse.json({ ok: true, skipped: true, dailyCadence: 'not_due', runnerInvoked: false, agents: notDue })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ ok: false, enabled: true, error: message }, { status: 500 })

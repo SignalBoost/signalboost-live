@@ -32,8 +32,14 @@ import {
   validateCosUniversityPhdMethodologyRubric,
   type CosUniversityPhdMethodologyRubric,
 } from './cosUniversityPhdMethodologyExam.ts'
+import {
+  executeBoundAgentExam,
+  hasBoundAcademicExecutor,
+  isBoundSoftwareCapstoneEvidence,
+} from './cosUniversityAgentExamRuntime.ts'
+import { boundExecutionBindingFailure } from './cosUniversityExecutionBinding.ts'
+import { DEFAULT_PHD_AGENT_ID, requirePhdAgentId } from './cosUniversityPhdAgentScope.ts'
 
-const AGENT_ID = 'cos'
 const EVIDENCE_VALIDITY_DAYS = 365
 
 type ExamRunRow = {
@@ -81,6 +87,18 @@ type CandidateIdentityRow = {
   valid_from: string
   valid_until: string
 }
+
+type CandidateExecution = Readonly<{
+  reply: string
+  turnId: string | null
+  responseSource: string | null
+  localModelInvoked: boolean
+  externalAiInvoked: boolean
+  semanticCache: boolean
+  handled: boolean
+  principalFingerprint: string
+  boundEvidenceValid: boolean
+}>
 
 export type CosUniversityPhdMethodologyExamRunSummary = Readonly<{
   enabled: boolean
@@ -176,15 +194,16 @@ async function privateRubricById(rubricId: string): Promise<LoadedRubric | null>
   return Object.freeze({ id: row.rubric_id, hash: hashCosUniversityPhdMethodologyRubric(rubric), rubric })
 }
 
-async function activeProgram(now: Date): Promise<{
+async function activeProgram(now: Date, agentId: string): Promise<{
   programId: CosUniversityPhdProgramId
   candidateActorId: string
   researchProjectId: string
   protocolId: string
 } | null | 'project_required' | 'ambiguous_lineage'> {
+  requirePhdAgentId(agentId)
   const ids = Object.keys(COS_UNIVERSITY_PHD_PROGRAMS) as CosUniversityPhdProgramId[]
   for (const programId of ids) {
-    const status = await readCosUniversityPhdRuntimeStatus(programId, now)
+    const status = await readCosUniversityPhdRuntimeStatus(programId, now, agentId)
     if (!status.enrollment && !status.credential) continue
     if (status.credential || status.timingStatus === 'deadline_expired' || status.timingStatus === 'not_enrolled') return null
     if (!status.projects.length) return 'project_required'
@@ -231,13 +250,16 @@ async function findRun(runKey: string): Promise<ExamRunRow | null> {
 }
 
 async function createOrFindRun(input: {
+  agentId: string
   programId: CosUniversityPhdProgramId
   candidateActorId: string
   researchProjectId: string
   protocolId: string
   now: Date
 }): Promise<ExamRunRow | null> {
-  const runKey = `${COS_UNIVERSITY_PHD_METHODOLOGY_EXAM_PROFILE}:${hourKey(input.now)}:${input.programId}:${input.researchProjectId}:${input.protocolId}`
+  const agentId = requirePhdAgentId(input.agentId)
+  const historicalKey = `${COS_UNIVERSITY_PHD_METHODOLOGY_EXAM_PROFILE}:${hourKey(input.now)}:${input.programId}:${input.researchProjectId}:${input.protocolId}`
+  const runKey = agentId === DEFAULT_PHD_AGENT_ID ? historicalKey : `agent:${agentId}:${historicalKey}`
   const existing = await findRun(runKey)
   if (existing) return existing
   const privateRubric = await activePrivateRubric()
@@ -247,7 +269,7 @@ async function createOrFindRun(input: {
   const evaluatorActorId = examinerActorId(privateRubric.hash)
   const insert = await dbOrThrow().from('cos_university_phd_methodology_exam_runs').insert({
     run_key: runKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     program_key: `specialist_phd_${input.programId}_v1`,
     program_id: input.programId,
     research_project_id: input.researchProjectId,
@@ -312,7 +334,68 @@ async function finishRun(input: {
   if (result.error) throw result.error
 }
 
-async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdMethodologyExamRunSummary> {
+async function executeCandidate(agentId: string, row: ExamRunRow, prompt: string): Promise<CandidateExecution> {
+  if (agentId !== DEFAULT_PHD_AGENT_ID) {
+    if (!(await hasBoundAcademicExecutor(agentId))) throw new Error('phd_bound_executor_unavailable')
+    const bound = await executeBoundAgentExam(
+      { agentId, runId: row.id, manifestHash: row.manifest_hash, prompt },
+      { domain: 'role_domain' },
+    )
+    const boundEvidenceValid = isBoundSoftwareCapstoneEvidence(bound.execution, {
+      id: row.id,
+      agent_id: agentId,
+      manifest_hash: row.manifest_hash,
+      turn_id: bound.execution.turnId,
+    }, bound.execution.role)
+    if (!boundEvidenceValid) throw new Error('agent_execution_identity_mismatch')
+    const bindingFailure = boundExecutionBindingFailure(bound.reply, bound.execution)
+    if (bindingFailure) throw new Error(bindingFailure)
+    return {
+      reply: bound.reply,
+      turnId: bound.execution.turnId,
+      responseSource: bound.execution.runtime,
+      localModelInvoked: true,
+      externalAiInvoked: false,
+      semanticCache: false,
+      handled: true,
+      principalFingerprint: bound.execution.model,
+      boundEvidenceValid: true,
+    }
+  }
+
+  beginEvidenceSourceUseTurn()
+  let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
+  try {
+    if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
+      await ensureLocalInferenceRuntimeReady()
+      await generateLocalEmbedding(prompt)
+    }
+    result = await tryCOSFirstAnswer({ prompt, language: 'en', privileged: true, disableCache: true })
+  } catch (error) {
+    flushCapturedEvidenceSourceUse()
+    throw error
+  }
+  const turnId = peekEvidenceSourceUseTurnId()
+  const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
+  const semanticCache = result.provenance.responseSource === 'semantic_cache'
+    || result.provenance.responseSource === 'semantic_similarity'
+  const execution: CandidateExecution = {
+    reply,
+    turnId: turnId || null,
+    responseSource: result.provenance.responseSource,
+    localModelInvoked: Boolean(result.provenance.localModelInvoked),
+    externalAiInvoked: Boolean(result.provenance.externalAiInvoked),
+    semanticCache,
+    handled: result.handled,
+    principalFingerprint: String(result.provenance.reasonerLabel || '').trim(),
+    boundEvidenceValid: true,
+  }
+  flushCapturedEvidenceSourceUse()
+  return execution
+}
+
+async function executeRun(row: ExamRunRow, now: Date, agentId: string): Promise<CosUniversityPhdMethodologyExamRunSummary> {
+  requirePhdAgentId(agentId)
   if (!(await claimRun(row, now))) {
     return summary({ programId: row.program_id, runId: row.id, status: 'not_claimed', reasons: ['methodology_exam_claim_not_acquired'] })
   }
@@ -355,21 +438,10 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
   }
 
   const started = Date.now()
-  beginEvidenceSourceUseTurn()
-  let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
+  let execution: CandidateExecution
   try {
-    if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
-      await ensureLocalInferenceRuntimeReady()
-      await generateLocalEmbedding(exam.prompt)
-    }
-    result = await tryCOSFirstAnswer({
-      prompt: exam.prompt,
-      language: 'en',
-      privileged: true,
-      disableCache: true,
-    })
+    execution = await executeCandidate(agentId, row, exam.prompt)
   } catch (error) {
-    flushCapturedEvidenceSourceUse()
     const completedAt = new Date()
     const reasons = [`execution_error:${describeError(error)}`]
     await finishRun({
@@ -381,19 +453,15 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
   }
 
   const completedAt = new Date()
-  const turnId = peekEvidenceSourceUseTurnId()
-  const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
-  const semanticCache = result.provenance.responseSource === 'semantic_cache'
-    || result.provenance.responseSource === 'semantic_similarity'
-  const score = scoreCosUniversityPhdMethodologyExam(exam, reply, {
-    localReasoning: result.provenance.localModelInvoked,
-    externalAi: result.provenance.externalAiInvoked,
-    semanticCache,
-    handled: result.handled,
-    turnId,
+  const score = scoreCosUniversityPhdMethodologyExam(exam, execution.reply, {
+    localReasoning: execution.localModelInvoked,
+    externalAi: execution.externalAiInvoked,
+    semanticCache: execution.semanticCache,
+    handled: execution.handled,
+    turnId: execution.turnId,
   }, privateRubric.rubric)
   const candidate = await candidateIdentity(row.candidate_actor_id)
-  const reasonerFingerprint = String(result.provenance.reasonerLabel || '').trim()
+  const reasonerFingerprint = execution.principalFingerprint
   const candidateMatchesReasoner = Boolean(
     candidate
     && candidate.actorRole === 'candidate'
@@ -402,19 +470,20 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
     && candidate.principalFingerprint === reasonerFingerprint,
   )
   const freshExecution = Boolean(
-    result.handled
-    && result.provenance.localModelInvoked
-    && !result.provenance.externalAiInvoked
-    && !semanticCache
-    && turnId
-    && candidateMatchesReasoner,
+    execution.handled
+    && execution.localModelInvoked
+    && !execution.externalAiInvoked
+    && !execution.semanticCache
+    && execution.turnId
+    && candidateMatchesReasoner
+    && execution.boundEvidenceValid,
   )
   const reasons = [
     ...score.reasons,
     ...(!candidateMatchesReasoner ? ['candidate_reasoner_principal_mismatch'] : []),
+    ...(!execution.boundEvidenceValid ? ['bound_candidate_execution_invalid'] : []),
     ...(!freshExecution ? ['fresh_candidate_execution_required'] : []),
   ]
-  flushCapturedEvidenceSourceUse()
 
   let evidenceRecorded = false
   let evidenceError: string | null = null
@@ -422,6 +491,7 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
     const validUntil = new Date(completedAt.getTime() + EVIDENCE_VALIDITY_DAYS * 86_400_000)
     try {
       evidenceRecorded = await recordHostCosUniversityPhdEvidence({
+        agentId,
         evidenceKey: `phd-methodology-exam:${row.id}`,
         evidence: {
           evidenceId: `phd-methodology-exam:${row.id}`,
@@ -448,11 +518,12 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
           manifestHash: row.manifest_hash,
           rubricId: row.rubric_id,
           rubricHash: row.rubric_hash,
-          turnId,
-          responseSource: result.provenance.responseSource,
-          localModelInvoked: result.provenance.localModelInvoked,
-          externalAiInvoked: result.provenance.externalAiInvoked,
+          turnId: execution.turnId,
+          responseSource: execution.responseSource,
+          localModelInvoked: execution.localModelInvoked,
+          externalAiInvoked: execution.externalAiInvoked,
           candidateReasonerMatched: candidateMatchesReasoner,
+          boundEvidenceValid: execution.boundEvidenceValid,
           reasons: score.reasons,
         },
       })
@@ -475,21 +546,21 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
     status: terminalStatus,
     passed,
     evidenceRecorded,
-    turnId: turnId || null,
-    responseSource: result.provenance.responseSource,
-    localModelInvoked: Boolean(result.provenance.localModelInvoked),
-    externalAiInvoked: Boolean(result.provenance.externalAiInvoked),
+    turnId: execution.turnId,
+    responseSource: execution.responseSource,
+    localModelInvoked: execution.localModelInvoked,
+    externalAiInvoked: execution.externalAiInvoked,
     freshExecution,
     reasons: finalReasons,
     latencyMs,
     completedAt,
   })
 
-  if (turnId) {
-    await attachTurnOutcome(turnId, {
+  if (agentId === DEFAULT_PHD_AGENT_ID && execution.turnId) {
+    await attachTurnOutcome(execution.turnId, {
       verifiedSuccess: Boolean(score.passed && evidenceRecorded && freshExecution),
       repairNeeded: !score.passed || !evidenceRecorded || !freshExecution,
-      escalated: !result.handled,
+      escalated: !execution.handled,
       source: `cos_university_phd_methodology_exam:${row.id}`,
     })
   }
@@ -500,27 +571,30 @@ async function executeRun(row: ExamRunRow, now: Date): Promise<CosUniversityPhdM
     status: terminalStatus,
     passed,
     evidenceRecorded,
-    turnId: turnId || null,
+    turnId: execution.turnId,
     reasons: finalReasons,
     latencyMs,
   })
 }
 
-export async function runCosUniversityPhdMethodologyExam(options: { now?: Date } = {}): Promise<CosUniversityPhdMethodologyExamRunSummary> {
+export async function runCosUniversityPhdMethodologyExam(
+  options: { now?: Date; agentId?: string } = {},
+): Promise<CosUniversityPhdMethodologyExamRunSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
+  const agentId = requirePhdAgentId(options.agentId ?? DEFAULT_PHD_AGENT_ID)
   if (process.env.COS_UNIVERSITY_PHD_METHODOLOGY_EXAMS_ENABLED !== 'true') return summary({ enabled: false, status: 'disabled' })
 
   try {
-    const active = await activeProgram(now)
+    const active = await activeProgram(now, agentId)
     if (active === 'project_required') return summary({ status: 'research_project_required' })
     if (active === 'ambiguous_lineage') return summary({ status: 'ambiguous_research_lineage' })
     if (!active) {
       const anyEnrollment = await Promise.all((Object.keys(COS_UNIVERSITY_PHD_PROGRAMS) as CosUniversityPhdProgramId[])
-        .map(programId => readCosUniversityPhdRuntimeStatus(programId, now)))
+        .map(programId => readCosUniversityPhdRuntimeStatus(programId, now, agentId)))
       return summary({ status: anyEnrollment.some(item => item.enrollment || item.credential) ? 'program_inactive' : 'not_enrolled' })
     }
 
-    const evidence = await readCosUniversityPhdEvidence(active.programId)
+    const evidence = await readCosUniversityPhdEvidence(active.programId, agentId)
     const program = COS_UNIVERSITY_PHD_PROGRAMS[active.programId]
     const passCount = cosUniversityPhdDistinctPassesAfterLatestFailure(
       evidence,
@@ -533,7 +607,7 @@ export async function runCosUniversityPhdMethodologyExam(options: { now?: Date }
       return summary({ programId: active.programId, status: 'complete' })
     }
 
-    const row = await createOrFindRun({ ...active, now })
+    const row = await createOrFindRun({ agentId, ...active, now })
     if (!row) return summary({ programId: active.programId, status: 'error', reasons: ['methodology_exam_run_not_created'] })
     if (row.status === 'passed' || row.status === 'failed' || row.status === 'error') {
       return summary({
@@ -547,7 +621,7 @@ export async function runCosUniversityPhdMethodologyExam(options: { now?: Date }
       })
     }
     if (row.status !== 'created') return summary({ programId: row.program_id, runId: row.id, status: 'not_claimed', reasons: ['methodology_exam_run_active'] })
-    return executeRun(row, now)
+    return executeRun(row, now, agentId)
   } catch (error) {
     return summary({ status: 'error', reasons: [describeError(error)] })
   }

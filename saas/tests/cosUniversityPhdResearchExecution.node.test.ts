@@ -251,7 +251,7 @@ test('research worker requires fresh local non-cache model work and does not exp
   assert.match(runner, /generateLocalEmbedding/)
   assert.match(runner, /disableCache: true/)
   assert.match(runner, /localModelInvoked/)
-  assert.match(runner, /!result\.provenance\.externalAiInvoked/)
+  assert.match(runner, /!execution\.externalAiInvoked/)
   assert.match(runner, /fresh_local_research_execution_required/)
   assert.doesNotMatch(file('app/api/admin/cos-university-phd/route.ts'), /ResearchRunner|ResearchAssignment|ResearchProduct/)
 })

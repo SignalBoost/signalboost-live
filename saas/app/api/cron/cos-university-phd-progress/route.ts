@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runCosUniversityPhdProgress } from '@/lib/ai/cos/cosUniversityPhdRuntime'
+import { runCosUniversityPhdProgressForAgent } from '@/lib/ai/cos/cosUniversityPhdAgentRunner'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { listCosUniversityRegisteredAgents } from '@/lib/ai/cos/cosUniversityAgentRegistry'
+import { rotatePhdAgents } from '@/lib/ai/cos/cosUniversityPhdAgentScope'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,9 +17,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, enabled: false, awarded: false, semantics: 'phd_runtime_fail_closed' })
   }
   try {
-    const result = await runCosUniversityPhdProgress(new Date())
-    await recordCosUniversityProductionPath({ path: 'phd_progress', invocationSucceeded: result.errors.length === 0, evidence: result })
-    return NextResponse.json({ ok: result.errors.length === 0, enabled: true, ...result }, { status: result.errors.length ? 500 : 200 })
+    const now = new Date()
+    const agents = rotatePhdAgents(await listCosUniversityRegisteredAgents(), now, 2)
+    const selected = agents[0]
+    if (!selected) throw new Error('no_registered_phd_agents')
+    const result = await runCosUniversityPhdProgressForAgent(now, selected.agentId)
+    const evidence = { agentId: selected.agentId, role: selected.role, ...result }
+    await recordCosUniversityProductionPath({ path: 'phd_progress', invocationSucceeded: result.errors.length === 0, evidence })
+    return NextResponse.json({ ok: result.errors.length === 0, enabled: true, ...evidence }, { status: result.errors.length ? 500 : 200 })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ ok: false, enabled: true, error: message }, { status: 500 })

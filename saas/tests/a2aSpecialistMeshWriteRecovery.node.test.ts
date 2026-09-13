@@ -78,6 +78,44 @@ function providerRegistry(outcomes: Record<string, 'applied' | 'not_applied' | '
   ])
 }
 
+test('provider registry preserves class prototype methods', async () => {
+  class PrototypeProvider {
+    readonly providerId = 'prototype-provider'
+    matches(input: any) { return input.transportRef === 'prototype-transport' }
+    idempotencyKey(input: any) { return `prototype:${input.operationKey}` }
+    async reconcile(input: any) {
+      return {
+        outcome: 'not_applied' as const,
+        evidenceRef: `db://prototype/${encodeURIComponent(input.operationKey)}/not-applied`,
+      }
+    }
+  }
+
+  const registry = createSpecialistMeshWriteRecoveryProviderRegistry([new PrototypeProvider()])
+  const request = {
+    tenantId,
+    environmentId,
+    portableId,
+    taskId: 'task-prototype-provider',
+    skillId,
+    workItemId: 'specialist-mesh:task-prototype-provider',
+    risk: 'write' as const,
+    operationKey: 'operation-prototype-provider',
+    agentId: 'publisher-a',
+    transportRef: 'prototype-transport',
+  }
+  const provider = registry.resolve(request)
+  assert.ok(provider)
+  const idempotencyKey = await provider.idempotencyKey(request)
+  assert.equal(idempotencyKey, 'prototype:operation-prototype-provider')
+  const reconciliation = await provider.reconcile({
+    ...request,
+    idempotencyKey,
+    result: { ok: false, agentId: 'publisher-a', skillId, risk: 'write', mode: 'a2a_transport_unavailable', error: 'timeout' },
+  })
+  assert.equal(reconciliation.outcome, 'not_applied')
+})
+
 function writeMesh(input: {
   outcomes: Record<string, 'applied' | 'not_applied' | 'unknown'>
   delegate: (invocation: any) => Promise<any>

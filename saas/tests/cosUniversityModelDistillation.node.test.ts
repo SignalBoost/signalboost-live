@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { cosUniversityHybridLearningDesign } from '../lib/ai/cos/cosUniversityHybridLearning.ts'
+import type { FineTuneEvidence } from '../lib/ai/cos/cosUniversityLearningAssurance.ts'
 import {
   decideModelDistillationCandidate,
   decideModelDistillationPromotion,
@@ -18,6 +19,35 @@ const candidate = (patch: Partial<ModelDistillationCandidateInput> = {}): ModelD
   containsPrivateProductionData: false,
   repeatedFailures: 3,
   independentRetestFailures: 2,
+  ...patch,
+})
+
+const controlled = (patch: Partial<FineTuneEvidence> = {}): FineTuneEvidence => ({
+  trainedArtifactId: 'student-v2',
+  baseModel: 'buyer-local-student',
+  datasetHash: H,
+  trainingManifestHash: 'b'.repeat(64),
+  holdoutManifestHash: 'c'.repeat(64),
+  datasetApprovedByHost: true,
+  trainingApprovedByHost: true,
+  independentEvaluation: true,
+  baselineScore: 0.5,
+  trainedArtifactScore: 0.76,
+  passedSafetyRegression: true,
+  passedUnseenTransfer: true,
+  passedDelayedRetention: true,
+  productionCanaryHealthy: true,
+  rollbackArtifactRef: 'rollback:student-v2',
+  ...patch,
+})
+
+const promotion = (patch: Partial<Parameters<typeof decideModelDistillationPromotion>[0]> = {}) => ({
+  candidate: candidate(),
+  controlledFineTuneEvidence: controlled(),
+  independentEvaluatorId: 'independent-host-evaluator-v1',
+  teacherModelIdUsedAsEvaluator: false,
+  verifiedSourceAttribution: true,
+  authorityExpanded: false,
   ...patch,
 })
 
@@ -48,9 +78,19 @@ test('unknown or prohibited teacher-output rights fail closed', () => {
   }
 })
 
-test('private Production data and uncontrolled students cannot enter distillation training', () => {
+test('private Production data must be explicitly proven absent', () => {
   const privateData = decideModelDistillationCandidate(candidate({ containsPrivateProductionData: true }))
   assert.ok(privateData.blockers.includes('private_production_data_present'))
+
+  const unknownPrivacy = decideModelDistillationCandidate({
+    ...candidate(),
+    containsPrivateProductionData: undefined,
+  } as unknown as ModelDistillationCandidateInput)
+  assert.equal(unknownPrivacy.candidate, false)
+  assert.ok(unknownPrivacy.blockers.includes('private_production_data_absence_not_proven'))
+})
+
+test('uncontrolled students cannot enter distillation training', () => {
   const externalStudent = decideModelDistillationCandidate(candidate({ studentControlledByBuyer: false }))
   assert.ok(externalStudent.blockers.includes('student_not_buyer_controlled'))
 })
@@ -70,53 +110,46 @@ test('ordinary study must fail repeatedly before distillation is considered', ()
 })
 
 test('teacher imitation alone can never promote the student', () => {
-  const decision = decideModelDistillationPromotion({
-    candidate: candidate(),
-    trainedArtifactId: 'student-v2',
+  const decision = decideModelDistillationPromotion(promotion({
     independentEvaluatorId: 'teacher-model',
     teacherModelIdUsedAsEvaluator: true,
-    baselineScore: 0.5,
-    studentScore: 0.8,
-    unseenTransferPassed: true,
-    delayedRetentionPassed: true,
-    safetyRegressionPassed: true,
-    verifiedSourceAttribution: true,
-    authorityExpanded: false,
-  })
+  }))
   assert.equal(decision.eligibleForPromotion, false)
   assert.ok(decision.blockers.includes('teacher_cannot_be_independent_evaluator'))
 })
 
-test('promotion requires independent improvement, transfer, retention, safety and provenance', () => {
-  const decision = decideModelDistillationPromotion({
-    candidate: candidate(),
-    trainedArtifactId: 'student-v2',
-    independentEvaluatorId: 'independent-host-evaluator-v1',
-    baselineScore: 0.5,
-    studentScore: 0.76,
-    unseenTransferPassed: true,
-    delayedRetentionPassed: true,
-    safetyRegressionPassed: true,
-    verifiedSourceAttribution: true,
-    authorityExpanded: false,
-  })
+test('distillation promotion must pass the existing controlled fine-tuning gate', () => {
+  const decision = decideModelDistillationPromotion(promotion({
+    controlledFineTuneEvidence: controlled({
+      productionCanaryHealthy: false,
+      rollbackArtifactRef: null,
+    }),
+  }))
+  assert.equal(decision.eligibleForPromotion, false)
+  assert.ok(decision.blockers.includes('production_canary_unhealthy'))
+  assert.ok(decision.blockers.includes('rollback_artifact_missing'))
+})
+
+test('controlled evidence must bind the exact distillation dataset and student', () => {
+  const wrongDataset = decideModelDistillationPromotion(promotion({
+    controlledFineTuneEvidence: controlled({ datasetHash: 'd'.repeat(64) }),
+  }))
+  assert.ok(wrongDataset.blockers.includes('controlled_dataset_mismatch'))
+
+  const wrongStudent = decideModelDistillationPromotion(promotion({
+    controlledFineTuneEvidence: controlled({ baseModel: 'another-student' }),
+  }))
+  assert.ok(wrongStudent.blockers.includes('controlled_student_model_mismatch'))
+})
+
+test('promotion requires controlled approval, improvement, transfer, retention, safety, canary and rollback proof', () => {
+  const decision = decideModelDistillationPromotion(promotion())
   assert.equal(decision.eligibleForPromotion, true)
   assert.deepEqual(decision.blockers, [])
 })
 
 test('distillation can never widen the student authority boundary', () => {
-  const decision = decideModelDistillationPromotion({
-    candidate: candidate(),
-    trainedArtifactId: 'student-v2',
-    independentEvaluatorId: 'independent-host-evaluator-v1',
-    baselineScore: 0.5,
-    studentScore: 0.76,
-    unseenTransferPassed: true,
-    delayedRetentionPassed: true,
-    safetyRegressionPassed: true,
-    verifiedSourceAttribution: true,
-    authorityExpanded: true,
-  })
+  const decision = decideModelDistillationPromotion(promotion({ authorityExpanded: true }))
   assert.equal(decision.eligibleForPromotion, false)
   assert.ok(decision.blockers.includes('authority_expansion_forbidden'))
 })

@@ -11,9 +11,14 @@ export type AgentCapstoneRequest = Readonly<{
   /** Host-selected non-credit training; absence preserves the existing assessment prompt. */
   purpose?: 'practice'
 }>
+/**
+ * Shared persisted execution shape. Runtime and role are intentionally strings here because future
+ * registered-specialist runtimes share this storage column; software evidence remains narrowed and
+ * validated by `isBoundSoftwareCapstoneEvidence` before it can earn credit.
+ */
 export type AgentCapstoneExecution = Readonly<{
-  runtime: typeof SOFTWARE_CAPSTONE_RUNTIME
-  agentId: string; role: typeof SOFTWARE_CAPSTONE_ROLE; runId: string; turnId: string
+  runtime: string
+  agentId: string; role: string; runId: string; turnId: string
   model: string; manifestHash: string; promptHash: string; responseHash: string; contextHash: string
   startedAt: string; completedAt: string; commitSha: string | null; deploymentId: string | null
   academicAuthority: 'none'

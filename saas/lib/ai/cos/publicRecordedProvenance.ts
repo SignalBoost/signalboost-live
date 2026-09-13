@@ -131,24 +131,24 @@ function quoted(value: string | null): string {
 
 function originLine(facts: PublicRecordedProvenance, lang: string): string {
   const route = facts.responseSource ? quoted(facts.responseSource) : ''
-  const model = facts.localReasoning.model ? quoted(facts.localReasoning.model) : ''
-  const external = [facts.externalAi.provider, facts.externalAi.model].filter(Boolean).join(' / ')
   const utility = facts.deterministicUtility.utility ? quoted(facts.deterministicUtility.utility) : ''
 
+  // Public provenance reports the execution class, never internal provider/model identifiers.
+  // The durable internal record still retains those identifiers for authorized diagnostics/audit.
   if (facts.externalAi.invoked) {
-    if (lang === 'pt') return `Origem registrada: um provedor externo de IA${external ? ` (${external})` : ''} participou desta resposta${route ? ` pela rota ${route}` : ''}.`
-    if (lang === 'es') return `Origen registrado: un proveedor externo de IA${external ? ` (${external})` : ''} participó en esta respuesta${route ? ` por la ruta ${route}` : ''}.`
-    if (lang === 'pl') return `Zarejestrowane pochodzenie: zewnętrzny dostawca AI${external ? ` (${external})` : ''} uczestniczył w tej odpowiedzi${route ? ` przez ścieżkę ${route}` : ''}.`
-    if (lang === 'ru') return `Зафиксированное происхождение: внешний провайдер ИИ${external ? ` (${external})` : ''} участвовал в формировании ответа${route ? ` через маршрут ${route}` : ''}.`
-    return `Recorded origin: an external AI provider${external ? ` (${external})` : ''} contributed to this answer${route ? ` through route ${route}` : ''}.`
+    if (lang === 'pt') return `Origem registrada: um provedor externo de IA participou desta resposta${route ? ` pela rota ${route}` : ''}.`
+    if (lang === 'es') return `Origen registrado: un proveedor externo de IA participó en esta respuesta${route ? ` por la ruta ${route}` : ''}.`
+    if (lang === 'pl') return `Zarejestrowane pochodzenie: zewnętrzny dostawca AI uczestniczył w tej odpowiedzi${route ? ` przez ścieżkę ${route}` : ''}.`
+    if (lang === 'ru') return `Зафиксированное происхождение: внешний провайдер ИИ участвовал в формировании ответа${route ? ` через маршрут ${route}` : ''}.`
+    return `Recorded origin: an external AI provider contributed to this answer${route ? ` through route ${route}` : ''}.`
   }
 
   if (facts.localReasoning.invoked) {
-    if (lang === 'pt') return `Origem registrada: o raciocinador local${model ? ` ${model}` : ''} gerou ou sintetizou esta resposta${route ? ` pela rota ${route}` : ''}.`
-    if (lang === 'es') return `Origen registrado: el razonador local${model ? ` ${model}` : ''} generó o sintetizó esta respuesta${route ? ` por la ruta ${route}` : ''}.`
-    if (lang === 'pl') return `Zarejestrowane pochodzenie: lokalny model rozumujący${model ? ` ${model}` : ''} wygenerował lub zsyntetyzował tę odpowiedź${route ? ` przez ścieżkę ${route}` : ''}.`
-    if (lang === 'ru') return `Зафиксированное происхождение: локальная модель рассуждения${model ? ` ${model}` : ''} сгенерировала или синтезировала ответ${route ? ` через маршрут ${route}` : ''}.`
-    return `Recorded origin: the local reasoner${model ? ` ${model}` : ''} generated or synthesized this answer${route ? ` through route ${route}` : ''}.`
+    if (lang === 'pt') return `Origem registrada: o raciocinador local gerou ou sintetizou esta resposta${route ? ` pela rota ${route}` : ''}.`
+    if (lang === 'es') return `Origen registrado: el razonador local generó o sintetizó esta respuesta${route ? ` por la ruta ${route}` : ''}.`
+    if (lang === 'pl') return `Zarejestrowane pochodzenie: lokalny model rozumujący wygenerował lub zsyntetyzował tę odpowiedź${route ? ` przez ścieżkę ${route}` : ''}.`
+    if (lang === 'ru') return `Зафиксированное происхождение: локальная модель рассуждения сгенерировала или синтезировала ответ${route ? ` через маршрут ${route}` : ''}.`
+    return `Recorded origin: the local reasoner generated or synthesized this answer${route ? ` through route ${route}` : ''}.`
   }
 
   if (facts.deterministicUtility.used) {

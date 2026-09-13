@@ -7,9 +7,10 @@ import {
   trainingExecutorReadiness,
   type TrainingMode,
 } from '@/lib/ai/cos/cosUniversityTrainingExecutor'
+import { registerCosUniversityDistillationTrainingPlan } from '@/lib/ai/cos/cosUniversityDistillationDatasetPlan'
 import { installHuggingFaceTrainingExecutorEnv } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
 import type { FineTuneRevision } from '@/lib/ai/cos/cosUniversityFineTuneEvidence'
-import type { ModelDistillationCandidateInput } from '@/lib/ai/cos/cosUniversityModelDistillation'
+import type { ModelDistillationCandidateInput, ModelDistillationTrainingRights } from '@/lib/ai/cos/cosUniversityModelDistillation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,7 @@ export const maxDuration = 120
 
 function statusForError(message: string): number {
   if (message === 'training_executor_not_configured' || message === 'training_executor_dispatch_disabled') return 503
-  if (message.startsWith('training_executor_') || message.startsWith('huggingface_training_')) return 400
+  if (message.startsWith('training_executor_') || message.startsWith('huggingface_training_') || message.startsWith('distillation_dataset_')) return 400
   return 500
 }
 
@@ -38,10 +39,29 @@ export async function POST(request: Request) {
   try { body = await request.json() } catch { body = null }
 
   try {
-    // Training can create external cost. Owner auth alone is not intent to spend: every dispatch must
-    // carry an explicit per-request confirmation and the server-side dispatch feature must be enabled.
-    requireExplicitTrainingDispatchConfirmation(body?.confirmDispatch)
     const operation = String(body?.operation || '')
+
+    // Metadata-only registration is intentionally separated from dispatch. It cannot start a Job,
+    // spend credits, approve training, or enable the server-side dispatch feature.
+    if (operation === 'register_distillation_dataset') {
+      const result = await registerCosUniversityDistillationTrainingPlan({
+        candidateId: String(body?.candidateId || ''),
+        teacherModelId: String(body?.teacherModelId || ''),
+        studentModelId: String(body?.studentModelId || ''),
+        sourceRef: String(body?.sourceRef || ''),
+        provenanceRefs: Array.isArray(body?.provenanceRefs) ? body.provenanceRefs.map((value: unknown) => String(value)) : [],
+        trainingRights: String(body?.trainingRights || 'unknown') as ModelDistillationTrainingRights,
+        containsPrivateProductionData: body?.containsPrivateProductionData,
+        teacherOutputItemHashes: Array.isArray(body?.teacherOutputItemHashes) ? body.teacherOutputItemHashes.map((value: unknown) => String(value)) : [],
+      })
+      return NextResponse.json({ ok: true, ...result }, {
+        headers: { 'Cache-Control': 'no-store, max-age=0' },
+      })
+    }
+
+    // Dataset preparation and model training can create external cost. Owner auth alone is not
+    // intent to spend: every dispatch must carry explicit confirmation and the global feature gate.
+    requireExplicitTrainingDispatchConfirmation(body?.confirmDispatch)
     if (operation === 'prepare_dataset') {
       const result = await dispatchUniversityDatasetPreparation({
         candidateId: String(body?.candidateId || ''),

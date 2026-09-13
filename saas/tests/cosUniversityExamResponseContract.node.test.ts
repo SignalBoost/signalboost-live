@@ -133,6 +133,7 @@ for (const agentId of ['cos', 'software-specialist']) {
     assert.match(result.sent[0].prompt, /at most 260 words/)
     assert.doesNotMatch(result.sent[0].prompt, /private-scorer-sentinel/)
     assert.equal(result.result.status, 'failed')
+    assert.equal(result.result.reasons.length, 2)
     assert.equal(result.result.reasons[0], 'word_limit_exceeded')
     assert.match(String(result.result.reasons[1]), /^word_limit_measured:words=\d+:limit=\d+$/)
     assert.equal(result.assessments.length, 1)

@@ -12,6 +12,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
 import { SOFTWARE_CAPSTONE_RUNTIME } from './cosUniversityAgentCapstone.ts'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
+import { boundExecutionBindingFailure } from './cosUniversityExecutionBinding.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import type { CosUniversitySubjectId } from './cosUniversity.ts'
 import type { CosPlatformLanguage, CosPlatformLanguageDimension } from './cosUniversityLanguages.ts'
@@ -224,6 +225,10 @@ async function executeBoundExam(
   if (execution.agentId !== agentId || execution.runId !== row.id || execution.manifestHash !== exam.manifestHash) {
     return fail(['agent_execution_identity_mismatch'])
   }
+  // The receipt must be about the answer this lane is about to score. Identity fields prove a bound
+  // execution happened; only the response hash proves it produced this reply.
+  const bindingFailure = boundExecutionBindingFailure(bound.reply, execution)
+  if (bindingFailure) return fail([bindingFailure])
 
   // One direct call to the agent's assigned model: local reasoning, no external AI, no cache replay.
   const score = scoreCosUniversityBlindExam(exam, bound.reply, {

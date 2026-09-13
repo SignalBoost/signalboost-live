@@ -25,7 +25,7 @@ test('every response payload can produce server-observed provenance even without
   assert.equal(provenance.external_ai.invoked, false)
 })
 
-test('signed provenance capsule is bound to the exact delivered answer', () => {
+test('signed provenance capsule is bound to the exact delivered answer and hides internal model IDs', () => {
   const previous = process.env.COS_PROVENANCE_SIGNING_KEY
   process.env.COS_PROVENANCE_SIGNING_KEY = SIGNING_KEY
   try {
@@ -36,7 +36,7 @@ test('signed provenance capsule is bound to the exact delivered answer', () => {
         authority: 'server_execution_telemetry',
         response_source: 'cos-local-primary',
         lineage_completeness: 'runtime_recorded',
-        local_reasoning: { invoked: true, model: 'local-test-model' },
+        local_reasoning: { invoked: true, model: 'internal-model-name-must-not-be-exposed' },
         external_ai: { invoked: false, provider: null, model: null },
         live_external_evidence: {
           used: true,
@@ -51,6 +51,8 @@ test('signed provenance capsule is bound to the exact delivered answer', () => {
     const capsule = createPublicAnswerProvenanceCapsule(payload, payload.reply)
     assert.equal(capsule.signed, true)
     assert.ok(capsule.signature)
+    assert.equal(capsule.record.local_reasoning.model, null)
+    assert.doesNotMatch(JSON.stringify(capsule), /internal-model-name-must-not-be-exposed/)
     assert.ok(verifyPublicAnswerProvenanceCapsule(capsule, payload.reply))
     assert.equal(verifyPublicAnswerProvenanceCapsule(capsule, `${payload.reply} altered`), null)
 
@@ -62,6 +64,7 @@ test('signed provenance capsule is bound to the exact delivered answer', () => {
     assert.match(rendered, /https:\/\/www\.cbf\.com\.br\/ranking/)
     assert.match(rendered, /https:\/\/www\.conmebol\.com\/history/)
     assert.doesNotMatch(rendered, /Não tenho um registro verificável/i)
+    assert.doesNotMatch(rendered, /internal-model-name/i)
   } finally {
     if (previous === undefined) delete process.env.COS_PROVENANCE_SIGNING_KEY
     else process.env.COS_PROVENANCE_SIGNING_KEY = previous
@@ -83,20 +86,26 @@ test('a model-only answer still explains its recorded origin instead of pretendi
   assert.match(reply, /local reasoner/i)
   assert.match(reply, /No live external sources were recorded/i)
   assert.doesNotMatch(reply, /don't have a verifiable provenance record/i)
+  assert.doesNotMatch(reply, /qwen-local/i)
 })
 
-test('browser ingress is forced through the mandatory provenance wrapper', () => {
+test('browser ingress is forced through the authenticated mandatory provenance wrapper', () => {
   const proxy = readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8')
   const route = readFileSync(new URL('../app/api/cos-provenance-browser/route.ts', import.meta.url), 'utf8')
   assert.match(proxy, /target\.pathname = '\/api\/cos-provenance-browser'/)
   assert.match(proxy, /pathname === '\/api\/concierge'/)
   assert.match(proxy, /pathname === '\/api\/cos-browser'/)
   assert.match(proxy, /pathname === '\/api\/cos-primary'/)
+  assert.match(proxy, /PROVENANCE_BOUNDARY_HEADER/)
+  assert.match(proxy, /provenanceBoundarySecret\(\)/)
   assert.match(route, /POST as cosBrowserPost/)
   assert.match(route, /ensureAnswerExecutionProvenance/)
   assert.match(route, /createPublicAnswerProvenanceCapsule/)
   assert.match(route, /recordLatestUserTurnProvenance/)
   assert.match(route, /PROVENANCE_COOKIE/)
   assert.match(route, /verifyPublicAnswerProvenanceCapsule/)
+  assert.match(route, /trustedBoundaryRequest\(req\)/)
+  assert.match(route, /status: 404/)
+  assert.match(route, /headers\.delete\(PROVENANCE_BOUNDARY_HEADER\)/)
   assert.match(route, /provenance_match_verified: true/)
 })

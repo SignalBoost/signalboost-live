@@ -5,6 +5,7 @@ import { validateA2AAgentCard } from '../a2a-core/a2a-client.ts'
 import { createInMemoryA2AAgentRegistry } from './a2a-agent-registry.ts'
 import { createA2AHttpJsonRpcTransportFactory, fetchA2AAgentCard } from './a2a-http-jsonrpc-transport.ts'
 import { createInMemoryA2ARuntimeObserver } from './a2a-runtime-observability.ts'
+import type { SpecialistQualificationPort } from './cos-specialist-orchestrator.ts'
 import { createPortableA2AHost } from './portable-a2a-host.ts'
 import {
   PRIMARY_REFERENCE_WRITE_ACCEPTANCE_AGENT_ID,
@@ -18,7 +19,7 @@ import {
 } from './reference-write-acceptance.ts'
 import { createSupabaseSpecialistMeshProductionAdapters } from './specialist-mesh-production-adapters.ts'
 import { createSupabaseSpecialistMeshWriteRecoveryStore, createSpecialistMeshWriteRecoveryProviderRegistry, specialistMeshWriteOperationKey } from './specialist-mesh-write-recovery.ts'
-import { rankSpecialistMeshCandidates } from './specialist-mesh-router.ts'
+import { rankSpecialistMeshCandidates, type SpecialistMeshSignalPort } from './specialist-mesh-router.ts'
 import {
   SPECIALIST_MESH_WRITE_ACCEPTANCE_CONTROL_HEADER,
   createSpecialistMeshWriteAcceptanceControlToken,
@@ -29,6 +30,7 @@ import type { OwnershipIdentity } from '../lib/supervisor/coordination/index.ts'
 
 export const SPECIALIST_MESH_WRITE_PRODUCTION_LIVE_ACCEPTANCE_VERSION = 'signalboost-specialist-mesh-write-production-live-acceptance-v1' as const
 export const SPECIALIST_MESH_WRITE_PRODUCTION_ACCEPTANCE_EVENT = 'specialist_mesh_write_recovery_live_acceptance_completed' as const
+export const SPECIALIST_MESH_WRITE_ACCEPTANCE_REFERENCE_GATE_EVENT = 'specialist_mesh_write_acceptance_reference_gate' as const
 
 const TENANT_ID = 'signalboost-production'
 const ENVIRONMENT_ID = 'production'
@@ -38,7 +40,6 @@ const SKILL_ID = REFERENCE_WRITE_ACCEPTANCE_SKILL_ID
 const TRANSPORT_PRIMARY = 'signalboost-production-reference-write-primary-jsonrpc'
 const TRANSPORT_SECONDARY = 'signalboost-production-reference-write-secondary-jsonrpc'
 const MESSAGE_TEXT = 'Publish the isolated SignalBoost Phase 5 Production acceptance marker. No customer content or external provider is involved.'
-const QUALIFICATION_VERIFIER_ID = 'signalboost-reference-write-acceptance-provenance-v1'
 
 type Db = SupabaseClient<any, any, any>
 type Scenario = 'already_applied' | 'safe_takeover' | 'unknown_outcome'
@@ -128,14 +129,14 @@ async function measureAgentCard(agent: AgentDescriptor): Promise<MeasuredCard> {
   })
 }
 
-async function persistReferenceQualifications(input: {
+async function persistReferenceAcceptanceGates(input: {
   db: Db
   agents: readonly AgentDescriptor[]
   productionCommit: string
   runId: string
   observedAt: Date
-}): Promise<void> {
-  const validUntil = new Date(input.observedAt.getTime() + 24 * 60 * 60_000).toISOString()
+}): Promise<Readonly<Record<string, string>>> {
+  const refs: Record<string, string> = {}
   const rows = input.agents.map(agent => {
     const digest = createHash('sha256').update(JSON.stringify({
       version: REFERENCE_WRITE_ACCEPTANCE_VERSION,
@@ -143,24 +144,50 @@ async function persistReferenceQualifications(input: {
       skillId: SKILL_ID,
       transportRef: agent.transportRef,
       productionCommit: input.productionCommit,
+      acceptanceOnly: true,
     }), 'utf8').digest('hex')
+    const eventId = `specialist-mesh-write-reference-gate-${input.runId}-${agent.agentId}`
+    refs[agent.agentId] = `db://supervisor_audit_events/${eventId}`
     return {
-      qualification_key: `production-write-live:${input.runId}:${agent.agentId}`,
-      tenant_id: TENANT_ID,
-      environment_id: ENVIRONMENT_ID,
-      portable_id: PORTABLE_ID,
-      agent_id: agent.agentId,
-      skill_id: SKILL_ID,
-      qualified: true,
-      evidence_ref: `sha256:${digest}`,
-      verified_by: QUALIFICATION_VERIFIER_ID,
-      valid_from: input.observedAt.toISOString(),
-      valid_until: validUntil,
-      observed_at: input.observedAt.toISOString(),
+      event_id: eventId,
+      execution_id: `production-write-live-${input.runId}`,
+      incident_id: `reference-write-gate:${agent.agentId}`,
+      event_type: SPECIALIST_MESH_WRITE_ACCEPTANCE_REFERENCE_GATE_EVENT,
+      occurred_at: input.observedAt.toISOString(),
+      payload: {
+        schemaVersion: SPECIALIST_MESH_WRITE_PRODUCTION_LIVE_ACCEPTANCE_VERSION,
+        acceptanceOnly: true,
+        qualificationGranted: false,
+        credentialGranted: false,
+        productionCommit: input.productionCommit,
+        agentId: agent.agentId,
+        transportRef: agent.transportRef,
+        tenantId: TENANT_ID,
+        environmentId: ENVIRONMENT_ID,
+        portableId: PORTABLE_ID,
+        skillId: SKILL_ID,
+        sourceFingerprint: `sha256:${digest}`,
+      },
+      schema_version: SPECIALIST_MESH_WRITE_PRODUCTION_LIVE_ACCEPTANCE_VERSION,
     }
   })
-  const { error } = await input.db.from('a2a_specialist_qualifications').insert(rows)
+  const { error } = await input.db.from('supervisor_audit_events').insert(rows)
   if (error) throw error
+  return Object.freeze(refs)
+}
+
+function createReferenceAcceptanceGatePort(evidenceRefs: Readonly<Record<string, string>>): SpecialistQualificationPort {
+  return Object.freeze({
+    async snapshot(input) {
+      if (input.tenantId !== TENANT_ID || input.environmentId !== ENVIRONMENT_ID || input.portableId !== PORTABLE_ID || input.skillId !== SKILL_ID) return {}
+      const out: Record<string, { qualified: true; evidenceRef: string }> = {}
+      for (const agentId of input.agentIds) {
+        const evidenceRef = String(evidenceRefs[agentId] ?? '').trim()
+        if (evidenceRef) out[agentId] = Object.freeze({ qualified: true, evidenceRef })
+      }
+      return Object.freeze(out)
+    },
+  })
 }
 
 async function persistTelemetry(db: Db, measurements: readonly MeasuredCard[], runId: string, observedAt: Date): Promise<void> {
@@ -274,7 +301,8 @@ async function rpcJson(db: Db, name: string, args: Record<string, unknown>): Pro
 async function runScenario(input: {
   db: Db
   registry: ReturnType<typeof registryFor>
-  productionAdapters: ReturnType<typeof createSupabaseSpecialistMeshProductionAdapters>
+  qualifications: SpecialistQualificationPort
+  meshSignals: SpecialistMeshSignalPort
   agents: readonly AgentDescriptor[]
   ranked: readonly { agentId: string; meshScore: number }[]
   signingSecret: string
@@ -304,8 +332,8 @@ async function runScenario(input: {
   const host = createPortableA2AHost({
     registry: input.registry,
     transportFactory,
-    qualifications: input.productionAdapters.qualifications,
-    meshSignals: input.productionAdapters.meshSignals,
+    qualifications: input.qualifications,
+    meshSignals: input.meshSignals,
     observe: observer,
     meshCoordination: {
       store: coordinationStore,
@@ -415,23 +443,24 @@ export async function runSpecialistMeshWriteProductionLiveAcceptance(input: {
   const registry = registryFor(agents)
 
   const measurements = await Promise.all(agents.map(measureAgentCard))
-  await persistReferenceQualifications({ db: input.db, agents, productionCommit, runId, observedAt: startedAt })
+  const gateEvidenceRefs = await persistReferenceAcceptanceGates({ db: input.db, agents, productionCommit, runId, observedAt: startedAt })
+  const qualifications = createReferenceAcceptanceGatePort(gateEvidenceRefs)
   await persistTelemetry(input.db, measurements, runId, startedAt)
 
   const productionAdapters = createSupabaseSpecialistMeshProductionAdapters(input.db)
   const agentIds = agents.map(agent => agent.agentId)
-  const qualifications = await productionAdapters.qualifications.snapshot({
+  const gateSnapshot = await qualifications.snapshot({
     tenantId: TENANT_ID,
     environmentId: ENVIRONMENT_ID,
     portableId: PORTABLE_ID,
     skillId: SKILL_ID,
     agentIds,
   })
-  if (agentIds.some(agentId => qualifications[agentId]?.qualified !== true || !String(qualifications[agentId]?.evidenceRef ?? '').trim())) {
-    throw new Error('specialist_mesh_write_acceptance_exact_two_qualifications_missing')
+  if (agentIds.some(agentId => gateSnapshot[agentId]?.qualified !== true || !String(gateSnapshot[agentId]?.evidenceRef ?? '').trim())) {
+    throw new Error('specialist_mesh_write_acceptance_exact_two_reference_gates_missing')
   }
-  if (qualifications[agentIds[0]!]!.evidenceRef === qualifications[agentIds[1]!]!.evidenceRef) {
-    throw new Error('specialist_mesh_write_acceptance_independent_qualification_evidence_required')
+  if (gateSnapshot[agentIds[0]!]!.evidenceRef === gateSnapshot[agentIds[1]!]!.evidenceRef) {
+    throw new Error('specialist_mesh_write_acceptance_distinct_reference_gate_evidence_required')
   }
 
   const signals = await productionAdapters.meshSignals.snapshot({
@@ -444,9 +473,10 @@ export async function runSpecialistMeshWriteProductionLiveAcceptance(input: {
   const ranked = rankSpecialistMeshCandidates(agentIds.map(agentId => ({ agentId })), signals)
   if (ranked.length !== 2) throw new Error(`specialist_mesh_write_acceptance_exact_two_routable_required:${ranked.length}`)
 
-  const alreadyApplied = await runScenario({ db: input.db, registry, productionAdapters, agents, ranked, signingSecret, productionCommit, runId, scenario: 'already_applied' })
-  const safeTakeover = await runScenario({ db: input.db, registry, productionAdapters, agents, ranked, signingSecret, productionCommit, runId, scenario: 'safe_takeover' })
-  const unknownOutcome = await runScenario({ db: input.db, registry, productionAdapters, agents, ranked, signingSecret, productionCommit, runId, scenario: 'unknown_outcome' })
+  const scenarioBase = { db: input.db, registry, qualifications, meshSignals: productionAdapters.meshSignals, agents, ranked, signingSecret, productionCommit, runId }
+  const alreadyApplied = await runScenario({ ...scenarioBase, scenario: 'already_applied' })
+  const safeTakeover = await runScenario({ ...scenarioBase, scenario: 'safe_takeover' })
+  const unknownOutcome = await runScenario({ ...scenarioBase, scenario: 'unknown_outcome' })
 
   const acceptedAt = new Date().toISOString()
   const evidence = Object.freeze({
@@ -472,10 +502,13 @@ export async function runSpecialistMeshWriteProductionLiveAcceptance(input: {
       primaryMeshScore: ranked[0]!.meshScore,
       fallbackMeshScore: ranked[1]!.meshScore,
     },
-    qualification: {
-      verifierId: QUALIFICATION_VERIFIER_ID,
-      exactScopeReferenceQualification: true,
-      customerOrBuyerQualificationClaimed: false,
+    acceptanceGate: {
+      durableHostEvidence: true,
+      acceptanceOnly: true,
+      productionQualificationGranted: false,
+      credentialGranted: false,
+      primaryEvidenceRef: gateSnapshot[agentIds[0]!]!.evidenceRef,
+      fallbackEvidenceRef: gateSnapshot[agentIds[1]!]!.evidenceRef,
     },
     scenarios: { alreadyApplied, safeTakeover, unknownOutcome },
     security: {

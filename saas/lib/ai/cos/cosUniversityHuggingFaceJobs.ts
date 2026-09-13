@@ -14,10 +14,13 @@ export type HuggingFaceJobsConfig = Readonly<{
   token: string
   workerUrl: string
   preparationFlavor: string
+  teacherFlavor: string
   trainingFlavor: string
   preparationTimeoutSeconds: number
+  teacherTimeoutSeconds: number
   trainingTimeoutSeconds: number
   maxDatasetItems: number
+  maxHourlyCostUsd: number
 }>
 
 export type HuggingFaceJobSpec = Readonly<{
@@ -31,7 +34,21 @@ export type HuggingFaceJobSpec = Readonly<{
   timeoutSeconds: number
 }>
 
+export type HuggingFaceModelMetadata = Readonly<{
+  modelId: string
+  revision: string
+  license: string
+}>
+
+export type HuggingFaceHardwareRate = Readonly<{
+  flavor: string
+  prettyName: string
+  hourlyCostUsd: number
+  accelerator: Readonly<{ type: string; model: string; manufacturer: string; quantity: string }> | null
+}>
+
 type Env = Record<string, string | undefined>
+type FetchPort = (url: string, init?: RequestInit) => Promise<Response>
 
 type TrainingEnvelope = Readonly<Record<string, unknown>> & {
   operation?: unknown
@@ -51,6 +68,12 @@ function positiveInt(value: unknown, fallback: number, min: number, max: number)
   const parsed = Number(value)
   if (!Number.isFinite(parsed)) return fallback
   return Math.max(min, Math.min(max, Math.floor(parsed)))
+}
+
+function positiveFloat(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.max(min, Math.min(max, parsed))
 }
 
 function deploymentOrigin(env: Env): string | null {
@@ -120,12 +143,16 @@ export function huggingFaceJobsConfigFromEnv(env: Env = process.env): HuggingFac
     token,
     workerUrl,
     preparationFlavor: clean(env.COS_UNIVERSITY_HF_PREPARATION_FLAVOR, 80) || 'cpu-upgrade',
+    teacherFlavor: clean(env.COS_UNIVERSITY_HF_TEACHER_FLAVOR, 80) || 't4-small',
     // Start with the least-expensive NVIDIA GPU. We never auto-upgrade hardware or spend more
     // because of an OOM; a larger flavor must be deliberately configured after the failed run is reviewed.
     trainingFlavor: clean(env.COS_UNIVERSITY_HF_TRAINING_FLAVOR, 80) || 't4-small',
     preparationTimeoutSeconds: positiveInt(env.COS_UNIVERSITY_HF_PREPARATION_TIMEOUT_SECONDS, 1800, 300, 7200),
+    teacherTimeoutSeconds: positiveInt(env.COS_UNIVERSITY_HF_TEACHER_TIMEOUT_SECONDS, 1800, 300, 3600),
     trainingTimeoutSeconds: positiveInt(env.COS_UNIVERSITY_HF_TRAINING_TIMEOUT_SECONDS, 14400, 900, 86400),
     maxDatasetItems: positiveInt(env.COS_UNIVERSITY_HF_MAX_DATASET_ITEMS, 5000, 20, 20000),
+    // Owner requested sub-$1/hour hardware. Configuration may lower this ceiling, never raise it.
+    maxHourlyCostUsd: positiveFloat(env.COS_UNIVERSITY_HF_MAX_HOURLY_COST_USD, 1, 0.01, 1),
   })
 }
 
@@ -153,6 +180,25 @@ function workerBootstrap(packages: readonly string[]): readonly string[] {
   return Object.freeze(['bash', '-lc', shell])
 }
 
+function teacherEnvelopeValid(envelope: TrainingEnvelope): boolean {
+  const teacher = (envelope as any)?.teacher
+  const student = (envelope as any)?.student
+  const prompts = (envelope as any)?.prompts
+  return Boolean(
+    teacher && student
+    && clean(teacher.modelId, 240) && COMMIT_SHA.test(clean(teacher.revision, 40)) && clean(teacher.license, 80) === 'apache-2.0'
+    && clean(student.modelId, 240) && COMMIT_SHA.test(clean(student.revision, 40)) && clean(student.license, 80) === 'apache-2.0'
+    && clean(teacher.modelId, 240) !== clean(student.modelId, 240)
+    && Array.isArray(prompts) && prompts.length >= 20 && prompts.length <= 256
+    && prompts.every((item: any) => clean(item?.id, 160) && clean(item?.prompt, 12000))
+    && (envelope as any)?.trainingRights === 'open_license'
+    && (envelope as any)?.studentControlledByBuyer === true
+    && (envelope as any)?.containsPrivateProductionData === false
+    && COMMIT_SHA.test(clean(teacher.revision, 40))
+    && COMMIT_SHA.test(clean(student.revision, 40))
+  )
+}
+
 /**
  * Builds, but never submits, a Hugging Face Job. Submission remains behind the existing global
  * dispatch flag plus explicit owner confirmation in the University training executor.
@@ -176,7 +222,19 @@ export function buildHuggingFaceJobSpec(input: {
   let timeoutSeconds: number
   let command: readonly string[]
 
-  if (operation === 'prepare_dataset') {
+  if (operation === 'generate_teacher_dataset') {
+    if (!teacherEnvelopeValid(input.envelope)) throw new Error('huggingface_teacher_dataset_envelope_invalid')
+    dockerImage = 'pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime'
+    flavor = input.config.teacherFlavor
+    timeoutSeconds = input.config.teacherTimeoutSeconds
+    command = workerBootstrap([
+      'huggingface_hub>=0.34,<2',
+      'datasets>=3,<5',
+      'transformers>=4.55,<6',
+      'accelerate>=1.10,<2',
+      'bitsandbytes>=0.46,<1',
+    ])
+  } else if (operation === 'prepare_dataset') {
     const source = (input.envelope as any)?.candidate?.source
     if (!isHuggingFaceDatasetRef(source)) throw new Error('huggingface_training_source_dataset_ref_required')
     dockerImage = 'python:3.12-slim'
@@ -208,6 +266,11 @@ export function buildHuggingFaceJobSpec(input: {
 
   const requestB64 = Buffer.from(JSON.stringify(input.envelope), 'utf8').toString('base64url')
   const digest = requestDigest(input.envelope)
+  const purpose = operation === 'train'
+    ? 'governed-model-training'
+    : operation === 'generate_teacher_dataset'
+      ? 'governed-teacher-dataset'
+      : 'governed-dataset-preparation'
   return Object.freeze({
     dockerImage,
     command,
@@ -230,14 +293,83 @@ export function buildHuggingFaceJobSpec(input: {
       name: `itmounts-${operation}-${digest}`,
       product: 'itmounts',
       subsystem: 'cos-university',
-      purpose: operation === 'train' ? 'governed-model-training' : 'governed-dataset-preparation',
+      purpose,
     }),
+  })
+}
+
+function modelApiUrl(modelId: string): string {
+  const parts = clean(modelId, 240).split('/').filter(Boolean)
+  if (parts.length !== 2) throw new Error('huggingface_model_id_invalid')
+  return `${HUGGING_FACE_JOBS_API}/api/models/${parts.map(encodeURIComponent).join('/')}`
+}
+
+export async function resolveHuggingFaceModelMetadata(input: {
+  modelId: string
+  token: string
+  fetchImpl?: FetchPort
+}): Promise<HuggingFaceModelMetadata> {
+  const modelId = clean(input.modelId, 240)
+  const response = await (input.fetchImpl || fetch)(modelApiUrl(modelId), {
+    headers: { authorization: `Bearer ${input.token}` },
+    redirect: 'error',
+  })
+  if (!response.ok) throw new Error(`huggingface_model_metadata_rejected:${response.status}`)
+  const payload = await response.json() as any
+  const resolvedId = clean(payload?.id || payload?.modelId, 240)
+  const revision = clean(payload?.sha, 40).toLowerCase()
+  const tagLicense = Array.isArray(payload?.tags)
+    ? payload.tags.map((item: unknown) => clean(item, 120)).find((item: string) => item.startsWith('license:'))?.slice('license:'.length)
+    : ''
+  const license = clean(payload?.cardData?.license || tagLicense, 80).toLowerCase()
+  if (resolvedId !== modelId || !COMMIT_SHA.test(revision) || !license) {
+    throw new Error('huggingface_model_metadata_invalid')
+  }
+  if (payload?.disabled === true) throw new Error('huggingface_model_disabled')
+  return Object.freeze({ modelId: resolvedId, revision, license })
+}
+
+export async function resolveHuggingFaceHardwareRate(input: {
+  flavor: string
+  token?: string
+  fetchImpl?: FetchPort
+}): Promise<HuggingFaceHardwareRate> {
+  const flavor = clean(input.flavor, 80)
+  if (!flavor) throw new Error('huggingface_hardware_flavor_missing')
+  const headers: Record<string, string> = {}
+  if (clean(input.token, 4096)) headers.authorization = `Bearer ${clean(input.token, 4096)}`
+  const response = await (input.fetchImpl || fetch)(`${HUGGING_FACE_JOBS_API}/api/jobs/hardware`, {
+    headers,
+    redirect: 'error',
+  })
+  if (!response.ok) throw new Error(`huggingface_hardware_pricing_rejected:${response.status}`)
+  const payload = await response.json() as any
+  const row = Array.isArray(payload) ? payload.find(item => clean(item?.name, 80) === flavor) : null
+  const unitCost = Number(row?.unitCostUSD)
+  const unitLabel = clean(row?.unitLabel, 40).toLowerCase()
+  if (!row || !Number.isFinite(unitCost) || unitCost < 0 || !['minute', 'hour'].includes(unitLabel)) {
+    throw new Error('huggingface_hardware_pricing_invalid')
+  }
+  const hourlyCostUsd = unitLabel === 'minute' ? unitCost * 60 : unitCost
+  const accelerator = row.accelerator && typeof row.accelerator === 'object'
+    ? Object.freeze({
+      type: clean(row.accelerator.type, 40),
+      model: clean(row.accelerator.model, 80),
+      manufacturer: clean(row.accelerator.manufacturer, 80),
+      quantity: clean(row.accelerator.quantity, 20),
+    })
+    : null
+  return Object.freeze({
+    flavor,
+    prettyName: clean(row.prettyName, 120) || flavor,
+    hourlyCostUsd: Number(hourlyCostUsd.toFixed(6)),
+    accelerator,
   })
 }
 
 export async function resolveHuggingFaceNamespace(input: {
   token: string
-  fetchImpl?: typeof fetch
+  fetchImpl?: FetchPort
 }): Promise<string> {
   const response = await (input.fetchImpl || fetch)(`${HUGGING_FACE_JOBS_API}/api/whoami-v2`, {
     headers: { authorization: `Bearer ${input.token}` },
@@ -254,7 +386,7 @@ export async function submitHuggingFaceJob(input: {
   namespace: string
   token: string
   spec: HuggingFaceJobSpec
-  fetchImpl?: typeof fetch
+  fetchImpl?: FetchPort
 }): Promise<{ jobId: string; jobUrl: string }> {
   const namespace = clean(input.namespace, 200)
   if (!namespace) throw new Error('huggingface_training_namespace_missing')

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getCurrentUser } from '@/lib/auth/permission-middleware'
+import { resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { loadCosLiveMissionBindings } from '@/lib/ai/cos/autonomy/liveRuntime.ts'
 
 export const runtime = 'nodejs'
@@ -18,6 +19,7 @@ async function isAuthorized(req: NextRequest): Promise<boolean> {
 export async function GET(req: NextRequest) {
   if (!(await isAuthorized(req))) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
+  const reasoner = resolveCosReasoner()
   const checks = {
     cronSecret: present('CRON_SECRET'),
     portableBridgeSecret: present('COS_PORTABLE_BRIDGE_SECRET') || present('CRON_SECRET'),
@@ -25,7 +27,7 @@ export async function GET(req: NextRequest) {
     supabaseServiceRole: present('SUPABASE_SERVICE_ROLE_KEY'),
     vercelToken: present('VERCEL_TOKEN'),
     vercelProjectId: present('VERCEL_PROJECT_ID'),
-    modelProvider: present('ANTHROPIC_API_KEY') || present('OPENAI_API_KEY') || present('LOCAL_AI_BASE_URL'),
+    modelProvider: !('reason' in reasoner),
   }
 
   let stateTable = { readable: false, error: '' }
@@ -50,7 +52,7 @@ export async function GET(req: NextRequest) {
   if (!checks.supabaseUrl || !checks.supabaseServiceRole) blockers.push('Supabase URL/service-role configuration is missing; COS cannot persist leadership state.')
   if (!stateTable.readable) blockers.push(`cos_autonomy_state is not readable${stateTable.error ? `: ${stateTable.error}` : ''}. Apply the 20260808_cos_autonomy_state migration.`)
   if (!checks.vercelToken || !checks.vercelProjectId) blockers.push('VERCEL_TOKEN and VERCEL_PROJECT_ID are missing; the default Self-Healing portable cannot observe deployments.')
-  if (!checks.modelProvider) blockers.push('No COS autonomy model is available. Configure Anthropic, OpenAI, or the private local endpoint.')
+  if (!checks.modelProvider) blockers.push(`No independent COS reasoner is configured${'reason' in reasoner ? `: ${reasoner.reason}` : ''}. Configure the private/local COS runtime; hosted provider keys do not satisfy COS readiness.`)
   if (missionConfigError) blockers.push(`COS_AUTONOMY_MISSIONS is invalid: ${missionConfigError}`)
 
   return NextResponse.json({

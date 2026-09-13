@@ -42,7 +42,7 @@ function systemPrompt(): string {
   ].join(' ')
 }
 
-export function createModelBackedAutonomyBrain(input?: { modelPreference?: 'claude' | 'openai' | 'local'; maxTokens?: number }): CosAutonomyBrain {
+export function createModelBackedAutonomyBrain(input?: { modelPreference?: 'local'; maxTokens?: number }): CosAutonomyBrain {
   return {
     async plan({ objective, manifest, observation, cycle, previousCycles }) {
       const prompt = JSON.stringify({ objective, cycle, portable: { portableId: manifest.portableId, portableVersion: manifest.portableVersion, capabilities: manifest.capabilities }, observation, previousCycles: previousCycles.map(item => ({ cycle: item.cycle, stateFingerprint: item.observation.stateFingerprint, verification: item.verification, recovery: item.recovery })) })

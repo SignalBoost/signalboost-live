@@ -77,7 +77,7 @@ export async function runCosLiveTick(input: {
   binding: CosLiveMissionBinding
   stateStore: CosLiveTickStateStore
   killSwitch?: () => Promise<boolean> | boolean
-  modelPreference?: 'claude' | 'openai' | 'local'
+  modelPreference?: 'local'
 }): Promise<CosLiveTickResult> {
   const previous = await input.stateStore.load(input.binding.mission.missionId)
   const lifecycle = previous?.lifecycle ?? createMissionLifecycleState(input.binding.mission, input.binding.lifecycle)

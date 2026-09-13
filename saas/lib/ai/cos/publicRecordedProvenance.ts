@@ -1,9 +1,10 @@
 // Public-safe provenance rendering for the Concierge channel.
 //
-// This module is intentionally pure and deterministic. A provenance question is about what the
-// server actually recorded for the preceding turn, so a reasoning model must never reconstruct
-// or narrate that history from memory. If the record is unavailable, fail closed instead of
-// inventing an origin.
+// A provenance question is about what the server actually recorded for the preceding turn.
+// The full record may contain private implementation identifiers (model/provider names, routes,
+// utilities and tool ids). Keep those fields available to internal audit code, but never echo them
+// through the public renderer. Public provenance reports only high-level origin categories plus
+// recorded public source URLs. If the record is unavailable, fail closed instead of inventing it.
 
 export type PublicRecordedSource = { title: string; url: string }
 
@@ -38,7 +39,7 @@ function cleanText(value: unknown, max = 160): string | null {
   return text ? text.slice(0, max) : null
 }
 
-function publicToolNames(provenance: any): string[] {
+function recordedToolNames(provenance: any): string[] {
   const values = Array.isArray(provenance?.tools_used) ? provenance.tools_used : []
   const names = new Set<string>()
   for (const item of values) {
@@ -117,7 +118,7 @@ export function extractPublicRecordedProvenance(provenance: any): PublicRecorded
       used: Boolean(provenance?.deterministic_utility?.used),
       utility: cleanText(provenance?.deterministic_utility?.utility, 160),
     },
-    toolsUsed: publicToolNames(provenance),
+    toolsUsed: recordedToolNames(provenance),
   }
 }
 
@@ -125,55 +126,38 @@ function sourceLines(sources: PublicRecordedSource[]): string {
   return sources.map(source => `- ${source.title}: ${source.url}`).join('\n')
 }
 
-function quoted(value: string | null): string {
-  return value ? `“${value}”` : ''
-}
-
-function originLine(facts: PublicRecordedProvenance, lang: string): string {
-  const route = facts.responseSource ? quoted(facts.responseSource) : ''
-  const utility = facts.deterministicUtility.utility ? quoted(facts.deterministicUtility.utility) : ''
-
-  // Public provenance reports the execution class, never internal provider/model identifiers.
-  // The durable internal record still retains those identifiers for authorized diagnostics/audit.
+// Public disclosure deliberately omits the recorded model/provider, route, utility and tool names.
+// Those identifiers remain in the internal record for owner/admin audit and troubleshooting.
+function publicOriginLine(facts: PublicRecordedProvenance, lang: string): string {
   if (facts.externalAi.invoked) {
-    if (lang === 'pt') return `Origem registrada: um provedor externo de IA participou desta resposta${route ? ` pela rota ${route}` : ''}.`
-    if (lang === 'es') return `Origen registrado: un proveedor externo de IA participó en esta respuesta${route ? ` por la ruta ${route}` : ''}.`
-    if (lang === 'pl') return `Zarejestrowane pochodzenie: zewnętrzny dostawca AI uczestniczył w tej odpowiedzi${route ? ` przez ścieżkę ${route}` : ''}.`
-    if (lang === 'ru') return `Зафиксированное происхождение: внешний провайдер ИИ участвовал в формировании ответа${route ? ` через маршрут ${route}` : ''}.`
-    return `Recorded origin: an external AI provider contributed to this answer${route ? ` through route ${route}` : ''}.`
+    if (lang === 'pt') return 'Origem registrada: um provedor externo de IA participou desta resposta.'
+    if (lang === 'es') return 'Origen registrado: un proveedor externo de IA participó en esta respuesta.'
+    if (lang === 'pl') return 'Zarejestrowane pochodzenie: zewnętrzny dostawca AI uczestniczył w tej odpowiedzi.'
+    if (lang === 'ru') return 'Зафиксированное происхождение: внешний провайдер ИИ участвовал в формировании ответа.'
+    return 'Recorded origin: an external AI provider contributed to this answer.'
   }
 
   if (facts.localReasoning.invoked) {
-    if (lang === 'pt') return `Origem registrada: o raciocinador local gerou ou sintetizou esta resposta${route ? ` pela rota ${route}` : ''}.`
-    if (lang === 'es') return `Origen registrado: el razonador local generó o sintetizó esta respuesta${route ? ` por la ruta ${route}` : ''}.`
-    if (lang === 'pl') return `Zarejestrowane pochodzenie: lokalny model rozumujący wygenerował lub zsyntetyzował tę odpowiedź${route ? ` przez ścieżkę ${route}` : ''}.`
-    if (lang === 'ru') return `Зафиксированное происхождение: локальная модель рассуждения сгенерировала или синтезировала ответ${route ? ` через маршрут ${route}` : ''}.`
-    return `Recorded origin: the local reasoner generated or synthesized this answer${route ? ` through route ${route}` : ''}.`
+    if (lang === 'pt') return 'Origem registrada: o raciocinador local gerou ou sintetizou esta resposta.'
+    if (lang === 'es') return 'Origen registrado: el razonador local generó o sintetizó esta respuesta.'
+    if (lang === 'pl') return 'Zarejestrowane pochodzenie: lokalny model rozumujący wygenerował lub zsyntetyzował tę odpowiedź.'
+    if (lang === 'ru') return 'Зафиксированное происхождение: локальная модель рассуждения сгенерировала или синтезировала ответ.'
+    return 'Recorded origin: the local reasoner generated or synthesized this answer.'
   }
 
   if (facts.deterministicUtility.used) {
-    if (lang === 'pt') return `Origem registrada: lógica determinística do servidor${utility ? ` (${utility})` : ''} produziu esta resposta; nenhum modelo de raciocínio foi registrado como invocado.`
-    if (lang === 'es') return `Origen registrado: lógica determinista del servidor${utility ? ` (${utility})` : ''} produjo esta respuesta; no se registró ningún modelo de razonamiento como invocado.`
-    if (lang === 'pl') return `Zarejestrowane pochodzenie: deterministyczna logika serwera${utility ? ` (${utility})` : ''} utworzyła tę odpowiedź; nie odnotowano wywołania modelu rozumującego.`
-    if (lang === 'ru') return `Зафиксированное происхождение: детерминированная серверная логика${utility ? ` (${utility})` : ''} сформировала ответ; вызов модели рассуждения не зафиксирован.`
-    return `Recorded origin: deterministic server logic${utility ? ` (${utility})` : ''} produced this answer; no reasoning model was recorded as invoked.`
+    if (lang === 'pt') return 'Origem registrada: lógica determinística do servidor produziu esta resposta; nenhum modelo de raciocínio foi registrado como invocado.'
+    if (lang === 'es') return 'Origen registrado: lógica determinista del servidor produjo esta respuesta; no se registró ningún modelo de razonamiento como invocado.'
+    if (lang === 'pl') return 'Zarejestrowane pochodzenie: deterministyczna logika serwera utworzyła tę odpowiedź; nie odnotowano wywołania modelu rozumującego.'
+    if (lang === 'ru') return 'Зафиксированное происхождение: детерминированная серверная логика сформировала ответ; вызов модели рассуждения не зафиксирован.'
+    return 'Recorded origin: deterministic server logic produced this answer; no reasoning model was recorded as invoked.'
   }
 
-  if (lang === 'pt') return `Origem registrada: a resposta foi entregue pela rota do servidor ${route || 'não especificada'}; o registro não identifica um modelo de raciocínio como responsável.`
-  if (lang === 'es') return `Origen registrado: la respuesta fue entregada por la ruta del servidor ${route || 'no especificada'}; el registro no identifica un modelo de razonamiento como responsable.`
-  if (lang === 'pl') return `Zarejestrowane pochodzenie: odpowiedź dostarczono przez ścieżkę serwera ${route || 'nieokreśloną'}; zapis nie wskazuje modelu rozumującego jako źródła.`
-  if (lang === 'ru') return `Зафиксированное происхождение: ответ был доставлен серверным маршрутом ${route || 'не указан'}; запись не указывает модель рассуждения как источник.`
-  return `Recorded origin: the answer was delivered by server route ${route || 'unspecified'}; the record does not identify a reasoning model as its source.`
-}
-
-function toolLine(facts: PublicRecordedProvenance, lang: string): string {
-  if (!facts.toolsUsed.length) return ''
-  const names = facts.toolsUsed.join(', ')
-  if (lang === 'pt') return `Ferramentas registradas: ${names}.`
-  if (lang === 'es') return `Herramientas registradas: ${names}.`
-  if (lang === 'pl') return `Zarejestrowane narzędzia: ${names}.`
-  if (lang === 'ru') return `Зафиксированные инструменты: ${names}.`
-  return `Recorded tools: ${names}.`
+  if (lang === 'pt') return 'Origem registrada: a resposta foi entregue pelo servidor; o registro público não identifica um modelo de raciocínio como responsável.'
+  if (lang === 'es') return 'Origen registrado: la respuesta fue entregada por el servidor; el registro público no identifica un modelo de razonamiento como responsable.'
+  if (lang === 'pl') return 'Zarejestrowane pochodzenie: odpowiedź dostarczył serwer; publiczny zapis nie wskazuje modelu rozumującego jako źródła.'
+  if (lang === 'ru') return 'Зафиксированное происхождение: ответ был доставлен сервером; публичная запись не указывает модель рассуждения как источник.'
+  return 'Recorded origin: the answer was delivered by the server; the public record does not identify a reasoning model as its source.'
 }
 
 export function renderPublicRecordedProvenance(provenance: any, language = 'en'): string {
@@ -188,37 +172,36 @@ export function renderPublicRecordedProvenance(provenance: any, language = 'en')
     return "I don't have a verifiable provenance record for that answer, so I won't reconstruct or guess where it came from."
   }
 
-  const origin = originLine(facts, lang)
-  const tools = toolLine(facts, lang)
+  const origin = publicOriginLine(facts, lang)
 
   if (facts.sources.length) {
     const lines = sourceLines(facts.sources)
-    if (lang === 'es') return `${origin}${tools ? `\n${tools}` : ''}\n\n${facts.fromCache ? 'El registro indica que esa respuesta fue reutilizada de una respuesta anterior y conserva evidencia pública registrada.' : 'El registro de esa respuesta muestra que se utilizó evidencia pública consultada en vivo.'}\n\nFuentes registradas:\n${lines}\n\nEsta lista proviene del registro real de la respuesta; no fue reconstruida de memoria.`
-    if (lang === 'pt') return `${origin}${tools ? `\n${tools}` : ''}\n\n${facts.fromCache ? 'O registro indica que essa resposta foi reutilizada de uma resposta anterior e preserva evidência pública registrada.' : 'O registro dessa resposta mostra que foram usadas evidências públicas consultadas ao vivo.'}\n\nFontes registradas:\n${lines}\n\nEsta lista vem do registro real da resposta; não foi reconstruída de memória.`
-    if (lang === 'pl') return `${origin}${tools ? `\n${tools}` : ''}\n\n${facts.fromCache ? 'Zapis wskazuje, że ta odpowiedź została ponownie użyta z wcześniejszej odpowiedzi i zachowuje zarejestrowane publiczne dowody.' : 'Zapis tej odpowiedzi pokazuje, że użyto publicznych źródeł sprawdzonych na żywo.'}\n\nZarejestrowane źródła:\n${lines}\n\nTa lista pochodzi z rzeczywistego zapisu odpowiedzi; nie została odtworzona z pamięci.`
-    if (lang === 'ru') return `${origin}${tools ? `\n${tools}` : ''}\n\n${facts.fromCache ? 'Запись показывает, что этот ответ был повторно использован из более раннего ответа и сохраняет зарегистрированные публичные источники.' : 'Запись этого ответа показывает, что использовались публичные источники, проверенные в реальном времени.'}\n\nЗарегистрированные источники:\n${lines}\n\nЭтот список взят из фактической записи ответа, а не восстановлен по памяти.`
-    return `${origin}${tools ? `\n${tools}` : ''}\n\n${facts.fromCache ? 'The record shows that this answer was reused from an earlier response and retains recorded public evidence.' : 'The recorded turn shows that live public evidence was used for this answer.'}\n\nRecorded sources:\n${lines}\n\nThis source list comes from the actual turn record; it was not reconstructed from model memory.`
+    if (lang === 'es') return `${origin}\n\n${facts.fromCache ? 'El registro indica que esa respuesta fue reutilizada de una respuesta anterior y conserva evidencia pública registrada.' : 'El registro de esa respuesta muestra que se utilizó evidencia pública consultada en vivo.'}\n\nFuentes registradas:\n${lines}\n\nEsta lista proviene del registro real de la respuesta; no fue reconstruida de memoria.`
+    if (lang === 'pt') return `${origin}\n\n${facts.fromCache ? 'O registro indica que essa resposta foi reutilizada de uma resposta anterior e preserva evidência pública registrada.' : 'O registro dessa resposta mostra que foram usadas evidências públicas consultadas ao vivo.'}\n\nFontes registradas:\n${lines}\n\nEsta lista vem do registro real da resposta; não foi reconstruída de memória.`
+    if (lang === 'pl') return `${origin}\n\n${facts.fromCache ? 'Zapis wskazuje, że ta odpowiedź została ponownie użyta z wcześniejszej odpowiedzi i zachowuje zarejestrowane publiczne dowody.' : 'Zapis tej odpowiedzi pokazuje, że użyto publicznych źródeł sprawdzonych na żywo.'}\n\nZarejestrowane źródła:\n${lines}\n\nTa lista pochodzi z rzeczywistego zapisu odpowiedzi; nie została odtworzona z pamięci.`
+    if (lang === 'ru') return `${origin}\n\n${facts.fromCache ? 'Запись показывает, что этот ответ был повторно использован из более раннего ответа и сохраняет зарегистрированные публичные источники.' : 'Запись этого ответа показывает, что использовались публичные источники, проверенные в реальном времени.'}\n\nЗарегистрированные источники:\n${lines}\n\nЭтот список взят из фактической записи ответа, а не восстановлен по памяти.`
+    return `${origin}\n\n${facts.fromCache ? 'The record shows that this answer was reused from an earlier response and retains recorded public evidence.' : 'The recorded turn shows that live public evidence was used for this answer.'}\n\nRecorded sources:\n${lines}\n\nThis source list comes from the actual turn record; it was not reconstructed from model memory.`
   }
 
   if (facts.liveEvidenceUsed) {
-    if (lang === 'es') return `${origin}${tools ? `\n${tools}` : ''}\n\nEl registro muestra que se utilizó evidencia pública en vivo, pero no contiene URL de fuentes que pueda citar. No voy a inventarlas.`
-    if (lang === 'pt') return `${origin}${tools ? `\n${tools}` : ''}\n\nO registro mostra que foi usada evidência pública ao vivo, mas não contém URLs de fontes que eu possa citar. Não vou inventá-las.`
-    if (lang === 'pl') return `${origin}${tools ? `\n${tools}` : ''}\n\nZapis pokazuje, że użyto publicznych dowodów na żywo, ale nie zawiera adresów URL źródeł, które mógłbym podać. Nie będę ich wymyślać.`
-    if (lang === 'ru') return `${origin}${tools ? `\n${tools}` : ''}\n\nЗапись показывает, что использовались актуальные публичные источники, но в ней нет URL, которые я мог бы привести. Я не буду их выдумывать.`
-    return `${origin}${tools ? `\n${tools}` : ''}\n\nThe recorded turn shows that live public evidence was used, but it does not contain source URLs I can cite. I won't invent them.`
+    if (lang === 'es') return `${origin}\n\nEl registro muestra que se utilizó evidencia pública en vivo, pero no contiene URL de fuentes que pueda citar. No voy a inventarlas.`
+    if (lang === 'pt') return `${origin}\n\nO registro mostra que foi usada evidência pública ao vivo, mas não contém URLs de fontes que eu possa citar. Não vou inventá-las.`
+    if (lang === 'pl') return `${origin}\n\nZapis pokazuje, że użyto publicznych dowodów na żywo, ale nie zawiera adresów URL źródeł, które mógłbym podać. Nie będę ich wymyślać.`
+    if (lang === 'ru') return `${origin}\n\nЗапись показывает, что использовались актуальные публичные источники, но в ней нет URL, которые я мог бы привести. Я не буду их выдумывать.`
+    return `${origin}\n\nThe recorded turn shows that live public evidence was used, but it does not contain source URLs I can cite. I won't invent them.`
   }
 
   if (facts.fromCache) {
-    if (lang === 'es') return `${origin}${tools ? `\n${tools}` : ''}\n\nEl registro muestra que la respuesta fue reutilizada de una respuesta anterior y no registra nuevas fuentes públicas externas para este turno.`
-    if (lang === 'pt') return `${origin}${tools ? `\n${tools}` : ''}\n\nO registro mostra que a resposta foi reutilizada de uma resposta anterior e não registra novas fontes públicas externas para este turno.`
-    if (lang === 'pl') return `${origin}${tools ? `\n${tools}` : ''}\n\nZapis pokazuje, że odpowiedź została ponownie użyta z wcześniejszej odpowiedzi i dla tego przebiegu nie zarejestrowano nowych zewnętrznych źródeł publicznych.`
-    if (lang === 'ru') return `${origin}${tools ? `\n${tools}` : ''}\n\nЗапись показывает, что ответ был повторно использован из более раннего ответа; для этого хода новые внешние публичные источники не зафиксированы.`
-    return `${origin}${tools ? `\n${tools}` : ''}\n\nThe recorded turn shows that the answer was reused from an earlier response; no new external public sources were recorded for this turn.`
+    if (lang === 'es') return `${origin}\n\nEl registro muestra que la respuesta fue reutilizada de una respuesta anterior y no registra nuevas fuentes públicas externas para este turno.`
+    if (lang === 'pt') return `${origin}\n\nO registro mostra que a resposta foi reutilizada de uma resposta anterior e não registra novas fontes públicas externas para este turno.`
+    if (lang === 'pl') return `${origin}\n\nZapis pokazuje, że odpowiedź została ponownie użyta z wcześniejszej odpowiedzi i dla tego przebiegu nie zarejestrowano nowych zewnętrznych źródeł publicznych.`
+    if (lang === 'ru') return `${origin}\n\nЗапись показывает, что ответ был повторно использован из более раннего ответа; для этого хода новые внешние публичные источники не зафиксированы.`
+    return `${origin}\n\nThe recorded turn shows that the answer was reused from an earlier response; no new external public sources were recorded for this turn.`
   }
 
-  if (lang === 'es') return `${origin}${tools ? `\n${tools}` : ''}\n\nNo se registraron fuentes externas en vivo para esta respuesta.`
-  if (lang === 'pt') return `${origin}${tools ? `\n${tools}` : ''}\n\nNão foram registradas fontes externas ao vivo para esta resposta.`
-  if (lang === 'pl') return `${origin}${tools ? `\n${tools}` : ''}\n\nDla tej odpowiedzi nie zarejestrowano zewnętrznych źródeł na żywo.`
-  if (lang === 'ru') return `${origin}${tools ? `\n${tools}` : ''}\n\nДля этого ответа внешние источники в реальном времени не зафиксированы.`
-  return `${origin}${tools ? `\n${tools}` : ''}\n\nNo live external sources were recorded for this answer.`
+  if (lang === 'es') return `${origin}\n\nNo se registraron fuentes externas en vivo para esta respuesta.`
+  if (lang === 'pt') return `${origin}\n\nNão foram registradas fontes externas ao vivo para esta resposta.`
+  if (lang === 'pl') return `${origin}\n\nDla tej odpowiedzi nie zarejestrowano zewnętrznych źródeł na żywo.`
+  if (lang === 'ru') return `${origin}\n\nДля этого ответа внешние источники в реальном времени не зафиксированы.`
+  return `${origin}\n\nNo live external sources were recorded for this answer.`
 }

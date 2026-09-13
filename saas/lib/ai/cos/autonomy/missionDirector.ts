@@ -31,7 +31,7 @@ function validateDecision(raw: Record<string, unknown>, observation: PortableObs
   return { decisionId: String(raw.decisionId || `mission-decision-${Date.now()}`), objective, priority: priority as CosMissionDecision['priority'], rationale: String(raw.rationale || ''), evidenceIds, shouldAct, confidence }
 }
 
-export function createModelMissionDirector(input?: { modelPreference?: 'claude' | 'openai' | 'local'; maxTokens?: number }): CosMissionDirector {
+export function createModelMissionDirector(input?: { modelPreference?: 'local'; maxTokens?: number }): CosMissionDirector {
   return {
     async decide({ mission, manifest, observation, recentDecisions }) {
       const systemPrompt = [

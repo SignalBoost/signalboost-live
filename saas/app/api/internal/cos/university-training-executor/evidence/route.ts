@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await recordUniversityTrainingExecutorEvidence(body)
+    const result = await recordUniversityTrainingExecutorEvidence(body, { idempotencyKey })
     return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

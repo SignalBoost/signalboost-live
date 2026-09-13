@@ -14,6 +14,7 @@ import {
   type CosPlatformLanguageDimension,
   type CosPlatformLanguageTranscriptEntry,
 } from './cosUniversityLanguages.ts'
+import { platformLanguageDiscoveryQuery } from './cosUniversityLanguageDiscoveryQuery.ts'
 import {
   cosUniversityHybridLearningDesign,
   type CosUniversityHybridLearningDesign,
@@ -442,7 +443,11 @@ export function platformLanguageStudyGapSignal(input: {
     succeeded: false,
     // Acquisition searches the language and what is being studied about it, never the boilerplate
     // question; evaluation still uses the complete subject and question, unchanged.
-    discoveryQuery: [language.title, ...rotatedThemes.slice(0, 2)].join(' '),
+    discoveryQuery: platformLanguageDiscoveryQuery({
+      language: language.id,
+      dimension,
+      studyVariant: input.studyVariant,
+    }) || [language.title, ...rotatedThemes.slice(0, 2)].join(' '),
     ...(studyThemes.length ? { missingFacts: studyThemes } : {}),
     repeatedCount: Math.max(1, Math.floor(Number(input.repeatedCount || 1))),
     evidence: [

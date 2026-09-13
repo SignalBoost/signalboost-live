@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
 import { universityPracticeModelFromEnv } from './cosUniversityAgentModelPolicy.ts'
+import { currentUniversityPracticeModelOverride } from './cosUniversityPracticeModelContext.ts'
 import {
   enforceUniversityPracticeCostGuard,
   meterUniversityPracticeInvocation,
@@ -43,10 +44,13 @@ async function executeCosPracticeOnConfiguredEconomyModel(
   practiceModelOverride?: string | null,
 ): Promise<ReasonerResult | null> {
   // Direct/low-level callers preserve the original env-only fail-closed contract. The host runner
-  // may supply a buyer-controlled model selected from durable service configuration.
-  const practiceModel = practiceModelOverride === undefined
-    ? universityPracticeModelFromEnv()
-    : practiceModelOverride
+  // may inject a buyer-controlled request-local model without mutating process.env.
+  const contextualModel = currentUniversityPracticeModelOverride()
+  const practiceModel = practiceModelOverride !== undefined
+    ? practiceModelOverride
+    : contextualModel !== undefined
+      ? contextualModel
+      : universityPracticeModelFromEnv()
   if (!practiceModel) return null
   const config = localInferenceConfigFromEnv()
   const text = await callLocalModel({

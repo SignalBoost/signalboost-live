@@ -47,7 +47,7 @@ export type CosUniversityRemediationGraduationStatus = CosUniversityTimeBoundedG
 
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
 import { executeSoftwareCapstoneRuntime, requireRegisteredCapstoneRuntime } from './cosUniversityAgentCapstoneRuntime.ts'
-import { SOFTWARE_CAPSTONE_RUNTIME, type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
+import type { AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
 
 const AGENT_ID = 'cos'
 const UNDERGRADUATE_PROGRAM_KEY = 'generalist_undergraduate_v1'
@@ -335,12 +335,7 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
   }).eq('id', row.id).eq('status', 'created').select('id').maybeSingle()
   if (claim.error) throw claim.error
   if (!claim.data) {
-    return {
-      runId: row.id,
-      state: 'error',
-      passed: null,
-      reasons: ['capstone_run_not_claimed'],
-    }
+    return { runId: row.id, state: 'error', passed: null, reasons: ['capstone_run_not_claimed'] }
   }
 
   const started = Date.now()
@@ -357,7 +352,7 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
       })
       execution = specialist.execution
       result = { handled: true, reply: specialist.reply, provenance: {
-        localModelInvoked: true, externalAiInvoked: false, responseSource: SOFTWARE_CAPSTONE_RUNTIME,
+        localModelInvoked: true, externalAiInvoked: false, responseSource: specialist.execution.runtime,
       } }
     } else {
       if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
@@ -443,14 +438,12 @@ function disabledStatus(now: Date): CosUniversityRemediationGraduationStatus {
   const academicStatus = deriveCosUniversityGeneralistGraduation({ academicState, capstoneRuns: [] })
   return {
     ...applyCosUniversityUndergraduateCalendar({ academicStatus, enrollment: null, credential: null, now }),
-    remediation: null, // Unavailable or disabled is not proof of zero unresolved plans.
+    remediation: null,
   }
 }
 
 export async function runCosUniversityGeneralistGraduationGate(options: { now?: Date; agentId?: string } = {}): Promise<CosUniversityGraduationGateSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
-  // Every registered agent graduates under the same gate: its own enrollment, its own minimum
-  // residence and deadline, its own subject/language evidence and its own capstone passes.
   const agentId = String(options.agentId || AGENT_ID).trim() || AGENT_ID
   const emptyStatus = disabledStatus(now)
   if (process.env.COS_UNIVERSITY_GRADUATION_ENABLED !== 'true') {

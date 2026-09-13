@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
+import { DEFAULT_PHD_AGENT_ID, requirePhdAgentId, rotatePhdAgents } from '../lib/ai/cos/cosUniversityPhdAgentScope.ts'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
@@ -16,6 +17,48 @@ test('PhD runtime reuses canonical University enrollment and credential ledgers'
   assert.match(runtime, /readCosUniversityMastersRuntimeStatus/)
   assert.match(runtime, /evaluateCosUniversityPhdAdmission/)
   assert.doesNotMatch(runtime, /caller.*graduat/i)
+})
+
+test('PhD learner scope preserves COS compatibility while isolating each registered agent', () => {
+  assert.equal(DEFAULT_PHD_AGENT_ID, 'cos')
+  assert.equal(requirePhdAgentId('software-specialist'), 'software-specialist')
+  assert.throws(() => requirePhdAgentId('../cos'), /invalid_phd_agent_id/)
+  const rotated = rotatePhdAgents([{ agentId: 'cos' }, { agentId: 'software-specialist' }], new Date('2026-09-13T20:00:00.000Z'))
+  assert.equal(new Set(rotated.map(row => row.agentId)).size, 2)
+
+  const runtime = file('lib/ai/cos/cosUniversityPhdRuntime.ts')
+  assert.match(runtime, /agentId: string = DEFAULT_PHD_AGENT_ID/)
+  assert.match(runtime, /readCosUniversityMastersRuntimeStatus\(program\.mastersPrerequisite, now, undefined, agentId\)/)
+  assert.match(runtime, /\.eq\('agent_id', agentId\)/)
+  assert.match(runtime, /cosUniversityPhdCredentialKey\(agentId, programId\)/)
+  assert.doesNotMatch(runtime, /const AGENT_ID = 'cos'/)
+})
+
+test('PhD specialist methodology and research execution use the registered bound runtime', () => {
+  const methodology = file('lib/ai/cos/cosUniversityPhdMethodologyExamRunner.ts')
+  const research = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
+  for (const source of [methodology, research]) {
+    assert.doesNotMatch(source, /const AGENT_ID = 'cos'/)
+    assert.match(source, /hasBoundAcademicExecutor/)
+    assert.match(source, /executeBoundAgentExam/)
+    assert.match(source, /isBoundSoftwareCapstoneEvidence/)
+    assert.match(source, /agentId/)
+  }
+  assert.match(research, /runId: row\.id/)
+  assert.match(research, /manifestHash: assignment\.assignmentKey/)
+})
+
+test('PhD crons rotate registered learners instead of permanently executing COS', () => {
+  for (const routePath of [
+    'app/api/cron/cos-university-phd-admission/route.ts',
+    'app/api/cron/cos-university-phd-progress/route.ts',
+    'app/api/cron/cos-university-phd-methodology-exam/route.ts',
+    'app/api/cron/cos-university-phd-research/route.ts',
+  ]) {
+    const route = file(routePath)
+    assert.match(route, /listCosUniversityRegisteredAgents\(\)/)
+    assert.match(route, /rotatePhdAgents\(/)
+  }
 })
 
 test('PhD research need is host-controlled and cannot be self-declared by the owner API', () => {

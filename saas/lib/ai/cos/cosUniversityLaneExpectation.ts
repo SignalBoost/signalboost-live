@@ -18,6 +18,12 @@
  * reported as `undeclared` rather than assumed healthy, so adding a lane without declaring its
  * expectation is visible instead of silent.
  *
+ * A fourth situation was found on the first sweep after this module shipped: a lane with no receipt
+ * yet on a fresh build. `featureEnabled` comes out of receipt evidence, so an absent receipt reads
+ * as `false` and looked identical to a flag switched off. Seven lanes were filed as accidentally
+ * disabled minutes after a deploy, before their crons were due. An observation now carries
+ * `receiptFound`, and no claim about a flag is made where no receipt reported one.
+ *
  * Nothing here writes evidence, changes a flag, or influences a grade. It classifies observations.
  */
 
@@ -40,9 +46,15 @@ export type CosUniversityLaneStatus =
   | 'idle_no_eligible_work'
   | 'gated_as_expected'
   | 'absent_as_expected'
-  /** Expected to run, but its feature flag is off. This is the accidental-shutdown case. */
+  /**
+   * Expected to run, and a receipt for this build reported its feature flag OFF. This is the
+   * accidental-shutdown case, and it is only claimable when a receipt actually said so.
+   */
   | 'unexpectedly_disabled'
-  /** Expected to run, flag on, but produced no valid receipt for this deployment. */
+  /**
+   * Expected to run, but this build holds no usable receipt for the lane — either none at all, or
+   * one that ran and failed. The flag state is unreported, so no claim is made about it.
+   */
   | 'unexpectedly_dark'
   /** Deliberately gated, yet enabled. Staging drift rather than an outage. */
   | 'unexpectedly_enabled'
@@ -117,6 +129,14 @@ export function cosUniversityLaneExpectation(
 
 export type CosUniversityLaneObservation = Readonly<{
   path: LearningPathId
+  /**
+   * Whether a receipt for the current commit was found for this lane. Required, because
+   * `featureEnabled` is read out of receipt evidence and NEVER out of the environment: with no
+   * receipt it is false by absence, which says nothing about the flag. On 2026-09-13 a fresh
+   * deployment reported all eighteen lanes `featureEnabled: false` for that reason alone, and
+   * seven were filed as accidentally disabled before any cron had had a chance to fire.
+   */
+  receiptFound: boolean
   featureEnabled: boolean
   verified: boolean
   /** From the verification board. `runner_not_invoked` means it ran and had nothing eligible. */
@@ -136,9 +156,13 @@ export function classifyCosUniversityLane(
   if (expectation === 'expected_absent') return 'absent_as_expected'
 
   if (expectation === 'expected_gated') {
-    return observation.featureEnabled && observation.verified ? 'unexpectedly_enabled' : 'gated_as_expected'
+    return observation.receiptFound && observation.featureEnabled && observation.verified
+      ? 'unexpectedly_enabled' : 'gated_as_expected'
   }
 
+  // Absent evidence is not evidence of a flag. A lane whose cron has not yet fired on this build
+  // is dark — the honest reading — rather than disabled, which would accuse the environment.
+  if (!observation.receiptFound) return 'unexpectedly_dark'
   if (!observation.featureEnabled) return 'unexpectedly_disabled'
   if (observation.verified) return 'running_as_expected'
   // The lane executed and declined for want of eligible work. Not a fault; it clears on its own.

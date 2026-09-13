@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { decideControlledFineTune } from './cosUniversityLearningAssurance.ts'
 import { buildFineTuneEvidenceInput, readFineTuneEvidence, readFineTunePartitionRevision } from './cosUniversityFineTuneEvidence.ts'
+import { controlledFineTuneDatasetHash } from './cosUniversityTrainingIdentity.ts'
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 
@@ -28,7 +29,7 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
   const candidates = []
   for (const plan of plans.data || []) {
     const candidateId = `study-plan:${plan.id}`
-    const datasetHash = hash({ plan: plan.plan_key, subject: plan.subject_id, failure: plan.failure_class, objective: plan.objective, methods: plan.methods, source: plan.source_ref })
+    const datasetHash = controlledFineTuneDatasetHash(plan)
     const revision = await readFineTunePartitionRevision(candidateId, datasetHash, now)
     const recordedEvidence = revision ? await readFineTuneEvidence(candidateId, revision, now) : null
     const decision = decideControlledFineTune(buildFineTuneEvidenceInput(revision || {

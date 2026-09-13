@@ -461,12 +461,13 @@ async function executeRun(row: ExamRunRow, now: Date, agentId: string): Promise<
     turnId: execution.turnId,
   }, privateRubric.rubric)
   const candidate = await candidateIdentity(row.candidate_actor_id)
+  const reasonerFingerprint = execution.principalFingerprint
   const candidateMatchesReasoner = Boolean(
     candidate
     && candidate.actorRole === 'candidate'
     && candidate.principalType === 'ai_model'
     && cosUniversityPhdActorIdentityEligible(candidate, completedAt)
-    && candidate.principalFingerprint === execution.principalFingerprint,
+    && candidate.principalFingerprint === reasonerFingerprint,
   )
   const freshExecution = Boolean(
     execution.handled

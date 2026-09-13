@@ -38,31 +38,47 @@ function practiceRuntimeEnabled(request: { purpose?: string | null }): boolean {
   return request.purpose === 'practice' && process.env.COS_UNIVERSITY_PRACTICE_ENABLED === 'true'
 }
 
+async function readBudgetRows(input: { agentId: string; planId: string }) {
+  const db = await serviceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const committed = await db.from('cos_active_practice_queue')
+    .select('id,attempt_count,metadata,created_at')
+    .eq('generation_source', 'curated')
+    .contains('metadata', { origin: ORIGIN, agentId: input.agentId, universityPlanId: input.planId })
+    .gt('attempt_count', 0)
+    .order('created_at', { ascending: false })
+    .limit(MAX_BUDGET_HISTORY_ROWS)
+  if (committed.error) throw committed.error
+
+  // Result-persistence failures leave attempt_count at zero, so read those rows separately and let
+  // the durable pre-inference invocation marker decide whether they consumed the round budget.
+  const uncommitted = await db.from('cos_active_practice_queue')
+    .select('id,attempt_count,metadata,created_at')
+    .eq('generation_source', 'curated')
+    .contains('metadata', { origin: ORIGIN, agentId: input.agentId, universityPlanId: input.planId })
+    .eq('attempt_count', 0)
+    .order('created_at', { ascending: false })
+    .limit(MAX_BUDGET_HISTORY_ROWS)
+  if (uncommitted.error) throw uncommitted.error
+
+  const byId = new Map<string, { attempt_count: unknown; metadata: unknown }>()
+  for (const row of [...(committed.data || []), ...(uncommitted.data || [])]) {
+    byId.set(String(row.id), row)
+  }
+  return [...byId.values()]
+}
+
 /** Read-only host meter used by both routing and the final execution fence. */
 export async function readUniversityPracticeBudget(input: {
   agentId: string
   planId: string
   currentRound: unknown
 }): Promise<UniversityPracticeBudgetDecision> {
-  const db = await serviceDb()
-  if (!db) throw new Error('service_database_unavailable')
   const currentRound = boundedRound(input.currentRound)
   if (!currentRound) return decideUniversityPracticeBudget({ currentRound, executedRounds: [] })
-
-  const result = await db.from('cos_active_practice_queue')
-    .select('attempt_count,metadata')
-    .eq('generation_source', 'curated')
-    .contains('metadata', {
-      origin: ORIGIN,
-      agentId: input.agentId,
-      universityPlanId: input.planId,
-    })
-    .order('created_at', { ascending: false })
-    .limit(MAX_BUDGET_HISTORY_ROWS)
-  if (result.error) throw result.error
-
+  const rows = await readBudgetRows(input)
   const executedRounds = new Set<number>()
-  for (const row of result.data || []) {
+  for (const row of rows) {
     const metadata = asRecord(row.metadata)
     const round = practiceBudgetRoundFromEvidence({
       practiceRound: metadata.practiceRound,

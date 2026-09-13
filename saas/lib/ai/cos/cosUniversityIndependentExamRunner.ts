@@ -10,7 +10,6 @@ import { attachTurnOutcome, recordTurnLearningEnrichment } from '@/lib/ai/cos/tu
 import { decideCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
-import { SOFTWARE_CAPSTONE_RUNTIME } from './cosUniversityAgentCapstone.ts'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import type { CosUniversitySubjectId } from './cosUniversity.ts'
@@ -214,7 +213,6 @@ async function executeBoundExam(
   try {
     bound = await executeBoundAgentExam(
       { agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: universityIndependentLearnerPrompt(exam) },
-      // A language exam is generalist work; a subject exam may or may not be this role's own field.
       { subjectId: target.kind === 'subject' ? target.subjectId : null },
     )
   } catch (error) {
@@ -225,7 +223,6 @@ async function executeBoundExam(
     return fail(['agent_execution_identity_mismatch'])
   }
 
-  // One direct call to the agent's assigned model: local reasoning, no external AI, no cache replay.
   const score = scoreCosUniversityBlindExam(exam, bound.reply, {
     localReasoning: true, externalAi: false, semanticCache: false, handled: true, turnId: execution.turnId,
   })
@@ -249,7 +246,7 @@ async function executeBoundExam(
       manifestHash: exam.manifestHash,
       responseContract: universityExamResponseContract(exam),
       turnId: execution.turnId,
-      responseSource: SOFTWARE_CAPSTONE_RUNTIME,
+      responseSource: execution.runtime,
       localModelInvoked: true,
       externalAiInvoked: false,
       executionProvenance: execution,
@@ -264,7 +261,7 @@ async function executeBoundExam(
     status: score.passed ? 'passed' : 'failed',
     passed: score.passed,
     turn_id: execution.turnId,
-    response_source: SOFTWARE_CAPSTONE_RUNTIME,
+    response_source: execution.runtime,
     local_model_invoked: true,
     external_ai_invoked: false,
     fresh_execution: true,
@@ -294,8 +291,6 @@ async function executeExam(agentId: string, row: ExamRunRow, target: CosUniversi
   }
 
   const started = Date.now()
-  // A registered agent with its own bound executor answers as itself, through its assigned model,
-  // and carries verifiable execution identity. COS keeps its existing reasoner path unchanged.
   if (agentId !== DEFAULT_AGENT_ID) {
     return executeBoundExam(agentId, row, target, exam, started)
   }
@@ -458,7 +453,6 @@ export async function runCosUniversityIndependentExamBatch(options: {
   const now = options.now instanceof Date ? options.now : new Date()
   const agentId = String(options.agentId || DEFAULT_AGENT_ID).trim()
   if (!agentId) return { enabled: true, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: ['agent_id_required'], semantics: 'host_seeded_independent_exam_no_self_grading' }
-  // COS uses its own reasoner; any other agent needs its own bound executor before it can be graded.
   let blocked = cosUniversityAcademicExecutionBlocker(agentId)
   if (blocked && await hasBoundAcademicExecutor(agentId).catch(() => false)) blocked = null
   if (blocked) return { enabled: true, blocked, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors: [], semantics: 'host_seeded_independent_exam_no_self_grading' }

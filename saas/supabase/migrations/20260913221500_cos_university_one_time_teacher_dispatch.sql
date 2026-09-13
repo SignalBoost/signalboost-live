@@ -5,6 +5,7 @@
 create table if not exists public.cos_university_one_time_teacher_dispatch_approvals (
   token_hash text primary key check (token_hash ~ '^[a-f0-9]{64}$'),
   candidate_id text not null check (candidate_id ~ '^study-plan:[0-9a-fA-F-]{36}$'),
+  subject_id text not null check (subject_id = 'reasoning_decision_science'),
   operation text not null default 'generate_teacher_dataset'
     check (operation = 'generate_teacher_dataset'),
   status text not null default 'pending'
@@ -67,6 +68,7 @@ begin
   set status = 'claimed', claimed_at = v_now
   where cos_university_one_time_teacher_dispatch_approvals.token_hash = p_token_hash
     and status = 'pending'
+    and subject_id = 'reasoning_decision_science'
     and operation = 'generate_teacher_dataset'
     and student_training_authorized = false
     and authority_expanded = false
@@ -85,6 +87,7 @@ begin
     'profile', 'cos_university_one_time_teacher_dispatch_v1',
     'claim', 'teacher_dataset_one_time_approval_claimed',
     'candidateId', v_row.candidate_id,
+    'subjectId', v_row.subject_id,
     'operation', v_row.operation,
     'tokenHash', v_row.token_hash,
     'authorizedAt', v_row.authorized_at,
@@ -104,7 +107,7 @@ begin
   insert into public.cos_university_learning_assurance_events (
     event_key, event_type, subject_id, candidate_id, evidence_hash, evidence, verifier, observed_at, expires_at
   ) values (
-    v_event_key, 'fine_tune', 'reasoning_decision_science', v_row.candidate_id,
+    v_event_key, 'fine_tune', v_row.subject_id, v_row.candidate_id,
     v_evidence_hash, v_evidence, 'host_controller', v_row.claimed_at, v_row.expires_at
   );
 
@@ -172,6 +175,7 @@ begin
       then 'teacher_dataset_one_time_approval_dispatched'
       else 'teacher_dataset_one_time_approval_failed' end,
     'candidateId', v_row.candidate_id,
+    'subjectId', v_row.subject_id,
     'operation', v_row.operation,
     'tokenHash', v_row.token_hash,
     'authorizedAt', v_row.authorized_at,
@@ -195,7 +199,7 @@ begin
   insert into public.cos_university_learning_assurance_events (
     event_key, event_type, subject_id, candidate_id, evidence_hash, evidence, verifier, observed_at
   ) values (
-    v_event_key, 'fine_tune', 'reasoning_decision_science', v_row.candidate_id,
+    v_event_key, 'fine_tune', v_row.subject_id, v_row.candidate_id,
     v_evidence_hash, v_evidence, 'host_controller', v_row.completed_at
   );
 

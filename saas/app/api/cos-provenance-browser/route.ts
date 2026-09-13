@@ -3,6 +3,7 @@ import { POST as cosBrowserPost } from '@/app/api/cos-browser/route'
 import { getAccess } from '@/lib/auth/access'
 import { isProvenanceIntrospection } from '@/lib/ai/cos/cosOrchestration'
 import { ensureAnswerExecutionProvenance } from '@/lib/ai/cos/answerProvenance.ts'
+import { provenanceBoundarySecret } from '@/lib/ai/cos/provenanceBoundarySecret.ts'
 import {
   createPublicAnswerProvenanceCapsule,
   publicAnswerCapsuleAsRecordedProvenance,
@@ -16,6 +17,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const PROVENANCE_COOKIE = 'sb_answer_provenance'
+const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
 const MAX_PROVENANCE_COOKIE_CHARS = 3600
 
 type BrowserMessage = {
@@ -78,6 +80,12 @@ function decodeCapsuleCookie(req: NextRequest): unknown {
   }
 }
 
+function trustedBoundaryRequest(req: NextRequest): boolean {
+  const expected = provenanceBoundarySecret()
+  const supplied = req.headers.get(PROVENANCE_BOUNDARY_HEADER) || ''
+  return Boolean(expected && supplied && supplied === expected)
+}
+
 async function finalizeAnswer(response: Response, req: NextRequest, body: any): Promise<Response> {
   let payload: any
   try { payload = await response.clone().json() } catch { return response }
@@ -135,6 +143,12 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
+  // This route is an internal network boundary, not a second public assistant endpoint. The proxy
+  // injects a server-only secret after applying spend/routing policy. A direct request fails closed.
+  if (!trustedBoundaryRequest(req)) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 })
+  }
+
   const body = await req.clone().json().catch(() => ({}))
   const prompt = latestUserText(body)
   const prior = precedingAssistant(body)

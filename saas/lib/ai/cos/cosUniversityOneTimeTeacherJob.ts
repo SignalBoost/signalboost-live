@@ -39,7 +39,11 @@ function record(value: unknown): Record<string, unknown> {
 
 async function serviceDb() {
   const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
-  return cosServiceDb()
+  return modCosServiceDb(await import('../../cos-core/storage/supabase.ts'))
+}
+
+function modCosServiceDb(mod: { cosServiceDb: () => unknown }) {
+  return mod.cosServiceDb() as any
 }
 
 function planUuid(candidateId: string): string {
@@ -99,6 +103,44 @@ async function recordTeacherAudit(input: {
 
 type DispatchPort = (url: string, init: RequestInit) => Promise<Response>
 
+export type OneTimeTeacherDispatchAccepted = Readonly<{
+  accepted: true
+  operation: 'generate_teacher_dataset'
+  candidateId: string
+  jobId: string
+  jobUrl: string
+  teacherModel: string
+  studentModel: string
+  promptCount: number
+  flavor: string
+  hourlyCostUsd: number
+  timeoutSeconds: number
+  maxEstimatedCostUsd: number
+  studentTrainingAuthorized: false
+  auditRecorded: boolean
+}>
+
+/**
+ * Once Hugging Face accepts a job, that consequence can never be downgraded to a replayable
+ * pre-dispatch failure merely because the later host audit insert faults. The one-time receipt is
+ * already consumed, and callers must finalize it as dispatched and reconcile the missing audit.
+ */
+export class OneTimeTeacherProviderAcceptedAuditError extends Error {
+  readonly acceptedDispatch: OneTimeTeacherDispatchAccepted
+  readonly auditError: string
+
+  constructor(acceptedDispatch: OneTimeTeacherDispatchAccepted, cause: unknown) {
+    super('one_time_teacher_provider_accepted_audit_pending')
+    this.name = 'OneTimeTeacherProviderAcceptedAuditError'
+    this.acceptedDispatch = acceptedDispatch
+    this.auditError = cause instanceof Error ? clean(cause.message, 240) : clean(cause, 240)
+  }
+}
+
+export function isOneTimeTeacherProviderAcceptedAuditError(value: unknown): value is OneTimeTeacherProviderAcceptedAuditError {
+  return value instanceof OneTimeTeacherProviderAcceptedAuditError
+}
+
 /**
  * Execute exactly one already-approved teacher-dataset job without enabling the persistent global
  * dispatch switch. The short-lived capability is produced only by the atomically claimed ledger
@@ -108,7 +150,7 @@ type DispatchPort = (url: string, init: RequestInit) => Promise<Response>
 export async function dispatchApprovedOneTimeTeacherDataset(input: {
   capability: OneTimeTeacherDispatchCapability
   fetchImpl?: DispatchPort
-}) {
+}): Promise<OneTimeTeacherDispatchAccepted> {
   const approval = input.capability
   if (approval.operation !== 'generate_teacher_dataset'
     || approval.studentTrainingAuthorized !== false
@@ -211,16 +253,9 @@ export async function dispatchApprovedOneTimeTeacherDataset(input: {
 
   const namespace = await resolveHuggingFaceNamespace({ token: hf.token, fetchImpl: input.fetchImpl })
   const submitted = await submitHuggingFaceJob({ namespace, token: hf.token, spec, fetchImpl: input.fetchImpl })
-  await recordTeacherAudit({
-    candidateId: approval.candidateId,
-    subjectId: plan.subject_id,
-    claim: 'teacher_dataset_job_dispatched',
-    evidence: { ...auditBase, jobId: submitted.jobId, jobUrl: submitted.jobUrl },
-  })
-
-  return Object.freeze({
+  const acceptedDispatch: OneTimeTeacherDispatchAccepted = Object.freeze({
     accepted: true,
-    operation: 'generate_teacher_dataset' as const,
+    operation: 'generate_teacher_dataset',
     candidateId: approval.candidateId,
     jobId: submitted.jobId,
     jobUrl: submitted.jobUrl,
@@ -231,6 +266,20 @@ export async function dispatchApprovedOneTimeTeacherDataset(input: {
     hourlyCostUsd: hardware.hourlyCostUsd,
     timeoutSeconds,
     maxEstimatedCostUsd,
-    studentTrainingAuthorized: false as const,
+    studentTrainingAuthorized: false,
+    auditRecorded: false,
   })
+
+  try {
+    await recordTeacherAudit({
+      candidateId: approval.candidateId,
+      subjectId: plan.subject_id,
+      claim: 'teacher_dataset_job_dispatched',
+      evidence: { ...auditBase, jobId: submitted.jobId, jobUrl: submitted.jobUrl },
+    })
+  } catch (error) {
+    throw new OneTimeTeacherProviderAcceptedAuditError(acceptedDispatch, error)
+  }
+
+  return Object.freeze({ ...acceptedDispatch, auditRecorded: true })
 }

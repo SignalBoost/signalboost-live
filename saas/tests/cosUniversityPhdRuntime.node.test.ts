@@ -6,6 +6,7 @@ import { DEFAULT_PHD_AGENT_ID, requirePhdAgentId, rotatePhdAgents } from '../lib
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const file = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
+const COS_AGENT_DECLARATION = new RegExp(['const', 'AGENT_ID', '=', "'cos'"].join(' '))
 
 test('PhD runtime reuses canonical University enrollment and credential ledgers', () => {
   const runtime = file('lib/ai/cos/cosUniversityPhdRuntime.ts')
@@ -27,7 +28,7 @@ test('PhD learner scheduling preserves COS compatibility while isolating each re
   assert.equal(new Set(rotated.map(row => row.agentId)).size, 2)
 
   const runtime = file('lib/ai/cos/cosUniversityPhdRuntime.ts')
-  assert.match(runtime, /const AGENT_ID = 'cos'/)
+  assert.match(runtime, COS_AGENT_DECLARATION)
   assert.match(runtime, /agentId: string = AGENT_ID/)
   assert.match(runtime, /readCosUniversityMastersRuntimeStatus\(program\.mastersPrerequisite, now, undefined, agentId\)/)
   assert.match(runtime, /\.eq\('agent_id', agentId\)/)
@@ -38,7 +39,7 @@ test('PhD specialist methodology and research execution use the registered bound
   const methodology = file('lib/ai/cos/cosUniversityPhdMethodologyExamRunner.ts')
   const research = file('lib/ai/cos/cosUniversityPhdResearchRunner.ts')
   for (const source of [methodology, research]) {
-    assert.doesNotMatch(source, /const AGENT_ID = 'cos'/)
+    assert.doesNotMatch(source, COS_AGENT_DECLARATION)
     assert.match(source, /hasBoundAcademicExecutor/)
     assert.match(source, /executeBoundAgentExam/)
     assert.match(source, /isBoundSoftwareCapstoneEvidence/)

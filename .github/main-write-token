@@ -1,2 +1,2 @@
-base_sha=1e6ce6e8c718e445d89ed3fd78ae07ce18f4ca3f
-branch=fix/specialist-mesh-acceptance-signing-secret-20260912
+base_sha=ed046255b4ee2293aabf92fb0b5a7aa2956a16d8
+branch=feat/cos-governed-model-distillation-20260912

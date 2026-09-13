@@ -4,6 +4,11 @@ import {
   COS_UNIVERSITY_MASTERS_PROGRAMS,
   type CosUniversityMastersProgramId,
 } from '@/lib/ai/cos/cosUniversityMasters'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import {
+  COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE,
+  cosUniversityEvidenceSupply,
+} from '@/lib/ai/cos/cosUniversityEvidenceSupply'
 import {
   ensureCosUniversityMastersEnrollment,
   evaluateAndAwardCosUniversityMastersCredential,
@@ -22,6 +27,22 @@ function programId(value: unknown): CosUniversityMastersProgramId | null {
     : null
 }
 
+/**
+ * Whether any verified-production outcome exists to draw practical-work evidence from. Existence
+ * only — the supplying lane still decides which outcomes match a programme. Reported here rather
+ * than inside the runtime status so the academic read path keeps its exact query set.
+ */
+async function productionOutcomesObserved(): Promise<number> {
+  const db = cosServiceDb()
+  if (!db) return 0
+  const result = await db.from('cos_turn_outcomes')
+    .select('turn_id')
+    .like('outcome_source', `${COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE}%`)
+    .limit(1)
+  if (result.error) return 0
+  return (result.data || []).length
+}
+
 export async function GET() {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
@@ -29,9 +50,21 @@ export async function GET() {
     const now = new Date()
     const sharedAdmissionState = await readCosUniversityMastersSharedAdmissionState(now)
     const ids = Object.keys(COS_UNIVERSITY_MASTERS_PROGRAMS) as CosUniversityMastersProgramId[]
-    const programs = await Promise.all(ids.map(id =>
-      readCosUniversityMastersRuntimeStatus(id, now, sharedAdmissionState),
-    ))
+    const [statuses, observed] = await Promise.all([
+      Promise.all(ids.map(id => readCosUniversityMastersRuntimeStatus(id, now, sharedAdmissionState))),
+      productionOutcomesObserved(),
+    ])
+    // `verified_practical_work_incomplete` cannot say whether the learner is behind or whether
+    // nothing writes this kind of evidence at all. Both read identically on the board, and today
+    // the second is the true one, so the distinction is reported beside the blocker.
+    const programs = statuses.map(status => ({
+      ...status,
+      practicalEvidenceSupply: cosUniversityEvidenceSupply({
+        required: COS_UNIVERSITY_MASTERS_PROGRAMS[status.programId].minimumDistinctPracticalPasses,
+        earned: status.graduation.blockers.includes('verified_practical_work_incomplete') ? 0 : 1,
+        observed,
+      }),
+    }))
     return NextResponse.json({
       ok: true,
       programs,

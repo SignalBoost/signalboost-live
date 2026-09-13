@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { resolveSpecialistMeshAcceptanceControlSecret } from '@/a2a-host/specialist-mesh-acceptance-control'
 import {
   SPECIALIST_MESH_PRODUCTION_LIVE_ACCEPTANCE_VERSION,
   runSpecialistMeshProductionLiveAcceptance,
@@ -19,8 +20,8 @@ function deploymentFingerprint(): string {
 }
 
 export async function GET(req: NextRequest) {
-  const secret = String(process.env.CRON_SECRET ?? '').trim()
-  if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
+  const cronSecret = String(process.env.CRON_SECRET ?? '').trim()
+  if (!cronSecret || req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized_cron' }, { status: 401 })
   }
   if (process.env.VERCEL_ENV !== 'production') {
@@ -31,10 +32,12 @@ export async function GET(req: NextRequest) {
   if (!productionCommit) return NextResponse.json({ ok: false, error: 'specialist_mesh_acceptance_commit_unavailable' }, { status: 503 })
 
   let productionDeploymentFingerprint: string
+  let failureControlSecret: string
   try {
     productionDeploymentFingerprint = deploymentFingerprint()
+    failureControlSecret = resolveSpecialistMeshAcceptanceControlSecret()
   } catch (error) {
-    const reason = error instanceof Error ? error.message : 'specialist_mesh_acceptance_deployment_unavailable'
+    const reason = error instanceof Error ? error.message : 'specialist_mesh_acceptance_server_control_unavailable'
     return NextResponse.json({ ok: false, error: reason }, { status: 503, headers: { 'cache-control': 'no-store' } })
   }
 
@@ -64,7 +67,7 @@ export async function GET(req: NextRequest) {
   try {
     const result = await runSpecialistMeshProductionLiveAcceptance({
       db,
-      failureControlSecret: secret,
+      failureControlSecret,
       productionCommit,
     })
     const bindingEventId = `specialist-mesh-production-live-binding-${result.evidence.runId}`

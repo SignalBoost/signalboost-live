@@ -10,7 +10,7 @@ import {
   type A2ARuntimeObservationPort,
 } from './a2a-runtime-observability.ts'
 
-export const A2A_DELEGATION_RUNTIME_VERSION = 'signalboost-a2a-delegation-runtime-v2' as const
+export const A2A_DELEGATION_RUNTIME_VERSION = 'signalboost-a2a-delegation-runtime-v3' as const
 
 export interface A2AApprovalEvidence {
   approvalId: string
@@ -29,6 +29,17 @@ export interface A2AMeshResumeCheckpoint {
   state: Readonly<Record<string, unknown>>
 }
 
+/**
+ * Host-owned write recovery metadata. The remote specialist must propagate this exact provider
+ * idempotency key to the consequential provider. It grants no permission by itself.
+ */
+export interface A2AMeshWriteRecoveryEnvelope {
+  schemaVersion: 'signalboost-specialist-mesh-write-recovery-v1'
+  operationKey: string
+  providerId: string
+  idempotencyKey: string
+}
+
 export interface A2ADelegationInvocation {
   tenantId: string
   environmentId: string
@@ -43,6 +54,7 @@ export interface A2ADelegationInvocation {
   actor?: A2AScope['actor']
   approval?: A2AApprovalEvidence
   meshResume?: A2AMeshResumeCheckpoint
+  meshWriteRecovery?: A2AMeshWriteRecoveryEnvelope
 }
 
 export interface A2ADelegationResult {
@@ -84,6 +96,12 @@ function required(value: unknown, name: string): string {
   return normalized
 }
 
+function boundedRequired(value: unknown, name: string, max: number): string {
+  const normalized = required(value, name)
+  if (normalized.length > max || /[\u0000-\u001f\u007f]/.test(normalized)) throw new Error(`A2A delegation ${name} is invalid`)
+  return normalized
+}
+
 function validateApproval(value: A2AApprovalEvidence | undefined): A2AApprovalEvidence | null {
   if (!value) return null
   const approvedAt = new Date(required(value.approvedAt, 'approval.approvedAt'))
@@ -92,6 +110,19 @@ function validateApproval(value: A2AApprovalEvidence | undefined): A2AApprovalEv
     approvalId: required(value.approvalId, 'approval.approvalId'),
     approvedBy: required(value.approvedBy, 'approval.approvedBy'),
     approvedAt: approvedAt.toISOString(),
+  })
+}
+
+function validateMeshWriteRecovery(value: A2AMeshWriteRecoveryEnvelope | undefined): A2AMeshWriteRecoveryEnvelope | undefined {
+  if (!value) return undefined
+  if (value.schemaVersion !== 'signalboost-specialist-mesh-write-recovery-v1') {
+    throw new Error('a2a_write_recovery_schema_version_invalid')
+  }
+  return Object.freeze({
+    schemaVersion: value.schemaVersion,
+    operationKey: boundedRequired(value.operationKey, 'meshWriteRecovery.operationKey', 2048),
+    providerId: boundedRequired(value.providerId, 'meshWriteRecovery.providerId', 256),
+    idempotencyKey: boundedRequired(value.idempotencyKey, 'meshWriteRecovery.idempotencyKey', 512),
   })
 }
 
@@ -198,6 +229,7 @@ export function createA2ADelegationRuntime(options: {
 
   async function invoke(raw: A2ADelegationInvocation): Promise<A2ADelegationResult> {
     const startedAtMs = now().getTime()
+    const meshWriteRecovery = validateMeshWriteRecovery(raw.meshWriteRecovery)
     const invocation: A2ADelegationInvocation = Object.freeze({
       ...raw,
       tenantId: required(raw.tenantId, 'tenantId'),
@@ -207,6 +239,7 @@ export function createA2ADelegationRuntime(options: {
       skillId: required(raw.skillId, 'skillId'),
       messageId: required(raw.messageId, 'messageId'),
       text: required(raw.text, 'text'),
+      ...(meshWriteRecovery ? { meshWriteRecovery } : {}),
     })
     const snapshot = await options.registry.snapshot()
     if (snapshot.schemaVersion !== A2A_AGENT_REGISTRY_VERSION) throw new Error('a2a_registry_schema_version_mismatch')
@@ -277,6 +310,7 @@ export function createA2ADelegationRuntime(options: {
           signalboostRisk: skill.risk,
           ...(approval ? { signalboostApprovalId: approval.approvalId } : {}),
           ...(skill.risk === 'advisory' && invocation.meshResume ? { signalboostMeshResume: JSON.stringify(invocation.meshResume) } : {}),
+          ...(skill.risk !== 'advisory' && invocation.meshWriteRecovery ? { signalboostMeshWriteRecovery: JSON.stringify(invocation.meshWriteRecovery) } : {}),
         }),
       })
       result = Object.freeze({ ok: true, agentId: invocation.agentId, skillId: invocation.skillId, risk: skill.risk, data, mode: 'delegated' })

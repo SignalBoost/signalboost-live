@@ -9,6 +9,7 @@ import {
   requireCosUniversityGraduationRuntime,
   rotateCosUniversityGraduationAgents,
 } from '../lib/ai/cos/cosUniversityGraduationRuntimePolicy.ts'
+import { REGISTERED_SPECIALIST_RUNTIME } from '../lib/ai/cos/cosUniversityRegisteredSpecialistExecutor.ts'
 
 const root = path.resolve(import.meta.dirname, '..')
 const file = (relative: string) => fs.readFileSync(path.join(root, relative), 'utf8')
@@ -17,22 +18,87 @@ const evidence = {
   external_ai_invoked: false, response_source: 'local_reasoning', turn_id: 'fresh-cos-turn',
 }
 const admission = { agentId: 'cos', enabled: true, errors: [] as string[], capstoneState: 'not_eligible' }
+const specialistTurn = 'aaaaaaaa-2222-4333-8444-555555555555'
+const specialistRun = 'aaaaaaaa-1111-4111-8111-111111111111'
+const hash = 'a'.repeat(64)
+const specialistExecution = {
+  runtime: REGISTERED_SPECIALIST_RUNTIME,
+  agentId: 'cybersecurity-specialist',
+  role: 'cybersecurity',
+  runId: specialistRun,
+  turnId: specialistTurn,
+  model: 'fixture-security-model',
+  manifestHash: hash,
+  promptHash: 'b'.repeat(64),
+  responseHash: 'c'.repeat(64),
+  contextHash: 'd'.repeat(64),
+  startedAt: '2026-09-13T10:00:00.000Z',
+  completedAt: '2026-09-13T10:00:01.000Z',
+  commitSha: 'e'.repeat(40),
+  deploymentId: 'fixture-deployment',
+  academicAuthority: 'none' as const,
+}
 
-test('the COS executor cannot be relabeled as a specialist or unknown identity', () => {
+test('COS and only host-registered specialist roles clear the graduation runtime identity gate', () => {
   assert.equal(cosUniversityGraduationRuntimeBlocker('cos'), null)
   assert.doesNotThrow(() => requireCosUniversityGraduationRuntime('cos'))
-  for (const agentId of ['software-specialist', 'cybersecurity-specialist', 'unknown', 'COS', ' cos ']) {
-    assert.equal(cosUniversityGraduationRuntimeBlocker(agentId), 'agent_capstone_runtime_unavailable')
-    assert.throws(() => requireCosUniversityGraduationRuntime(agentId), /agent_capstone_runtime_unavailable/)
+  assert.equal(cosUniversityGraduationRuntimeBlocker('software-specialist', 'software_engineering'), null)
+  assert.equal(cosUniversityGraduationRuntimeBlocker('cybersecurity-specialist', 'cybersecurity'), null)
+  assert.equal(cosUniversityGraduationRuntimeBlocker('quant-agent', 'quantitative_data_science'), null)
+  for (const [agentId, role] of [
+    ['software-specialist', null],
+    ['cybersecurity-specialist', 'chief_of_staff_generalist'],
+    ['unknown', 'unknown'],
+    ['COS', 'cybersecurity'],
+    [' cos ', 'software_engineering'],
+  ] as const) {
+    assert.equal(cosUniversityGraduationRuntimeBlocker(agentId, role), 'agent_capstone_runtime_unavailable')
+    assert.throws(() => requireCosUniversityGraduationRuntime(agentId, role), /agent_capstone_runtime_unavailable/)
   }
   assert.equal(cosUniversityGraduationRuntimeBlocker('  '), 'agent_id_required')
 })
 
-test('only a fresh COS execution may be used as COS capstone evidence', () => {
+test('only fresh identity-bound execution may become graduation capstone evidence', () => {
   assert.equal(isCosUniversityGraduationExecutionEvidence(evidence, 'cos'), true)
+  assert.equal(isCosUniversityGraduationExecutionEvidence({
+    ...evidence,
+    agent_id: specialistExecution.agentId,
+    id: specialistRun,
+    manifest_hash: hash,
+    turn_id: specialistTurn,
+    response_source: REGISTERED_SPECIALIST_RUNTIME,
+    execution_provenance: specialistExecution,
+  }, specialistExecution.agentId, 'cybersecurity', new Date('2026-09-13T10:01:00Z')), true)
   assert.equal(isCosUniversityGraduationExecutionEvidence(evidence, 'software-specialist'), false)
   assert.equal(isCosUniversityGraduationExecutionEvidence({ ...evidence, agent_id: 'software-specialist' }, 'cos'), false)
-  assert.equal(isCosUniversityGraduationExecutionEvidence({ ...evidence, agent_id: 'software-specialist' }, 'software-specialist'), false)
+})
+
+test('COS cannot borrow either legacy software or generic specialist provenance', () => {
+  for (const response_source of ['university_software_specialist_v1', REGISTERED_SPECIALIST_RUNTIME]) {
+    assert.equal(isCosUniversityGraduationExecutionEvidence({
+      ...evidence,
+      response_source,
+      execution_provenance: specialistExecution,
+    }, 'cos'), false)
+  }
+})
+
+test('registered specialist evidence cannot be relabeled across role, learner, run, manifest or response source', () => {
+  const base = {
+    ...evidence,
+    agent_id: specialistExecution.agentId,
+    id: specialistRun,
+    manifest_hash: hash,
+    turn_id: specialistTurn,
+    response_source: REGISTERED_SPECIALIST_RUNTIME,
+    execution_provenance: specialistExecution,
+  }
+  const now = new Date('2026-09-13T10:01:00Z')
+  assert.equal(isCosUniversityGraduationExecutionEvidence(base, specialistExecution.agentId, 'software_engineering', now), false)
+  assert.equal(isCosUniversityGraduationExecutionEvidence({ ...base, agent_id: 'other-specialist' }, 'other-specialist', 'cybersecurity', now), false)
+  assert.equal(isCosUniversityGraduationExecutionEvidence({ ...base, id: 'bbbbbbbb-1111-4111-8111-111111111111' }, specialistExecution.agentId, 'cybersecurity', now), false)
+  assert.equal(isCosUniversityGraduationExecutionEvidence({ ...base, manifest_hash: 'f'.repeat(64) }, specialistExecution.agentId, 'cybersecurity', now), false)
+  assert.equal(isCosUniversityGraduationExecutionEvidence({ ...base, response_source: 'local_reasoning' }, specialistExecution.agentId, 'cybersecurity', now), false)
 })
 
 test('cached, external, unexecuted and untraceable capstones cannot earn a degree', () => {
@@ -43,13 +109,13 @@ test('cached, external, unexecuted and untraceable capstones cannot earn a degre
   ]) assert.equal(isCosUniversityGraduationExecutionEvidence({ ...evidence, ...invalid }, 'cos'), false)
 })
 
-test('specialist admission is explicitly deferred while graduate workers are COS-only', () => {
+test('successful graduation may proceed to the already agent-scoped Masters admission decision', () => {
   assert.equal(cosUniversityGraduationAdmissionBlocker(admission), null)
-  assert.equal(cosUniversityGraduationAdmissionBlocker({ ...admission, agentId: 'software-specialist', capstoneState: 'credential_awarded' }), 'agent_masters_runtime_unavailable')
-  assert.equal(cosUniversityGraduationAdmissionBlocker({ ...admission, agentId: 'unknown' }), 'agent_masters_runtime_unavailable')
+  assert.equal(cosUniversityGraduationAdmissionBlocker({ ...admission, agentId: 'software-specialist', capstoneState: 'credential_awarded' }), null)
+  assert.equal(cosUniversityGraduationAdmissionBlocker({ ...admission, agentId: 'cybersecurity-specialist', capstoneState: 'credential_awarded' }), null)
 })
 
-test('disabled or failed graduation cannot invoke admission even for COS', () => {
+test('disabled or failed graduation cannot invoke admission for any learner', () => {
   assert.equal(cosUniversityGraduationAdmissionBlocker({ ...admission, enabled: false }), 'graduation_gate_disabled')
   assert.equal(cosUniversityGraduationAdmissionBlocker({ ...admission, errors: ['service_database_unavailable'] }), 'graduation_evaluation_failed')
   assert.equal(cosUniversityGraduationAdmissionBlocker({ ...admission, capstoneState: 'error' }), 'graduation_evaluation_failed')
@@ -133,7 +199,7 @@ test('capstone errors reach the route errors instead of becoming successful rece
   assert.match(route, /invocationSucceeded: errors\.length === 0/)
 })
 
-test('cron uses the tested rotation and deferral while keeping one batch and same-agent admission', () => {
+test('cron uses tested rotation and same-agent admission without inventing a graduate enrollment', () => {
   const route = file('app/api/cron/cos-university-graduation/route.ts')
   assert.match(route, /rotateCosUniversityGraduationAgents\(registeredAgents, now\)/)
   assert.match(route, /const admissionBlocker = cosUniversityGraduationAdmissionBlocker\(/)

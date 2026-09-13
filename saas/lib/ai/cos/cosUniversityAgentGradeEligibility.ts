@@ -1,5 +1,9 @@
 // saas/lib/ai/cos/cosUniversityAgentGradeEligibility.ts
-import { isSoftwareCapstoneIdentity, SOFTWARE_CAPSTONE_RUNTIME } from './cosUniversityAgentCapstone.ts'
+import { SOFTWARE_CAPSTONE_ROLE, SOFTWARE_CAPSTONE_RUNTIME } from './cosUniversityAgentCapstone.ts'
+import {
+  isRegisteredSpecialistIdentity,
+  REGISTERED_SPECIALIST_RUNTIME,
+} from './cosUniversityRegisteredSpecialistExecutor.ts'
 
 /**
  * Grade eligibility by executing identity.
@@ -22,8 +26,12 @@ function record(value: unknown): Record<string, unknown> {
 /** True when this assessment row's evidence proves the named agent's own bound execution. */
 export function assessmentCarriesBoundExecution(evidence: unknown, agentId: string): boolean {
   const execution = record(record(evidence).executionProvenance)
-  return execution.runtime === SOFTWARE_CAPSTONE_RUNTIME
-    && isSoftwareCapstoneIdentity(agentId, execution.role)
+  const role = execution.role
+  if (!isRegisteredSpecialistIdentity(agentId, role)) return false
+  const expectedRuntime = role === SOFTWARE_CAPSTONE_ROLE
+    ? SOFTWARE_CAPSTONE_RUNTIME
+    : REGISTERED_SPECIALIST_RUNTIME
+  return execution.runtime === expectedRuntime
     && execution.agentId === agentId
     && execution.academicAuthority === 'none'
     && typeof execution.model === 'string'

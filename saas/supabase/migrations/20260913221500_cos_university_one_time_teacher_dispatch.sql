@@ -55,6 +55,9 @@ as $$
 declare
   v_now timestamptz := clock_timestamp();
   v_row public.cos_university_one_time_teacher_dispatch_approvals%rowtype;
+  v_evidence jsonb;
+  v_evidence_hash text;
+  v_event_key text;
 begin
   if p_token_hash is null or p_token_hash !~ '^[a-f0-9]{64}$' then
     raise exception 'one_time_teacher_approval_token_invalid';
@@ -77,6 +80,33 @@ begin
   if not found then
     raise exception 'one_time_teacher_approval_unavailable';
   end if;
+
+  v_evidence := jsonb_build_object(
+    'profile', 'cos_university_one_time_teacher_dispatch_v1',
+    'claim', 'teacher_dataset_one_time_approval_claimed',
+    'candidateId', v_row.candidate_id,
+    'operation', v_row.operation,
+    'tokenHash', v_row.token_hash,
+    'authorizedAt', v_row.authorized_at,
+    'expiresAt', v_row.expires_at,
+    'claimedAt', v_row.claimed_at,
+    'maxHourlyCostUsd', v_row.max_hourly_cost_usd,
+    'maxEstimatedCostUsd', v_row.max_estimated_cost_usd,
+    'studentTrainingAuthorized', false,
+    'authorityExpanded', false
+  );
+  v_evidence_hash := encode(extensions.digest(convert_to(v_evidence::text, 'UTF8'), 'sha256'), 'hex');
+  v_event_key := encode(extensions.digest(convert_to(
+    'cos_university_one_time_teacher_dispatch_v1:claimed:' || v_row.token_hash || ':' || v_row.claimed_at::text,
+    'UTF8'
+  ), 'sha256'), 'hex');
+
+  insert into public.cos_university_learning_assurance_events (
+    event_key, event_type, subject_id, candidate_id, evidence_hash, evidence, verifier, observed_at, expires_at
+  ) values (
+    v_event_key, 'fine_tune', 'reasoning_decision_science', v_row.candidate_id,
+    v_evidence_hash, v_evidence, 'host_controller', v_row.claimed_at, v_row.expires_at
+  );
 
   return query select
     v_row.token_hash,
@@ -107,6 +137,9 @@ as $$
 declare
   v_now timestamptz := clock_timestamp();
   v_row public.cos_university_one_time_teacher_dispatch_approvals%rowtype;
+  v_evidence jsonb;
+  v_evidence_hash text;
+  v_event_key text;
 begin
   if p_token_hash is null or p_token_hash !~ '^[a-f0-9]{64}$' then
     raise exception 'one_time_teacher_approval_token_invalid';
@@ -133,6 +166,39 @@ begin
     raise exception 'one_time_teacher_approval_finalize_fence_lost';
   end if;
 
+  v_evidence := jsonb_build_object(
+    'profile', 'cos_university_one_time_teacher_dispatch_v1',
+    'claim', case when p_status = 'dispatched'
+      then 'teacher_dataset_one_time_approval_dispatched'
+      else 'teacher_dataset_one_time_approval_failed' end,
+    'candidateId', v_row.candidate_id,
+    'operation', v_row.operation,
+    'tokenHash', v_row.token_hash,
+    'authorizedAt', v_row.authorized_at,
+    'expiresAt', v_row.expires_at,
+    'claimedAt', v_row.claimed_at,
+    'completedAt', v_row.completed_at,
+    'maxHourlyCostUsd', v_row.max_hourly_cost_usd,
+    'maxEstimatedCostUsd', v_row.max_estimated_cost_usd,
+    'jobId', v_row.job_id,
+    'jobUrl', v_row.job_url,
+    'error', v_row.error,
+    'studentTrainingAuthorized', false,
+    'authorityExpanded', false
+  );
+  v_evidence_hash := encode(extensions.digest(convert_to(v_evidence::text, 'UTF8'), 'sha256'), 'hex');
+  v_event_key := encode(extensions.digest(convert_to(
+    'cos_university_one_time_teacher_dispatch_v1:' || p_status || ':' || v_row.token_hash || ':' || v_row.completed_at::text,
+    'UTF8'
+  ), 'sha256'), 'hex');
+
+  insert into public.cos_university_learning_assurance_events (
+    event_key, event_type, subject_id, candidate_id, evidence_hash, evidence, verifier, observed_at
+  ) values (
+    v_event_key, 'fine_tune', 'reasoning_decision_science', v_row.candidate_id,
+    v_evidence_hash, v_evidence, 'host_controller', v_row.completed_at
+  );
+
   return query select v_row.token_hash, v_row.status, v_row.completed_at;
 end;
 $$;
@@ -143,4 +209,4 @@ grant execute on function public.finish_cos_university_one_time_teacher_dispatch
   to service_role;
 
 -- Direct mutation is deliberately unavailable to application roles. The service role can only
--- claim/finalize through the two fenced RPCs above.
+-- claim/finalize through the two fenced RPCs above; each RPC appends immutable audit evidence.

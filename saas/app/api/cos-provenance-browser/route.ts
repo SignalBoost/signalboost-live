@@ -15,6 +15,9 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+const PROVENANCE_COOKIE = 'sb_answer_provenance'
+const MAX_PROVENANCE_COOKIE_CHARS = 3600
+
 type BrowserMessage = {
   role?: unknown
   content?: unknown
@@ -56,6 +59,25 @@ function withJsonPayload(response: Response, payload: any): NextResponse {
   return NextResponse.json(payload, { status: response.status, headers })
 }
 
+function encodeCapsuleCookie(value: unknown): string | null {
+  try {
+    const encoded = Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
+    return encoded.length <= MAX_PROVENANCE_COOKIE_CHARS ? encoded : null
+  } catch {
+    return null
+  }
+}
+
+function decodeCapsuleCookie(req: NextRequest): unknown {
+  const value = req.cookies.get(PROVENANCE_COOKIE)?.value || ''
+  if (!value || value.length > MAX_PROVENANCE_COOKIE_CHARS) return null
+  try {
+    return JSON.parse(Buffer.from(value, 'base64url').toString('utf8'))
+  } catch {
+    return null
+  }
+}
+
 async function finalizeAnswer(response: Response, req: NextRequest, body: any): Promise<Response> {
   let payload: any
   try { payload = await response.clone().json() } catch { return response }
@@ -77,8 +99,9 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
   )
 
   // Durable account-bound record when a signed-in identity exists. Anonymous preview users still
-  // receive the signed capsule, which is bound to the exact answer text and can be verified on the
-  // immediately following provenance question without trusting model memory or client assertions.
+  // receive a signed, answer-bound capsule. The most recent capsule is also kept in an HttpOnly
+  // same-site cookie so the natural next-turn question "where did that come from?" works without
+  // forcing trial users to create an account or trusting model memory/client-authored provenance.
   const access = await getAccess().catch(() => null)
   const userId = access?.userId || null
   if (userId) {
@@ -90,11 +113,25 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
     ).catch(() => false)
   }
 
-  return withJsonPayload(response, {
+  const delivered = withJsonPayload(response, {
     ...payload,
     execution_provenance: payload.execution_provenance ?? scopedProvenance,
     answer_provenance: answerProvenance,
   })
+
+  if (publicSurface(req) && answerProvenance.signed) {
+    const cookie = encodeCapsuleCookie(answerProvenance)
+    if (cookie) {
+      delivered.cookies.set(PROVENANCE_COOKIE, cookie, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+        maxAge: 60 * 60,
+      })
+    }
+  }
+  return delivered
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
@@ -103,11 +140,11 @@ export async function POST(req: NextRequest): Promise<Response> {
   const prior = precedingAssistant(body)
 
   // Public users may be in trial mode with no account row yet. Prefer a cryptographically verified
-  // capsule carried with the exact preceding assistant message. It is accepted only when its HMAC
-  // verifies AND its answer hash matches that exact displayed answer. A fabricated/replayed capsule
-  // is ignored and the mature durable-record path gets the request instead.
+  // capsule carried with the exact preceding assistant message; when the UI does not carry hidden
+  // response metadata, use the HttpOnly capsule cookie issued with that same preceding response.
+  // Both paths are accepted only when the HMAC verifies AND the answer hash matches the exact text.
   if (publicSurface(req) && prompt && isProvenanceIntrospection(prompt) && prior && typeof prior.content === 'string') {
-    const suppliedCapsule = prior.answerProvenance ?? prior.answer_provenance
+    const suppliedCapsule = prior.answerProvenance ?? prior.answer_provenance ?? decodeCapsuleCookie(req)
     const verified = verifyPublicAnswerProvenanceCapsule(suppliedCapsule, prior.content)
     if (verified) {
       const recorded = publicAnswerCapsuleAsRecordedProvenance(verified)

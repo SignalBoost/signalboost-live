@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMastersLearningRunner.ts
 import { ContinuousLearningCycle } from '@/lib/cos-core/layers/learning/cycle'
 import { ContinuousLearningDirector } from '@/lib/cos-core/layers/learning'
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
@@ -34,6 +35,7 @@ import {
 
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
 import { requireMastersLearningAgentId, mastersLearningSlotKey, mastersLearningPlanKey, mastersLearningProgramBlocker } from './cosUniversityMastersAgentLearning.ts'
+import { cosUniversityContinuousStudyVariant } from './cosUniversityStudyVariant.ts'
 const ZERO_EXTERNAL_COST_POLICY = {
   allowedSourceKinds: new Set([
     'work_experience',
@@ -328,6 +330,7 @@ export async function runCosUniversityMastersLearning(options: {
           failureClass,
           strategy,
           repeatedCount: 1,
+          studyVariant: cosUniversityContinuousStudyVariant(plan.plan_key),
           evidence: [`agent_id=${agentId}`, `academic_level=masters`, `program_id=${programId}`, `module_key=${plan.module_key}`],
         }),
       }

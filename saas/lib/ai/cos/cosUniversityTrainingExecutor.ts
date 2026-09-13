@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityTrainingExecutor.ts
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
 import { decideControlledFineTune } from './cosUniversityLearningAssurance.ts'
 import {
@@ -264,7 +265,8 @@ async function readPartitionMaterialization(candidateId: string, revision: FineT
   if (rows.error) throw rows.error
   const expectedKey = fineTuneRevisionKey(revision)
   for (const row of rows.data || []) {
-    const evidence: any = row.evidence
+    // Stored jsonb from the database. `unknown` keeps the guards below load-bearing.
+    const evidence = row.evidence as Record<string, unknown> | null
     const observedAt = Date.parse(String(row.observed_at || ''))
     if (row.verifier !== 'training_executor'
       || evidence?.profile !== FINE_TUNE_EVIDENCE_PROFILE
@@ -272,11 +274,16 @@ async function readPartitionMaterialization(candidateId: string, revision: FineT
       || evidence?.revisionKey !== expectedKey
       || !Number.isFinite(observedAt) || observedAt > now.getTime()
       || (row.expires_at && Date.parse(row.expires_at) <= now.getTime())) continue
-    const materialized = validateTrainingExecutorPartition(evidence)
+    const materialized = validateTrainingExecutorPartition({
+      baseModel: evidence?.baseModel,
+      datasetHash: evidence?.datasetHash,
+      trainingItemHashes: evidence?.trainingItemHashes,
+      holdoutItemHashes: evidence?.holdoutItemHashes,
+    })
     if (!materialized || fineTuneRevisionKey(materialized.revision) !== expectedKey) continue
-    const trainingDataRef = clean(evidence.trainingDataRef, 2000)
-    const holdoutDataRef = clean(evidence.holdoutDataRef, 2000)
-    const evidenceRef = clean(evidence.evidenceRef, 2000)
+    const trainingDataRef = clean(evidence?.trainingDataRef, 2000)
+    const holdoutDataRef = clean(evidence?.holdoutDataRef, 2000)
+    const evidenceRef = clean(evidence?.evidenceRef, 2000)
     if (trainingDataRef && holdoutDataRef && evidenceRef) return { revision: materialized.revision, trainingDataRef, holdoutDataRef, evidenceRef }
   }
   return null
@@ -364,7 +371,8 @@ async function readMatchingDispatch(input: {
     .limit(10)
   if (result.error) throw result.error
   for (const row of result.data || []) {
-    const evidence: any = row.evidence
+    // Stored jsonb from the database. `unknown` keeps the guards below load-bearing.
+    const evidence = row.evidence as Record<string, unknown> | null
     const operation = evidence?.operation === 'prepare_dataset' || evidence?.operation === 'train' ? evidence.operation : null
     const trainingMode = evidence?.trainingMode === 'fine_tune' || evidence?.trainingMode === 'distillation' ? evidence.trainingMode : null
     if (!operation
@@ -427,8 +435,12 @@ async function dispatchSignedJob(input: {
     rawBody: responseBody,
     signature: responseSignature,
   })) throw new Error('training_executor_response_signature_invalid')
-  let payload: any = null
-  try { payload = JSON.parse(responseBody) } catch { payload = null }
+  // Parsed from an external executor's HTTP response: never trusted, only checked.
+  let payload: Record<string, unknown> | null = null
+  try {
+    const parsed: unknown = JSON.parse(responseBody)
+    payload = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null
+  } catch { payload = null }
   const jobId = clean(payload?.jobId, 240)
   if (payload?.accepted !== true || !jobId) throw new Error('training_executor_response_invalid')
   return { accepted: true as const, jobId, idempotencyKey: input.idempotencyKey }
@@ -548,7 +560,37 @@ export async function dispatchUniversityApprovedTraining(input: {
   return { ...result, operation: 'train' as const, trainingMode: input.trainingMode, candidateId: input.candidateId, revisionKey }
 }
 
-export async function recordUniversityTrainingExecutorEvidence(input: any, binding: { idempotencyKey: string }) {
+/**
+ * Payload an external training executor posts back as evidence. Every field stays `unknown`: this
+ * arrives over HTTP from outside the platform, so the runtime checks below — not the type — decide
+ * what is admitted. The type exists so a caller inside the repo cannot silently omit a field and
+ * discover it in production, and so the accepted shape is documented in one place instead of being
+ * spread across thirteen `input?.x` reads.
+ */
+export type TrainingExecutorEvidenceInput = Readonly<{
+  claim?: unknown
+  candidateId?: unknown
+  jobId?: unknown
+  evidenceRef?: unknown
+  /** partition_manifests_registered */
+  baseModel?: unknown
+  datasetHash?: unknown
+  trainingItemHashes?: unknown
+  holdoutItemHashes?: unknown
+  trainingDataRef?: unknown
+  holdoutDataRef?: unknown
+  /** trained_artifact_registered and later claims */
+  trainingManifestHash?: unknown
+  holdoutManifestHash?: unknown
+  trainedArtifactId?: unknown
+  artifactHash?: unknown
+  rollbackArtifactRef?: unknown
+}>
+
+export async function recordUniversityTrainingExecutorEvidence(
+  input: TrainingExecutorEvidenceInput,
+  binding: { idempotencyKey: string },
+) {
   const claim = clean(input?.claim, 80) as TrainingExecutorClaim
   if (!TRAINING_EXECUTOR_CLAIMS.includes(claim)) throw new Error('training_executor_claim_not_permitted')
   const candidateId = clean(input?.candidateId, 100)
@@ -563,7 +605,12 @@ export async function recordUniversityTrainingExecutorEvidence(input: any, bindi
 
   if (claim === 'partition_manifests_registered') {
     if (dispatch.operation !== 'prepare_dataset') throw new Error('training_executor_dispatch_operation_mismatch')
-    const materialized = validateTrainingExecutorPartition(input)
+    const materialized = validateTrainingExecutorPartition({
+      baseModel: input?.baseModel,
+      datasetHash: input?.datasetHash,
+      trainingItemHashes: input?.trainingItemHashes,
+      holdoutItemHashes: input?.holdoutItemHashes,
+    })
     if (!materialized) throw new Error('training_executor_partition_invalid')
     if (materialized.revision.baseModel !== dispatch.baseModel || materialized.revision.datasetHash !== dispatch.datasetHash) {
       throw new Error('training_executor_partition_dispatch_mismatch')

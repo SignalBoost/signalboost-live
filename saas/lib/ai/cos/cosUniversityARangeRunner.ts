@@ -8,7 +8,7 @@ import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseSt
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
-import { SOFTWARE_CAPSTONE_RUNTIME, type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
+import type { AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { COS_UNIVERSITY_SUBJECTS, classifyCosUniversitySubjects, type CosUniversitySubjectId } from './cosUniversity.ts'
@@ -395,8 +395,6 @@ async function executeExamRun(agentId: string, row: ARangeRunRow, now: Date): Pr
   let handled = false
   let executionProvenance: AgentCapstoneExecution | null = null
 
-  // A registered agent with its own bound executor answers as itself, through its assigned model.
-  // COS keeps its existing reasoner path unchanged.
   if (agentId !== AGENT_ID) {
     let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
     try {
@@ -413,7 +411,7 @@ async function executeExamRun(agentId: string, row: ARangeRunRow, now: Date): Pr
     }
     reply = bound.reply
     turnId = execution.turnId
-    responseSource = SOFTWARE_CAPSTONE_RUNTIME
+    responseSource = execution.runtime
     localModelInvoked = true
     handled = true
     executionProvenance = execution
@@ -494,9 +492,6 @@ export async function runCosUniversityARangeBatch(options: { now?: Date; agentId
   const errors: string[] = []
   let productionCandidates = 0
   let productionEvidenceRecorded = 0
-  // cos_turn_outcomes are COS's own verified Production turns. Attributing them to another agent would
-  // fabricate that agent's practical work, so other agents earn production_transfer from their own
-  // applied-knowledge outcomes (cosUniversityAppliedKnowledge), never from this bridge.
   if (agentId === AGENT_ID) {
     try {
       const synced = await syncVerifiedProductionOutcomes(now)
@@ -507,7 +502,6 @@ export async function runCosUniversityARangeBatch(options: { now?: Date; agentId
     }
   }
 
-  // COS uses its own reasoner; any other agent needs its own bound executor before it can be graded.
   let blocked = cosUniversityAcademicExecutionBlocker(agentId)
   if (blocked && await hasBoundAcademicExecutor(agentId).catch(() => false)) blocked = null
   if (blocked) {

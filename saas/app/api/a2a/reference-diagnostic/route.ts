@@ -2,9 +2,14 @@ import { randomUUID } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { referenceDiagnosticAgentCard } from '@/a2a-host/reference-a2a-config'
 import {
+  REFERENCE_DIAGNOSTIC_AGENT_ID,
   REFERENCE_DIAGNOSTIC_SKILL_ID,
   referenceDiagnosticArtifactText,
 } from '@/a2a-host/reference-self-healing-diagnostic'
+import {
+  SPECIALIST_MESH_ACCEPTANCE_FAILURE_HEADER,
+  isValidSpecialistMeshAcceptanceFailureToken,
+} from '@/a2a-host/specialist-mesh-acceptance-control'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,6 +27,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (isValidSpecialistMeshAcceptanceFailureToken({
+    token: request.headers.get(SPECIALIST_MESH_ACCEPTANCE_FAILURE_HEADER),
+    agentId: REFERENCE_DIAGNOSTIC_AGENT_ID,
+  })) {
+    return NextResponse.json({ error: 'specialist_mesh_acceptance_controlled_unavailability' }, { status: 503, headers: { 'cache-control': 'no-store' } })
+  }
+
   let body: any
   try { body = await request.json() } catch { return jsonRpcError(null, -32700, 'Parse error') }
   const id = body?.id

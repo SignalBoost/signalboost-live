@@ -5,6 +5,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { loadUniversityPracticeStudyMaterial } from './cosUniversityPracticeStudyMaterialRuntime.ts'
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
 import { agentWorkDomain, modelForAgentWork, type AgentWorkDomain } from './cosUniversityAgentModelPolicy.ts'
+import { resolveUniversityPracticeModel } from './cosUniversityPracticeModelRuntime.ts'
 import { enforceUniversityPracticeCostGuard } from './cosUniversityPracticeBudget.ts'
 import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import {
@@ -52,10 +53,12 @@ export async function executeBoundAgentExam(
   await enforceUniversityPracticeCostGuard(request)
   const config = localInferenceConfigFromEnv()
   const domain = work?.domain ?? agentWorkDomain(await readCosUniversityAgentRole(request.agentId), work?.subjectId)
-  const model = modelForAgentWork({
+  const roleModel = requireBuilderCodingModel()
+  const practiceModel = request.purpose === 'practice' ? await resolveUniversityPracticeModel() : null
+  const model = practiceModel || modelForAgentWork({
     domain,
-    roleModel: requireBuilderCodingModel(),
-    purpose: request.purpose === 'practice' ? 'practice' : 'assessment',
+    roleModel,
+    purpose: 'assessment',
   })
   return executeBoundSoftwareCapstone(request, {
     readRole: readCosUniversityAgentRole, loadProcedures: loadAgentOwnProcedures, model,

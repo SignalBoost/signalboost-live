@@ -3,7 +3,10 @@ import {
   claimOneTimeTeacherDispatchApproval,
   finishOneTimeTeacherDispatchApproval,
 } from '@/lib/ai/cos/cosUniversityOneTimeTeacherDispatch'
-import { dispatchApprovedOneTimeTeacherDataset } from '@/lib/ai/cos/cosUniversityOneTimeTeacherJob'
+import {
+  dispatchApprovedOneTimeTeacherDataset,
+  isOneTimeTeacherProviderAcceptedAuditError,
+} from '@/lib/ai/cos/cosUniversityOneTimeTeacherJob'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,8 +25,8 @@ function response(body: Record<string, unknown>, status = 200) {
 
 /**
  * Single-use bearer route for an already-recorded owner approval. The raw token is never stored or
- * echoed. Claiming is optimistic-concurrency fenced before any provider call, and the receipt is
- * terminal after the first attempt. This route cannot authorize student training.
+ * echoed. Claiming is atomic before any provider call, and the receipt is terminal after the first
+ * attempt. This route cannot authorize student training.
  */
 export async function GET(req: NextRequest) {
   const rawToken = req.nextUrl.searchParams.get('approval') || ''
@@ -55,9 +58,44 @@ export async function GET(req: NextRequest) {
       hourlyCostUsd: dispatched.hourlyCostUsd,
       timeoutSeconds: dispatched.timeoutSeconds,
       maxEstimatedCostUsd: dispatched.maxEstimatedCostUsd,
+      auditRecorded: dispatched.auditRecorded,
+      reconciliationRequired: false,
       studentTrainingAuthorized: false,
     })
   } catch (error) {
+    if (isOneTimeTeacherProviderAcceptedAuditError(error)) {
+      const dispatched = error.acceptedDispatch
+      let terminalReceiptRecorded = false
+      try {
+        await finishOneTimeTeacherDispatchApproval({
+          capability,
+          status: 'dispatched',
+          jobId: dispatched.jobId,
+          jobUrl: dispatched.jobUrl,
+        })
+        terminalReceiptRecorded = true
+      } catch {
+        // Provider acceptance remains authoritative. Do not downgrade or replay the external job.
+      }
+      return response({
+        ok: false,
+        accepted: true,
+        operation: dispatched.operation,
+        candidateId: dispatched.candidateId,
+        jobId: dispatched.jobId,
+        jobUrl: dispatched.jobUrl,
+        flavor: dispatched.flavor,
+        hourlyCostUsd: dispatched.hourlyCostUsd,
+        timeoutSeconds: dispatched.timeoutSeconds,
+        maxEstimatedCostUsd: dispatched.maxEstimatedCostUsd,
+        auditRecorded: false,
+        terminalReceiptRecorded,
+        reconciliationRequired: true,
+        error: error.message,
+        studentTrainingAuthorized: false,
+      }, 202)
+    }
+
     const message = error instanceof Error ? error.message : String(error)
     try {
       await finishOneTimeTeacherDispatchApproval({
@@ -66,8 +104,8 @@ export async function GET(req: NextRequest) {
         error: message.split(':')[0],
       })
     } catch {
-      // The original failure remains authoritative; a finalization fault cannot trigger a retry.
+      // The original pre-provider failure remains authoritative; a finalization fault cannot retry it.
     }
-    return response({ ok: false, error: message.split(':')[0] }, 400)
+    return response({ ok: false, accepted: false, error: message.split(':')[0] }, 400)
   }
 }

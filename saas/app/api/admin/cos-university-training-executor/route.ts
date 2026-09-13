@@ -8,6 +8,7 @@ import {
   type TrainingMode,
 } from '@/lib/ai/cos/cosUniversityTrainingExecutor'
 import { registerCosUniversityDistillationTrainingPlan } from '@/lib/ai/cos/cosUniversityDistillationDatasetPlan'
+import { dispatchCosUniversityDistillationTeacherDataset } from '@/lib/ai/cos/cosUniversityDistillationTeacherDataset'
 import { installHuggingFaceTrainingExecutorEnv } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
 import type { FineTuneRevision } from '@/lib/ai/cos/cosUniversityFineTuneEvidence'
 import type { ModelDistillationCandidateInput, ModelDistillationTrainingRights } from '@/lib/ai/cos/cosUniversityModelDistillation'
@@ -18,7 +19,10 @@ export const maxDuration = 120
 
 function statusForError(message: string): number {
   if (message === 'training_executor_not_configured' || message === 'training_executor_dispatch_disabled') return 503
-  if (message.startsWith('training_executor_') || message.startsWith('huggingface_training_') || message.startsWith('distillation_dataset_')) return 400
+  if (message.startsWith('training_executor_')
+    || message.startsWith('huggingface_training_')
+    || message.startsWith('distillation_dataset_')
+    || message.startsWith('teacher_dataset_')) return 400
   return 500
 }
 
@@ -60,9 +64,18 @@ export async function POST(request: Request) {
       })
     }
 
-    // Dataset preparation and model training can create external cost. Owner auth alone is not
-    // intent to spend: every dispatch must carry explicit confirmation and the global feature gate.
+    // Teacher generation is GPU work and therefore cost-bearing. It shares the same explicit owner
+    // confirmation and global dispatch kill switch as partition preparation and model training.
     requireExplicitTrainingDispatchConfirmation(body?.confirmDispatch)
+    if (operation === 'generate_teacher_dataset') {
+      const result = await dispatchCosUniversityDistillationTeacherDataset({
+        candidateId: String(body?.candidateId || ''),
+        confirmDispatch: body?.confirmDispatch,
+      })
+      return NextResponse.json({ ok: true, ...result }, {
+        headers: { 'Cache-Control': 'no-store, max-age=0' },
+      })
+    }
     if (operation === 'prepare_dataset') {
       const result = await dispatchUniversityDatasetPreparation({
         candidateId: String(body?.candidateId || ''),

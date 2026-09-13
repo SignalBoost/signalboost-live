@@ -6,13 +6,11 @@ import {
   enforceUniversityPracticeCostGuard,
   meterUniversityPracticeInvocation,
 } from './cosUniversityPracticeBudget.ts'
+import type { AgentCapstoneRequest } from './cosUniversityAgentCapstone.ts'
 import {
-  isBoundSoftwareCapstoneEvidence,
-  SOFTWARE_CAPSTONE_ROLE,
-  SOFTWARE_CAPSTONE_RUNTIME,
-  type AgentCapstoneExecution,
-  type AgentCapstoneRequest,
-} from './cosUniversityAgentCapstone.ts'
+  isBoundRegisteredSpecialistEvidence,
+  type BoundAgentExecution,
+} from './cosUniversityRegisteredSpecialistExecutor.ts'
 
 export const BOUND_PRACTICE_VERSION = 'agent_bound_practice_v1' as const
 const COS_PRACTICE_SYSTEM_PROMPT = [
@@ -26,7 +24,7 @@ const COS_PRACTICE_SYSTEM_PROMPT = [
 type ReasonerResult = { text: string; turnId: string; reasoner: { kind: string; label: string } }
 export type UniversityPracticeExecution = ReasonerResult & {
   responseSource: string
-  executionProvenance: AgentCapstoneExecution | null
+  executionProvenance: BoundAgentExecution | null
 }
 
 /** New specialist practice never reuses a COS-produced skill, prompt variant, or queue result. */
@@ -78,7 +76,7 @@ export async function executeUniversityPractice(
   request: AgentCapstoneRequest,
   ports: {
     cos(): Promise<ReasonerResult | null>
-    bound(request: AgentCapstoneRequest): Promise<{ reply: string; execution: AgentCapstoneExecution }>
+    bound(request: AgentCapstoneRequest): Promise<{ reply: string; execution: BoundAgentExecution }>
     practiceModel?: string | null
   },
 ): Promise<UniversityPracticeExecution | null> {
@@ -101,17 +99,18 @@ export async function executeUniversityPractice(
   }
   const { reply, execution } = await ports.bound(practiceRequest)
   if (typeof reply !== 'string' || !reply.trim() || !execution
-    || !isBoundSoftwareCapstoneEvidence(execution, {
+    || !isBoundRegisteredSpecialistEvidence(execution, {
       id: request.runId, agent_id: request.agentId, manifest_hash: request.manifestHash,
       turn_id: execution.turnId,
-    }, SOFTWARE_CAPSTONE_ROLE)
+    }, execution.role)
     || execution.responseHash !== createHash('sha256').update(reply).digest('hex')) {
     throw new Error('university_practice_execution_binding_invalid')
   }
   return {
-    text: reply, turnId: execution.turnId,
-    reasoner: { kind: SOFTWARE_CAPSTONE_RUNTIME, label: execution.model },
-    responseSource: SOFTWARE_CAPSTONE_RUNTIME,
+    text: reply,
+    turnId: execution.turnId,
+    reasoner: { kind: execution.runtime, label: execution.model },
+    responseSource: execution.runtime,
     executionProvenance: execution,
   }
 }

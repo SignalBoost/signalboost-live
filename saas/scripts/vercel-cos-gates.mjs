@@ -156,6 +156,7 @@ const tests = [
   'tests/cosUniversityExecutionBinding.node.test.ts',
   'tests/cosUniversityRoleModelPolicy.node.test.ts',
   'tests/cosUniversityMastersAgentScope.node.test.ts',
+  'tests/cosUniversityEvidenceSupply.node.test.ts',
   'tests/cosUniversityARange.node.test.ts',
   'tests/cosUniversityLanguageAuthenticity.node.test.ts',
   'tests/cosUniversityContinuousEducation.node.test.ts',

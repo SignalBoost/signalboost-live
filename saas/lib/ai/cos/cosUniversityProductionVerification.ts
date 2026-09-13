@@ -124,6 +124,9 @@ export async function readCosUniversityProductionVerification(now = new Date(), 
     })
     const laneStatus: CosUniversityLaneStatus = classifyCosUniversityLane(expectation, {
       path: path.path,
+      // Without a receipt on this commit the flag was never reported, so `featureEnabled` below is
+      // false by absence. The classifier needs both facts to avoid inventing a shutdown.
+      receiptFound: path.receiptFound === true,
       featureEnabled: path.featureEnabled === true,
       verified: path.verified === true,
       executionBlocker: path.executionBlocker ?? null,

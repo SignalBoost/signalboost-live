@@ -1,4 +1,4 @@
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 
 const ORIGIN = 'cos_university_deliberate_practice'
 export const DEFAULT_UNIVERSITY_MAX_PRACTICE_ROUNDS = 12

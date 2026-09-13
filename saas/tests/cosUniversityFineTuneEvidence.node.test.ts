@@ -1,6 +1,7 @@
 import './cosUniversityTrainingExecutor.node.test.ts'
 import './cosUniversityHuggingFaceJobs.node.test.ts'
 import './cosUniversityDistillationPreparation.node.test.ts'
+import './cosUniversityDistillationTeacherDataset.node.test.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'

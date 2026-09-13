@@ -14,16 +14,24 @@ import {
 
 const TEST_SECRET = 'test-only-specialist-mesh-control-secret-32-bytes'
 
-test('Production reference routing prefers the stable project origin over the protected deployment origin', () => {
+test('Production reference routing prefers the stable project origin while Preview stays on its own deployment', () => {
   assert.equal(resolveReferenceA2AOrigin({
+    VERCEL_ENV: 'production',
     VERCEL_PROJECT_PRODUCTION_URL: 'signalboost-live.vercel.app',
     VERCEL_URL: 'protected-deployment.vercel.app',
   } as NodeJS.ProcessEnv), 'https://signalboost-live.vercel.app')
 
   assert.equal(resolveReferenceA2AOrigin({
-    SIGNALBOOST_A2A_REFERENCE_ORIGIN: 'https://explicit-reference.example.com/path',
+    VERCEL_ENV: 'preview',
     VERCEL_PROJECT_PRODUCTION_URL: 'signalboost-live.vercel.app',
-    VERCEL_URL: 'protected-deployment.vercel.app',
+    VERCEL_URL: 'preview-deployment.vercel.app',
+  } as NodeJS.ProcessEnv), 'https://preview-deployment.vercel.app')
+
+  assert.equal(resolveReferenceA2AOrigin({
+    SIGNALBOOST_A2A_REFERENCE_ORIGIN: 'https://explicit-reference.example.com/path',
+    VERCEL_ENV: 'preview',
+    VERCEL_PROJECT_PRODUCTION_URL: 'signalboost-live.vercel.app',
+    VERCEL_URL: 'preview-deployment.vercel.app',
   } as NodeJS.ProcessEnv), 'https://explicit-reference.example.com')
 })
 

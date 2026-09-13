@@ -172,7 +172,15 @@ export function normalizeSpecialistMeshWriteReconciliation(value: SpecialistMesh
 export function createSpecialistMeshWriteRecoveryProviderRegistry(
   providers: readonly SpecialistMeshWriteRecoveryProvider[],
 ): SpecialistMeshWriteRecoveryProviderRegistry {
-  const normalized = providers.map(provider => Object.freeze({ ...provider, providerId: required(provider.providerId, 'providerId', 256) }))
+  const normalized = providers.map(provider => {
+    const providerId = required(provider.providerId, 'providerId', 256)
+    return Object.freeze({
+      providerId,
+      matches: (input: SpecialistMeshWriteProviderRequest) => provider.matches(input),
+      idempotencyKey: (input: SpecialistMeshWriteProviderRequest) => provider.idempotencyKey(input),
+      reconcile: (input: SpecialistMeshWriteProviderRequest & { idempotencyKey: string; result: A2ADelegationResult }) => provider.reconcile(input),
+    })
+  })
   if (new Set(normalized.map(provider => provider.providerId)).size !== normalized.length) {
     throw new SpecialistMeshWriteRecoveryError('write_recovery_provider_duplicate', 'provider ids must be unique')
   }

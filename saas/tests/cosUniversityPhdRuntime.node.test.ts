@@ -19,7 +19,7 @@ test('PhD runtime reuses canonical University enrollment and credential ledgers'
   assert.doesNotMatch(runtime, /caller.*graduat/i)
 })
 
-test('PhD learner scope preserves COS compatibility while isolating each registered agent', () => {
+test('PhD learner scheduling preserves COS compatibility while isolating each registered agent', () => {
   assert.equal(DEFAULT_PHD_AGENT_ID, 'cos')
   assert.equal(requirePhdAgentId('software-specialist'), 'software-specialist')
   assert.throws(() => requirePhdAgentId('../cos'), /invalid_phd_agent_id/)
@@ -27,11 +27,11 @@ test('PhD learner scope preserves COS compatibility while isolating each registe
   assert.equal(new Set(rotated.map(row => row.agentId)).size, 2)
 
   const runtime = file('lib/ai/cos/cosUniversityPhdRuntime.ts')
-  assert.match(runtime, /agentId: string = DEFAULT_PHD_AGENT_ID/)
+  assert.match(runtime, /const AGENT_ID = 'cos'/)
+  assert.match(runtime, /agentId: string = AGENT_ID/)
   assert.match(runtime, /readCosUniversityMastersRuntimeStatus\(program\.mastersPrerequisite, now, undefined, agentId\)/)
   assert.match(runtime, /\.eq\('agent_id', agentId\)/)
   assert.match(runtime, /cosUniversityPhdCredentialKey\(agentId, programId\)/)
-  assert.doesNotMatch(runtime, /const AGENT_ID = 'cos'/)
 })
 
 test('PhD specialist methodology and research execution use the registered bound runtime', () => {
@@ -42,9 +42,10 @@ test('PhD specialist methodology and research execution use the registered bound
     assert.match(source, /hasBoundAcademicExecutor/)
     assert.match(source, /executeBoundAgentExam/)
     assert.match(source, /isBoundSoftwareCapstoneEvidence/)
+    assert.match(source, /boundExecutionBindingFailure/)
     assert.match(source, /agentId/)
   }
-  assert.match(research, /runId: row\.id/)
+  assert.match(research, /runId: run\.runId/)
   assert.match(research, /manifestHash: assignment\.assignmentKey/)
 })
 

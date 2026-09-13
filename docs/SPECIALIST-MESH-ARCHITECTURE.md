@@ -157,13 +157,13 @@ For advisory/read-only tasks only, try the next ranked eligible worker after a c
 
 Integrate specialist work with the existing Supervisor durable work queue, leases, fencing tokens, heartbeat, and expired-lease reconciliation so another worker can continue after failure without stale ownership.
 
-**Control-plane implementation present on PR #2154.** The mesh can create durable work, register workers, enforce eligibility before lease acquisition, reconcile expired ownership, issue a newer fenced lease to another eligible worker, reject the stale owner, and enforce `leased -> processing -> verification_pending -> completed`. End-to-end A2A execution wiring and Production evidence are still pending.
+**Control-plane foundation landed through PR #2154 and real Production specialist delegation ownership was wired on PR #2181.** The mesh creates durable work, registers workers, enforces eligibility before lease acquisition, reconciles expired ownership, issues a newer fenced lease to another eligible worker, rejects the stale owner, and enforces `leased -> processing -> verification_pending -> completed` without changing A2A authority.
 
 ### Phase 4 — checkpoint/resume
 
 Persist bounded task checkpoints so takeover continues useful progress instead of restarting expensive work unnecessarily.
 
-**Pending.**
+**Implemented on PR #2194 for advisory/read-only work.** Checkpoints are service-role-only, bounded to 64 KiB JSON objects, expire within one hour, reject credential-shaped keys, and are loaded/saved/cleared only while the caller holds the current Supervisor fence. A cooperative advisory worker may yield with `signalboostMeshHandoff`; after the next independently eligible specialist acquires a newer fence, the host may deliver the prior bounded state as authority-free `signalboostMeshResume` metadata. Checkpoint state never grants qualification, scope, approval, credentials, or tool authority.
 
 ### Phase 5 — idempotent write recovery
 
@@ -179,7 +179,7 @@ Build a qualification coverage map and automatically prioritize cross-training w
 
 ## Current implementation evidence — 2026-09-12
 
-PR #2154 currently includes:
+Cumulative Specialist Mesh implementation now includes:
 
 - deterministic ranking of multiple already-authorized specialists;
 - injectable live availability/cost/load/latency/reliability/quality signals;
@@ -188,11 +188,14 @@ PR #2154 currently includes:
 - explicit governed agent selection when an exact specialist is requested;
 - durable mesh work items on the existing Supervisor coordination plane;
 - eligibility checks before task claim;
-- fenced lease ownership and expired-owner reconciliation;
+- fenced Production execution ownership and expired-owner reconciliation;
 - stale-owner rejection after another specialist takes over;
-- tests for routing, live-signal override/fallback, lease conflict, failover, fencing, and lifecycle transitions.
+- bounded advisory checkpoint persistence and cooperative checkpoint handoff;
+- newer-fence-only resume delivery to the replacement specialist;
+- no checkpoint or automatic takeover path for write/consequential work;
+- tests for routing, live-signal override/fallback, lease conflict, failover, fencing, lifecycle transitions, checkpoint handoff/resume, and resume metadata transport.
 
-The live-signal interface is not yet itself a Production telemetry adapter, and the durable ownership helper is not yet wired through every A2A execution path. Those distinctions must remain explicit until live acceptance proves them.
+These mechanics are not buyer-live proof by themselves. The live acceptance distinction remains strict: genuine buyer/Production failover requires real independently qualified buyer specialists, real deployed transports, and observed governed takeover evidence. Loopback, in-memory, or synthetic checkpoint tests do not satisfy that claim.
 
 ## Acceptance targets
 

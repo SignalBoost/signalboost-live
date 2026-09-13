@@ -8,7 +8,7 @@ import {
   type SpecialistMeshExecutionCoordinationOptions,
 } from './specialist-mesh-execution-ownership.ts'
 
-export const PORTABLE_A2A_HOST_VERSION = 'signalboost-portable-a2a-host-v3' as const
+export const PORTABLE_A2A_HOST_VERSION = 'signalboost-portable-a2a-host-v4' as const
 
 export interface PortableA2AHostOptions {
   registry: A2AAgentRegistryPort

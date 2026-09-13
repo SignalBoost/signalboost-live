@@ -5,6 +5,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { loadUniversityPracticeStudyMaterial } from './cosUniversityPracticeStudyMaterialRuntime.ts'
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
 import { agentWorkDomain, modelForAgentWork, type AgentWorkDomain } from './cosUniversityAgentModelPolicy.ts'
+import { enforceUniversityPracticeCostGuard } from './cosUniversityPracticeBudget.ts'
 import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import {
   executeBoundSoftwareCapstone,
@@ -13,8 +14,6 @@ import {
   selectAgentCapstoneProcedures,
   type AgentCapstoneRequest,
 } from './cosUniversityAgentCapstone.ts'
-
-const DEFAULT_MAX_PRACTICE_ROUNDS = 12
 
 /**
  * Independent exams executed as the registered learner, not as the COS generalist. This reuses the
@@ -40,33 +39,6 @@ export async function hasBoundAcademicExecutor(agentId: string): Promise<boolean
   return isSoftwareCapstoneIdentity(agentId, await readCosUniversityAgentRole(agentId))
 }
 
-function configuredMaxPracticeRounds(): number {
-  const configured = Number(process.env.UNIVERSITY_MAX_PRACTICE_ROUNDS || DEFAULT_MAX_PRACTICE_ROUNDS)
-  return Number.isSafeInteger(configured) ? Math.max(2, Math.min(50, configured)) : DEFAULT_MAX_PRACTICE_ROUNDS
-}
-
-/**
- * Cost circuit breaker only. It never marks a practice pass, advances a plan, changes a rubric, or
- * creates academic evidence. A plan that repeatedly reaches this boundary remains unresolved until
- * fresh study/harness evidence changes the situation.
- */
-async function enforcePracticeCostGuard(request: AgentCapstoneRequest): Promise<void> {
-  if (request.purpose !== 'practice') return
-  const db = cosServiceDb()
-  if (!db) throw new Error('service_database_unavailable')
-  const result = await db.from('cos_active_practice_queue')
-    .select('metadata')
-    .eq('id', request.runId)
-    .maybeSingle()
-  if (result.error) throw result.error
-  const metadata = result.data?.metadata && typeof result.data.metadata === 'object' && !Array.isArray(result.data.metadata)
-    ? result.data.metadata as Record<string, unknown>
-    : {}
-  const practiceRound = Number(metadata.practiceRound)
-  if (!Number.isSafeInteger(practiceRound) || practiceRound < 1) throw new Error('university_practice_round_missing')
-  if (practiceRound > configuredMaxPracticeRounds()) throw new Error('university_practice_cost_guard_reached')
-}
-
 export async function executeBoundAgentExam(
   request: AgentCapstoneRequest,
   /**
@@ -77,7 +49,7 @@ export async function executeBoundAgentExam(
    */
   work?: { subjectId?: string | null; domain?: AgentWorkDomain },
 ) {
-  await enforcePracticeCostGuard(request)
+  await enforceUniversityPracticeCostGuard(request)
   const config = localInferenceConfigFromEnv()
   const domain = work?.domain ?? agentWorkDomain(await readCosUniversityAgentRole(request.agentId), work?.subjectId)
   const model = modelForAgentWork({

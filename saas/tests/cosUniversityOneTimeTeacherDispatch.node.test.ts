@@ -89,3 +89,23 @@ test('single-use route has no owner-session fallback and never enables persisten
   assert.match(jobModule, /Math\.floor\(approval\.maxEstimatedCostUsd \* 3600 \/ hardware\.hourlyCostUsd\)/)
   assert.match(jobModule, /buildHuggingFaceJobSpec/)
 })
+
+test('single-use claim uses fenced RPCs and never mutates the append-only assurance ledger', () => {
+  const approvalModule = readFileSync('lib/ai/cos/cosUniversityOneTimeTeacherDispatch.ts', 'utf8')
+  assert.match(approvalModule, /\.rpc\('claim_cos_university_one_time_teacher_dispatch'/)
+  assert.match(approvalModule, /\.rpc\('finish_cos_university_one_time_teacher_dispatch'/)
+  assert.doesNotMatch(approvalModule, /from\('cos_university_learning_assurance_events'\)[\s\S]{0,500}\.update\(/)
+})
+
+test('migration isolates mutable capability state and appends immutable audit receipts', () => {
+  const migration = readFileSync('supabase/migrations/20260913221500_cos_university_one_time_teacher_dispatch.sql', 'utf8')
+  assert.match(migration, /cos_university_one_time_teacher_dispatch_approvals/)
+  assert.match(migration, /claim_cos_university_one_time_teacher_dispatch/)
+  assert.match(migration, /finish_cos_university_one_time_teacher_dispatch/)
+  assert.match(migration, /revoke all on public\.cos_university_one_time_teacher_dispatch_approvals from public, anon, authenticated, service_role/)
+  assert.match(migration, /insert into public\.cos_university_learning_assurance_events/)
+  assert.match(migration, /student_training_authorized = false/)
+  assert.match(migration, /max_hourly_cost_usd <= 1\.000000/)
+  assert.match(migration, /max_estimated_cost_usd <= 0\.200000/)
+  assert.match(migration, /subject_id text not null check \(subject_id = 'reasoning_decision_science'\)/)
+})

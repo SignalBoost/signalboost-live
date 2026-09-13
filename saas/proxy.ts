@@ -8,7 +8,7 @@
 // cosBrowserUrl.pathname = '/api/cos-browser'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
-import { proxy as baseProxy } from './proxyBase'
+import { proxy as baseProxy } from './proxyBase.ts'
 
 function dashboardSurface(req: NextRequest): boolean {
   const referer = req.headers.get('referer') || ''

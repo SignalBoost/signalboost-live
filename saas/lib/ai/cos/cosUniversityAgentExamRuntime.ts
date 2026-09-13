@@ -7,6 +7,7 @@ import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
 import { agentWorkDomain, modelForAgentWork, type AgentWorkDomain } from './cosUniversityAgentModelPolicy.ts'
 import { enforceUniversityPracticeCostGuard } from './cosUniversityPracticeBudget.ts'
 import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
+import { currentUniversityPracticeModelOverride } from './cosUniversityPracticeModelContext.ts'
 import {
   executeBoundSoftwareCapstone,
   isBoundSoftwareCapstoneEvidence,
@@ -54,7 +55,13 @@ export async function executeBoundAgentExam(
   await enforceUniversityPracticeCostGuard(request)
   const config = localInferenceConfigFromEnv()
   const domain = work?.domain ?? agentWorkDomain(await readCosUniversityAgentRole(request.agentId), work?.subjectId)
-  const practiceOverride = request.purpose === 'practice' ? String(practiceModelOverride ?? '').trim() : ''
+  const contextualPracticeModel = request.purpose === 'practice'
+    ? currentUniversityPracticeModelOverride()
+    : undefined
+  const selectedPracticeOverride = practiceModelOverride !== undefined
+    ? practiceModelOverride
+    : contextualPracticeModel
+  const practiceOverride = request.purpose === 'practice' ? String(selectedPracticeOverride ?? '').trim() : ''
   const model = practiceOverride || modelForAgentWork({
     domain,
     roleModel: requireBuilderCodingModel(),

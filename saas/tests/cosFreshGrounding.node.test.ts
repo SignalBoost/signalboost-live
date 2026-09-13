@@ -67,12 +67,15 @@ test('COS status depends on the independent reasoner, not ANTHROPIC_API_KEY', ()
   assert.ok(publicGate >= 0 && healthProbe > publicGate, 'private reasoner diagnostics must be probed only after the owner gate')
 })
 
-test('legacy browser network ingresses cannot bypass provider-independent COS routing', () => {
+test('legacy browser network ingresses cannot bypass provenance or provider-independent COS routing', () => {
   const proxy = readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8')
+  const provenanceRoute = readFileSync(new URL('../app/api/cos-provenance-browser/route.ts', import.meta.url), 'utf8')
   const aiRoute = readFileSync(new URL('../app/api/ai/route.ts', import.meta.url), 'utf8')
   assert.match(proxy, /pathname === '\/api\/support'/)
-  assert.match(proxy, /target\.pathname = '\/api\/cos-browser'/)
-  assert.match(proxy, /baseProxy\(req\)/, 'anonymous spend gate must still run before the support rewrite')
+  assert.match(proxy, /target\.pathname = '\/api\/cos-provenance-browser'/)
+  assert.match(proxy, /baseProxy\(req\)/, 'anonymous spend gate must still run before the provenance rewrite')
+  assert.match(provenanceRoute, /POST as cosBrowserPost/)
+  assert.match(provenanceRoute, /ensureAnswerExecutionProvenance/)
   assert.match(aiRoute, /POST as cosBrowserPost/)
   assert.doesNotMatch(aiRoute, /supportPost/)
 })

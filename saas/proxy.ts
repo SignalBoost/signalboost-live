@@ -1,6 +1,6 @@
 // Provider-independent network ingress wrapper.
-// The mature proxy implementation remains in proxyBase.ts. This wrapper closes the legacy
-// /api/support network path so a stale hosted-provider credential cannot be reached accidentally.
+// The mature proxy implementation remains in proxyBase.ts. This wrapper closes legacy/browser
+// paths through the mandatory answer-provenance boundary without weakening proxyBase's spend gates.
 // Canonical routing invariants retained by proxyBase.ts (kept visible here for architecture gates):
 // pathname === '/api/concierge' && req.method === 'POST'
 // cosBrowserUrl.pathname = '/api/cos-browser'
@@ -8,7 +8,10 @@
 // cosBrowserUrl.pathname = '/api/cos-browser'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
-import { proxy as baseProxy } from './proxyBase'
+import { provenanceBoundarySecret } from './lib/ai/cos/provenanceBoundarySecret.ts'
+import { proxy as baseProxy } from './proxyBase.ts'
+
+const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
 
 function dashboardSurface(req: NextRequest): boolean {
   const referer = req.headers.get('referer') || ''
@@ -21,18 +24,52 @@ function dashboardSurface(req: NextRequest): boolean {
   }
 }
 
+function fullAssistantSurface(req: NextRequest): boolean {
+  const referer = req.headers.get('referer') || ''
+  if (!referer) return false
+  try {
+    const url = new URL(referer)
+    return url.origin === req.nextUrl.origin && url.pathname.startsWith('/dashboard/assistant')
+  } catch {
+    return false
+  }
+}
+
+function provenanceRewrite(req: NextRequest, forceAssistant = false) {
+  const secret = provenanceBoundarySecret()
+  if (!secret) return NextResponse.json({ error: 'provenance_boundary_unconfigured' }, { status: 503 })
+  const headers = new Headers(req.headers)
+  headers.set(PROVENANCE_BOUNDARY_HEADER, secret)
+  if (forceAssistant || headers.get('x-signalboost-surface') === 'cos') headers.set('x-signalboost-surface', 'cos')
+  const target = req.nextUrl.clone()
+  target.pathname = '/api/cos-provenance-browser'
+  return NextResponse.rewrite(target, { request: { headers } })
+}
+
 export async function proxy(req: NextRequest) {
-  if (req.nextUrl.pathname === '/api/support' && req.method === 'POST') {
+  const pathname = req.nextUrl.pathname
+
+  // Every browser-delivered answer crosses the provenance wrapper. Call proxyBase first so the
+  // existing anonymous spend limit and other ingress guards remain authoritative; only a successful
+  // continuation/rewrite is replaced with the provenance-aware destination.
+  if ((pathname === '/api/concierge' || pathname === '/api/cos-browser') && req.method === 'POST') {
+    const gated = await baseProxy(req)
+    if (gated.status !== 200) return gated
+    return provenanceRewrite(req, req.headers.get('x-signalboost-surface') === 'cos')
+  }
+
+  if (pathname === '/api/cos-primary' && req.method === 'POST' && fullAssistantSurface(req)) {
+    const gated = await baseProxy(req)
+    if (gated.status !== 200) return gated
+    return provenanceRewrite(req, true)
+  }
+
+  if (pathname === '/api/support' && req.method === 'POST') {
     // Preserve the existing anonymous preview/spend gate before rewriting the legacy endpoint.
     const gated = await baseProxy(req)
     const continues = gated.status === 200 && gated.headers.get('x-middleware-next') === '1'
     if (!continues) return gated
-
-    const headers = new Headers(req.headers)
-    if (dashboardSurface(req)) headers.set('x-signalboost-surface', 'cos')
-    const target = req.nextUrl.clone()
-    target.pathname = '/api/cos-browser'
-    return NextResponse.rewrite(target, { request: { headers } })
+    return provenanceRewrite(req, dashboardSurface(req))
   }
 
   return baseProxy(req)

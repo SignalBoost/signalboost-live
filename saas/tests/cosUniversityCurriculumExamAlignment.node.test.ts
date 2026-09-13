@@ -3,18 +3,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { COS_UNIVERSITY_SUBJECTS, cosUniversitySubjectById } from '../lib/ai/cos/cosUniversity.ts'
 
-/**
- * A subject's study themes decide what acquisition searches for; its independent exam decides what
- * is asked. When the exam tests method and the themes name only content, the learner studies the
- * wrong material and the subject can never pass — which is what History showed in production.
- */
 function themesOf(subjectId: string): string {
   return (cosUniversitySubjectById(subjectId as never)?.studyThemes ?? []).join(' | ').toLowerCase()
 }
 
 test('History studies historical method, not only historical content', () => {
-  // Its exam asks how a primary diary and a 2024 scholarly synthesis differ evidentially, and what
-  // corroboration is needed before preferring either causal account.
   const themes = themesOf('history_culture_philosophy_religion')
   assert.match(themes, /historiograph|source criticism/, themes)
 })
@@ -22,6 +15,14 @@ test('History studies historical method, not only historical content', () => {
 test('Reasoning already studies the method its exam tests, and still does', () => {
   const themes = themesOf('reasoning_decision_science')
   assert.match(themes, /logic and evidence evaluation/, themes)
+})
+
+test('Quantum Computing studies its required foundations', () => {
+  const themes = themesOf('quantum_computing')
+  assert.match(themes, /qubits/)
+  assert.match(themes, /measurement/)
+  assert.match(themes, /error correction/)
+  assert.match(themes, /quantum-classical/)
 })
 
 test('the existing content themes are kept, not replaced', () => {
@@ -40,7 +41,8 @@ test('every subject keeps enough themes to rotate acquisition across cycles', ()
   }
 })
 
-test('the thirteen-subject core is unchanged', () => {
-  assert.equal(COS_UNIVERSITY_SUBJECTS.length, 13)
-  assert.equal(new Set(COS_UNIVERSITY_SUBJECTS.map(s => s.id)).size, 13)
+test('the fourteen-subject core includes Quantum Computing once', () => {
+  assert.equal(COS_UNIVERSITY_SUBJECTS.length, 14)
+  assert.equal(new Set(COS_UNIVERSITY_SUBJECTS.map(s => s.id)).size, 14)
+  assert.equal(COS_UNIVERSITY_SUBJECTS.filter(s => s.id === 'quantum_computing').length, 1)
 })

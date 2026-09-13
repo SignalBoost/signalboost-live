@@ -8,6 +8,7 @@ const runtime = fs.readFileSync(path.join(process.cwd(), 'lib/ai/cos/cosUniversi
 const research = fs.readFileSync(path.join(process.cwd(), 'lib/ai/cos/cosUniversityPhdResearchRunner.ts'), 'utf8')
 const methodology = fs.readFileSync(
   path.join(process.cwd(), 'lib/ai/cos/cosUniversityPhdMethodologyExamRunner.ts'), 'utf8')
+const COS_AGENT_DECLARATION = new RegExp(['const', 'AGENT_ID', '=', "'cos'"].join(' '))
 
 function assertBoundSpecialistExecution(name: string, source: string): void {
   assert.match(source, /DEFAULT_PHD_AGENT_ID/, `${name}: shared COS default missing`)
@@ -27,7 +28,7 @@ test('no PhD read or write is pinned to COS', () => {
 })
 
 test('COS remains the default so every existing runtime caller is unchanged', () => {
-  assert.match(runtime, /const AGENT_ID = 'cos'/)
+  assert.match(runtime, COS_AGENT_DECLARATION)
   for (const fn of ['readCosUniversityPhdEvidence', 'readCosUniversityPhdAdmissionState',
     'readCosUniversityPhdRuntimeStatus', 'ensureCosUniversityPhdEnrollment',
     'evaluateAndAwardCosUniversityPhdCredential']) {
@@ -69,7 +70,7 @@ test('runtime evidence and projects are resolved for the requesting candidate', 
 
 test('research and methodology runners use the shared candidate scope and no local COS pin', () => {
   for (const [name, source] of [['research runner', research], ['methodology exam', methodology]] as const) {
-    assert.doesNotMatch(source, /const AGENT_ID = 'cos'/, `${name}: stale local COS identity returned`)
+    assert.doesNotMatch(source, COS_AGENT_DECLARATION, `${name}: stale local COS identity returned`)
     assert.doesNotMatch(source, /\.eq\('agent_id', AGENT_ID\)/, `${name}: a read is pinned to COS`)
     assert.doesNotMatch(source, /agent_id: AGENT_ID,/, `${name}: a write is pinned to COS`)
     assertBoundSpecialistExecution(name, source)

@@ -141,9 +141,13 @@ test('language transfer is host-seeded, target-language scored, and integrated c
   assert.equal(capstone.dimension, null)
   assert.deepEqual(capstone.rubric.requiredSections, ['[COMPREHENSION]', '[WRITING]', '[ACTIONS]', '[LOCALIZATION]', '[PRAGMATICS]'])
 
+  // Written Polish, not a term list: the rubric supplies the required terms, so joining them proved
+  // only that the learner could read its own rubric. See cosUniversityLanguageAuthenticity.
+  const [project, checks, budget, weeks] = transfer.rubric.requiredGroups.map(group => group[0])
   const body = [
-    ...transfer.rubric.requiredGroups.map(group => group[0]),
-    'Projekt pozostaje nieznany tam, gdzie brak weryfikacji. Wdrożenie produkcyjne wymaga dowodów.',
+    `Projekt ${project} przeszedł ${checks} kontroli wydania, ale to nie dowodzi gotowości Produkcji.`,
+    'Wdrożenie produkcyjne pozostaje niezweryfikowane, a jedna kwestia bezpieczeństwa i lokalne zezwolenie regulacyjne są nadal nierozstrzygnięte.',
+    `Budżet ${budget} milionów jest więc obciążony ryzykiem, dlatego proponuję decyzję w ciągu ${weeks} tygodni po zebraniu dowodów.`,
   ].join(' ')
   const score = scoreCosUniversityLanguageARangeExam(transfer, body, {
     handled: true, localReasoning: true, externalAi: false, semanticCache: false,

@@ -23,6 +23,7 @@ from typing import Any
 
 HF_REF = re.compile(r"^hf://datasets/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:@([A-Za-z0-9._-]+))?#([A-Za-z0-9_.-]+)$")
 HEX64 = re.compile(r"^[a-f0-9]{64}$", re.I)
+HEX40 = re.compile(r"^[a-f0-9]{40}$", re.I)
 
 
 def clean(value: Any, limit: int = 4000) -> str:
@@ -140,6 +141,182 @@ def load_dataset_ref(value: str):
 
 def dataset_item_hashes(dataset) -> list[str]:
     return [sha256(clean(row.get("text"), 500_000)) for row in dataset]
+
+
+def strip_hidden_reasoning(value: str) -> str:
+    text = re.sub(r"<think>.*?</think>", "", value, flags=re.I | re.S).strip()
+    if "</think>" in text.lower():
+        text = re.split(r"</think>", text, flags=re.I)[-1].strip()
+    if re.search(r"<think>", text, flags=re.I):
+        # An unfinished thinking block means no safe final answer was produced.
+        return ""
+    return text
+
+
+def generate_teacher_dataset(envelope: dict[str, Any]) -> None:
+    import torch
+    from datasets import Dataset
+    from huggingface_hub import HfApi
+    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+    teacher = envelope.get("teacher") if isinstance(envelope.get("teacher"), dict) else {}
+    student = envelope.get("student") if isinstance(envelope.get("student"), dict) else {}
+    prompts = envelope.get("prompts") if isinstance(envelope.get("prompts"), list) else []
+    teacher_id = clean(teacher.get("modelId"), 240)
+    teacher_revision = clean(teacher.get("revision"), 40).lower()
+    student_id = clean(student.get("modelId"), 240)
+    student_revision = clean(student.get("revision"), 40).lower()
+    prompt_set_hash = clean(envelope.get("promptSetHash"), 64).lower()
+    if (
+        not teacher_id
+        or not student_id
+        or teacher_id == student_id
+        or not HEX40.match(teacher_revision)
+        or not HEX40.match(student_revision)
+        or clean(teacher.get("license"), 80).lower() != "apache-2.0"
+        or clean(student.get("license"), 80).lower() != "apache-2.0"
+        or not HEX64.match(prompt_set_hash)
+        or envelope.get("trainingRights") != "open_license"
+        or envelope.get("studentControlledByBuyer") is not True
+        or envelope.get("containsPrivateProductionData") is not False
+        or len(prompts) < 20
+        or len(prompts) > 256
+    ):
+        raise RuntimeError("worker_teacher_dataset_contract_invalid")
+
+    normalized_prompts: list[tuple[str, str]] = []
+    seen_prompt_ids: set[str] = set()
+    for item in prompts:
+        if not isinstance(item, dict):
+            raise RuntimeError("worker_teacher_prompt_invalid")
+        prompt_id = clean(item.get("id"), 160)
+        prompt = clean(item.get("prompt"), 12_000)
+        if not prompt_id or not prompt or prompt_id in seen_prompt_ids:
+            raise RuntimeError("worker_teacher_prompt_invalid")
+        seen_prompt_ids.add(prompt_id)
+        normalized_prompts.append((prompt_id, prompt))
+
+    token = os.environ["HF_TOKEN"]
+    use_bf16 = bool(torch.cuda.is_available() and torch.cuda.is_bf16_supported())
+    compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
+    quantization = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_compute_dtype=compute_dtype,
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        teacher_id,
+        revision=teacher_revision,
+        token=token,
+        use_fast=True,
+    )
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    model = AutoModelForCausalLM.from_pretrained(
+        teacher_id,
+        revision=teacher_revision,
+        token=token,
+        quantization_config=quantization,
+        device_map="auto",
+        torch_dtype=compute_dtype,
+    )
+    model.eval()
+
+    rows: list[dict[str, Any]] = []
+    item_hashes: list[str] = []
+    system = (
+        "You are producing public synthetic supervised training examples for reasoning practice. "
+        "Answer the supplied standalone case directly. Never reveal hidden chain-of-thought or internal scratch work. "
+        "Use only facts supplied in the case and general reasoning principles."
+    )
+    for prompt_id, prompt in normalized_prompts:
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ]
+        try:
+            rendered = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
+        except TypeError:
+            rendered = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+
+        encoded = tokenizer(rendered, return_tensors="pt")
+        encoded = {key: value.to(model.device) for key, value in encoded.items()}
+        with torch.inference_mode():
+            generated = model.generate(
+                **encoded,
+                max_new_tokens=384,
+                do_sample=False,
+                pad_token_id=tokenizer.pad_token_id,
+                eos_token_id=tokenizer.eos_token_id,
+            )
+        new_tokens = generated[0][encoded["input_ids"].shape[-1]:]
+        answer = strip_hidden_reasoning(tokenizer.decode(new_tokens, skip_special_tokens=True))
+        if len(answer) < 80:
+            continue
+        text = f"<user>\n{prompt}\n\n<assistant>\n{answer}"
+        digest = sha256(text)
+        if digest in item_hashes:
+            continue
+        item_hashes.append(digest)
+        rows.append({
+            "prompt_id": prompt_id,
+            "prompt": prompt,
+            "response": answer,
+            "text": text,
+            "messages": [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": answer},
+            ],
+            "item_hash": digest,
+            "teacher_model": teacher_id,
+            "teacher_revision": teacher_revision,
+            "student_model": student_id,
+            "student_revision": student_revision,
+            "training_rights": "open_license",
+            "contains_private_production_data": False,
+            "prompt_profile": clean(envelope.get("promptProfile"), 120),
+            "prompt_set_hash": prompt_set_hash,
+        })
+
+    if len(rows) < 20:
+        raise RuntimeError("worker_teacher_dataset_too_small")
+
+    api = HfApi(token=token)
+    namespace = api.whoami()["name"]
+    candidate_id = clean(envelope.get("candidateId"), 200)
+    job_id = clean(os.environ.get("JOB_ID"), 240)
+    if not job_id:
+        raise RuntimeError("worker_job_id_missing")
+    output_repo = f"{namespace}/itmounts-teacher-{sha256(candidate_id + ':' + job_id)[:12]}"
+    api.create_repo(output_repo, repo_type="dataset", private=True, exist_ok=True, token=token)
+    Dataset.from_list(rows).push_to_hub(output_repo, split="train", private=True, token=token)
+    info = api.dataset_info(output_repo, token=token)
+    pinned_revision = clean(getattr(info, "sha", None), 40).lower()
+    if not HEX40.match(pinned_revision):
+        raise RuntimeError("worker_teacher_dataset_revision_missing")
+
+    source_ref = f"hf://datasets/{output_repo}@{pinned_revision}#train"
+    callback({
+        "claim": "teacher_dataset_registered",
+        "candidateId": candidate_id,
+        "jobId": job_id,
+        "sourceRef": source_ref,
+        "teacherOutputItemHashes": item_hashes,
+        "promptSetHash": prompt_set_hash,
+        "teacherModelId": teacher_id,
+        "teacherModelRevision": teacher_revision,
+        "studentModelId": student_id,
+        "studentModelRevision": student_revision,
+        "trainingRights": "open_license",
+        "studentControlledByBuyer": True,
+        "containsPrivateProductionData": False,
+    })
 
 
 def prepare_dataset(envelope: dict[str, Any]) -> None:
@@ -330,7 +507,9 @@ def train(envelope: dict[str, Any]) -> None:
 def main() -> int:
     envelope = parse_request()
     operation = clean(envelope.get("operation"), 40)
-    if operation == "prepare_dataset":
+    if operation == "generate_teacher_dataset":
+        generate_teacher_dataset(envelope)
+    elif operation == "prepare_dataset":
         prepare_dataset(envelope)
     elif operation == "train":
         train(envelope)

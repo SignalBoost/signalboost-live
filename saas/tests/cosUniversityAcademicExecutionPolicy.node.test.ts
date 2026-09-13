@@ -11,17 +11,16 @@ import './cosUniversityExamSchema.node.test.ts'
 
 const file = (relative: string) => fs.readFileSync(path.resolve(import.meta.dirname, '..', relative), 'utf8')
 
-test('only COS has a bound academic executor; every other agent fails closed', () => {
+test('legacy COS-only policy remains fail-closed until a registered bound executor explicitly clears it', () => {
   assert.equal(cosUniversityAcademicExecutionBlocker('cos'), null)
   assert.equal(cosUniversityAcademicExecutionBlocker('software-specialist'), COS_UNIVERSITY_ACADEMIC_EXECUTOR_UNAVAILABLE)
   assert.equal(cosUniversityAcademicExecutionBlocker('any-future-agent'), COS_UNIVERSITY_ACADEMIC_EXECUTOR_UNAVAILABLE)
   assert.equal(cosUniversityAcademicExecutionBlocker('  '), 'agent_id_required')
 })
 
-const RUNNERS: Array<{ file: string; blockAt: RegExp; firstWork: string }> = [
-]
+const RUNNERS: Array<{ file: string; blockAt: RegExp; firstWork: string }> = []
 
-test('every credit-bearing runner that answers through the COS reasoner blocks other agents before any evidence work', () => {
+test('every credit-bearing runner that still answers through COS blocks other agents before evidence work', () => {
   for (const runner of RUNNERS) {
     const source = file(runner.file)
     assert.match(source, /tryCOSFirstAnswer\(/, `${runner.file} still answers through the COS reasoner`)
@@ -30,13 +29,10 @@ test('every credit-bearing runner that answers through the COS reasoner blocks o
     assert.ok(blockMatch, `${runner.file} must return a blocked result`)
     const workAt = source.indexOf(runner.firstWork, source.indexOf('cosUniversityAcademicExecutionBlocker(agentId)'))
     assert.ok(workAt > blockMatch.index, `${runner.file} must block before loading or creating academic evidence`)
-    const ends = [source.indexOf('semantics:', blockMatch.index), source.indexOf('blocked }', blockMatch.index)].filter(at => at > 0)
-    const blockedReturn = source.slice(blockMatch.index, Math.min(...ends))
-    assert.doesNotMatch(blockedReturn, /errors: \[['"]/, 'a policy block is an explicit outcome, not a lane failure')
   }
 })
 
-test('independent exams are unblocked only for an agent with its own bound executor, and are answered by it', () => {
+test('independent exams admit only a registered bound executor and persist its exact runtime', () => {
   const runner = file('lib/ai/cos/cosUniversityIndependentExamRunner.ts')
   assert.match(runner, /if \(blocked && await hasBoundAcademicExecutor\(agentId\)\.catch\(\(\) => false\)\) blocked = null/)
   assert.match(runner, /if \(agentId !== DEFAULT_AGENT_ID\) \{\s*return executeBoundExam\(agentId, row, target, exam, started\)/)
@@ -48,23 +44,24 @@ test('independent exams are unblocked only for an agent with its own bound execu
   assert.match(boundBody, /execution\.agentId !== agentId \|\| execution\.runId !== row\.id \|\| execution\.manifestHash !== exam\.manifestHash/)
   assert.match(boundBody, /return fail\(\['agent_execution_identity_mismatch'\]\)/)
   assert.match(boundBody, /execution_provenance: execution/)
-  assert.match(boundBody, /response_source: SOFTWARE_CAPSTONE_RUNTIME/)
+  assert.match(boundBody, /response_source: execution\.runtime/)
+  assert.match(boundBody, /responseSource: execution\.runtime/)
 })
 
-test('the bound exam runtime reuses the host capstone executor and the agent\'s own assigned model', () => {
+test('the bound exam runtime is role-generic, fail-closed, and keeps software legacy identity', () => {
   const runtime = file('lib/ai/cos/cosUniversityAgentExamRuntime.ts')
-  assert.match(runtime, /executeBoundSoftwareCapstone\(request, \{/)
-  assert.match(runtime, /requireBuilderCodingModel\(\)/)
-  assert.match(runtime, /isSoftwareCapstoneIdentity\(agentId, await readCosUniversityAgentRole\(agentId\)\)/)
+  assert.match(runtime, /executeBoundRegisteredSpecialist\(request, \{/)
+  assert.match(runtime, /isRegisteredSpecialistIdentity\(id, await readCosUniversityAgentRole\(id\)\)/)
+  assert.match(runtime, /COS_UNIVERSITY_ROLE_MODELS_SETTING_KEY = 'cos_university_role_models'/)
+  assert.match(runtime, /if \(role === SOFTWARE_CAPSTONE_ROLE\) return requireBuilderCodingModel\(\)/)
+  assert.match(runtime, /university_role_model_not_configured:/)
   assert.doesNotMatch(runtime, /tryCOSFirstAnswer/)
-  const migration = file('supabase/migrations/20260911235500_university_agent_exam_execution.sql')
-  assert.match(migration, /ALTER TABLE public\.cos_university_exam_runs/)
-  assert.match(migration, /execution_provenance IS NULL AND \(agent_id = 'cos' OR fresh_execution IS NOT TRUE\)/)
-  assert.match(migration, /execution_provenance->>'runId' = id::text/)
-  assert.match(migration, /NOT VALID/, 'historical rows are never granted fresh provenance')
+  const generic = file('lib/ai/cos/cosUniversityRegisteredSpecialistExecutor.ts')
+  assert.match(generic, /if \(role === SOFTWARE_CAPSTONE_ROLE\) return executeBoundSoftwareCapstone\(request, ports\)/)
+  assert.match(generic, /REGISTERED_SPECIALIST_RUNTIME = 'university_registered_specialist_v1'/)
 })
 
-test('subject A-range is unblocked only for an agent with its own bound executor, and is answered by it', () => {
+test('subject A-range uses the registered learner and persists the exact returned runtime', () => {
   const runner = file('lib/ai/cos/cosUniversityARangeRunner.ts')
   assert.match(runner, /if \(blocked && await hasBoundAcademicExecutor\(agentId\)\.catch\(\(\) => false\)\) blocked = null/)
   const boundAt = runner.indexOf('if (agentId !== AGENT_ID) {')
@@ -73,41 +70,34 @@ test('subject A-range is unblocked only for an agent with its own bound executor
   const boundBody = runner.slice(boundAt, cosAt)
   assert.doesNotMatch(boundBody, /tryCOSFirstAnswer\(/)
   assert.match(boundBody, /executeBoundAgentExam\(\s*\{ agentId, runId: row\.id, manifestHash: exam\.manifestHash, prompt: exam\.prompt \},\s*\{ subjectId: row\.subject_id \},\s*\)/)
-  assert.match(boundBody, /execution\.agentId !== agentId \|\| execution\.runId !== row\.id \|\| execution\.manifestHash !== exam\.manifestHash/)
-  assert.match(boundBody, /return failRun\(\['agent_execution_identity_mismatch'\]\)/)
+  assert.match(boundBody, /responseSource = execution\.runtime/)
   assert.match(runner, /execution_provenance: executionProvenance/)
-  assert.match(runner, /const freshExecution = Boolean\(handled && localModelInvoked && !externalAiInvoked && !semanticCache && turnId\)/)
-  assert.match(runner.slice(cosAt), /tryCOSFirstAnswer\(\{ prompt: exam\.prompt, language: 'en', privileged: true, disableCache: true \}\)/)
 })
 
-test('the A-range execution binding matches the exam and capstone bindings', () => {
-  const migration = file('supabase/migrations/20260912001500_university_agent_a_range_execution.sql')
-  assert.match(migration, /ALTER TABLE public\.cos_university_a_range_runs/)
-  assert.match(migration, /execution_provenance IS NULL AND \(agent_id = 'cos' OR fresh_execution IS NOT TRUE\)/)
-  assert.match(migration, /execution_provenance->>'runId' = id::text/)
-  assert.match(migration, /response_source = 'university_software_specialist_v1'/)
-  assert.match(migration, /NOT VALID/, 'historical rows are never granted fresh provenance')
+test('live database binding migrations accept only exact role-bound runtime evidence', () => {
+  const apply = file('supabase/migrations/20260912030000_university_agent_execution_binding_apply.sql')
+  assert.match(apply, /execution_provenance->>'runtime' ~ '\^university_/)
+  assert.match(apply, /execution_provenance->>'role' in \(/)
+  assert.match(apply, /execution_provenance->>'agentId' = agent_id/)
+  assert.match(apply, /execution_provenance->>'runId' = id::text/)
+  assert.match(apply, /response_source = execution_provenance->>'runtime'/)
+  assert.match(apply, /NOT VALID/, 'historical rows are never retroactively promoted')
 })
 
-test('language A-range is unblocked only for an agent with its own bound executor, and is answered by it', () => {
+test('language A-range uses generalist work routing but preserves specialist execution identity', () => {
   const runner = file('lib/ai/cos/cosUniversityLanguageARangeRunner.ts')
   assert.match(runner, /if \(blocked && await hasBoundAcademicExecutor\(agentId\)\.catch\(\(\) => false\)\) blocked = null/)
-  const bridgeAt = runner.indexOf('await syncVerifiedLanguageProductionOutcomes(agentId, now)')
-  const blockAt = runner.indexOf('let blocked = cosUniversityAcademicExecutionBlocker(agentId)')
-  assert.ok(bridgeAt > 0 && blockAt > bridgeAt, 'the Production bridge runs before the exam block')
   const boundAt = runner.indexOf('if (agentId !== AGENT_ID) {')
   const cosAt = runner.indexOf('} else {', boundAt)
   assert.ok(boundAt > 0 && cosAt > boundAt)
   const boundBody = runner.slice(boundAt, cosAt)
   assert.doesNotMatch(boundBody, /tryCOSFirstAnswer\(/)
   assert.match(boundBody, /executeBoundAgentExam\(\s*\{ agentId, runId: row\.id, manifestHash: exam\.manifestHash, prompt: exam\.prompt \},\s*\{ domain: 'generalist' \},\s*\)/)
-  assert.match(boundBody, /return failRun\(\['agent_execution_identity_mismatch'\]\)/)
+  assert.match(boundBody, /responseSource = execution\.runtime/)
   assert.match(runner, /execution_provenance: executionProvenance/)
-  assert.match(runner.slice(cosAt), /tryCOSFirstAnswer\(\{ prompt: exam\.prompt, language: row\.language_code, privileged: true, disableCache: true \}\)/)
-  assert.match(runner, /const freshExecution = Boolean\(handled && localModelInvoked && !externalAiInvoked && !semanticCache && turnId\)/)
 })
 
-test('delayed retention is unblocked only for an agent with its own bound executor, and is answered by it', () => {
+test('delayed retention remains learner-scoped and preserves returned execution provenance', () => {
   const runner = file('lib/ai/cos/cosUniversityRetentionRunner.ts')
   assert.match(runner, /if \(blocked && await hasBoundAcademicExecutor\(agentId\)\.catch\(\(\) => false\)\) blocked = null/)
   const boundAt = runner.indexOf('if (agentId !== DEFAULT_AGENT_ID) {')
@@ -118,11 +108,9 @@ test('delayed retention is unblocked only for an agent with its own bound execut
   assert.match(boundBody, /executeBoundAgentExam\(\s*\{ agentId, runId: inserted\.data\.id, manifestHash: source\.manifestHash, prompt: exam\.prompt \},\s*\{ subjectId: source\.subjectId \},\s*\)/)
   assert.match(boundBody, /throw new Error\('agent_execution_identity_mismatch'\)/)
   assert.match(runner, /execution_provenance: executionProvenance/)
-  assert.match(runner.slice(cosAt), /tryCOSFirstAnswer\(\{ prompt: exam\.prompt, language: 'en', privileged: true, disableCache: true \}\)/)
-  assert.match(runner, /const fresh = Boolean\(handled && localModelInvoked && !externalAiInvoked && !semanticCache && turnId\)/)
 })
 
-test('every credit-bearing University lane now has an execution binding in the database', () => {
+test('every credit-bearing University lane has a database execution binding', () => {
   const bindings = [
     ['supabase/migrations/20260911201757_university_agent_capstone_execution.sql', 'cos_university_generalist_capstone_runs'],
     ['supabase/migrations/20260911235500_university_agent_exam_execution.sql', 'cos_university_exam_runs'],

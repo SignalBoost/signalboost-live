@@ -3,8 +3,12 @@ import { createCOSSpecialistOrchestrator, type SpecialistQualificationPort } fro
 import type { A2AAgentRegistryPort, A2ATransportFactory } from './a2a-agent-registry.ts'
 import type { A2ARuntimeObservationPort } from './a2a-runtime-observability.ts'
 import type { SpecialistMeshSignalPort } from './specialist-mesh-router.ts'
+import {
+  createDurableSpecialistMeshDelegationPort,
+  type SpecialistMeshExecutionCoordinationOptions,
+} from './specialist-mesh-execution-ownership.ts'
 
-export const PORTABLE_A2A_HOST_VERSION = 'signalboost-portable-a2a-host-v2' as const
+export const PORTABLE_A2A_HOST_VERSION = 'signalboost-portable-a2a-host-v3' as const
 
 export interface PortableA2AHostOptions {
   registry: A2AAgentRegistryPort
@@ -13,6 +17,7 @@ export interface PortableA2AHostOptions {
   observe?: A2ARuntimeObservationPort
   qualifications?: SpecialistQualificationPort
   meshSignals?: SpecialistMeshSignalPort
+  meshCoordination?: SpecialistMeshExecutionCoordinationOptions
   timeoutMs?: number
   requireAuditForConsequential?: boolean
 }
@@ -31,9 +36,16 @@ export function createPortableA2AHost(options: PortableA2AHostOptions) {
     timeoutMs: options.timeoutMs,
     requireAuditForConsequential: options.requireAuditForConsequential,
   })
+  const specialistDelegation = options.meshCoordination
+    ? createDurableSpecialistMeshDelegationPort({
+        registry: options.registry,
+        delegation,
+        coordination: options.meshCoordination,
+      })
+    : delegation
   const orchestrator = createCOSSpecialistOrchestrator({
     registry: options.registry,
-    delegation,
+    delegation: specialistDelegation,
     qualifications: options.qualifications,
     meshSignals: options.meshSignals,
   })

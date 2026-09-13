@@ -4,13 +4,15 @@ import { installCOSA2AQualificationAssessmentPort, installCOSA2ARuntimeHost } fr
 import { createCOSSpecialistOrchestrator } from './cos-specialist-orchestrator.ts'
 import { createPortableA2AHost, type PortableA2AHost, type PortableA2AHostOptions } from './portable-a2a-host.ts'
 import { createSupabaseSpecialistMeshProductionAdapters } from './specialist-mesh-production-adapters.ts'
+import { createDurableSpecialistMeshDelegationPort } from './specialist-mesh-execution-ownership.ts'
+import { createSupervisorCoordinationStore } from '../lib/supervisor/coordination/durable-coordination-store.ts'
 import {
   createSpecialistQualificationAssessmentPort,
   type SpecialistQualificationProbeProvider,
   type SpecialistQualificationVerifier,
 } from './specialist-qualification-assessment.ts'
 
-export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v4' as const
+export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v5' as const
 
 export interface A2AHostActivationSummary {
   version: typeof A2A_HOST_ACTIVATION_VERSION
@@ -31,6 +33,15 @@ function required(value: unknown, name: string): string {
   if (!normalized) throw new Error(`A2A host activation ${name} is required`)
   if (normalized === '*') throw new Error(`A2A host activation ${name} does not allow wildcard scope`)
   return normalized
+}
+
+function productionMeshCoordination(db: SupabaseClient) {
+  return Object.freeze({
+    store: createSupervisorCoordinationStore({ supabase: db, runtime: 'production' }),
+    environment: 'production' as const,
+    policyVersion: A2A_HOST_ACTIVATION_VERSION,
+    softwareVersion: A2A_HOST_ACTIVATION_VERSION,
+  })
 }
 
 export async function validateA2AHostActivation(registry: A2AAgentRegistryPort, now: () => Date = () => new Date()): Promise<A2AHostActivationSummary> {
@@ -72,18 +83,24 @@ export async function activateCOSA2AHost(options: PortableA2AHostOptions & { now
 }
 
 /**
- * Production composition root for a fully constructed host. Durable specialist qualification and
- * routing telemetry replace caller-supplied mesh evidence. The same exact registry/transport authority
- * is also used to install the host-owned qualification assessor with hidden probes + independent verifier.
+ * Production composition root for a fully constructed host. Durable specialist qualification,
+ * routing telemetry, and execution ownership replace caller-supplied mesh evidence/coordination.
+ * The same exact registry/transport authority is also used to install the host-owned qualification
+ * assessor with hidden probes + independent verifier.
  */
-export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHostOptions, 'qualifications' | 'meshSignals'> & {
+export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHostOptions, 'qualifications' | 'meshSignals' | 'meshCoordination'> & {
   db: SupabaseClient
   qualificationAssessment: ProductionSpecialistQualificationAssessmentOptions
   now?: () => Date
 }) {
   const { db, qualificationAssessment, ...hostOptions } = options
   const mesh = createSupabaseSpecialistMeshProductionAdapters(db, { now: options.now })
-  const activated = await activateCOSA2AHost({ ...hostOptions, qualifications: mesh.qualifications, meshSignals: mesh.meshSignals })
+  const activated = await activateCOSA2AHost({
+    ...hostOptions,
+    qualifications: mesh.qualifications,
+    meshSignals: mesh.meshSignals,
+    meshCoordination: productionMeshCoordination(db),
+  })
   const assessmentPort = createSpecialistQualificationAssessmentPort({
     registry: hostOptions.registry,
     transportFactory: hostOptions.transportFactory,
@@ -103,8 +120,9 @@ export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHost
 
 /**
  * Deployed-route composition for an already installed governed host. This preserves its registry,
- * transport runtime, audit boundaries, and authorization while replacing only qualification/routing
- * evidence with service-role durable Production evidence. No host is fabricated on a cold start.
+ * transport runtime, audit boundaries, and authorization while replacing qualification/routing
+ * evidence and adding durable fenced execution ownership with the service-role Production store.
+ * No host is fabricated on a cold start.
  */
 export function attachProductionSpecialistMeshEvidence(
   host: PortableA2AHost,
@@ -112,9 +130,14 @@ export function attachProductionSpecialistMeshEvidence(
   options: { now?: () => Date } = {},
 ): PortableA2AHost {
   const mesh = createSupabaseSpecialistMeshProductionAdapters(db, { now: options.now })
-  const orchestrator = createCOSSpecialistOrchestrator({
+  const specialistDelegation = createDurableSpecialistMeshDelegationPort({
     registry: host.registry,
     delegation: host.delegation,
+    coordination: productionMeshCoordination(db),
+  })
+  const orchestrator = createCOSSpecialistOrchestrator({
+    registry: host.registry,
+    delegation: specialistDelegation,
     qualifications: mesh.qualifications,
     meshSignals: mesh.meshSignals,
   })

@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
-import { universityPracticeModelFromEnv } from './cosUniversityAgentModelPolicy.ts'
+import { resolveUniversityPracticeModel } from './cosUniversityPracticeModelRuntime.ts'
 import {
   enforceUniversityPracticeCostGuard,
   meterUniversityPracticeInvocation,
@@ -39,7 +39,7 @@ export function universityPracticeExecutionFence(agentId: string): Record<string
 }
 
 async function executeCosPracticeOnConfiguredEconomyModel(request: AgentCapstoneRequest): Promise<ReasonerResult | null> {
-  const practiceModel = universityPracticeModelFromEnv()
+  const practiceModel = await resolveUniversityPracticeModel()
   if (!practiceModel) return null
   const config = localInferenceConfigFromEnv()
   const text = await callLocalModel({

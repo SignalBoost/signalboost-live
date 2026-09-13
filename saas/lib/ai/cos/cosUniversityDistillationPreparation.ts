@@ -7,6 +7,7 @@ import { controlledFineTuneDatasetHash, type ControlledFineTunePlanIdentityInput
 export const COS_UNIVERSITY_DISTILLATION_PREPARATION_PROFILE = 'cos_university_distillation_preparation_v1' as const
 const UNSEEN_EXAM_PROFILE = 'cos_university_unseen_v1'
 const HASH = /^[a-f0-9]{64}$/i
+const HF_COMMIT_SHA = /^[a-f0-9]{40}$/i
 
 export type DistillationExamRun = Readonly<{
   id: string
@@ -32,6 +33,7 @@ export type DistillationDatasetBindingInput = Readonly<{
   plan: ControlledFineTunePlanIdentityInput & { evidence?: unknown }
   teacherModelId: string
   studentModelId: string
+  studentControlledByBuyer: boolean
   sourceRef: string
   provenanceRefs: readonly string[]
   trainingRights: ModelDistillationTrainingRights
@@ -150,7 +152,7 @@ function readQualification(evidence: unknown): DistillationFailureQualification 
 
 function pinnedDatasetRef(value: unknown): boolean {
   const decoded = decodeHuggingFaceDatasetRef(value)
-  return Boolean(decoded?.revision)
+  return Boolean(decoded?.revision && HF_COMMIT_SHA.test(decoded.revision))
 }
 
 function hashItems(items: readonly string[]): string {
@@ -185,7 +187,7 @@ export function buildDistillationDatasetBinding(input: DistillationDatasetBindin
     datasetHash,
     provenanceRefs: [...new Set((input.provenanceRefs || []).map(item => clean(item, 1000)).filter(Boolean))],
     trainingRights: input.trainingRights,
-    studentControlledByBuyer: true,
+    studentControlledByBuyer: input.studentControlledByBuyer === true,
     containsPrivateProductionData: input.containsPrivateProductionData,
     repeatedFailures: qualification!.repeatedFailures,
     independentRetestFailures: qualification!.independentRetestFailures,
@@ -206,6 +208,7 @@ export function buildDistillationDatasetBinding(input: DistillationDatasetBindin
     studentModelId: candidate.studentModelId,
     trainingRights: candidate.trainingRights,
     provenanceRefs: [...candidate.provenanceRefs],
+    studentControlledByBuyer: true,
     containsPrivateProductionData: false,
     qualification: {
       repeatedFailures: qualification!.repeatedFailures,

@@ -66,10 +66,15 @@ function languageStage(
   }))
 }
 
-test('COS University exposes a stable unique thirteen-subject core', () => {
-  assert.equal(COS_UNIVERSITY_SUBJECTS.length, 13)
+test('COS University exposes a stable unique fourteen-subject core including Quantum Computing', () => {
+  assert.equal(COS_UNIVERSITY_SUBJECTS.length, 14)
   assert.equal(new Set(COS_UNIVERSITY_SUBJECTS.map(subject => subject.id)).size, COS_UNIVERSITY_SUBJECTS.length)
   assert.ok(COS_UNIVERSITY_SUBJECTS.every(subject => subject.studyThemes.length >= 4))
+  const quantum = COS_UNIVERSITY_SUBJECTS.find(subject => subject.id === 'quantum_computing')
+  assert.equal(quantum?.title, 'Quantum Computing')
+  assert.ok(quantum?.studyThemes.some(theme => /qubit/i.test(theme)))
+  assert.ok(quantum?.studyThemes.some(theme => /error correction/i.test(theme)))
+  assert.ok(quantum?.studyThemes.some(theme => /quantum-classical/i.test(theme)))
 })
 
 test('real work can classify into multiple university subjects without forcing a false single label', () => {
@@ -84,6 +89,13 @@ test('real work can classify into multiple university subjects without forcing a
 
   const diplomacy = classifyCosUniversitySubjects('Assess diplomatic options and geopolitical public-policy consequences.')
   assert.ok(diplomacy.includes('politics_government_international_relations'))
+
+  const quantum = classifyCosUniversitySubjects('Evaluate a fault-tolerant quantum circuit with qubits, decoherence, error correction, and a classical benchmark.')
+  assert.ok(quantum.includes('quantum_computing'))
+  assert.ok(!quantum.includes('physics_natural_sciences'))
+
+  const quantumMechanics = classifyCosUniversitySubjects('Analyze quantum mechanics and physical measurement.')
+  assert.ok(quantumMechanics.includes('physics_natural_sciences'))
 })
 
 test('academic evidence tags can travel with existing learning gaps without claiming a grade', () => {
@@ -99,7 +111,7 @@ test('study volume cannot manufacture a university grade', () => {
   assert.equal(entry.evidenceCount, 0)
 
   const transcript = buildCosUniversityTranscript([])
-  assert.equal(transcript.length, 13)
+  assert.equal(transcript.length, 14)
   assert.ok(transcript.every(subject => subject.grade === 'unassessed'))
 })
 

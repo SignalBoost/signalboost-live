@@ -1,8 +1,17 @@
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
-import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
+import { currentPlatformModelTopology, requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
-import { executeBoundSoftwareCapstone, selectAgentCapstoneProcedures, type AgentCapstoneRequest } from './cosUniversityAgentCapstone.ts'
+import {
+  executeBoundSoftwareCapstone,
+  selectAgentCapstoneProcedures,
+  SOFTWARE_CAPSTONE_ROLE,
+  type AgentCapstoneRequest,
+} from './cosUniversityAgentCapstone.ts'
+import {
+  executeBoundRegisteredSpecialist,
+  isRegisteredSpecialistIdentity,
+} from './cosUniversityRegisteredSpecialistExecutor.ts'
 import { requireCosUniversityGraduationRuntime } from './cosUniversityGraduationRuntimePolicy.ts'
 
 export async function requireRegisteredCapstoneRuntime(agentId: string): Promise<string> {
@@ -25,17 +34,43 @@ async function loadOwnProcedures(agentId: string): Promise<string[]> {
   return selectAgentCapstoneProcedures(result.data || [], agentId)
 }
 
-/** Uses the same explicitly configured software model as Builder, without Builder's JSON envelope. */
-export async function executeSoftwareCapstoneRuntime(request: AgentCapstoneRequest) {
-  await requireRegisteredCapstoneRuntime(request.agentId)
+function inferencePorts(model: string) {
   const config = localInferenceConfigFromEnv()
-  const model = requireBuilderCodingModel()
-  return executeBoundSoftwareCapstone(request, {
-    readRole: readCosUniversityAgentRole, loadProcedures: loadOwnProcedures, model,
+  return {
+    readRole: readCosUniversityAgentRole,
+    loadProcedures: loadOwnProcedures,
+    model,
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA || null,
     deploymentId: process.env.VERCEL_DEPLOYMENT_ID || null,
-    infer: (input, selectedModel) => callLocalModel({ ...input, frequencyPenalty: 0, presencePenalty: 0 }, {
-      ...config, model: selectedModel, timeoutMs: Math.min(config.timeoutMs, 90_000),
+    infer: (input: { prompt: string; systemPrompt: string; maxTokens: number }, selectedModel: string) => callLocalModel({
+      ...input,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+    }, {
+      ...config,
+      model: selectedModel,
+      timeoutMs: Math.min(config.timeoutMs, 90_000),
     }),
-  })
+  }
 }
+
+/**
+ * Graduation capstone dispatch for any registered specialist. Software keeps its historical Builder-
+ * model runtime and evidence identity. Other roles use the platform reasoner for the multidisciplinary
+ * common-foundation capstone; their role model is reserved for role-domain coursework/exams.
+ */
+export async function executeRegisteredCapstoneRuntime(request: AgentCapstoneRequest) {
+  const role = await requireRegisteredCapstoneRuntime(request.agentId)
+  if (!isRegisteredSpecialistIdentity(request.agentId, role)) {
+    throw new Error('agent_capstone_runtime_unavailable')
+  }
+  if (role === SOFTWARE_CAPSTONE_ROLE) {
+    return executeBoundSoftwareCapstone(request, inferencePorts(requireBuilderCodingModel()))
+  }
+  const model = String(currentPlatformModelTopology().primaryReasonerModel ?? '').trim()
+  if (!model) throw new Error('primary_reasoner_model_not_configured')
+  return executeBoundRegisteredSpecialist(request, inferencePorts(model))
+}
+
+/** Backward-compatible export used by the existing graduation runner. */
+export const executeSoftwareCapstoneRuntime = executeRegisteredCapstoneRuntime

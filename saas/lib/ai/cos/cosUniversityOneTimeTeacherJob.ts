@@ -38,12 +38,8 @@ function record(value: unknown): Record<string, unknown> {
 }
 
 async function serviceDb() {
-  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
-  return modCosServiceDb(await import('../../cos-core/storage/supabase.ts'))
-}
-
-function modCosServiceDb(mod: { cosServiceDb: () => unknown }) {
-  return mod.cosServiceDb() as any
+  const mod = await import('../../cos-core/storage/supabase.ts')
+  return mod.cosServiceDb()
 }
 
 function planUuid(candidateId: string): string {

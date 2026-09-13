@@ -6,6 +6,21 @@ const tests = [
   'tests/cosUniversityLaneFaultRecorder.node.test.ts',
   'tests/cosUniversityFineTuneEvidence.node.test.ts',
   'tests/cosUniversityDailyLaneCadence.node.test.ts',
+  // Registered 2026-09-13. These eleven regressions existed but were never in this gate, so they had
+  // never run in CI: every "green" for them came from a sandbox. They defend the execution binding,
+  // the per-agent scoping of graduate work, the honest-receipt rule, acquisition selection and the
+  // curriculum/exam alignment — all behaviour a deploy can silently undo.
+  'tests/cosUniversityPracticeGateParity.node.test.ts',
+  'tests/cosUniversityMastersRuntimeAgentScope.node.test.ts',
+  'tests/cosUniversityMastersAgentAware.node.test.ts',
+  'tests/cosUniversityReceiptHonesty.node.test.ts',
+  'tests/cosUniversityPracticeDeferralPolicy.node.test.ts',
+  'tests/cosUniversityCurriculumExamAlignment.node.test.ts',
+  'tests/cosUniversityStudySupplyPriority.node.test.ts',
+  'tests/cosUniversityLearningSourceCooldown.node.test.ts',
+  'tests/learningSourceMix.node.test.ts',
+  'tests/openAlexAbstract.node.test.ts',
+  'tests/cosUniversityAgentModelPolicy.node.test.ts',
   'tests/cosUniversityCredentialKeys.node.test.ts',
   'tests/cosUniversityGraduationRuntimePolicy.node.test.ts',
   'tests/cosUniversityAcademicExecutionPolicy.node.test.ts',

@@ -24,7 +24,9 @@ test('every agent clears the same accepted-study proof before practising', () =>
   // host-written proof of accepted study for the current attempt — the exact check COS must pass.
   assert.match(cycle, /readCosUniversityPracticeStudyGate\(now, agent\.agentId\)/)
   const gateAt = cycle.indexOf('readCosUniversityPracticeStudyGate(now, agent.agentId)')
-  const runAt = cycle.indexOf('runCosUniversityDeliberatePractice({')
+  // The practice entry point has been renamed once already (runConfigured...); match either, so this
+  // test keeps checking the ORDER rather than one spelling.
+  const runAt = cycle.search(/run(?:Configured)?CosUniversityDeliberatePractice\(\{/)
   assert.ok(gateAt > 0 && gateAt < runAt, 'the gate must precede execution')
 })
 

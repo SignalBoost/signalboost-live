@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runCosUniversityPhdProgress } from '@/lib/ai/cos/cosUniversityPhdRuntime'
+import { runCosUniversityPhdProgressForAgent } from '@/lib/ai/cos/cosUniversityPhdAgentRunner'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { listCosUniversityRegisteredAgents } from '@/lib/ai/cos/cosUniversityAgentRegistry'
 import { rotatePhdAgents } from '@/lib/ai/cos/cosUniversityPhdAgentScope'
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const agents = rotatePhdAgents(await listCosUniversityRegisteredAgents(), now, 2)
     const selected = agents[0]
     if (!selected) throw new Error('no_registered_phd_agents')
-    const result = await runCosUniversityPhdProgress(now, selected.agentId)
+    const result = await runCosUniversityPhdProgressForAgent(now, selected.agentId)
     const evidence = { agentId: selected.agentId, role: selected.role, ...result }
     await recordCosUniversityProductionPath({ path: 'phd_progress', invocationSucceeded: result.errors.length === 0, evidence })
     return NextResponse.json({ ok: result.errors.length === 0, enabled: true, ...evidence }, { status: result.errors.length ? 500 : 200 })

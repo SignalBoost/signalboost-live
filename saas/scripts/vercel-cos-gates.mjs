@@ -12,6 +12,7 @@ const tests = [
   // curriculum/exam alignment — all behaviour a deploy can silently undo.
   'tests/cosUniversityPracticeGateParity.node.test.ts',
   'tests/cosUniversitySpecialistRuntimes.node.test.ts',
+  'tests/cosUniversityPhdAgentScope.node.test.ts',
   'tests/cosUniversitySpecialistRuntimeDatabase.node.test.ts',
   'tests/cosUniversityMastersRuntimeAgentScope.node.test.ts',
   'tests/cosUniversityMastersAgentAware.node.test.ts',
@@ -150,8 +151,10 @@ const tests = [
   'tests/cosCognitiveAutonomousCertification.node.test.ts',
   'tests/cosUniversity.node.test.ts',
   'tests/cosUniversityContinuousLearning.node.test.ts',
+  'tests/cosUniversityUndergraduateAcceptance.node.test.ts',
   'tests/cosUniversityIndependentExam.node.test.ts',
   'tests/cosUniversityExecutionBinding.node.test.ts',
+  'tests/cosUniversityRoleModelPolicy.node.test.ts',
   'tests/cosUniversityARange.node.test.ts',
   'tests/cosUniversityLanguageAuthenticity.node.test.ts',
   'tests/cosUniversityContinuousEducation.node.test.ts',

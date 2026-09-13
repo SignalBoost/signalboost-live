@@ -7,6 +7,7 @@ import {
   trainingExecutorReadiness,
   type TrainingMode,
 } from '@/lib/ai/cos/cosUniversityTrainingExecutor'
+import { installHuggingFaceTrainingExecutorEnv } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
 import type { FineTuneRevision } from '@/lib/ai/cos/cosUniversityFineTuneEvidence'
 import type { ModelDistillationCandidateInput } from '@/lib/ai/cos/cosUniversityModelDistillation'
 
@@ -16,14 +17,15 @@ export const maxDuration = 120
 
 function statusForError(message: string): number {
   if (message === 'training_executor_not_configured' || message === 'training_executor_dispatch_disabled') return 503
-  if (message.startsWith('training_executor_')) return 400
+  if (message.startsWith('training_executor_') || message.startsWith('huggingface_training_')) return 400
   return 500
 }
 
 export async function GET() {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
-  return NextResponse.json({ ok: true, ...trainingExecutorReadiness() }, {
+  const provider = installHuggingFaceTrainingExecutorEnv()
+  return NextResponse.json({ ok: true, provider: provider.provider, ...trainingExecutorReadiness() }, {
     headers: { 'Cache-Control': 'no-store, max-age=0' },
   })
 }
@@ -31,6 +33,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
+  installHuggingFaceTrainingExecutorEnv()
   let body: any = null
   try { body = await request.json() } catch { body = null }
 

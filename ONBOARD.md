@@ -2,6 +2,16 @@
 
 # iTMounts Engineering Blueprint
 
+## COS University Hugging Face Jobs training adapter — 2026-09-13
+
+The governed COS University training-executor contract now has an iTMounts Hugging Face Jobs adapter on branch `feat/itmounts-huggingface-training-adapter-20260913`. `HF_TOKEN` may back the internal signed executor without exposing the provider token as a callback credential; a separate HMAC key is derived for signed evidence callbacks. Explicit buyer-supplied executor configuration still takes precedence.
+
+Cost-bearing dispatch remains fail-closed. The adapter never enables `COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED` automatically, and every individual dataset-preparation or training dispatch still requires the existing owner-authenticated explicit confirmation. The default training hardware is **NVIDIA T4 Small (`t4-small`)**, currently $0.40/hour on Hugging Face Jobs. An OOM or failed run stops; the adapter never silently escalates to a more expensive GPU. Any larger hardware must be deliberately configured after review.
+
+Dataset preparation accepts only explicit governed Hugging Face dataset references, creates private train/holdout material with immutable revision evidence, and training creates private LoRA/QLoRA student artifacts. Historical teacher lessons are not silently reclassified as distillation material: explicit training rights, provenance, privacy exclusion, candidate eligibility, host approvals, and exact student/dataset binding remain required. Independent evaluation, safety regression, unseen transfer, delayed retention, Production canary, rollback proof, and promotion remain under their existing independent authorities.
+
+This entry is **implementation evidence only** until the branch is merged and deployed. It is not evidence that a paid Hugging Face Job has run, that a student model has been trained, or that a model has passed Production promotion gates.
+
 ## Cybersecurity saved-message branding — 2026-09-12
 
 Cybersecurity remediation titles, summaries, plan prose and implementation notes must render the

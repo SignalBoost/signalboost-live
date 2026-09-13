@@ -5,11 +5,13 @@ import {
   trainingExecutorConfigFromEnv,
   verifyTrainingExecutorPayload,
 } from '@/lib/ai/cos/cosUniversityTrainingExecutor'
+import { installHuggingFaceTrainingExecutorEnv } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
+  installHuggingFaceTrainingExecutorEnv()
   const config = trainingExecutorConfigFromEnv()
   if (!config) return NextResponse.json({ ok: false, error: 'training_executor_not_configured' }, { status: 503 })
 

@@ -16,7 +16,7 @@ function boundedRound(value: unknown): number | null {
 }
 
 export function configuredUniversityMaxPracticeRounds(
-  env: PracticeBudgetEnv = process.env,
+  env: PracticeBudgetEnv = { UNIVERSITY_MAX_PRACTICE_ROUNDS: process.env.UNIVERSITY_MAX_PRACTICE_ROUNDS },
 ): number {
   const configured = Number(env.UNIVERSITY_MAX_PRACTICE_ROUNDS || DEFAULT_UNIVERSITY_MAX_PRACTICE_ROUNDS)
   return Number.isSafeInteger(configured)

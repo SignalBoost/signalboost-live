@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMastersExamRunner.ts
 import { randomUUID } from 'node:crypto'
 import { tryCOSFirstAnswer } from '@/lib/ai/cos/cosFirstAnswerEnterprise'
 import { ensureLocalInferenceRuntimeReady } from '@/lib/ai/local-inference'
@@ -8,6 +9,7 @@ import {
 } from '@/lib/ai/cos/evidenceSourceUseTurnContext'
 import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
+import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   COS_UNIVERSITY_MASTERS_EXAM_PROFILE,
@@ -30,6 +32,17 @@ import {
 } from './cosUniversityMastersRuntime.ts'
 
 const AGENT_ID = 'cos'
+
+/**
+ * Graduate work was written for one learner. Every read and write below pinned `cos`, so a
+ * registered specialist could finish its undergraduate degree and still be unable to sit a single
+ * Master's exam. The identity is now a parameter, and a non-COS learner answers through its own
+ * bound executor with the same provenance the undergraduate lanes already require.
+ */
+function learnerId(agentId?: string): string {
+  const id = String(agentId ?? '').trim()
+  return id || AGENT_ID
+}
 
 type EnrollmentRow = { program_key: string }
 type ExamRunRow = {
@@ -93,12 +106,12 @@ function targetKey(target: CosUniversityMastersExamTarget): string {
   return `${target.programId}:${target.stage}:${target.moduleKey || 'integrated'}`
 }
 
-async function activeProgramId(): Promise<CosUniversityMastersProgramId | null> {
+async function activeProgramId(agentId: string): Promise<CosUniversityMastersProgramId | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_program_enrollments')
     .select('program_key')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_level', 'masters')
     .order('enrolled_at', { ascending: false })
     .limit(1)
@@ -108,13 +121,13 @@ async function activeProgramId(): Promise<CosUniversityMastersProgramId | null> 
   return row ? cosUniversityMastersTrackIdFromProgramKey(row.program_key) : null
 }
 
-async function courseworkStudyPlan(target: CosUniversityMastersExamTarget): Promise<{ id: string; attempt_count: number } | null> {
+async function courseworkStudyPlan(target: CosUniversityMastersExamTarget, agentId: string): Promise<{ id: string; attempt_count: number } | null> {
   if (target.stage !== 'graduate_coursework' || !target.moduleKey) return null
   const db = cosServiceDb()
   if (!db) return null
   const result = await db.from('cos_university_study_plans')
     .select('id,attempt_count')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('academic_level', 'masters')
     .eq('program_key', `specialist_masters_${target.programId}_v1`)
     .eq('module_key', target.moduleKey)
@@ -148,17 +161,21 @@ async function findRun(runKey: string): Promise<ExamRunRow | null> {
   return (result.data || null) as ExamRunRow | null
 }
 
-async function createOrFindRun(target: CosUniversityMastersExamTarget, now: Date): Promise<ExamRunRow | null> {
+async function createOrFindRun(target: CosUniversityMastersExamTarget, now: Date, agentId: string): Promise<ExamRunRow | null> {
   const db = cosServiceDb()
   if (!db) return null
-  const runKey = `${COS_UNIVERSITY_MASTERS_EXAM_PROFILE}:${hourKey(now)}:${targetKey(target)}`
+  // COS keeps its historical key shape; every other learner is namespaced so two agents sitting the
+  // same module in the same hour cannot collide on the unique run key.
+  const runKey = agentId === AGENT_ID
+    ? `${COS_UNIVERSITY_MASTERS_EXAM_PROFILE}:${hourKey(now)}:${targetKey(target)}`
+    : `${COS_UNIVERSITY_MASTERS_EXAM_PROFILE}:${agentId}:${hourKey(now)}:${targetKey(target)}`
   const existing = await findRun(runKey)
   if (existing) return existing
   const seed = randomUUID()
   const exam = buildCosUniversityMastersExam(seed, target)
   const insert = await db.from('cos_university_masters_exam_runs').insert({
     run_key: runKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     program_key: `specialist_masters_${target.programId}_v1`,
     program_id: target.programId,
     module_key: target.moduleKey,
@@ -193,11 +210,76 @@ function targetFromRow(row: ExamRunRow): CosUniversityMastersExamTarget {
   return { programId: row.program_id, stage: row.stage, moduleKey: row.module_key }
 }
 
+/**
+ * Graduate execution for a registered specialist. One direct call to the learner's assigned model —
+ * local reasoning, no external AI, no cache replay — and the returned receipt is written as the
+ * run's execution provenance. The database binding refuses the write unless that receipt names this
+ * run, this manifest, this turn and this learner, so a specialist's degree evidence can never be
+ * confused with COS's.
+ */
+async function executeBoundRun(
+  row: ExamRunRow,
+  target: CosUniversityMastersExamTarget,
+  agentId: string,
+  exam: ReturnType<typeof buildCosUniversityMastersExam>,
+  started: number,
+): Promise<CosUniversityMastersExamRunSummary> {
+  const db = cosServiceDb()
+  if (!db) return summary({ programId: target.programId, runId: row.id, target, status: 'error', reasons: ['service_database_unavailable'] })
+  const fail = async (reasons: string[]): Promise<CosUniversityMastersExamRunSummary> => {
+    const at = new Date().toISOString()
+    await db.from('cos_university_masters_exam_runs').update({ status: 'error', reasons, updated_at: at, completed_at: at }).eq('id', row.id)
+    return summary({ programId: target.programId, runId: row.id, target, status: 'error', reasons, latencyMs: Date.now() - started })
+  }
+  if (!await hasBoundAcademicExecutor(agentId)) return fail(['agent_capstone_runtime_unavailable'])
+
+  let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
+  try {
+    // A Master's track is the learner's own specialization, so graduate work is role-domain work.
+    bound = await executeBoundAgentExam(
+      { agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: exam.prompt },
+      { domain: 'role_domain' },
+    )
+  } catch (error) {
+    return fail([`execution_error:${describeError(error)}`])
+  }
+  const execution = bound.execution
+  if (execution.agentId !== agentId || execution.runId !== row.id || execution.manifestHash !== exam.manifestHash) {
+    return fail(['agent_execution_identity_mismatch'])
+  }
+
+  const score = scoreCosUniversityMastersExam(exam, bound.reply, {
+    localReasoning: true, externalAi: false, semanticCache: false, handled: true, turnId: execution.turnId,
+  })
+  const completedAt = new Date().toISOString()
+  const update = await db.from('cos_university_masters_exam_runs').update({
+    status: score.passed ? 'passed' : 'failed',
+    passed: score.passed,
+    turn_id: execution.turnId,
+    response_source: execution.runtime,
+    local_model_invoked: true,
+    external_ai_invoked: false,
+    fresh_execution: true,
+    execution_provenance: execution,
+    reasons: score.reasons,
+    latency_ms: Date.now() - started,
+    updated_at: completedAt,
+    completed_at: completedAt,
+  }).eq('id', row.id)
+  if (update.error) return fail([`result_persist_failed:${describeError(update.error)}`])
+  return summary({
+    programId: target.programId, runId: row.id, target,
+    status: score.passed ? 'passed' : 'failed', passed: score.passed,
+    reasons: score.reasons, latencyMs: Date.now() - started,
+  })
+}
+
 async function executeRun(
   row: ExamRunRow,
   target: CosUniversityMastersExamTarget,
   courseworkPlanId: string | null,
   now: Date,
+  agentId: string,
 ): Promise<CosUniversityMastersExamRunSummary> {
   const db = cosServiceDb()
   if (!db) return summary({ programId: target.programId, runId: row.id, target, status: 'error', reasons: ['service_database_unavailable'] })
@@ -209,6 +291,12 @@ async function executeRun(
   }
 
   const started = Date.now()
+  // A registered specialist answers graduate work through its own bound executor, exactly as it does
+  // for undergraduate exams, and its evidence carries the host execution binding. COS keeps the
+  // reasoner path it has always used. An agent with no bound executor never reaches inference.
+  if (agentId !== AGENT_ID) {
+    return executeBoundRun(row, target, agentId, exam, started)
+  }
   beginEvidenceSourceUseTurn()
   let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
   try {
@@ -317,12 +405,13 @@ async function executeRun(
   })
 }
 
-export async function runCosUniversityMastersExam(options: { now?: Date } = {}): Promise<CosUniversityMastersExamRunSummary> {
+export async function runCosUniversityMastersExam(options: { agentId?: string; now?: Date } = {}): Promise<CosUniversityMastersExamRunSummary> {
   const now = options.now instanceof Date ? options.now : new Date()
+  const agentId = learnerId(options.agentId)
   if (process.env.COS_UNIVERSITY_MASTERS_EXAMS_ENABLED !== 'true') return summary({ enabled: false, status: 'disabled' })
 
   try {
-    const programId = await activeProgramId()
+    const programId = await activeProgramId(agentId)
     if (!programId) return summary({ status: 'not_enrolled' })
     const runtime = await readCosUniversityMastersRuntimeStatus(programId, now)
     if (!runtime.enrollment || runtime.credential || runtime.timingStatus === 'deadline_expired' || runtime.timingStatus === 'not_enrolled') {
@@ -338,12 +427,12 @@ export async function runCosUniversityMastersExam(options: { now?: Date } = {}):
 
     let planId: string | null = null
     if (target.stage === 'graduate_coursework') {
-      const plan = await courseworkStudyPlan(target)
+      const plan = await courseworkStudyPlan(target, agentId)
       if (!plan) return summary({ programId, target, status: 'study_required', reasons: ['module_study_required_before_coursework_exam'] })
       planId = plan.id
     }
 
-    const row = await createOrFindRun(target, now)
+    const row = await createOrFindRun(target, now, agentId)
     if (!row) return summary({ programId, target, status: 'error', reasons: ['service_database_unavailable'] })
     const canonicalTarget = targetFromRow(row)
     if (row.status === 'passed' || row.status === 'failed') {
@@ -351,7 +440,7 @@ export async function runCosUniversityMastersExam(options: { now?: Date } = {}):
     }
     if (row.status !== 'created') return summary({ programId, runId: row.id, target: canonicalTarget, status: 'not_claimed', reasons: [`run_status:${row.status}`] })
     if (!await claimRun(row, now)) return summary({ programId, runId: row.id, target: canonicalTarget, status: 'not_claimed', reasons: ['concurrent_claim'] })
-    return executeRun(row, canonicalTarget, planId, now)
+    return executeRun(row, canonicalTarget, planId, now, agentId)
   } catch (error) {
     return summary({ status: 'error', reasons: [describeError(error)] })
   }

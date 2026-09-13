@@ -64,9 +64,12 @@ function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
-function uniqueHashes(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return [...new Set(value.map(item => clean(item, 64).toLowerCase()).filter(item => HASH.test(item)))]
+function normalizedHashes(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null
+  const normalized = value.map(item => clean(item, 64).toLowerCase())
+  if (normalized.some(item => !HASH.test(item))) return null
+  const unique = [...new Set(normalized)]
+  return unique.length ? unique : null
 }
 
 function validRevision(revision: FineTuneRevision): boolean {
@@ -152,7 +155,7 @@ function candidatePlanId(candidateId: string): string {
   return match[1]
 }
 
-async function readCandidatePlan(candidateId: string): Promise<CandidatePlanRow> {
+async function readCandidatePlan(candidateId: string, options: { requireActive?: boolean } = {}): Promise<CandidatePlanRow> {
   const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
   const id = candidatePlanId(candidateId)
@@ -162,7 +165,9 @@ async function readCandidatePlan(candidateId: string): Promise<CandidatePlanRow>
   if (result.error) throw result.error
   const plan = result.data as CandidatePlanRow | null
   if (!plan || plan.fine_tune_candidate !== true) throw new Error('training_executor_candidate_not_authorized')
-  if (!['queued', 'studying', 'ready_for_exam'].includes(plan.status)) throw new Error('training_executor_candidate_inactive')
+  if (options.requireActive !== false && !['queued', 'studying', 'ready_for_exam'].includes(plan.status)) {
+    throw new Error('training_executor_candidate_inactive')
+  }
   return plan
 }
 
@@ -204,8 +209,9 @@ export function validateTrainingExecutorPartition(input: {
   trainingItemHashes: unknown
   holdoutItemHashes: unknown
 }) {
-  const trainingItemHashes = uniqueHashes(input.trainingItemHashes)
-  const holdoutItemHashes = uniqueHashes(input.holdoutItemHashes)
+  const trainingItemHashes = normalizedHashes(input.trainingItemHashes)
+  const holdoutItemHashes = normalizedHashes(input.holdoutItemHashes)
+  if (!trainingItemHashes || !holdoutItemHashes) return null
   const revision = buildFineTunePartitionRevision({
     baseModel: input.baseModel,
     datasetHash: input.datasetHash,
@@ -436,7 +442,9 @@ export async function recordUniversityTrainingExecutorEvidence(input: any) {
   const claim = clean(input?.claim, 80) as TrainingExecutorClaim
   if (!TRAINING_EXECUTOR_CLAIMS.includes(claim)) throw new Error('training_executor_claim_not_permitted')
   const candidateId = clean(input?.candidateId, 100)
-  const plan = await readCandidatePlan(candidateId)
+  // A valid asynchronous callback may arrive after study moved to another state. Preserve the
+  // original fine-tune-candidate authorization without requiring the academic plan to remain active.
+  const plan = await readCandidatePlan(candidateId, { requireActive: false })
   const evidenceRef = clean(input?.evidenceRef, 2000)
   if (!evidenceRef) throw new Error('training_executor_evidence_ref_missing')
 

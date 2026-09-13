@@ -73,6 +73,10 @@ export function universitySpecialistRuntime(role: unknown): string | null {
   return isUniversitySpecialistRole(role) ? RUNTIME_BY_ROLE[role] : null
 }
 
+export function isUniversitySpecialistRuntime(runtime: unknown): boolean {
+  return typeof runtime === 'string' && Object.values(RUNTIME_BY_ROLE).includes(runtime)
+}
+
 export function universitySpecialistTitle(role: unknown): string | null {
   return isUniversitySpecialistRole(role) ? TITLE_BY_ROLE[role] : null
 }

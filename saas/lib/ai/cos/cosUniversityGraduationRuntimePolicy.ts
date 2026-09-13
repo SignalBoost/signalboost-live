@@ -1,15 +1,23 @@
-import { isSoftwareCapstoneIdentity, isBoundSoftwareCapstoneEvidence, SOFTWARE_CAPSTONE_RUNTIME } from './cosUniversityAgentCapstone.ts'
+import {
+  isBoundRegisteredSpecialistEvidence,
+  isRegisteredSpecialistIdentity,
+} from './cosUniversityRegisteredSpecialistExecutor.ts'
 
 /** Host capability checks, not academic evidence or a grant of authority. */
 export function cosUniversityGraduationRuntimeBlocker(agentId: string, registeredRole?: string | null): string | null {
   if (!agentId.trim()) return 'agent_id_required'
   if (agentId === 'cos' && (registeredRole === undefined || registeredRole === 'chief_of_staff_generalist')) return null
-  return isSoftwareCapstoneIdentity(agentId, registeredRole) ? null : 'agent_capstone_runtime_unavailable'
+  return isRegisteredSpecialistIdentity(agentId, registeredRole) ? null : 'agent_capstone_runtime_unavailable'
 }
 
 export function requireCosUniversityGraduationRuntime(agentId: string, registeredRole?: string | null): void {
   const blocker = cosUniversityGraduationRuntimeBlocker(agentId, registeredRole)
   if (blocker) throw new Error(blocker)
+}
+
+function executionRuntime(value: unknown): string {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return ''
+  return String((value as Record<string, unknown>).runtime ?? '').trim()
 }
 
 export function isCosUniversityGraduationExecutionEvidence(row: {
@@ -33,9 +41,9 @@ export function isCosUniversityGraduationExecutionEvidence(row: {
     && row.response_source !== 'semantic_cache'
     && row.response_source !== 'semantic_similarity'
     && (agentId === 'cos'
-      ? row.response_source !== SOFTWARE_CAPSTONE_RUNTIME && row.execution_provenance == null
-      : (row.response_source === SOFTWARE_CAPSTONE_RUNTIME
-      && isBoundSoftwareCapstoneEvidence(row.execution_provenance, row, registeredRole, now)))
+      ? row.execution_provenance == null
+      : (row.response_source === executionRuntime(row.execution_provenance)
+      && isBoundRegisteredSpecialistEvidence(row.execution_provenance, row, registeredRole, now)))
 }
 
 /** Absolute hours avoid resetting the rotation daily when there are more than 24 agents. */
@@ -55,6 +63,7 @@ export function cosUniversityGraduationAdmissionBlocker(input: {
 }): string | null {
   if (!input.enabled) return 'graduation_gate_disabled'
   if (input.errors.length || input.capstoneState === 'error') return 'graduation_evaluation_failed'
-  // Master's workers still read COS-only ledgers. Do not open an unserviceable program.
-  return input.agentId === 'cos' ? null : 'agent_masters_runtime_unavailable'
+  // Master's workers are agent-scoped. A successful registered learner may proceed to the ordinary
+  // admission decision; this function does not itself award or create a graduate enrollment.
+  return null
 }

@@ -5,6 +5,11 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { loadUniversityPracticeStudyMaterial } from './cosUniversityPracticeStudyMaterialRuntime.ts'
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
 import { agentWorkDomain, modelForAgentWork, type AgentWorkDomain } from './cosUniversityAgentModelPolicy.ts'
+import {
+  COS_UNIVERSITY_ROLE_MODELS_SETTING_KEY,
+  universityRoleModelFromSetting,
+  universityRoleModelNotConfigured,
+} from './cosUniversityRoleModelPolicy.ts'
 import { enforceUniversityPracticeCostGuard } from './cosUniversityPracticeBudget.ts'
 import { universityPracticeExecutionFence } from './cosUniversityPracticeExecution.ts'
 import { currentUniversityPracticeModelOverride } from './cosUniversityPracticeModelContext.ts'
@@ -13,6 +18,7 @@ import {
   isBoundSoftwareCapstoneEvidence,
   isSoftwareCapstoneIdentity,
   selectAgentCapstoneProcedures,
+  SOFTWARE_CAPSTONE_ROLE,
   type AgentCapstoneRequest,
 } from './cosUniversityAgentCapstone.ts'
 
@@ -40,6 +46,27 @@ export async function hasBoundAcademicExecutor(agentId: string): Promise<boolean
   return isSoftwareCapstoneIdentity(agentId, await readCosUniversityAgentRole(agentId))
 }
 
+/**
+ * The model a specialist answers its own field on. Software keeps Builder's configured coding model;
+ * every other role requires an explicit buyer-controlled entry and fails closed without one, so a
+ * specialist never borrows another field's model or a source-code default.
+ */
+export async function readUniversityRoleDomainModel(role: unknown): Promise<string> {
+  const id = String(role ?? '').trim()
+  if (!id) throw universityRoleModelNotConfigured('unregistered')
+  if (id === SOFTWARE_CAPSTONE_ROLE) return requireBuilderCodingModel()
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const result = await db.from('system_settings')
+    .select('value')
+    .eq('key', COS_UNIVERSITY_ROLE_MODELS_SETTING_KEY)
+    .maybeSingle()
+  if (result.error) throw result.error
+  const model = universityRoleModelFromSetting(result.data?.value ?? null, id)
+  if (!model) throw universityRoleModelNotConfigured(id)
+  return model
+}
+
 export async function executeBoundAgentExam(
   request: AgentCapstoneRequest,
   /**
@@ -62,9 +89,14 @@ export async function executeBoundAgentExam(
     ? practiceModelOverride
     : contextualPracticeModel
   const practiceOverride = request.purpose === 'practice' ? String(selectedPracticeOverride ?? '').trim() : ''
+  // Only work inside the agent's own field consults a role model, so an unconfigured specialist can
+  // still sit the generalist foundation, languages and retention on the platform reasoner.
+  const roleModel = domain === 'role_domain' && !practiceOverride
+    ? await readUniversityRoleDomainModel(await readCosUniversityAgentRole(request.agentId))
+    : null
   const model = practiceOverride || modelForAgentWork({
     domain,
-    roleModel: requireBuilderCodingModel(),
+    roleModel,
     purpose: request.purpose === 'practice' ? 'practice' : 'assessment',
   })
   return executeBoundSoftwareCapstone(request, {

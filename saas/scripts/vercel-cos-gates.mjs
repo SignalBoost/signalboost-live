@@ -135,6 +135,7 @@ const tests = [
   'tests/cosUniversityContinuousLearning.node.test.ts',
   'tests/cosUniversityIndependentExam.node.test.ts',
   'tests/cosUniversityARange.node.test.ts',
+  'tests/cosUniversityLanguageAuthenticity.node.test.ts',
   'tests/cosUniversityContinuousEducation.node.test.ts',
   'tests/cosUniversityPostRemediationStudyProof.node.test.ts',
   'tests/cosUniversityPracticeInferenceFence.node.test.ts',

@@ -4,6 +4,7 @@ import {
   type CosUniversityARangeProvenance,
   type CosUniversityARangeStage,
 } from './cosUniversityARange.ts'
+import { cosUniversityLanguageAuthenticityReasons } from './cosUniversityLanguageAuthenticity.ts'
 import {
   COS_PLATFORM_LANGUAGES,
   type CosPlatformLanguage,
@@ -53,6 +54,11 @@ export type CosUniversityLanguageARangeExam = Readonly<{
   dimension: CosPlatformLanguageDimension | null
   project: string
   prompt: string
+  /**
+   * The packet embedded in the prompt, carried separately so the scorer can tell original prose
+   * from a copy of the material the learner was handed.
+   */
+  packet: string
   rubric: CosUniversityLanguageARangeRubric
   manifestHash: string
 }>
@@ -227,8 +233,10 @@ export function buildCosUniversityLanguageARangeExam(args: {
   ]
 
   let prompt: string
+  let suppliedPacket: string
   let rubric: CosUniversityLanguageARangeRubric
   if (args.target.stage === 'capstone') {
+    suppliedPacket = packet
     prompt = `${capstoneInstruction(args.target.language)}\n\nDECISION PACKET:\n${packet}`
     rubric = {
       requiredGroups: [...commonGroups, groups.please, groups.thanks],
@@ -242,6 +250,7 @@ export function buildCosUniversityLanguageARangeExam(args: {
     const transferPacket = args.target.dimension === 'translation_localization'
       ? translationPacket(args.target.language, { project, checks, budget, weeks })
       : packet
+    suppliedPacket = transferPacket
     prompt = `HOST-CONTROLLED CROSS-DOMAIN LANGUAGE TRANSFER EXAM. Use only the packet. ${dimensionInstruction(args.target.language, args.target.dimension)}\n\nPACKET:\n${transferPacket}`
     rubric = {
       requiredGroups: [
@@ -264,6 +273,7 @@ export function buildCosUniversityLanguageARangeExam(args: {
     dimension: args.target.dimension,
     project,
     prompt,
+    packet: suppliedPacket,
     rubric,
   }
   return Object.freeze({ ...base, manifestHash: manifestHash(base) })
@@ -301,6 +311,12 @@ export function scoreCosUniversityLanguageARangeExam(
   if (!LANGUAGE_MARKERS[exam.rubric.targetLanguage].test(text)) {
     reasons.push(`target_language_not_demonstrated:${exam.rubric.targetLanguage}`)
   }
+  // A single marker hit proved only that one target-language token appeared somewhere. Required
+  // terms are supplied to the learner by the rubric itself, so term coverage is not evidence of
+  // writing ability either. The reply must be original prose written in the target language.
+  reasons.push(...cosUniversityLanguageAuthenticityReasons({
+    reply: text, packet: exam.packet, targetLanguage: exam.rubric.targetLanguage,
+  }))
   if (words(text) > exam.rubric.maxWords) reasons.push('word_limit_exceeded')
   return { passed: reasons.length === 0, reasons }
 }

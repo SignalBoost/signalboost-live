@@ -15,6 +15,11 @@ function boundedRound(value: unknown): number | null {
   return Number.isSafeInteger(parsed) && parsed >= 1 ? parsed : null
 }
 
+function positiveCount(value: unknown): number {
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
+}
+
 export function configuredUniversityMaxPracticeRounds(
   env: PracticeBudgetEnv = { UNIVERSITY_MAX_PRACTICE_ROUNDS: process.env.UNIVERSITY_MAX_PRACTICE_ROUNDS },
 ): number {
@@ -25,10 +30,24 @@ export function configuredUniversityMaxPracticeRounds(
 }
 
 /**
+ * A round starts consuming the cost budget when the host durably records a model invocation, not
+ * only when the later practice-result transaction succeeds. `attemptCount` keeps historical rows
+ * compatible; `practiceInvocationCount` closes the inference-success / persistence-failure gap.
+ */
+export function practiceBudgetRoundFromEvidence(input: {
+  practiceRound: unknown
+  attemptCount: unknown
+  practiceInvocationCount: unknown
+}): number | null {
+  if (positiveCount(input.attemptCount) === 0 && positiveCount(input.practiceInvocationCount) === 0) return null
+  return boundedRound(input.practiceRound)
+}
+
+/**
  * The study-attempt ordinal is not spend. A plan may restudy many times without invoking inference,
- * so the cost ceiling counts only distinct practice rounds that have at least one committed execution.
- * If one variant of the current round already executed, the sibling variant may finish that same
- * already-metered round even when the maximum number of rounds has been reached.
+ * so the cost ceiling counts only distinct practice rounds with durable invocation/attempt evidence.
+ * If one variant of the current round already consumed inference, the sibling variant may finish
+ * that same already-metered round without charging a second round.
  */
 export function decideUniversityPracticeBudget(input: {
   currentRound: unknown

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
+import { resolveReferenceA2AOrigin } from '../a2a-host/reference-a2a-config.ts'
 import {
   SECONDARY_REFERENCE_DIAGNOSTIC_AGENT_ID,
   diagnoseSecondaryReferenceIncident,
@@ -12,6 +13,19 @@ import {
 } from '../a2a-host/specialist-mesh-acceptance-control.ts'
 
 const TEST_SECRET = 'test-only-specialist-mesh-control-secret-32-bytes'
+
+test('Production reference routing prefers the stable project origin over the protected deployment origin', () => {
+  assert.equal(resolveReferenceA2AOrigin({
+    VERCEL_PROJECT_PRODUCTION_URL: 'signalboost-live.vercel.app',
+    VERCEL_URL: 'protected-deployment.vercel.app',
+  } as NodeJS.ProcessEnv), 'https://signalboost-live.vercel.app')
+
+  assert.equal(resolveReferenceA2AOrigin({
+    SIGNALBOOST_A2A_REFERENCE_ORIGIN: 'https://explicit-reference.example.com/path',
+    VERCEL_PROJECT_PRODUCTION_URL: 'signalboost-live.vercel.app',
+    VERCEL_URL: 'protected-deployment.vercel.app',
+  } as NodeJS.ProcessEnv), 'https://explicit-reference.example.com')
+})
 
 test('secondary Production reference specialist independently implements the advisory capability', () => {
   const result = diagnoseSecondaryReferenceIncident('Production requests return 504 gateway timeout after upstream latency increased.')

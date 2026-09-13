@@ -1,4 +1,4 @@
-import type { A2AAgentRegistryPort } from './a2a-agent-registry.ts'
+import type { A2AAgentRegistryPort, A2ADelegationRisk } from './a2a-agent-registry.ts'
 import type { A2ADelegationInvocation, A2ADelegationResult, A2AMeshResumeCheckpoint } from './a2a-delegation-runtime.ts'
 import { isRecoverableMeshDelegationFailure } from './specialist-mesh-router.ts'
 import {
@@ -9,6 +9,21 @@ import {
   type SpecialistMeshCheckpointScope,
   type SpecialistMeshCheckpointStore,
 } from './specialist-mesh-checkpoint.ts'
+import {
+  SPECIALIST_MESH_WRITE_FAILOVER_SAFE_MODE,
+  SPECIALIST_MESH_WRITE_RECONCILED_APPLIED_MODE,
+  SpecialistMeshWriteRecoveryError,
+  normalizeSpecialistMeshIdempotencyKey,
+  normalizeSpecialistMeshWriteReconciliation,
+  specialistMeshWriteOperationKey,
+  specialistMeshWriteRecoveryEnvelope,
+  type SpecialistMeshWriteOwner,
+  type SpecialistMeshWriteProviderRequest,
+  type SpecialistMeshWriteRecoveryProviderRegistry,
+  type SpecialistMeshWriteRecoveryStore,
+  type SpecialistMeshWriteRisk,
+  type SpecialistMeshWriteScope,
+} from './specialist-mesh-write-recovery.ts'
 import {
   assertSpecialistMeshOwnership,
   claimSpecialistMeshTask,
@@ -21,7 +36,12 @@ import {
 } from './specialist-mesh-coordination.ts'
 import { ownershipIdentity, type CoordinationStore, type Lease, type WorkItem } from '../lib/supervisor/coordination/index.ts'
 
-export const SPECIALIST_MESH_EXECUTION_OWNERSHIP_VERSION = 'signalboost-specialist-mesh-execution-ownership-v2' as const
+export const SPECIALIST_MESH_EXECUTION_OWNERSHIP_VERSION = 'signalboost-specialist-mesh-execution-ownership-v3' as const
+
+export interface SpecialistMeshWriteRecoveryOptions {
+  providers: SpecialistMeshWriteRecoveryProviderRegistry
+  store: SpecialistMeshWriteRecoveryStore
+}
 
 export interface SpecialistMeshExecutionCoordinationOptions {
   store: CoordinationStore
@@ -31,6 +51,7 @@ export interface SpecialistMeshExecutionCoordinationOptions {
   leaseDurationMs?: number
   checkpoints?: SpecialistMeshCheckpointStore
   checkpointTtlMs?: number
+  writeRecovery?: SpecialistMeshWriteRecoveryOptions
 }
 
 export interface SpecialistMeshDelegationPort {
@@ -68,6 +89,22 @@ function checkpointOwner(lease: Lease, agentId: string): SpecialistMeshCheckpoin
   return Object.freeze({ ...ownershipIdentity(lease), agentId: required(agentId, 'agentId') })
 }
 
+function writeScope(invocation: A2ADelegationInvocation, meshTaskId: string, risk: SpecialistMeshWriteRisk): SpecialistMeshWriteScope {
+  return Object.freeze({
+    tenantId: required(invocation.tenantId, 'tenantId'),
+    environmentId: required(invocation.environmentId, 'environmentId'),
+    portableId: required(invocation.portableId, 'portableId'),
+    taskId: meshTaskId,
+    skillId: required(invocation.skillId, 'skillId'),
+    workItemId: `specialist-mesh:${meshTaskId}`,
+    risk,
+  })
+}
+
+function writeOwner(lease: Lease, agentId: string): SpecialistMeshWriteOwner {
+  return Object.freeze({ ...ownershipIdentity(lease), agentId: required(agentId, 'agentId') })
+}
+
 function resumeEnvelope(record: SpecialistMeshCheckpointRecord): A2AMeshResumeCheckpoint {
   return Object.freeze({
     schemaVersion: 'signalboost-specialist-mesh-checkpoint-v1',
@@ -93,6 +130,33 @@ function checkpointFailure(invocation: A2ADelegationInvocation, error: unknown):
   })
 }
 
+function writeRecoveryFailure(invocation: A2ADelegationInvocation, risk: SpecialistMeshWriteRisk, error: unknown): A2ADelegationResult {
+  const code = error instanceof SpecialistMeshWriteRecoveryError ? error.code : 'write_recovery_unavailable'
+  const message = error instanceof Error ? error.message : 'specialist mesh write recovery failed'
+  return Object.freeze({
+    ok: false,
+    agentId: invocation.agentId,
+    skillId: invocation.skillId,
+    risk,
+    mode: `a2a_${code}`,
+    error: message,
+  })
+}
+
+async function failOwnedWork(store: CoordinationStore, input: {
+  workItemId: string
+  lease: Lease
+  executionId: string
+}): Promise<void> {
+  await store.transitionWorkItem({
+    workItemId: input.workItemId,
+    from: 'processing',
+    to: 'failed',
+    owner: ownershipIdentity(input.lease),
+    executionId: input.executionId,
+  }).catch(() => undefined)
+}
+
 export function specialistMeshWorkerIdentity(input: A2ADelegationInvocation, transportRef: string): SpecialistMeshWorker {
   const tenantId = required(input.tenantId, 'tenantId')
   const environmentId = required(input.environmentId, 'environmentId')
@@ -106,12 +170,10 @@ export function specialistMeshWorkerIdentity(input: A2ADelegationInvocation, tra
 }
 
 /**
- * Adds durable Supervisor ownership to the real specialist orchestration attempt without changing
- * A2A authority. Registry assignment + qualification remain upstream hard gates; this layer only
- * fences an already-selected advisory worker. Write/consequential work is never auto-replayed here.
- *
- * Advisory checkpoints are host-owned efficiency state only. A specialist can cooperatively yield a
- * bounded checkpoint; a replacement may receive it only after acquiring a newer valid Supervisor fence.
+ * Adds durable Supervisor ownership to real specialist orchestration without changing A2A authority.
+ * Advisory tasks support bounded checkpoint/resume. Write/consequential tasks enter the durable mesh
+ * only when an exact provider recovery adapter exists and approval is already present. Automatic
+ * non-advisory takeover is emitted only after that provider durably proves `not_applied`.
  */
 export function createDurableSpecialistMeshDelegationPort(input: {
   registry: A2AAgentRegistryPort
@@ -129,16 +191,163 @@ export function createDurableSpecialistMeshDelegationPort(input: {
       )
       const skill = assignment?.allowedSkills.find(item => item.skillId === invocation.skillId)
 
-      // Coordination/checkpoint state never creates authority. Invalid/unresolved and non-advisory work
-      // stays on the canonical governed delegation path, which owns deny/approval semantics.
-      if (!agent || !assignment || !skill || skill.risk !== 'advisory') {
-        return input.delegation.invoke(invocation)
-      }
+      // Coordination state never creates authority. Invalid/unresolved work stays on the canonical
+      // governed delegation path, which owns deny/approval semantics.
+      if (!agent || !assignment || !skill) return input.delegation.invoke(invocation)
 
       const meshTaskId = coordinationTaskId(invocation)
       const workItemId = `specialist-mesh:${meshTaskId}`
       const worker = specialistMeshWorkerIdentity(invocation, agent.transportRef)
       const executionId = invocation.traceId || invocation.messageId
+
+      if (skill.risk !== 'advisory') {
+        const risk = skill.risk as SpecialistMeshWriteRisk
+        // Never create recovery semantics around an unapproved mutation. The canonical runtime blocks it.
+        if (!invocation.approval || !input.coordination.writeRecovery) return input.delegation.invoke(invocation)
+
+        const scope = writeScope(invocation, meshTaskId, risk)
+        const operationKey = specialistMeshWriteOperationKey(scope)
+        const providerRequest: SpecialistMeshWriteProviderRequest = Object.freeze({
+          ...scope,
+          operationKey,
+          agentId: invocation.agentId,
+          transportRef: agent.transportRef,
+        })
+
+        let provider
+        try {
+          provider = input.coordination.writeRecovery.providers.resolve(providerRequest)
+        } catch (error) {
+          return writeRecoveryFailure(invocation, risk, error)
+        }
+        // No exact provider contract means no automatic write takeover; preserve legacy single-attempt behavior.
+        if (!provider) return input.delegation.invoke(invocation)
+
+        await ensureSpecialistMeshTask(input.coordination.store, {
+          taskId: meshTaskId,
+          tenantId: invocation.tenantId,
+          environment: input.coordination.environment,
+          policyVersion: input.coordination.policyVersion,
+        })
+        await registerSpecialistMeshWorker(input.coordination.store, worker, {
+          softwareVersion: input.coordination.softwareVersion,
+        })
+        const lease = await claimSpecialistMeshTask(input.coordination.store, {
+          taskId: meshTaskId,
+          worker,
+          eligibleAgentIds: [invocation.agentId],
+          leaseDurationMs: input.coordination.leaseDurationMs,
+        })
+        await startSpecialistMeshTask(input.coordination.store, meshTaskId, lease, executionId)
+        const owner = writeOwner(lease, invocation.agentId)
+
+        let idempotencyKey: string
+        try {
+          await assertSpecialistMeshOwnership(input.coordination.store, meshTaskId, lease)
+          idempotencyKey = normalizeSpecialistMeshIdempotencyKey(await provider.idempotencyKey(providerRequest))
+          await input.coordination.writeRecovery.store.prepare({
+            ...scope,
+            owner,
+            operationKey,
+            providerId: provider.providerId,
+            idempotencyKey,
+          })
+        } catch (error) {
+          await failOwnedWork(input.coordination.store, { workItemId, lease, executionId })
+          return writeRecoveryFailure(invocation, risk, error)
+        }
+
+        const delegatedInvocation = Object.freeze({
+          ...invocation,
+          meshWriteRecovery: specialistMeshWriteRecoveryEnvelope({
+            operationKey,
+            providerId: provider.providerId,
+            idempotencyKey,
+          }),
+        })
+        const result = await input.delegation.invoke(delegatedInvocation)
+        await assertSpecialistMeshOwnership(input.coordination.store, meshTaskId, lease)
+
+        const mustReconcile = result.ok || isRecoverableMeshDelegationFailure(result.mode)
+        if (!mustReconcile) {
+          await failOwnedWork(input.coordination.store, { workItemId, lease, executionId })
+          return result
+        }
+
+        let reconciliation
+        try {
+          reconciliation = normalizeSpecialistMeshWriteReconciliation(await provider.reconcile({
+            ...providerRequest,
+            idempotencyKey,
+            result,
+          }))
+          await assertSpecialistMeshOwnership(input.coordination.store, meshTaskId, lease)
+          await input.coordination.writeRecovery.store.record({
+            ...scope,
+            owner,
+            operationKey,
+            providerId: provider.providerId,
+            idempotencyKey,
+            outcome: reconciliation.outcome,
+            evidenceRef: reconciliation.evidenceRef,
+            providerOperationRef: reconciliation.providerOperationRef,
+          })
+        } catch (error) {
+          // Reconciliation failure is itself ambiguous. Never release the lease for another writer.
+          await failOwnedWork(input.coordination.store, { workItemId, lease, executionId })
+          return writeRecoveryFailure(invocation, risk, error)
+        }
+
+        if (reconciliation.outcome === 'applied') {
+          await verifySpecialistMeshTask(input.coordination.store, meshTaskId, lease, executionId)
+          await completeSpecialistMeshTask(input.coordination.store, meshTaskId, lease, executionId)
+          if (result.ok) return result
+          return Object.freeze({
+            ok: true,
+            agentId: invocation.agentId,
+            skillId: invocation.skillId,
+            risk,
+            mode: SPECIALIST_MESH_WRITE_RECONCILED_APPLIED_MODE,
+            data: reconciliation.data ?? Object.freeze({
+              signalboostWriteRecovery: Object.freeze({
+                providerId: provider.providerId,
+                evidenceRef: reconciliation.evidenceRef,
+                ...(reconciliation.providerOperationRef ? { providerOperationRef: reconciliation.providerOperationRef } : {}),
+              }),
+            }),
+          })
+        }
+
+        if (reconciliation.outcome === 'not_applied') {
+          if (result.ok) {
+            await failOwnedWork(input.coordination.store, { workItemId, lease, executionId })
+            return Object.freeze({
+              ok: false,
+              agentId: invocation.agentId,
+              skillId: invocation.skillId,
+              risk,
+              mode: 'a2a_write_reconciliation_conflict',
+              error: 'specialist reported success but provider proof says the side effect was not applied',
+            })
+          }
+          await input.coordination.store.releaseLease(ownershipIdentity(lease))
+          return Object.freeze({
+            ...result,
+            mode: SPECIALIST_MESH_WRITE_FAILOVER_SAFE_MODE,
+            error: 'provider reconciliation proved the prior side effect was not applied; next eligible specialist may take over',
+          })
+        }
+
+        await failOwnedWork(input.coordination.store, { workItemId, lease, executionId })
+        return Object.freeze({
+          ok: false,
+          agentId: invocation.agentId,
+          skillId: invocation.skillId,
+          risk,
+          mode: 'a2a_write_outcome_ambiguous',
+          error: 'provider reconciliation could not prove whether the side effect was applied; automatic takeover is blocked',
+        })
+      }
 
       await ensureSpecialistMeshTask(input.coordination.store, {
         taskId: meshTaskId,

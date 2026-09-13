@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { decideModelDistillationCandidate, type ModelDistillationCandidateInput, type ModelDistillationTrainingRights } from './cosUniversityModelDistillation.ts'
 import { decodeHuggingFaceDatasetRef } from './cosUniversityHuggingFaceJobs.ts'
 import { selectCosUniversityStudyStrategy, type CosUniversityFailureClass } from './cosUniversityStudyStrategy.ts'
@@ -8,7 +7,6 @@ import { controlledFineTuneDatasetHash, type ControlledFineTunePlanIdentityInput
 export const COS_UNIVERSITY_DISTILLATION_PREPARATION_PROFILE = 'cos_university_distillation_preparation_v1' as const
 const UNSEEN_EXAM_PROFILE = 'cos_university_unseen_v1'
 const HASH = /^[a-f0-9]{64}$/i
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 export type DistillationExamRun = Readonly<{
   id: string
@@ -71,6 +69,11 @@ function record(value: unknown): Record<string, unknown> {
     : {}
 }
 
+async function serviceDb() {
+  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
+  return cosServiceDb()
+}
+
 function validTime(value: unknown): number | null {
   const parsed = Date.parse(clean(value, 100))
   return Number.isFinite(parsed) ? parsed : null
@@ -85,9 +88,9 @@ function manifestHash(row: DistillationExamRun): string | null {
 }
 
 /**
- * A distillation failure episode begins after the most recent passed unseen exam. Replays of the
- * same unseen manifest do not count as independent retest failures. A later pass therefore resets
- * the escalation path instead of allowing old failures to manufacture a training candidate.
+ * The active failure episode begins after the most recent passed unseen exam. Replays of one hidden
+ * manifest count as repeated failures but not as independent retests. A newer pass resets the
+ * episode, so old failures cannot manufacture a distillation candidate after the weakness clears.
  */
 export function deriveDistillationFailureQualification(rows: readonly DistillationExamRun[]): DistillationFailureQualification {
   const ordered = rows
@@ -156,20 +159,20 @@ function hashItems(items: readonly string[]): string {
 
 /**
  * Validate an already-created teacher-output dataset before attaching it to a training candidate.
- * This function does not upload data and cannot launch a Job. The source must be an immutable HF
- * dataset revision and at least 20 unique teacher-output item hashes must be supplied as evidence.
+ * This is pure metadata validation: it uploads nothing and cannot launch a Hugging Face Job.
  */
 export function buildDistillationDatasetBinding(input: DistillationDatasetBindingInput): DistillationDatasetBindingDecision {
   const blockers: string[] = []
   const sourceRef = clean(input.sourceRef, 2000)
   if (!pinnedDatasetRef(sourceRef)) blockers.push('distillation_dataset_revision_not_pinned')
 
-  const itemHashes = [...new Set((input.teacherOutputItemHashes || []).map(item => clean(item, 64).toLowerCase()).filter(item => HASH.test(item)))]
+  const itemHashes = [...new Set((input.teacherOutputItemHashes || [])
+    .map(item => clean(item, 64).toLowerCase())
+    .filter(item => HASH.test(item)))]
   if (itemHashes.length < 20) blockers.push('teacher_output_dataset_too_small')
 
   const qualification = readQualification(input.plan.evidence)
   if (!qualification) blockers.push('distillation_failure_qualification_missing')
-
   if (blockers.length) {
     return Object.freeze({ eligible: false, blockers: Object.freeze(blockers), datasetHash: null, teacherOutputManifestHash: null, candidate: null, binding: null })
   }
@@ -217,7 +220,7 @@ export function buildDistillationDatasetBinding(input: DistillationDatasetBindin
 }
 
 async function examHistoryForPlan(plan: ActivePlanRow): Promise<DistillationExamRun[]> {
-  const db = cosServiceDb()
+  const db = await serviceDb()
   if (!db) return []
   let query = db.from('cos_university_exam_runs')
     .select('id,profile,status,manifest_hash,completed_at,execution_provenance')
@@ -235,13 +238,13 @@ async function examHistoryForPlan(plan: ActivePlanRow): Promise<DistillationExam
 }
 
 /**
- * Non-spending reconciliation. It may mark an active remediation plan as a candidate after durable
- * unseen-failure evidence crosses the existing 3/2 threshold, but it never registers a dataset,
- * enables dispatch, calls Hugging Face, approves training, or expands authority.
+ * Non-spending reconciliation. It can promote an unresolved remediation row to candidate status
+ * after durable unseen-failure evidence crosses the existing 3/2 threshold. It cannot attach a
+ * dataset, approve training, enable dispatch, call Hugging Face, or expand model authority.
  */
 export async function reconcileCosUniversityDistillationCandidates(now = new Date()) {
-  const db = cosServiceDb()
-  if (!db) return { considered: 0, eligible: 0, promoted: 0, semantics: 'service_database_unavailable' as const }
+  const db = await serviceDb()
+  if (!db) return { considered: 0, eligible: 0, promoted: 0, candidates: [], semantics: 'service_database_unavailable' as const }
   const result = await db.from('cos_university_study_plans')
     .select('id,plan_key,agent_id,subject_id,language_code,language_dimension,failure_class,objective,methods,source_ref,fine_tune_candidate,status,evidence')
     .eq('source_kind', 'recertification')
@@ -308,48 +311,5 @@ export async function reconcileCosUniversityDistillationCandidates(now = new Dat
     promoted,
     candidates: Object.freeze(candidates),
     semantics: 'candidate_only_no_dataset_no_dispatch_no_training' as const,
-  })
-}
-
-function candidateUuid(candidateId: string): string {
-  const match = /^study-plan:([0-9a-f-]+)$/i.exec(clean(candidateId, 100))
-  if (!match || !UUID.test(match[1])) throw new Error('distillation_dataset_candidate_id_invalid')
-  return match[1]
-}
-
-/** Register a pre-existing, immutable teacher-output dataset. This is a metadata write only. */
-export async function registerCosUniversityDistillationDataset(input: Omit<DistillationDatasetBindingInput, 'plan'> & { candidateId: string }) {
-  const db = cosServiceDb()
-  if (!db) throw new Error('service_database_unavailable')
-  const id = candidateUuid(input.candidateId)
-  const result = await db.from('cos_university_study_plans')
-    .select('id,plan_key,agent_id,subject_id,language_code,language_dimension,failure_class,objective,methods,source_ref,fine_tune_candidate,status,evidence')
-    .eq('id', id).maybeSingle()
-  if (result.error) throw result.error
-  const plan = result.data as ActivePlanRow | null
-  if (!plan || plan.fine_tune_candidate !== true || !['queued', 'studying', 'ready_for_exam'].includes(plan.status)) {
-    throw new Error('distillation_dataset_candidate_not_authorized')
-  }
-  const binding = buildDistillationDatasetBinding({ ...input, plan })
-  if (!binding.eligible || !binding.binding || !binding.candidate) {
-    throw new Error(`distillation_dataset_blocked:${binding.blockers.join(',')}`)
-  }
-  const evidence = {
-    ...record(plan.evidence),
-    distillationDataset: {
-      ...binding.binding,
-      registeredAt: new Date().toISOString(),
-    },
-  }
-  const update = await db.from('cos_university_study_plans').update({ evidence, updated_at: new Date().toISOString() })
-    .eq('id', id).eq('fine_tune_candidate', true).in('status', ['queued', 'studying', 'ready_for_exam'])
-  if (update.error) throw update.error
-  return Object.freeze({
-    candidateId: input.candidateId,
-    registered: true,
-    datasetHash: binding.datasetHash,
-    teacherOutputManifestHash: binding.teacherOutputManifestHash,
-    distillationCandidate: binding.candidate,
-    autoExecuteTraining: false,
   })
 }

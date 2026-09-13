@@ -6,6 +6,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
 import { type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
+import { boundExecutionBindingFailure } from './cosUniversityExecutionBinding.ts'
 import { buildCosUniversityARangeExam, COS_UNIVERSITY_A_RANGE_SCORER, scoreCosUniversityARangeExam, universityARangeValidUntil } from './cosUniversityARange.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { COS_UNIVERSITY_RETENTION_PROFILE, selectDueCosUniversityRetention, type CosUniversityRetentionSource } from './cosUniversityRetention.ts'
@@ -75,6 +76,8 @@ export async function runCosUniversityRetention(options: { now?: Date; agentId?:
     if (execution.agentId !== agentId || execution.runId !== inserted.data.id || execution.manifestHash !== source.manifestHash) {
       throw new Error('agent_execution_identity_mismatch')
     }
+    const bindingFailure = boundExecutionBindingFailure(bound.reply, execution)
+    if (bindingFailure) throw new Error(bindingFailure)
     reply = bound.reply
     turnId = execution.turnId
     localModelInvoked = true

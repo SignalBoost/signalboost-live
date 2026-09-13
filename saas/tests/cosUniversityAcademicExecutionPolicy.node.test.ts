@@ -48,7 +48,9 @@ test('independent exams are unblocked only for an agent with its own bound execu
   assert.match(boundBody, /execution\.agentId !== agentId \|\| execution\.runId !== row\.id \|\| execution\.manifestHash !== exam\.manifestHash/)
   assert.match(boundBody, /return fail\(\['agent_execution_identity_mismatch'\]\)/)
   assert.match(boundBody, /execution_provenance: execution/)
-  assert.match(boundBody, /response_source: SOFTWARE_CAPSTONE_RUNTIME/)
+  // Registry-scoped execution: the recorded source is the executing specialist's own runtime rather
+  // than one hardcoded constant, so a cybersecurity run records cybersecurity.
+  assert.match(boundBody, /response_source: execution\.runtime/)
 })
 
 test('the bound exam runtime reuses the host capstone executor and the agent\'s own assigned model', () => {

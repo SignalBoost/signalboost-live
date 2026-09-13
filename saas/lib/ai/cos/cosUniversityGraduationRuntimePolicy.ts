@@ -1,4 +1,5 @@
-import { isSoftwareCapstoneIdentity, isBoundSoftwareCapstoneEvidence, SOFTWARE_CAPSTONE_RUNTIME } from './cosUniversityAgentCapstone.ts'
+import { isSoftwareCapstoneIdentity, isBoundSoftwareCapstoneEvidence } from './cosUniversityAgentCapstone.ts'
+import { isUniversitySpecialistRuntime, universitySpecialistRuntime } from './cosUniversitySpecialistRuntimes.ts'
 
 /** Host capability checks, not academic evidence or a grant of authority. */
 export function cosUniversityGraduationRuntimeBlocker(agentId: string, registeredRole?: string | null): string | null {
@@ -23,6 +24,7 @@ export function isCosUniversityGraduationExecutionEvidence(row: {
   response_source: string | null
   turn_id: string | null
 }, agentId: string, registeredRole?: string | null, now = new Date()): boolean {
+  const expectedRuntime = universitySpecialistRuntime(registeredRole)
   return cosUniversityGraduationRuntimeBlocker(agentId, registeredRole) === null
     && row.agent_id === agentId
     && row.fresh_execution === true
@@ -33,8 +35,9 @@ export function isCosUniversityGraduationExecutionEvidence(row: {
     && row.response_source !== 'semantic_cache'
     && row.response_source !== 'semantic_similarity'
     && (agentId === 'cos'
-      ? row.response_source !== SOFTWARE_CAPSTONE_RUNTIME && row.execution_provenance == null
-      : (row.response_source === SOFTWARE_CAPSTONE_RUNTIME
+      ? !isUniversitySpecialistRuntime(row.response_source) && row.execution_provenance == null
+      : (Boolean(expectedRuntime)
+      && row.response_source === expectedRuntime
       && isBoundSoftwareCapstoneEvidence(row.execution_provenance, row, registeredRole, now)))
 }
 

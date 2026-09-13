@@ -10,6 +10,7 @@ import {
 import { flushCapturedEvidenceSourceUse } from '@/lib/ai/cos/evidenceSourceUseStore'
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
+import { boundExecutionBindingFailure } from './cosUniversityExecutionBinding.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   COS_UNIVERSITY_MASTERS_EXAM_PROFILE,
@@ -247,6 +248,8 @@ async function executeBoundRun(
   if (execution.agentId !== agentId || execution.runId !== row.id || execution.manifestHash !== exam.manifestHash) {
     return fail(['agent_execution_identity_mismatch'])
   }
+  const bindingFailure = boundExecutionBindingFailure(bound.reply, execution)
+  if (bindingFailure) return fail([bindingFailure])
 
   const score = scoreCosUniversityMastersExam(exam, bound.reply, {
     localReasoning: true, externalAi: false, semanticCache: false, handled: true, turnId: execution.turnId,

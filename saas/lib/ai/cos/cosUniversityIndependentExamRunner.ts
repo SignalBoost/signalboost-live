@@ -10,7 +10,6 @@ import { attachTurnOutcome, recordTurnLearningEnrichment } from '@/lib/ai/cos/tu
 import { decideCosTurnExperience } from '@/lib/ai/cos/cognitiveTurnExperience'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { cosUniversityAcademicExecutionBlocker } from './cosUniversityAcademicExecutionPolicy.ts'
-import { SOFTWARE_CAPSTONE_RUNTIME } from './cosUniversityAgentCapstone.ts'
 import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversityAgentExamRuntime.ts'
 import { boundExecutionBindingFailure } from './cosUniversityExecutionBinding.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
@@ -254,7 +253,7 @@ async function executeBoundExam(
       manifestHash: exam.manifestHash,
       responseContract: universityExamResponseContract(exam),
       turnId: execution.turnId,
-      responseSource: SOFTWARE_CAPSTONE_RUNTIME,
+      responseSource: execution.runtime,
       localModelInvoked: true,
       externalAiInvoked: false,
       executionProvenance: execution,
@@ -269,7 +268,7 @@ async function executeBoundExam(
     status: score.passed ? 'passed' : 'failed',
     passed: score.passed,
     turn_id: execution.turnId,
-    response_source: SOFTWARE_CAPSTONE_RUNTIME,
+    response_source: execution.runtime,
     local_model_invoked: true,
     external_ai_invoked: false,
     fresh_execution: true,

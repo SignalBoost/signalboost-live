@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityAgentCapstone.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -38,12 +39,27 @@ test('host selects the registered specialist, exact case and configured model, n
   assert.ok(isBoundSoftwareCapstoneEvidence(result.execution, evidenceRow(result.execution, result.execution.turnId), 'software_engineering'))
 })
 
+/**
+ * POLICY CHANGE 2026-09-13. This test previously refused every role but software_engineering, which
+ * dated from when one specialist existed. The invariant it was really protecting is that only an
+ * agent the HOST REGISTERED, holding a real role, may execute as itself — and the registry is a
+ * migration-gated, database-constrained list, a stronger boundary than a string literal in
+ * application code. Registry-scoped execution keeps every negative case below intact: COS refused,
+ * unknown roles refused, the generalist role refused, malformed ids refused. What changed is that a
+ * registered cybersecurity or quantum specialist is no longer refused for not being software.
+ */
 test('COS, missing registry roles and unsupported roles cannot use the specialist executor', async () => {
-  for (const role of [null, 'chief_of_staff_generalist', 'cybersecurity', 'unknown']) {
+  for (const role of [null, 'chief_of_staff_generalist', 'unknown']) {
     await assert.rejects(executeBoundSoftwareCapstone(request, ports({ readRole: async () => role, infer: async () => assert.fail('must not infer') })), /runtime_unavailable/)
   }
   await assert.rejects(executeBoundSoftwareCapstone({ ...request, agentId: 'cos' }, ports()), /runtime_unavailable/)
   await assert.rejects(executeBoundSoftwareCapstone({ ...request, agentId: ' software-specialist ' }, ports()), /runtime_unavailable/)
+
+  // A registered non-software specialist now executes, and stamps its own runtime and role.
+  const cyber = await executeBoundSoftwareCapstone(request, ports({ readRole: async () => 'cybersecurity' }))
+  assert.equal(cyber.execution.role, 'cybersecurity')
+  assert.equal(cyber.execution.runtime, 'university_cybersecurity_specialist_v1')
+  assert.equal(cyber.execution.academicAuthority, 'none')
 })
 
 test('blank specialist model cannot silently select the generalist model', async () => {
@@ -101,11 +117,13 @@ test('distinct host executions receive distinct trace identities', async () => {
   assert.notEqual(a.execution.turnId, b.execution.turnId)
 })
 
-test('specialist runtime is enabled only for an explicit registered software role; graduate admission stays deferred', () => {
+test('specialist runtime is enabled for any explicitly registered role; graduate admission stays deferred', () => {
+  // See the policy note above: the gate is the registry, not one role name.
   assert.equal(cosUniversityGraduationRuntimeBlocker('software-specialist'), 'agent_capstone_runtime_unavailable')
   assert.equal(cosUniversityGraduationRuntimeBlocker('software-specialist', 'software_engineering'), null)
   assert.equal(cosUniversityGraduationRuntimeBlocker('second-software-agent', 'software_engineering'), null)
-  assert.equal(cosUniversityGraduationRuntimeBlocker('software-specialist', 'cybersecurity'), 'agent_capstone_runtime_unavailable')
+  assert.equal(cosUniversityGraduationRuntimeBlocker('cyber-specialist', 'cybersecurity'), null)
+  assert.equal(cosUniversityGraduationRuntimeBlocker('software-specialist', 'not_a_registered_role'), 'agent_capstone_runtime_unavailable')
   assert.equal(cosUniversityGraduationRuntimeBlocker('cos', 'software_engineering'), 'agent_capstone_runtime_unavailable')
   assert.equal(cosUniversityGraduationAdmissionBlocker({ agentId: request.agentId, enabled: true, errors: [], capstoneState: 'credential_awarded' }), 'agent_masters_runtime_unavailable')
 })

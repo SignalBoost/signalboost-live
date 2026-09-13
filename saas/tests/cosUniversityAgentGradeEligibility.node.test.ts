@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 import { SOFTWARE_CAPSTONE_RUNTIME } from '../lib/ai/cos/cosUniversityAgentCapstone.ts'
+import { universitySpecialistRuntime } from '../lib/ai/cos/cosUniversitySpecialistRuntimes.ts'
 import {
   assessmentCarriesBoundExecution,
   assessmentGradeEligibleForAgent,
@@ -11,9 +12,9 @@ import {
 
 const file = (relative: string) => fs.readFileSync(path.resolve(import.meta.dirname, '..', relative), 'utf8')
 
-const bound = (agentId: string) => ({
-  runtime: SOFTWARE_CAPSTONE_RUNTIME,
-  role: 'software_engineering',
+const bound = (agentId: string, role = 'software_engineering') => ({
+  runtime: universitySpecialistRuntime(role),
+  role,
   agentId,
   turnId: '0f9f2a7c-2b47-4a0e-9d1a-6c4a1f2e8b30',
   model: 'configured-builder',
@@ -35,6 +36,12 @@ test('a specialist row written before its bound executor no longer counts toward
 test('a specialist row carrying its own bound execution does count', () => {
   const row = { agent_id: 'software-specialist', scorer_authority: 'host_private_exam', evidence: { executionProvenance: bound('software-specialist') } }
   assert.equal(assessmentGradeEligibleForAgent(row, 'software-specialist'), true)
+})
+
+test('a registered non-software specialist earns grade eligibility only through its own mapped runtime', () => {
+  const cyber = { agent_id: 'cyber-specialist', scorer_authority: 'host_private_exam', evidence: { executionProvenance: bound('cyber-specialist', 'cybersecurity') } }
+  assert.equal(assessmentGradeEligibleForAgent(cyber, 'cyber-specialist'), true)
+  assert.equal(assessmentCarriesBoundExecution({ executionProvenance: { ...bound('cyber-specialist', 'cybersecurity'), runtime: SOFTWARE_CAPSTONE_RUNTIME } }, 'cyber-specialist'), false)
 })
 
 test('another agent\'s execution, COS identity, or a missing field cannot satisfy the binding', () => {

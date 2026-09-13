@@ -92,6 +92,13 @@ test('dataset preparation stays CPU-bound and refuses arbitrary/non-HF source ma
   assert.equal(spec.secrets.HF_TOKEN, token)
 })
 
+test('training defaults to the lowest-cost NVIDIA T4 and never auto-upgrades', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv())!
+  assert.equal(config.trainingFlavor, 't4-small')
+  const explicitlyLarger = huggingFaceJobsConfigFromEnv(hfEnv({ COS_UNIVERSITY_HF_TRAINING_FLAVOR: 'l4x1' }))!
+  assert.equal(explicitlyLarger.trainingFlavor, 'l4x1')
+})
+
 test('training uses bounded GPU defaults only after immutable materialized dataset refs exist', () => {
   const config = huggingFaceJobsConfigFromEnv(hfEnv())!
   const common = {
@@ -117,7 +124,7 @@ test('training uses bounded GPU defaults only after immutable materialized datas
       authorityExpanded: false,
     },
   })
-  assert.equal(spec.flavor, 'l4x1')
+  assert.equal(spec.flavor, 't4-small')
   assert.equal(spec.timeoutSeconds, 14400)
   assert.match(spec.dockerImage, /pytorch/)
   assert.equal(spec.secrets.HF_TOKEN, token)

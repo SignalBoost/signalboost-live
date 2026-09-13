@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runCosUniversityDeliberatePractice } from '@/lib/ai/cos/cosUniversityDeliberatePracticeRunner'
+import { runConfiguredCosUniversityDeliberatePractice } from '@/lib/ai/cos/cosUniversityConfiguredPracticeRunner'
 import { reopenCosUniversityStudyAfterFailedPractice } from '@/lib/ai/cos/cosUniversityPracticeFailureRemediation'
 import { disciplineCosUniversityPracticeQueue } from '@/lib/ai/cos/cosUniversityPracticeQueueDiscipline'
 import { readCosUniversityPracticeStudyGate } from '@/lib/ai/cos/cosUniversityPracticeStudyGate'
@@ -9,6 +9,10 @@ import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityPro
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
+
+// Preserve the scheduled-lane worker contract: this is still the University deliberate-practice
+// worker, now with buyer-controlled host configuration resolved before the underlying runner begins.
+const runCosUniversityDeliberatePractice = runConfiguredCosUniversityDeliberatePractice
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET

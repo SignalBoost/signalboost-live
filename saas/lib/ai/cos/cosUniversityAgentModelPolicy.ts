@@ -16,7 +16,8 @@ import { currentPlatformModelTopology } from './platformIdentityContext.ts'
  * non-credit training answer moves.
  *
  * No paid managed model is selected from a source-code default. DeepInfra practice requires an
- * explicit operator-controlled UNIVERSITY_PRACTICE_MODEL value and fails closed when it is absent.
+ * explicit operator-controlled UNIVERSITY_PRACTICE_MODEL value or a buyer-controlled runtime
+ * setting supplied by the host runner, and fails closed when neither is present.
  */
 
 export type AgentWorkDomain = 'role_domain' | 'generalist'
@@ -25,6 +26,7 @@ export type AgentWorkPurpose = 'assessment' | 'practice'
 export const PRIMARY_REASONER_NOT_CONFIGURED = 'primary_reasoner_model_not_configured'
 export const BUILDER_MODEL_NOT_CONFIGURED_FOR_ROLE = 'builder_model_not_configured'
 export const UNIVERSITY_PRACTICE_MODEL_NOT_CONFIGURED = 'university_practice_model_not_configured'
+export const UNIVERSITY_PRACTICE_MODEL_INVALID = 'university_practice_model_invalid'
 
 /**
  * University subjects that belong to a registered role's own field. A role absent from this map has
@@ -57,15 +59,36 @@ function isDeepInfraRuntime(): boolean {
   }
 }
 
+function runtimePracticeModel(value: unknown): string | null {
+  const raw = typeof value === 'string'
+    ? value
+    : value && typeof value === 'object' && !Array.isArray(value) && typeof (value as Record<string, unknown>).model === 'string'
+      ? String((value as Record<string, unknown>).model)
+      : ''
+  const model = raw.trim()
+  if (!model) return null
+  if (model.length > 180 || !/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(model)) {
+    throw new Error(UNIVERSITY_PRACTICE_MODEL_INVALID)
+  }
+  return model
+}
+
 /**
- * Economy routing is training-only. Paid DeepInfra practice requires an explicit configured model;
- * self-hosted/non-DeepInfra runtimes may keep their existing primary model by returning null.
+ * Economy routing is training-only. Environment configuration remains authoritative. The optional
+ * runtime setting is supplied by the host/service layer; this pure policy module never reads a
+ * database or provider API itself, which keeps the academic execution boundary deterministic.
  */
-export function universityPracticeModelFromEnv(): string | null {
+export function universityPracticeModelFromConfiguration(runtimeSetting?: unknown): string | null {
   const explicit = String(process.env.UNIVERSITY_PRACTICE_MODEL ?? '').trim()
   if (explicit) return explicit
+  const configured = runtimePracticeModel(runtimeSetting)
+  if (configured) return configured
   if (isDeepInfraRuntime()) throw new Error(UNIVERSITY_PRACTICE_MODEL_NOT_CONFIGURED)
   return null
+}
+
+export function universityPracticeModelFromEnv(): string | null {
+  return universityPracticeModelFromConfiguration()
 }
 
 /**

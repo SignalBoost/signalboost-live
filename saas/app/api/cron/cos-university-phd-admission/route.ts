@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runCosUniversityPhdAdmission } from '@/lib/ai/cos/cosUniversityPhdRuntime'
+import { runCosUniversityPhdAdmissionForAgent } from '@/lib/ai/cos/cosUniversityPhdAgentRunner'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { readCosUniversityDailyLaneCadence } from '@/lib/ai/cos/cosUniversityDailyLaneCadence'
 import { listCosUniversityRegisteredAgents } from '@/lib/ai/cos/cosUniversityAgentRegistry'
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const agents = rotatePhdAgents(await listCosUniversityRegisteredAgents(), now, 1)
     const selected = agents[0]
     if (!selected) throw new Error('no_registered_phd_agents')
-    const result = await runCosUniversityPhdAdmission(now, selected.agentId)
+    const result = await runCosUniversityPhdAdmissionForAgent(now, selected.agentId)
     const evidence = { agentId: selected.agentId, role: selected.role, ...result }
     await recordCosUniversityProductionPath({ path: 'phd_runtime', invocationSucceeded: result.errors.length === 0, evidence })
     await recordCosUniversityProductionPath({ path: 'phd_admission', invocationSucceeded: result.errors.length === 0, evidence })

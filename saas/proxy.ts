@@ -31,7 +31,7 @@ export async function proxy(req: NextRequest) {
     const headers = new Headers(req.headers)
     if (dashboardSurface(req)) headers.set('x-signalboost-surface', 'cos')
     const target = req.nextUrl.clone()
-    target.pathname = '/api/cos-browser'
+    target.pathname = '/api/cos-provenance-browser'
     return NextResponse.rewrite(target, { request: { headers } })
   }
 

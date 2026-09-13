@@ -19,6 +19,7 @@
     "COS_UNIVERSITY_FINE_TUNING_ENABLED": "true",
     "COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED": "true",
     "COS_BEHAVIORAL_ROBUSTNESS_ENABLED": "true",
+    "SPECIALIST_MESH_UNIVERSITY_COVERAGE_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ENABLED": "true",
     "BUILDER_AUTO_MERGE_ROLLBACK_ENABLED": "true"
   },
@@ -37,6 +38,7 @@
   "crons": [
     { "path": "/api/cron/specialist-mesh-production-acceptance", "schedule": "* * * * *" },
     { "path": "/api/cron/specialist-mesh-write-production-acceptance", "schedule": "* * * * *" },
+    { "path": "/api/cron/specialist-mesh-university-coverage", "schedule": "9 * * * *" },
     { "path": "/api/cron/builder-continuations", "schedule": "* * * * *" },
     { "path": "/api/cron/builder-repair-merge", "schedule": "* * * * *" },
     { "path": "/api/cron/github-observation", "schedule": "*/5 * * * *" },

@@ -5,25 +5,14 @@ export const ONE_TIME_TEACHER_MAX_HOURLY_COST_USD = 1 as const
 export const ONE_TIME_TEACHER_MAX_ESTIMATED_COST_USD = 0.20 as const
 export const ONE_TIME_TEACHER_MAX_VALIDITY_MS = 15 * 60_000
 
-const HASH = /^[a-f0-9]{64}$/i
 const CANDIDATE = /^study-plan:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function clean(value: unknown, max = 4000): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
-function record(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-}
-
 function hashText(value: string): string {
   return createHash('sha256').update(value).digest('hex')
-}
-
-function hashObject(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
 async function serviceDb() {
@@ -37,7 +26,7 @@ export type OneTimeTeacherDispatchCapability = Readonly<{
   maxHourlyCostUsd: number
   maxEstimatedCostUsd: number
   expiresAt: string
-  claimedEvidenceHash: string
+  claimedAt: string
   operation: 'generate_teacher_dataset'
   studentTrainingAuthorized: false
   authorityExpanded: false
@@ -59,14 +48,16 @@ export function oneTimeTeacherApprovalEventKey(rawToken: unknown): string {
 }
 
 /**
- * This is a second, narrower spend gate for an individual teacher-dataset job. It never authorizes
- * model training. The receipt must be short-lived and may not exceed the hard $0.20 / $1-hour caps.
+ * Pure validation for issuance/testing. Runtime claiming is performed atomically by the database RPC,
+ * not by mutating the append-only University assurance ledger.
  */
 export function validateOneTimeTeacherApprovalEvidence(
   evidenceLike: unknown,
   now = new Date(),
 ): OneTimeTeacherApprovalValidation {
-  const evidence = record(evidenceLike)
+  const evidence = evidenceLike && typeof evidenceLike === 'object' && !Array.isArray(evidenceLike)
+    ? evidenceLike as Record<string, unknown>
+    : {}
   const blockers: string[] = []
   const candidateId = clean(evidence.candidateId, 120)
   const authorizedAt = Date.parse(clean(evidence.authorizedAt, 100))
@@ -106,55 +97,52 @@ export function validateOneTimeTeacherApprovalEvidence(
   })
 }
 
-/** Atomically claim a short-lived approval receipt using its hashed bearer token. */
+/**
+ * Atomically claim a short-lived approval through the dedicated operational fence table. The RPC
+ * also appends immutable claim evidence to cos_university_learning_assurance_events in the same DB
+ * transaction. The raw bearer token never reaches storage; only its SHA-256 token hash is supplied.
+ */
 export async function claimOneTimeTeacherDispatchApproval(rawToken: unknown): Promise<OneTimeTeacherDispatchCapability> {
   const eventKey = oneTimeTeacherApprovalEventKey(rawToken)
   const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
 
-  const result = await db.from('cos_university_learning_assurance_events')
-    .select('event_key,candidate_id,evidence,evidence_hash,expires_at,verifier,event_type')
-    .eq('event_key', eventKey)
-    .eq('event_type', 'fine_tune')
-    .eq('verifier', 'host_controller')
-    .maybeSingle()
-  if (result.error) throw result.error
-  const row: any = result.data
-  if (!row || !HASH.test(clean(row.evidence_hash, 64))) throw new Error('one_time_teacher_approval_not_found')
-
-  const validated = validateOneTimeTeacherApprovalEvidence(row.evidence)
-  if (!validated.eligible) throw new Error(validated.blockers[0] || 'one_time_teacher_approval_invalid')
-  if (clean(row.candidate_id, 120) !== validated.candidateId) throw new Error('one_time_teacher_approval_candidate_mismatch')
-  if (row.expires_at && Date.parse(String(row.expires_at)) <= Date.now()) throw new Error('one_time_teacher_approval_expired')
-
-  const claimedAt = new Date().toISOString()
-  const claimedEvidence = {
-    ...record(row.evidence),
-    status: 'claimed',
-    claimedAt,
+  const result = await db.rpc('claim_cos_university_one_time_teacher_dispatch', {
+    p_token_hash: eventKey,
+  })
+  if (result.error) {
+    const message = clean(result.error.message, 240)
+    if (message.includes('one_time_teacher_approval_')) throw new Error(message.match(/one_time_teacher_approval_[a-z_]+/)?.[0] || 'one_time_teacher_approval_unavailable')
+    throw result.error
   }
-  const claimedEvidenceHash = hashObject(claimedEvidence)
-  const update = await db.from('cos_university_learning_assurance_events')
-    .update({ evidence: claimedEvidence, evidence_hash: claimedEvidenceHash })
-    .eq('event_key', eventKey)
-    .eq('evidence_hash', row.evidence_hash)
-    .select('event_key')
-  if (update.error) throw update.error
-  if (!Array.isArray(update.data) || update.data.length !== 1) throw new Error('one_time_teacher_approval_already_claimed')
+  const row: any = Array.isArray(result.data) ? result.data[0] : result.data
+  const candidateId = clean(row?.candidate_id, 120)
+  const expiresAt = clean(row?.expires_at, 100)
+  const claimedAt = clean(row?.claimed_at, 100)
+  const maxHourlyCostUsd = Number(row?.max_hourly_cost_usd)
+  const maxEstimatedCostUsd = Number(row?.max_estimated_cost_usd)
+  if (!CANDIDATE.test(candidateId)
+    || !Number.isFinite(Date.parse(expiresAt))
+    || !Number.isFinite(Date.parse(claimedAt))
+    || !Number.isFinite(maxHourlyCostUsd) || maxHourlyCostUsd <= 0 || maxHourlyCostUsd > ONE_TIME_TEACHER_MAX_HOURLY_COST_USD
+    || !Number.isFinite(maxEstimatedCostUsd) || maxEstimatedCostUsd <= 0 || maxEstimatedCostUsd > ONE_TIME_TEACHER_MAX_ESTIMATED_COST_USD) {
+    throw new Error('one_time_teacher_approval_claim_response_invalid')
+  }
 
   return Object.freeze({
     eventKey,
-    candidateId: validated.candidateId,
-    maxHourlyCostUsd: validated.maxHourlyCostUsd,
-    maxEstimatedCostUsd: validated.maxEstimatedCostUsd,
-    expiresAt: validated.expiresAt,
-    claimedEvidenceHash,
+    candidateId,
+    maxHourlyCostUsd,
+    maxEstimatedCostUsd,
+    expiresAt: new Date(expiresAt).toISOString(),
+    claimedAt: new Date(claimedAt).toISOString(),
     operation: 'generate_teacher_dataset',
     studentTrainingAuthorized: false,
     authorityExpanded: false,
   })
 }
 
+/** The finalize RPC is fenced to the exact claim timestamp and appends immutable terminal evidence. */
 export async function finishOneTimeTeacherDispatchApproval(input: {
   capability: OneTimeTeacherDispatchCapability
   status: 'dispatched' | 'failed'
@@ -164,28 +152,20 @@ export async function finishOneTimeTeacherDispatchApproval(input: {
 }) {
   const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const existing = await db.from('cos_university_learning_assurance_events')
-    .select('evidence,evidence_hash')
-    .eq('event_key', input.capability.eventKey)
-    .eq('evidence_hash', input.capability.claimedEvidenceHash)
-    .maybeSingle()
-  if (existing.error) throw existing.error
-  if (!existing.data) throw new Error('one_time_teacher_approval_claim_fence_lost')
-
-  const evidence = {
-    ...record((existing.data as any).evidence),
-    status: input.status,
-    completedAt: new Date().toISOString(),
-    jobId: clean(input.jobId, 240) || null,
-    jobUrl: clean(input.jobUrl, 2000) || null,
-    error: clean(input.error, 200) || null,
+  const result = await db.rpc('finish_cos_university_one_time_teacher_dispatch', {
+    p_token_hash: input.capability.eventKey,
+    p_claimed_at: input.capability.claimedAt,
+    p_status: input.status,
+    p_job_id: clean(input.jobId, 240) || null,
+    p_job_url: clean(input.jobUrl, 2000) || null,
+    p_error: clean(input.error, 200) || null,
+  })
+  if (result.error) {
+    const message = clean(result.error.message, 240)
+    if (message.includes('one_time_teacher_approval_')) throw new Error(message.match(/one_time_teacher_approval_[a-z_]+/)?.[0] || 'one_time_teacher_approval_finalize_failed')
+    throw result.error
   }
-  const update = await db.from('cos_university_learning_assurance_events')
-    .update({ evidence, evidence_hash: hashObject(evidence) })
-    .eq('event_key', input.capability.eventKey)
-    .eq('evidence_hash', input.capability.claimedEvidenceHash)
-    .select('event_key')
-  if (update.error) throw update.error
-  if (!Array.isArray(update.data) || update.data.length !== 1) throw new Error('one_time_teacher_approval_finalize_fence_lost')
+  const row: any = Array.isArray(result.data) ? result.data[0] : result.data
+  if (clean(row?.status, 32) !== input.status) throw new Error('one_time_teacher_approval_finalize_response_invalid')
   return Object.freeze({ status: input.status, eventKey: input.capability.eventKey })
 }

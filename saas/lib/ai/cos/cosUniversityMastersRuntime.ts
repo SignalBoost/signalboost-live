@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMastersRuntime.ts
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   academicStateFromRows,
@@ -131,12 +132,12 @@ async function loadEnrollment(programKey: string, agentId: string = AGENT_ID): P
   return mapEnrollment((result.data || null) as EnrollmentRow | null)
 }
 
-async function loadAnyMastersEnrollment(): Promise<CosUniversityProgramEnrollment | null> {
+async function loadAnyMastersEnrollment(agentId: string = AGENT_ID): Promise<CosUniversityProgramEnrollment | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_program_enrollments')
     .select('program_key,program_level,enrolled_at,minimum_residence_until,target_completion_at,hard_deadline_at')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_level', 'masters')
     .order('enrolled_at', { ascending: true })
     .limit(1)
@@ -292,13 +293,14 @@ export type CosUniversityMastersEnrollmentResult = {
 export async function ensureCosUniversityMastersEnrollment(
   programId: CosUniversityMastersProgramId,
   now = new Date(),
+  agentId: string = AGENT_ID,
 ): Promise<CosUniversityMastersEnrollmentResult> {
-  const before = await readCosUniversityMastersRuntimeStatus(programId, now)
+  const before = await readCosUniversityMastersRuntimeStatus(programId, now, undefined, agentId)
   if (before.credential) return { enrolled: false, state: 'already_graduated', status: before, reasons: [] }
   if (!before.admission.admitted) return { enrolled: false, state: 'admission_denied', status: before, reasons: before.admission.reasons }
   if (before.enrollment) return { enrolled: false, state: 'already_enrolled', status: before, reasons: [] }
 
-  const existingMasters = await loadAnyMastersEnrollment()
+  const existingMasters = await loadAnyMastersEnrollment(agentId)
   if (existingMasters && existingMasters.programKey !== before.programKey) {
     return { enrolled: false, state: 'admission_denied', status: before, reasons: ['already_enrolled_at_next_level'] }
   }
@@ -311,7 +313,7 @@ export async function ensureCosUniversityMastersEnrollment(
     enrolledAt: now,
   })
   const insert = await db.from('cos_university_program_enrollments').insert({
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     program_key: enrollment.programKey,
     program_level: enrollment.programLevel,
     enrolled_at: enrollment.enrolledAt,
@@ -327,6 +329,12 @@ export async function ensureCosUniversityMastersEnrollment(
 }
 
 export type RecordCosUniversityMastersEvidenceInput = {
+  /**
+   * The learner this graduate evidence belongs to. Optional and defaulting to COS, so every existing
+   * caller is unchanged, while a registered specialist's evidence is written under its own identity
+   * instead of silently landing in COS's transcript.
+   */
+  agentId?: string
   programId: CosUniversityMastersProgramId
   moduleKey?: string | null
   evidenceKey: string
@@ -357,7 +365,8 @@ export async function recordHostCosUniversityMastersEvidence(
     return false
   }
 
-  const status = await readCosUniversityMastersRuntimeStatus(input.programId, observedAt)
+  const agentId = String(input.agentId ?? '').trim() || AGENT_ID
+  const status = await readCosUniversityMastersRuntimeStatus(input.programId, observedAt, undefined, agentId)
   if (!status.enrollment || status.credential) return false
   if (status.timingStatus === 'deadline_expired' || status.timingStatus === 'not_enrolled') return false
   const enrolledAt = Date.parse(status.enrollment.enrolledAt)
@@ -376,7 +385,7 @@ export async function recordHostCosUniversityMastersEvidence(
   if (!db) return false
   const insert = await db.from('cos_university_masters_evidence').insert({
     evidence_key: evidenceKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     program_key: status.programKey,
     program_id: input.programId,
     module_key: moduleKey,
@@ -407,8 +416,9 @@ export type CosUniversityMastersCredentialResult = {
 export async function evaluateAndAwardCosUniversityMastersCredential(
   programId: CosUniversityMastersProgramId,
   now = new Date(),
+  agentId: string = AGENT_ID,
 ): Promise<CosUniversityMastersCredentialResult> {
-  const before = await readCosUniversityMastersRuntimeStatus(programId, now)
+  const before = await readCosUniversityMastersRuntimeStatus(programId, now, undefined, agentId)
   if (before.credential) return { awarded: false, state: 'already_graduated', status: before, reasons: [] }
   if (!before.awardEligible || !before.enrollment || before.graduation.standing === 'not_graduated') {
     const reasons = [
@@ -425,8 +435,8 @@ export async function evaluateAndAwardCosUniversityMastersCredential(
   if (!db) return { awarded: false, state: 'error', status: before, reasons: ['service_database_unavailable'] }
   const program = COS_UNIVERSITY_MASTERS_PROGRAMS[programId]
   const insert = await db.from('cos_university_credentials').insert({
-    credential_key: cosUniversityMastersCredentialKey(AGENT_ID, programId),
-    agent_id: AGENT_ID,
+    credential_key: cosUniversityMastersCredentialKey(agentId, programId),
+    agent_id: agentId,
     program_key: before.programKey,
     program_level: 'masters',
     title: program.title,

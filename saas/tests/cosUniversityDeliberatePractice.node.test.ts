@@ -7,6 +7,10 @@ import {
   buildCosUniversityDeliberatePracticeVariants,
   cosUniversityPracticeSkillKey,
 } from '../lib/ai/cos/cosUniversityDeliberatePractice.ts'
+import {
+  configuredUniversityMaxPracticeRounds,
+  decideUniversityPracticeBudget,
+} from '../lib/ai/cos/cosUniversityPracticeBudget.ts'
 import { cosUniversityPlanEligibleForContinuousStudy } from '../lib/ai/cos/cosUniversityContinuousCadence.ts'
 import { selectEligibleCosUniversityPracticePlans } from '../lib/ai/cos/cosUniversityPracticeSelection.ts'
 
@@ -119,9 +123,48 @@ test('ready-for-exam plans stop passive rereading while failed/studying plans ca
   assert.equal(cosUniversityPlanEligibleForContinuousStudy({ id: '3', status: 'studying', lastAttemptAt: '2026-09-08T02:30:00Z' }, now), false)
 })
 
+test('practice spend counts executed rounds, not the study-attempt ordinal', () => {
+  const productionShape = decideUniversityPracticeBudget({
+    currentRound: 21,
+    executedRounds: [2, 18, 19, 20],
+    maxRounds: 12,
+  })
+  assert.equal(productionShape.allowed, true)
+  assert.equal(productionShape.reason, 'within_budget')
+  assert.equal(productionShape.executedRoundCount, 4)
+  assert.equal(productionShape.currentRound, 21)
+})
+
+test('practice spend blocks only a genuinely new round after twelve executed rounds', () => {
+  const exhausted = decideUniversityPracticeBudget({
+    currentRound: 21,
+    executedRounds: Array.from({ length: 12 }, (_, index) => index + 1),
+    maxRounds: 12,
+  })
+  assert.equal(exhausted.allowed, false)
+  assert.equal(exhausted.reason, 'practice_budget_exhausted')
+
+  const sameRoundSibling = decideUniversityPracticeBudget({
+    currentRound: 21,
+    executedRounds: [...Array.from({ length: 11 }, (_, index) => index + 1), 21],
+    maxRounds: 12,
+  })
+  assert.equal(sameRoundSibling.allowed, true)
+  assert.equal(sameRoundSibling.reason, 'current_round_already_metered')
+})
+
+test('practice spend configuration stays bounded and defaults to twelve actual rounds', () => {
+  assert.equal(configuredUniversityMaxPracticeRounds({}), 12)
+  assert.equal(configuredUniversityMaxPracticeRounds({ UNIVERSITY_MAX_PRACTICE_ROUNDS: '1' }), 2)
+  assert.equal(configuredUniversityMaxPracticeRounds({ UNIVERSITY_MAX_PRACTICE_ROUNDS: '99' }), 50)
+  assert.equal(configuredUniversityMaxPracticeRounds({ UNIVERSITY_MAX_PRACTICE_ROUNDS: 'garbage' }), 12)
+})
+
 test('runtime reuses cognitive practice evidence but cannot award an academic grade', () => {
   const runner = file('lib/ai/cos/cosUniversityDeliberatePracticeRunner.ts')
   const practiceExecution = file('lib/ai/cos/cosUniversityPracticeExecution.ts')
+  const boundExecution = file('lib/ai/cos/cosUniversityAgentExamRuntime.ts')
+  const budget = file('lib/ai/cos/cosUniversityPracticeBudget.ts')
   assert.match(runner, /cos_active_practice_queue/)
   assert.match(runner, /cos_record_cognitive_practice_result/)
   assert.match(runner, /academicCredit: false/)
@@ -134,11 +177,24 @@ test('runtime reuses cognitive practice evidence but cannot award an academic gr
   assert.match(practiceExecution, /responseSource: 'cos_university_practice_model'/)
   assert.match(practiceExecution, /responseSource: 'cos_local_reasoner'/)
   assert.doesNotMatch(practiceExecution, /economy \|\| await ports\.cos\(\)/)
-  assert.match(practiceExecution, /await enforceCommonPracticeCostGuard/)
+  assert.match(practiceExecution, /await enforceUniversityPracticeCostGuard/)
+  assert.match(boundExecution, /await enforceUniversityPracticeCostGuard\(request\)/)
+  assert.doesNotMatch(practiceExecution, /practiceRound > configuredMaxPracticeRounds/)
+  assert.doesNotMatch(boundExecution, /practiceRound > configuredMaxPracticeRounds/)
+  assert.match(budget, /\.gt\('attempt_count', 0\)/)
+  assert.match(budget, /new Set<number>\(\)/)
   assert.match(runner, /status: ready \? 'ready_for_exam' : 'studying'/)
   assert.doesNotMatch(runner, /tryCOSFirstAnswer/)
   assert.doesNotMatch(runner, /recordCosUniversityAssessment/)
   assert.doesNotMatch(runner, /from\(['"]cos_university_assessments['"]\)/)
+})
+
+test('practice budget selection can see past four blocked remediation plans', () => {
+  const gate = file('lib/ai/cos/cosUniversityPracticeStudyGate.ts')
+  assert.match(gate, /COS_UNIVERSITY_PRACTICE_PLAN_SCAN_LIMIT = 20/)
+  assert.match(gate, /readUniversityPracticeBudget/)
+  assert.match(gate, /practice_budget_exhausted/)
+  assert.match(gate, /selectCosUniversityPracticeGateDecision\(decisions\)/)
 })
 
 test('practice uses a training-specific local reasoning seam rather than the owner advisory release pipeline', () => {

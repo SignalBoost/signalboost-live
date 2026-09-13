@@ -217,6 +217,7 @@ function endpointResolver(input: {
   agents: readonly AgentDescriptor[]
   signingSecret: string
   taskId: string
+  operationKey: string
   primaryAgentId: string
   primaryMode: SpecialistMeshWriteAcceptanceMode
 }) {
@@ -229,6 +230,7 @@ function endpointResolver(input: {
       const token = createSpecialistMeshWriteAcceptanceControlToken({
         agentId: request.agentId,
         taskId: input.taskId,
+        operationKey: input.operationKey,
         mode,
         signingSecret: input.signingSecret,
         ttlMs: 120_000,
@@ -323,6 +325,7 @@ async function runScenario(input: {
       agents: input.agents,
       signingSecret: input.signingSecret,
       taskId,
+      operationKey: keys.operationKey,
       primaryAgentId,
       primaryMode,
     }),
@@ -513,6 +516,7 @@ export async function runSpecialistMeshWriteProductionLiveAcceptance(input: {
     scenarios: { alreadyApplied, safeTakeover, unknownOutcome },
     security: {
       signedTaskBoundAcceptanceControls: true,
+      signedOperationBoundAcceptanceControls: true,
       isolatedReferenceProvider: true,
       customerContentTouched: false,
       externalProviderTouched: false,

@@ -1,119 +1,109 @@
-export type CognitiveReasoningTriggerKind =
-  | 'deictic_predicate_question'
-  | 'unresolved_referent_followup'
-  | 'underspecified_comparison'
-  | 'vague_temporal_reference'
-
-export type CognitiveReasoningTrigger = {
-  kind: CognitiveReasoningTriggerKind
-  reason: string
-}
-
-// A REQUEST IS NOT ALWAYS A QUESTION (2026-08-26).
-//
-// This gate previously required a '?' or a leading interrogative, which silently excluded every
-// imperative brief — and those are the shape enterprise work actually arrives in: "Calculate the
-// break-even...", "Give the leading hypotheses...", "Identify the root cause...". Measured against
-// real production prompts, the detector returned zero triggers for all of them and fired only on
-// short interrogatives like "Is it safe here?". With no trigger, no procedural skill can ever be
-// selected, which is why the cognitive-skills funnel read "1 retrieved -> 0 relevant" on every
-// technical turn for days.
-//
-// An imperative brief can be exactly as underspecified as a question; the grammar of the request
-// says nothing about whether its referents resolve.
-const QUESTIONISH = /\?|^(?:who|what|when|where|why|how|is|are|am|do|does|did|can|could|should|would|will|which)\b/i
-const IMPERATIVE_TASK = /(?:^|[.;:]\s+)(?:calculate|compute|determine|define|identify|diagnose|explain|describe|compare|contrast|evaluate|assess|estimate|analyse|analyze|outline|summarise|summarize|list|give|tell|show|recommend|suggest|propose|design|draft|write|plan|review|check|verify|rank|prioriti[sz]e)\b/i
-const DEICTIC_LOCATION = /\b(?:here|there|nearby|around here|around there|this place|this area|that place|that area)\b/i
-const DEICTIC_PREDICATE = /^\s*(?:is|are|does|do|can|could|should|would|will)\b[\s\S]{0,140}\b(?:here|there|nearby|around here|around there|this place|this area|that place|that area)\b\s*\??\s*$/i
-// Natural follow-ups commonly have both a question word and an auxiliary: "When did she leave?",
-// "Where has it gone?", "Why would they do that?". Detect that grammar shape rather than a list
-// of people or topics.
-const REFERENT_PRONOUN = /^(?:and\s+)?(?:(?:when|where|why|how|what|who|which)\s+)?(?:(?:is|are|was|were|did|does|do|can|could|should|would|will|has|have|had)\s+)?(?:he|she|they|them|his|her|their|it|its|this|that|these|those)\b/i
-const EXPLICIT_NAMED_REFERENT = /\b[A-Z][a-z]{2,}(?:\s+[A-Z][a-z]{2,})+\b/
-const COMPARATIVE = /\b(?:better|worse|best|worst|faster|slower|safer|riskier|cheaper|more expensive|easier|harder|stronger|weaker|higher|lower|larger|smaller|more|less)\b/i
-const COMPARISON_BASELINE = /\b(?:than|compared (?:with|to)|versus|vs\.?|relative to|between\s+\S+\s+and\s+\S+)\b/i
-const VAGUE_TEMPORAL = /\b(?:soon|recently|lately|a while ago|in a while|these days|nowadays|at some point)\b/i
-
-function compact(value: unknown, max = 1200): string {
-  return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
-}
+// saas/tests/releaseSignalSeverity.node.test.ts
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import {
+  ADVISORY_RELEASE_SIGNALS,
+  advisoryReleaseSignals,
+  blockingReleaseSignals,
+  isBlockingReleaseSignal,
+} from '../lib/ai/cos/releaseSignalSeverity.ts'
 
 /**
- * Detect structural reasoning conditions, not topic keywords. These triggers never answer a
- * question themselves; they only make an already-validated procedural skill eligible for
- * selection. That lets future learned rules generalize across wording without granting a user
- * correction automatic authority.
+ * REBUILT 2026-09-13. This path held a byte-identical copy of
+ * `lib/ai/cos/cognitiveReasoningPatterns.ts` — a source module pasted over the test. It declared no
+ * tests, so `node --test` reported the file as passing and the Vercel gate printed a tick for it.
+ * The severity split had been unguarded for as long as that copy sat on main.
+ *
+ * `releaseSignalSeverity.ts` warns in its own header that it disappeared once before, and that this
+ * test plus its gate entry exist so a build fails instead of silently regressing. The gate entry
+ * survived; the test did not. `mainWriteDiscipline` now also fails any gated file that registers no
+ * tests, so an empty pass cannot happen again.
  */
-export function detectCognitiveReasoningTriggers(prompt: string): CognitiveReasoningTrigger[] {
-  const text = compact(prompt)
-  if (!text || (!QUESTIONISH.test(text) && !IMPERATIVE_TASK.test(text))) return []
 
-  const triggers: CognitiveReasoningTrigger[] = []
-  if (DEICTIC_LOCATION.test(text) && DEICTIC_PREDICATE.test(text)) {
-    triggers.push({
-      kind: 'deictic_predicate_question',
-      reason: 'Question predicates a condition on a deictic location whose referent or comparison frame may require context.',
-    })
-  }
-
-  // The operative clause of a brief is usually its last sentence ("… Should these alerts be
-  // treated as one incident?"). Test that as well as the whole text, so a scenario that ends in a
-  // question is not excluded merely because it opened with context.
-  const finalClause = (text.split(/(?<=[.?!])\s+/).pop() ?? text).trim()
-  const referentTargets = [text.length <= 180 ? text : '', finalClause].filter(Boolean)
-  const referentHit = referentTargets.some(
-    target => target.length <= 180 && REFERENT_PRONOUN.test(target) && !EXPLICIT_NAMED_REFERENT.test(target),
-  )
-  if (referentHit) {
-    triggers.push({
-      kind: 'unresolved_referent_followup',
-      reason: 'Short follow-up contains a pronoun or demonstrative whose referent may come from conversation context.',
-    })
-  }
-
-  if (COMPARATIVE.test(text) && !COMPARISON_BASELINE.test(text)) {
-    triggers.push({
-      kind: 'underspecified_comparison',
-      reason: 'Comparative language appears without an explicit comparison baseline.',
-    })
-  }
-
-  if (VAGUE_TEMPORAL.test(text)) {
-    triggers.push({
-      kind: 'vague_temporal_reference',
-      reason: 'Temporal wording is relative or vague and may require a concrete reference window.',
-    })
-  }
-
-  return [...new Map(triggers.map(trigger => [trigger.kind, trigger])).values()]
+function file(relative: string): string {
+  return fs.readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8')
 }
 
-const ALLOWED_TRIGGER_KINDS = new Set<CognitiveReasoningTriggerKind>([
-  'deictic_predicate_question',
-  'unresolved_referent_followup',
-  'underspecified_comparison',
-  'vague_temporal_reference',
-])
+test('the production failure: retrieval underperformance alone never fails a turn closed', () => {
+  // A 512-H100 migration cost question was answered correctly and killed twice by this signal.
+  assert.equal(isBlockingReleaseSignal('relevant_learned_evidence_not_used'), false)
+  assert.deepEqual(blockingReleaseSignals(['relevant_learned_evidence_not_used']), [])
+  assert.deepEqual(advisoryReleaseSignals(['relevant_learned_evidence_not_used']),
+    ['relevant_learned_evidence_not_used'])
+})
 
-export function cognitiveSkillReasoningTriggerKinds(row: {
-  procedure?: unknown
-  metadata?: unknown
-}): CognitiveReasoningTriggerKind[] {
-  const procedure = row.procedure && typeof row.procedure === 'object' ? row.procedure as Record<string, unknown> : {}
-  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata as Record<string, unknown> : {}
-  const raw = [
-    ...(Array.isArray(procedure.reasoningTriggers) ? procedure.reasoningTriggers : []),
-    ...(Array.isArray(metadata.reasoningTriggers) ? metadata.reasoningTriggers : []),
+test('signals about the answer itself still block', () => {
+  const blocking = [
+    'unsupported_commercial_certainty',
+    'invented_numeric_limit',
+    'fabricated_timeline',
+    'unstated_legal_conclusion',
+    'unstated_security_framework',
   ]
-  return [...new Set(raw
-    .map(value => compact(value, 80) as CognitiveReasoningTriggerKind)
-    .filter((value): value is CognitiveReasoningTriggerKind => ALLOWED_TRIGGER_KINDS.has(value)))]
-}
+  for (const signal of blocking) assert.equal(isBlockingReleaseSignal(signal), true, signal)
+  assert.deepEqual(blockingReleaseSignals(blocking), blocking)
+  assert.deepEqual(advisoryReleaseSignals(blocking), [])
+})
 
-export function matchingCognitiveReasoningTriggers(
-  detected: CognitiveReasoningTrigger[],
-  configured: CognitiveReasoningTriggerKind[],
-): CognitiveReasoningTriggerKind[] {
-  const active = new Set(detected.map(trigger => trigger.kind))
-  return configured.filter(kind => active.has(kind))
-}
+test('an unknown signal blocks, because severity is an allowlist and not a guess', () => {
+  assert.equal(isBlockingReleaseSignal('some_signal_added_next_month'), true)
+})
+
+test('a mixed set is split, and one advisory signal cannot rescue a blocking one', () => {
+  const mixed = ['relevant_learned_evidence_not_used', 'invented_numeric_limit']
+  assert.deepEqual(blockingReleaseSignals(mixed), ['invented_numeric_limit'])
+  assert.deepEqual(advisoryReleaseSignals(mixed), ['relevant_learned_evidence_not_used'])
+})
+
+test('order and duplicates are preserved, so the reason string reports what was found', () => {
+  const signals = ['invented_numeric_limit', 'relevant_learned_evidence_not_used', 'invented_numeric_limit']
+  assert.deepEqual(blockingReleaseSignals(signals), ['invented_numeric_limit', 'invented_numeric_limit'])
+})
+
+test('padding and junk cannot smuggle an advisory signal past the comparison', () => {
+  assert.equal(isBlockingReleaseSignal('  relevant_learned_evidence_not_used  '), false)
+  assert.equal(isBlockingReleaseSignal('RELEVANT_LEARNED_EVIDENCE_NOT_USED'), true)
+  assert.equal(isBlockingReleaseSignal('relevant_learned_evidence_not_used_extra'), true)
+  for (const value of ['', '   ', null, undefined]) {
+    assert.equal(isBlockingReleaseSignal(value as never), true, String(value))
+  }
+  assert.deepEqual(blockingReleaseSignals([]), [])
+})
+
+test('the advisory list stays deliberately narrow', () => {
+  // Widening it is a decision about what may reach a reader unchecked, never an incidental edit.
+  assert.deepEqual([...ADVISORY_RELEASE_SIGNALS], ['relevant_learned_evidence_not_used'])
+})
+
+test('the enterprise release gate consumes the split rather than failing on any signal', () => {
+  const gate = file('lib/ai/cos/cosFirstAnswerEnterprise.ts')
+  assert.match(gate, /import \{ blockingReleaseSignals, advisoryReleaseSignals \} from '\.\/releaseSignalSeverity\.ts'/)
+  const blocking = gate.indexOf('const remainingBlocking = blockingReleaseSignals(remainingSignals)')
+  const rejection = gate.indexOf('Executive answer release rejected')
+  const advisory = gate.indexOf('const remainingAdvisory = advisoryReleaseSignals(remainingSignals)')
+  assert.ok(blocking > 0 && rejection > blocking, 'rejection must be decided from blocking signals only')
+  assert.ok(advisory > rejection, 'advisory signals are handled after the rejection decision')
+  assert.match(gate.slice(advisory), /console\.warn/, 'advisory signals must be recorded, not discarded')
+})
+
+test('the public claim gate is filtered through the same severity rule', () => {
+  const core = file('lib/ai/cos/cosFirstAnswerCore.ts')
+  assert.match(core, /import \{ blockingReleaseSignals \} from '\.\/releaseSignalSeverity\.ts'/)
+  // Real call sites only: the import line and the prose comment above them name the function too.
+  const calls = core.split('\n')
+    .filter(line => /executiveDecisionUnsupportedClaims\(\s*\w/.test(line) && !line.trim().startsWith('//'))
+  assert.ok(calls.length >= 2, `expected the claim-gate call sites, found ${calls.length}`)
+  for (const line of calls) {
+    assert.match(line, /blockingReleaseSignals\(\s*executiveDecisionUnsupportedClaims\(/,
+      `unsupported-claim signals must pass through the severity rule: ${line.trim()}`)
+  }
+})
+
+test('this file is a test, not a module pasted over one', () => {
+  const self = file('tests/releaseSignalSeverity.node.test.ts')
+  assert.match(self, /^\/\/ saas\/tests\/releaseSignalSeverity\.node\.test\.ts$/m)
+  assert.match(self, /from 'node:test'/)
+  // Split so this test does not contain the literal it searches for.
+  assert.ok(!self.includes(`Cognitive${'ReasoningTriggerKind'}`), 'the pasted module is back')
+})

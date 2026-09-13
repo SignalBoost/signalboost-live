@@ -15,12 +15,14 @@ import {
 const secret = '0123456789abcdef0123456789abcdef'
 const agentId = PRIMARY_REFERENCE_WRITE_ACCEPTANCE_AGENT_ID
 const taskId = 'write-acceptance-test-task'
+const operationKey = 'tenant|prod|portable|write-acceptance-test-task|marketing.publish'
 
-test('write acceptance control is signed, task-bound, agent-bound, mode-bound, and expiring', () => {
+test('write acceptance control is signed, task-bound, agent-bound, operation-bound, mode-bound, and expiring', () => {
   const now = new Date('2026-09-13T07:30:00.000Z')
   const token = createSpecialistMeshWriteAcceptanceControlToken({
     agentId,
     taskId,
+    operationKey,
     mode: 'after_apply_unavailable',
     signingSecret: secret,
     now,
@@ -28,14 +30,15 @@ test('write acceptance control is signed, task-bound, agent-bound, mode-bound, a
     nonce: 'test-nonce',
   })
 
-  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token, agentId, taskId, signingSecret: secret, now }), {
+  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token, agentId, taskId, operationKey, signingSecret: secret, now }), {
     valid: true,
     mode: 'after_apply_unavailable',
   })
-  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token, agentId, taskId: 'wrong-task', signingSecret: secret, now }), { valid: false })
-  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token, agentId: 'wrong-agent', taskId, signingSecret: secret, now }), { valid: false })
-  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token: `${token}x`, agentId, taskId, signingSecret: secret, now }), { valid: false })
-  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token, agentId, taskId, signingSecret: secret, now: new Date(now.getTime() + 61_000) }), { valid: false })
+  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token, agentId, taskId: 'wrong-task', operationKey, signingSecret: secret, now }), { valid: false })
+  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token, agentId: 'wrong-agent', taskId, operationKey, signingSecret: secret, now }), { valid: false })
+  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token, agentId, taskId, operationKey: 'wrong-operation', signingSecret: secret, now }), { valid: false })
+  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token: `${token}x`, agentId, taskId, operationKey, signingSecret: secret, now }), { valid: false })
+  assert.deepEqual(verifySpecialistMeshWriteAcceptanceControlToken({ token, agentId, taskId, operationKey, signingSecret: secret, now: new Date(now.getTime() + 61_000) }), { valid: false })
 })
 
 test('reference provider idempotency key is deterministic per logical operation', () => {
@@ -78,19 +81,25 @@ test('Production reference provider is RPC-only and persists applied, not_applie
   assert.match(sql, /grant execute on function public\.a2a_specialist_mesh_write_recovery_evidence\(text\) to service_role;/)
 })
 
-test('public reference write endpoints require signed task-bound control before any provider apply', () => {
+test('public reference write endpoints require exact recovery key plus signed task/operation control before any provider apply', () => {
   for (const relative of [
     '../app/api/a2a/reference-write-acceptance-primary/route.ts',
     '../app/api/a2a/reference-write-acceptance-secondary/route.ts',
   ]) {
     const source = readFileSync(new URL(relative, import.meta.url), 'utf8')
+    const parseEnvelope = source.indexOf('parseReferenceWriteRecoveryEnvelope')
+    const deterministicKey = source.indexOf('referenceWriteAcceptanceIdempotencyKey(envelope.operationKey)')
     const verify = source.indexOf('verifySpecialistMeshWriteAcceptanceControlToken')
+    const operationBinding = source.indexOf('operationKey: envelope.operationKey', verify)
     const valid = source.indexOf('if (!control.valid)')
     const preApply = source.indexOf("control.mode === 'before_apply_unavailable'")
     const apply = source.indexOf('const effect = await applyReferenceWriteAcceptanceEffect')
     const postApply = source.indexOf("control.mode === 'after_apply_unavailable'")
+    assert.ok(parseEnvelope >= 0)
+    assert.ok(deterministicKey > parseEnvelope)
     assert.ok(verify >= 0)
-    assert.ok(valid > verify)
+    assert.ok(operationBinding > verify)
+    assert.ok(valid > operationBinding)
     assert.ok(preApply > valid)
     assert.ok(apply > preApply)
     assert.ok(postApply > apply)
@@ -108,5 +117,6 @@ test('deployment-bound acceptance explicitly refuses buyer/external-provider acc
   assert.match(runner, /scenario: 'already_applied'/)
   assert.match(runner, /scenario: 'safe_takeover'/)
   assert.match(runner, /scenario: 'unknown_outcome'/)
+  assert.match(runner, /signedOperationBoundAcceptanceControls: true/)
   assert.match(runner, /unknownOutcomeFailsClosed: true/)
 })

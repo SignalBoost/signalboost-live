@@ -6,6 +6,7 @@ import {
   COS_UNIVERSITY_TEACHER_DATASET_PROFILE,
   DEFAULT_DISTILLATION_STUDENT_MODEL,
   DEFAULT_DISTILLATION_TEACHER_MODEL,
+  validateTeacherDatasetCallbackBinding,
 } from '../lib/ai/cos/cosUniversityDistillationTeacherDataset.ts'
 import {
   buildHuggingFaceJobSpec,
@@ -143,6 +144,38 @@ test('teacher job envelope rejects moving model refs, private Production data an
     ...common,
     envelope: { ...teacherEnvelope(), studentControlledByBuyer: false },
   }), /teacher_dataset_envelope_invalid/)
+})
+
+test('teacher callback binds case-exact model IDs and normalized immutable revisions', () => {
+  const promptSetHash = '4'.repeat(64)
+  const outputHashes = Array.from({ length: 20 }, (_, index) => index.toString(16).padStart(64, '0'))
+  const evidence = {
+    promptSetHash,
+    teacherModelId: 'Qwen/Qwen3-8B',
+    teacherModelRevision: teacherRevision,
+    studentModelId: 'Qwen/Qwen3-4B',
+    studentModelRevision: studentRevision,
+    containsPrivateProductionData: false,
+    studentControlledByBuyer: true,
+    trainingRights: 'open_license',
+  }
+  const body = {
+    sourceRef: `hf://datasets/cadomos/itmounts-teacher@${commit}#train`,
+    teacherOutputItemHashes: outputHashes,
+    promptSetHash,
+    teacherModelId: 'Qwen/Qwen3-8B',
+    teacherModelRevision: teacherRevision.toUpperCase(),
+    studentModelId: 'Qwen/Qwen3-4B',
+    studentModelRevision: studentRevision.toUpperCase(),
+    containsPrivateProductionData: false,
+    studentControlledByBuyer: true,
+    trainingRights: 'open_license',
+  }
+  const valid = validateTeacherDatasetCallbackBinding(body, evidence)
+  assert.equal(valid.eligible, true)
+  const wrongCase = validateTeacherDatasetCallbackBinding({ ...body, teacherModelId: 'qwen/Qwen3-8B' }, evidence)
+  assert.equal(wrongCase.eligible, false)
+  assert.ok(wrongCase.blockers.includes('teacher_dataset_teacherModelId_mismatch'))
 })
 
 test('owner and internal routes preserve confirmation, signed callback, live price guard and dispatch kill switch', () => {

@@ -42,7 +42,7 @@ test('controlled unavailability requires an exact short-lived server signature',
   assert.equal(isValidSpecialistMeshAcceptanceFailureToken({ token: 'unsigned', agentId, signingSecret: TEST_SECRET, now }), false)
 })
 
-test('Production acceptance is exact-scope, advisory-only, durable, and caller cannot supply evidence', async () => {
+test('Production acceptance is exact-scope, advisory-only, durable, deployment-bound, and caller cannot supply evidence', async () => {
   const runner = await readFile(new URL('../a2a-host/specialist-mesh-production-live-acceptance.ts', import.meta.url), 'utf8')
   const cron = await readFile(new URL('../app/api/cron/specialist-mesh-production-acceptance/route.ts', import.meta.url), 'utf8')
 
@@ -58,4 +58,14 @@ test('Production acceptance is exact-scope, advisory-only, durable, and caller c
   assert.doesNotMatch(cron, /searchParams/)
   assert.match(cron, /VERCEL_ENV !== 'production'/)
   assert.match(cron, /authorization.*Bearer/)
+  assert.match(cron, /VERCEL_GIT_COMMIT_SHA/)
+  assert.match(cron, /VERCEL_URL/)
+  assert.match(cron, /createHash\('sha256'\)/)
+  assert.match(cron, /specialist_mesh_live_acceptance_deployment_bound/)
+  assert.match(cron, /contains\('payload', \{ productionCommit, productionDeploymentFingerprint \}\)/)
+  assert.match(cron, /productionDeploymentFingerprint,/)
+
+  const commitRead = cron.indexOf('const productionCommit =')
+  const evidenceLookup = cron.indexOf(".eq('event_type', SPECIALIST_MESH_PRODUCTION_DEPLOYMENT_BINDING_EVENT)")
+  assert.ok(commitRead >= 0 && evidenceLookup > commitRead, 'current Production commit must be read before acceptance evidence lookup')
 })

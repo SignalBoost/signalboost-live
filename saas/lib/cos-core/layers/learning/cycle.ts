@@ -1,4 +1,5 @@
 // saas/lib/cos-core/layers/learning/cycle.ts
+import { documentMatchesTargetLanguage } from './learningLanguage.ts'
 import { createHash } from 'node:crypto'
 import type { ContinuousLearningDecision, ContinuousLearningSourceKind, KnowledgeGap, LearningCandidate } from './index.ts'
 import { ContinuousLearningDirector } from './index.ts'
@@ -136,7 +137,13 @@ export class ContinuousLearningCycle{
           // Relevance is judged after fetching, so a poorly matched adapter burns budget silently.
           // The unattributed 'not_relevant' total cannot say WHICH adapter is mismatched, so an
           // attributed companion key is recorded next to it. The original keys are unchanged.
-          if(!sourceAwareRelevant(document,score,terms,floor,minMatches)){incrementDiagnosticCount(result.rejected,'not_relevant');incrementDiagnosticCount(result.rejected,`not_relevant_by_source:${source}`);if(diagnostic)incrementDiagnosticCount(diagnostic.rejected,'not_relevant');continue}
+          // A language gap's anchors are English; material written in the target language matches
+          // none of them and would be discarded as irrelevant even though it is exactly the study
+          // material the objective asks for. Recognise it, then let the ordinary confidence and
+          // admission floors judge it unchanged.
+          const targetLanguageMatch=documentMatchesTargetLanguage(document.text,gap.targetLanguage)
+          if(!targetLanguageMatch&&!sourceAwareRelevant(document,score,terms,floor,minMatches)){incrementDiagnosticCount(result.rejected,'not_relevant');incrementDiagnosticCount(result.rejected,`not_relevant_by_source:${source}`);if(diagnostic)incrementDiagnosticCount(diagnostic.rejected,'not_relevant');continue}
+          if(targetLanguageMatch)incrementDiagnosticCount(result.rejected,`target_language_admitted:${source}`)
           const kindFloor=admissionFloorFor(document)
           const admission=classifyTieredAdmission({ rawRelevance: score.coverage, confidence: candidate0Confidence(document,score), sourceFloor: kindFloor ?? 0, gapAligned: gapCurriculumAligned(gap) })
           const candidate={...this.toCandidate(document,allTerms,score),admission}

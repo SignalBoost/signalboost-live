@@ -389,6 +389,59 @@ function normalizedHashes(value: unknown): string[] {
   return [...new Set(value.map(item => clean(item, 64).toLowerCase()).filter(item => HASH.test(item)))]
 }
 
+export function validateTeacherDatasetCallbackBinding(body: any, dispatchedEvidence: unknown) {
+  const evidence = record(dispatchedEvidence)
+  const blockers: string[] = []
+  const sourceRef = clean(body?.sourceRef, 2000)
+  const decoded = decodeHuggingFaceDatasetRef(sourceRef)
+  if (!decoded || decoded.split !== 'train' || !decoded.revision || !COMMIT.test(decoded.revision)) {
+    blockers.push('teacher_dataset_immutable_source_required')
+  }
+  const itemHashes = normalizedHashes(body?.teacherOutputItemHashes)
+  if (itemHashes.length < 20) blockers.push('teacher_dataset_output_too_small')
+
+  const promptSetHash = clean(body?.promptSetHash, 64).toLowerCase()
+  if (!HASH.test(promptSetHash) || promptSetHash !== clean(evidence.promptSetHash, 64).toLowerCase()) {
+    blockers.push('teacher_dataset_promptSetHash_mismatch')
+  }
+  const teacherModelId = clean(body?.teacherModelId, 240)
+  if (!teacherModelId || teacherModelId !== clean(evidence.teacherModelId, 240)) {
+    blockers.push('teacher_dataset_teacherModelId_mismatch')
+  }
+  const teacherModelRevision = clean(body?.teacherModelRevision, 40).toLowerCase()
+  if (!COMMIT.test(teacherModelRevision) || teacherModelRevision !== clean(evidence.teacherModelRevision, 40).toLowerCase()) {
+    blockers.push('teacher_dataset_teacherModelRevision_mismatch')
+  }
+  const studentModelId = clean(body?.studentModelId, 240)
+  if (!studentModelId || studentModelId !== clean(evidence.studentModelId, 240)) {
+    blockers.push('teacher_dataset_studentModelId_mismatch')
+  }
+  const studentModelRevision = clean(body?.studentModelRevision, 40).toLowerCase()
+  if (!COMMIT.test(studentModelRevision) || studentModelRevision !== clean(evidence.studentModelRevision, 40).toLowerCase()) {
+    blockers.push('teacher_dataset_studentModelRevision_mismatch')
+  }
+  if (body?.containsPrivateProductionData !== false || evidence.containsPrivateProductionData !== false) {
+    blockers.push('teacher_dataset_private_production_data_forbidden')
+  }
+  if (body?.studentControlledByBuyer !== true || evidence.studentControlledByBuyer !== true) {
+    blockers.push('teacher_dataset_student_control_not_proven')
+  }
+  if (body?.trainingRights !== 'open_license' || evidence.trainingRights !== 'open_license') {
+    blockers.push('teacher_dataset_training_rights_not_proven')
+  }
+  return Object.freeze({
+    eligible: blockers.length === 0,
+    blockers: Object.freeze([...new Set(blockers)]),
+    sourceRef,
+    itemHashes: Object.freeze(itemHashes),
+    promptSetHash,
+    teacherModelId,
+    teacherModelRevision,
+    studentModelId,
+    studentModelRevision,
+  })
+}
+
 export async function recordCosUniversityDistillationTeacherDatasetEvidence(
   body: any,
   binding: { idempotencyKey: string },
@@ -401,41 +454,13 @@ export async function recordCosUniversityDistillationTeacherDatasetEvidence(
   if (!jobId || !idempotencyKey) throw new Error('teacher_dataset_callback_binding_missing')
   const dispatched = await readTeacherDispatch({ candidateId, idempotencyKey, jobId })
   const evidence = dispatched.evidence
-
-  const sourceRef = clean(body?.sourceRef, 2000)
-  const decoded = decodeHuggingFaceDatasetRef(sourceRef)
-  if (!decoded || decoded.split !== 'train' || !decoded.revision || !COMMIT.test(decoded.revision)) {
-    throw new Error('teacher_dataset_immutable_source_required')
-  }
-  const itemHashes = normalizedHashes(body?.teacherOutputItemHashes)
-  if (itemHashes.length < 20) throw new Error('teacher_dataset_output_too_small')
-
-  const exact = [
-    ['promptSetHash', clean(body?.promptSetHash, 64).toLowerCase()],
-    ['teacherModelId', clean(body?.teacherModelId, 240)],
-    ['teacherModelRevision', clean(body?.teacherModelRevision, 40).toLowerCase()],
-    ['studentModelId', clean(body?.studentModelId, 240)],
-    ['studentModelRevision', clean(body?.studentModelRevision, 40).toLowerCase()],
-  ] as const
-  for (const [key, observed] of exact) {
-    if (!observed || observed !== clean(evidence[key], 240).toLowerCase()) {
-      throw new Error(`teacher_dataset_${key}_mismatch`)
-    }
-  }
-  if (body?.containsPrivateProductionData !== false || evidence.containsPrivateProductionData !== false) {
-    throw new Error('teacher_dataset_private_production_data_forbidden')
-  }
-  if (body?.studentControlledByBuyer !== true || evidence.studentControlledByBuyer !== true) {
-    throw new Error('teacher_dataset_student_control_not_proven')
-  }
-  if (body?.trainingRights !== 'open_license' || evidence.trainingRights !== 'open_license') {
-    throw new Error('teacher_dataset_training_rights_not_proven')
-  }
+  const validated = validateTeacherDatasetCallbackBinding(body, evidence)
+  if (!validated.eligible) throw new Error(validated.blockers[0])
 
   const provenanceRefs = [
     `hf://models/${evidence.teacherModelId}@${evidence.teacherModelRevision}`,
     `hf://models/${evidence.studentModelId}@${evidence.studentModelRevision}`,
-    sourceRef,
+    validated.sourceRef,
     `prompt-set:sha256:${evidence.promptSetHash}`,
     'license:apache-2.0',
     'teacher-output:public-synthetic-practice-only',
@@ -445,11 +470,11 @@ export async function recordCosUniversityDistillationTeacherDatasetEvidence(
     teacherModelId: String(evidence.teacherModelId),
     studentModelId: String(evidence.studentModelId),
     studentControlledByBuyer: true,
-    sourceRef,
+    sourceRef: validated.sourceRef,
     provenanceRefs,
     trainingRights: 'open_license',
     containsPrivateProductionData: false,
-    teacherOutputItemHashes: itemHashes,
+    teacherOutputItemHashes: validated.itemHashes,
   })
   await recordAudit({
     candidateId,
@@ -458,9 +483,9 @@ export async function recordCosUniversityDistillationTeacherDatasetEvidence(
     evidence: {
       idempotencyKey,
       jobId,
-      sourceRef,
-      teacherOutputItemCount: itemHashes.length,
-      teacherOutputManifestHash: hash([...itemHashes].sort()),
+      sourceRef: validated.sourceRef,
+      teacherOutputItemCount: validated.itemHashes.length,
+      teacherOutputManifestHash: hash([...validated.itemHashes].sort()),
       promptSetHash: evidence.promptSetHash,
       teacherModelId: evidence.teacherModelId,
       teacherModelRevision: evidence.teacherModelRevision,
@@ -477,8 +502,8 @@ export async function recordCosUniversityDistillationTeacherDatasetEvidence(
     registered: true,
     sourceCandidateId: candidateId,
     trainingCandidateId: registered.trainingCandidateId,
-    sourceRef,
-    teacherOutputItemCount: itemHashes.length,
+    sourceRef: validated.sourceRef,
+    teacherOutputItemCount: validated.itemHashes.length,
     autoExecuteTraining: false,
   })
 }

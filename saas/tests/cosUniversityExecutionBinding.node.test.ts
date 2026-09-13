@@ -58,6 +58,43 @@ test('the independent exam runner refuses before scoring, not after recording', 
   assert.ok(scoring < recording, 'scoring still precedes recording')
 })
 
+test('every credit-bearing lane binds the reply it scores, not just the first one fixed', () => {
+  // The non-credit practice lane was stricter than all five graded lanes. Any new graded lane that
+  // reaches the bound executor and skips this check reopens the same hole, so the list is explicit.
+  for (const lane of [
+    'cosUniversityIndependentExamRunner',
+    'cosUniversityARangeRunner',
+    'cosUniversityLanguageARangeRunner',
+    'cosUniversityRetentionRunner',
+    'cosUniversityMastersExamRunner',
+  ]) {
+    const source = file(`lib/ai/cos/${lane}.ts`)
+    assert.match(source, /import \{ boundExecutionBindingFailure \} from '\.\/cosUniversityExecutionBinding\.ts'/, lane)
+    const binding = source.indexOf('boundExecutionBindingFailure(bound.reply')
+    const identity = source.indexOf("'agent_execution_identity_mismatch'")
+    assert.ok(binding > 0, `${lane} does not bind the scored reply`)
+    assert.ok(identity > 0 && identity < binding, `${lane} must keep its identity check ahead of the binding`)
+  }
+})
+
+test('a lane that calls the bound executor and never binds the reply is a gap', () => {
+  // Guards against a sixth lane appearing without the check. Practice does its own equivalent
+  // binding inline, so it is listed as satisfied rather than exempt.
+  const dir = new URL('../lib/ai/cos/', import.meta.url)
+  const bound = fs.readdirSync(dir)
+    .filter(name => name.endsWith('.ts'))
+    .filter(name => fs.readFileSync(new URL(name, dir), 'utf8').includes('executeBoundAgentExam('))
+    .filter(name => !name.endsWith('.node.test.ts') && name !== 'cosUniversityAgentExamRuntime.ts')
+  for (const name of bound) {
+    const source = fs.readFileSync(new URL(name, dir), 'utf8')
+    assert.ok(
+      source.includes('boundExecutionBindingFailure(bound.reply'),
+      `${name} reaches the bound executor without binding the scored reply`,
+    )
+  }
+  assert.ok(bound.length >= 5, `expected the five graded lanes, found ${bound.length}`)
+})
+
 test('the non-credit practice lane keeps the binding it already had', () => {
   // Practice checked this from the start. The credit-bearing lanes did not, which is the defect.
   const practice = file('lib/ai/cos/cosUniversityPracticeExecution.ts')

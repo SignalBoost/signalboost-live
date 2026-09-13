@@ -1,2 +1,2 @@
-base_sha=137687a2deac8fe1aa56c265cff6bd9354a96abb
-branch=test/phd-agent-scope-regression-20260913
+base_sha=b7d496b597489994e1f6e4b92253476f262e34dc
+branch=fix/phd-test-duplicate-token-20260913

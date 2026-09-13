@@ -324,7 +324,9 @@ export async function ensureCosUniversityMastersEnrollment(
   if (insert.error && String((insert.error as { code?: string }).code || '') !== '23505') {
     return { enrolled: false, state: 'error', status: before, reasons: [insert.error.message] }
   }
-  const after = await readCosUniversityMastersRuntimeStatus(programId, now)
+  // Read back the learner that was just enrolled. Defaulting to COS here reported another agent's
+  // enrollment as not persisted, or COS's as that agent's.
+  const after = await readCosUniversityMastersRuntimeStatus(programId, now, undefined, agentId)
   return { enrolled: Boolean(after.enrollment), state: after.enrollment ? 'enrolled' : 'error', status: after, reasons: after.enrollment ? [] : ['enrollment_not_persisted'] }
 }
 
@@ -455,7 +457,10 @@ export async function evaluateAndAwardCosUniversityMastersCredential(
   if (insert.error && String((insert.error as { code?: string }).code || '') !== '23505') {
     return { awarded: false, state: 'error', status: before, reasons: [insert.error.message] }
   }
-  const after = await readCosUniversityMastersRuntimeStatus(programId, now)
+  // The credential was inserted for this agent, so the read-back that confirms it must ask about
+  // this agent. Defaulting to COS turned a persisted credential into `credential_not_persisted`,
+  // and could confirm an award from COS's transcript instead of the learner's.
+  const after = await readCosUniversityMastersRuntimeStatus(programId, now, undefined, agentId)
   return {
     awarded: Boolean(after.credential),
     state: after.credential ? 'credential_awarded' : 'error',

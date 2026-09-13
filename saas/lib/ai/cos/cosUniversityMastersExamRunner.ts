@@ -223,6 +223,7 @@ async function executeBoundRun(
   target: CosUniversityMastersExamTarget,
   agentId: string,
   exam: ReturnType<typeof buildCosUniversityMastersExam>,
+  courseworkPlanId: string | null,
   started: number,
 ): Promise<CosUniversityMastersExamRunSummary> {
   const db = cosServiceDb()
@@ -254,7 +255,7 @@ async function executeBoundRun(
   const score = scoreCosUniversityMastersExam(exam, bound.reply, {
     localReasoning: true, externalAi: false, semanticCache: false, handled: true, turnId: execution.turnId,
   })
-  const completedAt = new Date().toISOString()
+  const completedAt = new Date()
   const update = await db.from('cos_university_masters_exam_runs').update({
     status: score.passed ? 'passed' : 'failed',
     passed: score.passed,
@@ -266,13 +267,48 @@ async function executeBoundRun(
     execution_provenance: execution,
     reasons: score.reasons,
     latency_ms: Date.now() - started,
-    updated_at: completedAt,
-    completed_at: completedAt,
+    updated_at: completedAt.toISOString(),
+    completed_at: completedAt.toISOString(),
   }).eq('id', row.id)
   if (update.error) return fail([`result_persist_failed:${describeError(update.error)}`])
+
+  let evidenceRecorded = false
+  try {
+    evidenceRecorded = await recordHostCosUniversityMastersEvidence({
+      agentId,
+      programId: target.programId,
+      moduleKey: target.moduleKey,
+      evidenceKey: `masters-exam:${row.id}`,
+      stage: target.stage,
+      passed: score.passed,
+      variantHash: row.variant_hash,
+      authority: cosUniversityMastersExpectedAuthority(target.stage),
+      sourceRef: `cos_university_masters_exam:${row.id}`,
+      scorerVersion: COS_UNIVERSITY_MASTERS_EXAM_SCORER,
+      observedAt: completedAt,
+      validityDays: target.stage === 'graduate_coursework' ? 365 : 180,
+      evidenceSnapshot: {
+        profile: COS_UNIVERSITY_MASTERS_EXAM_PROFILE,
+        manifestHash: row.manifest_hash,
+        turnId: execution.turnId,
+        responseSource: execution.runtime,
+        localModelInvoked: true,
+        externalAiInvoked: false,
+        executionProvenance: execution,
+        reasons: score.reasons,
+      },
+    })
+  } catch (error) {
+    return fail([`evidence_record_error:${describeError(error)}`])
+  }
+  if (!evidenceRecorded) return fail(['masters_evidence_not_recorded'])
+  if (courseworkPlanId && score.passed) await markCourseworkPlanComplete(courseworkPlanId)
+
   return summary({
     programId: target.programId, runId: row.id, target,
     status: score.passed ? 'passed' : 'failed', passed: score.passed,
+    evidenceRecorded,
+    turnId: execution.turnId,
     reasons: score.reasons, latencyMs: Date.now() - started,
   })
 }
@@ -298,7 +334,7 @@ async function executeRun(
   // for undergraduate exams, and its evidence carries the host execution binding. COS keeps the
   // reasoner path it has always used. An agent with no bound executor never reaches inference.
   if (agentId !== AGENT_ID) {
-    return executeBoundRun(row, target, agentId, exam, started)
+    return executeBoundRun(row, target, agentId, exam, courseworkPlanId, started)
   }
   beginEvidenceSourceUseTurn()
   let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
@@ -362,6 +398,7 @@ async function executeRun(
   let evidenceRecorded = false
   if (freshExecution) {
     evidenceRecorded = await recordHostCosUniversityMastersEvidence({
+      agentId,
       programId: target.programId,
       moduleKey: target.moduleKey,
       evidenceKey: `masters-exam:${row.id}`,
@@ -416,12 +453,14 @@ export async function runCosUniversityMastersExam(options: { agentId?: string; n
   try {
     const programId = await activeProgramId(agentId)
     if (!programId) return summary({ status: 'not_enrolled' })
-    const runtime = await readCosUniversityMastersRuntimeStatus(programId, now)
+    // Program activity is decided per learner. Reading COS's runtime here blocked every other
+    // agent's exams whenever COS was unenrolled or already graduated.
+    const runtime = await readCosUniversityMastersRuntimeStatus(programId, now, undefined, agentId)
     if (!runtime.enrollment || runtime.credential || runtime.timingStatus === 'deadline_expired' || runtime.timingStatus === 'not_enrolled') {
       return summary({ programId, status: 'program_inactive' })
     }
 
-    const evidence = await readCosUniversityMastersEvidence(programId)
+    const evidence = await readCosUniversityMastersEvidence(programId, agentId)
     const target = selectNextCosUniversityMastersExamTarget(programId, evidence, now)
     if (!target) {
       const practical = runtime.graduation.blockers.includes('verified_practical_work_incomplete')

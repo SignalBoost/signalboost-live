@@ -37,6 +37,7 @@ import {
   hasBoundAcademicExecutor,
   isBoundSoftwareCapstoneEvidence,
 } from './cosUniversityAgentExamRuntime.ts'
+import { boundExecutionBindingFailure } from './cosUniversityExecutionBinding.ts'
 import { DEFAULT_PHD_AGENT_ID, requirePhdAgentId } from './cosUniversityPhdAgentScope.ts'
 
 const EVIDENCE_VALIDITY_DAYS = 365
@@ -346,6 +347,9 @@ async function executeCandidate(agentId: string, row: ExamRunRow, prompt: string
       manifest_hash: row.manifest_hash,
       turn_id: bound.execution.turnId,
     }, bound.execution.role)
+    if (!boundEvidenceValid) throw new Error('agent_execution_identity_mismatch')
+    const bindingFailure = boundExecutionBindingFailure(bound.reply, bound.execution)
+    if (bindingFailure) throw new Error(bindingFailure)
     return {
       reply: bound.reply,
       turnId: bound.execution.turnId,
@@ -355,7 +359,7 @@ async function executeCandidate(agentId: string, row: ExamRunRow, prompt: string
       semanticCache: false,
       handled: true,
       principalFingerprint: bound.execution.model,
-      boundEvidenceValid,
+      boundEvidenceValid: true,
     }
   }
 

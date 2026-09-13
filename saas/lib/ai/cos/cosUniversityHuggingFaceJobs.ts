@@ -120,7 +120,9 @@ export function huggingFaceJobsConfigFromEnv(env: Env = process.env): HuggingFac
     token,
     workerUrl,
     preparationFlavor: clean(env.COS_UNIVERSITY_HF_PREPARATION_FLAVOR, 80) || 'cpu-upgrade',
-    trainingFlavor: clean(env.COS_UNIVERSITY_HF_TRAINING_FLAVOR, 80) || 'l4x1',
+    // Start with the least-expensive NVIDIA GPU. We never auto-upgrade hardware or spend more
+    // because of an OOM; a larger flavor must be deliberately configured after the failed run is reviewed.
+    trainingFlavor: clean(env.COS_UNIVERSITY_HF_TRAINING_FLAVOR, 80) || 't4-small',
     preparationTimeoutSeconds: positiveInt(env.COS_UNIVERSITY_HF_PREPARATION_TIMEOUT_SECONDS, 1800, 300, 7200),
     trainingTimeoutSeconds: positiveInt(env.COS_UNIVERSITY_HF_TRAINING_TIMEOUT_SECONDS, 14400, 900, 86400),
     maxDatasetItems: positiveInt(env.COS_UNIVERSITY_HF_MAX_DATASET_ITEMS, 5000, 20, 20000),

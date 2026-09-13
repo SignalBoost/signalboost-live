@@ -95,6 +95,7 @@ export async function readCosUniversityProductionVerification(now = new Date(), 
     missingOrInvalid: UNIVERSITY_PRODUCTION_PATHS,
     paths: [],
     faults: [],
+    expectationContextAvailable: false,
     semantics: 'exact_production_commit_and_deployment_receipts_required',
   }
   const db = cosServiceDb()

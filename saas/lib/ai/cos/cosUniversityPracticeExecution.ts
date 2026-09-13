@@ -38,8 +38,15 @@ export function universityPracticeExecutionFence(agentId: string): Record<string
   return agentId === 'cos' ? {} : { executionBinding: BOUND_PRACTICE_VERSION }
 }
 
-async function executeCosPracticeOnConfiguredEconomyModel(request: AgentCapstoneRequest): Promise<ReasonerResult | null> {
-  const practiceModel = universityPracticeModelFromEnv()
+async function executeCosPracticeOnConfiguredEconomyModel(
+  request: AgentCapstoneRequest,
+  practiceModelOverride?: string | null,
+): Promise<ReasonerResult | null> {
+  // Direct/low-level callers preserve the original env-only fail-closed contract. The host runner
+  // may supply a buyer-controlled model selected from durable service configuration.
+  const practiceModel = practiceModelOverride === undefined
+    ? universityPracticeModelFromEnv()
+    : practiceModelOverride
   if (!practiceModel) return null
   const config = localInferenceConfigFromEnv()
   const text = await callLocalModel({
@@ -68,13 +75,14 @@ export async function executeUniversityPractice(
   ports: {
     cos(): Promise<ReasonerResult | null>
     bound(request: AgentCapstoneRequest): Promise<{ reply: string; execution: AgentCapstoneExecution }>
+    practiceModel?: string | null
   },
 ): Promise<UniversityPracticeExecution | null> {
   const practiceRequest = { ...request, purpose: 'practice' as const }
   await enforceUniversityPracticeCostGuard(practiceRequest)
   await meterUniversityPracticeInvocation(practiceRequest)
   if (request.agentId === 'cos') {
-    const economy = await executeCosPracticeOnConfiguredEconomyModel(request)
+    const economy = await executeCosPracticeOnConfiguredEconomyModel(request, ports.practiceModel)
     if (economy) return {
       ...economy,
       responseSource: 'cos_university_practice_model',

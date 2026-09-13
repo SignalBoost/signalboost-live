@@ -79,3 +79,26 @@ test('partition revision requires real nonempty disjoint item manifests', () => 
   assert.equal(buildFineTunePartitionRevision({ baseModel: 'base', datasetHash: H, trainingItemHashes: [H], holdoutItemHashes: [H] }), null)
   assert.equal(buildFineTunePartitionRevision({ baseModel: 'base', datasetHash: H, trainingItemHashes: [], holdoutItemHashes: ['2'.repeat(64)] }), null)
 })
+
+test('owner HTTP route cannot manufacture independent, canary, artifact, or rollback proof', () => {
+  const route = readFileSync('app/api/admin/cos-university-assurance/route.ts', 'utf8')
+  assert.match(route, /requireOwner\(\)/); assert.match(route, /dataset_approved.*training_approved/)
+  assert.doesNotMatch(route, /independent_evaluation.*safety_regression_passed/)
+  assert.match(route, /host_claim_not_permitted/)
+})
+
+test('runner reads durable evidence instead of hard-coded passing values', () => {
+  const runner = readFileSync('lib/ai/cos/cosUniversityControlledFineTuning.ts', 'utf8')
+  assert.match(runner, /readFineTuneEvidence\(candidateId, revision, now\)/)
+  assert.doesNotMatch(runner, /datasetApprovedByHost:\s*true/)
+  assert.match(runner, /readFineTunePartitionRevision\(candidateId, datasetHash, now\)/)
+  assert.doesNotMatch(runner, /partition:\s*'training'/)
+  assert.match(runner, /claim:\s*'candidate_status_observed'/)
+  assert.match(runner, /lifecycleStage:\s*decision\.stage/)
+  assert.doesNotMatch(runner, /candidate_packaged_not_trained/)
+})
+
+test('database admits the training executor verifier', () => {
+  const migration = readFileSync('supabase/migrations/20260911022000_cos_university_training_executor_verifier.sql', 'utf8')
+  assert.match(migration, /training_executor/)
+})

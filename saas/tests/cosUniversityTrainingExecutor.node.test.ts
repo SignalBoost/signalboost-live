@@ -135,6 +135,36 @@ test('training executor can attest only its own partition, artifact and rollback
   }
 })
 
+test('signed callbacks require an exact owner-dispatched job before executor evidence can be written', () => {
+  const callback = readFileSync('app/api/internal/cos/university-training-executor/evidence/route.ts', 'utf8')
+  const executor = readFileSync('lib/ai/cos/cosUniversityTrainingExecutor.ts', 'utf8')
+  assert.match(callback, /recordUniversityTrainingExecutorEvidence\(body, \{ idempotencyKey \}\)/)
+  assert.match(executor, /async function readMatchingDispatch/)
+  assert.match(executor, /claim: 'training_job_dispatched'/)
+  assert.match(executor, /\.eq\('verifier', 'host_controller'\)/)
+  assert.match(executor, /idempotencyKey: input\.idempotencyKey/)
+  assert.match(executor, /jobId: input\.jobId/)
+  assert.match(executor, /training_executor_dispatch_binding_missing/)
+  assert.match(executor, /training_executor_dispatch_identity_mismatch/)
+  assert.match(executor, /dispatchJobId: jobId/)
+  assert.doesNotMatch(executor, /readCandidatePlan\(candidateId, \{ requireActive: false \}\)/)
+})
+
+test('distilled artifacts retain their mode and can never use generic fine-tune promotion alone', () => {
+  const executor = readFileSync('lib/ai/cos/cosUniversityTrainingExecutor.ts', 'utf8')
+  const runner = readFileSync('lib/ai/cos/cosUniversityControlledFineTuning.ts', 'utf8')
+  const promotion = readFileSync('lib/ai/cos/cosUniversityDistillationPromotionEvidence.ts', 'utf8')
+  assert.match(executor, /trainingMode: dispatch\.trainingMode/)
+  assert.match(executor, /distillationCandidate: distillationAuditSnapshot\(distillationCandidate\)/)
+  assert.match(runner, /readCosUniversityArtifactTrainingMode/)
+  assert.match(runner, /decideModelDistillationPromotion/)
+  assert.match(runner, /distillation_candidate_binding_missing/)
+  assert.match(runner, /training_mode_not_proven/)
+  assert.match(promotion, /verifiedSourceAttribution: independentEvidence\?\.verifiedSourceAttribution === true/)
+  assert.match(promotion, /authorityExpanded: canaryEvidence\?\.authorityExpanded === false \? false : true/)
+  assert.match(promotion, /teacherModelIdUsedAsEvaluator/)
+})
+
 test('owner route and signed callback preserve authority separation and contain no hosted training fallback', () => {
   const owner = readFileSync('app/api/admin/cos-university-training-executor/route.ts', 'utf8')
   const callback = readFileSync('app/api/internal/cos/university-training-executor/evidence/route.ts', 'utf8')
@@ -143,7 +173,7 @@ test('owner route and signed callback preserve authority separation and contain 
   assert.match(owner, /requireExplicitTrainingDispatchConfirmation\(body\?\.confirmDispatch\)/)
   assert.match(callback, /await req\.text\(\)/)
   const verificationGateAt = callback.indexOf("if (profile !== COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE")
-  const evidenceWriteAt = callback.indexOf('await recordUniversityTrainingExecutorEvidence(body)')
+  const evidenceWriteAt = callback.indexOf('await recordUniversityTrainingExecutorEvidence(body, { idempotencyKey })')
   assert.ok(verificationGateAt >= 0)
   assert.ok(evidenceWriteAt > verificationGateAt)
   assert.match(executor, /decideControlledFineTune/)

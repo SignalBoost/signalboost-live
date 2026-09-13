@@ -39,6 +39,7 @@ export const ROLE_DOMAIN_SUBJECTS: Readonly<Record<string, readonly string[]>> =
   quantitative_data_science: ['statistics_data_science', 'mathematics'],
   enterprise_operations_governance: ['business_operations', 'law_regulation_governance'],
   scientific_physical_systems: ['physics_natural_sciences'],
+  quantum_theoretical_physics: ['quantum_computing', 'physics_natural_sciences', 'mathematics'],
 }
 
 export function agentWorkDomain(role: string | null | undefined, subjectId?: string | null): AgentWorkDomain {

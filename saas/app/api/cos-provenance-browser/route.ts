@@ -86,6 +86,14 @@ function trustedBoundaryRequest(req: NextRequest): boolean {
   return Boolean(expected && supplied && supplied === expected)
 }
 
+function downstreamRequest(req: NextRequest, body: any): NextRequest {
+  const headers = new Headers(req.headers)
+  headers.delete(PROVENANCE_BOUNDARY_HEADER)
+  headers.delete('content-length')
+  headers.set('content-type', 'application/json')
+  return new NextRequest(req.url, { method: 'POST', headers, body: JSON.stringify(body) })
+}
+
 async function finalizeAnswer(response: Response, req: NextRequest, body: any): Promise<Response> {
   let payload: any
   try { payload = await response.clone().json() } catch { return response }
@@ -94,10 +102,11 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
   if (!reply) return response
 
   const provenance = ensureAnswerExecutionProvenance(payload)
+  const isPublic = publicSurface(req)
   const scopedProvenance = {
     ...provenance,
-    delivery_scope: publicSurface(req) ? 'public_concierge' : 'owner_assistant',
-    audit_identity: publicSurface(req)
+    delivery_scope: isPublic ? 'public_concierge' : 'owner_assistant',
+    audit_identity: isPublic
       ? { binding: 'server_authenticated_user_id_or_signed_capsule', authorization_authority: false, exposed_to_reasoning: false }
       : (provenance as any)?.audit_identity,
   }
@@ -105,6 +114,7 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
     { ...payload, execution_provenance: scopedProvenance },
     reply,
   )
+  const publicProvenance = publicAnswerCapsuleAsRecordedProvenance(answerProvenance)
 
   // Durable account-bound record when a signed-in identity exists. Anonymous preview users still
   // receive a signed, answer-bound capsule. The most recent capsule is also kept in an HttpOnly
@@ -123,11 +133,11 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
 
   const delivered = withJsonPayload(response, {
     ...payload,
-    execution_provenance: payload.execution_provenance ?? scopedProvenance,
+    execution_provenance: isPublic ? publicProvenance : (payload.execution_provenance ?? scopedProvenance),
     answer_provenance: answerProvenance,
   })
 
-  if (publicSurface(req) && answerProvenance.signed) {
+  if (isPublic && answerProvenance.signed) {
     const cookie = encodeCapsuleCookie(answerProvenance)
     if (cookie) {
       delivered.cookies.set(PROVENANCE_COOKIE, cookie, {
@@ -186,6 +196,6 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
   }
 
-  const response = await cosBrowserPost(req)
+  const response = await cosBrowserPost(downstreamRequest(req, body))
   return finalizeAnswer(response, req, body)
 }

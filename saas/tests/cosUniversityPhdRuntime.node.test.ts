@@ -62,6 +62,14 @@ test('PhD crons rotate registered learners instead of permanently executing COS'
   }
 })
 
+test('PhD admission cadence is evaluated per learner so one receipt cannot starve the rest of the registry', () => {
+  const admission = file('app/api/cron/cos-university-phd-admission/route.ts')
+  assert.match(admission, /for \(const agent of agents\)/)
+  assert.match(admission, /readCosUniversityDailyLaneCadence\('phd_admission', now, agent\.agentId\)/)
+  assert.match(admission, /notDue\.push\(\{ agentId: agent\.agentId/)
+  assert.doesNotMatch(admission, /readCosUniversityDailyLaneCadence\('phd_admission'\)/)
+})
+
 test('PhD research need is host-controlled and cannot be self-declared by the owner API', () => {
   const runtime = file('lib/ai/cos/cosUniversityPhdRuntime.ts')
   const route = file('app/api/admin/cos-university-phd/route.ts')

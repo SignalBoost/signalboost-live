@@ -26,9 +26,18 @@ function requireText(result: string | null, provider: string): string {
   return result
 }
 
+/**
+ * First-party SignalBoost/COS text generation is provider-independent and local-first by policy.
+ * Legacy callers may still pass stale hosted-provider hints while they are migrated; this boundary
+ * intentionally discards those hints so an old `claude`/`openai` preference cannot bypass the
+ * current COS independence policy. Explicit external-teacher work uses the separate adapter below.
+ */
 export function createPlatformAiPort(): CosAiPort {
   return {
-    generate: async (input) => requireText(await callCosText({ ...input, taskId: 'cos-portable-text' }), 'platform'),
+    generate: async (input) => requireText(
+      await callCosText({ ...input, modelPreference: 'local', taskId: 'cos-portable-text' }),
+      'platform',
+    ),
   }
 }
 

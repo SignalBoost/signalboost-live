@@ -1,2 +1,2 @@
-base_sha=1b34389698c60b09b4aacb9677df742c52ff5964
-branch=feat/itmounts-huggingface-training-adapter-20260913
+base_sha=ead8869e858023065ccdaa97286960114cf7d246
+branch=fix/cos-provider-independence-drift-20260913

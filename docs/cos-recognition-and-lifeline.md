@@ -15,6 +15,10 @@ The owner Assistant depends on:
 
 Hosted-model fallback is separately governed by **`COS_EXTERNAL_AI_FALLBACK_ENABLED`**. It is disabled unless explicitly set to `true`. A forgotten or stale hosted-provider key must therefore not silently turn provider-independent reasoning into paid fallback.
 
+First-party SignalBoost/COS text generation is normalized to the local provider at the shared platform AI port and legacy `callModel()` compatibility seam. Stale `modelPreference: 'claude'` or `modelPreference: 'openai'` hints in older first-party callers therefore cannot select a hosted provider. Explicit customer/provider adapters and governed external-teacher integrations remain separate surfaces.
+
+COS autonomy is also local-only. The scheduled autonomy runtime no longer accepts `COS_AUTONOMY_MODEL` as a hosted-provider selector, and its readiness check is satisfied only by the configured independent COS reasoner—not by the presence of Anthropic or OpenAI keys.
+
 ## 2. Failure modes
 
 ### Owner recognition failure
@@ -38,6 +42,8 @@ Hosted fallback is optional. It may run only when the platform's governed fallba
 - `mode: "concierge"` — caller is not recognized as owner.
 
 The response also reports `localReasoner`, `cloudFallbackEnabled`, and `providerIndependent`. The Assistant badge consumes this status so a downgrade is visible before the owner sends a task.
+
+`GET /api/admin/cos-reasoner/health` uses the same fallback rule as runtime: `fallbackEnabled` is true only when `COS_EXTERNAL_AI_FALLBACK_ENABLED=true` exactly. Missing or unrelated hosted-provider keys do not change that status.
 
 ## 4. Restore steps
 

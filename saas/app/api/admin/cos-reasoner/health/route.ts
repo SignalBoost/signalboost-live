@@ -11,6 +11,7 @@ export async function GET() {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
 
+  const fallbackEnabled = process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED === 'true'
   const resolved = resolveCosReasoner()
   if ('reason' in resolved) {
     return NextResponse.json({
@@ -20,7 +21,7 @@ export async function GET() {
       model: null,
       embedding: null,
       reason: resolved.reason,
-      fallbackEnabled: process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED !== 'false',
+      fallbackEnabled,
     })
   }
 
@@ -55,7 +56,7 @@ export async function GET() {
         error: embeddingHealth.error ?? null,
       },
       error,
-      fallbackEnabled: process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED !== 'false',
+      fallbackEnabled,
     }, { status: healthy ? 200 : 503 })
   } catch (error) {
     return NextResponse.json({
@@ -71,7 +72,7 @@ export async function GET() {
       },
       reasoner: resolved.config.label,
       error: error instanceof Error ? error.message : String(error),
-      fallbackEnabled: process.env.COS_EXTERNAL_AI_FALLBACK_ENABLED !== 'false',
+      fallbackEnabled,
     }, { status: 503 })
   }
 }

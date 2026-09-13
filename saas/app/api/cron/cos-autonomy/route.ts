@@ -11,9 +11,8 @@ function authorized(req: NextRequest): boolean {
   return Boolean(secret && req.headers.get('authorization') === `Bearer ${secret}`)
 }
 
-function modelPreference(): 'claude' | 'openai' | 'local' | undefined {
-  const value = process.env.COS_AUTONOMY_MODEL?.trim().toLowerCase()
-  return value === 'claude' || value === 'openai' || value === 'local' ? value : undefined
+function modelPreference(): 'local' {
+  return 'local'
 }
 
 function defaultSupervisorBinding(req: NextRequest): CosLiveMissionBinding {

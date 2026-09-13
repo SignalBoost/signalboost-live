@@ -1,13 +1,22 @@
+import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import {
-  SPECIALIST_MESH_PRODUCTION_ACCEPTANCE_EVENT,
+  SPECIALIST_MESH_PRODUCTION_LIVE_ACCEPTANCE_VERSION,
   runSpecialistMeshProductionLiveAcceptance,
 } from '@/a2a-host/specialist-mesh-production-live-acceptance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
+
+const SPECIALIST_MESH_PRODUCTION_DEPLOYMENT_BINDING_EVENT = 'specialist_mesh_live_acceptance_deployment_bound' as const
+
+function deploymentFingerprint(): string {
+  const deploymentUrl = String(process.env.VERCEL_URL ?? '').trim()
+  if (!deploymentUrl) throw new Error('specialist_mesh_acceptance_deployment_unavailable')
+  return `sha256:${createHash('sha256').update(deploymentUrl, 'utf8').digest('hex')}`
+}
 
 export async function GET(req: NextRequest) {
   const secret = String(process.env.CRON_SECRET ?? '').trim()
@@ -18,10 +27,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'specialist_mesh_acceptance_production_only' }, { status: 409 })
   }
 
+  const productionCommit = String(process.env.VERCEL_GIT_COMMIT_SHA ?? '').trim()
+  if (!productionCommit) return NextResponse.json({ ok: false, error: 'specialist_mesh_acceptance_commit_unavailable' }, { status: 503 })
+
+  let productionDeploymentFingerprint: string
+  try {
+    productionDeploymentFingerprint = deploymentFingerprint()
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'specialist_mesh_acceptance_deployment_unavailable'
+    return NextResponse.json({ ok: false, error: reason }, { status: 503, headers: { 'cache-control': 'no-store' } })
+  }
+
   const db = getAdminSupabase()
   const existing = await db.from('supervisor_audit_events')
     .select('event_id,occurred_at,payload')
-    .eq('event_type', SPECIALIST_MESH_PRODUCTION_ACCEPTANCE_EVENT)
+    .eq('event_type', SPECIALIST_MESH_PRODUCTION_DEPLOYMENT_BINDING_EVENT)
+    .contains('payload', { productionCommit, productionDeploymentFingerprint })
     .order('occurred_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -31,16 +52,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       alreadyAccepted: true,
-      eventId: existing.data.event_id,
-      acceptedAt: existing.data.occurred_at,
-      productionCommit: payload.productionCommit ?? null,
+      eventId: payload.acceptanceEventId ?? null,
+      deploymentBindingEventId: existing.data.event_id,
+      acceptedAt: payload.acceptedAt ?? existing.data.occurred_at,
+      productionCommit,
       acceptanceClass: payload.acceptanceClass ?? 'signalboost-production-live',
       buyerAccepted: false,
     }, { headers: { 'cache-control': 'no-store' } })
   }
-
-  const productionCommit = String(process.env.VERCEL_GIT_COMMIT_SHA ?? '').trim()
-  if (!productionCommit) return NextResponse.json({ ok: false, error: 'specialist_mesh_acceptance_commit_unavailable' }, { status: 503 })
 
   try {
     const result = await runSpecialistMeshProductionLiveAcceptance({
@@ -48,10 +67,31 @@ export async function GET(req: NextRequest) {
       failureControlSecret: secret,
       productionCommit,
     })
+    const bindingEventId = `specialist-mesh-production-live-binding-${result.evidence.runId}`
+    const bindingPayload = Object.freeze({
+      acceptanceEventId: result.eventId,
+      acceptedAt: result.evidence.acceptedAt,
+      productionCommit,
+      productionDeploymentFingerprint,
+      acceptanceClass: result.evidence.acceptanceClass,
+      buyerAccepted: false,
+    })
+    const { error: bindingError } = await db.from('supervisor_audit_events').insert({
+      event_id: bindingEventId,
+      execution_id: result.evidence.runId,
+      incident_id: result.evidence.ownership.workItemId,
+      event_type: SPECIALIST_MESH_PRODUCTION_DEPLOYMENT_BINDING_EVENT,
+      occurred_at: result.evidence.acceptedAt,
+      payload: bindingPayload,
+      schema_version: SPECIALIST_MESH_PRODUCTION_LIVE_ACCEPTANCE_VERSION,
+    })
+    if (bindingError) throw new Error('specialist_mesh_acceptance_deployment_binding_failed')
+
     return NextResponse.json({
       ok: true,
       alreadyAccepted: false,
       eventId: result.eventId,
+      deploymentBindingEventId: bindingEventId,
       acceptedAt: result.evidence.acceptedAt,
       productionCommit: result.evidence.productionCommit,
       acceptanceClass: result.evidence.acceptanceClass,

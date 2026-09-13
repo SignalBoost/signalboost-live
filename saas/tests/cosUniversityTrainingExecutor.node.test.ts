@@ -97,6 +97,10 @@ test('partition evidence requires nonempty disjoint valid training and holdout i
     baseModel: 'base', datasetHash: H,
     trainingItemHashes: [], holdoutItemHashes: ['3'.repeat(64)],
   }), null)
+  assert.equal(validateTrainingExecutorPartition({
+    baseModel: 'base', datasetHash: H,
+    trainingItemHashes: ['1'.repeat(64), 'not-a-hash'], holdoutItemHashes: ['3'.repeat(64)],
+  }), null)
 })
 
 test('canonical candidate dataset hash preserves the original controlled-fine-tuning identity', () => {
@@ -138,8 +142,10 @@ test('owner route and signed callback preserve authority separation and contain 
   assert.match(owner, /requireOwner\(\)/)
   assert.match(owner, /requireExplicitTrainingDispatchConfirmation\(body\?\.confirmDispatch\)/)
   assert.match(callback, /await req\.text\(\)/)
-  assert.match(callback, /verifyTrainingExecutorPayload/)
-  assert.ok(callback.indexOf('verifyTrainingExecutorPayload') < callback.indexOf('recordUniversityTrainingExecutorEvidence'))
+  const verificationGateAt = callback.indexOf("if (profile !== COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE")
+  const evidenceWriteAt = callback.indexOf('await recordUniversityTrainingExecutorEvidence(body)')
+  assert.ok(verificationGateAt >= 0)
+  assert.ok(evidenceWriteAt > verificationGateAt)
   assert.match(executor, /decideControlledFineTune/)
   assert.match(executor, /readFineTuneEvidence/)
   assert.match(executor, /COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED/)

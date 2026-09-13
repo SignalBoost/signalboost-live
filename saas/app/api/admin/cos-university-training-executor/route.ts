@@ -48,6 +48,7 @@ export async function POST(request: Request) {
         candidateId: String(body?.candidateId || ''),
         teacherModelId: String(body?.teacherModelId || ''),
         studentModelId: String(body?.studentModelId || ''),
+        studentControlledByBuyer: body?.studentControlledByBuyer === true,
         sourceRef: String(body?.sourceRef || ''),
         provenanceRefs: Array.isArray(body?.provenanceRefs) ? body.provenanceRefs.map((value: unknown) => String(value)) : [],
         trainingRights: String(body?.trainingRights || 'unknown') as ModelDistillationTrainingRights,

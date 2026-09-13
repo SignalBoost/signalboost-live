@@ -51,7 +51,8 @@ const itemHashes = Array.from({ length: 20 }, (_, index) => index.toString(16).p
 const datasetInput = {
   teacherModelId: 'Qwen/Qwen3.6-35B-A3B',
   studentModelId: 'Qwen/Qwen3-8B',
-  sourceRef: 'hf://datasets/cadomos/itmounts-teacher@abcdef1234567890#train',
+  studentControlledByBuyer: true,
+  sourceRef: `hf://datasets/cadomos/itmounts-teacher@${'a'.repeat(40)}#train`,
   provenanceRefs: ['license:apache-2.0', 'teacher-batch:sha256:abc'],
   trainingRights: 'open_license' as const,
   containsPrivateProductionData: false,
@@ -106,14 +107,15 @@ test('new failures after an older pass form a new independent escalation episode
   assert.equal(result.failedRunIds.includes('old-fail'), false)
 })
 
-test('teacher-output dataset registration requires a pinned HF revision and at least 20 unique items', () => {
-  const unpinned = buildDistillationDatasetBinding({
-    ...datasetInput,
-    sourceRef: 'hf://datasets/cadomos/itmounts-teacher#train',
-    plan: sourcePlan,
-  })
-  assert.equal(unpinned.eligible, false)
-  assert.ok(unpinned.blockers.includes('distillation_dataset_revision_not_pinned'))
+test('teacher-output dataset registration requires an immutable HF commit and at least 20 unique items', () => {
+  for (const sourceRef of [
+    'hf://datasets/cadomos/itmounts-teacher#train',
+    'hf://datasets/cadomos/itmounts-teacher@main#train',
+  ]) {
+    const unpinned = buildDistillationDatasetBinding({ ...datasetInput, sourceRef, plan: sourcePlan })
+    assert.equal(unpinned.eligible, false)
+    assert.ok(unpinned.blockers.includes('distillation_dataset_revision_not_pinned'))
+  }
 
   const tooSmall = buildDistillationDatasetBinding({
     ...datasetInput,
@@ -124,15 +126,20 @@ test('teacher-output dataset registration requires a pinned HF revision and at l
   assert.ok(tooSmall.blockers.includes('teacher_output_dataset_too_small'))
 })
 
-test('rights, privacy, provenance and qualification remain mandatory for a valid binding', () => {
+test('rights, privacy, buyer control, provenance and qualification remain mandatory for a valid binding', () => {
   const valid = buildDistillationDatasetBinding({ ...datasetInput, plan: sourcePlan })
   assert.equal(valid.eligible, true)
   assert.equal(valid.candidate?.trainingRights, 'open_license')
+  assert.equal(valid.candidate?.studentControlledByBuyer, true)
   assert.equal(valid.candidate?.containsPrivateProductionData, false)
   assert.equal(valid.candidate?.repeatedFailures, 3)
   assert.equal(valid.candidate?.independentRetestFailures, 2)
   assert.match(valid.datasetHash || '', /^[a-f0-9]{64}$/)
   assert.match(valid.teacherOutputManifestHash || '', /^[a-f0-9]{64}$/)
+
+  const uncontrolled = buildDistillationDatasetBinding({ ...datasetInput, studentControlledByBuyer: false, plan: sourcePlan })
+  assert.equal(uncontrolled.eligible, false)
+  assert.ok(uncontrolled.blockers.includes('student_not_buyer_controlled'))
 
   const privateData = buildDistillationDatasetBinding({ ...datasetInput, containsPrivateProductionData: true, plan: sourcePlan })
   assert.equal(privateData.eligible, false)

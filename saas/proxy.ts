@@ -8,7 +8,10 @@
 // cosBrowserUrl.pathname = '/api/cos-browser'
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import { provenanceBoundarySecret } from './lib/ai/cos/provenanceBoundarySecret.ts'
 import { proxy as baseProxy } from './proxyBase.ts'
+
+const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
 
 function dashboardSurface(req: NextRequest): boolean {
   const referer = req.headers.get('referer') || ''
@@ -33,7 +36,10 @@ function fullAssistantSurface(req: NextRequest): boolean {
 }
 
 function provenanceRewrite(req: NextRequest, forceAssistant = false) {
+  const secret = provenanceBoundarySecret()
+  if (!secret) return NextResponse.json({ error: 'provenance_boundary_unconfigured' }, { status: 503 })
   const headers = new Headers(req.headers)
+  headers.set(PROVENANCE_BOUNDARY_HEADER, secret)
   if (forceAssistant || headers.get('x-signalboost-surface') === 'cos') headers.set('x-signalboost-surface', 'cos')
   const target = req.nextUrl.clone()
   target.pathname = '/api/cos-provenance-browser'

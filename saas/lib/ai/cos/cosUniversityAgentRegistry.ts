@@ -1,4 +1,3 @@
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import type { CosUniversityAgentRole } from './cosUniversityRoleCurriculum.ts'
 
 export const COS_UNIVERSITY_AGENT_ROLES: readonly CosUniversityAgentRole[] = Object.freeze([
@@ -15,8 +14,18 @@ export function isCosUniversityAgentRole(value: unknown): value is CosUniversity
 
 export type CosUniversityRegisteredAgent = Readonly<{ agentId: string; role: CosUniversityAgentRole }>
 
+/**
+ * Keep the registry's pure identity surface importable by bare Node tests. The service DB module uses
+ * application-only TypeScript/Next runtime syntax, so it is loaded only when a database operation is
+ * actually requested. This changes no authority or persistence behavior.
+ */
+async function registryDb() {
+  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
+  return cosServiceDb()
+}
+
 export async function listCosUniversityRegisteredAgents(limit?: number): Promise<CosUniversityRegisteredAgent[]> {
-  const db = cosServiceDb()
+  const db = await registryDb()
   if (!db) throw new Error('service_database_unavailable')
   const requested = limit == null ? Number.POSITIVE_INFINITY : Math.max(1, limit)
   const pageSize = Math.min(500, requested)
@@ -38,7 +47,7 @@ export async function listCosUniversityRegisteredAgents(limit?: number): Promise
 export async function readCosUniversityAgentRole(agentId: string): Promise<CosUniversityAgentRole | null> {
   const id = String(agentId || '').trim()
   if (!id) throw new Error('agent_id_required')
-  const db = cosServiceDb()
+  const db = await registryDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_agent_registry')
     .select('role').eq('agent_id', id).maybeSingle()
@@ -59,7 +68,7 @@ export async function persistCosUniversityAgentRole(input: {
   const assignedBy = String(input.assignedBy || '').trim()
   if (!agentId) throw new Error('agent_id_required')
   if (!assignedBy) throw new Error('assigned_by_required')
-  const db = cosServiceDb()
+  const db = await registryDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_agent_registry').upsert({
     agent_id: agentId, role: input.role, assigned_by: assignedBy,

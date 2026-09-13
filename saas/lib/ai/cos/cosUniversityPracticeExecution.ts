@@ -1,7 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
 import { universityPracticeModelFromEnv } from './cosUniversityAgentModelPolicy.ts'
-import { enforceUniversityPracticeCostGuard } from './cosUniversityPracticeBudget.ts'
+import {
+  enforceUniversityPracticeCostGuard,
+  meterUniversityPracticeInvocation,
+} from './cosUniversityPracticeBudget.ts'
 import {
   isBoundSoftwareCapstoneEvidence,
   SOFTWARE_CAPSTONE_ROLE,
@@ -67,7 +70,9 @@ export async function executeUniversityPractice(
     bound(request: AgentCapstoneRequest): Promise<{ reply: string; execution: AgentCapstoneExecution }>
   },
 ): Promise<UniversityPracticeExecution | null> {
-  await enforceUniversityPracticeCostGuard({ ...request, purpose: 'practice' })
+  const practiceRequest = { ...request, purpose: 'practice' as const }
+  await enforceUniversityPracticeCostGuard(practiceRequest)
+  await meterUniversityPracticeInvocation(practiceRequest)
   if (request.agentId === 'cos') {
     const economy = await executeCosPracticeOnConfiguredEconomyModel(request)
     if (economy) return {
@@ -82,7 +87,7 @@ export async function executeUniversityPractice(
       executionProvenance: null,
     } : null
   }
-  const { reply, execution } = await ports.bound({ ...request, purpose: 'practice' })
+  const { reply, execution } = await ports.bound(practiceRequest)
   if (typeof reply !== 'string' || !reply.trim() || !execution
     || !isBoundSoftwareCapstoneEvidence(execution, {
       id: request.runId, agent_id: request.agentId, manifest_hash: request.manifestHash,

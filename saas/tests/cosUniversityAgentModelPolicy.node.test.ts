@@ -1,5 +1,7 @@
 // saas/tests/cosUniversityAgentModelPolicy.node.test.ts
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
 import test from 'node:test'
 import {
   BUILDER_MODEL_NOT_CONFIGURED_FOR_ROLE,
@@ -139,6 +141,28 @@ test('neither graded model is ever substituted silently', () => {
       new RegExp(PRIMARY_REASONER_NOT_CONFIGURED))
   } finally {
     if (before !== undefined) process.env.LOCAL_AI_MODEL = before
+  }
+})
+
+test('host practice entry points use the service-only request-scoped configuration bridge', () => {
+  const root = path.resolve(import.meta.dirname, '../lib/ai/cos')
+  const configured = fs.readFileSync(path.join(root, 'cosUniversityConfiguredPracticeRunner.ts'), 'utf8')
+  const context = fs.readFileSync(path.join(root, 'cosUniversityPracticeModelContext.ts'), 'utf8')
+  const cycle = fs.readFileSync(path.join(root, 'cosUniversityAutonomousAgentCycle.ts'), 'utf8')
+  const route = fs.readFileSync(path.resolve(import.meta.dirname, '../app/api/cron/cos-university-practice/route.ts'), 'utf8')
+  const execution = fs.readFileSync(path.join(root, 'cosUniversityPracticeExecution.ts'), 'utf8')
+  const specialist = fs.readFileSync(path.join(root, 'cosUniversityAgentExamRuntime.ts'), 'utf8')
+
+  assert.match(configured, /COS_UNIVERSITY_PRACTICE_MODEL_SETTING_KEY = 'cos_university_practice_model'/)
+  assert.match(configured, /\.from\('system_settings'\)/)
+  assert.match(configured, /runWithUniversityPracticeModel\(model/)
+  assert.match(context, /new AsyncLocalStorage/)
+  assert.match(route, /runConfiguredCosUniversityDeliberatePractice/)
+  assert.match(cycle, /runConfiguredCosUniversityDeliberatePractice/)
+  assert.match(execution, /currentUniversityPracticeModelOverride\(\)/)
+  assert.match(specialist, /currentUniversityPracticeModelOverride\(\)/)
+  for (const source of [configured, context, cycle, route, execution, specialist]) {
+    assert.doesNotMatch(source, /deepseek-ai\/DeepSeek-V4-Flash-0731/)
   }
 })
 

@@ -12,7 +12,7 @@ function httpsOrigin(value: string): string {
 
 /** Server-owned origin only. Never derive live acceptance authority from Host/x-forwarded-host/request.nextUrl. */
 export function resolveReferenceA2AOrigin(env: NodeJS.ProcessEnv = process.env): string {
-  const configured = env.SIGNALBOOST_A2A_REFERENCE_ORIGIN || env.VERCEL_URL || env.VERCEL_PROJECT_PRODUCTION_URL || ''
+  const configured = env.SIGNALBOOST_A2A_REFERENCE_ORIGIN || env.VERCEL_PROJECT_PRODUCTION_URL || env.VERCEL_URL || ''
   return httpsOrigin(configured)
 }
 

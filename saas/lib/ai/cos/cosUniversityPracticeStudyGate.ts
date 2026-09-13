@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityPracticeStudyGate.ts
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { readUniversityPracticeBudget, type UniversityPracticeBudgetDecision } from './cosUniversityPracticeBudget.ts'
 import { selectCosUniversityPracticeGateDecision } from './cosUniversityPracticeSelectionPolicy.ts'
@@ -89,12 +90,17 @@ export function evaluateCosUniversityPracticeStudyGate(
  * current accepted study proof and actual execution budget. The scan is bounded but wide enough to
  * step past accumulated remediation plans instead of pinning Production to the first four rows.
  */
-export async function readCosUniversityPracticeStudyGate(now = new Date()): Promise<CosUniversityPracticeStudyGate> {
+export async function readCosUniversityPracticeStudyGate(
+  now = new Date(),
+  /** Every learner must clear the same accepted-study and spend gates. */
+  agentId: string = 'cos',
+): Promise<CosUniversityPracticeStudyGate> {
   const db = cosServiceDb()
   if (!db) return decision(false, 'service_database_unavailable', null)
+  const learner = String(agentId || '').trim() || 'cos'
   const result = await db.from('cos_university_study_plans')
     .select('id,plan_key,priority,status,attempt_count,last_attempt_at,methods,evidence')
-    .eq('agent_id', 'cos')
+    .eq('agent_id', learner)
     .eq('status', 'studying')
     .gt('attempt_count', 0)
     .order('priority', { ascending: false })
@@ -110,7 +116,7 @@ export async function readCosUniversityPracticeStudyGate(now = new Date()): Prom
       continue
     }
     const practiceBudget = await readUniversityPracticeBudget({
-      agentId: 'cos',
+      agentId: learner,
       planId: studyDecision.planId,
       currentRound: studyDecision.studyAttempt,
     })

@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 const SOURCE = readFileSync(new URL('../lib/ai/cos/cosUniversityLaneFaultRecorder.ts', import.meta.url), 'utf8')
 const MIGRATION = readFileSync(
   new URL('../supabase/migrations/20260913041500_cos_university_lane_fault_events.sql', import.meta.url), 'utf8')
+const VERCEL = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
 test('the migration admits lane_fault without dropping an existing evidence class', () => {
   for (const kind of ['fine_tune', 'production_path', 'learning_outcome', 'team_contribution', 'integrity_violation', 'lane_fault']) {
@@ -39,6 +40,31 @@ test('a healthy sweep returns before touching the database', () => {
   assert.match(SOURCE, /if \(!faults\.length\) return \{ recorded: 0, faults: \[\], skipped: null \}/)
   const beforeDb = SOURCE.slice(0, SOURCE.indexOf('const db = cosServiceDb()'))
   assert.match(beforeDb, /!faults\.length/)
+})
+
+test('fresh deployments wait through one full hourly schedule before recording dark-lane absence', () => {
+  assert.match(SOURCE, /FIRST_SCHEDULE_GRACE_MS = 65 \* 60_000/)
+  assert.match(SOURCE, /\.eq\('event_type', 'production_path'\)/)
+  assert.match(SOURCE, /\.eq\('deployment_id', deploymentId\)/)
+  assert.match(SOURCE, /\.eq\('commit_sha', commitSha\)/)
+  assert.match(SOURCE, /\.order\('observed_at', \{ ascending: true \}\)/)
+  assert.match(SOURCE, /fault\.laneStatus !== 'unexpectedly_dark'/)
+  assert.match(SOURCE, /fresh_deployment_schedule_grace/)
+  // The two lanes that produced the observed false positives are hourly, so a 65-minute bound
+  // covers the worst post-slot deploy plus scheduler tolerance without becoming an indefinite mute.
+  assert.match(VERCEL, /"\/api\/cron\/cos-university-exam"\s*,\s*"schedule"\s*:\s*"0 \* \* \* \*"/)
+  assert.match(VERCEL, /"\/api\/cron\/cos-university-a-range"\s*,\s*"schedule"\s*:\s*"10 \* \* \* \*"/)
+})
+
+test('startup grace suppresses only absence; explicit fault classes remain immediately recordable', () => {
+  const graceFilter = SOURCE.slice(
+    SOURCE.indexOf("if (startupGraceActive)"),
+    SOURCE.indexOf("if (!effectiveFaults.length)"),
+  )
+  assert.match(graceFilter, /fault\.laneStatus !== 'unexpectedly_dark'/)
+  assert.equal(graceFilter.includes('unexpectedly_disabled'), false)
+  assert.equal(graceFilter.includes('unexpectedly_enabled'), false)
+  assert.equal(graceFilter.includes('undeclared'), false)
 })
 
 test('identity is bucketed by hour so a standing fault does not flood the ledger', () => {

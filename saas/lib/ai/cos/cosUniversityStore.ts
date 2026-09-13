@@ -29,6 +29,7 @@ import {
   type CosUniversityFailureClass,
   type CosUniversityStudyStrategy,
 } from './cosUniversityStudyStrategy.ts'
+import { cosUniversityContinuousStudyVariant } from './cosUniversityStudyVariant.ts'
 
 const DEFAULT_AGENT_ID = 'cos'
 const VALID_SCORER_AUTHORITIES = new Set(['host_private_exam', 'verified_production', 'host_capstone'])
@@ -628,6 +629,9 @@ export async function runCosUniversityPlanningCycle(options: {
       // Only emit an acquisition gap when the selected strategy actually contains an automatic
       // acquisition method. Labs/A2A/fine-tuning remain explicit planned work until their bridge exists.
       if (!candidate.strategy.acquisitionSourceKinds.length) continue
+      // Without a variant every gap for a subject rotates its study themes by 0 and issues one
+      // unchanging discovery query, which is what made Computer Science duplicate-dominant.
+      const studyVariant = cosUniversityContinuousStudyVariant(candidate.planKey)
       gapSignals.push(candidate.language
         ? platformLanguageStudyGapSignal({
             planKey: candidate.planKey,
@@ -635,6 +639,7 @@ export async function runCosUniversityPlanningCycle(options: {
             objective: candidate.objective,
             strategy: candidate.strategy,
             repeatedCount: candidate.repeatedCount,
+            studyVariant,
           })
         : universityStudyGapSignal({
             planKey: candidate.planKey,
@@ -643,6 +648,7 @@ export async function runCosUniversityPlanningCycle(options: {
             failureClass: candidate.failureClass,
             strategy: candidate.strategy,
             repeatedCount: candidate.repeatedCount,
+            studyVariant,
             evidence: [`source_kind=${candidate.sourceKind}`, `source_ref=${candidate.sourceRef || 'none'}`],
           }))
     } catch (error) {

@@ -53,6 +53,20 @@ type PartitionMaterialization = Readonly<{
   evidenceRef: string
 }>
 
+type TrainingDispatchAudit = Readonly<{
+  subjectId: string | null
+  candidateId: string
+  operation: 'prepare_dataset' | 'train'
+  idempotencyKey: string
+  jobId: string
+  trainingMode: TrainingMode | null
+  revisionKey: string | null
+  baseModel: string | null
+  datasetHash: string | null
+  distillationCandidate: ModelDistillationCandidateInput | null
+  authorityExpanded: false
+}>
+
 const HASH = /^[a-f0-9]{64}$/i
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -78,6 +92,25 @@ function validRevision(revision: FineTuneRevision): boolean {
     && HASH.test(revision.trainingManifestHash)
     && HASH.test(revision.holdoutManifestHash)
     && revision.trainingManifestHash !== revision.holdoutManifestHash
+}
+
+function normalizedDistillationCandidate(value: unknown): ModelDistillationCandidateInput | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const row = value as Record<string, unknown>
+  const candidate: ModelDistillationCandidateInput = {
+    teacherModelId: clean(row.teacherModelId, 240),
+    studentModelId: clean(row.studentModelId, 240),
+    datasetHash: clean(row.datasetHash, 64).toLowerCase(),
+    provenanceRefs: Array.isArray(row.provenanceRefs)
+      ? [...new Set(row.provenanceRefs.map(item => clean(item, 1000)).filter(Boolean))]
+      : [],
+    trainingRights: clean(row.trainingRights, 80) as ModelDistillationCandidateInput['trainingRights'],
+    studentControlledByBuyer: row.studentControlledByBuyer === true,
+    containsPrivateProductionData: row.containsPrivateProductionData as boolean,
+    repeatedFailures: Number(row.repeatedFailures),
+    independentRetestFailures: Number(row.independentRetestFailures),
+  }
+  return candidate
 }
 
 async function serviceDb() {
@@ -118,7 +151,7 @@ export function requireExplicitTrainingDispatchConfirmation(value: unknown): tru
 }
 
 function signatureMessage(timestamp: string, idempotencyKey: string, rawBody: string): string {
-  return `${timestamp}\n${idempotencyKey}\n${rawBody}`
+  return [timestamp, idempotencyKey, rawBody].join('\n')
 }
 
 export function signTrainingExecutorPayload(input: {
@@ -155,7 +188,7 @@ function candidatePlanId(candidateId: string): string {
   return match[1]
 }
 
-async function readCandidatePlan(candidateId: string, options: { requireActive?: boolean } = {}): Promise<CandidatePlanRow> {
+async function readCandidatePlan(candidateId: string): Promise<CandidatePlanRow> {
   const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
   const id = candidatePlanId(candidateId)
@@ -165,9 +198,7 @@ async function readCandidatePlan(candidateId: string, options: { requireActive?:
   if (result.error) throw result.error
   const plan = result.data as CandidatePlanRow | null
   if (!plan || plan.fine_tune_candidate !== true) throw new Error('training_executor_candidate_not_authorized')
-  if (options.requireActive !== false && !['queued', 'studying', 'ready_for_exam'].includes(plan.status)) {
-    throw new Error('training_executor_candidate_inactive')
-  }
+  if (!['queued', 'studying', 'ready_for_exam'].includes(plan.status)) throw new Error('training_executor_candidate_inactive')
   return plan
 }
 
@@ -251,6 +282,21 @@ async function readPartitionMaterialization(candidateId: string, revision: FineT
   return null
 }
 
+function distillationAuditSnapshot(candidate: ModelDistillationCandidateInput | null | undefined) {
+  if (!candidate) return null
+  return {
+    teacherModelId: candidate.teacherModelId,
+    studentModelId: candidate.studentModelId,
+    datasetHash: candidate.datasetHash,
+    provenanceRefs: [...candidate.provenanceRefs],
+    trainingRights: candidate.trainingRights,
+    studentControlledByBuyer: candidate.studentControlledByBuyer,
+    containsPrivateProductionData: candidate.containsPrivateProductionData,
+    repeatedFailures: candidate.repeatedFailures,
+    independentRetestFailures: candidate.independentRetestFailures,
+  }
+}
+
 async function recordDispatchAudit(input: {
   candidateId: string
   subjectId?: string | null
@@ -259,6 +305,9 @@ async function recordDispatchAudit(input: {
   jobId: string
   trainingMode?: TrainingMode
   revisionKey?: string | null
+  baseModel?: string | null
+  datasetHash?: string | null
+  distillation?: ModelDistillationCandidateInput | null
   now?: Date
 }) {
   const db = await serviceDb()
@@ -273,6 +322,9 @@ async function recordDispatchAudit(input: {
     jobId: input.jobId,
     trainingMode: input.trainingMode || null,
     revisionKey: input.revisionKey || null,
+    baseModel: input.baseModel || null,
+    datasetHash: input.datasetHash || null,
+    distillationCandidate: distillationAuditSnapshot(input.distillation),
     authorityExpanded: false,
   }
   const evidenceHash = hash(evidence)
@@ -288,6 +340,53 @@ async function recordDispatchAudit(input: {
     observed_at: now.toISOString(),
   }, { onConflict: 'event_key', ignoreDuplicates: true })
   if (result.error) throw result.error
+}
+
+async function readMatchingDispatch(input: {
+  candidateId: string
+  idempotencyKey: string
+  jobId: string
+}): Promise<TrainingDispatchAudit> {
+  const db = await serviceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const result = await db.from('cos_university_learning_assurance_events')
+    .select('subject_id,evidence,verifier,observed_at')
+    .eq('event_type', 'fine_tune')
+    .eq('candidate_id', input.candidateId)
+    .eq('verifier', 'host_controller')
+    .contains('evidence', {
+      profile: COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE,
+      claim: 'training_job_dispatched',
+      idempotencyKey: input.idempotencyKey,
+      jobId: input.jobId,
+    })
+    .order('observed_at', { ascending: false })
+    .limit(10)
+  if (result.error) throw result.error
+  for (const row of result.data || []) {
+    const evidence: any = row.evidence
+    const operation = evidence?.operation === 'prepare_dataset' || evidence?.operation === 'train' ? evidence.operation : null
+    const trainingMode = evidence?.trainingMode === 'fine_tune' || evidence?.trainingMode === 'distillation' ? evidence.trainingMode : null
+    if (!operation
+      || clean(evidence?.candidateId, 100) !== input.candidateId
+      || clean(evidence?.idempotencyKey, 128) !== input.idempotencyKey
+      || clean(evidence?.jobId, 240) !== input.jobId
+      || evidence?.authorityExpanded !== false) continue
+    return {
+      subjectId: row.subject_id ? String(row.subject_id) : null,
+      candidateId: input.candidateId,
+      operation,
+      idempotencyKey: input.idempotencyKey,
+      jobId: input.jobId,
+      trainingMode,
+      revisionKey: clean(evidence?.revisionKey, 64) || null,
+      baseModel: clean(evidence?.baseModel, 240) || null,
+      datasetHash: clean(evidence?.datasetHash, 64).toLowerCase() || null,
+      distillationCandidate: normalizedDistillationCandidate(evidence?.distillationCandidate),
+      authorityExpanded: false,
+    }
+  }
+  throw new Error('training_executor_dispatch_binding_missing')
 }
 
 type DispatchPort = (url: string, init: RequestInit) => Promise<Response>
@@ -362,7 +461,15 @@ export async function dispatchUniversityDatasetPreparation(input: {
       authorityExpanded: false,
     },
   })
-  await recordDispatchAudit({ candidateId: input.candidateId, subjectId: plan.subject_id, operation: 'prepare_dataset', idempotencyKey, jobId: result.jobId })
+  await recordDispatchAudit({
+    candidateId: input.candidateId,
+    subjectId: plan.subject_id,
+    operation: 'prepare_dataset',
+    idempotencyKey,
+    jobId: result.jobId,
+    baseModel,
+    datasetHash,
+  })
   return { ...result, operation: 'prepare_dataset' as const, candidateId: input.candidateId, datasetHash }
 }
 
@@ -421,46 +528,65 @@ export async function dispatchUniversityApprovedTraining(input: {
       revisionKey,
       trainingDataRef: materialization.trainingDataRef,
       holdoutDataRef: materialization.holdoutDataRef,
-      distillation: distillation ? {
-        teacherModelId: distillation.teacherModelId,
-        studentModelId: distillation.studentModelId,
-        datasetHash: distillation.datasetHash,
-        provenanceRefs: distillation.provenanceRefs,
-        trainingRights: distillation.trainingRights,
-        studentControlledByBuyer: distillation.studentControlledByBuyer,
-        containsPrivateProductionData: distillation.containsPrivateProductionData,
-      } : null,
+      distillation: distillationAuditSnapshot(distillation),
       callbackPath: '/api/internal/cos/university-training-executor/evidence',
       authorityExpanded: false,
     },
   })
-  await recordDispatchAudit({ candidateId: input.candidateId, subjectId: plan.subject_id, operation: 'train', trainingMode: input.trainingMode, revisionKey, idempotencyKey, jobId: result.jobId })
+  await recordDispatchAudit({
+    candidateId: input.candidateId,
+    subjectId: plan.subject_id,
+    operation: 'train',
+    trainingMode: input.trainingMode,
+    revisionKey,
+    baseModel: input.revision.baseModel,
+    datasetHash: input.revision.datasetHash,
+    distillation,
+    idempotencyKey,
+    jobId: result.jobId,
+  })
   return { ...result, operation: 'train' as const, trainingMode: input.trainingMode, candidateId: input.candidateId, revisionKey }
 }
 
-export async function recordUniversityTrainingExecutorEvidence(input: any) {
+export async function recordUniversityTrainingExecutorEvidence(input: any, binding: { idempotencyKey: string }) {
   const claim = clean(input?.claim, 80) as TrainingExecutorClaim
   if (!TRAINING_EXECUTOR_CLAIMS.includes(claim)) throw new Error('training_executor_claim_not_permitted')
   const candidateId = clean(input?.candidateId, 100)
-  // A valid asynchronous callback may arrive after study moved to another state. Preserve the
-  // original fine-tune-candidate authorization without requiring the academic plan to remain active.
-  const plan = await readCandidatePlan(candidateId, { requireActive: false })
+  candidatePlanId(candidateId)
+  const jobId = clean(input?.jobId, 240)
+  if (!jobId) throw new Error('training_executor_job_id_missing')
+  const idempotencyKey = clean(binding?.idempotencyKey, 128)
+  if (!idempotencyKey) throw new Error('training_executor_idempotency_key_missing')
+  const dispatch = await readMatchingDispatch({ candidateId, idempotencyKey, jobId })
   const evidenceRef = clean(input?.evidenceRef, 2000)
   if (!evidenceRef) throw new Error('training_executor_evidence_ref_missing')
 
   if (claim === 'partition_manifests_registered') {
+    if (dispatch.operation !== 'prepare_dataset') throw new Error('training_executor_dispatch_operation_mismatch')
     const materialized = validateTrainingExecutorPartition(input)
     if (!materialized) throw new Error('training_executor_partition_invalid')
-    if (materialized.revision.datasetHash !== controlledFineTuneDatasetHash(plan)) throw new Error('training_executor_dataset_identity_mismatch')
+    if (materialized.revision.baseModel !== dispatch.baseModel || materialized.revision.datasetHash !== dispatch.datasetHash) {
+      throw new Error('training_executor_partition_dispatch_mismatch')
+    }
+    const expectedKey = hash([
+      COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE,
+      'prepare_dataset',
+      candidateId,
+      materialized.revision.baseModel,
+      materialized.revision.datasetHash,
+    ])
+    if (expectedKey !== idempotencyKey) throw new Error('training_executor_dispatch_identity_mismatch')
     const trainingDataRef = clean(input?.trainingDataRef, 2000)
     const holdoutDataRef = clean(input?.holdoutDataRef, 2000)
     if (!trainingDataRef || !holdoutDataRef) throw new Error('training_executor_partition_data_ref_missing')
     return recordExecutorEvent({
       candidateId,
-      subjectId: plan.subject_id,
+      subjectId: dispatch.subjectId,
       claim,
       evidence: {
         evidenceRef,
+        dispatchJobId: jobId,
+        dispatchIdempotencyKey: idempotencyKey,
         revisionKey: fineTuneRevisionKey(materialized.revision),
         baseModel: materialized.revision.baseModel,
         datasetHash: materialized.revision.datasetHash,
@@ -472,25 +598,60 @@ export async function recordUniversityTrainingExecutorEvidence(input: any) {
     })
   }
 
+  if (dispatch.operation !== 'train' || !dispatch.trainingMode) throw new Error('training_executor_dispatch_operation_mismatch')
   const revision: FineTuneRevision = {
     baseModel: clean(input?.baseModel, 240),
-    datasetHash: clean(input?.datasetHash, 64),
-    trainingManifestHash: clean(input?.trainingManifestHash, 64),
-    holdoutManifestHash: clean(input?.holdoutManifestHash, 64),
+    datasetHash: clean(input?.datasetHash, 64).toLowerCase(),
+    trainingManifestHash: clean(input?.trainingManifestHash, 64).toLowerCase(),
+    holdoutManifestHash: clean(input?.holdoutManifestHash, 64).toLowerCase(),
   }
-  if (!validRevision(revision) || revision.datasetHash !== controlledFineTuneDatasetHash(plan)) throw new Error('training_executor_revision_invalid')
+  if (!validRevision(revision)) throw new Error('training_executor_revision_invalid')
+  const revisionKey = fineTuneRevisionKey(revision)
+  if (revisionKey !== dispatch.revisionKey
+    || revision.baseModel !== dispatch.baseModel
+    || revision.datasetHash !== dispatch.datasetHash) throw new Error('training_executor_revision_dispatch_mismatch')
+  const expectedKey = hash([
+    COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE,
+    'train',
+    dispatch.trainingMode,
+    candidateId,
+    revisionKey,
+  ])
+  if (expectedKey !== idempotencyKey) throw new Error('training_executor_dispatch_identity_mismatch')
   const registeredRevision = await readFineTunePartitionRevision(candidateId, revision.datasetHash)
-  if (!registeredRevision || fineTuneRevisionKey(registeredRevision) !== fineTuneRevisionKey(revision)) throw new Error('training_executor_partition_revision_missing')
+  if (!registeredRevision || fineTuneRevisionKey(registeredRevision) !== revisionKey) throw new Error('training_executor_partition_revision_missing')
+
+  let distillationCandidate: ModelDistillationCandidateInput | null = null
+  if (dispatch.trainingMode === 'distillation') {
+    distillationCandidate = dispatch.distillationCandidate
+    if (!distillationCandidate) throw new Error('training_executor_distillation_dispatch_binding_missing')
+    const distillationBinding = validateDistillationTrainingBinding({ candidate: distillationCandidate, revision })
+    if (!distillationBinding.eligible) {
+      throw new Error(`training_executor_distillation_dispatch_invalid:${distillationBinding.blockers.join(',')}`)
+    }
+  }
+
   const trainedArtifactId = clean(input?.trainedArtifactId, 500)
   const artifactHash = clean(input?.artifactHash, 64).toLowerCase()
   if (!trainedArtifactId || !HASH.test(artifactHash)) throw new Error('training_executor_artifact_invalid')
+  const artifactBinding = {
+    evidenceRef,
+    dispatchJobId: jobId,
+    dispatchIdempotencyKey: idempotencyKey,
+    revisionKey,
+    trainedArtifactId,
+    artifactHash,
+    trainingMode: dispatch.trainingMode,
+    distillationCandidate: distillationAuditSnapshot(distillationCandidate),
+    authorityExpanded: dispatch.authorityExpanded,
+  }
 
   if (claim === 'trained_artifact_registered') {
     return recordExecutorEvent({
       candidateId,
-      subjectId: plan.subject_id,
+      subjectId: dispatch.subjectId,
       claim,
-      evidence: { evidenceRef, revisionKey: fineTuneRevisionKey(revision), trainedArtifactId, artifactHash },
+      evidence: artifactBinding,
     })
   }
 
@@ -502,8 +663,8 @@ export async function recordUniversityTrainingExecutorEvidence(input: any) {
   if (!rollbackArtifactRef) throw new Error('training_executor_rollback_ref_missing')
   return recordExecutorEvent({
     candidateId,
-    subjectId: plan.subject_id,
+    subjectId: dispatch.subjectId,
     claim,
-    evidence: { evidenceRef, revisionKey: fineTuneRevisionKey(revision), trainedArtifactId, artifactHash, rollbackArtifactRef },
+    evidence: { ...artifactBinding, rollbackArtifactRef },
   })
 }

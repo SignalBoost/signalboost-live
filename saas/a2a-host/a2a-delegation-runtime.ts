@@ -18,6 +18,17 @@ export interface A2AApprovalEvidence {
   approvedAt: string
 }
 
+/** Host-owned advisory progress only. This envelope never grants authorization, qualification, approval, or tool authority. */
+export interface A2AMeshResumeCheckpoint {
+  schemaVersion: 'signalboost-specialist-mesh-checkpoint-v1'
+  checkpointKey: string
+  sourceAgentId: string
+  sourceFencingToken: number
+  createdAt: string
+  expiresAt: string
+  state: Readonly<Record<string, unknown>>
+}
+
 export interface A2ADelegationInvocation {
   tenantId: string
   environmentId: string
@@ -31,6 +42,7 @@ export interface A2ADelegationInvocation {
   traceId?: string
   actor?: A2AScope['actor']
   approval?: A2AApprovalEvidence
+  meshResume?: A2AMeshResumeCheckpoint
 }
 
 export interface A2ADelegationResult {
@@ -264,6 +276,7 @@ export function createA2ADelegationRuntime(options: {
           signalboostSkillId: invocation.skillId,
           signalboostRisk: skill.risk,
           ...(approval ? { signalboostApprovalId: approval.approvalId } : {}),
+          ...(skill.risk === 'advisory' && invocation.meshResume ? { signalboostMeshResume: JSON.stringify(invocation.meshResume) } : {}),
         }),
       })
       result = Object.freeze({ ok: true, agentId: invocation.agentId, skillId: invocation.skillId, risk: skill.risk, data, mode: 'delegated' })

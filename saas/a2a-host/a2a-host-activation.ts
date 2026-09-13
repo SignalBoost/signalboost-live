@@ -4,6 +4,7 @@ import { installCOSA2AQualificationAssessmentPort, installCOSA2ARuntimeHost } fr
 import { createCOSSpecialistOrchestrator } from './cos-specialist-orchestrator.ts'
 import { createPortableA2AHost, type PortableA2AHost, type PortableA2AHostOptions } from './portable-a2a-host.ts'
 import { createSupabaseSpecialistMeshProductionAdapters } from './specialist-mesh-production-adapters.ts'
+import { createSupabaseSpecialistMeshCheckpointStore } from './specialist-mesh-checkpoint.ts'
 import { createDurableSpecialistMeshDelegationPort } from './specialist-mesh-execution-ownership.ts'
 import { createSupervisorCoordinationStore } from '../lib/supervisor/coordination/durable-coordination-store.ts'
 import {
@@ -12,7 +13,7 @@ import {
   type SpecialistQualificationVerifier,
 } from './specialist-qualification-assessment.ts'
 
-export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v5' as const
+export const A2A_HOST_ACTIVATION_VERSION = 'signalboost-a2a-host-activation-v6' as const
 
 export interface A2AHostActivationSummary {
   version: typeof A2A_HOST_ACTIVATION_VERSION
@@ -38,6 +39,7 @@ function required(value: unknown, name: string): string {
 function productionMeshCoordination(db: SupabaseClient) {
   return Object.freeze({
     store: createSupervisorCoordinationStore({ supabase: db, runtime: 'production' }),
+    checkpoints: createSupabaseSpecialistMeshCheckpointStore(db),
     environment: 'production' as const,
     policyVersion: A2A_HOST_ACTIVATION_VERSION,
     softwareVersion: A2A_HOST_ACTIVATION_VERSION,
@@ -84,9 +86,9 @@ export async function activateCOSA2AHost(options: PortableA2AHostOptions & { now
 
 /**
  * Production composition root for a fully constructed host. Durable specialist qualification,
- * routing telemetry, and execution ownership replace caller-supplied mesh evidence/coordination.
- * The same exact registry/transport authority is also used to install the host-owned qualification
- * assessor with hidden probes + independent verifier.
+ * routing telemetry, execution ownership, and bounded advisory checkpoints replace caller-supplied
+ * mesh evidence/coordination. The same exact registry/transport authority is also used to install
+ * the host-owned qualification assessor with hidden probes + independent verifier.
  */
 export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHostOptions, 'qualifications' | 'meshSignals' | 'meshCoordination'> & {
   db: SupabaseClient
@@ -121,7 +123,7 @@ export async function activateProductionCOSA2AHost(options: Omit<PortableA2AHost
 /**
  * Deployed-route composition for an already installed governed host. This preserves its registry,
  * transport runtime, audit boundaries, and authorization while replacing qualification/routing
- * evidence and adding durable fenced execution ownership with the service-role Production store.
+ * evidence and adding durable fenced execution ownership plus bounded advisory checkpoint/resume.
  * No host is fabricated on a cold start.
  */
 export function attachProductionSpecialistMeshEvidence(

@@ -51,9 +51,11 @@ export async function readUniversityPracticeBudget(input: {
     .limit(MAX_BUDGET_HISTORY_ROWS)
   if (result.error) throw result.error
 
-  const executedRounds = [...new Set<number>((result.data || [])
-    .map(row => boundedRound(asRecord(row.metadata).practiceRound))
-    .filter((round): round is number => round !== null))]
+  const executedRounds = new Set<number>()
+  for (const row of result.data || []) {
+    const round = boundedRound(asRecord(row.metadata).practiceRound)
+    if (round !== null) executedRounds.add(round)
+  }
   return decideUniversityPracticeBudget({ currentRound, executedRounds })
 }
 

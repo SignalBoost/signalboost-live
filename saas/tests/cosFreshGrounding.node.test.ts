@@ -5,6 +5,7 @@ import './cosFreshGroundingBase.node.test.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import { requiresFreshExternalEvidence } from '../lib/ai/cos/cosFreshnessPolicy.ts'
 import {
   freshEvidenceGroundingBlock,
   freshEvidenceMeetsAuthority,
@@ -25,6 +26,19 @@ test('best football team question uses sports evidence instead of unemployment C
   assert.match(joined, /league champions|championship titles|standings/i)
   assert.match(joined, /continental|international/i)
   assert.doesNotMatch(joined, /unemployment|\bCPI\b|\bGDP\b/i)
+})
+
+test('Portuguese evaluative sports lookup enters live verification before local synthesis', () => {
+  for (const prompt of [
+    'qual e a melhor selecao de futebol do mundo?',
+    'qual é a melhor seleção de futebol do mundo?',
+    'qual e o melhor time de futebol do brasil?',
+  ]) {
+    assert.equal(requiresFreshExternalEvidence(prompt), true, prompt)
+    assert.equal(isSportsTeamEvaluation(prompt), true, prompt)
+    const queries = freshEvidenceSearchQueries(prompt, new Date('2026-09-13T00:00:00.000Z'))
+    assert.ok(queries.length >= 3, `${prompt} must produce bounded comparative sports research`)
+  }
 })
 
 test('office-holder evaluation keeps the existing economic comparison research plan', () => {

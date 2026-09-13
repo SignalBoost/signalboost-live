@@ -1,8 +1,9 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { readUniversityPracticeBudget, type UniversityPracticeBudgetDecision } from './cosUniversityPracticeBudget.ts'
 import { selectCosUniversityPracticeGateDecision } from './cosUniversityPracticeSelectionPolicy.ts'
 import { cosUniversityStudyProofEligible } from './cosUniversityStudyProof.ts'
 
-const PRACTICE_PLAN_SCAN_LIMIT = 4
+export const COS_UNIVERSITY_PRACTICE_PLAN_SCAN_LIMIT = 20
 
 type PracticePlanRow = {
   id: string
@@ -17,10 +18,17 @@ type PracticePlanRow = {
 
 export type CosUniversityPracticeStudyGate = Readonly<{
   allowed: boolean
-  reason: 'accepted_study_proof_verified' | 'restudy_required_after_failed_practice' | 'accepted_study_proof_required' | 'no_practice_plan' | 'service_database_unavailable'
+  reason:
+    | 'accepted_study_proof_verified'
+    | 'restudy_required_after_failed_practice'
+    | 'accepted_study_proof_required'
+    | 'practice_budget_exhausted'
+    | 'no_practice_plan'
+    | 'service_database_unavailable'
   planId: string | null
   planKey: string | null
   studyAttempt: number | null
+  practiceBudget: UniversityPracticeBudgetDecision | null
   semantics: 'practice_requires_current_host_accepted_study_proof'
 }>
 
@@ -40,6 +48,7 @@ function decision(
   allowed: boolean,
   reason: CosUniversityPracticeStudyGate['reason'],
   plan: PracticePlanRow | null,
+  practiceBudget: UniversityPracticeBudgetDecision | null = null,
 ): CosUniversityPracticeStudyGate {
   return {
     allowed,
@@ -47,6 +56,7 @@ function decision(
     planId: plan?.id || null,
     planKey: plan?.plan_key || null,
     studyAttempt: plan ? Math.max(1, Math.floor(Number(plan.attempt_count || 1))) : null,
+    practiceBudget,
     semantics: 'practice_requires_current_host_accepted_study_proof',
   }
 }
@@ -75,8 +85,9 @@ export function evaluateCosUniversityPracticeStudyGate(
 
 /**
  * Match the normal one-plan deliberate-practice priority before any queue mutation/execution.
- * A blocked higher-ranked plan remains blocked for itself, but cannot starve a later plan in the
- * same bounded scan that already has current host-accepted study proof.
+ * A blocked higher-ranked plan remains blocked for itself, but cannot starve a later plan with
+ * current accepted study proof and actual execution budget. The scan is bounded but wide enough to
+ * step past accumulated remediation plans instead of pinning Production to the first four rows.
  */
 export async function readCosUniversityPracticeStudyGate(now = new Date()): Promise<CosUniversityPracticeStudyGate> {
   const db = cosServiceDb()
@@ -88,12 +99,25 @@ export async function readCosUniversityPracticeStudyGate(now = new Date()): Prom
     .gt('attempt_count', 0)
     .order('priority', { ascending: false })
     .order('last_attempt_at', { ascending: false })
-    .limit(PRACTICE_PLAN_SCAN_LIMIT)
+    .limit(COS_UNIVERSITY_PRACTICE_PLAN_SCAN_LIMIT)
   if (result.error) throw result.error
 
-  const decisions = ((result.data || []) as PracticePlanRow[])
-    .filter(row => hasDeliberatePractice(row.methods))
-    .map(plan => evaluateCosUniversityPracticeStudyGate(plan, now))
+  const decisions: CosUniversityPracticeStudyGate[] = []
+  for (const plan of ((result.data || []) as PracticePlanRow[]).filter(row => hasDeliberatePractice(row.methods))) {
+    const studyDecision = evaluateCosUniversityPracticeStudyGate(plan, now)
+    if (!studyDecision.allowed || !studyDecision.planId || !studyDecision.studyAttempt) {
+      decisions.push(studyDecision)
+      continue
+    }
+    const practiceBudget = await readUniversityPracticeBudget({
+      agentId: 'cos',
+      planId: studyDecision.planId,
+      currentRound: studyDecision.studyAttempt,
+    })
+    decisions.push(practiceBudget.allowed
+      ? { ...studyDecision, practiceBudget }
+      : decision(false, 'practice_budget_exhausted', plan, practiceBudget))
+  }
 
   return selectCosUniversityPracticeGateDecision(decisions)
     ?? decision(true, 'no_practice_plan', null)

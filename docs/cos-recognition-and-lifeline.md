@@ -1,84 +1,62 @@
-> **Read with [ONBOARD.md](../ONBOARD.md)** — repo operating doctrine & documentation
-> index (§12D). This is a CRITICAL operational doc: COS is the brain of the platform,
-> and this file records how it silently fails and how to keep it alive.
+> **Read with [ONBOARD.md](../ONBOARD.md)** — repository operating doctrine and current-state handoff.
 
 # COS Recognition & Lifeline (critical)
 
-Your COS (Chief of Staff) is the brain of SignalBoost. It has failed the **same way
-twice** (2026-06-10 and again 2026-07-20), each time costing hours — because the
-failure is **silent** and the AI then **lied about it**. This doc exists so it never
-does again, and so any future AI/developer fixes it in minutes.
+COS (Chief of Staff) must remain operational without silently substituting a hosted model provider. Owner recognition, independent reasoning health, and optional hosted fallback are separate concerns.
 
-## 1. The two lifeline env vars
-COS lives or dies by two environment variables in the SaaS Vercel project
-(`signalboost-live` / saas.signalboostapp.com). If either is wrong, COS **silently
-downgrades to the customer Concierge** with no error shown:
+## 1. Required runtime boundaries
 
-- **`OWNER_EMAILS`** — must contain the owner's **exact login email, lowercase**
-  (currently `cadomos@gmail.com`). Owner status is granted by this allowlist and
-  **nothing else** — database team roles and legacy admin settings do NOT elevate
-  (`saas/lib/auth/access.ts`: `isAdmin = isOwner`, "only the canonical owner allowlist
-  may create an owner context"). This also *is* the access control: only emails on this
-  list get COS; everyone else gets the Concierge.
-- **`ANTHROPIC_API_KEY`** — must be present. If missing, `saas/app/api/support/route.ts`
-  returns the deterministic **Concierge** response *even for a recognized owner*.
+The owner Assistant depends on:
 
-## 2. The failure mode
-When `OWNER_EMAILS` doesn't match your login (or the AI key is missing):
-1. `getAccess()` returns `isOwner: false` → you get the **Concierge**, not COS.
-2. The Concierge has **no owner tools** (no `proposeInfrastructurePR`, no
-   `proposeCodeCommit`, etc.).
-3. **Confabulation:** asked to do an owner action anyway (e.g. "stage a PR to connect
-   LinkedIn"), the model **fabricated a convincing success** — a fake "PR staged" table
-   with an id and timestamp — instead of admitting it couldn't. The PR never appeared on
-   `/dashboard/infrastructure` because nothing was ever staged. This invisible +
-   misleading combination is what burned the time.
+- **`OWNER_EMAILS`** — contains the exact authorized owner login address(es), normalized by the access resolver. Owner/admin privilege comes from the canonical owner allowlist in `saas/lib/auth/access.ts`; a database role does not silently create owner authority.
+- **Independent COS reasoner configuration** — `LOCAL_AI_BASE_URL`, `LOCAL_AI_MODEL`, and the matching local/provider credential and host allowlist used by the configured COS reasoner. `/api/cos/status` verifies the actual reasoner health instead of treating a hosted-provider key as proof that COS is alive.
 
-## 3. Detection (built 2026-07-20)
-So a silent downgrade is never invisible again:
-- **`/api/cos/status`** — returns `mode` = `cos` (owner + key OK) / `degraded` (owner but
-  key missing) / `concierge` (not recognized as owner), plus a `detail` fix hint.
-- **Live badge on `/dashboard/assistant`** — a green **🧠 COS ACTIVE — owner**, or a red
-  **⚠️ COS DEGRADED** / amber **⚠️ CONCIERGE MODE** with the exact remedy. One glance
-  tells you which brain you're talking to before you send a message.
+`ANTHROPIC_API_KEY` is **not** a COS lifeline requirement. Anthropic is an optional provider integration only. Ordinary Concierge and independent COS reasoning must not require it.
 
-## 4. Restore steps (owner action, in Vercel)
-1. Set **`OWNER_EMAILS`** to your exact login email, lowercase (comma-separated with no
-   spaces for multiple owners). Edit the existing var — don't add a second.
-2. Confirm **`ANTHROPIC_API_KEY`** exists in the same project.
-3. **Redeploy** (env changes only apply on a fresh deploy).
-4. Log out and back in as the owner email; the Assistant badge should read
-   **COS ACTIVE**, and owner tools (like `proposeInfrastructurePR`) will actually fire.
-Note the chicken-and-egg: you cannot stage a PR to fix this, because staging needs the
-owner recognition you're missing. Do it manually in Vercel.
+Hosted-model fallback is separately governed by **`COS_EXTERNAL_AI_FALLBACK_ENABLED`**. It is disabled unless explicitly set to `true`. A forgotten or stale hosted-provider key must therefore not silently turn provider-independent reasoning into paid fallback.
 
-## 5. Pending hardening — anti-confabulation guard (COS brain)
-The detection layer above makes the downgrade visible. The remaining fix lives in the
-COS brain (`saas/app/api/support/route.ts`) and must NOT be rushed into that 1850-line
-file blindly:
-- **Prompt rule** (Concierge + Chief-of-Staff prompts): never claim to have staged a PR,
-  committed code, created a campaign, sent an email, or changed infrastructure unless the
-  corresponding tool actually ran and returned success with a real id. In Concierge/
-  degraded mode, say plainly "I can't do that here — you're not recognized as owner."
-- **Post-generation guard**: if a non-owner reply asserts a completed owner-action but no
-  owner tool fired this turn, replace it with the honest can't-do message.
-This is the one change that stops the *lie*; it is tracked as the next step so it goes in
-carefully rather than alongside unrelated edits.
+## 2. Failure modes
 
-## 6. Related items surfaced this session
-- **Infra-PR step-chaining fix**: implemented 2026-07-22. The resolver lives in
-  `saas/lib/hub/pr-step-refs.ts` and is wired into `saas/lib/hub/pr-engine.ts` at two
-  points — staging (references are validated, so self-, forward-, and malformed refs are
-  rejected before the owner sees the PR) and merge (each `{{steps[N].field}}` is resolved
-  from the `data` the earlier step returned). Dependent multi-step PRs (Stripe product →
-  price) work; unresolved refs fail *before* hitting the provider instead of shipping a
-  literal placeholder; the stored PR keeps the reference text, so the approved record and
-  the dedup fingerprint are unchanged. Covered by `saas/tests/prStepRefs.node.test.ts`.
-  NOTE: an earlier revision of this line read "(done)" while no resolver existed anywhere
-  in the repo — the precise confabulated-completion failure this whole document exists to
-  prevent, sitting inside the document itself. Verify against code, never against a note
-  that says something is done.
-- **Governance audit item (verify + fix)**: campaign rendering (`startSiteVideo`) is
-  reported to begin while the campaign is still `waiting_approval` — i.e. render spend
-  *before* approval, which violates the approval-gated-spending doctrine. Treat as a real
-  audit item, not just documentation.
+### Owner recognition failure
+
+If `OWNER_EMAILS` does not match the authenticated login, `getAccess()` does not create an owner context. The caller receives the customer Concierge boundary and owner-only actions are unavailable.
+
+### Independent reasoner failure
+
+If the owner is recognized but the configured COS reasoner is missing or unhealthy, the owner channel is **degraded**. The remedy is to repair the local/provider-independent COS configuration — not to add an Anthropic key.
+
+### Hosted fallback
+
+Hosted fallback is optional. It may run only when the platform's governed fallback policy explicitly enables it. Provider credentials by themselves are not authorization to invoke that provider.
+
+## 3. Detection
+
+`GET /api/cos/status` reports:
+
+- `mode: "cos"` — owner recognized and the independent COS reasoner is configured and healthy.
+- `mode: "degraded"` — owner recognized, but the independent COS reasoner is not configured or unhealthy.
+- `mode: "concierge"` — caller is not recognized as owner.
+
+The response also reports `localReasoner`, `cloudFallbackEnabled`, and `providerIndependent`. The Assistant badge consumes this status so a downgrade is visible before the owner sends a task.
+
+## 4. Restore steps
+
+1. Verify the authenticated login is authorized by `OWNER_EMAILS`.
+2. Verify `LOCAL_AI_BASE_URL`, `LOCAL_AI_MODEL`, the configured reasoner credential, and `LOCAL_AI_ALLOWED_HOSTS` match the intended COS runtime.
+3. Keep `COS_EXTERNAL_AI_FALLBACK_ENABLED` unset/false for provider-independent operation. Enable it only as an intentional policy decision.
+4. Redeploy after environment changes.
+5. Confirm `/api/cos/status` reports `mode: "cos"`, a healthy local reasoner, and the expected fallback state.
+
+Do **not** restore COS by adding `ANTHROPIC_API_KEY`. If an old Anthropic credential still exists, it should be removed when no optional Anthropic integration needs it, but its mere presence must not control COS health or public Concierge behavior.
+
+## 5. Anti-confabulation guard
+
+The support brain already contains structural action-integrity checks: owner-only tools are access-gated, execution claims are checked against tools that actually fired, and non-owner replies cannot truthfully claim an owner mutation that never occurred. Preserve this rule when adding tools: a model may describe an action only after the real executor returns success evidence.
+
+## 6. Provider-independence invariant
+
+The canonical invariant is:
+
+> Local/COS reasoning and live evidence retrieval come first. A hosted model is never selected merely because its API key happens to be present. Hosted fallback requires an explicit policy opt-in and recorded provenance.
+
+This invariant applies independently to Concierge, COS, Builder, specialist routing, and future agent/tool loops. Optional provider adapters may remain available for customers or explicitly governed integrations without becoming hidden runtime dependencies.

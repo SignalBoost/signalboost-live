@@ -4,7 +4,7 @@ import { runCosUniversityAdmission } from './cosUniversityAdmissionRunner.ts'
 import { listCosUniversityRegisteredAgents } from './cosUniversityAgentRegistry.ts'
 import { runCosUniversityIndependentExamBatch } from './cosUniversityIndependentExamRunner.ts'
 import { runCosUniversityContinuousLearning } from './cosUniversityContinuousLearning.ts'
-import { runCosUniversityDeliberatePractice } from './cosUniversityDeliberatePracticeRunner.ts'
+import { runConfiguredCosUniversityDeliberatePractice } from './cosUniversityConfiguredPracticeRunner.ts'
 import { readCosUniversityPracticeStudyGate } from './cosUniversityPracticeStudyGate.ts'
 import { reopenCosUniversityStudyAfterFailedPractice } from './cosUniversityPracticeFailureRemediation.ts'
 import { decideCosUniversityNextAcademicAction, type CosUniversityNextAcademicAction } from './cosUniversityAgentAcademicProgression.ts'
@@ -65,7 +65,7 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
         // this tick, which is an honest outcome rather than an error.
         const studyGate = await readCosUniversityPracticeStudyGate(now, agent.agentId)
         if (studyGate.allowed && studyGate.planId && studyGate.studyAttempt) {
-          const practice = await runCosUniversityDeliberatePractice({
+          const practice = await runConfiguredCosUniversityDeliberatePractice({
             agentId: agent.agentId,
             maxPlans: 1,
             maxExercises: 2,

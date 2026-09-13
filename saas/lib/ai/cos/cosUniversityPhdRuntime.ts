@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityPhdRuntime.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
@@ -279,11 +280,11 @@ function dbOrThrow() {
   return db
 }
 
-async function loadEnrollment(programId: CosUniversityPhdProgramId): Promise<CosUniversityProgramEnrollment | null> {
+async function loadEnrollment(programId: CosUniversityPhdProgramId, agentId: string): Promise<CosUniversityProgramEnrollment | null> {
   const db = dbOrThrow()
   const result = await db.from('cos_university_program_enrollments')
     .select('program_key,program_level,enrolled_at,minimum_residence_until,target_completion_at,hard_deadline_at')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_key', cosUniversityPhdProgramKey(programId))
     .eq('program_level', 'phd')
     .maybeSingle()
@@ -291,11 +292,11 @@ async function loadEnrollment(programId: CosUniversityPhdProgramId): Promise<Cos
   return mapEnrollment((result.data || null) as EnrollmentRow | null)
 }
 
-async function loadAnyPhdEnrollment(): Promise<CosUniversityProgramEnrollment | null> {
+async function loadAnyPhdEnrollment(agentId: string): Promise<CosUniversityProgramEnrollment | null> {
   const db = dbOrThrow()
   const result = await db.from('cos_university_program_enrollments')
     .select('program_key,program_level,enrolled_at,minimum_residence_until,target_completion_at,hard_deadline_at')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_level', 'phd')
     .order('enrolled_at', { ascending: true })
     .limit(1)
@@ -304,23 +305,23 @@ async function loadAnyPhdEnrollment(): Promise<CosUniversityProgramEnrollment | 
   return mapEnrollment((result.data || null) as EnrollmentRow | null)
 }
 
-async function loadCredential(programId: CosUniversityPhdProgramId): Promise<CosUniversityCredential | null> {
+async function loadCredential(programId: CosUniversityPhdProgramId, agentId: string): Promise<CosUniversityCredential | null> {
   const db = dbOrThrow()
   const result = await db.from('cos_university_credentials')
     .select('credential_key,program_key,program_level,title,standing,awarded_at')
-    .eq('agent_id', AGENT_ID)
-    .eq('credential_key', cosUniversityPhdCredentialKey(AGENT_ID, programId))
+    .eq('agent_id', agentId)
+    .eq('credential_key', cosUniversityPhdCredentialKey(agentId, programId))
     .eq('program_level', 'phd')
     .maybeSingle()
   if (result.error) throw result.error
   return mapCredential((result.data || null) as CredentialRow | null)
 }
 
-async function loadCurrentResearchNeed(programId: CosUniversityPhdProgramId, now: Date): Promise<CosUniversityPhdResearchNeed | null> {
+async function loadCurrentResearchNeed(programId: CosUniversityPhdProgramId, now: Date, agentId: string): Promise<CosUniversityPhdResearchNeed | null> {
   const db = dbOrThrow()
   const result = await db.from('cos_university_phd_research_needs')
     .select('need_key,program_id,justified,reason_code,source_ref,host_authority,observed_at,valid_until')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_id', programId)
     .eq('justified', true)
     .lte('observed_at', now.toISOString())
@@ -332,22 +333,22 @@ async function loadCurrentResearchNeed(programId: CosUniversityPhdProgramId, now
   return mapNeed((result.data || null) as ResearchNeedRow | null)
 }
 
-async function loadProjects(programId: CosUniversityPhdProgramId): Promise<CosUniversityPhdProject[]> {
+async function loadProjects(programId: CosUniversityPhdProgramId, agentId: string): Promise<CosUniversityPhdProject[]> {
   const db = dbOrThrow()
   const result = await db.from('cos_university_phd_projects')
     .select('project_key,program_id,candidate_actor_id,research_project_id,protocol_id,research_objective,source_ref,opened_at')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_key', cosUniversityPhdProgramKey(programId))
     .order('opened_at', { ascending: true })
   if (result.error) throw result.error
   return ((result.data || []) as ProjectRow[]).map(mapProject)
 }
 
-async function loadEvidenceRows(programId: CosUniversityPhdProgramId): Promise<EvidenceRow[]> {
+async function loadEvidenceRows(programId: CosUniversityPhdProgramId, agentId: string): Promise<EvidenceRow[]> {
   const db = dbOrThrow()
   const result = await db.from('cos_university_phd_evidence')
     .select(EVIDENCE_SELECT)
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_key', cosUniversityPhdProgramKey(programId))
     .order('observed_at', { ascending: true })
     .limit(10000)
@@ -355,8 +356,11 @@ async function loadEvidenceRows(programId: CosUniversityPhdProgramId): Promise<E
   return (result.data || []) as unknown as EvidenceRow[]
 }
 
-export async function readCosUniversityPhdEvidence(programId: CosUniversityPhdProgramId): Promise<CosUniversityPhdEvidence[]> {
-  return (await loadEvidenceRows(programId)).map(mapEvidence)
+export async function readCosUniversityPhdEvidence(
+  programId: CosUniversityPhdProgramId,
+  agentId: string = AGENT_ID,
+): Promise<CosUniversityPhdEvidence[]> {
+  return (await loadEvidenceRows(programId, agentId)).map(mapEvidence)
 }
 
 async function loadActorIdentities(actorIds: readonly string[]): Promise<CosUniversityPhdActorIdentity[]> {
@@ -460,11 +464,14 @@ export type CosUniversityPhdAdmissionState = {
 export async function readCosUniversityPhdAdmissionState(
   programId: CosUniversityPhdProgramId,
   now = new Date(),
+  /** The candidate. COS stays the default so every existing caller is unchanged. */
+  agentId: string = AGENT_ID,
 ): Promise<CosUniversityPhdAdmissionState> {
   const program = COS_UNIVERSITY_PHD_PROGRAMS[programId]
   const [masters, researchNeed] = await Promise.all([
-    readCosUniversityMastersRuntimeStatus(program.mastersPrerequisite, now),
-    loadCurrentResearchNeed(programId, now),
+    // The Master's prerequisite must be this candidate's own, not COS's.
+    readCosUniversityMastersRuntimeStatus(program.mastersPrerequisite, now, undefined, agentId),
+    loadCurrentResearchNeed(programId, now, agentId),
   ])
   return {
     mastersCredentialAwarded: Boolean(masters.credential),
@@ -478,7 +485,7 @@ export async function readCosUniversityPhdAdmissionState(
 }
 
 export type CosUniversityPhdRuntimeStatus = {
-  agentId: 'cos'
+  agentId: string
   programId: CosUniversityPhdProgramId
   programKey: string
   title: string
@@ -501,16 +508,17 @@ export type CosUniversityPhdRuntimeStatus = {
 export async function readCosUniversityPhdRuntimeStatus(
   programId: CosUniversityPhdProgramId,
   now = new Date(),
+  agentId: string = AGENT_ID,
 ): Promise<CosUniversityPhdRuntimeStatus> {
   const program = COS_UNIVERSITY_PHD_PROGRAMS[programId]
   const programKey = cosUniversityPhdProgramKey(programId)
-  const admissionState = await readCosUniversityPhdAdmissionState(programId, now)
+  const admissionState = await readCosUniversityPhdAdmissionState(programId, now, agentId)
   const admission = evaluateCosUniversityPhdAdmission(programId, admissionState)
   const [enrollment, credential, projects, evidence] = await Promise.all([
-    loadEnrollment(programId),
-    loadCredential(programId),
-    loadProjects(programId),
-    readCosUniversityPhdEvidence(programId),
+    loadEnrollment(programId, agentId),
+    loadCredential(programId, agentId),
+    loadProjects(programId, agentId),
+    readCosUniversityPhdEvidence(programId, agentId),
   ])
   const candidateActorIds = [...new Set(projects.map(row => row.candidateActorId))]
   const candidateActorId = candidateActorIds.length === 1 ? candidateActorIds[0] : null
@@ -526,7 +534,7 @@ export async function readCosUniversityPhdRuntimeStatus(
     && principalIndependence.ok
 
   return {
-    agentId: AGENT_ID,
+    agentId,
     programId,
     programKey,
     title: program.title,
@@ -550,12 +558,13 @@ export async function readCosUniversityPhdRuntimeStatus(
 export async function ensureCosUniversityPhdEnrollment(
   programId: CosUniversityPhdProgramId,
   now = new Date(),
+  agentId: string = AGENT_ID,
 ): Promise<{ enrolled: boolean; state: 'enrolled' | 'already_enrolled' | 'already_graduated' | 'admission_denied' | 'error'; status: CosUniversityPhdRuntimeStatus | null; reasons: string[] }> {
-  const before = await readCosUniversityPhdRuntimeStatus(programId, now)
+  const before = await readCosUniversityPhdRuntimeStatus(programId, now, agentId)
   if (before.credential) return { enrolled: false, state: 'already_graduated', status: before, reasons: [] }
   if (!before.admission.admitted) return { enrolled: false, state: 'admission_denied', status: before, reasons: before.admission.reasons }
   if (before.enrollment) return { enrolled: false, state: 'already_enrolled', status: before, reasons: [] }
-  const existing = await loadAnyPhdEnrollment()
+  const existing = await loadAnyPhdEnrollment(agentId)
   if (existing && existing.programKey !== before.programKey) {
     return { enrolled: false, state: 'admission_denied', status: before, reasons: ['already_enrolled_at_next_level'] }
   }
@@ -563,7 +572,7 @@ export async function ensureCosUniversityPhdEnrollment(
   const enrollment = buildCosUniversityProgramEnrollment({ programKey: before.programKey, level: 'phd', enrolledAt: now })
   const db = dbOrThrow()
   const result = await db.from('cos_university_program_enrollments').insert({
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     program_key: enrollment.programKey,
     program_level: 'phd',
     enrolled_at: enrollment.enrolledAt,
@@ -574,7 +583,7 @@ export async function ensureCosUniversityPhdEnrollment(
   if (result.error && String((result.error as { code?: string }).code || '') !== '23505') {
     return { enrolled: false, state: 'error', status: before, reasons: [result.error.message] }
   }
-  const after = await readCosUniversityPhdRuntimeStatus(programId, now)
+  const after = await readCosUniversityPhdRuntimeStatus(programId, now, agentId)
   return { enrolled: Boolean(after.enrollment), state: after.enrollment ? 'enrolled' : 'error', status: after, reasons: after.enrollment ? [] : ['phd_enrollment_not_persisted'] }
 }
 
@@ -615,6 +624,8 @@ export async function recordHostCosUniversityPhdActorIdentity(input: {
 }
 
 export async function recordHostCosUniversityPhdResearchNeed(input: {
+  /** The candidate this research need belongs to. Defaults to COS. */
+  agentId?: string
   programId: CosUniversityPhdProgramId
   reasonCode: CosUniversityPhdResearchNeedReason
   sourceRef: string
@@ -626,11 +637,12 @@ export async function recordHostCosUniversityPhdResearchNeed(input: {
   const sourceRef = clean(input.sourceRef, 1000)
   if (!COS_UNIVERSITY_PHD_PROGRAMS[input.programId] || !sourceRef || !Number.isFinite(observedAt.getTime())) return false
   const validityDays = Math.max(1, Math.min(730, Math.floor(input.validityDays || 180)))
-  const needKey = createHash('sha256').update(`${AGENT_ID}|${input.programId}|${input.reasonCode}|${sourceRef}|${observedAt.toISOString()}`).digest('hex')
+  const agentId = String(input.agentId ?? '').trim() || AGENT_ID
+  const needKey = createHash('sha256').update(`${agentId}|${input.programId}|${input.reasonCode}|${sourceRef}|${observedAt.toISOString()}`).digest('hex')
   const db = dbOrThrow()
   const result = await db.from('cos_university_phd_research_needs').insert({
     need_key: needKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     program_id: input.programId,
     justified: true,
     reason_code: input.reasonCode,
@@ -646,6 +658,8 @@ export async function recordHostCosUniversityPhdResearchNeed(input: {
 }
 
 export async function recordHostCosUniversityPhdProject(input: {
+  /** The candidate this research project belongs to. Defaults to COS. */
+  agentId?: string
   programId: CosUniversityPhdProgramId
   candidateActorId: string
   researchProjectId: string
@@ -660,16 +674,17 @@ export async function recordHostCosUniversityPhdProject(input: {
   const protocolId = clean(input.protocolId, 300)
   const researchObjective = clean(input.researchObjective, 4000)
   const sourceRef = clean(input.sourceRef, 1000)
+  const agentId = String(input.agentId ?? '').trim() || AGENT_ID
   if (!candidateActorId || !researchProjectId || !protocolId || !researchObjective || !sourceRef || !Number.isFinite(openedAt.getTime())) return false
-  const status = await readCosUniversityPhdRuntimeStatus(input.programId, openedAt)
+  const status = await readCosUniversityPhdRuntimeStatus(input.programId, openedAt, agentId)
   if (!status.enrollment || status.credential || status.timingStatus === 'deadline_expired') return false
   const actor = (await loadActorIdentities([candidateActorId])).find(row => row.actorId === candidateActorId)
   if (!actor || actor.actorRole !== 'candidate' || !cosUniversityPhdActorIdentityEligible(actor, openedAt)) return false
-  const projectKey = createHash('sha256').update(`${AGENT_ID}|${input.programId}|${candidateActorId}|${researchProjectId}|${protocolId}`).digest('hex')
+  const projectKey = createHash('sha256').update(`${agentId}|${input.programId}|${candidateActorId}|${researchProjectId}|${protocolId}`).digest('hex')
   const db = dbOrThrow()
   const result = await db.from('cos_university_phd_projects').insert({
     project_key: projectKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     program_key: status.programKey,
     program_id: input.programId,
     candidate_actor_id: candidateActorId,
@@ -684,8 +699,8 @@ export async function recordHostCosUniversityPhdProject(input: {
   throw result.error
 }
 
-async function projectForEvidence(programId: CosUniversityPhdProgramId, evidence: CosUniversityPhdEvidence): Promise<CosUniversityPhdProject | null> {
-  const projects = await loadProjects(programId)
+async function projectForEvidence(programId: CosUniversityPhdProgramId, evidence: CosUniversityPhdEvidence, agentId: string): Promise<CosUniversityPhdProject | null> {
+  const projects = await loadProjects(programId, agentId)
   return projects.find(project => project.candidateActorId === evidence.candidateActorId
     && project.researchProjectId === evidence.researchProjectId
     && project.protocolId === evidence.protocolId) ?? null
@@ -718,6 +733,8 @@ function failureStructurallyEligible(evidence: CosUniversityPhdEvidence, now: Da
 }
 
 export async function recordHostCosUniversityPhdEvidence(input: {
+  /** The candidate this research evidence belongs to. Defaults to COS. */
+  agentId?: string
   evidenceKey: string
   evidence: CosUniversityPhdEvidence
   sourceRef: string
@@ -730,10 +747,11 @@ export async function recordHostCosUniversityPhdEvidence(input: {
   const observedAt = new Date(evidence.observedAt)
   if (!evidenceKey || !sourceRef || !Number.isFinite(observedAt.getTime())) return false
   if (observedAt.getTime() > Date.now() + MAX_FUTURE_CLOCK_SKEW_MS) return false
-  const status = await readCosUniversityPhdRuntimeStatus(evidence.programId, observedAt)
+  const agentId = String(input.agentId ?? '').trim() || AGENT_ID
+  const status = await readCosUniversityPhdRuntimeStatus(evidence.programId, observedAt, agentId)
   if (!status.enrollment || status.credential || status.timingStatus === 'deadline_expired' || status.timingStatus === 'not_enrolled') return false
   if (observedAt.getTime() < Date.parse(status.enrollment.enrolledAt)) return false
-  const project = await projectForEvidence(evidence.programId, evidence)
+  const project = await projectForEvidence(evidence.programId, evidence, agentId)
   if (!project || observedAt.getTime() < Date.parse(project.openedAt)) return false
   if (!(await evidenceActorsResolve(evidence, observedAt))) return false
   if (evidence.passed ? !cosUniversityPhdEvidenceEligible(evidence, observedAt) : !failureStructurallyEligible(evidence, observedAt)) return false
@@ -742,7 +760,7 @@ export async function recordHostCosUniversityPhdEvidence(input: {
   if (evidence.passed && evidence.parentEvidenceIds?.length) {
     const parents = await db.from('cos_university_phd_evidence')
       .select('evidence_id,research_project_id,protocol_id,candidate_actor_id')
-      .eq('agent_id', AGENT_ID)
+      .eq('agent_id', agentId)
       .eq('program_key', status.programKey)
       .in('evidence_id', [...evidence.parentEvidenceIds])
     if (parents.error) throw parents.error
@@ -756,7 +774,7 @@ export async function recordHostCosUniversityPhdEvidence(input: {
   const result = await db.from('cos_university_phd_evidence').insert({
     evidence_key: evidenceKey,
     evidence_id: evidence.evidenceId,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     program_key: status.programKey,
     program_id: evidence.programId,
     stage: evidence.stage,
@@ -773,8 +791,8 @@ export async function recordHostCosUniversityPhdEvidence(input: {
     authority: evidence.authority,
     primary_source_count: evidence.primarySourceCount ?? null,
     protocol_frozen: evidence.protocolFrozen ?? null,
-    reproducible_artifact_hash: evidence.reproducibleArtifactHash ?? null,
-    replicated_artifact_hash: evidence.replicatedArtifactHash ?? null,
+    reproducible_artifact_hash: evidence.reproducibleArtifactHash,
+    replicated_artifact_hash: evidence.replicatedArtifactHash,
     independent_replication: evidence.independentReplication ?? null,
     critique_resolved: evidence.critiqueResolved ?? null,
     novelty_judged_independent: evidence.noveltyJudgedIndependent ?? null,
@@ -798,8 +816,9 @@ export function cosUniversityPhdShouldAwardNow(status: Pick<CosUniversityPhdRunt
 export async function evaluateAndAwardCosUniversityPhdCredential(
   programId: CosUniversityPhdProgramId,
   now = new Date(),
+  agentId: string = AGENT_ID,
 ): Promise<{ awarded: boolean; state: 'credential_awarded' | 'already_graduated' | 'not_eligible' | 'error'; status: CosUniversityPhdRuntimeStatus | null; reasons: string[] }> {
-  const before = await readCosUniversityPhdRuntimeStatus(programId, now)
+  const before = await readCosUniversityPhdRuntimeStatus(programId, now, agentId)
   if (before.credential) return { awarded: false, state: 'already_graduated', status: before, reasons: [] }
   if (!cosUniversityPhdShouldAwardNow(before) || !before.enrollment) {
     const reasons = [
@@ -817,8 +836,8 @@ export async function evaluateAndAwardCosUniversityPhdCredential(
   const db = dbOrThrow()
   const program = COS_UNIVERSITY_PHD_PROGRAMS[programId]
   const result = await db.from('cos_university_credentials').insert({
-    credential_key: cosUniversityPhdCredentialKey(AGENT_ID, programId),
-    agent_id: AGENT_ID,
+    credential_key: cosUniversityPhdCredentialKey(agentId, programId),
+    agent_id: agentId,
     program_key: before.programKey,
     program_level: 'phd',
     title: program.title,
@@ -839,7 +858,7 @@ export async function evaluateAndAwardCosUniversityPhdCredential(
   if (result.error && String((result.error as { code?: string }).code || '') !== '23505') {
     return { awarded: false, state: 'error', status: before, reasons: [result.error.message] }
   }
-  const after = await readCosUniversityPhdRuntimeStatus(programId, now)
+  const after = await readCosUniversityPhdRuntimeStatus(programId, now, agentId)
   return {
     awarded: Boolean(after.credential),
     state: after.credential ? 'credential_awarded' : 'error',

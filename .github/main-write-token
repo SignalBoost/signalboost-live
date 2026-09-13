@@ -1,2 +1,2 @@
-base_sha=137687a2deac8fe1aa56c265cff6bd9354a96abb
-branch=test/phd-agent-scope-regression-20260913
+base_sha=b6757d15076eedd9733dff21cc8f8b4fc1f556e0
+branch=fix/cos-one-time-teacher-dispatch-20260913

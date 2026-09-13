@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityExamResponseContract.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
@@ -65,7 +66,11 @@ test('actual unchanged scorer still rejects the same over-limit answer and enfor
   const provenance = { handled: true, localReasoning: true, externalAi: false, semanticCache: false, turnId: 'fixture-turn' }
   const before = JSON.stringify(exam)
   universityIndependentLearnerPrompt(exam)
-  assert.deepEqual(score(exam, Array(261).fill('evidence').join(' '), provenance), { passed: false, reasons: ['word_limit_exceeded'] })
+  // The exact tag is unchanged and still first — the public feedback path matches it literally. The
+  // measurement is additive: six identical length failures in production carried no way to tell a
+  // genuinely long answer from one a single word over.
+  assert.deepEqual(score(exam, Array(261).fill('evidence').join(' '), provenance),
+    { passed: false, reasons: ['word_limit_exceeded', 'word_limit_measured:words=261:limit=260'] })
   assert.deepEqual(score(exam, Array(260).fill('evidence').join('\n'), provenance), { passed: true, reasons: [] })
   assert.deepEqual(score(exam, 'short but missing the substantive concept', provenance), { passed: false, reasons: ['required_group_1_missing'] })
   assert.equal(JSON.stringify(exam), before)
@@ -128,7 +133,8 @@ for (const agentId of ['cos', 'software-specialist']) {
     assert.match(result.sent[0].prompt, /at most 260 words/)
     assert.doesNotMatch(result.sent[0].prompt, /private-scorer-sentinel/)
     assert.equal(result.result.status, 'failed')
-    assert.deepEqual(result.result.reasons, ['word_limit_exceeded'])
+    assert.equal(result.result.reasons[0], 'word_limit_exceeded')
+    assert.match(String(result.result.reasons[1]), /^word_limit_measured:words=\d+:limit=\d+$/)
     assert.equal(result.assessments.length, 1)
     assert.equal(result.assessments[0].passed, false)
     assert.deepEqual(result.assessments[0].evidence.responseContract, universityExamResponseContract(exam))

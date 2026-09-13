@@ -35,6 +35,7 @@
     }
   ],
   "crons": [
+    { "path": "/api/cron/specialist-mesh-production-acceptance", "schedule": "* * * * *" },
     { "path": "/api/cron/builder-continuations", "schedule": "* * * * *" },
     { "path": "/api/cron/builder-repair-merge", "schedule": "* * * * *" },
     { "path": "/api/cron/github-observation", "schedule": "*/5 * * * *" },

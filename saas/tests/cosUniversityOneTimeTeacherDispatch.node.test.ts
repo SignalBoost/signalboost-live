@@ -109,3 +109,14 @@ test('migration isolates mutable capability state and appends immutable audit re
   assert.match(migration, /max_estimated_cost_usd <= 0\.200000/)
   assert.match(migration, /subject_id text not null check \(subject_id = 'reasoning_decision_science'\)/)
 })
+
+test('provider acceptance is never downgraded to a replayable failed receipt by later audit failure', () => {
+  const route = readFileSync('app/api/internal/cos/university-distillation-teacher/dispatch-once/route.ts', 'utf8')
+  const jobModule = readFileSync('lib/ai/cos/cosUniversityOneTimeTeacherJob.ts', 'utf8')
+  assert.match(jobModule, /OneTimeTeacherProviderAcceptedAuditError/)
+  assert.match(jobModule, /submitHuggingFaceJob[\s\S]*teacher_dataset_job_dispatched/)
+  assert.match(route, /isOneTimeTeacherProviderAcceptedAuditError/)
+  assert.match(route, /status:\s*'dispatched'[\s\S]*jobId:\s*dispatched\.jobId/)
+  assert.match(route, /reconciliationRequired:\s*true/)
+  assert.doesNotMatch(route, /isOneTimeTeacherProviderAcceptedAuditError[\s\S]{0,1200}status:\s*'failed'/)
+})

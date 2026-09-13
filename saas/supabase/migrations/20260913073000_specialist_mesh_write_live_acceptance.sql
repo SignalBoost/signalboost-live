@@ -92,6 +92,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_effect public.a2a_specialist_mesh_write_acceptance_effects%rowtype;
+  v_effect_found boolean := false;
   v_reconciliation public.a2a_specialist_mesh_write_acceptance_reconciliations%rowtype;
   v_outcome text;
 begin
@@ -103,10 +104,11 @@ begin
   select * into v_effect
   from public.a2a_specialist_mesh_write_acceptance_effects
   where operation_key = p_operation_key;
+  v_effect_found := found;
 
   if p_force_unknown then
     v_outcome := 'unknown';
-  elsif found then
+  elsif v_effect_found then
     if v_effect.idempotency_key is distinct from p_idempotency_key then
       v_outcome := 'unknown';
     else
@@ -122,19 +124,68 @@ begin
     p_operation_key,
     p_idempotency_key,
     v_outcome,
-    case when found then v_effect.created_at else null end
+    case when v_effect_found then v_effect.created_at else null end
   ) returning * into v_reconciliation;
 
   return jsonb_build_object(
     'outcome', v_outcome,
     'evidence_ref', 'db://a2a_specialist_mesh_write_acceptance_reconciliations/' || v_reconciliation.reconciliation_id::text,
     'provider_operation_ref', p_operation_key,
-    'effect_created_at', v_effect.created_at
+    'effect_created_at', case when v_effect_found then v_effect.created_at else null end
   );
+end;
+$$;
+
+create or replace function public.a2a_specialist_mesh_write_acceptance_evidence(
+  p_operation_key text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_effect jsonb;
+  v_reconciliations jsonb;
+begin
+  if p_operation_key is null or trim(p_operation_key) = '' then raise exception 'write_acceptance_evidence_invalid'; end if;
+
+  select to_jsonb(e) into v_effect
+  from public.a2a_specialist_mesh_write_acceptance_effects e
+  where e.operation_key = p_operation_key;
+
+  select coalesce(jsonb_agg(to_jsonb(r) order by r.observed_at asc, r.reconciliation_id asc), '[]'::jsonb)
+  into v_reconciliations
+  from public.a2a_specialist_mesh_write_acceptance_reconciliations r
+  where r.operation_key = p_operation_key;
+
+  return jsonb_build_object('effect', v_effect, 'reconciliations', v_reconciliations);
+end;
+$$;
+
+create or replace function public.a2a_specialist_mesh_write_recovery_evidence(
+  p_operation_key text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_attempts jsonb;
+begin
+  if p_operation_key is null or trim(p_operation_key) = '' then raise exception 'write_recovery_evidence_invalid'; end if;
+  select coalesce(jsonb_agg(to_jsonb(a) order by a.fencing_token asc, a.created_at asc), '[]'::jsonb)
+  into v_attempts
+  from public.a2a_specialist_mesh_write_recovery_attempts a
+  where a.operation_key = p_operation_key;
+  return jsonb_build_object('attempts', v_attempts);
 end;
 $$;
 
 revoke all on function public.a2a_specialist_mesh_write_acceptance_apply(text,text,text,text) from public, anon, authenticated;
 revoke all on function public.a2a_specialist_mesh_write_acceptance_reconcile(text,text,boolean) from public, anon, authenticated;
+revoke all on function public.a2a_specialist_mesh_write_acceptance_evidence(text) from public, anon, authenticated;
+revoke all on function public.a2a_specialist_mesh_write_recovery_evidence(text) from public, anon, authenticated;
 grant execute on function public.a2a_specialist_mesh_write_acceptance_apply(text,text,text,text) to service_role;
 grant execute on function public.a2a_specialist_mesh_write_acceptance_reconcile(text,text,boolean) to service_role;
+grant execute on function public.a2a_specialist_mesh_write_acceptance_evidence(text) to service_role;
+grant execute on function public.a2a_specialist_mesh_write_recovery_evidence(text) to service_role;

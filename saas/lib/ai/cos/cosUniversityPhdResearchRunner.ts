@@ -31,8 +31,13 @@ import {
   type CosUniversityPhdResearchRunState,
   type CosUniversityPhdResearchWorkKind,
 } from './cosUniversityPhdResearchPolicy.ts'
+import {
+  executeBoundAgentExam,
+  hasBoundAcademicExecutor,
+  isBoundSoftwareCapstoneEvidence,
+} from './cosUniversityAgentExamRuntime.ts'
+import { DEFAULT_PHD_AGENT_ID, requirePhdAgentId } from './cosUniversityPhdAgentScope.ts'
 
-const AGENT_ID = 'cos'
 const CLAIM_TTL_MS = 15 * 60_000
 const MAX_PRODUCT_CHARS = 24_000
 const MAX_PRIOR_CONTEXT_CHARS = 9_000
@@ -97,6 +102,7 @@ type AssignmentRow = {
 }
 
 type RunRow = {
+  id: string
   run_key: string
   assignment_key: string
   status: 'created' | 'running' | 'submitted' | 'failed'
@@ -132,6 +138,19 @@ type ActorRow = {
   valid_until: string
 }
 
+type CandidateExecution = Readonly<{
+  reply: string
+  turnId: string | null
+  responseSource: string
+  localModelInvoked: boolean
+  externalAiInvoked: boolean
+  semanticCache: boolean
+  handled: boolean
+  principalFingerprint: string
+  boundEvidenceValid: boolean
+  sourceRef: string
+}>
+
 export type CosUniversityPhdResearchAssignment = Readonly<{
   assignmentKey: string
   programId: CosUniversityPhdProgramId
@@ -152,6 +171,7 @@ export type CosUniversityPhdResearchAssignment = Readonly<{
 }>
 
 export type CosUniversityPhdResearchRun = Readonly<{
+  runId: string
   runKey: string
   assignmentKey: string
   status: RunRow['status']
@@ -252,6 +272,7 @@ function mapAssignment(row: AssignmentRow): CosUniversityPhdResearchAssignment {
 function mapRun(row: RunRow | null): CosUniversityPhdResearchRun | null {
   if (!row) return null
   return {
+    runId: row.id,
     runKey: row.run_key,
     assignmentKey: row.assignment_key,
     status: row.status,
@@ -316,20 +337,23 @@ async function loadActorIdentities(actorIds: readonly string[]): Promise<Map<str
   return new Map(rows.map(row => [row.actorId, row]))
 }
 
-async function loadAssignments(programId: CosUniversityPhdProgramId): Promise<CosUniversityPhdResearchAssignment[]> {
+async function loadAssignments(programId: CosUniversityPhdProgramId, agentId: string): Promise<CosUniversityPhdResearchAssignment[]> {
+  requirePhdAgentId(agentId)
   const result = await dbOrThrow().from('cos_university_phd_work_assignments')
     .select('assignment_key,program_id,research_project_id,protocol_id,candidate_actor_id,performer_actor_id,work_kind,academic_stage,attempt_index,parent_evidence_ids,objective,objective_hash,source_ref,assigned_at,not_after')
-    .eq('agent_id', AGENT_ID)
+    .eq('agent_id', agentId)
     .eq('program_key', cosUniversityPhdProgramKey(programId))
     .order('assigned_at', { ascending: true })
   if (result.error) throw result.error
   return ((result.data || []) as AssignmentRow[]).map(mapAssignment)
 }
 
+const RUN_SELECT = 'id,run_key,assignment_key,status,failure_reason,started_at,claim_expires_at,completed_at,turn_id,response_source,local_model_invoked,external_ai_invoked,semantic_cache'
+
 async function loadRuns(assignmentKeys: readonly string[]): Promise<Map<string, CosUniversityPhdResearchRun>> {
   if (!assignmentKeys.length) return new Map()
   const result = await dbOrThrow().from('cos_university_phd_work_runs')
-    .select('run_key,assignment_key,status,failure_reason,started_at,claim_expires_at,completed_at,turn_id,response_source,local_model_invoked,external_ai_invoked,semantic_cache')
+    .select(RUN_SELECT)
     .in('assignment_key', [...assignmentKeys])
   if (result.error) throw result.error
   return new Map(((result.data || []) as RunRow[]).map(row => [row.assignment_key, mapRun(row)!]))
@@ -346,8 +370,10 @@ async function loadProducts(assignmentKeys: readonly string[]): Promise<Map<stri
 
 export async function readCosUniversityPhdResearchWork(
   programId: CosUniversityPhdProgramId,
+  agentId: string = DEFAULT_PHD_AGENT_ID,
 ): Promise<CosUniversityPhdResearchWorkRecord[]> {
-  const assignments = await loadAssignments(programId)
+  requirePhdAgentId(agentId)
+  const assignments = await loadAssignments(programId, agentId)
   const keys = assignments.map(row => row.assignmentKey)
   const [runs, products] = await Promise.all([loadRuns(keys), loadProducts(keys)])
   return assignments.map(assignment => ({
@@ -636,6 +662,7 @@ async function failUnclaimedAssignment(assignmentKey: string, reason: string, no
 }
 
 async function createCandidateAssignment(input: {
+  agentId: string
   programId: CosUniversityPhdProgramId
   project: CosUniversityPhdProject
   workKind: CosUniversityPhdResearchWorkKind
@@ -644,8 +671,9 @@ async function createCandidateAssignment(input: {
   now: Date
   programTitle: string
 }): Promise<CosUniversityPhdResearchAssignment | null> {
+  const agentId = requirePhdAgentId(input.agentId)
   if (!AUTO_CANDIDATE_WORK.has(input.workKind)) return null
-  const status = await readCosUniversityPhdRuntimeStatus(input.programId, input.now)
+  const status = await readCosUniversityPhdRuntimeStatus(input.programId, input.now, agentId)
   if (!status.enrollment || status.credential || status.timingStatus === 'deadline_expired' || status.timingStatus === 'not_enrolled') return null
   if (!status.projects.some(project => projectMatches(project, input.project.candidateActorId, input.project.researchProjectId, input.project.protocolId))) return null
 
@@ -665,7 +693,7 @@ async function createCandidateAssignment(input: {
   const academicStage = WORK_STAGE[input.workKind]
   const attemptIndex = Math.max(0, Math.floor(input.attemptIndex))
   const assignmentKey = digest([
-    AGENT_ID,
+    agentId,
     input.programId,
     input.project.researchProjectId,
     input.project.protocolId,
@@ -683,7 +711,7 @@ async function createCandidateAssignment(input: {
   const select = 'assignment_key,program_id,research_project_id,protocol_id,candidate_actor_id,performer_actor_id,work_kind,academic_stage,attempt_index,parent_evidence_ids,objective,objective_hash,source_ref,assigned_at,not_after'
   const insert = await db.from('cos_university_phd_work_assignments').insert({
     assignment_key: assignmentKey,
-    agent_id: AGENT_ID,
+    agent_id: agentId,
     program_key: status.programKey,
     program_id: input.programId,
     research_project_id: input.project.researchProjectId,
@@ -706,7 +734,7 @@ async function createCandidateAssignment(input: {
     assignment = mapAssignment(insert.data as AssignmentRow)
   } else if (insert.error && String((insert.error as { code?: string }).code || '') === '23505') {
     const existing = await db.from('cos_university_phd_work_assignments').select(select)
-      .eq('agent_id', AGENT_ID)
+      .eq('agent_id', agentId)
       .eq('program_key', status.programKey)
       .eq('research_project_id', input.project.researchProjectId)
       .eq('protocol_id', input.project.protocolId)
@@ -737,25 +765,25 @@ async function createCandidateAssignment(input: {
 
 async function loadRunForAssignment(assignmentKey: string): Promise<CosUniversityPhdResearchRun | null> {
   const result = await dbOrThrow().from('cos_university_phd_work_runs')
-    .select('run_key,assignment_key,status,failure_reason,started_at,claim_expires_at,completed_at,turn_id,response_source,local_model_invoked,external_ai_invoked,semantic_cache')
+    .select(RUN_SELECT)
     .eq('assignment_key', assignmentKey)
     .maybeSingle()
   if (result.error) throw result.error
   return mapRun((result.data || null) as RunRow | null)
 }
 
-async function claimCandidateAssignment(assignment: CosUniversityPhdResearchAssignment, now: Date): Promise<boolean> {
-  if (assignment.performerActorId !== assignment.candidateActorId || Date.parse(assignment.notAfter) <= now.getTime()) return false
+async function claimCandidateAssignment(assignment: CosUniversityPhdResearchAssignment, now: Date): Promise<CosUniversityPhdResearchRun | null> {
+  if (assignment.performerActorId !== assignment.candidateActorId || Date.parse(assignment.notAfter) <= now.getTime()) return null
   const run = await loadRunForAssignment(assignment.assignmentKey)
-  if (!run || run.status !== 'created') return false
+  if (!run || run.status !== 'created') return null
   const result = await dbOrThrow().from('cos_university_phd_work_runs').update({
     status: 'running',
     started_at: now.toISOString(),
     claim_expires_at: new Date(now.getTime() + CLAIM_TTL_MS).toISOString(),
     updated_at: now.toISOString(),
-  }).eq('assignment_key', assignment.assignmentKey).eq('status', 'created').select('assignment_key').maybeSingle()
+  }).eq('assignment_key', assignment.assignmentKey).eq('status', 'created').select(RUN_SELECT).maybeSingle()
   if (result.error) throw result.error
-  return Boolean(result.data?.assignment_key)
+  return mapRun((result.data || null) as RunRow | null)
 }
 
 async function failCandidateAssignment(assignment: CosUniversityPhdResearchAssignment, reason: string, now = new Date()): Promise<void> {
@@ -815,10 +843,10 @@ async function persistCandidateProduct(input: {
   }
 }
 
-async function recoverResearchRuns(programId: CosUniversityPhdProgramId, now: Date): Promise<void> {
-  let records = await readCosUniversityPhdResearchWork(programId)
+async function recoverResearchRuns(programId: CosUniversityPhdProgramId, now: Date, agentId: string): Promise<void> {
+  let records = await readCosUniversityPhdResearchWork(programId, agentId)
   for (const record of records.filter(item => !item.run)) await ensureRun(record.assignment.assignmentKey)
-  if (records.some(item => !item.run)) records = await readCosUniversityPhdResearchWork(programId)
+  if (records.some(item => !item.run)) records = await readCosUniversityPhdResearchWork(programId, agentId)
 
   const productOrphans = records.filter(record => record.product && record.run && record.run.status !== 'submitted')
   const db = dbOrThrow()
@@ -877,9 +905,11 @@ function policyRuns(records: readonly CosUniversityPhdResearchWorkRecord[]): Cos
 async function ensureNextCandidateAssignment(
   programId: CosUniversityPhdProgramId,
   now: Date,
+  agentId: string,
 ): Promise<{ assignment: CosUniversityPhdResearchAssignment | null; reason: string; workKind: CosUniversityPhdResearchWorkKind | null }> {
-  await recoverResearchRuns(programId, now)
-  const status = await readCosUniversityPhdRuntimeStatus(programId, now)
+  requirePhdAgentId(agentId)
+  await recoverResearchRuns(programId, now, agentId)
+  const status = await readCosUniversityPhdRuntimeStatus(programId, now, agentId)
   if (!status.enrollment) return { assignment: null, reason: 'not_enrolled', workKind: null }
   if (status.credential || status.timingStatus === 'deadline_expired') return { assignment: null, reason: 'program_inactive', workKind: null }
   if (!status.projects.length) return { assignment: null, reason: 'research_project_required', workKind: null }
@@ -887,8 +917,8 @@ async function ensureNextCandidateAssignment(
 
   const project = status.projects[0]
   const [records, allEvidence] = await Promise.all([
-    readCosUniversityPhdResearchWork(programId),
-    readCosUniversityPhdEvidence(programId),
+    readCosUniversityPhdResearchWork(programId, agentId),
+    readCosUniversityPhdEvidence(programId, agentId),
   ])
   const evidence = allEvidence.filter(row => row.researchProjectId === project.researchProjectId
     && row.protocolId === project.protocolId
@@ -915,6 +945,7 @@ async function ensureNextCandidateAssignment(
     return { assignment: null, reason: 'independent_boundary', workKind: decision.workKind }
   }
   const assignment = await createCandidateAssignment({
+    agentId,
     programId,
     project,
     workKind: decision.workKind,
@@ -930,8 +961,8 @@ async function ensureNextCandidateAssignment(
   }
 }
 
-async function priorContextForAssignment(assignment: CosUniversityPhdResearchAssignment): Promise<string> {
-  const records = await readCosUniversityPhdResearchWork(assignment.programId)
+async function priorContextForAssignment(assignment: CosUniversityPhdResearchAssignment, agentId: string): Promise<string> {
+  const records = await readCosUniversityPhdResearchWork(assignment.programId, agentId)
   return records
     .filter(record => record.run?.status === 'submitted'
       && record.product
@@ -976,12 +1007,77 @@ function buildResearchPrompt(assignment: CosUniversityPhdResearchAssignment, pri
   return sections.join('\n\n')
 }
 
+async function executeCandidateResearch(
+  agentId: string,
+  run: CosUniversityPhdResearchRun,
+  assignment: CosUniversityPhdResearchAssignment,
+  prompt: string,
+): Promise<CandidateExecution> {
+  if (agentId !== DEFAULT_PHD_AGENT_ID) {
+    if (!(await hasBoundAcademicExecutor(agentId))) throw new Error('phd_bound_executor_unavailable')
+    const bound = await executeBoundAgentExam(
+      { agentId, runId: run.runId, manifestHash: assignment.assignmentKey, prompt },
+      { domain: 'role_domain' },
+    )
+    const boundEvidenceValid = isBoundSoftwareCapstoneEvidence(bound.execution, {
+      id: run.runId,
+      agent_id: agentId,
+      manifest_hash: assignment.assignmentKey,
+      turn_id: bound.execution.turnId,
+    }, bound.execution.role)
+    return {
+      reply: bound.reply,
+      turnId: bound.execution.turnId,
+      responseSource: bound.execution.runtime,
+      localModelInvoked: true,
+      externalAiInvoked: false,
+      semanticCache: false,
+      handled: true,
+      principalFingerprint: bound.execution.model,
+      boundEvidenceValid,
+      sourceRef: `university_specialist_phd_research:${agentId}:${bound.execution.turnId}`,
+    }
+  }
+
+  beginEvidenceSourceUseTurn()
+  let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
+  try {
+    if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
+      await ensureLocalInferenceRuntimeReady()
+      await generateLocalEmbedding(prompt)
+    }
+    result = await tryCOSFirstAnswer({ prompt, language: 'en', privileged: true, disableCache: true })
+  } catch (error) {
+    flushCapturedEvidenceSourceUse()
+    throw error
+  }
+  const turnId = peekEvidenceSourceUseTurnId()
+  const semanticCache = result.provenance.responseSource === 'semantic_cache'
+    || result.provenance.responseSource === 'semantic_similarity'
+  const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
+  const execution: CandidateExecution = {
+    reply,
+    turnId: turnId || null,
+    responseSource: result.provenance.responseSource,
+    localModelInvoked: Boolean(result.provenance.localModelInvoked),
+    externalAiInvoked: Boolean(result.provenance.externalAiInvoked),
+    semanticCache,
+    handled: result.handled,
+    principalFingerprint: clean(result.provenance.reasonerLabel, 500),
+    boundEvidenceValid: true,
+    sourceRef: turnId ? `cos_turn:${turnId}` : 'cos_turn:missing',
+  }
+  flushCapturedEvidenceSourceUse()
+  return execution
+}
+
 async function executeCandidateAssignment(
   assignment: CosUniversityPhdResearchAssignment,
   now: Date,
+  agentId: string,
 ): Promise<CosUniversityPhdResearchCycleSummary> {
-  const claimed = await claimCandidateAssignment(assignment, now)
-  if (!claimed) return {
+  const claimedRun = await claimCandidateAssignment(assignment, now)
+  if (!claimedRun) return {
     enabled: true,
     programId: assignment.programId,
     assignmentKey: assignment.assignmentKey,
@@ -993,22 +1089,11 @@ async function executeCandidateAssignment(
     contentHash: null,
   }
 
-  const prompt = buildResearchPrompt(assignment, await priorContextForAssignment(assignment))
-  beginEvidenceSourceUseTurn()
-  let result: Awaited<ReturnType<typeof tryCOSFirstAnswer>>
+  const prompt = buildResearchPrompt(assignment, await priorContextForAssignment(assignment, agentId))
+  let execution: CandidateExecution
   try {
-    if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {
-      await ensureLocalInferenceRuntimeReady()
-      await generateLocalEmbedding(prompt)
-    }
-    result = await tryCOSFirstAnswer({
-      prompt,
-      language: 'en',
-      privileged: true,
-      disableCache: true,
-    })
+    execution = await executeCandidateResearch(agentId, claimedRun, assignment, prompt)
   } catch (error) {
-    flushCapturedEvidenceSourceUse()
     const reason = `research_execution_error:${error instanceof Error ? error.message : String(error)}`
     await failCandidateAssignment(assignment, reason)
     return {
@@ -1025,34 +1110,31 @@ async function executeCandidateAssignment(
   }
 
   const completedAt = new Date()
-  const turnId = peekEvidenceSourceUseTurnId()
-  const semanticCache = result.provenance.responseSource === 'semantic_cache'
-    || result.provenance.responseSource === 'semantic_similarity'
-  const reply = result.handled ? result.reply : ('bestEffortReply' in result ? result.bestEffortReply ?? '' : '')
   const candidateIdentity = await loadCandidateIdentity(assignment.candidateActorId)
-  const reasonerFingerprint = clean(result.provenance.reasonerLabel, 500)
   const candidateMatchesReasoner = Boolean(
     candidateIdentity
     && candidateIdentity.actorRole === 'candidate'
     && candidateIdentity.principalType === 'ai_model'
     && cosUniversityPhdActorIdentityEligible(candidateIdentity, completedAt)
-    && reasonerFingerprint
-    && clean(candidateIdentity.principalFingerprint, 500) === reasonerFingerprint,
+    && execution.principalFingerprint
+    && clean(candidateIdentity.principalFingerprint, 500) === execution.principalFingerprint,
   )
   const freshLocal = Boolean(
-    result.handled
-    && result.provenance.localModelInvoked
-    && !result.provenance.externalAiInvoked
-    && !semanticCache
+    execution.handled
+    && execution.localModelInvoked
+    && !execution.externalAiInvoked
+    && !execution.semanticCache
     && candidateMatchesReasoner
-    && turnId
-    && String(reply || '').trim(),
+    && execution.boundEvidenceValid
+    && execution.turnId
+    && execution.reply.trim(),
   )
-  flushCapturedEvidenceSourceUse()
-  if (!freshLocal || !turnId) {
-    const failureReason = candidateMatchesReasoner
-      ? 'fresh_local_research_execution_required'
-      : 'research_reasoner_principal_mismatch'
+  if (!freshLocal || !execution.turnId) {
+    const failureReason = !candidateMatchesReasoner
+      ? 'research_reasoner_principal_mismatch'
+      : !execution.boundEvidenceValid
+        ? 'research_bound_execution_invalid'
+        : 'fresh_local_research_execution_required'
     await failCandidateAssignment(assignment, failureReason, completedAt)
     return {
       enabled: true,
@@ -1062,21 +1144,21 @@ async function executeCandidateAssignment(
       status: 'failed',
       reason: failureReason,
       academicCredit: false,
-      turnId: turnId || null,
+      turnId: execution.turnId,
       contentHash: null,
     }
   }
 
   const product = await persistCandidateProduct({
     assignment,
-    contentText: reply,
-    sourceRef: `cos_turn:${turnId}`,
+    contentText: execution.reply,
+    sourceRef: execution.sourceRef,
     submittedAt: completedAt,
-    turnId,
-    responseSource: result.provenance.responseSource,
-    localModelInvoked: result.provenance.localModelInvoked,
-    externalAiInvoked: result.provenance.externalAiInvoked,
-    semanticCache,
+    turnId: execution.turnId,
+    responseSource: execution.responseSource,
+    localModelInvoked: execution.localModelInvoked,
+    externalAiInvoked: execution.externalAiInvoked,
+    semanticCache: execution.semanticCache,
   })
   if (!product) {
     await failCandidateAssignment(assignment, 'research_product_not_persisted', completedAt)
@@ -1088,7 +1170,7 @@ async function executeCandidateAssignment(
       status: 'failed',
       reason: 'research_product_not_persisted',
       academicCredit: false,
-      turnId,
+      turnId: execution.turnId,
       contentHash: null,
     }
   }
@@ -1100,7 +1182,7 @@ async function executeCandidateAssignment(
     status: 'submitted',
     reason: 'research_product_awaits_independent_evaluation',
     academicCredit: cosUniversityPhdResearchWorkAcademicCredit(),
-    turnId,
+    turnId: execution.turnId,
     contentHash: product.contentHash,
   }
 }
@@ -1116,7 +1198,11 @@ function noWorkStatus(reason: string): CosUniversityPhdResearchCycleSummary['sta
   return 'no_candidate_work'
 }
 
-export async function runCosUniversityPhdResearchCycle(now = new Date()): Promise<CosUniversityPhdResearchCycleSummary> {
+export async function runCosUniversityPhdResearchCycle(
+  now = new Date(),
+  agentId: string = DEFAULT_PHD_AGENT_ID,
+): Promise<CosUniversityPhdResearchCycleSummary> {
+  requirePhdAgentId(agentId)
   if (process.env.COS_UNIVERSITY_PHD_RESEARCH_EXECUTION_ENABLED !== 'true') {
     return {
       enabled: false,
@@ -1133,9 +1219,9 @@ export async function runCosUniversityPhdResearchCycle(now = new Date()): Promis
   const programIds = Object.keys(COS_UNIVERSITY_PHD_PROGRAMS) as CosUniversityPhdProgramId[]
   for (const programId of programIds) {
     try {
-      const status = await readCosUniversityPhdRuntimeStatus(programId, now)
+      const status = await readCosUniversityPhdRuntimeStatus(programId, now, agentId)
       if (!status.enrollment && !status.credential) continue
-      const next = await ensureNextCandidateAssignment(programId, now)
+      const next = await ensureNextCandidateAssignment(programId, now, agentId)
       if (!next.assignment) return {
         enabled: true,
         programId,
@@ -1147,7 +1233,7 @@ export async function runCosUniversityPhdResearchCycle(now = new Date()): Promis
         turnId: null,
         contentHash: null,
       }
-      return executeCandidateAssignment(next.assignment, now)
+      return executeCandidateAssignment(next.assignment, now, agentId)
     } catch (error) {
       return {
         enabled: true,

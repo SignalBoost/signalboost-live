@@ -47,7 +47,7 @@ export type CosUniversityRemediationGraduationStatus = CosUniversityTimeBoundedG
 
 import { readCosUniversityAgentRole } from './cosUniversityAgentRegistry.ts'
 import { executeSoftwareCapstoneRuntime, requireRegisteredCapstoneRuntime } from './cosUniversityAgentCapstoneRuntime.ts'
-import { SOFTWARE_CAPSTONE_RUNTIME, type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
+import { type AgentCapstoneExecution } from './cosUniversityAgentCapstone.ts'
 
 const AGENT_ID = 'cos'
 const UNDERGRADUATE_PROGRAM_KEY = 'generalist_undergraduate_v1'
@@ -357,7 +357,7 @@ async function executeCapstoneRun(row: GeneralistCapstoneRunRow, now: Date): Pro
       })
       execution = specialist.execution
       result = { handled: true, reply: specialist.reply, provenance: {
-        localModelInvoked: true, externalAiInvoked: false, responseSource: SOFTWARE_CAPSTONE_RUNTIME,
+        localModelInvoked: true, externalAiInvoked: false, responseSource: specialist.execution.runtime,
       } }
     } else {
       if (process.env.COS_LOCAL_FIRST_ENABLED !== 'false') {

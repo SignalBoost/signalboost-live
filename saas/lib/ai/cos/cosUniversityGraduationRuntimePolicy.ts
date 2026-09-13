@@ -1,6 +1,8 @@
+import { SOFTWARE_CAPSTONE_RUNTIME } from './cosUniversityAgentCapstone.ts'
 import {
   isBoundRegisteredSpecialistEvidence,
   isRegisteredSpecialistIdentity,
+  REGISTERED_SPECIALIST_RUNTIME,
 } from './cosUniversityRegisteredSpecialistExecutor.ts'
 
 /** Host capability checks, not academic evidence or a grant of authority. */
@@ -41,9 +43,11 @@ export function isCosUniversityGraduationExecutionEvidence(row: {
     && row.response_source !== 'semantic_cache'
     && row.response_source !== 'semantic_similarity'
     && (agentId === 'cos'
-      ? row.execution_provenance == null
+      ? (row.execution_provenance == null
+        && row.response_source !== SOFTWARE_CAPSTONE_RUNTIME
+        && row.response_source !== REGISTERED_SPECIALIST_RUNTIME)
       : (row.response_source === executionRuntime(row.execution_provenance)
-      && isBoundRegisteredSpecialistEvidence(row.execution_provenance, row, registeredRole, now)))
+        && isBoundRegisteredSpecialistEvidence(row.execution_provenance, row, registeredRole, now)))
 }
 
 /** Absolute hours avoid resetting the rotation daily when there are more than 24 agents. */

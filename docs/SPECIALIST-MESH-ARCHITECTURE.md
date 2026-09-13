@@ -1,7 +1,7 @@
 # Specialist Mesh Architecture
 
 **Date:** 2026-09-13  
-**Status:** accepted direction; implementation progressive and evidence-gated  
+**Status:** final phase implementation in progress; evidence-gated  
 **Scope:** COS/A2A specialists, operational continuity, and COS University continuing learning
 
 ## Objective
@@ -109,23 +109,40 @@ Shared task evidence is bounded to what is necessary for the authorized task.
 
 The same mesh principle applies to continuing education.
 
-The University should continuously measure capability coverage. If only one specialist is qualified for an operationally important capability, that is a resilience gap and the University should prioritize cross-training another suitable specialist.
+The University continuously measures capability coverage from configured Production specialist manifests plus fresh durable qualification evidence. The default host resilience target is two independently qualified **and authorized** agents per configured exact capability. If that target is not met, the gap is persisted and University cross-training is prioritized for a role-fit registered learner.
+
+Coverage is education-only. A study plan does not create an A2A assignment or qualification. A learner who is already qualified but not authorized is recorded as an `authorization_gap` rather than being sent back to study, and the University never fills the missing assignment itself. If no role-fit learner exists, the gap is `unassigned` rather than force-fitting an unrelated identity.
 
 Validated lessons may be shared across the cohort, but academic credit never transfers. Each specialist must independently study, pass fresh assessments, demonstrate transfer, retain the knowledge, and produce verified applied outcomes.
 
 ```text
-Production work -> capability evidence -> coverage map
-                                  |
-                 single-worker capability detected
-                                  |
-                                  v
-                    University cross-training
-                                  |
-                                  v
-                     independent qualification
-                                  |
-                                  v
-                      stronger operational mesh
+Production manifests + fresh qualification evidence
+                       |
+                       v
+                exact coverage map
+                       |
+          +------------+-------------+
+          |                          |
+      target met                  coverage gap
+          |                          |
+       covered               role-fit learner?
+                                     |
+                    +----------------+----------------+
+                    |                                 |
+               training needed                 already qualified,
+                    |                          not authorized
+                    v                                 |
+           bounded University plan             authorization_gap
+                    |
+                    v
+         independent study / exam /
+          transfer / retention
+                    |
+                    v
+       separate specialist qualification
+                    |
+                    v
+       separate authorization if needed
 ```
 
 A specialist failure can also create targeted remediation for that specialist and a generalized lesson for peers when evidence shows the lesson is transferable.
@@ -139,7 +156,8 @@ A specialist failure can also create targeted remediation for that specialist an
 - Cache/reuse governed evidence where valid.
 - Use bounded retries.
 - Use health/load telemetry to avoid repeatedly selecting degraded workers.
-- Measure cost, latency, first-attempt success, failover frequency, recovery time, and verified final quality.
+- Admit at most one new coverage-driven study plan per hourly Production coverage cycle by default.
+- Measure cost, latency, first-attempt success, failover frequency, recovery time, verified final quality, and qualification coverage.
 
 ## Implementation sequence
 
@@ -171,13 +189,13 @@ Persist bounded task checkpoints so takeover continues useful progress instead o
 
 Add provider-specific idempotency and reconciliation contracts before enabling automatic failover for write/consequential operations.
 
-**Implemented on branch `feat/specialist-mesh-phase5-write-recovery-20260913`; merge and Production acceptance remain pending.** The host requires an exact provider adapter before a non-advisory task enters automatic mesh recovery. The adapter deterministically derives the provider idempotency key, the runtime transports that authority-free key to the specialist, and a fenced Supabase ledger records the prepared attempt plus provider reconciliation evidence. `applied` completes without replay; `not_applied` is the only verdict that releases ownership for the next eligible specialist; `unknown` fails closed. Missing/ambiguous adapters, missing evidence, storage failure, or unsupported providers preserve single-attempt behavior rather than widening failover.
+**Merged on PR #2233 and accepted in SignalBoost Production on 2026-09-13.** The host requires an exact provider adapter before a non-advisory task enters automatic mesh recovery. The adapter deterministically derives the provider idempotency key, the runtime transports that authority-free key to the specialist, and a fenced Supabase ledger records the prepared attempt plus provider reconciliation evidence. Production acceptance proved all three required outcomes against the isolated SignalBoost reference provider: `applied` completed without replay, `not_applied` permitted a newer-fence takeover, and `unknown` failed closed. This acceptance does not make arbitrary third-party providers replay-safe; each external provider still requires its own accepted adapter and real reconciliation evidence.
 
 ### Phase 6 — University coverage mesh
 
 Build a qualification coverage map and automatically prioritize cross-training where critical capabilities have insufficient independent coverage.
 
-**Documented direction; implementation pending.**
+**Implemented on PR #2235 branch `feat/specialist-mesh-phase6-university-coverage-20260913`; merge/migration/deployment/Production cycle evidence remain pending.** The host derives exact capabilities from validated configured Production manifests, uses the existing newest-exact-scope Production qualification adapter, persists service-role coverage state, selects only role-fit registered University identities, and admits at most one deterministic `operational_weakness` study plan per cycle. Training evidence explicitly records that no runtime authority, specialist qualification, or academic credit was granted by admission.
 
 ## Current implementation evidence — 2026-09-13
 
@@ -200,9 +218,15 @@ Cumulative Specialist Mesh implementation now includes:
 - automatic non-advisory takeover only when provider evidence proves the prior write was not applied;
 - fail-closed handling for unknown or unavailable provider outcomes;
 - no automatic write takeover when an exact provider recovery contract is absent;
-- tests for routing, live-signal override/fallback, lease conflict, failover, fencing, lifecycle transitions, checkpoint handoff/resume, resume metadata transport, write idempotency metadata, provider reconciliation, and ambiguous-outcome blocking.
+- exact-scope Production capability coverage derived from configured specialist manifests;
+- newest-fresh qualification counting by independent agent identity;
+- durable `covered`, `training_priority`, `authorization_gap`, and `unassigned` coverage states;
+- role-fit bounded cross-training admission through existing University study plans;
+- explicit separation between education, specialist qualification, and runtime authorization;
+- hourly Production coverage execution with metadata-only Supervisor audit receipts;
+- tests for routing, live-signal override/fallback, lease conflict, failover, fencing, lifecycle transitions, checkpoint handoff/resume, resume metadata transport, write idempotency metadata, provider reconciliation, ambiguous-outcome blocking, coverage counting, candidate selection, and authorization-gap separation.
 
-These mechanics are not buyer-live proof by themselves. The live acceptance distinction remains strict: genuine buyer/Production failover requires real independently qualified buyer specialists, real deployed transports, a real provider recovery adapter, and observed governed takeover evidence. In-memory or synthetic reconciliation tests do not satisfy that claim.
+These mechanics are not buyer-live proof by themselves. The live acceptance distinction remains strict: genuine buyer/Production failover requires real independently qualified buyer specialists, real deployed transports, a real provider recovery adapter where applicable, and observed governed takeover evidence. University coverage may expose buyer capability gaps without claiming those gaps are already closed.
 
 ## Acceptance targets
 
@@ -219,6 +243,10 @@ The mesh is not considered complete because routing code exists. Production evid
 - `not_applied` provider proof permits one newer-fence takeover while `applied` prevents replay and `unknown` blocks it;
 - durable reconciliation evidence survives process failure and is scoped to the exact work item/fence;
 - University credit remains agent-specific;
-- operational capability coverage increases over time.
+- configured capabilities receive an exact durable coverage state based on fresh qualification evidence;
+- a single-worker coverage gap produces a bounded role-fit education priority without creating authority;
+- qualified-but-unauthorized candidates remain authorization gaps rather than being silently assigned;
+- the deployed hourly coverage lane records a successful Production cycle bound to the current Production commit;
+- operational capability coverage can increase over time as independently trained agents later pass the separate qualification and authorization gates.
 
-The write-recovery live acceptance should deliberately interrupt an authorized write after execution begins, independently reconcile the real provider by idempotency key, prove either no replay (`applied`) or exactly one newer-fence takeover (`not_applied`), and verify that `unknown` cannot advance. Buyer-live acceptance additionally requires real buyer specialists and provider evidence, not loopback or synthetic fixtures.
+Phase 6 Production acceptance requires the migration, merged deployment, and a successful `specialist_mesh_university_coverage_cycle` audit receipt for the exact Production commit with `authorityExpanded=false`, `qualificationGranted=false`, and `credentialGranted=false`. The receipt proves the deployed coverage lane operates; it does not claim every buyer capability is already redundantly staffed.

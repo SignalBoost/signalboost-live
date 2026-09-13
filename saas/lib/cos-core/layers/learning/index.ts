@@ -62,6 +62,11 @@ export type KnowledgeGap = {
   evidence: string[]
   /** Optional study-method constraint. Omitted/empty preserves the normal all-adapter behavior. */
   sourceKinds?: ContinuousLearningSourceKind[]
+  /**
+   * Set by language study lanes. Relevance anchors are English, so material written IN the target
+   * language matches none of them; this lets the relevance gate recognise it as on-topic.
+   */
+  targetLanguage?: string
   /** Optional adapter-level exclusions for objectives whose source-kind bucket is intentionally broader. */
   excludedAdapterIds?: string[]
   /**

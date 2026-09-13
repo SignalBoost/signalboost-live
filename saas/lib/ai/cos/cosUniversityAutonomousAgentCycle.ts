@@ -1,9 +1,11 @@
+// saas/lib/ai/cos/cosUniversityAutonomousAgentCycle.ts
 import { readCosUniversityAgentAcademicRecord } from './cosUniversityAgentAcademicRecordRuntime.ts'
 import { runCosUniversityAdmission } from './cosUniversityAdmissionRunner.ts'
 import { listCosUniversityRegisteredAgents } from './cosUniversityAgentRegistry.ts'
 import { runCosUniversityIndependentExamBatch } from './cosUniversityIndependentExamRunner.ts'
 import { runCosUniversityContinuousLearning } from './cosUniversityContinuousLearning.ts'
 import { runCosUniversityDeliberatePractice } from './cosUniversityDeliberatePracticeRunner.ts'
+import { readCosUniversityPracticeStudyGate } from './cosUniversityPracticeStudyGate.ts'
 import { reopenCosUniversityStudyAfterFailedPractice } from './cosUniversityPracticeFailureRemediation.ts'
 import { decideCosUniversityNextAcademicAction, type CosUniversityNextAcademicAction } from './cosUniversityAgentAcademicProgression.ts'
 import { syncCosUniversityAppliedKnowledge } from './cosUniversityAppliedKnowledge.ts'
@@ -56,9 +58,22 @@ export async function runCosUniversityAutonomousAgentCycle(options: { now?: Date
         const learning = await runCosUniversityContinuousLearning({ now, agentId: agent.agentId, maxStudyPlans: motivation?.studyPlanLimit || 4 })
         if (learning.status === 'error') throw new Error(learning.errors.join('; ') || 'continuous_learning_failed')
         // Practice follows durable accepted-study proof, not whether this tick acquired material.
-        const practice = await runCosUniversityDeliberatePractice({ agentId: agent.agentId, maxPlans: 1, maxExercises: 2 })
-        if (practice.errors.length) throw new Error(practice.errors.join('; '))
-        await reopenCosUniversityStudyAfterFailedPractice(practice.runs, now, agent.agentId)
+        // The dedicated COS lane has always required that proof before touching the queue; this cycle
+        // executed practice without it, so a specialist's practice carried a weaker guarantee than
+        // COS's for the same stage. Every learner now clears the same gate, bound to the exact plan
+        // and round, and a learner with no current proof simply does not practise this tick.
+        const studyGate = await readCosUniversityPracticeStudyGate(now, agent.agentId)
+        if (studyGate.allowed && studyGate.planId && studyGate.studyAttempt) {
+          const practice = await runCosUniversityDeliberatePractice({
+            agentId: agent.agentId,
+            maxPlans: 1,
+            maxExercises: 2,
+            requiredPlanId: studyGate.planId,
+            requiredPracticeRound: studyGate.studyAttempt,
+          })
+          if (practice.errors.length) throw new Error(practice.errors.join('; '))
+          await reopenCosUniversityStudyAfterFailedPractice(practice.runs, now, agent.agentId)
+        }
       }
       agents.push({ agentId: agent.agentId, role: agent.role, admitted: admission.admitted, nextAction, completionRatio: record.completionRatio, motivation: motivation?.state || null, peerRank: motivation?.rank || null, error: null })
     } catch (error) {

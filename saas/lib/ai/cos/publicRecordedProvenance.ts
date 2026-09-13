@@ -40,7 +40,9 @@ function cleanText(value: unknown, max = 160): string | null {
 }
 
 function recordedToolNames(provenance: any): string[] {
-  const values = Array.isArray(provenance?.tools_used) ? provenance.tools_used : []
+  const values = Array.isArray(provenance?.tools_used)
+    ? provenance.tools_used
+    : Array.isArray(provenance?.toolsUsed) ? provenance.toolsUsed : []
   const names = new Set<string>()
   for (const item of values) {
     const name = cleanText(typeof item === 'string' ? item : item?.name ?? item?.tool ?? item?.function?.name, 120)
@@ -69,10 +71,13 @@ export function extractPublicRecordedProvenance(provenance: any): PublicRecorded
   const rawSources: any[] = []
   for (const candidate of [
     provenance?.live_external_evidence?.sources,
+    provenance?.liveExternalEvidence?.sources,
     provenance?.fresh_evidence?.sources,
     provenance?.freshEvidence?.sources,
     provenance?.live_evidence_sources,
+    provenance?.liveEvidenceSources,
     provenance?.answer_origin?.live_evidence_sources,
+    provenance?.answerOrigin?.liveEvidenceSources,
     provenance?.live_evidence?.sources,
   ]) {
     if (Array.isArray(candidate)) rawSources.push(...candidate)
@@ -90,32 +95,42 @@ export function extractPublicRecordedProvenance(provenance: any): PublicRecorded
 
   const liveEvidenceUsed = Boolean(
     provenance?.live_external_evidence?.used
+      || provenance?.liveExternalEvidence?.used
       || provenance?.fresh_evidence?.used
       || provenance?.freshEvidence?.used
       || provenance?.live_evidence?.used
       || provenance?.autonomous_research?.used
       || provenance?.autonomous_research_attempted
+      || provenance?.autonomousResearchAttempted
       || sources.length,
   )
 
+  const localInvoked = Boolean(provenance?.local_reasoning?.invoked || provenance?.localModelInvoked)
+  const externalInvoked = Boolean(provenance?.external_ai?.invoked || provenance?.externalAiInvoked)
+
   return {
     recordAvailable: true,
-    fromCache: Boolean(provenance?.answer_origin?.from_cache || provenance?.semantic_cache?.used || provenance?.cache?.used),
+    fromCache: Boolean(
+      provenance?.answer_origin?.from_cache
+        || provenance?.answerOrigin?.fromCache
+        || provenance?.semantic_cache?.used
+        || provenance?.cache?.used,
+    ),
     liveEvidenceUsed,
     sources,
     responseSource: cleanText(provenance?.response_source ?? provenance?.responseSource ?? provenance?.answer_origin?.response_source, 180),
-    lineageCompleteness: cleanText(provenance?.lineage_completeness, 100),
+    lineageCompleteness: cleanText(provenance?.lineage_completeness ?? provenance?.lineageCompleteness, 100),
     localReasoning: {
-      invoked: Boolean(provenance?.local_reasoning?.invoked),
-      model: cleanText(provenance?.local_reasoning?.model, 140),
+      invoked: localInvoked,
+      model: cleanText(provenance?.local_reasoning?.model ?? provenance?.reasonerLabel, 140),
     },
     externalAi: {
-      invoked: Boolean(provenance?.external_ai?.invoked),
-      provider: cleanText(provenance?.external_ai?.provider, 100),
-      model: cleanText(provenance?.external_ai?.model, 140),
+      invoked: externalInvoked,
+      provider: cleanText(provenance?.external_ai?.provider ?? provenance?.externalAiProvider, 100),
+      model: cleanText(provenance?.external_ai?.model ?? provenance?.externalAiModel, 140),
     },
     deterministicUtility: {
-      used: Boolean(provenance?.deterministic_utility?.used),
+      used: Boolean(provenance?.deterministic_utility?.used || provenance?.deterministicFreshFactUsed),
       utility: cleanText(provenance?.deterministic_utility?.utility, 160),
     },
     toolsUsed: recordedToolNames(provenance),
@@ -160,6 +175,22 @@ function publicOriginLine(facts: PublicRecordedProvenance, lang: string): string
   return 'Recorded origin: the answer was delivered by the server; the public record does not identify a reasoning model as its source.'
 }
 
+function noLiveVerificationLine(facts: PublicRecordedProvenance, lang: string): string {
+  if (facts.localReasoning.invoked) {
+    if (lang === 'pt') return 'Nenhuma pesquisa web ao vivo nem URL de fonte externa foi registrada para essa resposta. Portanto, qualquer afirmação factual atual ou mutável nela não foi verificada ao vivo e não deve ser tratada como sustentada por fontes web.'
+    if (lang === 'es') return 'No se registró ninguna búsqueda web en vivo ni URL de fuente externa para esa respuesta. Por lo tanto, cualquier afirmación factual actual o cambiante no fue verificada en vivo y no debe tratarse como respaldada por fuentes web.'
+    if (lang === 'pl') return 'Dla tej odpowiedzi nie zarejestrowano wyszukiwania na żywo ani adresów URL zewnętrznych źródeł. Dlatego wszelkie aktualne lub zmienne twierdzenia faktyczne nie zostały zweryfikowane na żywo i nie powinny być traktowane jako poparte źródłami internetowymi.'
+    if (lang === 'ru') return 'Для этого ответа не зафиксированы веб-поиск в реальном времени или URL внешних источников. Поэтому любые актуальные или изменяемые фактические утверждения не были проверены в реальном времени и не должны считаться подтверждёнными веб-источниками.'
+    return 'No live web search or external source URL was recorded for this answer. Therefore, any current or changeable factual claims in it were not live-verified and should not be treated as supported by web sources.'
+  }
+
+  if (lang === 'pt') return 'Não foram registradas fontes externas ao vivo para esta resposta.'
+  if (lang === 'es') return 'No se registraron fuentes externas en vivo para esta respuesta.'
+  if (lang === 'pl') return 'Dla tej odpowiedzi nie zarejestrowano zewnętrznych źródeł na żywo.'
+  if (lang === 'ru') return 'Для этого ответа внешние источники в реальном времени не зафиксированы.'
+  return 'No live external sources were recorded for this answer.'
+}
+
 export function renderPublicRecordedProvenance(provenance: any, language = 'en'): string {
   const facts = extractPublicRecordedProvenance(provenance)
   const lang = ['en', 'es', 'pt', 'pl', 'ru'].includes(language) ? language : 'en'
@@ -199,9 +230,5 @@ export function renderPublicRecordedProvenance(provenance: any, language = 'en')
     return `${origin}\n\nThe recorded turn shows that the answer was reused from an earlier response; no new external public sources were recorded for this turn.`
   }
 
-  if (lang === 'es') return `${origin}\n\nNo se registraron fuentes externas en vivo para esta respuesta.`
-  if (lang === 'pt') return `${origin}\n\nNão foram registradas fontes externas ao vivo para esta resposta.`
-  if (lang === 'pl') return `${origin}\n\nDla tej odpowiedzi nie zarejestrowano zewnętrznych źródeł na żywo.`
-  if (lang === 'ru') return `${origin}\n\nДля этого ответа внешние источники в реальном времени не зафиксированы.`
-  return `${origin}\n\nNo live external sources were recorded for this answer.`
+  return `${origin}\n\n${noLiveVerificationLine(facts, lang)}`
 }

@@ -53,6 +53,13 @@ function previousAssistantMessage(body: any): string {
 }
 
 function languageCodeFrom(body: any): string {
+  // A provenance follow-up is deterministic server output, so it cannot rely on a model to infer
+  // language. Prefer strong markers in the user's actual latest message over a stale UI locale.
+  const prompt = latestUserMessage(body)
+  if (/[А-Яа-яЁё]/u.test(prompt)) return 'ru'
+  if (/[ąćęłńóśźż]/iu.test(prompt) || /\b(?:skąd|źródł\w*|informacj\w*|odpowiedź|pokaż|który|która|które)\b/iu.test(prompt)) return 'pl'
+  if (/\b(?:de\s+onde|essa|isso|informação|informacao|fonte|fontes|veio|qual|quais|quem|não|nao|você|voce|resposta)\b/iu.test(prompt)) return 'pt'
+  if (/\b(?:de\s+d[oó]nde|esta\s+informaci[oó]n|informaci[oó]n|fuente|fuentes|vino|cu[aá]l|cu[aá]les|qui[eé]n|respuesta)\b/iu.test(prompt)) return 'es'
   const value = String(body?.context?.language || 'en').toLowerCase()
   return ['en', 'es', 'pt', 'pl', 'ru'].includes(value) ? value : 'en'
 }

@@ -7,6 +7,7 @@ import {
   requireMastersLearningAgentId, mastersLearningSlotKey, mastersLearningPlanKey,
   mastersLearningProgramBlocker, rotateMastersLearningAgents, runOneMastersLearningAgent,
 } from '../lib/ai/cos/cosUniversityMastersAgentLearning.ts'
+import { cosUniversityContinuousStudyVariant } from '../lib/ai/cos/cosUniversityStudyVariant.ts'
 
 const NOW = new Date('2026-09-11T20:30:00Z')
 const PROGRAM = 'applied_ai_systems'
@@ -64,6 +65,7 @@ function learningHarness(options: { admitted?: boolean; noAccepted?: boolean; ro
   let acquired = 0, roleReads = 0
   const ports: Record<string, unknown> = {
     requireMastersLearningAgentId, mastersLearningSlotKey, mastersLearningPlanKey, mastersLearningProgramBlocker,
+    cosUniversityContinuousStudyVariant,
     cosServiceDb: () => db,
     readCosUniversityAgentRole: async (id: string) => { assert.equal(id, AGENT); return options.roleChanged && ++roleReads > 1 ? 'cybersecurity' : 'software_engineering' },
     autonomousLearningReadiness: () => ({ autonomousEnabled: true }),

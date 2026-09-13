@@ -10,6 +10,7 @@ import {
 import {
   createSpecialistMeshAcceptanceFailureToken,
   isValidSpecialistMeshAcceptanceFailureToken,
+  resolveSpecialistMeshAcceptanceControlSecret,
 } from '../a2a-host/specialist-mesh-acceptance-control.ts'
 
 const TEST_SECRET = 'test-only-specialist-mesh-control-secret-32-bytes'
@@ -47,6 +48,29 @@ test('secondary Production reference specialist independently implements the adv
   assert.equal(artifact.advisoryOnly, true)
 })
 
+test('acceptance fault injection uses strong server-only signing independent from cron authentication', () => {
+  const serviceRole = 'service-role-secret-material-that-is-long-enough-for-derivation'
+  const derived = resolveSpecialistMeshAcceptanceControlSecret({
+    SUPABASE_SERVICE_ROLE_KEY: serviceRole,
+    CRON_SECRET: 'short',
+  } as NodeJS.ProcessEnv)
+  assert.match(derived, /^[0-9a-f]{64}$/)
+  assert.notEqual(derived, serviceRole)
+  assert.notEqual(derived, 'short')
+  assert.equal(derived, resolveSpecialistMeshAcceptanceControlSecret({ SUPABASE_SERVICE_ROLE_KEY: serviceRole } as NodeJS.ProcessEnv))
+
+  assert.equal(resolveSpecialistMeshAcceptanceControlSecret({
+    SPECIALIST_MESH_ACCEPTANCE_CONTROL_SECRET: TEST_SECRET,
+    SUPABASE_SERVICE_ROLE_KEY: serviceRole,
+  } as NodeJS.ProcessEnv), TEST_SECRET)
+
+  assert.throws(() => resolveSpecialistMeshAcceptanceControlSecret({
+    SPECIALIST_MESH_ACCEPTANCE_CONTROL_SECRET: 'too-short',
+    SUPABASE_SERVICE_ROLE_KEY: serviceRole,
+  } as NodeJS.ProcessEnv), /specialist_mesh_acceptance_control_secret_unavailable/)
+  assert.throws(() => resolveSpecialistMeshAcceptanceControlSecret({ CRON_SECRET: TEST_SECRET } as NodeJS.ProcessEnv), /specialist_mesh_acceptance_control_secret_unavailable/)
+})
+
 test('controlled unavailability requires an exact short-lived server signature', () => {
   const now = new Date('2026-09-13T01:00:00.000Z')
   const agentId = 'worker-a'
@@ -67,6 +91,7 @@ test('controlled unavailability requires an exact short-lived server signature',
 test('Production acceptance is exact-scope, advisory-only, durable, deployment-bound, and caller cannot supply evidence', async () => {
   const runner = await readFile(new URL('../a2a-host/specialist-mesh-production-live-acceptance.ts', import.meta.url), 'utf8')
   const cron = await readFile(new URL('../app/api/cron/specialist-mesh-production-acceptance/route.ts', import.meta.url), 'utf8')
+  const control = await readFile(new URL('../a2a-host/specialist-mesh-acceptance-control.ts', import.meta.url), 'utf8')
 
   assert.match(runner, /allowedSkills: \[\{ skillId: SKILL_ID, risk: 'advisory' as const \}\]/)
   assert.match(runner, /persistSupabaseSpecialistQualificationAssessment/)
@@ -83,11 +108,18 @@ test('Production acceptance is exact-scope, advisory-only, durable, deployment-b
   assert.match(cron, /VERCEL_GIT_COMMIT_SHA/)
   assert.match(cron, /VERCEL_URL/)
   assert.match(cron, /createHash\('sha256'\)/)
+  assert.match(cron, /resolveSpecialistMeshAcceptanceControlSecret\(\)/)
+  assert.doesNotMatch(cron, /failureControlSecret:\s*cronSecret/)
+  assert.doesNotMatch(control, /process\.env\.CRON_SECRET/)
+  assert.match(control, /SPECIALIST_MESH_ACCEPTANCE_CONTROL_SECRET/)
+  assert.match(control, /SUPABASE_SERVICE_ROLE_KEY/)
+  assert.match(control, /createHmac\('sha256', serviceRoleSecret\)/)
   assert.match(cron, /specialist_mesh_live_acceptance_deployment_bound/)
   assert.match(cron, /contains\('payload', \{ productionCommit, productionDeploymentFingerprint \}\)/)
   assert.match(cron, /productionDeploymentFingerprint,/)
 
   const commitRead = cron.indexOf('const productionCommit =')
+  const controlPreflight = cron.indexOf('resolveSpecialistMeshAcceptanceControlSecret()')
   const evidenceLookup = cron.indexOf(".eq('event_type', SPECIALIST_MESH_PRODUCTION_DEPLOYMENT_BINDING_EVENT)")
-  assert.ok(commitRead >= 0 && evidenceLookup > commitRead, 'current Production commit must be read before acceptance evidence lookup')
+  assert.ok(commitRead >= 0 && controlPreflight > commitRead && evidenceLookup > controlPreflight, 'strong control signing must be resolved before Production acceptance evidence work')
 })

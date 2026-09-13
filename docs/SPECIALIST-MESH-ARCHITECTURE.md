@@ -1,6 +1,6 @@
 # Specialist Mesh Architecture
 
-**Date:** 2026-09-12  
+**Date:** 2026-09-13  
 **Status:** accepted direction; implementation progressive and evidence-gated  
 **Scope:** COS/A2A specialists, operational continuity, and COS University continuing learning
 
@@ -87,6 +87,8 @@ Automatic failover is initially allowed only for advisory/read-only work where d
 
 Write or consequential work must not be automatically replayed after an ambiguous timeout until that action has durable idempotency/reconciliation evidence. A timeout does not prove that the first external action failed.
 
+Phase 5 implements the stricter write path: an exact host-controlled provider adapter derives the provider idempotency key for the logical operation and independently reconciles the provider after an ambiguous execution result. `not_applied` is the only outcome that permits another specialist to acquire a newer fence and replay the logical operation. `applied` completes the task without replay. `unknown`, missing provider evidence, adapter/store failure, or no matching provider contract blocks automatic takeover.
+
 The existing Supervisor coordination lease/fencing primitives are reused rather than creating a second competing ownership system.
 
 ## Specialist independence
@@ -169,7 +171,7 @@ Persist bounded task checkpoints so takeover continues useful progress instead o
 
 Add provider-specific idempotency and reconciliation contracts before enabling automatic failover for write/consequential operations.
 
-**Pending; automatic write/consequential takeover remains disabled.**
+**Implemented on branch `feat/specialist-mesh-phase5-write-recovery-20260913`; merge and Production acceptance remain pending.** The host requires an exact provider adapter before a non-advisory task enters automatic mesh recovery. The adapter deterministically derives the provider idempotency key, the runtime transports that authority-free key to the specialist, and a fenced Supabase ledger records the prepared attempt plus provider reconciliation evidence. `applied` completes without replay; `not_applied` is the only verdict that releases ownership for the next eligible specialist; `unknown` fails closed. Missing/ambiguous adapters, missing evidence, storage failure, or unsupported providers preserve single-attempt behavior rather than widening failover.
 
 ### Phase 6 — University coverage mesh
 
@@ -177,7 +179,7 @@ Build a qualification coverage map and automatically prioritize cross-training w
 
 **Documented direction; implementation pending.**
 
-## Current implementation evidence — 2026-09-12
+## Current implementation evidence — 2026-09-13
 
 Cumulative Specialist Mesh implementation now includes:
 
@@ -192,10 +194,15 @@ Cumulative Specialist Mesh implementation now includes:
 - stale-owner rejection after another specialist takes over;
 - bounded advisory checkpoint persistence and cooperative checkpoint handoff;
 - newer-fence-only resume delivery to the replacement specialist;
-- no checkpoint or automatic takeover path for write/consequential work;
-- tests for routing, live-signal override/fallback, lease conflict, failover, fencing, lifecycle transitions, checkpoint handoff/resume, and resume metadata transport.
+- host-controlled provider-specific idempotency/reconciliation contracts for write/consequential recovery;
+- a fenced, RPC-only durable side-effect reconciliation ledger;
+- recovered completion when provider evidence proves an ambiguous write was already applied;
+- automatic non-advisory takeover only when provider evidence proves the prior write was not applied;
+- fail-closed handling for unknown or unavailable provider outcomes;
+- no automatic write takeover when an exact provider recovery contract is absent;
+- tests for routing, live-signal override/fallback, lease conflict, failover, fencing, lifecycle transitions, checkpoint handoff/resume, resume metadata transport, write idempotency metadata, provider reconciliation, and ambiguous-outcome blocking.
 
-These mechanics are not buyer-live proof by themselves. The live acceptance distinction remains strict: genuine buyer/Production failover requires real independently qualified buyer specialists, real deployed transports, and observed governed takeover evidence. Loopback, in-memory, or synthetic checkpoint tests do not satisfy that claim.
+These mechanics are not buyer-live proof by themselves. The live acceptance distinction remains strict: genuine buyer/Production failover requires real independently qualified buyer specialists, real deployed transports, a real provider recovery adapter, and observed governed takeover evidence. In-memory or synthetic reconciliation tests do not satisfy that claim.
 
 ## Acceptance targets
 
@@ -208,7 +215,10 @@ The mesh is not considered complete because routing code exists. Production evid
 - stale ownership cannot complete the task;
 - no authority is widened during takeover;
 - final work remains attributable to the worker(s) that actually performed it;
+- for write/consequential recovery, the provider idempotency key is propagated and the first ambiguous outcome is reconciled before any takeover;
+- `not_applied` provider proof permits one newer-fence takeover while `applied` prevents replay and `unknown` blocks it;
+- durable reconciliation evidence survives process failure and is scoped to the exact work item/fence;
 - University credit remains agent-specific;
 - operational capability coverage increases over time.
 
-The first live acceptance should deliberately interrupt an advisory task after ownership is established, prove a second independently eligible specialist acquires the newer fenced lease, prove the first worker is rejected as stale, and finish with one verified completion and no duplicated side effect.
+The write-recovery live acceptance should deliberately interrupt an authorized write after execution begins, independently reconcile the real provider by idempotency key, prove either no replay (`applied`) or exactly one newer-fence takeover (`not_applied`), and verify that `unknown` cannot advance. Buyer-live acceptance additionally requires real buyer specialists and provider evidence, not loopback or synthetic fixtures.

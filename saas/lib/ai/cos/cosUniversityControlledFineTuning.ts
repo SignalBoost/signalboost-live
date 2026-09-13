@@ -4,6 +4,7 @@ import { decideControlledFineTune } from './cosUniversityLearningAssurance.ts'
 import { buildFineTuneEvidenceInput, readFineTuneEvidence, readFineTunePartitionRevision } from './cosUniversityFineTuneEvidence.ts'
 import { decideModelDistillationPromotion } from './cosUniversityModelDistillation.ts'
 import { readCosUniversityArtifactTrainingMode } from './cosUniversityDistillationPromotionEvidence.ts'
+import { reconcileCosUniversityDistillationCandidates } from './cosUniversityDistillationPreparation.ts'
 import { controlledFineTuneDatasetHash } from './cosUniversityTrainingIdentity.ts'
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -19,8 +20,14 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
   }
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
+
+  // Candidate qualification is non-spending and evidence-only. It may turn an unresolved study plan
+  // into a candidate after the existing 3/2 failure threshold is proven, but it does not attach a
+  // dataset, approve training, enable dispatch, call a provider, or expand authority.
+  const distillationPreparation = await reconcileCosUniversityDistillationCandidates(now)
+
   const plans = await db.from('cos_university_study_plans')
-    .select('id,plan_key,subject_id,failure_class,objective,methods,source_ref,attempt_count,updated_at')
+    .select('id,plan_key,subject_id,failure_class,objective,methods,source_ref,evidence,attempt_count,updated_at')
     .eq('fine_tune_candidate', true)
     .in('status', ['queued', 'studying', 'ready_for_exam'])
     .order('priority', { ascending: false })
@@ -117,6 +124,7 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
   }
   return {
     enabled: true, considered: (plans.data || []).length, recorded, eligibleForTraining, candidates,
+    distillationPreparation,
     semantics: 'candidate_packaging_only_training_requires_separate_host_approvals',
   }
 }

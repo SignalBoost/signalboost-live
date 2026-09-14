@@ -135,6 +135,7 @@ function shouldPersistUsage(provider: string, config: LocalInferenceConfig): boo
   // The durable table exists to measure managed-provider dependency and iTMounts graduate adoption.
   // Do not add a second network call to ordinary anonymous localhost/test inference.
   return provider === 'deepinfra'
+    || provider === 'runpod'
     || config.routeOwner === 'itmounts'
     || Boolean(config.graduateCandidateId || config.graduateArtifactId || config.graduateArtifactHash)
 }
@@ -144,7 +145,27 @@ function nonNegativeNumber(value: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null
 }
 
-export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
+function protectedIndependentEvaluation(args: LocalModelCallArgs): boolean {
+  const feature = String(args.usageContext?.feature || '').toLowerCase()
+  const purpose = String(args.usageContext?.purpose || '').toLowerCase()
+  const system = String(args.systemPrompt || '').toLowerCase()
+  return feature.includes('independent_exam')
+    || feature.includes('controlled_comparison')
+    || feature.includes('behavioral_robustness')
+    || purpose.includes('independent_assessment')
+    || purpose.includes('independent_evaluation')
+    || /host-controlled cos university .*exam|independent .*exam|graduation capstone/.test(system)
+}
+
+function eligibleForRunpodPrimary(args: LocalModelCallArgs, config: LocalInferenceConfig): boolean {
+  if (process.env.RUNPOD_PRIMARY_ENABLED?.trim().toLowerCase() === 'false') return false
+  if (providerFor(config) === 'runpod') return false
+  if (config.fallbackFromOwned === true) return false
+  if (protectedIndependentEvaluation(args)) return false
+  return true
+}
+
+async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<string | null> {
   const startedAt = Date.now()
   const requestId = randomUUID()
   const provider = providerFor(config)
@@ -166,7 +187,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   try {
     inferenceStartedAt = Date.now()
     // LOCAL_AI_REASONING_EFFORT is a property of the current DeepInfra deployment. Generic graduate
-    // transports may reject that vendor-specific field, so do not leak it into self-hosted/HF/etc.
+    // and RunPod transports may reject that vendor-specific field, so do not leak it outside DeepInfra.
     const reasoningEffort = provider === 'deepinfra' ? configuredReasoningEffort() : undefined
     const enforceJsonObject = strictJsonObjectRequested(args)
     const parsePenalty = (value: string | undefined, fallback: number): number => {
@@ -269,6 +290,36 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
 
   if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
   return text
+}
+
+/**
+ * Platform text inference policy: active graduate routing (when callers provide it) remains above
+ * this seam; otherwise ordinary iTMounts text inference prefers the verified RunPod primary and uses
+ * the configured LOCAL_AI/DeepInfra transport only as a bounded fallback. Independent University
+ * evaluation is intentionally excluded so the learner cannot silently change its evaluator runtime.
+ */
+export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
+  if (!eligibleForRunpodPrimary(args, config)) return callConfiguredModel(args, config)
+
+  let ownedAttempted = false
+  try {
+    const primary = await import('./cos/runpodPrimaryInference.ts')
+    if (primary.runpodPrimaryEnabled()) {
+      ownedAttempted = true
+      const runpodConfig = await primary.resolveReadyRunpodPrimaryConfig('reasoner')
+      if (runpodConfig) {
+        const text = await callConfiguredModel(args, runpodConfig)
+        if (text?.trim()) return text
+      }
+    }
+  } catch (error) {
+    console.warn('[runpod-primary-routing] primary unavailable; DeepInfra fallback remains bounded', JSON.stringify({
+      feature: args.usageContext?.feature || 'unattributed_local_inference',
+      reason: error instanceof Error ? error.message : String(error),
+    }))
+  }
+
+  return callConfiguredModel(args, ownedAttempted ? { ...config, fallbackFromOwned: true } : config)
 }
 
 export async function checkLocalInferenceHealth(config = localInferenceConfigFromEnv()): Promise<{ ok: boolean; model: string; error?: string }> {

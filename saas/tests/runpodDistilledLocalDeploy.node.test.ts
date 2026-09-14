@@ -20,10 +20,18 @@ test('RunPod distilled deployment stays scale-to-zero and one-worker bounded', (
   assert.match(provision, /workersMin:\s*0/)
   assert.match(provision, /workersMax:\s*1/)
   assert.match(provision, /idleTimeout:\s*5/)
-  assert.match(provision, /gpuTypePriority:\s*'availability'/)
   assert.match(provision, /NVIDIA RTX A4000/)
   assert.match(provision, /NVIDIA RTX A4500/)
   assert.match(provision, /NVIDIA RTX 4000 Ada Generation/)
+})
+
+test('RunPod endpoint POST follows the documented REST contract', () => {
+  assert.match(provision, /name:\s*DISTILLED_ENDPOINT_NAME/)
+  assert.match(provision, /templateId:\s*template\.id/)
+  assert.match(provision, /gpuTypeIds:\s*GPU_TYPES/)
+  assert.match(provision, /scalerType:\s*'REQUEST_COUNT'/)
+  assert.match(provision, /scalerValue:\s*1/)
+  assert.doesNotMatch(provision, /gpuTypePriority/)
 })
 
 test('deployment requires explicit durable unexpired approval and does not authorize Production traffic', () => {

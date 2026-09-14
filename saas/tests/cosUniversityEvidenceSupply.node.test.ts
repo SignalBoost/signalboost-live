@@ -65,15 +65,12 @@ test('the academic read path keeps its exact query set', () => {
   assert.ok(!runtime.includes('COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE'))
 })
 
-test('THE FINDING: the verified-production namespace still has no writer in this repository', () => {
-  // Master's requires minimumDistinctPracticalPasses >= 1, that stage requires authority
-  // verified_production, and the only lane that writes it reads this namespace. If this test starts
-  // failing, a writer has appeared and the requirement became satisfiable — update the expectation
-  // and delete the `unsupplied` framing from the Master's status if it is no longer true.
+test('verified Production supply has exactly one guarded application writer', () => {
   const root = new URL('../..', import.meta.url).pathname
   const skip = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage'])
   const writers: string[] = []
   const readerOrTest = /(?:tests\/|cosUniversityARange|cosUniversityLanguageARange|cosUniversityMastersProductionEvidence|cosUniversityEvidenceSupply)/
+  const writeSeam = 'source: verifiedProductionTurnOutcomeSource(decision)'
 
   const walk = (dir: string) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -82,16 +79,22 @@ test('THE FINDING: the verified-production namespace still has no writer in this
       if (entry.isDirectory()) { walk(full); continue }
       if (!/\.(ts|tsx|mjs|js|sql)$/.test(entry.name)) continue
       const source = fs.readFileSync(full, 'utf8')
-      if (!source.includes(COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE)) continue
+      if (!source.includes(writeSeam)) continue
       if (readerOrTest.test(full)) continue
       writers.push(full.slice(root.length))
     }
   }
   walk(path.join(root, 'saas'))
-  assert.deepEqual(writers, [], `unexpected reference outside the known readers: ${writers.join(', ')}`)
+  assert.equal(writers.length, 1, `expected one governed writer, found: ${writers.join(', ')}`)
+  assert.ok(writers[0]?.endsWith('saas/lib/ai/cos/cognitiveVerifiedOutcome.ts'))
+
+  const writer = file('lib/ai/cos/cognitiveVerifiedOutcome.ts')
+  assert.match(writer, /kind !== 'cos_turn_id'/)
+  assert.match(writer, /Model\/Council output cannot be a verified COS production outcome source/)
+  assert.match(writer, /source: verifiedProductionTurnOutcomeSource\(decision\)/)
 })
 
-test('every Master\'s track requires practical work, so the gap blocks all of them', () => {
+test('every Master\'s track still requires real practical work', () => {
   const masters = file('lib/ai/cos/cosUniversityMasters.ts')
   assert.match(masters, /minimumDistinctPracticalPasses: [1-9]/)
   assert.match(masters, /if \(stage === 'verified_practical_work'\) return 'verified_production'/)

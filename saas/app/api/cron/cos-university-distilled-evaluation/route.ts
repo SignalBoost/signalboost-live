@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runUniversityDistilledArtifactEvaluation } from '@/lib/ai/cos/cosUniversityDistilledArtifactEvaluation'
+import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const runtime = 'nodejs'
@@ -12,6 +13,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   try {
+    // The evaluation engine keeps its existing fail-closed env seam. When no explicit Vercel secret
+    // exists, hydrate only this server invocation from the separately generated service-only Vault key.
+    const evaluator = await independentEvaluatorConfig()
+    if (evaluator && !process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
+      process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
+    }
     const result = await runUniversityDistilledArtifactEvaluation(new Date())
     const skipped = 'skipped' in result && result.skipped === true
     await recordCosUniversityProductionPath({

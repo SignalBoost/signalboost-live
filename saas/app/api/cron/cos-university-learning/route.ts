@@ -1,6 +1,7 @@
 // saas/app/api/cron/cos-university-learning/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityContinuousLearning } from '@/lib/ai/cos/cosUniversityContinuousLearning'
+import { prepareUniversityMassDistillationCurriculum } from '@/lib/ai/cos/cosUniversityMassDistillation'
 import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { readCosUniversityProductionVerification } from '@/lib/ai/cos/cosUniversityProductionVerification'
@@ -25,12 +26,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: !unavailable, skipped: true, programGate }, { status: unavailable ? 503 : 200 })
     }
     const result = await runCosUniversityContinuousLearning()
-    await recordCosUniversityProductionPath({ path: 'continuous_learning', invocationSucceeded: result.status !== 'error', evidence: result })
+    let distillationCurriculum: unknown
+    try {
+      // Non-spending packaging rides the frequent learning lane so new rights-cleared retained
+      // knowledge reaches the local-model queue quickly. It never dispatches a provider job.
+      distillationCurriculum = await prepareUniversityMassDistillationCurriculum(new Date())
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('COS University mass-distillation packaging failed:', message)
+      distillationCurriculum = { error: message, externalCostUsd: 0, dispatchAuthorized: false }
+    }
+    await recordCosUniversityProductionPath({
+      path: 'continuous_learning',
+      invocationSucceeded: result.status !== 'error',
+      evidence: { ...result, distillationCurriculum },
+    })
     // A lane the calendar expects to be running, that is not, leaves no trace anywhere else. Sweep
     // after the receipt is written so this tick's own receipt is part of what is judged. It never
     // affects this route's status: an audit failure must not fail continuous learning.
     const laneAudit = await sweepLaneFaults()
-    return NextResponse.json({ ok: result.status !== 'error', ...result, laneAudit }, { status: result.status === 'error' ? 500 : 200 })
+    return NextResponse.json({ ok: result.status !== 'error', ...result, distillationCurriculum, laneAudit }, { status: result.status === 'error' ? 500 : 200 })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('cron COS University continuous learning failed:', message)

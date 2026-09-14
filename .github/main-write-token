@@ -1,2 +1,2 @@
-base_sha=d85d344130223a17224d770bcd4b8bc23f611a23
-branch=fix/distilled-v3-capacity-fallback-20260914
+base_sha=c0fd332060dff4bca65c48164ff816f350714160
+branch=fix/mass-distillation-provider-ledger-20260914

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { configuredRunpodApiKey, configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
+import { provisionRunpodServerlessEmbedding } from '@/lib/ai/cos/runpodServerlessEmbeddingProvision'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -64,6 +65,10 @@ export async function GET(req: NextRequest) {
       configuredMatch: Boolean(configuredPodId && pod.id === configuredPodId),
     }))
 
+    const serverlessEmbedding = await provisionRunpodServerlessEmbedding().catch(error => ({
+      error: error instanceof Error ? error.message : String(error),
+    }))
+
     const result = {
       ok: true,
       configured: true,
@@ -77,6 +82,7 @@ export async function GET(req: NextRequest) {
         minBalance: typeof account.minBalance === 'number' ? account.minBalance : null,
       },
       pods,
+      serverlessEmbedding,
     }
     console.info('[runpod-primary-probe]', JSON.stringify(result))
     return NextResponse.json(result)

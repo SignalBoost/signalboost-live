@@ -20,6 +20,37 @@ const GPU_TYPES = [
 type RunpodTemplate = { id: string; name: string; imageName?: string; isServerless?: boolean }
 type RunpodEndpoint = { id: string; name: string; workersMin?: number; workersMax?: number; templateId?: string }
 
+function clean(value: unknown, max = 300): string {
+  return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+/** Provider errors are useful operational evidence, but never echo arbitrary raw bodies or secrets. */
+export function safeRunpodErrorDetail(raw: string): string | null {
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (typeof parsed === 'string') return clean(parsed)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const value = parsed as Record<string, unknown>
+    const nested = value.error && typeof value.error === 'object' && !Array.isArray(value.error)
+      ? value.error as Record<string, unknown>
+      : null
+    const candidates = [
+      value.message,
+      value.detail,
+      typeof value.error === 'string' ? value.error : null,
+      nested?.message,
+      nested?.detail,
+      nested?.code,
+      value.code,
+    ]
+    const detail = candidates.map(item => clean(item)).find(Boolean) || ''
+    if (!detail) return null
+    return detail.replace(/\b(bearer|token|secret|api[_-]?key)\b\s*[:=]?\s*[^,;\s]+/gi, '$1=[redacted]').slice(0, 300)
+  } catch {
+    return null
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const key = configuredRunpodApiKey()
   if (!key) throw new Error('RUNPOD_API_KEY is not configured')
@@ -36,7 +67,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       },
     })
     const raw = await response.text()
-    if (!response.ok) throw new Error(`RunPod REST HTTP ${response.status}`)
+    if (!response.ok) {
+      const detail = safeRunpodErrorDetail(raw)
+      throw new Error(`RunPod REST HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
+    }
     return raw ? JSON.parse(raw) as T : {} as T
   } finally {
     clearTimeout(timer)
@@ -63,6 +97,12 @@ function startupCommand(): string {
   ].join('; ')
 }
 
+export function runpodServerlessOpenAiBaseUrl(endpointId: string): string {
+  const id = endpointId.trim()
+  if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
+  return `https://api.runpod.ai/v2/${id}/openai/v1`
+}
+
 export async function provisionRunpodServerlessDistilledLlm(): Promise<{
   createdTemplate: boolean
   createdEndpoint: boolean
@@ -86,7 +126,7 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
         name: DISTILLED_TEMPLATE_NAME,
         imageName: VLLM_IMAGE,
         category: 'NVIDIA',
-        containerDiskInGb: 30,
+        containerDiskInGb: 50,
         dockerEntrypoint: ['bash', '-lc'],
         dockerStartCmd: [startupCommand()],
         env: {
@@ -98,8 +138,6 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
         isServerless: true,
         ports: ['8000/http'],
         readme: 'iTMounts exact distilled Qwen3-4B + LoRA runtime on public vLLM image. Scale-to-zero. DeepInfra remains fallback until promotion.',
-        volumeInGb: 0,
-        volumeMountPath: '/workspace',
       }),
     })
     createdTemplate = true
@@ -118,9 +156,10 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
         executionTimeoutMs: 300_000,
         flashboot: true,
         gpuCount: 1,
+        // RunPod treats gpuTypeIds as an ordered preference list. No non-schema priority field is sent.
         gpuTypeIds: GPU_TYPES,
-        gpuTypePriority: 'availability',
         idleTimeout: 5,
+        name: DISTILLED_ENDPOINT_NAME,
         scalerType: 'REQUEST_COUNT',
         scalerValue: 1,
         workersMax: 1,
@@ -139,7 +178,7 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
     createdEndpoint,
     templateId: template.id,
     endpointId: endpoint.id,
-    baseUrl: `https://${endpoint.id}.api.runpod.ai/v1`,
+    baseUrl: runpodServerlessOpenAiBaseUrl(endpoint.id),
     model: DISTILLED_MODEL_NAME,
     workersMin: Number(endpoint.workersMin ?? 0),
     workersMax: Number(endpoint.workersMax ?? 1),
@@ -156,6 +195,7 @@ export async function canaryRunpodServerlessDistilledLlm(input: {
   if (!key) throw new Error('RUNPOD_API_KEY is not configured')
   const attempts = Math.max(1, Math.min(6, Math.floor(input.attempts ?? 5)))
   const delayMs = Math.max(1000, Math.min(10_000, Math.floor(input.delayMs ?? 5000)))
+  const baseUrl = runpodServerlessOpenAiBaseUrl(input.endpointId)
   let lastStatus: number | null = null
   let lastError: string | null = null
 
@@ -163,7 +203,7 @@ export async function canaryRunpodServerlessDistilledLlm(input: {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 30_000)
     try {
-      const response = await fetch(`https://${input.endpointId}.api.runpod.ai/v1/chat/completions`, {
+      const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${key}`,
@@ -189,7 +229,7 @@ export async function canaryRunpodServerlessDistilledLlm(input: {
         if (text) return { ok: true, model: DISTILLED_MODEL_NAME, httpStatus: response.status, text, error: null }
         lastError = 'distilled_canary_empty_response'
       } else {
-        lastError = `HTTP ${response.status}`
+        lastError = safeRunpodErrorDetail(raw) || `HTTP ${response.status}`
       }
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'distilled_canary_failed'

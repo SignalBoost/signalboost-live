@@ -1,6 +1,6 @@
 // saas/lib/cos-core/layers/learning/dynamicGaps.ts
-import type { KnowledgeGap } from './index'
-import { generateKnowledgeGaps, type KnowledgeGapSignal } from './gaps'
+import type { KnowledgeGap } from './index.ts'
+import { generateKnowledgeGaps, type KnowledgeGapSignal } from './gaps.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
 const STOP_WORDS = new Set([

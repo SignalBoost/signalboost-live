@@ -34,6 +34,31 @@ test('teacher retry remains deterministic and never requests hidden reasoning', 
   assert.match(worker, /at least two substantive sentences/)
 })
 
+test('teacher yield failures report survivor and drop-reason evidence', () => {
+  assert.match(worker, /"totalPrompts": len\(normalized_prompts\)/)
+  assert.match(worker, /"survivors": len\(rows\)/)
+  assert.match(worker, /"yieldPct": round/)
+  assert.match(worker, /"initialBelowFloor": len\(terse\)/)
+  assert.match(worker, /"retried": len\(terse\)/)
+  assert.match(worker, /"short_answer": 0/)
+  assert.match(worker, /"empty_after_strip": 0/)
+  assert.match(worker, /"hidden_reasoning_stripped_below_floor": 0/)
+  assert.match(worker, /"duplicate": 0/)
+  assert.match(worker, /itmounts_teacher_yield:/)
+  assert.match(worker, /worker_teacher_dataset_too_small:\{diagnostic_json\}/)
+})
+
+test('teacher diagnostics distinguish raw-length loss without logging raw hidden text', () => {
+  assert.match(worker, /raw_answer = tokenizer\.decode/)
+  assert.match(worker, /len\(raw_answer\)/)
+  assert.match(worker, /raw_chars >= TEACHER_MIN_RESPONSE_CHARS/)
+  assert.match(worker, /"rawChars": raw_chars/)
+  assert.match(worker, /"safeChars": len\(answer\)/)
+  assert.match(worker, /"safeSample": safe_sample/)
+  assert.match(worker, /Never log raw decoded text/)
+  assert.doesNotMatch(worker, /rawSample|rawAnswerSample|"rawSample"/)
+})
+
 test('wrapper preserves the proven preparation and training implementation unchanged', () => {
   assert.match(worker, /BASE_WORKER_FILENAME = "cos-university-hf-worker-base\.py"/)
   assert.match(worker, /base\.generate_teacher_dataset = lambda envelope: generate_teacher_dataset\(base, envelope\)/)
@@ -42,6 +67,6 @@ test('wrapper preserves the proven preparation and training implementation uncha
   assert.match(base, /worker_teacher_dataset_too_small/)
 })
 
-test('teacher throughput repair does not encode provider budget or timeout expansion', () => {
+test('teacher throughput and diagnostics do not encode provider budget or timeout expansion', () => {
   assert.doesNotMatch(worker, /teacherTimeoutSeconds|maxHourlyCostUsd|reservedCostCeilingUsd|1\.61|9\.125/)
 })

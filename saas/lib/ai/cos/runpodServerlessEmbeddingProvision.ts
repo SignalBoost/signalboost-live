@@ -101,7 +101,7 @@ export async function provisionRunpodServerlessEmbedding(): Promise<{
         flashboot: true,
         gpuCount: 1,
         gpuTypeIds: GPU_TYPES,
-        idleTimeout: 30,
+        idleTimeout: 5,
         scalerType: 'REQUEST_COUNT',
         scalerValue: 1,
         workersMax: 1,

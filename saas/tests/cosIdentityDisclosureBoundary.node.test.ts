@@ -25,22 +25,24 @@ test('the active owner entrypoint does not define or release a canned model/spec
   assert.match(shared, /The deterministic compatibility answer was blocked rather than released/)
 })
 
-test('trusted runtime context describes the multi-model topology instead of one platform-wide model', () => {
-  assert.match(topology, /General COS reasoning model:/)
-  assert.match(topology, /Builder \/ Platform Engineer coding-specialist model:/)
+test('trusted runtime context reports RunPod primary separately from DeepInfra fallback', () => {
+  assert.match(topology, /Preferred COS text compute provider:/)
+  assert.match(topology, /RunPod primary reasoning model setting:/)
+  assert.match(topology, /DeepInfra\/LOCAL_AI fallback|Controlled LOCAL_AI \/ DeepInfra fallback/)
+  assert.match(topology, /DeepInfra Builder fallback model:/)
+  assert.match(topology, /RUNPOD_PRIMARY_MODEL/)
   assert.match(topology, /DEEPINFRA_BUILDER_MODEL/)
   assert.match(topology, /LOCAL_AI_MODEL/)
-  // Owner rule 2026-09-03: no hard-coded configuration. Model and provider identifiers are read
-  // from the live runtime, never carried as literals in source, so a misconfiguration can never be
-  // reported to the owner as fact.
+  assert.match(topology, /primaryReasonerModel: controlledLocalModel/)
+  assert.match(topology, /preferredPrimaryReasonerModel/)
+  // Owner rule 2026-09-03: no hard-coded provider model identifiers may masquerade as runtime facts.
   assert.doesNotMatch(topology, /deepseek-ai\//)
   assert.doesNotMatch(topology, /Qwen\//)
   assert.doesNotMatch(topology, /BAAI\//)
   assert.match(topology, /VERBATIM FACTUAL ATOMS/)
-  assert.match(topology, /version-complete/)
   assert.match(topology, /NOT CONFIGURED/)
-  assert.match(topology, /it does not replace the/)
-  assert.match(topology, /general COS reasoner/)
+  assert.match(topology, /RunPod primary/)
+  assert.match(topology, /fallback/)
 })
 
 test('public disclosure remains a deterministic safety boundary, separate from owner reasoning', () => {

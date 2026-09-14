@@ -3,11 +3,11 @@ import {
   checkLocalInferenceHealth,
   type LocalInferenceConfig,
   type LocalModelCallArgs,
-} from '@/lib/ai/local-inference'
-import { configuredRunpodPodId, runpodControlConfigured, runpodPrimaryBaseUrl } from '@/lib/ai/cos/runpodConfig'
-import { ensureRunpodReasonerStarted } from '@/lib/ai/cos/runpodLifecycle'
-import { resolveRunpodPrimaryPodId } from '@/lib/ai/cos/runpodPodResolver'
-import { runpodGatewayKey } from '@/lib/hub/runpodTelemetry'
+} from '../local-inference.ts'
+import { configuredRunpodPodId, runpodControlConfigured, runpodPrimaryBaseUrl } from './runpodConfig.ts'
+import { ensureRunpodReasonerStarted } from './runpodLifecycle.ts'
+import { resolveRunpodPrimaryPodId } from './runpodPodResolver.ts'
+import { runpodGatewayKey } from '../../hub/runpodTelemetry.ts'
 
 export type RunpodPrimaryWorkload = 'reasoner' | 'builder'
 export type RunpodPrimaryAttempt = Readonly<{

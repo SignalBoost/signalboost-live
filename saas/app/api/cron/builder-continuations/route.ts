@@ -57,10 +57,18 @@ export async function GET(request: Request) {
   const unique = new Map<string, { id: string; userId: string }>()
   for (const job of [...continuations, ...ownedRepairs]) unique.set(job.id, { id: job.id, userId: job.userId })
   const jobs = [...unique.values()]
-  await Promise.all(jobs.map(job => runBuilderJob(job.id, job.userId)))
+
+  // A single RunPod reasoner serves Builder. Running several continuations in Promise.all overloaded
+  // that one GPU, pushed healthy requests past the 120s timeout, and converted queueing into paid
+  // DeepInfra fallback. Execute one durable continuation per scheduler tick; later jobs remain queued.
+  const selected = jobs[0] || null
+  if (selected) await runBuilderJob(selected.id, selected.userId)
+
   return NextResponse.json({
     ok: true,
     candidates: jobs.length,
+    executed: selected ? 1 : 0,
+    deferred: Math.max(0, jobs.length - (selected ? 1 : 0)),
     ownedSiteRepairQueued: ownedRepairs.some(job => job.kind === 'site'),
     ownedAuditRepairQueued: ownedRepairs.some(job => job.kind === 'audit'),
     ownedAuditRepairRetried: auditRetry.retried,

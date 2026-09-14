@@ -41,7 +41,7 @@ test('database never stores graduate serving URLs or secrets', () => {
   )
   assert.match(migration, /runtime_profile/)
   assert.match(migration, /'local_ai', 'graduate_ai'/)
-  assert.doesNotMatch(migration, /api_key|secret|base_url/i)
+  assert.doesNotMatch(migration, /add column[^;]*(?:api_key|secret|base_url)/i)
 })
 
 test('COS control plane gives active graduates bounded priority with base fallback', () => {

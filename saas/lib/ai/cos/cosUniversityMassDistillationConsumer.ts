@@ -195,7 +195,9 @@ async function buildTeacherPrompts(subjectId: string, sourceHashes: readonly str
   const byHash = new Map((rows.data || []).map((row: any) => [clean(row.content_hash, 64).toLowerCase(), row]))
   if (byHash.size !== sourceHashes.length) throw new Error('mass_distillation_rights_cleared_source_missing')
 
-  const prompts = sourceHashes.map(contentHash => {
+  const prompts: Array<Readonly<{ id: string; prompt: string }>> = []
+  const seenPromptBodies = new Set<string>()
+  for (const contentHash of sourceHashes) {
     const row: any = byHash.get(contentHash)
     if (!row
       || Number(row.confidence) < MASS_DISTILLATION_MIN_CONFIDENCE
@@ -211,9 +213,15 @@ async function buildTeacherPrompts(subjectId: string, sourceHashes: readonly str
       'Task: turn the supplied material into one rigorous standalone teaching example that explains the important concept, shows how to apply it, and includes a useful check or counterexample where appropriate.',
       'Use only the supplied material and generally valid reasoning. Do not invent citations, telemetry, people, prices, laws, or events. Do not reproduce hidden chain-of-thought. Return only the final teaching response.',
     ].filter(Boolean).join('\n\n').slice(0, 11_800)
-    return Object.freeze({ id: contentHash, prompt })
-  })
-  if (prompts.length < 20 || prompts.length > 128) throw new Error('mass_distillation_teacher_prompt_count_invalid')
+    const promptBodyHash = hash(prompt)
+    if (seenPromptBodies.has(promptBodyHash)) continue
+    seenPromptBodies.add(promptBodyHash)
+    prompts.push(Object.freeze({ id: contentHash, prompt }))
+  }
+  if (prompts.length < 20) {
+    throw new Error(`mass_distillation_teacher_prompt_diversity_insufficient:${prompts.length}/${sourceHashes.length}`)
+  }
+  if (prompts.length > 128) throw new Error('mass_distillation_teacher_prompt_count_invalid')
   return Object.freeze({ prompts: Object.freeze(prompts), promptSetHash: hash(prompts) })
 }
 
@@ -401,6 +409,8 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       timeoutSeconds: spec.timeoutSeconds,
       maxEstimatedCostUsd,
       reservedCostCeilingUsd: expectedCeiling,
+      sourceCount: sourceHashes.length,
+      promptCount: claim.stage === 'teacher_dispatching' ? ((envelope as any).prompts?.length ?? null) : null,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
     },

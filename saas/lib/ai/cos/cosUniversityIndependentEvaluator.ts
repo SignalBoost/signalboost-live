@@ -1,5 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import {
   FINE_TUNE_EVIDENCE_PROFILE,
   fineTuneRevisionKey,

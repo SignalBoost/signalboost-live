@@ -22,6 +22,13 @@ TEACHER_MAX_NEW_TOKENS = 384
 TEACHER_RETRY_MAX_NEW_TOKENS = 512
 BASE_WORKER_FILENAME = "cos-university-hf-worker-base.py"
 BASE_WORKER_PATH = Path("/tmp/itmounts_hf_worker_base.py")
+BASE_CONTRACT_MARKERS = (
+    "partition_manifests_registered",
+    "trained_artifact_registered",
+    "rollback_artifact_registered",
+    "LoraConfig",
+    "load_in_4bit=True",
+)
 
 
 def _base_worker_url() -> str:
@@ -33,6 +40,9 @@ def _base_worker_url() -> str:
 
 def _load_base_worker():
     urllib.request.urlretrieve(_base_worker_url(), BASE_WORKER_PATH)
+    source = BASE_WORKER_PATH.read_text(encoding="utf-8")
+    if not all(marker in source for marker in BASE_CONTRACT_MARKERS):
+        raise RuntimeError("worker_base_contract_invalid")
     spec = importlib.util.spec_from_file_location("itmounts_hf_worker_base", BASE_WORKER_PATH)
     if spec is None or spec.loader is None:
         raise RuntimeError("worker_base_import_invalid")

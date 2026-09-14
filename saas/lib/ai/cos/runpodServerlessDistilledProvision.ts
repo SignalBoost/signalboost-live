@@ -297,27 +297,23 @@ async function approvedServerlessGpuSelection(): Promise<{ pools: string[]; gpuT
   return { pools, gpuTypeIds }
 }
 
-export async function reconcileRunpodServerlessDistilledEndpoint(endpointId: string): Promise<{
+function assertDistilledEndpointPolicy(endpoint: RunpodEndpointV2, expectedId: string): {
   endpointId: string
   workersMin: number
   workersMax: number
   idleTimeout: number
-}> {
-  const id = endpointId.trim()
-  if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
-  const endpoint = await requestV2<RunpodEndpointV2>(`/serverless/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(endpointV2PolicyPayload()),
-  })
+} {
   if (endpoint.type && endpoint.type !== DISTILLED_ENDPOINT_ROUTING) {
     throw new Error('RunPod distilled endpoint routing no longer matches load-balancer policy')
   }
-  const workersMin = Number(endpoint.workers?.min ?? 0)
-  const workersMax = Number(endpoint.workers?.max ?? 1)
-  const idleTimeout = Number(endpoint.workers?.idleTimeout ?? DISTILLED_IDLE_TIMEOUT_SECONDS)
+  const workersMin = Number(endpoint.workers?.min ?? Number.NaN)
+  const workersMax = Number(endpoint.workers?.max ?? Number.NaN)
+  const idleTimeout = Number(endpoint.workers?.idleTimeout ?? Number.NaN)
   if (workersMin !== 0) throw new Error('RunPod distilled endpoint is not scale-to-zero')
-  if (workersMax > 1) throw new Error('RunPod distilled endpoint exceeds the approved one-worker ceiling')
-  if (idleTimeout > DISTILLED_IDLE_TIMEOUT_SECONDS) throw new Error('RunPod distilled endpoint exceeds the approved warm-window ceiling')
+  if (!Number.isFinite(workersMax) || workersMax > 1) throw new Error('RunPod distilled endpoint exceeds the approved one-worker ceiling')
+  if (!Number.isFinite(idleTimeout) || idleTimeout > DISTILLED_IDLE_TIMEOUT_SECONDS) {
+    throw new Error('RunPod distilled endpoint exceeds the approved warm-window ceiling')
+  }
   if (endpoint.scaling?.type && endpoint.scaling.type !== 'REQUEST_COUNT') {
     throw new Error('RunPod distilled endpoint scaler no longer matches request-count policy')
   }
@@ -327,7 +323,28 @@ export async function reconcileRunpodServerlessDistilledEndpoint(endpointId: str
   if (Number(endpoint.timeout ?? 300_000) > 300_000) {
     throw new Error('RunPod distilled endpoint exceeds the approved request timeout ceiling')
   }
-  return { endpointId: endpoint.id || id, workersMin, workersMax, idleTimeout }
+  if (endpoint.gpu?.count !== undefined && Number(endpoint.gpu.count) !== 1) {
+    throw new Error('RunPod distilled endpoint no longer uses exactly one GPU per worker')
+  }
+  return { endpointId: endpoint.id || expectedId, workersMin, workersMax, idleTimeout }
+}
+
+export async function reconcileRunpodServerlessDistilledEndpoint(endpointId: string): Promise<{
+  endpointId: string
+  workersMin: number
+  workersMax: number
+  idleTimeout: number
+}> {
+  const id = endpointId.trim()
+  if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
+  // Canary execution is an evidence operation, not an endpoint-management operation. Re-read the
+  // endpoint and fail closed on policy drift instead of PATCHing before every paid canary. RunPod's
+  // load-balancer control surface has changed independently of endpoint creation, and a rejected
+  // PATCH must never prevent an already-safe endpoint from proving the exact trained artifact.
+  const listed = await requestV2<{ endpoints?: RunpodEndpointV2[] }>('/serverless')
+  const endpoint = (listed.endpoints || []).find(item => item.id === id)
+  if (!endpoint) throw new Error('RunPod distilled endpoint is no longer present in the account')
+  return assertDistilledEndpointPolicy(endpoint, id)
 }
 
 export async function provisionRunpodServerlessDistilledLlm(): Promise<{

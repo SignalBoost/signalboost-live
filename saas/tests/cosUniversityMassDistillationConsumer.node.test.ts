@@ -21,6 +21,18 @@ test('mass campaign migration separates prepared curriculum from paid authorizat
   assert.doesNotMatch(sql, /update public\.cos_university_distillation_curriculum_batches[\s\S]*dispatch_authorized\s*=\s*true/i)
 })
 
+test('follow-up claim migration qualifies every batch-run reference against RETURNS TABLE output names', () => {
+  const sql = source('../supabase/migrations/20260914162000_cos_university_mass_distillation_claim_qualification.sql')
+  assert.match(sql, /from public\.cos_university_mass_distillation_batch_runs r/)
+  assert.match(sql, /where r\.campaign_id = p_campaign_id/)
+  assert.match(sql, /and r\.stage in \('teacher_pending','preparation_pending','training_pending'\)/)
+  assert.match(sql, /order by r\.batch_key/)
+  assert.match(sql, /where r\.campaign_id=p_campaign_id and r\.stage <> 'complete'/)
+  assert.match(sql, /where r\.id=v_run\.id/)
+  assert.doesNotMatch(sql, /\n\s*where campaign_id\s*=\s*p_campaign_id/)
+  assert.doesNotMatch(sql, /\n\s*and stage in \(/)
+})
+
 test('mass consumer spends only through the bounded Hugging Face stages and never mutates RunPod', () => {
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
   assert.match(consumer, /MASS_DISTILLATION_TEACHER_COST_CEILING_USD = 0\.20/)

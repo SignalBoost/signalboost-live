@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
+import { resolvePlatformOwnedInferenceRoute } from './platformOwnedInference.ts'
 
 export interface LocalModelCallArgs {
   prompt: string
@@ -15,7 +16,7 @@ export interface LocalModelCallArgs {
   presencePenalty?: number
   /** Ask the provider to enforce a JSON object response. Required for control-object generation. */
   jsonObject?: boolean
-  /** Billing attribution only. Never changes routing, grading, authorization, or model output. */
+  /** Routing + billing attribution. Never expands authority or academic evidence. */
   usageContext?: LocalInferenceUsageContext
 }
 
@@ -24,7 +25,19 @@ export interface LocalModelCallArgs {
  * a half-written control object or source file must not be mistaken for a finished answer.
  */
 export const LOCAL_MODEL_OUTPUT_TRUNCATED = 'local_model_output_truncated'
-export interface LocalInferenceConfig { baseUrl: string; model: string; apiKey?: string; timeoutMs: number }
+export interface LocalInferenceConfig {
+  baseUrl: string
+  model: string
+  apiKey?: string
+  timeoutMs: number
+  /** Actual compute provider, separate from model ownership. */
+  provider?: string
+  /** `itmounts` means the selected model/runtime asset belongs to iTMounts. */
+  routeOwner?: 'itmounts' | 'external'
+  graduateCandidateId?: string
+  graduateArtifactId?: string
+  graduateArtifactHash?: string
+}
 
 export interface LocalInferenceTelemetry {
   at: string
@@ -32,6 +45,10 @@ export interface LocalInferenceTelemetry {
   provider: string
   model: string
   feature: string
+  routeOwner: 'itmounts' | 'external'
+  graduateCandidateId: string | null
+  graduateArtifactId: string | null
+  fallbackFromOwned: boolean
   latencyMs: number
   startupLatencyMs: number
   inferenceLatencyMs: number
@@ -96,6 +113,8 @@ export async function ensureLocalInferenceRuntimeReady(_config = localInferenceC
 }
 
 function providerFor(config: LocalInferenceConfig): string {
+  const bound = String(config.provider || '').trim().toLowerCase()
+  if (bound) return bound.replace(/[^a-z0-9._-]+/g, '-')
   try {
     const host = normalizeHost(new URL(config.baseUrl).hostname)
     if (host === 'api.deepinfra.com' || host.endsWith('.deepinfra.com')) return 'deepinfra'
@@ -107,15 +126,28 @@ function providerFor(config: LocalInferenceConfig): string {
   }
 }
 
+function routeOwnerFor(config: LocalInferenceConfig): 'itmounts' | 'external' {
+  if (config.routeOwner === 'itmounts') return 'itmounts'
+  return providerFor(config) === 'self_hosted' ? 'itmounts' : 'external'
+}
+
 function nonNegativeNumber(value: unknown): number | null {
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? n : null
 }
 
-export async function callLocalModel(args: LocalModelCallArgs, config = localInferenceConfigFromEnv()): Promise<string | null> {
+type AttemptResult = Readonly<{ text: string | null; finishReason: string | null }>
+
+async function callModelAttempt(input: {
+  args: LocalModelCallArgs
+  config: LocalInferenceConfig
+  fallbackFromOwned?: boolean
+}): Promise<AttemptResult> {
+  const { args, config } = input
   const startedAt = Date.now()
   const requestId = randomUUID()
   const provider = providerFor(config)
+  const routeOwner = routeOwnerFor(config)
   const usageContext: LocalInferenceUsageContext = args.usageContext || { feature: 'unattributed_local_inference' }
   let inferenceStartedAt: number | null = null
   let httpStatus: number | null = null
@@ -132,7 +164,9 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
   try {
     inferenceStartedAt = Date.now()
-    const reasoningEffort = configuredReasoningEffort()
+    // reasoning_effort is a DeepInfra-specific deployment setting in the current platform. Do not
+    // leak it into arbitrary self-hosted/graduate OpenAI-compatible transports that may reject it.
+    const reasoningEffort = provider === 'deepinfra' ? configuredReasoningEffort() : undefined
     const enforceJsonObject = strictJsonObjectRequested(args)
     const parsePenalty = (value: string | undefined, fallback: number): number => {
       const n = Number(value)
@@ -208,23 +242,62 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300
     emitLocalInferenceTelemetry({
       at: new Date().toISOString(), requestId, provider, model: config.model,
-      feature: usageContext.feature, latencyMs, startupLatencyMs: 0, inferenceLatencyMs,
+      feature: usageContext.feature, routeOwner,
+      graduateCandidateId: config.graduateCandidateId || null,
+      graduateArtifactId: config.graduateArtifactId || null,
+      fallbackFromOwned: input.fallbackFromOwned === true,
+      latencyMs, startupLatencyMs: 0, inferenceLatencyMs,
       success, httpStatus, error: errorText, finishReason, requestedMaxTokens,
       promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
     })
-    if (provider === 'deepinfra') {
-      await recordLocalInferenceUsage({
-        requestId, provider, model: config.model, context: usageContext,
-        promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
-        success, httpStatus, latencyMs, finishReason,
-      }).catch(error => {
-        console.warn('[provider-inference-usage-write-failed]', error instanceof Error ? error.message : String(error))
-      })
-    }
+    await recordLocalInferenceUsage({
+      requestId, provider, model: config.model, context: usageContext, routeOwner,
+      graduateCandidateId: config.graduateCandidateId || null,
+      graduateArtifactId: config.graduateArtifactId || null,
+      graduateArtifactHash: config.graduateArtifactHash || null,
+      fallbackFromOwned: input.fallbackFromOwned === true,
+      promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
+      success, httpStatus, latencyMs, finishReason,
+    }).catch(error => {
+      console.warn('[provider-inference-usage-write-failed]', error instanceof Error ? error.message : String(error))
+    })
+  }
+  return Object.freeze({ text, finishReason })
+}
+
+/**
+ * Platform-owned graduate models are preferred only after their registry row reaches `active` with
+ * exact runtime health + activation evidence. The caller's pre-existing config remains a bounded
+ * fallback so iTMounts can keep operating while a graduate runtime is unavailable. University
+ * training/grading/evaluation contexts are excluded by the graduate selector and never self-grade.
+ */
+export async function callLocalModel(args: LocalModelCallArgs, config?: LocalInferenceConfig): Promise<string | null> {
+  const baseConfig = config || localInferenceConfigFromEnv()
+  const owned = await resolvePlatformOwnedInferenceRoute(args.usageContext).catch(error => {
+    console.warn('[platform-owned-routing-resolution-failed]', error instanceof Error ? error.message : String(error))
+    return null
+  })
+
+  if (owned) {
+    const first = await callModelAttempt({ args, config: owned.config })
+    if (first.finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
+    if (first.text) return first.text
+    if (process.env.COS_GRADUATE_AI_ALLOW_BASE_FALLBACK === 'false') return null
+    console.warn('[platform-owned-routing-fallback]', JSON.stringify({
+      candidateId: owned.candidateId,
+      artifactId: owned.artifactId,
+      subjectId: owned.subjectId,
+      graduateProvider: owned.runtimeProvider,
+      fallbackProvider: providerFor(baseConfig),
+    }))
+    const fallback = await callModelAttempt({ args, config: baseConfig, fallbackFromOwned: true })
+    if (fallback.finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
+    return fallback.text
   }
 
-  if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
-  return text
+  const result = await callModelAttempt({ args, config: baseConfig })
+  if (result.finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
+  return result.text
 }
 
 export async function checkLocalInferenceHealth(config = localInferenceConfigFromEnv()): Promise<{ ok: boolean; model: string; error?: string }> {

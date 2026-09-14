@@ -137,7 +137,12 @@ export function resolveRunpodPrimaryEmbeddingConfig(
       baseUrl: url.toString().replace(/\/$/, ''),
       model: expectedModel,
       apiKey,
-      timeoutMs: boundedTimeout(trimmed(env, 'RUNPOD_PRIMARY_EMBEDDING_TIMEOUT_MS'), fallback.timeoutMs),
+      // Primary failure must degrade quickly to the managed fallback. Do not inherit a two-minute
+      // DeepInfra timeout for a cold/unavailable Serverless worker unless explicitly requested.
+      timeoutMs: boundedTimeout(
+        trimmed(env, 'RUNPOD_PRIMARY_EMBEDDING_TIMEOUT_MS'),
+        Math.min(fallback.timeoutMs, 20_000),
+      ),
     },
     reason: 'ready',
     expectedModel,

@@ -1,3 +1,4 @@
+// saas/tests/runpodDistilledLocalDeploy.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
@@ -9,7 +10,6 @@ import {
 } from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
 
 const provision = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledProvision.ts', import.meta.url), 'utf8')
-const workerRepair = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledWorkerRepair.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 
 test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
@@ -17,19 +17,10 @@ test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
   assert.match(provision, /1cfa9a7208912126459214e8b04321603b3df60c/)
   assert.match(provision, /cadomos\/itmounts-student-f993a365a01e/)
   assert.match(provision, /9f03387d87de550b96d973f9f30a3f02e783997e/)
-  assert.match(workerRepair, /MODEL_REVISION:\s*DISTILLED_BASE_MODEL_REVISION/)
-  assert.match(workerRepair, /snapshot_download\(repo_id=\$\{repo\}, revision=\$\{revision\}/)
-  assert.match(workerRepair, /exactAdapterRevision:\s*DISTILLED_ADAPTER_MODEL_REVISION/)
-})
-
-test('queue-based Serverless uses the pinned RunPod worker-vllm wrapper rather than a bare HTTP server', () => {
-  assert.match(workerRepair, /runpod\/worker-v1-vllm:v2\.27\.0/)
-  assert.match(workerRepair, /exec python3 \/src\/main\.py/)
-  assert.match(workerRepair, /ENABLE_LORA:\s*'true'/)
-  assert.match(workerRepair, /LORA_MODULES/)
-  assert.match(workerRepair, /MAX_LORA_RANK:\s*'16'/)
-  assert.match(workerRepair, /MAX_CONCURRENCY:\s*'1'/)
-  assert.doesNotMatch(workerRepair, /vllm\/vllm-openai/)
+  assert.match(provision, /vllm\/vllm-openai:v0\.29\.0/)
+  assert.match(provision, /snapshot_download/)
+  assert.match(provision, /--enable-lora/)
+  assert.match(provision, /--max-lora-rank 16/)
 })
 
 test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and temporarily warm', () => {
@@ -57,14 +48,8 @@ test('RunPod endpoint POST and PATCH follow the documented REST contract', () =>
   assert.match(provision, /containerDiskInGb:\s*50/)
 })
 
-test('worker template and endpoint policy are reconciled before a paid canary', () => {
-  const workerIndex = route.indexOf('reconcileRunpodServerlessDistilledWorkerTemplate(endpointId)')
-  const endpointIndex = route.indexOf('reconcileRunpodServerlessDistilledEndpoint(endpointId)')
-  const canaryIndex = route.indexOf('canaryRunpodServerlessDistilledLlm({')
-  assert.ok(workerIndex >= 0 && endpointIndex > workerIndex && canaryIndex > endpointIndex)
-  assert.match(workerRepair, /`\/templates\/\$\{encodeURIComponent\(templateId\)\}\/update`/)
-  assert.match(workerRepair, /method:\s*'POST'/)
-  assert.match(route, /local_distilled_runtime_worker_reconciled/)
+test('existing endpoint policy is reconciled before a paid canary', () => {
+  assert.match(route, /reconcileRunpodServerlessDistilledEndpoint\(endpointId\)/)
   assert.match(route, /CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 2/)
   assert.match(route, /timeoutMs:\s*DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS/)
   assert.match(route, /httpAttempts:\s*CANARY_HTTP_ATTEMPTS_PER_INVOCATION/)
@@ -91,11 +76,39 @@ test('append-only host suspension overrides older approval without mutating assu
   assert.ok(controlIndex >= 0 && approvalIndex > controlIndex)
 })
 
-test('RunPod OpenAI compatibility uses the official v2 endpoint shape', () => {
-  assert.equal(runpodServerlessOpenAiBaseUrl('abc_123'), 'https://api.runpod.ai/v2/abc_123/openai/v1')
+test('the distilled runtime is addressed as a load-balancer endpoint, not through the job queue', () => {
+  // The public vLLM image implements no RunPod queue handler, so the queue URL shape can never be
+  // answered by this runtime. Routing must be LOAD_BALANCER and the address its own endpoint host.
+  assert.equal(runpodServerlessOpenAiBaseUrl('abc_123'), 'https://abc_123.api.runpod.ai/v1')
   assert.throws(() => runpodServerlessOpenAiBaseUrl('../bad'), /endpoint id is invalid/)
   assert.match(provision, /\$\{baseUrl\}\/chat\/completions/)
-  assert.doesNotMatch(provision, /\.api\.runpod\.ai\/v1\/chat\/completions/)
+  assert.doesNotMatch(provision, /api\.runpod\.ai\/v2\/\$\{id\}\/openai\/v1/)
+  assert.match(provision, /DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER'/)
+  assert.match(provision, /type: DISTILLED_ENDPOINT_ROUTING/)
+  assert.match(provision, /HEALTH_CHECK_PATH: '\/health'/)
+  assert.match(provision, /PORT_HEALTH: String\(DISTILLED_CONTAINER_PORT\)/)
+})
+
+test('load-balancer port and health env can actually reach RunPod', () => {
+  // A template is created only when its name is absent, so the pre-existing queue-mode template
+  // would silently keep serving the old env. The name must move with the configuration.
+  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v1'/)
+  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v1'/)
+  assert.match(provision, /templates\.find\(item => item\.name === DISTILLED_TEMPLATE_NAME/)
+})
+
+test('routing mode is fixed at creation and never sent on the update policy payload', () => {
+  const policyStart = provision.indexOf('function endpointPolicyPayload()')
+  const policyEnd = provision.indexOf('export async function reconcileRunpodServerlessDistilledEndpoint')
+  assert.ok(policyStart >= 0 && policyEnd > policyStart)
+  assert.doesNotMatch(provision.slice(policyStart, policyEnd), /type:/)
+})
+
+test('a previously provisioned endpoint is only reused when its name and routing still match', () => {
+  assert.match(route, /String\(row\?\.evidence\?\.endpointName \|\| ''\) === DISTILLED_ENDPOINT_NAME/)
+  assert.match(route, /String\(row\?\.evidence\?\.routing \|\| ''\) === DISTILLED_ENDPOINT_ROUTING/)
+  assert.match(route, /endpointName: DISTILLED_ENDPOINT_NAME/)
+  assert.match(route, /routing: DISTILLED_ENDPOINT_ROUTING/)
 })
 
 test('RunPod error details are bounded and credential-like fields are redacted', () => {
@@ -117,10 +130,8 @@ test('deployment requires explicit durable unexpired approval and does not autho
   assert.doesNotMatch(route, /RUNPOD_PRIMARY_MODE\s*=|RUNPOD_SERVERLESS_LLM_ENDPOINT_ID\s*=/)
 })
 
-test('private provider credentials are never returned or logged', () => {
+test('private provider credentials are never returned or logged by the provisioner', () => {
   assert.match(provision, /HF_TOKEN/)
-  assert.match(workerRepair, /HF_TOKEN/)
   assert.doesNotMatch(provision, /console\.(log|info|warn|error).*HF_TOKEN/)
-  assert.doesNotMatch(workerRepair, /console\.(log|info|warn|error).*HF_TOKEN/)
   assert.doesNotMatch(route, /RUNPOD_API_KEY.*NextResponse|HF_TOKEN.*NextResponse/)
 })

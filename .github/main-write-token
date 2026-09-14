@@ -1,2 +1,2 @@
-base_sha=c6457d79066a3c7623b19f970c2b199c8abdc560
-branch=fix/distilled-canary-bounded-receipt-20260914
+base_sha=1cf8d721ca4e67e82404e308eb1222db066006d3
+branch=fix/hf-mass-distillation-compressed-envelope-20260914-v2

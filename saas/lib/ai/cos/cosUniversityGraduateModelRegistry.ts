@@ -68,6 +68,8 @@ export function decideGraduateModelRegistration(input: GraduateModelRegistration
   if (!(input.promotedAt instanceof Date) || Number.isNaN(input.promotedAt.getTime())) blockers.push('graduate_promoted_at_invalid')
 
   const eligibleForRegistry = blockers.length === 0
+  // Deliberately excludes wall-clock registration time: the same promoted artifact must always
+  // resolve to the same promotion identity across reconciliation runs.
   const promotionEvidenceHash = eligibleForRegistry
     ? hash({
         profile: COS_UNIVERSITY_GRADUATE_MODEL_REGISTRY_VERSION,
@@ -77,7 +79,6 @@ export function decideGraduateModelRegistration(input: GraduateModelRegistration
         trainedArtifactId,
         trainedArtifactHash,
         rollbackArtifactRef,
-        promotedAt: input.promotedAt.toISOString(),
         authorityExpanded: false,
       })
     : null

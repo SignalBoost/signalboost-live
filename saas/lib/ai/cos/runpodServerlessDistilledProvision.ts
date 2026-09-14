@@ -8,6 +8,7 @@ export const DISTILLED_BASE_MODEL_ID = 'Qwen/Qwen3-4B'
 export const DISTILLED_BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 export const DISTILLED_ADAPTER_MODEL_ID = 'cadomos/itmounts-student-f993a365a01e'
 export const DISTILLED_ADAPTER_MODEL_REVISION = '9f03387d87de550b96d973f9f30a3f02e783997e'
+const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const REQUEST_TIMEOUT_MS = 15_000
 
 const GPU_TYPES = [
@@ -48,11 +49,18 @@ function hfToken(): string {
   return token
 }
 
-function imageName(): string {
-  const sha = process.env.VERCEL_GIT_COMMIT_SHA?.trim() || ''
-  return /^[a-f0-9]{40}$/i.test(sha)
-    ? `ghcr.io/signalboost/itmounts-distilled-llm-serverless:${sha}`
-    : 'ghcr.io/signalboost/itmounts-distilled-llm-serverless:latest'
+function startupCommand(): string {
+  const lora = JSON.stringify({
+    name: DISTILLED_MODEL_NAME,
+    path: '/models/adapter',
+    base_model_name: DISTILLED_BASE_MODEL_ID,
+  })
+  return [
+    'set -euo pipefail',
+    'mkdir -p /models/base /models/adapter /models/hf-cache',
+    `python3 -c "from huggingface_hub import snapshot_download; import os; t=os.environ['HF_TOKEN']; snapshot_download(repo_id='${DISTILLED_BASE_MODEL_ID}', revision='${DISTILLED_BASE_MODEL_REVISION}', local_dir='/models/base', token=t); snapshot_download(repo_id='${DISTILLED_ADAPTER_MODEL_ID}', revision='${DISTILLED_ADAPTER_MODEL_REVISION}', local_dir='/models/adapter', token=t)"`,
+    `exec vllm serve /models/base --host 0.0.0.0 --port 8000 --served-model-name '${DISTILLED_BASE_MODEL_ID}' --enable-lora --max-lora-rank 16 --max-loras 1 --max-cpu-loras 1 --lora-modules '${lora}' --gpu-memory-utilization 0.85 --max-model-len 16384 --dtype auto`,
+  ].join('; ')
 }
 
 export async function provisionRunpodServerlessDistilledLlm(): Promise<{
@@ -67,7 +75,6 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
   gpuTypes: readonly string[]
 }> {
   const token = hfToken()
-  const image = imageName()
   const templates = await request<RunpodTemplate[]>('/templates')
   let template = templates.find(item => item.name === DISTILLED_TEMPLATE_NAME && item.isServerless !== false)
   let createdTemplate = false
@@ -77,24 +84,20 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
       method: 'POST',
       body: JSON.stringify({
         name: DISTILLED_TEMPLATE_NAME,
-        imageName: image,
+        imageName: VLLM_IMAGE,
         category: 'NVIDIA',
         containerDiskInGb: 30,
-        dockerEntrypoint: [],
-        dockerStartCmd: [],
+        dockerEntrypoint: ['bash', '-lc'],
+        dockerStartCmd: [startupCommand()],
         env: {
           HF_TOKEN: token,
-          ITMOUNTS_BASE_MODEL_ID: DISTILLED_BASE_MODEL_ID,
-          ITMOUNTS_BASE_MODEL_REVISION: DISTILLED_BASE_MODEL_REVISION,
-          ITMOUNTS_ADAPTER_MODEL_ID: DISTILLED_ADAPTER_MODEL_ID,
-          ITMOUNTS_ADAPTER_MODEL_REVISION: DISTILLED_ADAPTER_MODEL_REVISION,
-          ITMOUNTS_DISTILLED_MODEL_NAME: DISTILLED_MODEL_NAME,
+          HF_HOME: '/models/hf-cache',
           PORT: '8000',
         },
         isPublic: false,
         isServerless: true,
         ports: ['8000/http'],
-        readme: 'iTMounts distilled Qwen3-4B + LoRA runtime. Scale-to-zero. DeepInfra remains fallback until promotion.',
+        readme: 'iTMounts exact distilled Qwen3-4B + LoRA runtime on public vLLM image. Scale-to-zero. DeepInfra remains fallback until promotion.',
         volumeInGb: 0,
         volumeMountPath: '/workspace',
       }),
@@ -151,14 +154,14 @@ export async function canaryRunpodServerlessDistilledLlm(input: {
 }): Promise<{ ok: boolean; model: string; httpStatus: number | null; text: string | null; error: string | null }> {
   const key = configuredRunpodApiKey()
   if (!key) throw new Error('RUNPOD_API_KEY is not configured')
-  const attempts = Math.max(1, Math.min(12, Math.floor(input.attempts ?? 8)))
-  const delayMs = Math.max(1000, Math.min(15_000, Math.floor(input.delayMs ?? 8000)))
+  const attempts = Math.max(1, Math.min(6, Math.floor(input.attempts ?? 5)))
+  const delayMs = Math.max(1000, Math.min(10_000, Math.floor(input.delayMs ?? 5000)))
   let lastStatus: number | null = null
   let lastError: string | null = null
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 45_000)
+    const timer = setTimeout(() => controller.abort(), 30_000)
     try {
       const response = await fetch(`https://${input.endpointId}.api.runpod.ai/v1/chat/completions`, {
         method: 'POST',

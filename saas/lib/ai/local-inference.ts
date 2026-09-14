@@ -131,6 +131,14 @@ function routeOwnerFor(config: LocalInferenceConfig): 'itmounts' | 'external' {
   return providerFor(config) === 'self_hosted' ? 'itmounts' : 'external'
 }
 
+function shouldPersistUsage(provider: string, config: LocalInferenceConfig): boolean {
+  // The durable table exists to measure managed-provider dependency and iTMounts graduate adoption.
+  // Do not add a second network call to ordinary anonymous localhost/test inference.
+  return provider === 'deepinfra'
+    || config.routeOwner === 'itmounts'
+    || Boolean(config.graduateCandidateId || config.graduateArtifactId || config.graduateArtifactHash)
+}
+
 function nonNegativeNumber(value: unknown): number | null {
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? n : null
@@ -243,18 +251,20 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       success, httpStatus, error: errorText, finishReason, requestedMaxTokens,
       promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
     })
-    await recordLocalInferenceUsage({
-      requestId, provider, model: config.model, context: usageContext,
-      routeOwner,
-      graduateCandidateId: config.graduateCandidateId || null,
-      graduateArtifactId: config.graduateArtifactId || null,
-      graduateArtifactHash: config.graduateArtifactHash || null,
-      fallbackFromOwned: config.fallbackFromOwned === true,
-      promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
-      success, httpStatus, latencyMs, finishReason,
-    }).catch(error => {
-      console.warn('[provider-inference-usage-write-failed]', error instanceof Error ? error.message : String(error))
-    })
+    if (shouldPersistUsage(provider, config)) {
+      await recordLocalInferenceUsage({
+        requestId, provider, model: config.model, context: usageContext,
+        routeOwner,
+        graduateCandidateId: config.graduateCandidateId || null,
+        graduateArtifactId: config.graduateArtifactId || null,
+        graduateArtifactHash: config.graduateArtifactHash || null,
+        fallbackFromOwned: config.fallbackFromOwned === true,
+        promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
+        success, httpStatus, latencyMs, finishReason,
+      }).catch(error => {
+        console.warn('[provider-inference-usage-write-failed]', error instanceof Error ? error.message : String(error))
+      })
+    }
   }
 
   if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)

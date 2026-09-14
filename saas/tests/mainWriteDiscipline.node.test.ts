@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import * as ts from 'typescript'
 
 const root = new URL('../../', import.meta.url)
 const readRoot = (path: string) => readFileSync(new URL(path, root), 'utf8')
@@ -121,10 +122,13 @@ test('test files cannot import missing bare siblings', () => {
   for (const name of files) {
     const fileUrl = new URL(name, testsDir)
     const source = readFileSync(fileUrl, 'utf8')
-    const specifiers = [
-      ...source.matchAll(/\bfrom\s+['"](\.\/[^'"]+\.(?:ts|tsx|js|mjs|cjs))['"]/g),
-      ...source.matchAll(/^\s*import\s+['"](\.\/[^'"]+\.(?:ts|tsx|js|mjs|cjs))['"]/gm),
-    ].map(match => match[1])
+    const sourceFile = ts.createSourceFile(name, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+    const specifiers = sourceFile.statements
+      .filter(ts.isImportDeclaration)
+      .map(statement => statement.moduleSpecifier)
+      .filter(ts.isStringLiteral)
+      .map(literal => literal.text)
+      .filter(specifier => /^\.\/.*\.(?:ts|tsx|js|mjs|cjs)$/.test(specifier))
 
     for (const specifier of specifiers) {
       assert.equal(

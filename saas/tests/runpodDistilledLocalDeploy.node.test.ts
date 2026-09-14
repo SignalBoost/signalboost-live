@@ -68,11 +68,12 @@ test('v2 endpoint policy uses nested worker and scaling fields only', () => {
   assert.doesNotMatch(policy, /gpuTypeIds\s*:|gpuCount\s*:/)
 })
 
-test('v2 GPU selection is catalog-driven, bounded by memory and price, and fails closed', () => {
+test('v2 GPU selection is catalog-driven, bounded by memory, provider price, and the owner canary ceiling', () => {
   assert.match(provision, /requestV2<\{ gpus\?: RunpodGpuCatalogItemV2\[] \}>\('\/catalog\/gpus'\)/)
   assert.match(provision, /Number\(item\.memory \|\| 0\) >= 16/)
   assert.match(provision, /Number\(item\.memory \|\| 0\) <= 24/)
-  assert.match(provision, /MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 1\.5/)
+  assert.match(provision, /MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 0\.6/)
+  assert.ok(((900 + (2 * 120) + 5) * 0.6) / 3600 < 0.2)
   assert.match(provision, /item\.availability !== 'NONE'/)
   assert.match(provision, /if \(!pools\.length\) throw new Error/)
   assert.match(provision, /pools\.length >= 4/)

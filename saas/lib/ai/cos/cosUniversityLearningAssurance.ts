@@ -100,6 +100,7 @@ export type LearningPathId =
   | 'phd_research'
   | 'phd_methodology_exams'
   | 'controlled_fine_tuning'
+  | 'distilled_independent_evaluation'
 
 export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId, string>> = Object.freeze({
   registered_agent_cycle: 'COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED',
@@ -120,6 +121,7 @@ export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId,
   phd_research: 'COS_UNIVERSITY_PHD_RESEARCH_EXECUTION_ENABLED',
   phd_methodology_exams: 'COS_UNIVERSITY_PHD_METHODOLOGY_EXAMS_ENABLED',
   controlled_fine_tuning: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
+  distilled_independent_evaluation: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
 })
 
 export type ProductionPathReceipt = Readonly<{
@@ -181,24 +183,37 @@ export function verifyLearningPathReceipts(input: {
   expectedCommitSha: string
   now: Date
   receipts: readonly ProductionPathReceipt[]
-  requiredPaths?: readonly LearningPathId[]
-}): { verified: boolean; missingOrInvalid: LearningPathId[] } {
-  const required = input.requiredPaths || Object.keys(COS_UNIVERSITY_FEATURE_GATED_PATHS) as LearningPathId[]
-  const valid = new Set(input.receipts.filter(receipt =>
-    receipt.commitSha === input.expectedCommitSha
-    && Boolean(receipt.deploymentId.trim())
-    && receipt.featureEnabled === true
-    && receipt.invocationSucceeded === true
-    && universityProductionExecutionBlocker(receipt.path, receipt.executionEvidence) === null
-    && Boolean(receipt.durableEvidenceRef.trim())
-    && receipt.verifier === 'host_production_verifier'
-    && Number.isFinite(Date.parse(receipt.observedAt))
-    && Date.parse(receipt.observedAt) <= input.now.getTime()
-    && Date.parse(receipt.expiresAt) > input.now.getTime()
-  ).map(receipt => receipt.path))
-  const missingOrInvalid = required.filter(path => !valid.has(path))
-  return { verified: missingOrInvalid.length === 0, missingOrInvalid }
+}): { verified: boolean; missingOrInvalid: readonly LearningPathId[] } {
+  const invalid: LearningPathId[] = []
+  for (const path of Object.keys(COS_UNIVERSITY_FEATURE_GATED_PATHS) as LearningPathId[]) {
+    const candidates = input.receipts.filter(receipt => receipt.path === path)
+      .sort((a, b) => Date.parse(b.observedAt) - Date.parse(a.observedAt))
+    const receipt = candidates[0]
+    const observedAt = receipt ? Date.parse(receipt.observedAt) : Number.NaN
+    const expiresAt = receipt ? Date.parse(receipt.expiresAt) : Number.NaN
+    const valid = receipt
+      && receipt.verifier === 'host_production_verifier'
+      && receipt.commitSha === input.expectedCommitSha
+      && receipt.deploymentId.trim().length > 0
+      && receipt.featureEnabled === true
+      && receipt.invocationSucceeded === true
+      && receipt.durableEvidenceRef.trim().length > 0
+      && Number.isFinite(observedAt)
+      && Number.isFinite(expiresAt)
+      && observedAt <= input.now.getTime()
+      && expiresAt > input.now.getTime()
+      && universityProductionExecutionBlocker(path, receipt.executionEvidence) === null
+    if (!valid) invalid.push(path)
+  }
+  return { verified: invalid.length === 0, missingOrInvalid: invalid }
 }
+
+export type RealWorldOutcome = Readonly<{
+  baseline: number
+  candidate: number
+  higherIsBetter: boolean
+  sampleSize: number
+}>
 
 export type RealWorldLearningEvidence = Readonly<{
   baselineScore: number
@@ -207,30 +222,45 @@ export type RealWorldLearningEvidence = Readonly<{
   practicalEvidenceRefs: readonly string[]
   delayedRetentionEvidenceRefs: readonly string[]
   sourceEvidenceRefs: readonly string[]
-  productionOutcome: { baseline: number; candidate: number; higherIsBetter: boolean; sampleSize: number }
   independentScorer: boolean
+  productionOutcome: RealWorldOutcome
 }>
 
-export function evaluateRealWorldLearningEvidence(input: RealWorldLearningEvidence) {
-  const outcomeImproved = input.productionOutcome.sampleSize > 0 && (input.productionOutcome.higherIsBetter
+export type RealWorldLearningDecision = Readonly<{
+  promotionEligible: boolean
+  outcomeImproved: boolean
+  scoreImproved: boolean
+  blockers: readonly string[]
+  evidenceHash: string
+}>
+
+export function evaluateRealWorldLearningEvidence(input: RealWorldLearningEvidence): RealWorldLearningDecision {
+  const blockers: string[] = []
+  const scoreImproved = input.postStudyScore > input.baselineScore
+  if (!scoreImproved) blockers.push('post_study_score_not_improved')
+  if (!input.independentScorer) blockers.push('independent_scorer_missing')
+  if (!input.transferEvidenceRefs.length) blockers.push('transfer_evidence_missing')
+  if (!input.practicalEvidenceRefs.length) blockers.push('practical_evidence_missing')
+  if (!input.delayedRetentionEvidenceRefs.length) blockers.push('delayed_retention_missing')
+  if (!input.sourceEvidenceRefs.length) blockers.push('source_evidence_missing')
+  if (!Number.isFinite(input.productionOutcome.sampleSize) || input.productionOutcome.sampleSize < 1) blockers.push('production_sample_missing')
+  const outcomeImproved = input.productionOutcome.higherIsBetter
     ? input.productionOutcome.candidate > input.productionOutcome.baseline
-    : input.productionOutcome.candidate < input.productionOutcome.baseline)
-  const result = evaluateCosUniversityLearning({
+    : input.productionOutcome.candidate < input.productionOutcome.baseline
+  if (!outcomeImproved) blockers.push('production_outcome_not_improved')
+  const evidenceHash = createHash('sha256').update(JSON.stringify({
     baselineScore: input.baselineScore,
     postStudyScore: input.postStudyScore,
-    passedUnseenTransfer: input.transferEvidenceRefs.length > 0,
-    passedPracticalExecution: input.practicalEvidenceRefs.length > 0 && outcomeImproved,
-    passedDelayedRetention: input.delayedRetentionEvidenceRefs.length > 0,
-    verifiedSourceAttribution: input.sourceEvidenceRefs.length > 0,
+    transferEvidenceRefs: [...input.transferEvidenceRefs].sort(),
+    practicalEvidenceRefs: [...input.practicalEvidenceRefs].sort(),
+    delayedRetentionEvidenceRefs: [...input.delayedRetentionEvidenceRefs].sort(),
+    sourceEvidenceRefs: [...input.sourceEvidenceRefs].sort(),
     independentScorer: input.independentScorer,
-  })
-  const missing = [...result.missing]
-  if (!outcomeImproved && !missing.includes('practical_execution')) missing.push('practical_execution')
-  return {
-    ...result,
-    promotionEligible: result.promotionEligible && outcomeImproved,
-    missing: missing as CosUniversityLearningMeasurement[],
-    outcomeImproved,
-    evidenceHash: createHash('sha256').update(JSON.stringify(input)).digest('hex'),
-  }
+    productionOutcome: input.productionOutcome,
+  })).digest('hex')
+  return { promotionEligible: blockers.length === 0, outcomeImproved, scoreImproved, blockers, evidenceHash }
+}
+
+export function evaluateLearningMeasurement(input: CosUniversityLearningMeasurement) {
+  return evaluateCosUniversityLearning(input)
 }

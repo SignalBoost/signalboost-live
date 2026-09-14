@@ -19,7 +19,9 @@ export const DISTILLED_IDLE_TIMEOUT_SECONDS = 900
 export const DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS = 120_000
 const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const REQUEST_TIMEOUT_MS = 15_000
-const MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 1.5
+// 900s warm + two 120s canary attempts + 5s retry delay = 1145s. At $0.60/hr the
+// maximum bounded runtime cost is ~$0.191, below the existing $0.20 owner canary ceiling.
+const MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 0.6
 
 const PREFERRED_GPU_TYPE_IDS = [
   'NVIDIA RTX A4000',

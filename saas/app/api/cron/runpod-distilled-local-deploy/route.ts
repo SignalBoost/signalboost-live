@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { FINE_TUNE_EVIDENCE_PROFILE } from '@/lib/ai/cos/cosUniversityFineTuneEvidence'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import {
   DISTILLED_ADAPTER_MODEL_ID,
@@ -34,7 +35,7 @@ async function events() {
     .eq('event_type', 'fine_tune')
     .eq('candidate_id', CANDIDATE_ID)
     .order('observed_at', { ascending: false })
-    .limit(100)
+    .limit(200)
   if (result.error) throw result.error
   return result.data || []
 }
@@ -43,6 +44,15 @@ function matching(rows: any[], claim: string) {
   return rows.find(row => row?.evidence?.profile === PROFILE
     && row?.evidence?.claim === claim
     && row?.evidence?.artifactHash === ARTIFACT_HASH)
+}
+
+function matchingAfter(rows: any[], claim: string, notBefore: string) {
+  const floor = Date.parse(notBefore)
+  return rows.find(row => row?.evidence?.profile === PROFILE
+    && row?.evidence?.claim === claim
+    && row?.evidence?.artifactHash === ARTIFACT_HASH
+    && Number.isFinite(Date.parse(String(row?.observed_at || '')))
+    && Date.parse(String(row.observed_at)) >= floor)
 }
 
 function validApproval(rows: any[], now = new Date()) {
@@ -56,6 +66,8 @@ function validApproval(rows: any[], now = new Date()) {
       && evidence?.claim === 'local_distilled_runtime_deploy_approved'
       && evidence?.artifactHash === ARTIFACT_HASH
       && evidence?.canaryAuthorized === true
+      && Number(evidence?.maxCanaryInvocations || MAX_CANARY_INVOCATIONS) <= MAX_CANARY_INVOCATIONS
+      && Number(evidence?.maxEstimatedCanaryCostUsd || 0) <= 0.2
       && evidence?.productionTrafficAuthorized === false
       && evidence?.authorityExpanded === false
       && Number.isFinite(observedAt)
@@ -65,7 +77,7 @@ function validApproval(rows: any[], now = new Date()) {
   })
 }
 
-async function record(claim: string, evidence: Record<string, unknown>) {
+async function record(claim: string, evidence: Record<string, unknown>, verifier = 'host_controller') {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const body = {
@@ -84,7 +96,50 @@ async function record(claim: string, evidence: Record<string, unknown>) {
     candidate_id: CANDIDATE_ID,
     evidence_hash: evidenceHash,
     evidence: body,
-    verifier: 'host_controller',
+    verifier,
+    observed_at: new Date().toISOString(),
+  }, { onConflict: 'event_key', ignoreDuplicates: true })
+  if (result.error) throw result.error
+  return evidenceHash
+}
+
+async function recordProductionCanaryEvidence(rows: any[], endpointId: string, responseHash: string) {
+  const trained = rows.find(row => row?.verifier === 'training_executor'
+    && row?.evidence?.profile === FINE_TUNE_EVIDENCE_PROFILE
+    && row?.evidence?.claim === 'trained_artifact_registered'
+    && row?.evidence?.artifactHash === ARTIFACT_HASH)
+  const trainedArtifactId = String(trained?.evidence?.trainedArtifactId || '').trim()
+  const revisionKey = String(trained?.evidence?.revisionKey || '').trim().toLowerCase()
+  if (!trainedArtifactId || !/^[a-f0-9]{64}$/.test(revisionKey)) {
+    throw new Error('distilled_canary_training_binding_missing')
+  }
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const evidence = {
+    profile: FINE_TUNE_EVIDENCE_PROFILE,
+    claim: 'production_canary_healthy',
+    candidateId: CANDIDATE_ID,
+    revisionKey,
+    trainedArtifactId,
+    artifactHash: ARTIFACT_HASH,
+    evidenceRef: `db://cos_university_learning_assurance_events/${hash(['distilled-production-canary', endpointId, responseHash])}`,
+    endpointId,
+    model: DISTILLED_MODEL_NAME,
+    responseHash,
+    exactArtifact: true,
+    scaleToZero: true,
+    productionTrafficAuthorized: false,
+    authorityExpanded: false,
+  }
+  const evidenceHash = hash(evidence)
+  const result = await db.from('cos_university_learning_assurance_events').upsert({
+    event_key: hash([FINE_TUNE_EVIDENCE_PROFILE, 'production_canary_healthy', CANDIDATE_ID, ARTIFACT_HASH, endpointId, responseHash]),
+    event_type: 'fine_tune',
+    subject_id: 'reasoning_decision_science',
+    candidate_id: CANDIDATE_ID,
+    evidence_hash: evidenceHash,
+    evidence,
+    verifier: 'host_production_verifier',
     observed_at: new Date().toISOString(),
   }, { onConflict: 'event_key', ignoreDuplicates: true })
   if (result.error) throw result.error
@@ -102,8 +157,9 @@ export async function GET(req: NextRequest) {
     if (!approval) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'explicit_owner_approval_missing_or_expired' })
     }
+    const approvalObservedAt = String(approval.observed_at)
 
-    const passed = matching(rows, 'local_distilled_runtime_canary_passed')
+    const passed = matchingAfter(rows, 'local_distilled_runtime_canary_passed', approvalObservedAt)
     if (passed) {
       return NextResponse.json({
         ok: true,
@@ -141,9 +197,11 @@ export async function GET(req: NextRequest) {
     }
 
     const refreshed = await events()
+    const approvalFloor = Date.parse(approvalObservedAt)
     const failures = refreshed.filter(row => row?.evidence?.profile === PROFILE
       && row?.evidence?.claim === 'local_distilled_runtime_canary_failed'
-      && row?.evidence?.artifactHash === ARTIFACT_HASH).length
+      && row?.evidence?.artifactHash === ARTIFACT_HASH
+      && Date.parse(String(row?.observed_at || '')) >= approvalFloor).length
     if (failures >= MAX_CANARY_INVOCATIONS) {
       return NextResponse.json({ ok: false, error: 'distilled_canary_retry_ceiling', endpointId }, { status: 503 })
     }
@@ -156,19 +214,23 @@ export async function GET(req: NextRequest) {
         httpStatus: canary.httpStatus,
         error: canary.error,
         attemptOrdinal: failures + 1,
+        authorizationObservedAt: approvalObservedAt,
       })
       return NextResponse.json({ ok: false, deployed: true, canaryPassed: false, endpointId, error: canary.error }, { status: 503 })
     }
 
+    const responseHash = hash(canary.text || '')
     await record('local_distilled_runtime_canary_passed', {
       endpointId,
       model: canary.model,
       httpStatus: canary.httpStatus,
-      responseHash: hash(canary.text || ''),
+      responseHash,
       exactArtifact: true,
       scaleToZero: true,
       productionTrafficAuthorized: false,
+      authorizationObservedAt: approvalObservedAt,
     })
+    await recordProductionCanaryEvidence(await events(), endpointId, responseHash)
 
     return NextResponse.json({
       ok: true,

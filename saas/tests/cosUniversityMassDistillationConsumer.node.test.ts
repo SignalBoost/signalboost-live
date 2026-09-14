@@ -1,0 +1,58 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import test from 'node:test'
+
+function source(relative: string) {
+  return fs.readFileSync(path.join(process.cwd(), relative), 'utf8')
+}
+
+test('mass campaign migration separates prepared curriculum from paid authorization', () => {
+  const sql = source('../supabase/migrations/20260914155000_cos_university_mass_distillation_campaign_consumer.sql')
+  assert.match(sql, /cos_university_mass_distillation_campaigns/)
+  assert.match(sql, /cos_university_mass_distillation_batch_runs/)
+  assert.match(sql, /max_total_cost_usd <= batch_count \* 1\.825000/)
+  assert.match(sql, /v_ceiling := 0\.200000/)
+  assert.match(sql, /v_ceiling := 0\.015000/)
+  assert.match(sql, /v_ceiling := 1\.610000/)
+  assert.match(sql, /automatic_promotion_authorized boolean not null default false/)
+  assert.match(sql, /runpod_mutation_authorized boolean not null default false/)
+  assert.match(sql, /unique \(batch_key\)/)
+  assert.doesNotMatch(sql, /update public\.cos_university_distillation_curriculum_batches[\s\S]*dispatch_authorized\s*=\s*true/i)
+})
+
+test('mass consumer spends only through the bounded Hugging Face stages and never mutates RunPod', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /MASS_DISTILLATION_TEACHER_COST_CEILING_USD = 0\.20/)
+  assert.match(consumer, /MASS_DISTILLATION_PREPARATION_COST_CEILING_USD = 0\.015/)
+  assert.match(consumer, /MASS_DISTILLATION_TRAINING_COST_CEILING_USD = 1\.61/)
+  assert.match(consumer, /claim_cos_university_mass_distillation_stage/)
+  assert.match(consumer, /COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED/)
+  assert.match(consumer, /submitHuggingFaceJob/)
+  assert.match(consumer, /campaign_stopped_on_first_failed_or_uncertain_dispatch_no_automatic_retry/)
+  assert.match(consumer, /trafficAuthorized: false/)
+  assert.doesNotMatch(consumer, /runpod\.ai|RUNPOD_API_KEY|reconcileRunpod|provisionRunpod|canaryRunpod/)
+})
+
+test('worker callbacks advance teacher to partitions to training to evaluation without promoting traffic', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /teacher_dataset_registered/)
+  assert.match(consumer, /partition_manifests_registered/)
+  assert.match(consumer, /trained_artifact_registered/)
+  assert.match(consumer, /rollback_artifact_registered/)
+  assert.match(consumer, /stage: 'preparation_pending'/)
+  assert.match(consumer, /stage: 'training_pending'/)
+  assert.match(consumer, /status: 'evaluation_pending'/)
+  assert.match(consumer, /nextGate: 'independent_evaluation'/)
+})
+
+test('mass campaign has a signed callback and a bounded scheduled consumer', () => {
+  const callback = source('../app/api/internal/cos/mass-distillation/evidence/route.ts')
+  const cron = source('../app/api/cron/cos-university-mass-distillation/route.ts')
+  const vercel = source('../vercel.json')
+  assert.match(callback, /verifyTrainingExecutorPayload/)
+  assert.match(callback, /recordMassDistillationWorkerEvidence/)
+  assert.match(cron, /CRON_SECRET/)
+  assert.match(cron, /maxDispatches: 3/)
+  assert.match(vercel, /\/api\/cron\/cos-university-mass-distillation/)
+})

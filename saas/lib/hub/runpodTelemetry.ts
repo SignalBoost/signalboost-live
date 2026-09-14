@@ -66,8 +66,8 @@ function bootstrapRef(): string {
 
 /**
  * Derive an inference-only credential from the RunPod control credential. The root RunPod API key is
- * never sent to the model gateway or written into the Pod startup contract. Compromise of this
- * derived token grants only access to the authenticated inference proxy, not RunPod account control.
+ * never sent to the model gateway. Compromise of this derived token grants only access to the
+ * authenticated inference proxy, not RunPod account control.
  */
 export function runpodGatewayKey(podId = configuredRunpodPodId()): string {
   const apiKey = configuredRunpodApiKey()
@@ -94,9 +94,10 @@ export function desiredRunpodStartupContract(options: RunpodStartupOptions = {})
     'if [ -x /start.sh ]; then nohup /start.sh >/workspace/runpod-base-start.log 2>&1 & fi',
     `curl -fsSL --max-time 30 '${bootstrapUrl}' -o /workspace/cos-runpod-reasoner.sh`,
     'chmod 700 /workspace/cos-runpod-reasoner.sh',
+    `printf '%s' '${gatewayKey}' > /workspace/cos-api-key`,
+    'chmod 600 /workspace/cos-api-key',
     `export COS_REASONER_MODEL='${reasonerModel}'`,
     `export COS_EMBEDDING_MODEL='${embeddingModel}'`,
-    `export COS_REASONER_GATEWAY_KEY='${gatewayKey}'`,
     '/workspace/cos-runpod-reasoner.sh',
     'exec tail -f /dev/null',
   ].join('; ')

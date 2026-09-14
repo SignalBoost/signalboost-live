@@ -113,13 +113,14 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
     endpoint = await request<RunpodEndpoint>('/endpoints', {
       method: 'POST',
       body: JSON.stringify({
+        name: DISTILLED_ENDPOINT_NAME,
         templateId: template.id,
         computeType: 'GPU',
         executionTimeoutMs: 300_000,
         flashboot: true,
         gpuCount: 1,
+        // RunPod rents GPU types in list order; there is no separate gpuTypePriority field.
         gpuTypeIds: GPU_TYPES,
-        gpuTypePriority: 'availability',
         idleTimeout: 5,
         scalerType: 'REQUEST_COUNT',
         scalerValue: 1,

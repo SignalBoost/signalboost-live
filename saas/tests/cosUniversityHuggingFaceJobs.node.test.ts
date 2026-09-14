@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { gunzipSync } from 'node:zlib'
 import {
   buildHuggingFaceJobSpec,
   decodeHuggingFaceDatasetRef,
@@ -129,6 +130,50 @@ test('training uses bounded GPU defaults only after immutable materialized datas
   assert.match(spec.dockerImage, /pytorch/)
   assert.equal(spec.secrets.HF_TOKEN, token)
   assert.ok(spec.command.join(' ').includes('itmounts_hf_worker.py'))
+})
+
+test('large teacher envelopes are gzip/base64url transported without truncating curriculum material', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv({
+    COS_UNIVERSITY_HF_WORKER_URL: 'https://workers.example.com/cos-university-hf-worker.py',
+  }))!
+  const prompts = Array.from({ length: 54 }, (_, index) => ({
+    id: `prompt-${index}`,
+    prompt: `Standalone case ${index}: ${'rights-cleared-material '.repeat(180)}`,
+  }))
+  const envelope = {
+    profile: 'cos_university_training_executor_v1',
+    operation: 'generate_teacher_dataset',
+    candidateId: 'mass:00000000-0000-4000-8000-000000000001:abcdef0123456789',
+    subjectId: 'Build a Semantic Book Recommender',
+    promptProfile: 'cos-university-mass-distillation-campaign-v1',
+    promptSetHash: 'a'.repeat(64),
+    prompts,
+    teacher: { modelId: 'Qwen/Qwen3-8B', revision: '1'.repeat(40), license: 'apache-2.0' },
+    student: { modelId: 'Qwen/Qwen3-4B', revision: '2'.repeat(40), license: 'apache-2.0' },
+    trainingRights: 'open_license',
+    studentControlledByBuyer: true,
+    containsPrivateProductionData: false,
+    callbackPath: '/api/internal/cos/mass-distillation/evidence',
+    authorityExpanded: false,
+  }
+  const spec = buildHuggingFaceJobSpec({
+    envelope,
+    callbackUrl: 'https://itmounts.com/api/internal/cos/mass-distillation/evidence',
+    idempotencyKey: 'teacher-compressed-key',
+    callbackSecret: 'k'.repeat(64),
+    config,
+  })
+  const compressed = spec.environment.ITMOUNTS_TRAINING_REQUEST_GZIP_B64
+  assert.ok(compressed)
+  assert.equal(spec.environment.ITMOUNTS_TRAINING_REQUEST_B64, undefined)
+  assert.equal(spec.environment.ITMOUNTS_TRAINING_REQUEST_ENCODING, 'gzip-base64url-v1')
+  const restored = JSON.parse(gunzipSync(Buffer.from(compressed, 'base64url')).toString('utf8'))
+  assert.deepEqual(restored, envelope)
+  const rawB64Length = Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64url').length
+  assert.ok(compressed.length < rawB64Length / 2)
+  assert.match(spec.command.join(' '), /gzip\.decompress/)
+  assert.match(spec.command.join(' '), /ITMOUNTS_TRAINING_REQUEST_GZIP_B64/)
+  assert.match(spec.command.join(' '), /ITMOUNTS_TRAINING_REQUEST_B64/)
 })
 
 test('routes keep owner confirmation, signed callbacks and the global dispatch switch authoritative', () => {

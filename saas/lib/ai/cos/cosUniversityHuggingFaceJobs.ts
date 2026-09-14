@@ -1,4 +1,5 @@
 import { createHash, createHmac } from 'node:crypto'
+import { gzipSync } from 'node:zlib'
 
 export const COS_UNIVERSITY_HF_JOBS_PROFILE = 'cos_university_huggingface_jobs_v1' as const
 export const COS_UNIVERSITY_HF_EXECUTOR_PATH = '/api/internal/cos/huggingface-training-executor' as const
@@ -59,6 +60,7 @@ type TrainingEnvelope = Readonly<Record<string, unknown>> & {
 
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:@([A-Za-z0-9._-]+))?#([A-Za-z0-9_.-]+)$/
 const COMMIT_SHA = /^[a-f0-9]{40}$/i
+const MAX_WORKER_REQUEST_JSON_BYTES = 1_400_000
 
 function clean(value: unknown, max = 4096): string {
   return String(value ?? '').trim().slice(0, max)
@@ -170,12 +172,19 @@ function requestDigest(input: TrainingEnvelope): string {
   return createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 12)
 }
 
+/**
+ * The provider API request carries a gzip/base64url envelope so large teacher curricula do not hit
+ * the Jobs control-plane request-size ceiling. The bootstrap expands it only after the container has
+ * started, then runs the existing worker contract unchanged. This also keeps explicit/custom worker
+ * URLs compatible: they still receive the legacy ITMOUNTS_TRAINING_REQUEST_B64 variable in-process.
+ */
 function workerBootstrap(packages: readonly string[]): readonly string[] {
   const install = packages.map(item => JSON.stringify(item)).join(' ')
+  const worker = `python -c "import os,base64,gzip,runpy; e=os.environ.pop('ITMOUNTS_TRAINING_REQUEST_GZIP_B64'); p='='*(-len(e)%4); raw=gzip.decompress(base64.urlsafe_b64decode(e+p)); assert len(raw)<=${MAX_WORKER_REQUEST_JSON_BYTES}; os.environ['ITMOUNTS_TRAINING_REQUEST_B64']=base64.urlsafe_b64encode(raw).rstrip(b'=').decode(); runpy.run_path('/tmp/itmounts_hf_worker.py', run_name='__main__')"`
   const shell = [
     `python -c "import os,urllib.request; urllib.request.urlretrieve(os.environ['ITMOUNTS_HF_WORKER_URL'],'/tmp/itmounts_hf_worker.py')"`,
     `pip install --quiet --disable-pip-version-check --no-cache-dir ${install}`,
-    'python /tmp/itmounts_hf_worker.py',
+    worker,
   ].join(' && ')
   return Object.freeze(['bash', '-lc', shell])
 }
@@ -264,7 +273,11 @@ export function buildHuggingFaceJobSpec(input: {
     throw new Error('huggingface_training_operation_invalid')
   }
 
-  const requestB64 = Buffer.from(JSON.stringify(input.envelope), 'utf8').toString('base64url')
+  const requestJson = Buffer.from(JSON.stringify(input.envelope), 'utf8')
+  if (requestJson.byteLength > MAX_WORKER_REQUEST_JSON_BYTES) {
+    throw new Error('huggingface_training_request_too_large')
+  }
+  const requestGzipB64 = gzipSync(requestJson, { level: 9 }).toString('base64url')
   const digest = requestDigest(input.envelope)
   const purpose = operation === 'train'
     ? 'governed-model-training'
@@ -279,7 +292,8 @@ export function buildHuggingFaceJobSpec(input: {
     timeoutSeconds,
     environment: Object.freeze({
       ITMOUNTS_HF_WORKER_URL: input.config.workerUrl,
-      ITMOUNTS_TRAINING_REQUEST_B64: requestB64,
+      ITMOUNTS_TRAINING_REQUEST_GZIP_B64: requestGzipB64,
+      ITMOUNTS_TRAINING_REQUEST_ENCODING: 'gzip-base64url-v1',
       ITMOUNTS_TRAINING_CALLBACK_URL: clean(input.callbackUrl, 2000),
       ITMOUNTS_TRAINING_IDEMPOTENCY_KEY: clean(input.idempotencyKey, 256),
       ITMOUNTS_HF_MAX_DATASET_ITEMS: String(input.config.maxDatasetItems),

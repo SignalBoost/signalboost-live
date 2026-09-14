@@ -1,6 +1,7 @@
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 
 const REST = 'https://rest.runpod.io/v1'
+const SERVERLESS_API = 'https://api.runpod.ai/v2'
 export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-v1'
 export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-primary'
 export const DISTILLED_MODEL_NAME = 'itmounts-distilled-reasoning-v1'
@@ -33,8 +34,21 @@ type RunpodEndpoint = {
   gpuTypeIds?: string[]
 }
 
+export type RunpodServerlessHealth = Readonly<{
+  ok: boolean
+  httpStatus: number | null
+  jobs: Readonly<{ completed: number; failed: number; inProgress: number; inQueue: number; retried: number }>
+  workers: Readonly<{ idle: number; running: number }>
+  error: string | null
+}>
+
 function clean(value: unknown, max = 300): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+function count(value: unknown): number {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0
 }
 
 /** Provider errors are useful operational evidence, but never echo arbitrary raw bodies or secrets. */
@@ -113,7 +127,57 @@ function startupCommand(): string {
 export function runpodServerlessOpenAiBaseUrl(endpointId: string): string {
   const id = endpointId.trim()
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
-  return `https://api.runpod.ai/v2/${id}/openai/v1`
+  return `${SERVERLESS_API}/${id}/openai/v1`
+}
+
+/** Official RunPod /health view. Numeric counts only; no raw provider body or credentials escape. */
+export async function runpodServerlessEndpointHealth(endpointId: string): Promise<RunpodServerlessHealth> {
+  const key = configuredRunpodApiKey()
+  if (!key) throw new Error('RUNPOD_API_KEY is not configured')
+  const id = endpointId.trim()
+  if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
+  try {
+    const response = await fetch(`${SERVERLESS_API}/${id}/health`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10_000),
+    })
+    const raw = await response.text()
+    if (!response.ok) {
+      return Object.freeze({
+        ok: false,
+        httpStatus: response.status,
+        jobs: Object.freeze({ completed: 0, failed: 0, inProgress: 0, inQueue: 0, retried: 0 }),
+        workers: Object.freeze({ idle: 0, running: 0 }),
+        error: safeRunpodErrorDetail(raw) || `HTTP ${response.status}`,
+      })
+    }
+    let payload: any = null
+    try { payload = JSON.parse(raw) } catch { payload = null }
+    return Object.freeze({
+      ok: true,
+      httpStatus: response.status,
+      jobs: Object.freeze({
+        completed: count(payload?.jobs?.completed),
+        failed: count(payload?.jobs?.failed),
+        inProgress: count(payload?.jobs?.inProgress),
+        inQueue: count(payload?.jobs?.inQueue),
+        retried: count(payload?.jobs?.retried),
+      }),
+      workers: Object.freeze({
+        idle: count(payload?.workers?.idle),
+        running: count(payload?.workers?.running),
+      }),
+      error: null,
+    })
+  } catch (error) {
+    return Object.freeze({
+      ok: false,
+      httpStatus: null,
+      jobs: Object.freeze({ completed: 0, failed: 0, inProgress: 0, inQueue: 0, retried: 0 }),
+      workers: Object.freeze({ idle: 0, running: 0 }),
+      error: error instanceof Error ? clean(error.message) : 'runpod_health_failed',
+    })
+  }
 }
 
 function endpointPolicyPayload() {

@@ -21,12 +21,31 @@ function exactArtifact(evidence: any, artifactHash: string, revisionKey: string)
     && clean(evidence?.revisionKey, 64).toLowerCase() === revisionKey
 }
 
-function mappedLifecycleStatus(graduateStatus: string, rollbackReady: boolean) {
-  if (graduateStatus === 'active') return 'active' as const
-  if (graduateStatus === 'quarantined') return 'quarantined' as const
-  if (graduateStatus === 'retired') return 'retired' as const
-  if (graduateStatus === 'pending_runtime' || graduateStatus === 'canary') return 'runtime_pending' as const
-  return rollbackReady ? 'evaluation_pending' as const : 'trained_pending_rollback' as const
+export function decideLocalDistillationLifecycle(graduateStatusInput: unknown, rollbackReady: boolean) {
+  const graduateStatus = clean(graduateStatusInput, 40)
+  const status = graduateStatus === 'active'
+    ? 'active' as const
+    : graduateStatus === 'quarantined'
+      ? 'quarantined' as const
+      : graduateStatus === 'retired'
+        ? 'retired' as const
+        : graduateStatus === 'pending_runtime' || graduateStatus === 'canary'
+          ? 'runtime_pending' as const
+          : rollbackReady
+            ? 'evaluation_pending' as const
+            : 'trained_pending_rollback' as const
+  const nextGate = status === 'trained_pending_rollback'
+    ? 'rollback_evidence' as const
+    : status === 'evaluation_pending'
+      ? 'independent_evaluation' as const
+      : status === 'runtime_pending'
+        ? 'runtime_binding_canary' as const
+        : status
+  return Object.freeze({
+    status,
+    nextGate,
+    trafficAuthorized: status === 'active',
+  })
 }
 
 /**
@@ -86,15 +105,7 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
     .eq('trained_artifact_hash', trainedArtifactHash)
     .maybeSingle()
   if (graduate.error) throw graduate.error
-  const graduateStatus = clean((graduate.data as any)?.status, 40)
-  const status = mappedLifecycleStatus(graduateStatus, Boolean(rollbackArtifactRef))
-  const nextGate = status === 'trained_pending_rollback'
-    ? 'rollback_evidence'
-    : status === 'evaluation_pending'
-      ? 'independent_evaluation'
-      : status === 'runtime_pending'
-        ? 'runtime_binding_canary'
-        : status
+  const lifecycle = decideLocalDistillationLifecycle((graduate.data as any)?.status, Boolean(rollbackArtifactRef))
 
   const result = await db.from('cos_local_distillation_artifacts').upsert({
     candidate_id: candidateId,
@@ -107,7 +118,7 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
     revision_key: revisionKey,
     dataset_hash: HEX64.test(datasetHash) ? datasetHash : null,
     rollback_artifact_ref: rollbackArtifactRef,
-    status,
+    status: lifecycle.status,
     runtime_target: 'itmounts_local',
     runtime_preference: 'runpod_primary_deepinfra_fallback',
     artifact_kind: 'lora_adapter',
@@ -117,8 +128,8 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
       canonicalBaseModel: studentModelId,
       adapterModel: trainedArtifactId,
       teacherModel: teacherModelId || null,
-      trafficAuthorized: status === 'active',
-      nextGate,
+      trafficAuthorized: lifecycle.trafficAuthorized,
+      nextGate: lifecycle.nextGate,
     },
     authority_expanded: false,
     updated_at: now.toISOString(),
@@ -134,10 +145,11 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
     trainedArtifactId,
     trainedArtifactHash,
     rollbackReady: Boolean(rollbackArtifactRef),
-    status,
+    status: lifecycle.status,
     runtimeTarget: 'itmounts_local' as const,
     runtimePreference: 'runpod_primary_deepinfra_fallback' as const,
-    trafficAuthorized: status === 'active',
+    trafficAuthorized: lifecycle.trafficAuthorized,
+    nextGate: lifecycle.nextGate,
   }
 }
 

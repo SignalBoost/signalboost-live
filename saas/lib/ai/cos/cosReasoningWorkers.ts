@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
-import type { LocalModelCallArgs } from '@/lib/ai/local-inference'
+import { callLocalModel, type LocalModelCallArgs } from '@/lib/ai/local-inference'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import {
   CosReasoningEngine,
@@ -17,6 +18,10 @@ import { learnedRoutingOverride } from '@/lib/ai/cos/reasoningOutcomeLearning'
 import { recordReasoningWorkerMetric } from '@/lib/ai/cos/reasoningWorkerMetrics'
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
 import { COS_GENERAL_REASONING_DISCIPLINE } from '@/lib/ai/cos/cosGeneralReasoningDiscipline'
+import {
+  activeGraduateRuntimesForRole,
+  type ActiveGraduateRuntime,
+} from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 
 const ROLE_GUIDANCE: Readonly<Record<Exclude<CosSpecialistRole, 'primary'>, string>> = {
   coder: [
@@ -118,14 +123,98 @@ function createOpenModelWorker(role: CosSpecialistRole): CosReasoningWorker | nu
   }
 }
 
+/**
+ * A University graduate is an additional COS worker, not a second brain. It is admitted only after
+ * independent promotion plus an active serving binding, and only for its recorded role/problem
+ * scope. Priority 200 lets the graduate do the work it was educated for; the ordinary priority-100
+ * worker remains directly behind it as a deterministic fallback.
+ */
+function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorker {
+  const role = runtime.workerRole as CosSpecialistRole
+  return {
+    id: `cos-graduate-${runtime.registryId}-${role}`,
+    role,
+    kind: 'cos-open-model',
+    label: runtime.reasoner.label,
+    priority: 200,
+    async execute(request) {
+      const effective = toLocalModelCallArgs(request, role)
+      const turnId = randomUUID()
+      const startedAt = Date.now()
+      const text = await callLocalModel({
+        ...effective,
+        usageContext: {
+          feature: 'cos_university_graduate_worker',
+          purpose: `${runtime.subjectId}:${role}`,
+        },
+      }, runtime.inference).catch(error => {
+        console.warn('[cos-graduate-worker] inference failed; base worker may take over', error instanceof Error ? error.message : String(error))
+        return null
+      })
+      if (!text?.trim()) return null
+
+      recordReasoningWorkerMetric({
+        turnId,
+        problemClass: runtime.problemClass,
+        workerRole: role,
+        reasonerLabel: runtime.reasoner.label,
+        latencyMs: Date.now() - startedAt,
+        prompt: request.prompt,
+        systemPrompt: effective.systemPrompt,
+        response: text,
+      })
+      return {
+        text,
+        turnId,
+        metadata: {
+          reasonerKind: runtime.reasoner.kind,
+          reasonerLabel: runtime.reasoner.label,
+          workerRole: role,
+          effectiveMaxTokens: effective.maxTokens ?? null,
+          universityGraduate: true,
+          graduateRegistryId: runtime.registryId,
+          graduateCandidateId: runtime.candidateId,
+          graduateSubjectId: runtime.subjectId,
+          graduateArtifactHash: runtime.trainedArtifactHash,
+          graduateRuntimeProfile: runtime.runtimeProfile,
+          graduateRuntimeProvider: runtime.runtimeProvider,
+          graduateProblemClass: runtime.problemClass,
+        },
+      }
+    },
+  }
+}
+
+function baseOpenModelWorkers(): CosReasoningWorker[] {
+  const roles: CosSpecialistRole[] = ['primary', 'coder', 'critic', 'verifier', 'researcher']
+  return roles.map(createOpenModelWorker).filter(Boolean) as CosReasoningWorker[]
+}
+
 export function createPrimaryCosReasoningWorker(): CosReasoningWorker | null {
   return createOpenModelWorker('primary')
 }
 
 export function createDefaultCosReasoningEngine(): CosReasoningEngine {
-  const roles: CosSpecialistRole[] = ['primary', 'coder', 'critic', 'verifier', 'researcher']
-  const workers = roles.map(createOpenModelWorker).filter(Boolean) as CosReasoningWorker[]
-  return new CosReasoningEngine(workers)
+  return new CosReasoningEngine(baseOpenModelWorkers())
+}
+
+async function createGraduateAwareCosReasoningEngine(
+  role: CosReasoningWorkerRole,
+  objective: string,
+): Promise<CosReasoningEngine> {
+  const baseWorkers = baseOpenModelWorkers()
+  // Academic/controlled comparisons must remain isolated from Production graduate adoption so a
+  // model cannot end up participating in the evidence used to evaluate another candidate.
+  if (currentReasoningEvaluationContext()) return new CosReasoningEngine(baseWorkers)
+
+  const graduates = await activeGraduateRuntimesForRole(role, objective).catch(error => {
+    console.warn('[cos-graduate-runtime] routing lookup failed closed', error instanceof Error ? error.message : String(error))
+    return []
+  })
+  return new CosReasoningEngine([
+    ...graduates.map(createGraduateWorker),
+    ...baseWorkers,
+  ])
 }
 
 async function routingDecision(args: LocalModelCallArgs, options: {
@@ -179,7 +268,8 @@ export async function reasonThroughCosControlPlane(
   } = {},
 ) {
   const decision = await routingDecision(args, options)
-  const execution = await createDefaultCosReasoningEngine().run({
+  const engine = await createGraduateAwareCosReasoningEngine(decision.role, decision.objective)
+  const execution = await engine.run({
     ...args,
     requestedRole: decision.role,
     allowExternalEscalation: options.allowExternalEscalation,

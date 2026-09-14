@@ -12,10 +12,18 @@ test('exact production RunPod capacity message is classified', () => {
   assert.ok(result.matchedPattern)
 })
 
-test('known capacity phrasings are classified', () => {
-  for (const message of ['no gpu instances available in this region','insufficient GPU capacity for this request','no capacity is available right now']) {
+test('known RunPod capacity phrasings are classified', () => {
+  for (const message of [
+    'RunPod: no gpu instances available in this region',
+    'RunPod: insufficient GPU capacity for this request',
+    'RunPod: no capacity is available right now',
+  ]) {
     assert.equal(classifyRunpodFailure(message).capacityUnavailable, true)
   }
+})
+
+test('fallback-provider capacity wording is not mislabeled as RunPod', () => {
+  assert.equal(classifyRunpodFailure('DeepInfra: insufficient GPU capacity for this request').capacityUnavailable, false)
 })
 
 test('unrelated failures are not classified as capacity', () => {
@@ -24,10 +32,11 @@ test('unrelated failures are not classified as capacity', () => {
   }
 })
 
-test('capacity reason names the pod and preserves original wording', () => {
-  const reason = runpodCapacityUnavailableReason({ podId: 'yvj6e9zboi7ofo', originalMessage: 'There are not enough free GPUs on the host machine to start this pod.' })
-  assert.match(reason, /RunPod GPU capacity unavailable/)
-  assert.match(reason, /yvj6e9zboi7ofo/)
+test('capacity reason names the pod, fallback, and preserves original wording', () => {
+  const reason = runpodCapacityUnavailableReason({ podId: 'examplepod', originalMessage: 'There are not enough free GPUs on the host machine to start this pod.' })
+  assert.match(reason, /RunPod primary capacity unavailable/)
+  assert.match(reason, /examplepod/)
+  assert.match(reason, /DeepInfra fallback/)
   assert.match(reason, /not enough free GPUs/)
 })
 

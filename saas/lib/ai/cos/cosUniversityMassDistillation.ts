@@ -14,6 +14,7 @@ const HEX64 = /^[a-f0-9]{64}$/i
 export type DistillationRightsClass = 'public_domain' | 'cc0' | 'itmounts_synthetic'
 export type RetainedDistillationIdentity = Readonly<{
   contentHash: string
+  materialHash: string
   subject: string
   sourceKind: string
   license: string
@@ -42,6 +43,35 @@ function normalizedSubject(value: string): string {
   return clean(value, 240).toLowerCase()
 }
 
+function normalizedMaterialPart(value: unknown, limit: number): string {
+  return clean(value, limit).toLowerCase()
+}
+
+function normalizedFact(value: unknown): string {
+  if (typeof value === 'string') return normalizedMaterialPart(value, 4000)
+  try { return normalizedMaterialPart(JSON.stringify(value), 4000) } catch { return '' }
+}
+
+/**
+ * Fingerprint only the retained teaching material that actually reaches teacher-prompt construction.
+ * Provenance/content-row identities may differ while title/summary/facts are byte-for-byte or
+ * semantically-normalized duplicates; those rows must count as one curriculum item, not many.
+ */
+export function retainedMaterialHash(input: {
+  sourceTitle?: unknown
+  summary?: unknown
+  facts?: unknown
+}): string | null {
+  const sourceTitle = normalizedMaterialPart(input.sourceTitle, 1000)
+  const summary = normalizedMaterialPart(input.summary, 12_000)
+  const facts = Array.isArray(input.facts)
+    ? input.facts.map(normalizedFact).filter(Boolean).sort()
+    : input.facts == null ? [] : [normalizedFact(input.facts)].filter(Boolean)
+  const material = [sourceTitle, summary, ...facts].filter(Boolean).join('\n')
+  if (material.length < 20) return null
+  return hash({ sourceTitle, summary, facts })
+}
+
 /**
  * Keep the first mass-distillation lane deliberately conservative. Public-domain and CC0 material can
  * seed synthetic teacher examples without silently turning ordinary copyrighted learning sources into
@@ -59,13 +89,14 @@ export function classifyMassDistillationRights(licenseInput: unknown): Distillat
 
 export function retainedIdentityEligibleForMassDistillation(row: RetainedDistillationIdentity): boolean {
   return HEX64.test(clean(row.contentHash, 64))
+    && HEX64.test(clean(row.materialHash, 64))
     && clean(row.subject, 240).length >= 3
     && Number.isFinite(row.confidence)
     && row.confidence >= MASS_DISTILLATION_MIN_CONFIDENCE
     && classifyMassDistillationRights(row.license) !== null
 }
 
-/** Deterministically package source identities by subject; no source text enters this queue. */
+/** Deterministically package unique retained teaching material by subject; no source text enters this queue. */
 export function buildMassDistillationBatches(
   rows: readonly RetainedDistillationIdentity[],
   assignedHashes: ReadonlySet<string> = new Set(),
@@ -75,6 +106,7 @@ export function buildMassDistillationBatches(
   for (const raw of rows) {
     const row = {
       contentHash: clean(raw.contentHash, 64).toLowerCase(),
+      materialHash: clean(raw.materialHash, 64).toLowerCase(),
       subject: clean(raw.subject, 240),
       sourceKind: clean(raw.sourceKind, 80),
       license: clean(raw.license, 1000),
@@ -83,7 +115,9 @@ export function buildMassDistillationBatches(
     if (!retainedIdentityEligibleForMassDistillation(row) || assignedHashes.has(row.contentHash)) continue
     const key = normalizedSubject(row.subject)
     const group = groups.get(key) || { subject: row.subject, rows: [] }
-    if (!group.rows.some(item => item.contentHash === row.contentHash)) group.rows.push(row)
+    if (!group.rows.some(item => item.contentHash === row.contentHash || item.materialHash === row.materialHash)) {
+      group.rows.push(row)
+    }
     groups.set(key, group)
   }
 
@@ -129,16 +163,19 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
 
+  // Quarantined/superseded batches never trained successfully, so their retained source identities may
+  // be reconsidered after material-level dedupe. Prepared/ready/consumed batches remain assigned.
   const existing = await db.from('cos_university_distillation_curriculum_batches')
     .select('source_hashes')
     .eq('source_policy', MASS_DISTILLATION_SOURCE_POLICY)
+    .in('status', ['prepared', 'teacher_synthesis_ready', 'consumed'])
     .limit(1000)
   if (existing.error) throw existing.error
   const assigned = new Set<string>()
   for (const row of existing.data || []) for (const digest of stringArray((row as any).source_hashes)) assigned.add(digest)
 
   const corpus = await db.from('cos_continuous_learning')
-    .select('content_hash,subject,source_kind,license,confidence')
+    .select('content_hash,subject,source_kind,license,confidence,source_title,summary,facts')
     .gte('confidence', MASS_DISTILLATION_MIN_CONFIDENCE)
     .order('created_at', { ascending: true })
     .limit(5000)
@@ -146,6 +183,7 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
 
   const identities: RetainedDistillationIdentity[] = (corpus.data || []).map((row: any) => ({
     contentHash: clean(row.content_hash, 64),
+    materialHash: retainedMaterialHash({ sourceTitle: row.source_title, summary: row.summary, facts: row.facts }) || '',
     subject: clean(row.subject, 240),
     sourceKind: clean(row.source_kind, 80),
     license: clean(row.license, 1000),
@@ -188,6 +226,6 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     sourceItemsPrepared,
     dispatchAuthorized: false,
     externalCostUsd: 0,
-    semantics: 'rights_cleared_identity_packaging_only_no_text_no_provider_dispatch_no_traffic_authorization' as const,
+    semantics: 'rights_cleared_unique_material_identity_packaging_only_no_text_no_provider_dispatch_no_traffic_authorization' as const,
   })
 }

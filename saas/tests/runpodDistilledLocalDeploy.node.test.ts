@@ -9,6 +9,7 @@ import {
 } from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
 
 const provision = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledProvision.ts', import.meta.url), 'utf8')
+const workerRepair = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledWorkerRepair.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 
 test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
@@ -16,10 +17,19 @@ test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
   assert.match(provision, /1cfa9a7208912126459214e8b04321603b3df60c/)
   assert.match(provision, /cadomos\/itmounts-student-f993a365a01e/)
   assert.match(provision, /9f03387d87de550b96d973f9f30a3f02e783997e/)
-  assert.match(provision, /vllm\/vllm-openai:v0\.29\.0/)
-  assert.match(provision, /snapshot_download/)
-  assert.match(provision, /--enable-lora/)
-  assert.match(provision, /--max-lora-rank 16/)
+  assert.match(workerRepair, /MODEL_REVISION:\s*DISTILLED_BASE_MODEL_REVISION/)
+  assert.match(workerRepair, /snapshot_download\(repo_id=\$\{repo\}, revision=\$\{revision\}/)
+  assert.match(workerRepair, /exactAdapterRevision:\s*DISTILLED_ADAPTER_MODEL_REVISION/)
+})
+
+test('queue-based Serverless uses the pinned RunPod worker-vllm wrapper rather than a bare HTTP server', () => {
+  assert.match(workerRepair, /runpod\/worker-v1-vllm:v2\.27\.0/)
+  assert.match(workerRepair, /exec python3 \/src\/main\.py/)
+  assert.match(workerRepair, /ENABLE_LORA:\s*'true'/)
+  assert.match(workerRepair, /LORA_MODULES/)
+  assert.match(workerRepair, /MAX_LORA_RANK:\s*'16'/)
+  assert.match(workerRepair, /MAX_CONCURRENCY:\s*'1'/)
+  assert.doesNotMatch(workerRepair, /vllm\/vllm-openai/)
 })
 
 test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and temporarily warm', () => {
@@ -47,8 +57,14 @@ test('RunPod endpoint POST and PATCH follow the documented REST contract', () =>
   assert.match(provision, /containerDiskInGb:\s*50/)
 })
 
-test('existing endpoint policy is reconciled before a paid canary', () => {
-  assert.match(route, /reconcileRunpodServerlessDistilledEndpoint\(endpointId\)/)
+test('worker template and endpoint policy are reconciled before a paid canary', () => {
+  const workerIndex = route.indexOf('reconcileRunpodServerlessDistilledWorkerTemplate(endpointId)')
+  const endpointIndex = route.indexOf('reconcileRunpodServerlessDistilledEndpoint(endpointId)')
+  const canaryIndex = route.indexOf('canaryRunpodServerlessDistilledLlm({')
+  assert.ok(workerIndex >= 0 && endpointIndex > workerIndex && canaryIndex > endpointIndex)
+  assert.match(workerRepair, /`\/templates\/\$\{encodeURIComponent\(templateId\)\}\/update`/)
+  assert.match(workerRepair, /method:\s*'POST'/)
+  assert.match(route, /local_distilled_runtime_worker_reconciled/)
   assert.match(route, /CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 2/)
   assert.match(route, /timeoutMs:\s*DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS/)
   assert.match(route, /httpAttempts:\s*CANARY_HTTP_ATTEMPTS_PER_INVOCATION/)
@@ -101,8 +117,10 @@ test('deployment requires explicit durable unexpired approval and does not autho
   assert.doesNotMatch(route, /RUNPOD_PRIMARY_MODE\s*=|RUNPOD_SERVERLESS_LLM_ENDPOINT_ID\s*=/)
 })
 
-test('private provider credentials are never returned or logged by the provisioner', () => {
+test('private provider credentials are never returned or logged', () => {
   assert.match(provision, /HF_TOKEN/)
+  assert.match(workerRepair, /HF_TOKEN/)
   assert.doesNotMatch(provision, /console\.(log|info|warn|error).*HF_TOKEN/)
+  assert.doesNotMatch(workerRepair, /console\.(log|info|warn|error).*HF_TOKEN/)
   assert.doesNotMatch(route, /RUNPOD_API_KEY.*NextResponse|HF_TOKEN.*NextResponse/)
 })

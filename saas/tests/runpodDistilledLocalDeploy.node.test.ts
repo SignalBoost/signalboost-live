@@ -81,9 +81,21 @@ test('v2 GPU selection is catalog-driven, bounded by memory, provider price, and
 
 test('existing endpoint policy is reconciled before a paid canary', () => {
   assert.match(route, /reconcileRunpodServerlessDistilledEndpoint\(endpointId\)/)
-  assert.match(route, /CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 2/)
+  assert.match(route, /CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 1/)
   assert.match(route, /timeoutMs:\s*DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS/)
   assert.match(route, /httpAttempts:\s*CANARY_HTTP_ATTEMPTS_PER_INVOCATION/)
+})
+
+test('each provider invocation is durably receipted before the bounded network call', () => {
+  assert.match(route, /CANARY_STARTED_CLAIM = 'local_distilled_runtime_canary_started'/)
+  assert.match(route, /const starts = refreshed\.filter/)
+  assert.match(route, /const consumedInvocations = Math\.max\(failures, starts\)/)
+  assert.match(route, /consumedInvocations >= MAX_CANARY_INVOCATIONS/)
+  const receipt = route.indexOf('await record(CANARY_STARTED_CLAIM')
+  const providerCall = route.indexOf('const canary = await canaryRunpodServerlessDistilledLlm')
+  assert.ok(receipt >= 0 && providerCall > receipt)
+  assert.match(route.slice(receipt, providerCall), /startedAt/)
+  assert.match(route.slice(receipt, providerCall), /productionTrafficAuthorized:\s*false/)
 })
 
 test('official RunPod endpoint health is captured around canary execution', () => {

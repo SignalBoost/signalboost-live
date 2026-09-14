@@ -123,6 +123,23 @@ test('routing mode is fixed at creation and never sent on the update policy payl
   assert.doesNotMatch(provision.slice(policyStart, policyEnd), /type:/)
 })
 
+test('gpu pool constraints are creation-only and never resent by routine reconciliation', () => {
+  const policyStart = provision.indexOf('function endpointPolicyPayload()')
+  const policyEnd = provision.indexOf('export async function reconcileRunpodServerlessDistilledEndpoint')
+  const creationStart = provision.indexOf("name: DISTILLED_ENDPOINT_NAME")
+  const creationEnd = provision.indexOf('...endpointPolicyPayload()', creationStart)
+  assert.ok(policyStart >= 0 && policyEnd > policyStart)
+  assert.ok(creationStart >= 0 && creationEnd > creationStart)
+  const policy = provision.slice(policyStart, policyEnd)
+  const creation = provision.slice(creationStart, creationEnd)
+  assert.doesNotMatch(policy, /gpuCount\s*:|gpuTypeIds\s*:/)
+  assert.match(policy, /workersMin:\s*0/)
+  assert.match(policy, /workersMax:\s*1/)
+  assert.match(policy, /idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
+  assert.match(creation, /gpuCount:\s*1/)
+  assert.match(creation, /gpuTypeIds:\s*GPU_TYPES/)
+})
+
 test('a previously provisioned endpoint is only reused when its name and routing still match', () => {
   assert.match(route, /String\(row\?\.evidence\?\.endpointName \|\| ''\) === DISTILLED_ENDPOINT_NAME/)
   assert.match(route, /String\(row\?\.evidence\?\.routing \|\| ''\) === DISTILLED_ENDPOINT_ROUTING/)

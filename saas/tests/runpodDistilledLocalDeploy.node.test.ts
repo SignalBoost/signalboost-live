@@ -9,6 +9,7 @@ import {
 } from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
 
 const provision = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledProvision.ts', import.meta.url), 'utf8')
+const repair = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledWorkerRepair.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 
 test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
@@ -16,10 +17,19 @@ test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
   assert.match(provision, /1cfa9a7208912126459214e8b04321603b3df60c/)
   assert.match(provision, /cadomos\/itmounts-student-f993a365a01e/)
   assert.match(provision, /9f03387d87de550b96d973f9f30a3f02e783997e/)
-  assert.match(provision, /vllm\/vllm-openai:v0\.29\.0/)
-  assert.match(provision, /snapshot_download/)
-  assert.match(provision, /--enable-lora/)
-  assert.match(provision, /--max-lora-rank 16/)
+  assert.match(repair, /MODEL_REVISION:\s*DISTILLED_BASE_MODEL_REVISION/)
+  assert.match(repair, /snapshot_download\(repo_id=.*revision=.*DISTILLED_ADAPTER_MODEL_REVISION|snapshot_download\(repo_id=\$\{repo\}, revision=\$\{revision\}/)
+  assert.match(repair, /exactAdapterRevision:\s*DISTILLED_ADAPTER_MODEL_REVISION/)
+})
+
+test('queue-based Serverless uses RunPod worker-vllm rather than a bare vLLM HTTP server', () => {
+  assert.match(repair, /runpod\/worker-v1-vllm:v2\.27\.0/)
+  assert.match(repair, /exec python3 \/src\/main\.py/)
+  assert.match(repair, /ENABLE_LORA:\s*'true'/)
+  assert.match(repair, /LORA_MODULES/)
+  assert.match(repair, /MAX_LORA_RANK:\s*'16'/)
+  assert.match(repair, /MAX_CONCURRENCY:\s*'1'/)
+  assert.doesNotMatch(repair, /vllm\/vllm-openai/)
 })
 
 test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and temporarily warm', () => {
@@ -47,11 +57,24 @@ test('RunPod endpoint POST and PATCH follow the documented REST contract', () =>
   assert.match(provision, /containerDiskInGb:\s*50/)
 })
 
-test('existing endpoint policy is reconciled before a paid canary', () => {
-  assert.match(route, /reconcileRunpodServerlessDistilledEndpoint\(endpointId\)/)
+test('existing worker template and endpoint policy are reconciled before a paid canary', () => {
+  const workerIndex = route.indexOf('reconcileRunpodServerlessDistilledWorkerTemplate(endpointId)')
+  const endpointIndex = route.indexOf('reconcileRunpodServerlessDistilledEndpoint(endpointId)')
+  const canaryIndex = route.indexOf('canaryRunpodServerlessDistilledLlm({')
+  assert.ok(workerIndex >= 0 && endpointIndex > workerIndex && canaryIndex > endpointIndex)
+  assert.match(repair, /`\/templates\/\$\{encodeURIComponent\(templateId\)\}\/update`/)
+  assert.match(repair, /method:\s*'POST'/)
   assert.match(route, /CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 2/)
   assert.match(route, /timeoutMs:\s*DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS/)
   assert.match(route, /httpAttempts:\s*CANARY_HTTP_ATTEMPTS_PER_INVOCATION/)
+})
+
+test('failed canary records read-only RunPod worker and queue health for the next repair', () => {
+  assert.match(repair, /\/health/)
+  assert.match(repair, /workers:\s*Object\.freeze/)
+  assert.match(repair, /inQueue/)
+  assert.match(route, /inspectRunpodServerlessDistilledHealth\(endpointId\)/)
+  assert.match(route, /health,/)
 })
 
 test('RunPod OpenAI compatibility uses the official v2 endpoint shape', () => {
@@ -80,8 +103,10 @@ test('deployment requires explicit durable unexpired approval and does not autho
   assert.doesNotMatch(route, /RUNPOD_PRIMARY_MODE\s*=|RUNPOD_SERVERLESS_LLM_ENDPOINT_ID\s*=/)
 })
 
-test('private provider credentials are never returned or logged by the provisioner', () => {
+test('private provider credentials are never returned or logged', () => {
   assert.match(provision, /HF_TOKEN/)
+  assert.match(repair, /HF_TOKEN/)
   assert.doesNotMatch(provision, /console\.(log|info|warn|error).*HF_TOKEN/)
+  assert.doesNotMatch(repair, /console\.(log|info|warn|error).*HF_TOKEN/)
   assert.doesNotMatch(route, /RUNPOD_API_KEY.*NextResponse|HF_TOKEN.*NextResponse/)
 })

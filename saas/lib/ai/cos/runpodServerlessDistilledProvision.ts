@@ -135,7 +135,7 @@ function startupCommand(): string {
 export function runpodServerlessOpenAiBaseUrl(endpointId: string): string {
   const id = endpointId.trim()
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
-  // Load-balancer endpoints are addressed on their own host, not through the queue API.
+  // Load-balancer endpoints are addressed on their own host, not through the job queue API.
   return `https://${id}.api.runpod.ai/v1`
 }
 
@@ -189,12 +189,14 @@ export async function runpodServerlessEndpointHealth(endpointId: string): Promis
   }
 }
 
+/**
+ * Mutable endpoint runtime policy only. GPU pool/count are creation-time constraints and are kept
+ * out of routine PATCH reconciliation because RunPod's load-balancer update contract rejects them.
+ */
 function endpointPolicyPayload() {
   return {
     executionTimeoutMs: 300_000,
     flashboot: true,
-    gpuCount: 1,
-    gpuTypeIds: GPU_TYPES,
     // Keep scale-to-zero, but hold a successfully started worker long enough for the independently
     // scheduled evaluator to reuse the loaded base+adapter instead of redownloading on every call.
     idleTimeout: DISTILLED_IDLE_TIMEOUT_SECONDS,
@@ -284,6 +286,9 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
         computeType: 'GPU',
         // Routing mode is fixed at creation; it is deliberately absent from the PATCH policy payload.
         type: DISTILLED_ENDPOINT_ROUTING,
+        // GPU constraints are creation-time-only and are deliberately not resent by reconciliation.
+        gpuCount: 1,
+        gpuTypeIds: GPU_TYPES,
         ...endpointPolicyPayload(),
       }),
     })

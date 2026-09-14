@@ -1,2 +1,2 @@
-base_sha=dec38b0778dbbae287f2c4b525bd8675ff9cee3c
-branch=fix/distillation-dataset-provenance-20260914
+base_sha=3bbd3f4a8bfdefe7fb653a860b84d07f61fd17a4
+branch=fix/distillation-evaluator-secret-and-canary-lease-20260914

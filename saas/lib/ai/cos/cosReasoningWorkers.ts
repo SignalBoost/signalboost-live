@@ -145,7 +145,7 @@ function createGraduateWorker(runtime: ActiveGraduateRuntime): CosReasoningWorke
         ...effective,
         usageContext: {
           feature: 'cos_university_graduate_worker',
-          detail: `${runtime.subjectId}:${role}`,
+          purpose: `${runtime.subjectId}:${role}`,
         },
       }, runtime.inference).catch(error => {
         console.warn('[cos-graduate-worker] inference failed; base worker may take over', error instanceof Error ? error.message : String(error))

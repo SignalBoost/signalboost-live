@@ -18,6 +18,7 @@ import {
   reconcileRunpodServerlessDistilledEndpoint,
   runpodServerlessEndpointHealth,
 } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
+import { purgeRunpodServerlessLegacyQueue } from '@/lib/ai/cos/runpodServerlessLegacyQueueCleanup'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -31,6 +32,8 @@ const MAX_CANARY_INVOCATIONS = 3
 const CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 2
 const APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved'
 const SUSPEND_CLAIM = 'local_distilled_runtime_canary_suspended'
+const LEGACY_QUEUE_CLEANED_CLAIM = 'local_distilled_runtime_legacy_queue_cleaned'
+const LEGACY_QUEUE_CLEANUP_FAILED_CLAIM = 'local_distilled_runtime_legacy_queue_cleanup_failed'
 
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -44,7 +47,7 @@ async function events() {
     .eq('event_type', 'fine_tune')
     .eq('candidate_id', CANDIDATE_ID)
     .order('observed_at', { ascending: false })
-    .limit(200)
+    .limit(300)
   if (result.error) throw result.error
   return result.data || []
 }
@@ -113,12 +116,70 @@ async function record(claim: string, evidence: Record<string, unknown>, verifier
     subject_id: 'reasoning_decision_science',
     candidate_id: CANDIDATE_ID,
     evidence_hash: evidenceHash,
-    evidence: body,
+    evidence,
     verifier,
     observed_at: new Date().toISOString(),
   }, { onConflict: 'event_key', ignoreDuplicates: true })
   if (result.error) throw result.error
   return evidenceHash
+}
+
+function legacyQueueEndpointIds(rows: any[]): string[] {
+  const ids = new Set<string>()
+  for (const row of rows) {
+    const evidence = row?.evidence
+    if (evidence?.profile !== PROFILE
+      || evidence?.claim !== 'local_distilled_runtime_endpoint_provisioned'
+      || evidence?.artifactHash !== ARTIFACT_HASH) continue
+    const endpointId = String(evidence?.endpointId || '').trim()
+    if (!/^[A-Za-z0-9_-]{3,120}$/.test(endpointId)) continue
+    const isCurrentLoadBalancer = String(evidence?.endpointName || '') === DISTILLED_ENDPOINT_NAME
+      && String(evidence?.routing || '') === DISTILLED_ENDPOINT_ROUTING
+    if (!isCurrentLoadBalancer) ids.add(endpointId)
+  }
+  return [...ids].slice(0, 5)
+}
+
+async function cleanupLegacyQueueEndpoints(rows: any[]) {
+  const results: Array<Record<string, unknown>> = []
+  for (const endpointId of legacyQueueEndpointIds(rows)) {
+    const alreadyCleaned = rows.find(row => row?.evidence?.profile === PROFILE
+      && row?.evidence?.claim === LEGACY_QUEUE_CLEANED_CLAIM
+      && row?.evidence?.artifactHash === ARTIFACT_HASH
+      && String(row?.evidence?.endpointId || '') === endpointId
+      && row?.evidence?.cleanupSucceeded === true)
+    if (alreadyCleaned) {
+      results.push({ endpointId, skipped: true, reason: 'already_cleaned' })
+      continue
+    }
+
+    try {
+      const cleanup = await purgeRunpodServerlessLegacyQueue(endpointId)
+      const receipt = {
+        endpointId,
+        cleanupSucceeded: true,
+        purged: cleanup.purged,
+        reason: 'reason' in cleanup ? cleanup.reason : null,
+        queuedBefore: 'queuedBefore' in cleanup ? cleanup.queuedBefore : cleanup.before.jobs.inQueue,
+        queuedAfter: 'queuedAfter' in cleanup ? cleanup.queuedAfter : cleanup.after.jobs.inQueue,
+        inProgressBefore: cleanup.before.jobs.inProgress,
+        inProgressAfter: cleanup.after.jobs.inProgress,
+        productionTrafficAuthorized: false,
+      }
+      await record(LEGACY_QUEUE_CLEANED_CLAIM, receipt)
+      results.push(receipt)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      await record(LEGACY_QUEUE_CLEANUP_FAILED_CLAIM, {
+        endpointId,
+        cleanupSucceeded: false,
+        error: message.slice(0, 300),
+        productionTrafficAuthorized: false,
+      })
+      results.push({ endpointId, cleanupSucceeded: false, error: message.slice(0, 300) })
+    }
+  }
+  return results
 }
 
 async function recordProductionCanaryEvidence(rows: any[], endpointId: string, responseHash: string) {
@@ -173,7 +234,13 @@ export async function GET(req: NextRequest) {
     const rows = await events()
     const control = latestCanaryControl(rows)
     if (control?.evidence?.claim === SUSPEND_CLAIM) {
-      return NextResponse.json({ ok: true, skipped: true, reason: 'canary_suspended_by_host_controller' })
+      const cleanup = await cleanupLegacyQueueEndpoints(rows)
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: 'canary_suspended_by_host_controller',
+        legacyQueueCleanup: cleanup,
+      })
     }
     const approval = validApproval(rows)
     if (!approval) {

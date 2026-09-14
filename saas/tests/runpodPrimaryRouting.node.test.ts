@@ -16,6 +16,19 @@ test('RunPod primary is a separate transport and does not overwrite DeepInfra fa
   assert.doesNotMatch(primary, /process\.env\.LOCAL_AI_API_KEY/)
 })
 
+test('RunPod primary dependency chain is directly Node-resolvable without Next alias fallback', () => {
+  const primary = source('../lib/ai/cos/runpodPrimaryInference.ts')
+  const lifecycle = source('../lib/ai/cos/runpodLifecycle.ts')
+  const resolver = source('../lib/ai/cos/runpodPodResolver.ts')
+  const telemetry = source('../lib/hub/runpodTelemetry.ts')
+  for (const text of [primary, lifecycle, resolver, telemetry]) assert.doesNotMatch(text, /from ['"]@\/lib\//)
+  assert.match(primary, /from '\.\.\/local-inference\.ts'/)
+  assert.match(primary, /from '\.\/runpodLifecycle\.ts'/)
+  assert.match(primary, /from '\.\/runpodPodResolver\.ts'/)
+  assert.match(lifecycle, /from '\.\.\/\.\.\/hub\/runpodTelemetry\.ts'/)
+  assert.match(telemetry, /from '\.\.\/ai\/cos\/runpodConfig\.ts'/)
+})
+
 test('stale configured pod ids recover only to the unique canonical SignalBoost reasoner pod', () => {
   const resolver = source('../lib/ai/cos/runpodPodResolver.ts')
   const config = source('../lib/ai/cos/runpodConfig.ts')

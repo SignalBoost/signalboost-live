@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import {
   COS_UNIVERSITY_INDEPENDENT_EVALUATOR_PROFILE,
-  independentEvaluatorConfigFromEnv,
+  independentEvaluatorConfig,
   recordIndependentEvaluatorEvidence,
   verifyIndependentEvaluatorPayload,
 } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
@@ -20,7 +20,7 @@ function header(request: Request, name: string, max: number): string {
 }
 
 export async function POST(request: Request) {
-  const config = independentEvaluatorConfigFromEnv()
+  const config = await independentEvaluatorConfig()
   if (!config) return noStore({ error: 'independent_evaluator_not_configured' }, { status: 503 })
 
   const profile = header(request, 'x-itmounts-evaluator-profile', 120)

@@ -2,7 +2,7 @@ import {
   configuredRunpodApiKey,
   explicitRunpodPodId,
   setRuntimeRunpodPodIdOverride,
-} from './runpodConfig'
+} from './runpodConfig.ts'
 
 const RUNPOD_GRAPHQL = 'https://api.runpod.io/graphql'
 const CANONICAL_REASONER_NAME = 'signalboost-cos-reasoner-v2'

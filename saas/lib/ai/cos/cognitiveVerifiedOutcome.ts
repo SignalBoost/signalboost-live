@@ -3,7 +3,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { classifyProblemClass, knownProblemClasses } from '@/lib/ai/cos/cosProblemClass'
 import { FOUNDATIONAL_KNOWLEDGE_DOMAINS } from '@/lib/cos-core/layers/learning/foundational'
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
-import { COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE } from './cosUniversityEvidenceSupply'
+import { COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE } from './cosUniversityEvidenceSupply.ts'
 import {
   recordCosUniversityRealWorldOutcome,
   type CosUniversityRealWorldOutcomeResult,

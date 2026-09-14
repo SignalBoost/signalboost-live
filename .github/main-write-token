@@ -1,2 +1,2 @@
-base_sha=7cde21983f6d615cbab8aa588cff4569d8143ee6
-branch=fix/runpod-distilled-canary-contract-20260914
+base_sha=27e13ad17adf00433e83df939f8075632fa0867c
+branch=fix/runpod-primary-builder-overload-20260914

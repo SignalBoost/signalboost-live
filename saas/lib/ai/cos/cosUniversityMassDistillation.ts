@@ -18,6 +18,7 @@ export type RetainedDistillationIdentity = Readonly<{
   sourceKind: string
   license: string
   confidence: number
+  materialFingerprint?: string
 }>
 
 export type PreparedDistillationBatch = Readonly<{
@@ -40,6 +41,31 @@ function hash(value: unknown): string {
 
 function normalizedSubject(value: string): string {
   return clean(value, 240).toLowerCase()
+}
+
+function retainedFactsForFingerprint(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, 8).map(item => {
+    if (typeof item === 'string') return clean(item, 1200)
+    try { return clean(JSON.stringify(item), 1200) } catch { return '' }
+  }).filter(Boolean)
+}
+
+/**
+ * Hash only the retained material that becomes a teacher prompt. Provenance/content hashes may differ
+ * while the retained title, summary and facts are identical; those rows must count once for training
+ * diversity. The fingerprint is used in memory only and source text still never enters the batch queue.
+ */
+export function retainedMaterialFingerprint(input: {
+  sourceTitle?: unknown
+  summary?: unknown
+  facts?: unknown
+}): string {
+  return hash({
+    sourceTitle: clean(input.sourceTitle, 400),
+    summary: clean(input.summary, 7000),
+    facts: retainedFactsForFingerprint(input.facts),
+  })
 }
 
 /**
@@ -65,13 +91,13 @@ export function retainedIdentityEligibleForMassDistillation(row: RetainedDistill
     && classifyMassDistillationRights(row.license) !== null
 }
 
-/** Deterministically package source identities by subject; no source text enters this queue. */
+/** Deterministically package unique retained material identities by subject; no source text enters this queue. */
 export function buildMassDistillationBatches(
   rows: readonly RetainedDistillationIdentity[],
   assignedHashes: ReadonlySet<string> = new Set(),
   maxBatches = MASS_DISTILLATION_MAX_BATCHES_PER_RUN,
 ): PreparedDistillationBatch[] {
-  const groups = new Map<string, { subject: string; rows: RetainedDistillationIdentity[] }>()
+  const groups = new Map<string, { subject: string; rows: RetainedDistillationIdentity[]; materialFingerprints: Set<string> }>()
   for (const raw of rows) {
     const row = {
       contentHash: clean(raw.contentHash, 64).toLowerCase(),
@@ -79,11 +105,15 @@ export function buildMassDistillationBatches(
       sourceKind: clean(raw.sourceKind, 80),
       license: clean(raw.license, 1000),
       confidence: Number(raw.confidence),
+      materialFingerprint: clean(raw.materialFingerprint, 64).toLowerCase(),
     }
     if (!retainedIdentityEligibleForMassDistillation(row) || assignedHashes.has(row.contentHash)) continue
     const key = normalizedSubject(row.subject)
-    const group = groups.get(key) || { subject: row.subject, rows: [] }
-    if (!group.rows.some(item => item.contentHash === row.contentHash)) group.rows.push(row)
+    const group = groups.get(key) || { subject: row.subject, rows: [], materialFingerprints: new Set<string>() }
+    if (group.rows.some(item => item.contentHash === row.contentHash)) continue
+    if (HEX64.test(row.materialFingerprint) && group.materialFingerprints.has(row.materialFingerprint)) continue
+    group.rows.push(row)
+    if (HEX64.test(row.materialFingerprint)) group.materialFingerprints.add(row.materialFingerprint)
     groups.set(key, group)
   }
 
@@ -138,7 +168,7 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
   for (const row of existing.data || []) for (const digest of stringArray((row as any).source_hashes)) assigned.add(digest)
 
   const corpus = await db.from('cos_continuous_learning')
-    .select('content_hash,subject,source_kind,license,confidence')
+    .select('content_hash,subject,source_kind,license,confidence,source_title,summary,facts')
     .gte('confidence', MASS_DISTILLATION_MIN_CONFIDENCE)
     .order('created_at', { ascending: true })
     .limit(5000)
@@ -150,6 +180,11 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     sourceKind: clean(row.source_kind, 80),
     license: clean(row.license, 1000),
     confidence: Number(row.confidence),
+    materialFingerprint: retainedMaterialFingerprint({
+      sourceTitle: row.source_title,
+      summary: row.summary,
+      facts: row.facts,
+    }),
   }))
   const eligible = identities.filter(retainedIdentityEligibleForMassDistillation)
   const unassigned = eligible.filter(row => !assigned.has(row.contentHash))
@@ -188,6 +223,6 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     sourceItemsPrepared,
     dispatchAuthorized: false,
     externalCostUsd: 0,
-    semantics: 'rights_cleared_identity_packaging_only_no_text_no_provider_dispatch_no_traffic_authorization' as const,
+    semantics: 'rights_cleared_identity_packaging_material_dedup_only_no_text_persisted_no_provider_dispatch_no_traffic_authorization' as const,
   })
 }

@@ -13,6 +13,7 @@ import {
   canaryRunpodServerlessDistilledLlm,
   provisionRunpodServerlessDistilledLlm,
   reconcileRunpodServerlessDistilledEndpoint,
+  runpodServerlessEndpointHealth,
 } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
 
 export const runtime = 'nodejs'
@@ -25,6 +26,8 @@ const ARTIFACT_HASH = 'bd7b151e75cc963d02597529b7256b755419dd20bcd2c36ca849e903d
 const MIN_BALANCE_USD = 1
 const MAX_CANARY_INVOCATIONS = 3
 const CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 2
+const APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved'
+const SUSPEND_CLAIM = 'local_distilled_runtime_canary_suspended'
 
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -58,26 +61,35 @@ function matchingAfter(rows: any[], claim: string, notBefore: string) {
     && Date.parse(String(row.observed_at)) >= floor)
 }
 
+/**
+ * The assurance ledger is append-only. Therefore a newer host-controller suspension must override
+ * an older approval without mutating history. A still newer approval can explicitly resume canaries.
+ */
+function latestCanaryControl(rows: any[]) {
+  return rows.find(row => row?.verifier === 'host_controller'
+    && row?.evidence?.profile === PROFILE
+    && row?.evidence?.artifactHash === ARTIFACT_HASH
+    && [APPROVAL_CLAIM, SUSPEND_CLAIM].includes(String(row?.evidence?.claim || '')))
+}
+
 function validApproval(rows: any[], now = new Date()) {
+  const row = latestCanaryControl(rows)
+  if (!row || row?.evidence?.claim !== APPROVAL_CLAIM) return null
+  const evidence = row.evidence
+  const observedAt = Date.parse(String(row.observed_at || ''))
+  const expiresAt = Date.parse(String(row.expires_at || ''))
   const nowMs = now.getTime()
-  return rows.find(row => {
-    const evidence = row?.evidence
-    const observedAt = Date.parse(String(row?.observed_at || ''))
-    const expiresAt = Date.parse(String(row?.expires_at || ''))
-    return row?.verifier === 'host_controller'
-      && evidence?.profile === PROFILE
-      && evidence?.claim === 'local_distilled_runtime_deploy_approved'
-      && evidence?.artifactHash === ARTIFACT_HASH
-      && evidence?.canaryAuthorized === true
-      && Number(evidence?.maxCanaryInvocations || MAX_CANARY_INVOCATIONS) <= MAX_CANARY_INVOCATIONS
-      && Number(evidence?.maxEstimatedCanaryCostUsd || 0) <= 0.2
-      && evidence?.productionTrafficAuthorized === false
-      && evidence?.authorityExpanded === false
-      && Number.isFinite(observedAt)
-      && Number.isFinite(expiresAt)
-      && observedAt <= nowMs
-      && expiresAt > nowMs
-  })
+  return evidence?.canaryAuthorized === true
+    && Number(evidence?.maxCanaryInvocations || MAX_CANARY_INVOCATIONS) <= MAX_CANARY_INVOCATIONS
+    && Number(evidence?.maxEstimatedCanaryCostUsd || 0) <= 0.2
+    && evidence?.productionTrafficAuthorized === false
+    && evidence?.authorityExpanded === false
+    && Number.isFinite(observedAt)
+    && Number.isFinite(expiresAt)
+    && observedAt <= nowMs
+    && expiresAt > nowMs
+    ? row
+    : null
 }
 
 async function record(claim: string, evidence: Record<string, unknown>, verifier = 'host_controller') {
@@ -156,6 +168,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const rows = await events()
+    const control = latestCanaryControl(rows)
+    if (control?.evidence?.claim === SUSPEND_CLAIM) {
+      return NextResponse.json({ ok: true, skipped: true, reason: 'canary_suspended_by_host_controller' })
+    }
     const approval = validApproval(rows)
     if (!approval) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'explicit_owner_approval_missing_or_expired' })
@@ -199,8 +215,6 @@ export async function GET(req: NextRequest) {
         scaleToZero: provisioned.workersMin === 0,
       })
     } else {
-      // Existing evidence may refer to an endpoint created under an older five-second idle policy.
-      // Reconcile it before any paid canary so the exact worker can remain warm for the evaluator.
       await reconcileRunpodServerlessDistilledEndpoint(endpointId)
     }
 
@@ -214,6 +228,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'distilled_canary_retry_ceiling', endpointId }, { status: 503 })
     }
 
+    const healthBefore = await runpodServerlessEndpointHealth(endpointId)
     const canary = await canaryRunpodServerlessDistilledLlm({
       endpointId,
       attempts: CANARY_HTTP_ATTEMPTS_PER_INVOCATION,
@@ -221,6 +236,7 @@ export async function GET(req: NextRequest) {
       timeoutMs: DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
     })
     if (!canary.ok) {
+      const healthAfter = await runpodServerlessEndpointHealth(endpointId)
       await record('local_distilled_runtime_canary_failed', {
         endpointId,
         model: canary.model,
@@ -229,12 +245,22 @@ export async function GET(req: NextRequest) {
         attemptOrdinal: failures + 1,
         httpAttempts: CANARY_HTTP_ATTEMPTS_PER_INVOCATION,
         attemptTimeoutMs: DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
+        healthBefore,
+        healthAfter,
         authorizationObservedAt: approvalObservedAt,
       })
-      return NextResponse.json({ ok: false, deployed: true, canaryPassed: false, endpointId, error: canary.error }, { status: 503 })
+      return NextResponse.json({
+        ok: false,
+        deployed: true,
+        canaryPassed: false,
+        endpointId,
+        error: canary.error,
+        health: healthAfter,
+      }, { status: 503 })
     }
 
     const responseHash = hash(canary.text || '')
+    const healthAfter = await runpodServerlessEndpointHealth(endpointId)
     await record('local_distilled_runtime_canary_passed', {
       endpointId,
       model: canary.model,
@@ -244,6 +270,8 @@ export async function GET(req: NextRequest) {
       scaleToZero: true,
       productionTrafficAuthorized: false,
       httpAttemptsCeiling: CANARY_HTTP_ATTEMPTS_PER_INVOCATION,
+      healthBefore,
+      healthAfter,
       authorizationObservedAt: approvalObservedAt,
     })
     await recordProductionCanaryEvidence(await events(), endpointId, responseHash)
@@ -255,6 +283,7 @@ export async function GET(req: NextRequest) {
       endpointId,
       model: canary.model,
       productionTrafficAuthorized: false,
+      health: healthAfter,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

@@ -7,6 +7,7 @@ import {
 } from '../lib/ai/cos/cosUniversityMassDistillation.ts'
 
 const h = (n: number) => n.toString(16).padStart(64, '0')
+const packager = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillation.ts', import.meta.url), 'utf8')
 const consumer = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts', import.meta.url), 'utf8')
 
 test('retained material fingerprint ignores provenance identity and stays deterministic', () => {
@@ -57,6 +58,12 @@ test('twenty genuinely distinct retained materials remain eligible for one bound
   const batches = buildMassDistillationBatches(rows)
   assert.equal(batches.length, 1)
   assert.equal(batches[0].sourceCount, 20)
+})
+
+test('quarantined and superseded batches release source identities for deduplicated repackaging', () => {
+  assert.match(packager, /\.in\('status', \['prepared', 'teacher_synthesis_ready', 'consumed'\]\)/)
+  assert.doesNotMatch(packager, /\.in\('status', \[[^\]]*'quarantined'/)
+  assert.doesNotMatch(packager, /\.in\('status', \[[^\]]*'superseded'/)
 })
 
 test('teacher dispatch deduplicates exact prompt bodies and fails before provider submission', () => {

@@ -1,2 +1,2 @@
-base_sha=7e4208b086fe3d379ee1d5cd51208c588a718754
-branch=fix/power-stabilization-test-integrity-20260913-v3
+base_sha=3afc9096e64f79ea47b9f312f239ac4a9fbef9b7
+branch=fix/runpod-embedding-primary-fallback-20260914

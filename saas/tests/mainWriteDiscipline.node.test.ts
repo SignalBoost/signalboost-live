@@ -1,6 +1,6 @@
 // tests/mainWriteDiscipline.node.test.ts
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
@@ -60,13 +60,6 @@ test('the shared token is a conflict surface, not an authority credential', () =
 })
 
 test('a library or route file committed into tests/ is caught, whatever it is named', () => {
-  // The guard below only reads *.node.test.ts, so on 2026-09-13 a library module committed as
-  // saas/tests/cosUniversityEvidenceSupply.ts sat on main unnoticed: nothing imported it, no suite
-  // ran it, and the gate had no opinion. The signature is the same as the pasted-route corruption —
-  // a first-line path comment pointing somewhere other than tests/ — so the same rule applies to
-  // every TypeScript file in the directory, not only the ones that end in .node.test.ts.
-  //
-  // Files that legitimately live here keep pointing at tests/: fixtures, .cases.ts, e2e specs.
   const testsDir = fileURLToPath(new URL('./', import.meta.url))
   const files = readdirSync(testsDir).filter(name => /\.tsx?$/.test(name))
   assert.ok(files.length > 0, 'no TypeScript files found to verify')
@@ -84,13 +77,8 @@ test('a library or route file committed into tests/ is caught, whatever it is na
 })
 
 test('every gated file actually registers tests, so an empty pass is impossible', () => {
-  // The stronger half of the same corruption. On 2026-09-13 tests/releaseSignalSeverity.node.test.ts
-  // held a byte-identical copy of lib/ai/cos/cognitiveReasoningPatterns.ts. It declared no tests, so
-  // node --test reported the file as PASSING and the gate printed a tick for it. A header check
-  // could not see it: the pasted module's first line is `export type ...`, not a path comment.
-  // A gated file that registers nothing is never a pass; it is a missing regression.
   const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
-  const listed = [...gate.matchAll(/'(tests\/[^']+\.node\.test\.ts)'/g)].map(match => match[1])
+  const listed = [...gate.matchAll(/'((?:tests|regression)\/[^']+\.node\.test\.ts)'/g)].map(match => match[1])
   assert.ok(listed.length > 100, `gate list looks truncated: ${listed.length} entries`)
 
   for (const relative of listed) {
@@ -101,10 +89,6 @@ test('every gated file actually registers tests, so an empty pass is impossible'
 })
 
 test('every gated test file is a real test, not source code pasted into a test path', () => {
-  // Recurring corruption: an agent overwrites a tests/*.node.test.ts with the contents of a
-  // route/lib source file. The pasted file keeps its own first-line path comment (e.g.
-  // "// saas/app/api/builder/route.ts") and imports runtime-only modules like next/server, which
-  // then fail ESM resolution under Node 24 and break the whole gate. Catch it at the gate instead.
   const testsDir = fileURLToPath(new URL('./', import.meta.url))
   const files = readdirSync(testsDir).filter(name => name.endsWith('.node.test.ts'))
   assert.ok(files.length > 0, 'no test files found to verify')
@@ -112,22 +96,54 @@ test('every gated test file is a real test, not source code pasted into a test p
   for (const name of files) {
     const source = readFileSync(new URL(name, import.meta.url), 'utf8')
     const firstLine = source.split('\n', 1)[0].trim()
-
-    // A first-line path comment must point at this file's own tests/ location, never at a
-    // route/lib/source path. This is the exact signature of the route-pasted-into-test corruption.
     const headerPath = firstLine.startsWith('//') ? firstLine.replace(/^\/\/\s*/, '').trim() : ''
     if (headerPath && /\.(?:ts|tsx|js|mjs|cjs)$/.test(headerPath)) {
       assert.ok(
         /(?:^|\/)tests\//.test(headerPath),
-        `${name}: first-line path comment points outside tests/ ("${headerPath}") — a source file was pasted into a test path`,
+        `${name}: first-line path comment points outside tests/ ("${headerPath}") — a source file was pasted into this test path`,
       )
     }
 
-    // A test file must never pull the Next server runtime; that only appears when route.ts was pasted in.
     assert.doesNotMatch(
       source,
       /from ['"]next\/server['"]/,
       `${name}: imports next/server — route/source code was pasted into this test file`,
     )
+  }
+})
+
+test('test files cannot import missing bare siblings', () => {
+  const testsDir = new URL('./', import.meta.url)
+  const files = readdirSync(testsDir, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.node.test.ts'))
+    .map(entry => entry.name)
+
+  for (const name of files) {
+    const fileUrl = new URL(name, testsDir)
+    const source = readFileSync(fileUrl, 'utf8')
+    const specifiers = [
+      ...source.matchAll(/\bfrom\s+['"](\.\/[^'"]+\.(?:ts|tsx|js|mjs|cjs))['"]/g),
+      ...source.matchAll(/^\s*import\s+['"](\.\/[^'"]+\.(?:ts|tsx|js|mjs|cjs))['"]/gm),
+    ].map(match => match[1])
+
+    for (const specifier of specifiers) {
+      assert.equal(
+        existsSync(fileURLToPath(new URL(specifier, fileUrl))),
+        true,
+        `${name}: imports missing sibling ${specifier}; likely source code was copied into tests/`,
+      )
+    }
+  }
+})
+
+test('critical release regressions cannot sit dead outside the COS gate', () => {
+  const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
+  const criticalReleaseTests = [
+    'tests/releaseSignalSeverity.node.test.ts',
+    'regression/powerStabilizationRelease.node.test.ts',
+  ]
+
+  for (const relative of criticalReleaseTests) {
+    assert.ok(gate.includes(`'${relative}'`), `${relative}: critical regression is not registered in the COS gate`)
   }
 })

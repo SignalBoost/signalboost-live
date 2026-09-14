@@ -48,10 +48,18 @@ test('teacher yield failures report survivor and drop-reason evidence', () => {
   assert.match(worker, /worker_teacher_dataset_too_small:\{diagnostic_json\}/)
 })
 
-test('teacher diagnostics distinguish raw-length loss without logging raw hidden text', () => {
+test('teacher diagnostics require an actual hidden-reasoning marker before attributing stripped yield loss', () => {
+  assert.match(worker, /hidden_reasoning_present = "<think>" in raw_answer\.lower\(\) or "<\/think>" in raw_answer\.lower\(\)/)
+  assert.match(worker, /hidden_reasoning_by_id = \{/)
+  assert.match(worker, /hidden_reasoning_by_id\[prompt_id\] = hidden_reasoning_present/)
+  assert.match(worker, /if hidden_reasoning_present and raw_chars >= TEACHER_MIN_RESPONSE_CHARS/)
+  assert.match(worker, /"hiddenReasoningMarker": hidden_reasoning_present/)
+  assert.doesNotMatch(worker, /if raw_chars >= TEACHER_MIN_RESPONSE_CHARS:\n\s+reason = "hidden_reasoning_stripped_below_floor"/)
+})
+
+test('teacher diagnostics preserve raw-length evidence without logging raw hidden text', () => {
   assert.match(worker, /raw_answer = tokenizer\.decode/)
   assert.match(worker, /len\(raw_answer\)/)
-  assert.match(worker, /raw_chars >= TEACHER_MIN_RESPONSE_CHARS/)
   assert.match(worker, /"rawChars": raw_chars/)
   assert.match(worker, /"safeChars": len\(answer\)/)
   assert.match(worker, /"safeSample": safe_sample/)

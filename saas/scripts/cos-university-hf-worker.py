@@ -72,7 +72,7 @@ def _generate_batch(
     items: list[tuple[str, str]],
     system: str,
     max_new_tokens: int,
-) -> list[tuple[str, str, int, str]]:
+) -> list[tuple[str, str, int, bool, str]]:
     if not items:
         return []
     rendered = [
@@ -94,12 +94,13 @@ def _generate_batch(
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
             )
-        output: list[tuple[str, str, int, str]] = []
+        output: list[tuple[str, str, int, bool, str]] = []
         for index, (prompt_id, prompt) in enumerate(items):
             new_tokens = generated[index][input_width:]
             raw_answer = tokenizer.decode(new_tokens, skip_special_tokens=True)
+            hidden_reasoning_present = "<think>" in raw_answer.lower() or "</think>" in raw_answer.lower()
             answer = base.strip_hidden_reasoning(raw_answer)
-            output.append((prompt_id, prompt, len(raw_answer), answer))
+            output.append((prompt_id, prompt, len(raw_answer), hidden_reasoning_present, answer))
         return output
     except RuntimeError as exc:
         if "out of memory" not in str(exc).lower() or len(items) <= 1:
@@ -121,8 +122,8 @@ def _batched_generate(
     items: list[tuple[str, str]],
     system: str,
     max_new_tokens: int,
-) -> list[tuple[str, str, int, str]]:
-    output: list[tuple[str, str, int, str]] = []
+) -> list[tuple[str, str, int, bool, str]]:
+    output: list[tuple[str, str, int, bool, str]] = []
     for start in range(0, len(items), TEACHER_BATCH_SIZE):
         output.extend(_generate_batch(
             base,
@@ -136,7 +137,13 @@ def _batched_generate(
     return output
 
 
-def _safe_drop_sample(prompt_id: str, reason: str, raw_chars: int, answer: str) -> dict[str, Any]:
+def _safe_drop_sample(
+    prompt_id: str,
+    reason: str,
+    raw_chars: int,
+    hidden_reasoning_present: bool,
+    answer: str,
+) -> dict[str, Any]:
     # Never log raw decoded text: it may contain hidden-reasoning tokens that are deliberately stripped.
     safe_sample = " ".join(answer.split())[:160]
     return {
@@ -144,6 +151,7 @@ def _safe_drop_sample(prompt_id: str, reason: str, raw_chars: int, answer: str) 
         "reason": reason,
         "rawChars": raw_chars,
         "safeChars": len(answer),
+        "hiddenReasoningMarker": hidden_reasoning_present,
         "safeSample": safe_sample,
     }
 
@@ -228,12 +236,16 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
     first_pass = _batched_generate(
         base, torch, tokenizer, model, normalized_prompts, system, TEACHER_MAX_NEW_TOKENS
     )
-    answers = {prompt_id: answer for prompt_id, _, _, answer in first_pass}
-    raw_chars_by_id = {prompt_id: raw_chars for prompt_id, _, raw_chars, _ in first_pass}
+    answers = {prompt_id: answer for prompt_id, _, _, _, answer in first_pass}
+    raw_chars_by_id = {prompt_id: raw_chars for prompt_id, _, raw_chars, _, _ in first_pass}
+    hidden_reasoning_by_id = {
+        prompt_id: hidden_reasoning_present
+        for prompt_id, _, _, hidden_reasoning_present, _ in first_pass
+    }
 
     terse = [
         (prompt_id, prompt)
-        for prompt_id, prompt, _, answer in first_pass
+        for prompt_id, prompt, _, _, answer in first_pass
         if len(answer) < TEACHER_MIN_RESPONSE_CHARS
     ]
     if terse:
@@ -245,8 +257,9 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
         second_pass = _batched_generate(
             base, torch, tokenizer, model, terse, retry_system, TEACHER_RETRY_MAX_NEW_TOKENS
         )
-        for prompt_id, _, raw_chars, answer in second_pass:
+        for prompt_id, _, raw_chars, hidden_reasoning_present, answer in second_pass:
             raw_chars_by_id[prompt_id] = raw_chars
+            hidden_reasoning_by_id[prompt_id] = hidden_reasoning_present
             answers[prompt_id] = answer
 
     rows: list[dict[str, Any]] = []
@@ -262,8 +275,9 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
     for prompt_id, prompt in normalized_prompts:
         answer = answers.get(prompt_id, "")
         raw_chars = int(raw_chars_by_id.get(prompt_id, 0))
+        hidden_reasoning_present = bool(hidden_reasoning_by_id.get(prompt_id, False))
         if len(answer) < TEACHER_MIN_RESPONSE_CHARS:
-            if raw_chars >= TEACHER_MIN_RESPONSE_CHARS:
+            if hidden_reasoning_present and raw_chars >= TEACHER_MIN_RESPONSE_CHARS:
                 reason = "hidden_reasoning_stripped_below_floor"
             elif len(answer) == 0:
                 reason = "empty_after_strip"
@@ -271,7 +285,13 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
                 reason = "short_answer"
             drop_counts[reason] += 1
             if drop_sample is None:
-                drop_sample = _safe_drop_sample(prompt_id, reason, raw_chars, answer)
+                drop_sample = _safe_drop_sample(
+                    prompt_id,
+                    reason,
+                    raw_chars,
+                    hidden_reasoning_present,
+                    answer,
+                )
             continue
 
         text = f"<user>\n{prompt}\n\n<assistant>\n{answer}"
@@ -279,7 +299,13 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
         if digest in item_hashes:
             drop_counts["duplicate"] += 1
             if drop_sample is None:
-                drop_sample = _safe_drop_sample(prompt_id, "duplicate", raw_chars, answer)
+                drop_sample = _safe_drop_sample(
+                    prompt_id,
+                    "duplicate",
+                    raw_chars,
+                    hidden_reasoning_present,
+                    answer,
+                )
             continue
         item_hashes.append(digest)
         rows.append({

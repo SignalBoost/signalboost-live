@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runUniversityDistilledArtifactEvaluation } from '@/lib/ai/cos/cosUniversityDistilledArtifactEvaluation'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,12 @@ export async function GET(req: NextRequest) {
   }
   try {
     const result = await runUniversityDistilledArtifactEvaluation(new Date())
+    const skipped = 'skipped' in result && result.skipped === true
+    await recordCosUniversityProductionPath({
+      path: 'distilled_independent_evaluation',
+      invocationSucceeded: result.ok === true,
+      evidence: { ...result, runnerInvoked: !skipped, skipped },
+    })
     console.info('[cos-distilled-independent-evaluation]', JSON.stringify(result))
     return NextResponse.json(result, {
       status: result.ok ? 200 : 503,
@@ -19,6 +26,11 @@ export async function GET(req: NextRequest) {
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    await recordCosUniversityProductionPath({
+      path: 'distilled_independent_evaluation',
+      invocationSucceeded: false,
+      evidence: { error: message, runnerInvoked: true },
+    }).catch(() => null)
     console.error('[cos-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: message }))
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

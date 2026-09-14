@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkLocalInferenceHealth } from '@/lib/ai/local-inference'
 import { configuredRunpodApiKey, configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
-import { runpodPrimaryConfig, runpodPrimaryEnabled } from '@/lib/ai/cos/runpodPrimaryInference'
+import { ensureRunpodReasonerStarted, runpodOrphanGuardEnabled, stopRunpodReasoner } from '@/lib/ai/cos/runpodLifecycle'
+import { runpodPrimaryConfig, runpodPrimaryEnabled, runpodPrimaryModel } from '@/lib/ai/cos/runpodPrimaryInference'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 30
+export const maxDuration = 60
 
 const RUNPOD_GRAPHQL = 'https://api.runpod.io/graphql'
+const DEFAULT_UNHEALTHY_REPAIR_GRACE_SECONDS = 300
+
+function unhealthyRepairGraceSeconds(): number {
+  const raw = Number(process.env.RUNPOD_UNHEALTHY_REPAIR_GRACE_SECONDS || DEFAULT_UNHEALTHY_REPAIR_GRACE_SECONDS)
+  if (!Number.isFinite(raw)) return DEFAULT_UNHEALTHY_REPAIR_GRACE_SECONDS
+  return Math.max(60, Math.min(3600, Math.round(raw)))
+}
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -26,6 +34,9 @@ export async function GET(req: NextRequest) {
       inferenceReady: false,
       inferenceModel: null,
       inferenceError: 'runpod_primary_not_configured',
+      repairAttempted: false,
+      repairStarted: false,
+      repairError: null,
     }
     console.info('[runpod-primary-probe]', JSON.stringify(result))
     return NextResponse.json(result)
@@ -89,6 +100,52 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    let repairAttempted = false
+    let repairStarted = false
+    let repairError: string | null = null
+    const configuredPod = configuredPodId ? pods.find(pod => pod.id === configuredPodId) : null
+    const hardServingFailure = Boolean(inferenceError && /^HTTP 502\b/.test(inferenceError))
+    const graceSeconds = unhealthyRepairGraceSeconds()
+
+    // HTTP 502 means the external RunPod proxy has no usable serving process behind it. This is
+    // materially different from a slow/busy inference timeout, which must never cause us to throw
+    // away scarce GPU capacity. Once a RUNNING pod is well past cold-start grace, repair only this
+    // hard-serving state: stop the useless billing allocation, apply the exact startup contract while
+    // stopped, and request a clean restart. The next probe proves readiness before traffic uses it.
+    if (configuredPod?.running
+      && !inferenceReady
+      && hardServingFailure
+      && configuredPod.uptimeSeconds >= graceSeconds
+      && runpodOrphanGuardEnabled()) {
+      repairAttempted = true
+      try {
+        const stopped = await stopRunpodReasoner()
+        if (!stopped.stopped) throw new Error('runpod_unhealthy_repair_stop_failed')
+        const started = await ensureRunpodReasonerStarted({
+          reasonerModel: runpodPrimaryModel('reasoner'),
+          embeddingModel: process.env.RUNPOD_PRIMARY_EMBEDDING_MODEL?.trim() || 'nomic-embed-text',
+        })
+        repairStarted = started.started
+        if (!repairStarted) throw new Error('runpod_unhealthy_repair_restart_failed')
+        console.warn('[runpod-primary-repair]', JSON.stringify({
+          ok: true,
+          podId: configuredPodId,
+          reason: inferenceError,
+          previousUptimeSeconds: configuredPod.uptimeSeconds,
+          startupContractRepaired: started.startupContractRepaired,
+          desiredStatus: started.desiredStatus,
+        }))
+      } catch (error) {
+        repairError = error instanceof Error ? error.message : String(error)
+        console.error('[runpod-primary-repair]', JSON.stringify({
+          ok: false,
+          podId: configuredPodId,
+          reason: inferenceError,
+          error: repairError,
+        }))
+      }
+    }
+
     const result = {
       ok: true,
       configured: true,
@@ -97,6 +154,9 @@ export async function GET(req: NextRequest) {
       inferenceReady,
       inferenceModel,
       inferenceError,
+      repairAttempted,
+      repairStarted,
+      repairError,
       account: {
         clientBalance: typeof account.clientBalance === 'number' ? account.clientBalance : null,
         currentSpendPerHr: typeof account.currentSpendPerHr === 'number' ? account.currentSpendPerHr : null,
@@ -116,6 +176,9 @@ export async function GET(req: NextRequest) {
       inferenceReady: false,
       inferenceModel: null,
       inferenceError: 'runpod_probe_failed',
+      repairAttempted: false,
+      repairStarted: false,
+      repairError: null,
       error: error instanceof Error ? error.message : String(error),
     }
     console.warn('[runpod-primary-probe]', JSON.stringify(result))

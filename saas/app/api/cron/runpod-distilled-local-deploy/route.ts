@@ -1,3 +1,4 @@
+// saas/app/api/cron/runpod-distilled-local-deploy/route.ts
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -9,13 +10,14 @@ import {
   DISTILLED_BASE_MODEL_ID,
   DISTILLED_BASE_MODEL_REVISION,
   DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
+  DISTILLED_ENDPOINT_NAME,
+  DISTILLED_ENDPOINT_ROUTING,
   DISTILLED_MODEL_NAME,
   canaryRunpodServerlessDistilledLlm,
   provisionRunpodServerlessDistilledLlm,
   reconcileRunpodServerlessDistilledEndpoint,
   runpodServerlessEndpointHealth,
 } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
-import { reconcileRunpodServerlessDistilledWorkerTemplate } from '@/lib/ai/cos/runpodServerlessDistilledWorkerRepair'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -195,12 +197,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'runpod_balance_guard', balance: account.clientBalance }, { status: 402 })
     }
 
-    let endpointId = String(matching(rows, 'local_distilled_runtime_endpoint_provisioned')?.evidence?.endpointId || '').trim()
+    // Endpoint evidence is bound to the endpoint NAME as well as the artifact: a previously
+    // provisioned endpoint built under a different routing mode must never be reused silently.
+    const provisionedRow = rows.find(row => row?.evidence?.profile === PROFILE
+      && row?.evidence?.claim === 'local_distilled_runtime_endpoint_provisioned'
+      && row?.evidence?.artifactHash === ARTIFACT_HASH
+      && String(row?.evidence?.endpointName || '') === DISTILLED_ENDPOINT_NAME
+      && String(row?.evidence?.routing || '') === DISTILLED_ENDPOINT_ROUTING)
+    let endpointId = String(provisionedRow?.evidence?.endpointId || '').trim()
     if (!endpointId) {
       const provisioned = await provisionRunpodServerlessDistilledLlm()
       endpointId = provisioned.endpointId
       await record('local_distilled_runtime_endpoint_provisioned', {
         endpointId,
+        endpointName: DISTILLED_ENDPOINT_NAME,
+        routing: DISTILLED_ENDPOINT_ROUTING,
         baseUrl: provisioned.baseUrl,
         model: provisioned.model,
         baseModelId: DISTILLED_BASE_MODEL_ID,
@@ -215,19 +226,9 @@ export async function GET(req: NextRequest) {
         createdEndpoint: provisioned.createdEndpoint,
         scaleToZero: provisioned.workersMin === 0,
       })
+    } else {
+      await reconcileRunpodServerlessDistilledEndpoint(endpointId)
     }
-
-    // RunPod's queue-based OpenAI Serverless surface requires the worker-vllm wrapper. Reconcile the
-    // existing template before a paid canary so the endpoint cannot run a bare HTTP server that never
-    // registers a Serverless worker loop. The immutable adapter revision is downloaded before wrapper start.
-    const worker = await reconcileRunpodServerlessDistilledWorkerTemplate(endpointId)
-    await reconcileRunpodServerlessDistilledEndpoint(endpointId)
-    await record('local_distilled_runtime_worker_reconciled', {
-      endpointId,
-      imageName: worker.imageName,
-      exactAdapterRevision: worker.exactAdapterRevision,
-      productionTrafficAuthorized: false,
-    })
 
     const refreshed = await events()
     const approvalFloor = Date.parse(approvalObservedAt)

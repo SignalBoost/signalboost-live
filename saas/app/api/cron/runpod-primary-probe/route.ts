@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkLocalInferenceHealth } from '@/lib/ai/local-inference'
 import { configuredRunpodApiKey, configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
+import { runpodPrimaryConfig, runpodPrimaryEnabled } from '@/lib/ai/cos/runpodPrimaryInference'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -16,7 +18,15 @@ export async function GET(req: NextRequest) {
   const apiKey = configuredRunpodApiKey()
   const configuredPodId = configuredRunpodPodId()
   if (!apiKey) {
-    const result = { ok: true, configured: false, apiKeyPresent: false, podIdPresent: Boolean(configuredPodId) }
+    const result = {
+      ok: true,
+      configured: false,
+      apiKeyPresent: false,
+      podIdPresent: Boolean(configuredPodId),
+      inferenceReady: false,
+      inferenceModel: null,
+      inferenceError: 'runpod_primary_not_configured',
+    }
     console.info('[runpod-primary-probe]', JSON.stringify(result))
     return NextResponse.json(result)
   }
@@ -64,11 +74,29 @@ export async function GET(req: NextRequest) {
       configuredMatch: Boolean(configuredPodId && pod.id === configuredPodId),
     }))
 
+    let inferenceReady = false
+    let inferenceModel: string | null = null
+    let inferenceError: string | null = runpodPrimaryEnabled() ? null : 'runpod_primary_disabled'
+    if (configuredPodId && runpodPrimaryEnabled()) {
+      try {
+        const inferenceConfig = runpodPrimaryConfig('reasoner', configuredPodId)
+        const health = await checkLocalInferenceHealth(inferenceConfig)
+        inferenceReady = health.ok
+        inferenceModel = health.model
+        inferenceError = health.ok ? null : (health.error || 'runpod_primary_model_unavailable')
+      } catch (error) {
+        inferenceError = error instanceof Error ? error.message : String(error)
+      }
+    }
+
     const result = {
       ok: true,
       configured: true,
       configuredPodId: configuredPodId || null,
       configuredPodFound: Boolean(configuredPodId && pods.some(pod => pod.id === configuredPodId)),
+      inferenceReady,
+      inferenceModel,
+      inferenceError,
       account: {
         clientBalance: typeof account.clientBalance === 'number' ? account.clientBalance : null,
         currentSpendPerHr: typeof account.currentSpendPerHr === 'number' ? account.currentSpendPerHr : null,
@@ -85,6 +113,9 @@ export async function GET(req: NextRequest) {
       ok: false,
       configured: true,
       configuredPodId: configuredPodId || null,
+      inferenceReady: false,
+      inferenceModel: null,
+      inferenceError: 'runpod_probe_failed',
       error: error instanceof Error ? error.message : String(error),
     }
     console.warn('[runpod-primary-probe]', JSON.stringify(result))

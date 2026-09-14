@@ -118,17 +118,18 @@ test('primary cron probe reports model-serving health, not only pod/account stat
   assert.match(route, /inferenceError/)
 })
 
-test('primary cron repairs only hard HTTP 502 serving failures after cold-start grace', () => {
+test('primary cron repairs only hard HTTP 502 serving failures after cold-start grace without releasing the GPU', () => {
   const route = source('../app/api/cron/runpod-primary-probe/route.ts')
   assert.match(route, /\^HTTP 502\\b/)
   assert.match(route, /configuredPod\.uptimeSeconds >= graceSeconds/)
   assert.match(route, /runpodOrphanGuardEnabled\(\)/)
-  assert.match(route, /await stopRunpodReasoner\(\)/)
-  assert.match(route, /await ensureRunpodReasonerStarted\(/)
+  assert.match(route, /await configurePodStartupContract\(/)
   assert.match(route, /runpodPrimaryModel\('reasoner'\)/)
+  assert.match(route, /repairMode: 'in_place_update_reset'/)
   assert.match(route, /repairAttempted/)
   assert.match(route, /repairStarted/)
-  assert.doesNotMatch(route, /inferenceError.*AbortError.*stopRunpodReasoner/s)
+  assert.doesNotMatch(route, /stopRunpodReasoner|ensureRunpodReasonerStarted/)
+  assert.doesNotMatch(route, /inferenceError.*AbortError.*configurePodStartupContract/s)
 })
 
 test('admin probe reports configuration booleans without returning the RunPod account key', () => {

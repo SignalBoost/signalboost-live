@@ -162,6 +162,7 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
   const existing = await db.from('cos_university_distillation_curriculum_batches')
     .select('source_hashes')
     .eq('source_policy', MASS_DISTILLATION_SOURCE_POLICY)
+    .in('status', ['prepared', 'teacher_synthesis_ready', 'consumed'])
     .limit(1000)
   if (existing.error) throw existing.error
   const assigned = new Set<string>()

@@ -1,7 +1,7 @@
 // Cost-control lifecycle for a dedicated RunPod iTMounts primary reasoner.
 // RunPod control is independent from LOCAL_AI_BASE_URL so DeepInfra can remain the fallback transport.
 
-import { runpodControlConfigured } from './runpodConfig'
+import { runpodControlConfigured } from './runpodConfig.ts'
 import {
   configurePodStartupContract,
   queryPodRuntimeConfig,
@@ -10,7 +10,7 @@ import {
   startPod,
   stopPod,
   type RunpodStartupOptions,
-} from '../../hub/runpodTelemetry'
+} from '../../hub/runpodTelemetry.ts'
 
 function booleanOverride(name: string): boolean | null {
   const value = process.env[name]?.trim().toLowerCase()

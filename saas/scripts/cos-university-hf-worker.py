@@ -9,6 +9,7 @@ rights, callback, quality-floor, dataset-minimum, model identity, or spend autho
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
 import urllib.request
@@ -63,7 +64,15 @@ def _render_chat(tokenizer, messages: list[dict[str, str]]) -> str:
         return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
 
 
-def _generate_batch(base, torch, tokenizer, model, items: list[tuple[str, str]], system: str, max_new_tokens: int) -> list[tuple[str, str, str]]:
+def _generate_batch(
+    base,
+    torch,
+    tokenizer,
+    model,
+    items: list[tuple[str, str]],
+    system: str,
+    max_new_tokens: int,
+) -> list[tuple[str, str, int, str]]:
     if not items:
         return []
     rendered = [
@@ -85,11 +94,12 @@ def _generate_batch(base, torch, tokenizer, model, items: list[tuple[str, str]],
                 pad_token_id=tokenizer.pad_token_id,
                 eos_token_id=tokenizer.eos_token_id,
             )
-        output: list[tuple[str, str, str]] = []
+        output: list[tuple[str, str, int, str]] = []
         for index, (prompt_id, prompt) in enumerate(items):
             new_tokens = generated[index][input_width:]
-            answer = base.strip_hidden_reasoning(tokenizer.decode(new_tokens, skip_special_tokens=True))
-            output.append((prompt_id, prompt, answer))
+            raw_answer = tokenizer.decode(new_tokens, skip_special_tokens=True)
+            answer = base.strip_hidden_reasoning(raw_answer)
+            output.append((prompt_id, prompt, len(raw_answer), answer))
         return output
     except RuntimeError as exc:
         if "out of memory" not in str(exc).lower() or len(items) <= 1:
@@ -103,8 +113,16 @@ def _generate_batch(base, torch, tokenizer, model, items: list[tuple[str, str]],
         )
 
 
-def _batched_generate(base, torch, tokenizer, model, items: list[tuple[str, str]], system: str, max_new_tokens: int) -> list[tuple[str, str, str]]:
-    output: list[tuple[str, str, str]] = []
+def _batched_generate(
+    base,
+    torch,
+    tokenizer,
+    model,
+    items: list[tuple[str, str]],
+    system: str,
+    max_new_tokens: int,
+) -> list[tuple[str, str, int, str]]:
+    output: list[tuple[str, str, int, str]] = []
     for start in range(0, len(items), TEACHER_BATCH_SIZE):
         output.extend(_generate_batch(
             base,
@@ -116,6 +134,18 @@ def _batched_generate(base, torch, tokenizer, model, items: list[tuple[str, str]
             max_new_tokens,
         ))
     return output
+
+
+def _safe_drop_sample(prompt_id: str, reason: str, raw_chars: int, answer: str) -> dict[str, Any]:
+    # Never log raw decoded text: it may contain hidden-reasoning tokens that are deliberately stripped.
+    safe_sample = " ".join(answer.split())[:160]
+    return {
+        "promptId": prompt_id[:80],
+        "reason": reason,
+        "rawChars": raw_chars,
+        "safeChars": len(answer),
+        "safeSample": safe_sample,
+    }
 
 
 def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
@@ -198,9 +228,14 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
     first_pass = _batched_generate(
         base, torch, tokenizer, model, normalized_prompts, system, TEACHER_MAX_NEW_TOKENS
     )
-    answers = {prompt_id: answer for prompt_id, _, answer in first_pass}
+    answers = {prompt_id: answer for prompt_id, _, _, answer in first_pass}
+    raw_chars_by_id = {prompt_id: raw_chars for prompt_id, _, raw_chars, _ in first_pass}
 
-    terse = [(prompt_id, prompt) for prompt_id, prompt, answer in first_pass if len(answer) < TEACHER_MIN_RESPONSE_CHARS]
+    terse = [
+        (prompt_id, prompt)
+        for prompt_id, prompt, _, answer in first_pass
+        if len(answer) < TEACHER_MIN_RESPONSE_CHARS
+    ]
     if terse:
         retry_system = (
             system
@@ -210,18 +245,41 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
         second_pass = _batched_generate(
             base, torch, tokenizer, model, terse, retry_system, TEACHER_RETRY_MAX_NEW_TOKENS
         )
-        for prompt_id, _, answer in second_pass:
+        for prompt_id, _, raw_chars, answer in second_pass:
+            raw_chars_by_id[prompt_id] = raw_chars
             answers[prompt_id] = answer
 
     rows: list[dict[str, Any]] = []
     item_hashes: list[str] = []
+    drop_counts = {
+        "short_answer": 0,
+        "empty_after_strip": 0,
+        "hidden_reasoning_stripped_below_floor": 0,
+        "duplicate": 0,
+    }
+    drop_sample: dict[str, Any] | None = None
+
     for prompt_id, prompt in normalized_prompts:
         answer = answers.get(prompt_id, "")
+        raw_chars = int(raw_chars_by_id.get(prompt_id, 0))
         if len(answer) < TEACHER_MIN_RESPONSE_CHARS:
+            if raw_chars >= TEACHER_MIN_RESPONSE_CHARS:
+                reason = "hidden_reasoning_stripped_below_floor"
+            elif len(answer) == 0:
+                reason = "empty_after_strip"
+            else:
+                reason = "short_answer"
+            drop_counts[reason] += 1
+            if drop_sample is None:
+                drop_sample = _safe_drop_sample(prompt_id, reason, raw_chars, answer)
             continue
+
         text = f"<user>\n{prompt}\n\n<assistant>\n{answer}"
         digest = base.sha256(text)
         if digest in item_hashes:
+            drop_counts["duplicate"] += 1
+            if drop_sample is None:
+                drop_sample = _safe_drop_sample(prompt_id, "duplicate", raw_chars, answer)
             continue
         item_hashes.append(digest)
         rows.append({
@@ -244,8 +302,20 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
             "prompt_set_hash": prompt_set_hash,
         })
 
+    yield_diagnostic = {
+        "totalPrompts": len(normalized_prompts),
+        "survivors": len(rows),
+        "yieldPct": round((100.0 * len(rows)) / max(1, len(normalized_prompts)), 2),
+        "initialBelowFloor": len(terse),
+        "retried": len(terse),
+        "drops": drop_counts,
+        "sample": drop_sample,
+    }
+    diagnostic_json = json.dumps(yield_diagnostic, ensure_ascii=True, separators=(",", ":"))
+    print(f"itmounts_teacher_yield:{diagnostic_json}", flush=True)
+
     if len(rows) < TEACHER_MIN_DATASET_ITEMS:
-        raise RuntimeError("worker_teacher_dataset_too_small")
+        raise RuntimeError(f"worker_teacher_dataset_too_small:{diagnostic_json}")
 
     api = HfApi(token=token)
     namespace = api.whoami()["name"]

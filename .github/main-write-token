@@ -1,2 +1,2 @@
-base_sha=5ccdb9ec490d576f7e3f102f5294d55bc2de9090
-branch=fix/mass-distillation-claim-rpc-20260914-v2
+base_sha=a933a6fa1deb7f79e52b0c5c16e7d951887a0111
+branch=fix/runpod-distilled-verify-before-patch-20260914

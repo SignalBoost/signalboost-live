@@ -222,7 +222,7 @@ async function buildTeacherPrompts(subjectId: string, sourceHashes: readonly str
     throw new Error(`mass_distillation_teacher_prompt_diversity_insufficient:${prompts.length}/${sourceHashes.length}`)
   }
   if (prompts.length > 128) throw new Error('mass_distillation_teacher_prompt_count_invalid')
-  return Object.freeze({ prompts: Object.freeze(prompts), promptSetHash: hash(prompts) })
+  return Object.freeze({ prompts: Object.freeze(prompts), promptSetHash: hash(prompts), distinctPrompts: prompts.length })
 }
 
 function expectedStageAfterDispatch(stage: Stage) {
@@ -257,9 +257,13 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
   let idempotencyKey: string
   let hardwareFlavor: string
   let preDispatch: Record<string, unknown> = {}
+  let distinctPrompts: number | null = null
+  let promptSetHash: string | null = null
 
   if (claim.stage === 'teacher_dispatching') {
     const promptSet = await buildTeacherPrompts(run.subject_id, sourceHashes)
+    distinctPrompts = promptSet.distinctPrompts
+    promptSetHash = promptSet.promptSetHash
     const teacherModelId = clean(process.env.COS_UNIVERSITY_HF_TEACHER_MODEL, 240) || MASS_DISTILLATION_TEACHER_MODEL
     const teacher = await resolveHuggingFaceModelMetadata({ modelId: teacherModelId, token: hf.token, fetchImpl })
     const student = await resolveHuggingFaceModelMetadata({ modelId: MASS_DISTILLATION_STUDENT_MODEL, token: hf.token, fetchImpl })
@@ -376,6 +380,30 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
   if (fenced.error) throw fenced.error
   if (!fenced.data) throw new Error('mass_distillation_pre_dispatch_fence_lost')
 
+  await recordAssurance({
+    candidateId: run.candidate_id,
+    subjectId: run.subject_id,
+    claim: 'mass_distillation_pre_dispatch_validated',
+    evidence: {
+      campaignId: run.campaign_id,
+      batchKey: run.batch_key,
+      operation: String((envelope as any).operation),
+      stage: claim.stage,
+      idempotencyKey,
+      sourceCount: sourceHashes.length,
+      distinctPrompts,
+      promptSetHash,
+      flavor: price.flavor,
+      hourlyCostUsd: price.hourlyCostUsd,
+      timeoutSeconds: spec.timeoutSeconds,
+      maxEstimatedCostUsd,
+      reservedCostCeilingUsd: expectedCeiling,
+      automaticPromotionAuthorized: false,
+      runpodMutationAuthorized: false,
+    },
+    verifier: 'host_controller',
+  })
+
   const namespace = await resolveHuggingFaceNamespace({ token: hf.token, fetchImpl })
   const submitted = await submitHuggingFaceJob({ namespace, token: hf.token, spec, fetchImpl })
   const jobColumns = claim.stage === 'teacher_dispatching'
@@ -411,6 +439,8 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       reservedCostCeilingUsd: expectedCeiling,
       sourceCount: sourceHashes.length,
       promptCount: claim.stage === 'teacher_dispatching' ? ((envelope as any).prompts?.length ?? null) : null,
+      distinctPrompts,
+      promptSetHash,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
     },

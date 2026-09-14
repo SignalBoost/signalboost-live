@@ -12,6 +12,11 @@ export type LocalInferenceUsageRecord = Readonly<{
   provider: string
   model: string
   context: LocalInferenceUsageContext
+  routeOwner?: 'itmounts' | 'external' | null
+  graduateCandidateId?: string | null
+  graduateArtifactId?: string | null
+  graduateArtifactHash?: string | null
+  fallbackFromOwned?: boolean
   promptTokens: number | null
   completionTokens: number | null
   totalTokens: number | null
@@ -49,11 +54,13 @@ function nonNegativeNumber(value: unknown): number | null {
 }
 
 /**
- * Best-effort billing telemetry only. A failed telemetry write must never change an inference result,
- * academic verdict, Builder result, or authorization decision.
+ * Best-effort billing/routing telemetry only. A failed telemetry write must never change an inference
+ * result, academic verdict, Builder result, or authorization decision. Prompts, responses, credentials
+ * and hidden reasoning are never stored here.
  *
- * This small recorder deliberately does not import COS storage: local-inference is also exercised by
- * direct Node tests that must not depend on Next.js path aliases or the rest of the COS persistence graph.
+ * Compute provider and model ownership are deliberately separate facts. For example,
+ * `provider=deepinfra, route_owner=itmounts` means iTMounts owns the selected graduate artifact but
+ * temporarily rents DeepInfra compute to serve it.
  */
 export async function recordLocalInferenceUsage(record: LocalInferenceUsageRecord): Promise<void> {
   const db = serviceDb()
@@ -66,6 +73,11 @@ export async function recordLocalInferenceUsage(record: LocalInferenceUsageRecor
     correlation_id: clean(record.context.correlationId, 240),
     agent_id: clean(record.context.agentId, 180),
     purpose: clean(record.context.purpose, 120),
+    route_owner: record.routeOwner || null,
+    graduate_candidate_id: clean(record.graduateCandidateId, 240),
+    graduate_artifact_id: clean(record.graduateArtifactId, 500),
+    graduate_artifact_hash: clean(record.graduateArtifactHash, 64),
+    fallback_from_owned: record.fallbackFromOwned === true,
     prompt_tokens: nonNegativeInt(record.promptTokens),
     completion_tokens: nonNegativeInt(record.completionTokens),
     total_tokens: nonNegativeInt(record.totalTokens),

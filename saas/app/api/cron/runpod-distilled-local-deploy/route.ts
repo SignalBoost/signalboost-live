@@ -116,7 +116,7 @@ async function record(claim: string, evidence: Record<string, unknown>, verifier
     subject_id: 'reasoning_decision_science',
     candidate_id: CANDIDATE_ID,
     evidence_hash: evidenceHash,
-    evidence,
+    evidence: body,
     verifier,
     observed_at: new Date().toISOString(),
   }, { onConflict: 'event_key', ignoreDuplicates: true })

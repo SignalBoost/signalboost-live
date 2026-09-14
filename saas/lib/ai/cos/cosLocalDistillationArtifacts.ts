@@ -1,5 +1,6 @@
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { FINE_TUNE_EVIDENCE_PROFILE } from './cosUniversityFineTuneEvidence.ts'
+import { decideLocalDistillationLifecycle } from './cosLocalDistillationPolicy.ts'
 
 export const COS_LOCAL_DISTILLATION_ARTIFACT_VERSION = 'cos-local-distillation-artifact-v1' as const
 
@@ -19,33 +20,6 @@ function validAt(row: any, now: Date): boolean {
 function exactArtifact(evidence: any, artifactHash: string, revisionKey: string): boolean {
   return clean(evidence?.artifactHash, 64).toLowerCase() === artifactHash
     && clean(evidence?.revisionKey, 64).toLowerCase() === revisionKey
-}
-
-export function decideLocalDistillationLifecycle(graduateStatusInput: unknown, rollbackReady: boolean) {
-  const graduateStatus = clean(graduateStatusInput, 40)
-  const status = graduateStatus === 'active'
-    ? 'active' as const
-    : graduateStatus === 'quarantined'
-      ? 'quarantined' as const
-      : graduateStatus === 'retired'
-        ? 'retired' as const
-        : graduateStatus === 'pending_runtime' || graduateStatus === 'canary'
-          ? 'runtime_pending' as const
-          : rollbackReady
-            ? 'evaluation_pending' as const
-            : 'trained_pending_rollback' as const
-  const nextGate = status === 'trained_pending_rollback'
-    ? 'rollback_evidence' as const
-    : status === 'evaluation_pending'
-      ? 'independent_evaluation' as const
-      : status === 'runtime_pending'
-        ? 'runtime_binding_canary' as const
-        : status
-  return Object.freeze({
-    status,
-    nextGate,
-    trafficAuthorized: status === 'active',
-  })
 }
 
 /**

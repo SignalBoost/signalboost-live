@@ -178,6 +178,7 @@ const tests = [
   'tests/cosCognitiveSkillRetrievalEfficiency.node.test.ts',
   'tests/cognitiveReasoningImperativeTriggers.node.test.ts',
   'tests/releaseSignalSeverity.node.test.ts',
+  'tests/powerStabilizationRelease.node.test.ts',
   'tests/cosAnswerPolicyCore.node.test.ts',
   'tests/cosNormativeAnswerPolicy.node.test.ts',
   'tests/normativeFreshEvidenceFallback.node.test.ts',

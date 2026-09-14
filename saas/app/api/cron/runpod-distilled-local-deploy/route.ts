@@ -29,9 +29,10 @@ const CANDIDATE_ID = 'study-plan:e23cb043-715e-4406-8898-421159fae2df'
 const ARTIFACT_HASH = 'bd7b151e75cc963d02597529b7256b755419dd20bcd2c36ca849e903d99421e4'
 const MIN_BALANCE_USD = 1
 const MAX_CANARY_INVOCATIONS = 3
-const CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 2
+const CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 1
 const APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved'
 const SUSPEND_CLAIM = 'local_distilled_runtime_canary_suspended'
+const CANARY_STARTED_CLAIM = 'local_distilled_runtime_canary_started'
 const LEGACY_QUEUE_CLEANED_CLAIM = 'local_distilled_runtime_legacy_queue_cleaned'
 const LEGACY_QUEUE_CLEANUP_FAILED_CLAIM = 'local_distilled_runtime_legacy_queue_cleanup_failed'
 
@@ -303,9 +304,27 @@ export async function GET(req: NextRequest) {
       && row?.evidence?.claim === 'local_distilled_runtime_canary_failed'
       && row?.evidence?.artifactHash === ARTIFACT_HASH
       && Date.parse(String(row?.observed_at || '')) >= approvalFloor).length
-    if (failures >= MAX_CANARY_INVOCATIONS) {
+    const starts = refreshed.filter(row => row?.evidence?.profile === PROFILE
+      && row?.evidence?.claim === CANARY_STARTED_CLAIM
+      && row?.evidence?.artifactHash === ARTIFACT_HASH
+      && Date.parse(String(row?.observed_at || '')) >= approvalFloor).length
+    const consumedInvocations = Math.max(failures, starts)
+    if (consumedInvocations >= MAX_CANARY_INVOCATIONS) {
       return NextResponse.json({ ok: false, error: 'distilled_canary_retry_ceiling', endpointId }, { status: 503 })
     }
+
+    const attemptOrdinal = consumedInvocations + 1
+    const startedAt = new Date().toISOString()
+    await record(CANARY_STARTED_CLAIM, {
+      endpointId,
+      model: DISTILLED_MODEL_NAME,
+      attemptOrdinal,
+      httpAttempts: CANARY_HTTP_ATTEMPTS_PER_INVOCATION,
+      attemptTimeoutMs: DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
+      startedAt,
+      authorizationObservedAt: approvalObservedAt,
+      productionTrafficAuthorized: false,
+    })
 
     const healthBefore = await runpodServerlessEndpointHealth(endpointId)
     const canary = await canaryRunpodServerlessDistilledLlm({
@@ -321,7 +340,7 @@ export async function GET(req: NextRequest) {
         model: canary.model,
         httpStatus: canary.httpStatus,
         error: canary.error,
-        attemptOrdinal: failures + 1,
+        attemptOrdinal,
         httpAttempts: CANARY_HTTP_ATTEMPTS_PER_INVOCATION,
         attemptTimeoutMs: DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
         healthBefore,

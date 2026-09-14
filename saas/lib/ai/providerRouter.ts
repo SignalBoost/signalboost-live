@@ -3,7 +3,8 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { getAdminSupabase } from '@/utils/supabase/server'
-import { callLocalModel } from './local-inference.ts'
+import { callLocalModelDetailed } from './local-inference.ts'
+import type { LocalInferenceUsageContext } from './localInferenceUsage.ts'
 
 export type ModelProvider = 'claude' | 'openai' | 'gemini' | 'local'
 
@@ -12,6 +13,8 @@ export interface ModelCallArgs {
   prompt: string
   maxTokens?: number
   systemPrompt?: string
+  /** Capability/routing attribution for the LOCAL_AI / platform-owned inference seam. */
+  usageContext?: LocalInferenceUsageContext
 }
 
 type ProviderResult = { text: string; provider: ModelProvider; model: string }
@@ -108,22 +111,12 @@ function externalOrder(preference: Exclude<ModelProvider, 'local'>): Array<Exclu
 }
 
 /**
- * EXTERNAL PROVIDERS ARE DISABLED BY OWNER POLICY (2026-08-16).
+ * EXTERNAL CLOSED-MODEL PROVIDERS ARE DISABLED BY OWNER POLICY (2026-08-16).
  *
- * OpenAI, Gemini and Claude are all removed from COS execution. The trigger was an exhausted
- * OpenAI balance returning HTTP 429 and failing a chat turn BEFORE the local reasoner was ever
- * consulted — an external account balance taking down a system whose entire purpose is local
- * independence. The decision that followed is broader than that one provider: COS answers from its
- * own reasoner, its own memory and live authoritative sources, or it says it cannot answer. It does
- * not borrow a stranger's model.
- *
- * This is the fail-closed rung of the grounding ladder applied globally: an honest "I could not
- * answer this locally" is worth more than a fluent answer from a model COS cannot audit, cannot
- * ground, and does not own.
- *
- * The provider implementations remain in the file intentionally. Re-enabling is then a reviewable
- * policy change here, not an archaeology exercise — and keeping them visible makes it obvious that
- * the block is deliberate rather than an accident of deletion.
+ * This policy is distinct from the managed-open-model fallback inside the LOCAL_AI transport. The
+ * iTMounts graduate router may first use an owned graduate and then, on a bounded transport failure,
+ * fall back to the already-approved open-model runtime (currently DeepInfra). It never enables this
+ * Claude/Gemini/OpenAI chain.
  */
 async function callExternalChain(args: ModelCallArgs, preference: Exclude<ModelProvider, 'local'>): Promise<ProviderResult | null> {
   console.warn('[cos-external-provider-blocked]', JSON.stringify({
@@ -131,17 +124,15 @@ async function callExternalChain(args: ModelCallArgs, preference: Exclude<ModelP
     requestedProvider: preference,
     promptChars: args.prompt.length,
     policy: 'cos_is_local_only_external_ai_disabled',
-    effect: 'no external model was called; the caller must fail closed or answer from local/COS-owned evidence',
+    effect: 'no external closed model was called; the caller must fail closed or answer from the governed open-model seam',
   }))
   return null
 }
 
 async function callLocal(args: ModelCallArgs): Promise<ProviderResult | null> {
-  const result = await callLocalModel(args)
-  if (result) return { text: result, provider: 'local', model: modelForProvider('local') }
-  // No cloud fallback exists any more: local failure is reported honestly instead of silently
-  // becoming an external answer. LOCAL_AI_ALLOW_CLOUD_FALLBACK is intentionally no longer honoured.
-  console.error('providerRouter: local inference failed; COS is local-only so this request fails closed')
+  const result = await callLocalModelDetailed(args)
+  if (result) return { text: result.text, provider: 'local', model: result.model }
+  console.error('providerRouter: governed open-model inference failed; request fails closed')
   return null
 }
 
@@ -152,7 +143,7 @@ export function resolveProviderPreference(
   if (explicitPreference) return explicitPreference
   const value = String(environmentPreference || '').trim().toLowerCase()
   if (value && value !== 'local') {
-    if (value === 'openai' || value === 'claude' || value === 'gemini') console.warn(`[providerRouter] AI_MODEL_PROVIDER=${value} cannot select a hosted provider; COS defaults to local`)
+    if (value === 'openai' || value === 'claude' || value === 'gemini') console.warn(`[providerRouter] AI_MODEL_PROVIDER=${value} cannot select a hosted closed-model provider; COS defaults to local`)
     else console.warn(`[providerRouter] ignoring unknown AI_MODEL_PROVIDER=${value}; defaulting to local`)
   }
   return 'local'
@@ -165,7 +156,7 @@ async function logAiTask(args: { taskType: string; provider: ModelProvider; stat
   } catch { /* Observability must never break provider execution. */ }
 }
 
-/** Raw compute execution with truthful provider/model metadata. */
+/** Raw compute execution with truthful selected-model metadata. */
 export async function callProviderModelDetailed(args: ModelCallArgs): Promise<ProviderExecutionResult | null> {
   const preference = resolveProviderPreference(args.modelPreference)
   const startedAt = Date.now()

@@ -1,2 +1,2 @@
-base_sha=7aef08e8830c81908074f66774f947afe9d562c7
-branch=fix/distilled-serverless-cold-start-20260914
+base_sha=2434577e497f6421c3aa11787f88e4263e749133
+branch=fix/distilled-canary-health-suspend-20260914

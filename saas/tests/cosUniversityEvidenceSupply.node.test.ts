@@ -70,6 +70,7 @@ test('verified Production supply has exactly one guarded application writer', ()
   const skip = new Set(['node_modules', '.git', '.next', 'dist', 'build', 'coverage'])
   const writers: string[] = []
   const readerOrTest = /(?:tests\/|cosUniversityARange|cosUniversityLanguageARange|cosUniversityMastersProductionEvidence|cosUniversityEvidenceSupply)/
+  const writeSeam = 'source: verifiedProductionTurnOutcomeSource(decision)'
 
   const walk = (dir: string) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -78,7 +79,7 @@ test('verified Production supply has exactly one guarded application writer', ()
       if (entry.isDirectory()) { walk(full); continue }
       if (!/\.(ts|tsx|mjs|js|sql)$/.test(entry.name)) continue
       const source = fs.readFileSync(full, 'utf8')
-      if (!source.includes(COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE)) continue
+      if (!source.includes(writeSeam)) continue
       if (readerOrTest.test(full)) continue
       writers.push(full.slice(root.length))
     }

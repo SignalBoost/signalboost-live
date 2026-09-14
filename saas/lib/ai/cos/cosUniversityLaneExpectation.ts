@@ -88,9 +88,18 @@ const CALENDAR_NEUTRAL_PATHS: ReadonlySet<string> = new Set([
   'distilled_independent_evaluation',
 ])
 
+/**
+ * Operational controllers remain expected to report even when they have no eligible work. Their
+ * no-work receipt is classified as idle, while a missing/disabled controller remains visible.
+ */
+const OPERATIONAL_IDLE_OK_PATHS: ReadonlySet<string> = new Set([
+  'mass_distillation_campaign',
+])
+
 export function cosUniversityLaneExpectation(
   input: CosUniversityLaneExpectationInput,
 ): CosUniversityLaneExpectation {
+  if (OPERATIONAL_IDLE_OK_PATHS.has(String(input.path))) return 'expected_running'
   if (CALENDAR_NEUTRAL_PATHS.has(String(input.path))) return 'expected_gated'
   const program = PATH_PROGRAMS[input.path]
   if (!program) return 'undeclared'

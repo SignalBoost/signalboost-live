@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runMassDistillationCampaignConsumer } from '@/lib/ai/cos/cosUniversityMassDistillationConsumer'
+import { diagnoseFailedMassDistillationHuggingFaceJobs } from '@/lib/ai/cos/cosUniversityHuggingFaceJobDiagnostics'
 import { reconcileMassDistillationHuggingFaceJobs } from '@/lib/ai/cos/cosUniversityHuggingFaceJobReconciler'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
@@ -16,13 +17,18 @@ export async function GET(req: NextRequest) {
     // Reconcile provider-accepted work before considering any new paid dispatch. A dead/timed-out
     // Hugging Face Job must become durable evidence before another batch can consume budget.
     const reconciliation = await reconcileMassDistillationHuggingFaceJobs({ maxJobs: 10 })
+    // Terminal Jobs are diagnosed read-only after settlement so retries are based on the provider's
+    // actual worker logs instead of a generic ERROR stage or guessed failure cause.
+    const diagnostics = await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })
     const result = await runMassDistillationCampaignConsumer({ maxDispatches: 3 })
     const consumerSkipped = 'skipped' in result && result.skipped === true
     const reconciliationSkipped = 'skipped' in reconciliation && reconciliation.skipped === true
-    const skipped = consumerSkipped && reconciliationSkipped
-    const response = { ...result, reconciliation }
+    const diagnosticsSkipped = 'skipped' in diagnostics && diagnostics.skipped === true
+    const skipped = consumerSkipped && reconciliationSkipped && diagnosticsSkipped
+    const response = { ...result, reconciliation, diagnostics }
     const invocationSucceeded = (result.ok === true || consumerSkipped)
       && (reconciliation.ok === true || reconciliationSkipped)
+      && (diagnostics.ok === true || diagnosticsSkipped)
 
     await recordCosUniversityProductionPath({
       path: 'mass_distillation_campaign',

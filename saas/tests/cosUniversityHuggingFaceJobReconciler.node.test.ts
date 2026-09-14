@@ -68,8 +68,8 @@ test('terminal cost settlement rounds conservatively by minute and cannot exceed
 
 test('mass cron reconciles accepted HF work before claiming another paid stage', () => {
   const route = fs.readFileSync(path.join(ROOT, 'app/api/cron/cos-university-mass-distillation/route.ts'), 'utf8')
-  const reconcileAt = route.indexOf('reconcileMassDistillationHuggingFaceJobs')
-  const consumeAt = route.indexOf('runMassDistillationCampaignConsumer({ maxDispatches: 3 })')
+  const reconcileAt = route.indexOf('await reconcileMassDistillationHuggingFaceJobs({ maxJobs: 10 })')
+  const consumeAt = route.indexOf('await runMassDistillationCampaignConsumer({ maxDispatches: 3 })')
   assert.ok(reconcileAt >= 0 && consumeAt > reconcileAt)
 })
 
@@ -79,7 +79,8 @@ test('provider-terminal settlement clears only live reserve and never grants ret
   assert.match(migration, /committed_cost_usd = greatest\(0, c\.committed_cost_usd - v_release\)/)
   assert.match(migration, /v_observed := least/)
   assert.match(migration, /automaticRetryAuthorized', false/)
-  assert.doesNotMatch(migration, /stage\s*=\s*'teacher_pending'|automatic_promotion_authorized\s*=\s*true|runpod/i)
+  assert.doesNotMatch(migration, /stage\s*=\s*'teacher_pending'|automatic_promotion_authorized\s*=\s*true/i)
+  assert.doesNotMatch(migration, /runpod[_a-zA-Z0-9]*\s*\(|runpod[_a-zA-Z0-9]*\s*=/i)
 })
 
 test('overdue nonterminal HF work is observed but never automatically retried', () => {

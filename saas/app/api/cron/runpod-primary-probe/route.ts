@@ -6,6 +6,61 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 const RUNPOD_GRAPHQL = 'https://api.runpod.io/graphql'
+const RUNPOD_REST = 'https://rest.runpod.io/v1'
+
+type JsonRecord = Record<string, unknown>
+
+function asRecord(value: unknown): JsonRecord {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {}
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+
+async function fetchRunpodRest(apiKey: string, path: string): Promise<unknown> {
+  const response = await fetch(`${RUNPOD_REST}${path}`, {
+    headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+    cache: 'no-store',
+  })
+  if (!response.ok) throw new Error(`RunPod REST ${path} HTTP ${response.status}`)
+  return response.json()
+}
+
+function safeServerlessEndpoints(payload: unknown) {
+  const root = asRecord(payload)
+  const rows = Array.isArray(payload) ? payload : asArray(root.endpoints)
+  return rows.slice(0, 30).map(row => {
+    const value = asRecord(row)
+    return {
+      id: String(value.id || ''),
+      name: String(value.name || ''),
+      templateId: typeof value.templateId === 'string' ? value.templateId : null,
+      workersMin: typeof value.workersMin === 'number' ? value.workersMin : null,
+      workersMax: typeof value.workersMax === 'number' ? value.workersMax : null,
+      idleTimeout: typeof value.idleTimeout === 'number' ? value.idleTimeout : null,
+      gpuTypeIds: asArray(value.gpuTypeIds).slice(0, 8).map(item => String(item)),
+      gpuCount: typeof value.gpuCount === 'number' ? value.gpuCount : null,
+    }
+  })
+}
+
+function safeTemplates(payload: unknown) {
+  const root = asRecord(payload)
+  const rows = Array.isArray(payload) ? payload : asArray(root.templates)
+  return rows.slice(0, 50).map(row => {
+    const value = asRecord(row)
+    return {
+      id: String(value.id || ''),
+      name: String(value.name || ''),
+      imageName: String(value.imageName || ''),
+      isServerless: Boolean(value.isServerless),
+      isRunpod: Boolean(value.isRunpod),
+      containerDiskInGb: typeof value.containerDiskInGb === 'number' ? value.containerDiskInGb : null,
+    }
+  })
+}
 
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
@@ -22,16 +77,27 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const response = await fetch(`${RUNPOD_GRAPHQL}?api_key=${encodeURIComponent(apiKey)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: 'query { myself { clientBalance currentSpendPerHr spendLimit underBalance minBalance pods { id name desiredStatus costPerHr runtime { uptimeInSeconds } } } }',
+    const [graphqlResponse, endpointsResult, templatesResult] = await Promise.all([
+      fetch(`${RUNPOD_GRAPHQL}?api_key=${encodeURIComponent(apiKey)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: 'query { myself { clientBalance currentSpendPerHr spendLimit underBalance minBalance pods { id name desiredStatus costPerHr runtime { uptimeInSeconds } } } }',
+        }),
+        signal: AbortSignal.timeout(15_000),
       }),
-      signal: AbortSignal.timeout(15_000),
-    })
-    if (!response.ok) throw new Error(`RunPod GraphQL HTTP ${response.status}`)
-    const body = await response.json() as {
+      fetchRunpodRest(apiKey, '/endpoints').then(
+        value => ({ ok: true as const, value }),
+        error => ({ ok: false as const, error: error instanceof Error ? error.message : String(error) }),
+      ),
+      fetchRunpodRest(apiKey, '/templates').then(
+        value => ({ ok: true as const, value }),
+        error => ({ ok: false as const, error: error instanceof Error ? error.message : String(error) }),
+      ),
+    ])
+
+    if (!graphqlResponse.ok) throw new Error(`RunPod GraphQL HTTP ${graphqlResponse.status}`)
+    const body = await graphqlResponse.json() as {
       data?: {
         myself?: {
           clientBalance?: number | null
@@ -77,6 +143,12 @@ export async function GET(req: NextRequest) {
         minBalance: typeof account.minBalance === 'number' ? account.minBalance : null,
       },
       pods,
+      serverless: {
+        endpoints: endpointsResult.ok ? safeServerlessEndpoints(endpointsResult.value) : [],
+        templates: templatesResult.ok ? safeTemplates(templatesResult.value) : [],
+        endpointsError: endpointsResult.ok ? null : endpointsResult.error,
+        templatesError: templatesResult.ok ? null : templatesResult.error,
+      },
     }
     console.info('[runpod-primary-probe]', JSON.stringify(result))
     return NextResponse.json(result)

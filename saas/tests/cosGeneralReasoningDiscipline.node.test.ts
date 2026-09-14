@@ -11,7 +11,7 @@ import {
 const read = (file: string) => readFileSync(new URL(file, import.meta.url), 'utf8')
 
 test('COS behavioral contract is versioned and preserves the owner-defined decision priority', () => {
-  assert.equal(COS_BEHAVIORAL_CONTRACT_VERSION, 'cos-behavioral-contract-v1')
+  assert.equal(COS_BEHAVIORAL_CONTRACT_VERSION, 'cos-behavioral-contract-v2')
   assert.deepEqual(COS_DECISION_PRIORITY, ['safety', 'accuracy', 'autonomy', 'speed', 'cost', 'convenience'])
   assert.match(COS_BEHAVIORAL_CONTRACT, /safety first, then accuracy, then autonomy, then speed, then cost, then convenience/i)
 })
@@ -26,6 +26,16 @@ test('COS behavioral contract requires challenge, proactive completion, evidence
   assert.match(rule, /continue searching or validating/i)
   assert.match(rule, /best-supported answer available/i)
   assert.match(rule, /When sources conflict/i)
+})
+
+test('COS core behavior resolves material ambiguity before committing', () => {
+  const rule = COS_BEHAVIORAL_CONTRACT
+  assert.match(rule, /Resolve material ambiguity before committing to an answer or action/i)
+  assert.match(rule, /conversation, supplied evidence, available system state, and permitted retrieval/i)
+  assert.match(rule, /If one interpretation is materially more likely, proceed/i)
+  assert.match(rule, /multiple plausible interpretations remain and would materially change the correct answer or action/i)
+  assert.match(rule, /ask one concise clarification or give conditional branches/i)
+  assert.match(rule, /Do not ask for information that can be safely inferred, reasonably defaulted, or retrieved/i)
 })
 
 test('COS behavioral contract governs learning, knowledge lifecycle, privacy and repository awareness', () => {
@@ -52,15 +62,14 @@ test('COS behavioral contract preserves human control for consequential decision
   assert.match(types, /'financial', 'safety', 'data_destructive', 'external_effect', 'unknown'/)
 })
 
-test('global reasoning guidance includes the COS behavioral contract and does not smuggle an unvalidated ambiguity skill into live prompts', () => {
-  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /COS BEHAVIORAL CONTRACT cos-behavioral-contract-v1/i)
+test('global reasoning guidance carries material ambiguity behavior without promoting the separate cognitive-skill candidate', () => {
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /COS BEHAVIORAL CONTRACT cos-behavioral-contract-v2/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /do not invent missing context/i)
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /Resolve material ambiguity before committing/i)
+  assert.match(COS_GENERAL_REASONING_DISCIPLINE, /ask one concise clarification or give conditional branches/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /validated cognitive-skill path/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /do not expose hidden scratchpad or chain-of-thought/i)
   assert.match(COS_GENERAL_REASONING_DISCIPLINE, /strict JSON/i)
-  assert.doesNotMatch(COS_GENERAL_REASONING_DISCIPLINE, /ask one concise clarification/i)
-  assert.doesNotMatch(COS_GENERAL_REASONING_DISCIPLINE, /unresolved referents/i)
-  assert.doesNotMatch(COS_GENERAL_REASONING_DISCIPLINE, /comparison baselines/i)
 })
 
 test('scenario strategy advice keeps supplied metrics separate from modeled outcomes', () => {
@@ -121,7 +130,7 @@ test('validated skill retrieval can use structural triggers but never bypasses l
   assert.doesNotMatch(source, /\.in\('status', \[[^\]]*'encountered'/)
 })
 
-test('seeded generalized ambiguity procedure is falsifiable candidate, not fake learned knowledge', () => {
+test('seeded generalized ambiguity procedure remains a falsifiable candidate, not fake learned knowledge', () => {
   const migration = read('../supabase/migrations/20260822_cos_general_ambiguity_reasoning_candidate.sql')
   assert.match(migration, /reasoning\.context_ambiguity_resolution\.v1/)
   assert.match(migration, /'deictic_predicate_question'/)

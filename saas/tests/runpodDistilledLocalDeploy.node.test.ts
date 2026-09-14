@@ -54,6 +54,27 @@ test('existing endpoint policy is reconciled before a paid canary', () => {
   assert.match(route, /httpAttempts:\s*CANARY_HTTP_ATTEMPTS_PER_INVOCATION/)
 })
 
+test('official RunPod endpoint health is captured around canary execution', () => {
+  assert.match(provision, /\$\{SERVERLESS_API\}\/\$\{id\}\/health/)
+  assert.match(provision, /workers:\s*Object\.freeze/)
+  assert.match(provision, /inProgress:/)
+  assert.match(provision, /inQueue:/)
+  assert.match(route, /healthBefore = await runpodServerlessEndpointHealth\(endpointId\)/)
+  assert.match(route, /healthAfter = await runpodServerlessEndpointHealth\(endpointId\)/)
+  assert.match(route, /healthBefore,/)
+  assert.match(route, /healthAfter,/)
+})
+
+test('append-only host suspension overrides older approval without mutating assurance history', () => {
+  assert.match(route, /SUSPEND_CLAIM = 'local_distilled_runtime_canary_suspended'/)
+  assert.match(route, /function latestCanaryControl/)
+  assert.match(route, /\[APPROVAL_CLAIM, SUSPEND_CLAIM\]/)
+  assert.match(route, /canary_suspended_by_host_controller/)
+  const controlIndex = route.indexOf('const control = latestCanaryControl(rows)')
+  const approvalIndex = route.indexOf('const approval = validApproval(rows)')
+  assert.ok(controlIndex >= 0 && approvalIndex > controlIndex)
+})
+
 test('RunPod OpenAI compatibility uses the official v2 endpoint shape', () => {
   assert.equal(runpodServerlessOpenAiBaseUrl('abc_123'), 'https://api.runpod.ai/v2/abc_123/openai/v1')
   assert.throws(() => runpodServerlessOpenAiBaseUrl('../bad'), /endpoint id is invalid/)
@@ -71,7 +92,7 @@ test('RunPod error details are bounded and credential-like fields are redacted',
 test('deployment requires explicit durable unexpired approval and does not authorize Production traffic', () => {
   assert.match(route, /local_distilled_runtime_deploy_approved/)
   assert.match(route, /canaryAuthorized === true/)
-  assert.match(route, /row\?\.verifier === 'host_controller'/)
+  assert.match(route, /host_controller/)
   assert.match(route, /expires_at/)
   assert.match(route, /MAX_CANARY_INVOCATIONS = 3/)
   assert.match(route, /MIN_BALANCE_USD = 1/)

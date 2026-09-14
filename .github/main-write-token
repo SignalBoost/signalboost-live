@@ -1,2 +1,2 @@
-base_sha=7d49936799084484ce5fe6e40aa2b4e6a1a80c78
-branch=fix/hf-teacher-batched-generation-20260914
+base_sha=88ff8ecaaf3d5d018a45e38965d259a2f54f4b05
+branch=fix/hf-teacher-yield-diagnostics-20260914

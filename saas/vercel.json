@@ -36,6 +36,7 @@
     }
   ],
   "crons": [
+    { "path": "/api/cron/runpod-primary-probe", "schedule": "* * * * *" },
     { "path": "/api/cron/specialist-mesh-production-acceptance", "schedule": "* * * * *" },
     { "path": "/api/cron/specialist-mesh-write-production-acceptance", "schedule": "* * * * *" },
     { "path": "/api/cron/specialist-mesh-university-coverage", "schedule": "9 * * * *" },

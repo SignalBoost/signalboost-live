@@ -1,9 +1,9 @@
-export type DeterministicUtilityName = 'current_time' | 'current_date' | 'current_datetime' | 'current_timezone' | 'current_season' | 'current_datetime_season' | 'signalboost_identity'
+export type DeterministicUtilityName = 'current_time' | 'current_date' | 'current_datetime' | 'current_timezone' | 'current_season' | 'current_datetime_season' | 'signalboost_identity' | 'weather_location_clarification'
 
 export type DeterministicUtilityResult = {
   handled: true
   reply: string
-  source: 'deterministic-current-time' | 'deterministic-current-date' | 'deterministic-current-datetime' | 'deterministic-current-timezone' | 'deterministic-current-season' | 'deterministic-current-datetime-season' | 'deterministic-signalboost-identity'
+  source: 'deterministic-current-time' | 'deterministic-current-date' | 'deterministic-current-datetime' | 'deterministic-current-timezone' | 'deterministic-current-season' | 'deterministic-current-datetime-season' | 'deterministic-signalboost-identity' | 'deterministic-weather-location-clarification'
   confidence: 1
   executionProvenance: {
     schema_version: 1
@@ -34,6 +34,75 @@ function validTimeZone(value: unknown): string | null {
 
 function normalizedPrompt(input: string): string {
   return input.toLowerCase().replace(/[?.!,]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function foldedRegionName(value: string): string {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/^the\s+/, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+let countryRegionNames: Set<string> | null = null
+
+function knownCountryRegionNames(): Set<string> {
+  if (countryRegionNames) return countryRegionNames
+
+  const names = new Set<string>()
+  const locales = ['en', 'es', 'pt', 'pl', 'ru']
+  const displayNames = locales
+    .map(locale => {
+      try {
+        return new Intl.DisplayNames([locale], { type: 'region' })
+      } catch {
+        return null
+      }
+    })
+    .filter((value): value is Intl.DisplayNames => Boolean(value))
+
+  for (let first = 65; first <= 90; first += 1) {
+    for (let second = 65; second <= 90; second += 1) {
+      const code = `${String.fromCharCode(first)}${String.fromCharCode(second)}`
+      for (const display of displayNames) {
+        const value = String(display.of(code) || '').trim()
+        if (!value || value.toUpperCase() === code || /^unknown region$/i.test(value)) continue
+        names.add(foldedRegionName(value))
+      }
+    }
+  }
+
+  for (const alias of ['usa', 'u s a', 'us', 'u s', 'uk', 'u k', 'uae', 'u a e']) names.add(alias)
+  countryRegionNames = names
+  return names
+}
+
+const WEATHER_REQUEST = /\b(?:weather|forecast|temperature|conditions|rain|snow)\b/i
+const WEATHER_COUNTRY_SUMMARY = /\b(?:climate|average|typical|normally|usually|historical|annual|monthly|seasonal|nationwide|countrywide|across)\b/i
+const CITY_STATE_COUNTRIES = new Set(['singapore', 'monaco', 'vatican city', 'holy see', 'san marino'])
+
+function weatherCountryNeedingClarification(input: string): string | null {
+  if (!WEATHER_REQUEST.test(input) || WEATHER_COUNTRY_SUMMARY.test(input)) return null
+
+  const locationMatch = input.match(/\b(?:in|for|at)\s+(?:the\s+)?([\p{L}\p{M}][\p{L}\p{M}'’.-]*(?:[\s-]+[\p{L}\p{M}'’.-]+){0,5})\s*[?.!]*\s*$/iu)
+  if (!locationMatch) return null
+
+  const location = locationMatch[1].trim()
+  const folded = foldedRegionName(location)
+  if (!folded || CITY_STATE_COUNTRIES.has(folded)) return null
+  return knownCountryRegionNames().has(folded) ? location : null
+}
+
+function weatherLocationClarificationReply(location: string, locale: string): string {
+  const language = String(locale || 'en').slice(0, 2).toLowerCase()
+  if (language === 'es') return `¿De qué ciudad o zona de ${location} quieres el tiempo?`
+  if (language === 'pt') return `Qual cidade ou região de ${location} você quer consultar para o tempo?`
+  if (language === 'pl') return `Dla którego miasta lub regionu w ${location} mam sprawdzić pogodę?`
+  if (language === 'ru') return `Для какого города или района в ${location} проверить погоду?`
+  return `Which city or area in ${location} would you like the weather for?`
 }
 
 // SHAPE-BASED DETECTION, NOT AN EXACT-PHRASE LIST.
@@ -143,11 +212,24 @@ export function tryDeterministicUtility(input: {
   locale?: string
   confidenceThreshold: number
 }): DeterministicUtilityResult | null {
+  const timeZone = validTimeZone(input.timezone) || 'UTC'
+  const locale = input.locale || 'en-US'
+
+  const broadWeatherLocation = weatherCountryNeedingClarification(input.prompt)
+  if (broadWeatherLocation) {
+    const utility: DeterministicUtilityName = 'weather_location_clarification'
+    return {
+      handled: true,
+      reply: weatherLocationClarificationReply(broadWeatherLocation, locale),
+      source: 'deterministic-weather-location-clarification',
+      confidence: 1,
+      executionProvenance: provenance(utility, timeZone, input.confidenceThreshold),
+    }
+  }
+
   const utility = utilityFromQuestion(input.prompt)
   if (!utility) return null
 
-  const timeZone = validTimeZone(input.timezone) || 'UTC'
-  const locale = input.locale || 'en-US'
   const now = new Date()
 
   if (utility === 'signalboost_identity') {

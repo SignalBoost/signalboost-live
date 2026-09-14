@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { runpodServerlessOpenAiBaseUrl, safeRunpodErrorDetail } from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
+import {
+  DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
+  DISTILLED_IDLE_TIMEOUT_SECONDS,
+  runpodServerlessOpenAiBaseUrl,
+  safeRunpodErrorDetail,
+} from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
 
 const provision = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledProvision.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
@@ -17,25 +22,36 @@ test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
   assert.match(provision, /--max-lora-rank 16/)
 })
 
-test('RunPod distilled deployment stays scale-to-zero and one-worker bounded', () => {
+test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and temporarily warm', () => {
+  assert.equal(DISTILLED_IDLE_TIMEOUT_SECONDS, 900)
+  assert.equal(DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS, 120_000)
   assert.match(provision, /workersMin:\s*0/)
   assert.match(provision, /workersMax:\s*1/)
-  assert.match(provision, /idleTimeout:\s*5/)
+  assert.match(provision, /idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
   assert.match(provision, /NVIDIA RTX A4000/)
   assert.match(provision, /NVIDIA RTX A4500/)
   assert.match(provision, /NVIDIA RTX 4000 Ada Generation/)
 })
 
-test('RunPod endpoint POST follows the documented REST contract', () => {
+test('RunPod endpoint POST and PATCH follow the documented REST contract', () => {
   assert.match(provision, /name:\s*DISTILLED_ENDPOINT_NAME/)
   assert.match(provision, /templateId:\s*template\.id/)
   assert.match(provision, /gpuTypeIds:\s*GPU_TYPES/)
   assert.match(provision, /scalerType:\s*'REQUEST_COUNT'/)
   assert.match(provision, /scalerValue:\s*1/)
+  assert.match(provision, /`\/endpoints\/\$\{encodeURIComponent\(id\)\}`/)
+  assert.match(provision, /method:\s*'PATCH'/)
   assert.doesNotMatch(provision, /gpuTypePriority\s*:/)
   assert.doesNotMatch(provision, /volumeInGb\s*:/)
   assert.doesNotMatch(provision, /volumeMountPath\s*:/)
   assert.match(provision, /containerDiskInGb:\s*50/)
+})
+
+test('existing endpoint policy is reconciled before a paid canary', () => {
+  assert.match(route, /reconcileRunpodServerlessDistilledEndpoint\(endpointId\)/)
+  assert.match(route, /CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 2/)
+  assert.match(route, /timeoutMs:\s*DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS/)
+  assert.match(route, /httpAttempts:\s*CANARY_HTTP_ATTEMPTS_PER_INVOCATION/)
 })
 
 test('RunPod OpenAI compatibility uses the official v2 endpoint shape', () => {
@@ -54,11 +70,12 @@ test('RunPod error details are bounded and credential-like fields are redacted',
 
 test('deployment requires explicit durable unexpired approval and does not authorize Production traffic', () => {
   assert.match(route, /local_distilled_runtime_deploy_approved/)
-  assert.match(route, /canaryAuthorized !== true/)
-  assert.match(route, /verifier !== 'host_controller'/)
+  assert.match(route, /canaryAuthorized === true/)
+  assert.match(route, /row\?\.verifier === 'host_controller'/)
   assert.match(route, /expires_at/)
   assert.match(route, /MAX_CANARY_INVOCATIONS = 3/)
   assert.match(route, /MIN_BALANCE_USD = 1/)
+  assert.match(route, /maxEstimatedCanaryCostUsd/)
   assert.match(route, /productionTrafficAuthorized:\s*false/)
   assert.doesNotMatch(route, /RUNPOD_PRIMARY_MODE\s*=|RUNPOD_SERVERLESS_LLM_ENDPOINT_ID\s*=/)
 })

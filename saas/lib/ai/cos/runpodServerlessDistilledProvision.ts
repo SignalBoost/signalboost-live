@@ -8,6 +8,8 @@ export const DISTILLED_BASE_MODEL_ID = 'Qwen/Qwen3-4B'
 export const DISTILLED_BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 export const DISTILLED_ADAPTER_MODEL_ID = 'cadomos/itmounts-student-f993a365a01e'
 export const DISTILLED_ADAPTER_MODEL_REVISION = '9f03387d87de550b96d973f9f30a3f02e783997e'
+export const DISTILLED_IDLE_TIMEOUT_SECONDS = 900
+export const DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS = 120_000
 const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const REQUEST_TIMEOUT_MS = 15_000
 
@@ -18,7 +20,18 @@ const GPU_TYPES = [
 ]
 
 type RunpodTemplate = { id: string; name: string; imageName?: string; isServerless?: boolean }
-type RunpodEndpoint = { id: string; name: string; workersMin?: number; workersMax?: number; templateId?: string }
+type RunpodEndpoint = {
+  id: string
+  name: string
+  workersMin?: number
+  workersMax?: number
+  templateId?: string
+  idleTimeout?: number
+  executionTimeoutMs?: number
+  scalerType?: string
+  scalerValue?: number
+  gpuTypeIds?: string[]
+}
 
 function clean(value: unknown, max = 300): string {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
@@ -103,6 +116,43 @@ export function runpodServerlessOpenAiBaseUrl(endpointId: string): string {
   return `https://api.runpod.ai/v2/${id}/openai/v1`
 }
 
+function endpointPolicyPayload() {
+  return {
+    executionTimeoutMs: 300_000,
+    flashboot: true,
+    gpuCount: 1,
+    gpuTypeIds: GPU_TYPES,
+    // Keep scale-to-zero, but hold a successfully started worker long enough for the independently
+    // scheduled evaluator to reuse the loaded base+adapter instead of redownloading on every call.
+    idleTimeout: DISTILLED_IDLE_TIMEOUT_SECONDS,
+    scalerType: 'REQUEST_COUNT',
+    scalerValue: 1,
+    workersMax: 1,
+    workersMin: 0,
+  }
+}
+
+export async function reconcileRunpodServerlessDistilledEndpoint(endpointId: string): Promise<{
+  endpointId: string
+  workersMin: number
+  workersMax: number
+  idleTimeout: number
+}> {
+  const id = endpointId.trim()
+  if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
+  const endpoint = await request<RunpodEndpoint>(`/endpoints/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(endpointPolicyPayload()),
+  })
+  const workersMin = Number(endpoint.workersMin ?? 0)
+  const workersMax = Number(endpoint.workersMax ?? 1)
+  const idleTimeout = Number(endpoint.idleTimeout ?? DISTILLED_IDLE_TIMEOUT_SECONDS)
+  if (workersMin !== 0) throw new Error('RunPod distilled endpoint is not scale-to-zero')
+  if (workersMax > 1) throw new Error('RunPod distilled endpoint exceeds the approved one-worker ceiling')
+  if (idleTimeout > DISTILLED_IDLE_TIMEOUT_SECONDS) throw new Error('RunPod distilled endpoint exceeds the approved warm-window ceiling')
+  return { endpointId: endpoint.id || id, workersMin, workersMax, idleTimeout }
+}
+
 export async function provisionRunpodServerlessDistilledLlm(): Promise<{
   createdTemplate: boolean
   createdEndpoint: boolean
@@ -112,6 +162,7 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
   model: string
   workersMin: number
   workersMax: number
+  idleTimeout: number
   gpuTypes: readonly string[]
 }> {
   const token = hfToken()
@@ -154,24 +205,14 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
         name: DISTILLED_ENDPOINT_NAME,
         templateId: template.id,
         computeType: 'GPU',
-        executionTimeoutMs: 300_000,
-        flashboot: true,
-        gpuCount: 1,
-        // RunPod treats gpuTypeIds as an ordered preference list. No non-schema priority field is sent.
-        gpuTypeIds: GPU_TYPES,
-        idleTimeout: 5,
-        scalerType: 'REQUEST_COUNT',
-        scalerValue: 1,
-        workersMax: 1,
-        workersMin: 0,
+        ...endpointPolicyPayload(),
       }),
     })
     createdEndpoint = true
   }
 
   if (!endpoint.id) throw new Error('RunPod distilled endpoint response carried no endpoint id')
-  if (Number(endpoint.workersMin ?? 0) !== 0) throw new Error('RunPod distilled endpoint is not scale-to-zero')
-  if (Number(endpoint.workersMax ?? 1) > 1) throw new Error('RunPod distilled endpoint exceeds the approved one-worker ceiling')
+  const policy = await reconcileRunpodServerlessDistilledEndpoint(endpoint.id)
 
   return {
     createdTemplate,
@@ -180,8 +221,9 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
     endpointId: endpoint.id,
     baseUrl: runpodServerlessOpenAiBaseUrl(endpoint.id),
     model: DISTILLED_MODEL_NAME,
-    workersMin: Number(endpoint.workersMin ?? 0),
-    workersMax: Number(endpoint.workersMax ?? 1),
+    workersMin: policy.workersMin,
+    workersMax: policy.workersMax,
+    idleTimeout: policy.idleTimeout,
     gpuTypes: Object.freeze([...GPU_TYPES]),
   }
 }
@@ -190,18 +232,20 @@ export async function canaryRunpodServerlessDistilledLlm(input: {
   endpointId: string
   attempts?: number
   delayMs?: number
+  timeoutMs?: number
 }): Promise<{ ok: boolean; model: string; httpStatus: number | null; text: string | null; error: string | null }> {
   const key = configuredRunpodApiKey()
   if (!key) throw new Error('RUNPOD_API_KEY is not configured')
-  const attempts = Math.max(1, Math.min(6, Math.floor(input.attempts ?? 5)))
+  const attempts = Math.max(1, Math.min(3, Math.floor(input.attempts ?? 2)))
   const delayMs = Math.max(1000, Math.min(10_000, Math.floor(input.delayMs ?? 5000)))
+  const timeoutMs = Math.max(30_000, Math.min(120_000, Math.floor(input.timeoutMs ?? DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS)))
   const baseUrl = runpodServerlessOpenAiBaseUrl(input.endpointId)
   let lastStatus: number | null = null
   let lastError: string | null = null
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 30_000)
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
     try {
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: 'POST',

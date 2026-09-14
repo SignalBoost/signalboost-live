@@ -1,2 +1,2 @@
-base_sha=3bbd3f4a8bfdefe7fb653a860b84d07f61fd17a4
-branch=fix/distillation-evaluator-secret-and-canary-lease-20260914
+base_sha=7aef08e8830c81908074f66774f947afe9d562c7
+branch=fix/distilled-serverless-cold-start-20260914

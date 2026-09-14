@@ -6,6 +6,7 @@ import {
   verifyTrainingExecutorPayload,
 } from '@/lib/ai/cos/cosUniversityTrainingExecutor'
 import { installHuggingFaceTrainingExecutorEnv } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
+import { reconcileLocalDistillationCandidate } from '@/lib/ai/cos/cosLocalDistillationArtifacts'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,7 +40,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await recordUniversityTrainingExecutorEvidence(body, { idempotencyKey })
-    return NextResponse.json(result, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
+    let localArtifactTracking: unknown = null
+    if (body.claim === 'trained_artifact_registered' || body.claim === 'rollback_artifact_registered') {
+      try {
+        localArtifactTracking = await reconcileLocalDistillationCandidate(String(body.candidateId || ''))
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        console.error('[cos-local-distillation-artifact] immediate reconciliation failed', message)
+        localArtifactTracking = { tracked: false, retryable: true, error: message }
+      }
+    }
+    return NextResponse.json({ ...result, localArtifactTracking }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     const status = message.startsWith('training_executor_') ? 400 : 500

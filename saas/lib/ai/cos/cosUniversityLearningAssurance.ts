@@ -100,6 +100,7 @@ export type LearningPathId =
   | 'phd_research'
   | 'phd_methodology_exams'
   | 'controlled_fine_tuning'
+  | 'distilled_independent_evaluation'
 
 export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId, string>> = Object.freeze({
   registered_agent_cycle: 'COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED',
@@ -120,6 +121,7 @@ export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId,
   phd_research: 'COS_UNIVERSITY_PHD_RESEARCH_EXECUTION_ENABLED',
   phd_methodology_exams: 'COS_UNIVERSITY_PHD_METHODOLOGY_EXAMS_ENABLED',
   controlled_fine_tuning: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
+  distilled_independent_evaluation: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
 })
 
 export type ProductionPathReceipt = Readonly<{

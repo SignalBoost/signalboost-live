@@ -1,2 +1,2 @@
-base_sha=fdd77791523cc9c35f0ad4e04494019dc66ef619
-branch=fix/runpod-distilled-reconcile-patch-20260914
+base_sha=338caac98e526e3a341de3cb2d726ea97cec28d3
+branch=fix/runpod-serverless-v2-reconcile-20260914

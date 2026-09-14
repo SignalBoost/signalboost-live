@@ -27,15 +27,24 @@ function requireText(result: string | null, provider: string): string {
 }
 
 /**
- * First-party SignalBoost/COS text generation is provider-independent and local-first by policy.
- * Legacy callers may still pass stale hosted-provider hints while they are migrated; this boundary
- * intentionally discards those hints so an old `claude`/`openai` preference cannot bypass the
- * current COS independence policy. Explicit external-teacher work uses the separate adapter below.
+ * First-party iTMounts/COS text generation is platform-owned-graduate first after an exact graduate
+ * becomes active for general reasoning. Until then it uses the existing approved open-model runtime.
+ * Closed-model provider hints remain ignored at this boundary.
  */
 export function createPlatformAiPort(): CosAiPort {
   return {
     generate: async (input) => requireText(
-      await callCosText({ ...input, modelPreference: 'local', taskId: 'cos-portable-text' }),
+      await callCosText({
+        ...input,
+        modelPreference: 'local',
+        taskId: 'cos-portable-text',
+        usageContext: {
+          feature: 'cos_platform_text',
+          agentId: 'cos',
+          purpose: 'platform_reasoning',
+          subjectId: 'reasoning_decision_science',
+        },
+      }),
       'platform',
     ),
   }
@@ -44,11 +53,9 @@ export function createPlatformAiPort(): CosAiPort {
 /**
  * Coding-specialist port for Builder and Platform Engineer.
  *
- * Keep coding work on the approved local/DeepInfra inference boundary, but select the coding model
- * independently from the general COS reasoner. This intentionally bypasses shared answer caching and
- * external-provider fallback: Builder must reason from the current workspace/repository evidence and
- * prove its result with tools rather than reuse a prior prose answer. The local inference layer still
- * records the exact selected model in its telemetry.
+ * The same graduate selector is available here, but the capability is explicitly computer_science.
+ * A reasoning_decision_science graduate therefore cannot replace Builder's coding model. A future
+ * promoted computer-science graduate can, after its own runtime activation evidence clears.
  */
 export function createBuilderCodingAiPort(): CosAiPort {
   return {
@@ -66,7 +73,11 @@ export function createBuilderCodingAiPort(): CosAiPort {
         // The control object must be JSON. Provider-enforced JSON mode removes the class of
         // failures where source quoting or escaping breaks the surrounding envelope.
         jsonObject: true,
-        usageContext: { feature: 'builder', purpose: 'coding_harness' },
+        usageContext: {
+          feature: 'builder',
+          purpose: 'coding_harness',
+          subjectId: 'computer_science',
+        },
       }, {
         ...config,
         model: builderCodingModelFromEnv(),
@@ -99,8 +110,8 @@ export interface CosImagePort {
 export function createPlatformImagePort(): CosImagePort {
   return {
     async generate({ prompt, size = '1024x1024' }): Promise<CosImageResult> {
-      // Visual creation uses only the approved COS managed runtime. It must never select an
-      // ambient OpenAI key or any other external-provider fallback.
+      // Visual creation uses only the approved COS managed runtime. Graduate text routing does not
+      // silently repurpose a text LoRA artifact as an image model.
       const key = process.env.LOCAL_AI_API_KEY?.trim()
       const baseUrl = (process.env.LOCAL_AI_BASE_URL || '').replace(/\/$/, '')
       if (!key || !/^https:\/\/api\.deepinfra\.com\/v1\/openai$/i.test(baseUrl)) {

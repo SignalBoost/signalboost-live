@@ -101,7 +101,7 @@ export async function classifyCosSemanticTaskIntent(args: {
       'For contextual_interpretation, set suppliedContextPrimary=true when the meaning can be answered from text/context the user supplied, and externalFactsRequired=false unless the user separately asks to verify an outside-world claim.',
       'Infer intent equivalently in every language. The language of the request must not change the classification standard.',
       'When deciding between clarification_required and external_fact_verification, choose clarification_required only when the missing context is essential and materially outcome-changing; otherwise prefer external_fact_verification so freshness protection fails safe.',
-      'When ambiguous between contextual_interpretation and external_fact_verification, prefer external_fact_verification so freshness protection fails safe.',
+      'When ambiguous between interpretation and verification, prefer external_fact_verification so freshness protection fails safe.',
     ].join(' '),
     prompt: [
       `CURRENT USER REQUEST:\n${input}`,

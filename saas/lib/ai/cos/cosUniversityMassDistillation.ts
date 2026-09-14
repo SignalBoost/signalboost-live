@@ -16,11 +16,11 @@ const TERMINAL_REPACKAGE_STATUSES = new Set(['quarantined', 'superseded'])
 export type DistillationRightsClass = 'public_domain' | 'cc0' | 'itmounts_synthetic'
 export type RetainedDistillationIdentity = Readonly<{
   contentHash: string
+  materialHash: string
   subject: string
   sourceKind: string
   license: string
   confidence: number
-  materialFingerprint?: string
 }>
 
 export type PreparedDistillationBatch = Readonly<{
@@ -31,6 +31,15 @@ export type PreparedDistillationBatch = Readonly<{
   sourceHashes: readonly string[]
   rightsClasses: readonly DistillationRightsClass[]
   sourceCount: number
+}>
+
+type NormalizedIdentity = Readonly<{
+  contentHash: string
+  materialHash: string
+  subject: string
+  sourceKind: string
+  license: string
+  confidence: number
 }>
 
 function clean(value: unknown, limit = 500): string {
@@ -45,29 +54,33 @@ function normalizedSubject(value: string): string {
   return clean(value, 240).toLowerCase()
 }
 
-function retainedFactsForFingerprint(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value.slice(0, 8).map(item => {
-    if (typeof item === 'string') return clean(item, 1200)
-    try { return clean(JSON.stringify(item), 1200) } catch { return '' }
-  }).filter(Boolean)
+function normalizedMaterialPart(value: unknown, limit: number): string {
+  return clean(value, limit).toLowerCase()
+}
+
+function normalizedFact(value: unknown): string {
+  if (typeof value === 'string') return normalizedMaterialPart(value, 4000)
+  try { return normalizedMaterialPart(JSON.stringify(value), 4000) } catch { return '' }
 }
 
 /**
- * Hash only the retained material that becomes a teacher prompt. Provenance/content hashes may differ
- * while the retained title, summary and facts are identical; those rows must count once for training
- * diversity. The fingerprint is used in memory only and source text still never enters the batch queue.
+ * Fingerprint only the retained teaching material that actually reaches teacher-prompt construction.
+ * Provenance/content-row identities may differ while title/summary/facts are byte-for-byte or
+ * semantically-normalized duplicates; those rows must count as one curriculum item, not many.
  */
-export function retainedMaterialFingerprint(input: {
+export function retainedMaterialHash(input: {
   sourceTitle?: unknown
   summary?: unknown
   facts?: unknown
-}): string {
-  return hash({
-    sourceTitle: clean(input.sourceTitle, 400),
-    summary: clean(input.summary, 7000),
-    facts: retainedFactsForFingerprint(input.facts),
-  })
+}): string | null {
+  const sourceTitle = normalizedMaterialPart(input.sourceTitle, 1000)
+  const summary = normalizedMaterialPart(input.summary, 12_000)
+  const facts = Array.isArray(input.facts)
+    ? input.facts.map(normalizedFact).filter(Boolean).sort()
+    : input.facts == null ? [] : [normalizedFact(input.facts)].filter(Boolean)
+  const material = [sourceTitle, summary, ...facts].filter(Boolean).join('\n')
+  if (material.length < 20) return null
+  return hash({ sourceTitle, summary, facts })
 }
 
 /**
@@ -87,33 +100,25 @@ export function classifyMassDistillationRights(licenseInput: unknown): Distillat
 
 export function retainedIdentityEligibleForMassDistillation(row: RetainedDistillationIdentity): boolean {
   return HEX64.test(clean(row.contentHash, 64))
+    && HEX64.test(clean(row.materialHash, 64))
     && clean(row.subject, 240).length >= 3
     && Number.isFinite(row.confidence)
     && row.confidence >= MASS_DISTILLATION_MIN_CONFIDENCE
     && classifyMassDistillationRights(row.license) !== null
 }
 
-type NormalizedIdentity = Readonly<{
-  contentHash: string
-  subject: string
-  sourceKind: string
-  license: string
-  confidence: number
-  materialFingerprint: string
-}>
-
 function normalizeIdentity(raw: RetainedDistillationIdentity): NormalizedIdentity {
   return Object.freeze({
     contentHash: clean(raw.contentHash, 64).toLowerCase(),
+    materialHash: clean(raw.materialHash, 64).toLowerCase(),
     subject: clean(raw.subject, 240),
     sourceKind: clean(raw.sourceKind, 80),
     license: clean(raw.license, 1000),
     confidence: Number(raw.confidence),
-    materialFingerprint: clean(raw.materialFingerprint, 64).toLowerCase(),
   })
 }
 
-/** Deterministically package unique retained material identities by subject; no source text enters this queue. */
+/** Deterministically package unique retained teaching material by subject; no source text enters this queue. */
 export function buildMassDistillationBatches(
   rows: readonly RetainedDistillationIdentity[],
   assignedHashes: ReadonlySet<string> = new Set(),
@@ -121,26 +126,26 @@ export function buildMassDistillationBatches(
   terminalAttemptByCurriculumHash: ReadonlyMap<string, string> = new Map(),
 ): PreparedDistillationBatch[] {
   const normalized = rows.map(normalizeIdentity)
-  const groups = new Map<string, { subject: string; rows: NormalizedIdentity[]; materialFingerprints: Set<string> }>()
+  const groups = new Map<string, { subject: string; rows: NormalizedIdentity[]; materialHashes: Set<string> }>()
 
-  // Seed each subject's material set from every active/consumed assignment before considering replacements.
-  // This is deliberately a first pass so corpus ordering cannot let an alternate provenance hash slip in first.
+  // Seed every subject with material already represented by a live or consumed assignment before
+  // considering replacement provenance hashes. This first pass makes the result independent of row order.
   for (const row of normalized) {
     if (!retainedIdentityEligibleForMassDistillation(row) || !assignedHashes.has(row.contentHash)) continue
     const key = normalizedSubject(row.subject)
-    const group = groups.get(key) || { subject: row.subject, rows: [], materialFingerprints: new Set<string>() }
-    if (HEX64.test(row.materialFingerprint)) group.materialFingerprints.add(row.materialFingerprint)
+    const group = groups.get(key) || { subject: row.subject, rows: [], materialHashes: new Set<string>() }
+    group.materialHashes.add(row.materialHash)
     groups.set(key, group)
   }
 
   for (const row of normalized) {
     if (!retainedIdentityEligibleForMassDistillation(row) || assignedHashes.has(row.contentHash)) continue
     const key = normalizedSubject(row.subject)
-    const group = groups.get(key) || { subject: row.subject, rows: [], materialFingerprints: new Set<string>() }
+    const group = groups.get(key) || { subject: row.subject, rows: [], materialHashes: new Set<string>() }
     if (group.rows.some(item => item.contentHash === row.contentHash)) continue
-    if (HEX64.test(row.materialFingerprint) && group.materialFingerprints.has(row.materialFingerprint)) continue
+    if (group.materialHashes.has(row.materialHash)) continue
     group.rows.push(row)
-    if (HEX64.test(row.materialFingerprint)) group.materialFingerprints.add(row.materialFingerprint)
+    group.materialHashes.add(row.materialHash)
     groups.set(key, group)
   }
 
@@ -161,8 +166,8 @@ export function buildMassDistillationBatches(
         studentModelId: MASS_DISTILLATION_STUDENT_MODEL,
         sourceHashes,
       })
-      const priorTerminalBatchKey = clean(terminalAttemptByCurriculumHash.get(curriculumHash), 64).toLowerCase()
       const batchKeySeed = { curriculumHash, rightsClasses, minimumConfidence: MASS_DISTILLATION_MIN_CONFIDENCE }
+      const priorTerminalBatchKey = clean(terminalAttemptByCurriculumHash.get(curriculumHash), 64).toLowerCase()
       const batchKey = HEX64.test(priorTerminalBatchKey)
         ? hash({ ...batchKeySeed, repackagedFromBatchKey: priorTerminalBatchKey })
         : hash(batchKeySeed)
@@ -209,7 +214,7 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     if (!TERMINAL_REPACKAGE_STATUSES.has(status)) continue
     const curriculumHash = clean(row.curriculum_hash, 64).toLowerCase()
     const batchKey = clean(row.batch_key, 64).toLowerCase()
-    // Rows are newest-first, so the first terminal key is the immediate prior attempt for this curriculum.
+    // Existing rows are newest-first; the first terminal key is the immediately prior attempt.
     if (HEX64.test(curriculumHash) && HEX64.test(batchKey) && !terminalAttemptByCurriculumHash.has(curriculumHash)) {
       terminalAttemptByCurriculumHash.set(curriculumHash, batchKey)
     }
@@ -224,33 +229,27 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
 
   const identities: RetainedDistillationIdentity[] = (corpus.data || []).map((row: any) => ({
     contentHash: clean(row.content_hash, 64),
+    materialHash: retainedMaterialHash({ sourceTitle: row.source_title, summary: row.summary, facts: row.facts }) || '',
     subject: clean(row.subject, 240),
     sourceKind: clean(row.source_kind, 80),
     license: clean(row.license, 1000),
     confidence: Number(row.confidence),
-    materialFingerprint: retainedMaterialFingerprint({
-      sourceTitle: row.source_title,
-      summary: row.summary,
-      facts: row.facts,
-    }),
   }))
   const eligible = identities.filter(retainedIdentityEligibleForMassDistillation)
-  const assignedMaterialFingerprintsBySubject = new Map<string, Set<string>>()
+  const assignedMaterialHashesBySubject = new Map<string, Set<string>>()
   for (const row of eligible) {
-    if (!assigned.has(clean(row.contentHash, 64).toLowerCase())) continue
-    const fingerprint = clean(row.materialFingerprint, 64).toLowerCase()
-    if (!HEX64.test(fingerprint)) continue
+    const contentHash = clean(row.contentHash, 64).toLowerCase()
+    if (!assigned.has(contentHash)) continue
     const subject = normalizedSubject(row.subject)
-    const fingerprints = assignedMaterialFingerprintsBySubject.get(subject) || new Set<string>()
-    fingerprints.add(fingerprint)
-    assignedMaterialFingerprintsBySubject.set(subject, fingerprints)
+    const materialHashes = assignedMaterialHashesBySubject.get(subject) || new Set<string>()
+    materialHashes.add(clean(row.materialHash, 64).toLowerCase())
+    assignedMaterialHashesBySubject.set(subject, materialHashes)
   }
   const unassigned = eligible.filter(row => {
     const contentHash = clean(row.contentHash, 64).toLowerCase()
     if (assigned.has(contentHash)) return false
-    const fingerprint = clean(row.materialFingerprint, 64).toLowerCase()
-    if (!HEX64.test(fingerprint)) return true
-    return !assignedMaterialFingerprintsBySubject.get(normalizedSubject(row.subject))?.has(fingerprint)
+    const materialHash = clean(row.materialHash, 64).toLowerCase()
+    return !assignedMaterialHashesBySubject.get(normalizedSubject(row.subject))?.has(materialHash)
   })
   const batches = buildMassDistillationBatches(
     identities,
@@ -292,6 +291,6 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     sourceItemsPrepared,
     dispatchAuthorized: false,
     externalCostUsd: 0,
-    semantics: 'rights_cleared_identity_packaging_material_dedup_only_no_text_persisted_no_provider_dispatch_no_traffic_authorization' as const,
+    semantics: 'rights_cleared_unique_material_identity_packaging_only_no_text_no_provider_dispatch_no_traffic_authorization' as const,
   })
 }

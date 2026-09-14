@@ -7,7 +7,7 @@ const SERVERLESS_API = 'https://api.runpod.ai/v2'
 // Keep the load-balancer template isolated from the historical queue-worker template. Serverless
 // templates can be bound to one endpoint and the earlier queue repair changed the v1 identity.
 export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v2'
-export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v2'
+export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v3'
 export const DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER' as const
 export const DISTILLED_CONTAINER_PORT = 8000
 export const DISTILLED_MODEL_NAME = 'itmounts-distilled-reasoning-v1'
@@ -15,18 +15,27 @@ export const DISTILLED_BASE_MODEL_ID = 'Qwen/Qwen3-4B'
 export const DISTILLED_BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 export const DISTILLED_ADAPTER_MODEL_ID = 'cadomos/itmounts-student-f993a365a01e'
 export const DISTILLED_ADAPTER_MODEL_REVISION = '9f03387d87de550b96d973f9f30a3f02e783997e'
-export const DISTILLED_IDLE_TIMEOUT_SECONDS = 900
+export const DISTILLED_IDLE_TIMEOUT_SECONDS = 600
 export const DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS = 120_000
 const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const REQUEST_TIMEOUT_MS = 15_000
-// 900s warm + two 120s canary attempts + 5s retry delay = 1145s. At $0.60/hr the
-// maximum bounded runtime cost is ~$0.191, below the existing $0.20 owner canary ceiling.
-const MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 0.6
+// The standard 24 GB Serverless tier is $0.69/hr. One 120s canary plus a 600s warm window
+// costs at most ~$0.138 of billed runtime; even 300s of additional startup headroom keeps the
+// bounded total at ~$0.196, below the existing $0.20 owner canary ceiling.
+const MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 0.69
+
+const APPROVED_SERVERLESS_GPU_POOLS = [
+  'AMPERE_16',
+  'AMPERE_24',
+] as const
 
 const PREFERRED_GPU_TYPE_IDS = [
   'NVIDIA RTX A4000',
   'NVIDIA RTX A4500',
   'NVIDIA RTX 4000 Ada Generation',
+  'NVIDIA RTX A5000',
+  'NVIDIA GeForce RTX 3090',
+  'NVIDIA L4',
 ] as const
 
 type RunpodTemplateV1 = {
@@ -275,6 +284,7 @@ function serverlessGpuCandidates(items: readonly RunpodGpuCatalogItemV2[]) {
       price: finitePrice(item.price?.serverless),
       availability: clean(item.availability, 40).toUpperCase(),
     }))
+    .filter(item => APPROVED_SERVERLESS_GPU_POOLS.includes(item.pool as typeof APPROVED_SERVERLESS_GPU_POOLS[number]))
     .filter(item => item.id && item.pool && item.price !== null && item.price <= MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD)
     .filter(item => item.availability !== 'NONE')
 }
@@ -291,9 +301,11 @@ async function approvedServerlessGpuSelection(): Promise<{ pools: string[]; gpuT
   for (const item of selected) {
     if (!pools.includes(item.pool)) pools.push(item.pool)
     if (!gpuTypeIds.includes(item.id)) gpuTypeIds.push(item.id)
-    if (pools.length >= 4) break
+    if (pools.length >= APPROVED_SERVERLESS_GPU_POOLS.length) break
   }
-  if (!pools.length) throw new Error('RunPod catalog has no approved 16-24 GB Serverless GPU pool within the canary price ceiling')
+  if (pools.length < APPROVED_SERVERLESS_GPU_POOLS.length) {
+    throw new Error('RunPod catalog does not currently expose both approved 16 GB and 24 GB Serverless pools within the canary price ceiling')
+  }
   return { pools, gpuTypeIds }
 }
 

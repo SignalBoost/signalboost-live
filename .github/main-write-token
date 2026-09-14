@@ -1,2 +1,2 @@
-base_sha=1cf8d721ca4e67e82404e308eb1222db066006d3
-branch=fix/hf-mass-distillation-compressed-envelope-20260914-v2
+base_sha=d85d344130223a17224d770bcd4b8bc23f611a23
+branch=fix/distilled-v3-capacity-fallback-20260914

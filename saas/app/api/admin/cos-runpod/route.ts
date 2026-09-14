@@ -1,8 +1,21 @@
 // saas/app/api/admin/cos-runpod/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
-import { runpodAutoStopEnabled, runpodLifecycleConfigured, runpodLifecycleEnabled, runpodOrphanGuardEnabled } from '@/lib/ai/cos/runpodLifecycle'
-import { runpodConfigured, queryPodStatus, estimateSessionCostUsd, startPod, stopPod } from '@/lib/hub/runpodTelemetry'
+import {
+  runpodAutoStopEnabled,
+  runpodLifecycleConfigured,
+  runpodLifecycleEnabled,
+  runpodOrphanGuardEnabled,
+} from '@/lib/ai/cos/runpodLifecycle'
+import {
+  runpodConfigured,
+  queryPodStatus,
+  queryRunpodAccountStatus,
+  estimateSessionCostUsd,
+  startPod,
+  stopPod,
+} from '@/lib/hub/runpodTelemetry'
+import { configuredRunpodApiKey, configuredRunpodPodId, runpodPrimaryBaseUrl } from '@/lib/ai/cos/runpodConfig'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
 export const runtime = 'nodejs'
@@ -17,16 +30,60 @@ async function lastCosActivityAt(): Promise<string | null> {
   } catch { return null }
 }
 
+function safeConfigurationState() {
+  const podId = configuredRunpodPodId()
+  return {
+    apiKeyPresent: Boolean(configuredRunpodApiKey()),
+    podIdPresent: Boolean(podId),
+    configured: runpodConfigured(),
+    primaryEndpoint: podId ? runpodPrimaryBaseUrl(podId) : null,
+    lifecycleConfigured: runpodLifecycleConfigured(),
+    lifecycleEnabled: runpodLifecycleEnabled(),
+    autoStopEnabled: runpodAutoStopEnabled(),
+    orphanGuardEnabled: runpodOrphanGuardEnabled(),
+  }
+}
+
 export async function GET() {
   const guard = await requireOwner()
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
-  if (!runpodConfigured()) return NextResponse.json({ ok: true, configured: false, lifecycleConfigured: runpodLifecycleConfigured(), lifecycleEnabled: runpodLifecycleEnabled(), autoStopEnabled: runpodAutoStopEnabled(), orphanGuardEnabled: runpodOrphanGuardEnabled(), error: 'RUNPOD_API_KEY and/or RUNPOD_POD_ID are not set — pod telemetry is unavailable.' })
+  const config = safeConfigurationState()
+  if (!config.configured) {
+    return NextResponse.json({
+      ok: true,
+      ...config,
+      error: 'RunPod primary control needs RUNPOD_API_KEY and RUNPOD_PRIMARY_POD_ID (or legacy RUNPOD_POD_ID). No compute was started.',
+    })
+  }
   try {
-    const [status, lastActivity] = await Promise.all([queryPodStatus(), lastCosActivityAt()])
+    const [status, account, lastActivity] = await Promise.all([
+      queryPodStatus(),
+      queryRunpodAccountStatus(),
+      lastCosActivityAt(),
+    ])
     const idleMinutes = lastActivity ? Math.max(0, Math.round((Date.now() - new Date(lastActivity).getTime()) / 60_000)) : null
-    return NextResponse.json({ ok: true, configured: true, lifecycleConfigured: runpodLifecycleConfigured(), lifecycleEnabled: runpodLifecycleEnabled(), pod: status, estimatedSessionCostUsd: estimateSessionCostUsd(status), lastCosActivityAt: lastActivity, idleMinutes, autoStopEnabled: runpodAutoStopEnabled(), autoStopIdleThresholdMinutes: Number(process.env.COS_RUNPOD_IDLE_MINUTES || '30'), orphanGuardEnabled: runpodOrphanGuardEnabled() })
+    return NextResponse.json({
+      ok: true,
+      ...config,
+      pod: status,
+      account,
+      estimatedSessionCostUsd: estimateSessionCostUsd(status),
+      lastCosActivityAt: lastActivity,
+      idleMinutes,
+      autoStopIdleThresholdMinutes: Number(process.env.COS_RUNPOD_IDLE_MINUTES || '30'),
+      policy: {
+        primary: 'runpod',
+        fallback: 'deepinfra',
+        warmPrimary: !runpodAutoStopEnabled(),
+        authorizedCreditExposureUsd: Number(process.env.RUNPOD_PRIMARY_MAX_CREDIT_SPEND_USD || '20'),
+      },
+    })
   } catch (error) {
-    return NextResponse.json({ ok: false, configured: true, lifecycleConfigured: runpodLifecycleConfigured(), lifecycleEnabled: runpodLifecycleEnabled(), autoStopEnabled: runpodAutoStopEnabled(), orphanGuardEnabled: runpodOrphanGuardEnabled(), error: error instanceof Error ? error.message : 'Failed to read RunPod pod status.' }, { status: 502 })
+    return NextResponse.json({
+      ok: false,
+      ...config,
+      error: error instanceof Error ? error.message : 'Failed to read RunPod account/pod status.',
+    }, { status: 502 })
   }
 }
 
@@ -35,8 +92,10 @@ export async function POST(req: NextRequest) {
   if (!guard.ok) return NextResponse.json({ error: guard.error }, { status: guard.status })
   const body = await req.json().catch(() => ({}))
   const action = body?.action
-  if (action !== 'start' && action !== 'stop') return NextResponse.json({ error: 'Supported actions are { "action": "start" } and { "action": "stop" }.' }, { status: 400 })
-  if (!runpodConfigured()) return NextResponse.json({ error: 'RUNPOD_API_KEY and/or RUNPOD_POD_ID are not set.' }, { status: 400 })
+  if (action !== 'start' && action !== 'stop') {
+    return NextResponse.json({ error: 'Supported actions are { "action": "start" } and { "action": "stop" }.' }, { status: 400 })
+  }
+  if (!runpodConfigured()) return NextResponse.json({ error: 'RunPod primary control is not configured.' }, { status: 400 })
   try {
     const result = action === 'start' ? await startPod() : await stopPod()
     return NextResponse.json({ ok: true, action, ...result })

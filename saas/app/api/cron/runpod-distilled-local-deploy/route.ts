@@ -14,6 +14,10 @@ import {
   provisionRunpodServerlessDistilledLlm,
   reconcileRunpodServerlessDistilledEndpoint,
 } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
+import {
+  inspectRunpodServerlessDistilledHealth,
+  reconcileRunpodServerlessDistilledWorkerTemplate,
+} from '@/lib/ai/cos/runpodServerlessDistilledWorkerRepair'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -198,11 +202,19 @@ export async function GET(req: NextRequest) {
         createdEndpoint: provisioned.createdEndpoint,
         scaleToZero: provisioned.workersMin === 0,
       })
-    } else {
-      // Existing evidence may refer to an endpoint created under an older five-second idle policy.
-      // Reconcile it before any paid canary so the exact worker can remain warm for the evaluator.
-      await reconcileRunpodServerlessDistilledEndpoint(endpointId)
     }
+
+    // Queue-based RunPod Serverless must use RunPod's worker-vllm wrapper. Reconcile the existing
+    // template before every authorized canary so an old vanilla vLLM template cannot consume another
+    // paid attempt without ever registering a Serverless worker loop.
+    const worker = await reconcileRunpodServerlessDistilledWorkerTemplate(endpointId)
+    await reconcileRunpodServerlessDistilledEndpoint(endpointId)
+    await record('local_distilled_runtime_worker_reconciled', {
+      endpointId,
+      imageName: worker.imageName,
+      exactAdapterRevision: worker.exactAdapterRevision,
+      productionTrafficAuthorized: false,
+    })
 
     const refreshed = await events()
     const approvalFloor = Date.parse(approvalObservedAt)
@@ -221,6 +233,7 @@ export async function GET(req: NextRequest) {
       timeoutMs: DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
     })
     if (!canary.ok) {
+      const health = await inspectRunpodServerlessDistilledHealth(endpointId).catch(() => null)
       await record('local_distilled_runtime_canary_failed', {
         endpointId,
         model: canary.model,
@@ -230,6 +243,7 @@ export async function GET(req: NextRequest) {
         httpAttempts: CANARY_HTTP_ATTEMPTS_PER_INVOCATION,
         attemptTimeoutMs: DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
         authorizationObservedAt: approvalObservedAt,
+        health,
       })
       return NextResponse.json({ ok: false, deployed: true, canaryPassed: false, endpointId, error: canary.error }, { status: 503 })
     }

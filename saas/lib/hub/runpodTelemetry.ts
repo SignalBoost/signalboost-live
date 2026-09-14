@@ -59,6 +59,11 @@ function safeModelName(value: string | undefined | null, fallback: string): stri
   return model
 }
 
+function bootstrapRef(): string {
+  const value = String(process.env.RUNPOD_BOOTSTRAP_REF || process.env.VERCEL_GIT_COMMIT_SHA || 'main').trim()
+  return /^[a-f0-9]{40}$/i.test(value) ? value : 'main'
+}
+
 /**
  * Derive an inference-only credential from the RunPod control credential. The root RunPod API key is
  * never sent to the model gateway or written into the Pod startup contract. Compromise of this
@@ -75,24 +80,24 @@ export function runpodGatewayKey(podId = configuredRunpodPodId()): string {
 
 /**
  * The Pod's container disk is recreated when RunPod restarts it, while /workspace persists.
- * The startup command therefore launches the persistent COS bootstrap on every cold start. Model
- * selection belongs to the RunPod-primary plane and is intentionally independent from LOCAL_AI_MODEL,
- * which may remain a DeepInfra model identifier for fallback.
+ * Every start downloads the bootstrap from the exact Vercel Git commit, making Pod behavior
+ * reproducible instead of trusting whatever script happened to remain on persistent storage.
  */
 export function desiredRunpodStartupContract(options: RunpodStartupOptions = {}): RunpodStartupContract {
   const reasonerModel = safeModelName(options.reasonerModel || process.env.RUNPOD_PRIMARY_MODEL, 'qwen2.5-coder:32b')
   const embeddingModel = safeModelName(options.embeddingModel || process.env.RUNPOD_PRIMARY_EMBEDDING_MODEL, 'nomic-embed-text')
   const gatewayKey = runpodGatewayKey()
+  const ref = bootstrapRef()
+  const bootstrapUrl = `https://raw.githubusercontent.com/SignalBoost/signalboost-live/${ref}/saas/scripts/runpod-cos-reasoner.sh`
   const command = [
     'set -euo pipefail',
     'if [ -x /start.sh ]; then nohup /start.sh >/workspace/runpod-base-start.log 2>&1 & fi',
-    'script=""',
-    'for candidate in /workspace/cos-runpod-reasoner.sh /workspace/run-cos-reasoner.sh; do if [ -x "$candidate" ]; then script="$candidate"; break; fi; done',
-    'if [ -z "$script" ]; then echo "COS RunPod bootstrap is missing from /workspace" >&2; exit 78; fi',
+    `curl -fsSL --max-time 30 '${bootstrapUrl}' -o /workspace/cos-runpod-reasoner.sh`,
+    'chmod 700 /workspace/cos-runpod-reasoner.sh',
     `export COS_REASONER_MODEL='${reasonerModel}'`,
     `export COS_EMBEDDING_MODEL='${embeddingModel}'`,
     `export COS_REASONER_GATEWAY_KEY='${gatewayKey}'`,
-    '"$script"',
+    '/workspace/cos-runpod-reasoner.sh',
     'exec tail -f /dev/null',
   ].join('; ')
   return {

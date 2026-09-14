@@ -9,6 +9,12 @@ import { callLocalModel, checkLocalInferenceHealth, localInferenceConfigFromEnv 
 const originalEnv = { ...process.env }
 const originalFetch = globalThis.fetch
 
+test.beforeEach(() => {
+  // These cases validate the explicit localhost/appliance transport itself. Provider-selection policy
+  // is covered separately in runpodPrimaryRouting.node.test.ts and must not add a second request here.
+  process.env.RUNPOD_PRIMARY_ENABLED = 'false'
+})
+
 test.afterEach(() => {
   process.env = { ...originalEnv }
   globalThis.fetch = originalFetch

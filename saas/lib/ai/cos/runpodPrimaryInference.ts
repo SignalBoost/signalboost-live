@@ -26,6 +26,24 @@ let readyUntil = 0
 let readyModel = ''
 let readinessPromise: Promise<boolean> | null = null
 
+function safeReason(value: unknown): string {
+  return String(value ?? 'runpod_primary_failed')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/(api[_-]?key|authorization|bearer)\s*[:=]?\s*[^\s,;]+/gi, '$1=[redacted]')
+    .trim()
+    .slice(0, 500) || 'runpod_primary_failed'
+}
+
+function logFallback(workload: RunpodPrimaryWorkload, model: string | null, stage: string, reason: unknown): void {
+  console.warn('[runpod-primary-fallback]', JSON.stringify({
+    at: new Date().toISOString(),
+    workload,
+    model,
+    stage,
+    reason: safeReason(reason),
+  }))
+}
+
 export function runpodPrimaryEnabled(): boolean {
   if (process.env.RUNPOD_PRIMARY_ENABLED?.trim().toLowerCase() === 'false') return false
   return runpodControlConfigured()
@@ -105,9 +123,11 @@ export async function tryRunpodPrimaryInference(
   try {
     const ready = await proveReady(workload)
     if (!ready) {
+      logFallback(workload, config.model, 'readiness', 'runpod_primary_not_ready')
       return { text: null, attempted: true, ready: false, reason: 'runpod_primary_not_ready', model: config.model }
     }
     const text = await callLocalModel(args, config)
+    if (!text?.trim()) logFallback(workload, config.model, 'inference', 'runpod_primary_empty_response')
     return {
       text: text?.trim() ? text : null,
       attempted: true,
@@ -116,11 +136,13 @@ export async function tryRunpodPrimaryInference(
       model: config.model,
     }
   } catch (error) {
+    const reason = error instanceof Error ? error.message : 'runpod_primary_failed'
+    logFallback(workload, config.model, 'exception', reason)
     return {
       text: null,
       attempted: true,
       ready: false,
-      reason: error instanceof Error ? error.message : 'runpod_primary_failed',
+      reason,
       model: config.model,
     }
   }

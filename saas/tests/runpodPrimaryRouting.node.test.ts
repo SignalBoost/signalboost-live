@@ -16,6 +16,19 @@ test('RunPod primary is a separate transport and does not overwrite DeepInfra fa
   assert.doesNotMatch(primary, /process\.env\.LOCAL_AI_API_KEY/)
 })
 
+test('stale configured pod ids recover only to the unique canonical SignalBoost reasoner pod', () => {
+  const resolver = source('../lib/ai/cos/runpodPodResolver.ts')
+  const config = source('../lib/ai/cos/runpodConfig.ts')
+  assert.match(resolver, /CANONICAL_REASONER_NAME = 'signalboost-cos-reasoner-v2'/)
+  assert.match(resolver, /pods\.some\(pod => pod\.id === configured\)/)
+  assert.match(resolver, /exact\.length === 1/)
+  assert.match(resolver, /branded\.length === 1/)
+  assert.match(resolver, /runpod_primary_resolution_failed/)
+  assert.match(resolver, /setRuntimeRunpodPodIdOverride\(recovered\.id\)/)
+  assert.match(config, /runtimeRunpodPodIdOverride \|\| explicitRunpodPodId\(\)/)
+  assert.doesNotMatch(resolver, /yvj6e9zboi7ofo|wh4k8f1imxrxft/)
+})
+
 test('Builder tries graduate then RunPod primary before DeepInfra coding fallback', () => {
   const port = source('../lib/cos/aiPort.ts')
   const builderStart = port.indexOf('export function createBuilderCodingAiPort')
@@ -37,10 +50,27 @@ test('shared Platform AI tries active graduate then RunPod before governed base 
   assert.ok(graduate >= 0 && runpod > graduate && fallback > runpod)
 })
 
-test('University controlled-comparison contexts never acquire RunPod primary routing', () => {
+test('ordinary shared text inference prefers RunPod and treats LOCAL_AI DeepInfra as fallback', () => {
+  const inference = source('../lib/ai/local-inference.ts')
+  const publicEntry = inference.indexOf('export async function callLocalModel')
+  const health = inference.indexOf('export async function checkLocalInferenceHealth', publicEntry)
+  const routing = inference.slice(publicEntry, health)
+  const resolveRunpod = routing.indexOf("import('./cos/runpodPrimaryInference.ts')")
+  const callRunpod = routing.indexOf('callConfiguredModel(args, runpodConfig)')
+  const fallback = routing.lastIndexOf('callConfiguredModel(args, ownedAttempted')
+  assert.ok(resolveRunpod >= 0 && callRunpod > resolveRunpod && fallback > callRunpod)
+  assert.match(inference, /protectedIndependentEvaluation/)
+  assert.match(inference, /independent_assessment/)
+  assert.match(inference, /fallbackFromOwned: true/)
+})
+
+test('University independent assessments never acquire RunPod primary routing', () => {
   const port = source('../lib/cos/aiPort.ts')
+  const inference = source('../lib/ai/local-inference.ts')
   assert.match(port, /currentReasoningEvaluationContext\(\)/)
   assert.match(port, /\? \{ text: null, attempted: false \}\s*:\s*await tryRunpodPrimaryInference/s)
+  assert.match(inference, /feature\.includes\('independent_exam'\)/)
+  assert.match(inference, /purpose\.includes\('independent_assessment'\)/)
 })
 
 test('warm primary defaults to no idle stop while unhealthy orphan protection remains enabled', () => {

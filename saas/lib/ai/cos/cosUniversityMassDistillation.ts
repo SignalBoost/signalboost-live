@@ -8,10 +8,13 @@ export const MASS_DISTILLATION_MIN_CONFIDENCE = 0.80
 export const MASS_DISTILLATION_MIN_BATCH = 20
 export const MASS_DISTILLATION_MAX_BATCH = 128
 export const MASS_DISTILLATION_MAX_BATCHES_PER_RUN = 20
+export const MASS_DISTILLATION_CORPUS_PAGE_SIZE = 1000
+export const MASS_DISTILLATION_CORPUS_MAX_ROWS = 5000
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const ACTIVE_BATCH_STATUSES = new Set(['prepared', 'teacher_synthesis_ready', 'consumed'])
 const TERMINAL_REPACKAGE_STATUSES = new Set(['quarantined', 'superseded'])
+const EFFECTIVE_CORPUS_FILTER = 'fact_extraction_error.is.null,fact_extraction_error.not.ilike.relevance_rejected:%'
 
 export type DistillationRightsClass = 'public_domain' | 'cc0' | 'itmounts_synthetic'
 export type RetainedDistillationIdentity = Readonly<{
@@ -190,6 +193,26 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(item => clean(item, 64).toLowerCase()).filter(item => HEX64.test(item)) : []
 }
 
+async function readMassDistillationCorpus(db: NonNullable<ReturnType<typeof cosServiceDb>>) {
+  const rows: any[] = []
+  for (let offset = 0; offset < MASS_DISTILLATION_CORPUS_MAX_ROWS; offset += MASS_DISTILLATION_CORPUS_PAGE_SIZE) {
+    const end = Math.min(offset + MASS_DISTILLATION_CORPUS_PAGE_SIZE, MASS_DISTILLATION_CORPUS_MAX_ROWS) - 1
+    const expectedPageSize = end - offset + 1
+    const page = await db.from('cos_continuous_learning')
+      .select('content_hash,subject,source_kind,license,confidence,source_title,summary,facts')
+      .gte('confidence', MASS_DISTILLATION_MIN_CONFIDENCE)
+      .or(EFFECTIVE_CORPUS_FILTER)
+      .order('created_at', { ascending: true })
+      .order('content_hash', { ascending: true })
+      .range(offset, end)
+    if (page.error) throw page.error
+    const pageRows = page.data ?? []
+    rows.push(...pageRows)
+    if (pageRows.length < expectedPageSize) break
+  }
+  return rows
+}
+
 /** Non-spending packaging sweep; provider dispatch remains a separate owner-governed consequence. */
 export async function prepareUniversityMassDistillationCurriculum(now = new Date()) {
   const db = cosServiceDb()
@@ -220,14 +243,8 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     }
   }
 
-  const corpus = await db.from('cos_continuous_learning')
-    .select('content_hash,subject,source_kind,license,confidence,source_title,summary,facts')
-    .gte('confidence', MASS_DISTILLATION_MIN_CONFIDENCE)
-    .order('created_at', { ascending: true })
-    .limit(5000)
-  if (corpus.error) throw corpus.error
-
-  const identities: RetainedDistillationIdentity[] = (corpus.data || []).map((row: any) => ({
+  const corpusRows = await readMassDistillationCorpus(db)
+  const identities: RetainedDistillationIdentity[] = corpusRows.map((row: any) => ({
     contentHash: clean(row.content_hash, 64),
     materialHash: retainedMaterialHash({ sourceTitle: row.source_title, summary: row.summary, facts: row.facts }) || '',
     subject: clean(row.subject, 240),
@@ -291,6 +308,6 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     sourceItemsPrepared,
     dispatchAuthorized: false,
     externalCostUsd: 0,
-    semantics: 'rights_cleared_unique_material_identity_packaging_only_no_text_no_provider_dispatch_no_traffic_authorization' as const,
+    semantics: 'rights_cleared_unique_material_identity_packaging_effective_corpus_paginated_no_text_no_provider_dispatch_no_traffic_authorization' as const,
   })
 }

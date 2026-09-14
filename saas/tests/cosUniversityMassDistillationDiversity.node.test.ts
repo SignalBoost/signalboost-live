@@ -63,3 +63,14 @@ test('packaging reads active and terminal lifecycle rows but reserves only activ
   assert.match(packager, /repackagedFromBatchKey/)
   assert.match(packager, /\.order\('updated_at', \{ ascending: false \}\)/)
 })
+
+test('packaging paginates the effective retained corpus beyond the PostgREST row cap', () => {
+  assert.match(packager, /MASS_DISTILLATION_CORPUS_PAGE_SIZE = 1000/)
+  assert.match(packager, /MASS_DISTILLATION_CORPUS_MAX_ROWS = 5000/)
+  assert.match(packager, /EFFECTIVE_CORPUS_FILTER = 'fact_extraction_error\.is\.null,fact_extraction_error\.not\.ilike\.relevance_rejected:%'/)
+  assert.match(packager, /for \(let offset = 0; offset < MASS_DISTILLATION_CORPUS_MAX_ROWS; offset \+= MASS_DISTILLATION_CORPUS_PAGE_SIZE\)/)
+  assert.match(packager, /\.or\(EFFECTIVE_CORPUS_FILTER\)/)
+  assert.match(packager, /\.order\('created_at', \{ ascending: true \}\)[\s\S]*\.order\('content_hash', \{ ascending: true \}\)[\s\S]*\.range\(offset, end\)/)
+  assert.match(packager, /if \(pageRows\.length < expectedPageSize\) break/)
+  assert.doesNotMatch(packager, /\.limit\(5000\)/)
+})

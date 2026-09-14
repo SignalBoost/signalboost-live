@@ -57,12 +57,25 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
   const trainedArtifactHash = clean(trainedEvidence?.artifactHash, 64).toLowerCase()
   const evidenceRef = clean(trainedEvidence?.evidenceRef, 2000)
   const revisionKey = clean(trainedEvidence?.revisionKey, 64).toLowerCase()
-  const datasetHash = clean(trainedEvidence?.datasetHash, 64).toLowerCase()
   const studentModelId = clean(trainedEvidence?.distillationCandidate?.studentModelId, 240)
   const teacherModelId = clean(trainedEvidence?.distillationCandidate?.teacherModelId, 240)
   if (!trainedArtifactId || !evidenceRef || !studentModelId || !HEX64.test(trainedArtifactHash) || !HEX64.test(revisionKey)) {
     throw new Error('local_distillation_artifact_identity_invalid')
   }
+
+  // The authoritative dataset identity is registered when train/holdout partitions are created,
+  // before the final trained-artifact callback. Some training executors intentionally omit it from
+  // the later artifact event, so bind by the exact revision key rather than treating absence there as
+  // missing provenance or hard-coding a dataset hash.
+  const partition = valid.find(row => {
+    const evidence: any = row.evidence
+    return row.verifier === 'training_executor'
+      && evidence?.profile === FINE_TUNE_EVIDENCE_PROFILE
+      && evidence?.claim === 'partition_manifests_registered'
+      && clean(evidence?.revisionKey, 64).toLowerCase() === revisionKey
+      && HEX64.test(clean(evidence?.datasetHash, 64))
+  })
+  const datasetHash = clean(trainedEvidence?.datasetHash || (partition?.evidence as any)?.datasetHash, 64).toLowerCase()
 
   const rollback = valid.find(row => {
     const evidence: any = row.evidence
@@ -118,6 +131,7 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
     teacherModelId: teacherModelId || null,
     trainedArtifactId,
     trainedArtifactHash,
+    datasetHash: HEX64.test(datasetHash) ? datasetHash : null,
     rollbackReady: Boolean(rollbackArtifactRef),
     status: lifecycle.status,
     runtimeTarget: 'itmounts_local' as const,

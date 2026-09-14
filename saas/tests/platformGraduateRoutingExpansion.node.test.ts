@@ -28,12 +28,14 @@ test('graduate inference config carries exact iTMounts artifact ownership into t
   assert.match(source, /provider:\s*runtime\.provider/)
 })
 
-test('inference telemetry separates model ownership from compute provider and records all providers', () => {
+test('inference telemetry separates model ownership from compute provider and persists DeepInfra plus owned graduates', () => {
   const inference = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
   assert.match(inference, /routeOwner/)
   assert.match(inference, /graduateArtifactId/)
-  assert.match(inference, /recordLocalInferenceUsage\(\{/)
-  assert.doesNotMatch(inference, /if \(provider === 'deepinfra'\) \{\s*await recordLocalInferenceUsage/s)
+  assert.match(inference, /function shouldPersistUsage/)
+  assert.match(inference, /provider === 'deepinfra'/)
+  assert.match(inference, /config\.routeOwner === 'itmounts'/)
+  assert.match(inference, /if \(shouldPersistUsage\(provider, config\)\)/)
   assert.match(inference, /const reasoningEffort = provider === 'deepinfra'/)
 })
 

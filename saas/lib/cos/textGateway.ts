@@ -7,6 +7,7 @@ import {
   type ModelProvider,
   type ProviderExecutionTrace,
 } from '@/lib/ai/providerRouter'
+import { platformOwnedInferenceCacheDiscriminator } from '@/lib/ai/platformOwnedInference'
 import { cosServiceDb } from '@/lib/cos-core/storage'
 
 export type CosTextGatewayInput = ModelCallArgs & {
@@ -36,16 +37,32 @@ type StoredText = {
   fallbackUsed?: boolean
 }
 
-function cacheIdentity(input: CosTextGatewayInput) {
-  const stable = JSON.stringify({ taskId: input.taskId ?? 'cos-text', prompt: input.prompt, systemPrompt: input.systemPrompt ?? '', maxTokens: input.maxTokens ?? 2048, modelPreference: input.modelPreference ?? null })
+async function cacheIdentity(input: CosTextGatewayInput) {
+  // An exact response from the old DeepInfra runtime must never mask activation of a promoted
+  // iTMounts graduate. The routing discriminator changes when the active artifact/runtime changes.
+  const routing = await platformOwnedInferenceCacheDiscriminator(input.usageContext).catch(() => 'graduate-routing:lookup-failed')
+  const stable = JSON.stringify({
+    taskId: input.taskId ?? 'cos-text',
+    prompt: input.prompt,
+    systemPrompt: input.systemPrompt ?? '',
+    maxTokens: input.maxTokens ?? 2048,
+    modelPreference: input.modelPreference ?? null,
+    usageContext: input.usageContext ? {
+      feature: input.usageContext.feature,
+      purpose: input.usageContext.purpose ?? null,
+      agentId: input.usageContext.agentId ?? null,
+      subjectId: input.usageContext.subjectId ?? null,
+    } : null,
+    routing,
+  })
   return createHash('sha256').update(stable).digest('hex')
 }
 
 const inFlight = new Map<string, Promise<CosTextGatewayResult | null>>()
 
-/** Compatibility gateway with durable exact reuse and truthful provider provenance. */
+/** Compatibility gateway with durable exact reuse and truthful selected-model provenance. */
 export async function callCosTextDetailed(input: CosTextGatewayInput): Promise<CosTextGatewayResult | null> {
-  const key = cacheIdentity(input)
+  const key = await cacheIdentity(input)
   const existing = inFlight.get(key)
   if (existing) return existing
 

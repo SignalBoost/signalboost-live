@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
+import { runpodServerlessOpenAiBaseUrl, safeRunpodErrorDetail } from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
 
 const provision = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledProvision.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
@@ -31,7 +32,24 @@ test('RunPod endpoint POST follows the documented REST contract', () => {
   assert.match(provision, /gpuTypeIds:\s*GPU_TYPES/)
   assert.match(provision, /scalerType:\s*'REQUEST_COUNT'/)
   assert.match(provision, /scalerValue:\s*1/)
-  assert.doesNotMatch(provision, /gpuTypePriority/)
+  assert.doesNotMatch(provision, /gpuTypePriority\s*:/)
+  assert.doesNotMatch(provision, /volumeInGb\s*:/)
+  assert.doesNotMatch(provision, /volumeMountPath\s*:/)
+  assert.match(provision, /containerDiskInGb:\s*50/)
+})
+
+test('RunPod OpenAI compatibility uses the official v2 endpoint shape', () => {
+  assert.equal(runpodServerlessOpenAiBaseUrl('abc_123'), 'https://api.runpod.ai/v2/abc_123/openai/v1')
+  assert.throws(() => runpodServerlessOpenAiBaseUrl('../bad'), /endpoint id is invalid/)
+  assert.match(provision, /\$\{baseUrl\}\/chat\/completions/)
+  assert.doesNotMatch(provision, /\.api\.runpod\.ai\/v1\/chat\/completions/)
+})
+
+test('RunPod error details are bounded and credential-like fields are redacted', () => {
+  assert.equal(safeRunpodErrorDetail('{"message":"gpuTypePriority is not allowed"}'), 'gpuTypePriority is not allowed')
+  assert.equal(safeRunpodErrorDetail('{"error":{"code":"invalid_request","message":"bad field"}}'), 'bad field')
+  assert.equal(safeRunpodErrorDetail('not-json-provider-body'), null)
+  assert.equal(safeRunpodErrorDetail('{"message":"token: super-secret-value rejected"}'), 'token=[redacted] rejected')
 })
 
 test('deployment requires explicit durable unexpired approval and does not authorize Production traffic', () => {

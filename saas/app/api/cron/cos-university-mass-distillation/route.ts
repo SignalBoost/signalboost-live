@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runMassDistillationCampaignConsumer } from '@/lib/ai/cos/cosUniversityMassDistillationConsumer'
+import { reconcileMassDistillationHuggingFaceJobs } from '@/lib/ai/cos/cosUniversityHuggingFaceJobReconciler'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
 export const runtime = 'nodejs'
@@ -12,16 +13,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   try {
+    // Reconcile provider-accepted work before considering any new paid dispatch. A dead/timed-out
+    // Hugging Face Job must become durable evidence before another batch can consume budget.
+    const reconciliation = await reconcileMassDistillationHuggingFaceJobs({ maxJobs: 10 })
     const result = await runMassDistillationCampaignConsumer({ maxDispatches: 3 })
-    const skipped = 'skipped' in result && result.skipped === true
+    const consumerSkipped = 'skipped' in result && result.skipped === true
+    const reconciliationSkipped = 'skipped' in reconciliation && reconciliation.skipped === true
+    const skipped = consumerSkipped && reconciliationSkipped
+    const response = { ...result, reconciliation }
+    const invocationSucceeded = (result.ok === true || consumerSkipped)
+      && (reconciliation.ok === true || reconciliationSkipped)
+
     await recordCosUniversityProductionPath({
       path: 'mass_distillation_campaign',
-      invocationSucceeded: result.ok === true,
-      evidence: { ...result, runnerInvoked: !skipped, skipped },
+      invocationSucceeded,
+      evidence: { ...response, runnerInvoked: !skipped, skipped },
     })
-    console.info('[cos-university-mass-distillation]', JSON.stringify(result))
-    return NextResponse.json(result, {
-      status: result.ok || skipped ? 200 : 503,
+    console.info('[cos-university-mass-distillation]', JSON.stringify(response))
+    return NextResponse.json(response, {
+      status: invocationSucceeded ? 200 : 503,
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     })
   } catch (error) {

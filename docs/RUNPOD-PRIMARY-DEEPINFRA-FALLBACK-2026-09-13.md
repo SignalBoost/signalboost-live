@@ -6,7 +6,7 @@
 
 ## Owner decision
 
-RunPod is restored as the preferred iTMounts-controlled text inference compute plane. DeepInfra remains configured as a bounded fallback/overflow provider rather than the default destination for every request.
+RunPod is the preferred iTMounts-controlled text inference compute plane. DeepInfra remains configured as a bounded fallback/overflow provider rather than the default destination for routine text work.
 
 The architectural order is:
 
@@ -16,19 +16,27 @@ active iTMounts graduate (when scoped + promoted + healthy)
 → DeepInfra fallback / difficult escalation
 ```
 
-University independent grading/evaluation and other protected controlled-comparison contexts remain isolated and do not silently inherit the RunPod-primary route.
+Independent University grading/evaluation and protected controlled-comparison contexts remain isolated and do not silently inherit the RunPod-primary route.
 
 ## Why
 
-Production telemetry showed Builder repeatedly calling DeepSeek V4 Pro on DeepInfra with large prompt contexts. The per-request cost is small in isolation but accumulates rapidly across iterative Builder rounds. A dedicated RunPod GPU can amortize sustained Builder/COS traffic and also host iTMounts-owned distilled models and the pinned 768-dimensional embedding model.
+Production telemetry showed Builder and other text paths repeatedly calling DeepInfra with large prompt contexts. The per-request cost is small in isolation but accumulates rapidly across iterative Builder/COS rounds. A dedicated RunPod GPU can amortize sustained Builder/COS traffic and can also host iTMounts-owned distilled models and the pinned 768-dimensional embedding model.
 
 This does not mean RunPod owns the model. Model/runtime ownership and compute-provider identity remain separate telemetry dimensions.
 
-## Existing pod
+## Existing pod and stale-id recovery
 
-The previously used RunPod Pod still exists in the owner's RunPod console and is currently stopped. Reuse it; do not create a second paid Pod unless the existing Pod is proven unusable.
+The existing iTMounts reasoner Pod must be reused; do not create a second paid Pod merely because a deployment variable is stale.
 
-Historical repository evidence identifies the prior Pod as `yvj6e9zboi7ofo`, but Production must use the explicit Vercel setting `RUNPOD_PRIMARY_POD_ID` (or the legacy `RUNPOD_POD_ID`) rather than hard-coding an infrastructure identifier.
+A live Production account probe on September 13, 2026 proved:
+
+- the configured deployment pod id referred to a terminated pod;
+- the authenticated RunPod account still contained exactly one canonical `signalboost-cos-reasoner-v2` Pod;
+- that Pod was stopped rather than deleted;
+- the account had approximately $8.41 in remaining RunPod credit at the time of the probe;
+- the stopped Pod reported a $0.22/hour compute rate when running.
+
+The runtime therefore supports a fail-closed recovery rule: if the configured pod id is absent, it may adopt a replacement only when the authenticated account proves exactly one canonical SignalBoost COS reasoner Pod. The selected id is held only as an in-process verified override; it is not hard-coded into source. Ambiguous account state fails closed to DeepInfra fallback.
 
 ## Vercel configuration boundary
 
@@ -40,13 +48,14 @@ LOCAL_AI_ALLOWED_HOSTS
 LOCAL_AI_API_KEY
 LOCAL_AI_MODEL
 DEEPINFRA_BUILDER_MODEL
+LOCAL_AI_EMBEDDING_MODEL
 ```
 
 RunPod primary uses separate settings:
 
 ```text
 RUNPOD_API_KEY                  # secret RunPod control credential
-RUNPOD_PRIMARY_POD_ID           # existing stopped Pod id
+RUNPOD_PRIMARY_POD_ID           # preferred explicit existing Pod id; stale values can be safely recovered at runtime
 RUNPOD_PRIMARY_ENABLED=true
 RUNPOD_PRIMARY_MODEL=qwen3:30b
 RUNPOD_PRIMARY_BUILDER_MODEL=qwen3:30b
@@ -58,11 +67,11 @@ COS_RUNPOD_AUTO_STOP_ENABLED=false
 COS_RUNPOD_ORPHAN_GUARD_ENABLED=true
 ```
 
-`RUNPOD_API_KEY` must be added only through Vercel's protected environment settings. Never place it in GitHub, documentation, logs, chat, or source.
+`RUNPOD_API_KEY` must remain only in protected runtime configuration. Never place it in GitHub, documentation, logs, chat, or source.
 
 ## Credential separation
 
-The RunPod control API key is not used as the inference-gateway credential. The application derives a deterministic HMAC inference-only gateway token from the control credential and Pod id. The derived token is installed into `/workspace/cos-api-key` when the Pod startup contract is applied. The RunPod account key therefore never travels to the model gateway.
+The RunPod control API key is not used as the inference-gateway credential. The application derives a deterministic HMAC inference-only gateway token from the control credential and the verified Pod id. The derived token is installed into `/workspace/cos-api-key` when the Pod startup contract is applied. The RunPod account key therefore never travels to the model gateway.
 
 ## Reproducible startup
 
@@ -77,37 +86,36 @@ A stale script left on the Pod volume is not trusted as the canonical boot imple
 
 ## Warm-capacity policy
 
-The previous aggressive idle-stop policy is not restored. Repository evidence showed that stopping the Pod released its GPU reservation; later resume attempts could fail when another RunPod customer took that host capacity.
+The previous aggressive idle-stop policy is not restored. Stopping the Pod can release its GPU reservation and later resume may fail when capacity is unavailable.
 
 Therefore:
 
 - healthy primary compute defaults to warm;
 - `COS_RUNPOD_AUTO_STOP_ENABLED` must be explicitly `true` to enable idle stop;
-- the unhealthy orphan guard remains enabled by default so a broken running Pod cannot bill indefinitely.
+- the unhealthy orphan guard remains enabled by default so a broken running Pod cannot bill indefinitely;
+- DeepInfra remains the operational fallback if RunPod cannot start, become ready, or return usable inference.
 
-## Routing phase 1
+## Runtime routing
 
-After the account/pod probe passes:
+Ordinary text inference uses the same policy at the shared `callLocalModel` seam, so core COS, Council/challenge reasoning, audit/synthesis callers, Builder and shared Platform AI do not silently bypass RunPod merely because they call the lower-level inference helper.
 
-1. active scoped graduate first;
-2. Builder and shared Platform AI use RunPod primary;
-3. on RunPod readiness/inference failure, existing DeepInfra execution remains available;
-4. fallback telemetry is marked explicitly;
-5. protected University evaluation contexts remain on their controlled path.
+Routing is:
 
-This first phase targets the largest observed DeepInfra cost source without making the deepest COS reasoning path depend on an unproven reactivated Pod.
+1. active scoped graduate where applicable;
+2. RunPod primary;
+3. DeepInfra/`LOCAL_AI_*` bounded fallback;
+4. explicit closed-model escalation only where separately governed.
 
-## Phase 2
+Builder additionally retains `DEEPINFRA_BUILDER_MODEL` as its specialized fallback model.
 
-After a real Production canary proves the existing Pod can boot the pinned model and serve sustained traffic:
+Protected independent University assessment is excluded from the shared RunPod preference. Training/practice may use primary platform compute, but evidence-generating independent exams/controlled comparisons must preserve evaluator separation.
 
-- add RunPod workers ahead of the existing DeepInfra COS reasoning workers;
-- move foreground embeddings to RunPod primary while preserving the 768-dimensional vector contract;
-- bind promoted iTMounts graduates to the RunPod serving plane when compatible;
-- leave DeepInfra as bounded fallback/overflow and deliberate high-end escalation.
+## Embeddings
 
-## Cost boundary
+Embeddings remain an independently governed transport because the database vector contract is fixed at 768 dimensions. The RunPod startup contract already provisions `nomic-embed-text`, but the separate embedding path must be moved only after a live RunPod canary proves the Pod boots and serves the expected 768-dimensional vectors. Until that canary closes, `LOCAL_AI_EMBEDDING_*` remains the embedding source of truth; do not silently mix vector spaces.
 
-The owner explicitly authorized reuse of the approximately $20 RunPod credit balance for this migration. Code deployment itself starts no GPU when `RUNPOD_API_KEY` is absent. Restoring that protected Vercel secret is the activation boundary.
+## Definition of complete cutover
 
-Before starting/resuming compute, Production must successfully read RunPod account/pod status. A missing/invalid credential fails closed and leaves DeepInfra active.
+The text-inference cutover is complete when Production telemetry shows routine COS/Builder/Platform text requests on `provider=runpod`, with DeepInfra rows occurring only after an explicit RunPod failure/fallback or deliberate escalation.
+
+The full compute cutover is complete after the embedding canary also proves 768-dimensional RunPod embeddings and the embedding endpoint is moved without changing vector-space identity.

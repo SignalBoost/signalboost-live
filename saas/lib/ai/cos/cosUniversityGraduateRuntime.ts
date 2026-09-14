@@ -89,7 +89,7 @@ function graduateManagedConfig(model: string): { inference: LocalInferenceConfig
     ? 'self_hosted'
     : normalizeProvider(process.env.COS_GRADUATE_AI_MANAGED_PROVIDER) || classification.provider || 'managed-open-model'
   const baseUrl = url.toString().replace(/\/$/, '')
-  const inference: LocalInferenceConfig = { baseUrl, model, apiKey, timeoutMs: timeoutValue }
+  const inference: LocalInferenceConfig = { baseUrl, model, apiKey, timeoutMs: timeoutValue, provider }
   const reasoner: CosReasonerConfig = classification.selfHosted
     ? { kind: 'independent-local', label: `independent-local:${model}` }
     : { kind: 'managed-open-model', label: `managed-open-model:${provider}:${model}` }
@@ -102,11 +102,11 @@ export function resolveGraduateRuntimeProfile(profile: GraduateRuntimeProfile, m
 
   if (profile === 'local_ai') {
     const base = localInferenceConfigFromEnv()
-    const inference: LocalInferenceConfig = { ...base, model }
-    const classification = classifyInferenceHost(inference.baseUrl)
+    const classification = classifyInferenceHost(base.baseUrl)
     const provider = classification.selfHosted
       ? 'self_hosted'
       : normalizeProvider(process.env.LOCAL_AI_MANAGED_PROVIDER) || classification.provider || 'managed-open-model'
+    const inference: LocalInferenceConfig = { ...base, model, provider }
     const reasoner: CosReasonerConfig = classification.selfHosted
       ? { kind: 'independent-local', label: `independent-local:${model}` }
       : { kind: 'managed-open-model', label: `managed-open-model:${provider}:${model}` }
@@ -273,18 +273,28 @@ export async function activeGraduateRuntimesForRole(
     try {
       const runtime = resolveGraduateRuntimeProfile(runtimeProfile, runtimeModelId)
       if (runtime.provider !== storedProvider) continue
+      const candidateId = clean(row.candidate_id, 240)
+      const artifactId = clean(row.trained_artifact_id, 500)
+      const artifactHash = clean(row.trained_artifact_hash, 64).toLowerCase()
       result.push(Object.freeze({
         registryId: clean(row.id, 100),
-        candidateId: clean(row.candidate_id, 240),
+        candidateId,
         subjectId: clean(row.subject_id, 160),
-        trainedArtifactId: clean(row.trained_artifact_id, 500),
-        trainedArtifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(),
+        trainedArtifactId: artifactId,
+        trainedArtifactHash: artifactHash,
         runtimeProfile,
         runtimeProvider: runtime.provider,
         runtimeModelId,
         workerRole: role,
         problemClass,
-        inference: runtime.inference,
+        inference: Object.freeze({
+          ...runtime.inference,
+          provider: runtime.provider,
+          routeOwner: 'itmounts' as const,
+          graduateCandidateId: candidateId,
+          graduateArtifactId: artifactId,
+          graduateArtifactHash: artifactHash,
+        }),
         reasoner: runtime.reasoner,
       }))
     } catch (error) {

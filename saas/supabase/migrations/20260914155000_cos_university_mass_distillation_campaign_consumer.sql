@@ -106,6 +106,7 @@ set search_path = ''
 as $$
 declare
   v_campaign_id uuid := gen_random_uuid();
+  v_now timestamptz := clock_timestamp();
   v_count integer;
   v_distinct_count integer;
   v_expected_max numeric(10,6);
@@ -156,7 +157,7 @@ begin
     automatic_promotion_authorized, runpod_mutation_authorized, authority_expanded
   ) values (
     v_campaign_id, p_batch_keys, cardinality(p_batch_keys), v_expected_max, 0,
-    left(btrim(p_authorization_ref), 500), clock_timestamp(), clock_timestamp() + p_valid_for,
+    left(btrim(p_authorization_ref), 500), v_now, v_now + p_valid_for,
     false, false, false
   );
 
@@ -200,7 +201,7 @@ begin
     event_key,event_type,candidate_id,evidence_hash,evidence,verifier,observed_at,expires_at
   ) values (
     v_event_key,'fine_tune','mass-campaign:' || v_campaign_id::text,
-    v_evidence_hash,v_evidence,'host_controller',clock_timestamp(),clock_timestamp() + p_valid_for
+    v_evidence_hash,v_evidence,'host_controller',v_now,v_now + p_valid_for
   );
 
   return v_campaign_id;

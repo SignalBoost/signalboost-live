@@ -1,9 +1,17 @@
+// saas/lib/ai/cos/runpodServerlessDistilledProvision.ts
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 
 const REST = 'https://rest.runpod.io/v1'
 const SERVERLESS_API = 'https://api.runpod.ai/v2'
-export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-v1'
-export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-primary'
+// Templates are looked up by name and never patched, so any change to image, ports or env only
+// takes effect under a new name. The load-balancer port/health env below is exactly such a change.
+export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v1'
+export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v1'
+// RunPod routes a QUEUE endpoint through its job handler protocol, which the public vLLM image does
+// not implement. A LOAD_BALANCER endpoint routes HTTP straight to the container port instead, which
+// is the only routing mode under which `vllm serve` can answer at all.
+export const DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER' as const
+export const DISTILLED_CONTAINER_PORT = 8000
 export const DISTILLED_MODEL_NAME = 'itmounts-distilled-reasoning-v1'
 export const DISTILLED_BASE_MODEL_ID = 'Qwen/Qwen3-4B'
 export const DISTILLED_BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
@@ -127,7 +135,8 @@ function startupCommand(): string {
 export function runpodServerlessOpenAiBaseUrl(endpointId: string): string {
   const id = endpointId.trim()
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
-  return `${SERVERLESS_API}/${id}/openai/v1`
+  // Load-balancer endpoints are addressed on their own host, not through the queue API.
+  return `https://${id}.api.runpod.ai/v1`
 }
 
 /** Official RunPod /health view. Numeric counts only; no raw provider body or credentials escape. */
@@ -247,11 +256,15 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
         env: {
           HF_TOKEN: token,
           HF_HOME: '/models/hf-cache',
-          PORT: '8000',
+          PORT: String(DISTILLED_CONTAINER_PORT),
+          PORT_HEALTH: String(DISTILLED_CONTAINER_PORT),
+          // vLLM answers 200 on /health only once weights are loaded, so the load balancer holds
+          // traffic until the exact base+adapter runtime is actually serving.
+          HEALTH_CHECK_PATH: '/health',
         },
         isPublic: false,
         isServerless: true,
-        ports: ['8000/http'],
+        ports: [`${DISTILLED_CONTAINER_PORT}/http`],
         readme: 'iTMounts exact distilled Qwen3-4B + LoRA runtime on public vLLM image. Scale-to-zero. DeepInfra remains fallback until promotion.',
       }),
     })
@@ -269,6 +282,8 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
         name: DISTILLED_ENDPOINT_NAME,
         templateId: template.id,
         computeType: 'GPU',
+        // Routing mode is fixed at creation; it is deliberately absent from the PATCH policy payload.
+        type: DISTILLED_ENDPOINT_ROUTING,
         ...endpointPolicyPayload(),
       }),
     })

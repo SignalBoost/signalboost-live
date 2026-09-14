@@ -1,2 +1,2 @@
-base_sha=284c51a43162b1d364689bbff01f2c9b13a51a45
-branch=fix/runpod-unhealthy-serving-recovery-20260914
+base_sha=5610ac19ad1ff4ceae551e0bd3ec26bd324661f1
+branch=fix/runpod-preserve-gpu-on-repair-20260914

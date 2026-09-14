@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkLocalInferenceHealth } from '@/lib/ai/local-inference'
 import { configuredRunpodApiKey, configuredRunpodPodId } from '@/lib/ai/cos/runpodConfig'
-import { ensureRunpodReasonerStarted, runpodOrphanGuardEnabled, stopRunpodReasoner } from '@/lib/ai/cos/runpodLifecycle'
+import { runpodOrphanGuardEnabled } from '@/lib/ai/cos/runpodLifecycle'
 import { runpodPrimaryConfig, runpodPrimaryEnabled, runpodPrimaryModel } from '@/lib/ai/cos/runpodPrimaryInference'
+import { configurePodStartupContract } from '@/lib/hub/runpodTelemetry'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -109,9 +110,9 @@ export async function GET(req: NextRequest) {
 
     // HTTP 502 means the external RunPod proxy has no usable serving process behind it. This is
     // materially different from a slow/busy inference timeout, which must never cause us to throw
-    // away scarce GPU capacity. Once a RUNNING pod is well past cold-start grace, repair only this
-    // hard-serving state: stop the useless billing allocation, apply the exact startup contract while
-    // stopped, and request a clean restart. The next probe proves readiness before traffic uses it.
+    // away scarce GPU capacity. RunPod's Pod update operation applies the desired startup contract
+    // and resets a RUNNING container in place, so repair does not Stop -> Start or release the GPU.
+    // The next probe proves readiness before normal traffic relies on the repaired runtime.
     if (configuredPod?.running
       && !inferenceReady
       && hardServingFailure
@@ -119,21 +120,19 @@ export async function GET(req: NextRequest) {
       && runpodOrphanGuardEnabled()) {
       repairAttempted = true
       try {
-        const stopped = await stopRunpodReasoner()
-        if (!stopped.stopped) throw new Error('runpod_unhealthy_repair_stop_failed')
-        const started = await ensureRunpodReasonerStarted({
+        const repaired = await configurePodStartupContract({
           reasonerModel: runpodPrimaryModel('reasoner'),
           embeddingModel: process.env.RUNPOD_PRIMARY_EMBEDDING_MODEL?.trim() || 'nomic-embed-text',
         })
-        repairStarted = started.started
-        if (!repairStarted) throw new Error('runpod_unhealthy_repair_restart_failed')
+        repairStarted = repaired.desiredStatus === 'RUNNING'
+        if (!repairStarted) throw new Error(`runpod_unhealthy_repair_not_running:${repaired.desiredStatus}`)
         console.warn('[runpod-primary-repair]', JSON.stringify({
           ok: true,
           podId: configuredPodId,
           reason: inferenceError,
           previousUptimeSeconds: configuredPod.uptimeSeconds,
-          startupContractRepaired: started.startupContractRepaired,
-          desiredStatus: started.desiredStatus,
+          repairMode: 'in_place_update_reset',
+          desiredStatus: repaired.desiredStatus,
         }))
       } catch (error) {
         repairError = error instanceof Error ? error.message : String(error)
@@ -141,6 +140,7 @@ export async function GET(req: NextRequest) {
           ok: false,
           podId: configuredPodId,
           reason: inferenceError,
+          repairMode: 'in_place_update_reset',
           error: repairError,
         }))
       }

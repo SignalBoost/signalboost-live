@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 
 const LEASE_MISSION_ID = '__cos_runpod_primary_inference_slot__'
 const DEFAULT_WAIT_MS = 15_000

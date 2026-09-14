@@ -46,3 +46,23 @@ test('answers the approved public SignalBoost identity without COS availability'
   assert.match(result.reply, /English, Spanish, Portuguese, Polish, and Russian/)
   assert.equal(result.executionProvenance.model_generated, false)
 })
+
+test('asks for a city or area before looking up weather for a whole country', () => {
+  const result = run('what is the weather in Poland?')
+  assert.ok(result)
+  assert.equal(result.source, 'deterministic-weather-location-clarification')
+  assert.equal(result.reply, 'Which city or area in Poland would you like the weather for?')
+  assert.equal(result.executionProvenance.model_generated, false)
+  assert.equal(result.executionProvenance.local_reasoning.invoked, false)
+  assert.equal(result.executionProvenance.external_ai.invoked, false)
+})
+
+test('does not intercept a city weather lookup', () => {
+  assert.equal(run('what is the weather in Paramaribo?'), null)
+  assert.equal(run('what is the weather in Warsaw, Poland?'), null)
+})
+
+test('does not force clarification for country-level climate summaries or city-states', () => {
+  assert.equal(run('what is the average weather in Poland in September?'), null)
+  assert.equal(run('what is the weather in Singapore?'), null)
+})

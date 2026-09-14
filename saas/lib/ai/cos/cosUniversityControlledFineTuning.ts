@@ -5,6 +5,7 @@ import { buildFineTuneEvidenceInput, readFineTuneEvidence, readFineTunePartition
 import { decideModelDistillationPromotion } from './cosUniversityModelDistillation.ts'
 import { readCosUniversityArtifactTrainingMode } from './cosUniversityDistillationPromotionEvidence.ts'
 import { reconcileCosUniversityDistillationCandidates } from './cosUniversityDistillationPreparation.ts'
+import { registerPromotedGraduateModel } from './cosUniversityGraduateModelRegistry.ts'
 import { controlledFineTuneDatasetHash } from './cosUniversityTrainingIdentity.ts'
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -13,6 +14,7 @@ const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(valu
  * Builds and records bounded fine-tuning candidates. Training remains impossible until separate
  * host approvals and independent post-training evidence exist. Distilled artifacts never inherit
  * ordinary fine-tune promotion: they must also satisfy the distillation-specific promotion gate.
+ * Once they do, promotion is not terminal: the graduate is registered for iTMounts platform adoption.
  */
 export async function runCosUniversityControlledFineTuning(now = new Date()) {
   if (process.env.COS_UNIVERSITY_FINE_TUNING_ENABLED !== 'true') {
@@ -49,6 +51,8 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
     const controlledDecision = decideControlledFineTune(evidenceInput)
     let decision = controlledDecision
     let trainingMode: 'fine_tune' | 'distillation' | 'unknown' | null = null
+    let distillationStudentModelId = ''
+    let distillationAuthorityExpanded = true
 
     if (revision && recordedEvidence?.trainedArtifactId && recordedEvidence.trainedArtifactHash) {
       const artifactMode = await readCosUniversityArtifactTrainingMode({
@@ -68,6 +72,8 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
             blockers: [...new Set([...controlledDecision.blockers, 'distillation_candidate_binding_missing'])],
           }
         } else {
+          distillationStudentModelId = context.candidate.studentModelId
+          distillationAuthorityExpanded = context.authorityExpanded
           const distillationDecision = decideModelDistillationPromotion({
             candidate: context.candidate,
             controlledFineTuneEvidence: evidenceInput,
@@ -91,13 +97,27 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
       }
     }
 
+    const platformAdoption = trainingMode === 'distillation' && recordedEvidence?.trainedArtifactId && recordedEvidence.trainedArtifactHash
+      ? await registerPromotedGraduateModel({
+          candidateId,
+          subjectId: plan.subject_id,
+          studentModelId: distillationStudentModelId,
+          trainedArtifactId: recordedEvidence.trainedArtifactId,
+          trainedArtifactHash: recordedEvidence.trainedArtifactHash,
+          rollbackArtifactRef: recordedEvidence.rollbackArtifactRef,
+          eligibleForPromotion: decision.eligibleForPromotion,
+          authorityExpanded: distillationAuthorityExpanded,
+          promotedAt: now,
+        })
+      : null
+
     if (decision.eligibleForTraining) eligibleForTraining += 1
     const evidence = {
       claim: 'candidate_status_observed', candidateId, planId: plan.id, datasetHash,
       lifecycleStage: decision.stage, trainedArtifactPresent: Boolean(recordedEvidence?.trainedArtifactId),
       trainingMode,
       trainingManifestHash: revision?.trainingManifestHash || null, holdoutManifestHash: revision?.holdoutManifestHash || null,
-      decision, recordedClaims: recordedEvidence?.claims || [],
+      decision, platformAdoption, recordedClaims: recordedEvidence?.claims || [],
     }
     const evidenceHash = hash(evidence)
     const eventKey = hash(['controlled-fine-tuning-v1', candidateId, plan.updated_at, evidenceHash])
@@ -119,12 +139,13 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
       trainingMode,
       eligibleForTraining: decision.eligibleForTraining,
       eligibleForPromotion: decision.eligibleForPromotion,
+      platformAdoption,
       blockers: decision.blockers,
     })
   }
   return {
     enabled: true, considered: (plans.data || []).length, recorded, eligibleForTraining, candidates,
     distillationPreparation,
-    semantics: 'candidate_packaging_only_training_requires_separate_host_approvals',
+    semantics: 'candidate_packaging_training_requires_host_approvals_promoted_distillations_require_platform_adoption',
   }
 }

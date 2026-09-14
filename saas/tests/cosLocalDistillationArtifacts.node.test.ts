@@ -37,6 +37,18 @@ test('migration creates a service-only local artifact library and backfills prio
   assert.match(migration, /trafficAuthorized.*false/s)
 })
 
+test('artifact dataset provenance binds to exact partition evidence when final artifact omits the hash', () => {
+  const registry = source('../lib/ai/cos/cosLocalDistillationArtifacts.ts')
+  const repair = source('../supabase/migrations/20260914125000_cos_local_distillation_dataset_provenance.sql')
+  assert.match(registry, /claim === 'partition_manifests_registered'/)
+  assert.match(registry, /revisionKey/)
+  assert.match(registry, /trainedEvidence\?\.datasetHash \|\| \(partition\?\.evidence as any\)\?\.datasetHash/)
+  assert.match(repair, /partition_manifests_registered/)
+  assert.match(repair, /a\.revision_key = p\.revision_key/)
+  assert.match(repair, /dataset_hash = p\.dataset_hash/)
+  assert.doesNotMatch(repair, /c5482ff5|e23cb043|bd7b151e/)
+})
+
 test('signed training callback reconciles local ownership only after evidence admission', () => {
   const route = source('../app/api/internal/cos/university-training-executor/evidence/route.ts')
   const recordIndex = route.indexOf('recordUniversityTrainingExecutorEvidence')

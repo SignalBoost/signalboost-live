@@ -1,16 +1,13 @@
 // saas/lib/ai/cos/runpodServerlessDistilledProvision.ts
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 
-const REST = 'https://rest.runpod.io/v1'
+const REST_V1 = 'https://rest.runpod.io/v1'
 const CONTROL_API_V2 = 'https://api.runpod.io/v2'
 const SERVERLESS_API = 'https://api.runpod.ai/v2'
-// Templates are looked up by name and never patched, so any change to image, ports or env only
-// takes effect under a new name. The load-balancer port/health env below is exactly such a change.
-export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v1'
-export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v1'
-// RunPod routes a QUEUE endpoint through its job handler protocol, which the public vLLM image does
-// not implement. A LOAD_BALANCER endpoint routes HTTP straight to the container port instead, which
-// is the only routing mode under which `vllm serve` can answer at all.
+// Keep the load-balancer template isolated from the historical queue-worker template. Serverless
+// templates can be bound to one endpoint and the earlier queue repair changed the v1 identity.
+export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v2'
+export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v2'
 export const DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER' as const
 export const DISTILLED_CONTAINER_PORT = 8000
 export const DISTILLED_MODEL_NAME = 'itmounts-distilled-reasoning-v1'
@@ -22,34 +19,44 @@ export const DISTILLED_IDLE_TIMEOUT_SECONDS = 900
 export const DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS = 120_000
 const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const REQUEST_TIMEOUT_MS = 15_000
+// 900s warm + two 120s canary attempts + 5s retry delay = 1145s. At $0.60/hr the
+// maximum bounded runtime cost is ~$0.191, below the existing $0.20 owner canary ceiling.
+const MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 0.6
 
-const GPU_TYPES = [
+const PREFERRED_GPU_TYPE_IDS = [
   'NVIDIA RTX A4000',
   'NVIDIA RTX A4500',
   'NVIDIA RTX 4000 Ada Generation',
-]
+] as const
 
-type RunpodTemplate = { id: string; name: string; imageName?: string; isServerless?: boolean }
-type RunpodEndpoint = {
+type RunpodTemplateV1 = {
   id: string
   name: string
-  workersMin?: number
-  workersMax?: number
-  templateId?: string
-  idleTimeout?: number
-  executionTimeoutMs?: number
-  scalerType?: string
-  scalerValue?: number
-  gpuTypeIds?: string[]
+  imageName?: string
+  isServerless?: boolean
+  dockerEntrypoint?: string[]
+  dockerStartCmd?: string[]
+  ports?: string[]
 }
 type RunpodEndpointV2 = {
   id: string
   name: string
   type?: 'QUEUE' | 'LOAD_BALANCER'
+  templateId?: string
   workers?: { min?: number; max?: number; idleTimeout?: number }
   scaling?: { type?: string; requestCount?: number; queueDelay?: number }
   timeout?: number
   flashboot?: string
+  gpu?: { pools?: string[]; count?: number }
+}
+type RunpodGpuCatalogItemV2 = {
+  id?: string
+  name?: string
+  pool?: string
+  manufacturer?: string
+  memory?: number
+  availability?: string
+  price?: { serverless?: number | null }
 }
 
 export type RunpodServerlessHealth = Readonly<{
@@ -69,6 +76,11 @@ function count(value: unknown): number {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0
 }
 
+function finitePrice(value: unknown): number | null {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 /** Provider errors are useful operational evidence, but never echo arbitrary raw bodies or secrets. */
 export function safeRunpodErrorDetail(raw: string): string | null {
   try {
@@ -82,6 +94,7 @@ export function safeRunpodErrorDetail(raw: string): string | null {
     const candidates = [
       value.message,
       value.detail,
+      Array.isArray(value.errors) ? value.errors.join('; ') : null,
       typeof value.error === 'string' ? value.error : null,
       nested?.message,
       nested?.detail,
@@ -96,13 +109,13 @@ export function safeRunpodErrorDetail(raw: string): string | null {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function requestV1<T>(path: string, init: RequestInit = {}): Promise<T> {
   const key = configuredRunpodApiKey()
   if (!key) throw new Error('RUNPOD_API_KEY is not configured')
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   try {
-    const response = await fetch(`${REST}${path}`, {
+    const response = await fetch(`${REST_V1}${path}`, {
       ...init,
       signal: controller.signal,
       headers: {
@@ -114,7 +127,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const raw = await response.text()
     if (!response.ok) {
       const detail = safeRunpodErrorDetail(raw)
-      throw new Error(`RunPod REST HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
+      const method = String(init.method || 'GET').toUpperCase()
+      throw new Error(`RunPod REST v1 ${method} ${path} HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
     }
     return raw ? JSON.parse(raw) as T : {} as T
   } finally {
@@ -140,7 +154,8 @@ async function requestV2<T>(path: string, init: RequestInit = {}): Promise<T> {
     const raw = await response.text()
     if (!response.ok) {
       const detail = safeRunpodErrorDetail(raw)
-      throw new Error(`RunPod REST v2 HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
+      const method = String(init.method || 'GET').toUpperCase()
+      throw new Error(`RunPod REST v2 ${method} ${path} HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
     }
     return raw ? JSON.parse(raw) as T : {} as T
   } finally {
@@ -168,10 +183,19 @@ function startupCommand(): string {
   ].join('; ')
 }
 
+function templateHasExactBootstrap(template: RunpodTemplateV1): boolean {
+  const command = (template.dockerStartCmd || []).join(' ')
+  const entrypoint = (template.dockerEntrypoint || []).join(' ')
+  return template.imageName === VLLM_IMAGE
+    && entrypoint.includes('bash')
+    && command.includes(DISTILLED_BASE_MODEL_REVISION)
+    && command.includes(DISTILLED_ADAPTER_MODEL_REVISION)
+    && (template.ports || []).includes(`${DISTILLED_CONTAINER_PORT}/http`)
+}
+
 export function runpodServerlessOpenAiBaseUrl(endpointId: string): string {
   const id = endpointId.trim()
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
-  // Load-balancer endpoints are addressed on their own host, not through the job queue API.
   return `https://${id}.api.runpod.ai/v1`
 }
 
@@ -225,20 +249,6 @@ export async function runpodServerlessEndpointHealth(endpointId: string): Promis
   }
 }
 
-/** Legacy v1 creation policy. Existing endpoint creation remains unchanged during the v2 reconcile repair. */
-function legacyEndpointCreationPolicyPayload() {
-  return {
-    executionTimeoutMs: 300_000,
-    flashboot: true,
-    idleTimeout: DISTILLED_IDLE_TIMEOUT_SECONDS,
-    scalerType: 'REQUEST_COUNT',
-    scalerValue: 1,
-    workersMax: 1,
-    workersMin: 0,
-  }
-}
-
-/** Current RunPod REST v2 Serverless PATCH contract. Only mutable runtime policy is sent. */
 function endpointV2PolicyPayload() {
   return {
     workers: {
@@ -253,6 +263,38 @@ function endpointV2PolicyPayload() {
     timeout: 300_000,
     flashboot: 'FLASHBOOT',
   }
+}
+
+function serverlessGpuCandidates(items: readonly RunpodGpuCatalogItemV2[]) {
+  return items
+    .filter(item => clean(item.manufacturer, 40).toUpperCase() === 'NVIDIA')
+    .filter(item => Number(item.memory || 0) >= 16 && Number(item.memory || 0) <= 24)
+    .map(item => ({
+      id: clean(item.id, 160),
+      pool: clean(item.pool, 80),
+      price: finitePrice(item.price?.serverless),
+      availability: clean(item.availability, 40).toUpperCase(),
+    }))
+    .filter(item => item.id && item.pool && item.price !== null && item.price <= MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD)
+    .filter(item => item.availability !== 'NONE')
+}
+
+async function approvedServerlessGpuSelection(): Promise<{ pools: string[]; gpuTypeIds: string[] }> {
+  const catalog = await requestV2<{ gpus?: RunpodGpuCatalogItemV2[] }>('/catalog/gpus')
+  const candidates = serverlessGpuCandidates(catalog.gpus || [])
+  const preferred = candidates.filter(item => PREFERRED_GPU_TYPE_IDS.includes(item.id as typeof PREFERRED_GPU_TYPE_IDS[number]))
+  const fallback = candidates.filter(item => !preferred.some(pref => pref.pool === item.pool))
+    .sort((a, b) => (a.price || Infinity) - (b.price || Infinity))
+  const selected = [...preferred, ...fallback]
+  const pools: string[] = []
+  const gpuTypeIds: string[] = []
+  for (const item of selected) {
+    if (!pools.includes(item.pool)) pools.push(item.pool)
+    if (!gpuTypeIds.includes(item.id)) gpuTypeIds.push(item.id)
+    if (pools.length >= 4) break
+  }
+  if (!pools.length) throw new Error('RunPod catalog has no approved 16-24 GB Serverless GPU pool within the canary price ceiling')
+  return { pools, gpuTypeIds }
 }
 
 export async function reconcileRunpodServerlessDistilledEndpoint(endpointId: string): Promise<{
@@ -301,12 +343,16 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
   gpuTypes: readonly string[]
 }> {
   const token = hfToken()
-  const templates = await request<RunpodTemplate[]>('/templates')
+  const templates = await requestV1<RunpodTemplateV1[]>('/templates')
   let template = templates.find(item => item.name === DISTILLED_TEMPLATE_NAME && item.isServerless !== false)
   let createdTemplate = false
 
+  if (template && !templateHasExactBootstrap(template)) {
+    throw new Error('RunPod distilled load-balancer template exists but does not match the exact-artifact bootstrap contract')
+  }
+
   if (!template) {
-    template = await request<RunpodTemplate>('/templates', {
+    template = await requestV1<RunpodTemplateV1>('/templates', {
       method: 'POST',
       body: JSON.stringify({
         name: DISTILLED_TEMPLATE_NAME,
@@ -320,39 +366,47 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
           HF_HOME: '/models/hf-cache',
           PORT: String(DISTILLED_CONTAINER_PORT),
           PORT_HEALTH: String(DISTILLED_CONTAINER_PORT),
-          // vLLM answers 200 on /health only once weights are loaded, so the load balancer holds
-          // traffic until the exact base+adapter runtime is actually serving.
           HEALTH_CHECK_PATH: '/health',
         },
         isPublic: false,
         isServerless: true,
         ports: [`${DISTILLED_CONTAINER_PORT}/http`],
-        readme: 'iTMounts exact distilled Qwen3-4B + LoRA runtime on public vLLM image. Scale-to-zero. DeepInfra remains fallback until promotion.',
+        readme: 'iTMounts exact distilled Qwen3-4B + immutable LoRA load-balancer runtime. Scale-to-zero. Evaluation before Production activation.',
       }),
     })
     createdTemplate = true
   }
 
-  const endpoints = await request<RunpodEndpoint[]>('/endpoints')
-  let endpoint = endpoints.find(item => item.name === DISTILLED_ENDPOINT_NAME)
+  if (!template?.id) throw new Error('RunPod distilled template response carried no template id')
+
+  const listed = await requestV2<{ endpoints?: RunpodEndpointV2[] }>('/serverless')
+  let endpoint = (listed.endpoints || []).find(item => item.name === DISTILLED_ENDPOINT_NAME)
   let createdEndpoint = false
+  let gpuTypeIds: string[] = []
+
+  if (endpoint && endpoint.type && endpoint.type !== DISTILLED_ENDPOINT_ROUTING) {
+    throw new Error('RunPod distilled endpoint name is already bound to the wrong routing type')
+  }
 
   if (!endpoint) {
-    endpoint = await request<RunpodEndpoint>('/endpoints', {
+    const gpu = await approvedServerlessGpuSelection()
+    gpuTypeIds = gpu.gpuTypeIds
+    endpoint = await requestV2<RunpodEndpointV2>('/serverless', {
       method: 'POST',
       body: JSON.stringify({
         name: DISTILLED_ENDPOINT_NAME,
-        templateId: template.id,
-        computeType: 'GPU',
-        // Routing mode is fixed at creation; it is deliberately absent from the PATCH policy payload.
         type: DISTILLED_ENDPOINT_ROUTING,
-        // GPU constraints are creation-time-only and are deliberately not resent by reconciliation.
-        gpuCount: 1,
-        gpuTypeIds: GPU_TYPES,
-        ...legacyEndpointCreationPolicyPayload(),
+        templateId: template.id,
+        gpu: {
+          pools: gpu.pools,
+          count: 1,
+        },
+        ...endpointV2PolicyPayload(),
       }),
     })
     createdEndpoint = true
+  } else {
+    gpuTypeIds = (endpoint.gpu?.pools || []).map(pool => `pool:${clean(pool, 80)}`)
   }
 
   if (!endpoint.id) throw new Error('RunPod distilled endpoint response carried no endpoint id')
@@ -368,7 +422,7 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
     workersMin: policy.workersMin,
     workersMax: policy.workersMax,
     idleTimeout: policy.idleTimeout,
-    gpuTypes: Object.freeze([...GPU_TYPES]),
+    gpuTypes: Object.freeze([...gpuTypeIds]),
   }
 }
 

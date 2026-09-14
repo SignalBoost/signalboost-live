@@ -8,9 +8,11 @@ import {
   DISTILLED_ADAPTER_MODEL_REVISION,
   DISTILLED_BASE_MODEL_ID,
   DISTILLED_BASE_MODEL_REVISION,
+  DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
   DISTILLED_MODEL_NAME,
   canaryRunpodServerlessDistilledLlm,
   provisionRunpodServerlessDistilledLlm,
+  reconcileRunpodServerlessDistilledEndpoint,
 } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
 
 export const runtime = 'nodejs'
@@ -22,6 +24,7 @@ const CANDIDATE_ID = 'study-plan:e23cb043-715e-4406-8898-421159fae2df'
 const ARTIFACT_HASH = 'bd7b151e75cc963d02597529b7256b755419dd20bcd2c36ca849e903d99421e4'
 const MIN_BALANCE_USD = 1
 const MAX_CANARY_INVOCATIONS = 3
+const CANARY_HTTP_ATTEMPTS_PER_INVOCATION = 2
 
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
@@ -189,11 +192,16 @@ export async function GET(req: NextRequest) {
         adapterModelRevision: DISTILLED_ADAPTER_MODEL_REVISION,
         workersMin: provisioned.workersMin,
         workersMax: provisioned.workersMax,
+        idleTimeout: provisioned.idleTimeout,
         gpuTypes: provisioned.gpuTypes,
         createdTemplate: provisioned.createdTemplate,
         createdEndpoint: provisioned.createdEndpoint,
         scaleToZero: provisioned.workersMin === 0,
       })
+    } else {
+      // Existing evidence may refer to an endpoint created under an older five-second idle policy.
+      // Reconcile it before any paid canary so the exact worker can remain warm for the evaluator.
+      await reconcileRunpodServerlessDistilledEndpoint(endpointId)
     }
 
     const refreshed = await events()
@@ -206,7 +214,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'distilled_canary_retry_ceiling', endpointId }, { status: 503 })
     }
 
-    const canary = await canaryRunpodServerlessDistilledLlm({ endpointId, attempts: 5, delayMs: 5000 })
+    const canary = await canaryRunpodServerlessDistilledLlm({
+      endpointId,
+      attempts: CANARY_HTTP_ATTEMPTS_PER_INVOCATION,
+      delayMs: 5000,
+      timeoutMs: DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
+    })
     if (!canary.ok) {
       await record('local_distilled_runtime_canary_failed', {
         endpointId,
@@ -214,6 +227,8 @@ export async function GET(req: NextRequest) {
         httpStatus: canary.httpStatus,
         error: canary.error,
         attemptOrdinal: failures + 1,
+        httpAttempts: CANARY_HTTP_ATTEMPTS_PER_INVOCATION,
+        attemptTimeoutMs: DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
         authorizationObservedAt: approvalObservedAt,
       })
       return NextResponse.json({ ok: false, deployed: true, canaryPassed: false, endpointId, error: canary.error }, { status: 503 })
@@ -228,6 +243,7 @@ export async function GET(req: NextRequest) {
       exactArtifact: true,
       scaleToZero: true,
       productionTrafficAuthorized: false,
+      httpAttemptsCeiling: CANARY_HTTP_ATTEMPTS_PER_INVOCATION,
       authorizationObservedAt: approvalObservedAt,
     })
     await recordProductionCanaryEvidence(await events(), endpointId, responseHash)

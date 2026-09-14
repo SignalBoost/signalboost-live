@@ -1,2 +1,2 @@
-base_sha=f630bd62fa0b3ad34b3c96bee291be9ea6ec9dd3
-branch=fix/distilled-runpod-worker-wrapper-v2-20260914
+base_sha=82453f177db5b24994ffe8b05b4c40939321a061
+branch=fix/distilled-legacy-queue-cleanup-20260914

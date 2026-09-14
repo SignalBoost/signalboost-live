@@ -10,6 +10,7 @@ import {
 } from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
 
 const provision = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledProvision.ts', import.meta.url), 'utf8')
+const cleanup = readFileSync(new URL('../lib/ai/cos/runpodServerlessLegacyQueueCleanup.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 
 test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
@@ -66,19 +67,39 @@ test('official RunPod endpoint health is captured around canary execution', () =
   assert.match(route, /healthAfter,/)
 })
 
-test('append-only host suspension overrides older approval without mutating assurance history', () => {
+test('append-only host suspension overrides older approval and performs only legacy queue cleanup', () => {
   assert.match(route, /SUSPEND_CLAIM = 'local_distilled_runtime_canary_suspended'/)
   assert.match(route, /function latestCanaryControl/)
   assert.match(route, /\[APPROVAL_CLAIM, SUSPEND_CLAIM\]/)
+  assert.match(route, /cleanupLegacyQueueEndpoints\(rows\)/)
   assert.match(route, /canary_suspended_by_host_controller/)
   const controlIndex = route.indexOf('const control = latestCanaryControl(rows)')
+  const cleanupIndex = route.indexOf('const cleanup = await cleanupLegacyQueueEndpoints(rows)')
   const approvalIndex = route.indexOf('const approval = validApproval(rows)')
-  assert.ok(controlIndex >= 0 && approvalIndex > controlIndex)
+  assert.ok(controlIndex >= 0 && cleanupIndex > controlIndex && approvalIndex > cleanupIndex)
+})
+
+test('legacy cleanup can only target provisioned endpoints superseded by the new load-balancer identity', () => {
+  assert.match(route, /function legacyQueueEndpointIds/)
+  assert.match(route, /evidence\?\.claim !== 'local_distilled_runtime_endpoint_provisioned'/)
+  assert.match(route, /String\(evidence\?\.endpointName \|\| ''\) === DISTILLED_ENDPOINT_NAME/)
+  assert.match(route, /String\(evidence\?\.routing \|\| ''\) === DISTILLED_ENDPOINT_ROUTING/)
+  assert.match(route, /if \(!isCurrentLoadBalancer\) ids\.add\(endpointId\)/)
+})
+
+test('legacy queue purge removes pending jobs only and is idempotently receipted', () => {
+  assert.match(cleanup, /\/purge-queue/)
+  assert.match(cleanup, /method:\s*'POST'/)
+  assert.match(cleanup, /runpodServerlessEndpointHealth\(endpointId\)/)
+  assert.doesNotMatch(cleanup, /\/cancel\//)
+  assert.doesNotMatch(cleanup, /workersMin|workersMax|templateId|train|chat\/completions/)
+  assert.match(route, /LEGACY_QUEUE_CLEANED_CLAIM/)
+  assert.match(route, /cleanupSucceeded:\s*true/)
+  assert.match(route, /already_cleaned/)
+  assert.match(route, /productionTrafficAuthorized:\s*false/)
 })
 
 test('the distilled runtime is addressed as a load-balancer endpoint, not through the job queue', () => {
-  // The public vLLM image implements no RunPod queue handler, so the queue URL shape can never be
-  // answered by this runtime. Routing must be LOAD_BALANCER and the address its own endpoint host.
   assert.equal(runpodServerlessOpenAiBaseUrl('abc_123'), 'https://abc_123.api.runpod.ai/v1')
   assert.throws(() => runpodServerlessOpenAiBaseUrl('../bad'), /endpoint id is invalid/)
   assert.match(provision, /\$\{baseUrl\}\/chat\/completions/)
@@ -90,8 +111,6 @@ test('the distilled runtime is addressed as a load-balancer endpoint, not throug
 })
 
 test('load-balancer port and health env can actually reach RunPod', () => {
-  // A template is created only when its name is absent, so the pre-existing queue-mode template
-  // would silently keep serving the old env. The name must move with the configuration.
   assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v1'/)
   assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v1'/)
   assert.match(provision, /templates\.find\(item => item\.name === DISTILLED_TEMPLATE_NAME/)
@@ -130,8 +149,10 @@ test('deployment requires explicit durable unexpired approval and does not autho
   assert.doesNotMatch(route, /RUNPOD_PRIMARY_MODE\s*=|RUNPOD_SERVERLESS_LLM_ENDPOINT_ID\s*=/)
 })
 
-test('private provider credentials are never returned or logged by the provisioner', () => {
+test('private provider credentials are never returned or logged by the provisioner or queue cleanup', () => {
   assert.match(provision, /HF_TOKEN/)
+  assert.match(cleanup, /RUNPOD_API_KEY/)
   assert.doesNotMatch(provision, /console\.(log|info|warn|error).*HF_TOKEN/)
+  assert.doesNotMatch(cleanup, /console\.(log|info|warn|error).*RUNPOD_API_KEY/)
   assert.doesNotMatch(route, /RUNPOD_API_KEY.*NextResponse|HF_TOKEN.*NextResponse/)
 })

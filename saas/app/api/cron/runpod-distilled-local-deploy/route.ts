@@ -30,7 +30,7 @@ async function events() {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const result = await db.from('cos_university_learning_assurance_events')
-    .select('evidence,observed_at,verifier')
+    .select('evidence,observed_at,expires_at,verifier')
     .eq('event_type', 'fine_tune')
     .eq('candidate_id', CANDIDATE_ID)
     .order('observed_at', { ascending: false })
@@ -43,6 +43,26 @@ function matching(rows: any[], claim: string) {
   return rows.find(row => row?.evidence?.profile === PROFILE
     && row?.evidence?.claim === claim
     && row?.evidence?.artifactHash === ARTIFACT_HASH)
+}
+
+function validApproval(rows: any[], now = new Date()) {
+  const nowMs = now.getTime()
+  return rows.find(row => {
+    const evidence = row?.evidence
+    const observedAt = Date.parse(String(row?.observed_at || ''))
+    const expiresAt = Date.parse(String(row?.expires_at || ''))
+    return row?.verifier === 'host_controller'
+      && evidence?.profile === PROFILE
+      && evidence?.claim === 'local_distilled_runtime_deploy_approved'
+      && evidence?.artifactHash === ARTIFACT_HASH
+      && evidence?.canaryAuthorized === true
+      && evidence?.productionTrafficAuthorized === false
+      && evidence?.authorityExpanded === false
+      && Number.isFinite(observedAt)
+      && Number.isFinite(expiresAt)
+      && observedAt <= nowMs
+      && expiresAt > nowMs
+  })
 }
 
 async function record(claim: string, evidence: Record<string, unknown>) {
@@ -78,9 +98,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const rows = await events()
-    const approval = matching(rows, 'local_distilled_runtime_deploy_approved')
-    if (!approval || approval?.evidence?.canaryAuthorized !== true) {
-      return NextResponse.json({ ok: true, skipped: true, reason: 'explicit_owner_approval_missing' })
+    const approval = validApproval(rows)
+    if (!approval) {
+      return NextResponse.json({ ok: true, skipped: true, reason: 'explicit_owner_approval_missing_or_expired' })
     }
 
     const passed = matching(rows, 'local_distilled_runtime_canary_passed')
@@ -128,7 +148,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'distilled_canary_retry_ceiling', endpointId }, { status: 503 })
     }
 
-    const canary = await canaryRunpodServerlessDistilledLlm({ endpointId, attempts: 8, delayMs: 8000 })
+    const canary = await canaryRunpodServerlessDistilledLlm({ endpointId, attempts: 5, delayMs: 5000 })
     if (!canary.ok) {
       await record('local_distilled_runtime_canary_failed', {
         endpointId,

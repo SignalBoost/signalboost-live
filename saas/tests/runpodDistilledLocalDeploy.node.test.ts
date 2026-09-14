@@ -27,26 +27,42 @@ test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
 test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and temporarily warm', () => {
   assert.equal(DISTILLED_IDLE_TIMEOUT_SECONDS, 900)
   assert.equal(DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS, 120_000)
-  assert.match(provision, /workersMin:\s*0/)
-  assert.match(provision, /workersMax:\s*1/)
+  assert.match(provision, /min:\s*0/)
+  assert.match(provision, /max:\s*1/)
   assert.match(provision, /idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
   assert.match(provision, /NVIDIA RTX A4000/)
   assert.match(provision, /NVIDIA RTX A4500/)
   assert.match(provision, /NVIDIA RTX 4000 Ada Generation/)
 })
 
-test('RunPod endpoint POST and PATCH follow the documented REST contract', () => {
+test('RunPod creation stays v1-compatible while reconciliation follows current REST v2 Serverless contract', () => {
+  assert.match(provision, /const REST = 'https:\/\/rest\.runpod\.io\/v1'/)
+  assert.match(provision, /const CONTROL_API_V2 = 'https:\/\/api\.runpod\.io\/v2'/)
   assert.match(provision, /name:\s*DISTILLED_ENDPOINT_NAME/)
   assert.match(provision, /templateId:\s*template\.id/)
   assert.match(provision, /gpuTypeIds:\s*GPU_TYPES/)
-  assert.match(provision, /scalerType:\s*'REQUEST_COUNT'/)
-  assert.match(provision, /scalerValue:\s*1/)
-  assert.match(provision, /`\/endpoints\/\$\{encodeURIComponent\(id\)\}`/)
-  assert.match(provision, /method:\s*'PATCH'/)
+  assert.match(provision, /requestV2<RunpodEndpointV2>/)
+  assert.match(provision, /`\/serverless\/\$\{encodeURIComponent\(id\)\}`/)
+  assert.match(provision, /workers:\s*\{[\s\S]*min:\s*0,[\s\S]*max:\s*1,[\s\S]*idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
+  assert.match(provision, /scaling:\s*\{[\s\S]*type:\s*'REQUEST_COUNT',[\s\S]*requestCount:\s*1/)
+  assert.match(provision, /timeout:\s*300_000/)
+  assert.match(provision, /flashboot:\s*'FLASHBOOT'/)
   assert.doesNotMatch(provision, /gpuTypePriority\s*:/)
   assert.doesNotMatch(provision, /volumeInGb\s*:/)
   assert.doesNotMatch(provision, /volumeMountPath\s*:/)
   assert.match(provision, /containerDiskInGb:\s*50/)
+})
+
+test('v2 reconciliation never sends the rejected flat v1 update fields', () => {
+  const policyStart = provision.indexOf('function endpointV2PolicyPayload()')
+  const policyEnd = provision.indexOf('export async function reconcileRunpodServerlessDistilledEndpoint')
+  assert.ok(policyStart >= 0 && policyEnd > policyStart)
+  const policy = provision.slice(policyStart, policyEnd)
+  assert.doesNotMatch(policy, /executionTimeoutMs\s*:/)
+  assert.doesNotMatch(policy, /scalerType\s*:/)
+  assert.doesNotMatch(policy, /scalerValue\s*:/)
+  assert.doesNotMatch(policy, /workersMin\s*:/)
+  assert.doesNotMatch(policy, /workersMax\s*:/)
 })
 
 test('existing endpoint policy is reconciled before a paid canary', () => {
@@ -116,28 +132,38 @@ test('load-balancer port and health env can actually reach RunPod', () => {
   assert.match(provision, /templates\.find\(item => item\.name === DISTILLED_TEMPLATE_NAME/)
 })
 
-test('routing mode is fixed at creation and never sent on the update policy payload', () => {
-  const policyStart = provision.indexOf('function endpointPolicyPayload()')
+test('routing mode is fixed at creation and never sent on the v2 update policy payload', () => {
+  const policyStart = provision.indexOf('function endpointV2PolicyPayload()')
   const policyEnd = provision.indexOf('export async function reconcileRunpodServerlessDistilledEndpoint')
   assert.ok(policyStart >= 0 && policyEnd > policyStart)
-  assert.doesNotMatch(provision.slice(policyStart, policyEnd), /type:/)
+  assert.doesNotMatch(provision.slice(policyStart, policyEnd), /type:\s*DISTILLED_ENDPOINT_ROUTING/)
 })
 
 test('gpu pool constraints are creation-only and never resent by routine reconciliation', () => {
-  const policyStart = provision.indexOf('function endpointPolicyPayload()')
+  const policyStart = provision.indexOf('function endpointV2PolicyPayload()')
   const policyEnd = provision.indexOf('export async function reconcileRunpodServerlessDistilledEndpoint')
   const creationStart = provision.indexOf("name: DISTILLED_ENDPOINT_NAME")
-  const creationEnd = provision.indexOf('...endpointPolicyPayload()', creationStart)
+  const creationEnd = provision.indexOf('...legacyEndpointCreationPolicyPayload()', creationStart)
   assert.ok(policyStart >= 0 && policyEnd > policyStart)
   assert.ok(creationStart >= 0 && creationEnd > creationStart)
   const policy = provision.slice(policyStart, policyEnd)
   const creation = provision.slice(creationStart, creationEnd)
   assert.doesNotMatch(policy, /gpuCount\s*:|gpuTypeIds\s*:/)
-  assert.match(policy, /workersMin:\s*0/)
-  assert.match(policy, /workersMax:\s*1/)
+  assert.match(policy, /min:\s*0/)
+  assert.match(policy, /max:\s*1/)
   assert.match(policy, /idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
   assert.match(creation, /gpuCount:\s*1/)
   assert.match(creation, /gpuTypeIds:\s*GPU_TYPES/)
+})
+
+test('v2 reconciliation validates returned routing and bounded worker policy before canary use', () => {
+  assert.match(provision, /endpoint\.type && endpoint\.type !== DISTILLED_ENDPOINT_ROUTING/)
+  assert.match(provision, /endpoint\.workers\?\.min/)
+  assert.match(provision, /endpoint\.workers\?\.max/)
+  assert.match(provision, /endpoint\.workers\?\.idleTimeout/)
+  assert.match(provision, /endpoint\.scaling\?\.type/)
+  assert.match(provision, /endpoint\.scaling\?\.requestCount/)
+  assert.match(provision, /endpoint\.timeout/)
 })
 
 test('a previously provisioned endpoint is only reused when its name and routing still match', () => {

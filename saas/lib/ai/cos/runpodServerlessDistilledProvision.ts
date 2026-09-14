@@ -2,6 +2,7 @@
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 
 const REST = 'https://rest.runpod.io/v1'
+const CONTROL_API_V2 = 'https://api.runpod.io/v2'
 const SERVERLESS_API = 'https://api.runpod.ai/v2'
 // Templates are looked up by name and never patched, so any change to image, ports or env only
 // takes effect under a new name. The load-balancer port/health env below is exactly such a change.
@@ -40,6 +41,15 @@ type RunpodEndpoint = {
   scalerType?: string
   scalerValue?: number
   gpuTypeIds?: string[]
+}
+type RunpodEndpointV2 = {
+  id: string
+  name: string
+  type?: 'QUEUE' | 'LOAD_BALANCER'
+  workers?: { min?: number; max?: number; idleTimeout?: number }
+  scaling?: { type?: string; requestCount?: number; queueDelay?: number }
+  timeout?: number
+  flashboot?: string
 }
 
 export type RunpodServerlessHealth = Readonly<{
@@ -105,6 +115,32 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (!response.ok) {
       const detail = safeRunpodErrorDetail(raw)
       throw new Error(`RunPod REST HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
+    }
+    return raw ? JSON.parse(raw) as T : {} as T
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function requestV2<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const key = configuredRunpodApiKey()
+  if (!key) throw new Error('RUNPOD_API_KEY is not configured')
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const response = await fetch(`${CONTROL_API_V2}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.headers || {}),
+      },
+    })
+    const raw = await response.text()
+    if (!response.ok) {
+      const detail = safeRunpodErrorDetail(raw)
+      throw new Error(`RunPod REST v2 HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
     }
     return raw ? JSON.parse(raw) as T : {} as T
   } finally {
@@ -189,21 +225,33 @@ export async function runpodServerlessEndpointHealth(endpointId: string): Promis
   }
 }
 
-/**
- * Mutable endpoint runtime policy only. GPU pool/count are creation-time constraints and are kept
- * out of routine PATCH reconciliation because RunPod's load-balancer update contract rejects them.
- */
-function endpointPolicyPayload() {
+/** Legacy v1 creation policy. Existing endpoint creation remains unchanged during the v2 reconcile repair. */
+function legacyEndpointCreationPolicyPayload() {
   return {
     executionTimeoutMs: 300_000,
     flashboot: true,
-    // Keep scale-to-zero, but hold a successfully started worker long enough for the independently
-    // scheduled evaluator to reuse the loaded base+adapter instead of redownloading on every call.
     idleTimeout: DISTILLED_IDLE_TIMEOUT_SECONDS,
     scalerType: 'REQUEST_COUNT',
     scalerValue: 1,
     workersMax: 1,
     workersMin: 0,
+  }
+}
+
+/** Current RunPod REST v2 Serverless PATCH contract. Only mutable runtime policy is sent. */
+function endpointV2PolicyPayload() {
+  return {
+    workers: {
+      min: 0,
+      max: 1,
+      idleTimeout: DISTILLED_IDLE_TIMEOUT_SECONDS,
+    },
+    scaling: {
+      type: 'REQUEST_COUNT',
+      requestCount: 1,
+    },
+    timeout: 300_000,
+    flashboot: 'FLASHBOOT',
   }
 }
 
@@ -215,16 +263,28 @@ export async function reconcileRunpodServerlessDistilledEndpoint(endpointId: str
 }> {
   const id = endpointId.trim()
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
-  const endpoint = await request<RunpodEndpoint>(`/endpoints/${encodeURIComponent(id)}`, {
+  const endpoint = await requestV2<RunpodEndpointV2>(`/serverless/${encodeURIComponent(id)}`, {
     method: 'PATCH',
-    body: JSON.stringify(endpointPolicyPayload()),
+    body: JSON.stringify(endpointV2PolicyPayload()),
   })
-  const workersMin = Number(endpoint.workersMin ?? 0)
-  const workersMax = Number(endpoint.workersMax ?? 1)
-  const idleTimeout = Number(endpoint.idleTimeout ?? DISTILLED_IDLE_TIMEOUT_SECONDS)
+  if (endpoint.type && endpoint.type !== DISTILLED_ENDPOINT_ROUTING) {
+    throw new Error('RunPod distilled endpoint routing no longer matches load-balancer policy')
+  }
+  const workersMin = Number(endpoint.workers?.min ?? 0)
+  const workersMax = Number(endpoint.workers?.max ?? 1)
+  const idleTimeout = Number(endpoint.workers?.idleTimeout ?? DISTILLED_IDLE_TIMEOUT_SECONDS)
   if (workersMin !== 0) throw new Error('RunPod distilled endpoint is not scale-to-zero')
   if (workersMax > 1) throw new Error('RunPod distilled endpoint exceeds the approved one-worker ceiling')
   if (idleTimeout > DISTILLED_IDLE_TIMEOUT_SECONDS) throw new Error('RunPod distilled endpoint exceeds the approved warm-window ceiling')
+  if (endpoint.scaling?.type && endpoint.scaling.type !== 'REQUEST_COUNT') {
+    throw new Error('RunPod distilled endpoint scaler no longer matches request-count policy')
+  }
+  if (Number(endpoint.scaling?.requestCount ?? 1) > 1) {
+    throw new Error('RunPod distilled endpoint exceeds the approved request-count scaler threshold')
+  }
+  if (Number(endpoint.timeout ?? 300_000) > 300_000) {
+    throw new Error('RunPod distilled endpoint exceeds the approved request timeout ceiling')
+  }
   return { endpointId: endpoint.id || id, workersMin, workersMax, idleTimeout }
 }
 
@@ -289,7 +349,7 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
         // GPU constraints are creation-time-only and are deliberately not resent by reconciliation.
         gpuCount: 1,
         gpuTypeIds: GPU_TYPES,
-        ...endpointPolicyPayload(),
+        ...legacyEndpointCreationPolicyPayload(),
       }),
     })
     createdEndpoint = true

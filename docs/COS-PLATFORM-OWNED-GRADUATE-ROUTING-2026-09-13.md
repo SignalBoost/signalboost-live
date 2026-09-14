@@ -54,19 +54,24 @@ Graduate registry `runtime_profile` is host-controlled:
 - `graduate_ai` — separately configured iTMounts graduate endpoint.
 - `local_ai` — reuses the existing OpenAI-compatible transport only when that transport is explicitly bound to the graduate runtime model.
 
-For `graduate_ai`, runtime secrets and URLs stay in environment configuration, not Supabase:
+For `graduate_ai`, runtime secrets and URLs stay in environment configuration, not Supabase. The host must bind the serving model to the exact immutable training artifact:
 
 ```text
 COS_GRADUATE_AI_BASE_URL
 COS_GRADUATE_AI_ALLOWED_HOSTS
 COS_GRADUATE_AI_PROVIDER
+COS_GRADUATE_AI_MODEL
+COS_GRADUATE_AI_ARTIFACT_ID
+COS_GRADUATE_AI_ARTIFACT_HASH
 COS_GRADUATE_AI_API_KEY   # or HF_TOKEN for an explicitly approved protected HF endpoint
 COS_GRADUATE_AI_TIMEOUT_MS
 COS_GRADUATE_AI_ALLOW_BASE_FALLBACK
 COS_GRADUATE_ROUTING_ENABLED
 ```
 
-No active graduate is inferred from these variables alone. The exact artifact must first clear the independent promotion/activation evidence gates and be bound in the graduate registry.
+No active graduate is inferred from these variables alone. The exact artifact must first clear the independent promotion gates, then `/models` health binds the endpoint into `canary`, and finally a no-fallback graduate canary must pass before the row becomes `active`.
+
+The canary invocation is separately owner-confirmed because it is an inference request against an already provisioned endpoint. Endpoint provisioning or model serving remains a separate cost-bearing action.
 
 ## Cache and observability
 

@@ -1,6 +1,6 @@
 // tests/mainWriteDiscipline.node.test.ts
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
@@ -119,7 +119,7 @@ test('every gated test file is a real test, not source code pasted into a test p
     if (headerPath && /\.(?:ts|tsx|js|mjs|cjs)$/.test(headerPath)) {
       assert.ok(
         /(?:^|\/)tests\//.test(headerPath),
-        `${name}: first-line path comment points outside tests/ ("${headerPath}") — a source file was pasted into a test path`,
+        `${name}: first-line path comment points outside tests/ ("${headerPath}") — a source file was pasted into this test path`,
       )
     }
 
@@ -129,5 +129,41 @@ test('every gated test file is a real test, not source code pasted into a test p
       /from ['"]next\/server['"]/,
       `${name}: imports next/server — route/source code was pasted into this test file`,
     )
+  }
+})
+
+test('test files cannot import missing bare siblings', () => {
+  const testsDir = new URL('./', import.meta.url)
+  const files = readdirSync(testsDir, { withFileTypes: true })
+    .filter(entry => entry.isFile() && entry.name.endsWith('.node.test.ts'))
+    .map(entry => entry.name)
+
+  for (const name of files) {
+    const fileUrl = new URL(name, testsDir)
+    const source = readFileSync(fileUrl, 'utf8')
+    const specifiers = [
+      ...source.matchAll(/\bfrom\s+['"](\.\/[^'"]+\.(?:ts|tsx|js|mjs|cjs))['"]/g),
+      ...source.matchAll(/^\s*import\s+['"](\.\/[^'"]+\.(?:ts|tsx|js|mjs|cjs))['"]/gm),
+    ].map(match => match[1])
+
+    for (const specifier of specifiers) {
+      assert.equal(
+        existsSync(fileURLToPath(new URL(specifier, fileUrl))),
+        true,
+        `${name}: imports missing sibling ${specifier}; likely source code was copied into tests/`,
+      )
+    }
+  }
+})
+
+test('critical release regressions cannot sit dead outside the COS gate', () => {
+  const gate = readFileSync(new URL('../scripts/vercel-cos-gates.mjs', import.meta.url), 'utf8')
+  const criticalReleaseTests = [
+    'tests/releaseSignalSeverity.node.test.ts',
+    'tests/powerStabilizationRelease.node.test.ts',
+  ]
+
+  for (const relative of criticalReleaseTests) {
+    assert.ok(gate.includes(`'${relative}'`), `${relative}: critical regression is not registered in the COS gate`)
   }
 })

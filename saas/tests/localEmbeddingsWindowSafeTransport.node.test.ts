@@ -1,13 +1,14 @@
 // saas/tests/localEmbeddingsWindowSafeTransport.node.test.ts
 //
 // Execute the dependency-free retry functions with a fake provider, and check transport
-// wiring separately. This avoids the module's Next.js path aliases in the bare Node runner.
+// wiring separately. The mature transport implementation now lives unchanged in
+// localEmbeddingsLegacy.ts; localEmbeddings.ts is the provider-selection wrapper.
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { stripTypeScriptTypes } from 'node:module'
 
-const SOURCE = readFileSync('lib/ai/cos/localEmbeddings.ts', 'utf8')
+const SOURCE = readFileSync('lib/ai/cos/localEmbeddingsLegacy.ts', 'utf8')
 
 // Execute the actual retry implementation with a fake transport; no Next.js aliases or
 // provider credentials are needed. Keep source checks below for transport wiring.
@@ -61,9 +62,6 @@ test('persistent overflow still stops at the bounded retry limit', async () => {
 })
 
 test('the native transport is wrapped in the context-window retry', () => {
-  // Production log, 2026-08-26: "You passed 513 input tokens ... context length is only 512".
-  // nomic-embed-text has a 512-token window and any substantial question exceeds it, so an
-  // unprotected transport fails hard and silently disables semantic cache for long prompts.
   assert.match(
     SOURCE,
     /requestEmbeddingsWindowSafe\(texts, config, model, requestNativeEmbeddings\)/,
@@ -87,8 +85,6 @@ test('the retry wrapper accepts a transport rather than hard-coding one', () => 
 })
 
 test('the batch retry path forwards the transport to each single retry', () => {
-  // A batch response does not say which item overflowed, so each is retried individually. If the
-  // transport were not forwarded, a native batch would silently retry on the OpenAI endpoint.
   assert.match(
     SOURCE,
     /requestSingleEmbeddingWindowSafe\(text, config, model, undefined, request\)/,
@@ -96,7 +92,6 @@ test('the batch retry path forwards the transport to each single retry', () => {
 })
 
 test('the context-window detector still matches the provider error shape', () => {
-  // Both clauses are required: the body must mention input tokens AND a limit.
   assert.match(SOURCE, /body\.includes\('input tokens'\)/)
   assert.match(SOURCE, /body\.includes\('context length'\)/)
   assert.match(SOURCE, /body\.includes\('maximum input length'\)/)

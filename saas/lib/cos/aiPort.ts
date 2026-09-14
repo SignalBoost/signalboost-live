@@ -7,6 +7,7 @@ import { callCosText } from '@/lib/cos/textGateway'
 import { requireBuilderCodingModel } from '@/lib/ai/cos/platformIdentityContext'
 import { activeGraduateRuntimesForRole } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { currentReasoningEvaluationContext } from '@/lib/ai/cos/reasoningEvaluationContext'
+import { tryRunpodPrimaryInference } from '@/lib/ai/cos/runpodPrimaryInference'
 import { freshVisualPrompt } from '@/lib/visuals/freshGeneration'
 
 export interface CosAiPort {
@@ -17,11 +18,7 @@ export type ExternalTeacherProvider = Exclude<ModelProvider, 'local'>
 
 type GraduateAttempt = Readonly<{ text: string | null; attempted: boolean }>
 
-/**
- * Reuse the same independently promoted + active graduate registry as the COS control plane.
- * Academic/controlled-comparison contexts remain excluded, and role/problem scope comes from the
- * activation evidence rather than from a hard-coded "all graduates can do everything" rule.
- */
+/** Independently promoted active graduates remain the highest-priority iTMounts-owned workers. */
 async function tryActiveGraduate(
   role: 'primary' | 'coder',
   input: { prompt: string; systemPrompt?: string; maxTokens?: number },
@@ -45,7 +42,7 @@ async function tryActiveGraduate(
         purpose: `${runtime.subjectId}:${role}`,
       },
     }, runtime.inference).catch(error => {
-      console.warn('[platform-graduate-routing] graduate failed; base runtime remains available', JSON.stringify({
+      console.warn('[platform-graduate-routing] graduate failed; lower-priority runtime remains available', JSON.stringify({
         candidateId: runtime.candidateId,
         artifactId: runtime.trainedArtifactId,
         role,
@@ -58,10 +55,7 @@ async function tryActiveGraduate(
   return { text: null, attempted: true }
 }
 
-/**
- * Execution path: no default, no substitution. An unset DEEPINFRA_BUILDER_MODEL throws
- * `builder_model_not_configured` rather than quietly sending a guessed model to the provider.
- */
+/** Existing DeepInfra Builder model remains the emergency/fallback coding model. */
 export function builderCodingModelFromEnv(): string {
   return requireBuilderCodingModel()
 }
@@ -72,30 +66,40 @@ function requireText(result: string | null, provider: string): string {
 }
 
 /**
- * First-party iTMounts/COS text generation now checks an active, scoped iTMounts graduate first.
- * When no relevant graduate is active (or it fails), the existing governed open-model gateway is the
- * bounded fallback. This extends University adoption to Portables/autonomy/business generators, not
- * only the COS reasoning-engine worker pool.
+ * Platform text priority:
+ * 1. active subject-relevant iTMounts graduate;
+ * 2. iTMounts RunPod primary reasoner;
+ * 3. existing DeepInfra/open-model gateway fallback.
  */
 export function createPlatformAiPort(): CosAiPort {
   return {
     generate: async (input) => {
       const graduate = await tryActiveGraduate('primary', input)
       if (graduate.text) return graduate.text
+
+      const runpod = currentReasoningEvaluationContext()
+        ? { text: null, attempted: false }
+        : await tryRunpodPrimaryInference({
+            prompt: input.prompt,
+            systemPrompt: input.systemPrompt,
+            maxTokens: input.maxTokens,
+            usageContext: { feature: 'platform_runpod_primary', purpose: 'portable_text' },
+          }, 'reasoner')
+      if (runpod.text) return runpod.text
+
       return requireText(
         await callCosText({ ...input, modelPreference: 'local', taskId: 'cos-portable-text' }),
-        graduate.attempted ? 'platform fallback' : 'platform',
+        graduate.attempted || runpod.attempted ? 'platform fallback' : 'platform',
       )
     },
   }
 }
 
 /**
- * Coding-specialist port for Builder and Platform Engineer.
- *
- * An active coder-scoped graduate may run first. A reasoning-only graduate cannot enter this path
- * because activeGraduateRuntimesForRole requires the registry's exact worker/problem scope. The
- * ordinary Builder coding model remains directly behind it as the deterministic fallback.
+ * Builder priority:
+ * 1. active coder-scoped graduate;
+ * 2. RunPod primary coding/reasoning model;
+ * 3. DeepSeek V4 Pro on DeepInfra as bounded fallback.
  */
 export function createBuilderCodingAiPort(): CosAiPort {
   return {
@@ -103,24 +107,36 @@ export function createBuilderCodingAiPort(): CosAiPort {
       const graduate = await tryActiveGraduate('coder', input, { coding: true })
       if (graduate.text) return graduate.text
 
+      const runpod = currentReasoningEvaluationContext()
+        ? { text: null, attempted: false }
+        : await tryRunpodPrimaryInference({
+            prompt: input.prompt,
+            systemPrompt: input.systemPrompt,
+            maxTokens: input.maxTokens,
+            frequencyPenalty: 0,
+            presencePenalty: 0,
+            jsonObject: true,
+            usageContext: { feature: 'builder_runpod_primary', purpose: 'coding_harness' },
+          }, 'builder')
+      if (runpod.text) return runpod.text
+
       const config = localInferenceConfigFromEnv()
+      const ownedAttempted = graduate.attempted || runpod.attempted
       return requireText(await callLocalModel({
         prompt: input.prompt,
         systemPrompt: input.systemPrompt,
         maxTokens: input.maxTokens,
-        // Source code is legitimately repetitive. The prose reasoner's repetition penalties
-        // accumulate over a generated file and push the sampler off valid syntax, so coding
-        // calls generate unpenalised.
         frequencyPenalty: 0,
         presencePenalty: 0,
-        // The control object must be JSON. Provider-enforced JSON mode removes the class of
-        // failures where source quoting or escaping breaks the surrounding envelope.
         jsonObject: true,
-        usageContext: { feature: 'builder', purpose: graduate.attempted ? 'coding_harness_fallback_from_owned' : 'coding_harness' },
+        usageContext: {
+          feature: 'builder',
+          purpose: ownedAttempted ? 'coding_harness_fallback_from_owned' : 'coding_harness',
+        },
       }, {
         ...config,
         model: builderCodingModelFromEnv(),
-        fallbackFromOwned: graduate.attempted,
+        fallbackFromOwned: ownedAttempted,
       }), 'builder coding')
     },
   }
@@ -150,8 +166,8 @@ export interface CosImagePort {
 export function createPlatformImagePort(): CosImagePort {
   return {
     async generate({ prompt, size = '1024x1024' }): Promise<CosImageResult> {
-      // Text-graduate routing does not repurpose a text model as a visual model. Visual creation
-      // remains on its separately approved runtime until a visual graduate has its own governed path.
+      // Visual creation remains on its separately approved runtime; the text RunPod primary does not
+      // repurpose itself as an image worker.
       const key = process.env.LOCAL_AI_API_KEY?.trim()
       const baseUrl = (process.env.LOCAL_AI_BASE_URL || '').replace(/\/$/, '')
       if (!key || !/^https:\/\/api\.deepinfra\.com\/v1\/openai$/i.test(baseUrl)) {

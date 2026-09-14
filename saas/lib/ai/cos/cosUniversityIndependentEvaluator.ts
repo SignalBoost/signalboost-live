@@ -1,5 +1,4 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto'
-import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import {
   FINE_TUNE_EVIDENCE_PROFILE,
   fineTuneRevisionKey,
@@ -42,6 +41,11 @@ const EVALUATOR_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{2,239}$/
 
 function clean(value: unknown, max = 2000): string {
   return String(value ?? '').trim().slice(0, max)
+}
+
+async function serviceDb() {
+  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
+  return cosServiceDb()
 }
 
 function sha256(value: unknown): string {
@@ -199,7 +203,7 @@ export async function recordIndependentEvaluatorEvidence(input: {
     if (teacher === payload.evaluatorId) throw new Error('independent_evaluator_teacher_separation_required')
   }
 
-  const db = cosServiceDb()
+  const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
   const revisionKey = fineTuneRevisionKey(payload.revision)
   const evidence = {

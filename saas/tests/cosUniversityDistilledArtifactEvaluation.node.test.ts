@@ -46,6 +46,22 @@ test('independent evaluator cannot dispatch new training', () => {
   assert.match(route, /runUniversityDistilledArtifactEvaluation/)
 })
 
+test('evaluator-only signing key falls back to service-only Vault without sharing learner credentials', () => {
+  const evaluatorAuth = source('../lib/ai/cos/cosUniversityIndependentEvaluator.ts')
+  const route = source('../app/api/cron/cos-university-distilled-evaluation/route.ts')
+  const migration = source('../supabase/migrations/20260914130000_cos_independent_evaluator_vault_secret.sql')
+  assert.match(evaluatorAuth, /independentEvaluatorConfigFromEnv\(\)/)
+  assert.match(evaluatorAuth, /cos_read_independent_evaluator_secret/)
+  assert.match(route, /await independentEvaluatorConfig\(\)/)
+  assert.match(route, /process\.env\.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator\.secret/)
+  assert.match(migration, /vault\.create_secret/)
+  assert.match(migration, /gen_random_bytes\(48\)/)
+  assert.match(migration, /security definer/)
+  assert.match(migration, /revoke all on function public\.cos_read_independent_evaluator_secret\(\) from public, anon, authenticated/)
+  assert.match(migration, /grant execute on function public\.cos_read_independent_evaluator_secret\(\) to service_role/)
+  assert.doesNotMatch(migration, /RUNPOD_API_KEY|LOCAL_AI_API_KEY|TRAINING_EXECUTOR_SECRET/)
+})
+
 test('fresh canary authorization owns a fresh retry budget and produces promotion evidence', () => {
   const route = source('../app/api/cron/runpod-distilled-local-deploy/route.ts')
   assert.match(route, /approvalObservedAt/)
@@ -57,8 +73,8 @@ test('fresh canary authorization owns a fresh retry budget and produces promotio
   assert.match(route, /productionTrafficAuthorized: false/)
 })
 
-test('Vercel schedules evaluation independently of training cadence', () => {
+test('Vercel schedules evaluation independently and spaces canaries beyond their cold-start envelope', () => {
   const config = JSON.parse(source('../vercel.json'))
   assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/cos-university-distilled-evaluation')?.schedule, '*/10 * * * *')
-  assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/runpod-distilled-local-deploy')?.schedule, '* * * * *')
+  assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/runpod-distilled-local-deploy')?.schedule, '*/5 * * * *')
 })

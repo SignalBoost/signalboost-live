@@ -15,6 +15,7 @@ import {
   reconcileRunpodServerlessDistilledEndpoint,
   runpodServerlessEndpointHealth,
 } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
+import { reconcileRunpodServerlessDistilledWorkerTemplate } from '@/lib/ai/cos/runpodServerlessDistilledWorkerRepair'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -214,9 +215,19 @@ export async function GET(req: NextRequest) {
         createdEndpoint: provisioned.createdEndpoint,
         scaleToZero: provisioned.workersMin === 0,
       })
-    } else {
-      await reconcileRunpodServerlessDistilledEndpoint(endpointId)
     }
+
+    // RunPod's queue-based OpenAI Serverless surface requires the worker-vllm wrapper. Reconcile the
+    // existing template before a paid canary so the endpoint cannot run a bare HTTP server that never
+    // registers a Serverless worker loop. The immutable adapter revision is downloaded before wrapper start.
+    const worker = await reconcileRunpodServerlessDistilledWorkerTemplate(endpointId)
+    await reconcileRunpodServerlessDistilledEndpoint(endpointId)
+    await record('local_distilled_runtime_worker_reconciled', {
+      endpointId,
+      imageName: worker.imageName,
+      exactAdapterRevision: worker.exactAdapterRevision,
+      productionTrafficAuthorized: false,
+    })
 
     const refreshed = await events()
     const approvalFloor = Date.parse(approvalObservedAt)

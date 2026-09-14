@@ -6,6 +6,7 @@ import {
 } from '@/lib/ai/local-inference'
 import { configuredRunpodPodId, runpodControlConfigured, runpodPrimaryBaseUrl } from '@/lib/ai/cos/runpodConfig'
 import { ensureRunpodReasonerStarted } from '@/lib/ai/cos/runpodLifecycle'
+import { resolveRunpodPrimaryPodId } from '@/lib/ai/cos/runpodPodResolver'
 import { runpodGatewayKey } from '@/lib/hub/runpodTelemetry'
 
 export type RunpodPrimaryWorkload = 'reasoner' | 'builder'
@@ -24,6 +25,7 @@ const HEALTH_INTERVAL_MS = 2_000
 
 let readyUntil = 0
 let readyModel = ''
+let readyPodId = ''
 let readinessPromise: Promise<boolean> | null = null
 
 export function runpodPrimaryEnabled(): boolean {
@@ -38,8 +40,7 @@ export function runpodPrimaryModel(workload: RunpodPrimaryWorkload): string {
   return explicit || process.env.RUNPOD_PRIMARY_MODEL?.trim() || DEFAULT_REASONER_MODEL
 }
 
-export function runpodPrimaryConfig(workload: RunpodPrimaryWorkload): LocalInferenceConfig {
-  const podId = configuredRunpodPodId()
+export function runpodPrimaryConfig(workload: RunpodPrimaryWorkload, podId = configuredRunpodPodId()): LocalInferenceConfig {
   const baseUrl = runpodPrimaryBaseUrl(podId)
   if (!podId || !baseUrl) throw new Error('runpod_primary_pod_not_configured')
   const timeoutMsRaw = Number(process.env.RUNPOD_PRIMARY_TIMEOUT_MS || process.env.LOCAL_AI_TIMEOUT_MS || '120000')
@@ -58,9 +59,9 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-async function proveReady(workload: RunpodPrimaryWorkload): Promise<boolean> {
-  const config = runpodPrimaryConfig(workload)
-  if (readyModel === config.model && readyUntil > Date.now()) return true
+async function proveReady(workload: RunpodPrimaryWorkload, podId: string): Promise<boolean> {
+  const config = runpodPrimaryConfig(workload, podId)
+  if (readyPodId === podId && readyModel === config.model && readyUntil > Date.now()) return true
   if (readinessPromise) return readinessPromise
 
   readinessPromise = (async () => {
@@ -73,6 +74,7 @@ async function proveReady(workload: RunpodPrimaryWorkload): Promise<boolean> {
     while (Date.now() < deadline) {
       const health = await checkLocalInferenceHealth(config)
       if (health.ok && health.model === config.model) {
+        readyPodId = podId
         readyModel = config.model
         readyUntil = Date.now() + READY_TTL_MS
         return true
@@ -90,6 +92,28 @@ async function proveReady(workload: RunpodPrimaryWorkload): Promise<boolean> {
 }
 
 /**
+ * Resolve and prove the iTMounts RunPod primary serving configuration without dispatching inference.
+ * A stale configured pod id may be recovered only through the authenticated canonical-pod resolver.
+ */
+export async function resolveReadyRunpodPrimaryConfig(
+  workload: RunpodPrimaryWorkload,
+): Promise<LocalInferenceConfig | null> {
+  if (!runpodPrimaryEnabled()) return null
+  try {
+    const podId = await resolveRunpodPrimaryPodId()
+    const ready = await proveReady(workload, podId)
+    return ready ? runpodPrimaryConfig(workload, podId) : null
+  } catch (error) {
+    console.warn('[runpod-primary-resolution]', JSON.stringify({
+      workload,
+      ready: false,
+      reason: error instanceof Error ? error.message : String(error),
+    }))
+    return null
+  }
+}
+
+/**
  * Try iTMounts-controlled RunPod first. Failure is explicit and non-terminal: callers decide whether
  * the existing DeepInfra runtime is an acceptable bounded fallback for that workload.
  */
@@ -101,11 +125,11 @@ export async function tryRunpodPrimaryInference(
     return { text: null, attempted: false, ready: false, reason: 'runpod_primary_not_configured', model: null }
   }
 
-  const config = runpodPrimaryConfig(workload)
+  const model = runpodPrimaryModel(workload)
   try {
-    const ready = await proveReady(workload)
-    if (!ready) {
-      return { text: null, attempted: true, ready: false, reason: 'runpod_primary_not_ready', model: config.model }
+    const config = await resolveReadyRunpodPrimaryConfig(workload)
+    if (!config) {
+      return { text: null, attempted: true, ready: false, reason: 'runpod_primary_not_ready', model }
     }
     const text = await callLocalModel(args, config)
     return {
@@ -121,7 +145,7 @@ export async function tryRunpodPrimaryInference(
       attempted: true,
       ready: false,
       reason: error instanceof Error ? error.message : 'runpod_primary_failed',
-      model: config.model,
+      model,
     }
   }
 }

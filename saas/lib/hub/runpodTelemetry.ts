@@ -1,6 +1,6 @@
 // saas/lib/hub/runpodTelemetry.ts
 import { createHmac } from 'node:crypto'
-import { configuredRunpodApiKey, configuredRunpodPodId, runpodControlConfigured } from '@/lib/ai/cos/runpodConfig'
+import { configuredRunpodApiKey, configuredRunpodPodId, runpodControlConfigured } from '../ai/cos/runpodConfig'
 
 const GRAPHQL_ENDPOINT = 'https://api.runpod.io/graphql'
 const REST_ENDPOINT = 'https://rest.runpod.io/v1'

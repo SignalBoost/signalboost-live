@@ -40,6 +40,36 @@ function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
+function boundedOperationalText(value: unknown, max = 180): string | null {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return null
+  return text
+    .replace(/\b(bearer|token|secret|api[_-]?key)\b\s*[:=]?\s*[^,;\s]+/gi, '$1=[redacted]')
+    .slice(0, max)
+}
+
+function compactHealth(health: any) {
+  return {
+    ok: health?.ok === true,
+    httpStatus: Number.isFinite(Number(health?.httpStatus)) ? Number(health.httpStatus) : null,
+    jobs: {
+      inProgress: Number(health?.jobs?.inProgress || 0),
+      inQueue: Number(health?.jobs?.inQueue || 0),
+      failed: Number(health?.jobs?.failed || 0),
+      completed: Number(health?.jobs?.completed || 0),
+    },
+    workers: {
+      idle: Number(health?.workers?.idle || 0),
+      running: Number(health?.workers?.running || 0),
+    },
+    error: boundedOperationalText(health?.error),
+  }
+}
+
+function logCanaryStatus(payload: Record<string, unknown>) {
+  console.info('[runpod-distilled-local-deploy]', JSON.stringify(payload))
+}
+
 async function events() {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -310,6 +340,24 @@ export async function GET(req: NextRequest) {
       && Date.parse(String(row?.observed_at || '')) >= approvalFloor).length
     const consumedInvocations = Math.max(failures, starts)
     if (consumedInvocations >= MAX_CANARY_INVOCATIONS) {
+      const latestFailure = refreshed.find(row => row?.evidence?.profile === PROFILE
+        && row?.evidence?.claim === 'local_distilled_runtime_canary_failed'
+        && row?.evidence?.artifactHash === ARTIFACT_HASH
+        && Date.parse(String(row?.observed_at || '')) >= approvalFloor)
+      logCanaryStatus({
+        ok: false,
+        reason: 'distilled_canary_retry_ceiling',
+        endpointId,
+        consumedInvocations,
+        maxCanaryInvocations: MAX_CANARY_INVOCATIONS,
+        latestFailure: latestFailure ? {
+          observedAt: String(latestFailure.observed_at || ''),
+          httpStatus: Number.isFinite(Number(latestFailure?.evidence?.httpStatus)) ? Number(latestFailure.evidence.httpStatus) : null,
+          error: boundedOperationalText(latestFailure?.evidence?.error),
+          healthBefore: compactHealth(latestFailure?.evidence?.healthBefore),
+          healthAfter: compactHealth(latestFailure?.evidence?.healthAfter),
+        } : null,
+      })
       return NextResponse.json({ ok: false, error: 'distilled_canary_retry_ceiling', endpointId }, { status: 503 })
     }
 
@@ -346,6 +394,16 @@ export async function GET(req: NextRequest) {
         healthBefore,
         healthAfter,
         authorizationObservedAt: approvalObservedAt,
+      })
+      logCanaryStatus({
+        ok: false,
+        reason: 'distilled_canary_failed',
+        endpointId,
+        attemptOrdinal,
+        httpStatus: canary.httpStatus,
+        error: boundedOperationalText(canary.error),
+        healthBefore: compactHealth(healthBefore),
+        healthAfter: compactHealth(healthAfter),
       })
       return NextResponse.json({
         ok: false,

@@ -73,6 +73,22 @@ export function independentEvaluatorConfigFromEnv(
   return Object.freeze({ secret })
 }
 
+/**
+ * Prefer an explicitly deployed evaluator credential, but permit a separately generated service-only
+ * Supabase Vault secret when the environment variable has not been provisioned. The learner, teacher,
+ * RunPod runtime, and browser never receive this secret. Missing/invalid Vault state remains fail-closed.
+ */
+export async function independentEvaluatorConfig(): Promise<IndependentEvaluatorConfig | null> {
+  const env = independentEvaluatorConfigFromEnv()
+  if (env) return env
+  const db = await serviceDb()
+  if (!db) return null
+  const { data, error } = await db.rpc('cos_read_independent_evaluator_secret')
+  if (error) return null
+  const secret = clean(data, 4096)
+  return secret.length >= 32 ? Object.freeze({ secret }) : null
+}
+
 function signatureMessage(timestamp: string, idempotencyKey: string, rawBody: string): string {
   return [timestamp, idempotencyKey, rawBody].join('\n')
 }

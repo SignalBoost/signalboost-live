@@ -186,20 +186,32 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
   try {
     inferenceStartedAt = Date.now()
-    // LOCAL_AI_REASONING_EFFORT is a property of the current DeepInfra deployment. Generic graduate
-    // and RunPod transports may reject that vendor-specific field, so do not leak it outside DeepInfra.
-    const reasoningEffort = provider === 'deepinfra' ? configuredReasoningEffort() : undefined
     const enforceJsonObject = strictJsonObjectRequested(args)
+    const independentEvaluation = protectedIndependentEvaluation(args)
+    // Independent scoring needs a compact verdict, not model scratch work. Pin reasoning off even if
+    // the general DeepInfra reasoner is configured differently, and do not spend novelty penalties
+    // encouraging extra JSON fields. This preserves the caller's max-token and judge-call ceilings.
+    const reasoningEffort = provider === 'deepinfra'
+      ? (independentEvaluation ? 'none' : configuredReasoningEffort())
+      : undefined
     const parsePenalty = (value: string | undefined, fallback: number): number => {
       const n = Number(value)
       return Number.isFinite(n) ? Math.max(0, Math.min(2, n)) : fallback
     }
-    const frequencyPenalty = typeof args.frequencyPenalty === 'number' && Number.isFinite(args.frequencyPenalty)
-      ? Math.max(0, Math.min(2, args.frequencyPenalty))
-      : parsePenalty(process.env.COS_REASONER_FREQUENCY_PENALTY, 0.4)
-    const presencePenalty = typeof args.presencePenalty === 'number' && Number.isFinite(args.presencePenalty)
-      ? Math.max(0, Math.min(2, args.presencePenalty))
-      : parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
+    const frequencyPenalty = independentEvaluation && enforceJsonObject
+      ? 0
+      : typeof args.frequencyPenalty === 'number' && Number.isFinite(args.frequencyPenalty)
+        ? Math.max(0, Math.min(2, args.frequencyPenalty))
+        : parsePenalty(process.env.COS_REASONER_FREQUENCY_PENALTY, 0.4)
+    const presencePenalty = independentEvaluation && enforceJsonObject
+      ? 0
+      : typeof args.presencePenalty === 'number' && Number.isFinite(args.presencePenalty)
+        ? Math.max(0, Math.min(2, args.presencePenalty))
+        : parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
+    const baseSystemPrompt = args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.'
+    const systemPrompt = independentEvaluation && enforceJsonObject
+      ? `${baseSystemPrompt} Output exactly the requested JSON schema. Do not add explanations, rationale, analysis, prose, repeated inputs, or extra keys.`
+      : baseSystemPrompt
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
@@ -213,7 +225,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
         ...(enforceJsonObject ? { response_format: { type: 'json_object' } } : {}),
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         messages: [
-          { role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: args.prompt },
         ],
       }),

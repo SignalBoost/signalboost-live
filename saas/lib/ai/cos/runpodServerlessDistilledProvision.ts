@@ -4,24 +4,26 @@ import { configuredRunpodApiKey } from './runpodConfig.ts'
 const REST_V1 = 'https://rest.runpod.io/v1'
 const CONTROL_API_V2 = 'https://api.runpod.io/v2'
 const SERVERLESS_API = 'https://api.runpod.ai/v2'
-// Keep the load-balancer template isolated from the historical queue-worker template. Serverless
-// templates can be bound to one endpoint and the earlier queue repair changed the v1 identity.
-export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v2'
-export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v3'
+// Keep each materially different load-balancer bootstrap immutable. A new endpoint identity makes
+// failed canary evidence auditable instead of silently changing the worker behind an old receipt.
+export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v3'
+export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v4'
 export const DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER' as const
 export const DISTILLED_CONTAINER_PORT = 8000
+const DISTILLED_INTERNAL_VLLM_PORT = 8001
 export const DISTILLED_MODEL_NAME = 'itmounts-distilled-reasoning-v1'
 export const DISTILLED_BASE_MODEL_ID = 'Qwen/Qwen3-4B'
 export const DISTILLED_BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 export const DISTILLED_ADAPTER_MODEL_ID = 'cadomos/itmounts-student-f993a365a01e'
 export const DISTILLED_ADAPTER_MODEL_REVISION = '9f03387d87de550b96d973f9f30a3f02e783997e'
-export const DISTILLED_IDLE_TIMEOUT_SECONDS = 600
-export const DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS = 120_000
+export const DISTILLED_IDLE_TIMEOUT_SECONDS = 300
+export const DISTILLED_STARTUP_READY_TIMEOUT_MS = 220_000
+export const DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS = 60_000
 const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const REQUEST_TIMEOUT_MS = 15_000
-// The standard 24 GB Serverless tier is $0.69/hr. One 120s canary plus a 600s warm window
-// costs at most ~$0.138 of billed runtime; even 300s of additional startup headroom keeps the
-// bounded total at ~$0.196, below the existing $0.20 owner canary ceiling.
+// The standard 24 GB Serverless tier is $0.69/hr. A bounded 220s startup-ready window, 60s
+// inference call, and 300s warm window total 580s, or ~$0.111 at $0.69/hr. This remains below the
+// existing $0.20 owner canary ceiling without keeping a worker permanently warm.
 const MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 0.69
 
 const APPROVED_SERVERLESS_GPU_POOLS = [
@@ -178,17 +180,176 @@ function hfToken(): string {
   return token
 }
 
+/**
+ * The public RunPod load balancer only sees port 8000. Start that tiny gateway immediately, then
+ * initialize the exact vLLM artifact behind it on localhost:8001. This converts a long cold start
+ * from "no worker available" into an accepted request waiting inside the already-routable worker.
+ * If RunPod's documented cached-model mount contains the exact base revision, use it directly;
+ * otherwise fall back to the exact Hugging Face revision while preserving artifact identity.
+ */
+function startupGatewaySource(): string {
+  return String.raw`import asyncio
+import json
+import os
+from pathlib import Path
+
+import httpx
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request, Response
+from huggingface_hub import snapshot_download
+
+BASE_ID = os.environ["ITMOUNTS_BASE_MODEL_ID"]
+BASE_REV = os.environ["ITMOUNTS_BASE_MODEL_REVISION"]
+ADAPTER_ID = os.environ["ITMOUNTS_ADAPTER_MODEL_ID"]
+ADAPTER_REV = os.environ["ITMOUNTS_ADAPTER_MODEL_REVISION"]
+DISTILLED_MODEL = os.environ["ITMOUNTS_DISTILLED_MODEL_NAME"]
+HF_TOKEN = os.environ["HF_TOKEN"]
+INTERNAL_PORT = int(os.environ.get("ITMOUNTS_INTERNAL_VLLM_PORT", "8001"))
+PUBLIC_PORT = int(os.environ.get("PORT", "8000"))
+
+app = FastAPI(title="iTMounts Distilled Startup Gateway", version="1.0")
+model_ready = asyncio.Event()
+bootstrap_error = None
+vllm_process = None
+
+
+def exact_cached_base_path():
+    if "/" not in BASE_ID:
+        return None
+    org, name = BASE_ID.split("/", 1)
+    path = Path("/runpod-volume/huggingface-cache/hub") / f"models--{org}--{name}" / "snapshots" / BASE_REV
+    return str(path) if path.is_dir() else None
+
+
+async def bootstrap():
+    global bootstrap_error, vllm_process
+    try:
+        base_path = exact_cached_base_path()
+        if not base_path:
+            base_path = await asyncio.to_thread(
+                snapshot_download,
+                repo_id=BASE_ID,
+                revision=BASE_REV,
+                local_dir="/models/base",
+                token=HF_TOKEN,
+            )
+        adapter_path = await asyncio.to_thread(
+            snapshot_download,
+            repo_id=ADAPTER_ID,
+            revision=ADAPTER_REV,
+            local_dir="/models/adapter",
+            token=HF_TOKEN,
+        )
+        lora = json.dumps({
+            "name": DISTILLED_MODEL,
+            "path": adapter_path,
+            "base_model_name": BASE_ID,
+        })
+        vllm_process = await asyncio.create_subprocess_exec(
+            "vllm", "serve", base_path,
+            "--host", "127.0.0.1",
+            "--port", str(INTERNAL_PORT),
+            "--served-model-name", BASE_ID,
+            "--enable-lora",
+            "--max-lora-rank", "16",
+            "--max-loras", "1",
+            "--max-cpu-loras", "1",
+            "--lora-modules", lora,
+            "--gpu-memory-utilization", "0.85",
+            "--max-model-len", "16384",
+            "--dtype", "auto",
+        )
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            for _ in range(300):
+                if vllm_process.returncode is not None:
+                    raise RuntimeError(f"vllm_exited_{vllm_process.returncode}")
+                try:
+                    response = await client.get(f"http://127.0.0.1:{INTERNAL_PORT}/health")
+                    if response.status_code == 200:
+                        model_ready.set()
+                        return
+                except Exception:
+                    pass
+                await asyncio.sleep(1)
+        raise TimeoutError("vllm_model_startup_timeout")
+    except Exception as exc:
+        bootstrap_error = f"{type(exc).__name__}:{str(exc)[:240]}"
+
+
+@app.on_event("startup")
+async def start_background_model():
+    asyncio.create_task(bootstrap())
+
+
+@app.get("/ping")
+async def ping():
+    return {"status": "accepting_requests", "modelReady": model_ready.is_set()}
+
+
+@app.get("/ready")
+async def ready():
+    if bootstrap_error:
+        raise HTTPException(status_code=503, detail=f"distilled_bootstrap_failed:{bootstrap_error}")
+    if not model_ready.is_set():
+        return Response(status_code=204)
+    return {"ready": True, "model": DISTILLED_MODEL}
+
+
+async def wait_for_model():
+    deadline = asyncio.get_running_loop().time() + 300
+    while not model_ready.is_set():
+        if bootstrap_error:
+            raise HTTPException(status_code=503, detail=f"distilled_bootstrap_failed:{bootstrap_error}")
+        if asyncio.get_running_loop().time() >= deadline:
+            raise HTTPException(status_code=503, detail="distilled_model_not_ready")
+        await asyncio.sleep(0.5)
+
+
+async def proxy_to_vllm(request: Request, path: str):
+    await wait_for_model()
+    body = await request.body()
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.request(
+            request.method,
+            f"http://127.0.0.1:{INTERNAL_PORT}{path}",
+            content=body,
+            headers={"content-type": request.headers.get("content-type", "application/json")},
+        )
+    return Response(
+        content=response.content,
+        status_code=response.status_code,
+        media_type=response.headers.get("content-type", "application/json"),
+    )
+
+
+@app.post("/v1/chat/completions")
+async def chat_completions(request: Request):
+    return await proxy_to_vllm(request, "/v1/chat/completions")
+
+
+@app.post("/v1/completions")
+async def completions(request: Request):
+    return await proxy_to_vllm(request, "/v1/completions")
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=PUBLIC_PORT)
+`
+}
+
 function startupCommand(): string {
-  const lora = JSON.stringify({
-    name: DISTILLED_MODEL_NAME,
-    path: '/models/adapter',
-    base_model_name: DISTILLED_BASE_MODEL_ID,
-  })
+  const gateway = Buffer.from(startupGatewaySource(), 'utf8').toString('base64')
   return [
     'set -euo pipefail',
     'mkdir -p /models/base /models/adapter /models/hf-cache',
-    `python3 -c "from huggingface_hub import snapshot_download; import os; t=os.environ['HF_TOKEN']; snapshot_download(repo_id='${DISTILLED_BASE_MODEL_ID}', revision='${DISTILLED_BASE_MODEL_REVISION}', local_dir='/models/base', token=t); snapshot_download(repo_id='${DISTILLED_ADAPTER_MODEL_ID}', revision='${DISTILLED_ADAPTER_MODEL_REVISION}', local_dir='/models/adapter', token=t)"`,
-    `exec vllm serve /models/base --host 0.0.0.0 --port 8000 --served-model-name '${DISTILLED_BASE_MODEL_ID}' --enable-lora --max-lora-rank 16 --max-loras 1 --max-cpu-loras 1 --lora-modules '${lora}' --gpu-memory-utilization 0.85 --max-model-len 16384 --dtype auto`,
+    `export ITMOUNTS_BASE_MODEL_ID='${DISTILLED_BASE_MODEL_ID}'`,
+    `export ITMOUNTS_BASE_MODEL_REVISION='${DISTILLED_BASE_MODEL_REVISION}'`,
+    `export ITMOUNTS_ADAPTER_MODEL_ID='${DISTILLED_ADAPTER_MODEL_ID}'`,
+    `export ITMOUNTS_ADAPTER_MODEL_REVISION='${DISTILLED_ADAPTER_MODEL_REVISION}'`,
+    `export ITMOUNTS_DISTILLED_MODEL_NAME='${DISTILLED_MODEL_NAME}'`,
+    `export ITMOUNTS_INTERNAL_VLLM_PORT='${DISTILLED_INTERNAL_VLLM_PORT}'`,
+    `python3 -c "import base64; open('/tmp/itmounts_distilled_gateway.py','wb').write(base64.b64decode('${gateway}'))"`,
+    'exec python3 /tmp/itmounts_distilled_gateway.py',
   ].join('; ')
 }
 
@@ -199,13 +360,18 @@ function templateHasExactBootstrap(template: RunpodTemplateV1): boolean {
     && entrypoint.includes('bash')
     && command.includes(DISTILLED_BASE_MODEL_REVISION)
     && command.includes(DISTILLED_ADAPTER_MODEL_REVISION)
+    && command.includes('itmounts_distilled_gateway.py')
     && (template.ports || []).includes(`${DISTILLED_CONTAINER_PORT}/http`)
 }
 
-export function runpodServerlessOpenAiBaseUrl(endpointId: string): string {
+function runpodServerlessRootUrl(endpointId: string): string {
   const id = endpointId.trim()
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
-  return `https://${id}.api.runpod.ai/v1`
+  return `https://${id}.api.runpod.ai`
+}
+
+export function runpodServerlessOpenAiBaseUrl(endpointId: string): string {
+  return `${runpodServerlessRootUrl(endpointId)}/v1`
 }
 
 /** Official RunPod /health view. Numeric counts only; no raw provider body or credentials escape. */
@@ -350,9 +516,7 @@ export async function reconcileRunpodServerlessDistilledEndpoint(endpointId: str
   const id = endpointId.trim()
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
   // Canary execution is an evidence operation, not an endpoint-management operation. Re-read the
-  // endpoint and fail closed on policy drift instead of PATCHing before every paid canary. RunPod's
-  // load-balancer control surface has changed independently of endpoint creation, and a rejected
-  // PATCH must never prevent an already-safe endpoint from proving the exact trained artifact.
+  // endpoint and fail closed on policy drift instead of PATCHing before every paid canary.
   const listed = await requestV2<{ endpoints?: RunpodEndpointV2[] }>('/serverless')
   const endpoint = (listed.endpoints || []).find(item => item.id === id)
   if (!endpoint) throw new Error('RunPod distilled endpoint is no longer present in the account')
@@ -395,12 +559,12 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
           HF_HOME: '/models/hf-cache',
           PORT: String(DISTILLED_CONTAINER_PORT),
           PORT_HEALTH: String(DISTILLED_CONTAINER_PORT),
-          HEALTH_CHECK_PATH: '/health',
+          HEALTH_CHECK_PATH: '/ping',
         },
         isPublic: false,
         isServerless: true,
         ports: [`${DISTILLED_CONTAINER_PORT}/http`],
-        readme: 'iTMounts exact distilled Qwen3-4B + immutable LoRA load-balancer runtime. Scale-to-zero. Evaluation before Production activation.',
+        readme: 'iTMounts exact distilled Qwen3-4B + immutable LoRA startup-gateway runtime. Scale-to-zero. Evaluation before Production activation.',
       }),
     })
     createdTemplate = true
@@ -455,6 +619,52 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
   }
 }
 
+export async function waitForRunpodServerlessDistilledReady(input: {
+  endpointId: string
+  timeoutMs?: number
+  delayMs?: number
+}): Promise<{ ok: boolean; httpStatus: number | null; error: string | null }> {
+  const key = configuredRunpodApiKey()
+  if (!key) throw new Error('RUNPOD_API_KEY is not configured')
+  const timeoutMs = Math.max(30_000, Math.min(DISTILLED_STARTUP_READY_TIMEOUT_MS, Math.floor(input.timeoutMs ?? DISTILLED_STARTUP_READY_TIMEOUT_MS)))
+  const delayMs = Math.max(1000, Math.min(10_000, Math.floor(input.delayMs ?? 3000)))
+  const deadline = Date.now() + timeoutMs
+  const readyUrl = `${runpodServerlessRootUrl(input.endpointId)}/ready`
+  let lastStatus: number | null = null
+  let lastError: string | null = null
+
+  while (Date.now() < deadline) {
+    const remaining = Math.max(1000, deadline - Date.now())
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), Math.min(125_000, remaining))
+    try {
+      const response = await fetch(readyUrl, {
+        headers: { Authorization: `Bearer ${key}` },
+        signal: controller.signal,
+      })
+      lastStatus = response.status
+      const raw = await response.text()
+      if (response.status === 200) return { ok: true, httpStatus: response.status, error: null }
+      const detail = safeRunpodErrorDetail(raw)
+      if (detail) lastError = detail
+      if (response.status === 503 && detail?.includes('distilled_bootstrap_failed')) {
+        return { ok: false, httpStatus: response.status, error: detail }
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? clean(error.message) : 'distilled_startup_probe_failed'
+    } finally {
+      clearTimeout(timer)
+    }
+    if (Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, Math.min(delayMs, Math.max(0, deadline - Date.now()))))
+  }
+
+  return {
+    ok: false,
+    httpStatus: lastStatus,
+    error: lastError || 'distilled_model_not_ready_before_startup_deadline',
+  }
+}
+
 export async function canaryRunpodServerlessDistilledLlm(input: {
   endpointId: string
   attempts?: number
@@ -463,9 +673,25 @@ export async function canaryRunpodServerlessDistilledLlm(input: {
 }): Promise<{ ok: boolean; model: string; httpStatus: number | null; text: string | null; error: string | null }> {
   const key = configuredRunpodApiKey()
   if (!key) throw new Error('RUNPOD_API_KEY is not configured')
+
+  const readiness = await waitForRunpodServerlessDistilledReady({
+    endpointId: input.endpointId,
+    timeoutMs: DISTILLED_STARTUP_READY_TIMEOUT_MS,
+    delayMs: input.delayMs,
+  })
+  if (!readiness.ok) {
+    return {
+      ok: false,
+      model: DISTILLED_MODEL_NAME,
+      httpStatus: readiness.httpStatus,
+      text: null,
+      error: readiness.error || 'distilled_startup_not_ready',
+    }
+  }
+
   const attempts = Math.max(1, Math.min(3, Math.floor(input.attempts ?? 2)))
   const delayMs = Math.max(1000, Math.min(10_000, Math.floor(input.delayMs ?? 5000)))
-  const timeoutMs = Math.max(30_000, Math.min(120_000, Math.floor(input.timeoutMs ?? DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS)))
+  const timeoutMs = Math.max(15_000, Math.min(DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS, Math.floor(input.timeoutMs ?? DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS)))
   const baseUrl = runpodServerlessOpenAiBaseUrl(input.endpointId)
   let lastStatus: number | null = null
   let lastError: string | null = null
@@ -503,7 +729,7 @@ export async function canaryRunpodServerlessDistilledLlm(input: {
         lastError = safeRunpodErrorDetail(raw) || `HTTP ${response.status}`
       }
     } catch (error) {
-      lastError = error instanceof Error ? error.message : 'distilled_canary_failed'
+      lastError = error instanceof Error ? clean(error.message) : 'distilled_canary_failed'
     } finally {
       clearTimeout(timer)
     }

@@ -1,2 +1,2 @@
-base_sha=c3a08bf15e10f2322b02f74bda0cb68193dec4f4
-branch=fix/distilled-v6-vllm-readiness-20260915
+base_sha=37102f3a6f38ff9330b8e195bc17804adfa49501
+branch=fix/distilled-evaluator-canonical-canary-20260915

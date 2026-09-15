@@ -78,3 +78,18 @@ test('Vercel schedules evaluation independently and spaces canaries beyond their
   assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/cos-university-distilled-evaluation')?.schedule, '*/10 * * * *')
   assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/runpod-distilled-local-deploy')?.schedule, '*/5 * * * *')
 })
+
+test('evaluation accepts only canonical verifier-bound production canary evidence', () => {
+  const evaluator = source('../lib/ai/cos/cosUniversityDistilledArtifactEvaluation.ts')
+  assert.match(evaluator, /FINE_TUNE_EVIDENCE_PROFILE/)
+  assert.match(evaluator, /row\.verifier === 'host_production_verifier'/)
+  assert.match(evaluator, /evidence\?\.claim === 'production_canary_healthy'/)
+  assert.match(evaluator, /evidence\?\.trainedArtifactId/)
+  assert.match(evaluator, /evidence\?\.revisionKey/)
+  assert.match(evaluator, /evidence\?\.exactArtifact === true/)
+  assert.match(evaluator, /evidence\?\.authorityExpanded === false/)
+  assert.match(evaluator, /observedAt <= now\.getTime\(\)/)
+  assert.match(evaluator, /expiresAt > now\.getTime\(\)/)
+  assert.doesNotMatch(evaluator, /cos_local_distilled_runtime_deploy_v1/)
+  assert.doesNotMatch(evaluator, /local_distilled_runtime_canary_passed/)
+})

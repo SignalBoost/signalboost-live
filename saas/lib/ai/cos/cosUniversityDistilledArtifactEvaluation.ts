@@ -10,6 +10,7 @@ import {
   runpodServerlessOpenAiBaseUrl,
 } from './runpodServerlessDistilledProvision.ts'
 import {
+  FINE_TUNE_EVIDENCE_PROFILE,
   fineTuneRevisionKey,
   readFineTunePartitionRevision,
   type FineTuneRevision,
@@ -26,7 +27,6 @@ export const COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-eva
 export const COS_DISTILLED_EVALUATION_APPROVAL_PROFILE = 'cos_distilled_independent_evaluation_authorization_v1' as const
 export const MIN_DISTILLED_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 
-const DEPLOY_PROFILE = 'cos_local_distilled_runtime_deploy_v1'
 const HEX40 = /^[a-f0-9]{40}$/i
 const HEX64 = /^[a-f0-9]{64}$/i
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40})#([A-Za-z0-9_.-]+)$/i
@@ -197,23 +197,37 @@ async function evaluationApproval(candidateId: string, artifactHash: string, now
   }) || null
 }
 
-async function runtimeCanary(candidateId: string, artifactHash: string) {
+async function runtimeCanary(input: {
+  candidateId: string
+  artifactId: string
+  artifactHash: string
+  revisionKey: string
+}, now: Date) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const rows = await db.from('cos_university_learning_assurance_events')
-    .select('evidence,observed_at')
+    .select('evidence,verifier,observed_at,expires_at')
     .eq('event_type', 'fine_tune')
-    .eq('candidate_id', candidateId)
+    .eq('candidate_id', input.candidateId)
     .order('observed_at', { ascending: false })
     .limit(100)
   if (rows.error) throw rows.error
   const passed = (rows.data || []).find(row => {
     const evidence: any = row.evidence
-    return evidence?.profile === DEPLOY_PROFILE
-      && evidence?.claim === 'local_distilled_runtime_canary_passed'
-      && String(evidence?.artifactHash || '').toLowerCase() === artifactHash
+    const observedAt = Date.parse(String(row.observed_at || ''))
+    const expiresAt = row.expires_at ? Date.parse(String(row.expires_at)) : null
+    return row.verifier === 'host_production_verifier'
+      && evidence?.profile === FINE_TUNE_EVIDENCE_PROFILE
+      && evidence?.claim === 'production_canary_healthy'
+      && clean(evidence?.trainedArtifactId, 500) === input.artifactId
+      && clean(evidence?.artifactHash, 64).toLowerCase() === input.artifactHash
+      && clean(evidence?.revisionKey, 64).toLowerCase() === input.revisionKey
       && evidence?.exactArtifact === true
       && evidence?.productionTrafficAuthorized === false
+      && evidence?.authorityExpanded === false
+      && Boolean(clean(evidence?.endpointId, 120))
+      && Number.isFinite(observedAt) && observedAt <= now.getTime()
+      && (expiresAt === null || (Number.isFinite(expiresAt) && expiresAt > now.getTime()))
   })
   return passed ? { endpointId: clean((passed.evidence as any).endpointId, 120), observedAt: String(passed.observed_at || '') } : null
 }
@@ -558,7 +572,12 @@ export async function runUniversityDistilledArtifactEvaluation(now = new Date())
   const approval = await evaluationApproval(candidateId, artifactHash, now)
   if (!approval) return { ok: true as const, skipped: true as const, reason: 'evaluation_approval_missing_or_expired' as const }
 
-  const canary = await runtimeCanary(candidateId, artifactHash)
+  const canary = await runtimeCanary({
+    candidateId,
+    artifactId,
+    artifactHash,
+    revisionKey: clean(artifact.revision_key, 64).toLowerCase(),
+  }, now)
   if (!canary?.endpointId) return { ok: true as const, skipped: true as const, reason: 'exact_runtime_canary_not_proven' as const }
 
   const evidence = await registeredTrainingEvidence(candidateId, artifactHash)

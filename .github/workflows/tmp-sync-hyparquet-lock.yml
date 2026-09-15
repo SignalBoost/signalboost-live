@@ -1,0 +1,36 @@
+name: Temporary Hyparquet Lock Sync
+
+on:
+  push:
+    branches:
+      - fix/distilled-evaluator-direct-hub-parquet-20260915
+
+permissions:
+  contents: write
+
+jobs:
+  sync-lock:
+    if: ${{ !contains(github.event.head_commit.message, 'chore(deps): sync hyparquet lock') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/distilled-evaluator-direct-hub-parquet-20260915
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - name: Generate exact lockfile
+        working-directory: saas
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Commit lockfile only
+        run: |
+          git config user.name "SignalBoost"
+          git config user.email "cadomos@gmail.com"
+          git add saas/package-lock.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore(deps): sync hyparquet lock"
+          git push origin HEAD:fix/distilled-evaluator-direct-hub-parquet-20260915

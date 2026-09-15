@@ -29,11 +29,11 @@ test('direct Hub parquet reader is exact-revision, split-scoped, and resource bo
   assert.equal(pkg.dependencies.hyparquet, '1.26.0')
 })
 
-test('fetch fallback is invocation-scoped and restored even when evaluation throws', () => {
+test('evaluation transport guards are invocation-scoped and restore host fetch even when evaluation throws', () => {
   assert.match(route, /const originalFetch = globalThis\.fetch/)
   assert.match(route, /globalThis\.fetch = patchedFetch/)
   assert.match(route, /finally \{\s*globalThis\.fetch = originalFetch\s*\}/)
-  assert.match(route, /runWithPinnedHfParquetFallback\(\s*\(\) => runUniversityDistilledArtifactEvaluation\(new Date\(\)\)/)
+  assert.match(route, /runWithEvaluationTransportGuards\(\s*\(\) => runUniversityDistilledArtifactEvaluation\(new Date\(\)\)/)
 })
 
 test('transport fallback does not weaken pinned holdout integrity gates', () => {

@@ -50,7 +50,7 @@ test('mass consumer spends only through the bounded Hugging Face stages and neve
 
 test('a failed or blocked campaign cannot starve later authorized campaigns', () => {
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
-  assert.match(consumer, /\.limit\(5\)/)
+  assert.match(consumer, /\.limit\(100\)/)
   assert.match(consumer, /const campaignRows: any\[\] = campaigns\.data \|\| \[\]/)
   assert.match(consumer, /\(index \+ offset\) % campaignRows\.length/)
   assert.match(consumer, /unavailableCampaignIds/)

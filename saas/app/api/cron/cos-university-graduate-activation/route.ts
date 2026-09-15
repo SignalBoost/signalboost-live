@@ -7,7 +7,9 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+// A scale-to-zero graduate runtime needs minutes to prove readiness from cold; the identity wait
+// (GRADUATE_RUNTIME_READY_WAIT_MS = 240s) must fit inside this ceiling with room to record evidence.
+export const maxDuration = 300
 
 /**
  * The missing caller: promotion writes graduates as `pending_runtime`, COS routing already consumes

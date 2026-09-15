@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { classifyCosUniversitySubjects, cosUniversitySubjectById } from './cosUniversity'
+import { classifyCosUniversitySubjects, cosUniversitySubjectById } from './cosUniversity.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-distillation-v1' as const
 export const MASS_DISTILLATION_SOURCE_POLICY = 'public_domain_cc0_v1' as const

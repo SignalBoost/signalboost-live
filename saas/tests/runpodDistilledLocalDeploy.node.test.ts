@@ -6,6 +6,7 @@ import {
   DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
   DISTILLED_IDLE_TIMEOUT_SECONDS,
   DISTILLED_STARTUP_READY_TIMEOUT_MS,
+  DISTILLED_WORST_CASE_CANARY_COST_USD,
   runpodServerlessOpenAiBaseUrl,
   safeRunpodErrorDetail,
 } from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
@@ -22,14 +23,15 @@ test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
   assert.match(provision, /vllm\/vllm-openai:v0\.29\.0/)
   assert.match(provision, /snapshot_download/)
   assert.match(provision, /--enable-lora/)
-  assert.match(provision, /--max-lora-rank 16/)
+  assert.match(provision, /"--max-lora-rank", "16"/)
 })
 
 test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and inside the owner canary ceiling', () => {
-  assert.equal(DISTILLED_IDLE_TIMEOUT_SECONDS, 300)
+  assert.equal(DISTILLED_IDLE_TIMEOUT_SECONDS, 60)
   assert.equal(DISTILLED_STARTUP_READY_TIMEOUT_MS, 220_000)
   assert.equal(DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS, 60_000)
-  assert.ok(((300 + 220 + 60) * 0.69) / 3600 < 0.2)
+  assert.equal(DISTILLED_WORST_CASE_CANARY_COST_USD, ((60 + 220 + 60) * 0.69) / 3600)
+  assert.ok(DISTILLED_WORST_CASE_CANARY_COST_USD < 0.2)
   assert.match(provision, /min:\s*0/)
   assert.match(provision, /max:\s*1/)
   assert.match(provision, /idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
@@ -70,6 +72,14 @@ test('startup gateway becomes routable before exact model initialization and can
   assert.match(provision, /distilled_bootstrap_failed/)
   assert.match(provision, /waitForRunpodServerlessDistilledReady/)
   assert.match(provision, /DISTILLED_STARTUP_READY_TIMEOUT_MS/)
+})
+
+test('a healthy gateway still loading at the readiness deadline uses the bounded inference window', () => {
+  assert.match(provision, /if \(response\.status === 204\) lastError = null/)
+  assert.match(provision, /if \(!readiness\.ok && readiness\.httpStatus !== 204\)/)
+  const readinessGate = provision.indexOf("readiness.httpStatus !== 204")
+  const inferenceCall = provision.indexOf("${baseUrl}/chat/completions")
+  assert.ok(readinessGate >= 0 && inferenceCall > readinessGate)
 })
 
 test('startup gateway falls back to exact Hugging Face revisions without changing artifact identity', () => {
@@ -122,7 +132,7 @@ test('each provider invocation is durably receipted before the bounded network c
   assert.match(route, /CANARY_STARTED_CLAIM = 'local_distilled_runtime_canary_started'/)
   assert.match(route, /const starts = refreshed\.filter/)
   assert.match(route, /const consumedInvocations = Math\.max\(failures, starts\)/)
-  assert.match(route, /consumedInvocations >= MAX_CANARY_INVOCATIONS/)
+  assert.match(route, /consumedInvocations >= approvedMaxCanaryInvocations/)
   const receipt = route.indexOf('await record(CANARY_STARTED_CLAIM')
   const providerCall = route.indexOf('const canary = await canaryRunpodServerlessDistilledLlm')
   assert.ok(receipt >= 0 && providerCall > receipt)
@@ -234,6 +244,8 @@ test('deployment requires explicit durable unexpired approval and does not autho
   assert.match(route, /MAX_CANARY_INVOCATIONS = 3/)
   assert.match(route, /MIN_BALANCE_USD = 1/)
   assert.match(route, /maxEstimatedCanaryCostUsd/)
+  assert.match(route, /approvedCostUsd >= \(approvedInvocations \* DISTILLED_WORST_CASE_CANARY_COST_USD\)/)
+  assert.match(route, /approvedMaxCanaryInvocations = Number\(approval\.evidence\.maxCanaryInvocations\)/)
   assert.match(route, /productionTrafficAuthorized:\s*false/)
   assert.doesNotMatch(route, /RUNPOD_PRIMARY_MODE\s*=|RUNPOD_SERVERLESS_LLM_ENDPOINT_ID\s*=/)
 })

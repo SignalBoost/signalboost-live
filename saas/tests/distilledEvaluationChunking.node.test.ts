@@ -57,3 +57,19 @@ test('the solo retry keeps the exact request contract of the batch call', () => 
 test('retries are part of the recorded response hash', () => {
   assert.match(source, /sha256Raw\(\[text, \.\.\.retryTexts\]\.join\('\\n<<<RETRY>>>\\n'\)\)/)
 })
+
+test('evidence submission survives Vercel deployment protection', () => {
+  // The 15:56 attempt computed every score, then the platform's deployment-protection wall
+  // returned 401 before the internal route ran. Bypass header when the secret exists; public
+  // origin otherwise. Either way the HMAC contract with the route is unchanged.
+  assert.match(source, /x-vercel-protection-bypass/)
+  assert.match(source, /VERCEL_AUTOMATION_BYPASS_SECRET/)
+  assert.match(source, /const target = !bypassSecret && publicOrigin \? publicOrigin : origin/)
+  assert.match(source, /'x-itmounts-evaluator-signature': signature/)
+})
+
+test('judge JSON is located inside fences or preamble, never invented', () => {
+  assert.match(source, /const start = result\.indexOf\('\{'\)/)
+  assert.match(source, /const end = result\.lastIndexOf\('\}'\)/)
+  assert.match(source, /distilled_evaluation_judge_json_invalid/)
+})

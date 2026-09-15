@@ -12,7 +12,15 @@ type Status = {
   ok?: boolean
   error?: string
   authRequired?: boolean
-  artifact?: { candidateId: string; subjectId: string; artifactHash: string } | null
+  artifact?: {
+    candidateId: string
+    subjectId: string
+    artifactHash: string
+    holdoutCaseCount: number
+    maxEndpointCalls: number
+    maxJudgeCalls: number
+    maxSoloRetryCalls: number
+  } | null
   state?: 'none' | 'armed' | 'consumed' | 'expired'
   approval?: { observedAt: string; expiresAt: string | null } | null
   outcome?: { observedAt: string; commit: string; succeeded: boolean; reason: string | null; error: string | null } | null
@@ -87,6 +95,11 @@ export default function CosUniversityApprovalsPage() {
         <section className="rounded-lg border p-4 space-y-2 text-sm">
           <div><strong>{copy.candidate}:</strong> <span className="break-all">{status.artifact.candidateId}</span></div>
           <div><strong>{copy.artifact}:</strong> <code>{status.artifact.artifactHash.slice(0, 16)}…</code></div>
+          <div><strong>{copy.holdoutCases}:</strong> {status.artifact.holdoutCaseCount}</div>
+          <div>
+            <strong>{copy.callCeilings}:</strong>{' '}
+            {status.artifact.maxEndpointCalls} / {status.artifact.maxJudgeCalls} / {status.artifact.maxSoloRetryCalls}
+          </div>
           <div><strong>{copy.state}:</strong> {stateLabel}</div>
           {status.approval ? (
             <>

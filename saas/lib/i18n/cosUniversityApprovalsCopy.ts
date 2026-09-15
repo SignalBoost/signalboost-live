@@ -6,6 +6,8 @@ export type CosUniversityApprovalsCopy = {
   subtitle: string
   candidate: string
   artifact: string
+  holdoutCases: string
+  callCeilings: string
   noArtifact: string
   state: string
   stateNone: string
@@ -30,8 +32,8 @@ export type CosUniversityApprovalsCopy = {
 export const COS_UNIVERSITY_APPROVALS_COPY: Record<CosUniversityApprovalsLanguage, CosUniversityApprovalsCopy> = {
   en: {
     title: 'Distilled model evaluation approval',
-    subtitle: 'Authorizes exactly one bounded evaluation attempt (8 model calls, 4 judge calls, $0.20 wake ceiling, 2-hour expiry). It never authorizes production traffic.',
-    candidate: 'Candidate', artifact: 'Artifact', noArtifact: 'No artifact is waiting for evaluation.',
+    subtitle: 'Authorizes one bounded evaluation attempt. Limits are calculated from the pinned holdout and include at most two marker-recovery calls, a $0.20 wake ceiling, and a 2-hour expiry. It never authorizes production traffic.',
+    candidate: 'Candidate', artifact: 'Artifact', holdoutCases: 'Pinned holdout cases', callCeilings: 'Maximum model / judge / retry calls', noArtifact: 'No artifact is waiting for evaluation.',
     state: 'Approval', stateNone: 'None issued', stateArmed: 'Armed — waiting for the next evaluator run', stateConsumed: 'Used — attempt already ran', stateExpired: 'Expired unused',
     armedAt: 'Issued', expiresAt: 'Expires', nextTick: 'Next evaluator run', lastOutcome: 'Last attempt',
     outcomeSucceeded: 'Succeeded', outcomeFailed: 'Failed', noOutcome: 'No attempt result yet',
@@ -41,8 +43,8 @@ export const COS_UNIVERSITY_APPROVALS_COPY: Record<CosUniversityApprovalsLanguag
   },
   es: {
     title: 'Aprobación de evaluación del modelo destilado',
-    subtitle: 'Autoriza exactamente un intento de evaluación acotado (8 llamadas al modelo, 4 al juez, techo de activación de $0.20, vence en 2 horas). Nunca autoriza tráfico de producción.',
-    candidate: 'Candidato', artifact: 'Artefacto', noArtifact: 'No hay ningún artefacto pendiente de evaluación.',
+    subtitle: 'Autoriza un intento de evaluación acotado. Los límites se calculan a partir del conjunto de prueba fijado e incluyen como máximo dos llamadas de recuperación, un techo de activación de $0.20 y 2 horas de vigencia. Nunca autoriza tráfico de producción.',
+    candidate: 'Candidato', artifact: 'Artefacto', holdoutCases: 'Casos de prueba fijados', callCeilings: 'Máximo de llamadas al modelo / juez / reintento', noArtifact: 'No hay ningún artefacto pendiente de evaluación.',
     state: 'Aprobación', stateNone: 'Ninguna emitida', stateArmed: 'Activa — esperando la próxima ejecución del evaluador', stateConsumed: 'Usada — el intento ya se ejecutó', stateExpired: 'Vencida sin usar',
     armedAt: 'Emitida', expiresAt: 'Vence', nextTick: 'Próxima ejecución del evaluador', lastOutcome: 'Último intento',
     outcomeSucceeded: 'Exitoso', outcomeFailed: 'Fallido', noOutcome: 'Aún no hay resultado',
@@ -52,8 +54,8 @@ export const COS_UNIVERSITY_APPROVALS_COPY: Record<CosUniversityApprovalsLanguag
   },
   pt: {
     title: 'Aprovação de avaliação do modelo destilado',
-    subtitle: 'Autoriza exatamente uma tentativa de avaliação limitada (8 chamadas ao modelo, 4 ao juiz, teto de ativação de US$0,20, expira em 2 horas). Nunca autoriza tráfego de produção.',
-    candidate: 'Candidato', artifact: 'Artefato', noArtifact: 'Nenhum artefato aguardando avaliação.',
+    subtitle: 'Autoriza uma tentativa de avaliação limitada. Os limites são calculados a partir do conjunto de teste fixado e incluem no máximo duas chamadas de recuperação, teto de ativação de US$0,20 e validade de 2 horas. Nunca autoriza tráfego de produção.',
+    candidate: 'Candidato', artifact: 'Artefato', holdoutCases: 'Casos de teste fixados', callCeilings: 'Máximo de chamadas ao modelo / juiz / repetição', noArtifact: 'Nenhum artefato aguardando avaliação.',
     state: 'Aprovação', stateNone: 'Nenhuma emitida', stateArmed: 'Ativa — aguardando a próxima execução do avaliador', stateConsumed: 'Usada — a tentativa já foi executada', stateExpired: 'Expirada sem uso',
     armedAt: 'Emitida', expiresAt: 'Expira', nextTick: 'Próxima execução do avaliador', lastOutcome: 'Última tentativa',
     outcomeSucceeded: 'Sucesso', outcomeFailed: 'Falhou', noOutcome: 'Ainda sem resultado',
@@ -63,8 +65,8 @@ export const COS_UNIVERSITY_APPROVALS_COPY: Record<CosUniversityApprovalsLanguag
   },
   pl: {
     title: 'Zatwierdzenie oceny modelu destylowanego',
-    subtitle: 'Autoryzuje dokładnie jedną ograniczoną próbę oceny (8 wywołań modelu, 4 wywołania sędziego, limit wybudzenia 0,20 USD, ważność 2 godziny). Nigdy nie autoryzuje ruchu produkcyjnego.',
-    candidate: 'Kandydat', artifact: 'Artefakt', noArtifact: 'Żaden artefakt nie czeka na ocenę.',
+    subtitle: 'Autoryzuje jedną ograniczoną próbę oceny. Limity są obliczane z przypiętego zbioru testowego i obejmują najwyżej dwa wywołania naprawcze, limit wybudzenia 0,20 USD oraz ważność 2 godziny. Nigdy nie autoryzuje ruchu produkcyjnego.',
+    candidate: 'Kandydat', artifact: 'Artefakt', holdoutCases: 'Przypięte przypadki testowe', callCeilings: 'Maks. wywołań modelu / sędziego / ponowienia', noArtifact: 'Żaden artefakt nie czeka na ocenę.',
     state: 'Zatwierdzenie', stateNone: 'Nie wydano', stateArmed: 'Aktywne — czeka na następne uruchomienie oceny', stateConsumed: 'Wykorzystane — próba już się odbyła', stateExpired: 'Wygasło niewykorzystane',
     armedAt: 'Wydano', expiresAt: 'Wygasa', nextTick: 'Następne uruchomienie oceny', lastOutcome: 'Ostatnia próba',
     outcomeSucceeded: 'Udana', outcomeFailed: 'Nieudana', noOutcome: 'Brak wyniku',
@@ -74,8 +76,8 @@ export const COS_UNIVERSITY_APPROVALS_COPY: Record<CosUniversityApprovalsLanguag
   },
   ru: {
     title: 'Одобрение оценки дистиллированной модели',
-    subtitle: 'Разрешает ровно одну ограниченную попытку оценки (8 вызовов модели, 4 вызова судьи, лимит пробуждения $0,20, срок 2 часа). Никогда не разрешает продакшн-трафик.',
-    candidate: 'Кандидат', artifact: 'Артефакт', noArtifact: 'Нет артефактов, ожидающих оценки.',
+    subtitle: 'Разрешает одну ограниченную попытку оценки. Лимиты рассчитываются по закреплённой контрольной выборке и включают не более двух восстановительных вызовов, лимит пробуждения $0,20 и срок 2 часа. Никогда не разрешает продакшн-трафик.',
+    candidate: 'Кандидат', artifact: 'Артефакт', holdoutCases: 'Закреплённые контрольные примеры', callCeilings: 'Макс. вызовов модели / судьи / повтора', noArtifact: 'Нет артефактов, ожидающих оценки.',
     state: 'Одобрение', stateNone: 'Не выдано', stateArmed: 'Активно — ожидает следующего запуска оценщика', stateConsumed: 'Использовано — попытка уже выполнена', stateExpired: 'Истекло неиспользованным',
     armedAt: 'Выдано', expiresAt: 'Истекает', nextTick: 'Следующий запуск оценщика', lastOutcome: 'Последняя попытка',
     outcomeSucceeded: 'Успешно', outcomeFailed: 'Неудачно', noOutcome: 'Результата пока нет',

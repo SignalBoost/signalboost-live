@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import {
   approvalState,
   buildDistilledEvaluationApproval,
+  distilledEvaluationCallCeilings,
   isDistilledEvaluationApprovalEvidence,
   tickClearance,
 } from '../lib/ai/cos/cosUniversityRuntimeApprovalPolicy.ts'
@@ -17,31 +18,50 @@ const route = readFileSync(new URL('../app/api/admin/cos-university-runtime-appr
 const HASH = 'bd7b151e75cc963d02597529b7256b755419dd20bcd2c36ca849e903d99421e4'
 
 test('built approval satisfies every field both evaluator matchers check', () => {
-  const e = buildDistilledEvaluationApproval({ candidateId: 'study-plan:x', artifactHash: HASH.toUpperCase() })
+  const e = buildDistilledEvaluationApproval({ candidateId: 'study-plan:x', artifactHash: HASH.toUpperCase(), holdoutCaseCount: 20 })
   assert.equal(e.profile, 'cos_distilled_independent_evaluation_authorization_v1')
   assert.equal(e.claim, 'distilled_independent_evaluation_approved')
   assert.equal(e.artifactHash, HASH)
   assert.equal(e.evaluationAuthorized, true)
-  assert.ok(e.maxEndpointCalls >= 8 && e.maxJudgeCalls >= 4)
+  assert.equal(e.holdoutCaseCount, 20)
+  assert.equal(e.maxEndpointCalls, 12)
+  assert.equal(e.maxJudgeCalls, 5)
+  assert.equal(e.maxSoloRetryCalls, 2)
   assert.equal(e.maxRuntimeWakeAttempts, 1)
   assert.ok(e.maxEstimatedRuntimeWakeCostUsd >= (((570 + 60) * 0.69) / 3600) && e.maxEstimatedRuntimeWakeCostUsd <= 0.2)
   assert.equal(e.productionTrafficAuthorized, false)
   assert.equal(e.authorityExpanded, false)
-  assert.equal(isDistilledEvaluationApprovalEvidence(e, { candidateId: 'study-plan:x', artifactHash: HASH }), true)
+  assert.equal(isDistilledEvaluationApprovalEvidence(e, { candidateId: 'study-plan:x', artifactHash: HASH, holdoutCaseCount: 20 }), true)
+  assert.equal(isDistilledEvaluationApprovalEvidence(e, { candidateId: 'study-plan:x', artifactHash: HASH, holdoutCaseCount: 12 }), false)
+  assert.equal(isDistilledEvaluationApprovalEvidence({ ...e, maxEndpointCalls: 11 }, { candidateId: 'study-plan:x', artifactHash: HASH }), false)
   assert.equal(isDistilledEvaluationApprovalEvidence({ ...e, maxEstimatedRuntimeWakeCostUsd: 0.01 }, { candidateId: 'study-plan:x', artifactHash: HASH }), false)
   assert.equal(isDistilledEvaluationApprovalEvidence(e, { candidateId: 'study-plan:y', artifactHash: HASH }), false)
-  // The matchers still check these exact names; if they are renamed this test must be revisited.
   for (const source of [evaluatorRoute, evaluatorLib]) {
-    assert.match(source, /evidence\?\.evaluationAuthorized === true/)
-    assert.match(source, /evidence\?\.productionTrafficAuthorized === false/)
-    assert.match(source, /distilled_independent_evaluation_approved/)
+    assert.match(source, /isDistilledEvaluationApprovalEvidence/)
   }
   assert.match(evaluatorRoute, /Number\(evidence\?\.maxRuntimeWakeAttempts \|\| 0\) === MAX_RUNTIME_WAKE_ATTEMPTS/)
 })
 
 test('malformed identity is refused before any write', () => {
-  assert.throws(() => buildDistilledEvaluationApproval({ candidateId: '', artifactHash: HASH }), /candidate_missing/)
-  assert.throws(() => buildDistilledEvaluationApproval({ candidateId: 'x', artifactHash: 'abc' }), /artifact_hash_invalid/)
+  assert.throws(() => buildDistilledEvaluationApproval({ candidateId: '', artifactHash: HASH, holdoutCaseCount: 12 }), /candidate_missing/)
+  assert.throws(() => buildDistilledEvaluationApproval({ candidateId: 'x', artifactHash: 'abc', holdoutCaseCount: 12 }), /artifact_hash_invalid/)
+  assert.throws(() => buildDistilledEvaluationApproval({ candidateId: 'x', artifactHash: HASH, holdoutCaseCount: 0 }), /holdout_case_count_invalid/)
+  assert.throws(() => distilledEvaluationCallCeilings(61), /holdout_case_count_invalid/)
+})
+
+test('call ceilings scale with the pinned holdout and reserve only two recovery calls', () => {
+  assert.deepEqual(distilledEvaluationCallCeilings(1), {
+    holdoutCaseCount: 1, maxEndpointCalls: 10, maxJudgeCalls: 4, maxSoloRetryCalls: 2,
+  })
+  assert.deepEqual(distilledEvaluationCallCeilings(12), {
+    holdoutCaseCount: 12, maxEndpointCalls: 10, maxJudgeCalls: 4, maxSoloRetryCalls: 2,
+  })
+  assert.deepEqual(distilledEvaluationCallCeilings(13), {
+    holdoutCaseCount: 13, maxEndpointCalls: 12, maxJudgeCalls: 5, maxSoloRetryCalls: 2,
+  })
+  assert.deepEqual(distilledEvaluationCallCeilings(60), {
+    holdoutCaseCount: 60, maxEndpointCalls: 18, maxJudgeCalls: 8, maxSoloRetryCalls: 2,
+  })
 })
 
 test('issuing inside the clearance window before a tick is refused', () => {
@@ -69,6 +89,9 @@ test('runtime targets the evaluator artifact, refuses a second armed approval, a
   assert.match(runtime, /\.eq\('event_key', eventKey\)[\s\S]*approval_not_persisted/)
   assert.match(runtime, /verifier: 'host_controller'/)
   assert.match(runtime, /isDistilledEvaluationApprovalEvidence/)
+  assert.match(runtime, /partition_manifests_registered/)
+  assert.match(runtime, /revisionKey/)
+  assert.match(runtime, /distilledEvaluationCallCeilings/)
   assert.match(runtime, /evidence\.runnerInvoked !== true/)
   assert.match(runtime, /state === 'consumed'/)
 })

@@ -8,6 +8,7 @@ import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependen
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 import { DISTILLED_ADAPTER_MODEL_ID } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
+import { isDistilledEvaluationApprovalEvidence } from '@/lib/ai/cos/cosUniversityRuntimeApprovalPolicy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,10 +29,6 @@ const RUNPOD_MAX_GPU_PRICE_USD = 0.69
 const RUNPOD_IDLE_TIMEOUT_SECONDS = 60
 const MAX_RUNTIME_WAKE_ATTEMPTS = 1
 const MAX_RUNTIME_WAKE_COST_USD = 0.2
-const ENDPOINT_CALLS_CEILING = 8
-const JUDGE_CALLS_CEILING = 4
-const EVALUATION_APPROVAL_PROFILE = 'cos_distilled_independent_evaluation_authorization_v1'
-const EVALUATION_APPROVAL_CLAIM = 'distilled_independent_evaluation_approved'
 const RUNTIME_ATTEMPT_PROFILE = 'cos_distilled_independent_evaluation_runtime_v1'
 const RUNTIME_ATTEMPT_CLAIM = 'distilled_independent_evaluation_attempt_started'
 const HEX40 = /^[a-f0-9]{40}$/i
@@ -53,6 +50,10 @@ type RuntimeAttemptClaim = Readonly<{
   authorizationObservedAt: string
   authorizationExpiresAt: string
   maxEstimatedRuntimeWakeCostUsd: number
+  holdoutCaseCount: number
+  maxEndpointCalls: number
+  maxJudgeCalls: number
+  maxSoloRetryCalls: number
 }> | Readonly<{
   ok: false
   reason: string
@@ -170,13 +171,7 @@ async function claimRuntimeEvaluationAttempt(now: Date, routeDeadlineMs: number)
     const expiresAt = Date.parse(String(row?.expires_at || ''))
     const runtimeCostCeiling = Number(evidence?.maxEstimatedRuntimeWakeCostUsd || 0)
     return row?.verifier === 'host_controller'
-      && evidence?.profile === EVALUATION_APPROVAL_PROFILE
-      && evidence?.claim === EVALUATION_APPROVAL_CLAIM
-      && evidence?.candidateId === candidateId
-      && String(evidence?.artifactHash || '').toLowerCase() === artifactHash
-      && evidence?.evaluationAuthorized === true
-      && Number(evidence?.maxEndpointCalls || 0) >= ENDPOINT_CALLS_CEILING
-      && Number(evidence?.maxJudgeCalls || 0) >= JUDGE_CALLS_CEILING
+      && isDistilledEvaluationApprovalEvidence(evidence, { candidateId, artifactHash })
       && Number(evidence?.maxRuntimeWakeAttempts || 0) === MAX_RUNTIME_WAKE_ATTEMPTS
       && runtimeCostCeiling >= RUNTIME_WAKE_WORST_CASE_COST_USD
       && runtimeCostCeiling <= MAX_RUNTIME_WAKE_COST_USD
@@ -190,6 +185,10 @@ async function claimRuntimeEvaluationAttempt(now: Date, routeDeadlineMs: number)
   const authorizationObservedAt = String(approval.observed_at || '')
   const authorizationExpiresAt = String(approval.expires_at || '')
   const maxEstimatedRuntimeWakeCostUsd = Number(approval.evidence?.maxEstimatedRuntimeWakeCostUsd || 0)
+  const holdoutCaseCount = Number(approval.evidence?.holdoutCaseCount)
+  const maxEndpointCalls = Number(approval.evidence?.maxEndpointCalls)
+  const maxJudgeCalls = Number(approval.evidence?.maxJudgeCalls)
+  const maxSoloRetryCalls = Number(approval.evidence?.maxSoloRetryCalls)
   const eventKey = hash([
     RUNTIME_ATTEMPT_PROFILE,
     RUNTIME_ATTEMPT_CLAIM,
@@ -211,8 +210,10 @@ async function claimRuntimeEvaluationAttempt(now: Date, routeDeadlineMs: number)
     routeReserveMs: EVALUATION_ROUTE_RESERVE_MS,
     readyTimeoutMs: RUNPOD_READY_TIMEOUT_MS,
     keepaliveIntervalMs: RUNPOD_KEEPALIVE_INTERVAL_MS,
-    endpointCallsCeiling: ENDPOINT_CALLS_CEILING,
-    judgeCallsCeiling: JUDGE_CALLS_CEILING,
+    holdoutCaseCount,
+    endpointCallsCeiling: maxEndpointCalls,
+    judgeCallsCeiling: maxJudgeCalls,
+    soloRetryCallsCeiling: maxSoloRetryCalls,
     productionTrafficAuthorized: false,
     authorityExpanded: false,
   }
@@ -243,6 +244,10 @@ async function claimRuntimeEvaluationAttempt(now: Date, routeDeadlineMs: number)
     authorizationObservedAt,
     authorizationExpiresAt,
     maxEstimatedRuntimeWakeCostUsd,
+    holdoutCaseCount,
+    maxEndpointCalls,
+    maxJudgeCalls,
+    maxSoloRetryCalls,
   }
 }
 
@@ -392,17 +397,18 @@ async function proveRunpodReady(input: {
  * The inference timeout starts only after readiness succeeds, so cold-start time cannot consume the
  * request's inference budget before the POST is forwarded. Once ready, a 30-second keepalive prevents
  * the 60-second scale-to-zero runtime from going cold across independent-judge calls. The successful
- * evaluation still performs exactly eight inference POSTs.
+ * evaluation's manifest-derived approval is also enforced as a hard inference-POST ceiling here.
  */
 async function runWithEvaluationTransportGuards<T>(input: {
   runner: () => Promise<T>
   routeDeadlineMs: number
-}): Promise<{ result: T; runtimeAttempt: SuccessfulRuntimeAttempt | null }> {
+}): Promise<{ result: T; runtimeAttempt: SuccessfulRuntimeAttempt | null; endpointCalls: number }> {
   const originalFetch = globalThis.fetch
   const pinned = new Map<string, PinnedDatasetMetadata>()
   const keepalives = new Map<string, ReturnType<typeof setInterval>>()
   const key = configuredRunpodApiKey()
   let runtimeAttempt: SuccessfulRuntimeAttempt | null = null
+  let endpointCalls = 0
 
   const routeBoundFetch: typeof fetch = async (request, init) => {
     const remaining = input.routeDeadlineMs - Date.now()
@@ -444,6 +450,10 @@ async function runWithEvaluationTransportGuards<T>(input: {
       }
       await proveRunpodReady({ origin: url.origin, fetchImpl: routeBoundFetch, routeDeadlineMs: input.routeDeadlineMs })
       ensureKeepalive(url.origin)
+      if (endpointCalls >= runtimeAttempt.maxEndpointCalls) {
+        throw new Error('distilled_evaluation_endpoint_call_ceiling_exceeded')
+      }
+      endpointCalls += 1
 
       const inferenceBudget = input.routeDeadlineMs - Date.now() - EVALUATION_ROUTE_RESERVE_MS
       if (inferenceBudget <= 0) {
@@ -503,7 +513,7 @@ async function runWithEvaluationTransportGuards<T>(input: {
   globalThis.fetch = patchedFetch
   try {
     const result = await input.runner()
-    return { result, runtimeAttempt }
+    return { result, runtimeAttempt, endpointCalls }
   } finally {
     for (const timer of keepalives.values()) clearInterval(timer)
     globalThis.fetch = originalFetch
@@ -552,6 +562,8 @@ export async function GET(req: NextRequest) {
         skipped,
         runtimeAttemptAuthorizationObservedAt: runtimeAttempt?.authorizationObservedAt ?? null,
         runtimeWakeCostCeilingUsd: runtimeAttempt?.maxEstimatedRuntimeWakeCostUsd ?? null,
+        runtimeEndpointCalls: guarded.endpointCalls,
+        runtimeEndpointCallsCeiling: runtimeAttempt?.maxEndpointCalls ?? null,
       },
     })
     console.info('[cos-distilled-independent-evaluation]', JSON.stringify(result))

@@ -10,7 +10,7 @@ test('a holdout larger than one batch is chunked, not rejected', () => {
   // distilled_evaluation_holdout_batch_size_unsupported before this. Chunking scores every pinned
   // case; only a suite past the cost ceiling is refused.
   assert.match(source, /if \(expectedHashes\.length > MAX_SUITE_CASES\) throw new Error\('distilled_evaluation_holdout_batch_size_unsupported'\)/)
-  assert.match(source, /const MAX_SUITE_CASES = 60/)
+  assert.match(source, /const MAX_SUITE_CASES = DISTILLED_EVALUATION_MAX_HOLDOUT_CASES/)
   assert.match(source, /function chunkCases\(/)
   assert.match(source, /for \(const chunk of chunkCases\(input\.cases\)\)/)
 })
@@ -21,7 +21,7 @@ test('chunking changes transport, never coverage', () => {
 })
 
 test('per-request ceiling is untouched so no request regrows past the streaming envelope', () => {
-  assert.match(source, /const MAX_BATCH_CASES = 12/)
+  assert.match(source, /const MAX_BATCH_CASES = DISTILLED_EVALUATION_MAX_BATCH_CASES/)
   assert.match(source, /input\.cases\.length > MAX_BATCH_CASES/)
 })
 
@@ -47,6 +47,8 @@ test('one mangled marker recovers with a solo retry instead of aborting the eval
   assert.match(source, /recoveredCaseIds: collected\.missing\.map\(item => item\.id\)/)
   assert.match(source, /if \(!answer\) throw new Error\(`distilled_evaluation_answer_missing:\$\{item\.id\}`\)/)
   assert.doesNotMatch(source, /function parseBatchAnswers\(/)
+  assert.match(source, /if \(budget\.soloRetryCalls >= budget\.maxSoloRetryCalls\)/)
+  assert.match(source, /distilled_evaluation_solo_retry_call_ceiling_exceeded/)
 })
 
 test('the solo retry keeps the exact request contract of the batch call', () => {

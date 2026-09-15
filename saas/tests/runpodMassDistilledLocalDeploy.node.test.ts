@@ -52,6 +52,19 @@ test('existing endpoint reuse is bound to the exact template and approved GPU po
   assert.match(provision, /Number\(endpoint\.gpu\?\.count/)
 })
 
+test('template drift is repaired only after the existing endpoint passes the non-template safety policy', () => {
+  const safetyIndex = provision.indexOf('assertEndpointSafetyPolicy(endpoint)')
+  const patchIndex = provision.indexOf("method:'PATCH'")
+  assert.ok(safetyIndex >= 0 && patchIndex > safetyIndex)
+  assert.match(provision, /`\/endpoints\/\$\{encodeURIComponent\(endpoint\.id\)\}`/)
+  assert.match(provision, /JSON\.stringify\(\{templateId\}\)/)
+  assert.match(provision, /requestV2<\{endpoints\?:Endpoint\[\]\}>\('\/serverless'\)/)
+  assert.match(provision, /item\.id===endpoint\.id&&item\.name===endpoint\.name/)
+  assert.match(provision, /mass_distilled_runtime_endpoint_template_rebind_missing/)
+  assert.match(provision, /mass_distilled_runtime_endpoint_template_rebind_failed/)
+  assert.match(provision, /assertEndpointPolicy\(refreshed,templateId\)/)
+})
+
 test('database atomically selects and reserves one owner-authorized canary across the whole corpus', () => {
   assert.match(migration, /create or replace function public\.claim_next_mass_distilled_runtime_canary\(\)/)
   assert.match(migration, /pg_advisory_xact_lock\(pg_catalog\.hashtextextended\('mass-distilled-runtime-canary-global'/)

@@ -138,13 +138,33 @@ async function gpuPools():Promise<string[]>{
   return [...APPROVED_POOLS]
 }
 
-function assertEndpointPolicy(endpoint:Endpoint,templateId:string){
+function assertEndpointSafetyPolicy(endpoint:Endpoint){
   if(endpoint.type!==ROUTING) throw new Error('mass_distilled_runtime_endpoint_routing_mismatch')
-  if(clean(endpoint.templateId,200)!==templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
   if(Number(endpoint.workers?.min??Number.NaN)!==0||Number(endpoint.workers?.max??Number.NaN)>1||Number(endpoint.workers?.idleTimeout??Number.NaN)>IDLE_TIMEOUT_SECONDS) throw new Error('mass_distilled_runtime_endpoint_worker_policy_drift')
   if(Number(endpoint.gpu?.count??Number.NaN)!==1) throw new Error('mass_distilled_runtime_endpoint_gpu_count_drift')
   const pools=(endpoint.gpu?.pools||[]).map(pool=>clean(pool,80))
   if(pools.length!==APPROVED_POOLS.length||!APPROVED_POOLS.every(pool=>pools.includes(pool))) throw new Error('mass_distilled_runtime_endpoint_gpu_pool_drift')
+}
+
+function assertEndpointPolicy(endpoint:Endpoint,templateId:string){
+  assertEndpointSafetyPolicy(endpoint)
+  if(clean(endpoint.templateId,200)!==templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
+}
+
+async function rebindEndpointTemplate(endpoint:Endpoint,templateId:string):Promise<Endpoint>{
+  // Never repair identity on an endpoint whose execution/cost policy has drifted. Template repair is
+  // permitted only for the already-safe, scale-to-zero, one-GPU canary endpoint.
+  assertEndpointSafetyPolicy(endpoint)
+  if(clean(endpoint.templateId,200)===templateId) return endpoint
+  await requestV1<unknown>(`/endpoints/${encodeURIComponent(endpoint.id)}`,{method:'PATCH',body:JSON.stringify({templateId})})
+  // PATCH triggers a provider rolling release. Re-read from the control plane and require the exact
+  // immutable template binding before any canary request is allowed to wake compute.
+  const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
+  const refreshed=(listed.endpoints||[]).find(item=>item.id===endpoint.id&&item.name===endpoint.name)
+  if(!refreshed) throw new Error('mass_distilled_runtime_endpoint_template_rebind_missing')
+  if(clean(refreshed.templateId,200)!==templateId) throw new Error('mass_distilled_runtime_endpoint_template_rebind_failed')
+  assertEndpointPolicy(refreshed,templateId)
+  return refreshed
 }
 
 export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeArtifact){
@@ -155,11 +175,12 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
   if(template&&!templateMatches(template,input,ids.modelName)) throw new Error('mass_distilled_runtime_template_identity_mismatch')
   if(!template){template=await requestV1<Template>('/templates',{method:'POST',body:JSON.stringify({name:ids.templateName,imageName:VLLM_IMAGE,category:'NVIDIA',containerDiskInGb:50,dockerEntrypoint:['bash','-lc'],dockerStartCmd:[startupCommand(input,ids.modelName)],env:{HF_TOKEN:token,HF_HOME:'/models/hf-cache',PORT:String(PUBLIC_PORT),PORT_HEALTH:String(PUBLIC_PORT),HEALTH_CHECK_PATH:'/ping'},isPublic:false,isServerless:true,ports:[`${PUBLIC_PORT}/http`],readme:'iTMounts exact mass-distilled Qwen3-4B + immutable LoRA v2 canary runtime. Strict internal-vLLM readiness; scale-to-zero; no Production traffic.'})});createdTemplate=true}
   if(!template?.id) throw new Error('mass_distilled_runtime_template_id_missing')
-  const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless'); let endpoint=(listed.endpoints||[]).find(item=>item.name===ids.endpointName); let createdEndpoint=false
+  const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless'); let endpoint=(listed.endpoints||[]).find(item=>item.name===ids.endpointName); let createdEndpoint=false; let reboundTemplate=false
   if(!endpoint){endpoint=await requestV2<Endpoint>('/serverless',{method:'POST',body:JSON.stringify({name:ids.endpointName,type:ROUTING,templateId:template.id,gpu:{pools:await gpuPools(),count:1},workers:{min:0,max:1,idleTimeout:IDLE_TIMEOUT_SECONDS},scaling:{type:'REQUEST_COUNT',requestCount:1},timeout:300000,flashboot:'FLASHBOOT'})});createdEndpoint=true}
+  else {const previousTemplateId=clean(endpoint.templateId,200); endpoint=await rebindEndpointTemplate(endpoint,template.id); reboundTemplate=previousTemplateId!==template.id}
   if(!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
   assertEndpointPolicy(endpoint,template.id)
-  return Object.freeze({...ids,endpointId:endpoint.id,createdTemplate,createdEndpoint,workersMin:Number(endpoint.workers?.min),workersMax:Number(endpoint.workers?.max),idleTimeout:Number(endpoint.workers?.idleTimeout),baseUrl:`https://${endpoint.id}.api.runpod.ai/v1`})
+  return Object.freeze({...ids,endpointId:endpoint.id,createdTemplate,createdEndpoint,reboundTemplate,workersMin:Number(endpoint.workers?.min),workersMax:Number(endpoint.workers?.max),idleTimeout:Number(endpoint.workers?.idleTimeout),baseUrl:`https://${endpoint.id}.api.runpod.ai/v1`})
 }
 
 export async function massDistilledRuntimeHealth(endpointId:string){

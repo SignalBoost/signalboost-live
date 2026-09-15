@@ -7,9 +7,17 @@ const route = readFileSync(new URL('../app/api/cron/cos-university-distilled-eva
 test('independent evaluation proves exact RunPod readiness before every inference POST', () => {
   assert.match(route, /RUNPOD_READY_TIMEOUT_MS = 220_000/)
   assert.match(route, /RUNPOD_READY_POLL_MS = 3_000/)
+  assert.match(route, /RUNPOD_INFERENCE_TIMEOUT_MS = 120_000/)
   assert.match(route, /RUNPOD_ENDPOINT_HOST = \/\^\[A-Za-z0-9_-\]/)
   assert.match(route, /url\.pathname === '\/v1\/chat\/completions'/)
   assert.match(route, /if \(isRunpodEvaluationInference\(url, init\)\) \{\s*await proveRunpodReady\(\{ origin: url\.origin, fetchImpl: routeBoundFetch, routeDeadlineMs: input\.routeDeadlineMs \}\)/)
+})
+
+test('RunPod inference receives a fresh timeout only after cold-start readiness', () => {
+  assert.match(route, /await proveRunpodReady\([\s\S]*const inferenceBudget = input\.routeDeadlineMs - Date\.now\(\) - EVALUATION_ROUTE_RESERVE_MS/)
+  assert.match(route, /guardedInit = \{[\s\S]*signal: AbortSignal\.timeout\(Math\.min\(RUNPOD_INFERENCE_TIMEOUT_MS, inferenceBudget\)\)/)
+  assert.match(route, /routeBoundFetch\(request, guardedInit\)/)
+  assert.doesNotMatch(route, /routeBoundFetch\(request, init\)/)
 })
 
 test('runtime readiness uses non-inference GET probes and requires HTTP 200', () => {

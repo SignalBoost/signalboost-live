@@ -3,14 +3,18 @@ import { readPinnedHfParquetRows } from '@/lib/ai/cos/hfPinnedParquetRows'
 import { runUniversityDistilledArtifactEvaluation } from '@/lib/ai/cos/cosUniversityDistilledArtifactEvaluation'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 300
+export const maxDuration = 600
 
 const HF_HUB_ORIGIN = 'https://huggingface.co'
 const HF_ROWS_ORIGIN = 'https://datasets-server.huggingface.co'
+const RUNPOD_READY_TIMEOUT_MS = 220_000
+const RUNPOD_READY_POLL_MS = 3_000
 const HEX40 = /^[a-f0-9]{40}$/i
+const RUNPOD_ENDPOINT_HOST = /^[A-Za-z0-9_-]{3,120}\.api\.runpod\.ai$/
 
 type PinnedDatasetMetadata = Readonly<{
   revision: string
@@ -36,6 +40,48 @@ function metadataRepoId(url: URL): string | null {
   }
 }
 
+function isRunpodEvaluationInference(url: URL | null, init?: RequestInit): url is URL {
+  if (!url || url.protocol !== 'https:' || !RUNPOD_ENDPOINT_HOST.test(url.hostname)) return false
+  const method = String(init?.method || 'GET').toUpperCase()
+  return method === 'POST' && url.pathname === '/v1/chat/completions'
+}
+
+async function proveRunpodReady(input: {
+  origin: string
+  originalFetch: typeof fetch
+}): Promise<void> {
+  const key = configuredRunpodApiKey()
+  if (!key) throw new Error('distilled_evaluation_runpod_key_missing')
+  const deadline = Date.now() + RUNPOD_READY_TIMEOUT_MS
+  let lastStatus: number | null = null
+
+  while (Date.now() < deadline) {
+    const remaining = Math.max(1_000, deadline - Date.now())
+    try {
+      const response = await input.originalFetch(`${input.origin}/ready`, {
+        headers: { Authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(Math.min(15_000, remaining)),
+      })
+      lastStatus = response.status
+      if (response.status === 200) return
+      if (response.status === 503) {
+        const detail = (await response.text()).slice(0, 1_000)
+        if (detail.includes('distilled_bootstrap_failed')) {
+          throw new Error('distilled_evaluation_runtime_bootstrap_failed')
+        }
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'distilled_evaluation_runtime_bootstrap_failed') throw error
+      lastStatus = null
+    }
+    if (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, Math.min(RUNPOD_READY_POLL_MS, deadline - Date.now())))
+    }
+  }
+
+  throw new Error(`distilled_evaluation_runtime_not_ready:${lastStatus ?? 'network'}`)
+}
+
 /**
  * Private datasets do not reliably expose Dataset Viewer `/rows` or `/first-rows`. Capture the exact
  * Hub revision already fetched by the evaluator, then on a Dataset Viewer provider 5xx read only the
@@ -43,17 +89,27 @@ function metadataRepoId(url: URL): string | null {
  * transport shape. The evaluator still performs the authoritative revision, count, SHA-256 item,
  * identity-set, and manifest checks before any model call.
  *
- * Keep the override scoped to this one server invocation and restore the host fetch in finally.
+ * The same invocation also proves the exact RunPod endpoint is freshly `/ready = 200` once before
+ * forwarding the first evaluation inference POST. Readiness probes are not model calls and therefore
+ * preserve the evaluator's exact eight inference calls. Keep both overrides scoped to this one server
+ * invocation and restore the host fetch in finally.
  */
-async function runWithPinnedHfParquetFallback<T>(runner: () => Promise<T>): Promise<T> {
+async function runWithEvaluationTransportGuards<T>(runner: () => Promise<T>): Promise<T> {
   const originalFetch = globalThis.fetch
   const pinned = new Map<string, PinnedDatasetMetadata>()
+  const warmedRunpodOrigins = new Set<string>()
   const patchedFetch: typeof fetch = async (input, init) => {
     const rawUrl = requestUrl(input)
-    const response = await originalFetch(input, init)
-
     let url: URL | null = null
     try { url = new URL(rawUrl) } catch { url = null }
+
+    if (isRunpodEvaluationInference(url, init) && !warmedRunpodOrigins.has(url.origin)) {
+      await proveRunpodReady({ origin: url.origin, originalFetch })
+      warmedRunpodOrigins.add(url.origin)
+    }
+
+    const response = await originalFetch(input, init)
+
     if (url && response.ok) {
       const repoId = metadataRepoId(url)
       if (repoId) {
@@ -117,7 +173,7 @@ export async function GET(req: NextRequest) {
     if (evaluator && !process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
-    const result = await runWithPinnedHfParquetFallback(
+    const result = await runWithEvaluationTransportGuards(
       () => runUniversityDistilledArtifactEvaluation(new Date()),
     )
     const skipped = 'skipped' in result && result.skipped === true

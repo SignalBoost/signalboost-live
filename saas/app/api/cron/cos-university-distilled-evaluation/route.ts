@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readPinnedHfParquetRows } from '@/lib/ai/cos/hfPinnedParquetRows'
 import { runUniversityDistilledArtifactEvaluation } from '@/lib/ai/cos/cosUniversityDistilledArtifactEvaluation'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
@@ -7,46 +8,93 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+const HF_HUB_ORIGIN = 'https://huggingface.co'
 const HF_ROWS_ORIGIN = 'https://datasets-server.huggingface.co'
+const HEX40 = /^[a-f0-9]{40}$/i
+
+type PinnedDatasetMetadata = Readonly<{
+  revision: string
+  siblings: ReadonlyArray<Readonly<{ rfilename?: unknown }>>
+}>
+
+function requestUrl(input: Parameters<typeof fetch>[0]): string {
+  return input instanceof URL
+    ? input.toString()
+    : typeof input === 'string'
+      ? input
+      : input.url
+}
+
+function metadataRepoId(url: URL): string | null {
+  if (url.origin !== HF_HUB_ORIGIN) return null
+  const match = /^\/api\/datasets\/([^/]+)\/([^/]+)$/.exec(url.pathname)
+  if (!match) return null
+  try {
+    return `${decodeURIComponent(match[1])}/${decodeURIComponent(match[2])}`
+  } catch {
+    return null
+  }
+}
 
 /**
- * Hugging Face's on-demand `/rows` view can return a provider-side 5xx even when the exact pinned
- * dataset is healthy. For this evaluator the holdout split is already bounded to <=100 items, so
- * `/first-rows` is an equivalent transport fallback. The evaluator still performs the authoritative
- * revision, row-count, item-hash, and manifest checks after this transport layer returns.
+ * Private datasets do not reliably expose Dataset Viewer `/rows` or `/first-rows`. Capture the exact
+ * Hub revision already fetched by the evaluator, then on a Dataset Viewer provider 5xx read only the
+ * pinned holdout Parquet shards from the private Hub repo and synthesize the same `{ rows: [{row}] }`
+ * transport shape. The evaluator still performs the authoritative revision, count, SHA-256 item,
+ * identity-set, and manifest checks before any model call.
  *
  * Keep the override scoped to this one server invocation and restore the host fetch in finally.
  */
-async function runWithHfRowsFallback<T>(runner: () => Promise<T>): Promise<T> {
+async function runWithPinnedHfParquetFallback<T>(runner: () => Promise<T>): Promise<T> {
   const originalFetch = globalThis.fetch
+  const pinned = new Map<string, PinnedDatasetMetadata>()
   const patchedFetch: typeof fetch = async (input, init) => {
-    const requestUrl = input instanceof URL
-      ? input.toString()
-      : typeof input === 'string'
-        ? input
-        : input.url
+    const rawUrl = requestUrl(input)
     const response = await originalFetch(input, init)
 
-    if (response.ok || response.status < 500) return response
-
-    let rowsUrl: URL
-    try {
-      rowsUrl = new URL(requestUrl)
-    } catch {
-      return response
+    let url: URL | null = null
+    try { url = new URL(rawUrl) } catch { url = null }
+    if (url && response.ok) {
+      const repoId = metadataRepoId(url)
+      if (repoId) {
+        try {
+          const metadata: any = await response.clone().json()
+          const revision = String(metadata?.sha || '').trim().toLowerCase()
+          if (HEX40.test(revision)) {
+            pinned.set(repoId, {
+              revision,
+              siblings: Array.isArray(metadata?.siblings) ? metadata.siblings : [],
+            })
+          }
+        } catch {
+          // The evaluator owns metadata validation; absence here simply disables the transport fallback.
+        }
+      }
     }
-    if (rowsUrl.origin !== HF_ROWS_ORIGIN || rowsUrl.pathname !== '/rows') return response
 
-    const fallbackUrl = new URL('/first-rows', HF_ROWS_ORIGIN)
-    for (const key of ['dataset', 'config', 'split'] as const) {
-      const value = rowsUrl.searchParams.get(key)
-      if (value) fallbackUrl.searchParams.set(key, value)
-    }
-    if (!fallbackUrl.searchParams.get('dataset') || !fallbackUrl.searchParams.get('split')) {
-      return response
-    }
+    if (response.ok || response.status < 500 || !url) return response
+    if (url.origin !== HF_ROWS_ORIGIN || url.pathname !== '/rows') return response
 
-    return originalFetch(fallbackUrl, init)
+    const repoId = url.searchParams.get('dataset')?.trim() || ''
+    const split = url.searchParams.get('split')?.trim() || ''
+    const metadata = pinned.get(repoId)
+    const token = process.env.HF_TOKEN?.trim() || ''
+    if (!metadata || !repoId || !split || token.length < 20) return response
+
+    const rows = await readPinnedHfParquetRows({
+      repoId,
+      revision: metadata.revision,
+      split,
+      token,
+      siblings: metadata.siblings,
+      fetchImpl: originalFetch,
+    })
+    return new Response(JSON.stringify({
+      rows: rows.map((row, rowIdx) => ({ row_idx: rowIdx, row })),
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+    })
   }
 
   globalThis.fetch = patchedFetch
@@ -69,7 +117,7 @@ export async function GET(req: NextRequest) {
     if (evaluator && !process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
-    const result = await runWithHfRowsFallback(
+    const result = await runWithPinnedHfParquetFallback(
       () => runUniversityDistilledArtifactEvaluation(new Date()),
     )
     const skipped = 'skipped' in result && result.skipped === true

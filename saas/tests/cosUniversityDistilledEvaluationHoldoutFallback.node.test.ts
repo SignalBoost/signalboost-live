@@ -3,21 +3,37 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
 const route = readFileSync(new URL('../app/api/cron/cos-university-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+const helper = readFileSync(new URL('../lib/ai/cos/hfPinnedParquetRows.ts', import.meta.url), 'utf8')
 const evaluator = readFileSync(new URL('../lib/ai/cos/cosUniversityDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 
-test('distilled evaluation falls back only from Hugging Face rows provider 5xx to first-rows', () => {
+test('distilled evaluation replaces private Dataset Viewer 5xx with exact pinned Hub parquet rows', () => {
   assert.match(route, /HF_ROWS_ORIGIN = 'https:\/\/datasets-server\.huggingface\.co'/)
+  assert.match(route, /metadataRepoId/)
+  assert.match(route, /metadata\?\.sha/)
+  assert.match(route, /readPinnedHfParquetRows/)
   assert.match(route, /response\.ok \|\| response\.status < 500/)
-  assert.match(route, /rowsUrl\.pathname !== '\/rows'/)
-  assert.match(route, /new URL\('\/first-rows', HF_ROWS_ORIGIN\)/)
-  assert.match(route, /\['dataset', 'config', 'split'\]/)
+  assert.doesNotMatch(route, /new URL\(['"]\/first-rows/)
+})
+
+test('direct Hub parquet reader is exact-revision, split-scoped, and resource bounded while streaming', () => {
+  assert.match(helper, /resolve\/\$\{revision\}/)
+  assert.match(helper, /MAX_PARQUET_FILES = 8/)
+  assert.match(helper, /MAX_PARQUET_FILE_BYTES = 8 \* 1024 \* 1024/)
+  assert.match(helper, /MAX_ROWS = 100/)
+  assert.match(helper, /splitParquetMatcher/)
+  assert.match(helper, /response\.body\.getReader\(\)/)
+  assert.match(helper, /total > maxBytes/)
+  assert.match(helper, /reader\.cancel\('distilled_evaluation_hf_pinned_parquet_size_ceiling'\)/)
+  assert.match(helper, /parquetReadObjects\(\{ file \}\)/)
+  assert.equal(pkg.dependencies.hyparquet, '1.26.0')
 })
 
 test('fetch fallback is invocation-scoped and restored even when evaluation throws', () => {
   assert.match(route, /const originalFetch = globalThis\.fetch/)
   assert.match(route, /globalThis\.fetch = patchedFetch/)
   assert.match(route, /finally \{\s*globalThis\.fetch = originalFetch\s*\}/)
-  assert.match(route, /runWithHfRowsFallback\(\s*\(\) => runUniversityDistilledArtifactEvaluation\(new Date\(\)\)/)
+  assert.match(route, /runWithPinnedHfParquetFallback\(\s*\(\) => runUniversityDistilledArtifactEvaluation\(new Date\(\)\)/)
 })
 
 test('transport fallback does not weaken pinned holdout integrity gates', () => {

@@ -1,2 +1,2 @@
-base_sha=0e8a1a02eb6ba2f5543651f1e0f2bc036514664d
-branch=fix/distilled-evaluator-holdout-first-rows-20260915
+base_sha=dfe62cdfee05f9a2f6a204c10c50434a0cf95997
+branch=fix/distilled-evaluator-direct-hub-parquet-20260915

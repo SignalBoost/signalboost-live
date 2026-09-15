@@ -7,6 +7,7 @@ import {
 import {
   buildHuggingFaceJobSpec,
   decodeHuggingFaceDatasetRef,
+  findHuggingFaceJobByName,
   huggingFaceJobsConfigFromEnv,
   installHuggingFaceTrainingExecutorEnv,
   resolveHuggingFaceHardwareRate,
@@ -141,8 +142,10 @@ async function markFailure(runId: string, campaignId: string, candidateId: strin
     .eq('id', runId)
     .neq('stage', 'complete')
   if (run.error) throw run.error
+  // A failed batch must not stop unrelated work in the same campaign. The scheduled recovery pass
+  // re-arms it only inside the original expiration and remaining cost envelope.
   const campaign = await db.from('cos_university_mass_distillation_campaigns')
-    .update({ status: 'failed', updated_at: now })
+    .update({ status: 'active', updated_at: now })
     .eq('id', campaignId)
     .in('status', ['authorized', 'active'])
   if (campaign.error) throw campaign.error
@@ -150,7 +153,14 @@ async function markFailure(runId: string, campaignId: string, candidateId: strin
     candidateId,
     subjectId,
     claim: 'mass_distillation_stage_failed',
-    evidence: { campaignId, runId, reason, automaticRetryAuthorized: false },
+    evidence: {
+      campaignId,
+      runId,
+      reason,
+      automaticRetryAuthorized: true,
+      retryScope: 'same_campaign_expiration_and_remaining_budget',
+      retryCadence: 'next_scheduled_consumer_tick',
+    },
     verifier: 'host_controller',
   }).catch(() => null)
 }
@@ -405,7 +415,40 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
   })
 
   const namespace = await resolveHuggingFaceNamespace({ token: hf.token, fetchImpl })
-  const submitted = await submitHuggingFaceJob({ namespace, token: hf.token, spec, fetchImpl })
+  const operation = String((envelope as any).operation)
+  const knownJobs = await db.from('cos_university_mass_distillation_provider_jobs')
+    .select('job_id')
+    .eq('run_id', claim.run_id)
+    .eq('operation', operation === 'generate_teacher_dataset' ? 'teacher' : operation === 'prepare_dataset' ? 'preparation' : 'training')
+  if (knownJobs.error) throw knownJobs.error
+  const currentJobId = claim.stage === 'teacher_dispatching'
+    ? clean(run.teacher_job_id, 240)
+    : claim.stage === 'preparation_dispatching'
+      ? clean(run.preparation_job_id, 240)
+      : clean(run.training_job_id, 240)
+  const excludeJobIds = [
+    ...(knownJobs.data || []).map((row: any) => clean(row.job_id, 240)),
+    currentJobId,
+  ].filter(Boolean)
+  const recoveredProviderJob = await findHuggingFaceJobByName({
+    namespace,
+    token: hf.token,
+    name: spec.labels.name,
+    excludeJobIds,
+    fetchImpl,
+  })
+  let submitted: { jobId: string; jobUrl: string }
+  if (recoveredProviderJob) {
+    submitted = recoveredProviderJob
+  } else {
+    try {
+      submitted = await submitHuggingFaceJob({ namespace, token: hf.token, spec, fetchImpl })
+    } catch (error) {
+      const message = safeError(error)
+      if (/^huggingface_training_job_rejected:4\d\d$/.test(message)) throw error
+      throw new Error(`mass_distillation_provider_submission_uncertain:${message}`)
+    }
+  }
   const jobColumns = claim.stage === 'teacher_dispatching'
     ? { teacher_job_id: submitted.jobId, teacher_job_url: submitted.jobUrl }
     : claim.stage === 'preparation_dispatching'
@@ -418,8 +461,12 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     .eq('stage_idempotency_key', idempotencyKey)
     .select('id')
     .maybeSingle()
-  if (finished.error) throw finished.error
-  if (!finished.data) throw new Error('mass_distillation_post_dispatch_fence_lost')
+  if (finished.error) {
+    throw new Error(`mass_distillation_provider_submission_uncertain:${submitted.jobId}:${safeError(finished.error)}`)
+  }
+  if (!finished.data) {
+    throw new Error(`mass_distillation_provider_submission_uncertain:${submitted.jobId}:post_dispatch_fence_lost`)
+  }
 
   await recordAssurance({
     candidateId: run.candidate_id,
@@ -432,6 +479,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       stage: claim.stage,
       idempotencyKey,
       jobId: submitted.jobId,
+      recoveredProviderJob: Boolean(recoveredProviderJob),
       flavor: price.flavor,
       hourlyCostUsd: price.hourlyCostUsd,
       timeoutSeconds: spec.timeoutSeconds,
@@ -459,6 +507,77 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     maxEstimatedCostUsd,
     reservedCostCeilingUsd: expectedCeiling,
   })
+}
+
+export async function recoverMassDistillationCampaigns(input: {
+  now?: Date
+  maxCampaigns?: number
+} = {}) {
+  const db = cosServiceDb()
+  if (!db) return { ok: false as const, skipped: true as const, reason: 'service_database_unavailable' as const }
+  const maxCampaigns = Math.max(1, Math.min(10, Math.floor(input.maxCampaigns ?? 5)))
+  const now = (input.now || new Date()).toISOString()
+  const campaigns = await db.from('cos_university_mass_distillation_campaigns')
+    .select('id,status,expires_at')
+    .in('status', ['authorized', 'active', 'failed'])
+    .gt('expires_at', now)
+    .order('updated_at', { ascending: true })
+    .limit(maxCampaigns)
+  if (campaigns.error) throw campaigns.error
+
+  const recovered: unknown[] = []
+  const failures: Array<{ campaignId: string; error: string }> = []
+  let campaignsWithFailedRuns = 0
+  let rearmedRuns = 0
+  let releasedRejectedReserveUsd = 0
+  let budgetBlockedRuns = 0
+  let awaitingProviderDiscoveryRuns = 0
+  for (const campaign of (campaigns.data || []) as any[]) {
+    const failed = await db.from('cos_university_mass_distillation_batch_runs')
+      .select('id')
+      .eq('campaign_id', campaign.id)
+      .eq('stage', 'failed')
+      .limit(1)
+    if (failed.error) {
+      failures.push({ campaignId: campaign.id, error: safeError(failed.error) })
+      continue
+    }
+    if ((failed.data || []).length === 0) continue
+    campaignsWithFailedRuns += 1
+    const result = await db.rpc('rearm_cos_university_mass_distillation_campaign', {
+      p_campaign_id: campaign.id,
+      p_source: 'scheduled_cron_retry_within_existing_campaign_authority',
+    })
+    if (result.error) {
+      failures.push({ campaignId: campaign.id, error: safeError(result.error) })
+      continue
+    }
+    const summary: any = result.data || {}
+    recovered.push(summary)
+    rearmedRuns += Number(summary.rearmedRuns || 0)
+    releasedRejectedReserveUsd += Number(summary.releasedRejectedReserveUsd || 0)
+    budgetBlockedRuns += Number(summary.budgetBlockedRuns || 0)
+    awaitingProviderDiscoveryRuns += Number(summary.awaitingProviderDiscoveryRuns || 0)
+  }
+
+  return {
+    ok: failures.length === 0,
+    skipped: campaignsWithFailedRuns === 0,
+    reason: campaignsWithFailedRuns === 0 ? 'no_recoverable_failed_campaign' as const : undefined,
+    campaignsInspected: (campaigns.data || []).length,
+    campaignsWithFailedRuns,
+    rearmedRuns,
+    releasedRejectedReserveUsd: Number(releasedRejectedReserveUsd.toFixed(6)),
+    budgetBlockedRuns,
+    awaitingProviderDiscoveryRuns,
+    recovered,
+    failures,
+    automaticRetryAuthorized: true,
+    automaticPromotionAuthorized: false,
+    runpodMutationAuthorized: false,
+    authorityExpanded: false,
+    semantics: 'scheduled_retry_within_existing_campaign_expiration_and_remaining_budget' as const,
+  }
 }
 
 export async function runMassDistillationCampaignConsumer(input: {
@@ -489,65 +608,78 @@ export async function runMassDistillationCampaignConsumer(input: {
     return { ok: true as const, skipped: true as const, reason: 'no_authorized_campaign' as const, dispatched: 0 }
   }
 
-  let campaign: any = null
-  let initialClaim: Claim | undefined
-  for (const candidate of campaignRows) {
-    const claimed = await db.rpc('claim_cos_university_mass_distillation_stage', { p_campaign_id: candidate.id })
-    if (claimed.error) throw claimed.error
-    const claim = Array.isArray(claimed.data) ? claimed.data[0] as Claim | undefined : undefined
-    if (!claim) continue
-    campaign = candidate
-    initialClaim = claim
-    break
+  const dispatched: unknown[] = []
+  const failures: Array<{ campaignId: string; runId?: string; phase: 'claim' | 'dispatch'; error: string }> = []
+  const unavailableCampaignIds = new Set<string>()
+  const inspectedCampaignIds = new Set<string>()
+  const touchedCampaignIds = new Set<string>()
+
+  for (let index = 0; index < maxDispatches; index += 1) {
+    let claim: Claim | undefined
+    let campaign: any = null
+    for (let offset = 0; offset < campaignRows.length; offset += 1) {
+      const candidate = campaignRows[(index + offset) % campaignRows.length]
+      if (unavailableCampaignIds.has(candidate.id)) continue
+      inspectedCampaignIds.add(candidate.id)
+      const claimed = await db.rpc('claim_cos_university_mass_distillation_stage', { p_campaign_id: candidate.id })
+      if (claimed.error) {
+        unavailableCampaignIds.add(candidate.id)
+        failures.push({ campaignId: candidate.id, phase: 'claim', error: safeError(claimed.error) })
+        continue
+      }
+      const next = Array.isArray(claimed.data) ? claimed.data[0] as Claim | undefined : undefined
+      if (!next) {
+        unavailableCampaignIds.add(candidate.id)
+        continue
+      }
+      campaign = candidate
+      claim = next
+      break
+    }
+    if (!campaign || !claim) break
+    touchedCampaignIds.add(campaign.id)
+    try {
+      dispatched.push(await dispatchClaim(claim, input.fetchImpl))
+    } catch (error) {
+      await markFailure(claim.run_id, claim.campaign_id, claim.candidate_id, claim.subject_id, error)
+      failures.push({
+        campaignId: claim.campaign_id,
+        runId: claim.run_id,
+        phase: 'dispatch',
+        error: safeError(error),
+      })
+    }
   }
 
-  if (!campaign || !initialClaim) {
+  if (dispatched.length === 0 && failures.length === 0) {
     return {
       ok: true as const,
       skipped: true as const,
       reason: 'no_claimable_campaign' as const,
       dispatched: 0,
-      campaignsInspected: campaignRows.length,
+      campaignsInspected: inspectedCampaignIds.size,
     }
   }
 
-  const dispatched: unknown[] = []
-  for (let index = 0; index < maxDispatches; index += 1) {
-    let claim: Claim | undefined = index === 0 ? initialClaim : undefined
-    if (index > 0) {
-      const claimed = await db.rpc('claim_cos_university_mass_distillation_stage', { p_campaign_id: campaign.id })
-      if (claimed.error) throw claimed.error
-      claim = Array.isArray(claimed.data) ? claimed.data[0] as Claim | undefined : undefined
-    }
-    if (!claim) break
-    try {
-      dispatched.push(await dispatchClaim(claim, input.fetchImpl))
-    } catch (error) {
-      await markFailure(claim.run_id, claim.campaign_id, claim.candidate_id, claim.subject_id, error)
-      return {
-        ok: false as const,
-        campaignId: campaign.id,
-        dispatched: dispatched.length,
-        jobs: dispatched,
-        failedRunId: claim.run_id,
-        error: safeError(error),
-        campaignsInspected: campaignRows.length,
-        semantics: 'campaign_stopped_on_first_failed_or_uncertain_dispatch_no_automatic_retry' as const,
-      }
-    }
-  }
-
+  const firstCampaign = campaignRows.find(row => touchedCampaignIds.has(row.id)) || campaignRows[0]
   return {
-    ok: true as const,
-    campaignId: campaign.id,
+    ok: failures.length === 0,
+    skipped: false as const,
+    degraded: failures.length > 0,
+    campaignId: touchedCampaignIds.values().next().value || firstCampaign.id,
+    campaignIds: [...touchedCampaignIds],
     dispatched: dispatched.length,
     jobs: dispatched,
-    maxTotalCostUsd: Number(campaign.max_total_cost_usd),
-    previouslyCommittedCostUsd: Number(campaign.committed_cost_usd),
-    campaignsInspected: campaignRows.length,
+    failures,
+    maxTotalCostUsd: Number(firstCampaign.max_total_cost_usd),
+    previouslyCommittedCostUsd: Number(firstCampaign.committed_cost_usd),
+    campaignsInspected: inspectedCampaignIds.size,
+    automaticRetryAuthorized: true,
     automaticPromotionAuthorized: false,
     runpodMutationAuthorized: false,
-    semantics: 'bounded_owner_authorized_huggingface_campaign_no_runpod_mutation_no_promotion' as const,
+    semantics: failures.length > 0
+      ? 'failed_stages_scheduled_for_bounded_retry_while_other_campaign_work_continues' as const
+      : 'bounded_owner_authorized_huggingface_campaign_no_runpod_mutation_no_promotion' as const,
   }
 }
 

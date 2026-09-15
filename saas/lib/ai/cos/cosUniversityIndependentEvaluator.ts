@@ -36,11 +36,18 @@ export type IndependentEvaluatorPayload = Readonly<{
 type IndependentEvaluatorConfig = Readonly<{ secret: string }>
 
 const HASH = /^[a-f0-9]{64}$/i
+const HEX40 = /^[a-f0-9]{40}$/i
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const EVALUATOR_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{2,239}$/
+const MASS_CANDIDATE = /^mass:([0-9a-f-]{36}):([a-f0-9]{16})$/i
 
 function clean(value: unknown, max = 2000): string {
   return String(value ?? '').trim().slice(0, max)
+}
+
+function isMassCandidate(candidateId: string): boolean {
+  const match = MASS_CANDIDATE.exec(candidateId)
+  return Boolean(match && UUID.test(match[1]))
 }
 
 async function serviceDb() {
@@ -58,7 +65,9 @@ function finiteScore(value: unknown): number | null {
 }
 
 function validRevision(revision: FineTuneRevision): boolean {
+  const baseRevision = clean(revision?.baseModelRevision, 40).toLowerCase()
   return Boolean(clean(revision?.baseModel, 500))
+    && (!baseRevision || HEX40.test(baseRevision))
     && HASH.test(clean(revision?.datasetHash, 64))
     && HASH.test(clean(revision?.trainingManifestHash, 64))
     && HASH.test(clean(revision?.holdoutManifestHash, 64))
@@ -73,11 +82,7 @@ export function independentEvaluatorConfigFromEnv(
   return Object.freeze({ secret })
 }
 
-/**
- * Prefer an explicitly deployed evaluator credential, but permit a separately generated service-only
- * Supabase Vault secret when the environment variable has not been provisioned. The learner, teacher,
- * RunPod runtime, and browser never receive this secret. Missing/invalid Vault state remains fail-closed.
- */
+/** Prefer a deployed evaluator credential, falling back only to the service-only Vault secret. */
 export async function independentEvaluatorConfig(): Promise<IndependentEvaluatorConfig | null> {
   const env = independentEvaluatorConfigFromEnv()
   if (env) return env
@@ -124,21 +129,25 @@ export function verifyIndependentEvaluatorPayload(input: {
 export function normalizeIndependentEvaluatorPayload(value: unknown): IndependentEvaluatorPayload {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('independent_evaluator_payload_invalid')
   const input = value as Record<string, unknown>
-  const candidateId = clean(input.candidateId, 140)
-  const match = /^study-plan:([0-9a-f-]+)$/i.exec(candidateId)
-  if (!match || !UUID.test(match[1])) throw new Error('independent_evaluator_candidate_invalid')
+  const candidateId = clean(input.candidateId, 240)
+  const study = /^study-plan:([0-9a-f-]+)$/i.exec(candidateId)
+  const studyValid = Boolean(study && UUID.test(study[1]))
+  const massValid = isMassCandidate(candidateId)
+  if (!studyValid && !massValid) throw new Error('independent_evaluator_candidate_invalid')
 
   const claim = clean(input.claim, 80) as IndependentEvaluatorClaim
   if (!(INDEPENDENT_EVALUATOR_CLAIMS as readonly string[]).includes(claim)) throw new Error('independent_evaluator_claim_invalid')
 
   const rawRevision = input.revision as Record<string, unknown> | null
+  const baseModelRevision = clean(rawRevision?.baseModelRevision, 40).toLowerCase()
   const revision: FineTuneRevision = {
     baseModel: clean(rawRevision?.baseModel, 500),
+    ...(baseModelRevision ? { baseModelRevision } : {}),
     datasetHash: clean(rawRevision?.datasetHash, 64).toLowerCase(),
     trainingManifestHash: clean(rawRevision?.trainingManifestHash, 64).toLowerCase(),
     holdoutManifestHash: clean(rawRevision?.holdoutManifestHash, 64).toLowerCase(),
   }
-  if (!validRevision(revision)) throw new Error('independent_evaluator_revision_invalid')
+  if (!validRevision(revision) || (massValid && !HEX40.test(baseModelRevision))) throw new Error('independent_evaluator_revision_invalid')
 
   const trainedArtifactId = clean(input.trainedArtifactId, 500)
   const artifactHash = clean(input.artifactHash, 64).toLowerCase()
@@ -184,11 +193,38 @@ export function normalizeIndependentEvaluatorPayload(value: unknown): Independen
   })
 }
 
-/**
- * Records only evidence produced by the separately authenticated independent evaluator. This function
- * does not dispatch an evaluator, start compute, approve spending, promote a model, or activate a
- * graduate. The training executor and owner HTTP routes have no signing authority for this boundary.
- */
+async function validateMassTrainingRegistration(input: {
+  payload: IndependentEvaluatorPayload
+  revisionKey: string
+  observedAt: Date
+}): Promise<{ teacherModelId: string }> {
+  const db = await serviceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const row = await db.from('cos_university_mass_distillation_batch_runs')
+    .select('candidate_id,student_model_id,student_model_revision,teacher_model_id,dataset_hash,training_manifest_hash,holdout_manifest_hash,revision_key,trained_artifact_id,trained_artifact_hash,stage,completed_at')
+    .eq('candidate_id', input.payload.candidateId)
+    .maybeSingle()
+  if (row.error) throw row.error
+  const run: any = row.data
+  if (!run || run.stage !== 'complete') throw new Error('independent_evaluator_mass_training_not_complete')
+  const completedAt = Date.parse(String(run.completed_at || ''))
+  if (!Number.isFinite(completedAt) || completedAt > input.observedAt.getTime()) throw new Error('independent_evaluator_mass_training_time_invalid')
+  if (clean(run.student_model_id, 500) !== input.payload.revision.baseModel
+    || clean(run.student_model_revision, 40).toLowerCase() !== clean(input.payload.revision.baseModelRevision, 40).toLowerCase()
+    || clean(run.dataset_hash, 64).toLowerCase() !== input.payload.revision.datasetHash
+    || clean(run.training_manifest_hash, 64).toLowerCase() !== input.payload.revision.trainingManifestHash
+    || clean(run.holdout_manifest_hash, 64).toLowerCase() !== input.payload.revision.holdoutManifestHash
+    || clean(run.revision_key, 64).toLowerCase() !== input.revisionKey
+    || clean(run.trained_artifact_id, 500) !== input.payload.trainedArtifactId
+    || clean(run.trained_artifact_hash, 64).toLowerCase() !== input.payload.artifactHash) {
+    throw new Error('independent_evaluator_mass_artifact_registration_mismatch')
+  }
+  const teacherModelId = clean(run.teacher_model_id, 240)
+  if (!teacherModelId) throw new Error('independent_evaluator_teacher_identity_missing')
+  return { teacherModelId }
+}
+
+/** Records only evidence produced by the separately authenticated independent evaluator. */
 export async function recordIndependentEvaluatorEvidence(input: {
   payload: unknown
   observedAt?: Date
@@ -199,29 +235,34 @@ export async function recordIndependentEvaluatorEvidence(input: {
   if (!Number.isFinite(observedAt.getTime())) throw new Error('independent_evaluator_observed_at_invalid')
   const idempotencyKey = clean(input.idempotencyKey, 500)
   if (!idempotencyKey) throw new Error('independent_evaluator_idempotency_key_missing')
+  const revisionKey = fineTuneRevisionKey(payload.revision)
 
-  const recorded = await readFineTuneEvidence(payload.candidateId, payload.revision, observedAt)
-  if (recorded.trainedArtifactId !== payload.trainedArtifactId
-    || clean(recorded.trainedArtifactHash, 64).toLowerCase() !== payload.artifactHash) {
-    throw new Error('independent_evaluator_artifact_not_registered')
-  }
+  if (isMassCandidate(payload.candidateId)) {
+    const mass = await validateMassTrainingRegistration({ payload, revisionKey, observedAt })
+    if (mass.teacherModelId === payload.evaluatorId) throw new Error('independent_evaluator_teacher_separation_required')
+  } else {
+    const recorded = await readFineTuneEvidence(payload.candidateId, payload.revision, observedAt)
+    if (recorded.trainedArtifactId !== payload.trainedArtifactId
+      || clean(recorded.trainedArtifactHash, 64).toLowerCase() !== payload.artifactHash) {
+      throw new Error('independent_evaluator_artifact_not_registered')
+    }
 
-  const mode = await readCosUniversityArtifactTrainingMode({
-    candidateId: payload.candidateId,
-    revision: payload.revision,
-    trainedArtifactId: payload.trainedArtifactId,
-    trainedArtifactHash: payload.artifactHash,
-    now: observedAt,
-  })
-  if (mode.mode === 'distillation') {
-    const teacher = clean(mode.distillation?.candidate?.teacherModelId, 240)
-    if (!teacher) throw new Error('independent_evaluator_teacher_identity_missing')
-    if (teacher === payload.evaluatorId) throw new Error('independent_evaluator_teacher_separation_required')
+    const mode = await readCosUniversityArtifactTrainingMode({
+      candidateId: payload.candidateId,
+      revision: payload.revision,
+      trainedArtifactId: payload.trainedArtifactId,
+      trainedArtifactHash: payload.artifactHash,
+      now: observedAt,
+    })
+    if (mode.mode === 'distillation') {
+      const teacher = clean(mode.distillation?.candidate?.teacherModelId, 240)
+      if (!teacher) throw new Error('independent_evaluator_teacher_identity_missing')
+      if (teacher === payload.evaluatorId) throw new Error('independent_evaluator_teacher_separation_required')
+    }
   }
 
   const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const revisionKey = fineTuneRevisionKey(payload.revision)
   const evidence = {
     profile: FINE_TUNE_EVIDENCE_PROFILE,
     claim: payload.claim,

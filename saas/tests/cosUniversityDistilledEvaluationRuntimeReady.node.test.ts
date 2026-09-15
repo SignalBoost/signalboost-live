@@ -4,21 +4,20 @@ import { readFileSync } from 'node:fs'
 
 const route = readFileSync(new URL('../app/api/cron/cos-university-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 
-test('independent evaluation wakes exact RunPod runtime before its first inference call', () => {
+test('independent evaluation proves exact RunPod readiness before every inference POST', () => {
   assert.match(route, /RUNPOD_READY_TIMEOUT_MS = 220_000/)
   assert.match(route, /RUNPOD_READY_POLL_MS = 3_000/)
   assert.match(route, /RUNPOD_ENDPOINT_HOST = \/\^\[A-Za-z0-9_-\]/)
   assert.match(route, /url\.pathname === '\/v1\/chat\/completions'/)
-  assert.match(route, /const warmedRunpodOrigins = new Set<string>\(\)/)
-  assert.match(route, /await proveRunpodReady\(\{ origin: url\.origin, originalFetch \}\)/)
-  assert.match(route, /warmedRunpodOrigins\.add\(url\.origin\)/)
+  assert.match(route, /if \(isRunpodEvaluationInference\(url, init\)\) \{\s*await proveRunpodReady\(\{ origin: url\.origin, originalFetch \}\)\s*\}/)
+  assert.doesNotMatch(route, /warmedRunpodOrigins/)
 })
 
 test('runtime readiness uses non-inference GET probes and requires HTTP 200', () => {
   assert.match(route, /input\.originalFetch\(`\$\{input\.origin\}\/ready`/)
   assert.match(route, /headers: \{ Authorization: `Bearer \$\{key\}` \}/)
   assert.match(route, /if \(response\.status === 200\) return/)
-  assert.doesNotMatch(route, /proveRunpodReady[\s\S]*?chat\/completions[\s\S]*?return/)
+  assert.doesNotMatch(route, /proveRunpodReady[\s\S]*?\/v1\/chat\/completions[\s\S]*?originalFetch/)
 })
 
 test('runtime readiness fails closed on bootstrap failure or deadline without retrying inference', () => {

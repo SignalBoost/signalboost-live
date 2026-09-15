@@ -7,7 +7,7 @@ on:
       - 'saas/**'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   diagnostics:
@@ -17,10 +17,25 @@ jobs:
         working-directory: saas
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - run: npm install --no-audit --no-fund
+      - name: Sync generated package lock on this PR branch
+        shell: bash
+        working-directory: .
+        run: |
+          set -euo pipefail
+          git config user.name "SignalBoost"
+          git config user.email "cadomos@gmail.com"
+          git add saas/package-lock.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore(deps): sync hyparquet lock"
+          git push origin HEAD:${{ github.head_ref }}
       - shell: bash
         run: |
           set +e

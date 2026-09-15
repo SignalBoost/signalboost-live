@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 const route = readFileSync(new URL('../app/api/cron/cos-university-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 
 test('independent evaluation proves exact RunPod readiness before every inference POST', () => {
-  assert.match(route, /RUNPOD_READY_TIMEOUT_MS = 220_000/)
+  assert.match(route, /RUNPOD_READY_TIMEOUT_MS = 300_000/)
   assert.match(route, /RUNPOD_READY_POLL_MS = 3_000/)
   assert.match(route, /RUNPOD_INFERENCE_TIMEOUT_MS = 120_000/)
   assert.match(route, /RUNPOD_ENDPOINT_HOST = \/\^\[A-Za-z0-9_-\]/)
@@ -26,6 +26,7 @@ test('runtime readiness uses non-inference GET probes and requires HTTP 200', ()
   assert.match(route, /if \(response\.status === 200\) return/)
   assert.match(route, /detail\.includes\('distilled_bootstrap_failed'\)/)
   assert.match(route, /distilled_evaluation_runtime_bootstrap_failed/)
+  assert.match(route, /no additional inference call is used to warm the worker/)
 })
 
 test('one durable cost-bounded attempt is consumed only at the first billed wake boundary', () => {

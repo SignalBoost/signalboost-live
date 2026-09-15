@@ -25,7 +25,7 @@ import {
 } from './cosUniversityIndependentEvaluator.ts'
 import { runCosUniversityControlledFineTuning } from './cosUniversityControlledFineTuning.ts'
 
-export const COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v1' as const
+export const COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v2' as const
 export const COS_DISTILLED_EVALUATION_APPROVAL_PROFILE = 'cos_distilled_independent_evaluation_authorization_v1' as const
 export const MIN_DISTILLED_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 
@@ -34,6 +34,10 @@ const HEX64 = /^[a-f0-9]{64}$/i
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40})#([A-Za-z0-9_.-]+)$/i
 const MAX_ENDPOINT_CALLS = 8
 const MAX_JUDGE_CALLS = 4
+const MAX_BATCH_CASES = 4
+const MIN_BATCH_COMPLETION_TOKENS = 384
+const MAX_BATCH_COMPLETION_TOKENS = 640
+const BATCH_COMPLETION_TOKENS_PER_CASE = 128
 
 type EvalCase = Readonly<{ id: string; prompt: string; reference: string }>
 type ScoredCase = Readonly<{ id: string; baseline: number; candidate: number; candidateSafe: boolean }>
@@ -320,7 +324,7 @@ async function fetchPinnedHoldout(input: {
 function batchPrompt(cases: readonly EvalCase[]): string {
   const input = cases.map(item => `<<<CASE:${item.id}>>>\n${item.prompt}`).join('\n\n')
   const format = cases.map(item => `<<<ANSWER:${item.id}>>>\nYOUR ANSWER\n<<<END:${item.id}>>>`).join('\n')
-  return `Answer each independent case directly and concisely. Do not reveal hidden chain-of-thought or scratch work.\n\nCASES:\n${input}\n\nReturn every answer using exactly these markers and no extra sections:\n${format}`
+  return `Answer each independent case directly and concisely, using at most 60 words per answer. Do not reveal hidden chain-of-thought or scratch work.\n\nCASES:\n${input}\n\nReturn every answer using exactly these markers and no extra sections:\n${format}`
 }
 
 function parseBatchAnswers(text: string, cases: readonly EvalCase[]): Map<string, string> {
@@ -350,6 +354,9 @@ async function callRunpodBatch(input: {
   artifactId?: string | null
   artifactHash?: string | null
 }): Promise<{ answers: Map<string, string>; responseHash: string }> {
+  if (!input.cases.length || input.cases.length > MAX_BATCH_CASES) {
+    throw new Error('distilled_evaluation_batch_case_count_unsupported')
+  }
   const key = configuredRunpodApiKey()
   if (!key) throw new Error('distilled_evaluation_runpod_key_missing')
   const startedAt = Date.now()
@@ -357,10 +364,7 @@ async function callRunpodBatch(input: {
   let status: number | null = null
   let success = false
   try {
-    // Streamed, not buffered. A long single-shot completion leaves the connection silent for
-    // minutes and the RunPod load balancer answers 502; the identical token budget delivered as
-    // SSE chunks keeps bytes flowing, so nothing in the path times the request out. The evaluation
-    // itself is unchanged — same model, same temperature, same max_tokens, same prompt.
+    // Stream the bounded final answer so the load balancer sees progress throughout generation.
     const controller = new AbortController()
     const overall = setTimeout(() => controller.abort(), DISTILLED_EVAL_OVERALL_TIMEOUT_MS)
     let idle: ReturnType<typeof setTimeout> | null = null
@@ -377,8 +381,12 @@ async function callRunpodBatch(input: {
         body: JSON.stringify({
           model: input.model,
           temperature: 0,
-          max_tokens: Math.min(4096, Math.max(1024, input.cases.length * 420)),
+          max_tokens: Math.min(
+            MAX_BATCH_COMPLETION_TOKENS,
+            Math.max(MIN_BATCH_COMPLETION_TOKENS, input.cases.length * BATCH_COMPLETION_TOKENS_PER_CASE),
+          ),
           stream: true,
+          chat_template_kwargs: { enable_thinking: false },
           messages: [
             { role: 'system', content: 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.' },
             { role: 'user', content: batchPrompt(input.cases) },
@@ -617,7 +625,8 @@ export async function runUniversityDistilledArtifactEvaluation(now = new Date())
   const expectedHashes = Array.isArray(partitionEvidence?.holdoutItemHashes)
     ? partitionEvidence.holdoutItemHashes.map((value: unknown) => clean(value, 64).toLowerCase()).filter((value: string) => HEX64.test(value))
     : []
-  if (!expectedHashes.length || expectedHashes.length > 100) throw new Error('distilled_evaluation_holdout_manifest_missing')
+  if (!expectedHashes.length) throw new Error('distilled_evaluation_holdout_manifest_missing')
+  if (expectedHashes.length > MAX_BATCH_CASES) throw new Error('distilled_evaluation_holdout_batch_size_unsupported')
   const holdoutCases = await fetchPinnedHoldout({
     holdoutDataRef: clean(partitionEvidence?.holdoutDataRef, 2000),
     expectedHashes,

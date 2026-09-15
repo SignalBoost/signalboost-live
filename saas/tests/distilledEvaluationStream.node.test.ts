@@ -63,10 +63,11 @@ test('every chunk resets the idle watchdog', async () => {
   assert.ok(ticks >= 3, `expected a tick per read, saw ${ticks}`)
 })
 
-test('the evaluation request itself is unchanged apart from streaming', () => {
-  // The gate scores the student on these values; a quiet change here would invalidate the result.
+test('the evaluation request preserves bounded non-thinking generation while streaming', () => {
   assert.match(source, /temperature: 0,/)
-  assert.match(source, /max_tokens: Math\.min\(4096, Math\.max\(1024, input\.cases\.length \* 420\)\)/)
+  assert.match(source, /MAX_BATCH_COMPLETION_TOKENS = 640/)
+  assert.match(source, /BATCH_COMPLETION_TOKENS_PER_CASE = 128/)
+  assert.match(source, /chat_template_kwargs: \{ enable_thinking: false \}/)
   assert.match(source, /stream: true/)
   assert.doesNotMatch(source, /AbortSignal\.timeout\(120_000\)/)
 })

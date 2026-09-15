@@ -45,7 +45,7 @@ function clean(value: unknown, max = 2000): string {
 }
 
 async function serviceDb() {
-  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
+  const mod = await import('../../cos-core/storage/supabase.ts')
   return mod.cosServiceDb()
 }
 

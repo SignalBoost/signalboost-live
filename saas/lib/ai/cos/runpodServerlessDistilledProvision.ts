@@ -7,7 +7,7 @@ const SERVERLESS_API = 'https://api.runpod.ai/v2'
 // Keep each materially different load-balancer bootstrap immutable. A new endpoint identity makes
 // failed canary evidence auditable instead of silently changing the worker behind an old receipt.
 export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v3'
-export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v4'
+export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v5'
 export const DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER' as const
 export const DISTILLED_CONTAINER_PORT = 8000
 const DISTILLED_INTERNAL_VLLM_PORT = 8001

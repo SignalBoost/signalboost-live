@@ -6,6 +6,7 @@ import {
   approvalState,
   buildDistilledEvaluationApproval,
   completedIndependentEvaluation,
+  delayedRetentionRecovery,
   distilledEvaluationCallCeilings,
   isDistilledEvaluationApprovalEvidence,
   tickClearance,
@@ -117,7 +118,24 @@ test('one independent verdict per artifact: an evaluated artifact cannot be re-a
   ], HASH)
   assert.equal(failed?.improved, false)
   assert.match(runtime, /\.eq\('verifier', 'independent_scorer'\)/)
-  assert.match(runtime, /if \(evaluation\) return \{ ok: false as const, error: 'artifact_already_independently_evaluated'/)
+  assert.match(runtime, /if \(evaluation && !retentionRecovery\) return \{ ok: false as const, error: 'artifact_already_independently_evaluated'/)
   const page = readFileSync(new URL('../app/dashboard/cos-university-approvals/page.tsx', import.meta.url), 'utf8')
   assert.match(page, /status\?\.state === 'evaluated'/)
+})
+
+test('a premature legacy verdict unlocks only when delayed retention is due', () => {
+  const row = {
+    created_at: '2026-09-15T12:00:00Z',
+    artifact_age_seconds: 60 * 60,
+    delayed_retention_passed: false,
+  }
+  const waiting = delayedRetentionRecovery(row, new Date('2026-09-15T20:00:00Z'))
+  assert.equal(waiting?.ready, false)
+  assert.equal(waiting?.readyAt, '2026-09-15T23:00:00.000Z')
+  assert.equal(delayedRetentionRecovery(row, new Date('2026-09-15T23:00:00Z'))?.ready, true)
+  assert.equal(delayedRetentionRecovery({ ...row, artifact_age_seconds: 12 * 60 * 60 }, new Date('2026-09-16T00:00:00Z')), null)
+  assert.match(runtime, /error: 'delayed_retention_not_due'/)
+  assert.match(runtime, /evaluation && !retentionRecovery/)
+  assert.match(runtime, /retentionReadyAt: new Date\(trainedAt \+ DISTILLED_EVALUATION_RETENTION_DELAY_MS\)/)
+  assert.match(runtime, /\.eq\('revision_key', revisionKey\)[\s\S]*\.eq\('evaluator_version', DISTILLED_EVALUATOR_VERSION\)/)
 })

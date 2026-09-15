@@ -9,9 +9,12 @@ import {
   DISTILLED_EVALUATION_APPROVAL_TTL_MS,
   DISTILLED_EVALUATION_ATTEMPT_CLAIM,
   DISTILLED_EVALUATION_PATH_ID,
+  DISTILLED_EVALUATION_RETENTION_DELAY_MS,
+  DISTILLED_EVALUATOR_VERSION,
   approvalState,
   buildDistilledEvaluationApproval,
   completedIndependentEvaluation,
+  delayedRetentionRecovery,
   distilledEvaluationCallCeilings,
   isDistilledEvaluationApprovalEvidence,
   tickClearance,
@@ -64,6 +67,15 @@ async function pendingArtifact() {
       && evidence?.claim === 'partition_manifests_registered'
       && String(evidence?.revisionKey || '').trim().toLowerCase() === revisionKey
   }) as any
+  const trained = (events.data || []).find((event: any) => {
+    const evidence = event?.evidence
+    return evidence?.profile === FINE_TUNE_EVIDENCE_PROFILE
+      && evidence?.claim === 'trained_artifact_registered'
+      && String(evidence?.artifactHash || '').trim().toLowerCase() === artifactHash
+      && String(evidence?.revisionKey || '').trim().toLowerCase() === revisionKey
+  }) as any
+  const trainedAt = Date.parse(String(trained?.observed_at || ''))
+  if (!Number.isFinite(trainedAt)) throw new Error('runtime_approval_training_time_invalid')
   const holdoutItemHashes = partition?.evidence?.holdoutItemHashes
   if (!Array.isArray(holdoutItemHashes)
     || !holdoutItemHashes.every((value: unknown) => HEX64.test(String(value || '').trim().toLowerCase()))) {
@@ -74,7 +86,14 @@ async function pendingArtifact() {
     throw new Error('runtime_approval_holdout_manifest_invalid')
   }
   const calls = distilledEvaluationCallCeilings(normalizedHashes.length)
-  return { candidateId, subjectId, artifactHash, revisionKey, ...calls }
+  return {
+    candidateId,
+    subjectId,
+    artifactHash,
+    revisionKey,
+    retentionReadyAt: new Date(trainedAt + DISTILLED_EVALUATION_RETENTION_DELAY_MS).toISOString(),
+    ...calls,
+  }
 }
 
 async function latestApproval(candidateId: string, artifactHash: string, holdoutCaseCount: number): Promise<ApprovalRow | null> {
@@ -145,14 +164,29 @@ async function independentEvaluationFor(candidateId: string, artifactHash: strin
   return completedIndependentEvaluation((rows.data || []) as any[], artifactHash)
 }
 
+async function delayedRetentionFor(candidateId: string, artifactHash: string, revisionKey: string, now: Date) {
+  const row = await db().from('cos_university_distilled_evaluation_runs')
+    .select('artifact_age_seconds,delayed_retention_passed,created_at')
+    .eq('candidate_id', candidateId)
+    .eq('trained_artifact_hash', artifactHash)
+    .eq('revision_key', revisionKey)
+    .eq('evaluator_version', DISTILLED_EVALUATOR_VERSION)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (row.error) throw row.error
+  return delayedRetentionRecovery((row.data as any) || null, now)
+}
+
 export async function readDistilledEvaluationApprovalStatus(now = new Date()) {
   const artifact = await pendingArtifact()
   if (!artifact) return { ok: true as const, artifact: null, state: 'none' as const, approval: null, outcome: null, evaluation: null, clearance: tickClearance(now) }
   const approval = await latestApproval(artifact.candidateId, artifact.artifactHash, artifact.holdoutCaseCount)
   const attempts = await attemptsFor(artifact.candidateId)
   const evaluation = await independentEvaluationFor(artifact.candidateId, artifact.artifactHash)
+  const retentionRecovery = await delayedRetentionFor(artifact.candidateId, artifact.artifactHash, artifact.revisionKey, now)
   const approvalLifecycle = approvalState({ approval, attempts, now })
-  const state = evaluation && approvalLifecycle !== 'armed' ? 'evaluated' as const : approvalLifecycle
+  const state = evaluation && !retentionRecovery && approvalLifecycle !== 'armed' ? 'evaluated' as const : approvalLifecycle
   const outcome = approvalLifecycle === 'consumed' && approval ? await latestOutcome(approval.observed_at) : null
   return {
     ok: true as const,
@@ -161,6 +195,7 @@ export async function readDistilledEvaluationApprovalStatus(now = new Date()) {
     approval: approval ? { observedAt: approval.observed_at, expiresAt: approval.expires_at } : null,
     outcome,
     evaluation,
+    retentionRecovery,
     clearance: tickClearance(now),
   }
 }
@@ -170,8 +205,27 @@ export async function issueDistilledEvaluationApproval(input: { ownerUserId: str
   const artifact = await pendingArtifact()
   if (!artifact) return { ok: false as const, error: 'no_supported_evaluation_pending_artifact' }
 
+  const retentionWaitSeconds = Math.max(0, Math.ceil((Date.parse(artifact.retentionReadyAt) - now.getTime()) / 1000))
+  if (retentionWaitSeconds > 0) {
+    return {
+      ok: false as const,
+      error: 'delayed_retention_not_due',
+      retryAfterSeconds: retentionWaitSeconds,
+      readyAt: artifact.retentionReadyAt,
+    }
+  }
+
   const evaluation = await independentEvaluationFor(artifact.candidateId, artifact.artifactHash)
-  if (evaluation) return { ok: false as const, error: 'artifact_already_independently_evaluated', evaluation }
+  const retentionRecovery = await delayedRetentionFor(artifact.candidateId, artifact.artifactHash, artifact.revisionKey, now)
+  if (evaluation && !retentionRecovery) return { ok: false as const, error: 'artifact_already_independently_evaluated', evaluation }
+  if (retentionRecovery && !retentionRecovery.ready) {
+    return {
+      ok: false as const,
+      error: 'delayed_retention_not_due',
+      retryAfterSeconds: retentionRecovery.retryAfterSeconds,
+      readyAt: retentionRecovery.readyAt,
+    }
+  }
 
   const existing = await latestApproval(artifact.candidateId, artifact.artifactHash, artifact.holdoutCaseCount)
   const state = approvalState({ approval: existing, attempts: await attemptsFor(artifact.candidateId), now })

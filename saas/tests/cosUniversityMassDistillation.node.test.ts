@@ -130,7 +130,7 @@ test('frequent University learning lane packages unique material without provide
   assert.match(packager, /retainedMaterialHash/)
   assert.match(packager, /classifyCosUniversitySubjects/)
   assert.match(packager, /cosUniversitySubjectById/)
-  assert.match(packager, /item\.materialHash === row\.materialHash/)
+  assert.match(packager, /group\.materialHashes\.has\(row\.materialHash\)/)
   assert.match(packager, /'teacher_synthesis_ready', 'consumed'/)
   assert.match(packager, /dispatch_authorized: false/)
   assert.match(packager, /externalCostUsd: 0/)

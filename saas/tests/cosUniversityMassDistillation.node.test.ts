@@ -67,6 +67,23 @@ test('mass distillation batches are bounded, deterministic and do not reuse assi
   assert.ok(remaining[0].sourceCount >= MASS_DISTILLATION_MIN_BATCH)
 })
 
+test('subject aliases package through the canonical University subject family without lowering the minimum', () => {
+  const rows = [
+    ...Array.from({ length: 10 }, (_, index) => ({
+      contentHash: h(index + 30_000), materialHash: h(index + 40_000), subject: 'TypeScript and Next.js',
+      sourceKind: 'course_material', license: 'Public Domain', confidence: 0.95,
+    })),
+    ...Array.from({ length: 10 }, (_, index) => ({
+      contentHash: h(index + 31_000), materialHash: h(index + 41_000), subject: 'databases',
+      sourceKind: 'course_material', license: 'Public Domain', confidence: 0.95,
+    })),
+  ]
+  const prepared = buildMassDistillationBatches(rows)
+  assert.equal(prepared.length, 1)
+  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_MIN_BATCH)
+  assert.equal(prepared[0].subjectId, 'Computer Science & Coding')
+})
+
 test('storage hashes cannot manufacture a distillation batch from duplicate learning material', () => {
   const duplicateRows = Array.from({ length: 34 }, (_, index) => ({
     contentHash: h(index + 1), materialHash: h(999_999), subject: 'Data Structures and Algorithms in Python',
@@ -111,7 +128,9 @@ test('frequent University learning lane packages unique material without provide
   assert.match(route, /externalCostUsd: 0/)
   assert.match(packager, /source_title,summary,facts/)
   assert.match(packager, /retainedMaterialHash/)
-  assert.match(packager, /item\.materialHash === row\.materialHash/)
+  assert.match(packager, /classifyCosUniversitySubjects/)
+  assert.match(packager, /cosUniversitySubjectById/)
+  assert.match(packager, /group\.materialHashes\.has\(row\.materialHash\)/)
   assert.match(packager, /'teacher_synthesis_ready', 'consumed'/)
   assert.match(packager, /dispatch_authorized: false/)
   assert.match(packager, /externalCostUsd: 0/)

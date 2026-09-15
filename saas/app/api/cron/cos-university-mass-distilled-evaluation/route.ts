@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
+import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import {
   runMassDistilledArtifactEvaluation,
   type MassEvaluationClaim,
@@ -22,6 +23,14 @@ const ENDPOINT_ID = /^[A-Za-z0-9_-]{3,120}$/
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const clean = (value: unknown, max = 1000) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
+
+async function recordProduction(invocationSucceeded: boolean, evidence: Record<string, unknown>) {
+  await recordCosUniversityProductionPath({
+    path: 'mass_distilled_independent_evaluation',
+    invocationSucceeded,
+    evidence,
+  })
+}
 
 type RawClaim = Readonly<{
   candidate_id: string
@@ -130,7 +139,15 @@ export async function GET(req: NextRequest) {
   let claim: MassEvaluationClaim | null = null
   try {
     const evaluator = await independentEvaluatorConfig()
-    if (!evaluator) return NextResponse.json({ ok: true, skipped: true, reason: 'independent_evaluator_not_configured' })
+    if (!evaluator) {
+      await recordProduction(true, {
+        runnerInvoked: false,
+        skipped: true,
+        status: 'not_claimed',
+        reason: 'independent_evaluator_not_configured',
+      }).catch(() => undefined)
+      return NextResponse.json({ ok: true, skipped: true, reason: 'independent_evaluator_not_configured' })
+    }
     if (!process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
@@ -138,11 +155,24 @@ export async function GET(req: NextRequest) {
     // Read-only provider balance check happens before consuming the single evaluation authorization.
     const account = await queryRunpodAccountStatus()
     if (account.clientBalance !== null && account.clientBalance < MIN_BALANCE_USD) {
+      await recordProduction(false, {
+        runnerInvoked: false,
+        blocked: 'runpod_balance_guard',
+        balance: account.clientBalance,
+      }).catch(() => undefined)
       return NextResponse.json({ ok: false, error: 'runpod_balance_guard', balance: account.clientBalance }, { status: 402 })
     }
 
     claim = await claimNext()
-    if (!claim) return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
+    if (!claim) {
+      await recordProduction(true, {
+        runnerInvoked: false,
+        skipped: true,
+        status: 'not_claimed',
+        reason: 'no_atomically_claimable_mass_distilled_evaluation',
+      }).catch(() => undefined)
+      return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
+    }
 
     const deadlineMs = Date.now() + ROUTE_BUDGET_MS
     const result = await runMassDistilledArtifactEvaluation({ claim, deadlineMs, now: new Date() })
@@ -162,6 +192,17 @@ export async function GET(req: NextRequest) {
         retention: result.retention,
       },
     })
+    await recordProduction(true, {
+      runnerInvoked: true,
+      attempted: 1,
+      status: 'completed',
+      candidateId: claim.candidateId,
+      artifactHash: claim.artifactHash,
+      evaluationPassed: result.evaluationPassed,
+      nextStatus: result.nextStatus,
+      endpointCalls: result.endpointCalls,
+      judgeCalls: result.judgeCalls,
+    }).catch(() => undefined)
     console.info('[cos-mass-distilled-independent-evaluation]', JSON.stringify(result))
     return NextResponse.json(result, { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
@@ -173,6 +214,11 @@ export async function GET(req: NextRequest) {
         evidence: { error: clean(message, 500) },
       }).catch(() => undefined)
     }
+    await recordProduction(false, {
+      runnerInvoked: Boolean(claim),
+      error: clean(message, 500),
+      ...(claim ? { candidateId: claim.candidateId, artifactHash: claim.artifactHash } : {}),
+    }).catch(() => undefined)
     console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: clean(message, 500) }))
     return NextResponse.json({ ok: false, error: clean(message, 500) }, { status: 500 })
   }

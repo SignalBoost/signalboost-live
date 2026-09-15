@@ -1,2 +1,2 @@
-base_sha=5aedcaadc9aa4378f826e85a67be5edd3efe8259
-branch=fix/distilled-evaluator-lazy-attempt-20260915
+base_sha=80230a58d14cc8b4e106a1d051f3ea106905e95e
+branch=fix/distilled-evaluator-bounded-output-20260915

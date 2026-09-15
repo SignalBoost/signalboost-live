@@ -27,7 +27,7 @@ test('RunPod fits the canonical twelve-case holdout into one bounded call per mo
   assert.match(evaluator, /chat_template_kwargs: \{ enable_thinking: false \}/)
   assert.match(evaluator, /Math\.min\(\s*MAX_BATCH_COMPLETION_TOKENS,/)
   assert.match(evaluator, /if \(!input\.cases\.length \|\| input\.cases\.length > MAX_BATCH_CASES\)/)
-  assert.match(evaluator, /if \(expectedHashes\.length > MAX_BATCH_CASES\) throw new Error\('distilled_evaluation_holdout_batch_size_unsupported'\)/)
+  assert.match(evaluator, /if \(expectedHashes\.length > MAX_SUITE_CASES\) throw new Error\('distilled_evaluation_holdout_batch_size_unsupported'\)/)
   assert.match(evaluator, /two calls x four suites/)
   assert.doesNotMatch(evaluator, /Math\.min\(4096, Math\.max\(1024, input\.cases\.length \* 420\)\)/)
 })

@@ -12,8 +12,9 @@ test('distilled canary reconciliation verifies existing endpoint without mutatin
   assert.match(reconcile, /requestV2<\{ endpoints\?: RunpodEndpointV2\[] \}>\('\/serverless'\)/)
   assert.match(reconcile, /find\(item => item\.id === id\)/)
   assert.match(reconcile, /assertDistilledEndpointPolicy\(endpoint, id\)/)
+  assert.match(reconcile, /await assertDistilledEndpointCachedBaseModel\(id\)/)
   assert.doesNotMatch(reconcile, /method:\s*'PATCH'/)
-  assert.doesNotMatch(reconcile, /JSON\.stringify\(endpointV2PolicyPayload\(\)\)/)
+  assert.doesNotMatch(reconcile, /mutation SaveDistilledEndpoint/)
 })
 
 test('read-only reconciliation fails closed on policy drift', () => {
@@ -23,4 +24,7 @@ test('read-only reconciliation fails closed on policy drift', () => {
   assert.match(provision, /endpoint\.scaling\?\.type && endpoint\.scaling\.type !== 'REQUEST_COUNT'/)
   assert.match(provision, /endpoint\.gpu\?\.count !== undefined && Number\(endpoint\.gpu\.count\) !== 1/)
   assert.match(provision, /RunPod distilled endpoint is no longer present in the account/)
+  assert.match(provision, /query DistilledEndpointCachedModel\(\$id: String!\)/)
+  assert.match(provision, /references\.length !== 1 \|\| references\[0\] !== DISTILLED_BASE_MODEL_REFERENCE/)
+  assert.match(provision, /RunPod distilled endpoint does not carry the exact cached base-model revision/)
 })

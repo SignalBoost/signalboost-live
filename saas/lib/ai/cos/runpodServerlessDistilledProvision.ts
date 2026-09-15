@@ -3,17 +3,19 @@ import { configuredRunpodApiKey } from './runpodConfig.ts'
 
 const REST_V1 = 'https://rest.runpod.io/v1'
 const CONTROL_API_V2 = 'https://api.runpod.io/v2'
+const GRAPHQL_API = 'https://api.runpod.io/graphql'
 const SERVERLESS_API = 'https://api.runpod.ai/v2'
 // Keep each materially different load-balancer bootstrap immutable. A new endpoint identity makes
 // failed canary evidence auditable instead of silently changing the worker behind an old receipt.
-export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v4'
-export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v6'
+export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v5'
+export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v7'
 export const DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER' as const
 export const DISTILLED_CONTAINER_PORT = 8000
 const DISTILLED_INTERNAL_VLLM_PORT = 8001
 export const DISTILLED_MODEL_NAME = 'itmounts-distilled-reasoning-v1'
 export const DISTILLED_BASE_MODEL_ID = 'Qwen/Qwen3-4B'
 export const DISTILLED_BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
+export const DISTILLED_BASE_MODEL_REFERENCE = `https://huggingface.co/${DISTILLED_BASE_MODEL_ID}:${DISTILLED_BASE_MODEL_REVISION}`
 export const DISTILLED_ADAPTER_MODEL_ID = 'cadomos/itmounts-student-f993a365a01e'
 export const DISTILLED_ADAPTER_MODEL_REVISION = '9f03387d87de550b96d973f9f30a3f02e783997e'
 export const DISTILLED_IDLE_TIMEOUT_SECONDS = 60
@@ -65,6 +67,13 @@ type RunpodEndpointV2 = {
   timeout?: number
   flashboot?: string
   gpu?: { pools?: string[]; count?: number }
+}
+type RunpodEndpointGraphQl = {
+  id?: string
+  name?: string
+  type?: 'QB' | 'LB'
+  templateId?: string
+  modelReferences?: string[]
 }
 type RunpodGpuCatalogItemV2 = {
   id?: string
@@ -180,6 +189,44 @@ async function requestV2<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 }
 
+async function requestGraphQl<T>(query: string, variables: Record<string, unknown>): Promise<T> {
+  const key = configuredRunpodApiKey()
+  if (!key) throw new Error('RUNPOD_API_KEY is not configured')
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const response = await fetch(`${GRAPHQL_API}?api_key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (compatible; SignalBoost/1.0)',
+      },
+      body: JSON.stringify({ query, variables }),
+    })
+    const raw = await response.text()
+    if (!response.ok) {
+      const detail = safeRunpodErrorDetail(raw)
+      throw new Error(`RunPod GraphQL HTTP ${response.status}${detail ? `: ${detail}` : ''}`)
+    }
+    let payload: { data?: T; errors?: Array<{ message?: unknown }> }
+    try {
+      payload = raw ? JSON.parse(raw) as typeof payload : {}
+    } catch {
+      throw new Error('RunPod GraphQL response was not valid JSON')
+    }
+    if (payload.errors?.length) {
+      const detail = safeRunpodErrorDetail(JSON.stringify({ message: payload.errors[0]?.message }))
+        || 'unknown GraphQL error'
+      throw new Error(`RunPod GraphQL error: ${detail}`)
+    }
+    if (!payload.data) throw new Error('RunPod GraphQL response carried no data')
+    return payload.data
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 function hfToken(): string {
   const token = process.env.HF_TOKEN?.trim() || ''
   if (token.length < 20) throw new Error('HF_TOKEN is not configured for private distilled adapter access')
@@ -263,8 +310,9 @@ async def bootstrap():
             "--max-cpu-loras", "1",
             "--lora-modules", lora,
             "--gpu-memory-utilization", "0.85",
-            "--max-model-len", "16384",
+            "--max-model-len", "8192",
             "--dtype", "auto",
+            "--enforce-eager",
         )
         async with httpx.AsyncClient(timeout=2.0) as client:
             for _ in range(300):
@@ -449,20 +497,85 @@ export async function runpodServerlessEndpointHealth(endpointId: string): Promis
   }
 }
 
-function endpointV2PolicyPayload() {
+function endpointGraphQlPolicyPayload() {
   return {
-    workers: {
-      min: 0,
-      max: 1,
-      idleTimeout: DISTILLED_IDLE_TIMEOUT_SECONDS,
-    },
-    scaling: {
-      type: 'REQUEST_COUNT',
-      requestCount: 1,
-    },
-    timeout: 300_000,
-    flashboot: 'FLASHBOOT',
+    workersMin: 0,
+    workersMax: 1,
+    idleTimeout: DISTILLED_IDLE_TIMEOUT_SECONDS,
+    scalerType: 'REQUEST_COUNT',
+    scalerValue: 1,
+    executionTimeoutMs: 300_000,
+    flashBootType: 'FLASHBOOT',
   }
+}
+
+function assertExactCachedBaseModel(endpoint: RunpodEndpointGraphQl, expectedId: string): void {
+  if (clean(endpoint.id, 120) !== expectedId) {
+    throw new Error('RunPod distilled endpoint cache evidence returned the wrong endpoint')
+  }
+  if (endpoint.type !== 'LB') {
+    throw new Error('RunPod distilled endpoint GraphQL routing no longer matches load-balancer policy')
+  }
+  const references = Array.isArray(endpoint.modelReferences)
+    ? endpoint.modelReferences.map(reference => clean(reference, 500))
+    : []
+  if (references.length !== 1 || references[0] !== DISTILLED_BASE_MODEL_REFERENCE) {
+    throw new Error('RunPod distilled endpoint does not carry the exact cached base-model revision')
+  }
+}
+
+async function createDistilledLoadBalancerEndpoint(input: {
+  templateId: string
+  pools: readonly string[]
+}): Promise<RunpodEndpointGraphQl> {
+  // RunPod's GraphQL EndpointInput is the control-plane surface that can set both the immutable LB
+  // routing type and modelReferences in one write. The cached base download completes outside the
+  // worker lifecycle, so the paid cold start only loads weights instead of downloading them.
+  const data = await requestGraphQl<{ saveEndpoint?: RunpodEndpointGraphQl }>(`
+    mutation SaveDistilledEndpoint($input: EndpointInput!) {
+      saveEndpoint(input: $input) {
+        id
+        name
+        type
+        templateId
+        modelReferences
+      }
+    }
+  `, {
+    input: {
+      name: DISTILLED_ENDPOINT_NAME,
+      type: 'LB',
+      templateId: input.templateId,
+      gpuIds: input.pools.join(','),
+      gpuCount: 1,
+      ...endpointGraphQlPolicyPayload(),
+      modelReferences: [DISTILLED_BASE_MODEL_REFERENCE],
+    },
+  })
+  const endpoint = data.saveEndpoint
+  const endpointId = clean(endpoint?.id, 120)
+  if (!endpoint || !endpointId) throw new Error('RunPod distilled endpoint creation returned no endpoint')
+  assertExactCachedBaseModel(endpoint, endpointId)
+  return endpoint
+}
+
+async function assertDistilledEndpointCachedBaseModel(endpointId: string): Promise<void> {
+  const data = await requestGraphQl<{
+    myself?: { endpoint?: RunpodEndpointGraphQl | null }
+  }>(`
+    query DistilledEndpointCachedModel($id: String!) {
+      myself {
+        endpoint(id: $id) {
+          id
+          type
+          modelReferences
+        }
+      }
+    }
+  `, { id: endpointId })
+  const endpoint = data.myself?.endpoint
+  if (!endpoint) throw new Error('RunPod distilled endpoint cache evidence is unavailable')
+  assertExactCachedBaseModel(endpoint, endpointId)
 }
 
 function serverlessGpuCandidates(items: readonly RunpodGpuCatalogItemV2[]) {
@@ -545,7 +658,9 @@ export async function reconcileRunpodServerlessDistilledEndpoint(endpointId: str
   const listed = await requestV2<{ endpoints?: RunpodEndpointV2[] }>('/serverless')
   const endpoint = (listed.endpoints || []).find(item => item.id === id)
   if (!endpoint) throw new Error('RunPod distilled endpoint is no longer present in the account')
-  return assertDistilledEndpointPolicy(endpoint, id)
+  const policy = assertDistilledEndpointPolicy(endpoint, id)
+  await assertDistilledEndpointCachedBaseModel(id)
+  return policy
 }
 
 export async function provisionRunpodServerlessDistilledLlm(): Promise<{
@@ -555,6 +670,7 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
   endpointId: string
   baseUrl: string
   model: string
+  baseModelReference: string
   workersMin: number
   workersMax: number
   idleTimeout: number
@@ -589,7 +705,7 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
         isPublic: false,
         isServerless: true,
         ports: [`${DISTILLED_CONTAINER_PORT}/http`],
-        readme: 'iTMounts exact distilled Qwen3-4B + immutable LoRA startup-gateway runtime. Scale-to-zero. Evaluation before Production activation.',
+        readme: 'iTMounts exact cached Qwen3-4B revision + immutable LoRA startup-gateway runtime. Scale-to-zero. Evaluation before Production activation.',
       }),
     })
     createdTemplate = true
@@ -609,19 +725,16 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
   if (!endpoint) {
     const gpu = await approvedServerlessGpuSelection()
     gpuTypeIds = gpu.gpuTypeIds
-    endpoint = await requestV2<RunpodEndpointV2>('/serverless', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: DISTILLED_ENDPOINT_NAME,
-        type: DISTILLED_ENDPOINT_ROUTING,
-        templateId: template.id,
-        gpu: {
-          pools: gpu.pools,
-          count: 1,
-        },
-        ...endpointV2PolicyPayload(),
-      }),
+    const created = await createDistilledLoadBalancerEndpoint({
+      templateId: template.id,
+      pools: gpu.pools,
     })
+    endpoint = {
+      id: clean(created.id, 120),
+      name: clean(created.name, 240) || DISTILLED_ENDPOINT_NAME,
+      type: created.type === 'LB' ? DISTILLED_ENDPOINT_ROUTING : undefined,
+      templateId: clean(created.templateId, 120) || template.id,
+    }
     createdEndpoint = true
   } else {
     gpuTypeIds = (endpoint.gpu?.pools || []).map(pool => `pool:${clean(pool, 80)}`)
@@ -637,6 +750,7 @@ export async function provisionRunpodServerlessDistilledLlm(): Promise<{
     endpointId: endpoint.id,
     baseUrl: runpodServerlessOpenAiBaseUrl(endpoint.id),
     model: DISTILLED_MODEL_NAME,
+    baseModelReference: DISTILLED_BASE_MODEL_REFERENCE,
     workersMin: policy.workersMin,
     workersMax: policy.workersMax,
     idleTimeout: policy.idleTimeout,

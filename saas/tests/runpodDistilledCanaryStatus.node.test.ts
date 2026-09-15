@@ -10,7 +10,7 @@ test('distilled canary retry ceiling is observable without another provider call
   assert.ok(ceilingIndex >= 0)
   assert.ok(providerIndex > ceilingIndex)
   assert.match(route, /consumedInvocations/)
-  assert.match(route, /maxCanaryInvocations:\s*MAX_CANARY_INVOCATIONS/)
+  assert.match(route, /maxCanaryInvocations:\s*approvedMaxCanaryInvocations/)
   assert.match(route, /latestFailure:/)
 })
 

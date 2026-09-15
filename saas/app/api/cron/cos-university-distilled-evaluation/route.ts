@@ -16,6 +16,7 @@ const HF_HUB_ORIGIN = 'https://huggingface.co'
 const HF_ROWS_ORIGIN = 'https://datasets-server.huggingface.co'
 const RUNPOD_READY_TIMEOUT_MS = 220_000
 const RUNPOD_READY_POLL_MS = 3_000
+const RUNPOD_INFERENCE_TIMEOUT_MS = 120_000
 const RUNPOD_KEEPALIVE_INTERVAL_MS = 30_000
 const EVALUATION_ROUTE_BUDGET_MS = 570_000
 const EVALUATION_ROUTE_RESERVE_MS = 30_000
@@ -281,6 +282,8 @@ async function proveRunpodReady(input: {
  * identity-set, and manifest checks before any model call.
  *
  * Before every exact RunPod evaluation inference POST, prove the same origin is freshly `/ready = 200`.
+ * The inference timeout starts only after readiness succeeds, so a legitimate cold start cannot
+ * consume the POST's abort budget before the POST is sent.
  * Once an origin is ready, a 30-second readiness keepalive keeps the 60-second scale-to-zero runtime
  * warm across independent-judge calls. All outbound fetches share a 570-second route deadline, leaving
  * a 30-second persistence reserve before Vercel's 600-second function ceiling. Readiness GETs are not
@@ -323,14 +326,24 @@ async function runWithEvaluationTransportGuards<T>(input: {
   const patchedFetch: typeof fetch = async (request, init) => {
     const rawUrl = requestUrl(request)
     let url: URL | null = null
+    let guardedInit = init
     try { url = new URL(rawUrl) } catch { url = null }
 
     if (isRunpodEvaluationInference(url, init)) {
       await proveRunpodReady({ origin: url.origin, fetchImpl: routeBoundFetch, routeDeadlineMs: input.routeDeadlineMs })
       ensureKeepalive(url.origin)
+
+      const inferenceBudget = input.routeDeadlineMs - Date.now() - EVALUATION_ROUTE_RESERVE_MS
+      if (inferenceBudget <= 0) {
+        throw new Error('distilled_evaluation_route_deadline_exceeded')
+      }
+      guardedInit = {
+        ...init,
+        signal: AbortSignal.timeout(Math.min(RUNPOD_INFERENCE_TIMEOUT_MS, inferenceBudget)),
+      }
     }
 
-    const response = await routeBoundFetch(request, init)
+    const response = await routeBoundFetch(request, guardedInit)
 
     if (url && response.ok) {
       const repoId = metadataRepoId(url)

@@ -9,10 +9,11 @@ const route = fs.readFileSync(path.join(ROOT, 'app/api/cron/cos-university-mass-
 const migration = fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260914180000_cos_university_mass_distillation_provider_spend.sql'), 'utf8')
 
 test('mass cron settles durable provider ledger before diagnostics and new paid claims', () => {
-  const reconcileAt = route.indexOf('reconcileMassDistillationHuggingFaceProviderLedger')
-  const diagnoseAt = route.indexOf('diagnoseFailedMassDistillationHuggingFaceJobs')
-  const consumeAt = route.indexOf('runMassDistillationCampaignConsumer({ maxDispatches: 3 })')
-  assert.ok(reconcileAt >= 0 && diagnoseAt > reconcileAt && consumeAt > diagnoseAt)
+  const reconcileAt = route.indexOf('await reconcileMassDistillationHuggingFaceProviderLedger({ maxJobs: 15 })')
+  const diagnoseAt = route.indexOf('await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })')
+  const recoverAt = route.indexOf('await recoverMassDistillationCampaigns({ maxCampaigns: 5 })')
+  const consumeAt = route.indexOf('await runMassDistillationCampaignConsumer({ maxDispatches: 3 })')
+  assert.ok(reconcileAt >= 0 && diagnoseAt > reconcileAt && recoverAt > diagnoseAt && consumeAt > recoverAt)
 })
 
 test('provider ledger hydrates accepted jobs independently of current run stage', () => {

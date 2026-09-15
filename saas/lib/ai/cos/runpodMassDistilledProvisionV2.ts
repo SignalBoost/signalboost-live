@@ -90,6 +90,14 @@ const requestV2 = <T>(path: string, init: RequestInit = {}) => request<T>(CONTRO
 
 function identity(input: MassDistilledRuntimeArtifact) {
   const suffix = input.artifactHash.slice(0, 12).toLowerCase()
+  const runtimeKey = clean(input.runtimeKey, 32).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 10)
+  if (runtimeKey) {
+    return {
+      templateName: `itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,
+      endpointName: `itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,
+      modelName: `itmounts-mass-distilled-${suffix}-${runtimeKey}`,
+    }
+  }
   return {
     templateName: `itmounts-mass-distilled-${suffix}-v2`,
     endpointName: `itmounts-mass-distilled-${suffix}-v2`,
@@ -164,15 +172,16 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact) {
 }
 
 /**
- * Preserve the proven creator first. The compatibility path is entered only for the obsolete
- * persistent-template-link assertion; all other legacy failures remain fail-closed.
+ * Preserve the proven creator first. Compatibility recovery handles provider response/identity drift,
+ * but only after the exact approval-scoped endpoint passes the non-template safety policy.
  */
 export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeArtifact) {
   try {
     return await provisionLegacyMassDistilledRuntime(input)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (message !== 'mass_distilled_runtime_endpoint_template_mismatch'
+    if (message !== 'mass_distilled_runtime_template_identity_mismatch'
+      && message !== 'mass_distilled_runtime_endpoint_template_mismatch'
       && message !== 'mass_distilled_runtime_endpoint_template_rebind_failed') throw error
 
     const recovered = await resolveExactEndpoint(input)

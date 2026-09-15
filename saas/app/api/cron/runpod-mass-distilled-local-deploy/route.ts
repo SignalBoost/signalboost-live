@@ -19,6 +19,9 @@ export const maxDuration = 300
 
 const PROFILE = 'cos_local_distilled_runtime_deploy_v1'
 const FINE_TUNE_PROFILE = 'cos_university_fine_tune_evidence_v1'
+const RESERVED = 'local_distilled_runtime_canary_started'
+const PREFLIGHT_FAILED = 'local_distilled_runtime_canary_preflight_failed'
+const INVOCATION_STARTED = 'local_distilled_runtime_canary_invocation_started'
 const PASSED = 'local_distilled_runtime_canary_passed'
 const FAILED = 'local_distilled_runtime_canary_failed'
 const HEX40 = /^[a-f0-9]{40}$/i
@@ -41,6 +44,15 @@ type AtomicClaim = Readonly<{
   reservation_event_key: string
 }>
 
+type ActiveClaim = Readonly<{
+  artifact: MassDistilledRuntimeArtifact
+  revisionKey: string
+  approvedCost: number
+  approvalAt: string
+  reservationEventKey: string
+  runtimeKey: string
+}>
+
 async function record(input:{candidateId:string;subjectId:string;artifactHash:string;claim:string;evidence:Record<string,unknown>;verifier?:string}){
   const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
   const body={profile:PROFILE,claim:input.claim,candidateId:input.candidateId,artifactHash:input.artifactHash,...input.evidence,authorityExpanded:false}
@@ -51,7 +63,7 @@ async function record(input:{candidateId:string;subjectId:string;artifactHash:st
 
 async function recordFineTuneCanary(input:{candidateId:string;subjectId:string;artifactId:string;artifactHash:string;revisionKey:string;endpointId:string;responseHash:string}){
   const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
-  const evidence={profile:FINE_TUNE_PROFILE,claim:'production_canary_healthy',candidateId:input.candidateId,revisionKey:input.revisionKey,trainedArtifactId:input.artifactId,artifactHash:input.artifactHash,evidenceRef:`db://cos_university_learning_assurance_events/${hash(['mass-distilled-production-canary-v2',input.endpointId,input.responseHash])}`,endpointId:input.endpointId,responseHash:input.responseHash,exactArtifact:true,internalVllmReady:true,scaleToZero:true,productionTrafficAuthorized:false,authorityExpanded:false}
+  const evidence={profile:FINE_TUNE_PROFILE,claim:'production_canary_healthy',candidateId:input.candidateId,revisionKey:input.revisionKey,trainedArtifactId:input.artifactId,artifactHash:input.artifactHash,evidenceRef:`db://cos_university_learning_assurance_events/${hash(['mass-distilled-production-canary-v3',input.endpointId,input.responseHash])}`,endpointId:input.endpointId,responseHash:input.responseHash,exactArtifact:true,internalVllmReady:true,scaleToZero:true,productionTrafficAuthorized:false,authorityExpanded:false}
   const evidenceHash=hash(evidence)
   const result=await db.from('cos_university_learning_assurance_events').upsert({event_key:hash([FINE_TUNE_PROFILE,'production_canary_healthy',input.candidateId,input.artifactHash,input.endpointId,input.responseHash]),event_type:'fine_tune',subject_id:input.subjectId,candidate_id:input.candidateId,evidence_hash:evidenceHash,evidence,verifier:'host_production_verifier',observed_at:new Date().toISOString()},{onConflict:'event_key',ignoreDuplicates:true})
   if(result.error) throw result.error
@@ -88,6 +100,9 @@ function artifactFromClaim(claim:AtomicClaim):{artifact:MassDistilledRuntimeArti
 export async function GET(req:NextRequest){
   const secret=process.env.CRON_SECRET
   if(!secret||req.headers.get('authorization')!==`Bearer ${secret}`) return NextResponse.json({ok:false,error:'Unauthorized'},{status:401})
+
+  let active:ActiveClaim|null=null
+  let providerInvocationStarted=false
   try{
     // Read-only balance guard comes before the transactional reservation so a low balance consumes no approval.
     const account=await queryRunpodAccountStatus()
@@ -99,23 +114,39 @@ export async function GET(req:NextRequest){
     const approvedCost=Number(claim.max_estimated_canary_cost_usd)
     const approvalAt=String(claim.approval_observed_at||'')
     const reservationEventKey=clean(claim.reservation_event_key,64)
+    const runtimeKey=hash(['mass-canary-runtime-v3',artifact.artifactHash,approvalAt]).slice(0,10)
+    const runtimeArtifact=Object.freeze({...artifact,runtimeKey})
+    active=Object.freeze({artifact:runtimeArtifact,revisionKey,approvedCost,approvalAt,reservationEventKey,runtimeKey})
 
-    const provisioned=await provisionMassDistilledRuntime(artifact)
+    // Provisioning is preflight. Provider/API/template drift here may be repaired and retried within
+    // the same unexpired approval because no model request or paid endpoint wake has happened yet.
+    const provisioned=await provisionMassDistilledRuntime(runtimeArtifact)
+
+    // This durable marker is the exact boundary where the single canary invocation becomes consumed.
+    // It is written before /ready, because the first endpoint request can wake paid compute.
+    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:INVOCATION_STARTED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
+    providerInvocationStarted=true
+
     const canary=await canaryMassDistilledRuntime({endpointId:provisioned.endpointId,modelName:provisioned.modelName})
-    const healthAfter=await massDistilledRuntimeHealth(provisioned.endpointId)
+    let healthAfter:unknown
+    try{healthAfter=await massDistilledRuntimeHealth(provisioned.endpointId)}
+    catch(error){healthAfter={ok:false,error:error instanceof Error?clean(error.message,300):'mass_distilled_health_read_failed'}}
 
     if(!canary.ok){
-      await record({candidateId:artifact.candidateId,subjectId:artifact.subjectId,artifactHash:artifact.artifactHash,claim:FAILED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,httpStatus:canary.httpStatus,error:clean(canary.error,300),healthAfter,readyTimeoutMs:MASS_DISTILLED_READY_TIMEOUT_MS,canaryTimeoutMs:MASS_DISTILLED_CANARY_TIMEOUT_MS,idleTimeoutSeconds:MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,authorizationObservedAt:approvalAt,reservationEventKey,productionTrafficAuthorized:false}})
-      return NextResponse.json({ok:false,deployed:true,canaryPassed:false,candidateId:artifact.candidateId,endpointId:provisioned.endpointId,error:canary.error},{status:503})
+      await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:FAILED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,httpStatus:canary.httpStatus,error:clean(canary.error,300),healthAfter,readyTimeoutMs:MASS_DISTILLED_READY_TIMEOUT_MS,canaryTimeoutMs:MASS_DISTILLED_CANARY_TIMEOUT_MS,idleTimeoutSeconds:MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
+      return NextResponse.json({ok:false,deployed:true,canaryPassed:false,candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,error:canary.error},{status:503})
     }
 
     const responseHash=hash(canary.text||'')
-    await record({candidateId:artifact.candidateId,subjectId:artifact.subjectId,artifactHash:artifact.artifactHash,claim:PASSED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:canary.httpStatus,responseHash,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,exactArtifact:true,internalVllmReady:true,scaleToZero:true,productionTrafficAuthorized:false,authorizationObservedAt:approvalAt,reservationEventKey,healthAfter}})
-    await recordFineTuneCanary({candidateId:artifact.candidateId,subjectId:artifact.subjectId,artifactId:artifact.artifactId,artifactHash:artifact.artifactHash,revisionKey,endpointId:provisioned.endpointId,responseHash})
-    return NextResponse.json({ok:true,deployed:true,canaryPassed:true,candidateId:artifact.candidateId,artifactHash:artifact.artifactHash,endpointId:provisioned.endpointId,model:provisioned.modelName,productionTrafficAuthorized:false})
+    await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:PASSED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:canary.httpStatus,responseHash,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,exactArtifact:true,internalVllmReady:true,scaleToZero:true,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false,healthAfter}})
+    await recordFineTuneCanary({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactId:runtimeArtifact.artifactId,artifactHash:runtimeArtifact.artifactHash,revisionKey,endpointId:provisioned.endpointId,responseHash})
+    return NextResponse.json({ok:true,deployed:true,canaryPassed:true,candidateId:runtimeArtifact.candidateId,artifactHash:runtimeArtifact.artifactHash,endpointId:provisioned.endpointId,model:provisioned.modelName,productionTrafficAuthorized:false})
   }catch(error){
     const message=error instanceof Error?error.message:String(error)
-    console.error('[runpod-mass-distilled-local-deploy]',JSON.stringify({ok:false,error:clean(message,300)}))
-    return NextResponse.json({ok:false,error:clean(message,300)},{status:500})
+    if(active&&!providerInvocationStarted){
+      await record({candidateId:active.artifact.candidateId,subjectId:active.artifact.subjectId,artifactHash:active.artifact.artifactHash,claim:PREFLIGHT_FAILED,evidence:{error:clean(message,300),attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:active.approvedCost,authorizationObservedAt:active.approvalAt,reservationEventKey:active.reservationEventKey,runtimeKey:active.runtimeKey,providerInvocationStarted:false,retryableWithinApproval:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}}).catch(recordError=>console.error('[runpod-mass-distilled-local-deploy-preflight-record]',JSON.stringify({ok:false,error:clean(recordError instanceof Error?recordError.message:String(recordError),300)})))
+    }
+    console.error('[runpod-mass-distilled-local-deploy]',JSON.stringify({ok:false,error:clean(message,300),claim:active?RESERVED:null,providerInvocationStarted}))
+    return NextResponse.json({ok:false,error:clean(message,300),providerInvocationStarted},{status:500})
   }
 }

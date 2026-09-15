@@ -23,6 +23,8 @@ export type MassDistilledRuntimeArtifact = Readonly<{
   artifactId: string
   artifactRevision: string
   artifactHash: string
+  /** Host-derived approval-scoped key. It isolates a fresh provider runtime after a preflight failure. */
+  runtimeKey?: string
 }>
 
 type Template = { id:string; name:string; imageName?:string; isServerless?:boolean; dockerEntrypoint?:string[]; dockerStartCmd?:string[]; ports?:string[] }
@@ -61,6 +63,11 @@ function assertArtifact(input:MassDistilledRuntimeArtifact){
 
 function identity(input:MassDistilledRuntimeArtifact){
   const suffix=input.artifactHash.slice(0,12).toLowerCase()
+  const runtimeKey=clean(input.runtimeKey,32).toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,10)
+  if(runtimeKey){
+    return {templateName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,endpointName:`itmounts-mass-distilled-${suffix}-${runtimeKey}-v3`,modelName:`itmounts-mass-distilled-${suffix}-${runtimeKey}`}
+  }
+  // Backward-compatible identity for historical callers. New approved canaries always provide runtimeKey.
   return {templateName:`itmounts-mass-distilled-${suffix}-v2`,endpointName:`itmounts-mass-distilled-${suffix}-v2`,modelName:`itmounts-mass-distilled-${suffix}`}
 }
 
@@ -152,13 +159,9 @@ function assertEndpointPolicy(endpoint:Endpoint,templateId:string){
 }
 
 async function rebindEndpointTemplate(endpoint:Endpoint,templateId:string):Promise<Endpoint>{
-  // Never repair identity on an endpoint whose execution/cost policy has drifted. Template repair is
-  // permitted only for the already-safe, scale-to-zero, one-GPU canary endpoint.
   assertEndpointSafetyPolicy(endpoint)
   if(clean(endpoint.templateId,200)===templateId) return endpoint
   await requestV1<unknown>(`/endpoints/${encodeURIComponent(endpoint.id)}`,{method:'PATCH',body:JSON.stringify({templateId})})
-  // PATCH triggers a provider rolling release. Re-read from the control plane and require the exact
-  // immutable template binding before any canary request is allowed to wake compute.
   const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless')
   const refreshed=(listed.endpoints||[]).find(item=>item.id===endpoint.id&&item.name===endpoint.name)
   if(!refreshed) throw new Error('mass_distilled_runtime_endpoint_template_rebind_missing')
@@ -173,7 +176,7 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
   const ids=identity(input); const templates=await requestV1<Template[]>('/templates')
   let template=templates.find(item=>item.name===ids.templateName&&item.isServerless!==false); let createdTemplate=false
   if(template&&!templateMatches(template,input,ids.modelName)) throw new Error('mass_distilled_runtime_template_identity_mismatch')
-  if(!template){template=await requestV1<Template>('/templates',{method:'POST',body:JSON.stringify({name:ids.templateName,imageName:VLLM_IMAGE,category:'NVIDIA',containerDiskInGb:50,dockerEntrypoint:['bash','-lc'],dockerStartCmd:[startupCommand(input,ids.modelName)],env:{HF_TOKEN:token,HF_HOME:'/models/hf-cache',PORT:String(PUBLIC_PORT),PORT_HEALTH:String(PUBLIC_PORT),HEALTH_CHECK_PATH:'/ping'},isPublic:false,isServerless:true,ports:[`${PUBLIC_PORT}/http`],readme:'iTMounts exact mass-distilled Qwen3-4B + immutable LoRA v2 canary runtime. Strict internal-vLLM readiness; scale-to-zero; no Production traffic.'})});createdTemplate=true}
+  if(!template){template=await requestV1<Template>('/templates',{method:'POST',body:JSON.stringify({name:ids.templateName,imageName:VLLM_IMAGE,category:'NVIDIA',containerDiskInGb:50,dockerEntrypoint:['bash','-lc'],dockerStartCmd:[startupCommand(input,ids.modelName)],env:{HF_TOKEN:token,HF_HOME:'/models/hf-cache',PORT:String(PUBLIC_PORT),PORT_HEALTH:String(PUBLIC_PORT),HEALTH_CHECK_PATH:'/ping'},isPublic:false,isServerless:true,ports:[`${PUBLIC_PORT}/http`],readme:'iTMounts exact mass-distilled Qwen3-4B + immutable LoRA canary runtime. Strict internal-vLLM readiness; scale-to-zero; no Production traffic.'})});createdTemplate=true}
   if(!template?.id) throw new Error('mass_distilled_runtime_template_id_missing')
   const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless'); let endpoint=(listed.endpoints||[]).find(item=>item.name===ids.endpointName); let createdEndpoint=false; let reboundTemplate=false
   if(!endpoint){endpoint=await requestV2<Endpoint>('/serverless',{method:'POST',body:JSON.stringify({name:ids.endpointName,type:ROUTING,templateId:template.id,gpu:{pools:await gpuPools(),count:1},workers:{min:0,max:1,idleTimeout:IDLE_TIMEOUT_SECONDS},scaling:{type:'REQUEST_COUNT',requestCount:1},timeout:300000,flashboot:'FLASHBOOT'})});createdEndpoint=true}

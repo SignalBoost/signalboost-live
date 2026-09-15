@@ -38,16 +38,17 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Mass-distillation artifacts are first-class evaluation candidates, but they never masquerade as
-    // study-plan identities. If no mass artifact is pending, preserve the legacy single-artifact lane.
+    // Mass-distillation artifacts have priority whenever actionable work exists, but retention waits
+    // must not starve the legacy study-plan evaluator. Release the shared cron when the mass lane is idle.
     const mass = await runUniversityMassDistilledArtifactEvaluation(new Date())
-    const noMassArtifact = 'skipped' in mass && mass.skipped === true && mass.reason === 'no_mass_evaluation_pending_artifact'
-    const result = noMassArtifact ? await runUniversityDistilledArtifactEvaluation(new Date()) : mass
+    const massIdle = 'skipped' in mass && mass.skipped === true
+      && ['no_mass_evaluation_pending_artifact', 'mass_evaluation_work_not_due'].includes(String(mass.reason || ''))
+    const result = massIdle ? await runUniversityDistilledArtifactEvaluation(new Date()) : mass
     const skipped = 'skipped' in result && result.skipped === true
     await recordCosUniversityProductionPath({
       path: 'distilled_independent_evaluation',
       invocationSucceeded: result.ok === true,
-      evidence: { ...result, massLaneChecked: true, claimRepairChecked: true, runnerInvoked: !skipped, skipped },
+      evidence: { ...result, massLaneChecked: true, massLaneIdle: massIdle, massLaneResult: mass, claimRepairChecked: true, runnerInvoked: !skipped, skipped },
     })
     console.info('[cos-distilled-independent-evaluation]', JSON.stringify(result))
     return NextResponse.json(result, {

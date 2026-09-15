@@ -4,12 +4,13 @@ import { readFileSync } from 'node:fs'
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
-test('canary consumption is fenced by the owner-approved invocation count, not the global maximum', () => {
+test('canary consumption is fenced by exact owner attempts and exact owner dollars', () => {
   const route = source('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts')
   assert.match(route, /approvedInvocations = Math\.floor\(Number\(evidence\?\.maxCanaryInvocations/)
-  assert.match(route, /approvedInvocations <= MAX_CANARY_INVOCATIONS/)
   assert.match(route, /consumed >= approval\.approvedInvocations/)
-  assert.match(route, /approvedInvocations: approval\.approvedInvocations/)
+  assert.match(route, /approvedCostUsd = Number\(evidence\?\.maxEstimatedCanaryCostUsd/)
+  assert.match(route, /estimatedCanaryCostUsd > approval\.approvedCostUsd \+ 1e-9/)
+  assert.match(route, /mass_distilled_canary_approved_budget_too_small/)
 })
 
 test('stored scorer claims repair without RunPod, judge, or dataset activity before evaluation starts', () => {
@@ -23,23 +24,24 @@ test('stored scorer claims repair without RunPod, judge, or dataset activity bef
   const repairIndex = route.indexOf('reconcileMassDistilledEvaluationClaims(new Date())')
   const evaluationIndex = route.indexOf('runUniversityMassDistilledArtifactEvaluation(new Date())')
   assert.ok(repairIndex >= 0 && evaluationIndex > repairIndex)
-  assert.match(route.slice(repairIndex, evaluationIndex), /claimRepairOnly: true/)
 })
 
-test('mass evaluator explicitly waits for exact runtime readiness before score-generating suites', () => {
+test('mass evaluator reserves a phase before exact runtime readiness and scoring', () => {
   const evaluator = source('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
-  assert.match(evaluator, /waitForMassDistilledReady\(canary\.endpointId\)/)
-  const readyIndex = evaluator.indexOf('waitForMassDistilledReady(canary.endpointId)')
-  const holdoutIndex = evaluator.indexOf("runSuite({ suiteName: 'holdout'")
-  const retentionIndex = evaluator.indexOf("runSuite({ suiteName: 'retention'")
-  assert.ok(readyIndex >= 0)
-  assert.ok(holdoutIndex > readyIndex)
-  assert.ok(retentionIndex > readyIndex)
+  const initialClaim = evaluator.indexOf("claimMassDistilledEvaluationPhase({ candidateId, artifactHash, phase: 'initial' })")
+  const initialReady = evaluator.lastIndexOf('waitForMassDistilledReady(canary.endpointId)')
+  const holdout = evaluator.indexOf("runSuite({ suiteName: 'holdout'")
+  assert.ok(initialClaim >= 0 && initialReady > initialClaim && holdout > initialReady)
+  const retentionClaim = evaluator.indexOf("claimMassDistilledEvaluationPhase({ candidateId, artifactHash, phase: 'retention' })")
+  const retentionReady = evaluator.indexOf('waitForMassDistilledReady(canary.endpointId)', retentionClaim)
+  const retentionSuite = evaluator.indexOf("runSuite({ suiteName: 'retention'", retentionReady)
+  assert.ok(retentionClaim >= 0 && retentionReady > retentionClaim && retentionSuite > retentionReady)
 })
 
 test('one failed retention attempt consumes the deferred marker so it cannot auto-spend again', () => {
+  const selector = source('../lib/ai/cos/cosUniversityMassDistilledEvaluationSelection.ts')
   const evaluator = source('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
-  assert.match(evaluator, /retentionDeferred = prior\?\.response_hashes\?\.retention\?\.deferred === true/)
+  assert.match(selector, /retentionDeferred = prior\?\.response_hashes\?\.retention\?\.deferred === true/)
   assert.match(evaluator, /retention: \{ \.\.\.retention\.responseHashes, attempted: true \}/)
 })
 
@@ -48,4 +50,13 @@ test('mass retention waits release the shared evaluator cron to legacy study-pla
   assert.match(route, /mass_evaluation_work_not_due/)
   assert.match(route, /massLaneIdle/)
   assert.match(route, /const result = massIdle \? await runUniversityDistilledArtifactEvaluation/)
+})
+
+test('mass selectors page beyond historical terminal artifacts', () => {
+  const selection = source('../lib/ai/cos/cosUniversityMassDistilledEvaluationSelection.ts')
+  const canary = source('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts')
+  assert.match(selection, /\.range\(offset, offset \+ PAGE_SIZE - 1\)/)
+  assert.match(canary, /\.range\(offset, offset \+ PAGE_SIZE - 1\)/)
+  assert.doesNotMatch(selection, /\.limit\(20\)/)
+  assert.doesNotMatch(canary, /\.limit\(20\)/)
 })

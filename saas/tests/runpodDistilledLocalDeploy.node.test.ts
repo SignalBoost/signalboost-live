@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import {
   DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
   DISTILLED_IDLE_TIMEOUT_SECONDS,
+  DISTILLED_STARTUP_READY_TIMEOUT_MS,
   runpodServerlessOpenAiBaseUrl,
   safeRunpodErrorDetail,
 } from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
@@ -24,9 +25,11 @@ test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
   assert.match(provision, /--max-lora-rank 16/)
 })
 
-test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and temporarily warm', () => {
-  assert.equal(DISTILLED_IDLE_TIMEOUT_SECONDS, 600)
-  assert.equal(DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS, 120_000)
+test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and inside the owner canary ceiling', () => {
+  assert.equal(DISTILLED_IDLE_TIMEOUT_SECONDS, 300)
+  assert.equal(DISTILLED_STARTUP_READY_TIMEOUT_MS, 220_000)
+  assert.equal(DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS, 60_000)
+  assert.ok(((300 + 220 + 60) * 0.69) / 3600 < 0.2)
   assert.match(provision, /min:\s*0/)
   assert.match(provision, /max:\s*1/)
   assert.match(provision, /idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
@@ -41,8 +44,8 @@ test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and te
 test('exact bootstrap template is isolated while endpoint discovery and creation use REST v2', () => {
   assert.match(provision, /const REST_V1 = 'https:\/\/rest\.runpod\.io\/v1'/)
   assert.match(provision, /const CONTROL_API_V2 = 'https:\/\/api\.runpod\.io\/v2'/)
-  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v2'/)
-  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v3'/)
+  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v3'/)
+  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v4'/)
   assert.match(provision, /requestV1<RunpodTemplateV1\[]>\('\/templates'\)/)
   assert.match(provision, /requestV2<\{ endpoints\?: RunpodEndpointV2\[] \}>\('\/serverless'\)/)
   assert.match(provision, /requestV2<RunpodEndpointV2>\('\/serverless'/)
@@ -52,6 +55,31 @@ test('exact bootstrap template is isolated while endpoint discovery and creation
   assert.match(provision, /containerDiskInGb:\s*50/)
   assert.match(provision, /dockerEntrypoint:\s*\['bash', '-lc'\]/)
   assert.match(provision, /dockerStartCmd:\s*\[startupCommand\(\)\]/)
+})
+
+test('startup gateway becomes routable before exact model initialization and can use RunPod cached base weights', () => {
+  assert.match(provision, /function startupGatewaySource\(\)/)
+  assert.match(provision, /\/runpod-volume\/huggingface-cache\/hub/)
+  assert.match(provision, /models--\{org\}--\{name\}/)
+  assert.match(provision, /snapshots.*BASE_REV/)
+  assert.match(provision, /@app\.get\("\/ping"\)/)
+  assert.match(provision, /@app\.get\("\/ready"\)/)
+  assert.match(provision, /asyncio\.create_task\(bootstrap\(\)\)/)
+  assert.match(provision, /ITMOUNTS_INTERNAL_VLLM_PORT/)
+  assert.match(provision, /127\.0\.0\.1/)
+  assert.match(provision, /distilled_bootstrap_failed/)
+  assert.match(provision, /waitForRunpodServerlessDistilledReady/)
+  assert.match(provision, /DISTILLED_STARTUP_READY_TIMEOUT_MS/)
+})
+
+test('startup gateway falls back to exact Hugging Face revisions without changing artifact identity', () => {
+  assert.match(provision, /repo_id=BASE_ID/)
+  assert.match(provision, /revision=BASE_REV/)
+  assert.match(provision, /repo_id=ADAPTER_ID/)
+  assert.match(provision, /revision=ADAPTER_REV/)
+  assert.match(provision, /local_dir="\/models\/base"/)
+  assert.match(provision, /local_dir="\/models\/adapter"/)
+  assert.match(provision, /"--lora-modules", lora/)
 })
 
 test('v2 endpoint policy uses nested worker and scaling fields only', () => {
@@ -71,14 +99,13 @@ test('v2 endpoint policy uses nested worker and scaling fields only', () => {
   assert.doesNotMatch(policy, /gpuTypeIds\s*:|gpuCount\s*:/)
 })
 
-test('v3 GPU selection widens capacity only to the standard 16 GB and 24 GB pools inside the owner ceiling', () => {
+test('v4 GPU selection stays on the standard 16 GB and 24 GB pools inside the owner ceiling', () => {
   assert.match(provision, /requestV2<\{ gpus\?: RunpodGpuCatalogItemV2\[] \}>\('\/catalog\/gpus'\)/)
   assert.match(provision, /Number\(item\.memory \|\| 0\) >= 16/)
   assert.match(provision, /Number\(item\.memory \|\| 0\) <= 24/)
   assert.match(provision, /APPROVED_SERVERLESS_GPU_POOLS = \[[\s\S]*'AMPERE_16',[\s\S]*'AMPERE_24'/)
   assert.doesNotMatch(provision, /APPROVED_SERVERLESS_GPU_POOLS = \[[\s\S]*'ADA_24'/)
   assert.match(provision, /MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 0\.69/)
-  assert.ok(((600 + 120 + 300) * 0.69) / 3600 < 0.2)
   assert.match(provision, /item\.availability !== 'NONE'/)
   assert.match(provision, /pools\.length < APPROVED_SERVERLESS_GPU_POOLS\.length/)
   assert.match(provision, /RunPod catalog does not currently expose both approved 16 GB and 24 GB Serverless pools/)
@@ -153,16 +180,17 @@ test('the distilled runtime is addressed as a load-balancer endpoint, not throug
   assert.doesNotMatch(provision, /api\.runpod\.ai\/v2\/\$\{id\}\/openai\/v1/)
   assert.match(provision, /DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER'/)
   assert.match(provision, /type:\s*DISTILLED_ENDPOINT_ROUTING/)
-  assert.match(provision, /HEALTH_CHECK_PATH: '\/health'/)
+  assert.match(provision, /HEALTH_CHECK_PATH: '\/ping'/)
   assert.match(provision, /PORT_HEALTH: String\(DISTILLED_CONTAINER_PORT\)/)
 })
 
-test('load-balancer template identity cannot reuse the historical queue-worker repair', () => {
-  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v2'/)
-  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v3'/)
+test('load-balancer template identity cannot reuse the failed pre-gateway runtime', () => {
+  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v3'/)
+  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v4'/)
   assert.match(provision, /templateHasExactBootstrap/)
   assert.match(provision, /command\.includes\(DISTILLED_BASE_MODEL_REVISION\)/)
   assert.match(provision, /command\.includes\(DISTILLED_ADAPTER_MODEL_REVISION\)/)
+  assert.match(provision, /command\.includes\('itmounts_distilled_gateway\.py'\)/)
   assert.match(provision, /throw new Error\('RunPod distilled load-balancer template exists but does not match the exact-artifact bootstrap contract'\)/)
 })
 

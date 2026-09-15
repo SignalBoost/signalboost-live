@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { runMassDistillationCampaignConsumer } from '@/lib/ai/cos/cosUniversityMassDistillationConsumer'
+import {
+  recoverMassDistillationCampaigns,
+  runMassDistillationCampaignConsumer,
+} from '@/lib/ai/cos/cosUniversityMassDistillationConsumer'
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from '@/lib/ai/cos/cosUniversityHuggingFaceJobDiagnostics'
 import { reconcileMassDistillationHuggingFaceProviderLedger } from '@/lib/ai/cos/cosUniversityHuggingFaceProviderLedger'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
@@ -18,18 +21,23 @@ export async function GET(req: NextRequest) {
     // provider cost before considering any new paid dispatch. This remains valid after a signed
     // worker callback has already advanced the run to its next stage.
     const reconciliation = await reconcileMassDistillationHuggingFaceProviderLedger({ maxJobs: 15 })
-    // Terminal failures are diagnosed read-only after settlement so any later explicit recovery is
-    // grounded in provider logs rather than a generic ERROR stage or guessed failure cause.
+    // Terminal failures are diagnosed read-only after settlement so scheduled recovery is grounded
+    // in provider logs rather than a generic ERROR stage or guessed failure cause.
     const diagnostics = await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })
+    // Re-arm failed stages only after provider settlement/diagnostics and only within the original
+    // campaign expiration and remaining cost envelope. Then keep dispatching unrelated work.
+    const recovery = await recoverMassDistillationCampaigns({ maxCampaigns: 5 })
     const result = await runMassDistillationCampaignConsumer({ maxDispatches: 3 })
     const consumerSkipped = 'skipped' in result && result.skipped === true
     const reconciliationSkipped = 'skipped' in reconciliation && reconciliation.skipped === true
     const diagnosticsSkipped = 'skipped' in diagnostics && diagnostics.skipped === true
-    const skipped = consumerSkipped && reconciliationSkipped && diagnosticsSkipped
-    const response = { ...result, reconciliation, diagnostics }
+    const recoverySkipped = recovery.skipped === true
+    const skipped = consumerSkipped && reconciliationSkipped && diagnosticsSkipped && recoverySkipped
+    const response = { ...result, reconciliation, diagnostics, recovery }
     const invocationSucceeded = (result.ok === true || consumerSkipped)
       && (reconciliation.ok === true || reconciliationSkipped)
       && (diagnostics.ok === true || diagnosticsSkipped)
+      && (recovery.ok === true || recoverySkipped)
 
     await recordCosUniversityProductionPath({
       path: 'mass_distillation_campaign',

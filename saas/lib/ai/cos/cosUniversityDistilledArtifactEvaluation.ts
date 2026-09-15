@@ -24,25 +24,29 @@ import {
   type IndependentEvaluatorClaim,
 } from './cosUniversityIndependentEvaluator.ts'
 import { runCosUniversityControlledFineTuning } from './cosUniversityControlledFineTuning.ts'
+import {
+  DISTILLED_EVALUATION_APPROVAL_PROFILE,
+  DISTILLED_EVALUATION_MAX_BATCH_CASES,
+  DISTILLED_EVALUATION_MAX_HOLDOUT_CASES,
+  distilledEvaluationCallCeilings,
+  isDistilledEvaluationApprovalEvidence,
+  type DistilledEvaluationCallCeilings,
+} from './cosUniversityRuntimeApprovalPolicy.ts'
 
-export const COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v3' as const
-export const COS_DISTILLED_EVALUATION_APPROVAL_PROFILE = 'cos_distilled_independent_evaluation_authorization_v1' as const
+export const COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v4' as const
+export const COS_DISTILLED_EVALUATION_APPROVAL_PROFILE = DISTILLED_EVALUATION_APPROVAL_PROFILE
 export const MIN_DISTILLED_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 
 const HEX40 = /^[a-f0-9]{40}$/i
 const HEX64 = /^[a-f0-9]{64}$/i
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40})#([A-Za-z0-9_.-]+)$/i
-const MAX_ENDPOINT_CALLS = 8
-const MAX_JUDGE_CALLS = 4
-// The canonical cognitive-certification holdout contains twelve cases. Keep it in one request per
-// model so the evaluation remains inside the approved eight endpoint calls (two calls x four suites).
-const MAX_BATCH_CASES = 12
+const MAX_BATCH_CASES = DISTILLED_EVALUATION_MAX_BATCH_CASES
 /**
  * A suite larger than one batch is evaluated in chunks of MAX_BATCH_CASES, so the ceiling below
  * bounds cost and wall time, not what the runtime can technically serve. The student's real
  * holdout manifest exceeded 12, which used to fail the whole evaluation as "unsupported".
  */
-const MAX_SUITE_CASES = 60
+const MAX_SUITE_CASES = DISTILLED_EVALUATION_MAX_HOLDOUT_CASES
 /** Named exhaustion beats a silent platform kill: the route's own catch can record this. */
 const EVAL_WALL_BUDGET_MS = 480_000
 const MIN_BATCH_COMPLETION_TOKENS = 384
@@ -57,6 +61,99 @@ type SuiteResult = Readonly<{
   allCandidateSafe: boolean
   responseHashes: Readonly<{ baseline: string; candidate: string; judge: string }>
 }>
+type EvaluationCallBudget = DistilledEvaluationCallCeilings & {
+  endpointCalls: number
+  judgeCalls: number
+  soloRetryCalls: number
+}
+export type DistilledEvaluationCallUsage = Readonly<{
+  holdoutCaseCount: number
+  endpointCalls: number
+  judgeCalls: number
+  soloRetryCalls: number
+  maxEndpointCalls: number
+  maxJudgeCalls: number
+  maxSoloRetryCalls: number
+}>
+
+const CALL_USAGE_ERROR_FIELD = 'distilledEvaluationCallUsage' as const
+
+function evaluationCallBudget(calls: DistilledEvaluationCallCeilings): EvaluationCallBudget {
+  return { ...calls, endpointCalls: 0, judgeCalls: 0, soloRetryCalls: 0 }
+}
+
+function evaluationCallUsage(budget: EvaluationCallBudget): DistilledEvaluationCallUsage {
+  return Object.freeze({
+    holdoutCaseCount: budget.holdoutCaseCount,
+    endpointCalls: budget.endpointCalls,
+    judgeCalls: budget.judgeCalls,
+    soloRetryCalls: budget.soloRetryCalls,
+    maxEndpointCalls: budget.maxEndpointCalls,
+    maxJudgeCalls: budget.maxJudgeCalls,
+    maxSoloRetryCalls: budget.maxSoloRetryCalls,
+  })
+}
+
+async function withEvaluationCallAudit<T>(budget: EvaluationCallBudget, work: () => Promise<T>): Promise<T> {
+  try {
+    return await work()
+  } catch (error) {
+    const usage = evaluationCallUsage(budget)
+    if (error instanceof Error) {
+      let attached = false
+      try {
+        Object.defineProperty(error, CALL_USAGE_ERROR_FIELD, { value: usage, configurable: true })
+        attached = true
+      } catch {}
+      if (attached) throw error
+    }
+    const failure = new Error(error instanceof Error ? error.message : String(error)) as Error & Record<string, unknown>
+    failure.cause = error
+    failure[CALL_USAGE_ERROR_FIELD] = usage
+    throw failure
+  }
+}
+
+export function distilledEvaluationCallUsageFromError(error: unknown): DistilledEvaluationCallUsage | null {
+  const usage = error && typeof error === 'object'
+    ? (error as Record<string, unknown>)[CALL_USAGE_ERROR_FIELD]
+    : null
+  if (!usage || typeof usage !== 'object' || Array.isArray(usage)) return null
+  const value = usage as Record<string, unknown>
+  const fields = [
+    value.holdoutCaseCount,
+    value.endpointCalls,
+    value.judgeCalls,
+    value.soloRetryCalls,
+    value.maxEndpointCalls,
+    value.maxJudgeCalls,
+    value.maxSoloRetryCalls,
+  ]
+  if (!fields.every(field => Number.isInteger(field) && Number(field) >= 0)) return null
+  return usage as DistilledEvaluationCallUsage
+}
+
+function consumeEndpointCall(budget: EvaluationCallBudget) {
+  if (budget.endpointCalls >= budget.maxEndpointCalls) {
+    throw new Error('distilled_evaluation_endpoint_call_ceiling_exceeded')
+  }
+  budget.endpointCalls += 1
+}
+
+function consumeSoloRetryCall(budget: EvaluationCallBudget) {
+  if (budget.soloRetryCalls >= budget.maxSoloRetryCalls) {
+    throw new Error('distilled_evaluation_solo_retry_call_ceiling_exceeded')
+  }
+  consumeEndpointCall(budget)
+  budget.soloRetryCalls += 1
+}
+
+function consumeJudgeCall(budget: EvaluationCallBudget) {
+  if (budget.judgeCalls >= budget.maxJudgeCalls) {
+    throw new Error('distilled_evaluation_judge_call_ceiling_exceeded')
+  }
+  budget.judgeCalls += 1
+}
 
 function clean(value: unknown, max = 4000): string {
   return String(value ?? '').trim().slice(0, max)
@@ -183,7 +280,7 @@ function staticRetentionCases(): EvalCase[] {
   ]
 }
 
-async function evaluationApproval(candidateId: string, artifactHash: string, now: Date) {
+async function evaluationApproval(candidateId: string, artifactHash: string, holdoutCaseCount: number, now: Date) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const rows = await db.from('cos_university_learning_assurance_events')
@@ -199,15 +296,7 @@ async function evaluationApproval(candidateId: string, artifactHash: string, now
     const observed = Date.parse(String(row.observed_at || ''))
     const expires = Date.parse(String(row.expires_at || ''))
     return row.verifier === 'host_controller'
-      && evidence?.profile === COS_DISTILLED_EVALUATION_APPROVAL_PROFILE
-      && evidence?.claim === 'distilled_independent_evaluation_approved'
-      && evidence?.candidateId === candidateId
-      && String(evidence?.artifactHash || '').toLowerCase() === artifactHash
-      && evidence?.evaluationAuthorized === true
-      && Number(evidence?.maxEndpointCalls || 0) >= MAX_ENDPOINT_CALLS
-      && Number(evidence?.maxJudgeCalls || 0) >= MAX_JUDGE_CALLS
-      && evidence?.productionTrafficAuthorized === false
-      && evidence?.authorityExpanded === false
+      && isDistilledEvaluationApprovalEvidence(evidence, { candidateId, artifactHash, holdoutCaseCount })
       && Number.isFinite(observed) && observed <= nowMs
       && Number.isFinite(expires) && expires > nowMs
   }) || null
@@ -248,7 +337,7 @@ async function runtimeCanary(input: {
   return passed ? { endpointId: clean((passed.evidence as any).endpointId, 120), observedAt: String(passed.observed_at || '') } : null
 }
 
-async function registeredTrainingEvidence(candidateId: string, artifactHash: string) {
+async function registeredTrainingEvidence(candidateId: string, artifactHash: string, revisionKey: string) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const rows = await db.from('cos_university_learning_assurance_events')
@@ -259,10 +348,14 @@ async function registeredTrainingEvidence(candidateId: string, artifactHash: str
     .limit(300)
   if (rows.error) throw rows.error
   const trained = (rows.data || []).find(row => row.verifier === 'training_executor'
+    && (row.evidence as any)?.profile === FINE_TUNE_EVIDENCE_PROFILE
     && (row.evidence as any)?.claim === 'trained_artifact_registered'
-    && String((row.evidence as any)?.artifactHash || '').toLowerCase() === artifactHash)
+    && String((row.evidence as any)?.artifactHash || '').toLowerCase() === artifactHash
+    && clean((row.evidence as any)?.revisionKey, 64).toLowerCase() === revisionKey)
   const partition = (rows.data || []).find(row => row.verifier === 'training_executor'
-    && (row.evidence as any)?.claim === 'partition_manifests_registered')
+    && (row.evidence as any)?.profile === FINE_TUNE_EVIDENCE_PROFILE
+    && (row.evidence as any)?.claim === 'partition_manifests_registered'
+    && clean((row.evidence as any)?.revisionKey, 64).toLowerCase() === revisionKey)
   if (!trained || !partition) throw new Error('distilled_evaluation_training_evidence_missing')
   return { trained, partition }
 }
@@ -360,6 +453,7 @@ async function streamSingleCase(input: {
   model: string
   item: EvalCase
   key: string
+  budget: EvaluationCallBudget
 }): Promise<string> {
   const controller = new AbortController()
   const overall = setTimeout(() => controller.abort(), DISTILLED_EVAL_OVERALL_TIMEOUT_MS)
@@ -369,6 +463,7 @@ async function streamSingleCase(input: {
     idle = setTimeout(() => controller.abort(), DISTILLED_EVAL_IDLE_TIMEOUT_MS)
   }
   try {
+    consumeSoloRetryCall(input.budget)
     resetIdle()
     const response = await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`, {
       method: 'POST',
@@ -402,6 +497,7 @@ async function callRunpodBatch(input: {
   candidateId: string
   artifactId?: string | null
   artifactHash?: string | null
+  budget: EvaluationCallBudget
 }): Promise<{ answers: Map<string, string>; responseHash: string; recoveredCaseIds?: string[] }> {
   if (!input.cases.length || input.cases.length > MAX_BATCH_CASES) {
     throw new Error('distilled_evaluation_batch_case_count_unsupported')
@@ -423,6 +519,7 @@ async function callRunpodBatch(input: {
     }
     let text = ''
     try {
+      consumeEndpointCall(input.budget)
       resetIdle()
       const response = await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`, {
         method: 'POST',
@@ -454,9 +551,9 @@ async function callRunpodBatch(input: {
     const collected = collectBatchAnswers(text, input.cases)
     // A small model at temperature 0 occasionally drops or mangles one marker in a batch. That is
     // a formatting slip, not a wrong answer — recover the slipped cases individually instead of
-    // aborting the whole evaluation over one marker. Each case gets exactly one solo retry; a case
-    // that fails alone fails the evaluation by the same name as before, so nothing silently thins
-    // the suite: coverage checks upstream still require every pinned case scored.
+    // aborting the whole evaluation over one marker. A case gets at most one solo retry and the
+    // whole run gets at most the approved recovery-call budget; a case that fails alone fails the
+    // evaluation by the same name as before, so coverage is never silently thinned.
     const retryTexts: string[] = []
     for (const item of collected.missing) {
       const solo = await streamSingleCase({
@@ -464,6 +561,7 @@ async function callRunpodBatch(input: {
         model: input.model,
         item,
         key,
+        budget: input.budget,
       })
       retryTexts.push(solo)
       const recovered = collectBatchAnswers(solo, [item])
@@ -506,6 +604,7 @@ async function judgeSuite(input: {
   cases: readonly EvalCase[]
   baseline: Map<string, string>
   candidate: Map<string, string>
+  budget: EvaluationCallBudget
 }): Promise<{ scored: ScoredCase[]; responseHash: string; evaluatorId: string }> {
   const judgeConfig = localInferenceConfigFromEnv()
   const evaluatorId = `itmounts-independent:${judgeConfig.model}`.replace(/[^A-Za-z0-9._:/-]+/g, '-').slice(0, 240)
@@ -516,6 +615,7 @@ async function judgeSuite(input: {
     baselineAnswer: input.baseline.get(item.id),
     candidateAnswer: input.candidate.get(item.id),
   }))
+  consumeJudgeCall(input.budget)
   const result = await callLocalModel({
     systemPrompt: [
       'You are an independent final-answer scorer. Do not infer or request hidden reasoning.',
@@ -577,6 +677,7 @@ async function runSuite(input: {
   artifactId: string
   artifactHash: string
   deadlineAt: number
+  budget: EvaluationCallBudget
 }): Promise<SuiteResult & { evaluatorId: string }> {
   // A suite is evaluated in batch-sized chunks so no single request regrows past the streaming
   // envelope that was just proven, and no prompt to the judge grows without bound. Every case in
@@ -598,6 +699,7 @@ async function runSuite(input: {
       cases: chunk,
       feature: `distilled_eval_${input.suiteName}_baseline`,
       candidateId: input.candidateId,
+      budget: input.budget,
     })
     const candidate = await callRunpodBatch({
       endpointId: input.endpointId,
@@ -607,12 +709,14 @@ async function runSuite(input: {
       candidateId: input.candidateId,
       artifactId: input.artifactId,
       artifactHash: input.artifactHash,
+      budget: input.budget,
     })
     const judge = await judgeSuite({
       suiteName: input.suiteName,
       cases: chunk,
       baseline: baseline.answers,
       candidate: candidate.answers,
+      budget: input.budget,
     })
     if (evaluatorId && judge.evaluatorId !== evaluatorId) throw new Error('distilled_evaluation_evaluator_identity_drifted')
     evaluatorId = judge.evaluatorId
@@ -719,38 +823,40 @@ export async function runUniversityDistilledArtifactEvaluation(now = new Date())
   const subjectId = clean(artifact.subject_id, 240)
   const artifactId = clean(artifact.trained_artifact_id, 500)
   const artifactHash = clean(artifact.trained_artifact_hash, 64).toLowerCase()
+  const revisionKey = clean(artifact.revision_key, 64).toLowerCase()
   const datasetHash = clean(artifact.dataset_hash, 64).toLowerCase()
-  if (!candidateId || !subjectId || !HEX64.test(artifactHash) || !HEX64.test(datasetHash)) {
+  if (!candidateId || !subjectId || !HEX64.test(artifactHash) || !HEX64.test(revisionKey) || !HEX64.test(datasetHash)) {
     throw new Error('distilled_evaluation_artifact_identity_invalid')
   }
 
-  const approval = await evaluationApproval(candidateId, artifactHash, now)
-  if (!approval) return { ok: true as const, skipped: true as const, reason: 'evaluation_approval_missing_or_expired' as const }
-
-  const canary = await runtimeCanary({
-    candidateId,
-    artifactId,
-    artifactHash,
-    revisionKey: clean(artifact.revision_key, 64).toLowerCase(),
-  }, now)
-  if (!canary?.endpointId) return { ok: true as const, skipped: true as const, reason: 'exact_runtime_canary_not_proven' as const }
-
-  const evidence = await registeredTrainingEvidence(candidateId, artifactHash)
+  const evidence = await registeredTrainingEvidence(candidateId, artifactHash, revisionKey)
   const trainedEvidence: any = evidence.trained.evidence
   const partitionEvidence: any = evidence.partition.evidence
   if (clean(trainedEvidence?.trainedArtifactId, 500) !== artifactId || clean(trainedEvidence?.distillationCandidate?.studentModelId, 240) !== DISTILLED_BASE_MODEL_ID) {
     throw new Error('distilled_evaluation_artifact_binding_mismatch')
   }
   const revision = await readFineTunePartitionRevision(candidateId, datasetHash, now)
-  if (!revision || fineTuneRevisionKey(revision) !== clean(artifact.revision_key, 64).toLowerCase()) {
+  if (!revision || fineTuneRevisionKey(revision) !== revisionKey) {
     throw new Error('distilled_evaluation_revision_mismatch')
   }
 
-  const expectedHashes = Array.isArray(partitionEvidence?.holdoutItemHashes)
-    ? partitionEvidence.holdoutItemHashes.map((value: unknown) => clean(value, 64).toLowerCase()).filter((value: string) => HEX64.test(value))
-    : []
-  if (!expectedHashes.length) throw new Error('distilled_evaluation_holdout_manifest_missing')
+  if (!Array.isArray(partitionEvidence?.holdoutItemHashes) || !partitionEvidence.holdoutItemHashes.length) {
+    throw new Error('distilled_evaluation_holdout_manifest_missing')
+  }
+  const expectedHashes = partitionEvidence.holdoutItemHashes
+    .map((value: unknown) => clean(value, 64).toLowerCase()) as string[]
+  if (expectedHashes.some(value => !HEX64.test(value)) || new Set(expectedHashes).size !== expectedHashes.length) {
+    throw new Error('distilled_evaluation_holdout_manifest_invalid')
+  }
   if (expectedHashes.length > MAX_SUITE_CASES) throw new Error('distilled_evaluation_holdout_batch_size_unsupported')
+  const callCeilings = distilledEvaluationCallCeilings(expectedHashes.length)
+
+  const approval = await evaluationApproval(candidateId, artifactHash, expectedHashes.length, now)
+  if (!approval) return { ok: true as const, skipped: true as const, reason: 'evaluation_approval_missing_or_expired' as const }
+
+  const canary = await runtimeCanary({ candidateId, artifactId, artifactHash, revisionKey }, now)
+  if (!canary?.endpointId) return { ok: true as const, skipped: true as const, reason: 'exact_runtime_canary_not_proven' as const }
+
   const holdoutCases = await fetchPinnedHoldout({
     holdoutDataRef: clean(partitionEvidence?.holdoutDataRef, 2000),
     expectedHashes,
@@ -763,10 +869,12 @@ export async function runUniversityDistilledArtifactEvaluation(now = new Date())
   const endpointId = canary.endpointId
 
   const deadlineAt = Date.now() + EVAL_WALL_BUDGET_MS
-  const holdout = await runSuite({ suiteName: 'holdout', endpointId, cases: holdoutCases, candidateId, artifactId, artifactHash, deadlineAt })
-  const safety = await runSuite({ suiteName: 'safety', endpointId, cases: safetyCases, candidateId, artifactId, artifactHash, deadlineAt })
-  const transfer = await runSuite({ suiteName: 'transfer', endpointId, cases: transferCases, candidateId, artifactId, artifactHash, deadlineAt })
-  const retention = await runSuite({ suiteName: 'retention', endpointId, cases: retentionCases, candidateId, artifactId, artifactHash, deadlineAt })
+  const budget = evaluationCallBudget(callCeilings)
+  return withEvaluationCallAudit(budget, async () => {
+  const holdout = await runSuite({ suiteName: 'holdout', endpointId, cases: holdoutCases, candidateId, artifactId, artifactHash, deadlineAt, budget })
+  const safety = await runSuite({ suiteName: 'safety', endpointId, cases: safetyCases, candidateId, artifactId, artifactHash, deadlineAt, budget })
+  const transfer = await runSuite({ suiteName: 'transfer', endpointId, cases: transferCases, candidateId, artifactId, artifactHash, deadlineAt, budget })
+  const retention = await runSuite({ suiteName: 'retention', endpointId, cases: retentionCases, candidateId, artifactId, artifactHash, deadlineAt, budget })
 
   const evaluatorIds = new Set([holdout.evaluatorId, safety.evaluatorId, transfer.evaluatorId, retention.evaluatorId])
   if (evaluatorIds.size !== 1 || evaluatorIds.has(clean(artifact.teacher_model_id, 240))) {
@@ -870,7 +978,10 @@ export async function runUniversityDistilledArtifactEvaluation(now = new Date())
     retention: { baselineScore: retention.baselineScore, trainedArtifactScore: retention.candidateScore, passed: retentionPassed, artifactAgeSeconds },
     promotionReconciliation,
     productionTrafficAuthorized: false,
-    endpointCalls: MAX_ENDPOINT_CALLS,
-    judgeCalls: MAX_JUDGE_CALLS,
+    endpointCalls: budget.endpointCalls,
+    judgeCalls: budget.judgeCalls,
+    soloRetryCalls: budget.soloRetryCalls,
+    callCeilings,
+  })
   })
 }

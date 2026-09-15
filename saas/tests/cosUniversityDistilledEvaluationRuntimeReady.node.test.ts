@@ -33,7 +33,7 @@ test('one durable cost-bounded attempt is consumed only at the first billed wake
   assert.match(route, /MAX_RUNTIME_WAKE_ATTEMPTS = 1/)
   assert.match(route, /MAX_RUNTIME_WAKE_COST_USD = 0\.2/)
   assert.match(route, /RUNTIME_ATTEMPT_PROFILE = 'cos_distilled_independent_evaluation_runtime_v1'/)
-  assert.match(route, /Number\(evidence\?\.maxRuntimeWakeAttempts \|\| 0\) === MAX_RUNTIME_WAKE_ATTEMPTS/)
+  assert.match(route, /isDistilledEvaluationApprovalEvidence\(evidence, \{ candidateId, artifactHash \}\)/)
   assert.match(route, /runtimeCostCeiling >= RUNTIME_WAKE_WORST_CASE_COST_USD/)
   assert.match(route, /event_key: eventKey/)
   assert.match(route, /code \|\| ''\) === '23505'/)
@@ -45,7 +45,7 @@ test('one durable cost-bounded attempt is consumed only at the first billed wake
 test('no-cost evaluator preflight can skip without consuming the wake attempt', () => {
   assert.match(route, /const guarded = await runWithEvaluationTransportGuards\(\{[\s\S]*runner: \(\) => runUniversityDistilledArtifactEvaluation\(new Date\(\)\)/)
   assert.match(route, /let runtimeAttempt: SuccessfulRuntimeAttempt \| null = null/)
-  assert.match(route, /return \{ result, runtimeAttempt \}/)
+  assert.match(route, /return \{ result, runtimeAttempt, endpointCalls \}/)
   assert.match(route, /runtimeAttemptAuthorizationObservedAt: runtimeAttempt\?\.authorizationObservedAt \?\? null/)
 })
 
@@ -67,9 +67,23 @@ test('shared route deadline and keepalive bound cold-start work under the functi
   assert.match(route, /distilled_evaluation_route_deadline_exceeded/)
 })
 
-test('successful evaluation retains exactly eight inference and four judge call ceilings', () => {
-  assert.match(route, /ENDPOINT_CALLS_CEILING = 8/)
-  assert.match(route, /JUDGE_CALLS_CEILING = 4/)
+test('successful evaluation enforces the manifest-derived inference ceiling at the transport boundary', () => {
+  assert.match(route, /const maxEndpointCalls = Number\(approval\.evidence\?\.maxEndpointCalls\)/)
+  assert.match(route, /if \(endpointCalls >= runtimeAttempt\.maxEndpointCalls\)/)
+  assert.match(route, /distilled_evaluation_endpoint_call_ceiling_exceeded/)
+  assert.match(route, /runtimeEndpointCalls: guarded\.endpointCalls/)
   assert.match(route, /productionTrafficAuthorized: false/)
   assert.match(route, /authorityExpanded: false/)
+})
+
+test('failed paid attempts retain authorization and every call counter in the production receipt', () => {
+  assert.match(route, /throw attachEvaluationTransportAudit\(error, \{ runtimeAttempt, endpointCalls \}\)/)
+  assert.match(route, /const failureAudit = evaluationTransportAuditFromError\(error\)/)
+  assert.match(route, /const callUsage = distilledEvaluationCallUsageFromError\(error\)/)
+  assert.match(route, /runtimeAttemptAuthorizationObservedAt: runtimeAttempt\?\.authorizationObservedAt \?\? null/)
+  assert.match(route, /runtimeEndpointCalls: failureAudit\?\.endpointCalls \?\? 0/)
+  assert.match(route, /endpointCalls: callUsage\?\.endpointCalls \?\? failureAudit\?\.endpointCalls \?\? 0/)
+  assert.match(route, /judgeCalls: callUsage\?\.judgeCalls \?\? 0/)
+  assert.match(route, /soloRetryCalls: callUsage\?\.soloRetryCalls \?\? 0/)
+  assert.match(route, /callCeilings: callUsage \? \{/)
 })

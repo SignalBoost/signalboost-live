@@ -6,8 +6,12 @@ const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'u
 
 test('distilled evaluation is bounded and requires exact holdout, canary and authorization', () => {
   const evaluator = source('../lib/ai/cos/cosUniversityDistilledArtifactEvaluation.ts')
-  assert.match(evaluator, /MAX_ENDPOINT_CALLS = 8/)
-  assert.match(evaluator, /MAX_JUDGE_CALLS = 4/)
+  assert.match(evaluator, /distilledEvaluationCallCeilings\(expectedHashes\.length\)/)
+  assert.match(evaluator, /consumeEndpointCall\(input\.budget\)/)
+  assert.match(evaluator, /consumeJudgeCall\(input\.budget\)/)
+  assert.match(evaluator, /consumeSoloRetryCall\(input\.budget\)/)
+  assert.match(evaluator, /withEvaluationCallAudit\(budget, async \(\) =>/)
+  assert.match(evaluator, /distilledEvaluationCallUsageFromError/)
   assert.match(evaluator, /evaluation_approval_missing_or_expired/)
   assert.match(evaluator, /exact_runtime_canary_not_proven/)
   assert.match(evaluator, /holdout_revision_moved/)
@@ -16,10 +20,10 @@ test('distilled evaluation is bounded and requires exact holdout, canary and aut
   assert.match(evaluator, /MIN_DISTILLED_RETENTION_DELAY_MS = 12 \* 60 \* 60 \* 1000/)
 })
 
-test('RunPod fits the canonical twelve-case holdout into one bounded call per model', () => {
+test('RunPod chunks the exact pinned holdout under its manifest-derived call budget', () => {
   const evaluator = source('../lib/ai/cos/cosUniversityDistilledArtifactEvaluation.ts')
-  assert.match(evaluator, /COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v3'/)
-  assert.match(evaluator, /MAX_BATCH_CASES = 12/)
+  assert.match(evaluator, /COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v4'/)
+  assert.match(evaluator, /MAX_BATCH_CASES = DISTILLED_EVALUATION_MAX_BATCH_CASES/)
   assert.match(evaluator, /MIN_BATCH_COMPLETION_TOKENS = 384/)
   assert.match(evaluator, /MAX_BATCH_COMPLETION_TOKENS = 960/)
   assert.match(evaluator, /BATCH_COMPLETION_TOKENS_PER_CASE = 80/)
@@ -28,7 +32,7 @@ test('RunPod fits the canonical twelve-case holdout into one bounded call per mo
   assert.match(evaluator, /Math\.min\(\s*MAX_BATCH_COMPLETION_TOKENS,/)
   assert.match(evaluator, /if \(!input\.cases\.length \|\| input\.cases\.length > MAX_BATCH_CASES\)/)
   assert.match(evaluator, /if \(expectedHashes\.length > MAX_SUITE_CASES\) throw new Error\('distilled_evaluation_holdout_batch_size_unsupported'\)/)
-  assert.match(evaluator, /two calls x four suites/)
+  assert.match(evaluator, /MAX_SUITE_CASES = DISTILLED_EVALUATION_MAX_HOLDOUT_CASES/)
   assert.doesNotMatch(evaluator, /Math\.min\(4096, Math\.max\(1024, input\.cases\.length \* 420\)\)/)
 })
 

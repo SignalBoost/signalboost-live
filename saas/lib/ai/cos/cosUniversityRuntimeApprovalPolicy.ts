@@ -13,6 +13,10 @@ export const DISTILLED_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const DISTILLED_EVALUATION_TICK_MINUTES = 10
 export const DISTILLED_EVALUATION_TICK_CLEARANCE_MS = 75_000
 export const DISTILLED_EVALUATION_MIN_RUNTIME_WAKE_COST_USD = ((570 + 60) * 0.69) / 3600
+export const DISTILLED_EVALUATION_MAX_BATCH_CASES = 12
+export const DISTILLED_EVALUATION_MAX_HOLDOUT_CASES = 60
+export const DISTILLED_EVALUATION_STATIC_SUITE_COUNT = 3
+export const DISTILLED_EVALUATION_MAX_SOLO_RETRY_CALLS = 2
 
 const HEX64 = /^[a-f0-9]{64}$/
 
@@ -21,9 +25,11 @@ export type DistilledEvaluationApprovalEvidence = Readonly<{
   claim: typeof DISTILLED_EVALUATION_APPROVAL_CLAIM
   candidateId: string
   artifactHash: string
+  holdoutCaseCount: number
   evaluationAuthorized: true
-  maxEndpointCalls: 8
-  maxJudgeCalls: 4
+  maxEndpointCalls: number
+  maxJudgeCalls: number
+  maxSoloRetryCalls: typeof DISTILLED_EVALUATION_MAX_SOLO_RETRY_CALLS
   maxRuntimeWakeAttempts: 1
   maxEstimatedRuntimeWakeCostUsd: 0.2
   productionTrafficAuthorized: false
@@ -31,19 +37,44 @@ export type DistilledEvaluationApprovalEvidence = Readonly<{
   issuedBy: 'owner_runtime_approval_surface'
 }>
 
-export function buildDistilledEvaluationApproval(input: { candidateId: string; artifactHash: string }): DistilledEvaluationApprovalEvidence {
+export type DistilledEvaluationCallCeilings = Readonly<{
+  holdoutCaseCount: number
+  maxEndpointCalls: number
+  maxJudgeCalls: number
+  maxSoloRetryCalls: typeof DISTILLED_EVALUATION_MAX_SOLO_RETRY_CALLS
+}>
+
+export function distilledEvaluationCallCeilings(holdoutCaseCountInput: number): DistilledEvaluationCallCeilings {
+  const holdoutCaseCount = Number(holdoutCaseCountInput)
+  if (!Number.isInteger(holdoutCaseCount) || holdoutCaseCount < 1 || holdoutCaseCount > DISTILLED_EVALUATION_MAX_HOLDOUT_CASES) {
+    throw new Error('runtime_approval_holdout_case_count_invalid')
+  }
+  const maxJudgeCalls = Math.ceil(holdoutCaseCount / DISTILLED_EVALUATION_MAX_BATCH_CASES)
+    + DISTILLED_EVALUATION_STATIC_SUITE_COUNT
+  return Object.freeze({
+    holdoutCaseCount,
+    maxEndpointCalls: (maxJudgeCalls * 2) + DISTILLED_EVALUATION_MAX_SOLO_RETRY_CALLS,
+    maxJudgeCalls,
+    maxSoloRetryCalls: DISTILLED_EVALUATION_MAX_SOLO_RETRY_CALLS,
+  })
+}
+
+export function buildDistilledEvaluationApproval(input: { candidateId: string; artifactHash: string; holdoutCaseCount: number }): DistilledEvaluationApprovalEvidence {
   const candidateId = String(input.candidateId || '').trim()
   const artifactHash = String(input.artifactHash || '').trim().toLowerCase()
   if (!candidateId) throw new Error('runtime_approval_candidate_missing')
   if (!HEX64.test(artifactHash)) throw new Error('runtime_approval_artifact_hash_invalid')
+  const calls = distilledEvaluationCallCeilings(input.holdoutCaseCount)
   return Object.freeze({
     profile: DISTILLED_EVALUATION_APPROVAL_PROFILE,
     claim: DISTILLED_EVALUATION_APPROVAL_CLAIM,
     candidateId,
     artifactHash,
+    holdoutCaseCount: calls.holdoutCaseCount,
     evaluationAuthorized: true,
-    maxEndpointCalls: 8,
-    maxJudgeCalls: 4,
+    maxEndpointCalls: calls.maxEndpointCalls,
+    maxJudgeCalls: calls.maxJudgeCalls,
+    maxSoloRetryCalls: calls.maxSoloRetryCalls,
     maxRuntimeWakeAttempts: 1,
     maxEstimatedRuntimeWakeCostUsd: 0.2,
     productionTrafficAuthorized: false,
@@ -55,22 +86,31 @@ export function buildDistilledEvaluationApproval(input: { candidateId: string; a
 /** Accept only approvals that the stricter runtime-attempt matcher can actually consume. */
 export function isDistilledEvaluationApprovalEvidence(
   value: unknown,
-  identity: { candidateId: string; artifactHash: string },
+  identity: { candidateId: string; artifactHash: string; holdoutCaseCount?: number },
 ): boolean {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const evidence = value as Record<string, unknown>
+  let calls: DistilledEvaluationCallCeilings
+  try {
+    calls = distilledEvaluationCallCeilings(Number(evidence.holdoutCaseCount))
+  } catch {
+    return false
+  }
   return evidence.profile === DISTILLED_EVALUATION_APPROVAL_PROFILE
     && evidence.claim === DISTILLED_EVALUATION_APPROVAL_CLAIM
     && evidence.candidateId === identity.candidateId
     && String(evidence.artifactHash || '').toLowerCase() === identity.artifactHash.toLowerCase()
+    && (identity.holdoutCaseCount === undefined || calls.holdoutCaseCount === identity.holdoutCaseCount)
     && evidence.evaluationAuthorized === true
-    && Number(evidence.maxEndpointCalls) >= 8
-    && Number(evidence.maxJudgeCalls) >= 4
+    && Number(evidence.maxEndpointCalls) === calls.maxEndpointCalls
+    && Number(evidence.maxJudgeCalls) === calls.maxJudgeCalls
+    && Number(evidence.maxSoloRetryCalls) === calls.maxSoloRetryCalls
     && Number(evidence.maxRuntimeWakeAttempts) === 1
     && Number(evidence.maxEstimatedRuntimeWakeCostUsd) >= DISTILLED_EVALUATION_MIN_RUNTIME_WAKE_COST_USD
     && Number(evidence.maxEstimatedRuntimeWakeCostUsd) <= 0.2
     && evidence.productionTrafficAuthorized === false
     && evidence.authorityExpanded === false
+    && evidence.issuedBy === 'owner_runtime_approval_surface'
 }
 
 /**
@@ -106,4 +146,29 @@ export function approvalState(input: { approval: ApprovalRow | null; attempts: r
   const expiresMs = Date.parse(String(input.approval.expires_at || ''))
   if (!Number.isFinite(expiresMs) || expiresMs <= input.now.getTime()) return 'expired'
   return 'armed'
+}
+
+export type IndependentEvaluationRow = Readonly<{
+  observed_at: string
+  evidence: Record<string, unknown> | null
+}>
+
+/**
+ * One independent verdict per artifact. Once the independent scorer has recorded an evaluation for
+ * this exact artifact hash, another attempt cannot change the model — it can only re-roll the score.
+ * Re-running to fish for a different verdict weakens the evaluator, so issuance is refused.
+ */
+export function completedIndependentEvaluation(rows: readonly IndependentEvaluationRow[], artifactHash: string) {
+  const target = String(artifactHash || '').trim().toLowerCase()
+  const row = rows.find(item => item?.evidence?.claim === 'independent_evaluation'
+    && String(item?.evidence?.artifactHash || '').toLowerCase() === target)
+  if (!row) return null
+  const baseline = Number(row.evidence?.baselineScore)
+  const student = Number(row.evidence?.trainedArtifactScore)
+  return {
+    observedAt: String(row.observed_at || ''),
+    baselineScore: Number.isFinite(baseline) ? baseline : null,
+    trainedArtifactScore: Number.isFinite(student) ? student : null,
+    improved: Number.isFinite(baseline) && Number.isFinite(student) && student > baseline,
+  }
 }

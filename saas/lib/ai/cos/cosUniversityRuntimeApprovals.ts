@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { DISTILLED_ADAPTER_MODEL_ID } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
+import { FINE_TUNE_EVIDENCE_PROFILE } from '@/lib/ai/cos/cosUniversityFineTuneEvidence'
 import {
   DISTILLED_EVALUATION_APPROVAL_CLAIM,
   DISTILLED_EVALUATION_APPROVAL_PROFILE,
@@ -10,12 +11,15 @@ import {
   DISTILLED_EVALUATION_PATH_ID,
   approvalState,
   buildDistilledEvaluationApproval,
+  completedIndependentEvaluation,
+  distilledEvaluationCallCeilings,
   isDistilledEvaluationApprovalEvidence,
   tickClearance,
   type ApprovalRow,
 } from '@/lib/ai/cos/cosUniversityRuntimeApprovalPolicy'
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
+const HEX64 = /^[a-f0-9]{64}$/
 
 function db() {
   const client = cosServiceDb()
@@ -26,7 +30,7 @@ function db() {
 /** Same artifact selection as the evaluator's runtime claim, so the approval targets what it will run. */
 async function pendingArtifact() {
   const result = await db().from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
+    .select('candidate_id,subject_id,trained_artifact_hash,revision_key,created_at')
     .eq('status', 'evaluation_pending')
     .eq('trained_artifact_id', DISTILLED_ADAPTER_MODEL_ID)
     .order('created_at', { ascending: true })
@@ -35,14 +39,45 @@ async function pendingArtifact() {
   if (result.error) throw result.error
   if (!result.data) return null
   const row: any = result.data
-  return {
-    candidateId: String(row.candidate_id || '').trim(),
-    subjectId: String(row.subject_id || '').trim(),
-    artifactHash: String(row.trained_artifact_hash || '').trim().toLowerCase(),
+  const candidateId = String(row.candidate_id || '').trim()
+  const subjectId = String(row.subject_id || '').trim()
+  const artifactHash = String(row.trained_artifact_hash || '').trim().toLowerCase()
+  const revisionKey = String(row.revision_key || '').trim().toLowerCase()
+  if (!candidateId || !HEX64.test(artifactHash) || !HEX64.test(revisionKey)) {
+    throw new Error('runtime_approval_artifact_identity_invalid')
   }
+
+  // The approval ceiling is derived from the exact partition manifest bound to this artifact's
+  // revision. Never guess from a default or silently discard malformed hashes: that could issue an
+  // approval whose apparent ceiling differs from the evaluator's real work.
+  const events = await db().from('cos_university_learning_assurance_events')
+    .select('evidence,verifier,observed_at')
+    .eq('event_type', 'fine_tune')
+    .eq('candidate_id', candidateId)
+    .eq('verifier', 'training_executor')
+    .order('observed_at', { ascending: false })
+    .limit(300)
+  if (events.error) throw events.error
+  const partition = (events.data || []).find((event: any) => {
+    const evidence = event?.evidence
+    return evidence?.profile === FINE_TUNE_EVIDENCE_PROFILE
+      && evidence?.claim === 'partition_manifests_registered'
+      && String(evidence?.revisionKey || '').trim().toLowerCase() === revisionKey
+  }) as any
+  const holdoutItemHashes = partition?.evidence?.holdoutItemHashes
+  if (!Array.isArray(holdoutItemHashes)
+    || !holdoutItemHashes.every((value: unknown) => HEX64.test(String(value || '').trim().toLowerCase()))) {
+    throw new Error('runtime_approval_holdout_manifest_invalid')
+  }
+  const normalizedHashes = holdoutItemHashes.map((value: unknown) => String(value).trim().toLowerCase())
+  if (new Set(normalizedHashes).size !== normalizedHashes.length) {
+    throw new Error('runtime_approval_holdout_manifest_invalid')
+  }
+  const calls = distilledEvaluationCallCeilings(normalizedHashes.length)
+  return { candidateId, subjectId, artifactHash, revisionKey, ...calls }
 }
 
-async function latestApproval(candidateId: string, artifactHash: string): Promise<ApprovalRow | null> {
+async function latestApproval(candidateId: string, artifactHash: string, holdoutCaseCount: number): Promise<ApprovalRow | null> {
   const rows = await db().from('cos_university_learning_assurance_events')
     .select('observed_at,expires_at,evidence')
     .eq('event_type', 'fine_tune')
@@ -51,7 +86,10 @@ async function latestApproval(candidateId: string, artifactHash: string): Promis
     .order('observed_at', { ascending: false })
     .limit(100)
   if (rows.error) throw rows.error
-  const match = (rows.data || []).find((row: any) => isDistilledEvaluationApprovalEvidence(row?.evidence, { candidateId, artifactHash }))
+  const match = (rows.data || []).find((row: any) => isDistilledEvaluationApprovalEvidence(
+    row?.evidence,
+    { candidateId, artifactHash, holdoutCaseCount },
+  ))
   return (match as ApprovalRow | undefined) || null
 }
 
@@ -95,19 +133,34 @@ async function latestOutcome(sinceIso: string | null) {
   }
 }
 
+async function independentEvaluationFor(candidateId: string, artifactHash: string) {
+  const rows = await db().from('cos_university_learning_assurance_events')
+    .select('observed_at,evidence')
+    .eq('event_type', 'fine_tune')
+    .eq('candidate_id', candidateId)
+    .eq('verifier', 'independent_scorer')
+    .order('observed_at', { ascending: false })
+    .limit(50)
+  if (rows.error) throw rows.error
+  return completedIndependentEvaluation((rows.data || []) as any[], artifactHash)
+}
+
 export async function readDistilledEvaluationApprovalStatus(now = new Date()) {
   const artifact = await pendingArtifact()
-  if (!artifact) return { ok: true as const, artifact: null, state: 'none' as const, approval: null, outcome: null, clearance: tickClearance(now) }
-  const approval = await latestApproval(artifact.candidateId, artifact.artifactHash)
+  if (!artifact) return { ok: true as const, artifact: null, state: 'none' as const, approval: null, outcome: null, evaluation: null, clearance: tickClearance(now) }
+  const approval = await latestApproval(artifact.candidateId, artifact.artifactHash, artifact.holdoutCaseCount)
   const attempts = await attemptsFor(artifact.candidateId)
-  const state = approvalState({ approval, attempts, now })
-  const outcome = state === 'consumed' && approval ? await latestOutcome(approval.observed_at) : null
+  const evaluation = await independentEvaluationFor(artifact.candidateId, artifact.artifactHash)
+  const approvalLifecycle = approvalState({ approval, attempts, now })
+  const state = evaluation && approvalLifecycle !== 'armed' ? 'evaluated' as const : approvalLifecycle
+  const outcome = approvalLifecycle === 'consumed' && approval ? await latestOutcome(approval.observed_at) : null
   return {
     ok: true as const,
     artifact,
     state,
     approval: approval ? { observedAt: approval.observed_at, expiresAt: approval.expires_at } : null,
     outcome,
+    evaluation,
     clearance: tickClearance(now),
   }
 }
@@ -117,7 +170,10 @@ export async function issueDistilledEvaluationApproval(input: { ownerUserId: str
   const artifact = await pendingArtifact()
   if (!artifact) return { ok: false as const, error: 'no_supported_evaluation_pending_artifact' }
 
-  const existing = await latestApproval(artifact.candidateId, artifact.artifactHash)
+  const evaluation = await independentEvaluationFor(artifact.candidateId, artifact.artifactHash)
+  if (evaluation) return { ok: false as const, error: 'artifact_already_independently_evaluated', evaluation }
+
+  const existing = await latestApproval(artifact.candidateId, artifact.artifactHash, artifact.holdoutCaseCount)
   const state = approvalState({ approval: existing, attempts: await attemptsFor(artifact.candidateId), now })
   if (state === 'armed') return { ok: false as const, error: 'approval_already_armed', approval: existing }
 
@@ -127,7 +183,14 @@ export async function issueDistilledEvaluationApproval(input: { ownerUserId: str
   const evidence = { ...buildDistilledEvaluationApproval(artifact), ownerUserId: input.ownerUserId }
   const observedAt = now.toISOString()
   const expiresAt = new Date(now.getTime() + DISTILLED_EVALUATION_APPROVAL_TTL_MS).toISOString()
-  const eventKey = hash([DISTILLED_EVALUATION_APPROVAL_PROFILE, DISTILLED_EVALUATION_APPROVAL_CLAIM, artifact.candidateId, artifact.artifactHash, observedAt])
+  const eventKey = hash([
+    DISTILLED_EVALUATION_APPROVAL_PROFILE,
+    DISTILLED_EVALUATION_APPROVAL_CLAIM,
+    artifact.candidateId,
+    artifact.artifactHash,
+    artifact.holdoutCaseCount,
+    observedAt,
+  ])
 
   const inserted = await db().from('cos_university_learning_assurance_events').insert({
     event_key: eventKey,

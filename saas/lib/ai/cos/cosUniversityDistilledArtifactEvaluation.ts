@@ -534,8 +534,16 @@ async function judgeSuite(input: {
     },
   }, judgeConfig)
   if (!result) throw new Error('distilled_evaluation_judge_unavailable')
+  // Local judge models wrap strict JSON in code fences or a sentence of preamble often enough that
+  // one attempt died on it. Scores are still read from parsed JSON only — the tolerance is to
+  // where the JSON sits in the text, never to what it must contain.
   let payload: any
-  try { payload = JSON.parse(result) } catch { throw new Error('distilled_evaluation_judge_json_invalid') }
+  try { payload = JSON.parse(result) } catch {
+    const start = result.indexOf('{')
+    const end = result.lastIndexOf('}')
+    if (start < 0 || end <= start) throw new Error('distilled_evaluation_judge_json_invalid')
+    try { payload = JSON.parse(result.slice(start, end + 1)) } catch { throw new Error('distilled_evaluation_judge_json_invalid') }
+  }
   if (!Array.isArray(payload?.cases) || payload.cases.length !== input.cases.length) {
     throw new Error('distilled_evaluation_judge_case_count_invalid')
   }
@@ -664,7 +672,15 @@ async function submitIndependentClaim(input: {
   const timestamp = new Date().toISOString()
   const idempotencyKey = sha256([COS_DISTILLED_EVALUATOR_VERSION, input.claim, input.artifactHash, input.suiteHash])
   const signature = signIndependentEvaluatorPayload({ secret: config.secret, timestamp, idempotencyKey, rawBody })
-  const response = await fetch(new URL('/api/internal/cos/university-independent-evaluator/evidence', origin), {
+  // The exact-deployment origin is a *.vercel.app host, and Vercel's Deployment Protection sits in
+  // front of it: a server-side self-call is rejected 401 by the platform before the route ever
+  // runs. The documented bypass header gets the request through while keeping the call pinned to
+  // this exact deployment. Without the bypass secret, fall back to the public origin — a different
+  // wall, not a different app.
+  const bypassSecret = clean(process.env.VERCEL_AUTOMATION_BYPASS_SECRET, 200)
+  const publicOrigin = clean(process.env.ITMOUNTS_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_APP_URL, 2000)
+  const target = !bypassSecret && publicOrigin ? publicOrigin : origin
+  const response = await fetch(new URL('/api/internal/cos/university-independent-evaluator/evidence', target), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -672,6 +688,7 @@ async function submitIndependentClaim(input: {
       'x-itmounts-evaluator-timestamp': timestamp,
       'x-itmounts-evaluator-idempotency-key': idempotencyKey,
       'x-itmounts-evaluator-signature': signature,
+      ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
     },
     body: rawBody,
     signal: AbortSignal.timeout(20_000),

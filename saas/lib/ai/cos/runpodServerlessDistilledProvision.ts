@@ -6,8 +6,8 @@ const CONTROL_API_V2 = 'https://api.runpod.io/v2'
 const SERVERLESS_API = 'https://api.runpod.ai/v2'
 // Keep each materially different load-balancer bootstrap immutable. A new endpoint identity makes
 // failed canary evidence auditable instead of silently changing the worker behind an old receipt.
-export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v3'
-export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v5'
+export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v4'
+export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v6'
 export const DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER' as const
 export const DISTILLED_CONTAINER_PORT = 8000
 const DISTILLED_INTERNAL_VLLM_PORT = 8001
@@ -202,6 +202,7 @@ from pathlib import Path
 import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import StreamingResponse
 from huggingface_hub import snapshot_download
 
 BASE_ID = os.environ["ITMOUNTS_BASE_MODEL_ID"]
@@ -314,15 +315,33 @@ async def wait_for_model():
 async def proxy_to_vllm(request: Request, path: str):
     await wait_for_model()
     body = await request.body()
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.request(
-            request.method,
-            f"http://127.0.0.1:{INTERNAL_PORT}{path}",
-            content=body,
-            headers={"content-type": request.headers.get("content-type", "application/json")},
-        )
-    return Response(
-        content=response.content,
+    # A buffered proxy defeats streaming: it collects the whole generation before answering, so the
+    # connection stays silent for minutes and the RunPod load balancer returns 502. Relay vLLM's
+    # bytes as they arrive. read=None lets a long generation run; connect stays bounded.
+    timeout = httpx.Timeout(connect=30.0, read=None, write=60.0, pool=30.0)
+    client = httpx.AsyncClient(timeout=timeout)
+    upstream = client.build_request(
+        request.method,
+        f"http://127.0.0.1:{INTERNAL_PORT}{path}",
+        content=body,
+        headers={"content-type": request.headers.get("content-type", "application/json")},
+    )
+    try:
+        response = await client.send(upstream, stream=True)
+    except Exception:
+        await client.aclose()
+        raise
+
+    async def relay():
+        try:
+            async for chunk in response.aiter_raw():
+                yield chunk
+        finally:
+            await response.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        relay(),
         status_code=response.status_code,
         media_type=response.headers.get("content-type", "application/json"),
     )

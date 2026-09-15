@@ -1,3 +1,4 @@
+// saas/app/api/cron/cos-university-distilled-evaluation/route.ts
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -245,6 +246,63 @@ async function claimRuntimeEvaluationAttempt(now: Date, routeDeadlineMs: number)
   }
 }
 
+type RunpodWorkerSnapshot = Readonly<{
+  atMs: number
+  httpStatus: number | null
+  workers: unknown
+  jobs: unknown
+  error: string | null
+}>
+
+type RunpodReadinessTrace = {
+  endpointId: string
+  windowMs: number
+  elapsedMs: number
+  probes: number
+  statusCounts: Record<string, number>
+  timeouts: number
+  networkErrors: number
+  lastErrorName: string | null
+  lastErrorMessage: string | null
+  firstHttpResponseAtMs: number | null
+  snapshots: RunpodWorkerSnapshot[]
+}
+
+// Diagnostic only: the failure receipt of the most recent readiness wait in this invocation.
+// The RunPod control-plane health read never wakes billed compute.
+let lastRunpodReadinessTrace: RunpodReadinessTrace | null = null
+const RUNPOD_HEALTH_SNAPSHOT_INTERVAL_MS = 60_000
+const RUNPOD_HEALTH_SNAPSHOT_LIMIT = 7
+
+async function runpodWorkerSnapshot(input: {
+  endpointId: string
+  key: string
+  fetchImpl: typeof fetch
+  startedAt: number
+}): Promise<RunpodWorkerSnapshot> {
+  const atMs = Date.now() - input.startedAt
+  try {
+    const response = await input.fetchImpl(`https://api.runpod.ai/v2/${input.endpointId}/health`, {
+      headers: { Authorization: `Bearer ${input.key}` },
+      signal: AbortSignal.timeout(8_000),
+    })
+    const raw = (await response.text()).slice(0, 2_000)
+    let parsed: any = null
+    try { parsed = raw ? JSON.parse(raw) : null } catch { parsed = null }
+    return {
+      atMs,
+      httpStatus: response.status,
+      workers: parsed?.workers ?? null,
+      jobs: parsed?.jobs ?? null,
+      error: parsed ? null : raw.replace(/\s+/g, ' ').slice(0, 200) || null,
+    }
+  } catch (error) {
+    const name = error instanceof Error ? error.name : 'Error'
+    const message = error instanceof Error ? error.message : String(error)
+    return { atMs, httpStatus: null, workers: null, jobs: null, error: `${name}:${message}`.slice(0, 200) }
+  }
+}
+
 async function proveRunpodReady(input: {
   origin: string
   fetchImpl: typeof fetch
@@ -256,15 +314,43 @@ async function proveRunpodReady(input: {
   const deadline = Math.min(Date.now() + RUNPOD_READY_TIMEOUT_MS, latestReadyDeadline)
   if (deadline <= Date.now()) throw new Error('distilled_evaluation_route_deadline_exceeded')
   let lastStatus: number | null = null
+  const startedAt = Date.now()
+  const endpointId = new URL(input.origin).hostname.split('.')[0] || ''
+  const trace: RunpodReadinessTrace = {
+    endpointId,
+    windowMs: deadline - startedAt,
+    elapsedMs: 0,
+    probes: 0,
+    statusCounts: {},
+    timeouts: 0,
+    networkErrors: 0,
+    lastErrorName: null,
+    lastErrorMessage: null,
+    firstHttpResponseAtMs: null,
+    snapshots: [],
+  }
+  lastRunpodReadinessTrace = trace
+  let nextSnapshotAt = startedAt
+  const takeSnapshot = async () => {
+    if (trace.snapshots.length >= RUNPOD_HEALTH_SNAPSHOT_LIMIT) return
+    trace.snapshots.push(await runpodWorkerSnapshot({ endpointId, key, fetchImpl: input.fetchImpl, startedAt }))
+  }
 
   while (Date.now() < deadline) {
+    if (Date.now() >= nextSnapshotAt) {
+      nextSnapshotAt = Date.now() + RUNPOD_HEALTH_SNAPSHOT_INTERVAL_MS
+      await takeSnapshot().catch(() => undefined)
+    }
     const remaining = Math.max(1_000, deadline - Date.now())
+    trace.probes += 1
     try {
       const response = await input.fetchImpl(`${input.origin}/ready`, {
         headers: { Authorization: `Bearer ${key}` },
         signal: AbortSignal.timeout(Math.min(15_000, remaining)),
       })
       lastStatus = response.status
+      trace.statusCounts[String(response.status)] = (trace.statusCounts[String(response.status)] || 0) + 1
+      if (trace.firstHttpResponseAtMs === null) trace.firstHttpResponseAtMs = Date.now() - startedAt
       if (response.status === 200) return
       if (response.status === 503) {
         const detail = (await response.text()).slice(0, 1_000)
@@ -274,6 +360,11 @@ async function proveRunpodReady(input: {
       }
     } catch (error) {
       if (error instanceof Error && error.message === 'distilled_evaluation_runtime_bootstrap_failed') throw error
+      const name = error instanceof Error ? error.name : 'Error'
+      if (name === 'TimeoutError' || name === 'AbortError') trace.timeouts += 1
+      else trace.networkErrors += 1
+      trace.lastErrorName = name
+      trace.lastErrorMessage = (error instanceof Error ? error.message : String(error)).slice(0, 200)
       if (Date.now() >= latestReadyDeadline) throw new Error('distilled_evaluation_route_deadline_exceeded')
       lastStatus = null
     }
@@ -282,6 +373,8 @@ async function proveRunpodReady(input: {
     }
   }
 
+  await takeSnapshot().catch(() => undefined)
+  trace.elapsedMs = Date.now() - startedAt
   if (Date.now() >= latestReadyDeadline) throw new Error('distilled_evaluation_route_deadline_exceeded')
   throw new Error(`distilled_evaluation_runtime_not_ready:${lastStatus ?? 'network'}`)
 }
@@ -434,6 +527,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   const routeDeadlineMs = Date.now() + EVALUATION_ROUTE_BUDGET_MS
+  lastRunpodReadinessTrace = null
   try {
     // Confirm evaluator signing is available before any billed runtime attempt can be consumed.
     const evaluator = await withinRouteDeadline(independentEvaluatorConfig(), routeDeadlineMs)
@@ -468,12 +562,16 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     if (error instanceof RuntimeAttemptSkip) return recordSkip(error.reason)
     const message = error instanceof Error ? error.message : String(error)
+    const readinessTrace = message.startsWith('distilled_evaluation_runtime_not_ready')
+      || message === 'distilled_evaluation_route_deadline_exceeded'
+      ? lastRunpodReadinessTrace
+      : null
     await recordCosUniversityProductionPath({
       path: 'distilled_independent_evaluation',
       invocationSucceeded: false,
-      evidence: { error: message, runnerInvoked: true },
+      evidence: { error: message, runnerInvoked: true, ...(readinessTrace ? { readinessTrace } : {}) },
     }).catch(() => null)
-    console.error('[cos-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: message }))
+    console.error('[cos-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: message, readinessTrace }))
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

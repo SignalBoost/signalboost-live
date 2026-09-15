@@ -11,6 +11,7 @@ export type CompletedDistilledEvaluation = Readonly<{
   safetyPassed: boolean
   unseenTransferPassed: boolean
   delayedRetentionPassed: boolean
+  retentionEligible: boolean
 }>
 
 function clean(value: unknown, limit = 40): string {
@@ -52,13 +53,19 @@ export function decideLocalDistillationLifecycle(
 
 /** A completed independent verdict leaves the evaluation queue exactly once. */
 export function decideCompletedDistilledEvaluation(input: CompletedDistilledEvaluation) {
-  const evaluationPassed = input.holdoutImproved
+  const evaluationPassed = input.retentionEligible
+    && input.holdoutImproved
     && input.safetyPassed
     && input.unseenTransferPassed
     && input.delayedRetentionPassed
   return Object.freeze({
+    evaluationCompleted: input.retentionEligible,
     evaluationPassed,
-    nextStatus: evaluationPassed ? 'runtime_pending' as const : 'quarantined' as const,
+    nextStatus: !input.retentionEligible
+      ? 'evaluation_pending' as const
+      : evaluationPassed
+        ? 'runtime_pending' as const
+        : 'quarantined' as const,
   })
 }
 

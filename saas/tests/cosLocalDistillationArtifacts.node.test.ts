@@ -24,13 +24,22 @@ test('completed evaluation leaves the pending queue on both pass and fail', () =
     safetyPassed: true,
     unseenTransferPassed: true,
     delayedRetentionPassed: true,
-  }), { evaluationPassed: true, nextStatus: 'runtime_pending' })
+    retentionEligible: true,
+  }), { evaluationCompleted: true, evaluationPassed: true, nextStatus: 'runtime_pending' })
   assert.deepEqual(decideCompletedDistilledEvaluation({
     holdoutImproved: false,
     safetyPassed: true,
     unseenTransferPassed: true,
     delayedRetentionPassed: true,
-  }), { evaluationPassed: false, nextStatus: 'quarantined' })
+    retentionEligible: true,
+  }), { evaluationCompleted: true, evaluationPassed: false, nextStatus: 'quarantined' })
+  assert.deepEqual(decideCompletedDistilledEvaluation({
+    holdoutImproved: true,
+    safetyPassed: true,
+    unseenTransferPassed: true,
+    delayedRetentionPassed: false,
+    retentionEligible: false,
+  }), { evaluationCompleted: false, evaluationPassed: false, nextStatus: 'evaluation_pending' })
 })
 
 test('local distillation strategy is Serverless-first and adapter-based', () => {

@@ -17,6 +17,8 @@ export const DISTILLED_EVALUATION_MAX_BATCH_CASES = 12
 export const DISTILLED_EVALUATION_MAX_HOLDOUT_CASES = 60
 export const DISTILLED_EVALUATION_STATIC_SUITE_COUNT = 3
 export const DISTILLED_EVALUATION_MAX_SOLO_RETRY_CALLS = 2
+export const DISTILLED_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
+export const DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v4' as const
 
 const HEX64 = /^[a-f0-9]{64}$/
 
@@ -152,6 +154,32 @@ export type IndependentEvaluationRow = Readonly<{
   observed_at: string
   evidence: Record<string, unknown> | null
 }>
+
+export type SavedEvaluationTimingRow = Readonly<{
+  artifact_age_seconds: number
+  delayed_retention_passed: boolean
+  created_at: string
+}>
+
+/** A legacy evaluation that ran before delayed retention became eligible may resume retention only. */
+export function delayedRetentionRecovery(
+  row: SavedEvaluationTimingRow | null,
+  now: Date,
+): Readonly<{ ready: boolean; readyAt: string; retryAfterSeconds: number }> | null {
+  if (!row || row.delayed_retention_passed !== false) return null
+  const ageSeconds = Number(row.artifact_age_seconds)
+  const evaluatedAt = Date.parse(String(row.created_at || ''))
+  if (!Number.isSafeInteger(ageSeconds) || ageSeconds < 0
+    || ageSeconds * 1000 >= DISTILLED_EVALUATION_RETENTION_DELAY_MS
+    || !Number.isFinite(evaluatedAt)) return null
+  const readyAtMs = evaluatedAt - ageSeconds * 1000 + DISTILLED_EVALUATION_RETENTION_DELAY_MS
+  const retryAfterSeconds = Math.max(0, Math.ceil((readyAtMs - now.getTime()) / 1000))
+  return Object.freeze({
+    ready: retryAfterSeconds === 0,
+    readyAt: new Date(readyAtMs).toISOString(),
+    retryAfterSeconds,
+  })
+}
 
 /**
  * One independent verdict per artifact. Once the independent scorer has recorded an evaluation for

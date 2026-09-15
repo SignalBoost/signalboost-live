@@ -105,7 +105,17 @@ async def is_ready():
 async def proxy(req,path):
     if not ready.is_set(): raise HTTPException(status_code=503,detail='distilled_internal_vllm_not_ready')
     body=await req.body()
-    async with httpx.AsyncClient(timeout=60.0) as client: r=await client.request(req.method,f'http://127.0.0.1:{INTERNAL}{path}',content=body,headers={'content-type':req.headers.get('content-type','application/json')})
+    if path=='/v1/chat/completions':
+        try:
+            payload=json.loads(body)
+        except Exception:
+            raise HTTPException(status_code=400,detail='distilled_chat_payload_invalid')
+        kwargs=payload.get('chat_template_kwargs')
+        if not isinstance(kwargs,dict): kwargs={}
+        kwargs['enable_thinking']=False
+        payload['chat_template_kwargs']=kwargs
+        body=json.dumps(payload).encode('utf-8')
+    async with httpx.AsyncClient(timeout=60.0) as client: r=await client.request(req.method,f'http://127.0.0.1:{INTERNAL}{path}',content=body,headers={'content-type':'application/json'})
     return Response(content=r.content,status_code=r.status_code,media_type=r.headers.get('content-type','application/json'))
 @app.post('/v1/chat/completions')
 async def chat(req:Request): return await proxy(req,'/v1/chat/completions')
@@ -174,7 +184,7 @@ export async function canaryMassDistilledRuntime(input:{endpointId:string;modelN
   }
   if(lastStatus!==200) return {ok:false,httpStatus:lastStatus,text:null,error:lastError||'mass_distilled_internal_vllm_not_ready'}
   try{
-    const response=await fetch(`${root}/v1/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.modelName,max_tokens:64,temperature:0,messages:[{role:'system',content:'Return one concise sentence. Do not reveal hidden reasoning.'},{role:'user',content:'State the operational principle: evidence should be separated from inference.'}]}),signal:AbortSignal.timeout(CANARY_TIMEOUT_MS)})
+    const response=await fetch(`${root}/v1/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.modelName,max_tokens:64,temperature:0,chat_template_kwargs:{enable_thinking:false},messages:[{role:'system',content:'Return one concise sentence. Do not reveal hidden reasoning.'},{role:'user',content:'State the operational principle: evidence should be separated from inference.'}]}),signal:AbortSignal.timeout(CANARY_TIMEOUT_MS)})
     const raw=await response.text(); if(!response.ok) return {ok:false,httpStatus:response.status,text:null,error:safeError(raw)||`HTTP ${response.status}`}
     let payload:any={}; try{payload=JSON.parse(raw)}catch{}
     const text=clean(payload?.choices?.[0]?.message?.content,2000)

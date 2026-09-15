@@ -521,7 +521,7 @@ export async function recoverMassDistillationCampaigns(input: {
     .select('campaign_id,updated_at')
     .eq('stage', 'failed')
     .order('updated_at', { ascending: true })
-    .limit(maxCampaigns * 4)
+    .limit(maxCampaigns * 20)
   if (failedRuns.error) throw failedRuns.error
   const candidateIds = [...new Set((failedRuns.data || []).map((row: any) => String(row.campaign_id)))].filter(Boolean)
   if (candidateIds.length === 0) {

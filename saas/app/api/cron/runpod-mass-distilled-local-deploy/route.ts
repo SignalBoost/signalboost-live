@@ -31,41 +31,6 @@ function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
 
-async function candidate() {
-  const db = cosServiceDb()
-  if (!db) throw new Error('service_database_unavailable')
-  const artifacts = await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,student_model_id,trained_artifact_id,trained_artifact_hash,evidence_ref,status,created_at')
-    .eq('status', 'evaluation_pending')
-    .like('candidate_id', 'mass:%')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  if (artifacts.error) throw artifacts.error
-  if (!artifacts.data) return null
-  const artifact: any = artifacts.data
-  const run = await db.from('cos_university_mass_distillation_batch_runs')
-    .select('student_model_revision,teacher_model_id,completed_at')
-    .eq('candidate_id', artifact.candidate_id)
-    .eq('stage', 'complete')
-    .maybeSingle()
-  if (run.error) throw run.error
-  if (!run.data) throw new Error('mass_distilled_runtime_training_run_missing')
-  const ref = HF_MODEL_REF.exec(clean(artifact.evidence_ref, 2000))
-  if (!ref || clean(ref[1], 240) !== clean(artifact.trained_artifact_id, 500)) {
-    throw new Error('mass_distilled_runtime_adapter_ref_invalid')
-  }
-  const spec = massDistilledRuntimeSpec({
-    candidateId: artifact.candidate_id,
-    artifactHash: artifact.trained_artifact_hash,
-    baseModelId: artifact.student_model_id,
-    baseModelRevision: (run.data as any).student_model_revision,
-    adapterModelId: artifact.trained_artifact_id,
-    adapterModelRevision: ref[2],
-  })
-  return { artifact, run: run.data as any, spec }
-}
-
 async function events(candidateId: string) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -77,6 +42,55 @@ async function events(candidateId: string) {
     .limit(300)
   if (rows.error) throw rows.error
   return rows.data || []
+}
+
+function hasExactCanary(rows: any[], artifactHash: string): boolean {
+  return rows.some(row => row?.evidence?.profile === PROFILE
+    && row?.evidence?.claim === 'local_distilled_runtime_canary_passed'
+    && clean(row?.evidence?.artifactHash, 64).toLowerCase() === artifactHash
+    && row?.evidence?.exactArtifact === true
+    && row?.evidence?.productionTrafficAuthorized === false)
+}
+
+async function candidate() {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const artifacts = await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,subject_id,student_model_id,trained_artifact_id,trained_artifact_hash,evidence_ref,status,created_at')
+    .eq('status', 'evaluation_pending')
+    .like('candidate_id', 'mass:%')
+    .order('created_at', { ascending: true })
+    .limit(20)
+  if (artifacts.error) throw artifacts.error
+
+  for (const artifact of artifacts.data || []) {
+    const candidateId = clean((artifact as any).candidate_id, 140)
+    const artifactHash = clean((artifact as any).trained_artifact_hash, 64).toLowerCase()
+    const rows = await events(candidateId)
+    if (hasExactCanary(rows, artifactHash)) continue
+
+    const run = await db.from('cos_university_mass_distillation_batch_runs')
+      .select('student_model_revision,teacher_model_id,completed_at')
+      .eq('candidate_id', candidateId)
+      .eq('stage', 'complete')
+      .maybeSingle()
+    if (run.error) throw run.error
+    if (!run.data) throw new Error('mass_distilled_runtime_training_run_missing')
+    const ref = HF_MODEL_REF.exec(clean((artifact as any).evidence_ref, 2000))
+    if (!ref || clean(ref[1], 240) !== clean((artifact as any).trained_artifact_id, 500)) {
+      throw new Error('mass_distilled_runtime_adapter_ref_invalid')
+    }
+    const spec = massDistilledRuntimeSpec({
+      candidateId,
+      artifactHash,
+      baseModelId: (artifact as any).student_model_id,
+      baseModelRevision: (run.data as any).student_model_revision,
+      adapterModelId: (artifact as any).trained_artifact_id,
+      adapterModelRevision: ref[2],
+    })
+    return { artifact, run: run.data as any, spec, rows }
+  }
+  return null
 }
 
 function latestControl(rows: any[], artifactHash: string) {
@@ -148,12 +162,11 @@ export async function GET(req: NextRequest) {
 
   try {
     const selected = await candidate()
-    if (!selected) return NextResponse.json({ ok: true, skipped: true, reason: 'no_mass_evaluation_pending_artifact' })
-    const { artifact, spec } = selected
+    if (!selected) return NextResponse.json({ ok: true, skipped: true, reason: 'no_mass_canary_pending_artifact' })
+    const { artifact, spec, rows } = selected
     const candidateId = spec.candidateId
-    const subjectId = clean(artifact.subject_id, 240)
+    const subjectId = clean((artifact as any).subject_id, 240)
     const artifactHash = spec.artifactHash
-    const rows = await events(candidateId)
     const control = latestControl(rows, artifactHash)
     if (control?.evidence?.claim === SUSPEND_CLAIM) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'canary_suspended_by_host_controller', candidateId, artifactHash })
@@ -162,14 +175,6 @@ export async function GET(req: NextRequest) {
     if (!approval) return NextResponse.json({ ok: true, skipped: true, reason: 'explicit_owner_approval_missing_or_expired', candidateId, artifactHash })
     const approvalObservedAt = String(approval.observed_at)
     const approvalFloor = Date.parse(approvalObservedAt)
-
-    const passed = rows.find(row => row?.evidence?.profile === PROFILE
-      && row?.evidence?.claim === 'local_distilled_runtime_canary_passed'
-      && clean(row?.evidence?.artifactHash, 64).toLowerCase() === artifactHash
-      && Date.parse(String(row?.observed_at || '')) >= approvalFloor)
-    if (passed) {
-      return NextResponse.json({ ok: true, deployed: true, canaryPassed: true, candidateId, artifactHash, endpointId: passed.evidence.endpointId, model: passed.evidence.model, productionTrafficAuthorized: false })
-    }
 
     const account = await queryRunpodAccountStatus()
     if (account.clientBalance !== null && account.clientBalance < MIN_BALANCE_USD) {

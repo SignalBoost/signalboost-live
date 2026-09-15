@@ -5,15 +5,16 @@ import test from 'node:test'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const ledger = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityHuggingFaceProviderLedger.ts'), 'utf8')
-const route = fs.readFileSync(path.join(ROOT, 'app/api/cron/cos-university-mass-distillation/route.ts'), 'utf8')
+const workflow = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityMassDistillationWorkflow.ts'), 'utf8')
 const migration = fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260914180000_cos_university_mass_distillation_provider_spend.sql'), 'utf8')
 
 test('mass cron settles durable provider ledger before diagnostics and new paid claims', () => {
-  const reconcileAt = route.indexOf('await reconcileMassDistillationHuggingFaceProviderLedger({ maxJobs: 15 })')
-  const diagnoseAt = route.indexOf('await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })')
-  const recoverAt = route.indexOf('await recoverMassDistillationCampaigns({ maxCampaigns: 5 })')
-  const consumeAt = route.indexOf('await runMassDistillationCampaignConsumer({ maxDispatches: 3 })')
-  assert.ok(reconcileAt >= 0 && diagnoseAt > reconcileAt && recoverAt > diagnoseAt && consumeAt > recoverAt)
+  const reconcileAt = workflow.indexOf('await reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 15 })')
+  const diagnoseAt = workflow.indexOf('await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })')
+  const stalledAt = workflow.indexOf('await recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 })')
+  const recoverAt = workflow.indexOf('await recoverMassDistillationCampaigns({ now, maxCampaigns: 5 })')
+  const consumeAt = workflow.indexOf('await runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })')
+  assert.ok(reconcileAt >= 0 && diagnoseAt > reconcileAt && stalledAt > diagnoseAt && recoverAt > stalledAt && consumeAt > recoverAt)
 })
 
 test('provider ledger hydrates accepted jobs independently of current run stage', () => {

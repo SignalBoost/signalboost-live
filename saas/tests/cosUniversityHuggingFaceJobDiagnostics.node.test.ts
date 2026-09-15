@@ -44,10 +44,10 @@ test('HF job logs use the documented read-only jobs log endpoint', async () => {
 })
 
 test('mass cron reconciles, diagnoses, then considers new paid dispatch', () => {
-  const route = fs.readFileSync(path.join(ROOT, 'app/api/cron/cos-university-mass-distillation/route.ts'), 'utf8')
-  const reconcileAt = route.indexOf('await reconcileMassDistillationHuggingFaceJobs({ maxJobs: 10 })')
-  const diagnoseAt = route.indexOf('await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })')
-  const consumeAt = route.indexOf('await runMassDistillationCampaignConsumer({ maxDispatches: 3 })')
+  const workflow = fs.readFileSync(path.join(ROOT, 'lib/ai/cos/cosUniversityMassDistillationWorkflow.ts'), 'utf8')
+  const reconcileAt = workflow.indexOf('await reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 15 })')
+  const diagnoseAt = workflow.indexOf('await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })')
+  const consumeAt = workflow.indexOf('await runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })')
   assert.ok(reconcileAt >= 0 && diagnoseAt > reconcileAt && consumeAt > diagnoseAt)
 })
 

@@ -597,6 +597,82 @@ export async function recoverMassDistillationCampaigns(input: {
   }
 }
 
+/**
+ * A function interruption can leave a claimed stage in `*_dispatching` after its durable cost
+ * reservation was taken but before a provider Job id was saved. Reopen only claims that have been
+ * motionless for fifteen minutes and still belong to an unexpired, non-promoting campaign. The
+ * normal recovery RPC then releases/reuses the same reservation and the deterministic provider
+ * Job name prevents a second POST when the first submission actually succeeded.
+ */
+export async function recoverStalledMassDistillationDispatchClaims(input: {
+  now?: Date
+  maxRuns?: number
+} = {}) {
+  const db = cosServiceDb()
+  if (!db) return { ok: false as const, skipped: true as const, reason: 'service_database_unavailable' as const }
+  const now = input.now || new Date()
+  const cutoff = new Date(now.getTime() - 15 * 60_000).toISOString()
+  const maxRuns = Math.max(1, Math.min(20, Math.floor(input.maxRuns ?? 10)))
+  const campaigns = await db.from('cos_university_mass_distillation_campaigns')
+    .select('id')
+    .in('status', ['authorized', 'active', 'failed'])
+    .gt('expires_at', now.toISOString())
+    .eq('automatic_promotion_authorized', false)
+    .eq('runpod_mutation_authorized', false)
+    .eq('authority_expanded', false)
+    .limit(100)
+  if (campaigns.error) throw campaigns.error
+  const campaignIds = (campaigns.data || []).map((row: any) => String(row.id)).filter(Boolean)
+  if (!campaignIds.length) {
+    return {
+      ok: true as const, skipped: true as const, reason: 'no_authorized_campaign' as const,
+      inspected: 0, recovered: 0, automaticRetryAuthorized: true,
+      automaticPromotionAuthorized: false, runpodMutationAuthorized: false, authorityExpanded: false,
+    }
+  }
+
+  const stale = await db.from('cos_university_mass_distillation_batch_runs')
+    .select('id,campaign_id,stage,updated_at')
+    .in('campaign_id', campaignIds)
+    .in('stage', ['teacher_dispatching', 'preparation_dispatching', 'training_dispatching'])
+    .lt('updated_at', cutoff)
+    .order('updated_at', { ascending: true })
+    .limit(maxRuns)
+  if (stale.error) throw stale.error
+
+  const recovered: Array<{ runId: string; campaignId: string; priorStage: string }> = []
+  for (const row of (stale.data || []) as any[]) {
+    const result = await db.from('cos_university_mass_distillation_batch_runs')
+      .update({
+        stage: 'failed',
+        failure_reason: `mass_distillation_stalled_dispatch_claim:${String(row.stage)}`,
+        updated_at: now.toISOString(),
+      })
+      .eq('id', row.id)
+      .eq('campaign_id', row.campaign_id)
+      .eq('stage', row.stage)
+      .lt('updated_at', cutoff)
+      .select('id')
+      .maybeSingle()
+    if (result.error) throw result.error
+    if (result.data) recovered.push({ runId: String(row.id), campaignId: String(row.campaign_id), priorStage: String(row.stage) })
+  }
+
+  return {
+    ok: true as const,
+    skipped: recovered.length === 0,
+    reason: recovered.length === 0 ? 'no_stalled_dispatch_claim' as const : undefined,
+    inspected: (stale.data || []).length,
+    recovered: recovered.length,
+    runs: recovered,
+    retryScope: 'same_campaign_expiration_and_remaining_budget' as const,
+    automaticRetryAuthorized: true,
+    automaticPromotionAuthorized: false,
+    runpodMutationAuthorized: false,
+    authorityExpanded: false,
+  }
+}
+
 export async function runMassDistillationCampaignConsumer(input: {
   now?: Date
   maxDispatches?: number

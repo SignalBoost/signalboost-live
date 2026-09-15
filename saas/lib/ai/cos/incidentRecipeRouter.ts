@@ -15,10 +15,16 @@ export const INCIDENT_CORRELATION_RECIPE = recipe('self-healing.incident-correla
 export const HEALTH_INCIDENT_RECIPE = recipe('self-healing.health.v1', ['health.read', 'logs.search'], ['metrics.query', 'deployment.read', 'incident.read'])
 /** Native SignalBoost probes already carry the triggering observation; health + metric history are the required independent follow-up evidence. */
 export const NATIVE_PLATFORM_INCIDENT_RECIPE = recipe('self-healing.native-platform.v1', ['health.read', 'metrics.query'], ['deployment.read', 'recent_changes.read', 'incident.read', 'logs.search'])
+export const UNIVERSITY_DISTILLATION_INCIDENT_RECIPE = recipe(
+  'self-healing.cos-university-mass-distillation.v1',
+  ['health.read', 'distillation.read'],
+  ['metrics.query', 'deployment.read', 'recent_changes.read', 'incident.read', 'logs.search'],
+)
 
 /** Selects a bounded read-only evidence routine from the incident itself, without an LLM call. */
 export function selectConnectorRecipe(incident: SupervisorIncident): CosConnectorRecipe {
   const text = `${incident.provider} ${incident.errorMessage} ${incident.evidence.map(item => item.summary).join(' ')}`.toLowerCase()
+  if (incident.metadata?.nativeProbe === 'cos-university-mass-distillation') return UNIVERSITY_DISTILLATION_INCIDENT_RECIPE
   if (incident.metadata?.monitoringMode === 'native' || incident.metadata?.nativeProbe) return NATIVE_PLATFORM_INCIDENT_RECIPE
   if (/latency|slow|timeout|cpu|memory|throughput|p9[059]|performance/.test(text)) return PERFORMANCE_INCIDENT_RECIPE
   if (/deploy|release|build|rollback|revision|commit/.test(text)) return DEPLOYMENT_INCIDENT_RECIPE

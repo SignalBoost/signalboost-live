@@ -4,7 +4,7 @@ import path from 'node:path'
 import test from 'node:test'
 
 function source(relative: string) {
-  return fs.readFileSync(path.join(process.cwd(), relative), 'utf8')
+  return fs.readFileSync(path.join(import.meta.dirname, relative), 'utf8')
 }
 
 test('mass campaign migration separates prepared curriculum from paid authorization', () => {
@@ -75,11 +75,14 @@ test('worker callbacks advance teacher to partitions to training to evaluation w
 test('mass campaign has a signed callback and a bounded scheduled consumer', () => {
   const callback = source('../app/api/internal/cos/mass-distillation/evidence/route.ts')
   const cron = source('../app/api/cron/cos-university-mass-distillation/route.ts')
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
   const vercel = source('../vercel.json')
   assert.match(callback, /verifyTrainingExecutorPayload/)
   assert.match(callback, /recordMassDistillationWorkerEvidence/)
   assert.match(cron, /CRON_SECRET/)
-  assert.match(cron, /recoverMassDistillationCampaigns\(\{ maxCampaigns: 5 \}\)/)
-  assert.match(cron, /maxDispatches: 3/)
+  assert.match(cron, /runCosUniversityMassDistillationWorkflow/)
+  assert.match(workflow, /recoverStalledMassDistillationDispatchClaims\(\{ now, maxRuns: 10 \}\)/)
+  assert.match(workflow, /recoverMassDistillationCampaigns\(\{ now, maxCampaigns: 5 \}\)/)
+  assert.match(workflow, /maxDispatches: 3/)
   assert.match(vercel, /\/api\/cron\/cos-university-mass-distillation/)
 })

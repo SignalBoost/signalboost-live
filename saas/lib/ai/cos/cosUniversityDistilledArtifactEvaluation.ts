@@ -337,23 +337,62 @@ function batchPrompt(cases: readonly EvalCase[]): string {
   return `Answer each independent case directly and concisely, using at most 40 words per answer. Do not reveal hidden chain-of-thought or scratch work.\n\nCASES:\n${input}\n\nReturn every answer using exactly these markers and no extra sections:\n${format}`
 }
 
-function parseBatchAnswers(text: string, cases: readonly EvalCase[]): Map<string, string> {
+function collectBatchAnswers(text: string, cases: readonly EvalCase[]): { answers: Map<string, string>; missing: EvalCase[] } {
   const answers = new Map<string, string>()
+  const missing: EvalCase[] = []
   for (const item of cases) {
     const startMarker = `<<<ANSWER:${item.id}>>>`
     const endMarker = `<<<END:${item.id}>>>`
     const start = text.indexOf(startMarker)
     const end = start < 0 ? -1 : text.indexOf(endMarker, start + startMarker.length)
-    if (start < 0 || end < 0) throw new Error(`distilled_evaluation_answer_missing:${item.id}`)
-    const answer = text.slice(start + startMarker.length, end).trim()
-    if (!answer) throw new Error(`distilled_evaluation_answer_empty:${item.id}`)
+    const answer = start < 0 || end < 0 ? '' : text.slice(start + startMarker.length, end).trim()
+    if (!answer) { missing.push(item); continue }
     answers.set(item.id, answer)
   }
-  return answers
+  return { answers, missing }
 }
 
 const DISTILLED_EVAL_IDLE_TIMEOUT_MS = 45_000
 const DISTILLED_EVAL_OVERALL_TIMEOUT_MS = 240_000
+
+async function streamSingleCase(input: {
+  endpointId: string
+  model: string
+  item: EvalCase
+  key: string
+}): Promise<string> {
+  const controller = new AbortController()
+  const overall = setTimeout(() => controller.abort(), DISTILLED_EVAL_OVERALL_TIMEOUT_MS)
+  let idle: ReturnType<typeof setTimeout> | null = null
+  const resetIdle = () => {
+    if (idle) clearTimeout(idle)
+    idle = setTimeout(() => controller.abort(), DISTILLED_EVAL_IDLE_TIMEOUT_MS)
+  }
+  try {
+    resetIdle()
+    const response = await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${input.key}`, 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      body: JSON.stringify({
+        model: input.model,
+        temperature: 0,
+        max_tokens: MIN_BATCH_COMPLETION_TOKENS,
+        stream: true,
+        chat_template_kwargs: { enable_thinking: false },
+        messages: [
+          { role: 'system', content: 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.' },
+          { role: 'user', content: batchPrompt([input.item]) },
+        ],
+      }),
+      signal: controller.signal,
+    })
+    if (!response.ok) throw new Error(`distilled_evaluation_runpod_http_${response.status}`)
+    return clean(await readOpenAiStream(response, resetIdle), 200_000)
+  } finally {
+    clearTimeout(overall)
+    if (idle) clearTimeout(idle)
+  }
+}
 
 async function callRunpodBatch(input: {
   endpointId: string
@@ -363,7 +402,7 @@ async function callRunpodBatch(input: {
   candidateId: string
   artifactId?: string | null
   artifactHash?: string | null
-}): Promise<{ answers: Map<string, string>; responseHash: string }> {
+}): Promise<{ answers: Map<string, string>; responseHash: string; recoveredCaseIds?: string[] }> {
   if (!input.cases.length || input.cases.length > MAX_BATCH_CASES) {
     throw new Error('distilled_evaluation_batch_case_count_unsupported')
   }
@@ -412,9 +451,32 @@ async function callRunpodBatch(input: {
       if (idle) clearTimeout(idle)
     }
     if (!text) throw new Error('distilled_evaluation_runpod_empty')
-    const answers = parseBatchAnswers(text, input.cases)
+    const collected = collectBatchAnswers(text, input.cases)
+    // A small model at temperature 0 occasionally drops or mangles one marker in a batch. That is
+    // a formatting slip, not a wrong answer — recover the slipped cases individually instead of
+    // aborting the whole evaluation over one marker. Each case gets exactly one solo retry; a case
+    // that fails alone fails the evaluation by the same name as before, so nothing silently thins
+    // the suite: coverage checks upstream still require every pinned case scored.
+    const retryTexts: string[] = []
+    for (const item of collected.missing) {
+      const solo = await streamSingleCase({
+        endpointId: input.endpointId,
+        model: input.model,
+        item,
+        key,
+      })
+      retryTexts.push(solo)
+      const recovered = collectBatchAnswers(solo, [item])
+      const answer = recovered.answers.get(item.id)
+      if (!answer) throw new Error(`distilled_evaluation_answer_missing:${item.id}`)
+      collected.answers.set(item.id, answer)
+    }
     success = true
-    return { answers, responseHash: sha256Raw(text) }
+    return {
+      answers: collected.answers,
+      responseHash: sha256Raw([text, ...retryTexts].join('\n<<<RETRY>>>\n')),
+      recoveredCaseIds: collected.missing.map(item => item.id),
+    }
   } finally {
     await recordLocalInferenceUsage({
       requestId,

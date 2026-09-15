@@ -7,6 +7,7 @@ import {
   buildHuggingFaceJobSpec,
   decodeHuggingFaceDatasetRef,
   deriveHuggingFaceTrainingExecutorSecret,
+  findHuggingFaceJobByName,
   huggingFaceJobsConfigFromEnv,
   installHuggingFaceTrainingExecutorEnv,
   isHuggingFaceDatasetRef,
@@ -53,6 +54,29 @@ test('derived callback key is deterministic and does not equal the HF provider t
   assert.equal(first, second)
   assert.match(first, /^[a-f0-9]{64}$/)
   assert.notEqual(first, token)
+})
+
+test('provider lookup recovers an accepted named Job without duplicating a known attempt', async () => {
+  let requestedUrl = ''
+  const recovered = await findHuggingFaceJobByName({
+    namespace: 'signalboost',
+    token,
+    name: 'itmounts-train-abc123',
+    excludeJobIds: ['old-job'],
+    fetchImpl: async url => {
+      requestedUrl = url
+      return new Response(JSON.stringify([
+        { id: 'old-job', url: 'https://huggingface.co/jobs/signalboost/old-job', createdAt: '2026-09-15T10:00:00Z', status: { stage: 'ERROR' } },
+        { id: 'recovered-job', url: 'https://huggingface.co/jobs/signalboost/recovered-job', createdAt: '2026-09-15T10:01:00Z', status: { stage: 'RUNNING' } },
+      ]), { status: 200, headers: { 'content-type': 'application/json' } })
+    },
+  })
+  assert.equal(new URL(requestedUrl).searchParams.get('label'), 'name=itmounts-train-abc123')
+  assert.deepEqual(recovered, {
+    jobId: 'recovered-job',
+    jobUrl: 'https://huggingface.co/jobs/signalboost/recovered-job',
+    providerStage: 'RUNNING',
+  })
 })
 
 test('HF dataset references must be explicit and revision/split aware', () => {

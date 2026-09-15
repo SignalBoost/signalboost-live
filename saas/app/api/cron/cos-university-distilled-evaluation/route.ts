@@ -93,7 +93,30 @@ function boundedSignal(existing: AbortSignal | null, timeoutMs: number): AbortSi
   return existing ? AbortSignal.any([existing, timeout]) : timeout
 }
 
-async function claimRuntimeEvaluationAttempt(now = new Date()): Promise<RuntimeAttemptClaim> {
+function routeDeadlineSignal(routeDeadlineMs: number): AbortSignal {
+  const remaining = routeDeadlineMs - Date.now() - EVALUATION_ROUTE_RESERVE_MS
+  if (remaining <= 0) throw new Error('distilled_evaluation_route_deadline_exceeded')
+  return AbortSignal.timeout(Math.max(1, Math.floor(remaining)))
+}
+
+async function withinRouteDeadline<T>(work: Promise<T>, routeDeadlineMs: number): Promise<T> {
+  const remaining = routeDeadlineMs - Date.now() - EVALUATION_ROUTE_RESERVE_MS
+  if (remaining <= 0) throw new Error('distilled_evaluation_route_deadline_exceeded')
+  let timer: ReturnType<typeof setTimeout> | null = null
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('distilled_evaluation_route_deadline_exceeded')), remaining)
+        timer.unref?.()
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+async function claimRuntimeEvaluationAttempt(now: Date, routeDeadlineMs: number): Promise<RuntimeAttemptClaim> {
   if (RUNTIME_WAKE_WORST_CASE_COST_USD > MAX_RUNTIME_WAKE_COST_USD) {
     throw new Error('distilled_evaluation_runtime_cost_model_exceeds_ceiling')
   }
@@ -106,6 +129,7 @@ async function claimRuntimeEvaluationAttempt(now = new Date()): Promise<RuntimeA
     .eq('trained_artifact_id', DISTILLED_ADAPTER_MODEL_ID)
     .order('created_at', { ascending: true })
     .limit(1)
+    .abortSignal(routeDeadlineSignal(routeDeadlineMs))
     .maybeSingle()
   if (artifactResult.error) throw artifactResult.error
   if (!artifactResult.data) return { ok: false, reason: 'no_supported_evaluation_pending_artifact' }
@@ -123,6 +147,7 @@ async function claimRuntimeEvaluationAttempt(now = new Date()): Promise<RuntimeA
     .eq('candidate_id', candidateId)
     .order('observed_at', { ascending: false })
     .limit(100)
+    .abortSignal(routeDeadlineSignal(routeDeadlineMs))
   if (approvalsResult.error) throw approvalsResult.error
   const nowMs = now.getTime()
   const approval = (approvalsResult.data || []).find((row: any) => {
@@ -186,7 +211,10 @@ async function claimRuntimeEvaluationAttempt(now = new Date()): Promise<RuntimeA
     evidence,
     verifier: 'host_controller',
     observed_at: now.toISOString(),
-  }).select('event_key').single()
+  })
+    .select('event_key')
+    .abortSignal(routeDeadlineSignal(routeDeadlineMs))
+    .single()
   if (insert.error) {
     if (String((insert.error as any)?.code || '') === '23505') {
       return { ok: false, reason: 'bounded_runtime_evaluation_attempt_already_consumed' }
@@ -372,19 +400,19 @@ export async function GET(req: NextRequest) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
+  const routeDeadlineMs = Date.now() + EVALUATION_ROUTE_BUDGET_MS
   try {
     // Confirm evaluator signing is available before consuming the one approved runtime attempt.
-    const evaluator = await independentEvaluatorConfig()
+    const evaluator = await withinRouteDeadline(independentEvaluatorConfig(), routeDeadlineMs)
     if (!evaluator) return recordSkip('independent_evaluator_not_configured')
     if (!process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
 
     // Claim one durable, cost-bounded runtime attempt before any call can wake billed RunPod compute.
-    const runtimeAttempt = await claimRuntimeEvaluationAttempt(new Date())
+    const runtimeAttempt = await claimRuntimeEvaluationAttempt(new Date(), routeDeadlineMs)
     if (runtimeAttempt.ok === false) return recordSkip(runtimeAttempt.reason)
 
-    const routeDeadlineMs = Date.now() + EVALUATION_ROUTE_BUDGET_MS
     const result = await runWithEvaluationTransportGuards({
       routeDeadlineMs,
       runner: () => runUniversityDistilledArtifactEvaluation(new Date()),

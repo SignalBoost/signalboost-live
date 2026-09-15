@@ -84,6 +84,23 @@ test('subject aliases package through the canonical University subject family wi
   assert.equal(prepared[0].subjectId, 'Computer Science & Coding')
 })
 
+test('AI engineering labels join Computer Science distillation without lowering the minimum', () => {
+  const rows = [
+    ...Array.from({ length: 19 }, (_, index) => ({
+      contentHash: h(index + 50_000), materialHash: h(index + 60_000), subject: 'Retrieval-Augmented Generation (RAG)',
+      sourceKind: 'course_material', license: 'Public Domain', confidence: 0.95,
+    })),
+    {
+      contentHash: h(50_100), materialHash: h(60_100), subject: 'AI Agents, RAG, Embeddings, Architectures, Framework, VectorDB & Memory',
+      sourceKind: 'course_material', license: 'Public Domain', confidence: 0.95,
+    },
+  ]
+  const prepared = buildMassDistillationBatches(rows)
+  assert.equal(prepared.length, 1)
+  assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_MIN_BATCH)
+  assert.equal(prepared[0].subjectId, 'Computer Science & Coding')
+})
+
 test('storage hashes cannot manufacture a distillation batch from duplicate learning material', () => {
   const duplicateRows = Array.from({ length: 34 }, (_, index) => ({
     contentHash: h(index + 1), materialHash: h(999_999), subject: 'Data Structures and Algorithms in Python',

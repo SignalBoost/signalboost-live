@@ -37,3 +37,23 @@ test('all four suites share one deadline', () => {
     assert.match(source, new RegExp(`suiteName: '${suite}'[^}]*deadlineAt`))
   }
 })
+
+test('one mangled marker recovers with a solo retry instead of aborting the evaluation', () => {
+  // The 15:08 attempt died on distilled_evaluation_answer_missing over a single marker slip in a
+  // twelve-case batch. Slipped cases are re-asked one at a time; only a case that fails alone
+  // fails the evaluation, under the same name, so coverage is never silently thinned.
+  assert.match(source, /function collectBatchAnswers\(/)
+  assert.match(source, /const solo = await streamSingleCase\(/)
+  assert.match(source, /recoveredCaseIds: collected\.missing\.map\(item => item\.id\)/)
+  assert.match(source, /if \(!answer\) throw new Error\(`distilled_evaluation_answer_missing:\$\{item\.id\}`\)/)
+  assert.doesNotMatch(source, /function parseBatchAnswers\(/)
+})
+
+test('the solo retry keeps the exact request contract of the batch call', () => {
+  assert.match(source, /max_tokens: MIN_BATCH_COMPLETION_TOKENS,\n\s+stream: true,\n\s+chat_template_kwargs: \{ enable_thinking: false \}/)
+  assert.match(source, /batchPrompt\(\[input\.item\]\)/)
+})
+
+test('retries are part of the recorded response hash', () => {
+  assert.match(source, /sha256Raw\(\[text, \.\.\.retryTexts\]\.join\('\\n<<<RETRY>>>\\n'\)\)/)
+})

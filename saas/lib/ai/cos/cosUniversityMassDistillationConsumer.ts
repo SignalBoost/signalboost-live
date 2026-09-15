@@ -517,8 +517,36 @@ export async function recoverMassDistillationCampaigns(input: {
   if (!db) return { ok: false as const, skipped: true as const, reason: 'service_database_unavailable' as const }
   const maxCampaigns = Math.max(1, Math.min(10, Math.floor(input.maxCampaigns ?? 5)))
   const now = (input.now || new Date()).toISOString()
+  const failedRuns = await db.from('cos_university_mass_distillation_batch_runs')
+    .select('campaign_id,updated_at')
+    .eq('stage', 'failed')
+    .order('updated_at', { ascending: true })
+    .limit(maxCampaigns * 4)
+  if (failedRuns.error) throw failedRuns.error
+  const candidateIds = [...new Set((failedRuns.data || []).map((row: any) => String(row.campaign_id)))].filter(Boolean)
+  if (candidateIds.length === 0) {
+    return {
+      ok: true as const,
+      skipped: true as const,
+      reason: 'no_recoverable_failed_campaign' as const,
+      campaignsInspected: 0,
+      campaignsWithFailedRuns: 0,
+      rearmedRuns: 0,
+      releasedRejectedReserveUsd: 0,
+      budgetBlockedRuns: 0,
+      awaitingProviderDiscoveryRuns: 0,
+      recovered: [],
+      failures: [],
+      automaticRetryAuthorized: true,
+      automaticPromotionAuthorized: false,
+      runpodMutationAuthorized: false,
+      authorityExpanded: false,
+      semantics: 'scheduled_retry_within_existing_campaign_expiration_and_remaining_budget' as const,
+    }
+  }
   const campaigns = await db.from('cos_university_mass_distillation_campaigns')
     .select('id,status,expires_at')
+    .in('id', candidateIds)
     .in('status', ['authorized', 'active', 'failed'])
     .gt('expires_at', now)
     .order('updated_at', { ascending: true })
@@ -527,23 +555,12 @@ export async function recoverMassDistillationCampaigns(input: {
 
   const recovered: unknown[] = []
   const failures: Array<{ campaignId: string; error: string }> = []
-  let campaignsWithFailedRuns = 0
+  const campaignsWithFailedRuns = (campaigns.data || []).length
   let rearmedRuns = 0
   let releasedRejectedReserveUsd = 0
   let budgetBlockedRuns = 0
   let awaitingProviderDiscoveryRuns = 0
   for (const campaign of (campaigns.data || []) as any[]) {
-    const failed = await db.from('cos_university_mass_distillation_batch_runs')
-      .select('id')
-      .eq('campaign_id', campaign.id)
-      .eq('stage', 'failed')
-      .limit(1)
-    if (failed.error) {
-      failures.push({ campaignId: campaign.id, error: safeError(failed.error) })
-      continue
-    }
-    if ((failed.data || []).length === 0) continue
-    campaignsWithFailedRuns += 1
     const result = await db.rpc('rearm_cos_university_mass_distillation_campaign', {
       p_campaign_id: campaign.id,
       p_source: 'scheduled_cron_retry_within_existing_campaign_authority',
@@ -601,7 +618,7 @@ export async function runMassDistillationCampaignConsumer(input: {
     .in('status', ['authorized', 'active'])
     .gt('expires_at', (input.now || new Date()).toISOString())
     .order('authorized_at', { ascending: true })
-    .limit(5)
+    .limit(100)
   if (campaigns.error) throw campaigns.error
   const campaignRows: any[] = campaigns.data || []
   if (campaignRows.length === 0) {

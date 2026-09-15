@@ -396,6 +396,49 @@ export async function resolveHuggingFaceNamespace(input: {
   return name
 }
 
+/**
+ * Finds a provider Job by its deterministic name before creating another paid Job. This closes
+ * the ambiguous window where Hugging Face accepted a POST but the response or following database
+ * write was lost. Known terminal attempts are excluded by the caller so a proven failure can retry.
+ */
+export async function findHuggingFaceJobByName(input: {
+  namespace: string
+  token: string
+  name: string
+  excludeJobIds?: readonly string[]
+  fetchImpl?: FetchPort
+}): Promise<{ jobId: string; jobUrl: string; providerStage: string } | null> {
+  const namespace = clean(input.namespace, 200)
+  const name = clean(input.name, 240)
+  if (!namespace) throw new Error('huggingface_training_namespace_missing')
+  if (!name) throw new Error('huggingface_training_job_name_missing')
+  const endpoint = new URL(`${HUGGING_FACE_JOBS_API}/api/jobs/${encodeURIComponent(namespace)}`)
+  endpoint.searchParams.append('label', `name=${name}`)
+  const response = await (input.fetchImpl || fetch)(endpoint.toString(), {
+    headers: { authorization: `Bearer ${input.token}` },
+    redirect: 'error',
+  })
+  if (!response.ok) throw new Error(`huggingface_training_job_lookup_rejected:${response.status}`)
+  const payload = await response.json() as any
+  const rows: any[] = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.items)
+      ? payload.items
+      : []
+  const excluded = new Set((input.excludeJobIds || []).map(value => clean(value, 240)).filter(Boolean))
+  const matches = rows
+    .filter(row => clean(row?.id, 240) && !excluded.has(clean(row?.id, 240)))
+    .sort((left, right) => Date.parse(clean(right?.createdAt || right?.created_at, 80)) - Date.parse(clean(left?.createdAt || left?.created_at, 80)))
+  const match = matches[0]
+  if (!match) return null
+  const jobId = clean(match.id, 240)
+  return Object.freeze({
+    jobId,
+    jobUrl: clean(match.url, 2000) || `https://huggingface.co/jobs/${namespace}/${jobId}`,
+    providerStage: clean(match?.status?.stage || match?.stage, 40).toUpperCase() || 'UNKNOWN',
+  })
+}
+
 export async function submitHuggingFaceJob(input: {
   namespace: string
   token: string

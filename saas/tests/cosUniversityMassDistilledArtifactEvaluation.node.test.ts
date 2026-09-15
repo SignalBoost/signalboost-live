@@ -45,11 +45,13 @@ test('mass RunPod runtime implements the provider load-balancer /ping contract b
   assert.match(provision, /MASS_DISTILLED_CANARY_TIMEOUT_MS = 60_000/)
 })
 
-test('mass canary lane is owner-approved, bounded and advances after an exact-artifact pass', () => {
+test('mass canary lane honors the exact owner-approved invocation ceiling and advances after proof', () => {
   const route = source('../app/api/cron/runpod-mass-distilled-local-deploy/route.ts')
   assert.match(route, /local_distilled_runtime_deploy_approved/)
-  assert.match(route, /maxCanaryInvocations/)
-  assert.match(route, /<= MAX_CANARY_INVOCATIONS/)
+  assert.match(route, /approvedInvocations = Math\.floor\(Number\(evidence\?\.maxCanaryInvocations/)
+  assert.match(route, /approvedInvocations > 0/)
+  assert.match(route, /approvedInvocations <= MAX_CANARY_INVOCATIONS/)
+  assert.match(route, /consumed >= approval\.approvedInvocations/)
   assert.match(route, /maxEstimatedCanaryCostUsd/)
   assert.match(route, /<= 0\.2/)
   assert.match(route, /MIN_BALANCE_USD = 1/)
@@ -101,6 +103,16 @@ test('mass evaluator normalizes authoritative campaign evidence without weakenin
   assert.match(evaluator, /manifestHash\(hashes\)/)
 })
 
+test('mass evaluation waits for the supported cold start before paid scoring calls', () => {
+  const evaluator = source('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
+  assert.match(evaluator, /waitForMassDistilledReady\(canary\.endpointId\)/)
+  const ready = evaluator.indexOf('waitForMassDistilledReady(canary.endpointId)')
+  const firstSuite = evaluator.indexOf("runSuite({ suiteName: 'retention'")
+  const initialSuite = evaluator.indexOf("runSuite({ suiteName: 'holdout'")
+  assert.ok(ready >= 0)
+  assert.ok(firstSuite > ready || initialSuite > ready)
+})
+
 test('mass evaluation queue finishes all initial evaluations before any delayed-retention spend', () => {
   const evaluator = source('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
   assert.match(evaluator, /\.limit\(20\)/)
@@ -111,6 +123,27 @@ test('mass evaluation queue finishes all initial evaluations before any delayed-
   assert.match(evaluator, /prior\.delayed_retention_passed === true \|\| !retentionDeferred/)
   assert.match(evaluator, /now\.getTime\(\) >= trainedAt \+ MIN_MASS_DISTILLED_RETENTION_DELAY_MS/)
   assert.match(evaluator, /reason: 'mass_evaluation_work_not_due'/)
+})
+
+test('failed delayed retention is terminal for the original approval and is not automatically rescored', () => {
+  const evaluator = source('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
+  assert.match(evaluator, /retention: \{ \.\.\.retention\.responseHashes, attempted: true \}/)
+  assert.match(evaluator, /retentionDeferred = prior\?\.response_hashes\?\.retention\?\.deferred === true/)
+})
+
+test('missing signed scorer claims repair before evaluation with zero provider or dataset work', () => {
+  const repair = source('../lib/ai/cos/cosUniversityMassDistilledClaimReconciliation.ts')
+  const route = source('../app/api/cron/cos-university-distilled-evaluation/route.ts')
+  assert.match(repair, /no_missing_mass_distilled_scorer_claims/)
+  assert.match(repair, /providerCalls: 0/)
+  assert.match(repair, /judgeCalls: 0/)
+  assert.match(repair, /datasetFetches: 0/)
+  assert.match(repair, /mass_distilled_claim_repair_original_approval_missing/)
+  assert.doesNotMatch(repair, /runpod|datasets-server\.huggingface|callLocalModel|waitForMassDistilledReady/i)
+  const repairCall = route.indexOf('reconcileMassDistilledEvaluationClaims(new Date())')
+  const evaluatorCall = route.indexOf('runUniversityMassDistilledArtifactEvaluation(new Date())')
+  assert.ok(repairCall >= 0 && evaluatorCall > repairCall)
+  assert.match(route.slice(repairCall, evaluatorCall), /claimRepairOnly: true/)
 })
 
 test('mass evaluation spends only the approved 8 endpoint and 4 judge calls across initial and delayed phases', () => {
@@ -131,6 +164,7 @@ test('production schedules mass canary and routes mass artifacts through indepen
   const vercel = source('../vercel.json')
   const route = source('../app/api/cron/cos-university-distilled-evaluation/route.ts')
   assert.match(vercel, /\/api\/cron\/runpod-mass-distilled-local-deploy/)
+  assert.match(route, /reconcileMassDistilledEvaluationClaims/)
   assert.match(route, /runUniversityMassDistilledArtifactEvaluation/)
   assert.match(route, /massLaneChecked: true/)
 })

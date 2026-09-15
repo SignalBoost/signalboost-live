@@ -129,7 +129,7 @@ export function cosUniversitySubjectById(id: CosUniversitySubjectId): CosUnivers
 }
 
 const SUBJECT_RULES: ReadonlyArray<{ id: CosUniversitySubjectId; match: RegExp }> = [
-  { id: 'computer_science', match: /\b(code|coding|software|program(?:ming)?|algorithms?|data structures?|databases?|distributed systems?|operating systems?|apis?|devops|debug(?:ging)?|typescript|javascript|python|next\.?js|architecture|latenc(?:y|ies)|observability|computer science)\b/i },
+  { id: 'computer_science', match: /\b(code|coding|software|program(?:ming)?|algorithms?|data structures?|databases?|distributed systems?|operating systems?|apis?|devops|debug(?:ging)?|typescript|javascript|python|next\.?js|architecture|latenc(?:y|ies)|observability|computer science|artificial intelligence|machine learning|deep learning|neural networks?|transformers?|pytorch|computer vision|large language models?|llms?|retrieval[- ]augmented generation|embeddings?|vector ?(?:db|databases?)|ai agents?)\b/i },
   { id: 'mathematics', match: /\b(algebra|calculus|linear algebra|discrete math(?:ematics)?|optimization|numerical|equations?|geometry|matri(?:x|ces)|vectors?|mathematics?)\b/i },
   { id: 'statistics_data_science', match: /\b(statistic(?:s|al)?|probability|inference|experiment(?:al|ation)?|forecast(?:ing)?|causal|data science|regression|distributions?|percentiles?|p50|p90|p95|p99|measurement)\b/i },
   { id: 'physics_natural_sciences', match: /\b(physics|chemistry|biology|scientific method|mechanics?|gravity|optics?|semiconductors?|energy|astronomy|astrophysics|space science|materials?|photonics?|natural sciences?)\b/i },

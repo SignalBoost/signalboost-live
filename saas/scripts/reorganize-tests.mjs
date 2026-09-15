@@ -42,6 +42,79 @@ function slug(value) {
   return value.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
 }
 
+// ---------------------------------------------------------------------------------------------
+// DEAD-CODE PASS. lib/autonomous-systems grew into a self-referential module farm: 70 files whose
+// only importer is their own barrel, which nothing in the product imports. Reachability is
+// computed live here rather than hardcoded: a member is kept only if real code (app/ or lib/
+// outside the directory, alias or relative form) imports it directly or transitively. Everything
+// else is deleted, together with tests stranded by the deletion. Recomputing on every run means
+// a module that gains a real importer tomorrow is automatically kept.
+// ---------------------------------------------------------------------------------------------
+import { rmSync } from 'node:fs'
+
+const DEAD_SCAN_DIR = 'lib/autonomous-systems'
+
+function memberImportsOf(file, members) {
+  const source = readFileSync(file, 'utf8')
+  const specs = [
+    ...source.matchAll(/from\s+['"]([^'"]+)['"]/g),
+    ...source.matchAll(/import\(\s*['"]([^'"]+)['"]/g),
+  ].map(match => match[1])
+  const found = new Set()
+  for (const spec of specs) {
+    let candidate = null
+    if (spec.startsWith('@/')) candidate = spec.slice(2)
+    else if (spec.startsWith('.')) candidate = path.normalize(path.join(path.dirname(file), spec))
+    else continue
+    for (const variant of [candidate, `${candidate}.ts`, `${candidate}.tsx`, path.join(candidate, 'index.ts')]) {
+      if (members.has(variant)) found.add(variant)
+    }
+  }
+  return found
+}
+
+function collectSourceFiles(root, skip) {
+  const out = []
+  const walk = dir => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (skip.some(prefix => full.startsWith(prefix))) continue
+      if (entry.isDirectory()) walk(full)
+      else if (/\.tsx?$/.test(entry.name)) out.push(full)
+    }
+  }
+  walk(root)
+  return out
+}
+
+function deadCodePass() {
+  if (!existsSync(DEAD_SCAN_DIR)) return { deletedModules: 0, deletedTests: 0 }
+  const members = new Set(readdirSync(DEAD_SCAN_DIR).filter(name => name.endsWith('.ts')).map(name => path.join(DEAD_SCAN_DIR, name)))
+  const outside = [...collectSourceFiles('lib', [DEAD_SCAN_DIR]), ...collectSourceFiles('app', [])]
+  const reachable = new Set()
+  for (const file of outside) for (const hit of memberImportsOf(file, members)) reachable.add(hit)
+  const frontier = [...reachable]
+  while (frontier.length) {
+    for (const dep of memberImportsOf(frontier.pop(), members)) {
+      if (!reachable.has(dep)) { reachable.add(dep); frontier.push(dep) }
+    }
+  }
+  const dead = [...members].filter(member => !reachable.has(member))
+  for (const member of dead) rmSync(member)
+  let deletedTests = 0
+  for (const name of readdirSync(TESTS, { withFileTypes: true }).filter(entry => entry.isFile()).map(entry => entry.name)) {
+    const full = path.join(TESTS, name)
+    const hits = memberImportsOf(full, members)
+    if (!hits.size) continue
+    // A test survives only if at least one thing it tests survived.
+    if ([...hits].every(hit => !reachable.has(hit))) { rmSync(full); deletedTests += 1 }
+  }
+  console.log(`Dead-code pass: deleted ${dead.length} unreachable modules in ${DEAD_SCAN_DIR} (kept ${reachable.size}), and ${deletedTests} tests that only exercised them.`)
+  return { deletedModules: dead.length, deletedTests }
+}
+
+deadCodePass()
+
 const files = readdirSync(TESTS, { withFileTypes: true })
   .filter(entry => entry.isFile())
   .map(entry => entry.name)

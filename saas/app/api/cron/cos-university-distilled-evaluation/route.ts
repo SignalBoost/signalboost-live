@@ -89,23 +89,22 @@ async function proveRunpodReady(input: {
  * transport shape. The evaluator still performs the authoritative revision, count, SHA-256 item,
  * identity-set, and manifest checks before any model call.
  *
- * The same invocation also proves the exact RunPod endpoint is freshly `/ready = 200` once before
- * forwarding the first evaluation inference POST. Readiness probes are not model calls and therefore
- * preserve the evaluator's exact eight inference calls. Keep both overrides scoped to this one server
+ * Before every exact RunPod evaluation inference POST, prove the same origin is freshly `/ready = 200`.
+ * These readiness GETs are not model calls, so the successful evaluation still performs exactly eight
+ * inference POSTs. Re-checking each POST prevents a long independent-judge step from letting the
+ * scale-to-zero endpoint go cold between suites. Keep both overrides scoped to this one server
  * invocation and restore the host fetch in finally.
  */
 async function runWithEvaluationTransportGuards<T>(runner: () => Promise<T>): Promise<T> {
   const originalFetch = globalThis.fetch
   const pinned = new Map<string, PinnedDatasetMetadata>()
-  const warmedRunpodOrigins = new Set<string>()
   const patchedFetch: typeof fetch = async (input, init) => {
     const rawUrl = requestUrl(input)
     let url: URL | null = null
     try { url = new URL(rawUrl) } catch { url = null }
 
-    if (isRunpodEvaluationInference(url, init) && !warmedRunpodOrigins.has(url.origin)) {
+    if (isRunpodEvaluationInference(url, init)) {
       await proveRunpodReady({ origin: url.origin, originalFetch })
-      warmedRunpodOrigins.add(url.origin)
     }
 
     const response = await originalFetch(input, init)

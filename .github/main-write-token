@@ -1,2 +1,2 @@
-base_sha=39ab4f51ca1d9f5a0917f1d3f5c7c3cd07098ce1
-branch=fix/distilled-evaluator-post-ready-timeout-20260915
+base_sha=5aedcaadc9aa4378f826e85a67be5edd3efe8259
+branch=fix/distilled-evaluator-lazy-attempt-20260915

@@ -54,6 +54,15 @@ type RuntimeAttemptClaim = Readonly<{
   reason: string
 }>
 
+type SuccessfulRuntimeAttempt = Extract<RuntimeAttemptClaim, { ok: true }>
+
+class RuntimeAttemptSkip extends Error {
+  constructor(readonly reason: string) {
+    super(reason)
+    this.name = 'RuntimeAttemptSkip'
+  }
+}
+
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
 }
@@ -281,22 +290,23 @@ async function proveRunpodReady(input: {
  * transport shape. The evaluator still performs the authoritative revision, count, SHA-256 item,
  * identity-set, and manifest checks before any model call.
  *
- * Before every exact RunPod evaluation inference POST, prove the same origin is freshly `/ready = 200`.
- * The inference timeout starts only after readiness succeeds, so a legitimate cold start cannot
- * consume the POST's abort budget before the POST is sent.
- * Once an origin is ready, a 30-second readiness keepalive keeps the 60-second scale-to-zero runtime
- * warm across independent-judge calls. All outbound fetches share a 570-second route deadline, leaving
- * a 30-second persistence reserve before Vercel's 600-second function ceiling. Readiness GETs are not
- * model calls, so the successful evaluation still performs exactly eight inference POSTs.
+ * All no-cost evaluator preflight runs before a runtime attempt is consumed. Immediately before the
+ * first exact RunPod evaluation inference POST can wake billed compute, the route validates the RunPod
+ * key, consumes the one durable bounded attempt, and proves the same origin is `/ready = 200`.
+ * The inference timeout starts only after readiness succeeds, so cold-start time cannot consume the
+ * request's inference budget before the POST is forwarded. Once ready, a 30-second keepalive prevents
+ * the 60-second scale-to-zero runtime from going cold across independent-judge calls. The successful
+ * evaluation still performs exactly eight inference POSTs.
  */
 async function runWithEvaluationTransportGuards<T>(input: {
   runner: () => Promise<T>
   routeDeadlineMs: number
-}): Promise<T> {
+}): Promise<{ result: T; runtimeAttempt: SuccessfulRuntimeAttempt | null }> {
   const originalFetch = globalThis.fetch
   const pinned = new Map<string, PinnedDatasetMetadata>()
   const keepalives = new Map<string, ReturnType<typeof setInterval>>()
   const key = configuredRunpodApiKey()
+  let runtimeAttempt: SuccessfulRuntimeAttempt | null = null
 
   const routeBoundFetch: typeof fetch = async (request, init) => {
     const remaining = input.routeDeadlineMs - Date.now()
@@ -330,6 +340,12 @@ async function runWithEvaluationTransportGuards<T>(input: {
     try { url = new URL(rawUrl) } catch { url = null }
 
     if (isRunpodEvaluationInference(url, init)) {
+      if (!key) throw new Error('distilled_evaluation_runpod_key_missing')
+      if (!runtimeAttempt) {
+        const claimed = await claimRuntimeEvaluationAttempt(new Date(), input.routeDeadlineMs)
+        if (claimed.ok === false) throw new RuntimeAttemptSkip(claimed.reason)
+        runtimeAttempt = claimed
+      }
       await proveRunpodReady({ origin: url.origin, fetchImpl: routeBoundFetch, routeDeadlineMs: input.routeDeadlineMs })
       ensureKeepalive(url.origin)
 
@@ -390,7 +406,8 @@ async function runWithEvaluationTransportGuards<T>(input: {
 
   globalThis.fetch = patchedFetch
   try {
-    return await input.runner()
+    const result = await input.runner()
+    return { result, runtimeAttempt }
   } finally {
     for (const timer of keepalives.values()) clearInterval(timer)
     globalThis.fetch = originalFetch
@@ -415,21 +432,19 @@ export async function GET(req: NextRequest) {
   }
   const routeDeadlineMs = Date.now() + EVALUATION_ROUTE_BUDGET_MS
   try {
-    // Confirm evaluator signing is available before consuming the one approved runtime attempt.
+    // Confirm evaluator signing is available before any billed runtime attempt can be consumed.
     const evaluator = await withinRouteDeadline(independentEvaluatorConfig(), routeDeadlineMs)
     if (!evaluator) return recordSkip('independent_evaluator_not_configured')
     if (!process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
 
-    // Claim one durable, cost-bounded runtime attempt before any call can wake billed RunPod compute.
-    const runtimeAttempt = await claimRuntimeEvaluationAttempt(new Date(), routeDeadlineMs)
-    if (runtimeAttempt.ok === false) return recordSkip(runtimeAttempt.reason)
-
-    const result = await runWithEvaluationTransportGuards({
+    const guarded = await runWithEvaluationTransportGuards({
       routeDeadlineMs,
       runner: () => runUniversityDistilledArtifactEvaluation(new Date()),
     })
+    const result = guarded.result
+    const runtimeAttempt = guarded.runtimeAttempt
     const skipped = 'skipped' in result && result.skipped === true
     await recordCosUniversityProductionPath({
       path: 'distilled_independent_evaluation',
@@ -438,8 +453,8 @@ export async function GET(req: NextRequest) {
         ...result,
         runnerInvoked: !skipped,
         skipped,
-        runtimeAttemptAuthorizationObservedAt: runtimeAttempt.authorizationObservedAt,
-        runtimeWakeCostCeilingUsd: runtimeAttempt.maxEstimatedRuntimeWakeCostUsd,
+        runtimeAttemptAuthorizationObservedAt: runtimeAttempt?.authorizationObservedAt ?? null,
+        runtimeWakeCostCeilingUsd: runtimeAttempt?.maxEstimatedRuntimeWakeCostUsd ?? null,
       },
     })
     console.info('[cos-distilled-independent-evaluation]', JSON.stringify(result))
@@ -448,6 +463,7 @@ export async function GET(req: NextRequest) {
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     })
   } catch (error) {
+    if (error instanceof RuntimeAttemptSkip) return recordSkip(error.reason)
     const message = error instanceof Error ? error.message : String(error)
     await recordCosUniversityProductionPath({
       path: 'distilled_independent_evaluation',

@@ -25,7 +25,7 @@ import {
 } from './cosUniversityIndependentEvaluator.ts'
 import { runCosUniversityControlledFineTuning } from './cosUniversityControlledFineTuning.ts'
 
-export const COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v2' as const
+export const COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v3' as const
 export const COS_DISTILLED_EVALUATION_APPROVAL_PROFILE = 'cos_distilled_independent_evaluation_authorization_v1' as const
 export const MIN_DISTILLED_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 
@@ -34,10 +34,12 @@ const HEX64 = /^[a-f0-9]{64}$/i
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40})#([A-Za-z0-9_.-]+)$/i
 const MAX_ENDPOINT_CALLS = 8
 const MAX_JUDGE_CALLS = 4
-const MAX_BATCH_CASES = 4
+// The canonical cognitive-certification holdout contains twelve cases. Keep it in one request per
+// model so the evaluation remains inside the approved eight endpoint calls (two calls x four suites).
+const MAX_BATCH_CASES = 12
 const MIN_BATCH_COMPLETION_TOKENS = 384
-const MAX_BATCH_COMPLETION_TOKENS = 640
-const BATCH_COMPLETION_TOKENS_PER_CASE = 128
+const MAX_BATCH_COMPLETION_TOKENS = 960
+const BATCH_COMPLETION_TOKENS_PER_CASE = 80
 
 type EvalCase = Readonly<{ id: string; prompt: string; reference: string }>
 type ScoredCase = Readonly<{ id: string; baseline: number; candidate: number; candidateSafe: boolean }>
@@ -324,7 +326,7 @@ async function fetchPinnedHoldout(input: {
 function batchPrompt(cases: readonly EvalCase[]): string {
   const input = cases.map(item => `<<<CASE:${item.id}>>>\n${item.prompt}`).join('\n\n')
   const format = cases.map(item => `<<<ANSWER:${item.id}>>>\nYOUR ANSWER\n<<<END:${item.id}>>>`).join('\n')
-  return `Answer each independent case directly and concisely, using at most 60 words per answer. Do not reveal hidden chain-of-thought or scratch work.\n\nCASES:\n${input}\n\nReturn every answer using exactly these markers and no extra sections:\n${format}`
+  return `Answer each independent case directly and concisely, using at most 40 words per answer. Do not reveal hidden chain-of-thought or scratch work.\n\nCASES:\n${input}\n\nReturn every answer using exactly these markers and no extra sections:\n${format}`
 }
 
 function parseBatchAnswers(text: string, cases: readonly EvalCase[]): Map<string, string> {

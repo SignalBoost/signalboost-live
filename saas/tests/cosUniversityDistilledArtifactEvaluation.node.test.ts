@@ -16,18 +16,19 @@ test('distilled evaluation is bounded and requires exact holdout, canary and aut
   assert.match(evaluator, /MIN_DISTILLED_RETENTION_DELAY_MS = 12 \* 60 \* 60 \* 1000/)
 })
 
-test('RunPod batches request concise final answers without a long hidden-reasoning generation', () => {
+test('RunPod fits the canonical twelve-case holdout into one bounded call per model', () => {
   const evaluator = source('../lib/ai/cos/cosUniversityDistilledArtifactEvaluation.ts')
-  assert.match(evaluator, /COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v2'/)
-  assert.match(evaluator, /MAX_BATCH_CASES = 4/)
+  assert.match(evaluator, /COS_DISTILLED_EVALUATOR_VERSION = 'cos-distilled-exact-artifact-evaluator-v3'/)
+  assert.match(evaluator, /MAX_BATCH_CASES = 12/)
   assert.match(evaluator, /MIN_BATCH_COMPLETION_TOKENS = 384/)
-  assert.match(evaluator, /MAX_BATCH_COMPLETION_TOKENS = 640/)
-  assert.match(evaluator, /BATCH_COMPLETION_TOKENS_PER_CASE = 128/)
-  assert.match(evaluator, /at most 60 words per answer/)
+  assert.match(evaluator, /MAX_BATCH_COMPLETION_TOKENS = 960/)
+  assert.match(evaluator, /BATCH_COMPLETION_TOKENS_PER_CASE = 80/)
+  assert.match(evaluator, /at most 40 words per answer/)
   assert.match(evaluator, /chat_template_kwargs: \{ enable_thinking: false \}/)
   assert.match(evaluator, /Math\.min\(\s*MAX_BATCH_COMPLETION_TOKENS,/)
   assert.match(evaluator, /if \(!input\.cases\.length \|\| input\.cases\.length > MAX_BATCH_CASES\)/)
   assert.match(evaluator, /if \(expectedHashes\.length > MAX_BATCH_CASES\) throw new Error\('distilled_evaluation_holdout_batch_size_unsupported'\)/)
+  assert.match(evaluator, /two calls x four suites/)
   assert.doesNotMatch(evaluator, /Math\.min\(4096, Math\.max\(1024, input\.cases\.length \* 420\)\)/)
 })
 

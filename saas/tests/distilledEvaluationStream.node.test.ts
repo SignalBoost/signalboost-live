@@ -65,8 +65,8 @@ test('every chunk resets the idle watchdog', async () => {
 
 test('the evaluation request preserves bounded non-thinking generation while streaming', () => {
   assert.match(source, /temperature: 0,/)
-  assert.match(source, /MAX_BATCH_COMPLETION_TOKENS = 640/)
-  assert.match(source, /BATCH_COMPLETION_TOKENS_PER_CASE = 128/)
+  assert.match(source, /MAX_BATCH_COMPLETION_TOKENS = 960/)
+  assert.match(source, /BATCH_COMPLETION_TOKENS_PER_CASE = 80/)
   assert.match(source, /chat_template_kwargs: \{ enable_thinking: false \}/)
   assert.match(source, /stream: true/)
   assert.doesNotMatch(source, /AbortSignal\.timeout\(120_000\)/)

@@ -52,7 +52,7 @@ test('evaluator-only signing key falls back to service-only Vault without sharin
   const migration = source('../supabase/migrations/20260914130000_cos_independent_evaluator_vault_secret.sql')
   assert.match(evaluatorAuth, /independentEvaluatorConfigFromEnv\(\)/)
   assert.match(evaluatorAuth, /cos_read_independent_evaluator_secret/)
-  assert.match(route, /await independentEvaluatorConfig\(\)/)
+  assert.match(route, /withinRouteDeadline\(independentEvaluatorConfig\(\), routeDeadlineMs\)/)
   assert.match(route, /process\.env\.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator\.secret/)
   assert.match(migration, /vault\.create_secret/)
   assert.match(migration, /gen_random_bytes\(48\)/)

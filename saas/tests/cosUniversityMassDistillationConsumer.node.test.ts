@@ -46,6 +46,16 @@ test('mass consumer spends only through the bounded Hugging Face stages and neve
   assert.doesNotMatch(consumer, /runpod\.ai|RUNPOD_API_KEY|reconcileRunpod|provisionRunpod|canaryRunpod/)
 })
 
+test('a blocked older campaign cannot starve a later authorized campaign', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /\.limit\(5\)/)
+  assert.match(consumer, /const campaignRows: any\[\] = campaigns\.data \|\| \[\]/)
+  assert.match(consumer, /for \(const candidate of campaignRows\)[\s\S]*claim_cos_university_mass_distillation_stage[\s\S]*if \(!claim\) continue/)
+  assert.match(consumer, /initialClaim/)
+  assert.match(consumer, /reason: 'no_claimable_campaign'/)
+  assert.doesNotMatch(consumer, /\.limit\(1\)[\s\S]*const campaign: any = campaigns\.data\?\.\[0\]/)
+})
+
 test('worker callbacks advance teacher to partitions to training to evaluation without promoting traffic', () => {
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
   assert.match(consumer, /teacher_dataset_registered/)

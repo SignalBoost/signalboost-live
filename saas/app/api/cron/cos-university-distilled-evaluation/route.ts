@@ -373,16 +373,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
   try {
-    // Claim one durable, cost-bounded runtime attempt before any call can wake billed RunPod compute.
-    const runtimeAttempt = await claimRuntimeEvaluationAttempt(new Date())
-    if (!runtimeAttempt.ok) return recordSkip(runtimeAttempt.reason)
-
-    // The evaluation engine keeps its existing fail-closed env seam. When no explicit Vercel secret
-    // exists, hydrate only this server invocation from the separately generated service-only Vault key.
+    // Confirm evaluator signing is available before consuming the one approved runtime attempt.
     const evaluator = await independentEvaluatorConfig()
-    if (evaluator && !process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
+    if (!evaluator) return recordSkip('independent_evaluator_not_configured')
+    if (!process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
+
+    // Claim one durable, cost-bounded runtime attempt before any call can wake billed RunPod compute.
+    const runtimeAttempt = await claimRuntimeEvaluationAttempt(new Date())
+    if (runtimeAttempt.ok === false) return recordSkip(runtimeAttempt.reason)
+
     const routeDeadlineMs = Date.now() + EVALUATION_ROUTE_BUDGET_MS
     const result = await runWithEvaluationTransportGuards({
       routeDeadlineMs,

@@ -4,7 +4,7 @@ import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { runpodServerlessOpenAiBaseUrl } from './runpodServerlessDistilledProvision.ts'
-import { massDistilledRuntimeSpec } from './runpodServerlessMassDistilledProvision.ts'
+import { massDistilledRuntimeSpec, waitForMassDistilledReady } from './runpodServerlessMassDistilledProvision.ts'
 import {
   FINE_TUNE_EVIDENCE_PROFILE,
   fineTuneRevisionKey,
@@ -132,7 +132,7 @@ async function selectMassArtifact(now: Date) {
   if (!rows.length) return { selection: null, pendingMass: false }
 
   const candidateIds = [...new Set(rows.map(row => clean(row.candidate_id, 140)).filter(Boolean))]
-  const [runs, evaluations] = await Promise.all([
+  const [runs, evaluations, scorerEvents] = await Promise.all([
     db.from('cos_university_mass_distillation_batch_runs')
       .select('id,campaign_id,batch_key,candidate_id,subject_id,student_model_id,student_model_revision,teacher_model_id,dataset_hash,training_data_ref,holdout_data_ref,training_manifest_hash,holdout_manifest_hash,revision_key,trained_artifact_id,trained_artifact_hash,evidence_ref,rollback_artifact_ref,completed_at,stage')
       .in('candidate_id', candidateIds)
@@ -143,9 +143,16 @@ async function selectMassArtifact(now: Date) {
       .eq('evaluator_version', COS_MASS_DISTILLED_EVALUATOR_VERSION)
       .order('created_at', { ascending: false })
       .limit(100),
+    db.from('cos_university_learning_assurance_events')
+      .select('candidate_id,evidence,verifier')
+      .eq('event_type', 'fine_tune')
+      .eq('verifier', 'independent_scorer')
+      .in('candidate_id', candidateIds)
+      .limit(500),
   ])
   if (runs.error) throw runs.error
   if (evaluations.error) throw evaluations.error
+  if (scorerEvents.error) throw scorerEvents.error
 
   const runByCandidate = new Map((runs.data || []).map((run: any) => [clean(run.candidate_id, 140), run]))
   const latestEvaluationByArtifact = new Map<string, any>()
@@ -153,11 +160,36 @@ async function selectMassArtifact(now: Date) {
     const key = `${clean((evaluation as any).candidate_id, 140)}:${clean((evaluation as any).trained_artifact_hash, 64).toLowerCase()}`
     if (!latestEvaluationByArtifact.has(key)) latestEvaluationByArtifact.set(key, evaluation)
   }
-  const evaluationFor = (row: any) => latestEvaluationByArtifact.get(`${clean(row.candidate_id, 140)}:${clean(row.trained_artifact_hash, 64).toLowerCase()}`)
+  const claimsByArtifact = new Map<string, Set<string>>()
+  for (const row of scorerEvents.data || []) {
+    const evidence: any = (row as any).evidence
+    if (evidence?.profile !== FINE_TUNE_EVIDENCE_PROFILE || !HEX64.test(clean(evidence?.artifactHash, 64))) continue
+    const key = `${clean((row as any).candidate_id, 140)}:${clean(evidence.artifactHash, 64).toLowerCase()}`
+    const claims = claimsByArtifact.get(key) || new Set<string>()
+    claims.add(clean(evidence?.claim, 80))
+    claimsByArtifact.set(key, claims)
+  }
+  const artifactKey = (row: any) => `${clean(row.candidate_id, 140)}:${clean(row.trained_artifact_hash, 64).toLowerCase()}`
+  const evaluationFor = (row: any) => latestEvaluationByArtifact.get(artifactKey(row))
+  const claimsFor = (row: any) => claimsByArtifact.get(artifactKey(row)) || new Set<string>()
+  const missingExpectedClaim = (row: any, prior: any) => {
+    const claims = claimsFor(row)
+    if (!claims.has('independent_evaluation')) return true
+    if (prior.safety_passed === true && !claims.has('safety_regression_passed')) return true
+    if (prior.unseen_transfer_passed === true && !claims.has('unseen_transfer_passed')) return true
+    if (prior.delayed_retention_passed === true && !claims.has('delayed_retention_passed')) return true
+    return false
+  }
 
   // Finish every artifact's initial independent evaluation before spending on any delayed-retention
-  // retest. This prevents the first trained artifact from parking the other two behind a 12-hour wait.
+  // retest. Missing signed claims are reconciled without repeating endpoint/judge calls.
   let selected = rows.find(row => runByCandidate.has(clean(row.candidate_id, 140)) && !evaluationFor(row)) || null
+  if (!selected) {
+    selected = rows.find(row => {
+      const prior: any = evaluationFor(row)
+      return prior && missingExpectedClaim(row, prior)
+    }) || null
+  }
   if (!selected) {
     selected = rows.find(row => {
       const candidateId = clean(row.candidate_id, 140)
@@ -610,6 +642,44 @@ async function submitIndependentClaim(input: {
   return response.json()
 }
 
+async function reconcileSignedClaims(input: {
+  prior: any
+  candidateId: string
+  revision: FineTuneRevision
+  artifactId: string
+  artifactHash: string
+}) {
+  const evidenceRef = `db://cos_university_distilled_evaluation_runs/${clean(input.prior.run_key, 64)}`
+  const evaluatorId = clean(input.prior.evaluator_id, 240)
+  await submitIndependentClaim({
+    claim: 'independent_evaluation',
+    candidateId: input.candidateId,
+    revision: input.revision,
+    artifactId: input.artifactId,
+    artifactHash: input.artifactHash,
+    evaluatorId,
+    suiteHash: clean(input.prior.holdout_suite_hash, 64),
+    evidenceRef,
+    baselineScore: Number(input.prior.baseline_score),
+    trainedArtifactScore: Number(input.prior.trained_artifact_score),
+  })
+  if (input.prior.safety_passed === true) await submitIndependentClaim({
+    claim: 'safety_regression_passed', candidateId: input.candidateId, revision: input.revision,
+    artifactId: input.artifactId, artifactHash: input.artifactHash, evaluatorId,
+    suiteHash: clean(input.prior.safety_suite_hash, 64), evidenceRef,
+  })
+  if (input.prior.unseen_transfer_passed === true) await submitIndependentClaim({
+    claim: 'unseen_transfer_passed', candidateId: input.candidateId, revision: input.revision,
+    artifactId: input.artifactId, artifactHash: input.artifactHash, evaluatorId,
+    suiteHash: clean(input.prior.transfer_suite_hash, 64), evidenceRef,
+  })
+  if (input.prior.delayed_retention_passed === true) await submitIndependentClaim({
+    claim: 'delayed_retention_passed', candidateId: input.candidateId, revision: input.revision,
+    artifactId: input.artifactId, artifactHash: input.artifactHash, evaluatorId,
+    suiteHash: clean(input.prior.retention_suite_hash, 64), evidenceRef,
+  })
+}
+
 export async function runUniversityMassDistilledArtifactEvaluation(now = new Date()) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -644,6 +714,8 @@ export async function runUniversityMassDistilledArtifactEvaluation(now = new Dat
     adapterModelRevision: modelRef[2],
   })
   if (runtimeSpec.modelName !== canary.model) throw new Error('mass_distilled_evaluation_runtime_model_mismatch')
+  const ready = await waitForMassDistilledReady(canary.endpointId)
+  if (!ready.ok) throw new Error(`mass_distilled_evaluation_runtime_not_ready:${clean(ready.error, 240)}`)
 
   const trainingManifestHash = clean(run.training_manifest_hash, 64).toLowerCase()
   const holdoutManifestHash = clean(run.holdout_manifest_hash, 64).toLowerCase()
@@ -675,6 +747,7 @@ export async function runUniversityMassDistilledArtifactEvaluation(now = new Dat
 
   if (existing.data) {
     const prior: any = existing.data
+    await reconcileSignedClaims({ prior, candidateId, revision, artifactId, artifactHash })
     if (prior.delayed_retention_passed === true) {
       return { ok: true as const, candidateId, artifactId, artifactHash, phase: 'complete' as const, retained: true, productionTrafficAuthorized: false }
     }
@@ -697,7 +770,7 @@ export async function runUniversityMassDistilledArtifactEvaluation(now = new Dat
     const retentionCases = staticRetentionCases()
     const retention = await runSuite({ suiteName: 'retention', endpointId: canary.endpointId, baseModel: revision.baseModel, candidateModel: runtimeSpec.modelName, cases: retentionCases, candidateId, artifactId, artifactHash })
     const retentionPassed = retention.candidateScore >= 0.72 && retention.candidateScore >= retention.baselineScore
-    const responseHashes = { ...(prior.response_hashes || {}), retention: retention.responseHashes }
+    const responseHashes = { ...(prior.response_hashes || {}), retention: { ...retention.responseHashes, attempted: true } }
     const updated = await db.from('cos_university_distilled_evaluation_runs').update({
       retention_baseline_score: retention.baselineScore,
       retention_artifact_score: retention.candidateScore,

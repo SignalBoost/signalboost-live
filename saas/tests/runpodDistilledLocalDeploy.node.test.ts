@@ -3,10 +3,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import {
+  DISTILLED_BASE_MODEL_REFERENCE,
   DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS,
+  DISTILLED_ENDPOINT_NAME,
   DISTILLED_IDLE_TIMEOUT_SECONDS,
   DISTILLED_STARTUP_READY_TIMEOUT_MS,
+  DISTILLED_TEMPLATE_NAME,
   DISTILLED_WORST_CASE_CANARY_COST_USD,
+  provisionRunpodServerlessDistilledLlm,
   runpodServerlessOpenAiBaseUrl,
   safeRunpodErrorDetail,
 } from '../lib/ai/cos/runpodServerlessDistilledProvision.ts'
@@ -15,12 +19,23 @@ const provision = readFileSync(new URL('../lib/ai/cos/runpodServerlessDistilledP
 const cleanup = readFileSync(new URL('../lib/ai/cos/runpodServerlessLegacyQueueCleanup.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/runpod-distilled-local-deploy/route.ts', import.meta.url), 'utf8')
 
+function jsonResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 test('distilled runtime is pinned to the exact trained Qwen artifact', () => {
   assert.match(provision, /Qwen\/Qwen3-4B/)
   assert.match(provision, /1cfa9a7208912126459214e8b04321603b3df60c/)
   assert.match(provision, /cadomos\/itmounts-student-f993a365a01e/)
   assert.match(provision, /9f03387d87de550b96d973f9f30a3f02e783997e/)
   assert.match(provision, /vllm\/vllm-openai:v0\.29\.0/)
+  assert.equal(
+    DISTILLED_BASE_MODEL_REFERENCE,
+    'https://huggingface.co/Qwen/Qwen3-4B:1cfa9a7208912126459214e8b04321603b3df60c',
+  )
   assert.match(provision, /snapshot_download/)
   assert.match(provision, /--enable-lora/)
   assert.match(provision, /"--max-lora-rank", "16"/)
@@ -32,8 +47,8 @@ test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and in
   assert.equal(DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS, 60_000)
   assert.equal(DISTILLED_WORST_CASE_CANARY_COST_USD, ((60 + 220 + 60) * 0.69) / 3600)
   assert.ok(DISTILLED_WORST_CASE_CANARY_COST_USD < 0.2)
-  assert.match(provision, /min:\s*0/)
-  assert.match(provision, /max:\s*1/)
+  assert.match(provision, /workersMin:\s*0/)
+  assert.match(provision, /workersMax:\s*1/)
   assert.match(provision, /idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
   assert.match(provision, /NVIDIA RTX A4000/)
   assert.match(provision, /NVIDIA RTX A4500/)
@@ -43,20 +58,119 @@ test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and in
   assert.match(provision, /NVIDIA L4/)
 })
 
-test('exact bootstrap template is isolated while endpoint discovery and creation use REST v2', () => {
+test('exact bootstrap template is isolated while endpoint discovery uses REST v2 and creation atomically attaches the cache', () => {
   assert.match(provision, /const REST_V1 = 'https:\/\/rest\.runpod\.io\/v1'/)
   assert.match(provision, /const CONTROL_API_V2 = 'https:\/\/api\.runpod\.io\/v2'/)
-  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v4'/)
-  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v6'/)
+  assert.match(provision, /const GRAPHQL_API = 'https:\/\/api\.runpod\.io\/graphql'/)
+  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v5'/)
+  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v7'/)
   assert.match(provision, /requestV1<RunpodTemplateV1\[]>\('\/templates'\)/)
   assert.match(provision, /requestV2<\{ endpoints\?: RunpodEndpointV2\[] \}>\('\/serverless'\)/)
-  assert.match(provision, /requestV2<RunpodEndpointV2>\('\/serverless'/)
-  assert.match(provision, /type:\s*DISTILLED_ENDPOINT_ROUTING/)
-  assert.match(provision, /templateId:\s*template\.id/)
-  assert.match(provision, /gpu:\s*\{[\s\S]*pools:\s*gpu\.pools,[\s\S]*count:\s*1/)
+  assert.match(provision, /mutation SaveDistilledEndpoint\(\$input: EndpointInput!\)/)
+  assert.match(provision, /type:\s*'LB'/)
+  assert.match(provision, /templateId:\s*input\.templateId/)
+  assert.match(provision, /gpuIds:\s*input\.pools\.join\(','\)/)
+  assert.match(provision, /modelReferences:\s*\[DISTILLED_BASE_MODEL_REFERENCE\]/)
+  assert.match(route, /baseModelReference:\s*provisioned\.baseModelReference/)
   assert.match(provision, /containerDiskInGb:\s*50/)
   assert.match(provision, /dockerEntrypoint:\s*\['bash', '-lc'\]/)
   assert.match(provision, /dockerStartCmd:\s*\[startupCommand\(\)\]/)
+})
+
+test('provisioning creates an exact cached-model load balancer without waking a worker', async (t) => {
+  const previousFetch = globalThis.fetch
+  const previousRunpodKey = process.env.RUNPOD_API_KEY
+  const previousHfToken = process.env.HF_TOKEN
+  const calls: Array<{ url: string; method: string; body: any }> = []
+  let endpointListReads = 0
+
+  process.env.RUNPOD_API_KEY = 'runpod-test-key'
+  process.env.HF_TOKEN = 'hf_test_token_long_enough_for_validation'
+  t.after(() => {
+    globalThis.fetch = previousFetch
+    if (previousRunpodKey === undefined) delete process.env.RUNPOD_API_KEY
+    else process.env.RUNPOD_API_KEY = previousRunpodKey
+    if (previousHfToken === undefined) delete process.env.HF_TOKEN
+    else process.env.HF_TOKEN = previousHfToken
+  })
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    const method = String(init?.method || 'GET').toUpperCase()
+    const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null
+    calls.push({ url, method, body })
+
+    if (url === 'https://rest.runpod.io/v1/templates' && method === 'GET') return jsonResponse([])
+    if (url === 'https://rest.runpod.io/v1/templates' && method === 'POST') {
+      return jsonResponse({ id: 'template-v5', name: DISTILLED_TEMPLATE_NAME })
+    }
+    if (url === 'https://api.runpod.io/v2/catalog/gpus') {
+      return jsonResponse({
+        gpus: [
+          { id: 'NVIDIA RTX A4000', pool: 'AMPERE_16', manufacturer: 'NVIDIA', memory: 16, availability: 'HIGH', price: { serverless: 0.34 } },
+          { id: 'NVIDIA RTX A5000', pool: 'AMPERE_24', manufacturer: 'NVIDIA', memory: 24, availability: 'HIGH', price: { serverless: 0.69 } },
+        ],
+      })
+    }
+    if (url === 'https://api.runpod.io/v2/serverless') {
+      endpointListReads += 1
+      if (endpointListReads === 1) return jsonResponse({ endpoints: [] })
+      return jsonResponse({
+        endpoints: [{
+          id: 'endpoint-v7',
+          name: DISTILLED_ENDPOINT_NAME,
+          type: 'LOAD_BALANCER',
+          workers: { min: 0, max: 1, idleTimeout: 60 },
+          scaling: { type: 'REQUEST_COUNT', requestCount: 1 },
+          timeout: 300_000,
+          gpu: { pools: ['AMPERE_16', 'AMPERE_24'], count: 1 },
+        }],
+      })
+    }
+    if (url.startsWith('https://api.runpod.io/graphql?api_key=')) {
+      if (String(body?.query || '').includes('mutation SaveDistilledEndpoint')) {
+        return jsonResponse({
+          data: {
+            saveEndpoint: {
+              id: 'endpoint-v7',
+              name: DISTILLED_ENDPOINT_NAME,
+              type: 'LB',
+              templateId: 'template-v5',
+              modelReferences: [DISTILLED_BASE_MODEL_REFERENCE],
+            },
+          },
+        })
+      }
+      return jsonResponse({
+        data: {
+          myself: {
+            endpoint: {
+              id: 'endpoint-v7',
+              type: 'LB',
+              modelReferences: [DISTILLED_BASE_MODEL_REFERENCE],
+            },
+          },
+        },
+      })
+    }
+    throw new Error(`unexpected test request: ${method} ${url}`)
+  }) as typeof fetch
+
+  const result = await provisionRunpodServerlessDistilledLlm()
+  assert.equal(result.createdTemplate, true)
+  assert.equal(result.createdEndpoint, true)
+  assert.equal(result.endpointId, 'endpoint-v7')
+  assert.equal(result.baseModelReference, DISTILLED_BASE_MODEL_REFERENCE)
+
+  const mutation = calls.find(call => String(call.body?.query || '').includes('mutation SaveDistilledEndpoint'))
+  assert.ok(mutation)
+  assert.deepEqual(mutation.body.variables.input.modelReferences, [DISTILLED_BASE_MODEL_REFERENCE])
+  assert.equal(mutation.body.variables.input.type, 'LB')
+  assert.equal(mutation.body.variables.input.gpuIds, 'AMPERE_16,AMPERE_24')
+  assert.equal(mutation.body.variables.input.workersMin, 0)
+  assert.equal(mutation.body.variables.input.workersMax, 1)
+  assert.equal(mutation.body.variables.input.scalerType, 'REQUEST_COUNT')
+  assert.equal(calls.some(call => call.url.includes('.api.runpod.ai')), false)
 })
 
 test('startup gateway becomes routable before exact model initialization and can use RunPod cached base weights', () => {
@@ -72,6 +186,8 @@ test('startup gateway becomes routable before exact model initialization and can
   assert.match(provision, /distilled_bootstrap_failed/)
   assert.match(provision, /waitForRunpodServerlessDistilledReady/)
   assert.match(provision, /DISTILLED_STARTUP_READY_TIMEOUT_MS/)
+  assert.match(provision, /"--max-model-len", "8192"/)
+  assert.match(provision, /"--enforce-eager"/)
 })
 
 test('a healthy gateway still loading at the readiness deadline uses the bounded inference window', () => {
@@ -92,21 +208,19 @@ test('startup gateway falls back to exact Hugging Face revisions without changin
   assert.match(provision, /"--lora-modules", lora/)
 })
 
-test('v2 endpoint policy uses nested worker and scaling fields only', () => {
-  const policyStart = provision.indexOf('function endpointV2PolicyPayload()')
+test('GraphQL endpoint policy preserves the bounded worker and request-count fields', () => {
+  const policyStart = provision.indexOf('function endpointGraphQlPolicyPayload()')
   const policyEnd = provision.indexOf('function serverlessGpuCandidates')
   assert.ok(policyStart >= 0 && policyEnd > policyStart)
   const policy = provision.slice(policyStart, policyEnd)
-  assert.match(policy, /workers:\s*\{[\s\S]*min:\s*0,[\s\S]*max:\s*1,[\s\S]*idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
-  assert.match(policy, /scaling:\s*\{[\s\S]*type:\s*'REQUEST_COUNT',[\s\S]*requestCount:\s*1/)
-  assert.match(policy, /timeout:\s*300_000/)
-  assert.match(policy, /flashboot:\s*'FLASHBOOT'/)
-  assert.doesNotMatch(policy, /executionTimeoutMs\s*:/)
-  assert.doesNotMatch(policy, /scalerType\s*:/)
-  assert.doesNotMatch(policy, /scalerValue\s*:/)
-  assert.doesNotMatch(policy, /workersMin\s*:/)
-  assert.doesNotMatch(policy, /workersMax\s*:/)
-  assert.doesNotMatch(policy, /gpuTypeIds\s*:|gpuCount\s*:/)
+  assert.match(policy, /workersMin:\s*0/)
+  assert.match(policy, /workersMax:\s*1/)
+  assert.match(policy, /idleTimeout:\s*DISTILLED_IDLE_TIMEOUT_SECONDS/)
+  assert.match(policy, /scalerType:\s*'REQUEST_COUNT'/)
+  assert.match(policy, /scalerValue:\s*1/)
+  assert.match(policy, /executionTimeoutMs:\s*300_000/)
+  assert.match(policy, /flashBootType:\s*'FLASHBOOT'/)
+  assert.doesNotMatch(policy, /gpuTypeIds\s*:/)
 })
 
 test('v5 GPU selection stays on the standard 16 GB and 24 GB pools inside the owner ceiling', () => {
@@ -189,14 +303,14 @@ test('the distilled runtime is addressed as a load-balancer endpoint, not throug
   assert.match(provision, /\$\{baseUrl\}\/chat\/completions/)
   assert.doesNotMatch(provision, /api\.runpod\.ai\/v2\/\$\{id\}\/openai\/v1/)
   assert.match(provision, /DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER'/)
-  assert.match(provision, /type:\s*DISTILLED_ENDPOINT_ROUTING/)
+  assert.match(provision, /type:\s*'LB'/)
   assert.match(provision, /HEALTH_CHECK_PATH: '\/ping'/)
   assert.match(provision, /PORT_HEALTH: String\(DISTILLED_CONTAINER_PORT\)/)
 })
 
 test('load-balancer template identity cannot reuse the failed pre-gateway runtime', () => {
-  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v4'/)
-  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v6'/)
+  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v5'/)
+  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v7'/)
   assert.match(provision, /templateHasExactBootstrap/)
   assert.match(provision, /command\.includes\(DISTILLED_BASE_MODEL_REVISION\)/)
   assert.match(provision, /command\.includes\(DISTILLED_ADAPTER_MODEL_REVISION\)/)
@@ -204,11 +318,12 @@ test('load-balancer template identity cannot reuse the failed pre-gateway runtim
   assert.match(provision, /throw new Error\('RunPod distilled load-balancer template exists but does not match the exact-artifact bootstrap contract'\)/)
 })
 
-test('routing mode is fixed at creation and never sent on the v2 update policy payload', () => {
-  const policyStart = provision.indexOf('function endpointV2PolicyPayload()')
+test('routing mode is fixed at GraphQL creation and not hidden inside the reusable policy payload', () => {
+  const policyStart = provision.indexOf('function endpointGraphQlPolicyPayload()')
   const policyEnd = provision.indexOf('function serverlessGpuCandidates')
   assert.ok(policyStart >= 0 && policyEnd > policyStart)
   assert.doesNotMatch(provision.slice(policyStart, policyEnd), /type:\s*DISTILLED_ENDPOINT_ROUTING/)
+  assert.match(provision, /type:\s*'LB'/)
 })
 
 test('v2 reconciliation validates returned routing and bounded worker policy before canary use', () => {

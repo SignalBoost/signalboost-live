@@ -322,6 +322,7 @@ export async function GET(req: NextRequest) {
         model: provisioned.model,
         baseModelId: DISTILLED_BASE_MODEL_ID,
         baseModelRevision: DISTILLED_BASE_MODEL_REVISION,
+        baseModelReference: provisioned.baseModelReference,
         adapterModelId: DISTILLED_ADAPTER_MODEL_ID,
         adapterModelRevision: DISTILLED_ADAPTER_MODEL_REVISION,
         workersMin: provisioned.workersMin,

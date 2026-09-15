@@ -31,5 +31,6 @@ test('canary discovery and retry ceilings still depend on persisted profile, cla
   assert.match(route, /row\?\.evidence\?\.claim === 'local_distilled_runtime_endpoint_provisioned'/)
   assert.match(route, /row\?\.evidence\?\.claim === 'local_distilled_runtime_canary_failed'/)
   assert.match(route, /row\?\.evidence\?\.artifactHash === ARTIFACT_HASH/)
-  assert.match(route, /failures >= MAX_CANARY_INVOCATIONS/)
+  assert.match(route, /const consumedInvocations = Math\.max\(failures, starts\)/)
+  assert.match(route, /consumedInvocations >= approvedMaxCanaryInvocations/)
 })

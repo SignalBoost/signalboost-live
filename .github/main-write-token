@@ -1,2 +1,2 @@
-base_sha=5498cc6be9cf450af93b87f836292d7d62c44be4
-branch=fix/distilled-evaluator-holdout-20260915
+base_sha=f30ff05ba2dd1c50b60a9ee7a861ea7ea6a15d99
+branch=fix/distilled-cached-model-20260915

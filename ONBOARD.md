@@ -115,6 +115,20 @@ Evaluation may run concurrently, but it should not unnecessarily stop the next a
 
 Current provider/job/model state is mutable. **Always query live Production evidence before reporting it.** Do not infer current HF spend, RunPod state, artifact status, or evaluation status from this file.
 
+## University distillation Self-Healing loop
+
+University mass distillation is connected to the existing Self-Healing Supervisor rather than a
+separate alert-only controller. The scheduled worker and Supervisor repair both call one canonical
+workflow: provider-ledger reconciliation -> failed-job diagnostics -> stale dispatch-claim recovery
+-> bounded failed-stage recovery -> next authorized dispatch. A dedicated offset five-minute monitor
+reads the durable Production heartbeat, campaign/run state, and provider-job ledger; unhealthy state
+becomes a host-created incident, an exact allowlisted repair, and a separate post-repair health read.
+
+The repair may only continue work inside the campaign's existing expiration and remaining cost
+ceiling. It cannot authorize promotion, Production traffic, RunPod mutation, a new campaign, a larger
+budget, or a later expiry. Missing/expired authority, failed verification, or an unrecognized incident
+fails closed and remains visible rather than being reported as healed.
+
 ---
 
 # Mandatory first-read / repo-scan rule

@@ -44,6 +44,46 @@ function parquetPathsFromSiblings(siblings: readonly HfSibling[], split: string)
   )].sort()
 }
 
+async function readResponseBodyBounded(response: Response, maxBytes: number): Promise<ArrayBuffer> {
+  const declaredSize = Number(response.headers.get('content-length') || 0)
+  if (Number.isFinite(declaredSize) && declaredSize > maxBytes) {
+    throw new Error('distilled_evaluation_hf_pinned_parquet_size_ceiling')
+  }
+
+  if (!response.body) {
+    const file = await response.arrayBuffer()
+    if (file.byteLength > maxBytes) throw new Error('distilled_evaluation_hf_pinned_parquet_size_ceiling')
+    return file
+  }
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value?.byteLength) continue
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel('distilled_evaluation_hf_pinned_parquet_size_ceiling').catch(() => undefined)
+        throw new Error('distilled_evaluation_hf_pinned_parquet_size_ceiling')
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const joined = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    joined.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return joined.buffer
+}
+
 async function listPinnedParquetPaths(input: {
   repoId: string
   revision: string
@@ -107,14 +147,7 @@ export async function readPinnedHfParquetRows(input: {
       signal: AbortSignal.timeout(30_000),
     })
     if (!response.ok) throw new Error(`distilled_evaluation_hf_parquet_http_${response.status}`)
-    const declaredSize = Number(response.headers.get('content-length') || 0)
-    if (Number.isFinite(declaredSize) && declaredSize > MAX_PARQUET_FILE_BYTES) {
-      throw new Error('distilled_evaluation_hf_pinned_parquet_size_ceiling')
-    }
-    const file = await response.arrayBuffer()
-    if (file.byteLength > MAX_PARQUET_FILE_BYTES) {
-      throw new Error('distilled_evaluation_hf_pinned_parquet_size_ceiling')
-    }
+    const file = await readResponseBodyBounded(response, MAX_PARQUET_FILE_BYTES)
 
     const objects = await parquetReadObjects({ file })
     for (const raw of objects) {

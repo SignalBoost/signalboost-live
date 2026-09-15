@@ -4,6 +4,8 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import {
   MASS_DISTILLED_CANARY_TIMEOUT_MS,
+  MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,
+  MASS_DISTILLED_STARTUP_READY_TIMEOUT_MS,
   canaryMassDistilledRuntime,
   massDistilledRuntimeSpec,
   provisionMassDistilledRuntime,
@@ -20,7 +22,9 @@ const APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved'
 const SUSPEND_CLAIM = 'local_distilled_runtime_canary_suspended'
 const STARTED_CLAIM = 'local_distilled_runtime_canary_started'
 const MAX_CANARY_INVOCATIONS = 3
+const MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 0.69
 const MIN_BALANCE_USD = 1
+const PAGE_SIZE = 100
 const HF_MODEL_REF = /^hf:\/\/models\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40})$/i
 
 function clean(value: unknown, max = 2000): string {
@@ -29,6 +33,13 @@ function clean(value: unknown, max = 2000): string {
 
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
+}
+
+function conservativeCanaryCostUsd(): number {
+  const seconds = MASS_DISTILLED_IDLE_TIMEOUT_SECONDS
+    + MASS_DISTILLED_STARTUP_READY_TIMEOUT_MS / 1000
+    + MASS_DISTILLED_CANARY_TIMEOUT_MS / 1000
+  return Number((seconds * MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD / 3600).toFixed(6))
 }
 
 async function events(candidateId: string) {
@@ -44,53 +55,75 @@ async function events(candidateId: string) {
   return rows.data || []
 }
 
-function hasExactCanary(rows: any[], artifactHash: string): boolean {
-  return rows.some(row => row?.evidence?.profile === PROFILE
-    && row?.evidence?.claim === 'local_distilled_runtime_canary_passed'
-    && clean(row?.evidence?.artifactHash, 64).toLowerCase() === artifactHash
-    && row?.evidence?.exactArtifact === true
-    && row?.evidence?.productionTrafficAuthorized === false)
+function exactCanaryKey(candidateId: string, artifactHash: string): string {
+  return `${candidateId}:${artifactHash.toLowerCase()}`
 }
 
 async function candidate() {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const artifacts = await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,student_model_id,trained_artifact_id,trained_artifact_hash,evidence_ref,status,created_at')
-    .eq('status', 'evaluation_pending')
-    .like('candidate_id', 'mass:%')
-    .order('created_at', { ascending: true })
-    .limit(20)
-  if (artifacts.error) throw artifacts.error
+  let offset = 0
 
-  for (const artifact of artifacts.data || []) {
-    const candidateId = clean((artifact as any).candidate_id, 140)
-    const artifactHash = clean((artifact as any).trained_artifact_hash, 64).toLowerCase()
-    const rows = await events(candidateId)
-    if (hasExactCanary(rows, artifactHash)) continue
+  while (true) {
+    const artifacts = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id,subject_id,student_model_id,trained_artifact_id,trained_artifact_hash,evidence_ref,status,created_at')
+      .eq('status', 'evaluation_pending')
+      .like('candidate_id', 'mass:%')
+      .order('created_at', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1)
+    if (artifacts.error) throw artifacts.error
+    const page: any[] = artifacts.data || []
+    if (!page.length) return null
 
-    const run = await db.from('cos_university_mass_distillation_batch_runs')
-      .select('student_model_revision,teacher_model_id,completed_at')
-      .eq('candidate_id', candidateId)
-      .eq('stage', 'complete')
-      .maybeSingle()
-    if (run.error) throw run.error
-    if (!run.data) throw new Error('mass_distilled_runtime_training_run_missing')
-    const ref = HF_MODEL_REF.exec(clean((artifact as any).evidence_ref, 2000))
-    if (!ref || clean(ref[1], 240) !== clean((artifact as any).trained_artifact_id, 500)) {
-      throw new Error('mass_distilled_runtime_adapter_ref_invalid')
+    const candidateIds = [...new Set(page.map(row => clean(row.candidate_id, 140)).filter(Boolean))]
+    const canaries = await db.from('cos_university_learning_assurance_events')
+      .select('candidate_id,evidence')
+      .eq('event_type', 'fine_tune')
+      .eq('verifier', 'host_controller')
+      .in('candidate_id', candidateIds)
+      .contains('evidence', {
+        profile: PROFILE,
+        claim: 'local_distilled_runtime_canary_passed',
+        exactArtifact: true,
+        productionTrafficAuthorized: false,
+      })
+      .limit(Math.max(PAGE_SIZE * 5, candidateIds.length * 5))
+    if (canaries.error) throw canaries.error
+    const passed = new Set((canaries.data || []).map((row: any) => exactCanaryKey(
+      clean(row.candidate_id, 140),
+      clean(row.evidence?.artifactHash, 64),
+    )))
+
+    for (const artifact of page) {
+      const candidateId = clean(artifact.candidate_id, 140)
+      const artifactHash = clean(artifact.trained_artifact_hash, 64).toLowerCase()
+      if (passed.has(exactCanaryKey(candidateId, artifactHash))) continue
+
+      const run = await db.from('cos_university_mass_distillation_batch_runs')
+        .select('student_model_revision,teacher_model_id,completed_at')
+        .eq('candidate_id', candidateId)
+        .eq('stage', 'complete')
+        .maybeSingle()
+      if (run.error) throw run.error
+      if (!run.data) throw new Error('mass_distilled_runtime_training_run_missing')
+      const ref = HF_MODEL_REF.exec(clean(artifact.evidence_ref, 2000))
+      if (!ref || clean(ref[1], 240) !== clean(artifact.trained_artifact_id, 500)) {
+        throw new Error('mass_distilled_runtime_adapter_ref_invalid')
+      }
+      const spec = massDistilledRuntimeSpec({
+        candidateId,
+        artifactHash,
+        baseModelId: artifact.student_model_id,
+        baseModelRevision: (run.data as any).student_model_revision,
+        adapterModelId: artifact.trained_artifact_id,
+        adapterModelRevision: ref[2],
+      })
+      return { artifact, run: run.data as any, spec, rows: await events(candidateId) }
     }
-    const spec = massDistilledRuntimeSpec({
-      candidateId,
-      artifactHash,
-      baseModelId: (artifact as any).student_model_id,
-      baseModelRevision: (run.data as any).student_model_revision,
-      adapterModelId: (artifact as any).trained_artifact_id,
-      adapterModelRevision: ref[2],
-    })
-    return { artifact, run: run.data as any, spec, rows }
+
+    if (page.length < PAGE_SIZE) return null
+    offset += PAGE_SIZE
   }
-  return null
 }
 
 function latestControl(rows: any[], artifactHash: string) {
@@ -107,16 +140,18 @@ function validApproval(rows: any[], artifactHash: string, now = new Date()) {
   const expires = Date.parse(String(row.expires_at || ''))
   const evidence = row.evidence
   const approvedInvocations = Math.floor(Number(evidence?.maxCanaryInvocations || 0))
+  const approvedCostUsd = Number(evidence?.maxEstimatedCanaryCostUsd || 0)
   return evidence?.canaryAuthorized === true
     && approvedInvocations > 0
     && approvedInvocations <= MAX_CANARY_INVOCATIONS
-    && Number(evidence?.maxEstimatedCanaryCostUsd || 0) > 0
-    && Number(evidence?.maxEstimatedCanaryCostUsd || 0) <= 0.2
+    && Number.isFinite(approvedCostUsd)
+    && approvedCostUsd > 0
+    && approvedCostUsd <= 0.2
     && evidence?.productionTrafficAuthorized === false
     && evidence?.authorityExpanded === false
     && Number.isFinite(observed) && observed <= now.getTime()
     && Number.isFinite(expires) && expires > now.getTime()
-    ? { row, approvedInvocations }
+    ? { row, approvedInvocations, approvedCostUsd }
     : null
 }
 
@@ -176,6 +211,17 @@ export async function GET(req: NextRequest) {
     if (!approval) return NextResponse.json({ ok: true, skipped: true, reason: 'explicit_owner_approval_missing_or_expired', candidateId, artifactHash })
     const approvalObservedAt = String(approval.row.observed_at)
     const approvalFloor = Date.parse(approvalObservedAt)
+    const estimatedCanaryCostUsd = conservativeCanaryCostUsd()
+    if (estimatedCanaryCostUsd > approval.approvedCostUsd + 1e-9) {
+      return NextResponse.json({
+        ok: false,
+        error: 'mass_distilled_canary_approved_budget_too_small',
+        candidateId,
+        artifactHash,
+        approvedCostUsd: approval.approvedCostUsd,
+        estimatedCanaryCostUsd,
+      }, { status: 402 })
+    }
 
     const account = await queryRunpodAccountStatus()
     if (account.clientBalance !== null && account.clientBalance < MIN_BALANCE_USD) {
@@ -210,6 +256,8 @@ export async function GET(req: NextRequest) {
           createdTemplate: provisioned.createdTemplate,
           createdEndpoint: provisioned.createdEndpoint,
           scaleToZero: true,
+          approvedCostUsd: approval.approvedCostUsd,
+          estimatedCanaryCostUsd,
         },
       })
     } else {
@@ -246,8 +294,12 @@ export async function GET(req: NextRequest) {
         model: spec.modelName,
         attemptOrdinal,
         approvedInvocations: approval.approvedInvocations,
+        approvedCostUsd: approval.approvedCostUsd,
+        estimatedCanaryCostUsd,
         attemptTimeoutMs: MASS_DISTILLED_CANARY_TIMEOUT_MS,
-        startupReadyTimeoutMs: 220_000,
+        startupReadyTimeoutMs: MASS_DISTILLED_STARTUP_READY_TIMEOUT_MS,
+        idleTimeoutSeconds: MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,
+        maxGpuHourlyCostUsd: MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD,
         authorizationObservedAt: approvalObservedAt,
       },
     })
@@ -264,6 +316,8 @@ export async function GET(req: NextRequest) {
           model: spec.modelName,
           attemptOrdinal,
           approvedInvocations: approval.approvedInvocations,
+          approvedCostUsd: approval.approvedCostUsd,
+          estimatedCanaryCostUsd,
           httpStatus: canary.httpStatus,
           error: clean(canary.error, 300),
           healthBefore,
@@ -285,6 +339,8 @@ export async function GET(req: NextRequest) {
         exactArtifact: true,
         scaleToZero: true,
         httpStatus: canary.httpStatus,
+        approvedCostUsd: approval.approvedCostUsd,
+        estimatedCanaryCostUsd,
         healthBefore,
         healthAfter,
         authorizationObservedAt: approvalObservedAt,

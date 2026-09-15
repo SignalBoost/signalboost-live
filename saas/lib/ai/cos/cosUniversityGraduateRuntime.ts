@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityGraduateRuntime.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
@@ -116,6 +117,82 @@ export function resolveGraduateRuntimeProfile(profile: GraduateRuntimeProfile, m
   return graduateManagedConfig(model)
 }
 
+/**
+ * Bounded wait for a scale-to-zero graduate runtime to prove the exact served identity.
+ * Standard OpenAI-compatible servers are proven by `GET <base>/models` listing the model. A runtime
+ * behind the iTMounts serving gateway exposes no `/models` route (HTTP 404); it is proven instead
+ * by the gateway's own readiness contract `GET <origin>/ready` = 200 `{ ready: true, model }`,
+ * which it only returns after its internal vLLM is healthy with that exact adapter loaded.
+ * A cold worker answers 204 / times out while booting, so this polls within the caller's budget.
+ */
+export const GRADUATE_RUNTIME_READY_WAIT_MS = 240_000
+const GRADUATE_RUNTIME_READY_POLL_MS = 5_000
+const GRADUATE_RUNTIME_PROBE_TIMEOUT_MS = 30_000
+
+export async function proveGraduateServedIdentity(
+  inference: LocalInferenceConfig,
+  model: string,
+  options: { waitMs?: number; fetchImpl?: typeof fetch } = {},
+): Promise<{ ok: boolean; model: string; error?: string; via?: 'models' | 'ready'; attempts: number }> {
+  const fetchImpl = options.fetchImpl || fetch
+  const waitMs = Math.max(0, Math.min(options.waitMs ?? GRADUATE_RUNTIME_READY_WAIT_MS, 280_000))
+  const deadline = Date.now() + waitMs
+  const headers: Record<string, string> = inference.apiKey
+    ? { Authorization: `Bearer ${inference.apiKey}`, 'x-api-key': inference.apiKey }
+    : {}
+  const baseUrl = inference.baseUrl.replace(/\/$/, '')
+  const origin = new URL(baseUrl).origin
+  let mode: 'models' | 'ready' = 'models'
+  let lastError = 'graduate_runtime_not_ready'
+  let attempts = 0
+
+  do {
+    attempts += 1
+    const remaining = Math.max(1_000, deadline - Date.now())
+    try {
+      const url = mode === 'models' ? `${baseUrl}/models` : `${origin}/ready`
+      const response = await fetchImpl(url, {
+        headers,
+        cache: 'no-store',
+        signal: AbortSignal.timeout(Math.min(GRADUATE_RUNTIME_PROBE_TIMEOUT_MS, remaining)),
+      })
+      if (mode === 'models') {
+        if (response.status === 404 || response.status === 405) {
+          mode = 'ready'
+          continue
+        }
+        if (response.ok) {
+          const data = await response.json().catch(() => null) as { data?: Array<{ id?: string }> } | null
+          const served = data?.data?.some(item => item?.id === model) ?? false
+          if (served) return { ok: true, model, via: 'models', attempts }
+          return { ok: false, model: '', error: 'model_not_served', via: 'models', attempts }
+        }
+        lastError = `HTTP ${response.status}`
+      } else {
+        if (response.status === 200) {
+          const data = await response.json().catch(() => null) as { ready?: unknown; model?: unknown } | null
+          const reported = clean(data?.model, 240)
+          if (data?.ready === true && reported === model) return { ok: true, model: reported, via: 'ready', attempts }
+          return { ok: false, model: reported, error: 'model_not_served', via: 'ready', attempts }
+        }
+        if (response.status === 503) {
+          const detail = (await response.text().catch(() => '')).slice(0, 300)
+          if (detail.includes('distilled_bootstrap_failed')) {
+            return { ok: false, model: '', error: 'runtime_bootstrap_failed', via: 'ready', attempts }
+          }
+        }
+        lastError = response.status === 204 ? 'runtime_booting' : `HTTP ${response.status}`
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? `${error.name}:${error.message}`.slice(0, 160) : 'probe_failed'
+    }
+    if (Date.now() + GRADUATE_RUNTIME_READY_POLL_MS >= deadline) break
+    await new Promise(resolve => setTimeout(resolve, GRADUATE_RUNTIME_READY_POLL_MS))
+  } while (Date.now() < deadline)
+
+  return { ok: false, model: '', error: lastError, via: mode, attempts }
+}
+
 export function decideGraduateRuntimeBinding(input: GraduateRuntimeBindingInput) {
   const blockers: string[] = []
   const candidateId = clean(input.candidateId, 240)
@@ -171,7 +248,9 @@ export async function activateGraduateRuntime(input: GraduateRuntimeBindingInput
   if (!['pending_runtime', 'canary', 'active'].includes(clean(row.status, 40))) throw new Error('graduate_runtime_status_not_bindable')
 
   const runtime = resolveGraduateRuntimeProfile(input.runtimeProfile, decision.runtimeModelId)
-  const health = await checkLocalInferenceHealth(runtime.inference)
+  const health = input.runtimeProfile === 'graduate_ai'
+    ? await proveGraduateServedIdentity(runtime.inference, decision.runtimeModelId)
+    : await checkLocalInferenceHealth(runtime.inference)
   if (!health.ok || health.model !== decision.runtimeModelId) {
     return {
       ...decision,

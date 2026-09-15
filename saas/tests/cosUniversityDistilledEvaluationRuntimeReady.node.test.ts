@@ -75,3 +75,15 @@ test('successful evaluation enforces the manifest-derived inference ceiling at t
   assert.match(route, /productionTrafficAuthorized: false/)
   assert.match(route, /authorityExpanded: false/)
 })
+
+test('failed paid attempts retain authorization and every call counter in the production receipt', () => {
+  assert.match(route, /throw attachEvaluationTransportAudit\(error, \{ runtimeAttempt, endpointCalls \}\)/)
+  assert.match(route, /const failureAudit = evaluationTransportAuditFromError\(error\)/)
+  assert.match(route, /const callUsage = distilledEvaluationCallUsageFromError\(error\)/)
+  assert.match(route, /runtimeAttemptAuthorizationObservedAt: runtimeAttempt\?\.authorizationObservedAt \?\? null/)
+  assert.match(route, /runtimeEndpointCalls: failureAudit\?\.endpointCalls \?\? 0/)
+  assert.match(route, /endpointCalls: callUsage\?\.endpointCalls \?\? failureAudit\?\.endpointCalls \?\? 0/)
+  assert.match(route, /judgeCalls: callUsage\?\.judgeCalls \?\? 0/)
+  assert.match(route, /soloRetryCalls: callUsage\?\.soloRetryCalls \?\? 0/)
+  assert.match(route, /callCeilings: callUsage \? \{/)
+})

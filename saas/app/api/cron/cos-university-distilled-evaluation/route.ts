@@ -3,7 +3,10 @@ import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { readPinnedHfParquetRows } from '@/lib/ai/cos/hfPinnedParquetRows'
-import { runUniversityDistilledArtifactEvaluation } from '@/lib/ai/cos/cosUniversityDistilledArtifactEvaluation'
+import {
+  distilledEvaluationCallUsageFromError,
+  runUniversityDistilledArtifactEvaluation,
+} from '@/lib/ai/cos/cosUniversityDistilledArtifactEvaluation'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
@@ -60,12 +63,45 @@ type RuntimeAttemptClaim = Readonly<{
 }>
 
 type SuccessfulRuntimeAttempt = Extract<RuntimeAttemptClaim, { ok: true }>
+type EvaluationTransportAudit = Readonly<{
+  runtimeAttempt: SuccessfulRuntimeAttempt | null
+  endpointCalls: number
+}>
+
+const TRANSPORT_AUDIT_ERROR_FIELD = 'distilledEvaluationTransportAudit' as const
 
 class RuntimeAttemptSkip extends Error {
   constructor(readonly reason: string) {
     super(reason)
     this.name = 'RuntimeAttemptSkip'
   }
+}
+
+function attachEvaluationTransportAudit(error: unknown, audit: EvaluationTransportAudit): Error {
+  const failure = error instanceof Error ? error : new Error(String(error))
+  try {
+    Object.defineProperty(failure, TRANSPORT_AUDIT_ERROR_FIELD, {
+      value: Object.freeze({ ...audit }),
+      configurable: true,
+    })
+    return failure
+  } catch {
+    const wrapper = new Error(failure.message) as Error & Record<string, unknown>
+    wrapper.cause = error
+    wrapper[TRANSPORT_AUDIT_ERROR_FIELD] = Object.freeze({ ...audit })
+    return wrapper
+  }
+}
+
+function evaluationTransportAuditFromError(error: unknown): EvaluationTransportAudit | null {
+  const audit = error && typeof error === 'object'
+    ? (error as Record<string, unknown>)[TRANSPORT_AUDIT_ERROR_FIELD]
+    : null
+  if (!audit || typeof audit !== 'object' || Array.isArray(audit)) return null
+  const value = audit as Record<string, unknown>
+  return Number.isInteger(value.endpointCalls) && Number(value.endpointCalls) >= 0
+    ? audit as EvaluationTransportAudit
+    : null
 }
 
 function hash(value: unknown): string {
@@ -514,6 +550,8 @@ async function runWithEvaluationTransportGuards<T>(input: {
   try {
     const result = await input.runner()
     return { result, runtimeAttempt, endpointCalls }
+  } catch (error) {
+    throw attachEvaluationTransportAudit(error, { runtimeAttempt, endpointCalls })
   } finally {
     for (const timer of keepalives.values()) clearInterval(timer)
     globalThis.fetch = originalFetch
@@ -574,6 +612,9 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     if (error instanceof RuntimeAttemptSkip) return recordSkip(error.reason)
     const message = error instanceof Error ? error.message : String(error)
+    const failureAudit = evaluationTransportAuditFromError(error)
+    const runtimeAttempt = failureAudit?.runtimeAttempt ?? null
+    const callUsage = distilledEvaluationCallUsageFromError(error)
     const readinessTrace = message.startsWith('distilled_evaluation_runtime_not_ready')
       || message === 'distilled_evaluation_route_deadline_exceeded'
       ? lastRunpodReadinessTrace
@@ -581,7 +622,24 @@ export async function GET(req: NextRequest) {
     await recordCosUniversityProductionPath({
       path: 'distilled_independent_evaluation',
       invocationSucceeded: false,
-      evidence: { error: message, runnerInvoked: true, ...(readinessTrace ? { readinessTrace } : {}) },
+      evidence: {
+        error: message,
+        runnerInvoked: true,
+        runtimeAttemptAuthorizationObservedAt: runtimeAttempt?.authorizationObservedAt ?? null,
+        runtimeWakeCostCeilingUsd: runtimeAttempt?.maxEstimatedRuntimeWakeCostUsd ?? null,
+        runtimeEndpointCalls: failureAudit?.endpointCalls ?? 0,
+        runtimeEndpointCallsCeiling: runtimeAttempt?.maxEndpointCalls ?? null,
+        endpointCalls: callUsage?.endpointCalls ?? failureAudit?.endpointCalls ?? 0,
+        judgeCalls: callUsage?.judgeCalls ?? 0,
+        soloRetryCalls: callUsage?.soloRetryCalls ?? 0,
+        callCeilings: callUsage ? {
+          holdoutCaseCount: callUsage.holdoutCaseCount,
+          maxEndpointCalls: callUsage.maxEndpointCalls,
+          maxJudgeCalls: callUsage.maxJudgeCalls,
+          maxSoloRetryCalls: callUsage.maxSoloRetryCalls,
+        } : null,
+        ...(readinessTrace ? { readinessTrace } : {}),
+      },
     }).catch(() => null)
     console.error('[cos-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: message, readinessTrace }))
     return NextResponse.json({ ok: false, error: message }, { status: 500 })

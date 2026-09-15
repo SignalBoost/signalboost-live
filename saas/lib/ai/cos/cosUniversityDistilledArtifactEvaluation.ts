@@ -66,9 +66,71 @@ type EvaluationCallBudget = DistilledEvaluationCallCeilings & {
   judgeCalls: number
   soloRetryCalls: number
 }
+export type DistilledEvaluationCallUsage = Readonly<{
+  holdoutCaseCount: number
+  endpointCalls: number
+  judgeCalls: number
+  soloRetryCalls: number
+  maxEndpointCalls: number
+  maxJudgeCalls: number
+  maxSoloRetryCalls: number
+}>
+
+const CALL_USAGE_ERROR_FIELD = 'distilledEvaluationCallUsage' as const
 
 function evaluationCallBudget(calls: DistilledEvaluationCallCeilings): EvaluationCallBudget {
   return { ...calls, endpointCalls: 0, judgeCalls: 0, soloRetryCalls: 0 }
+}
+
+function evaluationCallUsage(budget: EvaluationCallBudget): DistilledEvaluationCallUsage {
+  return Object.freeze({
+    holdoutCaseCount: budget.holdoutCaseCount,
+    endpointCalls: budget.endpointCalls,
+    judgeCalls: budget.judgeCalls,
+    soloRetryCalls: budget.soloRetryCalls,
+    maxEndpointCalls: budget.maxEndpointCalls,
+    maxJudgeCalls: budget.maxJudgeCalls,
+    maxSoloRetryCalls: budget.maxSoloRetryCalls,
+  })
+}
+
+async function withEvaluationCallAudit<T>(budget: EvaluationCallBudget, work: () => Promise<T>): Promise<T> {
+  try {
+    return await work()
+  } catch (error) {
+    const usage = evaluationCallUsage(budget)
+    if (error instanceof Error) {
+      let attached = false
+      try {
+        Object.defineProperty(error, CALL_USAGE_ERROR_FIELD, { value: usage, configurable: true })
+        attached = true
+      } catch {}
+      if (attached) throw error
+    }
+    const failure = new Error(error instanceof Error ? error.message : String(error)) as Error & Record<string, unknown>
+    failure.cause = error
+    failure[CALL_USAGE_ERROR_FIELD] = usage
+    throw failure
+  }
+}
+
+export function distilledEvaluationCallUsageFromError(error: unknown): DistilledEvaluationCallUsage | null {
+  const usage = error && typeof error === 'object'
+    ? (error as Record<string, unknown>)[CALL_USAGE_ERROR_FIELD]
+    : null
+  if (!usage || typeof usage !== 'object' || Array.isArray(usage)) return null
+  const value = usage as Record<string, unknown>
+  const fields = [
+    value.holdoutCaseCount,
+    value.endpointCalls,
+    value.judgeCalls,
+    value.soloRetryCalls,
+    value.maxEndpointCalls,
+    value.maxJudgeCalls,
+    value.maxSoloRetryCalls,
+  ]
+  if (!fields.every(field => Number.isInteger(field) && Number(field) >= 0)) return null
+  return usage as DistilledEvaluationCallUsage
 }
 
 function consumeEndpointCall(budget: EvaluationCallBudget) {
@@ -808,6 +870,7 @@ export async function runUniversityDistilledArtifactEvaluation(now = new Date())
 
   const deadlineAt = Date.now() + EVAL_WALL_BUDGET_MS
   const budget = evaluationCallBudget(callCeilings)
+  return withEvaluationCallAudit(budget, async () => {
   const holdout = await runSuite({ suiteName: 'holdout', endpointId, cases: holdoutCases, candidateId, artifactId, artifactHash, deadlineAt, budget })
   const safety = await runSuite({ suiteName: 'safety', endpointId, cases: safetyCases, candidateId, artifactId, artifactHash, deadlineAt, budget })
   const transfer = await runSuite({ suiteName: 'transfer', endpointId, cases: transferCases, candidateId, artifactId, artifactHash, deadlineAt, budget })
@@ -919,5 +982,6 @@ export async function runUniversityDistilledArtifactEvaluation(now = new Date())
     judgeCalls: budget.judgeCalls,
     soloRetryCalls: budget.soloRetryCalls,
     callCeilings,
+  })
   })
 }

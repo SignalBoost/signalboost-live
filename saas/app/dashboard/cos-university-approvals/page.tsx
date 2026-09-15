@@ -21,7 +21,8 @@ type Status = {
     maxJudgeCalls: number
     maxSoloRetryCalls: number
   } | null
-  state?: 'none' | 'armed' | 'consumed' | 'expired'
+  state?: 'none' | 'armed' | 'consumed' | 'expired' | 'evaluated'
+  evaluation?: { observedAt: string; baselineScore: number | null; trainedArtifactScore: number | null; improved: boolean } | null
   approval?: { observedAt: string; expiresAt: string | null } | null
   outcome?: { observedAt: string; commit: string; succeeded: boolean; reason: string | null; error: string | null } | null
   clearance?: { ok: boolean; retryAfterSeconds: number; nextTickAt: string }
@@ -66,6 +67,7 @@ export default function CosUniversityApprovalsPage() {
       })
       const result: IssueResult = await readJson(response)
       if (result.ok) setMessage(copy.issued)
+      else if (result.error === 'artifact_already_independently_evaluated') setMessage(copy.alreadyEvaluated)
       else if (result.error === 'too_close_to_evaluator_tick') setMessage(copy.waitSeconds.replace('{s}', String(result.retryAfterSeconds ?? 60)))
       else setMessage(result.error || String(response.status))
       await load()
@@ -74,7 +76,8 @@ export default function CosUniversityApprovalsPage() {
     }
   }
 
-  const stateLabel = status?.state === 'armed' ? copy.stateArmed
+  const stateLabel = status?.state === 'evaluated' ? copy.stateEvaluated
+    : status?.state === 'armed' ? copy.stateArmed
     : status?.state === 'consumed' ? copy.stateConsumed
     : status?.state === 'expired' ? copy.stateExpired
     : copy.stateNone
@@ -107,6 +110,14 @@ export default function CosUniversityApprovalsPage() {
               <div><strong>{copy.expiresAt}:</strong> {when(status.approval.expiresAt)}</div>
             </>
           ) : null}
+          {status.evaluation ? (
+            <div>
+              {copy.evaluationScores
+                .replace('{student}', status.evaluation.trainedArtifactScore === null ? '—' : status.evaluation.trainedArtifactScore.toFixed(3))
+                .replace('{baseline}', status.evaluation.baselineScore === null ? '—' : status.evaluation.baselineScore.toFixed(3))}
+              {' · '}{when(status.evaluation.observedAt)}
+            </div>
+          ) : null}
           <div><strong>{copy.nextTick}:</strong> {when(status.clearance?.nextTickAt)}</div>
           <div>
             <strong>{copy.lastOutcome}:</strong>{' '}
@@ -121,7 +132,7 @@ export default function CosUniversityApprovalsPage() {
         <button
           type="button"
           className="rounded-md bg-black px-4 py-2 text-white disabled:opacity-40"
-          disabled={busy || !status?.artifact || status?.state === 'armed'}
+          disabled={busy || !status?.artifact || status?.state === 'armed' || status?.state === 'evaluated'}
           onClick={() => { void authorize() }}
         >
           {busy ? copy.authorizing : copy.authorize}

@@ -11,6 +11,7 @@ import {
   DISTILLED_EVALUATION_PATH_ID,
   approvalState,
   buildDistilledEvaluationApproval,
+  completedIndependentEvaluation,
   distilledEvaluationCallCeilings,
   isDistilledEvaluationApprovalEvidence,
   tickClearance,
@@ -132,19 +133,34 @@ async function latestOutcome(sinceIso: string | null) {
   }
 }
 
+async function independentEvaluationFor(candidateId: string, artifactHash: string) {
+  const rows = await db().from('cos_university_learning_assurance_events')
+    .select('observed_at,evidence')
+    .eq('event_type', 'fine_tune')
+    .eq('candidate_id', candidateId)
+    .eq('verifier', 'independent_scorer')
+    .order('observed_at', { ascending: false })
+    .limit(50)
+  if (rows.error) throw rows.error
+  return completedIndependentEvaluation((rows.data || []) as any[], artifactHash)
+}
+
 export async function readDistilledEvaluationApprovalStatus(now = new Date()) {
   const artifact = await pendingArtifact()
-  if (!artifact) return { ok: true as const, artifact: null, state: 'none' as const, approval: null, outcome: null, clearance: tickClearance(now) }
+  if (!artifact) return { ok: true as const, artifact: null, state: 'none' as const, approval: null, outcome: null, evaluation: null, clearance: tickClearance(now) }
   const approval = await latestApproval(artifact.candidateId, artifact.artifactHash, artifact.holdoutCaseCount)
   const attempts = await attemptsFor(artifact.candidateId)
-  const state = approvalState({ approval, attempts, now })
-  const outcome = state === 'consumed' && approval ? await latestOutcome(approval.observed_at) : null
+  const evaluation = await independentEvaluationFor(artifact.candidateId, artifact.artifactHash)
+  const approvalLifecycle = approvalState({ approval, attempts, now })
+  const state = evaluation && approvalLifecycle !== 'armed' ? 'evaluated' as const : approvalLifecycle
+  const outcome = approvalLifecycle === 'consumed' && approval ? await latestOutcome(approval.observed_at) : null
   return {
     ok: true as const,
     artifact,
     state,
     approval: approval ? { observedAt: approval.observed_at, expiresAt: approval.expires_at } : null,
     outcome,
+    evaluation,
     clearance: tickClearance(now),
   }
 }
@@ -153,6 +169,9 @@ export async function issueDistilledEvaluationApproval(input: { ownerUserId: str
   const now = input.now || new Date()
   const artifact = await pendingArtifact()
   if (!artifact) return { ok: false as const, error: 'no_supported_evaluation_pending_artifact' }
+
+  const evaluation = await independentEvaluationFor(artifact.candidateId, artifact.artifactHash)
+  if (evaluation) return { ok: false as const, error: 'artifact_already_independently_evaluated', evaluation }
 
   const existing = await latestApproval(artifact.candidateId, artifact.artifactHash, artifact.holdoutCaseCount)
   const state = approvalState({ approval: existing, attempts: await attemptsFor(artifact.candidateId), now })

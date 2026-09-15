@@ -11,7 +11,7 @@ import {
   massDistilledRuntimeHealth,
   provisionMassDistilledRuntime,
   type MassDistilledRuntimeArtifact,
-} from '@/lib/ai/cos/runpodMassDistilledProvision'
+} from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

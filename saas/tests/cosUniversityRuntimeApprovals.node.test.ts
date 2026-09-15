@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import {
   approvalState,
   buildDistilledEvaluationApproval,
+  completedIndependentEvaluation,
   distilledEvaluationCallCeilings,
   isDistilledEvaluationApprovalEvidence,
   tickClearance,
@@ -93,11 +94,30 @@ test('runtime targets the evaluator artifact, refuses a second armed approval, a
   assert.match(runtime, /revisionKey/)
   assert.match(runtime, /distilledEvaluationCallCeilings/)
   assert.match(runtime, /evidence\.runnerInvoked !== true/)
-  assert.match(runtime, /state === 'consumed'/)
+  assert.match(runtime, /approvalLifecycle === 'consumed'/)
 })
 
 test('route is owner-only and issues only the evaluation kind', () => {
   assert.equal((route.match(/await requireOwner\(\)/g) || []).length, 2)
   assert.match(route, /!== 'distilled_evaluation'/)
   assert.match(route, /approval_kind_not_permitted/)
+})
+
+test('one independent verdict per artifact: an evaluated artifact cannot be re-authorized', () => {
+  const rows = [
+    { observed_at: '2026-09-15T21:15:12Z', evidence: { claim: 'delayed_retention_passed', artifactHash: HASH } },
+    { observed_at: '2026-09-15T21:15:10Z', evidence: { claim: 'independent_evaluation', artifactHash: HASH, baselineScore: 0.55, trainedArtifactScore: 0.6833 } },
+  ]
+  const verdict = completedIndependentEvaluation(rows, HASH.toUpperCase())
+  assert.ok(verdict)
+  assert.equal(verdict?.improved, true)
+  assert.equal(completedIndependentEvaluation(rows, 'a'.repeat(64)), null)
+  const failed = completedIndependentEvaluation([
+    { observed_at: 'x', evidence: { claim: 'independent_evaluation', artifactHash: HASH, baselineScore: 0.6, trainedArtifactScore: 0.5 } },
+  ], HASH)
+  assert.equal(failed?.improved, false)
+  assert.match(runtime, /\.eq\('verifier', 'independent_scorer'\)/)
+  assert.match(runtime, /if \(evaluation\) return \{ ok: false as const, error: 'artifact_already_independently_evaluated'/)
+  const page = readFileSync(new URL('../app/dashboard/cos-university-approvals/page.tsx', import.meta.url), 'utf8')
+  assert.match(page, /status\?\.state === 'evaluated'/)
 })

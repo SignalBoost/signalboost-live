@@ -10,6 +10,8 @@ test('distilled evaluation is bounded and requires exact holdout, canary and aut
   assert.match(evaluator, /consumeEndpointCall\(input\.budget\)/)
   assert.match(evaluator, /consumeJudgeCall\(input\.budget\)/)
   assert.match(evaluator, /consumeSoloRetryCall\(input\.budget\)/)
+  assert.match(evaluator, /withEvaluationCallAudit\(budget, async \(\) =>/)
+  assert.match(evaluator, /distilledEvaluationCallUsageFromError/)
   assert.match(evaluator, /evaluation_approval_missing_or_expired/)
   assert.match(evaluator, /exact_runtime_canary_not_proven/)
   assert.match(evaluator, /holdout_revision_moved/)

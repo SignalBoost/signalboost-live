@@ -147,3 +147,28 @@ export function approvalState(input: { approval: ApprovalRow | null; attempts: r
   if (!Number.isFinite(expiresMs) || expiresMs <= input.now.getTime()) return 'expired'
   return 'armed'
 }
+
+export type IndependentEvaluationRow = Readonly<{
+  observed_at: string
+  evidence: Record<string, unknown> | null
+}>
+
+/**
+ * One independent verdict per artifact. Once the independent scorer has recorded an evaluation for
+ * this exact artifact hash, another attempt cannot change the model — it can only re-roll the score.
+ * Re-running to fish for a different verdict weakens the evaluator, so issuance is refused.
+ */
+export function completedIndependentEvaluation(rows: readonly IndependentEvaluationRow[], artifactHash: string) {
+  const target = String(artifactHash || '').trim().toLowerCase()
+  const row = rows.find(item => item?.evidence?.claim === 'independent_evaluation'
+    && String(item?.evidence?.artifactHash || '').toLowerCase() === target)
+  if (!row) return null
+  const baseline = Number(row.evidence?.baselineScore)
+  const student = Number(row.evidence?.trainedArtifactScore)
+  return {
+    observedAt: String(row.observed_at || ''),
+    baselineScore: Number.isFinite(baseline) ? baseline : null,
+    trainedArtifactScore: Number.isFinite(student) ? student : null,
+    improved: Number.isFinite(baseline) && Number.isFinite(student) && student > baseline,
+  }
+}

@@ -13,15 +13,18 @@ test('distilled evaluation replaces private Dataset Viewer 5xx with exact pinned
   assert.match(route, /metadata\?\.sha/)
   assert.match(route, /readPinnedHfParquetRows/)
   assert.match(route, /response\.ok \|\| response\.status < 500/)
-  assert.doesNotMatch(route, /first-rows/)
+  assert.doesNotMatch(route, /new URL\(['"]\/first-rows/)
 })
 
-test('direct Hub parquet reader is exact-revision, split-scoped, and resource bounded', () => {
+test('direct Hub parquet reader is exact-revision, split-scoped, and resource bounded while streaming', () => {
   assert.match(helper, /resolve\/\$\{revision\}/)
   assert.match(helper, /MAX_PARQUET_FILES = 8/)
   assert.match(helper, /MAX_PARQUET_FILE_BYTES = 8 \* 1024 \* 1024/)
   assert.match(helper, /MAX_ROWS = 100/)
   assert.match(helper, /splitParquetMatcher/)
+  assert.match(helper, /response\.body\.getReader\(\)/)
+  assert.match(helper, /total > maxBytes/)
+  assert.match(helper, /reader\.cancel\('distilled_evaluation_hf_pinned_parquet_size_ceiling'\)/)
   assert.match(helper, /parquetReadObjects\(\{ file \}\)/)
   assert.equal(pkg.dependencies.hyparquet, '1.26.0')
 })

@@ -1,0 +1,109 @@
+// saas/lib/ai/cos/cosUniversityRuntimeApprovalPolicy.ts
+// Pure policy for owner-issued runtime approvals. No imports, no I/O, so it is testable in isolation.
+// The evidence shape here is the exact shape both distilled-evaluation matchers accept
+// (app/api/cron/cos-university-distilled-evaluation/route.ts and cosUniversityDistilledArtifactEvaluation.ts).
+// Hand-written approval SQL drifted from that shape, raced cron ticks and was silently dropped;
+// this module is the single source of the shape so the owner never types it again.
+
+export const DISTILLED_EVALUATION_APPROVAL_PROFILE = 'cos_distilled_independent_evaluation_authorization_v1' as const
+export const DISTILLED_EVALUATION_APPROVAL_CLAIM = 'distilled_independent_evaluation_approved' as const
+export const DISTILLED_EVALUATION_ATTEMPT_CLAIM = 'distilled_independent_evaluation_attempt_started' as const
+export const DISTILLED_EVALUATION_PATH_ID = 'distilled_independent_evaluation' as const
+export const DISTILLED_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
+export const DISTILLED_EVALUATION_TICK_MINUTES = 10
+export const DISTILLED_EVALUATION_TICK_CLEARANCE_MS = 75_000
+export const DISTILLED_EVALUATION_MIN_RUNTIME_WAKE_COST_USD = ((570 + 60) * 0.69) / 3600
+
+const HEX64 = /^[a-f0-9]{64}$/
+
+export type DistilledEvaluationApprovalEvidence = Readonly<{
+  profile: typeof DISTILLED_EVALUATION_APPROVAL_PROFILE
+  claim: typeof DISTILLED_EVALUATION_APPROVAL_CLAIM
+  candidateId: string
+  artifactHash: string
+  evaluationAuthorized: true
+  maxEndpointCalls: 8
+  maxJudgeCalls: 4
+  maxRuntimeWakeAttempts: 1
+  maxEstimatedRuntimeWakeCostUsd: 0.2
+  productionTrafficAuthorized: false
+  authorityExpanded: false
+  issuedBy: 'owner_runtime_approval_surface'
+}>
+
+export function buildDistilledEvaluationApproval(input: { candidateId: string; artifactHash: string }): DistilledEvaluationApprovalEvidence {
+  const candidateId = String(input.candidateId || '').trim()
+  const artifactHash = String(input.artifactHash || '').trim().toLowerCase()
+  if (!candidateId) throw new Error('runtime_approval_candidate_missing')
+  if (!HEX64.test(artifactHash)) throw new Error('runtime_approval_artifact_hash_invalid')
+  return Object.freeze({
+    profile: DISTILLED_EVALUATION_APPROVAL_PROFILE,
+    claim: DISTILLED_EVALUATION_APPROVAL_CLAIM,
+    candidateId,
+    artifactHash,
+    evaluationAuthorized: true,
+    maxEndpointCalls: 8,
+    maxJudgeCalls: 4,
+    maxRuntimeWakeAttempts: 1,
+    maxEstimatedRuntimeWakeCostUsd: 0.2,
+    productionTrafficAuthorized: false,
+    authorityExpanded: false,
+    issuedBy: 'owner_runtime_approval_surface',
+  })
+}
+
+/** Accept only approvals that the stricter runtime-attempt matcher can actually consume. */
+export function isDistilledEvaluationApprovalEvidence(
+  value: unknown,
+  identity: { candidateId: string; artifactHash: string },
+): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const evidence = value as Record<string, unknown>
+  return evidence.profile === DISTILLED_EVALUATION_APPROVAL_PROFILE
+    && evidence.claim === DISTILLED_EVALUATION_APPROVAL_CLAIM
+    && evidence.candidateId === identity.candidateId
+    && String(evidence.artifactHash || '').toLowerCase() === identity.artifactHash.toLowerCase()
+    && evidence.evaluationAuthorized === true
+    && Number(evidence.maxEndpointCalls) >= 8
+    && Number(evidence.maxJudgeCalls) >= 4
+    && Number(evidence.maxRuntimeWakeAttempts) === 1
+    && Number(evidence.maxEstimatedRuntimeWakeCostUsd) >= DISTILLED_EVALUATION_MIN_RUNTIME_WAKE_COST_USD
+    && Number(evidence.maxEstimatedRuntimeWakeCostUsd) <= 0.2
+    && evidence.productionTrafficAuthorized === false
+    && evidence.authorityExpanded === false
+}
+
+/**
+ * Refuse to issue inside the clearance window before the next evaluator tick. A write that lands
+ * seconds before a tick can miss that tick's read and waste a cycle; waiting ~1 minute is cheaper.
+ */
+export function tickClearance(now: Date, tickMinutes = DISTILLED_EVALUATION_TICK_MINUTES, clearanceMs = DISTILLED_EVALUATION_TICK_CLEARANCE_MS) {
+  const periodMs = tickMinutes * 60_000
+  const nowMs = now.getTime()
+  const nextTickMs = Math.floor(nowMs / periodMs) * periodMs + periodMs
+  const untilTickMs = nextTickMs - nowMs
+  if (untilTickMs < clearanceMs) {
+    return { ok: false as const, retryAfterSeconds: Math.ceil((untilTickMs + 5_000) / 1000), nextTickAt: new Date(nextTickMs).toISOString() }
+  }
+  return { ok: true as const, retryAfterSeconds: 0, nextTickAt: new Date(nextTickMs).toISOString() }
+}
+
+export type ApprovalRow = Readonly<{ observed_at: string; expires_at: string | null; evidence: Record<string, unknown> | null }>
+export type AttemptRow = Readonly<{ evidence: Record<string, unknown> | null }>
+
+export type ApprovalState = 'none' | 'armed' | 'consumed' | 'expired'
+
+/** Approval state for the newest approval of this candidate/artifact. */
+export function approvalState(input: { approval: ApprovalRow | null; attempts: readonly AttemptRow[]; now: Date }): ApprovalState {
+  if (!input.approval) return 'none'
+  const observedMs = Date.parse(String(input.approval.observed_at || ''))
+  if (!Number.isFinite(observedMs) || observedMs > input.now.getTime()) return 'none'
+  const consumed = input.attempts.some(row => {
+    const at = Date.parse(String(row.evidence?.authorizationObservedAt || ''))
+    return Number.isFinite(at) && Number.isFinite(observedMs) && at === observedMs
+  })
+  if (consumed) return 'consumed'
+  const expiresMs = Date.parse(String(input.approval.expires_at || ''))
+  if (!Number.isFinite(expiresMs) || expiresMs <= input.now.getTime()) return 'expired'
+  return 'armed'
+}

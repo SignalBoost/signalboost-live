@@ -1,0 +1,161 @@
+// saas/lib/ai/cos/cosUniversityRuntimeApprovals.ts
+import { createHash } from 'node:crypto'
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { DISTILLED_ADAPTER_MODEL_ID } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
+import {
+  DISTILLED_EVALUATION_APPROVAL_CLAIM,
+  DISTILLED_EVALUATION_APPROVAL_PROFILE,
+  DISTILLED_EVALUATION_APPROVAL_TTL_MS,
+  DISTILLED_EVALUATION_ATTEMPT_CLAIM,
+  DISTILLED_EVALUATION_PATH_ID,
+  approvalState,
+  buildDistilledEvaluationApproval,
+  isDistilledEvaluationApprovalEvidence,
+  tickClearance,
+  type ApprovalRow,
+} from '@/lib/ai/cos/cosUniversityRuntimeApprovalPolicy'
+
+const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
+
+function db() {
+  const client = cosServiceDb()
+  if (!client) throw new Error('service_database_unavailable')
+  return client
+}
+
+/** Same artifact selection as the evaluator's runtime claim, so the approval targets what it will run. */
+async function pendingArtifact() {
+  const result = await db().from('cos_local_distillation_artifacts')
+    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
+    .eq('status', 'evaluation_pending')
+    .eq('trained_artifact_id', DISTILLED_ADAPTER_MODEL_ID)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (result.error) throw result.error
+  if (!result.data) return null
+  const row: any = result.data
+  return {
+    candidateId: String(row.candidate_id || '').trim(),
+    subjectId: String(row.subject_id || '').trim(),
+    artifactHash: String(row.trained_artifact_hash || '').trim().toLowerCase(),
+  }
+}
+
+async function latestApproval(candidateId: string, artifactHash: string): Promise<ApprovalRow | null> {
+  const rows = await db().from('cos_university_learning_assurance_events')
+    .select('observed_at,expires_at,evidence')
+    .eq('event_type', 'fine_tune')
+    .eq('candidate_id', candidateId)
+    .eq('verifier', 'host_controller')
+    .order('observed_at', { ascending: false })
+    .limit(100)
+  if (rows.error) throw rows.error
+  const match = (rows.data || []).find((row: any) => isDistilledEvaluationApprovalEvidence(row?.evidence, { candidateId, artifactHash }))
+  return (match as ApprovalRow | undefined) || null
+}
+
+async function attemptsFor(candidateId: string) {
+  const rows = await db().from('cos_university_learning_assurance_events')
+    .select('evidence')
+    .eq('event_type', 'fine_tune')
+    .eq('candidate_id', candidateId)
+    .eq('verifier', 'host_controller')
+    .order('observed_at', { ascending: false })
+    .limit(200)
+  if (rows.error) throw rows.error
+  return ((rows.data || []) as Array<{ evidence: Record<string, unknown> | null }>)
+    .filter(row => row?.evidence?.claim === DISTILLED_EVALUATION_ATTEMPT_CLAIM)
+}
+
+async function latestOutcome(sinceIso: string | null) {
+  let query = db().from('cos_university_learning_assurance_events')
+    .select('observed_at,commit_sha,evidence')
+    .eq('event_type', 'production_path')
+    .eq('path_id', DISTILLED_EVALUATION_PATH_ID)
+    .order('observed_at', { ascending: false })
+    .limit(20)
+  if (sinceIso) query = query.gt('observed_at', sinceIso)
+  const rows = await query
+  if (rows.error) throw rows.error
+  const real = (rows.data || []).find((row: any) => {
+    const evidence = row?.evidence || {}
+    if (evidence.runnerInvoked !== true) return false
+    const authorizationObservedAt = String(evidence.runtimeAttemptAuthorizationObservedAt || '')
+    return !authorizationObservedAt
+      || Date.parse(authorizationObservedAt) === Date.parse(String(sinceIso || ''))
+  }) as any
+  if (!real) return null
+  return {
+    observedAt: String(real.observed_at || ''),
+    commit: String(real.commit_sha || '').slice(0, 9),
+    succeeded: real?.evidence?.invocationSucceeded === true,
+    reason: String(real?.evidence?.reason || '') || null,
+    error: String(real?.evidence?.error || '').slice(0, 300) || null,
+  }
+}
+
+export async function readDistilledEvaluationApprovalStatus(now = new Date()) {
+  const artifact = await pendingArtifact()
+  if (!artifact) return { ok: true as const, artifact: null, state: 'none' as const, approval: null, outcome: null, clearance: tickClearance(now) }
+  const approval = await latestApproval(artifact.candidateId, artifact.artifactHash)
+  const attempts = await attemptsFor(artifact.candidateId)
+  const state = approvalState({ approval, attempts, now })
+  const outcome = state === 'consumed' && approval ? await latestOutcome(approval.observed_at) : null
+  return {
+    ok: true as const,
+    artifact,
+    state,
+    approval: approval ? { observedAt: approval.observed_at, expiresAt: approval.expires_at } : null,
+    outcome,
+    clearance: tickClearance(now),
+  }
+}
+
+export async function issueDistilledEvaluationApproval(input: { ownerUserId: string | null; now?: Date }) {
+  const now = input.now || new Date()
+  const artifact = await pendingArtifact()
+  if (!artifact) return { ok: false as const, error: 'no_supported_evaluation_pending_artifact' }
+
+  const existing = await latestApproval(artifact.candidateId, artifact.artifactHash)
+  const state = approvalState({ approval: existing, attempts: await attemptsFor(artifact.candidateId), now })
+  if (state === 'armed') return { ok: false as const, error: 'approval_already_armed', approval: existing }
+
+  const clearance = tickClearance(now)
+  if (!clearance.ok) return { ok: false as const, error: 'too_close_to_evaluator_tick', retryAfterSeconds: clearance.retryAfterSeconds }
+
+  const evidence = { ...buildDistilledEvaluationApproval(artifact), ownerUserId: input.ownerUserId }
+  const observedAt = now.toISOString()
+  const expiresAt = new Date(now.getTime() + DISTILLED_EVALUATION_APPROVAL_TTL_MS).toISOString()
+  const eventKey = hash([DISTILLED_EVALUATION_APPROVAL_PROFILE, DISTILLED_EVALUATION_APPROVAL_CLAIM, artifact.candidateId, artifact.artifactHash, observedAt])
+
+  const inserted = await db().from('cos_university_learning_assurance_events').insert({
+    event_key: eventKey,
+    event_type: 'fine_tune',
+    subject_id: artifact.subjectId || null,
+    candidate_id: artifact.candidateId,
+    evidence_hash: hash(evidence),
+    evidence,
+    verifier: 'host_controller',
+    observed_at: observedAt,
+    expires_at: expiresAt,
+  })
+  if (inserted.error) throw inserted.error
+
+  // Never report success from the write alone: the approval exists only if it reads back.
+  const readBack = await db().from('cos_university_learning_assurance_events')
+    .select('observed_at,expires_at,evidence')
+    .eq('event_key', eventKey)
+    .maybeSingle()
+  if (readBack.error) throw readBack.error
+  if (!readBack.data) return { ok: false as const, error: 'approval_not_persisted' }
+
+  return {
+    ok: true as const,
+    candidateId: artifact.candidateId,
+    artifactHash: artifact.artifactHash,
+    observedAt: String((readBack.data as any).observed_at),
+    expiresAt: String((readBack.data as any).expires_at),
+    nextTickAt: clearance.nextTickAt,
+  }
+}

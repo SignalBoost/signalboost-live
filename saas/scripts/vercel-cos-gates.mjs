@@ -197,6 +197,7 @@ const tests = [
   'tests/demoPricing.node.test.ts',
   'tests/repositoryRepairAutoMerge.node.test.ts',
   'tests/repositoryMergeWatch.node.test.ts',
+  'tests/cosUniversityRuntimeApprovals.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

@@ -106,16 +106,17 @@ function validApproval(rows: any[], artifactHash: string, now = new Date()) {
   const observed = Date.parse(String(row.observed_at || ''))
   const expires = Date.parse(String(row.expires_at || ''))
   const evidence = row.evidence
+  const approvedInvocations = Math.floor(Number(evidence?.maxCanaryInvocations || 0))
   return evidence?.canaryAuthorized === true
-    && Number(evidence?.maxCanaryInvocations || 0) > 0
-    && Number(evidence?.maxCanaryInvocations || 0) <= MAX_CANARY_INVOCATIONS
+    && approvedInvocations > 0
+    && approvedInvocations <= MAX_CANARY_INVOCATIONS
     && Number(evidence?.maxEstimatedCanaryCostUsd || 0) > 0
     && Number(evidence?.maxEstimatedCanaryCostUsd || 0) <= 0.2
     && evidence?.productionTrafficAuthorized === false
     && evidence?.authorityExpanded === false
     && Number.isFinite(observed) && observed <= now.getTime()
     && Number.isFinite(expires) && expires > now.getTime()
-    ? row
+    ? { row, approvedInvocations }
     : null
 }
 
@@ -173,7 +174,7 @@ export async function GET(req: NextRequest) {
     }
     const approval = validApproval(rows, artifactHash)
     if (!approval) return NextResponse.json({ ok: true, skipped: true, reason: 'explicit_owner_approval_missing_or_expired', candidateId, artifactHash })
-    const approvalObservedAt = String(approval.observed_at)
+    const approvalObservedAt = String(approval.row.observed_at)
     const approvalFloor = Date.parse(approvalObservedAt)
 
     const account = await queryRunpodAccountStatus()
@@ -225,8 +226,15 @@ export async function GET(req: NextRequest) {
       && clean(row?.evidence?.artifactHash, 64).toLowerCase() === artifactHash
       && Date.parse(String(row?.observed_at || '')) >= approvalFloor).length
     const consumed = Math.max(starts, failures)
-    if (consumed >= MAX_CANARY_INVOCATIONS) {
-      return NextResponse.json({ ok: false, error: 'mass_distilled_canary_retry_ceiling', candidateId, artifactHash, endpointId }, { status: 503 })
+    if (consumed >= approval.approvedInvocations) {
+      return NextResponse.json({
+        ok: false,
+        error: 'mass_distilled_canary_retry_ceiling',
+        candidateId,
+        artifactHash,
+        endpointId,
+        approvedInvocations: approval.approvedInvocations,
+      }, { status: 503 })
     }
 
     const attemptOrdinal = consumed + 1
@@ -237,6 +245,7 @@ export async function GET(req: NextRequest) {
         endpointId,
         model: spec.modelName,
         attemptOrdinal,
+        approvedInvocations: approval.approvedInvocations,
         attemptTimeoutMs: MASS_DISTILLED_CANARY_TIMEOUT_MS,
         startupReadyTimeoutMs: 220_000,
         authorizationObservedAt: approvalObservedAt,
@@ -254,6 +263,7 @@ export async function GET(req: NextRequest) {
           endpointId,
           model: spec.modelName,
           attemptOrdinal,
+          approvedInvocations: approval.approvedInvocations,
           httpStatus: canary.httpStatus,
           error: clean(canary.error, 300),
           healthBefore,

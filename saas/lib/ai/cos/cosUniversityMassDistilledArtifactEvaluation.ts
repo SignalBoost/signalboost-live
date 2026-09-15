@@ -118,28 +118,66 @@ function staticRetentionCases(): EvalCase[] {
   ]
 }
 
-async function selectMassArtifact() {
+async function selectMassArtifact(now: Date) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const artifact = await db.from('cos_local_distillation_artifacts')
+  const artifacts = await db.from('cos_local_distillation_artifacts')
     .select('candidate_id,subject_id,student_model_id,teacher_model_id,trained_artifact_id,trained_artifact_hash,evidence_ref,revision_key,dataset_hash,rollback_artifact_ref,status,created_at')
     .eq('status', 'evaluation_pending')
     .like('candidate_id', 'mass:%')
     .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-  if (artifact.error) throw artifact.error
-  if (!artifact.data) return null
-  const row: any = artifact.data
-  if (!MASS_CANDIDATE.test(clean(row.candidate_id, 140))) throw new Error('mass_distilled_evaluation_candidate_invalid')
-  const run = await db.from('cos_university_mass_distillation_batch_runs')
-    .select('id,campaign_id,batch_key,candidate_id,subject_id,student_model_id,student_model_revision,teacher_model_id,dataset_hash,training_data_ref,holdout_data_ref,training_manifest_hash,holdout_manifest_hash,revision_key,trained_artifact_id,trained_artifact_hash,evidence_ref,rollback_artifact_ref,completed_at,stage')
-    .eq('candidate_id', row.candidate_id)
-    .eq('stage', 'complete')
-    .maybeSingle()
-  if (run.error) throw run.error
-  if (!run.data) throw new Error('mass_distilled_evaluation_training_run_missing')
-  return { artifact: row, run: run.data as any }
+    .limit(20)
+  if (artifacts.error) throw artifacts.error
+  const rows: any[] = artifacts.data || []
+  if (!rows.length) return { selection: null, pendingMass: false }
+
+  const candidateIds = [...new Set(rows.map(row => clean(row.candidate_id, 140)).filter(Boolean))]
+  const [runs, evaluations] = await Promise.all([
+    db.from('cos_university_mass_distillation_batch_runs')
+      .select('id,campaign_id,batch_key,candidate_id,subject_id,student_model_id,student_model_revision,teacher_model_id,dataset_hash,training_data_ref,holdout_data_ref,training_manifest_hash,holdout_manifest_hash,revision_key,trained_artifact_id,trained_artifact_hash,evidence_ref,rollback_artifact_ref,completed_at,stage')
+      .in('candidate_id', candidateIds)
+      .eq('stage', 'complete'),
+    db.from('cos_university_distilled_evaluation_runs')
+      .select('candidate_id,trained_artifact_hash,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,response_hashes,created_at,updated_at')
+      .in('candidate_id', candidateIds)
+      .eq('evaluator_version', COS_MASS_DISTILLED_EVALUATOR_VERSION)
+      .order('created_at', { ascending: false })
+      .limit(100),
+  ])
+  if (runs.error) throw runs.error
+  if (evaluations.error) throw evaluations.error
+
+  const runByCandidate = new Map((runs.data || []).map((run: any) => [clean(run.candidate_id, 140), run]))
+  const latestEvaluationByArtifact = new Map<string, any>()
+  for (const evaluation of evaluations.data || []) {
+    const key = `${clean((evaluation as any).candidate_id, 140)}:${clean((evaluation as any).trained_artifact_hash, 64).toLowerCase()}`
+    if (!latestEvaluationByArtifact.has(key)) latestEvaluationByArtifact.set(key, evaluation)
+  }
+  const evaluationFor = (row: any) => latestEvaluationByArtifact.get(`${clean(row.candidate_id, 140)}:${clean(row.trained_artifact_hash, 64).toLowerCase()}`)
+
+  // Finish every artifact's initial independent evaluation before spending on any delayed-retention
+  // retest. This prevents the first trained artifact from parking the other two behind a 12-hour wait.
+  let selected = rows.find(row => runByCandidate.has(clean(row.candidate_id, 140)) && !evaluationFor(row)) || null
+  if (!selected) {
+    selected = rows.find(row => {
+      const candidateId = clean(row.candidate_id, 140)
+      const run: any = runByCandidate.get(candidateId)
+      const prior: any = evaluationFor(row)
+      if (!run || !prior) return false
+      const retentionDeferred = prior?.response_hashes?.retention?.deferred === true
+      if (prior.holdout_improved !== true || prior.safety_passed !== true || prior.unseen_transfer_passed !== true
+        || prior.delayed_retention_passed === true || !retentionDeferred) return false
+      const trainedAt = Date.parse(String(run.completed_at || row.created_at || ''))
+      return Number.isFinite(trainedAt) && now.getTime() >= trainedAt + MIN_MASS_DISTILLED_RETENTION_DELAY_MS
+    }) || null
+  }
+
+  if (!selected) return { selection: null, pendingMass: true }
+  const candidateId = clean(selected.candidate_id, 140)
+  if (!MASS_CANDIDATE.test(candidateId)) throw new Error('mass_distilled_evaluation_candidate_invalid')
+  const run = runByCandidate.get(candidateId)
+  if (!run) throw new Error('mass_distilled_evaluation_training_run_missing')
+  return { selection: { artifact: selected, run }, pendingMass: true }
 }
 
 async function evaluationApproval(candidateId: string, artifactHash: string, now: Date) {
@@ -577,9 +615,13 @@ export async function runUniversityMassDistilledArtifactEvaluation(now = new Dat
   if (!db) throw new Error('service_database_unavailable')
   if (!independentEvaluatorConfigFromEnv()) return { ok: false as const, skipped: true as const, reason: 'independent_evaluator_not_configured' as const }
 
-  const selected = await selectMassArtifact()
-  if (!selected) return { ok: true as const, skipped: true as const, reason: 'no_mass_evaluation_pending_artifact' as const }
-  const { artifact, run } = selected
+  const selectedState = await selectMassArtifact(now)
+  if (!selectedState.selection) {
+    return selectedState.pendingMass
+      ? { ok: true as const, skipped: true as const, reason: 'mass_evaluation_work_not_due' as const }
+      : { ok: true as const, skipped: true as const, reason: 'no_mass_evaluation_pending_artifact' as const }
+  }
+  const { artifact, run } = selectedState.selection
   const candidateId = clean(artifact.candidate_id, 140)
   const subjectId = clean(artifact.subject_id, 240)
   const artifactId = clean(artifact.trained_artifact_id, 500)

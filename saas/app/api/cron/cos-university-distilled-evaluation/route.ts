@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runUniversityDistilledArtifactEvaluation } from '@/lib/ai/cos/cosUniversityDistilledArtifactEvaluation'
+import { runUniversityMassDistilledArtifactEvaluation } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
+import { reconcileMassDistilledEvaluationClaims } from '@/lib/ai/cos/cosUniversityMassDistilledClaimReconciliation'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
@@ -19,12 +21,34 @@ export async function GET(req: NextRequest) {
     if (evaluator && !process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
-    const result = await runUniversityDistilledArtifactEvaluation(new Date())
+
+    // Repair any missing idempotent signed scorer claim from a previously stored evaluation before
+    // considering new provider work. This path performs zero RunPod calls, judge calls, or dataset reads.
+    const claimRepair = await reconcileMassDistilledEvaluationClaims(new Date())
+    if ('repaired' in claimRepair && claimRepair.repaired === true) {
+      await recordCosUniversityProductionPath({
+        path: 'distilled_independent_evaluation',
+        invocationSucceeded: true,
+        evidence: { ...claimRepair, massLaneChecked: true, claimRepairOnly: true, runnerInvoked: true, skipped: false },
+      })
+      console.info('[cos-distilled-independent-evaluation]', JSON.stringify(claimRepair))
+      return NextResponse.json(claimRepair, {
+        status: 200,
+        headers: { 'Cache-Control': 'no-store, max-age=0' },
+      })
+    }
+
+    // Mass-distillation artifacts have priority whenever actionable work exists, but retention waits
+    // must not starve the legacy study-plan evaluator. Release the shared cron when the mass lane is idle.
+    const mass = await runUniversityMassDistilledArtifactEvaluation(new Date())
+    const massIdle = 'skipped' in mass && mass.skipped === true
+      && ['no_mass_evaluation_pending_artifact', 'mass_evaluation_work_not_due'].includes(String(mass.reason || ''))
+    const result = massIdle ? await runUniversityDistilledArtifactEvaluation(new Date()) : mass
     const skipped = 'skipped' in result && result.skipped === true
     await recordCosUniversityProductionPath({
       path: 'distilled_independent_evaluation',
       invocationSucceeded: result.ok === true,
-      evidence: { ...result, runnerInvoked: !skipped, skipped },
+      evidence: { ...result, massLaneChecked: true, massLaneIdle: massIdle, massLaneResult: mass, claimRepairChecked: true, runnerInvoked: !skipped, skipped },
     })
     console.info('[cos-distilled-independent-evaluation]', JSON.stringify(result))
     return NextResponse.json(result, {
@@ -36,7 +60,7 @@ export async function GET(req: NextRequest) {
     await recordCosUniversityProductionPath({
       path: 'distilled_independent_evaluation',
       invocationSucceeded: false,
-      evidence: { error: message, runnerInvoked: true },
+      evidence: { error: message, massLaneChecked: true, claimRepairChecked: true, runnerInvoked: true },
     }).catch(() => null)
     console.error('[cos-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: message }))
     return NextResponse.json({ ok: false, error: message }, { status: 500 })

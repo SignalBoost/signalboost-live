@@ -37,6 +37,7 @@ type IndependentEvaluatorConfig = Readonly<{ secret: string }>
 
 const HASH = /^[a-f0-9]{64}$/i
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const MASS_CANDIDATE = /^mass:([0-9a-f-]{36}):([a-f0-9]{16})$/i
 const EVALUATOR_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{2,239}$/
 
 function clean(value: unknown, max = 2000): string {
@@ -44,8 +45,8 @@ function clean(value: unknown, max = 2000): string {
 }
 
 async function serviceDb() {
-  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
-  return cosServiceDb()
+  const mod = await import('../../cos-core/storage/supabase.ts')
+  return mod.cosServiceDb()
 }
 
 function sha256(value: unknown): string {
@@ -125,8 +126,11 @@ export function normalizeIndependentEvaluatorPayload(value: unknown): Independen
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('independent_evaluator_payload_invalid')
   const input = value as Record<string, unknown>
   const candidateId = clean(input.candidateId, 140)
-  const match = /^study-plan:([0-9a-f-]+)$/i.exec(candidateId)
-  if (!match || !UUID.test(match[1])) throw new Error('independent_evaluator_candidate_invalid')
+  const studyPlan = /^study-plan:([0-9a-f-]+)$/i.exec(candidateId)
+  const mass = MASS_CANDIDATE.exec(candidateId)
+  const validStudyPlan = Boolean(studyPlan && UUID.test(studyPlan[1]))
+  const validMass = Boolean(mass && UUID.test(mass[1]) && /^[a-f0-9]{16}$/i.test(mass[2]))
+  if (!validStudyPlan && !validMass) throw new Error('independent_evaluator_candidate_invalid')
 
   const claim = clean(input.claim, 80) as IndependentEvaluatorClaim
   if (!(INDEPENDENT_EVALUATOR_CLAIMS as readonly string[]).includes(claim)) throw new Error('independent_evaluator_claim_invalid')

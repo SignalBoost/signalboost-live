@@ -6,6 +6,13 @@ export type LocalDistillationStatus =
   | 'quarantined'
   | 'retired'
 
+export type CompletedDistilledEvaluation = Readonly<{
+  holdoutImproved: boolean
+  safetyPassed: boolean
+  unseenTransferPassed: boolean
+  delayedRetentionPassed: boolean
+}>
+
 function clean(value: unknown, limit = 40): string {
   return String(value ?? '').trim().slice(0, limit)
 }
@@ -14,19 +21,21 @@ function clean(value: unknown, limit = 40): string {
  * Local artifact ownership begins at training completion; Production traffic remains separately gated.
  * This pure policy is intentionally provider-neutral and contains no dispatch or billing behavior.
  */
-export function decideLocalDistillationLifecycle(graduateStatusInput: unknown, rollbackReady: boolean) {
+export function decideLocalDistillationLifecycle(
+  graduateStatusInput: unknown,
+  rollbackReady: boolean,
+  existingStatusInput?: unknown,
+) {
   const graduateStatus = clean(graduateStatusInput)
-  const status: LocalDistillationStatus = graduateStatus === 'active'
-    ? 'active'
-    : graduateStatus === 'quarantined'
-      ? 'quarantined'
-      : graduateStatus === 'retired'
-        ? 'retired'
-        : graduateStatus === 'pending_runtime' || graduateStatus === 'canary'
-          ? 'runtime_pending'
-          : rollbackReady
-            ? 'evaluation_pending'
-            : 'trained_pending_rollback'
+  const existingStatus = clean(existingStatusInput)
+  let status: LocalDistillationStatus = rollbackReady ? 'evaluation_pending' : 'trained_pending_rollback'
+  if (existingStatus === 'quarantined' || existingStatus === 'runtime_pending') {
+    status = existingStatus
+  }
+  if (graduateStatus === 'pending_runtime' || graduateStatus === 'canary') status = 'runtime_pending'
+  if (graduateStatus === 'active' || graduateStatus === 'quarantined' || graduateStatus === 'retired') {
+    status = graduateStatus
+  }
   const nextGate = status === 'trained_pending_rollback'
     ? 'rollback_evidence'
     : status === 'evaluation_pending'
@@ -38,6 +47,18 @@ export function decideLocalDistillationLifecycle(graduateStatusInput: unknown, r
     status,
     nextGate,
     trafficAuthorized: status === 'active',
+  })
+}
+
+/** A completed independent verdict leaves the evaluation queue exactly once. */
+export function decideCompletedDistilledEvaluation(input: CompletedDistilledEvaluation) {
+  const evaluationPassed = input.holdoutImproved
+    && input.safetyPassed
+    && input.unseenTransferPassed
+    && input.delayedRetentionPassed
+  return Object.freeze({
+    evaluationPassed,
+    nextStatus: evaluationPassed ? 'runtime_pending' as const : 'quarantined' as const,
   })
 }
 

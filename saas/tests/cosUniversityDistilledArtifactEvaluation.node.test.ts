@@ -58,6 +58,23 @@ test('evaluation stores hashes and scores, never raw prompt or response columns'
   assert.match(migration, /revoke all on table public\.cos_university_distilled_evaluation_runs from public, anon, authenticated/)
 })
 
+test('a saved verdict resumes idempotent evidence admission before any new paid authorization', () => {
+  const evaluator = source('../lib/ai/cos/cosUniversityDistilledArtifactEvaluation.ts')
+  const recoveryIndex = evaluator.indexOf('const priorRun = await savedDistilledEvaluationRun')
+  const approvalIndex = evaluator.indexOf('const approval = await evaluationApproval')
+  const completionIndex = evaluator.indexOf('async function completeSavedDistilledEvaluation')
+  const finalizationIndex = evaluator.indexOf(".update({ status: outcome.nextStatus", completionIndex)
+  const reconciliationIndex = evaluator.indexOf('runCosUniversityControlledFineTuning(input.now)', completionIndex)
+  assert.ok(recoveryIndex >= 0 && recoveryIndex < approvalIndex)
+  assert.ok(completionIndex >= 0 && finalizationIndex > completionIndex && reconciliationIndex > finalizationIndex)
+  assert.match(evaluator, /Every claim uses a deterministic idempotency key/)
+  assert.match(evaluator, /completeSavedDistilledEvaluation/)
+  assert.match(evaluator, /\.eq\('status', 'evaluation_pending'\)[\s\S]*\.select\('status'\)/)
+  assert.match(evaluator, /decideCompletedDistilledEvaluation\(input\.run\)/)
+  assert.match(evaluator, /recovered: true as const/)
+  assert.match(evaluator, /endpointCalls: 0,[\s\S]*judgeCalls: 0,[\s\S]*soloRetryCalls: 0/)
+})
+
 test('independent evaluator cannot dispatch new training', () => {
   const evaluator = source('../lib/ai/cos/cosUniversityDistilledArtifactEvaluation.ts')
   const route = source('../app/api/cron/cos-university-distilled-evaluation/route.ts')

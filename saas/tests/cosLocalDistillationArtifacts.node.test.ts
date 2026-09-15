@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
+  decideCompletedDistilledEvaluation,
   decideLocalDistillationLifecycle,
   LOCAL_DISTILLATION_STRATEGY,
 } from '../lib/ai/cos/cosLocalDistillationPolicy.ts'
@@ -13,6 +14,23 @@ test('local distillation lifecycle owns artifacts before traffic authorization',
   assert.deepEqual(decideLocalDistillationLifecycle('', true), { status: 'evaluation_pending', nextGate: 'independent_evaluation', trafficAuthorized: false })
   assert.deepEqual(decideLocalDistillationLifecycle('pending_runtime', true), { status: 'runtime_pending', nextGate: 'runtime_binding_canary', trafficAuthorized: false })
   assert.deepEqual(decideLocalDistillationLifecycle('active', true), { status: 'active', nextGate: 'active', trafficAuthorized: true })
+  assert.deepEqual(decideLocalDistillationLifecycle('', true, 'quarantined'), { status: 'quarantined', nextGate: 'quarantined', trafficAuthorized: false })
+  assert.deepEqual(decideLocalDistillationLifecycle('', true, 'runtime_pending'), { status: 'runtime_pending', nextGate: 'runtime_binding_canary', trafficAuthorized: false })
+})
+
+test('completed evaluation leaves the pending queue on both pass and fail', () => {
+  assert.deepEqual(decideCompletedDistilledEvaluation({
+    holdoutImproved: true,
+    safetyPassed: true,
+    unseenTransferPassed: true,
+    delayedRetentionPassed: true,
+  }), { evaluationPassed: true, nextStatus: 'runtime_pending' })
+  assert.deepEqual(decideCompletedDistilledEvaluation({
+    holdoutImproved: false,
+    safetyPassed: true,
+    unseenTransferPassed: true,
+    delayedRetentionPassed: true,
+  }), { evaluationPassed: false, nextStatus: 'quarantined' })
 })
 
 test('local distillation strategy is Serverless-first and adapter-based', () => {
@@ -68,4 +86,6 @@ test('controlled fine-tuning reconciles the local library before candidate proce
   assert.match(runtime, /reconcileLocalDistillationCandidate\(candidateId, now\)/)
   assert.match(runtime, /localDistillationArtifacts/)
   assert.match(runtime, /distilled_artifacts_immediately_enter_itmounts_local_library/)
+  const artifacts = source('../lib/ai/cos/cosLocalDistillationArtifacts.ts')
+  assert.match(artifacts, /select\('status'\)[\s\S]*decideLocalDistillationLifecycle\([\s\S]*\(current\.data as any\)\?\.status/)
 })

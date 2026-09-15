@@ -92,7 +92,17 @@ export async function reconcileLocalDistillationCandidate(candidateIdInput: stri
     .eq('trained_artifact_hash', trainedArtifactHash)
     .maybeSingle()
   if (graduate.error) throw graduate.error
-  const lifecycle = decideLocalDistillationLifecycle((graduate.data as any)?.status, Boolean(rollbackArtifactRef))
+  const current = await db.from('cos_local_distillation_artifacts')
+    .select('status')
+    .eq('candidate_id', candidateId)
+    .eq('trained_artifact_hash', trainedArtifactHash)
+    .maybeSingle()
+  if (current.error) throw current.error
+  const lifecycle = decideLocalDistillationLifecycle(
+    (graduate.data as any)?.status,
+    Boolean(rollbackArtifactRef),
+    (current.data as any)?.status,
+  )
 
   const result = await db.from('cos_local_distillation_artifacts').upsert({
     candidate_id: candidateId,

@@ -29,7 +29,14 @@ test('one durable cost-bounded attempt is consumed before any runtime wake', () 
   assert.match(route, /event_key: eventKey/)
   assert.match(route, /code \|\| ''\) === '23505'/)
   assert.match(route, /bounded_runtime_evaluation_attempt_already_consumed/)
-  assert.match(route, /claimRuntimeEvaluationAttempt\(new Date\(\)\)[\s\S]*runWithEvaluationTransportGuards/)
+  assert.match(route, /claimRuntimeEvaluationAttempt\(new Date\(\), routeDeadlineMs\)[\s\S]*runWithEvaluationTransportGuards/)
+})
+
+test('shared route deadline starts before evaluator and database preflight', () => {
+  assert.match(route, /const routeDeadlineMs = Date\.now\(\) \+ EVALUATION_ROUTE_BUDGET_MS[\s\S]*withinRouteDeadline\(independentEvaluatorConfig\(\), routeDeadlineMs\)/)
+  assert.match(route, /claimRuntimeEvaluationAttempt\(new Date\(\), routeDeadlineMs\)/)
+  assert.match(route, /\.abortSignal\(routeDeadlineSignal\(routeDeadlineMs\)\)/)
+  assert.match(route, /distilled_evaluation_route_deadline_exceeded/)
 })
 
 test('shared route deadline and keepalive bound cold-start work under the function ceiling', () => {

@@ -74,15 +74,19 @@ test('Builder requests provider-enforced JSON for source with quotes, escapes an
 
 test('protected independent JSON scoring stays within one judge call and suppresses verbose generation controls', async () => {
   process.env.LOCAL_AI_REASONING_EFFORT = 'high'
-  let calls = 0
+  let judgeCalls = 0
   let observedBody: any = null
-  globalThis.fetch = (async (_input, init) => {
-    calls++
-    observedBody = JSON.parse(String(init?.body))
-    return Response.json({
-      choices: [{ finish_reason: 'stop', message: { content: '{"cases":[]}' } }],
-      usage: { completion_tokens: 8 },
-    })
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input)
+    if (url.endsWith('/chat/completions')) {
+      judgeCalls++
+      observedBody = JSON.parse(String(init?.body))
+      return Response.json({
+        choices: [{ finish_reason: 'stop', message: { content: '{"cases":[]}' } }],
+        usage: { completion_tokens: 8 },
+      })
+    }
+    return Response.json({})
   }) as typeof fetch
 
   const result = await callLocalModel({
@@ -101,7 +105,7 @@ test('protected independent JSON scoring stays within one judge call and suppres
   })
 
   assert.equal(result, '{"cases":[]}')
-  assert.equal(calls, 1)
+  assert.equal(judgeCalls, 1)
   assert.equal(observedBody.max_tokens, 2200)
   assert.equal(observedBody.reasoning_effort, 'none')
   assert.equal(observedBody.frequency_penalty, 0)

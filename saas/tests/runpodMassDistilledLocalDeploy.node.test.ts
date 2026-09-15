@@ -31,6 +31,8 @@ test('mass-distilled runtime uses the proven v6 memory and cold-start contract i
   assert.match(provision, /CANARY_TIMEOUT_MS = 40_000/)
   assert.match(provision, /REQUEST_TIMEOUT_MS = 8_000/)
   assert.match(provision, /HEALTH_TIMEOUT_MS = 5_000/)
+  assert.match(provision, /enable_thinking.*False/)
+  assert.match(provision, /chat_template_kwargs:\{enable_thinking:false\}/)
   assert.match(route, /maxDuration = 300/)
 })
 

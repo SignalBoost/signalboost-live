@@ -86,6 +86,7 @@ export type CosUniversityLaneExpectationInput = Readonly<{
 const CALENDAR_NEUTRAL_PATHS: ReadonlySet<string> = new Set([
   'controlled_fine_tuning',
   'distilled_independent_evaluation',
+  'mass_distilled_independent_evaluation',
 ])
 
 /**
@@ -94,6 +95,7 @@ const CALENDAR_NEUTRAL_PATHS: ReadonlySet<string> = new Set([
  */
 const OPERATIONAL_IDLE_OK_PATHS: ReadonlySet<string> = new Set([
   'mass_distillation_campaign',
+  'graduate_runtime_activation',
 ])
 
 export function cosUniversityLaneExpectation(

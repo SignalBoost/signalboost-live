@@ -46,8 +46,8 @@ test('RunPod distilled deployment stays scale-to-zero, one-worker bounded and in
 test('exact bootstrap template is isolated while endpoint discovery and creation use REST v2', () => {
   assert.match(provision, /const REST_V1 = 'https:\/\/rest\.runpod\.io\/v1'/)
   assert.match(provision, /const CONTROL_API_V2 = 'https:\/\/api\.runpod\.io\/v2'/)
-  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v3'/)
-  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v5'/)
+  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v4'/)
+  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v6'/)
   assert.match(provision, /requestV1<RunpodTemplateV1\[]>\('\/templates'\)/)
   assert.match(provision, /requestV2<\{ endpoints\?: RunpodEndpointV2\[] \}>\('\/serverless'\)/)
   assert.match(provision, /requestV2<RunpodEndpointV2>\('\/serverless'/)
@@ -195,8 +195,8 @@ test('the distilled runtime is addressed as a load-balancer endpoint, not throug
 })
 
 test('load-balancer template identity cannot reuse the failed pre-gateway runtime', () => {
-  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v3'/)
-  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v5'/)
+  assert.match(provision, /DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v4'/)
+  assert.match(provision, /DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v6'/)
   assert.match(provision, /templateHasExactBootstrap/)
   assert.match(provision, /command\.includes\(DISTILLED_BASE_MODEL_REVISION\)/)
   assert.match(provision, /command\.includes\(DISTILLED_ADAPTER_MODEL_REVISION\)/)

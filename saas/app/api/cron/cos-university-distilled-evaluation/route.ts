@@ -14,7 +14,10 @@ export const maxDuration = 600
 
 const HF_HUB_ORIGIN = 'https://huggingface.co'
 const HF_ROWS_ORIGIN = 'https://datasets-server.huggingface.co'
-const RUNPOD_READY_TIMEOUT_MS = 220_000
+// The exact v6 worker has repeatedly needed just over 220 seconds from scale-to-zero to model-ready.
+// Allow the gateway's full bounded bootstrap window; the shared 570-second route deadline remains
+// authoritative and no additional inference call is used to warm the worker.
+const RUNPOD_READY_TIMEOUT_MS = 300_000
 const RUNPOD_READY_POLL_MS = 3_000
 const RUNPOD_INFERENCE_TIMEOUT_MS = 120_000
 const RUNPOD_KEEPALIVE_INTERVAL_MS = 30_000

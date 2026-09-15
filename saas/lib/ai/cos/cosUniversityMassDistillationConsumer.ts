@@ -476,22 +476,49 @@ export async function runMassDistillationCampaignConsumer(input: {
   const db = cosServiceDb()
   if (!db) return { ok: false as const, skipped: true as const, reason: 'service_database_unavailable' as const }
 
+  const maxDispatches = Math.max(1, Math.min(5, Math.floor(input.maxDispatches ?? 3)))
   const campaigns = await db.from('cos_university_mass_distillation_campaigns')
     .select('id,status,max_total_cost_usd,committed_cost_usd,expires_at')
     .in('status', ['authorized', 'active'])
     .gt('expires_at', (input.now || new Date()).toISOString())
     .order('authorized_at', { ascending: true })
-    .limit(1)
+    .limit(5)
   if (campaigns.error) throw campaigns.error
-  const campaign: any = campaigns.data?.[0]
-  if (!campaign) return { ok: true as const, skipped: true as const, reason: 'no_authorized_campaign' as const, dispatched: 0 }
+  const campaignRows: any[] = campaigns.data || []
+  if (campaignRows.length === 0) {
+    return { ok: true as const, skipped: true as const, reason: 'no_authorized_campaign' as const, dispatched: 0 }
+  }
 
-  const maxDispatches = Math.max(1, Math.min(5, Math.floor(input.maxDispatches ?? 3)))
-  const dispatched: unknown[] = []
-  for (let index = 0; index < maxDispatches; index += 1) {
-    const claimed = await db.rpc('claim_cos_university_mass_distillation_stage', { p_campaign_id: campaign.id })
+  let campaign: any = null
+  let initialClaim: Claim | undefined
+  for (const candidate of campaignRows) {
+    const claimed = await db.rpc('claim_cos_university_mass_distillation_stage', { p_campaign_id: candidate.id })
     if (claimed.error) throw claimed.error
     const claim = Array.isArray(claimed.data) ? claimed.data[0] as Claim | undefined : undefined
+    if (!claim) continue
+    campaign = candidate
+    initialClaim = claim
+    break
+  }
+
+  if (!campaign || !initialClaim) {
+    return {
+      ok: true as const,
+      skipped: true as const,
+      reason: 'no_claimable_campaign' as const,
+      dispatched: 0,
+      campaignsInspected: campaignRows.length,
+    }
+  }
+
+  const dispatched: unknown[] = []
+  for (let index = 0; index < maxDispatches; index += 1) {
+    let claim: Claim | undefined = index === 0 ? initialClaim : undefined
+    if (index > 0) {
+      const claimed = await db.rpc('claim_cos_university_mass_distillation_stage', { p_campaign_id: campaign.id })
+      if (claimed.error) throw claimed.error
+      claim = Array.isArray(claimed.data) ? claimed.data[0] as Claim | undefined : undefined
+    }
     if (!claim) break
     try {
       dispatched.push(await dispatchClaim(claim, input.fetchImpl))
@@ -504,6 +531,7 @@ export async function runMassDistillationCampaignConsumer(input: {
         jobs: dispatched,
         failedRunId: claim.run_id,
         error: safeError(error),
+        campaignsInspected: campaignRows.length,
         semantics: 'campaign_stopped_on_first_failed_or_uncertain_dispatch_no_automatic_retry' as const,
       }
     }
@@ -516,6 +544,7 @@ export async function runMassDistillationCampaignConsumer(input: {
     jobs: dispatched,
     maxTotalCostUsd: Number(campaign.max_total_cost_usd),
     previouslyCommittedCostUsd: Number(campaign.committed_cost_usd),
+    campaignsInspected: campaignRows.length,
     automaticPromotionAuthorized: false,
     runpodMutationAuthorized: false,
     semantics: 'bounded_owner_authorized_huggingface_campaign_no_runpod_mutation_no_promotion' as const,

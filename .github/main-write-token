@@ -1,2 +1,2 @@
-base_sha=e555bf5187a314f05f71656f35fb1a2c989fe4b6
-branch=fix/distilled-canary-v5-policy-20260915
+base_sha=c3a08bf15e10f2322b02f74bda0cb68193dec4f4
+branch=fix/distilled-vllm-memory-20260915

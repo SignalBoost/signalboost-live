@@ -6,8 +6,8 @@ const CONTROL_API_V2 = 'https://api.runpod.io/v2'
 const SERVERLESS_API = 'https://api.runpod.ai/v2'
 // Keep each materially different load-balancer bootstrap immutable. A new endpoint identity makes
 // failed canary evidence auditable instead of silently changing the worker behind an old receipt.
-export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v3'
-export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v5'
+export const DISTILLED_TEMPLATE_NAME = 'itmounts-distilled-llm-serverless-lb-v4'
+export const DISTILLED_ENDPOINT_NAME = 'itmounts-distilled-reasoning-lb-v6'
 export const DISTILLED_ENDPOINT_ROUTING = 'LOAD_BALANCER' as const
 export const DISTILLED_CONTAINER_PORT = 8000
 const DISTILLED_INTERNAL_VLLM_PORT = 8001
@@ -230,6 +230,7 @@ def exact_cached_base_path():
 async def bootstrap():
     global bootstrap_error, vllm_process
     try:
+        print("distilled_bootstrap_stage=resolve_base", flush=True)
         base_path = exact_cached_base_path()
         if not base_path:
             base_path = await asyncio.to_thread(
@@ -239,6 +240,7 @@ async def bootstrap():
                 local_dir="/models/base",
                 token=HF_TOKEN,
             )
+        print("distilled_bootstrap_stage=resolve_adapter", flush=True)
         adapter_path = await asyncio.to_thread(
             snapshot_download,
             repo_id=ADAPTER_ID,
@@ -262,9 +264,11 @@ async def bootstrap():
             "--max-cpu-loras", "1",
             "--lora-modules", lora,
             "--gpu-memory-utilization", "0.85",
-            "--max-model-len", "16384",
+            "--max-model-len", "8192",
+            "--enforce-eager",
             "--dtype", "auto",
         )
+        print("distilled_bootstrap_stage=wait_for_vllm", flush=True)
         async with httpx.AsyncClient(timeout=2.0) as client:
             for _ in range(300):
                 if vllm_process.returncode is not None:
@@ -273,6 +277,7 @@ async def bootstrap():
                     response = await client.get(f"http://127.0.0.1:{INTERNAL_PORT}/health")
                     if response.status_code == 200:
                         model_ready.set()
+                        print("distilled_bootstrap_stage=model_ready", flush=True)
                         return
                 except Exception:
                     pass
@@ -280,6 +285,7 @@ async def bootstrap():
         raise TimeoutError("vllm_model_startup_timeout")
     except Exception as exc:
         bootstrap_error = f"{type(exc).__name__}:{str(exc)[:240]}"
+        print(f"distilled_bootstrap_failed={bootstrap_error}", flush=True)
 
 
 @app.on_event("startup")

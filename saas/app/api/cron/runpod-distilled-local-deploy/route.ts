@@ -13,6 +13,7 @@ import {
   DISTILLED_ENDPOINT_NAME,
   DISTILLED_ENDPOINT_ROUTING,
   DISTILLED_MODEL_NAME,
+  DISTILLED_WORST_CASE_CANARY_COST_USD,
   canaryRunpodServerlessDistilledLlm,
   provisionRunpodServerlessDistilledLlm,
   reconcileRunpodServerlessDistilledEndpoint,
@@ -116,9 +117,15 @@ function validApproval(rows: any[], now = new Date()) {
   const observedAt = Date.parse(String(row.observed_at || ''))
   const expiresAt = Date.parse(String(row.expires_at || ''))
   const nowMs = now.getTime()
+  const approvedInvocations = Number(evidence?.maxCanaryInvocations)
+  const approvedCostUsd = Number(evidence?.maxEstimatedCanaryCostUsd)
   return evidence?.canaryAuthorized === true
-    && Number(evidence?.maxCanaryInvocations || MAX_CANARY_INVOCATIONS) <= MAX_CANARY_INVOCATIONS
-    && Number(evidence?.maxEstimatedCanaryCostUsd || 0) <= 0.2
+    && Number.isInteger(approvedInvocations)
+    && approvedInvocations >= 1
+    && approvedInvocations <= MAX_CANARY_INVOCATIONS
+    && Number.isFinite(approvedCostUsd)
+    && approvedCostUsd >= (approvedInvocations * DISTILLED_WORST_CASE_CANARY_COST_USD)
+    && approvedCostUsd <= 0.2
     && evidence?.productionTrafficAuthorized === false
     && evidence?.authorityExpanded === false
     && Number.isFinite(observedAt)
@@ -278,6 +285,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'explicit_owner_approval_missing_or_expired' })
     }
     const approvalObservedAt = String(approval.observed_at)
+    const approvedMaxCanaryInvocations = Number(approval.evidence.maxCanaryInvocations)
 
     const passed = matchingAfter(rows, 'local_distilled_runtime_canary_passed', approvalObservedAt)
     if (passed) {
@@ -339,7 +347,7 @@ export async function GET(req: NextRequest) {
       && row?.evidence?.artifactHash === ARTIFACT_HASH
       && Date.parse(String(row?.observed_at || '')) >= approvalFloor).length
     const consumedInvocations = Math.max(failures, starts)
-    if (consumedInvocations >= MAX_CANARY_INVOCATIONS) {
+    if (consumedInvocations >= approvedMaxCanaryInvocations) {
       const latestFailure = refreshed.find(row => row?.evidence?.profile === PROFILE
         && row?.evidence?.claim === 'local_distilled_runtime_canary_failed'
         && row?.evidence?.artifactHash === ARTIFACT_HASH
@@ -349,7 +357,7 @@ export async function GET(req: NextRequest) {
         reason: 'distilled_canary_retry_ceiling',
         endpointId,
         consumedInvocations,
-        maxCanaryInvocations: MAX_CANARY_INVOCATIONS,
+        maxCanaryInvocations: approvedMaxCanaryInvocations,
         latestFailure: latestFailure ? {
           observedAt: String(latestFailure.observed_at || ''),
           httpStatus: Number.isFinite(Number(latestFailure?.evidence?.httpStatus)) ? Number(latestFailure.evidence.httpStatus) : null,

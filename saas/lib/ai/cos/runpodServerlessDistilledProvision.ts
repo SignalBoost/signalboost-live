@@ -16,15 +16,21 @@ export const DISTILLED_BASE_MODEL_ID = 'Qwen/Qwen3-4B'
 export const DISTILLED_BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 export const DISTILLED_ADAPTER_MODEL_ID = 'cadomos/itmounts-student-f993a365a01e'
 export const DISTILLED_ADAPTER_MODEL_REVISION = '9f03387d87de550b96d973f9f30a3f02e783997e'
-export const DISTILLED_IDLE_TIMEOUT_SECONDS = 300
+export const DISTILLED_IDLE_TIMEOUT_SECONDS = 60
 export const DISTILLED_STARTUP_READY_TIMEOUT_MS = 220_000
 export const DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS = 60_000
 const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const REQUEST_TIMEOUT_MS = 15_000
 // The standard 24 GB Serverless tier is $0.69/hr. A bounded 220s startup-ready window, 60s
-// inference call, and 300s warm window total 580s, or ~$0.111 at $0.69/hr. This remains below the
-// existing $0.20 owner canary ceiling without keeping a worker permanently warm.
+// inference call, and 60s warm window total 340s, or ~$0.065 at $0.69/hr. This remains below the
+// existing $0.20 owner canary ceiling without keeping a worker unnecessarily warm.
 const MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD = 0.69
+export const DISTILLED_WORST_CASE_CANARY_COST_USD = (
+  (DISTILLED_IDLE_TIMEOUT_SECONDS
+    + (DISTILLED_STARTUP_READY_TIMEOUT_MS / 1000)
+    + (DISTILLED_CANARY_ATTEMPT_TIMEOUT_MS / 1000))
+  * MAX_SERVERLESS_GPU_PRICE_PER_HOUR_USD
+) / 3600
 
 const APPROVED_SERVERLESS_GPU_POOLS = [
   'AMPERE_16',
@@ -645,6 +651,7 @@ export async function waitForRunpodServerlessDistilledReady(input: {
       lastStatus = response.status
       const raw = await response.text()
       if (response.status === 200) return { ok: true, httpStatus: response.status, error: null }
+      if (response.status === 204) lastError = null
       const detail = safeRunpodErrorDetail(raw)
       if (detail) lastError = detail
       if (response.status === 503 && detail?.includes('distilled_bootstrap_failed')) {
@@ -679,7 +686,10 @@ export async function canaryRunpodServerlessDistilledLlm(input: {
     timeoutMs: DISTILLED_STARTUP_READY_TIMEOUT_MS,
     delayMs: input.delayMs,
   })
-  if (!readiness.ok) {
+  // A 204 is the startup gateway explicitly saying the worker is healthy but the model is still
+  // loading. Use the already-budgeted inference request as the final bounded wait instead of
+  // abandoning a healthy worker before that 60-second window begins.
+  if (!readiness.ok && readiness.httpStatus !== 204) {
     return {
       ok: false,
       model: DISTILLED_MODEL_NAME,

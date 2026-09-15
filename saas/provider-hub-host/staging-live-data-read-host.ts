@@ -5,6 +5,7 @@ import {
   type ProviderLiveDataReadExecution,
   type ProviderLiveDataReadRequest,
 } from '../provider-hub-core/live-data-read-adapter.ts'
+import type { EntitlementGate } from '../portable-license/enforce.ts'
 
 export const SIGNALBOOST_STAGING_LIVE_DATA_READ_HOST_VERSION = 'signalboost-staging-live-data-read-host-v1' as const
 
@@ -13,6 +14,10 @@ export interface SignalBoostStagingLiveDataReadHostOptions {
   readonly allowedOrigins: readonly string[]
   readonly now?: () => string
   readonly fetchImpl?: typeof fetch
+}
+
+export interface LicensedSignalBoostStagingLiveDataReadHostOptions extends SignalBoostStagingLiveDataReadHostOptions {
+  readonly entitlementGate: EntitlementGate
 }
 
 export interface SignalBoostStagingLiveDataReadHost {
@@ -99,4 +104,30 @@ export function createSignalBoostStagingLiveDataReadHost(
   }
 
   return Object.freeze(host)
+}
+
+/**
+ * Creates the buyer-facing staging host with entitlement enforcement at the
+ * transport boundary. The requested provider capability must be present in the
+ * verified licence before the base host can invoke network transport.
+ */
+export function createLicensedSignalBoostStagingLiveDataReadHost(
+  options: LicensedSignalBoostStagingLiveDataReadHostOptions,
+): SignalBoostStagingLiveDataReadHost {
+  if (!options.entitlementGate || typeof options.entitlementGate.assertEntitled !== 'function') {
+    throw new Error('entitlement-gate-required')
+  }
+
+  const baseHost = createSignalBoostStagingLiveDataReadHost(options)
+  return Object.freeze({
+    ...baseHost,
+    async execute(request: ProviderLiveDataReadRequest) {
+      await options.entitlementGate.assertEntitled(
+        `provider live-data read: ${request.capability}`,
+        'execute',
+        request.capability,
+      )
+      return baseHost.execute(request)
+    },
+  })
 }

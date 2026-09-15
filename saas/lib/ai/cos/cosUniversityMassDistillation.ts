@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+import { classifyCosUniversitySubjects, cosUniversitySubjectById } from './cosUniversity'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-distillation-v1' as const
 export const MASS_DISTILLATION_SOURCE_POLICY = 'public_domain_cc0_v1' as const
@@ -55,6 +56,14 @@ function hash(value: unknown): string {
 
 function normalizedSubject(value: string): string {
   return clean(value, 240).toLowerCase()
+}
+
+function distillationSubjectGroup(value: string): Readonly<{ key: string; subject: string }> {
+  const raw = clean(value, 240)
+  const primary = classifyCosUniversitySubjects(raw)[0]
+  if (!primary) return Object.freeze({ key: normalizedSubject(raw), subject: raw })
+  const canonical = cosUniversitySubjectById(primary)
+  return Object.freeze({ key: canonical.id, subject: canonical.title })
 }
 
 function normalizedMaterialPart(value: unknown, limit: number): string {
@@ -121,7 +130,7 @@ function normalizeIdentity(raw: RetainedDistillationIdentity): NormalizedIdentit
   })
 }
 
-/** Deterministically package unique retained teaching material by subject; no source text enters this queue. */
+/** Deterministically package unique retained teaching material by canonical University subject family. */
 export function buildMassDistillationBatches(
   rows: readonly RetainedDistillationIdentity[],
   assignedHashes: ReadonlySet<string> = new Set(),
@@ -131,25 +140,26 @@ export function buildMassDistillationBatches(
   const normalized = rows.map(normalizeIdentity)
   const groups = new Map<string, { subject: string; rows: NormalizedIdentity[]; materialHashes: Set<string> }>()
 
-  // Seed every subject with material already represented by a live or consumed assignment before
-  // considering replacement provenance hashes. This first pass makes the result independent of row order.
+  // Seed every canonical subject family with material already represented by a live or consumed
+  // assignment before considering replacement provenance hashes. This first pass makes the result
+  // independent of row order and prevents duplicate teaching material across subject aliases.
   for (const row of normalized) {
     if (!retainedIdentityEligibleForMassDistillation(row) || !assignedHashes.has(row.contentHash)) continue
-    const key = normalizedSubject(row.subject)
-    const group = groups.get(key) || { subject: row.subject, rows: [], materialHashes: new Set<string>() }
+    const subject = distillationSubjectGroup(row.subject)
+    const group = groups.get(subject.key) || { subject: subject.subject, rows: [], materialHashes: new Set<string>() }
     group.materialHashes.add(row.materialHash)
-    groups.set(key, group)
+    groups.set(subject.key, group)
   }
 
   for (const row of normalized) {
     if (!retainedIdentityEligibleForMassDistillation(row) || assignedHashes.has(row.contentHash)) continue
-    const key = normalizedSubject(row.subject)
-    const group = groups.get(key) || { subject: row.subject, rows: [], materialHashes: new Set<string>() }
+    const subject = distillationSubjectGroup(row.subject)
+    const group = groups.get(subject.key) || { subject: subject.subject, rows: [], materialHashes: new Set<string>() }
     if (group.rows.some(item => item.contentHash === row.contentHash)) continue
     if (group.materialHashes.has(row.materialHash)) continue
     group.rows.push(row)
     group.materialHashes.add(row.materialHash)
-    groups.set(key, group)
+    groups.set(subject.key, group)
   }
 
   const out: PreparedDistillationBatch[] = []
@@ -257,7 +267,7 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
   for (const row of eligible) {
     const contentHash = clean(row.contentHash, 64).toLowerCase()
     if (!assigned.has(contentHash)) continue
-    const subject = normalizedSubject(row.subject)
+    const subject = distillationSubjectGroup(row.subject).key
     const materialHashes = assignedMaterialHashesBySubject.get(subject) || new Set<string>()
     materialHashes.add(clean(row.materialHash, 64).toLowerCase())
     assignedMaterialHashesBySubject.set(subject, materialHashes)
@@ -266,7 +276,7 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     const contentHash = clean(row.contentHash, 64).toLowerCase()
     if (assigned.has(contentHash)) return false
     const materialHash = clean(row.materialHash, 64).toLowerCase()
-    return !assignedMaterialHashesBySubject.get(normalizedSubject(row.subject))?.has(materialHash)
+    return !assignedMaterialHashesBySubject.get(distillationSubjectGroup(row.subject).key)?.has(materialHash)
   })
   const batches = buildMassDistillationBatches(
     identities,
@@ -308,6 +318,6 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     sourceItemsPrepared,
     dispatchAuthorized: false,
     externalCostUsd: 0,
-    semantics: 'rights_cleared_unique_material_identity_packaging_effective_corpus_paginated_no_text_no_provider_dispatch_no_traffic_authorization' as const,
+    semantics: 'rights_cleared_unique_material_identity_packaging_canonical_university_subjects_effective_corpus_paginated_no_text_no_provider_dispatch_no_traffic_authorization' as const,
   })
 }

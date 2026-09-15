@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { runUniversityDistilledArtifactEvaluation } from '@/lib/ai/cos/cosUniversityDistilledArtifactEvaluation'
+import { runUniversityMassDistilledArtifactEvaluation } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 
@@ -19,12 +20,17 @@ export async function GET(req: NextRequest) {
     if (evaluator && !process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
-    const result = await runUniversityDistilledArtifactEvaluation(new Date())
+
+    // Mass-distillation artifacts are first-class evaluation candidates, but they never masquerade as
+    // study-plan identities. If no mass artifact is pending, preserve the legacy single-artifact lane.
+    const mass = await runUniversityMassDistilledArtifactEvaluation(new Date())
+    const noMassArtifact = 'skipped' in mass && mass.skipped === true && mass.reason === 'no_mass_evaluation_pending_artifact'
+    const result = noMassArtifact ? await runUniversityDistilledArtifactEvaluation(new Date()) : mass
     const skipped = 'skipped' in result && result.skipped === true
     await recordCosUniversityProductionPath({
       path: 'distilled_independent_evaluation',
       invocationSucceeded: result.ok === true,
-      evidence: { ...result, runnerInvoked: !skipped, skipped },
+      evidence: { ...result, massLaneChecked: true, runnerInvoked: !skipped, skipped },
     })
     console.info('[cos-distilled-independent-evaluation]', JSON.stringify(result))
     return NextResponse.json(result, {
@@ -36,7 +42,7 @@ export async function GET(req: NextRequest) {
     await recordCosUniversityProductionPath({
       path: 'distilled_independent_evaluation',
       invocationSucceeded: false,
-      evidence: { error: message, runnerInvoked: true },
+      evidence: { error: message, massLaneChecked: true, runnerInvoked: true },
     }).catch(() => null)
     console.error('[cos-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: message }))
     return NextResponse.json({ ok: false, error: message }, { status: 500 })

@@ -101,6 +101,18 @@ test('mass evaluator normalizes authoritative campaign evidence without weakenin
   assert.match(evaluator, /manifestHash\(hashes\)/)
 })
 
+test('mass evaluation queue finishes all initial evaluations before any delayed-retention spend', () => {
+  const evaluator = source('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
+  assert.match(evaluator, /\.limit\(20\)/)
+  assert.match(evaluator, /latestEvaluationByArtifact/)
+  assert.match(evaluator, /!evaluationFor\(row\)/)
+  assert.match(evaluator, /Finish every artifact's initial independent evaluation before spending on any delayed-retention/)
+  assert.match(evaluator, /retentionDeferred = prior\?\.response_hashes\?\.retention\?\.deferred === true/)
+  assert.match(evaluator, /prior\.delayed_retention_passed === true \|\| !retentionDeferred/)
+  assert.match(evaluator, /now\.getTime\(\) >= trainedAt \+ MIN_MASS_DISTILLED_RETENTION_DELAY_MS/)
+  assert.match(evaluator, /reason: 'mass_evaluation_work_not_due'/)
+})
+
 test('mass evaluation spends only the approved 8 endpoint and 4 judge calls across initial and delayed phases', () => {
   const evaluator = source('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts')
   assert.match(evaluator, /const MAX_ENDPOINT_CALLS = 8/)

@@ -1,2 +1,2 @@
-base_sha=37102f3a6f38ff9330b8e195bc17804adfa49501
-branch=fix/distilled-evaluator-canonical-canary-20260915
+base_sha=0e8a1a02eb6ba2f5543651f1e0f2bc036514664d
+branch=fix/distilled-evaluator-holdout-first-rows-20260915

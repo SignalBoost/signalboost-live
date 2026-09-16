@@ -42,6 +42,7 @@ const tests = [
   'tests/runpodPrimaryThinkingRetry.node.test.ts',
   'tests/conciergeConversationResume.node.test.ts',
   'tests/cosConversationRecall.node.test.ts',
+  'tests/cosUniversityMassEvaluationHttpDetail.node.test.ts',
   'tests/builderToolLoop.node.test.ts',
   'tests/builderVerificationOrder.node.test.ts',
   'tests/builderProjectLessons.node.test.ts',

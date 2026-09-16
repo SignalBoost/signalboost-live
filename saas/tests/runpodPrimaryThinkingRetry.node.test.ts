@@ -63,6 +63,6 @@ test('RunPod budgets at or below 1024 tokens are thinking-off from the start; la
   await callLocalModel({ prompt: 'draft a long answer', maxTokens: 4096 }, runpodConfig)
   await callLocalModel({ prompt: 'classify', maxTokens: 360 }, { baseUrl: 'https://api.deepinfra.com/v1/openai', model: 'Qwen/Qwen3.6-35B-A3B', apiKey: 'k', timeoutMs: 5000, provider: 'deepinfra' })
   assert.equal(bodies[0].reasoning_effort, 'none')
-  assert.equal(bodies[1].reasoning_effort, 'none')
+  assert.equal('reasoning_effort' in bodies[1], false)
   assert.notEqual(bodies[2].reasoning_effort, 'none')
 })

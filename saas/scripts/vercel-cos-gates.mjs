@@ -40,6 +40,7 @@ const tests = [
   'tests/cosUniversityExamNumberMatching.node.test.ts',
   'tests/cosOwnerVerifiedOutcomes.node.test.ts',
   'tests/runpodPrimaryThinkingRetry.node.test.ts',
+  'tests/conciergeConversationResume.node.test.ts',
   'tests/builderToolLoop.node.test.ts',
   'tests/builderVerificationOrder.node.test.ts',
   'tests/builderProjectLessons.node.test.ts',

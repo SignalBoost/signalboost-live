@@ -36,6 +36,7 @@ const tests = [
   'tests/cosUniversityGraduationRemediation.node.test.ts',
   'tests/cosUniversityAgentCapstone.node.test.ts',
   'tests/cosUniversityExamLengthRevision.node.test.ts',
+  'tests/cosUniversityExamNumberMatching.node.test.ts',
   'tests/builderToolLoop.node.test.ts',
   'tests/builderVerificationOrder.node.test.ts',
   'tests/builderProjectLessons.node.test.ts',

@@ -50,3 +50,8 @@ test('the runner stays inside the approved 8 endpoint calls and still judges eac
   assert.equal((source.match(/await answersFor\(/g) || []).length, 4, '3 + 3 holdout requests at most, plus 1 + 1 fixed-suite requests')
   assert.equal((source.match(/await suite\(\{name:'(holdout|safety|transfer|retention)'/g) || []).length, 4)
 })
+
+test('endpoint requests get enough time to generate a fitted batch and remain bounded by the route deadline', () => {
+  assert.match(source, /const ENDPOINT_CALL_TIMEOUT_MS = 120_000/)
+  assert.match(source, /const timeout=Math\.max\(1,Math\.min\(ENDPOINT_CALL_TIMEOUT_MS,remaining\(input\.deadlineMs\)\)\)/)
+})

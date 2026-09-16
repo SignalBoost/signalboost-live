@@ -72,7 +72,7 @@ async function ensureRollingMassEvaluationApproval() {
   }))
   if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
   const events = await db.from('cos_university_learning_assurance_events')
-    .select('candidate_id,observed_at,expires_at,verifier,evidence')
+    .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
     .eq('event_type', 'fine_tune')
     .like('candidate_id', 'mass:%')
     .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
@@ -81,14 +81,24 @@ async function ensureRollingMassEvaluationApproval() {
     .limit(2000)
   if (events.error) throw events.error
   const reservations = await db.from('cos_university_learning_assurance_events')
-    .select('candidate_id,observed_at,expires_at,verifier,evidence')
+    .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
     .eq('event_type', 'fine_tune')
     .like('candidate_id', 'mass:%')
     .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
     .order('observed_at', { ascending: false })
     .limit(1000)
   if (reservations.error) throw reservations.error
-  const all: RollingEvent[] = [...(events.data || []), ...(reservations.data || [])].map((row: any) => ({
+  // Terminal and started rows are host_controller rows carrying the runtime profile, so both reads return them.
+  // Without de-duplication two real failures counted as four and tripped the three-failure stop (2026-09-16 18:10 UTC).
+  const seenEventKeys = new Set<string>()
+  const uniqueRows = [...(events.data || []), ...(reservations.data || [])].filter((row: any) => {
+    const key = String(row?.event_key || '')
+    if (!key) return true
+    if (seenEventKeys.has(key)) return false
+    seenEventKeys.add(key)
+    return true
+  })
+  const all: RollingEvent[] = uniqueRows.map((row: any) => ({
     candidateId: clean(row.candidate_id, 240), observedAt: String(row.observed_at || ''), expiresAt: row.expires_at ? String(row.expires_at) : null,
     verifier: clean(row.verifier, 80), evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,
   }))

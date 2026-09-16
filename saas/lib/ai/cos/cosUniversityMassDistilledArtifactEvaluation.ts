@@ -2,6 +2,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
+import { MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens } from './cosUniversityMassEvaluationContextBudget.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
 import { readPinnedHfParquetRows } from './hfPinnedParquetRows.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
@@ -174,7 +175,8 @@ async function callRunpod(input:{endpointId:string;model:string;cases:readonly E
   const started=Date.now();const requestId=randomUUID();let httpStatus:number|null=null;let success=false
   try{
     const timeout=Math.max(1,Math.min(ENDPOINT_CALL_TIMEOUT_MS,remaining(input.deadlineMs)))
-    const response=await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.model,temperature:0,max_tokens:Math.min(4096,Math.max(1024,input.cases.length*420)),messages:[{role:'system',content:'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'},{role:'user',content:batchPrompt(input.cases)}]}),signal:AbortSignal.timeout(timeout)})
+    const userPrompt=batchPrompt(input.cases)
+    const response=await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.model,temperature:0,max_tokens:massEvaluationOutputTokens(input.cases.length,userPrompt),messages:[{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT},{role:'user',content:userPrompt}]}),signal:AbortSignal.timeout(timeout)})
     httpStatus=response.status
     if(!response.ok){
       // The provider's reason (e.g. vLLM context-length or unknown-model errors) was previously discarded,

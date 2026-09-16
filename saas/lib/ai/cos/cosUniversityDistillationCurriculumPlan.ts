@@ -77,15 +77,14 @@ const REPLENISHMENT_RESEARCH_LENSES = [
 
 /**
  * Prefer the subjects closest to a valid batch, but do not keep asking one identical search for each
- * subject. Each target gets several distinct curriculum-theme/lens queries in the same control cycle.
- * This avoids a saturated public source returning the same top papers every five minutes while every
- * admission, confidence, rights, provenance and 20-item batch floor remains unchanged.
+ * subject. The live workflow explicitly supplies the owner-controlled query count. The helper keeps
+ * a one-query default for callers that only need prioritization semantics.
  */
 export function buildMassDistillationReplenishmentGaps(
   supply: readonly MassDistillationSubjectSupply[],
   now = new Date(),
   maxSubjects = MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS,
-  queriesPerSubject = MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
+  queriesPerSubject = 1,
 ): KnowledgeGap[] {
   const replenishmentSlot = Math.floor(now.getTime() / (MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000))
   const selected = supply

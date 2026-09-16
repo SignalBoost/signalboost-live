@@ -19,8 +19,16 @@ test('short batches keep the previous budget and never exceed 4096 output tokens
   assert.ok(massEvaluationOutputTokens(12, 'x'.repeat(3000)) <= 4096)
 })
 
+test('the 2026-09-16 batch refused at an estimated 9138 prompt tokens now fits with a usable budget', () => {
+  // 17:23 and 17:32 UTC: the refused batch was (9138 - 128) * 3 = 27030 characters including the system prompt.
+  const prompt = 'x'.repeat(27030 - 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'.length)
+  const maxTokens = massEvaluationOutputTokens(8, prompt)
+  assert.ok(maxTokens >= 8 * 120, 'leaves a usable answer budget per case')
+  assert.ok(4833 + maxTokens <= MASS_EVALUATION_MODEL_CONTEXT_TOKENS, 'the provider-measured prompt plus output stays inside the window')
+})
+
 test('a batch that cannot fit a usable answer fails with an explicit reason instead of a provider 400', () => {
-  assert.throws(() => massEvaluationOutputTokens(8, 'x'.repeat(24000)), /mass_distilled_evaluation_context_budget_insufficient:cases=8:estimatedPromptTokens=\d+/)
+  assert.throws(() => massEvaluationOutputTokens(8, 'x'.repeat(30000)), /mass_distilled_evaluation_context_budget_insufficient:cases=8:estimatedPromptTokens=\d+/)
 })
 
 test('the RunPod call uses the fitted budget and still makes exactly one request per suite and model', () => {

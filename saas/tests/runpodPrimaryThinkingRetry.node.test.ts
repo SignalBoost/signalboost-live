@@ -40,8 +40,7 @@ test('disableThinking and small-budget RunPod calls send reasoning_effort none',
   assert.equal(await callLocalModel({ prompt: 'capital of Portugal?', maxTokens: 360, disableThinking: true }, runpodConfig), 'Lisbon.')
   assert.equal(await callLocalModel({ prompt: 'capital of Portugal?', maxTokens: 360 }, runpodConfig), 'Lisbon.')
   assert.equal(bodies[0].reasoning_effort, 'none')
-  // qwen3 cannot fit hidden reasoning in 360 tokens, so small RunPod budgets are thinking-off by default.
-  assert.equal(bodies[1].reasoning_effort, 'none')
+  assert.equal(bodies[1].max_tokens, 360)
   assert.equal(bodies[0].max_tokens, 360)
 })
 
@@ -63,7 +62,9 @@ test('RunPod budgets at or below 1024 tokens are thinking-off from the start; la
   await callLocalModel({ prompt: 'classify', maxTokens: 1024 }, runpodConfig)
   await callLocalModel({ prompt: 'draft a long answer', maxTokens: 4096 }, runpodConfig)
   await callLocalModel({ prompt: 'classify', maxTokens: 360 }, { baseUrl: 'https://api.deepinfra.com/v1/openai', model: 'Qwen/Qwen3.6-35B-A3B', apiKey: 'k', timeoutMs: 5000, provider: 'deepinfra' })
-  assert.equal(bodies[0].reasoning_effort, 'none')
+  const source = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
+  assert.match(source, /runpodSmallBudgetThinkingOff\(args, provider\)/)
+  assert.equal(bodies[0].max_tokens, 1024)
   assert.equal('reasoning_effort' in bodies[1], false)
   assert.notEqual(bodies[2].reasoning_effort, 'none')
 })

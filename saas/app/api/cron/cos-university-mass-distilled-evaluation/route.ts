@@ -1,3 +1,4 @@
+// saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -8,6 +9,12 @@ import {
   runMassDistilledArtifactEvaluation,
   type MassEvaluationClaim,
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
+import {
+  MASS_EVALUATION_APPROVAL_TTL_MS,
+  decideRollingMassEvaluationApproval,
+  type RollingArtifact,
+  type RollingEvent,
+} from '@/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -47,6 +54,66 @@ type RawClaim = Readonly<{
   max_estimated_runtime_wake_cost_usd: number
   reservation_event_key: string
 }>
+
+/** Issues at most one bounded evaluation approval per tick under the owner's rolling direction. */
+async function ensureRollingMassEvaluationApproval() {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const artifacts = await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
+    .eq('status', 'evaluation_pending')
+    .like('candidate_id', 'mass:%')
+    .order('created_at', { ascending: true })
+    .limit(50)
+  if (artifacts.error) throw artifacts.error
+  const rows: RollingArtifact[] = (artifacts.data || []).map((row: any) => ({
+    candidateId: clean(row.candidate_id, 240), subjectId: clean(row.subject_id, 240),
+    artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
+  }))
+  if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
+  const events = await db.from('cos_university_learning_assurance_events')
+    .select('candidate_id,observed_at,expires_at,verifier,evidence')
+    .eq('event_type', 'fine_tune')
+    .like('candidate_id', 'mass:%')
+    .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
+    .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+    .order('observed_at', { ascending: false })
+    .limit(2000)
+  if (events.error) throw events.error
+  const reservations = await db.from('cos_university_learning_assurance_events')
+    .select('candidate_id,observed_at,expires_at,verifier,evidence')
+    .eq('event_type', 'fine_tune')
+    .like('candidate_id', 'mass:%')
+    .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
+    .order('observed_at', { ascending: false })
+    .limit(1000)
+  if (reservations.error) throw reservations.error
+  const all: RollingEvent[] = [...(events.data || []), ...(reservations.data || [])].map((row: any) => ({
+    candidateId: clean(row.candidate_id, 240), observedAt: String(row.observed_at || ''), expiresAt: row.expires_at ? String(row.expires_at) : null,
+    verifier: clean(row.verifier, 80), evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,
+  }))
+  const now = new Date()
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: process.env.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false',
+    artifacts: rows,
+    events: all,
+    now,
+  })
+  if (!decision.issue) return { issued: false, reason: decision.reason }
+  const inserted = await db.from('cos_university_learning_assurance_events').insert({
+    event_key: hash(['mass-rolling-evaluation-approval', decision.artifact.candidateId, decision.artifact.artifactHash, now.toISOString()]),
+    event_type: 'fine_tune',
+    subject_id: decision.artifact.subjectId || null,
+    candidate_id: decision.artifact.candidateId,
+    evidence_hash: hash(decision.evidence),
+    evidence: decision.evidence,
+    verifier: 'host_controller',
+    observed_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + MASS_EVALUATION_APPROVAL_TTL_MS).toISOString(),
+  })
+  if (inserted.error) throw inserted.error
+  return { issued: true, candidateId: decision.artifact.candidateId, artifactHash: decision.artifact.artifactHash }
+}
 
 async function claimNext(): Promise<MassEvaluationClaim | null> {
   const db = cosServiceDb()
@@ -163,6 +230,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'runpod_balance_guard', balance: account.clientBalance }, { status: 402 })
     }
 
+    const rolling = await ensureRollingMassEvaluationApproval()
+    console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
     claim = await claimNext()
     if (!claim) {
       await recordProduction(true, {

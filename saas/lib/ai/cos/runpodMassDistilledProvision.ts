@@ -33,6 +33,7 @@ export type MassDistilledRuntimeArtifact = Readonly<{
 
 type Template = { id:string; name:string; imageName?:string; isServerless?:boolean; dockerEntrypoint?:string[]; dockerStartCmd?:string[]; ports?:string[] }
 type Endpoint = { id:string; name:string; type?:'QUEUE'|'LOAD_BALANCER'; templateId?:string; workers?:{min?:number;max?:number;idleTimeout?:number}; gpu?:{pools?:string[];count?:number} }
+type RestEndpointIdentity = { id?:string; name?:string }
 type Gpu = { pool?:string; manufacturer?:string; memory?:number; availability?:string; price?:{serverless?:number|null} }
 
 const HEX40 = /^[a-f0-9]{40}$/i
@@ -169,6 +170,13 @@ async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEnd
   }
 }
 
+async function recoverEndpointId(endpoint:Endpoint|undefined,endpointName:string):Promise<Endpoint|undefined>{
+  if(endpoint?.id) return endpoint
+  const official=await requestV1<RestEndpointIdentity[]>('/endpoints')
+  const match=official.find(item=>clean(item.name,240)===endpointName&&clean(item.id,120))
+  return match?.id?{...(endpoint||{} as Endpoint),id:clean(match.id,120),name:endpointName}:endpoint
+}
+
 async function rebindEndpointTemplate(endpoint:Endpoint,templateId:string):Promise<Endpoint>{
   assertEndpointSafetyPolicy(endpoint)
   if(clean(endpoint.templateId,200)===templateId) return endpoint
@@ -198,6 +206,7 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
     endpoint=await requestV2<Endpoint>('/serverless',{method:'POST',body:JSON.stringify({name:ids.endpointName,type:ROUTING,templateId:template.id,gpu:{pools:await gpuPools(),count:1},workers:{min:0,max:1,idleTimeout:IDLE_TIMEOUT_SECONDS},scaling:{type:'REQUEST_COUNT',requestCount:1},timeout:300000,flashboot:'FLASHBOOT'})});createdEndpoint=true
   }
   else {const previousTemplateId=clean(endpoint.templateId,200); endpoint=await rebindEndpointTemplate(endpoint,template.id); reboundTemplate=previousTemplateId!==template.id}
+  endpoint=await recoverEndpointId(endpoint,ids.endpointName)
   if(!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
   assertEndpointPolicy(endpoint,template.id)
   return Object.freeze({...ids,endpointId:endpoint.id,createdTemplate,createdEndpoint,reboundTemplate,workersMin:Number(endpoint.workers?.min),workersMax:Number(endpoint.workers?.max),idleTimeout:Number(endpoint.workers?.idleTimeout),baseUrl:`https://${endpoint.id}.api.runpod.ai/v1`})

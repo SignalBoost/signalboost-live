@@ -52,6 +52,12 @@ test('mass-distilled provisioning releases only retired mass canary worker reser
   assert.doesNotMatch(provision, /releaseRetiredMassEndpointCapacity[\s\S]*method:'DELETE'/)
 })
 
+test('mass-distilled provisioning recovers an omitted v2 endpoint id from the official REST endpoint list', () => {
+  assert.match(provision, /requestV1<RestEndpointIdentity\[\]>\('\/endpoints'\)/)
+  assert.match(provision, /clean\(item\.name,240\)===endpointName/)
+  assert.match(provision, /endpoint=await recoverEndpointId\(endpoint,ids\.endpointName\)/)
+})
+
 test('204 is never treated as inference-ready for mass artifacts', () => {
   assert.match(provision, /if\(payload\?\.ready===true\) break/)
   assert.match(provision, /if\(lastStatus!==200\) return/)

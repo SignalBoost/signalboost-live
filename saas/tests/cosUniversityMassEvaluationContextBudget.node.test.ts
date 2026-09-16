@@ -55,3 +55,10 @@ test('endpoint requests get enough time to generate a fitted batch and remain bo
   assert.match(source, /const ENDPOINT_CALL_TIMEOUT_MS = 120_000/)
   assert.match(source, /const timeout=Math\.max\(1,Math\.min\(ENDPOINT_CALL_TIMEOUT_MS,remaining\(input\.deadlineMs\)\)\)/)
 })
+
+test('transient RunPod gateway failures retry once only when spare approved endpoint-call budget remains', () => {
+  assert.match(source, /mass_distilled_evaluation_runpod_http_\(502\|503\|504\)/)
+  assert.match(source, /if\(input\.budget\.used>=input\.budget\.max\)throw new Error\(`mass_distilled_evaluation_endpoint_call_ceiling:/)
+  assert.match(source, /input\.budget\.used\+=1\n\s*await new Promise\(resolve=>setTimeout\(resolve,500\)\)/)
+  assert.match(source, /endpointCalls:budget\.used/)
+})

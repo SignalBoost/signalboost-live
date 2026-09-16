@@ -40,5 +40,5 @@ jobs:
           cache-dependency-path: saas/package-lock.json
       - run: npm ci
       - name: Run owner-throughput and scale proofs
-        run: node --test tests/cosUniversityDistillationThroughput.node.test.ts tests/cosUniversityDistillationScale.node.test.ts tests/cosUniversityMassDistillationRollingAuthorization.node.test.ts
+        run: node --import ./scripts/test-alias-loader.mjs --test tests/cosUniversityDistillationThroughput.node.test.ts tests/cosUniversityDistillationScale.node.test.ts tests/cosUniversityMassDistillationRollingAuthorization.node.test.ts
       - run: npm run typecheck

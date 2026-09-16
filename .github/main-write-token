@@ -1,2 +1,2 @@
-base_sha=0449824e8abf549489d649bc2c5f69551f1c9094
-branch=perf/university-distillation-ready-buffer-20260916
+base_sha=82902bb0da79106f21caf9a4a265052059e4775c
+branch=fix/distillation-throughput-proof-alias-20260916

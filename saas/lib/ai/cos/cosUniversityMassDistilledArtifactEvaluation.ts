@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts
 import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
@@ -174,7 +175,14 @@ async function callRunpod(input:{endpointId:string;model:string;cases:readonly E
   try{
     const timeout=Math.max(1,Math.min(ENDPOINT_CALL_TIMEOUT_MS,remaining(input.deadlineMs)))
     const response=await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.model,temperature:0,max_tokens:Math.min(4096,Math.max(1024,input.cases.length*420)),messages:[{role:'system',content:'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'},{role:'user',content:batchPrompt(input.cases)}]}),signal:AbortSignal.timeout(timeout)})
-    httpStatus=response.status;if(!response.ok)throw new Error(`mass_distilled_evaluation_runpod_http_${response.status}`)
+    httpStatus=response.status
+    if(!response.ok){
+      // The provider's reason (e.g. vLLM context-length or unknown-model errors) was previously discarded,
+      // leaving only "http_400" in the ledger. Keep the status prefix unchanged and append the bounded reason.
+      const detail=clean((await response.text().catch(()=>'')).replace(/\s+/g,' '),240)
+      const role=input.model===BASE_MODEL_ID?'baseline':'candidate'
+      throw new Error(`mass_distilled_evaluation_runpod_http_${response.status}:${role}:cases=${input.cases.length}:${detail}`)
+    }
     const payload:any=await response.json();const text=clean(payload?.choices?.[0]?.message?.content,200_000);if(!text)throw new Error('mass_distilled_evaluation_runpod_empty')
     success=true;return {answers:parseAnswers(text,input.cases),responseHash:sha256Raw(text)}
   }finally{

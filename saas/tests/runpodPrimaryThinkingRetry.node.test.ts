@@ -58,6 +58,7 @@ test('routing retries the RunPod primary once with thinking off only for empty-c
 
 // Small-budget policy must not leak into larger generations or other providers.
 test('RunPod budgets at or below 1024 tokens are thinking-off from the start; larger budgets and other providers are unchanged', async () => {
+  process.env.LOCAL_AI_REASONING_EFFORT = 'high'
   const bodies: any[] = []
   globalThis.fetch = (async (url, init) => { if (String(url).includes('/chat/completions')) bodies.push(JSON.parse(String(init?.body))); return reply('ok', 'stop', 2) }) as typeof fetch
   await callLocalModel({ prompt: 'classify', maxTokens: 1024 }, runpodConfig)
@@ -68,5 +69,5 @@ test('RunPod budgets at or below 1024 tokens are thinking-off from the start; la
   assert.equal(bodies[0].reasoning_effort, 'none')
   assert.equal(bodies[0].max_tokens, 1024)
   assert.equal('reasoning_effort' in bodies[1], false)
-  assert.notEqual(bodies[2].reasoning_effort, 'none')
+  assert.equal(bodies[2].reasoning_effort, 'high')
 })

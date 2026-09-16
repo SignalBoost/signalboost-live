@@ -144,6 +144,11 @@ larger rolling ceiling, parallel campaigns, or a later campaign expiry. Missing/
 failed verification, or an unrecognized incident fails closed and remains visible rather than being
 reported as healed. Insufficient rights-cleared unique material is reported as a supply wait; the
 system does not weaken the 20-item curriculum quality floor merely to keep provider compute busy.
+Supply telemetry reports both raw unassigned provenance rows and the smaller post-dedup batchable
+count by canonical subject. When no batch is prepared, the shared workflow serializes one bounded
+replenishment pass per 30-minute slot against the nearest canonical subject shortfalls, using only
+the existing governed OpenAlex CC0 acquisition/admission path, then reruns packaging before any
+rolling authorization. Acquisition cannot dispatch training or expand provider authority.
 
 The rolling RPC is the only service-role campaign-authorizer entry point: direct execution of the
 legacy authorizer is revoked so concurrent workers cannot bypass the policy-row lock or 24-hour cap.

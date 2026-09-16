@@ -3,12 +3,14 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   buildMassDistillationBatches,
+  analyzeMassDistillationSupply,
   classifyMassDistillationRights,
   MASS_DISTILLATION_MAX_BATCH,
   MASS_DISTILLATION_MIN_BATCH,
   retainedIdentityEligibleForMassDistillation,
   retainedMaterialHash,
 } from '../lib/ai/cos/cosUniversityMassDistillation.ts'
+import { buildMassDistillationReplenishmentGaps } from '../lib/ai/cos/cosUniversityDistillationCurriculumPlan.ts'
 
 const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 const h = (n: number) => n.toString(16).padStart(64, '0')
@@ -116,6 +118,41 @@ test('storage hashes cannot manufacture a distillation batch from duplicate lear
   assert.equal(prepared.length, 1)
   assert.equal(prepared[0].sourceCount, MASS_DISTILLATION_MIN_BATCH + 1)
   assert.equal(new Set(prepared[0].sourceHashes).size, prepared[0].sourceCount)
+})
+
+test('supply telemetry reports unique post-dedup batchable material and exact subject shortfalls', () => {
+  const assigned = new Set([h(1)])
+  const rows = [
+    { contentHash: h(1), materialHash: h(101), subject: 'Social psychology', sourceKind: 'scientific_journal', license: 'Public Domain', confidence: 0.95 },
+    { contentHash: h(2), materialHash: h(101), subject: 'Social psychology', sourceKind: 'scientific_journal', license: 'Public Domain', confidence: 0.95 },
+    ...Array.from({ length: 18 }, (_, index) => ({
+      contentHash: h(index + 10), materialHash: h(index + 1_000), subject: 'Social psychology',
+      sourceKind: 'scientific_journal', license: 'OpenAlex CC0 abstract read for grounded learning', confidence: 0.9,
+    })),
+    ...Array.from({ length: 4 }, (_, index) => ({
+      contentHash: h(index + 100), materialHash: h(2_000), subject: 'Public policy and diplomacy',
+      sourceKind: 'scientific_journal', license: 'Public Domain', confidence: 0.9,
+    })),
+  ]
+  const supply = analyzeMassDistillationSupply(rows, assigned)
+  assert.equal(supply.rawUnassignedRows, 23)
+  assert.equal(supply.uniqueBatchableItems, 19)
+  assert.deepEqual(supply.subjects.map(subject => [subject.subjectKey, subject.uniqueBatchableItems, subject.shortfallToBatch]), [
+    ['social_behavioral_sciences', 18, 2],
+    ['politics_government_international_relations', 1, 19],
+  ])
+})
+
+test('targeted replenishment prioritizes the nearest canonical batches without weakening the floor', () => {
+  const supply = analyzeMassDistillationSupply([
+    ...Array.from({ length: 18 }, (_, index) => ({ contentHash: h(index + 10), materialHash: h(index + 1_000), subject: 'Social psychology', sourceKind: 'scientific_journal', license: 'Public Domain', confidence: 0.9 })),
+    ...Array.from({ length: 14 }, (_, index) => ({ contentHash: h(index + 100), materialHash: h(index + 2_000), subject: 'Statistics and causal inference', sourceKind: 'scientific_journal', license: 'Public Domain', confidence: 0.9 })),
+  ])
+  const gaps = buildMassDistillationReplenishmentGaps(supply.subjects, new Date('2026-09-16T00:00:00.000Z'))
+  assert.deepEqual(gaps.map(gap => gap.subject), ['Social & Behavioral Sciences', 'Statistics & Data Science'])
+  assert.ok(gaps.every(gap => gap.sourceKinds?.length === 1 && gap.sourceKinds[0] === 'scientific_journal'))
+  assert.match(gaps[0].evidence.join(' '), /shortfall_to_batch=2/)
+  assert.equal(MASS_DISTILLATION_MIN_BATCH, 20)
 })
 
 test('curriculum queue stores identities only and cannot authorize spend', () => {

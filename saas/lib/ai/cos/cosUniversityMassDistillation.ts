@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { classifyCosUniversitySubjects, cosUniversitySubjectById } from './cosUniversity.ts'
+import { classifyCosUniversitySubjects, cosUniversitySubjectById, type CosUniversitySubjectId } from './cosUniversity.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-distillation-v1' as const
 export const MASS_DISTILLATION_SOURCE_POLICY = 'public_domain_cc0_v1' as const
@@ -37,6 +37,21 @@ export type PreparedDistillationBatch = Readonly<{
   sourceCount: number
 }>
 
+export type MassDistillationSubjectSupply = Readonly<{
+  subjectKey: string
+  subject: string
+  canonicalSubjectId: CosUniversitySubjectId | null
+  uniqueBatchableItems: number
+  shortfallToBatch: number
+}>
+
+export type MassDistillationSupply = Readonly<{
+  eligibleRows: number
+  rawUnassignedRows: number
+  uniqueBatchableItems: number
+  subjects: readonly MassDistillationSubjectSupply[]
+}>
+
 type NormalizedIdentity = Readonly<{
   contentHash: string
   materialHash: string
@@ -58,12 +73,12 @@ function normalizedSubject(value: string): string {
   return clean(value, 240).toLowerCase()
 }
 
-function distillationSubjectGroup(value: string): Readonly<{ key: string; subject: string }> {
+function distillationSubjectGroup(value: string): Readonly<{ key: string; subject: string; canonicalSubjectId: CosUniversitySubjectId | null }> {
   const raw = clean(value, 240)
   const primary = classifyCosUniversitySubjects(raw)[0]
-  if (!primary) return Object.freeze({ key: normalizedSubject(raw), subject: raw })
+  if (!primary) return Object.freeze({ key: normalizedSubject(raw), subject: raw, canonicalSubjectId: null })
   const canonical = cosUniversitySubjectById(primary)
-  return Object.freeze({ key: canonical.id, subject: canonical.title })
+  return Object.freeze({ key: canonical.id, subject: canonical.title, canonicalSubjectId: canonical.id })
 }
 
 function normalizedMaterialPart(value: unknown, limit: number): string {
@@ -127,6 +142,75 @@ function normalizeIdentity(raw: RetainedDistillationIdentity): NormalizedIdentit
     sourceKind: clean(raw.sourceKind, 80),
     license: clean(raw.license, 1000),
     confidence: Number(raw.confidence),
+  })
+}
+
+/**
+ * Report the material the packager can actually use after the same rights, assignment, canonical
+ * subject, content, and retained-material de-duplication fences used for batch construction. Raw
+ * unassigned row counts are preserved separately so provenance volume cannot masquerade as supply.
+ */
+export function analyzeMassDistillationSupply(
+  rows: readonly RetainedDistillationIdentity[],
+  assignedHashes: ReadonlySet<string> = new Set(),
+): MassDistillationSupply {
+  const normalized = rows.map(normalizeIdentity)
+  const eligible = normalized.filter(retainedIdentityEligibleForMassDistillation)
+  const groups = new Map<string, {
+    subject: string
+    canonicalSubjectId: CosUniversitySubjectId | null
+    assignedMaterialHashes: Set<string>
+    unassignedContentHashes: Set<string>
+    uniqueMaterialHashes: Set<string>
+  }>()
+
+  const groupFor = (row: NormalizedIdentity) => {
+    const subject = distillationSubjectGroup(row.subject)
+    const group = groups.get(subject.key) || {
+      subject: subject.subject,
+      canonicalSubjectId: subject.canonicalSubjectId,
+      assignedMaterialHashes: new Set<string>(),
+      unassignedContentHashes: new Set<string>(),
+      uniqueMaterialHashes: new Set<string>(),
+    }
+    groups.set(subject.key, group)
+    return { subject, group }
+  }
+
+  for (const row of eligible) {
+    if (!assignedHashes.has(row.contentHash)) continue
+    groupFor(row).group.assignedMaterialHashes.add(row.materialHash)
+  }
+
+  let rawUnassignedRows = 0
+  for (const row of eligible) {
+    if (assignedHashes.has(row.contentHash)) continue
+    rawUnassignedRows += 1
+    const { group } = groupFor(row)
+    if (group.unassignedContentHashes.has(row.contentHash)) continue
+    group.unassignedContentHashes.add(row.contentHash)
+    if (group.assignedMaterialHashes.has(row.materialHash)) continue
+    group.uniqueMaterialHashes.add(row.materialHash)
+  }
+
+  const subjects = [...groups.entries()]
+    .map(([subjectKey, group]) => Object.freeze({
+      subjectKey,
+      subject: group.subject,
+      canonicalSubjectId: group.canonicalSubjectId,
+      uniqueBatchableItems: group.uniqueMaterialHashes.size,
+      shortfallToBatch: group.uniqueMaterialHashes.size >= MASS_DISTILLATION_MIN_BATCH
+        ? 0
+        : MASS_DISTILLATION_MIN_BATCH - group.uniqueMaterialHashes.size,
+    }))
+    .filter(subject => subject.uniqueBatchableItems > 0)
+    .sort((a, b) => b.uniqueBatchableItems - a.uniqueBatchableItems || a.subjectKey.localeCompare(b.subjectKey))
+
+  return Object.freeze({
+    eligibleRows: eligible.length,
+    rawUnassignedRows,
+    uniqueBatchableItems: subjects.reduce((sum, subject) => sum + subject.uniqueBatchableItems, 0),
+    subjects: Object.freeze(subjects),
   })
 }
 
@@ -262,22 +346,7 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     license: clean(row.license, 1000),
     confidence: Number(row.confidence),
   }))
-  const eligible = identities.filter(retainedIdentityEligibleForMassDistillation)
-  const assignedMaterialHashesBySubject = new Map<string, Set<string>>()
-  for (const row of eligible) {
-    const contentHash = clean(row.contentHash, 64).toLowerCase()
-    if (!assigned.has(contentHash)) continue
-    const subject = distillationSubjectGroup(row.subject).key
-    const materialHashes = assignedMaterialHashesBySubject.get(subject) || new Set<string>()
-    materialHashes.add(clean(row.materialHash, 64).toLowerCase())
-    assignedMaterialHashesBySubject.set(subject, materialHashes)
-  }
-  const unassigned = eligible.filter(row => {
-    const contentHash = clean(row.contentHash, 64).toLowerCase()
-    if (assigned.has(contentHash)) return false
-    const materialHash = clean(row.materialHash, 64).toLowerCase()
-    return !assignedMaterialHashesBySubject.get(distillationSubjectGroup(row.subject).key)?.has(materialHash)
-  })
+  const supply = analyzeMassDistillationSupply(identities, assigned)
   const batches = buildMassDistillationBatches(
     identities,
     assigned,
@@ -311,9 +380,12 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     sourcePolicy: MASS_DISTILLATION_SOURCE_POLICY,
     studentModelId: MASS_DISTILLATION_STUDENT_MODEL,
     considered: identities.length,
-    eligible: eligible.length,
-    alreadyAssigned: eligible.length - unassigned.length,
-    unassigned: unassigned.length,
+    eligible: supply.eligibleRows,
+    alreadyAssigned: supply.eligibleRows - supply.uniqueBatchableItems,
+    unassigned: supply.uniqueBatchableItems,
+    rawUnassignedRows: supply.rawUnassignedRows,
+    uniqueBatchableItems: supply.uniqueBatchableItems,
+    supply,
     batchesPrepared: batches.length,
     sourceItemsPrepared,
     dispatchAuthorized: false,

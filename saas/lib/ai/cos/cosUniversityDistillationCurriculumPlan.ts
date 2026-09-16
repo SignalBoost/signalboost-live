@@ -5,8 +5,21 @@ import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillat
 // Curriculum acquisition is non-spending and should keep pace with the five-minute distillation
 // control loop. Provider training authority remains governed separately by the rolling policy.
 export const MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES = 5
-export const MASS_DISTILLATION_PREPARED_BATCH_BUFFER_TARGET = 3
+export const MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET = 10
+export const MASS_DISTILLATION_MAX_PREPARED_BATCH_BUFFER_TARGET = 100
 export const MASS_DISTILLATION_MAX_TARGET_SUBJECTS = 3
+
+/**
+ * Preparation inventory is capacity policy, not a product architecture limit. University defaults
+ * to a modest queue; larger deployments can raise the queue without widening training authority.
+ */
+export function massDistillationPreparedBatchBufferTarget(env: NodeJS.ProcessEnv = process.env): number {
+  const configured = Number(env.COS_UNIVERSITY_DISTILLATION_PREPARED_BUFFER_TARGET)
+  const target = Number.isFinite(configured) && configured > 0
+    ? Math.floor(configured)
+    : MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET
+  return Math.max(1, Math.min(MASS_DISTILLATION_MAX_PREPARED_BATCH_BUFFER_TARGET, target))
+}
 
 /** Prefer the subjects closest to a valid batch so replenishment turns into useful work quickly. */
 export function buildMassDistillationReplenishmentGaps(

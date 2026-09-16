@@ -110,6 +110,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
           : [],
         now,
         maxSubjects: throughput.targetSubjectsPerReplenishment,
+        queriesPerSubject: throughput.queriesPerSubject,
         maxCandidatesPerCycle: throughput.acquisitionCandidatesPerCycle,
       })) }
       if (Number(curriculumReplenishment.accepted || 0) > 0) {
@@ -183,7 +184,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       preparedAfterReplenishment,
       rollingAuthorization,
       workflowSource: input.source,
-      workflowSemantics: 'detect_diagnose_repair_package_maintain_buyer_controlled_prepared_inventory_replenish_rights_cleared_shortfalls_authorize_within_owner_rolling_24h_ceiling_dispatch_verify',
+      workflowSemantics: 'detect_diagnose_repair_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_authorize_within_owner_rolling_24h_ceiling_dispatch_verify',
     },
     invocationSucceeded,
     skipped,

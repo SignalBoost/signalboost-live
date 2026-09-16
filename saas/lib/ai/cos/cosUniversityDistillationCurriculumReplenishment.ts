@@ -11,7 +11,9 @@ import {
 const RIGHTS_CLEARED_POLICY: ContinuousLearningPolicy = {
   allowedSourceKinds: new Set(['scientific_journal']),
   minimumConfidence: 0.80,
-  maxCandidatesPerCycle: 18,
+  // Keep enough zero-cost acquisition headroom to close a 20-item batch shortfall in one control
+  // cycle when OpenAlex has suitable unique material, instead of forcing multiple long waits.
+  maxCandidatesPerCycle: 40,
   maxExternalCostUsdPerCycle: 0,
 }
 

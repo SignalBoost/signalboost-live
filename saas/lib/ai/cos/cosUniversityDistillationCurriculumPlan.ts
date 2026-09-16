@@ -2,23 +2,78 @@ import type { KnowledgeGap } from '../../cos-core/layers/learning/index.ts'
 import { cosUniversitySubjectById } from './cosUniversity.ts'
 import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillation.ts'
 
-export const MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES = 30
-export const MASS_DISTILLATION_MAX_TARGET_SUBJECTS = 3
+// Curriculum acquisition is non-spending and should keep pace with the five-minute distillation
+// control loop. Provider training authority remains governed separately by the rolling policy.
+export const MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES = 5
+export const MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET = 10
+export const MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS = 3
+export const MASS_DISTILLATION_DEFAULT_ACQUISITION_CANDIDATES_PER_CYCLE = 40
+export const MASS_DISTILLATION_DEFAULT_CORPUS_SCAN_ROWS = 5_000
+export const MASS_DISTILLATION_DEFAULT_MAX_BATCHES_PER_SWEEP = 20
+
+export type MassDistillationThroughputProfile = Readonly<{
+  preparedBatchBufferTarget: number
+  targetSubjectsPerReplenishment: number
+  acquisitionCandidatesPerCycle: number
+  corpusScanRows: number
+  maxBatchesPerSweep: number
+}>
+
+function positiveSafeInteger(value: unknown, fallback: number): number {
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+/**
+ * Throughput belongs to the deployment owner/buyer, not to SignalBoost or a provider adapter.
+ * University uses deployment-owner environment settings as the current control surface; the later
+ * portable can bind the same profile to buyer-owned configuration/UI. There is deliberately no
+ * vendor-imposed throughput maximum here. Governance and spending authority remain separate gates.
+ */
+export function massDistillationThroughputProfile(env: NodeJS.ProcessEnv = process.env): MassDistillationThroughputProfile {
+  return Object.freeze({
+    preparedBatchBufferTarget: positiveSafeInteger(
+      env.DISTILLATION_PREPARED_BUFFER_TARGET ?? env.COS_UNIVERSITY_DISTILLATION_PREPARED_BUFFER_TARGET,
+      MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET,
+    ),
+    targetSubjectsPerReplenishment: positiveSafeInteger(
+      env.DISTILLATION_TARGET_SUBJECTS,
+      MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS,
+    ),
+    acquisitionCandidatesPerCycle: positiveSafeInteger(
+      env.DISTILLATION_ACQUISITION_CANDIDATES_PER_CYCLE,
+      MASS_DISTILLATION_DEFAULT_ACQUISITION_CANDIDATES_PER_CYCLE,
+    ),
+    corpusScanRows: positiveSafeInteger(
+      env.DISTILLATION_CORPUS_SCAN_ROWS,
+      MASS_DISTILLATION_DEFAULT_CORPUS_SCAN_ROWS,
+    ),
+    maxBatchesPerSweep: positiveSafeInteger(
+      env.DISTILLATION_MAX_BATCHES_PER_SWEEP,
+      MASS_DISTILLATION_DEFAULT_MAX_BATCHES_PER_SWEEP,
+    ),
+  })
+}
+
+/** Backward-compatible accessor used by existing workflow/tests. */
+export function massDistillationPreparedBatchBufferTarget(env: NodeJS.ProcessEnv = process.env): number {
+  return massDistillationThroughputProfile(env).preparedBatchBufferTarget
+}
 
 /** Prefer the subjects closest to a valid batch so replenishment turns into useful work quickly. */
 export function buildMassDistillationReplenishmentGaps(
   supply: readonly MassDistillationSubjectSupply[],
   now = new Date(),
-  maxSubjects = MASS_DISTILLATION_MAX_TARGET_SUBJECTS,
+  maxSubjects = MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS,
 ): KnowledgeGap[] {
-  const halfHourSlot = Math.floor(now.getTime() / (MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000))
+  const replenishmentSlot = Math.floor(now.getTime() / (MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000))
   return supply
     .filter(subject => subject.canonicalSubjectId && subject.uniqueBatchableItems > 0 && subject.shortfallToBatch > 0)
     .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch || b.uniqueBatchableItems - a.uniqueBatchableItems || a.subjectKey.localeCompare(b.subjectKey))
-    .slice(0, Math.max(1, Math.min(MASS_DISTILLATION_MAX_TARGET_SUBJECTS, Math.floor(maxSubjects))))
+    .slice(0, Math.max(1, Math.floor(maxSubjects)))
     .map((supplySubject, index) => {
       const subject = cosUniversitySubjectById(supplySubject.canonicalSubjectId!)
-      const theme = subject.studyThemes[(halfHourSlot + index) % subject.studyThemes.length]
+      const theme = subject.studyThemes[(replenishmentSlot + index) % subject.studyThemes.length]
       return {
         id: `distillation-curriculum:${subject.id}`,
         subject: subject.title,

@@ -1,11 +1,18 @@
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   massDistillationDispatchReadiness,
   recoverMassDistillationCampaigns,
   recoverStalledMassDistillationDispatchClaims,
   runMassDistillationCampaignConsumer,
 } from './cosUniversityMassDistillationConsumer.ts'
-import { prepareUniversityMassDistillationCurriculum } from './cosUniversityMassDistillation.ts'
+import {
+  MASS_DISTILLATION_MAX_BATCH,
+  MASS_DISTILLATION_MIN_BATCH,
+  MASS_DISTILLATION_STUDENT_MODEL,
+  prepareUniversityMassDistillationCurriculum,
+} from './cosUniversityMassDistillation.ts'
 import { replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
+import { massDistillationThroughputProfile } from './cosUniversityDistillationCurriculumPlan.ts'
 import { authorizeNextUniversityMassDistillationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
 import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUniversityHuggingFaceProviderLedger.ts'
@@ -16,13 +23,60 @@ function safeError(error: unknown): string {
   return String(error instanceof Error ? error.message : error || 'unknown_error').replace(/\s+/g, ' ').trim().slice(0, 300)
 }
 
+async function consumedBatchKeys(db: any, keys: readonly string[]): Promise<Set<string>> {
+  const consumed = new Set<string>()
+  const chunkSize = 200
+  for (let offset = 0; offset < keys.length; offset += chunkSize) {
+    const chunk = keys.slice(offset, offset + chunkSize)
+    const result = await db.from('cos_university_mass_distillation_batch_runs')
+      .select('batch_key')
+      .in('batch_key', chunk)
+    if (result.error) throw result.error
+    for (const row of result.data || []) {
+      const key = String((row as any).batch_key || '')
+      if (key) consumed.add(key)
+    }
+  }
+  return consumed
+}
+
+/** Count prepared batches until the buyer/owner configured inventory target is satisfied. */
+async function preparedMassDistillationInventory(target: number): Promise<number> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const pageSize = 500
+  let offset = 0
+  let available = 0
+  while (available < target) {
+    const prepared = await db.from('cos_university_distillation_curriculum_batches')
+      .select('batch_key')
+      .eq('status', 'prepared')
+      .eq('dispatch_authorized', false)
+      .eq('authority_expanded', false)
+      .eq('student_model_id', MASS_DISTILLATION_STUDENT_MODEL)
+      .gte('source_count', MASS_DISTILLATION_MIN_BATCH)
+      .lte('source_count', MASS_DISTILLATION_MAX_BATCH)
+      .order('prepared_at', { ascending: true })
+      .range(offset, offset + pageSize - 1)
+    if (prepared.error) throw prepared.error
+    const rows = prepared.data || []
+    const keys = rows.map((row: any) => String(row.batch_key || '')).filter(Boolean)
+    if (keys.length) {
+      const used = await consumedBatchKeys(db, keys)
+      available += keys.filter(key => !used.has(key)).length
+    }
+    if (rows.length < pageSize) break
+    offset += pageSize
+  }
+  return available
+}
+
 /**
  * One canonical distillation control loop shared by the scheduled worker and the Self-Healing
- * Supervisor. Keeping the order here prevents the repair path from drifting into a second,
- * weaker implementation: accepted provider work is reconciled, terminal failures are diagnosed,
- * interrupted dispatch claims and bounded retries are re-armed, the rights-cleared curriculum is
- * replenished, one next campaign may be authorized inside the owner's durable rolling ceiling, and
- * only then may another authorized stage be claimed.
+ * Supervisor. Accepted provider work is reconciled first. Non-spending curriculum preparation then
+ * maintains buyer/owner-configured ready inventory independently of paid training authority, so
+ * training need not wait for acquisition after capacity becomes available. Paid dispatch remains
+ * bounded by the University's separate owner-approved rolling policy.
  */
 export async function runCosUniversityMassDistillationWorkflow(input: {
   source: MassDistillationWorkflowSource
@@ -33,25 +87,39 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   skipped: boolean
 }> {
   const now = input.now || new Date()
+  const throughput = massDistillationThroughputProfile()
   const reconciliation = await reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 15 })
   const diagnostics = await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })
   const stalledDispatchRecovery = await recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 })
   const recovery = await recoverMassDistillationCampaigns({ now, maxCampaigns: 5 })
+  const preparedBufferTarget = throughput.preparedBatchBufferTarget
+  let preparedBeforeReplenishment = 0
+  let preparedAfterReplenishment = 0
   let curriculum: Record<string, unknown>
-  let curriculumReplenishment: Record<string, unknown> = { ok: true, skipped: true, reason: 'curriculum_batch_available', externalCostUsd: 0 }
+  let curriculumReplenishment: Record<string, unknown> = { ok: true, skipped: true, reason: 'prepared_buffer_satisfied', externalCostUsd: 0 }
   try {
-    curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now)) }
-    if (Number(curriculum.batchesPrepared || 0) === 0) {
+    curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now, {
+      corpusScanRows: throughput.corpusScanRows,
+      maxBatchesPerSweep: throughput.maxBatchesPerSweep,
+    })) }
+    preparedBeforeReplenishment = await preparedMassDistillationInventory(preparedBufferTarget)
+    if (preparedBeforeReplenishment < preparedBufferTarget) {
       curriculumReplenishment = { ...(await replenishUniversityMassDistillationCurriculum({
         supply: Array.isArray((curriculum.supply as { subjects?: unknown })?.subjects)
           ? (curriculum.supply as { subjects: any[] }).subjects
           : [],
         now,
+        maxSubjects: throughput.targetSubjectsPerReplenishment,
+        maxCandidatesPerCycle: throughput.acquisitionCandidatesPerCycle,
       })) }
       if (Number(curriculumReplenishment.accepted || 0) > 0) {
-        curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now)) }
+        curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now, {
+          corpusScanRows: throughput.corpusScanRows,
+          maxBatchesPerSweep: throughput.maxBatchesPerSweep,
+        })) }
       }
     }
+    preparedAfterReplenishment = await preparedMassDistillationInventory(preparedBufferTarget)
   } catch (error) {
     curriculum = { ok: false, error: safeError(error), externalCostUsd: 0, dispatchAuthorized: false }
     curriculumReplenishment = { ok: false, error: safeError(error), externalCostUsd: 0 }
@@ -88,8 +156,6 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const recoverySkipped = recovery.skipped === true
   const skipped = consumerSkipped && reconciliationSkipped && diagnosticsSkipped
     && stalledDispatchRecoverySkipped && recoverySkipped
-  // A disabled provider or missing service database is reported as `skipped` by the leaf helper,
-  // but it is not a successful workflow heartbeat. Benign no-work cases already return ok=true.
   const invocationSucceeded = result.ok === true
     && reconciliation.ok === true
     && diagnostics.ok === true
@@ -111,9 +177,13 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       recovery,
       curriculum,
       curriculumReplenishment,
+      throughput,
+      preparedBufferTarget,
+      preparedBeforeReplenishment,
+      preparedAfterReplenishment,
       rollingAuthorization,
       workflowSource: input.source,
-      workflowSemantics: 'detect_diagnose_repair_package_replenish_targeted_rights_cleared_shortfalls_repackage_authorize_one_within_owner_rolling_24h_ceiling_dispatch_verify',
+      workflowSemantics: 'detect_diagnose_repair_package_maintain_buyer_controlled_prepared_inventory_replenish_rights_cleared_shortfalls_authorize_within_owner_rolling_24h_ceiling_dispatch_verify',
     },
     invocationSucceeded,
     skipped,

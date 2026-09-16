@@ -8,11 +8,13 @@ import {
   MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES,
 } from './cosUniversityDistillationCurriculumPlan.ts'
 
-const RIGHTS_CLEARED_POLICY: ContinuousLearningPolicy = {
-  allowedSourceKinds: new Set(['scientific_journal']),
-  minimumConfidence: 0.80,
-  maxCandidatesPerCycle: 18,
-  maxExternalCostUsdPerCycle: 0,
+function rightsClearedPolicy(maxCandidatesPerCycle: number): ContinuousLearningPolicy {
+  return {
+    allowedSourceKinds: new Set(['scientific_journal']),
+    minimumConfidence: 0.80,
+    maxCandidatesPerCycle,
+    maxExternalCostUsdPerCycle: 0,
+  }
 }
 
 function slotKey(now: Date): string {
@@ -24,9 +26,15 @@ function slotKey(now: Date): string {
 export async function replenishUniversityMassDistillationCurriculum(input: {
   supply: readonly MassDistillationSubjectSupply[]
   now?: Date
+  maxSubjects?: number
+  maxCandidatesPerCycle?: number
 }) {
   const now = input.now || new Date()
-  const gaps = buildMassDistillationReplenishmentGaps(input.supply, now)
+  const maxSubjects = Number.isSafeInteger(input.maxSubjects) && Number(input.maxSubjects) > 0 ? Number(input.maxSubjects) : 3
+  const maxCandidatesPerCycle = Number.isSafeInteger(input.maxCandidatesPerCycle) && Number(input.maxCandidatesPerCycle) > 0
+    ? Number(input.maxCandidatesPerCycle)
+    : 40
+  const gaps = buildMassDistillationReplenishmentGaps(input.supply, now, maxSubjects)
   if (!gaps.length) return Object.freeze({ ok: true, skipped: true, reason: 'no_targetable_subject_shortfall', targets: [], externalCostUsd: 0 })
 
   const db = cosServiceDb()
@@ -59,7 +67,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
 
   try {
     const cycle = new ContinuousLearningCycle(
-      new ContinuousLearningDirector(stores.continuousLearning, RIGHTS_CLEARED_POLICY),
+      new ContinuousLearningDirector(stores.continuousLearning, rightsClearedPolicy(maxCandidatesPerCycle)),
       adapters,
     )
     const result = await cycle.run(gaps, 0)
@@ -82,6 +90,7 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
       skipped: false,
       slotKey: key,
       targets: gaps.map(gap => gap.subject),
+      maxCandidatesPerCycle,
       documentsAcquired: result.documentsAcquired,
       accepted: result.accepted,
       probationary: result.probationary,

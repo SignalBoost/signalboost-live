@@ -1,2 +1,2 @@
-base_sha=c48d45341f9dabe2cae3c608f0a5c73095c62d37
-branch=fix/university-distillation-canary-readiness-20260916
+base_sha=0449824e8abf549489d649bc2c5f69551f1c9094
+branch=perf/university-distillation-ready-buffer-20260916

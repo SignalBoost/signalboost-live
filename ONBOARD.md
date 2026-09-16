@@ -155,6 +155,12 @@ legacy authorizer is revoked so concurrent workers cannot bypass the policy-row 
 Monitoring and reconciliation read every unsettled Hugging Face provider job, including jobs whose
 campaign has already left the active window, before another campaign can be authorized.
 
+The exact-artifact RunPod canary reserves 235 seconds of the 300-second function window for a real
+Qwen3-4B + immutable-LoRA cold start and 35 seconds for the bounded inference probe. This reflects
+Production evidence that a healthy running worker could still be loading at the former 190-second
+cutoff. The change does not add an invocation, raise the $0.20 canary ceiling, authorize evaluation,
+or authorize Production traffic.
+
 ---
 
 # Mandatory first-read / repo-scan rule

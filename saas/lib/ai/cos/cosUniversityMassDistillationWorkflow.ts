@@ -5,6 +5,7 @@ import {
   runMassDistillationCampaignConsumer,
 } from './cosUniversityMassDistillationConsumer.ts'
 import { prepareUniversityMassDistillationCurriculum } from './cosUniversityMassDistillation.ts'
+import { replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
 import { authorizeNextUniversityMassDistillationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
 import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUniversityHuggingFaceProviderLedger.ts'
@@ -37,10 +38,23 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const stalledDispatchRecovery = await recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 })
   const recovery = await recoverMassDistillationCampaigns({ now, maxCampaigns: 5 })
   let curriculum: Record<string, unknown>
+  let curriculumReplenishment: Record<string, unknown> = { ok: true, skipped: true, reason: 'curriculum_batch_available', externalCostUsd: 0 }
   try {
     curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now)) }
+    if (Number(curriculum.batchesPrepared || 0) === 0) {
+      curriculumReplenishment = { ...(await replenishUniversityMassDistillationCurriculum({
+        supply: Array.isArray((curriculum.supply as { subjects?: unknown })?.subjects)
+          ? (curriculum.supply as { subjects: any[] }).subjects
+          : [],
+        now,
+      })) }
+      if (Number(curriculumReplenishment.accepted || 0) > 0) {
+        curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now)) }
+      }
+    }
   } catch (error) {
     curriculum = { ok: false, error: safeError(error), externalCostUsd: 0, dispatchAuthorized: false }
+    curriculumReplenishment = { ok: false, error: safeError(error), externalCostUsd: 0 }
   }
   let rollingAuthorization: Record<string, unknown>
   const dispatchReadiness = massDistillationDispatchReadiness()
@@ -82,6 +96,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     && stalledDispatchRecovery.ok === true
     && recovery.ok === true
     && curriculum.ok === true
+    && curriculumReplenishment.ok === true
     && rollingAuthorization.ok === true
 
   return {
@@ -95,9 +110,10 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       stalledDispatchRecovery,
       recovery,
       curriculum,
+      curriculumReplenishment,
       rollingAuthorization,
       workflowSource: input.source,
-      workflowSemantics: 'detect_diagnose_repair_package_authorize_one_within_owner_rolling_24h_ceiling_dispatch_verify',
+      workflowSemantics: 'detect_diagnose_repair_package_replenish_targeted_rights_cleared_shortfalls_repackage_authorize_one_within_owner_rolling_24h_ceiling_dispatch_verify',
     },
     invocationSucceeded,
     skipped,

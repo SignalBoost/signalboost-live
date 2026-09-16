@@ -61,6 +61,13 @@ test('database rolling policy serializes workers and counts worst-case campaign 
   assert.doesNotMatch(sql, /automatic_promotion_authorized\s*=\s*true|runpod_mutation_authorized\s*=\s*true/)
 })
 
+test('forward migration hardens databases that already applied the rolling policy', () => {
+  const sql = source('../supabase/migrations/20260916003402_harden_university_rolling_distillation_authority.sql')
+  assert.match(sql, /alter function public\.authorize_next_cos_university_mass_distillation_campaign\(\)[\s\S]*security definer/)
+  assert.match(sql, /revoke execute on function public\.authorize_cos_university_mass_distillation_campaign\(text\[\],numeric,text,interval\)[\s\S]*from service_role/)
+  assert.match(sql, /notify pgrst, 'reload schema'/)
+})
+
 test('canonical workflow packages, authorizes under the rolling policy, then dispatches', () => {
   const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
   const packaging = workflow.indexOf('prepareUniversityMassDistillationCurriculum(now)')

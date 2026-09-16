@@ -1,2 +1,2 @@
-base_sha=547ab59ed44a28d14fd9fc87afed3ece30e99cc4
-branch=fix/distillation-curriculum-starvation-20260916-v2
+base_sha=cefa63c472e4e721d39e5b3375a60c42a09b13b1
+branch=fix/hf-distillation-always-on-20260916

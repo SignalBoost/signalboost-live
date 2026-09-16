@@ -34,14 +34,14 @@ test('a genuinely long answer cut at the limit keeps the unchanged truncation er
   })
 })
 
-test('disableThinking sends reasoning_effort none to any provider; default RunPod calls send nothing', async () => {
+test('disableThinking and small-budget RunPod calls send reasoning_effort none', async () => {
   const bodies: any[] = []
-  globalThis.fetch = (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return reply('Lisbon.', 'stop', 3) }) as typeof fetch
+  globalThis.fetch = (async (url, init) => { if (String(url).includes('/chat/completions')) bodies.push(JSON.parse(String(init?.body))); return reply('Lisbon.', 'stop', 3) }) as typeof fetch
   assert.equal(await callLocalModel({ prompt: 'capital of Portugal?', maxTokens: 360, disableThinking: true }, runpodConfig), 'Lisbon.')
   assert.equal(await callLocalModel({ prompt: 'capital of Portugal?', maxTokens: 360 }, runpodConfig), 'Lisbon.')
   assert.equal(bodies[0].reasoning_effort, 'none')
-  // qwen3 cannot fit hidden reasoning in 360 tokens, so small RunPod budgets are thinking-off by default.
   assert.equal(bodies[1].reasoning_effort, 'none')
+  assert.equal(bodies[1].max_tokens, 360)
   assert.equal(bodies[0].max_tokens, 360)
 })
 
@@ -56,13 +56,18 @@ test('routing retries the RunPod primary once with thinking off only for empty-c
   assert.equal((routing.match(/disableThinking: true/g) || []).length, 1, 'exactly one retry, never a loop')
 })
 
+// Small-budget policy must not leak into larger generations or other providers.
 test('RunPod budgets at or below 1024 tokens are thinking-off from the start; larger budgets and other providers are unchanged', async () => {
+  process.env.LOCAL_AI_REASONING_EFFORT = 'high'
   const bodies: any[] = []
-  globalThis.fetch = (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return reply('ok', 'stop', 2) }) as typeof fetch
+  globalThis.fetch = (async (url, init) => { if (String(url).includes('/chat/completions')) bodies.push(JSON.parse(String(init?.body))); return reply('ok', 'stop', 2) }) as typeof fetch
   await callLocalModel({ prompt: 'classify', maxTokens: 1024 }, runpodConfig)
   await callLocalModel({ prompt: 'draft a long answer', maxTokens: 4096 }, runpodConfig)
   await callLocalModel({ prompt: 'classify', maxTokens: 360 }, { baseUrl: 'https://api.deepinfra.com/v1/openai', model: 'Qwen/Qwen3.6-35B-A3B', apiKey: 'k', timeoutMs: 5000, provider: 'deepinfra' })
+  const source = readFileSync(new URL('../lib/ai/local-inference.ts', import.meta.url), 'utf8')
+  assert.match(source, /runpodSmallBudgetThinkingOff\(args, provider\)/)
   assert.equal(bodies[0].reasoning_effort, 'none')
+  assert.equal(bodies[0].max_tokens, 1024)
   assert.equal('reasoning_effort' in bodies[1], false)
-  assert.notEqual(bodies[2].reasoning_effort, 'none')
+  assert.equal(bodies[2].reasoning_effort, 'high')
 })

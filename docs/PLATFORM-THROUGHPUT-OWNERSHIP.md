@@ -15,6 +15,10 @@ The platform may provide conservative defaults for its own hosted/reference envi
 not product limits. Buyer-owned deployments must be able to raise or lower capacity through governed
 configuration without source-code edits.
 
+This rule applies across the platform, not only to distillation. Shared runtimes, Builder, Concierge,
+COS, specialists, workflow engines, learning pipelines, provider adapters, queues, background workers,
+and future portables should treat throughput as owner capacity policy rather than vendor authority.
+
 ## Separation of concerns
 
 Buyer-controlled throughput does not weaken platform governance. These remain independently enforced:
@@ -30,6 +34,11 @@ Buyer-controlled throughput does not weaken platform governance. These remain in
 
 A safety or authority gate may block an unauthorized action. It must not be disguised as a fixed
 vendor throughput ceiling.
+
+Provider, operating-system, cloud-account, database, network, or physical-resource constraints may
+limit achievable throughput. Those are observed capacity constraints, not SignalBoost product limits.
+The platform should surface them explicitly and let the owner decide whether to add capacity, change a
+provider, or lower the requested operating target.
 
 ## Scaling contract
 

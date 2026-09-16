@@ -383,3 +383,5 @@ For the current University phase, success means COS and registered specialists i
 For the deferred portable phase, success will mean a buyer can plug in different models, agents, data sources, APIs, MCP servers, providers, and private infrastructure; have supported capabilities discovered automatically; distill/train/evaluate/deploy through normalized contracts; and swap providers without rebuilding the product core.
 
 **Finish University first. Then build the plug-and-play Agent Distillation & Training Portable.**
+
+- 2026-09-16: The mass-distilled evaluator must use the exact model alias recorded by the successful exact-artifact canary (including its runtime-key suffix). Evaluation requests are capped at 1,024 output tokens and fail closed above the bounded prompt budget; sanitized RunPod validation details are retained in terminal error evidence.

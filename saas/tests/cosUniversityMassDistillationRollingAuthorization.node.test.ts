@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityMassDistillationRollingAuthorization.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -29,7 +30,7 @@ test('rolling authorization response remains bounded and never carries promotion
     authorityExpanded: true,
   })
   assert.equal(MASS_DISTILLATION_ROLLING_WINDOW_HOURS, 24)
-  assert.equal(MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD, 25)
+  assert.equal(MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD, null)
   assert.equal(MASS_DISTILLATION_ROLLING_BATCHES_PER_CAMPAIGN, 1)
   assert.equal(normalized.ok, true)
   assert.equal(normalized.authorized, true)
@@ -82,4 +83,30 @@ test('canonical workflow prepares at owner-selected throughput, then separately 
   assert.match(workflow, /owner_rolling_24h_ceiling/)
   assert.match(workflow, /throughput\.corpusScanRows/)
   assert.match(workflow, /throughput\.maxBatchesPerSweep/)
+})
+
+test('owner removed the rolling 24-hour ceiling without widening any other authority', () => {
+  const sql = source('../supabase/migrations/20260916190000_remove_university_mass_distillation_rolling_ceiling.sql')
+  assert.match(sql, /alter column max_authorized_cost_usd drop not null/)
+  assert.match(sql, /set max_authorized_cost_usd = null/)
+  assert.match(sql, /owner_explicit_direction_2026-09-16_no_rolling_ceiling/)
+  assert.match(sql, /if v_policy\.max_authorized_cost_usd is not null\s+and round\(v_window_authorized \+ v_next_cost,6\) > round\(v_policy\.max_authorized_cost_usd,6\)/)
+  assert.match(sql, /v_next_cost constant numeric\(10,6\) := 1\.825000/)
+  assert.match(sql, /v_active_campaigns >= v_policy\.max_concurrent_campaigns or v_unsettled_jobs > 0/)
+  assert.match(sql, /security definer/)
+  assert.match(sql, /grant execute on function public\.authorize_next_cos_university_mass_distillation_campaign\(\)\s+to service_role/)
+  assert.doesNotMatch(sql, /automatic_promotion_authorized\s*=\s*true|runpod_mutation_authorized\s*=\s*true/)
+  assert.doesNotMatch(sql, /max_concurrent_campaigns\s*=\s*[2-9]|batches_per_campaign\s*=\s*[2-9]/)
+})
+
+test('an uncapped response reports no ceiling instead of a misleading zero remaining', () => {
+  const normalized = normalizeMassDistillationRollingAuthorization({
+    ok: true, authorized: true, reason: 'campaign_authorized', rollingCeilingRemoved: true,
+    rollingMaximumAuthorizedCostUsd: null, rollingAuthorizedCostUsd: 27.375, rollingRemainingAuthorizedCostUsd: null,
+  })
+  assert.equal(normalized.rollingCeilingRemoved, true)
+  assert.equal(normalized.rollingMaximumAuthorizedCostUsd, null)
+  assert.equal(normalized.rollingRemainingAuthorizedCostUsd, null)
+  assert.equal(normalized.rollingAuthorizedCostUsd, 27.375)
+  assert.equal(normalized.automaticPromotionAuthorized, false)
 })

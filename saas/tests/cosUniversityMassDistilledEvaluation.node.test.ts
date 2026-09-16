@@ -72,6 +72,7 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   assert.match(runner, /manifestHash\(observed\)!==input\.expectedManifestHash/)
   assert.match(runner, /itmounts-mass-distilled-\$\{artifactHash\.slice\(0,12\)/)
   assert.match(runner, /payload\?\.ready===true/)
+  assert.match(runner, /const READY_TIMEOUT_MS = 235_000/)
   assert.match(runner, /teacherModelId/)
   assert.match(runner, /evaluatorIds\.has\(training\.teacherModelId\)/)
 })

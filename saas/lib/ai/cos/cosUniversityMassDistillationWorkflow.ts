@@ -1,19 +1,27 @@
 import {
+  massDistillationDispatchReadiness,
   recoverMassDistillationCampaigns,
   recoverStalledMassDistillationDispatchClaims,
   runMassDistillationCampaignConsumer,
 } from './cosUniversityMassDistillationConsumer.ts'
+import { prepareUniversityMassDistillationCurriculum } from './cosUniversityMassDistillation.ts'
+import { authorizeNextUniversityMassDistillationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
 import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUniversityHuggingFaceProviderLedger.ts'
 
 export type MassDistillationWorkflowSource = 'scheduled_cron' | 'self_healing_supervisor'
 
+function safeError(error: unknown): string {
+  return String(error instanceof Error ? error.message : error || 'unknown_error').replace(/\s+/g, ' ').trim().slice(0, 300)
+}
+
 /**
  * One canonical distillation control loop shared by the scheduled worker and the Self-Healing
  * Supervisor. Keeping the order here prevents the repair path from drifting into a second,
  * weaker implementation: accepted provider work is reconciled, terminal failures are diagnosed,
- * interrupted dispatch claims and bounded retries are re-armed, and only then may another
- * authorized stage be claimed.
+ * interrupted dispatch claims and bounded retries are re-armed, the rights-cleared curriculum is
+ * replenished, one next campaign may be authorized inside the owner's durable rolling ceiling, and
+ * only then may another authorized stage be claimed.
  */
 export async function runCosUniversityMassDistillationWorkflow(input: {
   source: MassDistillationWorkflowSource
@@ -28,6 +36,36 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const diagnostics = await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })
   const stalledDispatchRecovery = await recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 })
   const recovery = await recoverMassDistillationCampaigns({ now, maxCampaigns: 5 })
+  let curriculum: Record<string, unknown>
+  try {
+    curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now)) }
+  } catch (error) {
+    curriculum = { ok: false, error: safeError(error), externalCostUsd: 0, dispatchAuthorized: false }
+  }
+  let rollingAuthorization: Record<string, unknown>
+  const dispatchReadiness = massDistillationDispatchReadiness()
+  try {
+    rollingAuthorization = dispatchReadiness.ready
+      ? { ...(await authorizeNextUniversityMassDistillationCampaign()) }
+      : {
+          ok: false,
+          authorized: false,
+          reason: dispatchReadiness.reason,
+          automaticPromotionAuthorized: false,
+          runpodMutationAuthorized: false,
+          authorityExpanded: false,
+        }
+  } catch (error) {
+    rollingAuthorization = {
+      ok: false,
+      authorized: false,
+      reason: 'rolling_authorization_failed',
+      error: safeError(error),
+      automaticPromotionAuthorized: false,
+      runpodMutationAuthorized: false,
+      authorityExpanded: false,
+    }
+  }
   const result = await runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })
   const consumerSkipped = 'skipped' in result && result.skipped === true
   const reconciliationSkipped = 'skipped' in reconciliation && reconciliation.skipped === true
@@ -43,6 +81,8 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     && diagnostics.ok === true
     && stalledDispatchRecovery.ok === true
     && recovery.ok === true
+    && curriculum.ok === true
+    && rollingAuthorization.ok === true
 
   return {
     response: {
@@ -54,8 +94,10 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       diagnostics,
       stalledDispatchRecovery,
       recovery,
+      curriculum,
+      rollingAuthorization,
       workflowSource: input.source,
-      workflowSemantics: 'detect_diagnose_repair_verify_within_existing_campaign_authority',
+      workflowSemantics: 'detect_diagnose_repair_package_authorize_one_within_owner_rolling_24h_ceiling_dispatch_verify',
     },
     invocationSucceeded,
     skipped,

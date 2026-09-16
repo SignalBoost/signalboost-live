@@ -39,6 +39,14 @@ type ProviderJobRow = {
   provider_stage: string | null
 }
 
+type RollingContinuityInput = Readonly<{
+  preparedBatches: number
+  rollingPolicyEnabled: boolean
+  rollingMaximumAuthorizedCostUsd: number
+  rollingAuthorizedCostUsd: number
+  nextBudgetReleaseAt: string | null
+}>
+
 export type UniversityDistillationHealthReason =
   | 'heartbeat_missing'
   | 'heartbeat_stale'
@@ -48,10 +56,14 @@ export type UniversityDistillationHealthReason =
   | 'dispatch_claim_stalled'
   | 'failed_stage_recovery_stalled'
   | 'provider_job_overdue'
+  | 'prepared_campaign_not_authorized'
+  | 'curriculum_supply_waiting'
+  | 'rolling_budget_exhausted'
+  | 'rolling_authorization_disabled'
 
 export interface UniversityDistillationHealthSnapshot {
   checkedAt: string
-  state: 'idle' | 'healthy' | 'repair_required'
+  state: 'healthy' | 'repair_required' | 'waiting_for_curriculum' | 'budget_paused' | 'authorization_required'
   reasons: UniversityDistillationHealthReason[]
   expectedIntervalSeconds: number
   maximumHeartbeatAgeSeconds: number
@@ -73,6 +85,12 @@ export interface UniversityDistillationHealthSnapshot {
   authorizedCostUsd: number
   committedCostUsd: number
   remainingAuthorizedCostUsd: number
+  preparedBatches: number
+  rollingPolicyEnabled: boolean
+  rollingMaximumAuthorizedCostUsd: number
+  rollingAuthorizedCostUsd: number
+  rollingRemainingAuthorizedCostUsd: number
+  nextBudgetReleaseAt: string | null
   automaticRecoveryAuthorized: boolean
   automaticPromotionAuthorized: false
   runpodMutationAuthorized: false
@@ -98,6 +116,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
   receipt: ReceiptRow | null
   workflowRuns: readonly WorkflowRunRow[]
   providerJobs: readonly ProviderJobRow[]
+  continuity?: RollingContinuityInput
 }): UniversityDistillationHealthSnapshot {
   const nowMs = input.now.getTime()
   const expectedIntervalSeconds = Math.max(60, Math.min(3600, Math.floor(input.expectedIntervalSeconds)))
@@ -141,17 +160,52 @@ export function evaluateUniversityMassDistillationHealth(input: {
   const authorizedCostUsd = input.campaigns.reduce((sum, campaign) => sum + finite(campaign.max_total_cost_usd), 0)
   const committedCostUsd = input.campaigns.reduce((sum, campaign) => sum + finite(campaign.committed_cost_usd), 0)
   const remainingAuthorizedCostUsd = Math.max(0, authorizedCostUsd - committedCostUsd)
+  const preparedBatches = Math.max(0, Math.floor(finite(input.continuity?.preparedBatches)))
+  const rollingPolicyEnabled = input.continuity?.rollingPolicyEnabled === true
+  const rollingMaximumAuthorizedCostUsd = finite(input.continuity?.rollingMaximumAuthorizedCostUsd)
+  const rollingAuthorizedCostUsd = finite(input.continuity?.rollingAuthorizedCostUsd)
+  const rollingRemainingAuthorizedCostUsd = Math.max(0, rollingMaximumAuthorizedCostUsd - rollingAuthorizedCostUsd)
+  const nextBudgetReleaseAt = input.continuity?.nextBudgetReleaseAt ?? null
 
   if (campaignIds.length === 0) {
+    const rollingBatchAffordable = rollingRemainingAuthorizedCostUsd + 0.000001 >= 1.825
+    const reasons: UniversityDistillationHealthReason[] = []
+    let state: UniversityDistillationHealthSnapshot['state']
+    let automaticRecoveryAuthorized = false
+    if (!input.receipt) reasons.push('heartbeat_missing')
+    else if (receiptAgeSeconds == null || receiptAgeSeconds > maximumHeartbeatAgeSeconds) reasons.push('heartbeat_stale')
+    if (invocationSucceeded === false) reasons.push('workflow_failed')
+    if (reasons.length > 0) {
+      state = 'repair_required'
+      automaticRecoveryAuthorized = true
+    } else if (!rollingPolicyEnabled) {
+      state = 'authorization_required'
+      reasons.push('rolling_authorization_disabled')
+    } else if (!rollingBatchAffordable) {
+      state = 'budget_paused'
+      reasons.push('rolling_budget_exhausted')
+    } else if (preparedBatches === 0) {
+      state = 'waiting_for_curriculum'
+      reasons.push('curriculum_supply_waiting')
+    } else {
+      state = 'repair_required'
+      reasons.push('prepared_campaign_not_authorized')
+      automaticRecoveryAuthorized = true
+    }
     return {
-      checkedAt: input.now.toISOString(), state: 'idle', reasons: [], expectedIntervalSeconds,
+      checkedAt: input.now.toISOString(), state, reasons, expectedIntervalSeconds,
       maximumHeartbeatAgeSeconds, activeCampaigns: 0, failedCampaigns: 0, activeCampaignIds: [], latestReceiptAt: input.receipt?.observed_at ?? null,
       latestCommitSha: input.receipt?.commit_sha ?? null, latestInvocationSucceeded: invocationSucceeded,
       receiptAgeSeconds, workflowRuns: 0, claimableRuns: 0, stalledDispatchRuns: 0,
       workflowProgressAgeSeconds: null, failedRuns: 0, staleFailedRuns: 0,
       unsettledProviderJobs: 0, overdueProviderJobs: 0,
       authorizedCostUsd: 0, committedCostUsd: 0, remainingAuthorizedCostUsd: 0,
-      automaticRecoveryAuthorized: false, automaticPromotionAuthorized: false, runpodMutationAuthorized: false,
+      preparedBatches, rollingPolicyEnabled,
+      rollingMaximumAuthorizedCostUsd: Number(rollingMaximumAuthorizedCostUsd.toFixed(6)),
+      rollingAuthorizedCostUsd: Number(rollingAuthorizedCostUsd.toFixed(6)),
+      rollingRemainingAuthorizedCostUsd: Number(rollingRemainingAuthorizedCostUsd.toFixed(6)),
+      nextBudgetReleaseAt, automaticRecoveryAuthorized,
+      automaticPromotionAuthorized: false, runpodMutationAuthorized: false,
       authorityExpanded: false,
     }
   }
@@ -202,6 +256,12 @@ export function evaluateUniversityMassDistillationHealth(input: {
     authorizedCostUsd: Number(authorizedCostUsd.toFixed(6)),
     committedCostUsd: Number(committedCostUsd.toFixed(6)),
     remainingAuthorizedCostUsd: Number(remainingAuthorizedCostUsd.toFixed(6)),
+    preparedBatches,
+    rollingPolicyEnabled,
+    rollingMaximumAuthorizedCostUsd: Number(rollingMaximumAuthorizedCostUsd.toFixed(6)),
+    rollingAuthorizedCostUsd: Number(rollingAuthorizedCostUsd.toFixed(6)),
+    rollingRemainingAuthorizedCostUsd: Number(rollingRemainingAuthorizedCostUsd.toFixed(6)),
+    nextBudgetReleaseAt,
     automaticRecoveryAuthorized: reasons.length > 0 && authorityIntact,
     automaticPromotionAuthorized: false,
     runpodMutationAuthorized: false,
@@ -216,22 +276,68 @@ export async function readUniversityMassDistillationHealth(input: {
   const now = input.now || new Date()
   const cadence = hostCronCadence(COS_UNIVERSITY_MASS_DISTILLATION_CRON_PATH)
   const expectedIntervalSeconds = cadence?.maximumIntervalSeconds ?? 5 * 60
-  const campaignsResult = await input.db.from('cos_university_mass_distillation_campaigns')
-    .select('id,status,authorized_at,expires_at,max_total_cost_usd,committed_cost_usd')
-    .in('status', ['authorized', 'active', 'failed'])
-    .gt('expires_at', now.toISOString())
-    .order('authorized_at', { ascending: true })
-    .limit(100)
+  const windowStart = new Date(now.getTime() - 24 * 60 * 60_000).toISOString()
+  const [campaignsResult, receiptResult, policyResult, windowResult, preparedResult] = await Promise.all([
+    input.db.from('cos_university_mass_distillation_campaigns')
+      .select('id,status,authorized_at,expires_at,max_total_cost_usd,committed_cost_usd')
+      .in('status', ['authorized', 'active', 'failed'])
+      .gt('expires_at', now.toISOString())
+      .order('authorized_at', { ascending: true })
+      .limit(100),
+    input.db.from('cos_university_learning_assurance_events')
+      .select('observed_at,commit_sha,evidence')
+      .eq('event_type', 'production_path')
+      .eq('path_id', 'mass_distillation_campaign')
+      .order('observed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    input.db.from('cos_university_mass_distillation_rolling_policy')
+      .select('enabled,max_authorized_cost_usd,rolling_window')
+      .eq('policy_key', 'owner-rolling-24h-v1')
+      .limit(1)
+      .maybeSingle(),
+    input.db.from('cos_university_mass_distillation_campaigns')
+      .select('authorized_at,max_total_cost_usd')
+      .gte('authorized_at', windowStart)
+      .order('authorized_at', { ascending: true })
+      .limit(500),
+    input.db.from('cos_university_distillation_curriculum_batches')
+      .select('batch_key')
+      .eq('status', 'prepared')
+      .eq('dispatch_authorized', false)
+      .eq('authority_expanded', false)
+      .eq('student_model_id', 'Qwen/Qwen3-4B')
+      .gte('source_count', 20)
+      .lte('source_count', 128)
+      .order('prepared_at', { ascending: true })
+      .limit(100),
+  ])
   if (campaignsResult.error) throw new Error(`university_distillation_campaign_health_read_failed:${String(campaignsResult.error.message || 'unknown').slice(0, 180)}`)
   const campaigns = (campaignsResult.data || []) as CampaignRow[]
-  const receiptResult = await input.db.from('cos_university_learning_assurance_events')
-    .select('observed_at,commit_sha,evidence')
-    .eq('event_type', 'production_path')
-    .eq('path_id', 'mass_distillation_campaign')
-    .order('observed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
   if (receiptResult.error) throw new Error(`university_distillation_heartbeat_read_failed:${String(receiptResult.error.message || 'unknown').slice(0, 180)}`)
+  if (policyResult.error) throw new Error(`university_distillation_rolling_policy_read_failed:${String(policyResult.error.message || 'unknown').slice(0, 180)}`)
+  if (windowResult.error) throw new Error(`university_distillation_rolling_window_read_failed:${String(windowResult.error.message || 'unknown').slice(0, 180)}`)
+  if (preparedResult.error) throw new Error(`university_distillation_prepared_queue_read_failed:${String(preparedResult.error.message || 'unknown').slice(0, 180)}`)
+
+  const preparedKeys = (preparedResult.data || []).map((row: any) => String(row.batch_key || '')).filter(Boolean)
+  let consumedPreparedKeys = new Set<string>()
+  if (preparedKeys.length > 0) {
+    const consumedResult = await input.db.from('cos_university_mass_distillation_batch_runs')
+      .select('batch_key')
+      .in('batch_key', preparedKeys)
+      .limit(100)
+    if (consumedResult.error) throw new Error(`university_distillation_prepared_queue_qualification_failed:${String(consumedResult.error.message || 'unknown').slice(0, 180)}`)
+    consumedPreparedKeys = new Set((consumedResult.data || []).map((row: any) => String(row.batch_key || '')).filter(Boolean))
+  }
+  const preparedBatches = preparedKeys.filter(key => !consumedPreparedKeys.has(key)).length
+  const policy = policyResult.data as { enabled?: unknown; max_authorized_cost_usd?: unknown } | null
+  const windowCampaigns = (windowResult.data || []) as Array<{ authorized_at?: unknown; max_total_cost_usd?: unknown }>
+  const rollingAuthorizedCostUsd = windowCampaigns.reduce((sum, row) => sum + finite(row.max_total_cost_usd), 0)
+  const nextBudgetReleaseAt = windowCampaigns
+    .map(row => Date.parse(String(row.authorized_at || '')))
+    .filter(Number.isFinite)
+    .map(time => time + 24 * 60 * 60_000)
+    .sort((a, b) => a - b)[0]
 
   let workflowRuns: WorkflowRunRow[] = []
   let providerJobs: ProviderJobRow[] = []
@@ -263,18 +369,25 @@ export async function readUniversityMassDistillationHealth(input: {
     receipt: (receiptResult.data || null) as ReceiptRow | null,
     workflowRuns,
     providerJobs,
+    continuity: {
+      preparedBatches,
+      rollingPolicyEnabled: policy?.enabled === true,
+      rollingMaximumAuthorizedCostUsd: finite(policy?.max_authorized_cost_usd),
+      rollingAuthorizedCostUsd,
+      nextBudgetReleaseAt: Number.isFinite(nextBudgetReleaseAt) ? new Date(nextBudgetReleaseAt).toISOString() : null,
+    },
   })
 }
 
 async function recordHealthSample(db: any, snapshot: UniversityDistillationHealthSnapshot, latencyMs: number): Promise<void> {
-  const status = snapshot.state === 'repair_required' ? 'warning' : 'healthy'
+  const status = snapshot.state === 'healthy' ? 'healthy' : 'warning'
   const { error } = await db.from('self_healing_native_probe_samples').insert({
     probe_id: 'database',
     target: UNIVERSITY_DISTILLATION_MONITOR_TARGET,
     observed_at: snapshot.checkedAt,
     status,
     latency_ms: latencyMs,
-    error_rate: snapshot.state === 'repair_required' ? 1 : 0,
+    error_rate: snapshot.state === 'healthy' ? 0 : 1,
     metric_value: snapshot.receiptAgeSeconds,
     metric_unit: 'heartbeat_age_seconds',
     details: {
@@ -291,6 +404,12 @@ async function recordHealthSample(db: any, snapshot: UniversityDistillationHealt
       staleFailedRuns: snapshot.staleFailedRuns,
       unsettledProviderJobs: snapshot.unsettledProviderJobs,
       overdueProviderJobs: snapshot.overdueProviderJobs,
+      preparedBatches: snapshot.preparedBatches,
+      rollingPolicyEnabled: snapshot.rollingPolicyEnabled,
+      rollingMaximumAuthorizedCostUsd: snapshot.rollingMaximumAuthorizedCostUsd,
+      rollingAuthorizedCostUsd: snapshot.rollingAuthorizedCostUsd,
+      rollingRemainingAuthorizedCostUsd: snapshot.rollingRemainingAuthorizedCostUsd,
+      nextBudgetReleaseAt: snapshot.nextBudgetReleaseAt,
       latestReceiptAt: snapshot.latestReceiptAt,
       latestInvocationSucceeded: snapshot.latestInvocationSucceeded,
       automaticRecoveryAuthorized: snapshot.automaticRecoveryAuthorized,
@@ -305,6 +424,8 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
     campaigns: snapshot.activeCampaignIds,
     reasons: snapshot.reasons,
     receipt: snapshot.latestReceiptAt,
+    preparedBatches: snapshot.preparedBatches,
+    rollingAuthorizedCostUsd: snapshot.rollingAuthorizedCostUsd,
   })).digest('hex').slice(0, 20)
   const critical = snapshot.reasons.some(reason => [
     'heartbeat_missing', 'heartbeat_stale', 'workflow_failed', 'campaign_failed',
@@ -325,7 +446,7 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
         evidenceId: `${fingerprint}:heartbeat`, type: 'university_distillation_heartbeat', capturedAt: snapshot.checkedAt,
         summary: snapshot.latestReceiptAt
           ? `Latest Production receipt is ${snapshot.receiptAgeSeconds ?? 'unknown'} seconds old and invocationSucceeded=${String(snapshot.latestInvocationSucceeded)}.`
-          : 'No Production receipt exists for the active mass-distillation campaign.',
+          : 'No Production receipt exists for the mass-distillation control loop.',
         reference: 'db://cos_university_learning_assurance_events/mass_distillation_campaign',
       },
       {
@@ -337,6 +458,11 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
         evidenceId: `${fingerprint}:workflow`, type: 'university_distillation_workflow_state', capturedAt: snapshot.checkedAt,
         summary: `${snapshot.claimableRuns} claimable run(s); ${snapshot.stalledDispatchRuns} stalled dispatch claim(s); ${snapshot.staleFailedRuns} stale failed run(s); ${snapshot.overdueProviderJobs} overdue unsettled provider job(s).`,
         reference: COS_UNIVERSITY_MASS_DISTILLATION_CRON_PATH,
+      },
+      {
+        evidenceId: `${fingerprint}:continuity`, type: 'university_distillation_rolling_authority', capturedAt: snapshot.checkedAt,
+        summary: `${snapshot.preparedBatches} unconsumed prepared batch(es); rolling policy enabled=${String(snapshot.rollingPolicyEnabled)}; $${snapshot.rollingAuthorizedCostUsd.toFixed(6)} of $${snapshot.rollingMaximumAuthorizedCostUsd.toFixed(6)} maximum authority used in the last 24 hours.`,
+        reference: 'db://cos_university_mass_distillation_rolling_policy/owner-rolling-24h-v1',
       },
     ],
     metadata: {
@@ -353,9 +479,17 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
       unsettledProviderJobs: snapshot.unsettledProviderJobs, overdueProviderJobs: snapshot.overdueProviderJobs,
       authorizedCostUsd: snapshot.authorizedCostUsd, committedCostUsd: snapshot.committedCostUsd,
       remainingAuthorizedCostUsd: snapshot.remainingAuthorizedCostUsd,
+      preparedBatches: snapshot.preparedBatches, rollingPolicyEnabled: snapshot.rollingPolicyEnabled,
+      rollingMaximumAuthorizedCostUsd: snapshot.rollingMaximumAuthorizedCostUsd,
+      rollingAuthorizedCostUsd: snapshot.rollingAuthorizedCostUsd,
+      rollingRemainingAuthorizedCostUsd: snapshot.rollingRemainingAuthorizedCostUsd,
+      nextBudgetReleaseAt: snapshot.nextBudgetReleaseAt,
       registeredRecoveryAction: UNIVERSITY_DISTILLATION_RECOVERY_TARGET,
       recoveryPreauthorized: snapshot.automaticRecoveryAuthorized,
-      retryScope: 'same_campaign_expiration_and_remaining_budget', automaticPromotionAuthorized: false,
+      retryScope: snapshot.activeCampaigns > 0
+        ? 'same_campaign_expiration_and_remaining_budget'
+        : 'one_prepared_batch_within_owner_rolling_24h_maximum_authority',
+      automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false, authorityExpanded: false,
     },
   })

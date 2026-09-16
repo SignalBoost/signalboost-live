@@ -1,0 +1,72 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+import {
+  MASS_DISTILLATION_ROLLING_BATCHES_PER_CAMPAIGN,
+  MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD,
+  MASS_DISTILLATION_ROLLING_WINDOW_HOURS,
+  normalizeMassDistillationRollingAuthorization,
+} from '../lib/ai/cos/cosUniversityMassDistillationRollingAuthorization.ts'
+
+const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
+
+test('rolling authorization response remains bounded and never carries promotion or RunPod authority', () => {
+  const normalized = normalizeMassDistillationRollingAuthorization({
+    ok: true,
+    authorized: true,
+    reason: 'campaign_authorized',
+    campaignId: '9d616328-d29a-4c69-9a75-4826497d74c7',
+    batchKey: 'a'.repeat(64),
+    batchCount: 1,
+    campaignMaximumAuthorizedCostUsd: 1.825,
+    rollingWindowHours: 24,
+    rollingMaximumAuthorizedCostUsd: 25,
+    rollingAuthorizedCostUsd: 12.775,
+    rollingRemainingAuthorizedCostUsd: 12.225,
+    authorizationRef: 'owner_explicit_approval_2026-09-15_rolling_24h_max_25_usd',
+    automaticPromotionAuthorized: true,
+    runpodMutationAuthorized: true,
+    authorityExpanded: true,
+  })
+  assert.equal(MASS_DISTILLATION_ROLLING_WINDOW_HOURS, 24)
+  assert.equal(MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD, 25)
+  assert.equal(MASS_DISTILLATION_ROLLING_BATCHES_PER_CAMPAIGN, 1)
+  assert.equal(normalized.ok, true)
+  assert.equal(normalized.authorized, true)
+  assert.equal(normalized.rollingRemainingAuthorizedCostUsd, 12.225)
+  assert.equal(normalized.automaticPromotionAuthorized, false)
+  assert.equal(normalized.runpodMutationAuthorized, false)
+  assert.equal(normalized.authorityExpanded, false)
+})
+
+test('database rolling policy serializes workers and counts worst-case campaign authority', () => {
+  const sql = source('../supabase/migrations/20260915234000_cos_university_mass_distillation_rolling_authority.sql')
+  assert.match(sql, /max_authorized_cost_usd <= 25\.000000/)
+  assert.match(sql, /batches_per_campaign = 1/)
+  assert.match(sql, /max_concurrent_campaigns = 1/)
+  assert.match(sql, /rolling_window = interval '24 hours'/)
+  assert.match(sql, /owner_explicit_approval_2026-09-15_rolling_24h_max_25_usd/)
+  assert.match(sql, /for update;/i)
+  assert.match(sql, /sum\(c\.max_total_cost_usd\)/)
+  assert.match(sql, /round\(v_window_authorized \+ v_next_cost,6\) > round\(v_policy\.max_authorized_cost_usd,6\)/)
+  assert.match(sql, /not exists \([\s\S]*cos_university_mass_distillation_batch_runs/)
+  assert.match(sql, /for update skip locked/)
+  assert.match(sql, /authorize_cos_university_mass_distillation_campaign\(/)
+  assert.match(sql, /automatic_promotion_authorized boolean not null default false/)
+  assert.match(sql, /runpod_mutation_authorized boolean not null default false/)
+  assert.match(sql, /revoke all on function public\.authorize_next_cos_university_mass_distillation_campaign\(\)/)
+  assert.doesNotMatch(sql, /sum\(c\.committed_cost_usd\)/)
+  assert.doesNotMatch(sql, /automatic_promotion_authorized\s*=\s*true|runpod_mutation_authorized\s*=\s*true/)
+})
+
+test('canonical workflow packages, authorizes under the rolling policy, then dispatches', () => {
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
+  const packaging = workflow.indexOf('prepareUniversityMassDistillationCurriculum(now)')
+  const authorization = workflow.indexOf('authorizeNextUniversityMassDistillationCampaign()')
+  const dispatch = workflow.indexOf('runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })')
+  assert.ok(packaging > 0)
+  assert.ok(authorization > packaging)
+  assert.ok(dispatch > authorization)
+  assert.match(workflow, /massDistillationDispatchReadiness/)
+  assert.match(workflow, /owner_rolling_24h_ceiling/)
+})

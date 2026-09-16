@@ -33,6 +33,11 @@ const MASS_CANDIDATE = /^mass:([0-9a-f-]{36}):([a-f0-9]{16})$/i
 type Stage = 'teacher_dispatching' | 'preparation_dispatching' | 'training_dispatching'
 type FetchPort = (url: string, init?: RequestInit) => Promise<Response>
 
+export type MassDistillationDispatchReadiness = Readonly<{
+  ready: boolean
+  reason: 'ready' | 'huggingface_not_configured' | 'global_training_dispatch_disabled'
+}>
+
 type Claim = Readonly<{
   run_id: string
   campaign_id: string
@@ -55,6 +60,18 @@ function hash(value: unknown): string {
 function safeError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error)
   return clean(message, 300) || 'mass_distillation_unknown_error'
+}
+
+/** Read the same provider/dispatch gates used by the paid consumer before allocating new authority. */
+export function massDistillationDispatchReadiness(): MassDistillationDispatchReadiness {
+  installHuggingFaceTrainingExecutorEnv()
+  const executor = trainingExecutorConfigFromEnv()
+  const hf = huggingFaceJobsConfigFromEnv()
+  if (!executor || !hf) return Object.freeze({ ready: false, reason: 'huggingface_not_configured' })
+  if (!executor.dispatchEnabled || process.env.COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED !== 'true') {
+    return Object.freeze({ ready: false, reason: 'global_training_dispatch_disabled' })
+  }
+  return Object.freeze({ ready: true, reason: 'ready' })
 }
 
 function normalizedHashes(value: unknown, min = 1, max = 500): string[] | null {
@@ -678,13 +695,12 @@ export async function runMassDistillationCampaignConsumer(input: {
   maxDispatches?: number
   fetchImpl?: FetchPort
 } = {}) {
-  installHuggingFaceTrainingExecutorEnv()
+  const readiness = massDistillationDispatchReadiness()
+  if (!readiness.ready) return { ok: false as const, skipped: true as const, reason: readiness.reason }
   const executor = trainingExecutorConfigFromEnv()
   const hf = huggingFaceJobsConfigFromEnv()
+  // The readiness read above and these config reads are synchronous within one invocation.
   if (!executor || !hf) return { ok: false as const, skipped: true as const, reason: 'huggingface_not_configured' as const }
-  if (!executor.dispatchEnabled || process.env.COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED !== 'true') {
-    return { ok: false as const, skipped: true as const, reason: 'global_training_dispatch_disabled' as const }
-  }
   const db = cosServiceDb()
   if (!db) return { ok: false as const, skipped: true as const, reason: 'service_database_unavailable' as const }
 

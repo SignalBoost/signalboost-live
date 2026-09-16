@@ -59,7 +59,7 @@ on conflict (policy_key) do nothing;
 create or replace function public.authorize_next_cos_university_mass_distillation_campaign()
 returns jsonb
 language plpgsql
-security invoker
+security definer
 set search_path = ''
 as $$
 declare
@@ -202,5 +202,12 @@ revoke all on function public.authorize_next_cos_university_mass_distillation_ca
   from public, anon, authenticated;
 grant execute on function public.authorize_next_cos_university_mass_distillation_campaign()
   to service_role;
+
+-- Once rolling authority exists, the serialized wrapper is the only service-role campaign
+-- authorization entry point. It holds the policy-row lock while checking the 24-hour ceiling,
+-- active campaign count, and unsettled provider ledger. The wrapper is SECURITY DEFINER so it can
+-- still call this owner-only primitive after direct service-role execution is removed.
+revoke execute on function public.authorize_cos_university_mass_distillation_campaign(text[],numeric,text,interval)
+  from service_role;
 
 notify pgrst, 'reload schema';

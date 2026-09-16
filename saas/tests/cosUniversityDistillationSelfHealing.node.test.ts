@@ -131,6 +131,28 @@ test('a broken control-loop heartbeat is repairable even while curriculum supply
   assert.equal(snapshot.automaticRecoveryAuthorized, true)
 })
 
+test('unsettled provider work remains visible after its campaign leaves the active window', () => {
+  const snapshot = evaluateUniversityMassDistillationHealth({
+    now,
+    expectedIntervalSeconds: 300,
+    campaigns: [],
+    receipt,
+    workflowRuns: [],
+    providerJobs: [runningJob],
+    continuity: {
+      preparedBatches: 1,
+      rollingPolicyEnabled: true,
+      rollingMaximumAuthorizedCostUsd: 25,
+      rollingAuthorizedCostUsd: 10.95,
+      nextBudgetReleaseAt: null,
+    },
+  })
+  assert.equal(snapshot.state, 'repair_required')
+  assert.deepEqual(snapshot.reasons, ['provider_job_unsettled'])
+  assert.equal(snapshot.unsettledProviderJobs, 1)
+  assert.equal(snapshot.automaticRecoveryAuthorized, true)
+})
+
 test('stale heartbeat produces an exact pre-authorized Supervisor recovery incident', () => {
   const snapshot = health({
     receipt: { ...receipt, observed_at: '2026-09-15T11:30:00.000Z' },
@@ -236,6 +258,8 @@ test('Production wiring runs monitor, governed repair, shared workflow, and sepa
   assert.match(policy, /UNIVERSITY_DISTILLATION_RECOVERY_ALLOWLIST_ENTRY/)
   assert.match(host, /createUniversityDistillationRecoveryExecutor/)
   assert.match(route, /recordCosUniversityProductionPath\s*\(\{[\s\S]*path: 'mass_distillation_supervision'/)
+  const monitor = readFileSync(new URL('../self-healing-host/university-distillation-monitoring.ts', import.meta.url), 'utf8')
+  assert.match(monitor, /cos_university_mass_distillation_provider_jobs'[\s\S]*\.is\('settled_at', null\)/)
   assert.deepEqual(config.crons.find((row: any) => row.path === '/api/cron/cos-university-distillation-supervisor'), {
     path: '/api/cron/cos-university-distillation-supervisor',
     schedule: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *',

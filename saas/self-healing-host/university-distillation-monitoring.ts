@@ -55,6 +55,7 @@ export type UniversityDistillationHealthReason =
   | 'claimable_stage_stalled'
   | 'dispatch_claim_stalled'
   | 'failed_stage_recovery_stalled'
+  | 'provider_job_unsettled'
   | 'provider_job_overdue'
   | 'prepared_campaign_not_authorized'
   | 'curriculum_supply_waiting'
@@ -123,6 +124,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
   const maximumHeartbeatAgeSeconds = Math.max(15 * 60, expectedIntervalSeconds * 3)
   const failedRunGraceSeconds = Math.max(20 * 60, expectedIntervalSeconds * 4)
   const campaignIds = unique(input.campaigns.map(campaign => String(campaign.id)).filter(Boolean))
+  const activeProviderJobs = input.providerJobs.filter(job => campaignIds.includes(String(job.campaign_id)))
   const failedCampaigns = input.campaigns.filter(campaign => campaign.status === 'failed')
   const evidence = input.receipt?.evidence && typeof input.receipt.evidence === 'object'
     ? input.receipt.evidence
@@ -175,6 +177,8 @@ export function evaluateUniversityMassDistillationHealth(input: {
     if (!input.receipt) reasons.push('heartbeat_missing')
     else if (receiptAgeSeconds == null || receiptAgeSeconds > maximumHeartbeatAgeSeconds) reasons.push('heartbeat_stale')
     if (invocationSucceeded === false) reasons.push('workflow_failed')
+    if (input.providerJobs.length > 0) reasons.push('provider_job_unsettled')
+    if (overdueProviderJobs.length > 0) reasons.push('provider_job_overdue')
     if (reasons.length > 0) {
       state = 'repair_required'
       automaticRecoveryAuthorized = true
@@ -198,7 +202,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
       latestCommitSha: input.receipt?.commit_sha ?? null, latestInvocationSucceeded: invocationSucceeded,
       receiptAgeSeconds, workflowRuns: 0, claimableRuns: 0, stalledDispatchRuns: 0,
       workflowProgressAgeSeconds: null, failedRuns: 0, staleFailedRuns: 0,
-      unsettledProviderJobs: 0, overdueProviderJobs: 0,
+      unsettledProviderJobs: input.providerJobs.length, overdueProviderJobs: overdueProviderJobs.length,
       authorizedCostUsd: 0, committedCostUsd: 0, remainingAuthorizedCostUsd: 0,
       preparedBatches, rollingPolicyEnabled,
       rollingMaximumAuthorizedCostUsd: Number(rollingMaximumAuthorizedCostUsd.toFixed(6)),
@@ -215,7 +219,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
   else if (receiptAgeSeconds == null || receiptAgeSeconds > maximumHeartbeatAgeSeconds) reasons.push('heartbeat_stale')
   if (invocationSucceeded === false) reasons.push('workflow_failed')
   if (failedCampaigns.length > 0) reasons.push('campaign_failed')
-  if (claimableRuns.length > 0 && input.providerJobs.length === 0
+  if (claimableRuns.length > 0 && activeProviderJobs.length === 0
     && workflowProgressAgeSeconds != null && workflowProgressAgeSeconds > failedRunGraceSeconds) {
     reasons.push('claimable_stage_stalled')
   }
@@ -277,7 +281,7 @@ export async function readUniversityMassDistillationHealth(input: {
   const cadence = hostCronCadence(COS_UNIVERSITY_MASS_DISTILLATION_CRON_PATH)
   const expectedIntervalSeconds = cadence?.maximumIntervalSeconds ?? 5 * 60
   const windowStart = new Date(now.getTime() - 24 * 60 * 60_000).toISOString()
-  const [campaignsResult, receiptResult, policyResult, windowResult, preparedResult] = await Promise.all([
+  const [campaignsResult, receiptResult, policyResult, windowResult, preparedResult, providerResult] = await Promise.all([
     input.db.from('cos_university_mass_distillation_campaigns')
       .select('id,status,authorized_at,expires_at,max_total_cost_usd,committed_cost_usd')
       .in('status', ['authorized', 'active', 'failed'])
@@ -311,6 +315,11 @@ export async function readUniversityMassDistillationHealth(input: {
       .lte('source_count', 128)
       .order('prepared_at', { ascending: true })
       .limit(100),
+    input.db.from('cos_university_mass_distillation_provider_jobs')
+      .select('campaign_id,operation,dispatched_at,timeout_seconds,provider_stage')
+      .is('settled_at', null)
+      .order('dispatched_at', { ascending: true })
+      .limit(200),
   ])
   if (campaignsResult.error) throw new Error(`university_distillation_campaign_health_read_failed:${String(campaignsResult.error.message || 'unknown').slice(0, 180)}`)
   const campaigns = (campaignsResult.data || []) as CampaignRow[]
@@ -318,6 +327,7 @@ export async function readUniversityMassDistillationHealth(input: {
   if (policyResult.error) throw new Error(`university_distillation_rolling_policy_read_failed:${String(policyResult.error.message || 'unknown').slice(0, 180)}`)
   if (windowResult.error) throw new Error(`university_distillation_rolling_window_read_failed:${String(windowResult.error.message || 'unknown').slice(0, 180)}`)
   if (preparedResult.error) throw new Error(`university_distillation_prepared_queue_read_failed:${String(preparedResult.error.message || 'unknown').slice(0, 180)}`)
+  if (providerResult.error) throw new Error(`university_distillation_provider_health_read_failed:${String(providerResult.error.message || 'unknown').slice(0, 180)}`)
 
   const preparedKeys = (preparedResult.data || []).map((row: any) => String(row.batch_key || '')).filter(Boolean)
   let consumedPreparedKeys = new Set<string>()
@@ -340,26 +350,16 @@ export async function readUniversityMassDistillationHealth(input: {
     .sort((a, b) => a - b)[0]
 
   let workflowRuns: WorkflowRunRow[] = []
-  let providerJobs: ProviderJobRow[] = []
+  const providerJobs = (providerResult.data || []) as ProviderJobRow[]
   const campaignIds = campaigns.map(campaign => campaign.id)
   if (campaignIds.length > 0) {
-    const [runsResult, providerResult] = await Promise.all([
-      input.db.from('cos_university_mass_distillation_batch_runs')
-        .select('id,campaign_id,stage,updated_at,failure_reason')
-        .in('campaign_id', campaignIds)
-        .order('updated_at', { ascending: true })
-        .limit(500),
-      input.db.from('cos_university_mass_distillation_provider_jobs')
-        .select('campaign_id,operation,dispatched_at,timeout_seconds,provider_stage')
-        .in('campaign_id', campaignIds)
-        .is('settled_at', null)
-        .order('dispatched_at', { ascending: true })
-        .limit(200),
-    ])
+    const runsResult = await input.db.from('cos_university_mass_distillation_batch_runs')
+      .select('id,campaign_id,stage,updated_at,failure_reason')
+      .in('campaign_id', campaignIds)
+      .order('updated_at', { ascending: true })
+      .limit(500)
     if (runsResult.error) throw new Error(`university_distillation_run_health_read_failed:${String(runsResult.error.message || 'unknown').slice(0, 180)}`)
-    if (providerResult.error) throw new Error(`university_distillation_provider_health_read_failed:${String(providerResult.error.message || 'unknown').slice(0, 180)}`)
     workflowRuns = (runsResult.data || []) as WorkflowRunRow[]
-    providerJobs = (providerResult.data || []) as ProviderJobRow[]
   }
 
   return evaluateUniversityMassDistillationHealth({

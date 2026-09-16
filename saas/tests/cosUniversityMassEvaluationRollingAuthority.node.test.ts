@@ -79,3 +79,10 @@ test('the cron issues at most one approval before the unchanged atomic claim, wi
   assert.match(route, /verifier: 'host_controller'/)
   assert.match(route, /db\.rpc\('claim_next_mass_distilled_evaluation'\)/)
 })
+
+test('an event returned by both cron reads is counted once, so two real failures cannot trip the three-failure stop', () => {
+  const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+  assert.equal((route.match(/\.select\('event_key,candidate_id,observed_at,expires_at,verifier,evidence'\)/g) || []).length, 2)
+  assert.match(route, /seenEventKeys\.has\(key\)/)
+  assert.match(route, /const all: RollingEvent\[\] = uniqueRows\.map/)
+})

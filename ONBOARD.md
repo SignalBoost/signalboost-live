@@ -165,6 +165,8 @@ RunPod counts each endpoint's `maxWorkers` against the account quota even when `
 Before creating a new exact-artifact mass canary, provisioning therefore sets only older
 `itmounts-mass-distilled-*` endpoints to `minWorkers=0,maxWorkers=0`. It does not delete endpoints,
 touch unrelated workloads, add an invocation, or expand Production authority.
+If the legacy v2 create/list response omits the endpoint identifier, provisioning resolves that
+identifier by exact endpoint name through RunPod's official REST endpoint list before failing closed.
 
 ---
 

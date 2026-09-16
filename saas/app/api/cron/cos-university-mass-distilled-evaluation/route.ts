@@ -99,7 +99,7 @@ async function ensureRollingMassEvaluationApproval() {
     events: all,
     now,
   })
-  if (!decision.issue) return { issued: false, reason: decision.reason }
+  if ('reason' in decision) return { issued: false, reason: decision.reason }
   const inserted = await db.from('cos_university_learning_assurance_events').insert({
     event_key: hash(['mass-rolling-evaluation-approval', decision.artifact.candidateId, decision.artifact.artifactHash, now.toISOString()]),
     event_type: 'fine_tune',

@@ -172,6 +172,19 @@ function eligibleForRunpodPrimary(args: LocalModelCallArgs, config: LocalInferen
   return true
 }
 
+/**
+ * Measured in Production (2026-09-16, one "capital of Portugal" turn): every RunPod qwen3:30b call with
+ * a small token budget first spent 8–21s on hidden reasoning, hit the limit with no answer text, and
+ * only answered on the thinking-off retry (1–6s). Six such pairs cost ~74s of a ~2 minute turn. Hidden
+ * reasoning cannot fit a budget this small, so RunPod calls at or below it go thinking-off from the
+ * start. Larger budgets keep thinking and keep the single empty-answer retry.
+ */
+export const RUNPOD_THINKING_MIN_BUDGET_TOKENS = 1024
+
+function runpodSmallBudgetThinkingOff(args: LocalModelCallArgs, provider: string): boolean {
+  return provider === 'runpod' && (args.maxTokens ?? 2048) <= RUNPOD_THINKING_MIN_BUDGET_TOKENS
+}
+
 async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<string | null> {
   const startedAt = Date.now()
   const requestId = randomUUID()
@@ -198,7 +211,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
     // Independent scoring needs a compact verdict, not model scratch work. Pin reasoning off even if
     // the general DeepInfra reasoner is configured differently, and do not spend novelty penalties
     // encouraging extra JSON fields. This preserves the caller's max-token and judge-call ceilings.
-    const reasoningEffort = args.disableThinking === true
+    const reasoningEffort = args.disableThinking === true || runpodSmallBudgetThinkingOff(args, provider)
       ? 'none'
       : provider === 'deepinfra'
         ? (independentEvaluation ? 'none' : configuredReasoningEffort())
@@ -347,7 +360,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
           // 360-token budget on hidden reasoning, returned no answer text, and the turn then waited 99s
           // for the DeepInfra fallback. Retry once on the same primary with thinking off before paying
           // for that fallback. Any other failure, or a failed retry, keeps the existing fallback.
-          if (!isEmptyThinkingTruncation(error) || args.disableThinking === true) throw error
+          if (!isEmptyThinkingTruncation(error) || args.disableThinking === true || runpodSmallBudgetThinkingOff(args, 'runpod')) throw error
           const feature = args.usageContext?.feature || 'unattributed_local_inference'
           const retried = await callConfiguredModel({ ...args, disableThinking: true }, runpodConfig).catch(retryError => {
             console.warn('[runpod-primary-thinking-retry]', JSON.stringify({ feature, contentReturned: false, error: retryError instanceof Error ? retryError.message : String(retryError) }))

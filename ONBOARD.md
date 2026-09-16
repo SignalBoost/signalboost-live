@@ -161,6 +161,11 @@ Production evidence that a healthy running worker could still be loading at the 
 cutoff. The change does not add an invocation, raise the $0.20 canary ceiling, authorize evaluation,
 or authorize Production traffic.
 
+RunPod counts each endpoint's `maxWorkers` against the account quota even when `minWorkers` is zero.
+Before creating a new exact-artifact mass canary, provisioning therefore sets only older
+`itmounts-mass-distilled-*` endpoints to `minWorkers=0,maxWorkers=0`. It does not delete endpoints,
+touch unrelated workloads, add an invocation, or expand Production authority.
+
 ---
 
 # Mandatory first-read / repo-scan rule

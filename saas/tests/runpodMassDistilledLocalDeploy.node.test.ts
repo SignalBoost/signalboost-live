@@ -44,6 +44,14 @@ test('mass-distilled cold-start and inference windows remain inside the route de
   assert.ok(ready + canary <= 270_000)
 })
 
+test('mass-distilled provisioning releases only retired mass canary worker reservations', () => {
+  assert.match(provision, /endpoint\.name\.startsWith\('itmounts-mass-distilled-'\)/)
+  assert.match(provision, /endpoint\.name!==activeEndpointName/)
+  assert.match(provision, /JSON\.stringify\(\{workers:\{min:0,max:0/)
+  assert.match(provision, /await releaseRetiredMassEndpointCapacity\(listed\.endpoints\|\|\[\],ids\.endpointName\)/)
+  assert.doesNotMatch(provision, /releaseRetiredMassEndpointCapacity[\s\S]*method:'DELETE'/)
+})
+
 test('204 is never treated as inference-ready for mass artifacts', () => {
   assert.match(provision, /if\(payload\?\.ready===true\) break/)
   assert.match(provision, /if\(lastStatus!==200\) return/)

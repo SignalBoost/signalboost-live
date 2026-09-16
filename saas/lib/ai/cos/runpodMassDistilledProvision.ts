@@ -162,6 +162,13 @@ function assertEndpointPolicy(endpoint:Endpoint,templateId:string){
   if(clean(endpoint.templateId,200)!==templateId) throw new Error('mass_distilled_runtime_endpoint_template_mismatch')
 }
 
+async function releaseRetiredMassEndpointCapacity(endpoints:Endpoint[],activeEndpointName:string){
+  const retired=endpoints.filter(endpoint=>endpoint.name.startsWith('itmounts-mass-distilled-')&&endpoint.name!==activeEndpointName&&Number(endpoint.workers?.max??0)>0)
+  for(const endpoint of retired){
+    await requestV2<Endpoint>(`/serverless/${encodeURIComponent(endpoint.id)}`,{method:'PATCH',body:JSON.stringify({workers:{min:0,max:0,idleTimeout:Math.min(Number(endpoint.workers?.idleTimeout??IDLE_TIMEOUT_SECONDS),IDLE_TIMEOUT_SECONDS)}})})
+  }
+}
+
 async function rebindEndpointTemplate(endpoint:Endpoint,templateId:string):Promise<Endpoint>{
   assertEndpointSafetyPolicy(endpoint)
   if(clean(endpoint.templateId,200)===templateId) return endpoint
@@ -183,7 +190,13 @@ export async function provisionMassDistilledRuntime(input:MassDistilledRuntimeAr
   if(!template){template=await requestV1<Template>('/templates',{method:'POST',body:JSON.stringify({name:ids.templateName,imageName:VLLM_IMAGE,category:'NVIDIA',containerDiskInGb:50,dockerEntrypoint:['bash','-lc'],dockerStartCmd:[startupCommand(input,ids.modelName)],env:{HF_TOKEN:token,HF_HOME:'/models/hf-cache',PORT:String(PUBLIC_PORT),PORT_HEALTH:String(PUBLIC_PORT),HEALTH_CHECK_PATH:'/ping'},isPublic:false,isServerless:true,ports:[`${PUBLIC_PORT}/http`],readme:'iTMounts exact mass-distilled Qwen3-4B + immutable LoRA canary runtime. Strict internal-vLLM readiness; scale-to-zero; no Production traffic.'})});createdTemplate=true}
   if(!template?.id) throw new Error('mass_distilled_runtime_template_id_missing')
   const listed=await requestV2<{endpoints?:Endpoint[]}>('/serverless'); let endpoint=(listed.endpoints||[]).find(item=>item.name===ids.endpointName); let createdEndpoint=false; let reboundTemplate=false
-  if(!endpoint){endpoint=await requestV2<Endpoint>('/serverless',{method:'POST',body:JSON.stringify({name:ids.endpointName,type:ROUTING,templateId:template.id,gpu:{pools:await gpuPools(),count:1},workers:{min:0,max:1,idleTimeout:IDLE_TIMEOUT_SECONDS},scaling:{type:'REQUEST_COUNT',requestCount:1},timeout:300000,flashboot:'FLASHBOOT'})});createdEndpoint=true}
+  if(!endpoint){
+    // RunPod counts maxWorkers even for scale-to-zero endpoints. Exact-artifact canaries are
+    // sequential, so older mass-distilled endpoints must release their reserved capacity without
+    // deleting provider resources or touching unrelated workloads.
+    await releaseRetiredMassEndpointCapacity(listed.endpoints||[],ids.endpointName)
+    endpoint=await requestV2<Endpoint>('/serverless',{method:'POST',body:JSON.stringify({name:ids.endpointName,type:ROUTING,templateId:template.id,gpu:{pools:await gpuPools(),count:1},workers:{min:0,max:1,idleTimeout:IDLE_TIMEOUT_SECONDS},scaling:{type:'REQUEST_COUNT',requestCount:1},timeout:300000,flashboot:'FLASHBOOT'})});createdEndpoint=true
+  }
   else {const previousTemplateId=clean(endpoint.templateId,200); endpoint=await rebindEndpointTemplate(endpoint,template.id); reboundTemplate=previousTemplateId!==template.id}
   if(!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
   assertEndpointPolicy(endpoint,template.id)

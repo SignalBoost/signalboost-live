@@ -56,6 +56,7 @@ test('routing retries the RunPod primary once with thinking off only for empty-c
   assert.equal((routing.match(/disableThinking: true/g) || []).length, 1, 'exactly one retry, never a loop')
 })
 
+// Small-budget policy must not leak into larger generations or other providers.
 test('RunPod budgets at or below 1024 tokens are thinking-off from the start; larger budgets and other providers are unchanged', async () => {
   const bodies: any[] = []
   globalThis.fetch = (async (_url, init) => { bodies.push(JSON.parse(String(init?.body))); return reply('ok', 'stop', 2) }) as typeof fetch

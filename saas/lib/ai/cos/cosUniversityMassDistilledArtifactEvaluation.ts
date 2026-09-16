@@ -23,7 +23,10 @@ const HEX64 = /^[a-f0-9]{64}$/i
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40})#([A-Za-z0-9_.-]+)$/i
 const ENDPOINT_CALLS = 8
 const JUDGE_CALLS = 4
-const ENDPOINT_CALL_TIMEOUT_MS = 30_000
+// 2026-09-16 22:53 UTC: the first 4-case holdout request (about 1,680 output tokens) was aborted at exactly 30,002 ms with no
+// HTTP response. 30 s cannot cover that much generation on the serverless worker. Each request is still capped by the remaining
+// route deadline, so a longer ceiling cannot outlive the cron invocation.
+const ENDPOINT_CALL_TIMEOUT_MS = 120_000
 const JUDGE_CALL_TIMEOUT_MS = 25_000
 // Match the proven exact-artifact cold-start envelope used by the canary. A scale-to-zero
 // worker can remain healthy but return 204 while Qwen3-4B + LoRA loads past 190 seconds.

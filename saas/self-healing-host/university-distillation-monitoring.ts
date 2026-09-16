@@ -42,7 +42,7 @@ type ProviderJobRow = {
 type RollingContinuityInput = Readonly<{
   preparedBatches: number
   rollingPolicyEnabled: boolean
-  rollingMaximumAuthorizedCostUsd: number
+  rollingMaximumAuthorizedCostUsd: number | null
   rollingAuthorizedCostUsd: number
   nextBudgetReleaseAt: string | null
 }>
@@ -88,9 +88,10 @@ export interface UniversityDistillationHealthSnapshot {
   remainingAuthorizedCostUsd: number
   preparedBatches: number
   rollingPolicyEnabled: boolean
-  rollingMaximumAuthorizedCostUsd: number
+  rollingMaximumAuthorizedCostUsd: number | null
+  rollingCeilingRemoved: boolean
   rollingAuthorizedCostUsd: number
-  rollingRemainingAuthorizedCostUsd: number
+  rollingRemainingAuthorizedCostUsd: number | null
   nextBudgetReleaseAt: string | null
   automaticRecoveryAuthorized: boolean
   automaticPromotionAuthorized: false
@@ -164,13 +165,19 @@ export function evaluateUniversityMassDistillationHealth(input: {
   const remainingAuthorizedCostUsd = Math.max(0, authorizedCostUsd - committedCostUsd)
   const preparedBatches = Math.max(0, Math.floor(finite(input.continuity?.preparedBatches)))
   const rollingPolicyEnabled = input.continuity?.rollingPolicyEnabled === true
-  const rollingMaximumAuthorizedCostUsd = finite(input.continuity?.rollingMaximumAuthorizedCostUsd)
+  const rollingCeilingRemoved = rollingPolicyEnabled && input.continuity?.rollingMaximumAuthorizedCostUsd == null
+  const rollingMaximumAuthorizedCostUsd = rollingCeilingRemoved
+    ? null
+    : finite(input.continuity?.rollingMaximumAuthorizedCostUsd)
   const rollingAuthorizedCostUsd = finite(input.continuity?.rollingAuthorizedCostUsd)
-  const rollingRemainingAuthorizedCostUsd = Math.max(0, rollingMaximumAuthorizedCostUsd - rollingAuthorizedCostUsd)
-  const nextBudgetReleaseAt = input.continuity?.nextBudgetReleaseAt ?? null
+  const rollingRemainingAuthorizedCostUsd = rollingCeilingRemoved
+    ? null
+    : Math.max(0, (rollingMaximumAuthorizedCostUsd ?? 0) - rollingAuthorizedCostUsd)
+  const nextBudgetReleaseAt = rollingCeilingRemoved ? null : (input.continuity?.nextBudgetReleaseAt ?? null)
 
   if (campaignIds.length === 0) {
-    const rollingBatchAffordable = rollingRemainingAuthorizedCostUsd + 0.000001 >= 1.825
+    const rollingBatchAffordable = rollingCeilingRemoved
+      || (rollingRemainingAuthorizedCostUsd ?? 0) + 0.000001 >= 1.825
     const reasons: UniversityDistillationHealthReason[] = []
     let state: UniversityDistillationHealthSnapshot['state']
     let automaticRecoveryAuthorized = false
@@ -205,9 +212,14 @@ export function evaluateUniversityMassDistillationHealth(input: {
       unsettledProviderJobs: input.providerJobs.length, overdueProviderJobs: overdueProviderJobs.length,
       authorizedCostUsd: 0, committedCostUsd: 0, remainingAuthorizedCostUsd: 0,
       preparedBatches, rollingPolicyEnabled,
-      rollingMaximumAuthorizedCostUsd: Number(rollingMaximumAuthorizedCostUsd.toFixed(6)),
+      rollingMaximumAuthorizedCostUsd: rollingMaximumAuthorizedCostUsd == null
+        ? null
+        : Number(rollingMaximumAuthorizedCostUsd.toFixed(6)),
+      rollingCeilingRemoved,
       rollingAuthorizedCostUsd: Number(rollingAuthorizedCostUsd.toFixed(6)),
-      rollingRemainingAuthorizedCostUsd: Number(rollingRemainingAuthorizedCostUsd.toFixed(6)),
+      rollingRemainingAuthorizedCostUsd: rollingRemainingAuthorizedCostUsd == null
+        ? null
+        : Number(rollingRemainingAuthorizedCostUsd.toFixed(6)),
       nextBudgetReleaseAt, automaticRecoveryAuthorized,
       automaticPromotionAuthorized: false, runpodMutationAuthorized: false,
       authorityExpanded: false,
@@ -262,9 +274,14 @@ export function evaluateUniversityMassDistillationHealth(input: {
     remainingAuthorizedCostUsd: Number(remainingAuthorizedCostUsd.toFixed(6)),
     preparedBatches,
     rollingPolicyEnabled,
-    rollingMaximumAuthorizedCostUsd: Number(rollingMaximumAuthorizedCostUsd.toFixed(6)),
+    rollingMaximumAuthorizedCostUsd: rollingMaximumAuthorizedCostUsd == null
+      ? null
+      : Number(rollingMaximumAuthorizedCostUsd.toFixed(6)),
+    rollingCeilingRemoved,
     rollingAuthorizedCostUsd: Number(rollingAuthorizedCostUsd.toFixed(6)),
-    rollingRemainingAuthorizedCostUsd: Number(rollingRemainingAuthorizedCostUsd.toFixed(6)),
+    rollingRemainingAuthorizedCostUsd: rollingRemainingAuthorizedCostUsd == null
+      ? null
+      : Number(rollingRemainingAuthorizedCostUsd.toFixed(6)),
     nextBudgetReleaseAt,
     automaticRecoveryAuthorized: reasons.length > 0 && authorityIntact,
     automaticPromotionAuthorized: false,
@@ -279,7 +296,7 @@ export async function readUniversityMassDistillationHealth(input: {
 }): Promise<UniversityDistillationHealthSnapshot> {
   const now = input.now || new Date()
   const cadence = hostCronCadence(COS_UNIVERSITY_MASS_DISTILLATION_CRON_PATH)
-  const expectedIntervalSeconds = cadence?.maximumIntervalSeconds ?? 5 * 60
+  const expectedIntervalSeconds = cadence?.maximumIntervalSeconds ?? 60
   const windowStart = new Date(now.getTime() - 24 * 60 * 60_000).toISOString()
   const [campaignsResult, receiptResult, policyResult, windowResult, preparedResult, providerResult] = await Promise.all([
     input.db.from('cos_university_mass_distillation_campaigns')
@@ -341,6 +358,7 @@ export async function readUniversityMassDistillationHealth(input: {
   }
   const preparedBatches = preparedKeys.filter(key => !consumedPreparedKeys.has(key)).length
   const policy = policyResult.data as { enabled?: unknown; max_authorized_cost_usd?: unknown } | null
+  const rollingCeilingRemoved = policy?.enabled === true && policy?.max_authorized_cost_usd == null
   const windowCampaigns = (windowResult.data || []) as Array<{ authorized_at?: unknown; max_total_cost_usd?: unknown }>
   const rollingAuthorizedCostUsd = windowCampaigns.reduce((sum, row) => sum + finite(row.max_total_cost_usd), 0)
   const nextBudgetReleaseAt = windowCampaigns
@@ -372,9 +390,11 @@ export async function readUniversityMassDistillationHealth(input: {
     continuity: {
       preparedBatches,
       rollingPolicyEnabled: policy?.enabled === true,
-      rollingMaximumAuthorizedCostUsd: finite(policy?.max_authorized_cost_usd),
+      rollingMaximumAuthorizedCostUsd: rollingCeilingRemoved ? null : finite(policy?.max_authorized_cost_usd),
       rollingAuthorizedCostUsd,
-      nextBudgetReleaseAt: Number.isFinite(nextBudgetReleaseAt) ? new Date(nextBudgetReleaseAt).toISOString() : null,
+      nextBudgetReleaseAt: rollingCeilingRemoved
+        ? null
+        : (Number.isFinite(nextBudgetReleaseAt) ? new Date(nextBudgetReleaseAt).toISOString() : null),
     },
   })
 }
@@ -407,6 +427,7 @@ async function recordHealthSample(db: any, snapshot: UniversityDistillationHealt
       preparedBatches: snapshot.preparedBatches,
       rollingPolicyEnabled: snapshot.rollingPolicyEnabled,
       rollingMaximumAuthorizedCostUsd: snapshot.rollingMaximumAuthorizedCostUsd,
+      rollingCeilingRemoved: snapshot.rollingCeilingRemoved,
       rollingAuthorizedCostUsd: snapshot.rollingAuthorizedCostUsd,
       rollingRemainingAuthorizedCostUsd: snapshot.rollingRemainingAuthorizedCostUsd,
       nextBudgetReleaseAt: snapshot.nextBudgetReleaseAt,
@@ -461,7 +482,9 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
       },
       {
         evidenceId: `${fingerprint}:continuity`, type: 'university_distillation_rolling_authority', capturedAt: snapshot.checkedAt,
-        summary: `${snapshot.preparedBatches} unconsumed prepared batch(es); rolling policy enabled=${String(snapshot.rollingPolicyEnabled)}; $${snapshot.rollingAuthorizedCostUsd.toFixed(6)} of $${snapshot.rollingMaximumAuthorizedCostUsd.toFixed(6)} maximum authority used in the last 24 hours.`,
+        summary: snapshot.rollingCeilingRemoved
+          ? `${snapshot.preparedBatches} unconsumed prepared batch(es); rolling policy enabled=${String(snapshot.rollingPolicyEnabled)}; rolling ceiling removed; $${snapshot.rollingAuthorizedCostUsd.toFixed(6)} authorized in the last 24 hours.`
+          : `${snapshot.preparedBatches} unconsumed prepared batch(es); rolling policy enabled=${String(snapshot.rollingPolicyEnabled)}; $${snapshot.rollingAuthorizedCostUsd.toFixed(6)} of $${(snapshot.rollingMaximumAuthorizedCostUsd ?? 0).toFixed(6)} maximum authority used in the last 24 hours.`,
         reference: 'db://cos_university_mass_distillation_rolling_policy/owner-rolling-24h-v1',
       },
     ],
@@ -481,6 +504,7 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
       remainingAuthorizedCostUsd: snapshot.remainingAuthorizedCostUsd,
       preparedBatches: snapshot.preparedBatches, rollingPolicyEnabled: snapshot.rollingPolicyEnabled,
       rollingMaximumAuthorizedCostUsd: snapshot.rollingMaximumAuthorizedCostUsd,
+      rollingCeilingRemoved: snapshot.rollingCeilingRemoved,
       rollingAuthorizedCostUsd: snapshot.rollingAuthorizedCostUsd,
       rollingRemainingAuthorizedCostUsd: snapshot.rollingRemainingAuthorizedCostUsd,
       nextBudgetReleaseAt: snapshot.nextBudgetReleaseAt,
@@ -488,7 +512,9 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
       recoveryPreauthorized: snapshot.automaticRecoveryAuthorized,
       retryScope: snapshot.activeCampaigns > 0
         ? 'same_campaign_expiration_and_remaining_budget'
-        : 'one_prepared_batch_within_owner_rolling_24h_maximum_authority',
+        : snapshot.rollingCeilingRemoved
+          ? 'one_prepared_batch_within_owner_uncapped_policy'
+          : 'one_prepared_batch_within_owner_rolling_24h_maximum_authority',
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false, authorityExpanded: false,
     },

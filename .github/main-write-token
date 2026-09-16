@@ -1,2 +1,2 @@
-base_sha=cefa63c472e4e721d39e5b3375a60c42a09b13b1
-branch=fix/hf-distillation-always-on-20260916
+base_sha=33a98803f95ccd84ebce3d597c43fddf3dd4a461
+branch=fix/uncapped-distillation-monitor-20260916

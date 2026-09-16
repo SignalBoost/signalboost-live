@@ -74,7 +74,7 @@ test('ready-inventory replenishment runs before paid authorization and may overl
 })
 
 test('owner throughput control remains separate from University spending and authority', () => {
-  assert.equal(MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD, 25)
+  assert.equal(MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD, null)
   assert.equal(MASS_DISTILLATION_ROLLING_BATCHES_PER_CAMPAIGN, 1)
   const replenishment = source('../lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts')
   assert.match(replenishment, /maxExternalCostUsdPerCycle:\s*0/)

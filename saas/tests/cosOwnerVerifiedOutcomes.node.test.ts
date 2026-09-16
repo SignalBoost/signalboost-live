@@ -1,3 +1,4 @@
+// saas/tests/cosOwnerVerifiedOutcomes.node.test.ts
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
@@ -79,4 +80,12 @@ test('the Production bridge uses recorded subjects only for authoritative record
 test('route is owner-only for read and write', () => {
   const route = file('app/api/admin/cos-verified-outcomes/route.ts')
   assert.equal((route.match(/await requireOwner\(\)/g) || []).length, 2)
+})
+
+test('a geography or ethics question is not Economics just because it says "capital"', () => {
+  assert.deepEqual(subjectsForVerifiedRequest('what is the capital of brazil?'), [])
+  assert.equal(subjectsForVerifiedRequest('Is capital punishment morally justified?').includes('economics_finance'), false)
+  assert.deepEqual(subjectsForVerifiedRequest('How should we think about capital allocation across our three product lines?'), ['economics_finance'])
+  assert.equal(subjectsForVerifiedRequest('Estimate our cost of capital for the expansion').includes('economics_finance'), true)
+  assert.equal(subjectsForVerifiedRequest('Compare venture capital and working capital options').includes('economics_finance'), true)
 })

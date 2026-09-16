@@ -1,2 +1,2 @@
-base_sha=82902bb0da79106f21caf9a4a265052059e4775c
-branch=fix/distillation-throughput-proof-alias-20260916
+base_sha=547ab59ed44a28d14fd9fc87afed3ece30e99cc4
+branch=fix/distillation-curriculum-starvation-20260916-v2

@@ -1,6 +1,9 @@
+// saas/lib/ai/cos/cosUniversityMassDistillationRollingAuthorization.ts
 export const COS_UNIVERSITY_MASS_DISTILLATION_ROLLING_POLICY = 'owner-rolling-24h-v1' as const
 export const MASS_DISTILLATION_ROLLING_WINDOW_HOURS = 24 as const
-export const MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD = 25 as const
+// Owner direction 2026-09-16: no rolling 24-hour spend ceiling (null). The owner stops spending by withdrawing
+// provider credit. Each campaign keeps its own hard ceiling and only one campaign runs at a time.
+export const MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD = null
 export const MASS_DISTILLATION_ROLLING_BATCHES_PER_CAMPAIGN = 1 as const
 
 export type MassDistillationRollingAuthorization = Readonly<{
@@ -12,9 +15,10 @@ export type MassDistillationRollingAuthorization = Readonly<{
   batchCount: number
   campaignMaximumAuthorizedCostUsd: number
   rollingWindowHours: number
-  rollingMaximumAuthorizedCostUsd: number
+  rollingMaximumAuthorizedCostUsd: number | null
+  rollingCeilingRemoved: boolean
   rollingAuthorizedCostUsd: number
-  rollingRemainingAuthorizedCostUsd: number
+  rollingRemainingAuthorizedCostUsd: number | null
   nextBudgetReleaseAt: string | null
   authorizationRef: string | null
   automaticPromotionAuthorized: false
@@ -45,9 +49,10 @@ export function normalizeMassDistillationRollingAuthorization(value: unknown): M
   const row = value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {}
-  const maximum = money(row.rollingMaximumAuthorizedCostUsd)
+  const ceilingRemoved = row.rollingCeilingRemoved === true
+  const maximum = ceilingRemoved ? null : money(row.rollingMaximumAuthorizedCostUsd)
   const authorized = money(row.rollingAuthorizedCostUsd)
-  const remaining = money(row.rollingRemainingAuthorizedCostUsd)
+  const remaining = ceilingRemoved ? null : money(row.rollingRemainingAuthorizedCostUsd)
   return Object.freeze({
     ok: row.ok === true,
     authorized: row.authorized === true,
@@ -58,6 +63,7 @@ export function normalizeMassDistillationRollingAuthorization(value: unknown): M
     campaignMaximumAuthorizedCostUsd: money(row.campaignMaximumAuthorizedCostUsd),
     rollingWindowHours: integer(row.rollingWindowHours),
     rollingMaximumAuthorizedCostUsd: maximum,
+    rollingCeilingRemoved: ceilingRemoved,
     rollingAuthorizedCostUsd: authorized,
     rollingRemainingAuthorizedCostUsd: remaining,
     nextBudgetReleaseAt: optionalIso(row.nextBudgetReleaseAt),

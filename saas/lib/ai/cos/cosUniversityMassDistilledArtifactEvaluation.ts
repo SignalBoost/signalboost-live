@@ -217,8 +217,18 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
   if(input.budget.used+groups.length>input.budget.max)throw new Error(`mass_distilled_evaluation_endpoint_call_ceiling:${input.budget.used}+${groups.length}>${input.budget.max}`)
   const answers=new Map<string,string>();const hashes:string[]=[]
   for(const group of groups){
+    const call=()=>callRunpod({endpointId:input.endpointId,model:input.model,cases:group,candidateId:input.claim.candidateId,...(input.candidate?{artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash}:{}),feature:input.feature,deadlineMs:input.deadlineMs})
     input.budget.used+=1
-    const result=await callRunpod({endpointId:input.endpointId,model:input.model,cases:group,candidateId:input.claim.candidateId,...(input.candidate?{artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash}:{}),feature:input.feature,deadlineMs:input.deadlineMs})
+    let result
+    try{result=await call()}
+    catch(error){
+      const message=error instanceof Error?error.message:String(error)
+      if(!/^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(message))throw error
+      if(input.budget.used>=input.budget.max)throw new Error(`mass_distilled_evaluation_endpoint_call_ceiling:${input.budget.used}+1>${input.budget.max}`)
+      input.budget.used+=1
+      await new Promise(resolve=>setTimeout(resolve,500))
+      result=await call()
+    }
     for(const [id,answer] of result.answers)answers.set(id,answer)
     hashes.push(result.responseHash)
   }
@@ -274,6 +284,6 @@ export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvalua
     if(transferPassed)await submitClaim({claim:'unseen_transfer_passed',candidateId:input.claim.candidateId,revision:training.revision,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,evaluatorId,suiteHash:transferSuiteHash,evidenceRef,deadlineMs:input.deadlineMs})
     if(retentionPassed)await submitClaim({claim:'delayed_retention_passed',candidateId:input.claim.candidateId,revision:training.revision,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,evaluatorId,suiteHash:retentionSuiteHash,evidenceRef,deadlineMs:input.deadlineMs})
     const lifecycle=await db.from('cos_local_distillation_artifacts').update({status:evaluationPassed?'runtime_pending':'quarantined',updated_at:now.toISOString()}).eq('candidate_id',input.claim.candidateId).eq('trained_artifact_hash',input.claim.artifactHash).eq('status','evaluation_pending');if(lifecycle.error)throw lifecycle.error
-    return Object.freeze({ok:true as const,candidateId:input.claim.candidateId,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,endpointId:input.claim.endpointId,model,evaluatorId,holdout:{baselineScore:holdout.baselineScore,trainedArtifactScore:holdout.candidateScore,improved:holdoutImproved,cases:holdoutCases.length},safety:{score:safety.candidateScore,passed:safetyPassed},transfer:{baselineScore:transfer.baselineScore,trainedArtifactScore:transfer.candidateScore,passed:transferPassed},retention:{baselineScore:retention.baselineScore,trainedArtifactScore:retention.candidateScore,passed:retentionPassed,artifactAgeSeconds:Math.floor(age/1000)},evaluationPassed,nextStatus:evaluationPassed?'runtime_pending':'quarantined',productionTrafficAuthorized:false,endpointCalls:ENDPOINT_CALLS,judgeCalls:JUDGE_CALLS})
+    return Object.freeze({ok:true as const,candidateId:input.claim.candidateId,artifactId:input.claim.artifactId,artifactHash:input.claim.artifactHash,endpointId:input.claim.endpointId,model,evaluatorId,holdout:{baselineScore:holdout.baselineScore,trainedArtifactScore:holdout.candidateScore,improved:holdoutImproved,cases:holdoutCases.length},safety:{score:safety.candidateScore,passed:safetyPassed},transfer:{baselineScore:transfer.baselineScore,trainedArtifactScore:transfer.candidateScore,passed:transferPassed},retention:{baselineScore:retention.baselineScore,trainedArtifactScore:retention.candidateScore,passed:retentionPassed,artifactAgeSeconds:Math.floor(age/1000)},evaluationPassed,nextStatus:evaluationPassed?'runtime_pending':'quarantined',productionTrafficAuthorized:false,endpointCalls:budget.used,judgeCalls:JUDGE_CALLS})
   }finally{if(keepalive)clearInterval(keepalive)}
 }

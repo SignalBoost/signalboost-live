@@ -8,9 +8,12 @@ export const MASS_DISTILLATION_STUDENT_MODEL = 'Qwen/Qwen3-4B' as const
 export const MASS_DISTILLATION_MIN_CONFIDENCE = 0.80
 export const MASS_DISTILLATION_MIN_BATCH = 20
 export const MASS_DISTILLATION_MAX_BATCH = 128
+// These are University defaults only. Deployment-owner throughput configuration may exceed them.
 export const MASS_DISTILLATION_MAX_BATCHES_PER_RUN = 20
 export const MASS_DISTILLATION_CORPUS_PAGE_SIZE = 1000
 export const MASS_DISTILLATION_CORPUS_MAX_ROWS = 5000
+const MASS_DISTILLATION_BATCH_WRITE_CHUNK = 100
+const MASS_DISTILLATION_EXISTING_BATCH_PAGE_SIZE = 1000
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const ACTIVE_BATCH_STATUSES = new Set(['prepared', 'teacher_synthesis_ready', 'consumed'])
@@ -67,6 +70,11 @@ function clean(value: unknown, limit = 500): string {
 
 function hash(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex')
+}
+
+function positiveSafeInteger(value: unknown, fallback: number): number {
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
 }
 
 function normalizedSubject(value: string): string {
@@ -222,32 +230,45 @@ export function buildMassDistillationBatches(
   terminalAttemptByCurriculumHash: ReadonlyMap<string, string> = new Map(),
 ): PreparedDistillationBatch[] {
   const normalized = rows.map(normalizeIdentity)
-  const groups = new Map<string, { subject: string; rows: NormalizedIdentity[]; materialHashes: Set<string> }>()
+  const groups = new Map<string, {
+    subject: string
+    rows: NormalizedIdentity[]
+    contentHashes: Set<string>
+    materialHashes: Set<string>
+  }>()
+
+  const groupFor = (row: NormalizedIdentity) => {
+    const subject = distillationSubjectGroup(row.subject)
+    const group = groups.get(subject.key) || {
+      subject: subject.subject,
+      rows: [],
+      contentHashes: new Set<string>(),
+      materialHashes: new Set<string>(),
+    }
+    groups.set(subject.key, group)
+    return group
+  }
 
   // Seed every canonical subject family with material already represented by a live or consumed
   // assignment before considering replacement provenance hashes. This first pass makes the result
   // independent of row order and prevents duplicate teaching material across subject aliases.
   for (const row of normalized) {
     if (!retainedIdentityEligibleForMassDistillation(row) || !assignedHashes.has(row.contentHash)) continue
-    const subject = distillationSubjectGroup(row.subject)
-    const group = groups.get(subject.key) || { subject: subject.subject, rows: [], materialHashes: new Set<string>() }
-    group.materialHashes.add(row.materialHash)
-    groups.set(subject.key, group)
+    groupFor(row).materialHashes.add(row.materialHash)
   }
 
   for (const row of normalized) {
     if (!retainedIdentityEligibleForMassDistillation(row) || assignedHashes.has(row.contentHash)) continue
-    const subject = distillationSubjectGroup(row.subject)
-    const group = groups.get(subject.key) || { subject: subject.subject, rows: [], materialHashes: new Set<string>() }
-    if (group.rows.some(item => item.contentHash === row.contentHash)) continue
+    const group = groupFor(row)
+    if (group.contentHashes.has(row.contentHash)) continue
     if (group.materialHashes.has(row.materialHash)) continue
-    group.rows.push(row)
+    group.contentHashes.add(row.contentHash)
     group.materialHashes.add(row.materialHash)
-    groups.set(subject.key, group)
+    group.rows.push(row)
   }
 
   const out: PreparedDistillationBatch[] = []
-  const boundedMax = Math.max(1, Math.min(100, Math.floor(maxBatches)))
+  const requestedMax = positiveSafeInteger(maxBatches, MASS_DISTILLATION_MAX_BATCHES_PER_RUN)
   const orderedGroups = [...groups.entries()].sort((a, b) => b[1].rows.length - a[1].rows.length || a[0].localeCompare(b[0]))
   for (const [subjectKey, group] of orderedGroups) {
     const ordered = [...group.rows].sort((a, b) => a.contentHash.localeCompare(b.contentHash))
@@ -277,7 +298,7 @@ export function buildMassDistillationBatches(
         rightsClasses: Object.freeze(rightsClasses),
         sourceCount: sourceHashes.length,
       }))
-      if (out.length >= boundedMax) return out
+      if (out.length >= requestedMax) return out
     }
   }
   return out
@@ -287,10 +308,14 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map(item => clean(item, 64).toLowerCase()).filter(item => HEX64.test(item)) : []
 }
 
-async function readMassDistillationCorpus(db: NonNullable<ReturnType<typeof cosServiceDb>>) {
+async function readMassDistillationCorpus(
+  db: NonNullable<ReturnType<typeof cosServiceDb>>,
+  maxRows = MASS_DISTILLATION_CORPUS_MAX_ROWS,
+) {
+  const requestedRows = positiveSafeInteger(maxRows, MASS_DISTILLATION_CORPUS_MAX_ROWS)
   const rows: any[] = []
-  for (let offset = 0; offset < MASS_DISTILLATION_CORPUS_MAX_ROWS; offset += MASS_DISTILLATION_CORPUS_PAGE_SIZE) {
-    const end = Math.min(offset + MASS_DISTILLATION_CORPUS_PAGE_SIZE, MASS_DISTILLATION_CORPUS_MAX_ROWS) - 1
+  for (let offset = 0; offset < requestedRows; offset += MASS_DISTILLATION_CORPUS_PAGE_SIZE) {
+    const end = Math.min(offset + MASS_DISTILLATION_CORPUS_PAGE_SIZE, requestedRows) - 1
     const expectedPageSize = end - offset + 1
     const page = await db.from('cos_continuous_learning')
       .select('content_hash,subject,source_kind,license,confidence,source_title,summary,facts')
@@ -307,22 +332,35 @@ async function readMassDistillationCorpus(db: NonNullable<ReturnType<typeof cosS
   return rows
 }
 
+async function readExistingMassDistillationBatches(db: NonNullable<ReturnType<typeof cosServiceDb>>) {
+  const rows: any[] = []
+  for (let offset = 0; ; offset += MASS_DISTILLATION_EXISTING_BATCH_PAGE_SIZE) {
+    const page = await db.from('cos_university_distillation_curriculum_batches')
+      .select('batch_key,curriculum_hash,source_hashes,status,updated_at')
+      .eq('source_policy', MASS_DISTILLATION_SOURCE_POLICY)
+      .in('status', ['prepared', 'teacher_synthesis_ready', 'consumed', 'quarantined', 'superseded'])
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + MASS_DISTILLATION_EXISTING_BATCH_PAGE_SIZE - 1)
+    if (page.error) throw page.error
+    const pageRows = page.data ?? []
+    rows.push(...pageRows)
+    if (pageRows.length < MASS_DISTILLATION_EXISTING_BATCH_PAGE_SIZE) break
+  }
+  return rows
+}
+
 /** Non-spending packaging sweep; provider dispatch remains a separate owner-governed consequence. */
-export async function prepareUniversityMassDistillationCurriculum(now = new Date()) {
+export async function prepareUniversityMassDistillationCurriculum(
+  now = new Date(),
+  throughput: { corpusScanRows?: number; maxBatchesPerSweep?: number } = {},
+) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
 
-  const existing = await db.from('cos_university_distillation_curriculum_batches')
-    .select('batch_key,curriculum_hash,source_hashes,status,updated_at')
-    .eq('source_policy', MASS_DISTILLATION_SOURCE_POLICY)
-    .in('status', ['prepared', 'teacher_synthesis_ready', 'consumed', 'quarantined', 'superseded'])
-    .order('updated_at', { ascending: false })
-    .limit(1000)
-  if (existing.error) throw existing.error
+  const existingRows = await readExistingMassDistillationBatches(db)
   const assigned = new Set<string>()
   const terminalAttemptByCurriculumHash = new Map<string, string>()
-  for (const raw of existing.data || []) {
-    const row: any = raw
+  for (const row of existingRows) {
     const status = clean(row.status, 40)
     if (ACTIVE_BATCH_STATUSES.has(status)) {
       for (const digest of stringArray(row.source_hashes)) assigned.add(digest)
@@ -337,7 +375,9 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     }
   }
 
-  const corpusRows = await readMassDistillationCorpus(db)
+  const corpusScanRows = positiveSafeInteger(throughput.corpusScanRows, MASS_DISTILLATION_CORPUS_MAX_ROWS)
+  const maxBatchesPerSweep = positiveSafeInteger(throughput.maxBatchesPerSweep, MASS_DISTILLATION_MAX_BATCHES_PER_RUN)
+  const corpusRows = await readMassDistillationCorpus(db, corpusScanRows)
   const identities: RetainedDistillationIdentity[] = corpusRows.map((row: any) => ({
     contentHash: clean(row.content_hash, 64),
     materialHash: retainedMaterialHash({ sourceTitle: row.source_title, summary: row.summary, facts: row.facts }) || '',
@@ -350,12 +390,13 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
   const batches = buildMassDistillationBatches(
     identities,
     assigned,
-    MASS_DISTILLATION_MAX_BATCHES_PER_RUN,
+    maxBatchesPerSweep,
     terminalAttemptByCurriculumHash,
   )
 
-  if (batches.length) {
-    const inserted = await db.from('cos_university_distillation_curriculum_batches').upsert(batches.map(batch => ({
+  for (let offset = 0; offset < batches.length; offset += MASS_DISTILLATION_BATCH_WRITE_CHUNK) {
+    const chunk = batches.slice(offset, offset + MASS_DISTILLATION_BATCH_WRITE_CHUNK)
+    const inserted = await db.from('cos_university_distillation_curriculum_batches').upsert(chunk.map(batch => ({
       batch_key: batch.batchKey,
       curriculum_hash: batch.curriculumHash,
       subject_id: batch.subjectId,
@@ -388,8 +429,9 @@ export async function prepareUniversityMassDistillationCurriculum(now = new Date
     supply,
     batchesPrepared: batches.length,
     sourceItemsPrepared,
+    throughput: Object.freeze({ corpusScanRows, maxBatchesPerSweep }),
     dispatchAuthorized: false,
     externalCostUsd: 0,
-    semantics: 'rights_cleared_unique_material_identity_packaging_canonical_university_subjects_effective_corpus_paginated_no_text_no_provider_dispatch_no_traffic_authorization' as const,
+    semantics: 'rights_cleared_unique_material_identity_packaging_canonical_university_subjects_owner_controlled_capacity_no_provider_dispatch_no_traffic_authorization' as const,
   })
 }

@@ -23,7 +23,9 @@ const ENDPOINT_CALLS = 8
 const JUDGE_CALLS = 4
 const ENDPOINT_CALL_TIMEOUT_MS = 30_000
 const JUDGE_CALL_TIMEOUT_MS = 25_000
-const READY_TIMEOUT_MS = 190_000
+// Match the proven exact-artifact cold-start envelope used by the canary. A scale-to-zero
+// worker can remain healthy but return 204 while Qwen3-4B + LoRA loads past 190 seconds.
+const READY_TIMEOUT_MS = 235_000
 const READY_POLL_MS = 3_000
 const ROUTE_RESERVE_MS = 25_000
 

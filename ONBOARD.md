@@ -167,6 +167,8 @@ Before creating a new exact-artifact mass canary, provisioning therefore sets on
 touch unrelated workloads, add an invocation, or expand Production authority.
 If the legacy v2 create/list response omits the endpoint identifier, provisioning resolves that
 identifier by exact endpoint name through RunPod's official REST endpoint list before failing closed.
+The independent mass evaluator uses the same 235-second exact-artifact readiness window as the
+canary, preventing a healthy scale-to-zero Qwen3-4B + LoRA cold start from failing at 190 seconds.
 
 ---
 

@@ -7,6 +7,7 @@ import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillat
 export const MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES = 5
 export const MASS_DISTILLATION_DEFAULT_PREPARED_BATCH_BUFFER_TARGET = 10
 export const MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS = 3
+export const MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT = 3
 export const MASS_DISTILLATION_DEFAULT_ACQUISITION_CANDIDATES_PER_CYCLE = 40
 export const MASS_DISTILLATION_DEFAULT_CORPUS_SCAN_ROWS = 5_000
 export const MASS_DISTILLATION_DEFAULT_MAX_BATCHES_PER_SWEEP = 20
@@ -14,6 +15,7 @@ export const MASS_DISTILLATION_DEFAULT_MAX_BATCHES_PER_SWEEP = 20
 export type MassDistillationThroughputProfile = Readonly<{
   preparedBatchBufferTarget: number
   targetSubjectsPerReplenishment: number
+  queriesPerSubject: number
   acquisitionCandidatesPerCycle: number
   corpusScanRows: number
   maxBatchesPerSweep: number
@@ -40,6 +42,10 @@ export function massDistillationThroughputProfile(env: NodeJS.ProcessEnv = proce
       env.DISTILLATION_TARGET_SUBJECTS,
       MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS,
     ),
+    queriesPerSubject: positiveSafeInteger(
+      env.DISTILLATION_QUERIES_PER_SUBJECT,
+      MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
+    ),
     acquisitionCandidatesPerCycle: positiveSafeInteger(
       env.DISTILLATION_ACQUISITION_CANDIDATES_PER_CYCLE,
       MASS_DISTILLATION_DEFAULT_ACQUISITION_CANDIDATES_PER_CYCLE,
@@ -60,25 +66,46 @@ export function massDistillationPreparedBatchBufferTarget(env: NodeJS.ProcessEnv
   return massDistillationThroughputProfile(env).preparedBatchBufferTarget
 }
 
-/** Prefer the subjects closest to a valid batch so replenishment turns into useful work quickly. */
+const REPLENISHMENT_RESEARCH_LENSES = [
+  'empirical findings',
+  'methods evidence',
+  'systematic review',
+  'comparative analysis',
+  'applications limitations',
+  'measurement validation',
+] as const
+
+/**
+ * Prefer the subjects closest to a valid batch, but do not keep asking one identical search for each
+ * subject. The live workflow explicitly supplies the owner-controlled query count. The helper keeps
+ * a one-query default for callers that only need prioritization semantics.
+ */
 export function buildMassDistillationReplenishmentGaps(
   supply: readonly MassDistillationSubjectSupply[],
   now = new Date(),
   maxSubjects = MASS_DISTILLATION_DEFAULT_TARGET_SUBJECTS,
+  queriesPerSubject = 1,
 ): KnowledgeGap[] {
   const replenishmentSlot = Math.floor(now.getTime() / (MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000))
-  return supply
+  const selected = supply
     .filter(subject => subject.canonicalSubjectId && subject.uniqueBatchableItems > 0 && subject.shortfallToBatch > 0)
     .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch || b.uniqueBatchableItems - a.uniqueBatchableItems || a.subjectKey.localeCompare(b.subjectKey))
     .slice(0, Math.max(1, Math.floor(maxSubjects)))
-    .map((supplySubject, index) => {
-      const subject = cosUniversitySubjectById(supplySubject.canonicalSubjectId!)
-      const theme = subject.studyThemes[(replenishmentSlot + index) % subject.studyThemes.length]
-      return {
-        id: `distillation-curriculum:${subject.id}`,
+
+  const gaps: KnowledgeGap[] = []
+  const queryCount = Math.max(1, Math.floor(queriesPerSubject))
+  for (const [subjectIndex, supplySubject] of selected.entries()) {
+    const subject = cosUniversitySubjectById(supplySubject.canonicalSubjectId!)
+    for (let queryIndex = 0; queryIndex < queryCount; queryIndex += 1) {
+      const theme = subject.studyThemes[(replenishmentSlot + subjectIndex + queryIndex) % subject.studyThemes.length]
+      const lens = REPLENISHMENT_RESEARCH_LENSES[
+        (replenishmentSlot + subjectIndex * queryCount + queryIndex) % REPLENISHMENT_RESEARCH_LENSES.length
+      ]
+      gaps.push({
+        id: `distillation-curriculum:${subject.id}:q${queryIndex + 1}`,
         subject: subject.title,
-        question: `What rigorous, reusable findings and methods strengthen ${theme} within ${subject.title}?`,
-        discoveryQuery: `${theme} ${subject.objective}`,
+        question: `What rigorous, reusable ${lens} strengthen ${theme} within ${subject.title}?`,
+        discoveryQuery: `${theme} ${lens} ${subject.title}`,
         portableIds: ['cos'],
         expectedReuse: 100,
         expectedAvoidedCostUsd: 10,
@@ -87,9 +114,12 @@ export function buildMassDistillationReplenishmentGaps(
           'mass_distillation_post_dedup_supply_shortfall',
           `unique_batchable_items=${supplySubject.uniqueBatchableItems}`,
           `shortfall_to_batch=${supplySubject.shortfallToBatch}`,
+          `query_variant=${queryIndex + 1}/${queryCount}`,
         ],
         sourceKinds: ['scientific_journal'],
         curriculumAligned: true,
-      }
-    })
+      })
+    }
+  }
+  return gaps
 }

@@ -1,3 +1,4 @@
+// saas/lib/ai/local-inference.ts
 import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 
@@ -17,6 +18,12 @@ export interface LocalModelCallArgs {
   jsonObject?: boolean
   /** Billing/routing attribution only. Never changes grading, authorization, or model output. */
   usageContext?: LocalInferenceUsageContext
+  /**
+   * Ask a thinking-capable model to answer without hidden reasoning (OpenAI-compatible
+   * `reasoning_effort: "none"`). Used only for the single RunPod retry after hidden reasoning
+   * consumed the whole token budget and returned no answer text.
+   */
+  disableThinking?: boolean
 }
 
 /**
@@ -191,9 +198,11 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
     // Independent scoring needs a compact verdict, not model scratch work. Pin reasoning off even if
     // the general DeepInfra reasoner is configured differently, and do not spend novelty penalties
     // encouraging extra JSON fields. This preserves the caller's max-token and judge-call ceilings.
-    const reasoningEffort = provider === 'deepinfra'
-      ? (independentEvaluation ? 'none' : configuredReasoningEffort())
-      : undefined
+    const reasoningEffort = args.disableThinking === true
+      ? 'none'
+      : provider === 'deepinfra'
+        ? (independentEvaluation ? 'none' : configuredReasoningEffort())
+        : undefined
     const parsePenalty = (value: string | undefined, fallback: number): number => {
       const n = Number(value)
       return Number.isFinite(n) ? Math.max(0, Math.min(2, n)) : fallback
@@ -300,8 +309,18 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
     }
   }
 
-  if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
+  if (finishReason === 'length') {
+    // emptyContent distinguishes "hidden reasoning consumed the whole budget and no answer text came
+    // back" from a genuinely long answer that was cut off. The message itself is unchanged.
+    throw Object.assign(new Error(LOCAL_MODEL_OUTPUT_TRUNCATED), { emptyContent: !String(text ?? '').trim() })
+  }
   return text
+}
+
+function isEmptyThinkingTruncation(error: unknown): boolean {
+  return error instanceof Error
+    && error.message === LOCAL_MODEL_OUTPUT_TRUNCATED
+    && (error as Error & { emptyContent?: boolean }).emptyContent === true
 }
 
 /**
@@ -320,8 +339,24 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       ownedAttempted = true
       const runpodConfig = await primary.resolveReadyRunpodPrimaryConfig('reasoner')
       if (runpodConfig) {
-        const text = await callConfiguredModel(args, runpodConfig)
-        if (text?.trim()) return text
+        try {
+          const text = await callConfiguredModel(args, runpodConfig)
+          if (text?.trim()) return text
+        } catch (error) {
+          // Verified in Production (2026-09-16): qwen3:30b on the RunPod primary spent its entire
+          // 360-token budget on hidden reasoning, returned no answer text, and the turn then waited 99s
+          // for the DeepInfra fallback. Retry once on the same primary with thinking off before paying
+          // for that fallback. Any other failure, or a failed retry, keeps the existing fallback.
+          if (!isEmptyThinkingTruncation(error) || args.disableThinking === true) throw error
+          const feature = args.usageContext?.feature || 'unattributed_local_inference'
+          const retried = await callConfiguredModel({ ...args, disableThinking: true }, runpodConfig).catch(retryError => {
+            console.warn('[runpod-primary-thinking-retry]', JSON.stringify({ feature, contentReturned: false, error: retryError instanceof Error ? retryError.message : String(retryError) }))
+            return null
+          })
+          console.info('[runpod-primary-thinking-retry]', JSON.stringify({ feature, contentReturned: Boolean(retried?.trim()) }))
+          if (retried?.trim()) return retried
+          throw error
+        }
       }
     }
   } catch (error) {

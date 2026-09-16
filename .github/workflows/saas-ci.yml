@@ -36,6 +36,19 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+  cos-public-customer-memory:
+    name: COS public customer memory isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify signed-in public recall, guest non-persistence, scoping, redaction, and untrusted-history boundaries
+        run: npx --yes tsx --test tests/publicCustomerMemory.node.test.ts
+
   cos-fresh-routing:
     name: COS fresh-data routing policy
     runs-on: ubuntu-latest

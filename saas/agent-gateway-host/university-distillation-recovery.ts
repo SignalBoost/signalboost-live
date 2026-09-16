@@ -37,8 +37,9 @@ type HealthReader = typeof readUniversityMassDistillationHealth
 
 /**
  * Executes the same bounded workflow used by the five-minute cron and then performs a separate
- * durable health read. The Supervisor never receives a free-form provider action or a new budget;
- * every paid claim still passes the original campaign expiration and cost fences.
+ * durable health read. The Supervisor never receives a free-form provider action or a new budget:
+ * every paid claim passes either the original campaign fences or the durable owner-approved
+ * single-batch rolling policy, and both paths retain the existing per-stage cost ceilings.
  */
 export async function recoverUniversityMassDistillation(input: {
   db: any
@@ -53,8 +54,8 @@ export async function recoverUniversityMassDistillation(input: {
   const readHealth = input.readHealth ?? readUniversityMassDistillationHealth
   const startedAt = now()
   const before = await readHealth({ db: input.db, now: startedAt })
-  // The offset monitor can race a successful scheduled worker. Treat an independently observed
-  // healthy/idle state as an idempotent verified no-op instead of turning healing into a failure.
+  // The offset monitor can race a successful scheduled worker. Treat any independently observed
+  // non-repair state as an idempotent verified no-op instead of turning healing into a failure.
   if (before.state !== 'repair_required') {
     const finishedAt = now()
     return {
@@ -83,7 +84,9 @@ export async function recoverUniversityMassDistillation(input: {
       runnerInvoked: !workflow.skipped,
       skipped: workflow.skipped,
       supervisorRecovery: true,
-      repairScope: 'same_campaign_expiration_and_remaining_budget',
+      repairScope: before.activeCampaigns > 0
+        ? 'same_campaign_expiration_and_remaining_budget'
+        : 'one_prepared_batch_within_owner_rolling_24h_maximum_authority',
       authorityExpanded: false,
     },
     now: now(),

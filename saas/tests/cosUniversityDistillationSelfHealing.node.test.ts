@@ -47,6 +47,90 @@ test('active distillation with a fresh durable receipt and bounded provider job 
   assert.equal(snapshot.remainingAuthorizedCostUsd, 1.625)
 })
 
+test('continuity states distinguish supply wait, repairable campaign gap, rolling budget pause, and missing authority', () => {
+  const base = {
+    now,
+    expectedIntervalSeconds: 300,
+    campaigns: [],
+    receipt,
+    workflowRuns: [],
+    providerJobs: [],
+  }
+  const waiting = evaluateUniversityMassDistillationHealth({
+    ...base,
+    continuity: {
+      preparedBatches: 0,
+      rollingPolicyEnabled: true,
+      rollingMaximumAuthorizedCostUsd: 25,
+      rollingAuthorizedCostUsd: 10.95,
+      nextBudgetReleaseAt: '2026-09-16T16:31:41.969Z',
+    },
+  })
+  assert.equal(waiting.state, 'waiting_for_curriculum')
+  assert.deepEqual(waiting.reasons, ['curriculum_supply_waiting'])
+  assert.equal(waiting.automaticRecoveryAuthorized, false)
+  assert.equal(waiting.rollingRemainingAuthorizedCostUsd, 14.05)
+
+  const repairable = evaluateUniversityMassDistillationHealth({
+    ...base,
+    continuity: { ...waiting, preparedBatches: 1, rollingPolicyEnabled: true },
+  } as any)
+  assert.equal(repairable.state, 'repair_required')
+  assert.deepEqual(repairable.reasons, ['prepared_campaign_not_authorized'])
+  assert.equal(repairable.automaticRecoveryAuthorized, true)
+  const incident = buildUniversityMassDistillationIncident(repairable)
+  assert.equal(incident.metadata.retryScope, 'one_prepared_batch_within_owner_rolling_24h_maximum_authority')
+  assert.ok(diagnoseRegisteredNativeRecovery(incident))
+
+  const paused = evaluateUniversityMassDistillationHealth({
+    ...base,
+    continuity: {
+      preparedBatches: 2,
+      rollingPolicyEnabled: true,
+      rollingMaximumAuthorizedCostUsd: 25,
+      rollingAuthorizedCostUsd: 23.725,
+      nextBudgetReleaseAt: '2026-09-16T16:31:41.969Z',
+    },
+  })
+  assert.equal(paused.state, 'budget_paused')
+  assert.deepEqual(paused.reasons, ['rolling_budget_exhausted'])
+  assert.equal(paused.automaticRecoveryAuthorized, false)
+
+  const unauthorized = evaluateUniversityMassDistillationHealth({
+    ...base,
+    continuity: {
+      preparedBatches: 2,
+      rollingPolicyEnabled: false,
+      rollingMaximumAuthorizedCostUsd: 0,
+      rollingAuthorizedCostUsd: 0,
+      nextBudgetReleaseAt: null,
+    },
+  })
+  assert.equal(unauthorized.state, 'authorization_required')
+  assert.deepEqual(unauthorized.reasons, ['rolling_authorization_disabled'])
+})
+
+test('a broken control-loop heartbeat is repairable even while curriculum supply is empty', () => {
+  const snapshot = evaluateUniversityMassDistillationHealth({
+    now,
+    expectedIntervalSeconds: 300,
+    campaigns: [],
+    receipt: { ...receipt, observed_at: '2026-09-15T11:30:00.000Z' },
+    workflowRuns: [],
+    providerJobs: [],
+    continuity: {
+      preparedBatches: 0,
+      rollingPolicyEnabled: true,
+      rollingMaximumAuthorizedCostUsd: 25,
+      rollingAuthorizedCostUsd: 10.95,
+      nextBudgetReleaseAt: null,
+    },
+  })
+  assert.equal(snapshot.state, 'repair_required')
+  assert.deepEqual(snapshot.reasons, ['heartbeat_stale'])
+  assert.equal(snapshot.automaticRecoveryAuthorized, true)
+})
+
 test('stale heartbeat produces an exact pre-authorized Supervisor recovery incident', () => {
   const snapshot = health({
     receipt: { ...receipt, observed_at: '2026-09-15T11:30:00.000Z' },
@@ -146,6 +230,8 @@ test('Production wiring runs monitor, governed repair, shared workflow, and sepa
   assert.match(recovery, /const after = await readHealth/)
   assert.match(recovery, /university_distillation_recovery_verification_failed/)
   assert.match(workflow, /recoverStalledMassDistillationDispatchClaims/)
+  assert.match(workflow, /prepareUniversityMassDistillationCurriculum/)
+  assert.match(workflow, /authorizeNextUniversityMassDistillationCampaign/)
   assert.match(workflow, /workflowSource: input\.source/)
   assert.match(policy, /UNIVERSITY_DISTILLATION_RECOVERY_ALLOWLIST_ENTRY/)
   assert.match(host, /createUniversityDistillationRecoveryExecutor/)

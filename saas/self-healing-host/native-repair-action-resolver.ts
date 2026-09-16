@@ -37,8 +37,8 @@ export function diagnoseRegisteredNativeRecovery(incident: SupervisorIncident): 
     : []
   return {
     incident_id: incident.incidentId,
-    incident_summary: 'The active COS University mass-distillation campaign stopped satisfying its durable workflow-health contract.',
-    diagnosis: `The native monitor observed ${healthReasons.join(', ') || 'an unhealthy workflow state'} while the original campaign expiration and cost authority remain intact.`,
+    incident_summary: 'The COS University mass-distillation control loop stopped satisfying its durable continuity contract.',
+    diagnosis: `The native monitor observed ${healthReasons.join(', ') || 'an unhealthy workflow state'} while a bounded registered recovery remains authorized by either the existing campaign envelope or the owner-approved rolling 24-hour policy.`,
     confidence_score: 100,
     confidence_reason: 'The diagnosis comes from exact host-owned database, heartbeat, and provider-ledger predicates rather than inferred model prose.',
     evidence: incident.evidence.map(item => ({ source: item.type, finding: item.summary })),
@@ -48,7 +48,7 @@ export function diagnoseRegisteredNativeRecovery(incident: SupervisorIncident): 
     requires_human_approval: false,
     risk_level: 'medium',
     risk_reasons: [
-      'The workflow may consume only cost already authorized by the active campaign.',
+      'The workflow may retry only inside an existing campaign or authorize one prepared batch inside the owner-approved rolling 24-hour maximum-authority ceiling.',
       'The repair cannot promote a model, alter RunPod, extend expiry, or increase budget.',
     ],
     repair_plan: [{

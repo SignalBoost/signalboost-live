@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 
 const tests = [
   'tests/cosUniversityDistillationSelfHealing.node.test.ts',
+  'tests/cosUniversityMassDistillationRollingAuthorization.node.test.ts',
   'tests/cosUniversityLaneExpectation.node.test.ts',
   'tests/cosUniversityLaneFaultRecorder.node.test.ts',
   'tests/cosUniversityFineTuneEvidence.node.test.ts',

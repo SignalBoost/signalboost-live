@@ -125,9 +125,25 @@ reads the durable Production heartbeat, campaign/run state, and provider-job led
 becomes a host-created incident, an exact allowlisted repair, and a separate post-repair health read.
 
 The repair may only continue work inside the campaign's existing expiration and remaining cost
-ceiling. It cannot authorize promotion, Production traffic, RunPod mutation, a new campaign, a larger
-budget, or a later expiry. Missing/expired authority, failed verification, or an unrecognized incident
-fails closed and remains visible rather than being reported as healed.
+ceiling, or authorize one already-prepared batch through the owner's durable rolling policy. On
+2026-09-15 the owner explicitly authorized at most **$25 of maximum campaign authority in any rolling
+24-hour window** for Hugging Face University mass distillation. The database serializes workers,
+counts campaign hard ceilings rather than optimistic actual cost, permits only one live single-batch
+campaign at a time, and retains the existing $1.825 maximum per batch. Historical/manual campaigns
+inside the same rolling window count against that ceiling.
+
+The shared worker now reconciles and recovers existing work, performs a non-spending rights-cleared
+packaging sweep, requests at most one campaign through that durable policy, and only then dispatches.
+The monitor distinguishes active health from `waiting_for_curriculum`, `budget_paused`, and
+`authorization_required`; zero active campaigns is no longer reported as healthy idle. A prepared
+batch that was not authorized despite available rolling authority is repairable automatically through
+the same governed workflow.
+
+The repair cannot authorize promotion, Production traffic, RunPod mutation, non-prepared data, a
+larger rolling ceiling, parallel campaigns, or a later campaign expiry. Missing/expired authority,
+failed verification, or an unrecognized incident fails closed and remains visible rather than being
+reported as healed. Insufficient rights-cleared unique material is reported as a supply wait; the
+system does not weaken the 20-item curriculum quality floor merely to keep provider compute busy.
 
 ---
 

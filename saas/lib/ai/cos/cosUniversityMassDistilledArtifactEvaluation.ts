@@ -55,7 +55,19 @@ function sha256(value:unknown){return createHash('sha256').update(JSON.stringify
 function manifestHash(items:readonly string[]){return sha256({items:[...items].sort()})}
 function average(values:readonly number[]){return values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0}
 function score(value:unknown){const n=Number(value);return Number.isFinite(n)&&n>=0&&n<=1?n:null}
-function candidateModelName(artifactHash:string){return `itmounts-mass-distilled-${artifactHash.slice(0,12).toLowerCase()}`}
+async function candidateModelName(claim:MassEvaluationClaim){
+  const db=cosServiceDb();if(!db)throw new Error('service_database_unavailable')
+  const result=await db.from('cos_university_learning_assurance_events').select('evidence,observed_at')
+    .eq('candidate_id',claim.candidateId).eq('verifier','host_controller').order('observed_at',{ascending:false}).limit(100)
+  if(result.error)throw result.error
+  const expectedPrefix=`itmounts-mass-distilled-${claim.artifactHash.slice(0,12).toLowerCase()}-`
+  const event=(result.data||[]).find((row:any)=>{const evidence=row?.evidence||{};return evidence.claim==='local_distilled_runtime_canary_passed'
+    &&evidence.endpointId===claim.endpointId&&evidence.artifactHash===claim.artifactHash&&evidence.exactArtifact===true&&evidence.internalVllmReady===true
+    &&typeof evidence.model==='string'&&evidence.model.startsWith(expectedPrefix)})
+  const model=clean((event as any)?.evidence?.model,240)
+  if(!model)throw new Error('mass_distilled_evaluation_canary_model_identity_missing')
+  return model
+}
 
 function remaining(deadlineMs:number,reserve=ROUTE_RESERVE_MS){
   const value=deadlineMs-Date.now()-reserve
@@ -173,8 +185,11 @@ async function callRunpod(input:{endpointId:string;model:string;cases:readonly E
   const started=Date.now();const requestId=randomUUID();let httpStatus:number|null=null;let success=false
   try{
     const timeout=Math.max(1,Math.min(ENDPOINT_CALL_TIMEOUT_MS,remaining(input.deadlineMs)))
-    const response=await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.model,temperature:0,max_tokens:Math.min(4096,Math.max(1024,input.cases.length*420)),messages:[{role:'system',content:'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'},{role:'user',content:batchPrompt(input.cases)}]}),signal:AbortSignal.timeout(timeout)})
-    httpStatus=response.status;if(!response.ok)throw new Error(`mass_distilled_evaluation_runpod_http_${response.status}`)
+    const prompt=batchPrompt(input.cases)
+    if(prompt.length>18_000)throw new Error('mass_distilled_evaluation_prompt_budget_exceeded')
+    const response=await fetch(`${runpodServerlessOpenAiBaseUrl(input.endpointId)}/chat/completions`,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:input.model,temperature:0,max_tokens:1024,messages:[{role:'system',content:'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'},{role:'user',content:prompt}]}),signal:AbortSignal.timeout(timeout)})
+    httpStatus=response.status
+    if(!response.ok){const raw=await response.text();let detail='';try{const payload:any=raw?JSON.parse(raw):{};detail=clean(payload?.error?.message||payload?.message||payload?.detail,240)}catch{};throw new Error(`mass_distilled_evaluation_runpod_http_${response.status}${detail?`:${detail}`:''}`)}
     const payload:any=await response.json();const text=clean(payload?.choices?.[0]?.message?.content,200_000);if(!text)throw new Error('mass_distilled_evaluation_runpod_empty')
     success=true;return {answers:parseAnswers(text,input.cases),responseHash:sha256Raw(text)}
   }finally{
@@ -217,7 +232,7 @@ export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvalua
   if(input.claim.maxEndpointCalls!==ENDPOINT_CALLS||input.claim.maxJudgeCalls!==JUDGE_CALLS||input.claim.maxRuntimeWakeAttempts!==1||input.claim.maxEstimatedRuntimeWakeCostUsd<=0||input.claim.maxEstimatedRuntimeWakeCostUsd>0.2)throw new Error('mass_distilled_evaluation_claim_ceiling_invalid')
   const now=input.now||new Date();const training=await massRun(input.claim,now);const age=now.getTime()-training.trainedAt;if(age<MASS_DISTILLED_RETENTION_DELAY_MS)throw new Error('mass_distilled_evaluation_retention_delay_not_met')
   const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs})
-  const model=candidateModelName(input.claim.artifactHash)
+  const model=await candidateModelName(input.claim)
   await waitReady(input.claim.endpointId,input.deadlineMs)
   const keepaliveKey=configuredRunpodApiKey();const keepalive=keepaliveKey?setInterval(()=>{void fetch(`https://${input.claim.endpointId}.api.runpod.ai/ready`,{headers:{Authorization:`Bearer ${keepaliveKey}`},signal:AbortSignal.timeout(8_000)}).catch(()=>undefined)},30_000):null;keepalive?.unref?.()
   try{

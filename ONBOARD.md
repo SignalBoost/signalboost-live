@@ -145,6 +145,11 @@ failed verification, or an unrecognized incident fails closed and remains visibl
 reported as healed. Insufficient rights-cleared unique material is reported as a supply wait; the
 system does not weaken the 20-item curriculum quality floor merely to keep provider compute busy.
 
+The rolling RPC is the only service-role campaign-authorizer entry point: direct execution of the
+legacy authorizer is revoked so concurrent workers cannot bypass the policy-row lock or 24-hour cap.
+Monitoring and reconciliation read every unsettled Hugging Face provider job, including jobs whose
+campaign has already left the active window, before another campaign can be authorized.
+
 ---
 
 # Mandatory first-read / repo-scan rule

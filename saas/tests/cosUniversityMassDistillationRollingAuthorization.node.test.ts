@@ -55,6 +55,8 @@ test('database rolling policy serializes workers and counts worst-case campaign 
   assert.match(sql, /automatic_promotion_authorized boolean not null default false/)
   assert.match(sql, /runpod_mutation_authorized boolean not null default false/)
   assert.match(sql, /revoke all on function public\.authorize_next_cos_university_mass_distillation_campaign\(\)/)
+  assert.match(sql, /security definer[\s\S]*authorize_next_cos_university_mass_distillation_campaign|authorize_next_cos_university_mass_distillation_campaign\(\)[\s\S]*security definer/i)
+  assert.match(sql, /revoke execute on function public\.authorize_cos_university_mass_distillation_campaign\(text\[\],numeric,text,interval\)[\s\S]*from service_role/)
   assert.doesNotMatch(sql, /sum\(c\.committed_cost_usd\)/)
   assert.doesNotMatch(sql, /automatic_promotion_authorized\s*=\s*true|runpod_mutation_authorized\s*=\s*true/)
 })

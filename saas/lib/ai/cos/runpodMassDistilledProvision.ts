@@ -10,8 +10,12 @@ const BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 const ROUTING = 'LOAD_BALANCER' as const
 const PUBLIC_PORT = 8000
 const IDLE_TIMEOUT_SECONDS = 60
-const READY_TIMEOUT_MS = 190_000
-const CANARY_TIMEOUT_MS = 40_000
+// Production evidence showed the exact Qwen3-4B + LoRA worker still loading at 190 seconds while
+// RunPod reported one healthy running worker. Keep enough of the 300-second route budget for the
+// inference probe and evidence writes, but do not turn a slow cold start into a false terminal
+// artifact failure.
+const READY_TIMEOUT_MS = 235_000
+const CANARY_TIMEOUT_MS = 35_000
 const MAX_GPU_PRICE_USD = 0.69
 const REQUEST_TIMEOUT_MS = 8_000
 const HEALTH_TIMEOUT_MS = 5_000

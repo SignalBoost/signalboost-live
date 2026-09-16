@@ -27,13 +27,21 @@ test('mass-distilled runtime uses the proven v6 memory and cold-start contract i
   assert.match(provision, /127\.0\.0\.1/)
   assert.match(provision, /runpod-volume\/huggingface-cache\/hub/)
   assert.match(provision, /IDLE_TIMEOUT_SECONDS = 60/)
-  assert.match(provision, /READY_TIMEOUT_MS = 190_000/)
-  assert.match(provision, /CANARY_TIMEOUT_MS = 40_000/)
+  assert.match(provision, /READY_TIMEOUT_MS = 235_000/)
+  assert.match(provision, /CANARY_TIMEOUT_MS = 35_000/)
   assert.match(provision, /REQUEST_TIMEOUT_MS = 8_000/)
   assert.match(provision, /HEALTH_TIMEOUT_MS = 5_000/)
   assert.match(provision, /enable_thinking.*False/)
   assert.match(provision, /chat_template_kwargs:\{enable_thinking:false\}/)
   assert.match(route, /maxDuration = 300/)
+})
+
+test('mass-distilled cold-start and inference windows remain inside the route deadline', () => {
+  const ready = Number(/READY_TIMEOUT_MS = ([\d_]+)/.exec(provision)?.[1].replaceAll('_', ''))
+  const canary = Number(/CANARY_TIMEOUT_MS = ([\d_]+)/.exec(provision)?.[1].replaceAll('_', ''))
+  assert.equal(ready, 235_000)
+  assert.equal(canary, 35_000)
+  assert.ok(ready + canary <= 270_000)
 })
 
 test('204 is never treated as inference-ready for mass artifacts', () => {

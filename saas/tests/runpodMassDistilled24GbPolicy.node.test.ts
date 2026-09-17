@@ -8,7 +8,7 @@ const evaluationRoute = readFileSync(new URL('../app/api/cron/cos-university-mas
 
 test('mass-distilled evaluator runtime narrows provider preflight to AMPERE_24 only', () => {
   assert.match(provisionV2, /const APPROVED_POOLS = \['AMPERE_24'\] as const/)
-  assert.doesNotMatch(provisionV2, /const APPROVED_POOLS = \['AMPERE_16', 'AMPERE_24'\] as const/)
+  assert.doesNotMatch(provisionV2, /APPROVED_POOLS = \['AMPERE_16', 'AMPERE_24'\] as const/)
   assert.match(provisionV2, /constrainEndpointToApprovedGpu/)
   assert.match(provisionV2, /body: JSON\.stringify\(\{ gpu: \{ pools: \[\.\.\.APPROVED_POOLS\], count: 1 \} \}\)/)
 })

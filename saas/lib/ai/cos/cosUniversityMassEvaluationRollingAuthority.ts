@@ -11,6 +11,8 @@ export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 12
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
+export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
+const REPAIRED_SUSPENSION_REASON = 'candidate_502_pending_runpod_worker_logs' as const
 
 export type RollingArtifact = Readonly<{ candidateId: string; subjectId: string; artifactHash: string; createdAt: string }>
 export type RollingEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
@@ -120,14 +122,19 @@ export function decideRollingMassEvaluationApproval(input: {
       && !evaluatorInfrastructureFailure(event)).length
     if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
-    // Respect the latest owner control: a suspension, or an approval that is still armed, means no new one.
+    // Respect the latest owner control. Generic suspensions remain hard stops. The one suspension raised specifically
+    // for the pre-#2398 502 investigation may be superseded only by this post-#2398 policy, because the evaluator now
+    // enforces the 24GB endpoint preflight itself before readiness/inference. The next approval becomes the latest control,
+    // so this exception cannot mint parallel approvals.
     const controls = mine
       .filter(event => event.verifier === 'host_controller'
         && (event.evidence?.claim === 'distilled_independent_evaluation_approved' || event.evidence?.claim === 'distilled_independent_evaluation_suspended'))
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
     const latest = controls[0]
-    if (latest?.evidence?.claim === 'distilled_independent_evaluation_suspended') continue
-    if (latest) {
+    const repairedSuspension = latest?.evidence?.claim === 'distilled_independent_evaluation_suspended'
+      && String(latest.evidence?.reason || '') === REPAIRED_SUSPENSION_REASON
+    if (latest?.evidence?.claim === 'distilled_independent_evaluation_suspended' && !repairedSuspension) continue
+    if (latest && latest.evidence?.claim === 'distilled_independent_evaluation_approved') {
       const startedAfter = mine.some(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_started' && at(event.observedAt) >= at(latest.observedAt))
       if (!startedAfter && at(latest.expiresAt) > nowMs) continue
     }
@@ -151,6 +158,7 @@ export function decideRollingMassEvaluationApproval(input: {
         rollingWindowHours: MASS_EVALUATION_ROLLING_WINDOW_HOURS,
         rollingMaxApprovals: MASS_EVALUATION_ROLLING_MAX_APPROVALS,
         priorFailedAttempts: failures,
+        ...(repairedSuspension ? { resumeAfterSuspension: true, repairRef: MASS_EVALUATION_24GB_REPAIR_REF } : {}),
       },
     }
   }

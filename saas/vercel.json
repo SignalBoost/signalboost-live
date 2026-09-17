@@ -1,5 +1,4 @@
 {
-  "_path": "saas/vercel.json",
   "buildCommand": "node scripts/vercel-cos-gates.mjs && npm run prebuild && next build",
   "env": {
     "COS_AUTONOMOUS_LEARNING_ENABLED": "true",

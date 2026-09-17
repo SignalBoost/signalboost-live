@@ -49,6 +49,22 @@ test('an armed approval or an owner suspension blocks a new one; a consumed appr
   assert.equal(decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), armed, started, failed, suspended], now }).issue, false)
 })
 
+test('the repaired 502 diagnostic suspension may resume only through the bounded post-2398 rolling approval', () => {
+  const suspended = ev(artifactA.candidateId, 'host_controller', {
+    claim: 'distilled_independent_evaluation_suspended',
+    artifactHash: hashA,
+    reason: 'candidate_502_pending_runpod_worker_logs',
+  }, '2026-09-16T16:45:00Z')
+  const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), suspended], now })
+  assert.equal(decision.issue, true)
+  if (!decision.issue) return
+  assert.equal(decision.evidence.resumeAfterSuspension, true)
+  assert.equal(decision.evidence.repairRef, 'pr_2398_24gb_evaluator_preflight')
+  assert.equal(decision.evidence.maxEndpointCalls, 8)
+  assert.equal(decision.evidence.maxEstimatedRuntimeWakeCostUsd, 0.2)
+  assert.equal(decision.evidence.productionTrafficAuthorized, false)
+})
+
 test('three substantive failures of rolling attempts stop automatic retries, and the next eligible artifact is chosen oldest first', () => {
   const rollingApproval = ev(artifactB.candidateId, 'host_controller', { claim: 'distilled_independent_evaluation_approved', artifactHash: hashB, authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF }, '2026-09-16T09:00:00Z', '2026-09-16T11:00:00Z')
   const failures = Array.from({ length: MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT }, (_, i) =>

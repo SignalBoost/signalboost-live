@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
@@ -17,6 +18,10 @@ import {
   type HuggingFaceJobsConfig,
 } from './cosUniversityHuggingFaceJobs.ts'
 import { trainingExecutorConfigFromEnv } from './cosUniversityTrainingExecutor.ts'
+import {
+  DISTILLATION_SOURCE_ATTRIBUTION_CLAIM,
+  attributeDistillationSources,
+} from './cosUniversityDistillationSourceAttribution.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
 export const MASS_DISTILLATION_CALLBACK_PATH = '/api/internal/cos/mass-distillation/evidence' as const
@@ -1032,6 +1037,32 @@ export async function recordMassDistillationWorkerEvidence(
     },
     verifier: 'training_executor',
   })
+
+  // Record which source mix produced this artifact, so recipe changes can be judged against verdicts instead of
+  // guessed. Attribution is descriptive evidence only: a failure here must never fail a completed training run.
+  try {
+    const batch = await db.from('cos_university_distillation_curriculum_batches')
+      .select('source_hashes')
+      .eq('batch_key', run.batch_key)
+      .maybeSingle()
+    if (!batch.error && batch.data) {
+      const attribution = attributeDistillationSources({
+        subjectId: String(run.subject_id || ''),
+        sourceHashes: Array.isArray(batch.data.source_hashes) ? batch.data.source_hashes.map((value: unknown) => String(value)) : [],
+      })
+      await recordAssurance({
+        candidateId, subjectId: run.subject_id, claim: DISTILLATION_SOURCE_ATTRIBUTION_CLAIM,
+        evidence: {
+          campaignId: run.campaign_id, batchKey: run.batch_key,
+          artifactHash: trainedArtifactHash, trainedArtifactId, revisionKey: run.revision_key,
+          sourceMix: attribution, trafficAuthorized: false,
+        },
+        verifier: 'training_executor',
+      })
+    }
+  } catch (error) {
+    console.error('[cos-university-distillation-source-attribution]', JSON.stringify({ ok: false, batchKey: run.batch_key, error: String(error instanceof Error ? error.message : error).slice(0, 200) }))
+  }
   await completeCampaignIfDone(run.campaign_id)
   return { ok: true as const, campaignId: run.campaign_id, batchKey: run.batch_key, nextStage: 'independent_evaluation' as const, artifactId: trainedArtifactId }
 }

@@ -36,7 +36,11 @@ const ROUTING = 'LOAD_BALANCER' as const
 const PUBLIC_PORT = 8000
 const IDLE_TIMEOUT_SECONDS = 60
 const REQUEST_TIMEOUT_MS = 8_000
-const APPROVED_POOLS = ['AMPERE_16', 'AMPERE_24'] as const
+// Production mass-evaluation evidence on 2026-09-17 showed the exact LoRA candidate repeatedly
+// returning HTTP 502 after ~40s while the same endpoint passed the short exact-artifact canary and
+// the base-model holdout calls succeeded. Keep the existing 24 GB Ampere pool and remove the 16 GB
+// option for this exact-artifact runtime so long-form evaluator generation has deterministic VRAM headroom.
+const APPROVED_POOLS = ['AMPERE_24'] as const
 
 type Template = { id?: string; name?: string; isServerless?: boolean }
 type Endpoint = {
@@ -105,7 +109,7 @@ function identity(input: MassDistilledRuntimeArtifact) {
   }
 }
 
-function assertEndpointSafetyPolicy(endpoint: Endpoint) {
+function assertNonGpuEndpointSafetyPolicy(endpoint: Endpoint) {
   if (endpoint.type !== ROUTING) throw new Error('mass_distilled_runtime_endpoint_routing_mismatch')
   if (Number(endpoint.workers?.min ?? Number.NaN) !== 0
     || Number(endpoint.workers?.max ?? Number.NaN) > 1
@@ -113,10 +117,32 @@ function assertEndpointSafetyPolicy(endpoint: Endpoint) {
     throw new Error('mass_distilled_runtime_endpoint_worker_policy_drift')
   }
   if (Number(endpoint.gpu?.count ?? Number.NaN) !== 1) throw new Error('mass_distilled_runtime_endpoint_gpu_count_drift')
+}
+
+function assertEndpointSafetyPolicy(endpoint: Endpoint) {
+  assertNonGpuEndpointSafetyPolicy(endpoint)
   const pools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
   if (pools.length !== APPROVED_POOLS.length || !APPROVED_POOLS.every(pool => pools.includes(pool))) {
     throw new Error('mass_distilled_runtime_endpoint_gpu_pool_drift')
   }
+}
+
+async function constrainEndpointToApprovedGpu(endpointId: string) {
+  const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
+  let endpoint = (listed.endpoints || []).find(item => clean(item.id, 160) === endpointId)
+  if (!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
+  assertNonGpuEndpointSafetyPolicy(endpoint)
+  const currentPools = (endpoint.gpu?.pools || []).map(pool => clean(pool, 80))
+  if (!currentPools.includes(APPROVED_POOLS[0])) throw new Error('mass_distilled_runtime_24gb_pool_unavailable')
+  if (currentPools.length === APPROVED_POOLS.length && APPROVED_POOLS.every(pool => currentPools.includes(pool))) return endpoint
+
+  endpoint = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(endpoint.id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ gpu: { pools: [...APPROVED_POOLS], count: 1 } }),
+  })
+  if (!endpoint?.id) throw new Error('mass_distilled_runtime_gpu_pool_rebind_missing')
+  assertEndpointSafetyPolicy(endpoint)
+  return endpoint
 }
 
 function materializedEndpointMatches(endpoint: Endpoint, input: MassDistilledRuntimeArtifact, modelName: string) {
@@ -152,12 +178,8 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact) {
   const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
   let endpoint = (listed.endpoints || []).find(item => clean(item.name, 240) === ids.endpointName)
   if (!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_id_missing')
+  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id))
 
-  // Authority/cost policy is checked before any provider-side repair.
-  assertEndpointSafetyPolicy(endpoint)
-
-  // RunPod v2 applies templateId once; no persistent template link is retained. If the effective
-  // endpoint already proves the exact immutable artifact identity, no mutation is needed.
   if (materializedEndpointMatches(endpoint, input, ids.modelName)) {
     return Object.freeze({ endpoint, ...ids, reboundTemplate: false })
   }
@@ -167,6 +189,7 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact) {
     body: JSON.stringify({ templateId: template.id }),
   })
   if (!endpoint?.id) throw new Error('mass_distilled_runtime_endpoint_template_rebind_missing')
+  endpoint = await constrainEndpointToApprovedGpu(String(endpoint.id))
   assertMaterializedEndpointIdentity(endpoint, input, ids.modelName)
   return Object.freeze({ endpoint, ...ids, reboundTemplate: true })
 }
@@ -177,7 +200,14 @@ async function resolveExactEndpoint(input: MassDistilledRuntimeArtifact) {
  */
 export async function provisionMassDistilledRuntime(input: MassDistilledRuntimeArtifact) {
   try {
-    return await provisionLegacyMassDistilledRuntime(input)
+    const provisioned = await provisionLegacyMassDistilledRuntime(input)
+    const endpoint = await constrainEndpointToApprovedGpu(String(provisioned.endpointId))
+    return Object.freeze({
+      ...provisioned,
+      workersMin: Number(endpoint.workers?.min),
+      workersMax: Number(endpoint.workers?.max),
+      idleTimeout: Number(endpoint.workers?.idleTimeout),
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (message !== 'mass_distilled_runtime_template_identity_mismatch'

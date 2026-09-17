@@ -1,2 +1,2 @@
-base_sha=bb5ecaf017c9393f4cc9b69d3cbfdd1e0efd3aab
-branch=fix/evaluator-wake-regression-20260917
+base_sha=eec43e19c001dc6f7677c8d521c81ef49ecef8c2
+branch=fix/eval-drain-cadence

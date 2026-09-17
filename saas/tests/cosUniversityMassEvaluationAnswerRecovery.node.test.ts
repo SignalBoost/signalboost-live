@@ -6,8 +6,8 @@ import { readFileSync } from 'node:fs'
 const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 
 test('a slipped answer marker no longer aborts the batch: parsed answers are kept and missing ids collected', () => {
-  assert.match(source, /function parseAnswersPartial\(text:string,cases:readonly EvalCase\[\],finish:string\)/)
-  assert.match(source, /const parsed=parseAnswersPartial\(text,input\.cases,clean\(payload\?\.choices\?\.\[0\]\?\.finish_reason,40\)\)/)
+  assert.match(source, /function parseAnswersPartial\(text:string,cases:readonly EvalCase\[\],finish:string,cap:number\)/)
+  assert.match(source, /const parsed=parseAnswersPartial\(text,input\.cases,clean\(payload\?\.choices\?\.\[0\]\?\.finish_reason,40\),cap\)/)
 })
 
 test('slipped cases are retried solo only inside the approved call ceiling and never use calls reserved for later suites', () => {
@@ -18,7 +18,7 @@ test('slipped cases are retried solo only inside the approved call ceiling and n
 
 test('a case that fails alone keeps the same error name, with finish_reason appended', () => {
   assert.match(source, /if\(solo\.missing\.length\)throw new Error\(solo\.errors\[id\]\)/)
-  assert.match(source, /errors\[item\.id\]=`\$\{error instanceof Error\?error\.message:String\(error\)\}:finish=\$\{finish\|\|'unknown'\}`/)
+  assert.match(source, /errors\[item\.id\]=`\$\{error instanceof Error\?error\.message:String\(error\)\}:\$\{answerFailureFingerprint\(text,item,finish,cap\)\}`/)
   assert.match(source, /throw new Error\(`mass_distilled_evaluation_answer_missing:\$\{item\.id\}`\)/)
 })
 

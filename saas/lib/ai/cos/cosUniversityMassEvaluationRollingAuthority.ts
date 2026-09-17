@@ -14,11 +14,13 @@ export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // (answer_missing:0ee6ecdba3940d76:finish=length) at 21:06, 21:08, 21:10 and 21:12 UTC on 2026-09-17, waking paid
 // compute each time and learning nothing. Identical repeats stop; a different failure resets the count.
 export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
-// PR #2433 changed the evaluator itself by forcing Qwen final-answer mode. Identical failures from before that repair
-// must not permanently suppress the artifact: only failures observed after this named repair generation count toward
-// the identical-infrastructure circuit breaker. A future evaluator repair can advance this epoch explicitly.
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_answer_failure_fingerprint' as const
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T22:10:00Z' as const
+// PR #2446 changed the evaluator transport after Production repeatedly returned a gateway 502 for a seven-case
+// candidate request. Identical infrastructure failures from before that repair must not suppress the repaired
+// evaluator before it gets one honest Production attempt. Advance both the named generation and its epoch whenever
+// a later evaluator repair changes the failing request path; older failures remain evidence but do not trip the
+// current-generation identical-failure circuit breaker.
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_seven_case_transport_split_pr_2446' as const
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T22:40:24Z' as const
 const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000

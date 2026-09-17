@@ -7,6 +7,10 @@ import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependen
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 import {
+  captureMassEvaluationRuntimeHealth,
+  isMassEvaluationCandidateGatewayFailure,
+} from '@/lib/ai/cos/cosUniversityMassEvaluationRuntimeHealth'
+import {
   runMassDistilledArtifactEvaluation,
   type MassEvaluationClaim,
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
@@ -289,19 +293,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(result, { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    const runtimeHealthEvidence = claim && isMassEvaluationCandidateGatewayFailure(message)
+      ? await captureMassEvaluationRuntimeHealth({ endpointId: claim.endpointId, gatewayFailure: message }).catch((healthError) => ({
+        profile: 'cos_mass_evaluation_runtime_health_v1',
+        source: 'runpod_serverless_health_control_plane',
+        captureFailed: true,
+        captureError: clean(healthError instanceof Error ? healthError.message : String(healthError), 300),
+        inferenceCallsAdded: 0,
+        runtimeWakeAttemptsAdded: 0,
+        productionTrafficAuthorized: false,
+        authorityExpanded: false,
+      }))
+      : null
     if (claim) {
       await recordTerminal({
         claim,
         eventClaim: FAILED,
-        evidence: { error: clean(message, 500) },
+        evidence: { error: clean(message, 500), ...(runtimeHealthEvidence ? { runtimeHealthEvidence } : {}) },
       }).catch(() => undefined)
     }
     await recordProduction(false, {
       runnerInvoked: Boolean(claim),
       error: clean(message, 500),
+      ...(runtimeHealthEvidence ? { runtimeHealthEvidence } : {}),
       ...(claim ? { candidateId: claim.candidateId, artifactHash: claim.artifactHash } : {}),
     }).catch(() => undefined)
-    console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: clean(message, 500) }))
+    console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({
+      ok: false,
+      error: clean(message, 500),
+      ...(runtimeHealthEvidence ? { runtimeHealthEvidence } : {}),
+    }))
     return NextResponse.json({ ok: false, error: clean(message, 500) }, { status: 500 })
   }
 }

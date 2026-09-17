@@ -1,6 +1,7 @@
 import type { AgentRequest, AllowlistEntry } from '../agent-gateway/index.ts'
 import type { ChainAttempt, ChainExecutor } from './execution-chain.ts'
 import { runCosUniversityMassDistillationWorkflow } from '../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts'
+import { preflightHfWorkerDelivery } from '../lib/ai/cos/cosUniversityHfWorkerDelivery.ts'
 import { recordCosUniversityProductionPath } from '../lib/ai/cos/cosUniversityProductionAssurance.ts'
 import {
   readUniversityMassDistillationHealth,
@@ -34,12 +35,18 @@ export interface UniversityDistillationRecoveryResult {
 type WorkflowRunner = typeof runCosUniversityMassDistillationWorkflow
 type ReceiptRecorder = typeof recordCosUniversityProductionPath
 type HealthReader = typeof readUniversityMassDistillationHealth
+type WorkerPreflight = typeof preflightHfWorkerDelivery
 
 /**
  * Executes the same bounded workflow used by the five-minute cron and then performs a separate
  * durable health read. The Supervisor never receives a free-form provider action or a new budget:
  * every paid claim passes either the original campaign fences or the durable owner-approved
  * single-batch rolling policy, and both paths retain the existing per-stage cost ceilings.
+ *
+ * Owner policy for this registered operational recovery is autonomous: no separate human approval
+ * is required. Before any recovery can dispatch paid Hugging Face work, however, the Supervisor
+ * must prove the signed iTMounts worker artifact is reachable and structurally valid. A failed
+ * preflight blocks spending and is retried on a later Supervisor tick instead of launching jobs.
  */
 export async function recoverUniversityMassDistillation(input: {
   db: any
@@ -47,11 +54,13 @@ export async function recoverUniversityMassDistillation(input: {
   runWorkflow?: WorkflowRunner
   recordReceipt?: ReceiptRecorder
   readHealth?: HealthReader
+  preflightWorker?: WorkerPreflight
 }): Promise<UniversityDistillationRecoveryResult> {
   const now = input.now ?? (() => new Date())
   const runWorkflow = input.runWorkflow ?? runCosUniversityMassDistillationWorkflow
   const recordReceipt = input.recordReceipt ?? recordCosUniversityProductionPath
   const readHealth = input.readHealth ?? readUniversityMassDistillationHealth
+  const preflightWorker = input.preflightWorker ?? preflightHfWorkerDelivery
   const startedAt = now()
   const before = await readHealth({ db: input.db, now: startedAt })
   // The offset monitor can race a successful scheduled worker. Treat any independently observed
@@ -75,6 +84,29 @@ export async function recoverUniversityMassDistillation(input: {
   }
   if (!before.automaticRecoveryAuthorized) throw new Error('university_distillation_recovery_not_authorized')
 
+  const workerPreflight = await preflightWorker()
+  if (!workerPreflight.ok) {
+    await recordReceipt({
+      path: 'mass_distillation_campaign',
+      invocationSucceeded: false,
+      evidence: {
+        runnerInvoked: false,
+        supervisorRecovery: true,
+        repairContained: true,
+        paidDispatchSuppressed: true,
+        reason: workerPreflight.reason,
+        workerStatus: workerPreflight.status,
+        workerBytes: workerPreflight.bytes,
+        automaticRetryOnLaterSupervisorTick: true,
+        automaticPromotionAuthorized: false,
+        runpodMutationAuthorized: false,
+        authorityExpanded: false,
+      },
+      now: now(),
+    }).catch(() => null)
+    throw new Error(`university_distillation_worker_preflight_failed:${workerPreflight.reason || 'unknown'}`)
+  }
+
   const workflow = await runWorkflow({ source: 'self_healing_supervisor', now: now() })
   const receiptRef = await recordReceipt({
     path: 'mass_distillation_campaign',
@@ -84,6 +116,9 @@ export async function recoverUniversityMassDistillation(input: {
       runnerInvoked: !workflow.skipped,
       skipped: workflow.skipped,
       supervisorRecovery: true,
+      workerPreflightPassed: true,
+      workerSha256: workerPreflight.sha256,
+      workerBytes: workerPreflight.bytes,
       repairScope: before.activeCampaigns > 0
         ? 'same_campaign_expiration_and_remaining_budget'
         : 'one_prepared_batch_within_owner_rolling_24h_maximum_authority',

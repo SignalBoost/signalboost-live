@@ -43,6 +43,10 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'the operation was aborted due to timeout'
     || error.includes('mass_distilled_evaluation_call_timeout')
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
+    // The independent judge is evaluator infrastructure, not the artifact under test. A transient provider overload
+    // (Production 2026-09-17: DeepInfra 429 engine_overloaded) returns judge_unavailable. Preserve the strict four-judge
+    // call ceiling and fail closed, but do not consume a substantive artifact attempt or rolling-window slot.
+    || error === 'mass_distilled_evaluation_judge_unavailable'
     // Evaluator protocol/output-budget defects are not evidence of model quality. They must fail closed, but they may retry
     // after the evaluator is repaired without consuming the model's substantive-attempt budget or the rolling approval window.
     || error.startsWith('mass_distilled_evaluation_answer_missing:')

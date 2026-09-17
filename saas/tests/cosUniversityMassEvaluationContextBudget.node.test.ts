@@ -75,15 +75,15 @@ test('a one-case batch stays one request, and one that cannot fit in the allowed
   assert.throws(() => planMassEvaluationGroups(huge, () => 'x'.repeat(30000), 3), /context_budget_insufficient:cases=3:maxGroups=3/)
 })
 
-test('the runner stays inside the approved 8 endpoint calls and still judges each suite separately', () => {
+test('the runner stays inside the approved 8 endpoint calls and reserves candidate recovery headroom', () => {
   assert.match(source, /const cap=massEvaluationOutputTokens\(input\.cases\.length,userPrompt\)/)
   assert.match(source, /max_tokens:cap,messages:\[\{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT\}/)
   assert.equal((source.match(/\/chat\/completions`/g) || []).length, 1)
   assert.match(source, /const budget:EndpointCallBudget=\{used:0,max:ENDPOINT_CALLS\}/)
   assert.match(source, /input\.budget\.used\+groups\.length\+input\.reserveCallsAfter>input\.budget\.max/)
   assert.match(source, /const reserve=remainingGroups\+input\.reserveCallsAfter/)
-  assert.match(source, /holdoutGroupCount\+2/)
-  assert.match(source, /reserveCallsAfter:2/)
+  assert.match(source, /model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutGroupCount\+2/)
+  assert.match(source, /model,cases:holdoutCases,maxGroups:3,reserveCallsAfter:2/)
   assert.match(source, /reserveCallsAfter:1/)
   assert.match(source, /reserveCallsAfter:0/)
   assert.equal((source.match(/await answersFor\(/g) || []).length, 4)
@@ -91,9 +91,13 @@ test('the runner stays inside the approved 8 endpoint calls and still judges eac
   assert.match(source, /endpointCalls:budget\.used/)
 })
 
-test('transient RunPod gateway failures split a multi-case group only when two calls fit beyond all reserved later work', () => {
+test('transient RunPod gateway failures retry the same bounded group before spending two calls on a split', () => {
   assert.match(source, /mass_distilled_evaluation_runpod_http_\(502\|503\|504\)/)
-  assert.match(source, /group\.length>1&&input\.budget\.used\+2\+reserve<=input\.budget\.max/)
+  const retry = source.indexOf('if(input.budget.used+1+reserve<=input.budget.max)')
+  const split = source.indexOf('if(group.length>1&&input.budget.used+2+reserve<=input.budget.max)')
+  assert.ok(retry >= 0, 'bounded same-group retry exists')
+  assert.ok(split > retry, 'split happens only after the bounded same-group retry path')
+  assert.match(source, /try\{mergeAnswerResult\(answers,hashes,await call\(group\)\);continue\}catch\(retryError\)\{if\(!transientGateway\(retryError\)\)throw retryError;error=retryError\}/)
   assert.match(source, /const midpoint=Math\.ceil\(group\.length\/2\)/)
   assert.match(source, /group\.slice\(0,midpoint\),group\.slice\(midpoint\)/)
   assert.match(source, /for\(const part of halves\)\{input\.budget\.used\+=1;mergeAnswerResult\(answers,hashes,await call\(part\)\)\}/)

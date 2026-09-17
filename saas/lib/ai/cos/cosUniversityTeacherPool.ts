@@ -30,17 +30,17 @@ export const UNIVERSITY_TEACHERS: readonly UniversityTeacherDefinition[] = Objec
     buyerOwnedCredential: true, provenanceRequired: true, costCeilingRequired: true, silentFallbackAllowed: false,
   }),
   Object.freeze({
-    id: 'openai', provider: 'openai', transport: 'openai_compatible', model: 'gpt-5.6',
+    id: 'openai', provider: 'openai', transport: 'openai_compatible', model: 'buyer-configured',
     credentialEnv: 'OPENAI_API_KEY', enabledEnv: 'COS_UNIVERSITY_TEACHER_OPENAI_ENABLED',
     buyerOwnedCredential: true, provenanceRequired: true, costCeilingRequired: true, silentFallbackAllowed: false,
   }),
   Object.freeze({
-    id: 'claude', provider: 'anthropic', transport: 'anthropic_messages', model: 'claude-enterprise-configured',
+    id: 'claude', provider: 'anthropic', transport: 'anthropic_messages', model: 'buyer-configured',
     credentialEnv: 'ANTHROPIC_API_KEY', enabledEnv: 'COS_UNIVERSITY_TEACHER_ANTHROPIC_ENABLED',
     buyerOwnedCredential: true, provenanceRequired: true, costCeilingRequired: true, silentFallbackAllowed: false,
   }),
   Object.freeze({
-    id: 'grok', provider: 'xai', transport: 'openai_compatible', model: 'grok-enterprise-configured',
+    id: 'grok', provider: 'xai', transport: 'openai_compatible', model: 'buyer-configured',
     credentialEnv: 'XAI_API_KEY', enabledEnv: 'COS_UNIVERSITY_TEACHER_XAI_ENABLED',
     buyerOwnedCredential: true, provenanceRequired: true, costCeilingRequired: true, silentFallbackAllowed: false,
   }),

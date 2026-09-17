@@ -1,4 +1,5 @@
 // saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts
+// saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
@@ -7,7 +8,7 @@ import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependen
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
-import { runpodServerlessOpenAiBaseUrl } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
+import { runpodServerlessRootUrl } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
 import {
   runMassDistilledArtifactEvaluation,
   type MassEvaluationClaim,
@@ -50,7 +51,10 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
   const remainingMs = deadlineMs - Date.now() - ROUTE_RESERVE_MS
   if (remainingMs <= 0) throw new Error('mass_distilled_evaluation_route_deadline_exceeded')
   const timeoutMs = Math.max(1, Math.min(RUNTIME_WAKE_TIMEOUT_MS, remainingMs))
-  const response = await fetch(`${runpodServerlessOpenAiBaseUrl(endpointId)}/models`, {
+  // The exact-artifact runtime serves only /ping, /ready and POST /v1/chat/completions (itmounts_mass_gateway.py),
+  // so GET /v1/models returned 404 and no evaluation could start (Production 2026-09-17 19:32 UTC).
+  // /ping is served by the same worker, so it still wakes the scaled-to-zero endpoint and generates no tokens.
+  const response = await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`, {
     headers: { Authorization: `Bearer ${key}` },
     signal: AbortSignal.timeout(timeoutMs),
   })
@@ -59,7 +63,7 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
     throw new Error(`mass_distilled_evaluation_runtime_wake_http_${response.status}:${detail}`)
   }
   const payload: any = await response.json().catch(() => null)
-  if (!Array.isArray(payload?.data) || payload.data.length < 1) {
+  if (String(payload?.status || '') !== 'accepting_requests') {
     throw new Error('mass_distilled_evaluation_runtime_wake_invalid')
   }
   return Object.freeze({
@@ -289,7 +293,8 @@ export async function GET(req: NextRequest) {
     const deadlineMs = Date.now() + ROUTE_BUDGET_MS
     // `/ready` is a worker-local probe. When the serverless endpoint has scaled fully to zero, repeatedly
     // polling it can produce network-only failures without ever creating a worker. Wake through the actual
-    // OpenAI/vLLM load-balancer path first; `/v1/models` generates no tokens and does not consume one of the
+    // load-balancer path first, using a route the exact-artifact gateway actually serves; `/ping` generates no
+    // tokens and does not consume one of the
     // eight approved scoring calls. It does, however, realize the already-approved single runtime wake attempt.
     const runtimeWake = await wakeMassDistilledRuntime(claim.endpointId, deadlineMs)
     console.info('[cos-mass-distilled-runtime-wake]', JSON.stringify(runtimeWake))

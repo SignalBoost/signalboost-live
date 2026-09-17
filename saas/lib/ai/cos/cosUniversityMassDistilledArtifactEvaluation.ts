@@ -60,7 +60,6 @@ function sha256(value:unknown){return createHash('sha256').update(JSON.stringify
 function manifestHash(items:readonly string[]){return sha256({items:[...items].sort()})}
 function average(values:readonly number[]){return values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0}
 function score(value:unknown){const n=Number(value);return Number.isFinite(n)&&n>=0&&n<=1?n:null}
-function candidateModelName(artifactHash:string){return `itmounts-mass-distilled-${artifactHash.slice(0,12).toLowerCase()}`}
 
 function remaining(deadlineMs:number,reserve=ROUTE_RESERVE_MS){
   const value=deadlineMs-Date.now()-reserve
@@ -123,7 +122,25 @@ async function massRun(claim:MassEvaluationClaim,now:Date){
     ||fineTuneRevisionKey(revision)!==claim.revisionKey||revision.datasetHash!==claim.datasetHash
     ||clean(run.trained_artifact_id,500)!==claim.artifactId||clean(run.trained_artifact_hash,64).toLowerCase()!==claim.artifactHash)throw new Error('mass_distilled_evaluation_revision_binding_mismatch')
   const teacherModelId=clean(run.teacher_model_id,240);if(!teacherModelId)throw new Error('mass_distilled_evaluation_teacher_identity_missing')
-  return {revision,teacherModelId,holdoutDataRef:clean(run.holdout_data_ref,2000),trainedAt:completedAt}
+
+  const canaries=await db.from('cos_university_learning_assurance_events')
+    .select('observed_at,evidence')
+    .eq('candidate_id',claim.candidateId)
+    .eq('verifier','host_controller')
+    .order('observed_at',{ascending:false})
+    .limit(100)
+  if(canaries.error)throw canaries.error
+  const expectedPrefix=`itmounts-mass-distilled-${claim.artifactHash.slice(0,12).toLowerCase()}-`
+  const canary=(canaries.data||[]).map((row:any)=>row?.evidence).find((e:any)=>e&&e.claim==='local_distilled_runtime_canary_passed'
+    && clean(e.artifactHash,64).toLowerCase()===claim.artifactHash
+    && clean(e.endpointId,120)===claim.endpointId
+    && e.exactArtifact===true
+    && e.productionTrafficAuthorized===false
+    && clean(e.model,240).startsWith(expectedPrefix))
+  const candidateModel=clean(canary?.model,240)
+  if(!candidateModel)throw new Error('mass_distilled_evaluation_canary_model_identity_missing')
+
+  return {revision,teacherModelId,holdoutDataRef:clean(run.holdout_data_ref,2000),trainedAt:completedAt,candidateModel}
 }
 
 async function pinnedHoldout(input:{holdoutDataRef:string;expectedManifestHash:string;deadlineMs:number}):Promise<EvalCase[]>{
@@ -184,7 +201,7 @@ async function callRunpod(input:{endpointId:string;model:string;cases:readonly E
     if(!response.ok){
       // The provider's reason (e.g. vLLM context-length or unknown-model errors) was previously discarded,
       // leaving only "http_400" in the ledger. Keep the status prefix unchanged and append the bounded reason.
-      const detail=clean((await response.text().catch(()=>'')).replace(/\s+/g,' '),240)
+      const detail=clean((await response.text().catch(()=>'')) .replace(/\s+/g,' '),240)
       const role=input.model===BASE_MODEL_ID?'baseline':'candidate'
       throw new Error(`mass_distilled_evaluation_runpod_http_${response.status}:${role}:cases=${input.cases.length}:${detail}`)
     }
@@ -256,7 +273,7 @@ export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvalua
   if(input.claim.maxEndpointCalls!==ENDPOINT_CALLS||input.claim.maxJudgeCalls!==JUDGE_CALLS||input.claim.maxRuntimeWakeAttempts!==1||input.claim.maxEstimatedRuntimeWakeCostUsd<=0||input.claim.maxEstimatedRuntimeWakeCostUsd>0.2)throw new Error('mass_distilled_evaluation_claim_ceiling_invalid')
   const now=input.now||new Date();const training=await massRun(input.claim,now);const age=now.getTime()-training.trainedAt;if(age<MASS_DISTILLED_RETENTION_DELAY_MS)throw new Error('mass_distilled_evaluation_retention_delay_not_met')
   const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs})
-  const model=candidateModelName(input.claim.artifactHash)
+  const model=training.candidateModel
   await waitReady(input.claim.endpointId,input.deadlineMs)
   const keepaliveKey=configuredRunpodApiKey();const keepalive=keepaliveKey?setInterval(()=>{void fetch(`https://${input.claim.endpointId}.api.runpod.ai/ready`,{headers:{Authorization:`Bearer ${keepaliveKey}`},signal:AbortSignal.timeout(8_000)}).catch(()=>undefined)},30_000):null;keepalive?.unref?.()
   try{

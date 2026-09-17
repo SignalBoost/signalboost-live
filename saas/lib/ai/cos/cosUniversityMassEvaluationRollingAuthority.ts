@@ -14,11 +14,11 @@ export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // (answer_missing:0ee6ecdba3940d76:finish=length) at 21:06, 21:08, 21:10 and 21:12 UTC on 2026-09-17, waking paid
 // compute each time and learning nothing. Identical repeats stop; a different failure resets the count.
 export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
-// PR #2433 changed the evaluator itself by forcing Qwen final-answer mode. Identical failures from before that repair
-// must not permanently suppress the artifact: only failures observed after this named repair generation count toward
-// the identical-infrastructure circuit breaker. A future evaluator repair can advance this epoch explicitly.
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_answer_failure_fingerprint' as const
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T22:10:00Z' as const
+// #2446 changed the evaluator transport after Production repeatedly returned candidate:cases=7 HTTP 502 on a healthy exact-artifact endpoint.
+// Failures from older evaluator generations must not permanently suppress the repaired transport. Only failures observed after this
+// named repair generation count toward the identical-infrastructure circuit breaker; the four-repeat ceiling itself is unchanged.
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_seven_case_transport' as const
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T22:40:24Z' as const
 const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
@@ -43,22 +43,12 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'the operation was aborted due to timeout'
     || error.includes('mass_distilled_evaluation_call_timeout')
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
-    // Evaluator protocol/output-budget defects are not evidence of model quality. They must fail closed, but they may retry
-    // after the evaluator is repaired without consuming the model's substantive-attempt budget or the rolling approval window.
     || error.startsWith('mass_distilled_evaluation_answer_missing:')
     || error.startsWith('mass_distilled_evaluation_answer_empty:')
-    // The pre-fix evaluator reconstructed a bare hash-only candidate name. The exact runtime serves a runtime-keyed alias,
-    // so this 404 proves evaluator/runtime identity drift, not model quality. Keep the exclusion narrow to that known shape.
     || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)
       && error.includes('the model `itmounts-mass-distilled-')
       && error.includes('does not exist'))
-    // No worker became ready inside the window (RunPod scheduling/cold start): nothing reached the artifact, so it
-    // says nothing about model quality. bootstrap_failed is deliberately NOT here — a bad adapter can cause it.
     || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
-    // A crash inside the evaluator (2026-09-17 20:01-20:20 UTC: "Cannot read properties of undefined (reading
-    // 'length')", a leftover model-list read after the runtime wake was repointed) says nothing about the model. It
-    // burned all three of mass:481a6760's substantive attempts. A JavaScript defect never reads as model quality;
-    // the shapes below cannot be produced by a model's answers, only by our own code or the wake contract.
     || error.startsWith('cannot read properties of')
     || error.startsWith('mass_distilled_evaluation_runtime_wake_')
     || error === 'mass_distilled_evaluation_route_deadline_exceeded'
@@ -133,8 +123,6 @@ export function decideRollingMassEvaluationApproval(input: {
       && !evaluatorInfrastructureFailure(event)).length
     if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
-    // Before the repair exists, preserve the historical circuit breaker. At/after the named repair epoch, only failures
-    // from the repaired generation count so the fixed evaluator gets one honest retry without erasing prior evidence.
     const infrastructureGenerationStart = nowMs >= MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
       ? MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
       : Number.NEGATIVE_INFINITY

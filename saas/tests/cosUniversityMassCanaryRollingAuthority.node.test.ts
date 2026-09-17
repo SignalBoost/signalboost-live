@@ -7,6 +7,8 @@ import {
   MASS_CANARY_PROFILE,
   MASS_CANARY_ROLLING_AUTHORIZATION_REF,
   MASS_CANARY_ROLLING_MAX_APPROVALS,
+  MASS_CANARY_COLD_START_FAILURE,
+  MASS_CANARY_MAX_IDENTICAL_FAILURES,
   decideMassCanaryRollingApproval,
   type CanaryArtifact,
   type CanaryEvent,
@@ -63,4 +65,34 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
   assert.doesNotMatch(route,/\.contains\('evidence',\{profile:MASS_CANARY_PROFILE\}\)/)
   assert.match(route,/db\.rpc\('claim_next_mass_distilled_runtime_canary'\)/)
   assert.doesNotMatch(route,/productionTrafficAuthorized:true|automaticPromotionAuthorized:true/)
+})
+
+test('cold-start timeouts do not spend an artifact\'s three substantive attempts', () => {
+  // 2026-09-17 17:15-17:27: mass:481a6760 needed three canaries because the first two timed out waking a cold worker.
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const events = [
+    event(a, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T15:00:00.000Z', { expiresAt: '2026-09-17T15:30:00.000Z' }, { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF }),
+    ...['15:05', '15:10', '15:15'].map(time => event(a, 'local_distilled_runtime_canary_failed', `2026-09-17T${time}:00.000Z`, {}, { error: MASS_CANARY_COLD_START_FAILURE })),
+  ]
+  const decision = decideMassCanaryRollingApproval({ artifacts: [a], events, now, enabled: true })
+  assert.ok('artifact' in decision, `expected a retry, got ${JSON.stringify(decision)}`)
+})
+
+test('the same canary failure repeating stops that artifact instead of looping', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z'); const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const stuck = Array.from({ length: MASS_CANARY_MAX_IDENTICAL_FAILURES }, (_, index) =>
+    event(a, 'local_distilled_runtime_canary_failed', `2026-09-17T15:0${index}:00.000Z`, {}, { error: 'distilled_bootstrap_failed:adapter_incompatible' }))
+  const decision = decideMassCanaryRollingApproval({ artifacts: [a, b], events: stuck, now, enabled: true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId, 'mass:2', 'the stuck artifact is skipped and the queue moves on')
+})
+
+test('the raised daily ceiling still bounds spend', () => {
+  assert.equal(MASS_CANARY_ROLLING_MAX_APPROVALS, 72)
+  const a = artifact(1)
+  const exhausted = Array.from({ length: MASS_CANARY_ROLLING_MAX_APPROVALS }, (_, index) => {
+    const other = artifact(100 + index)
+    return event(other, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T08:00:00.000Z', { expiresAt: '2026-09-17T10:00:00.000Z' }, { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF })
+  })
+  assert.deepEqual(decideMassCanaryRollingApproval({ artifacts: [a], events: exhausted, now, enabled: true }), { issue: false, reason: 'mass_canary_rolling_window_exhausted' })
 })

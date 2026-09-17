@@ -1,5 +1,7 @@
+// saas/lib/ai/cos/cosUniversityHuggingFaceJobs.ts
 import { createHash, createHmac } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
+import { deriveHfWorkerDeliveryToken } from './cosUniversityHfWorkerDelivery.ts'
 
 export const COS_UNIVERSITY_HF_JOBS_PROFILE = 'cos_university_huggingface_jobs_v1' as const
 export const COS_UNIVERSITY_HF_EXECUTOR_PATH = '/api/internal/cos/huggingface-training-executor' as const
@@ -124,15 +126,19 @@ export function installHuggingFaceTrainingExecutorEnv(env: Env = process.env): H
   return Object.freeze({ installed: true, provider: 'huggingface', endpoint })
 }
 
+export const COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX = '/api/internal/cos/hf-worker'
+
 export function huggingFaceJobsConfigFromEnv(env: Env = process.env): HuggingFaceJobsConfig | null {
   const token = clean(env.HF_TOKEN, 4096)
   if (token.length < 20) return null
 
-  const commit = clean(env.VERCEL_GIT_COMMIT_SHA, 64)
+  // Jobs fetch their worker from this deployment's authenticated delivery route, never from raw GitHub.
+  // 2026-09-17 03:29-13:11 UTC: the raw GitHub bootstrap returned 404 and every preparation and teacher job
+  // (468) exited on its first line. Delivery depends only on this deployment and HF_TOKEN.
   const explicitWorker = clean(env.COS_UNIVERSITY_HF_WORKER_URL, 2000)
-  const workerUrl = explicitWorker || (COMMIT_SHA.test(commit)
-    ? `https://raw.githubusercontent.com/SignalBoost/signalboost-live/${commit}/saas/scripts/cos-university-hf-worker.py`
-    : '')
+  const origin = deploymentOrigin(env)
+  const workerUrl = explicitWorker
+    || (origin ? `${origin}${COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX}/${deriveHfWorkerDeliveryToken(token)}/cos-university-hf-worker.py` : '')
   if (!workerUrl) return null
   try {
     const url = new URL(workerUrl)

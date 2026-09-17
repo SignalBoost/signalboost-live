@@ -99,7 +99,8 @@ function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly 
         && at(event.observedAt) < approvalAt))
     if (priorOpenStart) return false
     if (Number.isFinite(nextApprovalAt)) return false
-    return at(approval.expiresAt) > nowMs
+    const approvalExpiry = at(approval.expiresAt)
+    return !Number.isFinite(approvalExpiry) || approvalExpiry > nowMs
   }
 
   const startAt = at(start.observedAt)

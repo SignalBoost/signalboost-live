@@ -50,6 +50,18 @@ test('the two-case mass holdout starts as two solo requests so a gateway failure
   assert.deepEqual(groups, [[small[0]], [small[1]]])
 })
 
+test('three-to-six case holdouts are pre-split to at most two cases per request when the existing call ceiling permits', () => {
+  for (const count of [3, 4, 5, 6]) {
+    const cases = Array.from({ length: count }, (_, i) => ({ id: `c${count}-${i}` }))
+    const groups = planMassEvaluationGroups(cases, () => 'short', 3)
+    assert.equal(groups.length, Math.ceil(count / 2))
+    assert.ok(groups.every(group => group.length <= 2))
+    assert.deepEqual(groups.flat().map(item => item.id), cases.map(item => item.id))
+  }
+  const five = Array.from({ length: 5 }, (_, i) => ({ id: `five-${i}` }))
+  assert.deepEqual(planMassEvaluationGroups(five, () => 'short', 3).map(group => group.length), [2, 2, 1])
+})
+
 test('a one-case batch stays one request, and one that cannot fit in the allowed requests fails explicitly', () => {
   assert.equal(planMassEvaluationGroups([{ id: 'a' }], () => 'short', 3).length, 1)
   const huge = Array.from({ length: 3 }, (_, i) => ({ id: `h${i}` }))
@@ -57,7 +69,8 @@ test('a one-case batch stays one request, and one that cannot fit in the allowed
 })
 
 test('the runner stays inside the approved 8 endpoint calls and still judges each suite separately', () => {
-  assert.match(source, /max_tokens:massEvaluationOutputTokens\(input\.cases\.length,userPrompt\),messages:\[\{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT\}/)
+  assert.match(source, /const cap=massEvaluationOutputTokens\(input\.cases\.length,userPrompt\)/)
+  assert.match(source, /max_tokens:cap,messages:\[\{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT\}/)
   assert.equal((source.match(/\/chat\/completions`/g) || []).length, 1)
   assert.match(source, /const budget:EndpointCallBudget=\{used:0,max:ENDPOINT_CALLS\}/)
   assert.match(source, /input\.budget\.used\+groups\.length\+input\.reserveCallsAfter>input\.budget\.max/)

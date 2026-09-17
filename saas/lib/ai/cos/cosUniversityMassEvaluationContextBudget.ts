@@ -29,6 +29,13 @@
 // canary already disables thinking. Add Qwen's documented /no_think soft switch to the evaluator system prompt so the bounded
 // output budget is spent on the final answer rather than hidden thinking. Calls, output caps, cases, references, scoring
 // thresholds, authority, promotion rules, and fail-closed truncation behavior are unchanged.
+//
+// 2026-09-17 21:46 UTC Production then returned HTTP 502 for a 5-case candidate request even though the endpoint was awake and
+// preflight was healthy. Five cases can fit the model context but are still too large for the observed serverless transport.
+// For 3-6 case holdouts, start with enough near-equal groups to keep each request at two cases or fewer. A 5-case holdout becomes
+// 2+2+1 for baseline and candidate, which leaves exactly two calls for the fixed baseline/candidate suites and therefore stays
+// inside the unchanged eight-call authorization ceiling. Larger shapes keep the existing context planner and fail closed if the
+// bounded recovery cannot fit; this transport rule does not change cases, references, scoring, promotion, or authority.
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192
 export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought. /no_think'
@@ -53,11 +60,16 @@ function splitEvenly<T>(items: readonly T[], groups: number): T[][] {
 
 // Fewest contiguous, near-equal groups (at most maxGroups) whose every prompt fits the window. The two-case
 // mass-holdout shape is intentionally started as 1+1 so a transient 502 on one case can use the existing single-
-// group retry slot instead of entering the split-child path. Case order/content and every scoring threshold stay fixed.
+// group retry slot instead of entering the split-child path. Production also proves 5-case candidate requests can
+// 502 despite fitting context, so 3-6 case holdouts start with groups no larger than two whenever maxGroups permits.
+// Case order/content and every scoring threshold stay fixed.
 export function planMassEvaluationGroups<T>(items: readonly T[], promptFor: (group: readonly T[]) => string, maxGroups: number): T[][] {
   if (!items.length) throw new Error('mass_distilled_evaluation_no_cases')
   const limit = Math.max(1, Math.min(Math.floor(maxGroups), items.length))
-  const startGroups = items.length === 2 && limit >= 2 ? 2 : 1
+  const transportGroups = items.length >= 3 && items.length <= 6 && limit >= Math.ceil(items.length / 2)
+    ? Math.ceil(items.length / 2)
+    : 1
+  const startGroups = items.length === 2 && limit >= 2 ? 2 : transportGroups
   for (let groups = startGroups; groups <= limit; groups++) {
     const planned = splitEvenly(items, groups)
     const fits = planned.every(group => {

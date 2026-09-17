@@ -49,12 +49,25 @@ test('an armed approval or an owner suspension blocks a new one; a consumed appr
   assert.equal(decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), armed, started, failed, suspended], now }).issue, false)
 })
 
-test('three failures of rolling attempts stop automatic retries, and the next eligible artifact is chosen oldest first', () => {
+test('three substantive failures of rolling attempts stop automatic retries, and the next eligible artifact is chosen oldest first', () => {
   const rollingApproval = ev(artifactB.candidateId, 'host_controller', { claim: 'distilled_independent_evaluation_approved', artifactHash: hashB, authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF }, '2026-09-16T09:00:00Z', '2026-09-16T11:00:00Z')
   const failures = Array.from({ length: MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT }, (_, i) =>
-    ev(artifactB.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashB }, `2026-09-16T1${i}:00:00Z`))
+    ev(artifactB.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashB, error: 'mass_distilled_evaluation_judge_json_invalid' }, `2026-09-16T1${i}:00:00Z`))
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA, artifactB], events: [canary(artifactA), canary(artifactB), rollingApproval, ...failures], now })
   assert.equal(decision.issue && decision.artifact.candidateId, artifactA.candidateId)
+})
+
+test('evaluator infrastructure failures do not exhaust the artifact retry budget', () => {
+  const rollingApproval = ev(artifactA.candidateId, 'host_controller', { claim: 'distilled_independent_evaluation_approved', artifactHash: hashA, authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF }, '2026-09-16T09:00:00Z', '2026-09-16T11:00:00Z')
+  const failures = [
+    'mass_distilled_evaluation_context_budget_insufficient:cases=8:estimatedPromptTokens=9138',
+    "mass_distilled_evaluation_runpod_http_400:baseline:cases=8:{\"error\":{\"message\":\"This model's maximum context length is 8192 tokens\"}}",
+    'The operation was aborted due to timeout',
+    'mass_distilled_evaluation_runpod_http_502:baseline:cases=4:gateway',
+  ].map((error, i) => ev(artifactA.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashA, error }, `2026-09-16T1${i}:00:00Z`))
+  const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), rollingApproval, ...failures], now })
+  assert.equal(decision.issue, true)
+  if (decision.issue) assert.equal(decision.evidence.priorFailedAttempts, 0)
 })
 
 test('failures of earlier hand-approved attempts do not use up the automatic retry budget', () => {

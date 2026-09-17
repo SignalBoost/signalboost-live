@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Governed iTMounts Hugging Face Jobs worker wrapper.
 
-The canonical worker keeps the proven preparation/training implementation in an immutable sibling
-module and overrides only teacher generation. The override improves GPU throughput without changing
-rights, callback, quality-floor, dataset-minimum, model identity, or spend authority.
+The canonical worker keeps the proven preparation implementation in an immutable sibling module,
+overrides teacher generation for bounded batched throughput, and overrides training with a versioned
+small-batch recipe. Rights, callback signing, model identity, spend authority, independent evaluation,
+canary, retention, and promotion remain outside this worker.
 """
 
 from __future__ import annotations
@@ -21,6 +22,21 @@ TEACHER_MIN_RESPONSE_CHARS = 80
 TEACHER_MIN_DATASET_ITEMS = 20
 TEACHER_MAX_NEW_TOKENS = 384
 TEACHER_RETRY_MAX_NEW_TOKENS = 512
+
+TRAINING_PROFILE = "cos_university_small_batch_training_v2"
+TRAINING_SMALL_MAX_ITEMS = 64
+TRAINING_MEDIUM_MAX_ITEMS = 128
+TRAINING_SMALL_EPOCHS = 3.0
+TRAINING_MEDIUM_EPOCHS = 2.0
+TRAINING_LARGE_EPOCHS = 1.0
+TRAINING_SMALL_GRADIENT_ACCUMULATION = 4
+TRAINING_DEFAULT_GRADIENT_ACCUMULATION = 8
+TRAINING_LEARNING_RATE = 1e-4
+TRAINING_WARMUP_RATIO = 0.10
+TRAINING_LR_SCHEDULER = "cosine"
+TRAINING_MAX_GRAD_NORM = 1.0
+TRAINING_MAX_LENGTH = 2048
+
 BASE_WORKER_FILENAME = "cos-university-hf-worker-base.py"
 BASE_WORKER_PATH = Path("/tmp/itmounts_hf_worker_base.py")
 BASE_CONTRACT_MARKERS = (
@@ -375,9 +391,161 @@ def generate_teacher_dataset(base, envelope: dict[str, Any]) -> None:
     })
 
 
+def _training_recipe(training_items: int) -> dict[str, Any]:
+    if training_items <= 0:
+        raise RuntimeError("worker_training_dataset_empty")
+    if training_items <= TRAINING_SMALL_MAX_ITEMS:
+        epochs = TRAINING_SMALL_EPOCHS
+        gradient_accumulation_steps = TRAINING_SMALL_GRADIENT_ACCUMULATION
+    elif training_items <= TRAINING_MEDIUM_MAX_ITEMS:
+        epochs = TRAINING_MEDIUM_EPOCHS
+        gradient_accumulation_steps = TRAINING_SMALL_GRADIENT_ACCUMULATION
+    else:
+        epochs = TRAINING_LARGE_EPOCHS
+        gradient_accumulation_steps = TRAINING_DEFAULT_GRADIENT_ACCUMULATION
+    return {
+        "profile": TRAINING_PROFILE,
+        "trainingItems": training_items,
+        "epochs": epochs,
+        "perDeviceTrainBatchSize": 1,
+        "gradientAccumulationSteps": gradient_accumulation_steps,
+        "learningRate": TRAINING_LEARNING_RATE,
+        "warmupRatio": TRAINING_WARMUP_RATIO,
+        "lrSchedulerType": TRAINING_LR_SCHEDULER,
+        "maxGradNorm": TRAINING_MAX_GRAD_NORM,
+        "maxLength": TRAINING_MAX_LENGTH,
+        "loraR": 16,
+        "loraAlpha": 32,
+        "loraDropout": 0.05,
+        "targetModules": "all-linear",
+    }
+
+
+def train_student(base, envelope: dict[str, Any]) -> None:
+    import torch
+    from huggingface_hub import HfApi
+    from peft import LoraConfig
+    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+    from trl import SFTConfig, SFTTrainer
+
+    token = os.environ["HF_TOKEN"]
+    revision = envelope.get("revision") if isinstance(envelope.get("revision"), dict) else {}
+    base_model = base.clean(revision.get("baseModel"), 240)
+    dataset_hash = base.clean(revision.get("datasetHash"), 64).lower()
+    training_manifest = base.clean(revision.get("trainingManifestHash"), 64).lower()
+    holdout_manifest = base.clean(revision.get("holdoutManifestHash"), 64).lower()
+    if not base_model or not all(base.HEX64.match(value) for value in (dataset_hash, training_manifest, holdout_manifest)):
+        raise RuntimeError("worker_revision_invalid")
+
+    training = base.load_dataset_ref(base.clean(envelope.get("trainingDataRef"), 2000))
+    holdout = base.load_dataset_ref(base.clean(envelope.get("holdoutDataRef"), 2000))
+    observed_training = base.dataset_item_hashes(training)
+    observed_holdout = base.dataset_item_hashes(holdout)
+    if base.manifest_hash(observed_training) != training_manifest or base.manifest_hash(observed_holdout) != holdout_manifest:
+        raise RuntimeError("worker_partition_manifest_mismatch")
+
+    recipe = _training_recipe(len(training))
+    recipe["holdoutItems"] = len(holdout)
+    print(f"itmounts_training_profile:{json.dumps(recipe, ensure_ascii=True, separators=(',', ':'))}", flush=True)
+
+    use_bf16 = bool(torch.cuda.is_available() and torch.cuda.is_bf16_supported())
+    compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
+    quantization = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_compute_dtype=compute_dtype,
+    )
+    tokenizer = AutoTokenizer.from_pretrained(base_model, token=token, use_fast=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model,
+        token=token,
+        quantization_config=quantization,
+        device_map="auto",
+        torch_dtype=compute_dtype,
+    )
+    model.config.use_cache = False
+
+    output_dir = Path("/tmp/itmounts-trained-adapter")
+    args = SFTConfig(
+        output_dir=str(output_dir),
+        num_train_epochs=recipe["epochs"],
+        per_device_train_batch_size=recipe["perDeviceTrainBatchSize"],
+        gradient_accumulation_steps=recipe["gradientAccumulationSteps"],
+        learning_rate=recipe["learningRate"],
+        warmup_ratio=recipe["warmupRatio"],
+        lr_scheduler_type=recipe["lrSchedulerType"],
+        max_grad_norm=recipe["maxGradNorm"],
+        logging_steps=10,
+        save_strategy="no",
+        report_to="none",
+        bf16=use_bf16,
+        fp16=not use_bf16,
+        gradient_checkpointing=True,
+        dataset_text_field="text",
+        max_length=recipe["maxLength"],
+    )
+    peft_config = LoraConfig(
+        r=recipe["loraR"],
+        lora_alpha=recipe["loraAlpha"],
+        lora_dropout=recipe["loraDropout"],
+        bias="none",
+        task_type="CAUSAL_LM",
+        target_modules=recipe["targetModules"],
+    )
+    trainer = SFTTrainer(
+        model=model,
+        args=args,
+        train_dataset=training,
+        processing_class=tokenizer,
+        peft_config=peft_config,
+    )
+    trainer.train()
+    trainer.save_model(str(output_dir))
+    tokenizer.save_pretrained(str(output_dir))
+
+    profile_path = output_dir / "itmounts_training_profile.json"
+    profile_path.write_text(json.dumps(recipe, ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
+
+    api = HfApi(token=token)
+    namespace = api.whoami()["name"]
+    candidate_id = base.clean(envelope.get("candidateId"), 200)
+    job_id = base.clean(os.environ.get("JOB_ID"), 240)
+    output_repo = f"{namespace}/itmounts-student-{base.sha256(candidate_id + ':' + job_id)[:12]}"
+    api.create_repo(output_repo, repo_type="model", private=True, exist_ok=True, token=token)
+    api.upload_folder(repo_id=output_repo, folder_path=str(output_dir), repo_type="model", token=token)
+    info = api.model_info(output_repo, token=token)
+    model_revision = base.clean(getattr(info, "sha", None), 120)
+    artifact_hash = base.directory_hash(output_dir)
+    evidence_ref = f"hf://models/{output_repo}@{model_revision}" if model_revision else f"hf://models/{output_repo}"
+
+    common = {
+        "candidateId": candidate_id,
+        "jobId": job_id,
+        "evidenceRef": evidence_ref,
+        "baseModel": base_model,
+        "datasetHash": dataset_hash,
+        "trainingManifestHash": training_manifest,
+        "holdoutManifestHash": holdout_manifest,
+        "trainedArtifactId": output_repo,
+        "artifactHash": artifact_hash,
+        "trainingProfile": TRAINING_PROFILE,
+        "trainingRecipe": recipe,
+    }
+    base.callback({"claim": "trained_artifact_registered", **common})
+    base.callback({
+        "claim": "rollback_artifact_registered",
+        **common,
+        "rollbackArtifactRef": f"hf://models/{base_model}",
+    })
+
+
 def main() -> int:
     base = _load_base_worker()
     base.generate_teacher_dataset = lambda envelope: generate_teacher_dataset(base, envelope)
+    base.train = lambda envelope: train_student(base, envelope)
     return int(base.main())
 
 

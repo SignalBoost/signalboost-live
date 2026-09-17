@@ -5,6 +5,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 import {
   runMassDistilledArtifactEvaluation,
   type MassEvaluationClaim,
@@ -55,7 +56,6 @@ type RawClaim = Readonly<{
   reservation_event_key: string
 }>
 
-/** Issues at most one bounded evaluation approval per tick under the owner's rolling direction. */
 async function ensureRollingMassEvaluationApproval() {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -88,8 +88,6 @@ async function ensureRollingMassEvaluationApproval() {
     .order('observed_at', { ascending: false })
     .limit(1000)
   if (reservations.error) throw reservations.error
-  // Terminal and started rows are host_controller rows carrying the runtime profile, so both reads return them.
-  // Without de-duplication two real failures counted as four and tripped the three-failure stop (2026-09-16 18:10 UTC).
   const seenEventKeys = new Set<string>()
   const uniqueRows = [...(events.data || []), ...(reservations.data || [])].filter((row: any) => {
     const key = String(row?.event_key || '')
@@ -229,7 +227,6 @@ export async function GET(req: NextRequest) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
 
-    // Read-only provider balance check happens before consuming the single evaluation authorization.
     const account = await queryRunpodAccountStatus()
     if (account.clientBalance !== null && account.clientBalance < MIN_BALANCE_USD) {
       await recordProduction(false, {
@@ -252,6 +249,12 @@ export async function GET(req: NextRequest) {
       }).catch(() => undefined)
       return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
     }
+
+    // The evaluator must not depend on a separate canary cron having already applied the current GPU policy.
+    // Re-assert the exact endpoint's existing scale-to-zero/one-worker safety envelope and narrow its provider
+    // GPU pool to AMPERE_24 before readiness or any score-generating model request.
+    const runtimePolicy = await ensureMassDistilledEndpoint24Gb(claim.endpointId)
+    console.info('[cos-mass-distilled-runtime-preflight]', JSON.stringify(runtimePolicy))
 
     const deadlineMs = Date.now() + ROUTE_BUDGET_MS
     const result = await runMassDistilledArtifactEvaluation({ claim, deadlineMs, now: new Date() })

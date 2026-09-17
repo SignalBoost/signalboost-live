@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
 import { MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from './cosUniversityMassEvaluationContextBudget.ts'
+import { servedCandidateModelFromCanary } from './cosUniversityMassEvaluationServedModel.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
 import { readPinnedHfParquetRows } from './hfPinnedParquetRows.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
@@ -61,6 +62,12 @@ function manifestHash(items:readonly string[]){return sha256({items:[...items].s
 function average(values:readonly number[]){return values.length?values.reduce((sum,value)=>sum+value,0)/values.length:0}
 function score(value:unknown){const n=Number(value);return Number.isFinite(n)&&n>=0&&n<=1?n:null}
 function candidateModelName(artifactHash:string){return `itmounts-mass-distilled-${artifactHash.slice(0,12).toLowerCase()}`}
+async function servedCandidateModel(claim:MassEvaluationClaim){
+  const db=cosServiceDb();if(!db)throw new Error('service_database_unavailable')
+  const result=await db.from('cos_university_learning_assurance_events').select('verifier,evidence,observed_at').eq('event_type','fine_tune').eq('candidate_id',claim.candidateId).order('observed_at',{ascending:false}).limit(200)
+  if(result.error)throw result.error
+  return servedCandidateModelFromCanary(result.data||[],{candidateId:claim.candidateId,artifactHash:claim.artifactHash,endpointId:claim.endpointId})
+}
 
 function remaining(deadlineMs:number,reserve=ROUTE_RESERVE_MS){
   const value=deadlineMs-Date.now()-reserve
@@ -256,7 +263,7 @@ export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvalua
   if(input.claim.maxEndpointCalls!==ENDPOINT_CALLS||input.claim.maxJudgeCalls!==JUDGE_CALLS||input.claim.maxRuntimeWakeAttempts!==1||input.claim.maxEstimatedRuntimeWakeCostUsd<=0||input.claim.maxEstimatedRuntimeWakeCostUsd>0.2)throw new Error('mass_distilled_evaluation_claim_ceiling_invalid')
   const now=input.now||new Date();const training=await massRun(input.claim,now);const age=now.getTime()-training.trainedAt;if(age<MASS_DISTILLED_RETENTION_DELAY_MS)throw new Error('mass_distilled_evaluation_retention_delay_not_met')
   const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs})
-  const model=candidateModelName(input.claim.artifactHash)
+  const model=await servedCandidateModel(input.claim)
   await waitReady(input.claim.endpointId,input.deadlineMs)
   const keepaliveKey=configuredRunpodApiKey();const keepalive=keepaliveKey?setInterval(()=>{void fetch(`https://${input.claim.endpointId}.api.runpod.ai/ready`,{headers:{Authorization:`Bearer ${keepaliveKey}`},signal:AbortSignal.timeout(8_000)}).catch(()=>undefined)},30_000):null;keepalive?.unref?.()
   try{

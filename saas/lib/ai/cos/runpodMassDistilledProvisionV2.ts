@@ -145,6 +145,19 @@ async function constrainEndpointToApprovedGpu(endpointId: string) {
   return endpoint
 }
 
+/** Enforce the already-approved 24GB exact-artifact endpoint policy before evaluator inference. */
+export async function ensureMassDistilledEndpoint24Gb(endpointId: string) {
+  const endpoint = await constrainEndpointToApprovedGpu(clean(endpointId, 160))
+  return Object.freeze({
+    endpointId: String(endpoint.id),
+    gpuPools: Object.freeze([...(endpoint.gpu?.pools || [])]),
+    gpuCount: Number(endpoint.gpu?.count),
+    workersMin: Number(endpoint.workers?.min),
+    workersMax: Number(endpoint.workers?.max),
+    idleTimeout: Number(endpoint.workers?.idleTimeout),
+  })
+}
+
 function materializedEndpointMatches(endpoint: Endpoint, input: MassDistilledRuntimeArtifact, modelName: string) {
   const args = clean(endpoint.args, 20_000)
   const ports = endpoint.ports || []

@@ -1,4 +1,5 @@
 // saas/lib/ai/cos/runpodServerlessDistilledProvision.ts
+// saas/lib/ai/cos/runpodServerlessDistilledProvision.ts
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 
 const REST_V1 = 'https://rest.runpod.io/v1'
@@ -437,7 +438,7 @@ function templateHasExactBootstrap(template: RunpodTemplateV1): boolean {
     && (template.ports || []).includes(`${DISTILLED_CONTAINER_PORT}/http`)
 }
 
-function runpodServerlessRootUrl(endpointId: string): string {
+export function runpodServerlessRootUrl(endpointId: string): string {
   const id = endpointId.trim()
   if (!/^[A-Za-z0-9_-]{3,120}$/.test(id)) throw new Error('RunPod endpoint id is invalid')
   return `https://${id}.api.runpod.ai`

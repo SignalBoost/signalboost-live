@@ -64,6 +64,7 @@ test('evaluator infrastructure failures do not exhaust the artifact retry budget
     "mass_distilled_evaluation_runpod_http_400:baseline:cases=8:{\"error\":{\"message\":\"This model's maximum context length is 8192 tokens\"}}",
     'The operation was aborted due to timeout',
     'mass_distilled_evaluation_runpod_http_502:baseline:cases=4:gateway',
+    'mass_distilled_evaluation_answer_missing:0a546e1b26656083',
   ].map((error, i) => ev(artifactA.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hashA, error }, `2026-09-16T1${i}:00:00Z`))
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), rollingApproval, ...failures], now })
   assert.equal(decision.issue, true)
@@ -83,6 +84,25 @@ test('the rolling window caps approvals per 24 hours', () => {
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), ...issued], now })
   assert.equal(decision.issue, false)
   assert.equal(!decision.issue && decision.reason, 'rolling_mass_evaluation_window_exhausted')
+})
+
+test('infrastructure-failed approvals are released from the rolling window while in-flight approvals still count', () => {
+  const infraEvents: RollingEvent[] = []
+  for (let i = 0; i < MASS_EVALUATION_ROLLING_MAX_APPROVALS; i++) {
+    const candidateId = `mass:infra:${i}`
+    const minute = String(i).padStart(2, '0')
+    infraEvents.push(ev(candidateId, 'host_controller', { claim: 'distilled_independent_evaluation_approved', authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF, artifactHash: 'd'.repeat(64) }, `2026-09-16T12:${minute}:00Z`, `2026-09-16T14:${minute}:00Z`))
+    infraEvents.push(ev(candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_started', artifactHash: 'd'.repeat(64) }, `2026-09-16T12:${minute}:10Z`))
+    infraEvents.push(ev(candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: 'd'.repeat(64), error: i % 2 ? 'mass_distilled_evaluation_runpod_http_502:candidate:cases=4:gateway' : 'mass_distilled_evaluation_answer_missing:case' }, `2026-09-16T12:${minute}:20Z`))
+  }
+  const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), ...infraEvents], now })
+  assert.equal(decision.issue, true)
+
+  const armed = Array.from({ length: MASS_EVALUATION_ROLLING_MAX_APPROVALS }, (_, i) =>
+    ev(`mass:armed:${i}`, 'host_controller', { claim: 'distilled_independent_evaluation_approved', authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF, artifactHash: 'e'.repeat(64) }, '2026-09-16T12:00:00Z', '2026-09-16T18:00:00Z'))
+  const blocked = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA), ...armed], now })
+  assert.equal(blocked.issue, false)
+  assert.equal(!blocked.issue && blocked.reason, 'rolling_mass_evaluation_window_exhausted')
 })
 
 test('the cron issues at most one approval before the unchanged atomic claim, with an env kill switch', () => {

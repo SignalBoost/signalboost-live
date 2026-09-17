@@ -4,15 +4,22 @@
 // "prompt contains at least 6886 tokens". "At least" is the provider's floor (8193 - output), not a measurement, so the
 // 8-case holdout cannot be assumed to fit one call. The conservative 3 characters/token estimate is kept, and a suite that
 // does not fit is split into a few smaller calls instead of being sent as one oversized request.
+//
+// Production then showed another independent bottleneck: a 4-case candidate request with a 1,680-token generation budget
+// repeatedly reached the exact artifact but died behind the RunPod gateway with HTTP 502. Keep the evaluator unchanged, but
+// bound every model response to 1,024 tokens so the serverless worker is not asked for multi-thousand-token generations merely
+// because several concise cases share one request. The minimum remains proportional to case count so truncation still fails
+// closed instead of silently weakening the evaluation.
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192
 export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'
+export const MASS_EVALUATION_MAX_OUTPUT_TOKENS = 1024
 export function massEvaluationOutputTokens(caseCount: number, userPrompt: string): number {
   const estimatedPromptTokens=Math.ceil((MASS_EVALUATION_SYSTEM_PROMPT.length+userPrompt.length)/MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN)+128
-  const desired=Math.min(4096,Math.max(1024,caseCount*420))
+  const desired=Math.min(MASS_EVALUATION_MAX_OUTPUT_TOKENS,Math.max(512,caseCount*80))
   const available=MASS_EVALUATION_MODEL_CONTEXT_TOKENS-estimatedPromptTokens
   const maxTokens=Math.min(desired,available)
-  if(maxTokens<Math.max(256,caseCount*120))throw new Error(`mass_distilled_evaluation_context_budget_insufficient:cases=${caseCount}:estimatedPromptTokens=${estimatedPromptTokens}`)
+  if(maxTokens<Math.max(256,caseCount*60))throw new Error(`mass_distilled_evaluation_context_budget_insufficient:cases=${caseCount}:estimatedPromptTokens=${estimatedPromptTokens}`)
   return maxTokens
 }
 

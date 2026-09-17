@@ -135,3 +135,32 @@ test('an event returned by both cron reads is counted once, so two real failures
   assert.match(route, /seenEventKeys\.has\(key\)/)
   assert.match(route, /const all: RollingEvent\[\] = uniqueRows\.map/)
 })
+
+test('an evaluator crash does not spend an artifact\'s substantive attempts', () => {
+  // 2026-09-17: three attempts on mass:481a6760 were consumed by our own TypeError and by wake-contract errors,
+  // leaving a healthy artifact permanently unevaluated.
+  const artifact = { candidateId: 'mass:481a6760', subjectId: 'computer_science', artifactHash: 'b'.repeat(64), createdAt: '2026-09-16T10:00:00.000Z' }
+  const approval = (observedAt: string) => ({
+    candidateId: artifact.candidateId, observedAt, expiresAt: '2026-09-17T12:00:00.000Z', verifier: 'host_controller',
+    evidence: { claim: 'distilled_independent_evaluation_approved', artifactHash: artifact.artifactHash, authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF },
+  })
+  const failure = (observedAt: string, error: string) => ({
+    candidateId: artifact.candidateId, observedAt, expiresAt: null, verifier: 'host_controller',
+    evidence: { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: artifact.artifactHash, error },
+  })
+  const canary = {
+    candidateId: artifact.candidateId, observedAt: '2026-09-17T17:27:00.000Z', expiresAt: null, verifier: 'host_production_verifier',
+    evidence: { claim: 'production_canary_healthy', artifactHash: artifact.artifactHash, exactArtifact: true, productionTrafficAuthorized: false },
+  }
+  const events = [
+    canary,
+    approval('2026-09-17T20:01:00.000Z'), failure('2026-09-17T20:02:00.000Z', "Cannot read properties of undefined (reading 'length')"),
+    approval('2026-09-17T20:10:00.000Z'), failure('2026-09-17T20:11:00.000Z', "Cannot read properties of undefined (reading 'length')"),
+    approval('2026-09-17T20:20:00.000Z'), failure('2026-09-17T20:21:00.000Z', 'mass_distilled_evaluation_runtime_wake_http_404:{"detail":"Not Found"}'),
+  ]
+  const decision = decideRollingMassEvaluationApproval({
+    artifacts: [artifact], events, now: new Date('2026-09-17T20:40:00.000Z'), enabled: true,
+  } as Parameters<typeof decideRollingMassEvaluationApproval>[0])
+  assert.ok('artifact' in decision, `expected a new approval, got ${JSON.stringify(decision)}`)
+  assert.equal(decision.artifact.candidateId, 'mass:481a6760')
+})

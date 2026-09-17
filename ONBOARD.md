@@ -170,6 +170,18 @@ identifier by exact endpoint name through RunPod's official REST endpoint list b
 The independent mass evaluator uses the same 235-second exact-artifact readiness window as the
 canary, preventing a healthy scale-to-zero Qwen3-4B + LoRA cold start from failing at 190 seconds.
 
+Production evaluator evidence on 2026-09-17 established three additional transport rules. A two-case
+mass holdout starts as two single-case requests so a transient RunPod gateway failure on one case can
+use the existing bounded single-group retry rather than an unbounded split-child retry tree. A solo
+request may use the existing 1,024-token output cap, but token headroom alone is not a substitute for
+correct model mode: Qwen3 thinking is disabled for final-answer evaluation so the bounded output
+budget is spent on the required observable answer instead of hidden reasoning. The evaluator remains
+final-answer-only; it does not collect, persist, grade, or treat hidden chain-of-thought as evidence.
+These transport repairs do not change cases, references, scoring thresholds, delayed-retention gates,
+exact-artifact binding, promotion rules, or Production-traffic prohibition. Evaluation authority
+remains exactly eight endpoint calls, four judge calls, one runtime wake, and at most $0.20 estimated
+wake cost.
+
 ---
 
 # Mandatory first-read / repo-scan rule

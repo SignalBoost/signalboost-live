@@ -11,6 +11,12 @@ test('the conservative 3 characters per token estimate is kept after the 4 per t
   assert.throws(() => massEvaluationOutputTokens(8, prompt), /mass_distilled_evaluation_context_budget_insufficient:cases=8:estimatedPromptTokens=9138/)
 })
 
+test('the evaluator explicitly requests Qwen non-thinking mode so output budget is reserved for final answers', () => {
+  assert.match(MASS_EVALUATION_SYSTEM_PROMPT, /\/no_think\s*$/)
+  assert.match(MASS_EVALUATION_SYSTEM_PROMPT, /final-answer quality only/)
+  assert.match(source, /role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT/)
+})
+
 test('all evaluator generations are bounded to 1024 output tokens while solo split children get full marker headroom', () => {
   assert.equal(MASS_EVALUATION_MAX_OUTPUT_TOKENS, 1024)
   assert.equal(massEvaluationOutputTokens(1, 'short prompt'), 1024)

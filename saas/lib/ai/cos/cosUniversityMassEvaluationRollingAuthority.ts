@@ -43,6 +43,9 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'the operation was aborted due to timeout'
     || error.includes('mass_distilled_evaluation_call_timeout')
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
+    // A missing judge result after the inference provider rejects/overloads the request is evaluator infrastructure,
+    // not model quality. Release it from both the artifact retry budget and the 24h rolling approval window.
+    || error === 'mass_distilled_evaluation_judge_unavailable'
     // Evaluator protocol/output-budget defects are not evidence of model quality. They must fail closed, but they may retry
     // after the evaluator is repaired without consuming the model's substantive-attempt budget or the rolling approval window.
     || error.startsWith('mass_distilled_evaluation_answer_missing:')

@@ -11,6 +11,9 @@ test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-bal
   assert.match(route, /runpodServerlessRootUrl\(endpointId\)\}\/ping`/)
   assert.doesNotMatch(route, /\/models`/)
   assert.match(route, /!== 'accepting_requests'/)
+  // The wake result reads only fields /ping actually returns.
+  assert.match(route, /modelReady: payload\?\.modelReady === true/)
+  assert.doesNotMatch(route, /payload\.data\.length/)
   const gateway = fs.readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
   assert.match(gateway, /@app\.get\('\/ping'\)/)
   assert.doesNotMatch(gateway, /@app\.get\('\/v1\/models'\)/)

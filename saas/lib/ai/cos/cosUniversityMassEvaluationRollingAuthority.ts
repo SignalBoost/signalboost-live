@@ -30,6 +30,11 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'the operation was aborted due to timeout'
     || error.includes('mass_distilled_evaluation_call_timeout')
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
+    // The pre-fix evaluator reconstructed a bare hash-only candidate name. The exact runtime serves a runtime-keyed alias,
+    // so this 404 proves evaluator/runtime identity drift, not model quality. Keep the exclusion narrow to that known shape.
+    || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)
+      && error.includes('the model `itmounts-mass-distilled-')
+      && error.includes('does not exist'))
     // No worker became ready inside the window (RunPod scheduling/cold start): nothing reached the artifact, so it
     // says nothing about model quality. bootstrap_failed is deliberately NOT here — a bad adapter can cause it.
     || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')

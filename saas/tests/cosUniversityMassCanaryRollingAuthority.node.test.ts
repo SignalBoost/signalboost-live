@@ -8,6 +8,7 @@ import {
   MASS_CANARY_ROLLING_AUTHORIZATION_REF,
   MASS_CANARY_ROLLING_MAX_APPROVALS,
   MASS_CANARY_COLD_START_FAILURE,
+  MASS_CANARY_ENDPOINT_REFRESH_FAILURES,
   MASS_CANARY_MAX_IDENTICAL_FAILURES,
   decideMassCanaryRollingApproval,
   type CanaryArtifact,
@@ -29,7 +30,7 @@ test('issues exactly the claim-compatible approval for the oldest artifact witho
   assert.equal(decision.expiresAt, '2026-09-17T19:00:00.000Z')
 })
 
-test('passed canary keeps its endpoint until independent evaluation completes', () => {
+test('passed canary keeps its endpoint through one transient independent-evaluation lifecycle failure', () => {
   const a = artifact(1, '2026-09-15T00:00:00.000Z'); const b = artifact(2, '2026-09-15T01:00:00.000Z')
   const passed = event(a, 'local_distilled_runtime_canary_passed', '2026-09-17T16:00:00.000Z')
   const started = event(a, 'mass_distilled_independent_evaluation_started', '2026-09-17T16:10:00.000Z', {}, { profile:'cos_mass_distilled_independent_evaluation_runtime_v1' })
@@ -38,6 +39,32 @@ test('passed canary keeps its endpoint until independent evaluation completes', 
   assert.deepEqual(decideMassCanaryRollingApproval({ artifacts:[a,b], events:[passed,started,infraFailure], now, enabled:true }), { issue:false, reason:'mass_canary_waiting_for_independent_evaluation' })
   const completed = event(a, 'mass_distilled_independent_evaluation_completed', '2026-09-17T16:30:00.000Z', {}, { profile:'cos_mass_distilled_independent_evaluation_runtime_v1' })
   assert.equal((decideMassCanaryRollingApproval({ artifacts:[a,b], events:[passed,started,infraFailure,completed], now, enabled:true }) as any).artifact.candidateId, 'mass:2')
+})
+
+test('two consecutive endpoint-lifecycle failures refresh the same artifact canary before advancing the queue', () => {
+  assert.equal(MASS_CANARY_ENDPOINT_REFRESH_FAILURES, 2)
+  const a = artifact(1, '2026-09-15T00:00:00.000Z'); const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const events = [
+    event(a, 'local_distilled_runtime_canary_passed', '2026-09-17T16:00:00.000Z'),
+    event(a, 'mass_distilled_independent_evaluation_failed', '2026-09-17T16:10:00.000Z', {}, { profile:'cos_mass_distilled_independent_evaluation_runtime_v1', error:'mass_distilled_evaluation_runtime_not_ready:network' }),
+    event(a, 'mass_distilled_independent_evaluation_failed', '2026-09-17T16:20:00.000Z', {}, { profile:'cos_mass_distilled_independent_evaluation_runtime_v1', error:'mass_distilled_evaluation_runtime_not_ready:503' }),
+  ]
+  const decision = decideMassCanaryRollingApproval({ artifacts:[a,b], events, now, enabled:true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId, 'mass:1')
+  assert.equal(decision.evidence.endpointRefresh, true)
+  assert.equal(decision.evidence.endpointRefreshReason, 'repeated_evaluation_endpoint_lifecycle_failure')
+})
+
+test('a later non-lifecycle failure resets endpoint-refresh counting', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z'); const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const events = [
+    event(a, 'local_distilled_runtime_canary_passed', '2026-09-17T15:00:00.000Z'),
+    event(a, 'mass_distilled_independent_evaluation_failed', '2026-09-17T15:10:00.000Z', {}, { profile:'cos_mass_distilled_independent_evaluation_runtime_v1', error:'mass_distilled_evaluation_runtime_not_ready:network' }),
+    event(a, 'mass_distilled_independent_evaluation_failed', '2026-09-17T15:20:00.000Z', {}, { profile:'cos_mass_distilled_independent_evaluation_runtime_v1', error:'mass_distilled_evaluation_runtime_not_ready:network' }),
+    event(a, 'mass_distilled_independent_evaluation_failed', '2026-09-17T15:30:00.000Z', {}, { profile:'cos_mass_distilled_independent_evaluation_runtime_v1', error:'mass_distilled_evaluation_answer_missing:abc:finish=stop' }),
+  ]
+  assert.deepEqual(decideMassCanaryRollingApproval({ artifacts:[a,b], events, now, enabled:true }), { issue:false, reason:'mass_canary_waiting_for_independent_evaluation' })
 })
 
 test('three substantive evaluation failures release the endpoint handoff', () => {
@@ -68,7 +95,6 @@ test('cron reads evaluation events before issuing a new canary and preserves aut
 })
 
 test('cold-start timeouts do not spend an artifact\'s three substantive attempts', () => {
-  // 2026-09-17 17:15-17:27: mass:481a6760 needed three canaries because the first two timed out waking a cold worker.
   const a = artifact(1, '2026-09-15T00:00:00.000Z')
   const events = [
     event(a, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T15:00:00.000Z', { expiresAt: '2026-09-17T15:30:00.000Z' }, { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF }),

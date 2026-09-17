@@ -1,7 +1,9 @@
+// saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   massDistillationDispatchReadiness,
   recoverMassDistillationCampaigns,
+  closeExpiredMassDistillationCampaigns,
   recoverStalledMassDistillationDispatchClaims,
   runMassDistillationCampaignConsumer,
 } from './cosUniversityMassDistillationConsumer.ts'
@@ -94,6 +96,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const diagnostics = await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })
   const stalledDispatchRecovery = await recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 })
   const recovery = await recoverMassDistillationCampaigns({ now, maxCampaigns: 5 })
+  const campaignClosure = await closeExpiredMassDistillationCampaigns({ now, maxCampaigns: 10 })
   const preparedBufferTarget = throughput.preparedBatchBufferTarget
   let preparedBeforeReplenishment = 0
   let preparedAfterReplenishment = 0
@@ -164,6 +167,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     && diagnostics.ok === true
     && stalledDispatchRecovery.ok === true
     && recovery.ok === true
+    && campaignClosure.ok === true
     && curriculum.ok === true
     && curriculumReplenishment.ok === true
     && rollingAuthorization.ok === true
@@ -178,6 +182,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       diagnostics,
       stalledDispatchRecovery,
       recovery,
+      campaignClosure,
       curriculum,
       curriculumReplenishment,
       throughput,

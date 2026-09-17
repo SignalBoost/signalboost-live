@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityDistillationThroughput.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -83,4 +84,21 @@ test('owner throughput control remains separate from University spending and aut
   assert.match(replenishment, /DISTILLATION_OPENALEX_RESULTS_PER_QUERY = 10/)
   const packaging = source('../lib/ai/cos/cosUniversityMassDistillation.ts')
   assert.doesNotMatch(packaging, /Math\.min\(100,\s*Math\.floor\(maxBatches\)\)/)
+})
+
+test('replenishment keeps acquiring when every canonical subject was just consumed into batches', () => {
+  // Production 2026-09-16 19:43-20:12 local: only non-canonical subjects remained, replenishment reported
+  // no_targetable_subject_shortfall and Hugging Face idled with zero prepared batches.
+  const gaps = buildMassDistillationReplenishmentGaps([
+    { subjectKey: 'incident triage', subject: 'incident triage', canonicalSubjectId: null, uniqueBatchableItems: 4, shortfallToBatch: 16 },
+  ], new Date('2026-09-16T23:12:00.000Z'), 3, 1)
+  assert.equal(gaps.length, 3)
+  assert.equal(new Set(gaps.map(gap => gap.subject)).size, 3)
+  assert.ok(gaps.every(gap => gap.sourceKinds?.length === 1 && gap.sourceKinds[0] === 'scientific_journal'))
+  assert.ok(gaps.every(gap => gap.evidence.includes('shortfall_to_batch=20')))
+})
+
+test('empty canonical subjects rotate between slots instead of always asking the same three', () => {
+  const at = (iso: string) => buildMassDistillationReplenishmentGaps([], new Date(iso), 3, 1).map(gap => gap.subject).join('|')
+  assert.notEqual(at('2026-09-16T23:10:00.000Z'), at('2026-09-16T23:15:00.000Z'))
 })

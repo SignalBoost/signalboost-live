@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityTrainingProfileV2.node.test.ts
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
@@ -20,7 +21,9 @@ test('training profile v2 lowers learning rate and adds bounded scheduler contro
   assert.match(worker, /TRAINING_WARMUP_RATIO = 0\.10/)
   assert.match(worker, /TRAINING_LR_SCHEDULER = "cosine"/)
   assert.match(worker, /TRAINING_MAX_GRAD_NORM = 1\.0/)
-  assert.match(worker, /warmup_ratio=recipe\["warmupRatio"\]/)
+  assert.match(worker, /\*\*_warmup_arguments\(SFTConfig, recipe\)/)
+  assert.match(worker, /if "warmup_ratio" in parameters:\n\s+return \{"warmup_ratio": ratio\}/)
+  assert.match(worker, /return \{"warmup_steps": max\(1, math\.ceil\(total_steps \* ratio\)\) if ratio > 0 else 0\}/)
   assert.match(worker, /lr_scheduler_type=recipe\["lrSchedulerType"\]/)
   assert.match(worker, /max_grad_norm=recipe\["maxGradNorm"\]/)
 })

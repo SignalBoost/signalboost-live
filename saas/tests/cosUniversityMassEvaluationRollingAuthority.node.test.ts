@@ -164,3 +164,28 @@ test('an evaluator crash does not spend an artifact\'s substantive attempts', ()
   assert.ok('artifact' in decision, `expected a new approval, got ${JSON.stringify(decision)}`)
   assert.equal(decision.artifact.candidateId, 'mass:481a6760')
 })
+
+test('the same infrastructure failure repeating on one artifact stops instead of looping', () => {
+  // mass:8f5af666, 2026-09-17 21:06-21:12 UTC: one truncated case reproduced every two minutes, waking paid compute.
+  const artifact = { candidateId: 'mass:8f5af666', subjectId: 'economics_finance', artifactHash: 'd'.repeat(64), createdAt: '2026-09-14T19:12:00.000Z' }
+  const canary = {
+    candidateId: artifact.candidateId, observedAt: '2026-09-16T10:00:00.000Z', expiresAt: null, verifier: 'host_production_verifier',
+    evidence: { claim: 'production_canary_healthy', artifactHash: artifact.artifactHash, exactArtifact: true, productionTrafficAuthorized: false },
+  }
+  const failure = (minute: number, error: string) => ({
+    candidateId: artifact.candidateId, observedAt: `2026-09-17T21:${String(minute).padStart(2, '0')}:00.000Z`, expiresAt: null, verifier: 'host_controller',
+    evidence: { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: artifact.artifactHash, error },
+  })
+  const truncated = 'mass_distilled_evaluation_answer_missing:0ee6ecdba3940d76:finish=length'
+  const now = new Date('2026-09-17T21:20:00.000Z')
+  const repeated = [canary, failure(6, truncated), failure(8, truncated), failure(10, truncated), failure(12, truncated)]
+  assert.deepEqual(
+    decideRollingMassEvaluationApproval({ artifacts: [artifact], events: repeated, now, enabled: true } as Parameters<typeof decideRollingMassEvaluationApproval>[0]),
+    { issue: false, reason: 'no_mass_artifact_eligible_for_rolling_evaluation' },
+  )
+  // Three identical failures still retry, and a different newest failure resets the count.
+  const three = [canary, failure(6, truncated), failure(8, truncated), failure(10, truncated)]
+  assert.ok('artifact' in decideRollingMassEvaluationApproval({ artifacts: [artifact], events: three, now, enabled: true } as Parameters<typeof decideRollingMassEvaluationApproval>[0]))
+  const different = [...repeated, failure(14, 'mass_distilled_evaluation_runtime_not_ready:network')]
+  assert.ok('artifact' in decideRollingMassEvaluationApproval({ artifacts: [artifact], events: different, now, enabled: true } as Parameters<typeof decideRollingMassEvaluationApproval>[0]))
+})

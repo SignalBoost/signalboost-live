@@ -22,6 +22,16 @@ export type RollingDecision =
 const HEX64 = /^[a-f0-9]{64}$/i
 const at = (value: string | null | undefined) => Date.parse(String(value || ''))
 
+function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
+  const error = String(event.evidence?.error || '').trim().toLowerCase()
+  if (!error) return false
+  return error.startsWith('mass_distilled_evaluation_context_budget_insufficient:')
+    || error.includes("maximum context length is 8192 tokens")
+    || error === 'the operation was aborted due to timeout'
+    || error.includes('mass_distilled_evaluation_call_timeout')
+    || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
+}
+
 export function decideRollingMassEvaluationApproval(input: {
   enabled: boolean
   artifacts: readonly RollingArtifact[]
@@ -56,14 +66,17 @@ export function decideRollingMassEvaluationApproval(input: {
       && event.evidence?.productionTrafficAuthorized === false)
     if (!canary) continue
 
-    // Repeated failures of attempts THIS authority started stop automatic retries; the owner decides after that.
-    // Failures of earlier hand-approved attempts (made while evaluator defects were being fixed) do not count.
+    // Repeated substantive failures of attempts THIS authority started stop automatic retries; the owner decides after that.
+    // Failures caused by evaluator/runtime infrastructure defects do not count against the artifact: they do not constitute
+    // evidence about model quality and should be retried after the evaluator is repaired. Earlier hand-approved attempts also
+    // remain outside this budget.
     const firstRolling = mine
       .filter(event => event.verifier === 'host_controller' && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF)
       .map(event => at(event.observedAt))
       .sort((a, b) => a - b)[0]
     const failures = firstRolling === undefined ? 0 : mine.filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
-      && at(event.observedAt) >= firstRolling).length
+      && at(event.observedAt) >= firstRolling
+      && !evaluatorInfrastructureFailure(event)).length
     if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
     // Respect the latest owner control: a suspension, or an approval that is still armed, means no new one.

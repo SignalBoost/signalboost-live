@@ -2,7 +2,7 @@
 
 # iTMounts Engineering Blueprint
 
-**Updated:** 2026-09-15  
+**Updated:** 2026-09-17  
 **Canonical repository:** `SignalBoost/signalboost-live`  
 **Canonical public product:** **iTMounts**  
 **Canonical public origin:** `https://itmounts.com`
@@ -252,6 +252,26 @@ Models and providers are replaceable compute. **COS is the learner.**
 Never treat a source-code model string, old deployment observation, ONBOARD entry, or model memory as current runtime truth. Current runtime identity must come from verified live configuration/telemetry.
 
 For University distillation, Hugging Face and RunPod may currently act as governed training/runtime/evaluation adapters when live configuration and evidence prove that path. That does not make either provider a permanent product dependency or a general COS reasoning authority.
+
+## Enterprise University teacher-pool contract — 2026-09-17
+
+The Production University teacher layer is provider-agnostic. Supported teacher classes include Qwen and DeepSeek through the governed Hugging Face/local executor path, hosted OpenAI-compatible providers, Anthropic/Claude, xAI/Grok, and buyer-supplied custom/private gateways such as Azure-hosted endpoints, Bedrock/Vertex bridges, on-prem vLLM, private cloud, or future approved providers. Provider support is an adapter contract, not a core-product dependency.
+
+Teacher-provider rules are mandatory:
+
+- buyer-owned credentials and buyer-selected model identifiers/configuration;
+- explicit provider enablement and adapter-ready gates before use;
+- fail closed when a selected provider, credential, adapter, model, or license is unavailable or unapproved;
+- never silently substitute another provider or model;
+- persist teacher/provider/model provenance with generated training material and resulting artifacts;
+- preserve bounded provider spend/call ceilings and existing authorization boundaries;
+- keep independent evaluation, holdout comparison, graduation thresholds, and promotion policy provider-independent;
+- teacher intelligence, brand, benchmark strength, or model size never expands operational authority;
+- unknown open-model licenses fail closed. The current automatically accepted open-model teacher licenses are Apache-2.0 and MIT; other licenses require an explicit policy/legal addition before paid dispatch;
+- hosted-provider adapters must not expose or embed credentials in datasets, logs, client surfaces, or portable artifacts;
+- enterprise portability requires that a buyer can disable all public hosted teachers and operate only approved private/self-hosted teacher infrastructure without changing University core code.
+
+Current teacher-pool implementation is defined by `saas/lib/ai/cos/cosUniversityTeacherPool.ts`, `cosUniversityTeacherAdapters.ts`, and `cosUniversityTeacherLicensePolicy.ts`. Runtime activation remains live configuration and must be queried before reporting which teachers are actually active.
 
 No provider may silently substitute for another when policy/configuration requires fail-closed behavior.
 

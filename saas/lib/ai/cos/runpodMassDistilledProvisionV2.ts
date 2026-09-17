@@ -1,3 +1,4 @@
+// saas/lib/ai/cos/runpodMassDistilledProvisionV2.ts
 // RunPod REST v2 compatibility repair for exact-artifact mass-distilled canaries.
 // v2 applies templateId as a one-time materialization; it does not retain a persistent template link.
 import { configuredRunpodApiKey } from './runpodConfig.ts'
@@ -145,9 +146,29 @@ async function constrainEndpointToApprovedGpu(endpointId: string) {
   return endpoint
 }
 
+/**
+ * A newer artifact's canary releases every other mass-distilled endpoint's reserved capacity by setting
+ * max workers to 0. Evaluation runs up to 12 hours after its own canary, so by then its endpoint can no
+ * longer start a worker and the readiness probe gets no response at all
+ * (Production 2026-09-17: `mass_distilled_evaluation_runtime_not_ready:network` on mass:8f5af666 and
+ * mass:481a6760, whose endpoint showed 0 running workers and $0.00 billed). Restoring the one worker this
+ * endpoint is allowed keeps the single-active-endpoint rule intact and creates nothing.
+ */
+async function restoreRetiredEndpointCapacity(endpoint: Endpoint) {
+  if (Number(endpoint.workers?.max ?? Number.NaN) >= 1) return endpoint
+  const restored = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
+  })
+  if (!restored?.id) throw new Error('mass_distilled_runtime_capacity_restore_missing')
+  if (Number(restored.workers?.max ?? Number.NaN) !== 1) throw new Error('mass_distilled_runtime_capacity_restore_rejected')
+  assertEndpointSafetyPolicy(restored)
+  return restored
+}
+
 /** Enforce the already-approved 24GB exact-artifact endpoint policy before evaluator inference. */
 export async function ensureMassDistilledEndpoint24Gb(endpointId: string) {
-  const endpoint = await constrainEndpointToApprovedGpu(clean(endpointId, 160))
+  const endpoint = await restoreRetiredEndpointCapacity(await constrainEndpointToApprovedGpu(clean(endpointId, 160)))
   return Object.freeze({
     endpointId: String(endpoint.id),
     gpuPools: Object.freeze([...(endpoint.gpu?.pools || [])]),

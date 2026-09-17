@@ -3,8 +3,9 @@ import test from 'node:test'
 import type { ContinuousLearningSourceAdapter } from '../lib/cos-core/layers/learning/cycle'
 import type { KnowledgeGap } from '../lib/cos-core/layers/learning/index'
 import { youtubeLearningConnector } from '../lib/cos-core/layers/learning/connectors'
+import { DEFAULT_LEARNING_SOURCE_CAPS } from '../lib/cos-core/layers/learning/learningSourceCaps'
 import { createLiveLearningAdapters, guardLearningSourceAdapter, runsOnDailyLearningPass } from '../lib/cos-core/layers/learning/liveSources'
-import { createYouTubeTranscriptSearch } from '../lib/cos-core/layers/learning/mediaClients'
+import { createYouTubeMetadataSearch, createYouTubeTranscriptSearch } from '../lib/cos-core/layers/learning/mediaClients'
 
 const GAP: KnowledgeGap = {
   id: 'curriculum:multi-tenant-saas-performance',
@@ -24,19 +25,24 @@ function youtubeSearchResponse() {
       snippet: {
         title: 'PostgreSQL tail latency',
         description: 'Connection pools and wait events in multi tenant SaaS.',
-        channelTitle: 'SignalBoost Test',
+        channelTitle: 'iTMounts Test',
         publishedAt: '2026-08-12T00:00:00Z',
       },
     }],
   }), { status: 200, headers: { 'content-type': 'application/json' } })
 }
 
-test('transcript search uses one YouTube discovery and returns the full transcript when available', async () => {
+function youtubeStatusResponse(license: 'creativeCommon' | 'youtube' = 'creativeCommon') {
+  return new Response(JSON.stringify({ items: [{ id: 'abc123XYZ', status: { license } }] }), { status: 200, headers: { 'content-type': 'application/json' } })
+}
+
+test('transcript search uses one YouTube discovery and returns the full transcript when explicit rights are available', async () => {
   const calls: string[] = []
   const fetcher = (async (input: any) => {
     const url = String(input)
     calls.push(url)
     if (url.includes('youtube/v3/search')) return youtubeSearchResponse()
+    if (url.includes('youtube/v3/videos')) return youtubeStatusResponse()
     return new Response(JSON.stringify({
       transcript: 'PostgreSQL pg_stat_activity wait events and connection pool pressure distinguish database execution time from application queueing. '.repeat(4),
       license: 'authorized transcript supplied to COS',
@@ -51,10 +57,13 @@ test('transcript search uses one YouTube discovery and returns the full transcri
   const results = await search('postgresql tenant latency', 2)
 
   assert.equal(calls.filter(url => url.includes('youtube/v3/search')).length, 1)
-  assert.equal(calls.length, 2, 'one discovery plus one transcript lookup')
+  assert.equal(calls.filter(url => url.includes('youtube/v3/videos')).length, 1)
+  assert.equal(calls.length, 3, 'one discovery, one low-cost license lookup, and one transcript lookup')
   assert.equal(results.length, 1)
   assert.ok(results[0].text.includes('pg_stat_activity'))
   assert.ok(!String(results[0].license).toLowerCase().includes('metadata'))
+  assert.ok(results[0].evidence?.includes('youtube-status-license:creativeCommon'))
+  assert.ok(results[0].evidence?.includes('transcript-rights:explicit'))
 })
 
 test('repeated subject discovery is cached within one learning run', async () => {
@@ -63,6 +72,7 @@ test('repeated subject discovery is cached within one learning run', async () =>
     const url = String(input)
     calls.push(url)
     if (url.includes('youtube/v3/search')) return youtubeSearchResponse()
+    if (url.includes('youtube/v3/videos')) return youtubeStatusResponse('youtube')
     return new Response(JSON.stringify({ transcript: 'Substantive transcript evidence about tenant latency and connection pools. '.repeat(8) }), { status: 200, headers: { 'content-type': 'application/json' } })
   }) as typeof fetch
   const search = createYouTubeTranscriptSearch('test-key', { transcriptApiUrl: 'https://pod-11434.proxy.runpod.net/transcript', metadataFallback: true }, fetcher)
@@ -71,6 +81,7 @@ test('repeated subject discovery is cached within one learning run', async () =>
   await search('Multi-tenant SaaS performance isolation', 2)
 
   assert.equal(calls.filter(url => url.includes('youtube/v3/search')).length, 1, 'same subject should spend one search.list call')
+  assert.equal(calls.filter(url => url.includes('youtube/v3/videos')).length, 1, 'license metadata should share the discovery cache')
   assert.equal(calls.filter(url => url.includes('/transcript')).length, 2, 'transcript lookup may be retried for each question while discovery is shared')
 })
 
@@ -82,13 +93,14 @@ test('YouTube learning connector searches by subject while relevance remains que
   assert.deepEqual(queries, [GAP.subject, GAP.subject])
 })
 
-test('transcript failure reuses the same discovery result as metadata instead of issuing another YouTube search', async () => {
+test('transcript without explicit rights fails closed to license-tagged metadata', async () => {
   const calls: string[] = []
   const fetcher = (async (input: any) => {
     const url = String(input)
     calls.push(url)
     if (url.includes('youtube/v3/search')) return youtubeSearchResponse()
-    return new Response('unavailable', { status: 503 })
+    if (url.includes('youtube/v3/videos')) return youtubeStatusResponse('youtube')
+    return new Response(JSON.stringify({ transcript: 'Transcript exists but no rights statement was supplied. '.repeat(6) }), { status: 200, headers: { 'content-type': 'application/json' } })
   }) as typeof fetch
 
   const search = createYouTubeTranscriptSearch('test-key', {
@@ -97,11 +109,28 @@ test('transcript failure reuses the same discovery result as metadata instead of
   }, fetcher)
   const results = await search('postgresql tenant latency', 2)
 
-  assert.equal(calls.filter(url => url.includes('youtube/v3/search')).length, 1)
-  assert.equal(calls.length, 2)
   assert.equal(results.length, 1)
   assert.match(String(results[0].license), /metadata/i)
-  assert.ok(results[0].text.includes('Connection pools'))
+  assert.match(String(results[0].license), /publisher license=youtube/i)
+  assert.equal(results[0].evidence?.includes('transcript-rights:explicit'), false)
+})
+
+test('metadata discovery preserves the publisher-selected YouTube license as provenance', async () => {
+  const fetcher = (async (input: any) => {
+    const url = String(input)
+    if (url.includes('youtube/v3/search')) return youtubeSearchResponse()
+    if (url.includes('youtube/v3/videos')) return youtubeStatusResponse('creativeCommon')
+    throw new Error(`unexpected URL ${url}`)
+  }) as typeof fetch
+
+  const results = await createYouTubeMetadataSearch('test-key', fetcher)('database performance', 8)
+  assert.equal(results.length, 1)
+  assert.match(String(results[0].license), /creativeCommon/)
+  assert.deepEqual(results[0].evidence, ['youtube-status-license:creativeCommon'])
+})
+
+test('expanded YouTube quota is used for yield, not wider per-query authority', () => {
+  assert.equal(DEFAULT_LEARNING_SOURCE_CAPS.youtube, 8)
 })
 
 test('configured transcript runtime replaces the redundant YouTube metadata adapter', () => {

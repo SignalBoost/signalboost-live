@@ -1,2 +1,2 @@
-base_sha=1e0f828e4f35b27656675bf50a991c72e83932c6
-branch=fix/mass-canary-endpoint-refresh
+base_sha=b90955cca2055464d9d4b49c4c2d6d48e677e30d
+branch=fix/mass-evaluator-repair-epoch-after-2446

@@ -24,3 +24,13 @@ test('runtime wake remains separate from the approved scoring-call budget', () =
   assert.ok(wake >= 0 && evaluation > wake)
   assert.match(route, /does not consume one of the\n    \/\/ eight approved scoring calls/)
 })
+
+test('an evaluator defect records its own throw site, without leaking provider or prompt content', () => {
+  // 2026-09-17 20:01 UTC: a TypeError from our own code was stored with no stack, so the throwing line was unknown.
+  assert.match(route, /const frames = error instanceof Error/)
+  assert.match(route, /line\.trim\(\)\.startsWith\('at '\)/)
+  assert.match(route, /\.slice\(0, 4\)/)
+  assert.match(route, /errorFrames: frames/)
+  // Only our own frames are kept: the error body itself is still truncated to the existing 500-character message.
+  assert.match(route, /evidence: \{ error: clean\(message, 500\), \.\.\.\(frames\.length \? \{ errorFrames: frames \} : \{\}\) \}/)
+})

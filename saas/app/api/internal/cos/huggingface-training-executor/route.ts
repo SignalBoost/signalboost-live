@@ -53,16 +53,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'huggingface_training_not_configured' }, { status: 503 })
   }
 
-  // The repository is private. Default HF Jobs therefore receive a short-lived signed iTMounts URL
-  // instead of an unauthenticated raw.githubusercontent.com URL. Explicit buyer-owned worker URLs
-  // remain supported and are never overwritten.
-  if (!process.env.COS_UNIVERSITY_HF_WORKER_URL) {
-    process.env.COS_UNIVERSITY_HF_WORKER_URL = createHuggingFaceWorkerUrl({
-      origin: req.nextUrl.origin,
-      secret: executor.secret,
-    })
-  }
-  const hf = huggingFaceJobsConfigFromEnv()
+  // The repository is private. Generate a fresh short-lived signed iTMounts URL for every HF
+  // submission instead of caching an unauthenticated raw.githubusercontent.com URL in process.env.
+  // Explicit buyer-owned worker URLs still win and are passed through unchanged.
+  const workerUrl = process.env.COS_UNIVERSITY_HF_WORKER_URL || createHuggingFaceWorkerUrl({
+    origin: req.nextUrl.origin,
+    secret: executor.secret,
+  })
+  const hf = huggingFaceJobsConfigFromEnv({ ...process.env, COS_UNIVERSITY_HF_WORKER_URL: workerUrl })
   if (!hf) {
     return NextResponse.json({ ok: false, error: 'huggingface_training_not_configured' }, { status: 503 })
   }

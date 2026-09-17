@@ -8,15 +8,19 @@
 // Production then showed another independent bottleneck: a 4-case candidate request with a 1,680-token generation budget
 // repeatedly reached the exact artifact but died behind the RunPod gateway with HTTP 502. Keep the evaluator unchanged, but
 // bound every model response to 1,024 tokens so the serverless worker is not asked for multi-thousand-token generations merely
-// because several concise cases share one request. The minimum remains proportional to case count so truncation still fails
-// closed instead of silently weakening the evaluation.
+// because several concise cases share one request.
+//
+// 2026-09-17 01:20 UTC Production evidence showed the opposite edge too: after the 4-case request was reduced to 512 output
+// tokens, the gateway completed but the response omitted a required answer marker. Reserve 192 tokens per case (still hard-
+// capped at 1,024) so four-case batches receive 768 tokens while two-case batches stay at 512. Truncation still fails closed;
+// no cases, references, scoring thresholds, or promotion rules are changed.
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192
 export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'
 export const MASS_EVALUATION_MAX_OUTPUT_TOKENS = 1024
 export function massEvaluationOutputTokens(caseCount: number, userPrompt: string): number {
   const estimatedPromptTokens=Math.ceil((MASS_EVALUATION_SYSTEM_PROMPT.length+userPrompt.length)/MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN)+128
-  const desired=Math.min(MASS_EVALUATION_MAX_OUTPUT_TOKENS,Math.max(512,caseCount*80))
+  const desired=Math.min(MASS_EVALUATION_MAX_OUTPUT_TOKENS,Math.max(512,caseCount*192))
   const available=MASS_EVALUATION_MODEL_CONTEXT_TOKENS-estimatedPromptTokens
   const maxTokens=Math.min(desired,available)
   if(maxTokens<Math.max(256,caseCount*60))throw new Error(`mass_distilled_evaluation_context_budget_insufficient:cases=${caseCount}:estimatedPromptTokens=${estimatedPromptTokens}`)

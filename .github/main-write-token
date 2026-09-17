@@ -1,2 +1,2 @@
-base_sha=33a98803f95ccd84ebce3d597c43fddf3dd4a461
-branch=fix/uncapped-distillation-monitor-20260916
+base_sha=b27d16dabf91cb5fcea43a9cf6715c63b3ceadcc
+branch=fix/mass-eval-transient-502-20260916

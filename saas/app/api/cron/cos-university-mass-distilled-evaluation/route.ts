@@ -29,7 +29,7 @@ const COMPLETED = 'mass_distilled_independent_evaluation_completed'
 const FAILED = 'mass_distilled_independent_evaluation_failed'
 const ROUTE_BUDGET_MS = 570_000
 const ROUTE_RESERVE_MS = 25_000
-const RUNTIME_WAKE_TIMEOUT_MS = 300_000
+const RUNTIME_WAKE_TIMEOUT_MS = 20_000
 const MIN_BALANCE_USD = 1
 const HEX64 = /^[a-f0-9]{64}$/i
 const ENDPOINT_ID = /^[A-Za-z0-9_-]{3,120}$/
@@ -51,27 +51,41 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
   const remainingMs = deadlineMs - Date.now() - ROUTE_RESERVE_MS
   if (remainingMs <= 0) throw new Error('mass_distilled_evaluation_route_deadline_exceeded')
   const timeoutMs = Math.max(1, Math.min(RUNTIME_WAKE_TIMEOUT_MS, remainingMs))
-  // The exact-artifact runtime serves only /ping, /ready and POST /v1/chat/completions (itmounts_mass_gateway.py),
-  // so GET /v1/models returned 404 and no evaluation could start (Production 2026-09-17 19:32 UTC).
-  // /ping is served by the same worker, so it still wakes the scaled-to-zero endpoint and generates no tokens.
-  const response = await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`, {
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(timeoutMs),
-  })
-  if (!response.ok) {
-    const detail = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
-    throw new Error(`mass_distilled_evaluation_runtime_wake_http_${response.status}:${detail}`)
+  // /ping is only a scale-from-zero trigger. A cold RunPod LB request can stay open until a worker is
+  // routable, so waiting minutes for its response consumes the evaluator's entire route budget. Dispatch
+  // it briefly, then let the evaluator's /ready loop own startup readiness and the remaining deadline.
+  try {
+    const response = await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!response.ok) {
+      const detail = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
+      throw new Error(`mass_distilled_evaluation_runtime_wake_http_${response.status}:${detail}`)
+    }
+    const payload: any = await response.json().catch(() => null)
+    if (String(payload?.status || '') !== 'accepting_requests') {
+      throw new Error('mass_distilled_evaluation_runtime_wake_invalid')
+    }
+    return Object.freeze({
+      ok: true as const,
+      endpointId,
+      responseObserved: true,
+      modelReady: payload?.modelReady === true,
+      tokenGeneratingRequest: false,
+    })
+  } catch (error) {
+    const name = error instanceof Error ? error.name : ''
+    if (name !== 'TimeoutError' && name !== 'AbortError') throw error
+    return Object.freeze({
+      ok: true as const,
+      endpointId,
+      responseObserved: false,
+      modelReady: false,
+      wakeRequestTimedOut: true,
+      tokenGeneratingRequest: false,
+    })
   }
-  const payload: any = await response.json().catch(() => null)
-  if (String(payload?.status || '') !== 'accepting_requests') {
-    throw new Error('mass_distilled_evaluation_runtime_wake_invalid')
-  }
-  return Object.freeze({
-    ok: true as const,
-    endpointId,
-    modelCount: payload.data.length,
-    tokenGeneratingRequest: false,
-  })
 }
 
 type RawClaim = Readonly<{
@@ -284,18 +298,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
     }
 
-    // The evaluator must not depend on a separate canary cron having already applied the current GPU policy.
-    // Re-assert the exact endpoint's existing scale-to-zero/one-worker safety envelope and narrow its provider
-    // GPU pool to AMPERE_24 before waking or any score-generating model request.
     const runtimePolicy = await ensureMassDistilledEndpoint24Gb(claim.endpointId)
     console.info('[cos-mass-distilled-runtime-preflight]', JSON.stringify(runtimePolicy))
 
     const deadlineMs = Date.now() + ROUTE_BUDGET_MS
-    // `/ready` is a worker-local probe. When the serverless endpoint has scaled fully to zero, repeatedly
-    // polling it can produce network-only failures without ever creating a worker. Wake through the actual
-    // load-balancer path first, using a route the exact-artifact gateway actually serves; `/ping` generates no
-    // tokens and does not consume one of the
-    // eight approved scoring calls. It does, however, realize the already-approved single runtime wake attempt.
     const runtimeWake = await wakeMassDistilledRuntime(claim.endpointId, deadlineMs)
     console.info('[cos-mass-distilled-runtime-wake]', JSON.stringify(runtimeWake))
 

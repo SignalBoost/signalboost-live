@@ -62,6 +62,13 @@ test('three-to-six case holdouts are pre-split to at most two cases per request 
   assert.deepEqual(planMassEvaluationGroups(five, () => 'short', 3).map(group => group.length), [2, 2, 1])
 })
 
+test('seven-case holdouts use the full three-group budget as 3+2+2 after the observed candidate gateway failures', () => {
+  const seven = Array.from({ length: 7 }, (_, i) => ({ id: `seven-${i}` }))
+  const groups = planMassEvaluationGroups(seven, () => 'short', 3)
+  assert.deepEqual(groups.map(group => group.length), [3, 2, 2])
+  assert.deepEqual(groups.flat().map(item => item.id), seven.map(item => item.id), 'order and content preserved')
+})
+
 test('a one-case batch stays one request, and one that cannot fit in the allowed requests fails explicitly', () => {
   assert.equal(planMassEvaluationGroups([{ id: 'a' }], () => 'short', 3).length, 1)
   const huge = Array.from({ length: 3 }, (_, i) => ({ id: `h${i}` }))

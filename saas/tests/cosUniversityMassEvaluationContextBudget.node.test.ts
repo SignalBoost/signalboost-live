@@ -37,9 +37,15 @@ test('the recorded 8-case holdout is split into requests that each fit the windo
   }
 })
 
-test('a batch that fits keeps a single request, and one that cannot fit in the allowed requests fails explicitly', () => {
+test('the two-case mass holdout starts as two solo requests so a gateway failure can use the bounded single retry path', () => {
   const small = [{ id: 'a' }, { id: 'b' }]
-  assert.equal(planMassEvaluationGroups(small, () => 'short', 3).length, 1)
+  const groups = planMassEvaluationGroups(small, () => 'short', 3)
+  assert.equal(groups.length, 2)
+  assert.deepEqual(groups, [[small[0]], [small[1]]])
+})
+
+test('a one-case batch stays one request, and one that cannot fit in the allowed requests fails explicitly', () => {
+  assert.equal(planMassEvaluationGroups([{ id: 'a' }], () => 'short', 3).length, 1)
   const huge = Array.from({ length: 3 }, (_, i) => ({ id: `h${i}` }))
   assert.throws(() => planMassEvaluationGroups(huge, () => 'x'.repeat(30000), 3), /context_budget_insufficient:cases=3:maxGroups=3/)
 })

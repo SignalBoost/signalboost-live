@@ -1,2 +1,2 @@
-base_sha=eec43e19c001dc6f7677c8d521c81ef49ecef8c2
-branch=fix/eval-drain-cadence
+base_sha=44fab07e6a50cab48e213bd7a3e58871abe88ce5
+branch=fix/mass-evaluator-split-502-retry-v2

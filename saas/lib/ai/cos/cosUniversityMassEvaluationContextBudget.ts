@@ -17,6 +17,12 @@
 // 2026-09-17 01:53 UTC Production evidence then showed a missing answer marker after the adaptive 4-case -> 2+2 recovery path.
 // Give two-case split children the same 768-token floor. Truncation still fails closed; no cases, references, scoring thresholds,
 // authority, promotion rules, or endpoint-call ceilings are changed.
+//
+// 2026-09-17 20:42 UTC Production showed the remaining transport edge: a 2-case candidate call returned 502, the evaluator
+// split it 1+1, and the first child returned 502 again. That child failure escaped because split children are deliberately not
+// allowed to create an unbounded recursive retry tree. Mass batches currently produce two holdout cases, so start that shape as
+// two single-case groups instead. The existing bounded single-group retry can then retry one failed child while preserving all
+// later-suite reservations and the same eight-call authorization ceiling.
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192
 export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'
@@ -37,12 +43,14 @@ function splitEvenly<T>(items: readonly T[], groups: number): T[][] {
   return out
 }
 
-// Fewest contiguous, near-equal groups (at most maxGroups) whose every prompt fits the window. Case order and
-// content are never changed; only how many cases share one request. Throws when even maxGroups cannot fit.
+// Fewest contiguous, near-equal groups (at most maxGroups) whose every prompt fits the window. The two-case
+// mass-holdout shape is intentionally started as 1+1 so a transient 502 on one case can use the existing single-
+// group retry slot instead of entering the split-child path. Case order/content and every scoring threshold stay fixed.
 export function planMassEvaluationGroups<T>(items: readonly T[], promptFor: (group: readonly T[]) => string, maxGroups: number): T[][] {
   if (!items.length) throw new Error('mass_distilled_evaluation_no_cases')
   const limit = Math.max(1, Math.min(Math.floor(maxGroups), items.length))
-  for (let groups = 1; groups <= limit; groups++) {
+  const startGroups = items.length === 2 && limit >= 2 ? 2 : 1
+  for (let groups = startGroups; groups <= limit; groups++) {
     const planned = splitEvenly(items, groups)
     const fits = planned.every(group => {
       try { massEvaluationOutputTokens(group.length, promptFor(group)); return true } catch { return false }

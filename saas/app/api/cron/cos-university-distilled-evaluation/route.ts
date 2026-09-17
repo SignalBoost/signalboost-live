@@ -26,6 +26,7 @@ const RUNPOD_READY_TIMEOUT_MS = 300_000
 const RUNPOD_READY_POLL_MS = 3_000
 const RUNPOD_INFERENCE_TIMEOUT_MS = 120_000
 const RUNPOD_KEEPALIVE_INTERVAL_MS = 30_000
+const RUNPOD_ENDPOINT_PREFLIGHT_TIMEOUT_MS = 8_000
 const EVALUATION_ROUTE_BUDGET_MS = 570_000
 const EVALUATION_ROUTE_RESERVE_MS = 30_000
 const RUNPOD_MAX_GPU_PRICE_USD = 0.69
@@ -34,6 +35,8 @@ const MAX_RUNTIME_WAKE_ATTEMPTS = 1
 const MAX_RUNTIME_WAKE_COST_USD = 0.2
 const RUNTIME_ATTEMPT_PROFILE = 'cos_distilled_independent_evaluation_runtime_v1'
 const RUNTIME_ATTEMPT_CLAIM = 'distilled_independent_evaluation_attempt_started'
+const RUNPOD_PREFLIGHT_PROFILE = 'cos_distilled_evaluation_runpod_endpoint_preflight_v1'
+const RUNPOD_PREFLIGHT_CLAIM = 'runpod_endpoint_preflight_classified'
 const HEX40 = /^[a-f0-9]{40}$/i
 const HEX64 = /^[a-f0-9]{64}$/i
 const RUNPOD_ENDPOINT_HOST = /^[A-Za-z0-9_-]{3,120}\.api\.runpod\.ai$/
@@ -66,6 +69,15 @@ type SuccessfulRuntimeAttempt = Extract<RuntimeAttemptClaim, { ok: true }>
 type EvaluationTransportAudit = Readonly<{
   runtimeAttempt: SuccessfulRuntimeAttempt | null
   endpointCalls: number
+}>
+
+type RunpodEndpointClassification = 'available' | 'stale' | 'transient'
+
+type RunpodEndpointPreflight = Readonly<{
+  classification: RunpodEndpointClassification
+  httpStatus: number | null
+  errorName: string | null
+  errorMessage: string | null
 }>
 
 const TRANSPORT_AUDIT_ERROR_FIELD = 'distilledEvaluationTransportAudit' as const
@@ -344,6 +356,161 @@ async function runpodWorkerSnapshot(input: {
   }
 }
 
+async function persistRunpodEndpointClassification(input: {
+  endpointId: string
+  routeDeadlineMs: number
+  preflight: RunpodEndpointPreflight
+}): Promise<void> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const artifact = await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
+    .eq('status', 'evaluation_pending')
+    .eq('trained_artifact_id', DISTILLED_ADAPTER_MODEL_ID)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .abortSignal(routeDeadlineSignal(input.routeDeadlineMs))
+    .maybeSingle()
+  if (artifact.error) throw artifact.error
+  if (!artifact.data) return
+
+  const candidateId = String(artifact.data.candidate_id || '').trim()
+  const subjectId = String(artifact.data.subject_id || '').trim()
+  const artifactHash = String(artifact.data.trained_artifact_hash || '').trim().toLowerCase()
+  if (!candidateId || !subjectId || !HEX64.test(artifactHash)) return
+
+  const evidence = {
+    profile: RUNPOD_PREFLIGHT_PROFILE,
+    claim: RUNPOD_PREFLIGHT_CLAIM,
+    candidateId,
+    artifactHash,
+    endpointId: input.endpointId,
+    classification: input.preflight.classification,
+    httpStatus: input.preflight.httpStatus,
+    errorName: input.preflight.errorName,
+    errorMessage: input.preflight.errorMessage,
+    paidRuntimeAttemptConsumed: false,
+    productionTrafficAuthorized: false,
+    authorityExpanded: false,
+  }
+  const eventKey = hash([
+    RUNPOD_PREFLIGHT_PROFILE,
+    RUNPOD_PREFLIGHT_CLAIM,
+    candidateId,
+    artifactHash,
+    input.endpointId,
+    input.preflight.classification,
+    input.preflight.httpStatus,
+    input.preflight.errorName,
+  ])
+  const insert = await db.from('cos_university_learning_assurance_events').insert({
+    event_key: eventKey,
+    event_type: 'fine_tune',
+    subject_id: subjectId,
+    candidate_id: candidateId,
+    evidence_hash: hash(evidence),
+    evidence,
+    verifier: 'host_controller',
+    observed_at: new Date().toISOString(),
+  })
+    .select('event_key')
+    .abortSignal(routeDeadlineSignal(input.routeDeadlineMs))
+    .single()
+  if (insert.error && String((insert.error as any)?.code || '') !== '23505') throw insert.error
+}
+
+async function hasPersistedStaleRunpodEndpoint(input: {
+  endpointId: string
+  routeDeadlineMs: number
+}): Promise<boolean> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const artifact = await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,trained_artifact_hash,created_at')
+    .eq('status', 'evaluation_pending')
+    .eq('trained_artifact_id', DISTILLED_ADAPTER_MODEL_ID)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .abortSignal(routeDeadlineSignal(input.routeDeadlineMs))
+    .maybeSingle()
+  if (artifact.error) throw artifact.error
+  if (!artifact.data) return false
+
+  const candidateId = String(artifact.data.candidate_id || '').trim()
+  const artifactHash = String(artifact.data.trained_artifact_hash || '').trim().toLowerCase()
+  if (!candidateId || !HEX64.test(artifactHash)) return false
+
+  const events = await db.from('cos_university_learning_assurance_events')
+    .select('evidence,observed_at')
+    .eq('event_type', 'fine_tune')
+    .eq('candidate_id', candidateId)
+    .order('observed_at', { ascending: false })
+    .limit(100)
+    .abortSignal(routeDeadlineSignal(input.routeDeadlineMs))
+  if (events.error) throw events.error
+  return (events.data || []).some((row: any) => {
+    const evidence = row?.evidence || {}
+    return evidence?.profile === RUNPOD_PREFLIGHT_PROFILE
+      && evidence?.claim === RUNPOD_PREFLIGHT_CLAIM
+      && String(evidence?.artifactHash || '').toLowerCase() === artifactHash
+      && String(evidence?.endpointId || '') === input.endpointId
+      && evidence?.classification === 'stale'
+  })
+}
+
+async function preflightRunpodEndpoint(input: {
+  origin: string
+  fetchImpl: typeof fetch
+  routeDeadlineMs: number
+}): Promise<void> {
+  const key = configuredRunpodApiKey()
+  if (!key) throw new Error('distilled_evaluation_runpod_key_missing')
+  const endpointId = new URL(input.origin).hostname.split('.')[0] || ''
+  if (!endpointId) throw new Error('distilled_evaluation_runpod_endpoint_invalid')
+
+  if (await hasPersistedStaleRunpodEndpoint({ endpointId, routeDeadlineMs: input.routeDeadlineMs })) {
+    throw new RuntimeAttemptSkip('distilled_evaluation_runpod_endpoint_stale')
+  }
+
+  let preflight: RunpodEndpointPreflight
+  try {
+    const response = await input.fetchImpl(`https://api.runpod.ai/v2/${endpointId}/health`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(RUNPOD_ENDPOINT_PREFLIGHT_TIMEOUT_MS),
+    })
+    preflight = {
+      classification: response.status >= 200 && response.status < 300
+        ? 'available'
+        : response.status === 404 || response.status === 410
+          ? 'stale'
+          : 'transient',
+      httpStatus: response.status,
+      errorName: null,
+      errorMessage: response.ok ? null : (await response.text()).replace(/\s+/g, ' ').slice(0, 200) || null,
+    }
+  } catch (error) {
+    preflight = {
+      classification: 'transient',
+      httpStatus: null,
+      errorName: error instanceof Error ? error.name : 'Error',
+      errorMessage: (error instanceof Error ? error.message : String(error)).slice(0, 200),
+    }
+  }
+
+  await persistRunpodEndpointClassification({
+    endpointId,
+    routeDeadlineMs: input.routeDeadlineMs,
+    preflight,
+  })
+
+  if (preflight.classification === 'stale') {
+    throw new RuntimeAttemptSkip('distilled_evaluation_runpod_endpoint_stale')
+  }
+  if (preflight.classification === 'transient') {
+    throw new RuntimeAttemptSkip('distilled_evaluation_runpod_endpoint_preflight_transient')
+  }
+}
+
 async function proveRunpodReady(input: {
   origin: string
   fetchImpl: typeof fetch
@@ -429,7 +596,9 @@ async function proveRunpodReady(input: {
  *
  * All no-cost evaluator preflight runs before a runtime attempt is consumed. Immediately before the
  * first exact RunPod evaluation inference POST can wake billed compute, the route validates the RunPod
- * key, consumes the one durable bounded attempt, and proves the same origin is `/ready = 200`.
+ * key, fences stale/nonexistent endpoints through the RunPod control plane, consumes the one durable
+ * bounded attempt, and then proves the same origin is `/ready = 200`. A persisted stale classification
+ * prevents the same dead endpoint from re-entering the long readiness loop on later cron invocations.
  * The inference timeout starts only after readiness succeeds, so cold-start time cannot consume the
  * request's inference budget before the POST is forwarded. Once ready, a 30-second keepalive prevents
  * the 60-second scale-to-zero runtime from going cold across independent-judge calls. The successful
@@ -480,6 +649,7 @@ async function runWithEvaluationTransportGuards<T>(input: {
     if (isRunpodEvaluationInference(url, init)) {
       if (!key) throw new Error('distilled_evaluation_runpod_key_missing')
       if (!runtimeAttempt) {
+        await preflightRunpodEndpoint({ origin: url.origin, fetchImpl: routeBoundFetch, routeDeadlineMs: input.routeDeadlineMs })
         const claimed = await claimRuntimeEvaluationAttempt(new Date(), input.routeDeadlineMs)
         if (claimed.ok === false) throw new RuntimeAttemptSkip(claimed.reason)
         runtimeAttempt = claimed

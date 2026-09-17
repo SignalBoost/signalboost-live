@@ -9,8 +9,16 @@ export const MASS_CANARY_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2
 export const MASS_CANARY_PROFILE = 'cos_local_distilled_runtime_deploy_v1' as const
 export const MASS_CANARY_APPROVAL_CLAIM = 'local_distilled_runtime_deploy_approved' as const
 export const MASS_CANARY_ROLLING_WINDOW_HOURS = 24
-export const MASS_CANARY_ROLLING_MAX_APPROVALS = 24
+// 2026-09-17: 36 of 37 artifacts still need a canary, each taking 2-3 attempts because a cold RunPod worker often
+// misses the readiness window. At 24 approvals a day that is a multi-day drain of work that is already trained and
+// paid for. The ceiling is what bounds spend (<= $0.20 per canary), so it moves from 24 to 72: about $14.40/day
+// worst case, and one canary still runs at a time.
+export const MASS_CANARY_ROLLING_MAX_APPROVALS = 72
 export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
+// A cold-start timeout is the runtime never answering, not the artifact failing. It is retried without spending one
+// of the three substantive attempts, and the identical-repeat stop below still prevents an endless loop.
+export const MASS_CANARY_COLD_START_FAILURE = 'the operation was aborted due to timeout' as const
+export const MASS_CANARY_MAX_IDENTICAL_FAILURES = 4
 export const MASS_CANARY_MAX_COST_USD = 0.2
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
@@ -125,9 +133,24 @@ export function decideMassCanaryRollingApproval(input: {
       && event.evidence?.authorizationRef === MASS_CANARY_ROLLING_AUTHORIZATION_REF)
     const failures = firstRolling
       ? own.filter(event => at(event.observedAt) >= at(firstRolling.observedAt)
-        && claim(event) === 'local_distilled_runtime_canary_failed').length
+        && claim(event) === 'local_distilled_runtime_canary_failed'
+        && String(event.evidence?.error || '').trim().toLowerCase() !== MASS_CANARY_COLD_START_FAILURE).length
       : 0
     if (failures >= MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
+
+    // Consecutive identical failures are a stuck artifact, not a repairable retry; a different failure resets it.
+    const errors = own
+      .filter(event => claim(event) === 'local_distilled_runtime_canary_failed')
+      .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+      .map(event => String(event.evidence?.error || '').trim().toLowerCase())
+    if (errors.length) {
+      let identical = 0
+      for (const error of errors) {
+        if (error !== errors[0]) break
+        identical += 1
+      }
+      if (identical >= MASS_CANARY_MAX_IDENTICAL_FAILURES) continue
+    }
 
     return {
       issue: true,

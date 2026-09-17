@@ -69,7 +69,8 @@ test('a one-case batch stays one request, and one that cannot fit in the allowed
 })
 
 test('the runner stays inside the approved 8 endpoint calls and still judges each suite separately', () => {
-  assert.match(source, /max_tokens:massEvaluationOutputTokens\(input\.cases\.length,userPrompt\),messages:\[\{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT\}/)
+  assert.match(source, /const cap=massEvaluationOutputTokens\(input\.cases\.length,userPrompt\)/)
+  assert.match(source, /max_tokens:cap,messages:\[\{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT\}/)
   assert.equal((source.match(/\/chat\/completions`/g) || []).length, 1)
   assert.match(source, /const budget:EndpointCallBudget=\{used:0,max:ENDPOINT_CALLS\}/)
   assert.match(source, /input\.budget\.used\+groups\.length\+input\.reserveCallsAfter>input\.budget\.max/)

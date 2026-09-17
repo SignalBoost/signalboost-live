@@ -1,3 +1,4 @@
+// saas/tests/cosUniversityMassDistillation.node.test.ts
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -149,7 +150,8 @@ test('targeted replenishment prioritizes the nearest canonical batches without w
     ...Array.from({ length: 14 }, (_, index) => ({ contentHash: h(index + 100), materialHash: h(index + 2_000), subject: 'Statistics and causal inference', sourceKind: 'scientific_journal', license: 'Public Domain', confidence: 0.9 })),
   ])
   const gaps = buildMassDistillationReplenishmentGaps(supply.subjects, new Date('2026-09-16T00:00:00.000Z'))
-  assert.deepEqual(gaps.map(gap => gap.subject), ['Social & Behavioral Sciences', 'Statistics & Data Science'])
+  assert.deepEqual(gaps.map(gap => gap.subject).slice(0, 2), ['Social & Behavioral Sciences', 'Statistics & Data Science'])
+  assert.equal(gaps.length, 3, 'the free slot goes to an empty canonical subject instead of idling')
   assert.ok(gaps.every(gap => gap.sourceKinds?.length === 1 && gap.sourceKinds[0] === 'scientific_journal'))
   assert.match(gaps[0].evidence.join(' '), /shortfall_to_batch=2/)
   assert.equal(MASS_DISTILLATION_MIN_BATCH, 20)

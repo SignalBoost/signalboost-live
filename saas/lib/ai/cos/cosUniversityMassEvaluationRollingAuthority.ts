@@ -44,6 +44,14 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // No worker became ready inside the window (RunPod scheduling/cold start): nothing reached the artifact, so it
     // says nothing about model quality. bootstrap_failed is deliberately NOT here — a bad adapter can cause it.
     || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
+    // A crash inside the evaluator (2026-09-17 20:01-20:20 UTC: "Cannot read properties of undefined (reading
+    // 'length')", a leftover model-list read after the runtime wake was repointed) says nothing about the model. It
+    // burned all three of mass:481a6760's substantive attempts. A JavaScript defect never reads as model quality;
+    // the shapes below cannot be produced by a model's answers, only by our own code or the wake contract.
+    || error.startsWith('cannot read properties of')
+    || error.startsWith('mass_distilled_evaluation_runtime_wake_')
+    || error === 'mass_distilled_evaluation_route_deadline_exceeded'
+    || /\bis not a function\b/.test(error)
 }
 
 function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly RollingEvent[], nowMs: number): boolean {

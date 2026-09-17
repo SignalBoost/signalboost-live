@@ -17,8 +17,8 @@ export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
 // PR #2433 changed the evaluator itself by forcing Qwen final-answer mode. Identical failures from before that repair
 // must not permanently suppress the artifact: only failures observed after this named repair generation count toward
 // the identical-infrastructure circuit breaker. A future evaluator repair can advance this epoch explicitly.
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'pr_2433_qwen_final_answer_mode' as const
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T21:22:15Z' as const
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_answer_failure_fingerprint' as const
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T22:10:00Z' as const
 const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000

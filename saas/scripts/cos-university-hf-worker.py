@@ -1,3 +1,4 @@
+# saas/scripts/cos-university-hf-worker.py
 #!/usr/bin/env python3
 """Governed iTMounts Hugging Face Jobs worker wrapper.
 
@@ -421,6 +422,28 @@ def _training_recipe(training_items: int) -> dict[str, Any]:
     }
 
 
+def _warmup_arguments(config_cls, recipe: dict[str, Any]) -> dict[str, Any]:
+    """Keep the recipe's warmup fraction across trainer versions.
+
+    2026-09-17 16:00 UTC: the unpinned install resolved a transformers/TRL release whose SFTConfig no longer
+    accepts ``warmup_ratio`` and every training job exited. When it is absent the same fraction is converted
+    to whole optimizer steps, which every release accepts, so the schedule itself is unchanged.
+    """
+    import inspect
+    import math
+
+    ratio = float(recipe["warmupRatio"])
+    try:
+        parameters = inspect.signature(config_cls.__init__).parameters
+    except (TypeError, ValueError):
+        parameters = {}
+    if "warmup_ratio" in parameters:
+        return {"warmup_ratio": ratio}
+    per_step = max(1, int(recipe["perDeviceTrainBatchSize"]) * int(recipe["gradientAccumulationSteps"]))
+    total_steps = math.ceil(int(recipe["trainingItems"]) / per_step) * math.ceil(float(recipe["epochs"]))
+    return {"warmup_steps": max(1, math.ceil(total_steps * ratio)) if ratio > 0 else 0}
+
+
 def train_student(base, envelope: dict[str, Any]) -> None:
     import torch
     from huggingface_hub import HfApi
@@ -475,7 +498,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         per_device_train_batch_size=recipe["perDeviceTrainBatchSize"],
         gradient_accumulation_steps=recipe["gradientAccumulationSteps"],
         learning_rate=recipe["learningRate"],
-        warmup_ratio=recipe["warmupRatio"],
+        **_warmup_arguments(SFTConfig, recipe),
         lr_scheduler_type=recipe["lrSchedulerType"],
         max_grad_norm=recipe["maxGradNorm"],
         logging_steps=10,

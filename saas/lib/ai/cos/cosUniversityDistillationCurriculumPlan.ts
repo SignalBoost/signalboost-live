@@ -79,6 +79,13 @@ const REPLENISHMENT_RESEARCH_LENSES = [
  * Prefer the subjects closest to a valid batch, but do not keep asking one identical search for each
  * subject. The live workflow explicitly supplies the owner-controlled query count. The helper keeps
  * a one-query default for callers that only need prioritization semantics.
+ *
+ * A subject does not need to classify into a canonical University subject before replenishment. The
+ * packager can already group unclassified material by its normalized source subject, so refusing to
+ * replenish those groups creates a permanent starvation loop: material is visible, no batch reaches
+ * 20 unique items, and every replenishment cycle returns no_targetable_subject_shortfall. Canonical
+ * subjects still use curated study themes; unclassified groups use their retained subject label as the
+ * acquisition theme until enough evidence exists to classify them more specifically.
  */
 export function buildMassDistillationReplenishmentGaps(
   supply: readonly MassDistillationSubjectSupply[],
@@ -88,30 +95,34 @@ export function buildMassDistillationReplenishmentGaps(
 ): KnowledgeGap[] {
   const replenishmentSlot = Math.floor(now.getTime() / (MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000))
   const selected = supply
-    .filter(subject => subject.canonicalSubjectId && subject.uniqueBatchableItems > 0 && subject.shortfallToBatch > 0)
+    .filter(subject => subject.uniqueBatchableItems > 0 && subject.shortfallToBatch > 0 && subject.subject.trim().length >= 3)
     .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch || b.uniqueBatchableItems - a.uniqueBatchableItems || a.subjectKey.localeCompare(b.subjectKey))
     .slice(0, Math.max(1, Math.floor(maxSubjects)))
 
   const gaps: KnowledgeGap[] = []
   const queryCount = Math.max(1, Math.floor(queriesPerSubject))
   for (const [subjectIndex, supplySubject] of selected.entries()) {
-    const subject = cosUniversitySubjectById(supplySubject.canonicalSubjectId!)
+    const canonical = supplySubject.canonicalSubjectId ? cosUniversitySubjectById(supplySubject.canonicalSubjectId) : null
+    const subjectTitle = canonical?.title || supplySubject.subject.trim()
+    const subjectId = canonical?.id || supplySubject.subjectKey
+    const themes = canonical?.studyThemes?.length ? canonical.studyThemes : [subjectTitle]
     for (let queryIndex = 0; queryIndex < queryCount; queryIndex += 1) {
-      const theme = subject.studyThemes[(replenishmentSlot + subjectIndex + queryIndex) % subject.studyThemes.length]
+      const theme = themes[(replenishmentSlot + subjectIndex + queryIndex) % themes.length]
       const lens = REPLENISHMENT_RESEARCH_LENSES[
         (replenishmentSlot + subjectIndex * queryCount + queryIndex) % REPLENISHMENT_RESEARCH_LENSES.length
       ]
       gaps.push({
-        id: `distillation-curriculum:${subject.id}:q${queryIndex + 1}`,
-        subject: subject.title,
-        question: `What rigorous, reusable ${lens} strengthen ${theme} within ${subject.title}?`,
-        discoveryQuery: `${theme} ${lens} ${subject.title}`,
+        id: `distillation-curriculum:${subjectId}:q${queryIndex + 1}`,
+        subject: subjectTitle,
+        question: `What rigorous, reusable ${lens} strengthen ${theme} within ${subjectTitle}?`,
+        discoveryQuery: `${theme} ${lens} ${subjectTitle}`,
         portableIds: ['cos'],
         expectedReuse: 100,
         expectedAvoidedCostUsd: 10,
         urgency: 100,
         evidence: [
           'mass_distillation_post_dedup_supply_shortfall',
+          supplySubject.canonicalSubjectId ? 'subject_mapping=canonical' : 'subject_mapping=retained_fallback',
           `unique_batchable_items=${supplySubject.uniqueBatchableItems}`,
           `shortfall_to_batch=${supplySubject.shortfallToBatch}`,
           `query_variant=${queryIndex + 1}/${queryCount}`,

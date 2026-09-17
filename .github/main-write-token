@@ -1,2 +1,2 @@
-base_sha=4623064f686fdd6372b53f45e6b1c65fccfe08ca
-branch=fix/university-terminal-failed-unblocks-rolling-20260917
+base_sha=5d843e32dce334ded064387ecb230c062839491e
+branch=fix/self-healing-university-auto-recovery-20260917

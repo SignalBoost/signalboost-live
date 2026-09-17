@@ -6,6 +6,8 @@ import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
+import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
+import { runpodServerlessOpenAiBaseUrl } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
 import {
   runMassDistilledArtifactEvaluation,
   type MassEvaluationClaim,
@@ -25,6 +27,8 @@ const PROFILE = 'cos_mass_distilled_independent_evaluation_runtime_v1'
 const COMPLETED = 'mass_distilled_independent_evaluation_completed'
 const FAILED = 'mass_distilled_independent_evaluation_failed'
 const ROUTE_BUDGET_MS = 570_000
+const ROUTE_RESERVE_MS = 25_000
+const RUNTIME_WAKE_TIMEOUT_MS = 300_000
 const MIN_BALANCE_USD = 1
 const HEX64 = /^[a-f0-9]{64}$/i
 const ENDPOINT_ID = /^[A-Za-z0-9_-]{3,120}$/
@@ -37,6 +41,32 @@ async function recordProduction(invocationSucceeded: boolean, evidence: Record<s
     path: 'mass_distilled_independent_evaluation',
     invocationSucceeded,
     evidence,
+  })
+}
+
+async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) {
+  const key = configuredRunpodApiKey()
+  if (!key) throw new Error('mass_distilled_evaluation_runpod_key_missing')
+  const remainingMs = deadlineMs - Date.now() - ROUTE_RESERVE_MS
+  if (remainingMs <= 0) throw new Error('mass_distilled_evaluation_route_deadline_exceeded')
+  const timeoutMs = Math.max(1, Math.min(RUNTIME_WAKE_TIMEOUT_MS, remainingMs))
+  const response = await fetch(`${runpodServerlessOpenAiBaseUrl(endpointId)}/models`, {
+    headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  if (!response.ok) {
+    const detail = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
+    throw new Error(`mass_distilled_evaluation_runtime_wake_http_${response.status}:${detail}`)
+  }
+  const payload: any = await response.json().catch(() => null)
+  if (!Array.isArray(payload?.data) || payload.data.length < 1) {
+    throw new Error('mass_distilled_evaluation_runtime_wake_invalid')
+  }
+  return Object.freeze({
+    ok: true as const,
+    endpointId,
+    modelCount: payload.data.length,
+    tokenGeneratingRequest: false,
   })
 }
 
@@ -252,11 +282,18 @@ export async function GET(req: NextRequest) {
 
     // The evaluator must not depend on a separate canary cron having already applied the current GPU policy.
     // Re-assert the exact endpoint's existing scale-to-zero/one-worker safety envelope and narrow its provider
-    // GPU pool to AMPERE_24 before readiness or any score-generating model request.
+    // GPU pool to AMPERE_24 before waking or any score-generating model request.
     const runtimePolicy = await ensureMassDistilledEndpoint24Gb(claim.endpointId)
     console.info('[cos-mass-distilled-runtime-preflight]', JSON.stringify(runtimePolicy))
 
     const deadlineMs = Date.now() + ROUTE_BUDGET_MS
+    // `/ready` is a worker-local probe. When the serverless endpoint has scaled fully to zero, repeatedly
+    // polling it can produce network-only failures without ever creating a worker. Wake through the actual
+    // OpenAI/vLLM load-balancer path first; `/v1/models` generates no tokens and does not consume one of the
+    // eight approved scoring calls. It does, however, realize the already-approved single runtime wake attempt.
+    const runtimeWake = await wakeMassDistilledRuntime(claim.endpointId, deadlineMs)
+    console.info('[cos-mass-distilled-runtime-wake]', JSON.stringify(runtimeWake))
+
     const result = await runMassDistilledArtifactEvaluation({ claim, deadlineMs, now: new Date() })
     await recordTerminal({
       claim,

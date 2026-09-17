@@ -12,15 +12,18 @@
 //
 // 2026-09-17 01:20 UTC Production evidence showed the opposite edge too: after the 4-case request was reduced to 512 output
 // tokens, the gateway completed but the response omitted a required answer marker. Reserve 192 tokens per case (still hard-
-// capped at 1,024) so four-case batches receive 768 tokens while two-case batches stay at 512. Truncation still fails closed;
-// no cases, references, scoring thresholds, or promotion rules are changed.
+// capped at 1,024) so four-case batches receive 768 tokens.
+//
+// 2026-09-17 01:53 UTC Production evidence then showed a missing answer marker after the adaptive 4-case -> 2+2 recovery path.
+// Give two-case split children the same 768-token floor. Truncation still fails closed; no cases, references, scoring thresholds,
+// authority, promotion rules, or endpoint-call ceilings are changed.
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192
 export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'
 export const MASS_EVALUATION_MAX_OUTPUT_TOKENS = 1024
 export function massEvaluationOutputTokens(caseCount: number, userPrompt: string): number {
   const estimatedPromptTokens=Math.ceil((MASS_EVALUATION_SYSTEM_PROMPT.length+userPrompt.length)/MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN)+128
-  const desired=Math.min(MASS_EVALUATION_MAX_OUTPUT_TOKENS,Math.max(512,caseCount*192))
+  const desired=Math.min(MASS_EVALUATION_MAX_OUTPUT_TOKENS,Math.max(768,caseCount*192))
   const available=MASS_EVALUATION_MODEL_CONTEXT_TOKENS-estimatedPromptTokens
   const maxTokens=Math.min(desired,available)
   if(maxTokens<Math.max(256,caseCount*60))throw new Error(`mass_distilled_evaluation_context_budget_insufficient:cases=${caseCount}:estimatedPromptTokens=${estimatedPromptTokens}`)

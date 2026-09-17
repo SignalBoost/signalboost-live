@@ -11,9 +11,10 @@ test('the conservative 3 characters per token estimate is kept after the 4 per t
   assert.throws(() => massEvaluationOutputTokens(8, prompt), /mass_distilled_evaluation_context_budget_insufficient:cases=8:estimatedPromptTokens=9138/)
 })
 
-test('all evaluator generations are bounded to 1024 output tokens while four-case batches retain complete-marker headroom', () => {
+test('all evaluator generations are bounded to 1024 output tokens while split children retain complete-marker headroom', () => {
   assert.equal(MASS_EVALUATION_MAX_OUTPUT_TOKENS, 1024)
-  assert.equal(massEvaluationOutputTokens(2, 'short prompt'), 512)
+  assert.equal(massEvaluationOutputTokens(1, 'short prompt'), 768)
+  assert.equal(massEvaluationOutputTokens(2, 'short prompt'), 768)
   assert.equal(massEvaluationOutputTokens(4, 'short prompt'), 768)
   assert.equal(massEvaluationOutputTokens(8, 'x'.repeat(3000)), 1024)
   assert.equal(massEvaluationOutputTokens(12, 'x'.repeat(3000)), 1024)

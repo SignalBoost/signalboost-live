@@ -1,4 +1,5 @@
 // saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
+// saas/lib/ai/cos/cosUniversityMassDistillationConsumer.ts
 import { createHash } from 'node:crypto'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
@@ -22,6 +23,10 @@ import {
   DISTILLATION_SOURCE_ATTRIBUTION_CLAIM,
   attributeDistillationSources,
 } from './cosUniversityDistillationSourceAttribution.ts'
+import {
+  DISTILLATION_CAMPAIGN_CLOSURE_PROFILE,
+  decideDistillationCampaignClosures,
+} from './cosUniversityDistillationCampaignClosure.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
 export const MASS_DISTILLATION_CALLBACK_PATH = '/api/internal/cos/mass-distillation/evidence' as const
@@ -1065,4 +1070,61 @@ export async function recordMassDistillationWorkerEvidence(
   }
   await completeCampaignIfDone(run.campaign_id)
   return { ok: true as const, campaignId: run.campaign_id, batchKey: run.batch_key, nextStage: 'independent_evaluation' as const, artifactId: trainedArtifactId }
+}
+
+/**
+ * Closes campaigns that are past their own expiry and are no longer doing work, so the ledger shows why each one
+ * ended. Read-then-write only: it retries nothing, authorizes nothing and never touches an unexpired campaign.
+ */
+export async function closeExpiredMassDistillationCampaigns(input: { now?: Date; maxCampaigns?: number } = {}) {
+  const db = cosServiceDb()
+  if (!db) return Object.freeze({ ok: true as const, skipped: true as const, reason: 'service_database_unavailable', closed: 0, closures: [] as unknown[] })
+  const now = input.now || new Date()
+  const campaigns = await db.from('cos_university_mass_distillation_campaigns')
+    .select('id,status,expires_at,authorized_at')
+    .in('status', ['authorized', 'active'])
+    .lt('expires_at', now.toISOString())
+    .order('authorized_at', { ascending: true })
+    .limit(50)
+  if (campaigns.error) throw campaigns.error
+  const ids = (campaigns.data || []).map((row: any) => String(row.id))
+  if (!ids.length) return Object.freeze({ ok: true as const, skipped: true as const, reason: 'no_expired_campaign', closed: 0, closures: [] as unknown[] })
+
+  const runs = await db.from('cos_university_mass_distillation_batch_runs').select('campaign_id,stage').in('campaign_id', ids).limit(500)
+  if (runs.error) throw runs.error
+
+  const closures = decideDistillationCampaignClosures({
+    now,
+    maxClosures: input.maxCampaigns ?? 10,
+    campaigns: (campaigns.data || []).map((row: any) => ({ id: String(row.id), status: String(row.status), expiresAt: String(row.expires_at), authorizedAt: String(row.authorized_at) })),
+    runs: (runs.data || []).map((row: any) => ({ campaignId: String(row.campaign_id), stage: String(row.stage) })),
+  })
+
+  let closed = 0
+  for (const closure of closures) {
+    const completedAt = new Date().toISOString()
+    const update = await db.from('cos_university_mass_distillation_campaigns')
+      .update({ status: closure.status, completed_at: completedAt, updated_at: completedAt })
+      .eq('id', closure.campaignId)
+      .in('status', ['authorized', 'active'])
+    if (update.error) throw update.error
+    closed += 1
+    await recordAssurance({
+      candidateId: `campaign:${closure.campaignId}`,
+      subjectId: 'distillation_campaign',
+      claim: 'mass_distillation_campaign_closed',
+      evidence: {
+        closureProfile: DISTILLATION_CAMPAIGN_CLOSURE_PROFILE,
+        campaignId: closure.campaignId,
+        closedStatus: closure.status,
+        reason: closure.reason,
+        runs: closure.runs,
+        completeRuns: closure.completeRuns,
+        retryAuthorized: false,
+        trafficAuthorized: false,
+      },
+      verifier: 'host_controller',
+    })
+  }
+  return Object.freeze({ ok: true as const, skipped: closed === 0, reason: closed === 0 ? 'no_closable_campaign' : null, closed, closures })
 }

@@ -22,6 +22,12 @@ defaults:
   run:
     working-directory: saas
 
+env:
+  # The repository-wide TypeScript graph and Next production build exceed Node's
+  # default ~2 GiB old-space ceiling on GitHub-hosted runners. Keep CI validating
+  # the full graph rather than failing because of the runner's default heap.
+  NODE_OPTIONS: --max-old-space-size=6144
+
 jobs:
   typecheck:
     name: Typecheck (tsc --noEmit)
@@ -285,10 +291,3 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify Issue #205 architecture
         run: npm run verify:issue-205
-
-
-
-
-
-
-

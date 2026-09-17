@@ -1,8 +1,10 @@
+// saas/app/api/cron/runpod-mass-distilled-local-deploy/route.ts
 // Exact-artifact bounded canary for mass-distilled students.
 import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
+import { decideMassCanaryRollingApproval, MASS_CANARY_PROFILE, type CanaryEvent } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
 import {
   MASS_DISTILLED_READY_TIMEOUT_MS,
   MASS_DISTILLED_CANARY_TIMEOUT_MS,
@@ -74,6 +76,41 @@ function artifactRevision(evidenceRef: unknown){
   return match?.[1]?.toLowerCase() || ''
 }
 
+// Issues at most one bounded canary approval per tick before the unchanged atomic claim.
+// Kill switch: COS_MASS_CANARY_ROLLING_AUTHORIZATION=false.
+async function issueRollingCanaryApproval(now:Date){
+  const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
+  const artifacts=await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
+    .eq('status','evaluation_pending').like('candidate_id','mass:%')
+    .order('created_at',{ascending:true}).limit(200)
+  if(artifacts.error) throw artifacts.error
+  const candidateIds=(artifacts.data||[]).map((row:any)=>String(row.candidate_id))
+  if(!candidateIds.length) return {issued:false,reason:'no_evaluation_pending_mass_artifacts'}
+  const events=await db.from('cos_university_learning_assurance_events')
+    .select('candidate_id,observed_at,expires_at,verifier,evidence')
+    .eq('event_type','fine_tune').in('candidate_id',candidateIds)
+    .contains('evidence',{profile:MASS_CANARY_PROFILE})
+    .order('observed_at',{ascending:false}).limit(5000)
+  if(events.error) throw events.error
+  const decision=decideMassCanaryRollingApproval({
+    enabled:process.env.COS_MASS_CANARY_ROLLING_AUTHORIZATION!=='false',
+    now,
+    artifacts:(artifacts.data||[]).map((row:any)=>({candidateId:String(row.candidate_id),subjectId:String(row.subject_id||''),artifactHash:String(row.trained_artifact_hash||''),createdAt:String(row.created_at||'')})),
+    events:(events.data||[]).map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),
+  })
+  if(!('artifact' in decision)) return {issued:false,reason:decision.reason}
+  const evidenceHash=hash(decision.evidence)
+  const inserted=await db.from('cos_university_learning_assurance_events').insert({
+    event_key:hash(['mass-rolling-canary-approval',decision.artifact.candidateId,decision.artifact.artifactHash,now.toISOString()]),
+    event_type:'fine_tune',subject_id:decision.artifact.subjectId||null,candidate_id:decision.artifact.candidateId,
+    evidence_hash:evidenceHash,evidence:decision.evidence,verifier:'host_controller',
+    observed_at:now.toISOString(),expires_at:decision.expiresAt,
+  })
+  if(inserted.error) throw inserted.error
+  return {issued:true,candidateId:decision.artifact.candidateId,artifactHash:decision.artifact.artifactHash}
+}
+
 async function claimNext():Promise<AtomicClaim|null>{
   const db=cosServiceDb(); if(!db) throw new Error('service_database_unavailable')
   const result=await db.rpc('claim_next_mass_distilled_runtime_canary')
@@ -108,6 +145,8 @@ export async function GET(req:NextRequest){
     const account=await queryRunpodAccountStatus()
     if(account.clientBalance!==null&&account.clientBalance<MIN_BALANCE_USD) return NextResponse.json({ok:false,error:'runpod_balance_guard',balance:account.clientBalance},{status:402})
 
+    const rolling=await issueRollingCanaryApproval(new Date(Date.now()-1000))
+    console.log('[cos-mass-distilled-rolling-canary-authorization]',JSON.stringify(rolling))
     const claim=await claimNext()
     if(!claim) return NextResponse.json({ok:true,skipped:true,reason:'no_atomically_claimable_mass_distilled_artifact'})
     const {artifact,revisionKey}=artifactFromClaim(claim)

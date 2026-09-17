@@ -13,6 +13,7 @@ import {
   resolveHuggingFaceNamespace,
   submitHuggingFaceJob,
 } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
+import { installHfWorkerDeliveryEnv } from '@/lib/ai/cos/cosUniversityHfWorkerDelivery'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -47,6 +48,9 @@ function signedResponse(input: {
 
 export async function POST(req: NextRequest) {
   installHuggingFaceTrainingExecutorEnv()
+  // Never make a private GitHub raw URL the HF runtime dependency. The executor installs a
+  // deployment-local capability URL before reading the HF Jobs configuration.
+  installHfWorkerDeliveryEnv()
   const executor = trainingExecutorConfigFromEnv()
   const hf = huggingFaceJobsConfigFromEnv()
   if (!executor || !hf) {
@@ -94,8 +98,6 @@ export async function POST(req: NextRequest) {
       config: hf,
     })
 
-    // Price is checked from Hugging Face immediately before submission. Configuration may lower the
-    // owner-defined $1/hour ceiling, but cannot raise it. There is no automatic hardware escalation.
     const hardware = await resolveHuggingFaceHardwareRate({ flavor: spec.flavor, token: hf.token })
     if (hardware.hourlyCostUsd > hf.maxHourlyCostUsd) {
       throw new Error('huggingface_training_hourly_cost_cap_exceeded')

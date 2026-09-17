@@ -28,11 +28,6 @@ const PUBLIC_SECURITY_HEADERS = [
   { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=()' },
 ]
 
-// The public homepage is a same-origin application surface, not a cross-origin API.
-// Do not advertise wildcard CORS there. The explicit canonical origin preserves ordinary
-// same-origin browser behavior while removing an unnecessary wildcard trust signal.
-// `Server` is set empty here as the application-level suppression attempt; Preview/Production
-// verification remains authoritative because the hosting layer may add its own Server header.
 const PUBLIC_ROOT_EXPOSURE_HEADERS = [
   { key: 'Access-Control-Allow-Origin', value: 'https://itmounts.com' },
   { key: 'Server', value: '' },
@@ -41,12 +36,13 @@ const PUBLIC_ROOT_EXPOSURE_HEADERS = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   turbopack: {},
-  // Vercel builds from `saas`, while the protected approved COS snapshot lives at
-  // repository root. Expand the trace root only far enough to include that exact
-  // governance snapshot, then bind it explicitly to the Concierge route.
   outputFileTracingRoot: path.join(process.cwd(), '..'),
   outputFileTracingIncludes: {
     '/api/concierge': ['../cos-core/brain.md'],
+    '/api/internal/cos/hf-worker/[capability]/[filename]': [
+      './scripts/cos-university-hf-worker.py',
+      './scripts/cos-university-hf-worker-base.py',
+    ],
   },
   async headers() {
     return [

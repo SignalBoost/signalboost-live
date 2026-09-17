@@ -85,8 +85,6 @@ function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly 
         || event.evidence?.claim === 'mass_distilled_independent_evaluation_completed'))
     .sort((a, b) => at(a.observedAt) - at(b.observedAt))[0]
   if (!terminal) {
-    // Armed/in-flight approvals still consume capacity. Expired approvals without a start also remain counted so a broken
-    // scheduler cannot mint unlimited work merely by letting approvals expire.
     return true
   }
   if (terminal.evidence?.claim === 'mass_distilled_independent_evaluation_completed') return true
@@ -117,21 +115,15 @@ export function decideRollingMassEvaluationApproval(input: {
     const mine = input.events.filter(event => event.candidateId === artifact.candidateId
       && String(event.evidence?.artifactHash || '').toLowerCase() === hash)
 
-    // A verdict exists: never re-run the same artifact to fish for a different score.
     if (mine.some(event => event.verifier === 'independent_scorer' && event.evidence?.claim === 'independent_evaluation')) continue
     if (mine.some(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_completed')) continue
 
-    // The exact runtime must already be proven by its canary.
     const canary = mine.some(event => event.verifier === 'host_production_verifier'
       && event.evidence?.claim === 'production_canary_healthy'
       && event.evidence?.exactArtifact === true
       && event.evidence?.productionTrafficAuthorized === false)
     if (!canary) continue
 
-    // Repeated substantive failures of attempts THIS authority started stop automatic retries; the owner decides after that.
-    // Failures caused by evaluator/runtime infrastructure defects do not count against the artifact: they do not constitute
-    // evidence about model quality and should be retried after the evaluator is repaired. Earlier hand-approved attempts also
-    // remain outside this budget.
     const firstRolling = mine
       .filter(event => event.verifier === 'host_controller' && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF)
       .map(event => at(event.observedAt))
@@ -141,11 +133,14 @@ export function decideRollingMassEvaluationApproval(input: {
       && !evaluatorInfrastructureFailure(event)).length
     if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
-    // Consecutive identical infrastructure failures are a stuck loop, not a repairable retry. Count only failures from the
-    // current evaluator repair generation so a proven code repair can retry the artifact once without erasing historical evidence.
+    // Before the repair exists, preserve the historical circuit breaker. At/after the named repair epoch, only failures
+    // from the repaired generation count so the fixed evaluator gets one honest retry without erasing prior evidence.
+    const infrastructureGenerationStart = nowMs >= MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
+      ? MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
+      : Number.NEGATIVE_INFINITY
     const recentErrors = mine
       .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
-        && at(event.observedAt) >= MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS)
+        && at(event.observedAt) >= infrastructureGenerationStart)
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
       .map(event => String(event.evidence?.error || '').trim().toLowerCase())
     const newest = recentErrors[0]
@@ -158,10 +153,6 @@ export function decideRollingMassEvaluationApproval(input: {
       if (identical >= MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES) continue
     }
 
-    // Respect the latest owner control. Generic suspensions remain hard stops. The one suspension raised specifically
-    // for the pre-#2398 502 investigation may be superseded only by this post-#2398 policy, because the evaluator now
-    // enforces the 24GB endpoint preflight itself before readiness/inference. The next approval becomes the latest control,
-    // so this exception cannot mint parallel approvals.
     const controls = mine
       .filter(event => event.verifier === 'host_controller'
         && (event.evidence?.claim === 'distilled_independent_evaluation_approved' || event.evidence?.claim === 'distilled_independent_evaluation_suspended'))

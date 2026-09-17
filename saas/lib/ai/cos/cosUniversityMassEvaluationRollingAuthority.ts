@@ -14,6 +14,12 @@ export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // (answer_missing:0ee6ecdba3940d76:finish=length) at 21:06, 21:08, 21:10 and 21:12 UTC on 2026-09-17, waking paid
 // compute each time and learning nothing. Identical repeats stop; a different failure resets the count.
 export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
+// PR #2433 changed the evaluator itself by forcing Qwen final-answer mode. Identical failures from before that repair
+// must not permanently suppress the artifact: only failures observed after this named repair generation count toward
+// the identical-infrastructure circuit breaker. A future evaluator repair can advance this epoch explicitly.
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'pr_2433_qwen_final_answer_mode' as const
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T21:22:15Z' as const
+const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
@@ -135,9 +141,11 @@ export function decideRollingMassEvaluationApproval(input: {
       && !evaluatorInfrastructureFailure(event)).length
     if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
 
-    // Consecutive identical infrastructure failures are a stuck loop, not a repairable retry.
+    // Consecutive identical infrastructure failures are a stuck loop, not a repairable retry. Count only failures from the
+    // current evaluator repair generation so a proven code repair can retry the artifact once without erasing historical evidence.
     const recentErrors = mine
-      .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed')
+      .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
+        && at(event.observedAt) >= MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS)
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
       .map(event => String(event.evidence?.error || '').trim().toLowerCase())
     const newest = recentErrors[0]
@@ -185,6 +193,8 @@ export function decideRollingMassEvaluationApproval(input: {
         authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
         rollingWindowHours: MASS_EVALUATION_ROLLING_WINDOW_HOURS,
         rollingMaxApprovals: MASS_EVALUATION_ROLLING_MAX_APPROVALS,
+        infrastructureRepairRef: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF,
+        infrastructureRepairAt: MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT,
         priorFailedAttempts: failures,
         ...(repairedSuspension ? { resumeAfterSuspension: true, repairRef: MASS_EVALUATION_24GB_REPAIR_REF } : {}),
       },

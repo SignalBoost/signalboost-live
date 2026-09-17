@@ -26,7 +26,7 @@ async function json(fetcher: FetchLike, url: string, init?: RequestInit): Promis
       const response = await fetcher(url, {
         ...init,
         signal: init?.signal ?? controller.signal,
-        headers: { accept: 'application/json', 'user-agent': 'SignalBoost-COS/1.0', ...(init?.headers ?? {}) },
+        headers: { accept: 'application/json', 'user-agent': 'iTMounts-COS/1.0', ...(init?.headers ?? {}) },
       })
       if (!response.ok) {
         const error = new Error(`COS learning source failed: ${response.status}`)
@@ -58,19 +58,32 @@ function transcriptText(payload: any): string {
   return ''
 }
 
-type DiscoveredYouTubeVideo = { videoId:string; url:string; title:string; description:string; channelTitle:string; publishedAt:string }
+type YouTubeLicense = 'creativeCommon' | 'youtube' | ''
+type DiscoveredYouTubeVideo = { videoId:string; url:string; title:string; description:string; channelTitle:string; publishedAt:string; license:YouTubeLicense }
 async function discoverYouTubeVideos(apiKey: string, query: string, limit: number, fetcher: FetchLike): Promise<DiscoveredYouTubeVideo[]> {
   if (!apiKey) return []
   const maxResults = Math.min(Math.max(limit, 1), 10)
   const search = await json(fetcher, `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(compactQuery(query, 10))}&key=${encodeURIComponent(apiKey)}`)
-  return (search?.items ?? []).map((item: any): DiscoveredYouTubeVideo => ({
+  const discovered = (search?.items ?? []).map((item: any) => ({
     videoId: clean(item?.id?.videoId),
     url: item?.id?.videoId ? `https://www.youtube.com/watch?v=${item.id.videoId}` : '',
     title: clean(item?.snippet?.title),
     description: clean(item?.snippet?.description),
     channelTitle: clean(item?.snippet?.channelTitle),
     publishedAt: clean(item?.snippet?.publishedAt),
-  })).filter((item: DiscoveredYouTubeVideo) => Boolean(item.videoId && item.url))
+  })).filter((item: Omit<DiscoveredYouTubeVideo,'license'>) => Boolean(item.videoId && item.url))
+  if (!discovered.length) return []
+
+  // videos.list costs only a small fraction of search.list and lets governance preserve the
+  // publisher-selected YouTube license instead of treating every discovered video alike.
+  const ids = discovered.map((item: Omit<DiscoveredYouTubeVideo,'license'>) => item.videoId).join(',')
+  const details = await json(fetcher, `https://www.googleapis.com/youtube/v3/videos?part=status&id=${encodeURIComponent(ids)}&key=${encodeURIComponent(apiKey)}`)
+  const licenseById = new Map<string, YouTubeLicense>()
+  for (const item of details?.items ?? []) {
+    const value = clean(item?.status?.license)
+    licenseById.set(clean(item?.id), value === 'creativeCommon' ? 'creativeCommon' : value === 'youtube' ? 'youtube' : '')
+  }
+  return discovered.map((item: Omit<DiscoveredYouTubeVideo,'license'>): DiscoveredYouTubeVideo => ({ ...item, license: licenseById.get(item.videoId) ?? '' }))
 }
 function createCachedYouTubeDiscovery(apiKey: string, fetcher: FetchLike) {
   const cache = new Map<string, Promise<DiscoveredYouTubeVideo[]>>()
@@ -85,8 +98,13 @@ function createCachedYouTubeDiscovery(apiKey: string, fetcher: FetchLike) {
     return await pending
   }
 }
-function youtubeMetadataResult(item: DiscoveredYouTubeVideo, license = 'YouTube API metadata; transcript not ingested'): LearningConnectorResult {
-  return { uri:item.url, title:item.title, text:clean(`${item.title}. ${item.description}. Channel: ${item.channelTitle}.`), observedAt:item.publishedAt, license }
+function youtubeMetadataLicense(item: DiscoveredYouTubeVideo): string {
+  if (item.license === 'creativeCommon') return 'YouTube Data API metadata; publisher license=creativeCommon; transcript not ingested'
+  if (item.license === 'youtube') return 'YouTube Data API metadata; publisher license=youtube; transcript not ingested'
+  return 'YouTube Data API metadata; publisher license unavailable; transcript not ingested'
+}
+function youtubeMetadataResult(item: DiscoveredYouTubeVideo, license = youtubeMetadataLicense(item)): LearningConnectorResult {
+  return { uri:item.url, title:item.title, text:clean(`${item.title}. ${item.description}. Channel: ${item.channelTitle}.`), observedAt:item.publishedAt, license, evidence:item.license ? [`youtube-status-license:${item.license}`] : undefined }
 }
 export function createYouTubeMetadataSearch(apiKey: string, fetcher: FetchLike = fetch): LearningConnectorSearch {
   const discover = createCachedYouTubeDiscovery(apiKey, fetcher)
@@ -103,11 +121,17 @@ export function createYouTubeTranscriptSearch(apiKey: string, options: YouTubeTr
       try {
         const response = await fetcher(options.transcriptApiUrl, { method:'POST', headers:{ 'content-type':'application/json', ...(options.transcriptApiToken ? { authorization:`Bearer ${options.transcriptApiToken}` } : {}) }, body:JSON.stringify({ videoId:video.videoId, videoUrl:video.url, languages:options.languages?.length ? options.languages : ['en'] }) })
         if (response.ok) {
-          const payload = await response.json().catch(() => null), transcript = transcriptText(payload)
-          if (transcript) { results.push({ uri:video.url, title:video.title, text:transcript, observedAt:video.publishedAt, license:clean(payload?.license || 'authorized transcript service supplied to COS') }); storedTranscript = true }
+          const payload = await response.json().catch(() => null), transcript = transcriptText(payload), suppliedLicense = clean(payload?.license)
+          // Transcript text is admitted only when the configured transcript service supplies an
+          // explicit rights/provenance statement. YouTube discovery quota is not permission to copy
+          // audiovisual content or captions, so missing rights evidence fails closed to metadata.
+          if (transcript && suppliedLicense) {
+            results.push({ uri:video.url, title:video.title, text:transcript, observedAt:video.publishedAt, license:suppliedLicense, evidence:[...(video.license ? [`youtube-status-license:${video.license}`] : []),'transcript-rights:explicit'] })
+            storedTranscript = true
+          }
         }
       } catch {}
-      if (!storedTranscript && options.metadataFallback) { const fallback = youtubeMetadataResult(video, 'YouTube API metadata; transcript unavailable'); if (fallback.uri && fallback.text) results.push(fallback) }
+      if (!storedTranscript && options.metadataFallback) { const fallback = youtubeMetadataResult(video); if (fallback.uri && fallback.text) results.push(fallback) }
     }
     return results.slice(0, Math.min(Math.max(limit, 1), 10))
   }

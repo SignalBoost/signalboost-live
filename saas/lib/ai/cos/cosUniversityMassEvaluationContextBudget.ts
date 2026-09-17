@@ -36,6 +36,12 @@
 // 2+2+1 for baseline and candidate, which leaves exactly two calls for the fixed baseline/candidate suites and therefore stays
 // inside the unchanged eight-call authorization ceiling. Larger shapes keep the existing context planner and fail closed if the
 // bounded recovery cannot fit; this transport rule does not change cases, references, scoring, promotion, or authority.
+//
+// 2026-09-17 22:23-22:35 UTC Production then repeatedly returned HTTP 502 for a 7-case candidate request while the exact-artifact
+// endpoint was awake and preflight was healthy. Seven cases cannot be reduced to two-or-fewer per request without exceeding the
+// unchanged eight-call authorization ceiling, so use the full three-group holdout budget and balance it 3+2+2. Baseline and
+// candidate therefore consume six calls total and the fixed baseline/candidate suites consume the remaining two. No retry,
+// scoring, promotion, case, reference, or authority boundary is expanded.
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192
 export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought. /no_think'
@@ -53,22 +59,30 @@ export function massEvaluationOutputTokens(caseCount: number, userPrompt: string
 
 function splitEvenly<T>(items: readonly T[], groups: number): T[][] {
   const out: T[][] = []
-  const size = Math.ceil(items.length / groups)
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
+  const base = Math.floor(items.length / groups)
+  const extra = items.length % groups
+  let offset = 0
+  for (let i = 0; i < groups; i += 1) {
+    const size = base + (i < extra ? 1 : 0)
+    if (size > 0) out.push(items.slice(offset, offset + size))
+    offset += size
+  }
   return out
 }
 
 // Fewest contiguous, near-equal groups (at most maxGroups) whose every prompt fits the window. The two-case
 // mass-holdout shape is intentionally started as 1+1 so a transient 502 on one case can use the existing single-
-// group retry slot instead of entering the split-child path. Production also proves 5-case candidate requests can
-// 502 despite fitting context, so 3-6 case holdouts start with groups no larger than two whenever maxGroups permits.
-// Case order/content and every scoring threshold stay fixed.
+// group retry slot instead of entering the split-child path. Production also proves 5-case and 7-case candidate
+// requests can 502 despite fitting context, so 3-6 case holdouts start with groups no larger than two whenever
+// maxGroups permits, while 7-case holdouts use all three allowed groups as 3+2+2. Case order/content and every
+// scoring threshold stay fixed.
 export function planMassEvaluationGroups<T>(items: readonly T[], promptFor: (group: readonly T[]) => string, maxGroups: number): T[][] {
   if (!items.length) throw new Error('mass_distilled_evaluation_no_cases')
   const limit = Math.max(1, Math.min(Math.floor(maxGroups), items.length))
-  const transportGroups = items.length >= 3 && items.length <= 6 && limit >= Math.ceil(items.length / 2)
-    ? Math.ceil(items.length / 2)
+  const desiredTransportGroups = items.length >= 3 && items.length <= 7
+    ? Math.min(Math.ceil(items.length / 2), 3)
     : 1
+  const transportGroups = limit >= desiredTransportGroups ? desiredTransportGroups : 1
   const startGroups = items.length === 2 && limit >= 2 ? 2 : transportGroups
   for (let groups = startGroups; groups <= limit; groups++) {
     const planned = splitEvenly(items, groups)

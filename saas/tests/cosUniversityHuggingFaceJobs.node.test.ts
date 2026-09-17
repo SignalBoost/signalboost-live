@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { gunzipSync } from 'node:zlib'
+import { deriveHfWorkerDeliveryToken } from '../lib/ai/cos/cosUniversityHfWorkerDelivery.ts'
 import {
   buildHuggingFaceJobSpec,
   decodeHuggingFaceDatasetRef,
@@ -10,6 +11,7 @@ import {
   findHuggingFaceJobByName,
   huggingFaceJobsConfigFromEnv,
   installHuggingFaceTrainingExecutorEnv,
+  COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX,
   isHuggingFaceDatasetRef,
 } from '../lib/ai/cos/cosUniversityHuggingFaceJobs.ts'
 
@@ -216,4 +218,24 @@ test('routes keep owner confirmation, signed callbacks and the global dispatch s
   assert.match(worker, /rollback_artifact_registered/)
   assert.match(worker, /LoraConfig/)
   assert.match(worker, /load_in_4bit=True/)
+})
+
+test('HF jobs fetch the worker from the authenticated delivery route, never from raw GitHub', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv({ ITMOUNTS_PUBLIC_ORIGIN: 'https://itmounts.com' }))!
+  assert.equal(config.workerUrl, `https://itmounts.com${COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX}/${deriveHfWorkerDeliveryToken(token)}/cos-university-hf-worker.py`)
+  assert.doesNotMatch(config.workerUrl, /raw\.githubusercontent\.com/)
+  assert.ok(!config.workerUrl.includes(token), 'the HF token itself never appears in the job')
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /raw\.githubusercontent\.com/)
+})
+
+test('the delivered worker URL keeps the base-worker sibling path the Python worker derives', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv())!
+  assert.match(config.workerUrl, /^https:\/\/signalboost-live-example\.vercel\.app\/api\/internal\/cos\/hf-worker\/[a-f0-9]{64}\/cos-university-hf-worker\.py$/)
+  const route = readFileSync(new URL('../app/api/internal/cos/hf-worker/[capability]/[filename]/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /cos-university-hf-worker-base\.py/)
+})
+
+test('without a deployment origin or explicit worker the adapter refuses instead of guessing a source', () => {
+  assert.equal(huggingFaceJobsConfigFromEnv({ HF_TOKEN: token, VERCEL_GIT_COMMIT_SHA: commit }), null)
 })

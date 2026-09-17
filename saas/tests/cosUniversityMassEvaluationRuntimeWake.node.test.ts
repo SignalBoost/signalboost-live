@@ -6,14 +6,14 @@ import fs from 'node:fs'
 const route = fs.readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 
 test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-balancer path', () => {
-  // Production 2026-09-17 19:32 UTC: GET /v1/models returned 404 because the exact-artifact gateway serves only
-  // /ping, /ready and POST /v1/chat/completions. The wake uses a path the runtime actually serves.
   assert.match(route, /runpodServerlessRootUrl\(endpointId\)\}\/ping`/)
   assert.doesNotMatch(route, /\/models`/)
   assert.match(route, /!== 'accepting_requests'/)
-  // The wake result reads only fields /ping actually returns.
   assert.match(route, /modelReady: payload\?\.modelReady === true/)
   assert.doesNotMatch(route, /payload\.data\.length/)
+  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 20_000/)
+  assert.match(route, /name !== 'TimeoutError' && name !== 'AbortError'/)
+  assert.match(route, /wakeRequestTimedOut: true/)
   const gateway = fs.readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
   assert.match(gateway, /@app\.get\('\/ping'\)/)
   assert.doesNotMatch(gateway, /@app\.get\('\/v1\/models'\)/)
@@ -29,11 +29,9 @@ test('runtime wake remains separate from the approved scoring-call budget', () =
 })
 
 test('an evaluator defect records its own throw site, without leaking provider or prompt content', () => {
-  // 2026-09-17 20:01 UTC: a TypeError from our own code was stored with no stack, so the throwing line was unknown.
   assert.match(route, /const frames = error instanceof Error/)
   assert.match(route, /line\.trim\(\)\.startsWith\('at '\)/)
   assert.match(route, /\.slice\(0, 4\)/)
   assert.match(route, /errorFrames: frames/)
-  // Only our own frames are kept: the error body itself is still truncated to the existing 500-character message.
   assert.match(route, /evidence: \{ error: clean\(message, 500\), \.\.\.\(frames\.length \? \{ errorFrames: frames \} : \{\}\) \}/)
 })

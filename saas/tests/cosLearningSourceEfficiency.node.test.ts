@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { ContinuousLearningSourceAdapter } from '../lib/cos-core/layers/learning/cycle'
-import type { KnowledgeGap } from '../lib/cos-core/layers/learning/index'
-import { youtubeLearningConnector } from '../lib/cos-core/layers/learning/connectors'
-import { DEFAULT_LEARNING_SOURCE_CAPS } from '../lib/cos-core/layers/learning/learningSourceCaps'
-import { createLiveLearningAdapters, guardLearningSourceAdapter, runsOnDailyLearningPass } from '../lib/cos-core/layers/learning/liveSources'
-import { createYouTubeMetadataSearch, createYouTubeTranscriptSearch } from '../lib/cos-core/layers/learning/mediaClients'
+import type { ContinuousLearningSourceAdapter } from '../lib/cos-core/layers/learning/cycle.ts'
+import type { KnowledgeGap } from '../lib/cos-core/layers/learning/index.ts'
+import { youtubeLearningConnector } from '../lib/cos-core/layers/learning/connectors.ts'
+import { DEFAULT_LEARNING_SOURCE_CAPS } from '../lib/cos-core/layers/learning/learningSourceCaps.ts'
+import { createLiveLearningAdapters, guardLearningSourceAdapter, runsOnDailyLearningPass } from '../lib/cos-core/layers/learning/liveSources.ts'
+import { createYouTubeMetadataSearch, createYouTubeTranscriptSearch } from '../lib/cos-core/layers/learning/mediaClients.ts'
 
 const GAP: KnowledgeGap = {
   id: 'curriculum:multi-tenant-saas-performance',

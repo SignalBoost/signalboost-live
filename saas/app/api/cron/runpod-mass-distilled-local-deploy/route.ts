@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
-import { decideMassCanaryRollingApproval, MASS_CANARY_PROFILE, type CanaryEvent } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
+import { decideMassCanaryRollingApproval, type CanaryEvent } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
 import {
   MASS_DISTILLED_READY_TIMEOUT_MS,
   MASS_DISTILLED_CANARY_TIMEOUT_MS,
@@ -87,10 +87,11 @@ async function issueRollingCanaryApproval(now:Date){
   if(artifacts.error) throw artifacts.error
   const candidateIds=(artifacts.data||[]).map((row:any)=>String(row.candidate_id))
   if(!candidateIds.length) return {issued:false,reason:'no_evaluation_pending_mass_artifacts'}
+  // Include both canary and independent-evaluation events. The rolling policy must know when a
+  // passed canary still owns its exact endpoint so the next canary cannot retire it mid-evaluation.
   const events=await db.from('cos_university_learning_assurance_events')
     .select('candidate_id,observed_at,expires_at,verifier,evidence')
     .eq('event_type','fine_tune').in('candidate_id',candidateIds)
-    .contains('evidence',{profile:MASS_CANARY_PROFILE})
     .order('observed_at',{ascending:false}).limit(5000)
   if(events.error) throw events.error
   const decision=decideMassCanaryRollingApproval({

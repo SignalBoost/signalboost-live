@@ -19,6 +19,10 @@ export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // of the three substantive attempts, and the identical-repeat stop below still prevents an endless loop.
 export const MASS_CANARY_COLD_START_FAILURE = 'the operation was aborted due to timeout' as const
 export const MASS_CANARY_MAX_IDENTICAL_FAILURES = 4
+// A passed canary is not permanent proof that its exact endpoint still exists or can wake. One lifecycle failure can
+// be a normal cold start, but two consecutive lifecycle failures after the latest useful evaluation evidence mean the
+// endpoint binding itself needs to be refreshed. Re-canary the SAME artifact before advancing the queue.
+export const MASS_CANARY_ENDPOINT_REFRESH_FAILURES = 2
 export const MASS_CANARY_MAX_COST_USD = 0.2
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
@@ -61,16 +65,43 @@ function evaluationInfrastructureFailure(event: CanaryEvent): boolean {
     || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
 }
 
+function evaluationEndpointLifecycleFailure(event: CanaryEvent): boolean {
+  const error = String(event.evidence?.error || '').trim().toLowerCase()
+  return error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
+    || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)
+      && error.includes('the model `itmounts-mass-distilled-')
+      && error.includes('does not exist'))
+}
+
+function endpointRefreshRequired(events: readonly CanaryEvent[], artifact: CanaryArtifact): boolean {
+  const own = allForArtifact(events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
+  const passed = [...own].reverse().find(event => claim(event) === 'local_distilled_runtime_canary_passed')
+  if (!passed) return false
+  const failures = own
+    .filter(event => at(event.observedAt) >= at(passed.observedAt)
+      && claim(event) === 'mass_distilled_independent_evaluation_failed')
+    .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+  let consecutive = 0
+  for (const failure of failures) {
+    if (!evaluationEndpointLifecycleFailure(failure)) break
+    consecutive += 1
+  }
+  return consecutive >= MASS_CANARY_ENDPOINT_REFRESH_FAILURES
+}
+
 /**
  * A passed canary hands its exact endpoint to independent evaluation. The next canary may retire
  * older mass endpoints to stay inside provider capacity, so it must not be issued while evaluation
  * still owns the current endpoint. Infrastructure failures remain retryable and therefore keep the
- * endpoint reserved; a completed verdict, explicit suspension, or three substantive failures releases it.
+ * endpoint reserved, except repeated endpoint-lifecycle failures: those invalidate the stale binding
+ * and re-canary the same artifact. A completed verdict, explicit suspension, or three substantive
+ * failures releases it.
  */
 function evaluationHandoffPending(events: readonly CanaryEvent[], artifact: CanaryArtifact): boolean {
   const own = allForArtifact(events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
   const passed = [...own].reverse().find(event => claim(event) === 'local_distilled_runtime_canary_passed')
   if (!passed) return false
+  if (endpointRefreshRequired(events, artifact)) return false
   const passedAt = at(passed.observedAt)
   const after = own.filter(event => at(event.observedAt) >= passedAt)
   if (after.some(event => claim(event) === 'mass_distilled_independent_evaluation_completed')) return false
@@ -113,7 +144,8 @@ export function decideMassCanaryRollingApproval(input: {
 
   // Keep the exact endpoint alive until independent evaluation is done with it. Provisioning a new
   // canary retires older mass endpoints, so allowing overlap would turn a healthy endpoint into a
-  // runtime_not_ready/network failure for the evaluator.
+  // runtime_not_ready/network failure for the evaluator. Repeated lifecycle failure is the exception:
+  // that stale binding must be replaced rather than reserved forever.
   if (valid.some(artifact => evaluationHandoffPending(input.events, artifact))) {
     return { issue: false, reason: 'mass_canary_waiting_for_independent_evaluation' }
   }
@@ -125,7 +157,8 @@ export function decideMassCanaryRollingApproval(input: {
 
   for (const artifact of valid) {
     const own = forArtifact(input.events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
-    if (own.some(event => claim(event) === 'local_distilled_runtime_canary_passed')) continue
+    const refreshEndpoint = endpointRefreshRequired(input.events, artifact)
+    if (own.some(event => claim(event) === 'local_distilled_runtime_canary_passed') && !refreshEndpoint) continue
     const latestControl = [...own].reverse().find(event => event.verifier === 'host_controller'
       && [MASS_CANARY_APPROVAL_CLAIM, 'local_distilled_runtime_canary_suspended'].includes(claim(event)))
     if (latestControl && claim(latestControl) === 'local_distilled_runtime_canary_suspended') continue
@@ -168,6 +201,7 @@ export function decideMassCanaryRollingApproval(input: {
         automaticPromotionAuthorized: false,
         authorityExpanded: false,
         authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF,
+        ...(refreshEndpoint ? { endpointRefresh: true, endpointRefreshReason: 'repeated_evaluation_endpoint_lifecycle_failure' } : {}),
       },
     }
   }

@@ -41,12 +41,15 @@ const PUBLIC_ROOT_EXPOSURE_HEADERS = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   turbopack: {},
-  // Vercel builds from `saas`, while the protected approved COS snapshot lives at
-  // repository root. Expand the trace root only far enough to include that exact
-  // governance snapshot, then bind it explicitly to the Concierge route.
+  // Vercel builds from `saas`, while protected runtime assets may also live at repository root.
+  // Every non-code asset is bound to only the route that needs it.
   outputFileTracingRoot: path.join(process.cwd(), '..'),
   outputFileTracingIncludes: {
     '/api/concierge': ['../cos-core/brain.md'],
+    '/api/internal/cos/huggingface-worker/[token]/[filename]': [
+      'scripts/cos-university-hf-worker.py',
+      'scripts/cos-university-hf-worker-base.py',
+    ],
   },
   async headers() {
     return [

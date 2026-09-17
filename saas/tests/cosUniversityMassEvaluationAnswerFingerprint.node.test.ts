@@ -57,7 +57,7 @@ test('the requested cap is computed once and used for both the request and the f
 })
 
 test('this evaluator repair advances the infrastructure repair epoch', () => {
-  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_seven_case_transport_split'/)
-  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T22:41:47Z'/)
+  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_seven_case_baseline_split'/)
+  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T23:26:08\.784Z'/)
   assert.match(authority, /MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4/)
 })

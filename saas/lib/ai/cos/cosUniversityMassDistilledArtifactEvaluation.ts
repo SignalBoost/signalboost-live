@@ -224,12 +224,15 @@ async function answersFor(input:{endpointId:string;model:string;cases:readonly E
     input.budget.used+=1
     try{mergeAnswerResult(answers,hashes,await call(group));continue}catch(error){
       if(!transientGateway(error))throw error
+      if(input.budget.used+1+reserve<=input.budget.max){
+        input.budget.used+=1;await new Promise(resolve=>setTimeout(resolve,500))
+        try{mergeAnswerResult(answers,hashes,await call(group));continue}catch(retryError){if(!transientGateway(retryError))throw retryError;error=retryError}
+      }
       if(group.length>1&&input.budget.used+2+reserve<=input.budget.max){
         const midpoint=Math.ceil(group.length/2);const halves=[group.slice(0,midpoint),group.slice(midpoint)].filter(part=>part.length)
         for(const part of halves){input.budget.used+=1;mergeAnswerResult(answers,hashes,await call(part))}
         continue
       }
-      if(input.budget.used+1+reserve<=input.budget.max){input.budget.used+=1;await new Promise(resolve=>setTimeout(resolve,500));mergeAnswerResult(answers,hashes,await call(group));continue}
       throw error
     }
   }
@@ -254,7 +257,7 @@ export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvalua
   const keepaliveKey=configuredRunpodApiKey();const keepalive=keepaliveKey?setInterval(()=>{void fetch(`https://${input.claim.endpointId}.api.runpod.ai/ready`,{headers:{Authorization:`Bearer ${keepaliveKey}`},signal:AbortSignal.timeout(8_000)}).catch(()=>undefined)},30_000):null;keepalive?.unref?.()
   try{
     const budget:EndpointCallBudget={used:0,max:ENDPOINT_CALLS};const fixedCases=[...safetyCases(),...transferCases(),...retentionCases()];const common={endpointId:input.claim.endpointId,budget,claim:input.claim,deadlineMs:input.deadlineMs};const holdoutGroupCount=planMassEvaluationGroups(holdoutCases,batchPrompt,3).length
-    const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:3,reserveCallsAfter:holdoutGroupCount+2,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
+    const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutGroupCount+2,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
     const holdoutCandidate=await answersFor({...common,model,cases:holdoutCases,maxGroups:3,reserveCallsAfter:2,feature:'mass_distilled_eval_holdout_candidate',candidate:true})
     const fixedBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:fixedCases,maxGroups:1,reserveCallsAfter:1,feature:'mass_distilled_eval_fixed_suites_baseline',candidate:false})
     const fixedCandidate=await answersFor({...common,model,cases:fixedCases,maxGroups:1,reserveCallsAfter:0,feature:'mass_distilled_eval_fixed_suites_candidate',candidate:true})

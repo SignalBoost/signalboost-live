@@ -30,6 +30,9 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'the operation was aborted due to timeout'
     || error.includes('mass_distilled_evaluation_call_timeout')
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
+    // No worker became ready inside the window (RunPod scheduling/cold start): nothing reached the artifact, so it
+    // says nothing about model quality. bootstrap_failed is deliberately NOT here — a bad adapter can cause it.
+    || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
 }
 
 export function decideRollingMassEvaluationApproval(input: {

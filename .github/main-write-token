@@ -1,2 +1,2 @@
-base_sha=166a25cb02447e465f76540968c3ac16f278e6d2
-branch=fix/mass-evaluator-wake-regression
+base_sha=bb5ecaf017c9393f4cc9b69d3cbfdd1e0efd3aab
+branch=fix/evaluator-wake-regression-20260917

@@ -16,6 +16,7 @@ import { massDistillationThroughputProfile } from './cosUniversityDistillationCu
 import { authorizeNextUniversityMassDistillationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
 import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUniversityHuggingFaceProviderLedger.ts'
+import { universityTeacherPoolStatus } from './cosUniversityTeacherPool.ts'
 
 export type MassDistillationWorkflowSource = 'scheduled_cron' | 'self_healing_supervisor'
 
@@ -88,6 +89,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
 }> {
   const now = input.now || new Date()
   const throughput = massDistillationThroughputProfile()
+  const teacherPool = universityTeacherPoolStatus()
   const reconciliation = await reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 15 })
   const diagnostics = await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })
   const stalledDispatchRecovery = await recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 })
@@ -179,12 +181,13 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       curriculum,
       curriculumReplenishment,
       throughput,
+      teacherPool,
       preparedBufferTarget,
       preparedBeforeReplenishment,
       preparedAfterReplenishment,
       rollingAuthorization,
       workflowSource: input.source,
-      workflowSemantics: 'detect_diagnose_repair_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_authorize_within_owner_rolling_24h_ceiling_dispatch_verify',
+      workflowSemantics: 'detect_diagnose_repair_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_authorize_within_owner_rolling_24h_ceiling_dispatch_verify',
     },
     invocationSucceeded,
     skipped,

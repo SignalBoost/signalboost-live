@@ -13,6 +13,7 @@ import {
   resolveHuggingFaceNamespace,
   submitHuggingFaceJob,
 } from '@/lib/ai/cos/cosUniversityHuggingFaceJobs'
+import { createHuggingFaceWorkerUrl } from '@/lib/ai/cos/cosUniversityHuggingFaceWorkerAccess'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -48,8 +49,21 @@ function signedResponse(input: {
 export async function POST(req: NextRequest) {
   installHuggingFaceTrainingExecutorEnv()
   const executor = trainingExecutorConfigFromEnv()
+  if (!executor) {
+    return NextResponse.json({ ok: false, error: 'huggingface_training_not_configured' }, { status: 503 })
+  }
+
+  // The repository is private. Default HF Jobs therefore receive a short-lived signed iTMounts URL
+  // instead of an unauthenticated raw.githubusercontent.com URL. Explicit buyer-owned worker URLs
+  // remain supported and are never overwritten.
+  if (!process.env.COS_UNIVERSITY_HF_WORKER_URL) {
+    process.env.COS_UNIVERSITY_HF_WORKER_URL = createHuggingFaceWorkerUrl({
+      origin: req.nextUrl.origin,
+      secret: executor.secret,
+    })
+  }
   const hf = huggingFaceJobsConfigFromEnv()
-  if (!executor || !hf) {
+  if (!hf) {
     return NextResponse.json({ ok: false, error: 'huggingface_training_not_configured' }, { status: 503 })
   }
   if (process.env.COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED !== 'true') {

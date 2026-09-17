@@ -9,6 +9,11 @@ export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_directi
 export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
 export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 12
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
+// An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
+// resumes. That is only true while the failures differ. mass:8f5af666 reproduced the SAME truncated case
+// (answer_missing:0ee6ecdba3940d76:finish=length) at 21:06, 21:08, 21:10 and 21:12 UTC on 2026-09-17, waking paid
+// compute each time and learning nothing. Identical repeats stop; a different failure resets the count.
+export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
@@ -129,6 +134,21 @@ export function decideRollingMassEvaluationApproval(input: {
       && at(event.observedAt) >= firstRolling
       && !evaluatorInfrastructureFailure(event)).length
     if (failures >= MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT) continue
+
+    // Consecutive identical infrastructure failures are a stuck loop, not a repairable retry.
+    const recentErrors = mine
+      .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed')
+      .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+      .map(event => String(event.evidence?.error || '').trim().toLowerCase())
+    const newest = recentErrors[0]
+    if (newest) {
+      let identical = 0
+      for (const error of recentErrors) {
+        if (error !== newest) break
+        identical += 1
+      }
+      if (identical >= MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES) continue
+    }
 
     // Respect the latest owner control. Generic suspensions remain hard stops. The one suspension raised specifically
     // for the pre-#2398 502 investigation may be superseded only by this post-#2398 policy, because the evaluator now

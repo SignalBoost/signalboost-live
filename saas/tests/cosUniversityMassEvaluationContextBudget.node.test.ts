@@ -2,20 +2,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { MASS_EVALUATION_MODEL_CONTEXT_TOKENS, MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from '../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
+import { MASS_EVALUATION_MAX_OUTPUT_TOKENS, MASS_EVALUATION_MODEL_CONTEXT_TOKENS, MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from '../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
 
 const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 
 test('the conservative 3 characters per token estimate is kept after the 4 per token calibration was disproven', () => {
-  // 18:33 UTC: 1307 output tokens were requested for a batch estimated at 6886 tokens and the provider still rejected it.
   const prompt = 'x'.repeat(27030 - MASS_EVALUATION_SYSTEM_PROMPT.length)
   assert.throws(() => massEvaluationOutputTokens(8, prompt), /mass_distilled_evaluation_context_budget_insufficient:cases=8:estimatedPromptTokens=9138/)
 })
 
-test('short batches keep the previous budget and never exceed 4096 output tokens', () => {
-  assert.equal(massEvaluationOutputTokens(2, 'short prompt'), 1024)
-  assert.equal(massEvaluationOutputTokens(8, 'x'.repeat(3000)), 3360)
-  assert.ok(massEvaluationOutputTokens(12, 'x'.repeat(3000)) <= 4096)
+test('all evaluator generations are bounded to 1024 output tokens', () => {
+  assert.equal(MASS_EVALUATION_MAX_OUTPUT_TOKENS, 1024)
+  assert.equal(massEvaluationOutputTokens(2, 'short prompt'), 512)
+  assert.equal(massEvaluationOutputTokens(4, 'short prompt'), 512)
+  assert.equal(massEvaluationOutputTokens(8, 'x'.repeat(3000)), 640)
+  assert.equal(massEvaluationOutputTokens(12, 'x'.repeat(3000)), 960)
+  assert.ok(massEvaluationOutputTokens(12, 'x'.repeat(3000)) <= MASS_EVALUATION_MAX_OUTPUT_TOKENS)
 })
 
 test('the recorded 8-case holdout is split into requests that each fit the window with a usable answer budget', () => {
@@ -29,7 +31,8 @@ test('the recorded 8-case holdout is split into requests that each fit the windo
     const output = massEvaluationOutputTokens(group.length, prompt)
     const estimatedPrompt = Math.ceil((MASS_EVALUATION_SYSTEM_PROMPT.length + prompt.length) / 3) + 128
     assert.ok(estimatedPrompt + output <= MASS_EVALUATION_MODEL_CONTEXT_TOKENS)
-    assert.ok(output >= group.length * 120)
+    assert.ok(output >= group.length * 60)
+    assert.ok(output <= MASS_EVALUATION_MAX_OUTPUT_TOKENS)
   }
 })
 

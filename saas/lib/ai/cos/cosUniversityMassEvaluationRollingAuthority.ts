@@ -30,6 +30,10 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error === 'the operation was aborted due to timeout'
     || error.includes('mass_distilled_evaluation_call_timeout')
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
+    // Evaluator protocol/output-budget defects are not evidence of model quality. They must fail closed, but they may retry
+    // after the evaluator is repaired without consuming the model's substantive-attempt budget or the rolling approval window.
+    || error.startsWith('mass_distilled_evaluation_answer_missing:')
+    || error.startsWith('mass_distilled_evaluation_answer_empty:')
     // The pre-fix evaluator reconstructed a bare hash-only candidate name. The exact runtime serves a runtime-keyed alias,
     // so this 404 proves evaluator/runtime identity drift, not model quality. Keep the exclusion narrow to that known shape.
     || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)
@@ -38,6 +42,34 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // No worker became ready inside the window (RunPod scheduling/cold start): nothing reached the artifact, so it
     // says nothing about model quality. bootstrap_failed is deliberately NOT here — a bad adapter can cause it.
     || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
+}
+
+function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly RollingEvent[], nowMs: number): boolean {
+  const approvalAt = at(approval.observedAt)
+  if (!Number.isFinite(approvalAt)) return true
+  const nextApprovalAt = events
+    .filter(event => event.candidateId === approval.candidateId
+      && event.verifier === 'host_controller'
+      && event.evidence?.claim === 'distilled_independent_evaluation_approved'
+      && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF
+      && at(event.observedAt) > approvalAt)
+    .map(event => at(event.observedAt))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b)[0] ?? Number.POSITIVE_INFINITY
+  const terminal = events
+    .filter(event => event.candidateId === approval.candidateId
+      && at(event.observedAt) >= approvalAt
+      && at(event.observedAt) < nextApprovalAt
+      && (event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
+        || event.evidence?.claim === 'mass_distilled_independent_evaluation_completed'))
+    .sort((a, b) => at(a.observedAt) - at(b.observedAt))[0]
+  if (!terminal) {
+    // Armed/in-flight approvals still consume capacity. Expired approvals without a start also remain counted so a broken
+    // scheduler cannot mint unlimited work merely by letting approvals expire.
+    return true
+  }
+  if (terminal.evidence?.claim === 'mass_distilled_independent_evaluation_completed') return true
+  return !evaluatorInfrastructureFailure(terminal)
 }
 
 export function decideRollingMassEvaluationApproval(input: {
@@ -49,10 +81,11 @@ export function decideRollingMassEvaluationApproval(input: {
   if (!input.enabled) return { issue: false, reason: 'rolling_mass_evaluation_authorization_disabled' }
   const nowMs = input.now.getTime()
 
-  const issuedInWindow = input.events.filter(event => event.verifier === 'host_controller'
+  const rollingApprovalsInWindow = input.events.filter(event => event.verifier === 'host_controller'
     && event.evidence?.claim === 'distilled_independent_evaluation_approved'
     && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF
-    && nowMs - at(event.observedAt) < MASS_EVALUATION_ROLLING_WINDOW_HOURS * 3_600_000).length
+    && nowMs - at(event.observedAt) < MASS_EVALUATION_ROLLING_WINDOW_HOURS * 3_600_000)
+  const issuedInWindow = rollingApprovalsInWindow.filter(approval => rollingApprovalConsumesWindow(approval, input.events, nowMs)).length
   if (issuedInWindow >= MASS_EVALUATION_ROLLING_MAX_APPROVALS) return { issue: false, reason: 'rolling_mass_evaluation_window_exhausted' }
 
   const ordered = [...input.artifacts].sort((a, b) => at(a.createdAt) - at(b.createdAt))

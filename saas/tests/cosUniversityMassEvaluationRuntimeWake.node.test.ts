@@ -21,6 +21,14 @@ test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-bal
   assert.match(route, /await wakeMassDistilledRuntime\(claim\.endpointId, deadlineMs\)/)
 })
 
+test('runtime wake is bounded and hands cold-start readiness back to the evaluator', () => {
+  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 20_000/)
+  assert.match(route, /name !== 'TimeoutError' && name !== 'AbortError'/)
+  assert.match(route, /wakeRequestTimedOut: true/)
+  assert.match(route, /responseObserved: false/)
+  assert.doesNotMatch(route, /const RUNTIME_WAKE_TIMEOUT_MS = 300_000/)
+})
+
 test('runtime wake remains separate from the approved scoring-call budget', () => {
   const wake = route.indexOf('await wakeMassDistilledRuntime(claim.endpointId, deadlineMs)')
   const evaluation = route.indexOf('await runMassDistilledArtifactEvaluation({ claim, deadlineMs, now: new Date() })')

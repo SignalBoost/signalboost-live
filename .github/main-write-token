@@ -1,2 +1,2 @@
-base_sha=b27d16dabf91cb5fcea43a9cf6715c63b3ceadcc
-branch=fix/mass-eval-transient-502-20260916
+base_sha=43d1ac4c4caf647dc9d1d291ce84d0d99bdb9557
+branch=fix/mass-eval-infra-retry-budget-20260916

@@ -1,2 +1,2 @@
-base_sha=44fab07e6a50cab48e213bd7a3e58871abe88ce5
-branch=fix/mass-evaluator-split-502-retry-v2
+base_sha=f9dd88838780860b2a35cd894000a3420c4669cd
+branch=fix/mass-evaluator-single-case-output-v3

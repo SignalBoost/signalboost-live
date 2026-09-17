@@ -23,13 +23,19 @@
 // allowed to create an unbounded recursive retry tree. Mass batches currently produce two holdout cases, so start that shape as
 // two single-case groups instead. The existing bounded single-group retry can then retry one failed child while preserving all
 // later-suite reservations and the same eight-call authorization ceiling.
+//
+// 2026-09-17 20:56 UTC Production then showed a solo case reaching finish_reason=length with its required answer marker missing
+// at the 768-token floor. A one-case request has the smallest prompt and therefore safely receives the existing 1,024-token cap.
+// Multi-case budgets, grouping, call ceilings, scoring thresholds, authority, and fail-closed truncation behavior are unchanged.
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192
 export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought.'
 export const MASS_EVALUATION_MAX_OUTPUT_TOKENS = 1024
 export function massEvaluationOutputTokens(caseCount: number, userPrompt: string): number {
   const estimatedPromptTokens=Math.ceil((MASS_EVALUATION_SYSTEM_PROMPT.length+userPrompt.length)/MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN)+128
-  const desired=Math.min(MASS_EVALUATION_MAX_OUTPUT_TOKENS,Math.max(768,caseCount*192))
+  const desired=caseCount===1
+    ? MASS_EVALUATION_MAX_OUTPUT_TOKENS
+    : Math.min(MASS_EVALUATION_MAX_OUTPUT_TOKENS,Math.max(768,caseCount*192))
   const available=MASS_EVALUATION_MODEL_CONTEXT_TOKENS-estimatedPromptTokens
   const maxTokens=Math.min(desired,available)
   if(maxTokens<Math.max(256,caseCount*60))throw new Error(`mass_distilled_evaluation_context_budget_insufficient:cases=${caseCount}:estimatedPromptTokens=${estimatedPromptTokens}`)

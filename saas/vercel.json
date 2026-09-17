@@ -41,7 +41,7 @@
     { "path": "/api/cron/runpod-distilled-v6-local-deploy", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/runpod-mass-distilled-local-deploy", "schedule": "*/5 * * * *" },
     { "path": "/api/cron/cos-university-distilled-evaluation", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/cos-university-mass-distilled-evaluation", "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/cos-university-mass-distilled-evaluation", "schedule": "*/2 * * * *" },
     { "path": "/api/cron/cos-university-mass-distillation", "schedule": "* * * * *" },
     { "path": "/api/cron/cos-university-distillation-supervisor", "schedule": "2,7,12,17,22,27,32,37,42,47,52,57 * * * *" },
     { "path": "/api/cron/specialist-mesh-production-acceptance", "schedule": "* * * * *" },

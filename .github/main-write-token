@@ -1,2 +1,3 @@
 base_sha=46e7c753380f926a994dad07534e8f2a4273e739
 branch=fix/hf-worker-delivery-v2
+# HF worker delivery repair; CI heap fix included.

@@ -13,6 +13,7 @@ export const MASS_CANARY_ROLLING_MAX_APPROVALS = 24
 export const MASS_CANARY_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 export const MASS_CANARY_MAX_COST_USD = 0.2
 export const MASS_CANARY_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
+const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 
 export type CanaryArtifact = Readonly<{ candidateId: string; subjectId: string; artifactHash: string; createdAt: string }>
 export type CanaryEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
@@ -29,7 +30,47 @@ function forArtifact(events: readonly CanaryEvent[], artifact: CanaryArtifact): 
     && String(event.evidence?.artifactHash || '').toLowerCase() === artifact.artifactHash.toLowerCase())
 }
 
+function allForArtifact(events: readonly CanaryEvent[], artifact: CanaryArtifact): CanaryEvent[] {
+  return events.filter(event => event.candidateId === artifact.candidateId
+    && String(event.evidence?.artifactHash || '').toLowerCase() === artifact.artifactHash.toLowerCase())
+}
+
 function claim(event: CanaryEvent): string { return String(event.evidence?.claim || '') }
+
+function evaluationInfrastructureFailure(event: CanaryEvent): boolean {
+  const error = String(event.evidence?.error || '').trim().toLowerCase()
+  if (!error) return false
+  return error.startsWith('mass_distilled_evaluation_context_budget_insufficient:')
+    || error.includes('maximum context length is 8192 tokens')
+    || error === 'the operation was aborted due to timeout'
+    || error.includes('mass_distilled_evaluation_call_timeout')
+    || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
+    || error.startsWith('mass_distilled_evaluation_answer_missing:')
+    || error.startsWith('mass_distilled_evaluation_answer_empty:')
+    || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)
+      && error.includes('the model `itmounts-mass-distilled-')
+      && error.includes('does not exist'))
+    || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
+}
+
+/**
+ * A passed canary hands its exact endpoint to independent evaluation. The next canary may retire
+ * older mass endpoints to stay inside provider capacity, so it must not be issued while evaluation
+ * still owns the current endpoint. Infrastructure failures remain retryable and therefore keep the
+ * endpoint reserved; a completed verdict, explicit suspension, or three substantive failures releases it.
+ */
+function evaluationHandoffPending(events: readonly CanaryEvent[], artifact: CanaryArtifact): boolean {
+  const own = allForArtifact(events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
+  const passed = [...own].reverse().find(event => claim(event) === 'local_distilled_runtime_canary_passed')
+  if (!passed) return false
+  const passedAt = at(passed.observedAt)
+  const after = own.filter(event => at(event.observedAt) >= passedAt)
+  if (after.some(event => claim(event) === 'mass_distilled_independent_evaluation_completed')) return false
+  if (after.some(event => claim(event) === 'distilled_independent_evaluation_suspended')) return false
+  const substantiveFailures = after.filter(event => claim(event) === 'mass_distilled_independent_evaluation_failed'
+    && !evaluationInfrastructureFailure(event)).length
+  return substantiveFailures < MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT
+}
 
 /** An approval is still armed while unexpired, not yet invoked, and under the claim's three preflight failures. */
 function armedApproval(own: readonly CanaryEvent[], nowMs: number): boolean {
@@ -61,6 +102,13 @@ export function decideMassCanaryRollingApproval(input: {
   const valid = input.artifacts
     .filter(artifact => artifact.candidateId.startsWith('mass:') && HEX64.test(artifact.artifactHash) && artifact.subjectId)
     .sort((a, b) => at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId))
+
+  // Keep the exact endpoint alive until independent evaluation is done with it. Provisioning a new
+  // canary retires older mass endpoints, so allowing overlap would turn a healthy endpoint into a
+  // runtime_not_ready/network failure for the evaluator.
+  if (valid.some(artifact => evaluationHandoffPending(input.events, artifact))) {
+    return { issue: false, reason: 'mass_canary_waiting_for_independent_evaluation' }
+  }
 
   // The claim serves one reservation at a time; issuing a second approval while one is armed only queues spend.
   if (valid.some(artifact => armedApproval(forArtifact(input.events, artifact), nowMs))) {

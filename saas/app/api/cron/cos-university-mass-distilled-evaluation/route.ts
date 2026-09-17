@@ -69,7 +69,7 @@ async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) 
   return Object.freeze({
     ok: true as const,
     endpointId,
-    modelCount: payload.data.length,
+    modelReady: payload?.modelReady === true,
     tokenGeneratingRequest: false,
   })
 }

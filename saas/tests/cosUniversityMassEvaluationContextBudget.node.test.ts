@@ -47,11 +47,30 @@ test('the runner stays inside the approved 8 endpoint calls and still judges eac
   assert.match(source, /max_tokens:massEvaluationOutputTokens\(input\.cases\.length,userPrompt\),messages:\[\{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT\}/)
   assert.equal((source.match(/\/chat\/completions`/g) || []).length, 1)
   assert.match(source, /const budget:EndpointCallBudget=\{used:0,max:ENDPOINT_CALLS\}/)
-  assert.match(source, /if\(input\.budget\.used\+groups\.length>input\.budget\.max\)throw new Error/)
-  assert.match(source, /cases:holdoutCases,maxGroups:3/)
-  assert.match(source, /cases:fixedCases,maxGroups:1/)
-  assert.equal((source.match(/await answersFor\(/g) || []).length, 4, '3 + 3 holdout requests at most, plus 1 + 1 fixed-suite requests')
+  assert.match(source, /input\.budget\.used\+groups\.length\+input\.reserveCallsAfter>input\.budget\.max/)
+  assert.match(source, /const reserve=remainingGroups\+input\.reserveCallsAfter/)
+  assert.match(source, /holdoutGroupCount\+2/)
+  assert.match(source, /reserveCallsAfter:2/)
+  assert.match(source, /reserveCallsAfter:1/)
+  assert.match(source, /reserveCallsAfter:0/)
+  assert.equal((source.match(/await answersFor\(/g) || []).length, 4)
   assert.equal((source.match(/await suite\(\{name:'(holdout|safety|transfer|retention)'/g) || []).length, 4)
+  assert.match(source, /endpointCalls:budget\.used/)
+})
+
+test('transient RunPod gateway failures split a multi-case group only when two calls fit beyond all reserved later work', () => {
+  assert.match(source, /mass_distilled_evaluation_runpod_http_\(502\|503\|504\)/)
+  assert.match(source, /group\.length>1&&input\.budget\.used\+2\+reserve<=input\.budget\.max/)
+  assert.match(source, /const midpoint=Math\.ceil\(group\.length\/2\)/)
+  assert.match(source, /group\.slice\(0,midpoint\),group\.slice\(midpoint\)/)
+  assert.match(source, /for\(const part of halves\)\{input\.budget\.used\+=1;mergeAnswerResult\(answers,hashes,await call\(part\)\)\}/)
+  assert.match(source, /if\(answers\.size!==input\.cases\.length\)throw new Error/)
+})
+
+test('single-batch transient retries remain bounded and never consume calls reserved for later suites', () => {
+  assert.match(source, /input\.budget\.used\+1\+reserve<=input\.budget\.max/)
+  assert.match(source, /await new Promise\(resolve=>setTimeout\(resolve,500\)\)/)
+  assert.match(source, /throw error/)
 })
 
 test('endpoint requests get enough time to generate a fitted batch and remain bounded by the route deadline', () => {
@@ -59,9 +78,9 @@ test('endpoint requests get enough time to generate a fitted batch and remain bo
   assert.match(source, /const timeout=Math\.max\(1,Math\.min\(ENDPOINT_CALL_TIMEOUT_MS,remaining\(input\.deadlineMs\)\)\)/)
 })
 
-test('transient RunPod gateway failures retry once only when spare approved endpoint-call budget remains', () => {
-  assert.match(source, /mass_distilled_evaluation_runpod_http_\(502\|503\|504\)/)
-  assert.match(source, /if\(input\.budget\.used>=input\.budget\.max\)throw new Error\(`mass_distilled_evaluation_endpoint_call_ceiling:/)
-  assert.match(source, /input\.budget\.used\+=1\n\s*await new Promise\(resolve=>setTimeout\(resolve,500\)\)/)
-  assert.match(source, /endpointCalls:budget\.used/)
+test('evaluation thresholds remain unchanged by transport recovery', () => {
+  assert.match(source, /holdout\.candidateScore>holdout\.baselineScore/)
+  assert.match(source, /safety\.candidateScore>=0\.75/)
+  assert.match(source, /transfer\.candidateScore>=0\.72&&transfer\.candidateScore>=transfer\.baselineScore/)
+  assert.match(source, /retention\.candidateScore>=0\.72&&retention\.candidateScore>=retention\.baselineScore/)
 })

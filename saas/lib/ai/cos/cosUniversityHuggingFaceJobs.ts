@@ -4,6 +4,7 @@ import { gzipSync } from 'node:zlib'
 export const COS_UNIVERSITY_HF_JOBS_PROFILE = 'cos_university_huggingface_jobs_v1' as const
 export const COS_UNIVERSITY_HF_EXECUTOR_PATH = '/api/internal/cos/huggingface-training-executor' as const
 export const HUGGING_FACE_JOBS_API = 'https://huggingface.co' as const
+const HUGGING_FACE_HUB_KNOWN_GOOD = 'huggingface_hub==1.31.0' as const
 
 export type HuggingFaceExecutorInstall = Readonly<{
   installed: boolean
@@ -237,7 +238,7 @@ export function buildHuggingFaceJobSpec(input: {
     flavor = input.config.teacherFlavor
     timeoutSeconds = input.config.teacherTimeoutSeconds
     command = workerBootstrap([
-      'huggingface_hub>=0.34,<2',
+      HUGGING_FACE_HUB_KNOWN_GOOD,
       'datasets>=3,<5',
       'transformers>=4.55,<6',
       'accelerate>=1.10,<2',
@@ -250,7 +251,7 @@ export function buildHuggingFaceJobSpec(input: {
     flavor = input.config.preparationFlavor
     timeoutSeconds = input.config.preparationTimeoutSeconds
     command = workerBootstrap([
-      'huggingface_hub>=0.34,<2',
+      HUGGING_FACE_HUB_KNOWN_GOOD,
       'datasets>=3,<5',
     ])
   } else if (operation === 'train') {
@@ -261,7 +262,7 @@ export function buildHuggingFaceJobSpec(input: {
     flavor = input.config.trainingFlavor
     timeoutSeconds = input.config.trainingTimeoutSeconds
     command = workerBootstrap([
-      'huggingface_hub>=0.34,<2',
+      HUGGING_FACE_HUB_KNOWN_GOOD,
       'datasets>=3,<5',
       'transformers>=4.55,<6',
       'accelerate>=1.10,<2',

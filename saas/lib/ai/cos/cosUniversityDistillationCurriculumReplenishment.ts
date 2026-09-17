@@ -8,11 +8,13 @@ import {
   MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
   MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES,
 } from './cosUniversityDistillationCurriculumPlan.ts'
+import {
+  HYBRID_DISTILLATION_PROFILE,
+  teacherSyntheticSourceHash,
+} from './cosUniversityHybridDistillation.ts'
 
-// OpenAlex currently serves at most ten works per query through this adapter. Distillation scales
-// discovery through buyer-controlled query diversity rather than pretending a per-request provider
-// page size is the product throughput ceiling.
 const DISTILLATION_OPENALEX_RESULTS_PER_QUERY = 10
+const HYBRID_SYNTHETIC_MAX_PER_SUBJECT = 20
 
 function rightsClearedPolicy(maxCandidatesPerCycle: number): ContinuousLearningPolicy {
   return {
@@ -27,6 +29,63 @@ function slotKey(now: Date): string {
   const interval = MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000
   const slot = new Date(Math.floor(now.getTime() / interval) * interval)
   return `distillation-replenishment-${slot.toISOString().slice(0, 16).replace(/[-:T]/g, '')}`
+}
+
+async function installTeacherSyntheticFallback(input: {
+  db: NonNullable<ReturnType<typeof cosServiceDb>>
+  supply: readonly MassDistillationSubjectSupply[]
+  now: Date
+  maxSubjects: number
+}) {
+  let inserted = 0
+  const bySubject: Array<{ subject: string; inserted: number }> = []
+  const targets = [...input.supply]
+    .filter(subject => subject.shortfallToBatch > 0)
+    .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch || a.subject.localeCompare(b.subject))
+    .slice(0, input.maxSubjects)
+
+  for (const target of targets) {
+    const needed = Math.min(HYBRID_SYNTHETIC_MAX_PER_SUBJECT, Math.max(0, target.shortfallToBatch))
+    let subjectInserted = 0
+    for (let ordinal = 0; ordinal < needed; ordinal += 1) {
+      const contentHash = teacherSyntheticSourceHash(target.subject, ordinal)
+      const row = {
+        content_hash: contentHash,
+        source_kind: 'teacher_synthetic_curriculum',
+        source_uri: `itmounts://cos-university/hybrid-distillation/${encodeURIComponent(target.subject)}/${ordinal}`,
+        source_title: `${target.subject} — teacher-generated practice seed ${ordinal + 1}`,
+        observed_at: input.now.toISOString(),
+        subject: target.subject,
+        summary: [
+          `Teacher-synthetic curriculum seed for ${target.subject}.`,
+          `Generate a distinct, self-contained expert teaching example for this subject (variant ${ordinal + 1}).`,
+          'Prefer a concept, diagnostic problem, counterexample, or applied decision that is meaningfully different from neighboring variants.',
+          'The teacher must not claim current-web access, private context, hidden exams, user memories, or external citations.',
+        ].join(' '),
+        facts: [
+          { origin: 'teacher_synthetic', profile: HYBRID_DISTILLATION_PROFILE, ordinal },
+          { constraint: 'self_contained_no_private_or_current_web_claims' },
+        ],
+        confidence: 1,
+        license: 'synthetic-benchmark-fixture',
+        evidence: [{
+          profile: HYBRID_DISTILLATION_PROFILE,
+          origin: 'teacher_synthetic',
+          fallbackOnly: true,
+          fillsPostDedupShortfall: true,
+          authorityExpanded: false,
+        }],
+      }
+      const write = await input.db.from('cos_continuous_learning')
+        .upsert(row, { onConflict: 'content_hash', ignoreDuplicates: true })
+      if (write.error) throw write.error
+      inserted += 1
+      subjectInserted += 1
+    }
+    bySubject.push({ subject: target.subject, inserted: subjectInserted })
+  }
+
+  return Object.freeze({ inserted, bySubject: Object.freeze(bySubject) })
 }
 
 export async function replenishUniversityMassDistillationCurriculum(input: {
@@ -84,6 +143,11 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
       adapters,
     )
     const result = await cycle.run(gaps, 0)
+
+    // Real rights-cleared acquisition remains first. Deterministic synthetic seeds then fill only the
+    // post-dedup batch shortfall. The existing Qwen teacher turns those seeds into actual examples.
+    const synthetic = await installTeacherSyntheticFallback({ db, supply: input.supply, now, maxSubjects })
+
     const completedAt = new Date().toISOString()
     const update = await db.from('cos_university_continuous_runs').update({
       status: 'completed',
@@ -112,8 +176,11 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
       probationary: result.probationary,
       rejected: result.rejected,
       sourceErrors: result.sourceErrors,
+      syntheticInserted: synthetic.inserted,
+      syntheticBySubject: synthetic.bySubject,
+      sourceMix: ['real_source', 'teacher_synthetic'],
       externalCostUsd: 0,
-      semantics: 'diversified_targeted_post_dedup_shortfall_acquisition_openalex_cc0_existing_learning_admission_no_provider_training_dispatch',
+      semantics: 'real_rights_cleared_material_first_then_teacher_synthetic_shortfall_fallback_with_per_item_origin_evidence_no_training_dispatch',
     })
   } catch (error) {
     const message = String(error instanceof Error ? error.message : error || 'unknown_error').slice(0, 800)

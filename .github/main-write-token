@@ -1,2 +1,2 @@
-base_sha=be3443848c7720d912e2f4f19a113af3bc5932d6
-branch=fix/mass-evaluator-five-case-502
+base_sha=80e1bb129f24870bbb6cb19b3428888c2855baf6
+branch=fix/mass-evaluator-stop-marker-recovery

@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
 import { MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from './cosUniversityMassEvaluationContextBudget.ts'
+import { recoverStoppedOpenAnswer } from './cosUniversityMassEvaluationAnswerRecovery.ts'
 import { servedCandidateModelFromCanary } from './cosUniversityMassEvaluationServedModel.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
 import { readPinnedHfParquetRows } from './hfPinnedParquetRows.ts'
@@ -168,7 +169,18 @@ function answerFailureFingerprint(text:string,item:EvalCase,finish:string,cap:nu
   const other=/<<<ANSWER:[0-9a-f]{16}>>>/i.test(text)&&!open?1:0
   return `finish=${finish||'unknown'}:think=${think}:open=${open}:close=${close}:other=${other}:cap=${cap}`
 }
-function parseAnswersPartial(text:string,cases:readonly EvalCase[],finish:string,cap:number){const answers=new Map<string,string>();const missing:string[]=[];const errors:Record<string,string>={};for(const item of cases){try{answers.set(item.id,parseAnswers(text,[item]).get(item.id) as string)}catch(error){missing.push(item.id);errors[item.id]=`${error instanceof Error?error.message:String(error)}:${answerFailureFingerprint(text,item,finish,cap)}`}}return {answers,missing,errors}}
+function parseAnswersPartial(text:string,cases:readonly EvalCase[],finish:string,cap:number){
+  const answers=new Map<string,string>();const missing:string[]=[];const errors:Record<string,string>={}
+  for(const item of cases){
+    try{answers.set(item.id,parseAnswers(text,[item]).get(item.id) as string)}
+    catch(error){
+      const recovered=recoverStoppedOpenAnswer(text,item.id,finish)
+      if(recovered){answers.set(item.id,recovered);continue}
+      missing.push(item.id);errors[item.id]=`${error instanceof Error?error.message:String(error)}:${answerFailureFingerprint(text,item,finish,cap)}`
+    }
+  }
+  return {answers,missing,errors}
+}
 
 async function callRunpod(input:{endpointId:string;model:string;cases:readonly EvalCase[];candidateId:string;artifactId?:string;artifactHash?:string;feature:string;deadlineMs:number}){
   const key=configuredRunpodApiKey();if(!key)throw new Error('mass_distilled_evaluation_runpod_key_missing');await waitReady(input.endpointId,input.deadlineMs)

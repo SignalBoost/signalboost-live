@@ -6,6 +6,8 @@ import { DISTILLED_MODEL_NAME } from '@/lib/ai/cos/runpodServerlessDistilledProv
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { registerPromotedGraduateModel } from '@/lib/ai/cos/cosUniversityGraduateModelRegistry'
 import { decideMassGraduateRegistration, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
+import { GRADUATE_ROLLBACK_PROOF_CLAIM, GRADUATE_ROLLBACK_PROOF_PROFILE, proveGraduateRollbackReference } from '@/lib/ai/cos/cosUniversityGraduateRollbackProof'
+import { createHash } from 'node:crypto'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -102,6 +104,62 @@ async function registerNextMassGraduate() {
   }
 }
 
+/**
+ * Resolves the rollback target of the oldest pending graduate that has not been proven yet and records the result.
+ * Read-only: it proves the reference exists, it does not perform a rollback and it changes no graduate status.
+ */
+async function proveNextGraduateRollback() {
+  const db = cosServiceDb()
+  if (!db) return { proven: false as const, reason: 'service_database_unavailable' }
+  const graduates = await db.from('cos_university_graduate_model_registry')
+    .select('candidate_id,subject_id,trained_artifact_hash,rollback_artifact_ref')
+    .in('status', ['pending_runtime', 'canary', 'active'])
+    .order('created_at', { ascending: true })
+    .limit(50)
+  if (graduates.error) throw graduates.error
+  const rows = graduates.data || []
+  if (!rows.length) return { proven: false as const, reason: 'no_registered_graduate' }
+
+  const proven = await db.from('cos_university_learning_assurance_events')
+    .select('candidate_id,evidence')
+    .eq('event_type', 'fine_tune')
+    .in('candidate_id', rows.map((row: any) => String(row.candidate_id)))
+    .contains('evidence', { claim: GRADUATE_ROLLBACK_PROOF_CLAIM })
+    .limit(200)
+  if (proven.error) throw proven.error
+  const done = new Set((proven.data || [])
+    .filter((row: any) => row.evidence?.ok === true)
+    .map((row: any) => `${row.candidate_id}:${String(row.evidence?.artifactHash || '').toLowerCase()}`))
+
+  const next = rows.find((row: any) => !done.has(`${row.candidate_id}:${String(row.trained_artifact_hash).toLowerCase()}`))
+  if (!next) return { proven: false as const, reason: 'every_graduate_rollback_already_proven' }
+
+  const proof = await proveGraduateRollbackReference({ rollbackArtifactRef: next.rollback_artifact_ref })
+  const evidence = {
+    profile: GRADUATE_ROLLBACK_PROOF_PROFILE,
+    claim: GRADUATE_ROLLBACK_PROOF_CLAIM,
+    candidateId: String(next.candidate_id),
+    artifactHash: String(next.trained_artifact_hash).toLowerCase(),
+    ...proof,
+    rollbackPerformed: false,
+    productionTrafficAuthorized: false,
+    authorityExpanded: false,
+  }
+  const evidenceHash = createHash('sha256').update(JSON.stringify(evidence)).digest('hex')
+  const recorded = await db.from('cos_university_learning_assurance_events').upsert({
+    event_key: createHash('sha256').update(JSON.stringify([GRADUATE_ROLLBACK_PROOF_PROFILE, next.candidate_id, evidence.artifactHash, evidenceHash])).digest('hex'),
+    event_type: 'fine_tune',
+    subject_id: String(next.subject_id || ''),
+    candidate_id: String(next.candidate_id),
+    evidence_hash: evidenceHash,
+    evidence,
+    verifier: 'host_production_verifier',
+    observed_at: new Date().toISOString(),
+  }, { onConflict: 'event_key', ignoreDuplicates: true })
+  if (recorded.error) throw recorded.error
+  return { proven: proof.ok, candidateId: String(next.candidate_id), reason: proof.reason, resolvedRevision: proof.resolvedRevision, rollbackPerformed: false }
+}
+
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
@@ -111,9 +169,10 @@ export async function GET(req: NextRequest) {
     // Registration is a durable record, not a runtime: it writes one pending_runtime row and spends nothing, so it
     // runs before the activation flag. Activation itself stays behind that flag and its own evidence gates.
     const massRegistration = await registerNextMassGraduate()
+    const rollbackProof = await proveNextGraduateRollback()
 
     if (String(process.env[ACTIVATION_ENABLED_FLAG] || '').trim() !== 'true') {
-      return NextResponse.json({ ok: true, skipped: true, reason: 'graduate_activation_disabled', massRegistration })
+      return NextResponse.json({ ok: true, skipped: true, reason: 'graduate_activation_disabled', massRegistration, rollbackProof })
     }
 
     const db = cosServiceDb()
@@ -127,7 +186,7 @@ export async function GET(req: NextRequest) {
       .maybeSingle()
     if (pending.error) throw pending.error
     if (!pending.data) {
-      return NextResponse.json({ ok: true, skipped: true, reason: 'no_pending_runtime_graduate', massRegistration })
+      return NextResponse.json({ ok: true, skipped: true, reason: 'no_pending_runtime_graduate', massRegistration, rollbackProof })
     }
 
     const graduate: any = pending.data

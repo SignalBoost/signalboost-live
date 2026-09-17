@@ -107,7 +107,11 @@ test('single-batch transient retries remain bounded and never consume calls rese
 })
 
 test('endpoint requests get enough time to generate a fitted batch and remain bounded by the route deadline', () => {
-  assert.match(source, /const ENDPOINT_CALL_TIMEOUT_MS = 120_000/)
+  // Lowered from 120_000 on measured evidence: Production 2026-09-17 recorded 182 successful endpoint calls at
+  // 8.8-30.0s and 25 HTTP 502 failures in a 35.2-40.4s band. 50s clears the slowest observed success with margin
+  // while no longer waiting three times past the point the gateway has already abandoned the request.
+  assert.match(source, /const ENDPOINT_CALL_TIMEOUT_MS = 50_000/)
+  assert.ok(50_000 > 30_000, 'the timeout must still clear the slowest observed successful batch')
   assert.match(source, /const timeout=Math\.max\(1,Math\.min\(ENDPOINT_CALL_TIMEOUT_MS,remaining\(input\.deadlineMs\)\)\)/)
 })
 

@@ -79,6 +79,16 @@ test('mass distillation revalidates stored subjects against retained teaching ma
     sourceTitle: 'Enterprise technology developments — teacher-generated practice seed 1',
     summary: 'Teacher-synthetic curriculum seed for Enterprise technology developments.',
   }), 'Enterprise technology developments')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Physics & Natural Sciences',
+    sourceTitle: 'Array programming with NumPy',
+    summary: 'NumPy is used in research pipelines across physics, chemistry, biology, finance, and economics.',
+  }), 'Computer Science & Coding')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Physics & Natural Sciences',
+    sourceTitle: 'Scientific Machine Learning Through Physics-Informed Neural Networks',
+    summary: 'Deep learning methods for physics-informed neural networks and scientific computing.',
+  }), 'Computer Science & Coding')
 })
 
 test('mass distillation requires confidence, row identity, material identity and explicit rights', () => {

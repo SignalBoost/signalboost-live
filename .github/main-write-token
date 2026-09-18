@@ -1,2 +1,2 @@
-base_sha=e716cb31a1a04afcea7276c2d7a9d6378d58a67a
-branch=fix/cos-fast-routing-fallthrough-20260918
+base_sha=95addc452db80c8157095b85870036ae0723a53b
+branch=fix/cos-fast-edit-long-input-deadline-20260918

@@ -10,6 +10,7 @@ import {
   MASS_DISTILLATION_MIN_BATCH,
   retainedIdentityEligibleForMassDistillation,
   retainedMaterialHash,
+  resolveMassDistillationSubject,
 } from '../lib/ai/cos/cosUniversityMassDistillation.ts'
 import { buildMassDistillationReplenishmentGaps } from '../lib/ai/cos/cosUniversityDistillationCurriculumPlan.ts'
 
@@ -44,6 +45,25 @@ test('retained material fingerprint normalizes teaching content rather than row 
   assert.equal(same, first)
   assert.notEqual(different, first)
   assert.equal(retainedMaterialHash({ sourceTitle: '', summary: '', facts: [] }), null)
+})
+
+test('mass distillation revalidates stored subjects against retained teaching material', () => {
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'cos data center',
+    summary: 'Special relativity preserves the invariant spacetime interval and frame-dependent time dilation.',
+  }), 'Physics & Natural Sciences')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'cos data center',
+    summary: 'Advanced TypeScript and Next.js production engineering with API route tests.',
+  }), 'Computer Science & Coding')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'cos data center',
+    summary: 'Probability, variance, percentiles, and causal inference under uncertainty.',
+  }), 'Statistics & Data Science')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Cybersecurity',
+    summary: 'Authentication, authorization, incident response, and secure coding.',
+  }), 'Cybersecurity')
 })
 
 test('mass distillation requires confidence, row identity, material identity and explicit rights', () => {

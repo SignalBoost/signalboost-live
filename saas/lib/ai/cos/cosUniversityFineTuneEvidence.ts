@@ -21,12 +21,20 @@ export const FINE_TUNE_CLAIM_VERIFIER: Readonly<Record<FineTuneClaim, string>> =
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const validHash = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value)
-export type FineTuneRevision = Readonly<{ baseModel: string; datasetHash: string; trainingManifestHash: string; holdoutManifestHash: string }>
+const validRevision40 = (value: unknown) => typeof value === 'string' && /^[a-f0-9]{40}$/i.test(value)
+export type FineTuneRevision = Readonly<{
+  baseModel: string
+  /** Optional immutable base revision. Omitted for legacy revisions; required by mass distillation. */
+  baseModelRevision?: string
+  datasetHash: string
+  trainingManifestHash: string
+  holdoutManifestHash: string
+}>
 export const fineTuneRevisionKey = (revision: FineTuneRevision) => hash(revision)
 const manifestHash = (items: readonly string[]) => hash({ items: [...items].sort() })
 
 export function buildFineTunePartitionRevision(input: {
-  baseModel: unknown; datasetHash: unknown; trainingItemHashes: unknown; holdoutItemHashes: unknown
+  baseModel: unknown; baseModelRevision?: unknown; datasetHash: unknown; trainingItemHashes: unknown; holdoutItemHashes: unknown
 }): FineTuneRevision | null {
   const training = Array.isArray(input.trainingItemHashes) ? input.trainingItemHashes : []
   const holdout = Array.isArray(input.holdoutItemHashes) ? input.holdoutItemHashes : []
@@ -34,8 +42,15 @@ export function buildFineTunePartitionRevision(input: {
   const holdoutSet = new Set(holdout)
   if (training.some((item: string) => holdoutSet.has(item))) return null
   const baseModel = String(input.baseModel || '').trim()
-  if (!baseModel || !validHash(input.datasetHash)) return null
-  return { baseModel, datasetHash: String(input.datasetHash), trainingManifestHash: manifestHash(training), holdoutManifestHash: manifestHash(holdout) }
+  const baseModelRevision = String(input.baseModelRevision || '').trim().toLowerCase()
+  if (!baseModel || !validHash(input.datasetHash) || (baseModelRevision && !validRevision40(baseModelRevision))) return null
+  return {
+    baseModel,
+    ...(baseModelRevision ? { baseModelRevision } : {}),
+    datasetHash: String(input.datasetHash),
+    trainingManifestHash: manifestHash(training),
+    holdoutManifestHash: manifestHash(holdout),
+  }
 }
 
 async function serviceDb() {
@@ -52,7 +67,8 @@ export async function recordFineTuneHostApproval(input: {
   if (!candidateId) return { ok: false as const, problems: ['candidate_id_missing'] }
   if (!['dataset_approved', 'training_approved'].includes(input.claim)) return { ok: false as const, problems: ['host_claim_not_permitted'] }
   if (!evidenceRef) return { ok: false as const, problems: ['evidence_ref_missing'] }
-  if (!input.revision.baseModel.trim() || !validHash(input.revision.datasetHash) || !validHash(input.revision.trainingManifestHash) || !validHash(input.revision.holdoutManifestHash)) return { ok: false as const, problems: ['candidate_revision_invalid'] }
+  if (!input.revision.baseModel.trim() || !validHash(input.revision.datasetHash) || !validHash(input.revision.trainingManifestHash) || !validHash(input.revision.holdoutManifestHash)
+    || (input.revision.baseModelRevision !== undefined && !validRevision40(input.revision.baseModelRevision))) return { ok: false as const, problems: ['candidate_revision_invalid'] }
   const db = await serviceDb()
   if (!db) throw new Error('service_database_unavailable')
   const evidence = { profile: FINE_TUNE_EVIDENCE_PROFILE, claim: input.claim, candidateId, evidenceRef, revisionKey: fineTuneRevisionKey(input.revision) }
@@ -122,6 +138,36 @@ export async function readFineTuneEvidence(candidateId: string, revision: FineTu
 
 export async function readFineTunePartitionRevision(candidateId: string, datasetHash: string, decisionTime = new Date()): Promise<FineTuneRevision | null> {
   const db = await serviceDb(); if (!db) throw new Error('service_database_unavailable')
+
+  // Mass-distillation revisions deliberately bind the immutable base-model revision as an additional
+  // identity field. Query the governed batch run rather than weakening that stronger revision key.
+  if (String(candidateId || '').startsWith('mass:')) {
+    const mass = await db.from('cos_university_mass_distillation_batch_runs')
+      .select('student_model_id,student_model_revision,dataset_hash,training_manifest_hash,holdout_manifest_hash,revision_key,completed_at,stage')
+      .eq('candidate_id', candidateId)
+      .eq('dataset_hash', datasetHash)
+      .maybeSingle()
+    if (mass.error) throw mass.error
+    const row: any = mass.data
+    if (row && row.stage === 'complete' && (!row.completed_at || Date.parse(String(row.completed_at)) <= decisionTime.getTime())) {
+      const baseModel = String(row.student_model_id || '').trim()
+      const baseModelRevision = String(row.student_model_revision || '').trim().toLowerCase()
+      const trainingManifestHash = String(row.training_manifest_hash || '').trim().toLowerCase()
+      const holdoutManifestHash = String(row.holdout_manifest_hash || '').trim().toLowerCase()
+      const revision: FineTuneRevision = {
+        baseModel,
+        baseModelRevision,
+        datasetHash: String(row.dataset_hash || '').trim().toLowerCase(),
+        trainingManifestHash,
+        holdoutManifestHash,
+      }
+      if (baseModel && validRevision40(baseModelRevision) && validHash(revision.datasetHash)
+        && validHash(trainingManifestHash) && validHash(holdoutManifestHash)
+        && fineTuneRevisionKey(revision) === String(row.revision_key || '').trim().toLowerCase()) return revision
+    }
+    return null
+  }
+
   const result = await db.from('cos_university_learning_assurance_events').select('evidence,verifier,observed_at,expires_at')
     .eq('event_type', 'fine_tune').eq('candidate_id', candidateId).order('observed_at', { ascending: false }).limit(200)
   if (result.error) throw result.error

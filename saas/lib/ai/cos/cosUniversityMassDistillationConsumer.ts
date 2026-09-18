@@ -5,6 +5,7 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   classifyMassDistillationRights,
   MASS_DISTILLATION_MIN_CONFIDENCE,
+  resolveMassDistillationSubject,
 } from './cosUniversityMassDistillation.ts'
 import {
   buildHuggingFaceJobSpec,
@@ -192,6 +193,35 @@ async function markFailure(runId: string, campaignId: string, candidateId: strin
   }).catch(() => null)
 }
 
+function normalizedSubjectKey(value: unknown): string {
+  return clean(value, 240).toLowerCase()
+}
+
+async function assertMassDistillationSourceCohesion(subjectId: string, sourceHashes: readonly string[]) {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const rows = await db.from('cos_continuous_learning')
+    .select('content_hash,subject,source_title,summary,facts')
+    .in('content_hash', [...sourceHashes])
+    .limit(128)
+  if (rows.error) throw rows.error
+  const byHash = new Map((rows.data || []).map((row: any) => [clean(row.content_hash, 64).toLowerCase(), row]))
+  if (byHash.size !== sourceHashes.length) throw new Error('mass_distillation_source_subject_recheck_missing')
+  const expected = normalizedSubjectKey(subjectId)
+  for (const contentHash of sourceHashes) {
+    const row: any = byHash.get(contentHash)
+    const resolved = resolveMassDistillationSubject({
+      subject: row?.subject,
+      sourceTitle: row?.source_title,
+      summary: row?.summary,
+      facts: row?.facts,
+    })
+    if (!resolved || normalizedSubjectKey(resolved) !== expected) {
+      throw new Error(`mass_distillation_source_subject_recheck_failed:${contentHash.slice(0, 12)}`)
+    }
+  }
+}
+
 async function loadRunBundle(runId: string) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
@@ -218,6 +248,7 @@ async function loadRunBundle(runId: string) {
   if (!sourceHashes || sourceHashes.length !== Number(batch.source_count) || sourceHashes.length !== Number(run.source_count)) {
     throw new Error('mass_distillation_source_identity_invalid')
   }
+  await assertMassDistillationSourceCohesion(String(batch.subject_id), sourceHashes)
   return { run, batch, sourceHashes }
 }
 

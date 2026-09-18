@@ -60,6 +60,16 @@ test('a failed or blocked campaign cannot starve later authorized campaigns', ()
   assert.doesNotMatch(consumer, /campaign_stopped_on_first_failed/)
 })
 
+test('every paid stage rechecks source semantic cohesion before dispatch', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /assertMassDistillationSourceCohesion/)
+  assert.match(consumer, /resolveMassDistillationSubject/)
+  assert.match(consumer, /mass_distillation_source_subject_recheck_failed/)
+  assert.ok(
+    consumer.indexOf('await assertMassDistillationSourceCohesion') < consumer.indexOf('return { run, batch, sourceHashes }'),
+  )
+})
+
 test('worker callbacks advance teacher to partitions to training to evaluation without promoting traffic', () => {
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
   assert.match(consumer, /teacher_dataset_registered/)

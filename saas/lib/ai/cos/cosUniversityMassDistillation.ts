@@ -98,12 +98,20 @@ export function resolveMassDistillationSubject(input: {
     .join(' ')
   const materialIds = classifyCosUniversitySubjects(material)
 
+  const storedNormalized = normalizedSubject(stored)
+  const materialNormalized = normalizedSubject(material)
+  const literallyCorroborated = storedNormalized.length >= 3 && materialNormalized.includes(storedNormalized)
+
   if (storedIds.length) {
     const storedPrimary = storedIds[0]
-    if (!materialIds.length || materialIds.includes(storedPrimary)) return cosUniversitySubjectById(storedPrimary).title
+    if (materialIds.includes(storedPrimary) || literallyCorroborated) return cosUniversitySubjectById(storedPrimary).title
   }
   if (materialIds.length) return cosUniversitySubjectById(materialIds[0]).title
-  return stored
+  if (literallyCorroborated) return stored
+
+  // A stored label with no independent support from the retained teaching material is unsafe for training.
+  // Fail closed: unclassifiable material stays available to RAG but is excluded from mass-distillation packaging.
+  return ''
 }
 
 function distillationSubjectGroup(value: string): Readonly<{ key: string; subject: string; canonicalSubjectId: CosUniversitySubjectId | null }> {

@@ -207,9 +207,9 @@ correct model mode: Qwen3 thinking is disabled for final-answer evaluation so th
 budget is spent on the required observable answer instead of hidden reasoning. The evaluator remains
 final-answer-only; it does not collect, persist, grade, or treat hidden chain-of-thought as evidence.
 These transport repairs do not change cases, references, scoring thresholds, delayed-retention gates,
-exact-artifact binding, promotion rules, or Production-traffic prohibition. Evaluation authority
-remains exactly eight endpoint calls, four judge calls, one runtime wake, and at most $0.20 estimated
-wake cost.
+exact-artifact binding, promotion rules, or Production-traffic prohibition. Evaluation authority now permits at most fourteen endpoint calls, four judge calls, one runtime wake, and at most $0.20 estimated
+wake cost. The 14-call ceiling is a bounded transport authority for the measured slower candidate path; it does not change cases,
+scoring thresholds, promotion gates, provider spend authority, or Production-traffic authority.
 
 ---
 

@@ -1,5 +1,6 @@
 // saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts
 import { createHash } from 'node:crypto'
+import { MASS_EVALUATION_ENDPOINT_CALLS } from '../../../../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
@@ -195,7 +196,7 @@ async function claimNext(): Promise<MassEvaluationClaim | null> {
   if (!candidateId.startsWith('mass:') || !subjectId || !artifactId
     || !HEX64.test(artifactHash) || !HEX64.test(revisionKey) || !HEX64.test(datasetHash)
     || !ENDPOINT_ID.test(endpointId) || !approvalObservedAt || !HEX64.test(reservationEventKey)
-    || maxEndpointCalls !== 8 || maxJudgeCalls !== 4 || maxRuntimeWakeAttempts !== 1
+    || maxEndpointCalls !== MASS_EVALUATION_ENDPOINT_CALLS || maxJudgeCalls !== 4 || maxRuntimeWakeAttempts !== 1
     || !Number.isFinite(maxEstimatedRuntimeWakeCostUsd)
     || maxEstimatedRuntimeWakeCostUsd <= 0 || maxEstimatedRuntimeWakeCostUsd > 0.2) {
     throw new Error('mass_distilled_evaluation_atomic_claim_invalid')
@@ -308,7 +309,7 @@ export async function GET(req: NextRequest) {
     // polling it can produce network-only failures without ever creating a worker. Wake through the actual
     // load-balancer path first, using a route the exact-artifact gateway actually serves; `/ping` generates no
     // tokens and does not consume one of the
-    // eight approved scoring calls. It does, however, realize the already-approved single runtime wake attempt.
+    // approved scoring calls. It does, however, realize the already-approved single runtime wake attempt.
     const runtimeWake = await wakeMassDistilledRuntime(claim.endpointId, deadlineMs)
     console.info('[cos-mass-distilled-runtime-wake]', JSON.stringify(runtimeWake))
 

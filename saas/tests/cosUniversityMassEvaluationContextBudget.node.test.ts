@@ -78,15 +78,17 @@ test('a one-case batch stays one request, and one that cannot fit in the allowed
   assert.throws(() => planMassEvaluationGroups(huge, () => 'x'.repeat(30000), 3), /context_budget_insufficient:cases=3:maxGroups=3/)
 })
 
-test('the runner stays inside the approved 8 endpoint calls and reserves candidate recovery headroom', () => {
+test('the runner stays inside the approved endpoint-call ceiling and reserves candidate recovery headroom', () => {
+  // Ceiling raised 8 -> 14 by owner decision 2026-09-17. The candidate is ~1.7x slower than the baseline on
+  // identical cases, so it is asked one case per request; the baseline keeps its grouping.
   assert.match(source, /const cap=massEvaluationOutputTokens\(input\.cases\.length,userPrompt\)/)
   assert.match(source, /max_tokens:cap,messages:\[\{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT\}/)
   assert.equal((source.match(/\/chat\/completions`/g) || []).length, 1)
   assert.match(source, /const budget:EndpointCallBudget=\{used:0,max:ENDPOINT_CALLS\}/)
   assert.match(source, /input\.budget\.used\+groups\.length\+input\.reserveCallsAfter>input\.budget\.max/)
   assert.match(source, /const reserve=remainingGroups\+input\.reserveCallsAfter/)
-  assert.match(source, /model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutGroupCount\+2/)
-  assert.match(source, /model,cases:holdoutCases,maxGroups:3,reserveCallsAfter:2/)
+  assert.match(source, /model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutCases\.length\+2/)
+  assert.match(source, /model,cases:holdoutCases,maxGroups:holdoutCases\.length,reserveCallsAfter:2/)
   assert.match(source, /reserveCallsAfter:1/)
   assert.match(source, /reserveCallsAfter:0/)
   assert.equal((source.match(/await answersFor\(/g) || []).length, 4)

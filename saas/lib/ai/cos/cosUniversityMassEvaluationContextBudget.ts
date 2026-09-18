@@ -43,6 +43,25 @@
 // all three groups. When the baseline is intentionally capped at two groups to preserve one recovery slot, it must still split
 // 4+3 instead of collapsing back to one seven-case request. No retry, scoring, promotion, case, reference, or authority boundary
 // is expanded.
+// ENDPOINT-CALL CEILING — owner decision 2026-09-17, raised 8 -> 14.
+//
+// Production measured what the previous ceiling could not accommodate. On identical holdout cases the trained
+// candidate averages 28.4s per request against the baseline's 16.9s (roughly 1.7x), and the serverless gateway
+// abandons a request in a measured 35.2-40.4s band. The candidate therefore fails 27 of 71 requests while the
+// baseline fails 14 of 172, and the 12-case fixed suites - whose cases are short - never fail at all. Case count
+// is not what predicts failure; how long the answering model takes is.
+//
+// The repair is smaller requests for the slower model, which costs calls rather than weakening evaluation.
+// At 8 the run had no room: 3 holdout baseline + 3 holdout candidate + 2 fixed consumed everything. 14 lets
+// the candidate use one request per holdout case while retaining bounded recovery headroom.
+//
+// This is a CALL ceiling, not a SPEND ceiling. The $0.20 wake ceiling, one-runtime-wake limit, cases, references,
+// scoring thresholds, exact-artifact binding, promotion gates, and Production-traffic prohibition are unchanged.
+//
+// One constant is imported by the evaluator, rolling authority, and cron claim validator so approval cannot drift.
+export const MASS_EVALUATION_ENDPOINT_CALLS = 14
+export const MASS_EVALUATION_JUDGE_CALLS = 4
+
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192
 export const MASS_EVALUATION_ESTIMATED_CHARACTERS_PER_TOKEN = 3
 export const MASS_EVALUATION_SYSTEM_PROMPT = 'You are being evaluated on final-answer quality only. Do not provide hidden chain-of-thought. /no_think'

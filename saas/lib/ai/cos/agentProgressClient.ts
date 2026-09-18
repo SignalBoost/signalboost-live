@@ -1,6 +1,6 @@
 import { isConciergeBuilderObjective } from './cosReasoningRolePolicy.ts'
 import { isOperatorRepairRequest, isVerifiedBuilderTerminal, operatorProgressMessage } from './operator-progress.ts'
-import { ASSISTANT_TRANSPORT_TIMEOUT_COPY } from './assistantTransportRecovery.ts'
+import { ASSISTANT_TRANSPORT_TIMEOUT_COPY, findDurableCosTurnReply } from './assistantTransportRecovery.ts'
 import { planResearchTask } from './researchBudget.ts'
 
 export type AgentProgressEvent = {
@@ -12,6 +12,8 @@ export type AgentProgressEvent = {
 
 const JOB_POLL_DELAY_MS = 1_500
 const JOB_POLL_ATTEMPTS = 180
+const COS_TURN_POLL_DELAY_MS = 1_500
+const COS_TURN_POLL_ATTEMPTS = 180
 const PUBLIC_CONCIERGE_TRANSPORT_DEADLINE_MS = 45_000
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
 const MAX_CLIENT_FILE_BYTES = 512 * 1024
@@ -291,6 +293,52 @@ export async function postWithAgentProgress(args: {
     window.clearInterval(heartbeat)
   }
   let data: any = await response.json().catch(() => ({ error: 'assistant_response_unavailable' }))
+  const turnId = typeof data?.turnId === 'string' ? data.turnId : ''
+  const conversationId = typeof requestRecord?.context?.conversationId === 'string'
+    ? String(requestRecord.context.conversationId)
+    : ''
+
+  if (turnId && data?.status === 'running' && conversationId) {
+    for (let attempt = 0; attempt < COS_TURN_POLL_ATTEMPTS; attempt += 1) {
+      report('running', 'COS accepted the turn durably — checking History for the completed response')
+      try {
+        await wait(COS_TURN_POLL_DELAY_MS, args.signal)
+        const history = await fetch(`/api/assistant/chats?id=${encodeURIComponent(conversationId)}`, {
+          method: 'GET',
+          credentials: 'include',
+          cache: 'no-store',
+          signal: args.signal,
+          headers: { accept: 'application/json' },
+        })
+        if (!history.ok) continue
+        const historyPayload = await history.json().catch(() => null)
+        const terminal = findDurableCosTurnReply(
+          Array.isArray(historyPayload?.messages) ? historyPayload.messages : [],
+          turnId,
+        )
+        if (!terminal) continue
+        report('complete', terminal.status === 'succeeded' ? 'COS completed the durable turn' : 'COS durable turn stopped without a verified response')
+        return {
+          ok: terminal.status === 'succeeded',
+          status: terminal.status === 'succeeded' ? 200 : 500,
+          data: {
+            reply: terminal.content,
+            source: 'cos-durable-history',
+            turnId,
+            status: terminal.status,
+            execution_allowed: false,
+            external_action_taken: false,
+          },
+        }
+      } catch (error) {
+        if (deliberateAbort(error, args.signal)) throw error
+        // Read-only History polling never replays the accepted POST.
+      }
+    }
+    report('running', 'COS turn is still durable in History; the request was not replayed')
+    return { ok: true, status: 202, data }
+  }
+
   const jobId = typeof data?.jobId === 'string' ? data.jobId : ''
 
   if (!jobId || !['queued', 'running'].includes(String(data?.status || ''))) {

@@ -10,6 +10,7 @@ import {
 const evaluator = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 const authority = readFileSync(new URL('../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts', import.meta.url), 'utf8')
 const cron = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+const claimMigration = readFileSync(new URL('../supabase/migrations/20260918005000_mass_distilled_evaluation_claim_14_calls.sql', import.meta.url), 'utf8')
 
 // Owner decision 2026-09-17: ceiling raised 8 -> 14 so the trained candidate, measured at ~1.7x the baseline's wall
 // time on identical cases (28.4s vs 16.9s against a 35.2-40.4s gateway cutoff), can be asked one case per request.
@@ -55,4 +56,10 @@ test('raising the CALL ceiling leaves every SPEND and promotion gate untouched',
 test('the claim validator still rejects an approval that does not match the run it authorizes', () => {
   assert.match(evaluator, /if\(input\.claim\.maxEndpointCalls!==ENDPOINT_CALLS\|\|input\.claim\.maxJudgeCalls!==JUDGE_CALLS/)
   assert.match(evaluator, /throw new Error\('mass_distilled_evaluation_claim_ceiling_invalid'\)/)
+})
+
+
+test('the database claim gate accepts the same 14-call authority and rejects the stale 8-call contract', () => {
+  assert.match(claimMigration, /if v_max_endpoint<>14 or v_max_judge<>4 or v_max_wake<>1/)
+  assert.doesNotMatch(claimMigration, /v_max_endpoint<>8\b/)
 })

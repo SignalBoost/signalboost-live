@@ -101,7 +101,8 @@ const FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|corre
 // Foreground transforms must complete the user's task, not merely fail quickly. The owned RunPod
 // remains first choice, but one stalled worker must not turn an edit into a 503. A 25s per-provider
 // budget leaves room inside the 60s direct route for the configured secondary inference path.
-export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 25_000
+export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 40_000
+export const FAST_TEXT_TRANSFORM_ATTEMPT_MS = 18_000
 
 export function isFastTextTransform(input:string):boolean{
   return FAST_TEXT_TRANSFORM.test(String(input||'').trim())
@@ -109,27 +110,38 @@ export function isFastTextTransform(input:string):boolean{
 
 async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
   const config=localInferenceConfigFromEnv()
-  // This lane intentionally skips RunPod-primary discovery/readiness. Foreground editing must remain
-  // available while University/distillation jobs saturate the owned 30B worker. The configured
-  // secondary transport is still governed by LOCAL_AI_* policy and receives the same strict bounds.
-  const text=await callLocalModel({
-    temperature:.1,
-    maxTokens:768,
-    disableThinking:true,
-    timeoutMs:FAST_TEXT_TRANSFORM_TIMEOUT_MS,
-    allowConfiguredFallback:false,
-    persistUsage:false,
-    jsonObject:true,
-    usageContext:{feature:'cos_fast_text_transform'},
-    systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
-    prompt:input,
-  },{...config,timeoutMs:Math.min(config.timeoutMs,FAST_TEXT_TRANSFORM_TIMEOUT_MS),fallbackFromOwned:true}).catch(()=>null)
-  if(!text)return null
-  const parsed=parseLocalResult(text)
-  const reply=parsed?.answer?.trim()
-  const resolved=resolveCosReasoner()
-  const reasonerLabel=resolved.config?.label??`independent-local:${config.model}`
-  return reply?{reply,reasonerLabel}:null
+  const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
+  const preferredModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash':config.model)
+  const models=[...new Set([preferredModel,config.model].filter(Boolean))]
+  const startedAt=Date.now()
+  for(const model of models){
+    const remaining=Math.max(0,FAST_TEXT_TRANSFORM_TIMEOUT_MS-(Date.now()-startedAt))
+    if(remaining<1_000)break
+    const attemptMs=Math.min(FAST_TEXT_TRANSFORM_ATTEMPT_MS,remaining)
+    const text=await callLocalModel({
+      temperature:.1,
+      maxTokens:768,
+      disableThinking:true,
+      timeoutMs:attemptMs,
+      allowConfiguredFallback:false,
+      persistUsage:false,
+      jsonObject:true,
+      usageContext:{feature:'cos_fast_text_transform',purpose:model===preferredModel?'fast_editor_primary':'fast_editor_retry'},
+      systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+      prompt:input,
+    },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
+    if(!text)continue
+    const parsed=parseLocalResult(text)
+    const reply=parsed?.answer?.trim()
+    if(reply){
+      const provider=String(config.provider||'').trim()
+      const reasonerLabel=provider&&provider!=='self_hosted'
+        ? `managed-open-model:${provider}:${model}`
+        : `independent-local:${model}`
+      return{reply,reasonerLabel}
+    }
+  }
+  return null
 }
 
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}

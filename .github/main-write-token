@@ -1,2 +1,2 @@
-base_sha=cea9cdd10cd1a75a7ca7179ef3b0f4a6adeddd11
-branch=fix/university-prioritize-remediation-batches-20260918-v2
+base_sha=7fb41cb9730fc664c046ee5bdf49d8893268a056
+branch=fix/university-terminalize-semantic-recheck-failures

@@ -57,6 +57,14 @@ test('mass distillation revalidates stored subjects against retained teaching ma
     summary: 'Advanced TypeScript and Next.js production engineering with API route tests.',
   }), 'Computer Science & Coding')
   assert.equal(resolveMassDistillationSubject({
+    subject: 'The Art of Strategic Thinking',
+    summary: 'Strategic thinking for business decisions, software programs, planning, and competitive positioning.',
+  }), '')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Owner-supplied technical notes',
+    summary: 'TypeScript software debugging with API route tests and production observability.',
+  }), 'Computer Science & Coding')
+  assert.equal(resolveMassDistillationSubject({
     subject: 'cos data center',
     summary: 'Probability, variance, percentiles, and causal inference under uncertainty.',
   }), 'Statistics & Data Science')

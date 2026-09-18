@@ -98,7 +98,7 @@ async function assessSelfHealingSupervisor(request:string):Promise<string|null>{
 }
 const FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
 
-function isFastTextTransform(input:string):boolean{
+export function isFastTextTransform(input:string):boolean{
   return FAST_TEXT_TRANSFORM.test(String(input||'').trim())
 }
 

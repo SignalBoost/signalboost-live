@@ -1,6 +1,6 @@
 // saas/app/api/cos-browser/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
+import { POST as cosPrimaryPost, isFastTextTransform } from '@/app/api/cos-primary/route'
 import { POST as publicConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
@@ -150,6 +150,20 @@ export async function POST(req: NextRequest) {
   const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
     ? String(body.context.language).toLowerCase()
     : 'en'
+
+  // Simple edit/rewrite/proofread/translate requests must reach COS Primary before any
+  // browser-ingress auth, specialist, attachment, or orchestration work. COS Primary owns the
+  // bounded text-transform path and does not require owner authority for a non-mutating rewrite.
+  if (isFastTextTransform(prompt)) {
+    const routedHeaders = new Headers(req.headers)
+    routedHeaders.set('content-type', 'application/json')
+    routedHeaders.delete('content-length')
+    return cosPrimaryPost(new NextRequest(req.url, {
+      method: 'POST',
+      headers: routedHeaders,
+      body: JSON.stringify(body),
+    }))
+  }
 
   const access = await getAccess().catch(() => null)
   const auditUserId = access?.userId ?? null

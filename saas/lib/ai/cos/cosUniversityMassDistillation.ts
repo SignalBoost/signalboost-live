@@ -127,7 +127,8 @@ export function resolveMassDistillationSubject(input: {
       return cosUniversitySubjectById(storedPrimary).title
     }
   }
-  if (materialIds.length) return cosUniversitySubjectById(materialIds[0]).title
+  if (materialIds.length === 1) return cosUniversitySubjectById(materialIds[0]).title
+  if (materialIds.length > 1) return ''
   if (materialLiterallyCorroborated) return stored
 
   // A stored label with no independent support from the retained teaching material is unsafe for training.

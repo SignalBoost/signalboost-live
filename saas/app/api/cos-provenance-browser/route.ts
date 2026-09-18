@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { POST as cosBrowserPost } from '@/app/api/cos-browser/route'
 import { getAccess } from '@/lib/auth/access'
 import { isProvenanceIntrospection } from '@/lib/ai/cos/cosOrchestration'
@@ -120,16 +120,21 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
   // receive a signed, answer-bound capsule. The most recent capsule is also kept in an HttpOnly
   // same-site cookie so the natural next-turn question "where did that come from?" works without
   // forcing trial users to create an account or trusting model memory/client-authored provenance.
-  const access = await getAccess().catch(() => null)
-  const userId = access?.userId || null
-  if (userId) {
+  // Provenance persistence must never delay delivery of an already-completed answer.
+  // Resolve account identity and write the durable record after the response leaves the critical
+  // path. Signed answer provenance is still attached synchronously below, so delivery integrity
+  // does not depend on Supabase availability.
+  after(async () => {
+    const access = await getAccess().catch(() => null)
+    const userId = access?.userId || null
+    if (!userId) return
     await recordLatestUserTurnProvenance(
       userId,
       reply,
       scopedProvenance,
       String(payload.source || 'browser-delivery'),
     ).catch(() => false)
-  }
+  })
 
   const delivered = withJsonPayload(response, {
     ...payload,

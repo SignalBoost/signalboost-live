@@ -207,22 +207,23 @@ export async function POST(req: NextRequest): Promise<Response> {
     }
   }
 
-  // Owner Assistant ordinary turns use the same durable contract as Builder: persist a running
-  // History row, return 202 immediately, execute exactly once in after(), then update that same row.
+  // Signed-in ordinary turns use the same durable contract as Builder: persist a running History
+  // row, return 202 immediately, execute exactly once in after(), then update that same row.
   // Fast edits are already removed by the proxy/direct fast lane before this point. Source-heavy
   // coding requests stay on the existing Software Specialist/Builder lifecycle rather than nesting
   // one durable job inside another.
   const conversationId = String(body?.context?.conversationId || body?.conversationId || '').trim()
   const attachments = Array.isArray(body?.attachments) ? body.attachments : []
-  const ordinaryOwnerTurn = !publicSurface(req)
-    && Boolean(prompt)
+  const durableConversationTurn = Boolean(prompt)
     && UUID.test(conversationId)
     && attachments.length === 0
     && !isConciergeBuilderObjective(prompt, { attachmentNames: [], attachmentMimeTypes: [] })
 
-  if (ordinaryOwnerTurn) {
+  if (durableConversationTurn) {
     const access = await getAccess().catch(() => null)
-    if (access?.isOwner && access.userId) {
+    // Durability is storage/transport authority only. A signed-in public Concierge turn keeps its
+    // original public surface header in downstreamRequest(), so it cannot inherit owner privileges.
+    if (access?.userId) {
       const turnId = crypto.randomUUID()
       const runningReply = 'COS accepted this turn. The final response is durable in History and this request will not be replayed.'
       try {

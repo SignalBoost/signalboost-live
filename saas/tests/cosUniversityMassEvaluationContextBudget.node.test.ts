@@ -72,16 +72,17 @@ test('seven-case holdouts use the available transport budget instead of collapsi
   assert.deepEqual(baseline.flat().map(item => item.id), seven.map(item => item.id), 'baseline order and content preserved')
 })
 
-test('the live 13-case holdout fits the 14-call ceiling with one recovery call reserved', () => {
-  const cases = Array.from({ length: 13 }, (_, i) => ({ id: `thirteen-${i}` }))
-  const baseline = planMassEvaluationGroups(cases, () => 'short', 2)
-  assert.equal(baseline.length, 1)
+test('the live 13-case holdout shape fits the 14-call ceiling with one recovery call reserved', () => {
+  const cases = Array.from({ length: 13 }, (_, i) => ({ id: `thirteen-${i}`, text: 'x'.repeat(1700) }))
+  const promptFor = (group: readonly { text: string }[]) => group.map(item => item.text).join('\n')
+  const baseline = planMassEvaluationGroups(cases, promptFor, 2)
+  assert.equal(baseline.length, 2, 'the full 13-case prompt must not collapse into one baseline request')
   const fixedEndpointCalls = 2
   const recoveryReserve = 1
   const candidateTarget = Math.min(cases.length, MASS_EVALUATION_ENDPOINT_CALLS - baseline.length - fixedEndpointCalls - recoveryReserve)
-  assert.equal(candidateTarget, 10)
-  const candidate = planMassEvaluationGroups(cases, () => 'short', candidateTarget, candidateTarget)
-  assert.equal(candidate.length, 10)
+  assert.equal(candidateTarget, 9)
+  const candidate = planMassEvaluationGroups(cases, promptFor, candidateTarget, candidateTarget)
+  assert.equal(candidate.length, 9)
   assert.ok(candidate.every(group => group.length <= 2))
   assert.deepEqual(candidate.flat().map(item => item.id), cases.map(item => item.id), 'all holdout cases preserved exactly once')
   assert.equal(baseline.length + candidate.length + fixedEndpointCalls + recoveryReserve, MASS_EVALUATION_ENDPOINT_CALLS)

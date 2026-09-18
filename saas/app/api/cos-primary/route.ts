@@ -43,7 +43,7 @@ import { synthesizeFreshEvidenceLocally } from '@/lib/ai/cos/freshEvidenceLocalS
 import { freshFailureReply, type FreshEvidenceInternalFailureCode } from '@/lib/ai/cos/freshEvidenceFailureRecovery'
 import { buildNormativeFreshEvidenceFallback } from '@/lib/ai/cos/normativeFreshEvidenceFallback'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
-import { callCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
@@ -96,6 +96,28 @@ async function assessSelfHealingSupervisor(request:string):Promise<string|null>{
   const parsed=result?.text?parseLocalResult(result.text):null
   return parsed?.answer?.trim()||null
 }
+const FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
+
+function isFastTextTransform(input:string):boolean{
+  return FAST_TEXT_TRANSFORM.test(String(input||'').trim())
+}
+
+async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
+  const result=await Promise.race([
+    callRawCosReasoner({
+      temperature:.1,
+      maxTokens:1200,
+      systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+      prompt:input,
+    }).catch(()=>null),
+    new Promise<null>(resolve=>setTimeout(()=>resolve(null),12_000)),
+  ])
+  if(!result?.text)return null
+  const parsed=parseLocalResult(result.text)
+  const reply=parsed?.answer?.trim()
+  return reply?{reply,reasonerLabel:result.reasoner.label}:null
+}
+
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
 function languageFrom(body:any):string{const value=String(body?.context?.language||'en').toLowerCase();return['en','es','pt','pl','ru'].includes(value)?value:'en'}
 function providerFromPayload(payload:any):{provider:string|null;model:string|null}{for(const item of[payload?.execution,payload?.metadata,payload?.provenance,payload]){if(!item||typeof item!=='object')continue;const provider=typeof item.provider==='string'?item.provider:typeof item.ai_provider==='string'?item.ai_provider:typeof item.external_provider==='string'?item.external_provider:null;const model=typeof item.model==='string'?item.model:typeof item.ai_model==='string'?item.ai_model:typeof item.external_model==='string'?item.external_model:null;if(provider||model)return{provider,model}}return{provider:null,model:null}}
@@ -175,6 +197,25 @@ export async function postCosPrimary(req:NextRequest){
   const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body),isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
   const freshConversationContext=resolveFreshConversationContext(body, input)
   const lookupInput=freshConversationContext.lookupInput
+
+  // Simple text transformations must never enter the long orchestration path. They are a bounded,
+  // direct COS inference job: no Builder, University, research, web, or specialist admission.
+  if(isFastTextTransform(input)){
+    const fast=await runFastTextTransform(input)
+    if(!fast){
+      const reply='COS could not complete this simple text edit within the 12-second fast-path limit. The request was stopped instead of being allowed to hang in the long orchestration path.'
+      const executionProvenance=authoritativeProvenance(null,{invoked:false})
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
+      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fast-text-transform-timeout',{prompt:input,answered:false,confidence:0,branch:'fast_text_transform_timeout'})
+      return NextResponse.json({ok:false,reply,error:reply,source:'cos-fast-text-transform-timeout',confidence_score:0,external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
+    }
+    const executionProvenance=authoritativeProvenance(null,{invoked:false})
+    ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:1}
+    ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:fast.reasonerLabel,from_cache:false}
+    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
+    await writeCosPrimaryProvenance(userId,fast.reply,executionProvenance,'cos-fast-text-transform',{prompt:input,answered:true,confidence:1,branch:'fast_text_transform'})
+    return NextResponse.json({ok:true,reply:fast.reply,source:'cos-fast-text-transform',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+  }
 
   if(access?.isOwner&&isOwnerRepoScanRequest(input)){
     const scan=await scanRepositoryForOwner()

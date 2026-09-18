@@ -198,6 +198,17 @@ test('creation/advice requests are not hijacked by public live-data routing', ()
   assert.equal(structuredLiveDataKind('Build a stock price dashboard component.'), null)
 })
 
+test('polite anniversary writing with incidental today never enters live-fact verification', () => {
+  const prompt = 'my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation'
+  assert.equal(requiresFreshExternalEvidence(prompt), false)
+})
+
+test('freshness-only polite authoring escape does not suppress genuine live lookups', () => {
+  assert.equal(requiresFreshExternalEvidence("Please check today's weather in Warsaw."), true)
+  assert.equal(requiresFreshExternalEvidence('Could you find the current CEO of Apple?'), true)
+})
+
+
 
 test('regulated public guidance is live-verified across supported languages', () => {
   for (const prompt of [

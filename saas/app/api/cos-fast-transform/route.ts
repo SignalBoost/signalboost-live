@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isFastTextTransform } from '@/app/api/cos-primary/route'
+import { POST as provenanceBrowserPost } from '@/app/api/cos-provenance-browser/route'
 import { runDirectFastTextEdit } from '@/lib/ai/cos/fastTextEditDirect'
+import { isFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
+import { provenanceBoundarySecret } from '@/lib/ai/cos/provenanceBoundarySecret'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,6 +15,41 @@ function latestUserText(body: any): string {
     if (message?.role === 'user' && typeof message?.content === 'string') return message.content.trim()
   }
   return ''
+}
+
+function previousAssistantText(body: any): string {
+  const messages = Array.isArray(body?.messages) ? body.messages : []
+  let sawLatestUser = false
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (!sawLatestUser && message?.role === 'user') {
+      sawLatestUser = true
+      continue
+    }
+    if (sawLatestUser && message?.role === 'assistant' && typeof message?.content === 'string') {
+      return message.content.trim()
+    }
+  }
+  return ''
+}
+
+async function fallThroughToNormalCos(req: NextRequest, body: any): Promise<Response> {
+  const boundary = provenanceBoundarySecret()
+  if (!boundary) {
+    return NextResponse.json({ ok: false, error: 'provenance_boundary_unconfigured' }, { status: 503 })
+  }
+  const headers = new Headers(req.headers)
+  headers.delete('content-length')
+  headers.delete('x-signalboost-fast-transform-internal')
+  headers.set('content-type', 'application/json')
+  headers.set('x-signalboost-provenance-boundary', boundary)
+  headers.set('x-signalboost-fast-transform-attempted', '1')
+  const fallback = new NextRequest(req.url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  })
+  return provenanceBrowserPost(fallback)
 }
 
 export async function POST(req: NextRequest) {
@@ -31,14 +68,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.clone().json().catch(() => ({}))
   const prompt = latestUserText(body)
-  if (!isFastTextTransform(prompt)) {
-    return NextResponse.json({
-      ok: false,
-      error: 'fast_text_transform_required',
-      reply: 'This endpoint only accepts edit, rewrite, proofread, polish, translate, shorten, and equivalent text-transform requests.',
-      execution_allowed: false,
-      external_action_taken: false,
-    }, { status: 400 })
+  const previousAssistant = previousAssistantText(body)
+  if (!isFastTextTransform(prompt, { previousAssistant })) {
+    return fallThroughToNormalCos(req, body)
   }
 
   const edited = await runDirectFastTextEdit(prompt)
@@ -60,17 +92,5 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  const failed = 'COS could not complete this text edit within the fast-path deadline. Nothing was sent and no action was taken.'
-  return NextResponse.json({
-    ok: false,
-    reply: failed,
-    error: failed,
-    source: 'cos-fast-text-edit-direct-timeout',
-    confidence_score: 0,
-    external_ai_invoked: false,
-    external_fallback_invoked: false,
-    local_model_invoked: true,
-    execution_allowed: false,
-    external_action_taken: false,
-  }, { status: 503 })
+  return fallThroughToNormalCos(req, body)
 }

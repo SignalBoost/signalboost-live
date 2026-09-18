@@ -19,6 +19,7 @@ import { authorizeNextUniversityMassDistillationCampaign } from './cosUniversity
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
 import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUniversityHuggingFaceProviderLedger.ts'
 import { universityTeacherPoolStatus } from './cosUniversityTeacherPool.ts'
+import { terminalizeFailedMassDistillationCampaignRuns } from './cosUniversityMassDistillationTerminalCleanup.ts'
 
 export type MassDistillationWorkflowSource = 'scheduled_cron' | 'self_healing_supervisor'
 
@@ -97,6 +98,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const stalledDispatchRecovery = await recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 })
   const recovery = await recoverMassDistillationCampaigns({ now, maxCampaigns: 5 })
   const campaignClosure = await closeExpiredMassDistillationCampaigns({ now, maxCampaigns: 10 })
+  const terminalCleanup = await terminalizeFailedMassDistillationCampaignRuns({ maxCampaigns: 20 })
   const preparedBufferTarget = throughput.preparedBatchBufferTarget
   let preparedBeforeReplenishment = 0
   let preparedAfterReplenishment = 0
@@ -168,6 +170,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     && stalledDispatchRecovery.ok === true
     && recovery.ok === true
     && campaignClosure.ok === true
+    && terminalCleanup.ok === true
     && curriculum.ok === true
     && curriculumReplenishment.ok === true
     && rollingAuthorization.ok === true
@@ -183,6 +186,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       stalledDispatchRecovery,
       recovery,
       campaignClosure,
+      terminalCleanup,
       curriculum,
       curriculumReplenishment,
       throughput,

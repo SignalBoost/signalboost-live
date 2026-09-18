@@ -14,7 +14,6 @@ import { isFastTextTransform } from './lib/ai/cos/fastTextTransformIntent.ts'
 
 const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
 const FAST_TRANSFORM_INTERNAL_HEADER = 'x-signalboost-fast-transform-internal'
-const DIRECT_FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
 
 async function fastTextTransformRequest(req: NextRequest): Promise<boolean> {
   try {

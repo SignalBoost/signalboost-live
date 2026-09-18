@@ -124,17 +124,20 @@ async function finalizeAnswer(response: Response, req: NextRequest, body: any): 
   // Resolve account identity and write the durable record after the response leaves the critical
   // path. Signed answer provenance is still attached synchronously below, so delivery integrity
   // does not depend on Supabase availability.
-  after(async () => {
-    const access = await getAccess().catch(() => null)
-    const userId = access?.userId || null
-    if (!userId) return
-    await recordLatestUserTurnProvenance(
-      userId,
-      reply,
-      scopedProvenance,
-      String(payload.source || 'browser-delivery'),
-    ).catch(() => false)
-  })
+  const latencySensitiveTransform = String(payload.source || '').startsWith('cos-fast-text-transform')
+  if (!latencySensitiveTransform) {
+    after(async () => {
+      const access = await getAccess().catch(() => null)
+      const userId = access?.userId || null
+      if (!userId) return
+      await recordLatestUserTurnProvenance(
+        userId,
+        reply,
+        scopedProvenance,
+        String(payload.source || 'browser-delivery'),
+      ).catch(() => false)
+    })
+  }
 
   const delivered = withJsonPayload(response, {
     ...payload,

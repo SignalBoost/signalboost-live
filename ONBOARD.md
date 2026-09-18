@@ -34,6 +34,32 @@ Canonical latency rules:
 - University exams, controlled evaluations, training/distillation, Builder batch work, and other non-interactive workloads keep their own routing and evaluation policies.
 
 A user-facing turn that spends tens of seconds in RunPod lifecycle or RunPod inference before answering is a latency regression, not expected COS behavior.
+
+## COS Direct Editor fast capability — 2026-09-18
+
+Short explicit edit/proofread/polish requests are a bounded COS capability, not a second brain and not a general reasoning mission. Assistant and Concierge must invoke the same Direct Editor behavior for the same user input.
+
+Production latency evidence on 2026-09-18 showed the direct-edit lane correctly bypassing RunPod but still timing out on the general `Qwen/Qwen3.6-35B-A3B` managed model at the 20-second ceiling. The Direct Editor therefore uses a dedicated low-latency managed open-model worker on DeepInfra:
+
+- default direct-editor model: `zai-org/GLM-5.3-Flash`, overrideable with `COS_DIRECT_TEXT_MODEL`;
+- direct-editor reasoning effort: `none`;
+- direct-editor transport timeout: `COS_DIRECT_TEXT_TIMEOUT_MS`, default 12 seconds;
+- direct-edit output remains bounded by the existing meaning-fidelity, actor/action/recipient, terminology, layout, and presentation guards;
+- the editor must not add recommendations, warnings, advice, facts, promises, or commentary absent from the user's source;
+- general COS reasoning continues to use the configured stronger reasoner; University, evaluation, distillation, Builder, and specialist workloads are unchanged.
+
+This is capability routing inside COS, not a separate Assistant or Concierge intelligence.
+
+## Authoring intent outranks incidental freshness markers — 2026-09-18
+
+Writing, drafting, translating, editing, rewriting, proofreading, summarizing, and other artifact-generation requests are not live-fact verification merely because the user's context contains words such as `today`, `current`, `now`, a date, a person, or an organization.
+
+The content-generation detector must recognize ordinary polite command wrappers such as `please write`, `could you draft`, `can you translate`, and equivalent supported-language forms. Once the task is clearly authoring, COS must answer through the normal COS writing/reasoning capability unless the user separately asks to verify an external claim.
+
+Example release regression:
+`my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation`
+must be classified as content generation and must not enter current-fact web retrieval, evidence grounding, verifier, or freshness-repair workflows.
+
 ## COS University Hugging Face Jobs training adapter — 2026-09-13
 
 The governed COS University training-executor contract now has an iTMounts Hugging Face Jobs adapter on branch `feat/itmounts-huggingface-training-adapter-20260913`. `HF_TOKEN` may back the internal signed executor without exposing the provider token as a callback credential; a separate HMAC key is derived for signed evidence callbacks. Explicit buyer-supplied executor configuration still takes precedence.
@@ -109,7 +135,7 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.127
+**Version:** 1.129
 **Updated:** 2026-09-18
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**

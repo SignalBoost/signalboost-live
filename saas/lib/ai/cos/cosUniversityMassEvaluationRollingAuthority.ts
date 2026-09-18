@@ -2,8 +2,10 @@
 // Owner direction (2026-09-16): mass-distilled evaluations must complete without manual intervention.
 // Hand-inserted approvals were the dominant failure class. This pure policy decides, once per cron tick,
 // whether to issue ONE bounded evaluation approval in exactly the shape the atomic claim accepts
-// (8 endpoint calls, 4 judge calls, 1 wake, <= $0.20). It never touches the claim, the evaluator,
+// (shared endpoint-call ceiling, 4 judge calls, 1 wake, <= $0.20). It never touches the claim, the evaluator,
 // the scorer or promotion, and it never re-rolls an artifact that already has a verdict.
+
+import { MASS_EVALUATION_ENDPOINT_CALLS } from './cosUniversityMassEvaluationContextBudget.ts'
 
 export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention' as const
 export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
@@ -178,7 +180,7 @@ export function decideRollingMassEvaluationApproval(input: {
         candidateId: artifact.candidateId,
         artifactHash: hash,
         evaluationAuthorized: true,
-        maxEndpointCalls: 8,
+        maxEndpointCalls: MASS_EVALUATION_ENDPOINT_CALLS,
         maxJudgeCalls: 4,
         maxRuntimeWakeAttempts: 1,
         maxEstimatedRuntimeWakeCostUsd: 0.2,

@@ -168,7 +168,18 @@ export function decideRollingMassEvaluationApproval(input: {
     if (latest?.evidence?.claim === 'distilled_independent_evaluation_suspended' && !repairedSuspension) continue
     if (latest && latest.evidence?.claim === 'distilled_independent_evaluation_approved') {
       const startedAfter = mine.some(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_started' && at(event.observedAt) >= at(latest.observedAt))
-      if (!startedAfter && at(latest.expiresAt) > nowMs) continue
+      // An armed approval only reserves the slot while it is still CLAIMABLE. The claim validator accepts an approval
+      // only at the current endpoint-call ceiling, so one issued under a previous ceiling can never start an attempt —
+      // yet it used to hold the slot for its full 2h TTL, stalling the artifact for no reason. Production 2026-09-18
+      // 00:36 UTC: 52 approvals armed at the old ceiling of 8, newest expiring at 01:32, with every cron tick reporting
+      // no_atomically_claimable while nothing could ever claim them. Treat a stale-ceiling approval as spent so the
+      // authority issues a current one on the next tick. This grants no new authority: the replacement is issued in the
+      // same shape, inside the same rolling window, and every spend and promotion gate is unchanged.
+      // Only a ceiling that is PRESENT and mismatched proves the approval is dead. An approval that records no ceiling
+      // at all is treated as blocking, because releasing a reserved slot on missing evidence is the unsafe reading.
+      const recordedCalls = Number(latest.evidence?.maxEndpointCalls)
+      const staleCeiling = Number.isFinite(recordedCalls) && recordedCalls !== MASS_EVALUATION_ENDPOINT_CALLS
+      if (!staleCeiling && !startedAfter && at(latest.expiresAt) > nowMs) continue
     }
 
     return {

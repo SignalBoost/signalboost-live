@@ -61,8 +61,10 @@ test('public identity disclosure intercept still precedes every public reasoner 
   assert.ok(intercept < firstCall, 'public self-identity must never reach the model')
 })
 
-test('authenticated owner entrypoint is allowed to reason neurally before compatibility core', () => {
+test('owner self-knowledge neural reasoning is gated to actual self-knowledge before compatibility core', () => {
+  const guard = ENTRYPOINT.indexOf('!isPlatformSelfKnowledgePrompt(input.prompt)')
   const neural = ENTRYPOINT.indexOf('tryOwnerNeuralSelfKnowledge(input)')
   const core = ENTRYPOINT.indexOf('tryCoreCOSFirstAnswer(input)')
-  assert.ok(neural > 0 && core > neural)
+  assert.ok(guard > 0)
+  assert.ok(neural > guard && core > neural)
 })

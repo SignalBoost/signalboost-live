@@ -12,11 +12,10 @@ import { provenanceBoundarySecret } from './lib/ai/cos/provenanceBoundarySecret.
 import { proxy as baseProxy } from './proxyBase.ts'
 
 const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
+const FAST_TRANSFORM_INTERNAL_HEADER = 'x-signalboost-fast-transform-internal'
 const DIRECT_FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
 
 async function fastTextTransformRequest(req: NextRequest): Promise<boolean> {
-  const ownerAssistantSurface = req.headers.get('x-signalboost-surface') === 'cos' || fullAssistantSurface(req)
-  if (!ownerAssistantSurface) return false
   try {
     const body: any = await req.clone().json()
     const messages = Array.isArray(body?.messages) ? body.messages : []
@@ -72,10 +71,12 @@ export async function proxy(req: NextRequest) {
   if ((pathname === '/api/concierge' || pathname === '/api/cos-browser') && req.method === 'POST') {
     const gated = await baseProxy(req)
     if (gated.status !== 200) return gated
-    if (pathname === '/api/cos-browser' && await fastTextTransformRequest(req)) {
+    if (await fastTextTransformRequest(req)) {
       const target = req.nextUrl.clone()
       target.pathname = '/api/cos-fast-transform'
-      return NextResponse.rewrite(target)
+      const headers = new Headers(req.headers)
+      headers.set(FAST_TRANSFORM_INTERNAL_HEADER, '1')
+      return NextResponse.rewrite(target, { request: { headers } })
     }
     return provenanceRewrite(req, req.headers.get('x-signalboost-surface') === 'cos')
   }
@@ -86,7 +87,9 @@ export async function proxy(req: NextRequest) {
     if (await fastTextTransformRequest(req)) {
       const target = req.nextUrl.clone()
       target.pathname = '/api/cos-fast-transform'
-      return NextResponse.rewrite(target)
+      const headers = new Headers(req.headers)
+      headers.set(FAST_TRANSFORM_INTERNAL_HEADER, '1')
+      return NextResponse.rewrite(target, { request: { headers } })
     }
     return provenanceRewrite(req, true)
   }

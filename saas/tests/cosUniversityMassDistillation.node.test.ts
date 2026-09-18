@@ -64,6 +64,21 @@ test('mass distillation revalidates stored subjects against retained teaching ma
     subject: 'Cybersecurity',
     summary: 'Authentication, authorization, incident response, and secure coding.',
   }), 'Cybersecurity')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Enterprise technology developments',
+    sourceTitle: 'Do Domestic Firms Benefit from Direct Foreign Investment? Evidence from Venezuela',
+    summary: 'Foreign equity participation and plant productivity in Venezuelan firms.',
+  }), '')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Enterprise technology developments',
+    sourceTitle: 'Sustainable tourism: A state-of-the-art review',
+    summary: 'Tourism carrying capacity and sustainable development.',
+  }), '')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Enterprise technology developments',
+    sourceTitle: 'Enterprise technology developments — teacher-generated practice seed 1',
+    summary: 'Teacher-synthetic curriculum seed for Enterprise technology developments.',
+  }), 'Enterprise technology developments')
 })
 
 test('mass distillation requires confidence, row identity, material identity and explicit rights', () => {

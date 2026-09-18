@@ -54,11 +54,11 @@ This is capability routing inside COS, not a separate Assistant or Concierge int
 
 Writing, drafting, translating, editing, rewriting, proofreading, summarizing, and other artifact-generation requests are not live-fact verification merely because the user's context contains words such as `today`, `current`, `now`, a date, a person, or an organization.
 
-The content-generation detector must recognize ordinary polite command wrappers such as `please write`, `could you draft`, `can you translate`, and equivalent supported-language forms. Once the task is clearly authoring, COS must answer through the normal COS writing/reasoning capability unless the user separately asks to verify an external claim.
+The freshness boundary must recognize ordinary polite authoring wrappers such as `please write`, `could you draft`, `can you translate`, and equivalent supported-language forms without broadening the global execution classifier. Once the task is clearly authoring, incidental temporal words must not launch live-fact retrieval unless the user separately asks to verify an external claim.
 
 Example release regression:
 `my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation`
-must be classified as content generation and must not enter current-fact web retrieval, evidence grounding, verifier, or freshness-repair workflows.
+must not enter current-fact web retrieval, evidence grounding, verifier, or freshness-repair workflows.
 
 ## COS University Hugging Face Jobs training adapter — 2026-09-13
 

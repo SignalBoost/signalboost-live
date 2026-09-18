@@ -45,6 +45,7 @@ function stripWrapper(value: string): string {
   text = text.replace(/<think>[\s\S]*?<\/think>/gi, '')
   const strayThink = text.search(/<think>/i)
   if (strayThink >= 0) text = text.slice(0, strayThink)
+  text = text.replace(/\/no_?think/gi, '')
   text = text.trim()
 
   const fence = text.match(/^\`\`\`[a-z]*\s*\n?([\s\S]*?)\n?\`\`\`$/i)
@@ -80,6 +81,16 @@ async function callFastEditor(input: {
   const startedAt = Date.now()
   const timer = setTimeout(() => controller.abort(), input.timeoutMs)
 
+  // Qwen3 is a thinking model, and hosted runtimes disagree about how to switch that off: vLLM
+  // reads chat_template_kwargs.enable_thinking, Ollama reads think, OpenAI-compatible gateways read
+  // reasoning_effort. A runtime that does not recognise a field drops it silently, so send all
+  // three AND Qwen3's own /no_think system switch, which still works when every parameter is
+  // dropped. Measured in Production (local-inference.ts:181): with thinking on, a small token
+  // budget is spent entirely on hidden reasoning and NO answer text comes back — against this
+  // path's 6s per-attempt ceiling that meant every attempt aborted and every edit fell through.
+  const thinkingModel = /qwen/i.test(input.model)
+  const systemContent = thinkingModel ? `${SYSTEM_PROMPT} /no_think` : SYSTEM_PROMPT
+
   try {
     const response = await fetch(`${input.baseUrl}/chat/completions`, {
       method: 'POST',
@@ -95,8 +106,9 @@ async function callFastEditor(input: {
         max_tokens: 900,
         stream: false,
         reasoning_effort: 'none',
+        ...(thinkingModel ? { think: false, chat_template_kwargs: { enable_thinking: false } } : {}),
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: systemContent },
           { role: 'user', content: input.prompt },
         ],
       }),

@@ -175,10 +175,13 @@ export async function POST(req: NextRequest) {
       })
     }
     if (transformed) {
+      const reason = 'reason' in transformed
+        ? String(transformed.reason || 'The direct text editor was unavailable.')
+        : 'The direct text editor was unavailable.'
       return NextResponse.json({
         ok: false,
-        reply: transformed.reason,
-        error: transformed.reason,
+        reply: reason,
+        error: reason,
         source: 'cos-direct-text-transformation-unavailable',
         confidence_score: transformed.confidence,
         external_ai_invoked: false,

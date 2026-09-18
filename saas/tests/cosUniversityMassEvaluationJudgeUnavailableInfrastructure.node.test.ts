@@ -24,7 +24,7 @@ test('judge_unavailable releases approvals from the 24h window and artifact retr
     const minute = String(i).padStart(2, '0')
     events.push(ev(artifact.candidateId, 'host_controller', { claim: 'distilled_independent_evaluation_approved', artifactHash: hash, authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF }, `2026-09-17T21:${minute}:00Z`, `2026-09-17T23:${minute}:00Z`))
     events.push(ev(artifact.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_started', artifactHash: hash }, `2026-09-17T21:${minute}:10Z`))
-    events.push(ev(artifact.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hash, error: 'mass_distilled_evaluation_judge_unavailable' }, `2026-09-17T21:${minute}:20Z`))
+    events.push(ev(artifact.candidateId, 'host_controller', { claim: 'mass_distilled_independent_evaluation_failed', artifactHash: hash, error: i % 2 === 0 ? 'mass_distilled_evaluation_judge_unavailable' : 'mass_distilled_evaluation_judge_timeout:holdout' }, `2026-09-17T21:${minute}:20Z`))
   }
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifact], events, now: new Date('2026-09-17T22:59:00Z') })
   assert.equal(decision.issue, true)

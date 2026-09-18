@@ -15,6 +15,19 @@ function latestUserText(body: any): string {
 }
 
 export async function POST(req: NextRequest) {
+  const internalRewrite = req.headers.get('x-signalboost-fast-transform-internal') === '1'
+  const referer = req.headers.get('referer') || ''
+  let legacyOwnerAssistant = false
+  try {
+    const url = new URL(referer)
+    legacyOwnerAssistant = url.origin === req.nextUrl.origin
+      && url.pathname.startsWith('/dashboard/assistant')
+      && req.headers.get('x-signalboost-surface') === 'cos'
+  } catch {}
+  if (!internalRewrite && !legacyOwnerAssistant) {
+    return NextResponse.json({ ok: false, error: 'fast_transform_ingress_required' }, { status: 403 })
+  }
+
   const body = await req.clone().json().catch(() => ({}))
   const prompt = latestUserText(body)
   if (!isFastTextTransform(prompt)) {

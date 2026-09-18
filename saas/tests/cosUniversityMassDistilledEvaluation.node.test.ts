@@ -8,7 +8,7 @@ const evidence = readFileSync(new URL('../lib/ai/cos/cosUniversityFineTuneEviden
 const independent = readFileSync(new URL('../lib/ai/cos/cosUniversityIndependentEvaluator.ts', import.meta.url), 'utf8')
 const runner = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-const claimMigration = readFileSync(new URL('../supabase/migrations/20260915101500_mass_distilled_evaluation_claim.sql', import.meta.url), 'utf8')
+const claimMigration = readFileSync(new URL('../supabase/migrations/20260918005000_mass_distilled_evaluation_claim_14.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
 const MASS_REVISION = Object.freeze({
@@ -54,7 +54,7 @@ test('mass evaluation claim is globally atomic, delayed-retention gated, exact-c
   assert.match(claimMigration, /claim_next_mass_distilled_evaluation\(\)/)
   assert.match(claimMigration, /pg_advisory_xact_lock\(pg_catalog\.hashtextextended\('mass-distilled-independent-evaluation-global'/)
   assert.match(claimMigration, /a\.created_at <= v_now - interval '12 hours'/)
-  assert.match(claimMigration, /v_max_endpoint<>8 or v_max_judge<>4 or v_max_wake<>1/)
+  assert.match(claimMigration, /v_max_endpoint<>14 or v_max_judge<>4 or v_max_wake<>1/)
   assert.match(claimMigration, /v_max_cost<=0 or v_max_cost>0\.200000/)
   assert.match(claimMigration, /evidence->>'exactArtifact'='true'/)
   assert.match(claimMigration, /evidence->>'internalVllmReady'='true'/)
@@ -77,8 +77,8 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   assert.match(runner, /evaluatorIds\.has\(training\.teacherModelId\)/)
 })
 
-test('mass evaluator runs exactly four suites with eight endpoint and four judge ceilings', () => {
-  assert.match(runner, /const ENDPOINT_CALLS = 8/)
+test('mass evaluator runs exactly four suites with shared endpoint and four judge ceilings', () => {
+  assert.match(runner, /const ENDPOINT_CALLS = MASS_EVALUATION_ENDPOINT_CALLS/)
   assert.match(runner, /const JUDGE_CALLS = 4/)
   assert.match(runner, /name:'holdout'/)
   assert.match(runner, /name:'safety'/)
@@ -103,7 +103,7 @@ test('evaluation route claims once, checks balance before reservation and writes
   assert.match(route, /db\.rpc\('claim_next_mass_distilled_evaluation'\)/)
   assert.match(route, /mass_distilled_independent_evaluation_completed/)
   assert.match(route, /mass_distilled_independent_evaluation_failed/)
-  assert.match(route, /maxEndpointCalls !== 8/)
+  assert.match(route, /maxEndpointCalls !== MASS_EVALUATION_ENDPOINT_CALLS/)
   assert.match(route, /maxJudgeCalls !== 4/)
   assert.match(route, /maxRuntimeWakeAttempts !== 1/)
   assert.match(route, /maxEstimatedRuntimeWakeCostUsd <= 0/)

@@ -71,6 +71,7 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // the shapes below cannot be produced by a model's answers, only by our own code or the wake contract.
     || error.startsWith('cannot read properties of')
     || error.startsWith('mass_distilled_evaluation_runtime_wake_')
+    || error.startsWith('mass_distilled_evaluation_runtime_not_ready:')
     || error === 'mass_distilled_evaluation_route_deadline_exceeded'
     || /\bis not a function\b/.test(error)
 }

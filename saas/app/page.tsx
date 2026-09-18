@@ -26,7 +26,6 @@ import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import { boundComposerIntake } from '@/lib/ai/cos/composerIntakeBound'
 import VoiceInputButton from '@/components/VoiceInputButton'
-import { CONCIERGE_RESUME_KEYS, forgetResumeId, loadResumableConversation, pairResumedTurns, readResumeId, rememberResumeId } from '@/lib/concierge/conversationResume'
 
 type Attachment = {
   id: string
@@ -143,24 +142,7 @@ export default function Home() {
     }
   }
 
-  // Returning signed-in visitors continue the conversation this homepage Concierge started in this browser.
-  useEffect(() => {
-    let cancelled = false
-    const resumeId = readResumeId(CONCIERGE_RESUME_KEYS.homepage)
-    if (!resumeId) return
-    void loadResumableConversation(resumeId).then((messages) => {
-      if (cancelled) return
-      if (!messages) { forgetResumeId(CONCIERGE_RESUME_KEYS.homepage); return }
-      const restored = pairResumedTurns(messages)
-      if (!restored.length) return
-      setTurns((current) => current.length ? current : restored)
-      if (!conversationIdRef.current) conversationIdRef.current = resumeId
-    })
-    return () => { cancelled = true }
-  }, [])
-
   function startNewChat() {
-    forgetResumeId(CONCIERGE_RESUME_KEYS.homepage)
     conversationIdRef.current = ''
     setTurns([])
     setPendingRequest('')
@@ -185,7 +167,6 @@ export default function Home() {
     ].filter(Boolean).join('\n\n')
 
     if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
-    rememberResumeId(CONCIERGE_RESUME_KEYS.homepage, conversationIdRef.current)
     setLoading(true)
     setActivity(null)
     setFailed(false)

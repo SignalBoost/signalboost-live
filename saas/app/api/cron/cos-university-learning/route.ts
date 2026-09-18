@@ -1,7 +1,6 @@
 // saas/app/api/cron/cos-university-learning/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { runCosUniversityContinuousLearning } from '@/lib/ai/cos/cosUniversityContinuousLearning'
-import { prepareUniversityMassDistillationCurriculum } from '@/lib/ai/cos/cosUniversityMassDistillation'
 import { readCosUniversityUndergraduateAcademicLaneGate } from '@/lib/ai/cos/cosUniversityProgramRuntimeGate'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
 import { readCosUniversityProductionVerification } from '@/lib/ai/cos/cosUniversityProductionVerification'
@@ -26,21 +25,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: !unavailable, skipped: true, programGate }, { status: unavailable ? 503 : 200 })
     }
     const result = await runCosUniversityContinuousLearning()
-    let distillationCurriculum: unknown
-    try {
-      distillationCurriculum = await prepareUniversityMassDistillationCurriculum(new Date())
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      console.error('COS University mass-distillation packaging failed:', message)
-      distillationCurriculum = { error: message, externalCostUsd: 0, dispatchAuthorized: false }
-    }
-    await recordCosUniversityProductionPath({
-      path: 'continuous_learning',
-      invocationSucceeded: result.status !== 'error',
-      evidence: { ...result, distillationCurriculum },
-    })
+    await recordCosUniversityProductionPath({ path: 'continuous_learning', invocationSucceeded: result.status !== 'error', evidence: result })
+    // A lane the calendar expects to be running, that is not, leaves no trace anywhere else. Sweep
+    // after the receipt is written so this tick's own receipt is part of what is judged. It never
+    // affects this route's status: an audit failure must not fail continuous learning.
     const laneAudit = await sweepLaneFaults()
-    return NextResponse.json({ ok: result.status !== 'error', ...result, distillationCurriculum, laneAudit }, { status: result.status === 'error' ? 500 : 200 })
+    return NextResponse.json({ ok: result.status !== 'error', ...result, laneAudit }, { status: result.status === 'error' ? 500 : 200 })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('cron COS University continuous learning failed:', message)
@@ -48,6 +38,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/**
+ * Reads the production verification board and records any lane that should be running but is not.
+ * Isolated and non-throwing by design: this is an observer, and an observer must never be able to
+ * break the lane it rides on.
+ */
 async function sweepLaneFaults(): Promise<Record<string, unknown>> {
   try {
     const board = await readCosUniversityProductionVerification()

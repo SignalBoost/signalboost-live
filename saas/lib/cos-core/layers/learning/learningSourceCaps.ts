@@ -13,9 +13,7 @@
  * is untouched: the same gates judge a better-composed set.
  *
  * europe_pmc is deliberately lower than its scholarly peers because each result may trigger a
- * full-text XML fetch, so its cost per result is several times the others'. YouTube is query-targeted
- * too, and search.list charges per request rather than per returned item; asking for eight candidates
- * therefore improves yield without multiplying the expensive discovery call.
+ * full-text XML fetch, so its cost per result is several times the others'.
  */
 export const DEFAULT_LEARNING_SOURCE_CAPS = {
   crossref: 6,
@@ -25,7 +23,6 @@ export const DEFAULT_LEARNING_SOURCE_CAPS = {
   gdelt: 2,
   official_docs: 1,
   reference: 3,
-  youtube: 8,
 } as const
 
 /**

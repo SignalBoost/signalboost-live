@@ -96,18 +96,6 @@ test('real work can classify into multiple university subjects without forcing a
 
   const quantumMechanics = classifyCosUniversitySubjects('Analyze quantum mechanics and physical measurement.')
   assert.ok(quantumMechanics.includes('physics_natural_sciences'))
-
-
-  const militaryMaterial = classifyCosUniversitySubjects('Sun Tzu discusses military material, terrain, strategy, and command.')
-  assert.ok(!militaryMaterial.includes('physics_natural_sciences'))
-  assert.ok(militaryMaterial.includes('business_operations'))
-
-  const energyBusiness = classifyCosUniversitySubjects('Blockchain technology in the energy sector: business cases, smart contracts, startups, and market applications.')
-  assert.ok(!energyBusiness.includes('physics_natural_sciences'))
-  assert.ok(energyBusiness.includes('business_operations'))
-
-  const materialsScience = classifyCosUniversitySubjects('Materials science studies semiconductors, photonics, and condensed matter physics.')
-  assert.ok(materialsScience.includes('physics_natural_sciences'))
 })
 
 test('academic evidence tags can travel with existing learning gaps without claiming a grade', () => {

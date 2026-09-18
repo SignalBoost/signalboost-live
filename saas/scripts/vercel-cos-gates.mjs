@@ -2,8 +2,6 @@
 import { spawnSync } from 'node:child_process'
 
 const tests = [
-  'tests/cosUniversityDistillationSelfHealing.node.test.ts',
-  'tests/cosUniversityMassDistillationRollingAuthorization.node.test.ts',
   'tests/cosUniversityLaneExpectation.node.test.ts',
   'tests/cosUniversityLaneFaultRecorder.node.test.ts',
   'tests/cosUniversityFineTuneEvidence.node.test.ts',
@@ -36,15 +34,6 @@ const tests = [
   'tests/cosUniversityProductionReceiptIdentity.node.test.ts',
   'tests/cosUniversityGraduationRemediation.node.test.ts',
   'tests/cosUniversityAgentCapstone.node.test.ts',
-  'tests/cosUniversityExamLengthRevision.node.test.ts',
-  'tests/cosUniversityExamNumberMatching.node.test.ts',
-  'tests/cosOwnerVerifiedOutcomes.node.test.ts',
-  'tests/runpodPrimaryThinkingRetry.node.test.ts',
-  'tests/conciergeConversationResume.node.test.ts',
-  'tests/cosConversationRecall.node.test.ts',
-  'tests/cosUniversityMassEvaluationHttpDetail.node.test.ts',
-  'tests/cosUniversityMassEvaluationContextBudget.node.test.ts',
-  'tests/cosUniversityMassEvaluationRollingAuthority.node.test.ts',
   'tests/builderToolLoop.node.test.ts',
   'tests/builderVerificationOrder.node.test.ts',
   'tests/builderProjectLessons.node.test.ts',
@@ -107,9 +96,6 @@ const tests = [
   'tests/cosPrimaryDeterministicFreshRouting.node.test.ts',
   'tests/cosDomainAvailability.node.test.ts',
   'tests/assistantTransportClient.node.test.ts',
-  'tests/cosDirectFastTransformTransport.node.test.ts',
-  'tests/cosFastTransformCompletion.node.test.ts',
-  'tests/cosDurableTurnHistory.node.test.ts',
   'tests/operationalSystemsLearning.node.test.ts',
   'tests/advisoryDiagnosisPolicy.node.test.ts',
   'tests/cosChiefOfStaffAcceptance.node.test.ts',
@@ -211,7 +197,6 @@ const tests = [
   'tests/demoPricing.node.test.ts',
   'tests/repositoryRepairAutoMerge.node.test.ts',
   'tests/repositoryMergeWatch.node.test.ts',
-  'tests/cosUniversityRuntimeApprovals.node.test.ts',
 ]
 
 const result = spawnSync(process.execPath, ['--test', ...tests], {

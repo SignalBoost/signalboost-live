@@ -72,48 +72,6 @@ test('Builder requests provider-enforced JSON for source with quotes, escapes an
   assert.match(port.slice(port.indexOf('export function createBuilderCodingAiPort'), port.indexOf('export function createLocalApplianceAiPort')), /jsonObject: true/)
 })
 
-test('protected independent JSON scoring stays within one judge call and suppresses verbose generation controls', async () => {
-  process.env.LOCAL_AI_REASONING_EFFORT = 'high'
-  let judgeCalls = 0
-  let observedBody: any = null
-  globalThis.fetch = (async (input, init) => {
-    const url = String(input)
-    if (url.endsWith('/chat/completions')) {
-      judgeCalls++
-      observedBody = JSON.parse(String(init?.body))
-      return Response.json({
-        choices: [{ finish_reason: 'stop', message: { content: '{"cases":[]}' } }],
-        usage: { completion_tokens: 8 },
-      })
-    }
-    return Response.json({})
-  }) as typeof fetch
-
-  const result = await callLocalModel({
-    systemPrompt: 'You are an independent scorer. Return ONLY strict JSON. Schema: {"cases":[]}',
-    prompt: '{"suite":"holdout","cases":[]}',
-    maxTokens: 2200,
-    temperature: 0,
-    jsonObject: true,
-    usageContext: { feature: 'distilled_independent_evaluation', purpose: 'independent_assessment' },
-  }, {
-    baseUrl: 'https://api.deepinfra.com/v1/openai',
-    model: 'Qwen/Qwen3.6-35B-A3B',
-    apiKey: 'test-key',
-    timeoutMs: 5000,
-    provider: 'deepinfra',
-  })
-
-  assert.equal(result, '{"cases":[]}')
-  assert.equal(judgeCalls, 1)
-  assert.equal(observedBody.max_tokens, 2200)
-  assert.equal(observedBody.reasoning_effort, 'none')
-  assert.equal(observedBody.frequency_penalty, 0)
-  assert.equal(observedBody.presence_penalty, 0)
-  assert.deepEqual(observedBody.response_format, { type: 'json_object' })
-  assert.match(observedBody.messages[0].content, /Do not add explanations, rationale, analysis, prose, repeated inputs, or extra keys/)
-})
-
 test('provider-confirmed truncation gets one larger retry and never executes partial control', async () => {
   const observed: number[] = []
   globalThis.fetch = (async (_input, init) => {

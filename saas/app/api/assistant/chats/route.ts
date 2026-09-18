@@ -12,7 +12,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getAccess } from '@/lib/auth/access'
 import { reconcileStaleBuilderJobs } from '@/lib/builder/job-store'
-import { expireStaleDurableCosTurns } from '@/lib/ai/cos/durableCosTurn'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -43,13 +42,10 @@ async function authedUserId(): Promise<string | null> {
 
 async function reconcileBuilderHistory(userId: string, conversationId?: string | null): Promise<void> {
   try {
-    await Promise.all([
-      reconcileStaleBuilderJobs({ userId, conversationId: conversationId || null }),
-      expireStaleDurableCosTurns({ userId, conversationId: conversationId || null }),
-    ])
+    await reconcileStaleBuilderJobs({ userId, conversationId: conversationId || null })
   } catch (error) {
-    // History must remain readable during a transient reconciliation failure.
-    console.error('[assistant_history_durable_recovery_failed]', {
+    // History must remain readable during a staggered migration or transient reconciliation failure.
+    console.error('[assistant_history_builder_recovery_failed]', {
       conversationId: conversationId || null,
       message: error instanceof Error ? error.message : 'unknown',
     })

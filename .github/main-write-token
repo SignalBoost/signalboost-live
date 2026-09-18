@@ -1,2 +1,2 @@
-base_sha=e716cb31a1a04afcea7276c2d7a9d6378d58a67a
-branch=fix/cos-fast-routing-fallthrough-20260918
+base_sha=3afc9096e64f79ea47b9f312f239ac4a9fbef9b7
+branch=fix/runpod-embedding-primary-fallback-20260914

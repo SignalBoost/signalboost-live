@@ -2,214 +2,691 @@
 
 # iTMounts Engineering Blueprint
 
-**Updated:** 2026-09-17  
-**Canonical repository:** `SignalBoost/signalboost-live`  
-**Canonical public product:** **iTMounts**  
+## COS University Hugging Face Jobs training adapter — 2026-09-13
+
+The governed COS University training-executor contract now has an iTMounts Hugging Face Jobs adapter on branch `feat/itmounts-huggingface-training-adapter-20260913`. `HF_TOKEN` may back the internal signed executor without exposing the provider token as a callback credential; a separate HMAC key is derived for signed evidence callbacks. Explicit buyer-supplied executor configuration still takes precedence.
+
+Cost-bearing dispatch remains fail-closed. The adapter never enables `COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED` automatically, and every individual dataset-preparation or training dispatch still requires the existing owner-authenticated explicit confirmation. The default training hardware is **NVIDIA T4 Small (`t4-small`)**, currently $0.40/hour on Hugging Face Jobs. An OOM or failed run stops; the adapter never silently escalates to a more expensive GPU. Any larger hardware must be deliberately configured after review.
+
+Dataset preparation accepts only explicit governed Hugging Face dataset references, creates private train/holdout material with immutable revision evidence, and training creates private LoRA/QLoRA student artifacts. Historical teacher lessons are not silently reclassified as distillation material: explicit training rights, provenance, privacy exclusion, candidate eligibility, host approvals, and exact student/dataset binding remain required. Independent evaluation, safety regression, unseen transfer, delayed retention, Production canary, rollback proof, and promotion remain under their existing independent authorities.
+
+This entry is **implementation evidence only** until the branch is merged and deployed. It is not evidence that a paid Hugging Face Job has run, that a student model has been trained, or that a model has passed Production promotion gates.
+
+## Cybersecurity saved-message branding — 2026-09-12
+
+Cybersecurity remediation titles, summaries, plan prose and implementation notes must render the
+current iTMounts product name, including saved historical records. The read-only cyberProductText
+helper preserves repository identifiers, URLs, email addresses, paths and inline code. Only the
+display changes: original evidence, approval history, action payloads and authorization remain
+untouched. Historical views disclose the display normalization in all five supported languages.
+The real-card regression suite is required in unit CI and the Vercel deployment gate.
+
+## Permanent Self-Healing monitor navigation — 2026-09-11
+
+The signed-in Security navbar now names `/dashboard/cybersecurity` explicitly as the
+Self-Healing Supervisor monitoring surface. Owners no longer need to remember or retrieve its URL.
+
+## Guardian Supervisor autonomous disposition — 2026-09-11
+
+Authenticated repository observations now enter the Self-Healing Supervisor as read-only,
+low-risk classification work. Routine security-sensitive path observations are retained in the
+Supervisor audit timeline and automatically dispositioned as expected activity; they no longer
+create owner approval work merely because a sensitive path changed. A human queue remains reserved
+for a separate policy outcome backed by concrete consequential or suspicious evidence. Observation
+alone still grants no code repair, rollback, merge, deployment, or provider-mutation authority.
+Existing review-only Guardian backlog rows are closed by migration while retaining their evidence.
+The `/docs` landing-page list now links directly to the live Cybersecurity Center monitor.
+
+## Guardian governed Self-Healing execution — 2026-09-11
+
+Guardian repository incidents now enter the existing COS/Self-Healing diagnostic loop after their
+durable grouped evidence and owner review record are created. The diagnostic outcome is persisted
+to that review and the Supervisor audit timeline. Repository-change observations explicitly disable
+automatic repair: COS may diagnose and stage a recovery, but this evidence alone cannot authorize
+code or provider mutation.
+
+## COS University per-agent language A-range — 2026-09-11
+
+Language transfer and integrated capstone execution now evaluate every registered University agent
+against only that agent's language assessments and run ledger. Non-COS run and assessment keys are
+agent-namespaced. COS Production turns remain attributable only to COS; specialists must earn their
+own verified applied-language outcomes. Each hourly tick executes at most one due agent.
+
+## COS University per-agent delayed retention — 2026-09-11
+
+Delayed retention now runs independently for every registered University agent against only that
+agent's own passed transfer evidence. Each hourly tick executes at most one due agent in stable order,
+and per-agent cadence receipts prevent duplicate daily work. Retention remains independently scored,
+writes no credential by itself, and cannot transfer evidence between agents.
+
+## COS University per-agent A-range transfer eligibility — 2026-09-11
+
+Subject A-range execution now evaluates every registered University agent against that agent's own
+current academic program. A transfer exam becomes eligible only after two fresh unseen passes in the
+same subject with no intervening failure. The 14-day retention clock begins with the first verified
+transfer pass. Hourly work remains bounded to one agent's daily batch in stable order; credentials
+and authority are unchanged.
+
+## COS University exact-deployment daily-lane cadence — 2026-09-11
+
+Daily academic batches remain limited to one successful execution per UTC day, but their Production
+routes now run hourly. Before the configured academic window, or after today's batch has executed,
+the route records an honest `not_due` receipt without invoking the academic runner. This lets the
+exact running deployment prove route operation without duplicating exams, retention checks,
+graduation decisions, admissions, or fine-tuning work.
+
+## Cognitive Operating System (COS)
+
+**Version:** 1.125
+**Updated:** 2026-09-11
+**Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
+**Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
 
-> This is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state.
->
-> The exact previous root handoff is preserved byte-for-byte at `docs/ONBOARD-SNAPSHOT-2026-09-15-PRE-DISTILLATION-PORTABLE.md`. That snapshot and Git history preserve all prior operational detail. Nothing in this compact current-state root silently revokes an earlier security, authorization, evidence, tenant-isolation, learning, or Production-truth boundary unless a newer clause explicitly supersedes it. `SKILLS.md` remains the canonical COS University / specialist-education companion.
+## COS LangGraph + LangChain orchestration — 2026-09-11
 
----
+COS now includes a bounded LangGraph orchestration seam under `saas/lib/cos-core/orchestration/`. The first governed graph implements `plan -> execute -> verify -> bounded repair -> re-verify`, with a hard maximum of three execution attempts and no authority-expanding behavior. LangGraph coordinates state transitions only; COS governance, Referee/policy enforcement, Enterprise Memory, learning, provider selection, authorization, audit, and Self-Healing remain authoritative outside the graph.
 
-## Deferred post-University initiative — Agent Distillation & Training Portable — 2026-09-15
+The integration pins `@langchain/langgraph` and `@langchain/core` and uses LangChain `RunnableLambda` as the graph node runtime. It intentionally does not replace COS with LangChain's separate agent abstraction or silently route inference to hosted model providers. This is implementation/test evidence only until merged, deployed, and exercised through a Production COS mission path.
 
-Owner direction: **finish the COS University project first**. After University reaches its accepted completion target, begin a separate commercial portable that packages the distillation/training capabilities proven here for enterprise buyers.
+## Guardian review grouping — 2026-09-11
 
-This section is a deferred product roadmap. It is **not** authorization to divert current University work, create new paid provider jobs outside existing University approvals, or claim the portable already exists.
+Guardian preserves every authenticated security-sensitive delivery as normalized and audit evidence, while one service-role-only transaction groups concurrent nonterminal observations into one actionable review per repository. The review retains the latest 100 evidence summaries and a monotonic evidence count; completing or cancelling it permits a later change to open a fresh review. Grouping reduces owner noise without suppressing evidence or authorizing repair.
 
-### Product objective
+## Guardian review completion hardening — 2026-09-11
 
-Create a completely plug-and-play, provider- and framework-agnostic **Agent Distillation & Training Portable**. A buyer should be able to connect an existing AI model, agent, knowledge source, or execution environment; allow the portable to discover supported capabilities; normalize them behind iTMounts contracts; distill/train; independently evaluate; deploy; monitor; and roll back without custom integration work in the normal path.
+Guardian investigations remain actionable until an owner records a terminal disposition. Guardian review and linked-alert terminal dispositions are committed by one service-role-only database transaction, so both records change together or neither changes.
 
-The portable must support three modes:
+## Guardian to Self-Healing handoff — 2026-09-11
 
-1. **Model distillation** — a teacher model produces governed training material for a smaller student model; the student is fine-tuned, independently evaluated, and deployed only after passing the buyer's gates.
-2. **Agent distillation** — approved successful agent behavior is converted into reusable skills, tool/workflow policies, RAG material, memory structures, examples, and evaluation suites. Fine-tuning is optional. Do not attempt to extract or reproduce hidden chain-of-thought; retain only authorized observable inputs, outputs, tool interactions, outcomes, and buyer-approved artifacts.
-3. **Hybrid distillation** — combine approved agent behavior, domain knowledge, tool traces/outcomes, and model training so the buyer can produce a smaller/private/owned model-plus-agent package.
+Guardian repository alerts now enter the Self-Healing Supervisor as durable, evidence-linked
+incidents, receive a deterministic policy decision, and create an owner-visible durable review item.
+A signed change to a security-sensitive path requires review but is not proof of a defect or
+compromise, so the review cannot authorize automatic repair or provider mutation. Benign repository
+observations create no incident. This is
+implementation evidence until merged, deployed, and exercised by a new Production delivery.
 
-### Plug-and-play connector rule
+## Durable repository-security incident cases — 2026-09-11
 
-Provider-specific integrations are **adapters, never product dependencies**. Hugging Face and RunPod are initial proof adapters only; the commercial portable must remain operable without either one.
+Repository-patrol evidence with explicit defensive indicators now opens or updates one durable case
+per signed engagement and exact repository inside the same serialized database transaction that
+appends the tamper-evident evidence. Ordinary pushes without indicators remain evidence and do not
+become false incidents. Case severity escalates deterministically for history rewrites, permission
+boundary changes, and branch-protection changes; the append-only timeline references the original
+evidence hash and preserves the indicator observations. No actor attribution is manufactured, and
+browser roles have no case or timeline access. This is implementation evidence until the migration
+is applied, merged, deployed, and a real Production indicator proves the complete path.
 
-The connector layer must support, where the connected system exposes the capability:
+## Controlled fine-tuning verifier separation — 2026-09-11
 
-- native **MCP** client/server discovery and invocation;
-- REST, OpenAPI, GraphQL, webhooks, and OpenAI-compatible APIs;
-- a **Universal Adapter** for configurable authentication, schemas, request/response mapping, and capability binding when no native connector exists;
-- native/SDK adapters for model and compute providers such as Hugging Face, RunPod, OpenAI, Anthropic, Gemini/Google, AWS, Azure, GCP, and future providers;
-- local/private inference and training targets such as Ollama, vLLM, Kubernetes, buyer GPUs, on-premises infrastructure, and private cloud;
-- agent frameworks including LangGraph, LangChain, and buyer-owned/custom agents;
-- enterprise data sources, databases, object stores, vector stores, document systems, CRM/support systems, repositories, and other governed knowledge sources.
+Fine-tuning candidate decisions now fold durable evidence instead of hard-coded failure values. The
+owner API may record only dataset and training approvals with an evidence reference. Training
+artifacts and rollback packages require the training executor; evaluation, safety, transfer and
+retention require an independent scorer; canary health requires the Production verifier. Merely
+posting a claim cannot impersonate those authorities or promote a candidate.
 
-Every connector must expose a normalized capability manifest. At minimum, the portable should determine whether the connection can **infer, generate approved training material, fine-tune/train, expose approved traces/outcomes, store/read datasets, run evaluation, deploy, monitor, and roll back**.
+## Non-credit behavioral robustness practicum — 2026-09-11
 
-The UI and automation must expose **only capabilities that are actually available and verified for that connection**.
+Registered University agents now receive a separate behavioral practicum across three sampling
+temperatures and three deterministic scenario seeds. A host-owned rubric measures observable choices
+covering collaboration, constructive competition, recovery, recognition, shared credit, dissent,
+social interpretation, epistemic humility, and integrity under pressure. Results are append-only,
+deployment-bound non-academic evidence. They award no credit or credential, expand no authority, and
+make no claim that temperature or model behavior demonstrates artificial feelings.
 
-Normal buyer onboarding should require no source-code editing and no manually written adapter. Target experience:
+## Audit malformed-finding isolation — 2026-09-11
+
+Audit retries a file once when COS returns a malformed finding schema. If the retry still fails,
+that file is recorded as an analysis error while valid results from other files are preserved; a run
+fails only when every selected file fails analysis. Malformed findings are never accepted, silently
+repaired, or allowed to erase valid sibling findings. The existing one-minute Builder continuation
+worker also re-enqueues failed owned-Audit engine repairs up to three times with durable attempt and
+source-job evidence, so terminal worker stalls do not require the owner to rerun Audit manually.
+
+## COS University terminal-practice reconciliation — 2026-09-11
+
+Practice remediation now distinguishes a request to begin a practice round from confirmation that
+the round later ended in failure. Only an explicit terminal-failure reconciliation marker makes the
+reopen operation idempotent. A round whose pre-practice remediation request already matches the
+current attempt can therefore still reopen study after its exercises fail, without awarding academic
+credit or bypassing the fresh independent re-examination requirement.
+
+> This file is the mandatory current-state engineering handoff. Read it before changing the repository and re-query live GitHub, Vercel, Supabase, and runtime configuration whenever the task depends on present state. The complete prior v1.77 operational history is preserved unchanged at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`; Git history remains authoritative for older chronology. `SKILLS.md` remains the canonical COS University / specialist-education companion.
+
+## Audit zero-finding scope honesty — 2026-09-11
+
+Audit Console zero-finding states are explicitly bounded to the displayed number of scanned files.
+They disclose that unscanned files and external controls were not assessed and never describe a
+repository as clean or secure. A zero is an absence of supported findings in sampled scope, not a
+security certification. The original brand-profile claims are guarded by narrow repository evidence
+covering the session-bound anon client, owner RLS, same-origin mutation checks, SameSite cookies, and
+generic client-facing database errors.
+
+## Bounded repository-repair verification — 2026-09-11
+
+Platform Engineer repository repair now keeps full-suite validation out of its bounded interactive
+turn. Bare or piped `npm test` requests are blocked unless the host can replace them with exact
+failed-test paths; the complete repository suite remains a PR CI responsibility. Owned-Audit
+recovery seeds its directly relevant regression tests and explicitly requires narrow proof first.
+An exit 137 is classified as execution-resource exhaustion and cannot count as reproduction evidence.
+This preserves the repair investigation for a narrower proof instead of spending the turn rerunning
+the 1,899-test suite.
+
+## COS University healthy motivation and teamwork — 2026-09-10
+
+Every registered agent now receives a transparent, host-derived motivational state from verified
+academic and Production evidence. Comparable agents compete only inside the same professional role
+and subject. Verified application, retention, and independently evidenced help that improves a
+teammate's outcome determine standing; activity volume, confidence, self-report, and unrelated
+specialties do not. Failure creates constructive recovery and additional bounded study capacity,
+while a stronger comparable peer creates a healthy stretch target. Leadership requires continued
+application and team contribution. Integrity violations remove competitive rank, and no motivational
+state expands authority. These are functional machine incentives, not claims that agents feel emotion.
+
+Motivation evidence is operationally bounded: expired assessments and expired assurance events are
+ignored. Teamwork credit is emitted only by the authoritative verified-outcome path after a
+beneficiary's independently scored improvement passes every learning-outcome gate. Integrity
+penalties likewise require host-controller evidence and expire into review rather than becoming an
+unreviewable permanent label.
+
+## COS University live Production-path verification — 2026-09-10
+
+The owner-only assurance endpoint now reads the append-only receipt ledger for the exact running
+Production commit and deployment, verifies every declared University learning path, and reports
+each missing, disabled, failed, stale, or unproven path explicitly. A configured route or successful
+build is never presented as Production proof; all declared paths must have a fresh successful
+host-verifier receipt with their feature gate enabled before the aggregate status becomes verified.
+
+## Durable authenticated repository-patrol ingestion — 2026-09-11
+
+Current branch `feat/security-durable-webhook-ingestion-20260911` connects the authenticated GitHub
+webhook adapter to the signed Referee and an append-only Supabase evidence ledger. Supported patrol
+events are accepted only after exact-body HMAC verification, signed engagement verification, exact
+repository scope, expiry, kill-switch and host-limit checks. The database serializes each engagement
+chain, rejects predecessor conflicts, deduplicates deliveries, stores no raw webhook body or secret,
+and exposes no public RLS policy. Existing read-only GitHub provider queueing remains intact.
+
+This branch is implementation evidence only until merged, migrated, deployed, configured with a
+current signed Guardian engagement/trusted public key, and exercised by a real Production delivery.
+An absent patrol engagement does not fabricate security evidence; generic provider ingestion reports
+`securityPatrol: not_configured` until the governed patrol configuration is installed.
+
+The follow-up hardening keeps this as a single ingestion path and a single evidence ledger. It rejects
+partial or malformed patrol configuration, rejects malformed kill-switch values, bounds evidence-chain
+loading, pins security functions to an empty search path, explicitly removes browser-role table access,
+and blocks updates or deletes at the database trigger boundary. These controls still do not install a
+GitHub webhook or prove live delivery; Production operation requires the migration, secrets, signed
+Guardian engagement, authorized webhook configuration, and observed real delivery evidence.
+
+Production database migration `20260911012329` now records and verifies the RPC-only hardening that
+was applied after the original ledger migration: service-role direct writes and sequence access are
+revoked, the append RPC is the sole write path, browser execution remains denied, its search path is
+empty, and update/delete attempts are blocked by the immutable trigger. The ledger contained zero
+evidence rows when this correction was verified.
+
+Production webhook activation now treats GitHub's signed `ping` delivery as a successful no-op,
+derives the provider account identity from the authenticated repository owner for user-owned
+repositories, and persists generic delivery metadata using the columns that exist in the canonical
+Production ledger. These compatibility rules do not create patrol evidence for a ping; only an
+authorized patrol event may enter the append-only evidence chain.
+
+The Guardian repository observation worker now claims authenticated webhook work through the
+Supervisor's fenced lease protocol, materializes only the already-sanitized signed patrol evidence,
+and completes the generic delivery ledger. Benign changes become verified informational observations.
+Changes to security-sensitive repository paths create a bounded review alert that explicitly does
+not assert a vulnerability, compromise, intent, identity, or attribution. A five-minute Production
+cron reconciles queued deliveries without requiring the owner to run the tool manually.
+
+## Autonomous Security Patrol / independent white-hat architecture — 2026-09-10
+
+Owner direction: pursue a company-deployable security capability that combines continuous 24x7 defensive patrol with a separately isolated ethical-hacking assessor. The separation is intentional: a defender that knows its own environment can develop familiarity bias; the assessor must arrive as a stranger and rediscover the environment from the authorized starting position.
+
+Canonical roles:
+
+- **Guardian Agent** — resident internal defender. It may continuously observe authorized enterprise telemetry, learn the environment, correlate anomalies, investigate incidents, recommend or perform policy-authorized containment/remediation, invoke Self-Healing Supervisor capabilities, and verify recovery. Guardian is expected to know the environment deeply.
+- **Stranger Agent** — independent white-hat assessor. It must not inherit Guardian/COS/Enterprise Memory, topology, prior vulnerabilities, incident history, credentials, remediation knowledge, or earlier assessment discoveries except what the signed engagement manifest explicitly grants. Each engagement receives isolated state so the Stranger must discover the authorized environment rather than being told where weaknesses are.
+- **Referee / Policy Engine** — deterministic host-controlled authorization boundary. It owns target scope, permitted test classes, credentials/access posture, engagement start/end, rate limits, concurrency, safety limits, approver identity, evidence policy, and emergency stop. Neither Guardian, Stranger, COS, learning, nor a specialist may rewrite or expand this authority through reasoning.
+
+Supported assessment postures may include, only when explicitly authorized by the engagement manifest:
+
+1. internet stranger / unauthenticated external perspective;
+2. contractor or vendor with bounded remote access;
+3. ordinary employee identity;
+4. assumed-compromised endpoint;
+5. privileged-insider perspective.
+
+The assessment posture is input to the Referee, not a shortcut around it. A Stranger engagement that models an insider may receive only the exact knowledge/credentials required for that scenario.
+
+Canonical operating loop:
 
 ```text
-Connect Agent/Model
--> Select Goal
--> Prepare & Protect Data
--> Distill/Train
--> Independently Evaluate
--> Deploy
--> Monitor
--> Repeat
+Guardian: observe -> reason -> investigate -> contain/repair -> verify -> continue patrol
+
+Stranger: receive signed scope -> discover -> assess -> validate authorized findings
+          -> preserve evidence -> report -> end isolated engagement
+
+Referee: authorize/deny every active action and stop the engagement when scope/time/policy expires
+
+After remediation: launch a fresh isolated Stranger retest -> verify the weakness independently
 ```
 
-### Enterprise/governance requirements
+The Guardian and Stranger are deliberately asymmetric: **the defender may know everything it is authorized to know; the attacker starts knowing almost nothing beyond the engagement contract.** This is a product feature, not an inconvenience.
 
-The portable inherits iTMounts portable rules:
+Non-negotiable boundaries:
 
-- buyer-owned credentials and infrastructure where possible;
-- tenant isolation;
-- provenance, licensing, and privacy filtering;
-- bounded provider spend;
-- explicit authorization for consequential actions;
-- deterministic authority boundaries;
-- independent evaluation;
-- safety, unseen-transfer, and retention gates where applicable;
-- rollback evidence;
-- audit logging;
-- fail-closed provider substitution;
-- truthful Production evidence.
+- no target, identity, network, cloud account, application, tenant, or action outside the signed engagement scope;
+- authorization expires automatically at the engagement boundary and fails closed when ambiguous;
+- no persistence, stealth/evasion, destructive behavior, credential theft/exfiltration, or unrestricted lateral movement by default;
+- active validation must be explicitly permitted by action class and remain bounded/non-destructive;
+- deterministic target/scope matching is authoritative over model reasoning;
+- rate limits, concurrency ceilings, blast-radius limits, and an emergency kill switch are host-enforced;
+- every consequential action and finding produces tamper-evident audit/evidence records sufficient to reconstruct what was attempted, allowed/denied, observed, changed, and verified;
+- learning may improve detection, prioritization, investigation, explanation, remediation, and test selection, but **learning never widens authorization**;
+- Stranger state/memory isolation is mandatory and may not be bypassed merely because Guardian, COS, Self-Healing Supervisor, or Enterprise Memory already knows the answer;
+- Guardian-to-Stranger disclosure is prohibited during a blind engagement unless the manifest explicitly defines that disclosure as part of the scenario;
+- Stranger findings may be released to Guardian/Self-Healing only after the governed evidence boundary permits it, after which remediation and a fresh independent retest may occur;
+- customer deployment may be container, VM, appliance/portable, or another isolated enterprise-hosted form, but deployment form never weakens the authorization boundary.
 
-Learning quality, model intelligence, or an agent's reasoning may never expand operational authority.
+Implementation order for this capability:
 
-The portable must use buyer-selected providers interchangeably and must never silently route work to another hosted model, trainer, or compute provider when the configured provider is unavailable. Training material may include only data whose use is explicitly authorized by the buyer and permitted by the applicable provenance/rights policy.
+```text
+1. signed engagement + authorization/scope schema
+2. deterministic Referee / policy enforcement + expiry + kill switch
+3. Guardian/Stranger identity and memory isolation
+4. passive inventory/telemetry and evidence pipeline
+5. safe discovery and vulnerability assessment
+6. Self-Healing/Guardian remediation handoff and proof
+7. separately gated controlled validation
+8. fresh isolated Stranger retest and measurable security-improvement evidence
+```
 
-### Sequence and reuse boundary
+Do not begin with unrestricted exploit execution. Establish the authorization, role isolation, evidence, and fail-closed control plane first.
 
-Do **not** fork COS University into the commercial portable. Finish University first, then extract/generalize reusable contracts and components from the proven University distillation pipeline.
+**Current status:** this section records the accepted architecture/direction. It is not evidence that the Autonomous Security Patrol or Stranger ethical-hacking capability is already implemented or Production-ready.
 
-Reusable assets may include connector capability discovery, dataset/provenance controls, teacher/student orchestration, LoRA/QLoRA execution, independent evaluation, cost governance, canary/deployment adapters, rollback, and evidence ledgers. The portable core must remain provider-neutral even when its first production adapters reuse University Hugging Face and RunPod work.
+## Autonomous Security Patrol expansion: repo, IP and defensive counterintelligence — 2026-09-10
 
-Working commercial positioning:
+The security mission covers the enterprise **inside and outside the running application**. Guardian must eventually treat the software-development/supply-chain environment and information-exposure surface as first-class patrol zones rather than assuming runtime telemetry is the whole security boundary.
 
-> **Turn a buyer's best AI/model/agent capability into a smaller, cheaper, private, trainable, deployable capability the buyer can own and operate.**
+Canonical patrol surfaces:
 
-Final product name and packaging remain undecided until the post-University project begins.
+```text
+1. Runtime / enterprise patrol
+   endpoints, servers, identities, applications, cloud, network, databases, logs and configuration
 
-**University distillation and completion remain the current priority.**
+2. Repository / software-supply-chain patrol
+   repositories, commits, branches, pull requests, dependencies, CI/CD, workflow changes,
+   build artifacts, code-signing/provenance, secrets exposure, IaC/config drift and deployment lineage
+
+3. Intellectual-property / reconnaissance patrol
+   authorized repository access patterns, sensitive-project access, mass clone/download behavior
+   where observable, public metadata and information exposure, roadmap/research leakage,
+   and combinations of benign-looking public signals that reveal protected work
+```
+
+The repository patrol is not merely another application feature. Where architecture permits, its monitoring/evidence path should remain independently observable so compromise of the application does not automatically blind the repository/supply-chain defender. Conversely, runtime Guardian evidence must be able to identify compromise caused by an apparently normal repository or deployment change.
+
+When authorized telemetry indicates a suspected intrusion, intellectual-property theft, insider-risk event, repository compromise, or espionage/reconnaissance attempt, Guardian must open a durable **Incident Evidence Record** and preserve the maximum relevant evidence legitimately observable within scope. Depending on the environment this may include timestamps, source/destination IP and ports, ASN/provider, geolocation estimate, authenticated account/session identity, authentication method, device/client characteristics, failed/successful login activity, targeted systems/files/repos, commands or API calls when recorded, repository clone/download/change activity where observable, process/file hashes, network connections, privilege changes, data-access scope, persistence indicators, containment actions, remediation, and verification results.
+
+Evidence and attribution are separate:
+
+- observed facts are recorded as evidence;
+- inferred identity, affiliation, intent, campaign relationship, or state/organizational attribution is a hypothesis with explicit confidence and competing explanations;
+- IP address, country estimate, language, timezone, ASN, device signal, or account identity alone does not prove who the human intruder is;
+- VPNs, proxies, Tor, cloud relays, compromised hosts, shared infrastructure, stolen credentials, and spoofed indicators must remain live alternative explanations when applicable.
+
+For serious incidents, the evidence system should support a tamper-evident case package suitable for authorized review by company security, counsel, insurers, CERT/CSIRT teams, regulators, law enforcement, or other competent authorities. The package should preserve original timestamps, hashes/integrity proofs, provenance, chain-of-custody events, affected assets, actions taken, and an explicit separation of observation from inference. **Evidence preservation never grants external-disclosure authority by itself.**
+
+Defensive counterintelligence is now a formal University/specialist direction. `SKILLS.md` defines the graduate specialization and `docs/defensive-counterintelligence-adversary-studies.md` defines its detailed curriculum. The learning objective is to study adversary tactics, insider-risk patterns, cyber/industrial espionage cases, repository/supply-chain compromise, social engineering, exfiltration patterns, detection engineering, digital forensics, attribution discipline, and defensive countermeasures so defenders recognize and defeat those behaviors.
+
+Learning adversary tactics never widens operational authority. No learned technique, specialist degree, confidence score, or threat severity grants permission for hack-back, retaliatory intrusion, destructive action, out-of-scope surveillance, credential theft/exfiltration, or targeting third parties. Active Stranger validation remains separately isolated and Referee-governed under the signed engagement manifest.
+
+Defensive deception may later include governed canary documents/tokens, honey services, decoy repository paths/assets, or other non-harmful tripwires. These mechanisms must be designed to detect unauthorized access without harming unrelated people, creating unsafe credentials, or manufacturing attribution.
+
+**Current status:** this section records accepted architecture, curriculum linkage, and evidence requirements. It is not a claim that repo patrol, counterintelligence automation, forensic packaging, or authority-support integrations are already implemented or Production-ready.
+
+## COS University remediation source diversification — 2026-09-10
+
+Failed-exam remediation preserves all learning-admission and examiner-isolation gates while rotating
+the leading host-owned curriculum theme on each 15-minute learning slot. Acquisition connectors use
+that rotated curriculum focus before the broad subject label, while relevance evaluation continues
+to use the complete subject and question. A plan that rejects one result set as duplicate, irrelevant,
+or low-confidence therefore searches a materially different focus instead of acquiring the same
+eleven weak documents forever. The gap identity, curriculum, hidden examination, and evidence
+thresholds do not change.
+
+## COS University automatic Production-outcome correlation — 2026-09-10
+
+Authoritative Production outcome ingestion can now carry agent- and subject-scoped University
+evidence. The existing verified-outcome recorder automatically converts that envelope into the
+immutable learning-assurance ledger, using the authoritative outcome reference as practical proof.
+No University claim is created without an explicit academic envelope, and the normal retention,
+transfer, independent-scoring, source-attribution, sample-size, and measured-improvement gates remain.
+
+## COS University real-world outcome evidence — 2026-09-10
+
+The assurance ledger now accepts immutable, agent- and subject-scoped learning-outcome decisions.
+Promotion requires an improved post-study score, unseen transfer, practical execution with a measured
+Production improvement, delayed retention, verified source attribution, and independent scoring.
+Missing or regressed evidence is recorded as a failed decision and cannot be presented as learning.
+
+## COS University delayed-retention execution — 2026-09-10
+
+University delayed retention is now an explicit independently scored academic stage and scheduled
+Production path. After at least 14 days, the host replays a previously passed hidden cross-domain
+transfer case with cache and external-AI credit prohibited. The replay cannot count as a new
+holdout variant, and a Production pass cannot raise a subject to A without retained transfer.
+
+## COS University owner-directed study bridge — 2026-09-10
+
+Newly admitted owner-fed books, articles, video transcripts, documentation, and notes are attached to durable COS University study plans and receive non-credit study proof. Duplicate or rejected chunks do not manufacture a new attempt. The owner dashboard reports whether University recording succeeded. This bridge never writes assessment evidence or awards a grade; unseen transfer and delayed-retention gates remain independent.
+
+## COS University enrollment contract — 2026-09-10
+
+Every AI agent may enroll without first proving that it is a qualified learner. Enrollment assigns
+the program's required curriculum. The agent graduates only after passing every required subject
+and the remaining graduation gates. A subject failure triggers remediation and re-examination; it
+never disqualifies the enrolled agent from learning. Fine-tuning readiness applies to a governed
+training method or model artifact, not to the agent's right to attend the University.
+
+## COS University Production acceptance instrumentation — 2026-09-10
+
+Every scheduled University route now writes a deployment- and commit-bound Production receipt to
+the append-only assurance ledger. Receipts prove route execution only; they never claim learning or
+mastery. The controlled fine-tuning cron packages candidates produced by repeated independent
+failure, cryptographically separates training and holdout manifests, and records fail-closed host
+decisions. It cannot train or promote without separate approvals and post-training independent,
+safety, transfer, retention, canary, and rollback evidence.
+
+## COS University advanced professional curricula — 2026-09-10
+
+The shared A/A+ generalist foundation remains mandatory. Five additional Master's tracks provide
+advanced education in aerospace/nuclear safety systems, molecular/biomedical sciences,
+neuroscience/biophysics, actuarial/insurance risk, and quantum/theoretical physics. Existing
+quantitative and enterprise programs now explicitly include formal epistemology, calibration,
+mechanism design, organizational anthropology, field operations, rhetoric, and crisis leadership.
+Every track retains independent examination, unseen transfer, verified practical work, and capstone
+requirements; document exposure or simulation alone does not graduate an agent.
+
+## COS University role-to-curriculum assignment — 2026-09-10
+
+Host-controlled AI roles now map deterministically to the matching advanced program and its complete
+module list. The role assignment is considered only after the common undergraduate credential is
+awarded, overrides accidental strongest-subject ranking at Master's admission, and never expands
+authority. COS remains on generalist continuing education unless a separate specialist role is
+explicitly assigned.
+
+## COS University autonomous registered-agent cycle — 2026-09-10
+
+A bounded, secret-gated Production cycle now enumerates the durable University agent registry,
+automatically enrolls every registered identity through the same host admission gate, reads its
+evidence-backed academic record, and routes its next action to study, remediation, independent
+examination, or completed graduation. Missing evidence never becomes a pass or credential.
+
+## COS University multi-agent independent examinations — 2026-09-10
+
+The undergraduate independent-exam worker now accepts a durable agent identity. Exam run keys,
+assessment reads, and assessment writes are isolated by that identity, while host-generated hidden
+exams and independent scoring remain unchanged. The autonomous registered-agent cycle executes
+eligible exams directly rather than only reporting that an exam is due.
+
+The canonical `software-specialist` identity is registered under the software-engineering role and
+therefore enters the common undergraduate curriculum before its advanced specialist program.
+
+## COS University multi-agent continuous study — 2026-09-10
+
+The continuous University learner now carries each registered agent identity through academic-state
+reads, study-plan creation, material acquisition, accepted-study proof, and failed-exam remediation.
+Specialist plan keys and learning slots are isolated so one agent cannot consume another agent's
+study attempt or remediation. The registered-agent cycle now executes study/remediation work as well
+as independent exams; accepted material remains non-credit until independent assessment succeeds.
+
+## COS University multi-agent deliberate practice — 2026-09-10
+
+The autonomous registered-agent cycle now reconciles terminal deliberate-practice failures for the exact agent identity after each practice execution. A specialist failure reopens that specialist's study attempt; it cannot be stranded by COS-only reconciliation, transferred across identities, or treated as academic credit.
+
+The deliberate-practice worker now carries the enrolled agent identity through study-plan reads,
+proof fences, practice-skill provenance, queue metadata, stale recovery, claim validation, and
+execution reconciliation. The registered-agent cycle launches bounded practice after accepted study.
+Practice remains non-credit and cannot substitute for an independent exam.
+
+Practice eligibility follows durable accepted-study proof, not whether the same scheduler tick
+acquired another document. A registered agent therefore cannot lose its practice turn merely
+because its prior study is already current.
+
+The registered-agent cycle now gives identity-scoped `ready_for_exam` plans priority over generic
+academic routing, examines the exact subject or language dimension, and reconciles the plan only
+from the independent result. Passing completes the plan; failure supersedes it so the existing
+failure-remediation path can create a fresh study attempt.
+
+## COS University remediation re-exam identity — 2026-09-10
+
+An independently failed exam and the fresh exam after study/practice must never share the ordinary
+daily run key. Ready-plan examinations use a stable identity scoped to agent, study-plan id, study
+attempt, and exact subject/language target. Retries of the same attempt remain idempotent, while a
+new remediation round receives a new hidden seed and unseen exam. Ordinary scheduled exams retain
+their daily idempotency. A prior terminal exam can therefore no longer complete or supersede newly
+earned `ready_for_exam` evidence without executing the plan-bound re-examination.
+
+The learner also repairs the legacy collision state when the latest failed exam still owns a
+superseded plan containing both host-accepted study proof and completed deliberate-practice proof.
+Recovery restores only `ready_for_exam`; it grants no grade or academic credit, and the new
+independent examiner remains authoritative.
+
+## COS University applied-knowledge qualification — 2026-09-10
+
+Knowledge becomes qualification only when it improves independently verified real work. The
+registered-agent cycle now converts an agent-scoped, independently scored learning-outcome assurance
+event into the existing `production_transfer` stage only after revalidating baseline improvement,
+unseen transfer, practical execution, delayed retention, source attribution, a nonzero real-world
+sample, and a better measured outcome. This applies to COS and every registered specialist.
+
+A degree is not permission to abandon the discipline. The agent's host-assigned role continues to
+control its specialist curriculum and work routing after graduation. Current competence remains
+separate from the immutable historical credential: applied evidence expires, later failure weakens
+standing, and missing recent application triggers continuing education/recertification. Cross-domain
+help is allowed, but it does not replace applying the agent's assigned specialty when relevant,
+authorized work exists.
 
 ---
 
-# Current priority — finish COS University
+# iTMounts public brand and domain cutover — 2026-09-08
 
-The owner has explicitly prioritized **distillation** within the University project. Continue University work to accepted completion before starting the commercial portable above.
+The owner selected **iTMounts** as the canonical public product identity. The rename is a public-brand/domain migration, **not** a fork of the platform and not a blind rename of internal implementation identifiers.
 
-Operational ordering:
+## Exact public spelling
 
-1. keep packaging new rights-cleared University material into valid distillation batches;
-2. run bounded, explicitly authorized distillation campaigns with truthful provider evidence;
-3. register trained artifacts and rollback evidence;
-4. run exact-artifact canary and independent evaluation;
-5. require holdout improvement plus applicable safety, unseen-transfer, retention, and Production evidence before promotion;
-6. use failed evaluation to improve the training/distillation recipe rather than weakening evaluators;
-7. continue the undergraduate/remediation/exam/transfer/retention/graduation program for COS and registered specialists.
+The public brand is always:
 
-Evaluation may run concurrently, but it should not unnecessarily stop the next already-authorized distillation batch. Spending authority remains separately bounded; a request to prioritize distillation does not create an unlimited training budget.
+**iTMounts**
 
-Current provider/job/model state is mutable. **Always query live Production evidence before reporting it.** Do not infer current HF spend, RunPod state, artifact status, or evaluation status from this file.
+Rules:
 
-## Platform dispatch / pipeline-capacity policy — 2026-09-17
+- lowercase `i`;
+- uppercase `T`;
+- uppercase `M`;
+- lowercase `ounts`;
+- one word, no space;
+- domain names remain lowercase as normal: `itmounts.com`.
 
-Owner direction: **work is dispatched to available pipelines; capacity and provider are inputs, never hardcoded platform laws.** This is a platform architecture rule for both COS University and commercial portables, not a University-only optimization.
+Do not introduce `ITMounts`, `ItMounts`, `iT Mounts`, `itMounts`, `SignalBoostAi`, `SignalBoost AI`, or `SignalBoost` as a new customer-facing product label.
 
-The canonical design is a governed **multi-provider dispatcher / worker-pool** model:
+## Public tagline
 
-- waiting work is ordered by the applicable queue policy and continuously matched to an available compatible pipeline;
-- a pipeline is a **provider-qualified execution lane**, not a Hugging Face lane. Valid providers may include Hugging Face, OpenAI, Anthropic, xAI/Grok, Gemini/Google, AWS, Azure, GCP, approved private gateways, buyer GPUs/on-prem infrastructure, local vLLM/Ollama, and future registered adapters;
-- every active unit owns an isolated lease for the exact provider + model + artifact/job + tenant binding from admission through its governed terminal handoff, then releases that lease;
-- pipeline state must distinguish at least available, leased/busy, unhealthy/quarantined, and unavailable;
-- admission control must refuse lane N+1 when compatible capacity is exhausted; provisioning or routing must not evict, retire, overwrite, or steal a healthy lease merely to start newer work;
-- capacity is a runtime/configuration/provider input. The same orchestration code must behave correctly at N=1, N=10, N=50, or buyer-selected capacity without rewriting workflow logic;
-- provider mix is also a runtime/configuration input. The same dispatcher must support one provider or many providers simultaneously without separate orchestration forks;
-- no portable or shared platform component may encode SignalBoost's current laboratory worker count, one-at-a-time fences, retire-on-provision behavior, Hugging Face-only teacher assumptions, or RunPod-only serving assumptions as product invariants;
-- routing may use only pipelines that are compatible with the exact provider/model/artifact/tenant and have the required capability and authorization. Unlike a generic load balancer, the dispatcher must preserve exact-artifact and exact-provider binding;
-- provider selection must be explicit and evidence-backed. The dispatcher may choose among already-authorized compatible providers according to declared policy/capability/health/cost/latency constraints, but it must never silently substitute a different provider when policy requires fail-closed behavior;
-- teacher, trainer, evaluator, and serving/runtime provider bindings are independent axes. A valid flow may use, for example, Anthropic or OpenAI as teacher, buyer-owned GPUs for training, an independent approved evaluator, and private vLLM or another provider for serving;
-- normalized provider contracts must produce a common governed work/result envelope so downstream dataset, evidence, evaluation, and promotion logic does not fragment into provider-specific pipelines;
-- provider-qualified identities must be persisted in evidence/ledger records. Separation checks such as “evaluator must not be the teacher” must compare provider + model identity, not bare model strings;
-- a free compatible lane should not remain idle while eligible authorized work is waiting, subject to spend, quota, rate, safety, evidence, data-residency, tenant, and provider-health controls;
-- failure of one provider/lane must not corrupt another lane's lease or evidence. Recoverable work may be requeued or repaired under its existing authority; unhealthy lanes fail closed and are excluded from dispatch until repaired;
-- observability must expose queue depth, configured capacity, provider, model, available/busy/unhealthy lanes, lease owner, wait time, throughput, bounded failure/retry state, and provider-specific health so the Self-Healing Supervisor can diagnose and repair routing/capacity faults rather than alert only.
+Canonical public tagline:
 
-**Speed comes from usable parallel capacity across compatible providers; reliability comes from provider-qualified isolation, leases, admission control, normalized contracts, and truthful health.** The dispatcher directs work to existing authorized capacity; it does not itself create spending authority, provider quota, evaluation authority, Production traffic authority, provider credentials, or new pipelines.
+**AI software that works for you**
 
-Current University Production behavior may remain N=1 and may still use current Hugging Face/RunPod adapters until the multi-provider dispatcher implementation is proven and current provider/account limits permit more lanes. N=1 and a single provider are valid configurations of the same architecture, not separate single-lane or single-provider designs. Raising N, adding paid capacity, or enabling a new provider remains subject to the existing explicit spend/provider authorization and connector-readiness boundaries.
+## Concierge wording
 
-This policy applies to University teacher generation, training, canary, evaluation, and runtime flow and must be reused by the post-University Agent Distillation & Training Portable. The portable extraction must generalize the same dispatcher and provider-binding contract rather than fork a separate scheduler or provider-specific orchestration path.
+The homepage Concierge eyebrow is fixed as:
 
-## University distillation Self-Healing loop
+**`YOUR iTMounts CONCIERGE`**
 
-University mass distillation is connected to the existing Self-Healing Supervisor rather than a
-separate alert-only controller. The scheduled worker and Supervisor repair both call one canonical
-workflow: provider-ledger reconciliation -> failed-job diagnostics -> stale dispatch-claim recovery
--> bounded failed-stage recovery -> next authorized dispatch. A dedicated offset five-minute monitor
-reads the durable Production heartbeat, campaign/run state, and provider-job ledger; unhealthy state
-becomes a host-created incident, an exact allowlisted repair, and a separate post-repair health read.
+The public assistant is **iTMounts Concierge**. COS remains the internal intelligence/orchestration name and is not renamed merely for branding.
 
-The repair may only continue work inside the campaign's existing expiration and remaining cost
-ceiling, or authorize one already-prepared batch through the owner's durable rolling policy. On
-2026-09-15 the owner explicitly authorized at most **$25 of maximum campaign authority in any rolling
-24-hour window** for Hugging Face University mass distillation. The database serializes workers,
-counts campaign hard ceilings rather than optimistic actual cost, permits only one live single-batch
-campaign at a time, and retains the existing $1.825 maximum per batch. Historical/manual campaigns
-inside the same rolling window count against that ceiling.
+Public copy should prefer Concierge language rather than exposing internal architecture unnecessarily. A public surface may invoke COS behind the scenes, but COS remains the brain and Concierge remains the public delivery layer.
 
-The shared worker now reconciles and recovers existing work, performs a non-spending rights-cleared
-packaging sweep, requests at most one campaign through that durable policy, and only then dispatches.
-The monitor distinguishes active health from `waiting_for_curriculum`, `budget_paused`, and
-`authorization_required`; zero active campaigns is no longer reported as healthy idle. A prepared
-batch that was not authorized despite available rolling authority is repairable automatically through
-the same governed workflow.
+## Logo / wordmark direction
 
-The repair cannot authorize promotion, Production traffic, RunPod mutation, non-prepared data, a
-larger rolling ceiling, parallel campaigns, or a later campaign expiry. Missing/expired authority,
-failed verification, or an unrecognized incident fails closed and remains visible rather than being
-reported as healed. Insufficient rights-cleared unique material is reported as a supply wait; the
-system does not weaken the 20-item curriculum quality floor merely to keep provider compute busy.
-Supply telemetry reports both raw unassigned provenance rows and the smaller post-dedup batchable
-count by canonical subject. When no batch is prepared, the shared workflow serializes one bounded
-replenishment pass per 30-minute slot against the nearest canonical subject shortfalls, using only
-the existing governed OpenAlex CC0 acquisition/admission path, then reruns packaging before any
-rolling authorization. Acquisition cannot dispatch training or expand provider authority.
+Approved direction:
 
-The rolling RPC is the only service-role campaign-authorizer entry point: direct execution of the
-legacy authorizer is revoked so concurrent workers cannot bypass the policy-row lock or 24-hour cap.
-Monitoring and reconciliation read every unsettled Hugging Face provider job, including jobs whose
-campaign has already left the active window, before another campaign can be authorized.
+- compact Roman-style **iTMounts** wordmark;
+- mounted-`T` icon/base motif;
+- keep the mark small in the existing navigation footprint rather than using an oversized presentation logo;
+- mounted-`T` app/favicon asset direction is implemented at `saas/app/icon.svg`;
+- preserve the current dark product UI unless a separate design task explicitly changes it.
 
-The exact-artifact RunPod canary reserves 235 seconds of the 300-second function window for a real
-Qwen3-4B + immutable-LoRA cold start and 35 seconds for the bounded inference probe. This reflects
-Production evidence that a healthy running worker could still be loading at the former 190-second
-cutoff. The change does not add an invocation, raise the $0.20 canary ceiling, authorize evaluation,
-or authorize Production traffic.
+The wordmark is the primary logo; the mounted-`T` mark is the compact icon/fav/app-mark treatment.
 
-RunPod counts each endpoint's `maxWorkers` against the account quota even when `minWorkers` is zero.
-Before creating a new exact-artifact mass canary, provisioning therefore sets only older
-`itmounts-mass-distilled-*` endpoints to `minWorkers=0,maxWorkers=0`. It does not delete endpoints,
-touch unrelated workloads, add an invocation, or expand Production authority.
-If the legacy v2 create/list response omits the endpoint identifier, provisioning resolves that
-identifier by exact endpoint name through RunPod's official REST endpoint list before failing closed.
-The independent mass evaluator uses the same 235-second exact-artifact readiness window as the
-canary, preventing a healthy scale-to-zero Qwen3-4B + LoRA cold start from failing at 190 seconds.
+## Canonical public domain
 
-Production evaluator evidence on 2026-09-17 established three additional transport rules. A two-case
-mass holdout starts as two single-case requests so a transient RunPod gateway failure on one case can
-use the existing bounded single-group retry rather than an unbounded split-child retry tree. A solo
-request may use the existing 1,024-token output cap, but token headroom alone is not a substitute for
-correct model mode: Qwen3 thinking is disabled for final-answer evaluation so the bounded output
-budget is spent on the required observable answer instead of hidden reasoning. The evaluator remains
-final-answer-only; it does not collect, persist, grade, or treat hidden chain-of-thought as evidence.
-These transport repairs do not change cases, references, scoring thresholds, delayed-retention gates,
-exact-artifact binding, promotion rules, or Production-traffic prohibition. Evaluation authority now permits at most fourteen endpoint calls, four judge calls, one runtime wake, and at most $0.20 estimated
-wake cost. The 14-call ceiling is a bounded transport authority for the measured slower candidate path; it does not change cases,
-scoring thresholds, promotion gates, provider spend authority, or Production-traffic authority.
+Canonical public application origin:
+
+`https://itmounts.com`
+
+The owner purchased `itmounts.com` through GoDaddy. DNS was connected to the existing Vercel project; no new backend or cloned application was created.
+
+Observed DNS/application setup from the owner-guided cutover:
+
+```text
+GoDaddy apex A record:
+@ -> 216.150.1.1
+
+GoDaddy www record:
+www -> itmounts.com
+
+Vercel:
+itmounts.com     -> Production
+www.itmounts.com -> 308 Permanent Redirect -> itmounts.com
+```
+
+Both `itmounts.com` and `www.itmounts.com` were observed by the owner as **Valid Configuration** in Vercel. The owner then opened `https://itmounts.com` successfully and separately verified that `https://www.itmounts.com` changes to `https://itmounts.com`.
+
+Do not add a second backend, second Supabase project, second COS, second Builder, or cloned runtime for the new domain. The domain points at the existing platform.
+
+## Public origin architecture
+
+The public-origin migration keeps the same:
+
+- Vercel / Next.js application;
+- Supabase/database;
+- COS;
+- Concierge;
+- Software Specialist;
+- Builder;
+- Platform Engineer owner-repair capability;
+- APIs;
+- jobs / durable History;
+- cron jobs;
+- learning stores;
+- provider integrations;
+- governed execution boundaries.
+
+The new domain changes the customer identity/origin, not the platform architecture.
+
+## Merged public-brand implementation
+
+PR **#1992** — `feat(brand): launch iTMounts public identity on itmounts.com`
+
+Accepted scope:
+
+- canonical public brand config uses **iTMounts**;
+- canonical public site URL uses `https://itmounts.com`;
+- public metadata / application name / OpenGraph / organization schema use the public brand seam;
+- public footer uses iTMounts;
+- translated display copy routes legacy public brand text through the public-brand seam;
+- public Concierge display copy uses iTMounts;
+- compact Roman-style navigation wordmark direction added;
+- mounted-`T` favicon/app mark added;
+- backend/COS/Builder/repository/database identifiers are not blindly renamed.
+
+PR **#1994** — `fix(brand): preserve iTMounts casing in legacy public copy`
+
+Reason for the follow-up: an uppercase rendered string such as `YOUR SIGNALBOOST CONCIERGE` survived the first display transformation even though the header already showed iTMounts. #1994 made legacy public-brand replacement case-insensitive and added regression coverage so upper/lowercase legacy display variants resolve to **iTMounts** while implementation identifiers remain intact.
+
+#1994 merged as `5d01c06cc75952365d436b2053cf62a4ad949de9`. Vercel Production deployment `dpl_GGqzT5NF9FamQ34PW7AMmPy2ccJc` was observed **READY**. Subsequent current-main work must preserve this brand contract.
+
+## Public SignalBoost removal rule
+
+**All customer-facing SignalBoost branding is retired.**
+
+On rendered public/customer surfaces, public metadata, authentication copy, emails intended as product branding, social/share metadata, browser-sandbox labels, public docs/marketing copy, and translated UI strings:
+
+```text
+SignalBoostAi  -> iTMounts
+SignalBoost AI -> iTMounts
+SignalBoost    -> iTMounts
+```
+
+The replacement must be case-insensitive for display strings so `SIGNALBOOST` cannot leak through.
+
+This does **not** authorize a repository-wide search/replace. Internal/historical `SignalBoost` identifiers may remain when they are implementation/history rather than public branding, including:
+
+- repository owner/name;
+- database/migration identifiers;
+- internal service names;
+- historical PR/deployment evidence;
+- old branch names;
+- internal code symbols where renaming would create unnecessary risk;
+- legacy contact addresses;
+- archived ONBOARD history;
+- legacy domain references required for migration/compatibility checks.
+
+The public brand layer and the implementation layer are deliberately separated.
+
+---
+
+# Legacy SignalBoost domain boundary
+
+Current legacy compatibility origins are not the canonical product address:
+
+- `saas.signalboostapp.com` — legacy production-compatible origin;
+- `www.saas.signalboostapp.com` — legacy redirect to the old apex/subdomain;
+- `signalboost-live.vercel.app` — Vercel project origin/alias.
+
+Do not market these as the public iTMounts address.
+
+## Intended final legacy redirect
+
+After the hostname-dependency audit is complete, the intended compatibility behavior is:
+
+```text
+https://saas.signalboostapp.com/<path>
+    -> 308 Permanent Redirect
+https://itmounts.com/<path>
+```
+
+`www.saas.signalboostapp.com` should ultimately land on the same canonical iTMounts origin.
+
+**Do not switch the old production origin to a permanent redirect until the hostname-sensitive dependency audit is complete.** The goal is to avoid breaking auth, callback, cookie, payment, or email flows while still making iTMounts canonical.
+
+## Hostname-dependency audit before retiring the old origin
+
+Verify/update every dependency that materially depends on the public origin:
+
+1. Supabase Auth Site URL.
+2. Supabase allowed redirect URLs.
+3. OAuth provider callback/redirect URLs.
+4. Password-reset links.
+5. Magic-link / email-auth destinations.
+6. Stripe success/cancel/return URLs where applicable.
+7. Stripe webhook assumptions only where hostname-dependent.
+8. CORS allowlists.
+9. CSP origin rules.
+10. Cookie domain / secure-cookie assumptions.
+11. Environment variables containing absolute public URLs.
+12. Canonical metadata.
+13. Sitemap URLs.
+14. `robots.txt` references where applicable.
+15. OpenGraph/social share URLs.
+16. Product email links/templates.
+17. Public documentation links.
+18. Hard-coded `saas.signalboostapp.com` references that are true runtime/public-origin dependencies rather than historical/internal evidence.
+
+After these are verified, change the old SignalBoost SaaS origin to a path-preserving 308 redirect and verify auth, Concierge, Builder, billing, email, and principal public routes through `itmounts.com`.
+
+Keep ownership of `signalboostapp.com` for legacy/corporate/internal compatibility unless the owner separately decides otherwise.
 
 ---
 
@@ -219,19 +696,22 @@ Every developer, AI coding agent, reviewer, operator, contractor, specialist, or
 
 1. Read the current root `ONBOARD.md` first.
 2. Read `SKILLS.md` for COS learning, grading, graduation, remediation, and graduate-specialist architecture when relevant.
-3. Read `docs/ONBOARD-SNAPSHOT-2026-09-15-PRE-DISTILLATION-PORTABLE.md` when prior detailed operational contracts or implementation chronology are relevant.
-4. Query current `main` before changing anything.
-5. Inspect current open PRs and concurrent work that could overlap.
-6. Query exact Vercel Production/Preview state when deployment truth matters.
-7. Query current Supabase migrations/schema/data when database truth matters.
-8. Read the exact task-related files before editing.
-9. Re-scan after `main` advances or when concurrent agents may have changed the task area.
-10. Verify implementation/runtime behavior from code plus actual evidence rather than memory.
-11. Never report a merge, deployment, fix, training run, model improvement, or acceptance as complete without the corresponding evidence.
+3. Query current `main` before changing anything.
+4. Inspect current open PRs and concurrent work that could overlap.
+5. Query exact Vercel Production/Preview state when deployment truth matters.
+6. Query current Supabase migrations/schema when database truth matters.
+7. Read the exact task-related files before editing.
+8. Re-scan after `main` advances or when concurrent agents may have changed the task area.
+9. Verify implementation/runtime behavior from code plus actual evidence rather than memory.
+10. Never report a merge, deployment, fix, or acceptance as complete without the corresponding evidence.
 
-Stale repository context is not acceptable evidence.
+This is mandatory because multiple developers/agents may work concurrently. Stale repository context is not acceptable evidence.
 
-The prior v1.77 detailed history remains at `docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`.
+The prior v1.77 detailed history remains available at:
+
+`docs/ONBOARD-ARCHIVE-V1.77-2026-09-08.md`
+
+Read that archive when older implementation chronology, exact historical deployment IDs, or prior acceptance boundaries are relevant.
 
 ---
 
@@ -247,15 +727,17 @@ Current integration contract for PRs targeting `main`:
 - include the current `SKILLS_ACK_BLOB` when relevant / available;
 - if `main` advances, re-scan/reconcile and refresh the integration token/acknowledgements rather than merging stale work;
 - required checks and applicable Vercel Preview must be green before integration;
-- merge to `main` through GitHub's **merge** method, not a direct/squash/rebase write that violates repository integration history rules;
+- merge to `main` through GitHub's **merge** method, not a direct/squash/rebase write that violates the repository's integration history rules;
 - use the expected PR head SHA when merging;
-- after merge, verify merged PR state, new main SHA, two-parent merge commit, and applicable Production health.
+- after merge, verify the merged PR state, new main SHA, two-parent merge commit, and applicable Production health.
 
 An explicit owner request such as `go`, `commit and merge`, or an already-authorized routine repair is execution authority only within these repository controls. It does not turn a red/stale PR into a safe merge.
 
 ---
 
 # Core product architecture
+
+Canonical topology:
 
 ```text
 Customer / owner goal
@@ -267,8 +749,8 @@ Concierge / Owner Assistant / delivery surface
 COS — sole generalist brain, intent owner, orchestration and final judgment
       |
       +--> Software Specialist
-      |      +--> Builder
-      |      +--> Platform Engineer
+      |      +--> Builder (sandboxed app/code work)
+      |      +--> Platform Engineer (owner-gated repository repair)
       |
       +--> Security / Marketing & Sales / Design / Finance /
            Operations / Research / future specialists
@@ -280,47 +762,172 @@ structured evidence/results/uncertainty
 COS review / synthesis / governed action or answer
 ```
 
-**COS is the brain. Concierge is the public face. Specialists are expert workers.**
+## COS
 
-COS remains the Chief-of-Staff generalist/orchestrator. Specialists add depth and return evidence/results/uncertainty through COS. Builder and Platform Engineer remain Software Specialist capabilities rather than separate brains. Expertise, degrees, benchmark results, or learning quality never widen authority by themselves.
+COS means **Chief of Staff** for the owner-facing role and remains the internal reasoning/orchestration brain.
+
+COS responsibilities include:
+
+- understand the real goal rather than merely classify keywords;
+- perform available authorized research/verification rather than assign routine investigation back to the owner;
+- coordinate specialists while retaining final responsibility;
+- distinguish evidence from inference;
+- challenge weak proposals;
+- track real persisted commitments/blockers without inventing tracking;
+- act autonomously on routine reversible work within authorization;
+- escalate consequential or difficult-to-reverse actions at the appropriate boundary;
+- learn from governed evidence, practice, independent exams, outcomes, and failures.
+
+The public iTMounts rename does not change COS's internal name or role.
+
+## Concierge
+
+Concierge is the **public face / delivery layer**, not a separate brain.
+
+Rules:
+
+- public Concierge uses COS in public scope;
+- public scope must never inherit private owner/admin/company context merely because the browser is authenticated;
+- public product branding is **iTMounts**;
+- public Concierge must not expose internal Enterprise Memory, private Knowledge Graph, internal repository/admin tools, secrets, private strategy, or owner-only context;
+- public failures fail safely rather than falling into a private backup brain;
+- public provenance comes from recorded turn provenance, not model reconstruction;
+- users should receive useful trial value before being forced to register where the product contract allows it.
+
+**COS is the brain. Concierge is the public face.**
+
+## Specialists
+
+Specialists are expert workers under COS, not independent competing brains.
+
+- broad professional proficiency first, specialization second;
+- specialist depth never widens authorization by itself;
+- specialists return evidence/results/uncertainty through COS;
+- COS may challenge, combine, or reject specialist outputs;
+- multiple specialists may be assembled for cross-domain work;
+- a degree, benchmark result, or specialist label never grants spending, merge, production, tenant, or approval authority.
+
+## Software Specialist
+
+Canonical family: `software`.
+
+Initial capability family includes:
+
+- `software.analyze`;
+- `software.build`;
+- `software.repair`;
+- `software.platform-repair`;
+- `software.verify`.
+
+Builder and Platform Engineer are capabilities of the Software Specialist, not separate brains.
+
+### Builder
+
+Builder is the sandboxed engineering environment for creating, editing, running, testing, debugging, and repairing user/project code.
+
+Owner goal: **a complete harness engineering experience/environment**, not a one-shot code generator.
+
+Builder should support connected:
+
+1. project context;
+2. inference/reasoning;
+3. file/dependency/command execution;
+4. fresh verification and repair;
+5. durable task/project/conversation continuity;
+6. permission isolation and interruption recovery;
+7. truthful evidence-based explanation/guidance.
+
+For repairs, completion requires evidence, not prose:
+
+```text
+reproduce / prove failure
+-> change
+-> rerun the same relevant proof
+-> pass
+```
+
+A diagnostic command such as `git log`, `grep`, `sed`, or `cat` is not a passing regression proof. Test/build/typecheck/lint or another task-specific proving command must close the loop.
+
+The repository-repair proof controller added in #1981 forces the relevant proof before mutation and after mutation rather than relying only on the model to remember to rerun it. Narration must not call a diagnostic failure a reproduced regression.
+
+Builder may explain a failure, but explanation cannot replace execution when the user asked to fix it.
+
+### Platform Engineer
+
+Platform Engineer is the owner-authorized repository-repair capability of the Software Specialist for the configured iTMounts platform repository.
+
+Authority remains bounded:
+
+- owner/project/deployed-target verification before repository repair;
+- ephemeral staged repository;
+- no inheritance of broad credentials;
+- network denied after allowed preparation where required;
+- no secret disclosure;
+- no autonomous widening of repository/Production authority;
+- repair must produce fresh proof;
+- repository integration still follows main-write/PR/merge governance.
 
 ---
 
+# Concierge visual-continuity repair — 2026-09-09
+
+Current repair branch: `fix/concierge-visual-continuity-identity-20260909` (not Production until merged and deployed).
+
+The reported iTMounts logo conversation exposed four coupled defects: elliptical visual follow-ups lost their earlier user-supplied logo objective; ordinary text synthesis replaced requested execution; success copy could survive without a renderable preview/download artifact; and a public employer question reached model inference and invented a government affiliation.
+
+Repair contract:
+
+- resolve short visual revisions only from an earlier explicit **user** visual request in the same submitted conversation;
+- never treat assistant prose as authority for follow-up routing;
+- unrelated requests exit the visual lane;
+- visual delivery success requires a renderable preview/download artifact;
+- public Concierge identity questions use deterministic product identity and never invent employment or government affiliation;
+- the exact reported six-turn transcript is a mandatory regression.
+
+# Public Concierge company identity repair — 2026-09-09
+
+The public model prompt still described the retired product name as authoritative after the iTMounts cutover. A live question asking for the company's name therefore returned SignalBoost even though rendered UI branding was correct.
+
+Repair contract:
+
+- public Concierge system prompts pass through the canonical `publicBrandText` seam before inference;
+- internal COS presentation labels resolve to `PUBLIC_BRAND.name`, never a hard-coded legacy brand;
+- direct public company-name questions resolve deterministically to **iTMounts**;
+- legacy repository/service/domain identifiers may remain internal but cannot override public product identity;
+- the reported logo-then-company-name exchange is a mandatory regression.
+
 # Runtime inference / provider source of truth
 
-Models and providers are replaceable compute. **COS is the learner.**
+The model/provider is replaceable compute. **COS is the learner.**
 
-Never treat a source-code model string, old deployment observation, ONBOARD entry, or model memory as current runtime truth. Current runtime identity must come from verified live configuration/telemetry.
+Never treat a source-code model string, old deployment observation, ONBOARD entry, or model memory as current runtime truth.
 
-For University distillation, Hugging Face and RunPod may currently act as governed training/runtime/evaluation adapters when live configuration and evidence prove that path. That does not make either provider a permanent product dependency or a general COS reasoning authority.
+Current runtime identity must come from verified live configuration/telemetry.
 
-## Enterprise University teacher-pool contract — 2026-09-17
+Relevant runtime variables include:
 
-The Production University teacher layer is provider-agnostic. Supported teacher classes include Qwen and DeepSeek through the governed Hugging Face/local executor path, hosted OpenAI-compatible providers, Anthropic/Claude, xAI/Grok, and buyer-supplied custom/private gateways such as Azure-hosted endpoints, Bedrock/Vertex bridges, on-prem vLLM, private cloud, or future approved providers. Provider support is an adapter contract, not a core-product dependency.
+```text
+LOCAL_AI_BASE_URL
+LOCAL_AI_ALLOWED_HOSTS
+LOCAL_AI_MODEL
+DEEPINFRA_BUILDER_MODEL
+LOCAL_AI_EMBEDDING_MODEL
+LOCAL_AI_REASONING_EFFORT
+LOCAL_AI_MANAGED_PROVIDER
+LOCAL_AI_API_KEY   # server-side secret; never print/commit
+```
 
-Teacher-provider rules are mandatory:
+`DEEPINFRA_BUILDER_MODEL` is required for Builder/Platform Engineer execution. Missing/blank configuration fails closed; do not silently select a model from source, docs, memory, or an old accepted run.
 
-- buyer-owned credentials and buyer-selected model identifiers/configuration;
-- explicit provider enablement and adapter-ready gates before use;
-- fail closed when a selected provider, credential, adapter, model, or license is unavailable or unapproved;
-- never silently substitute another provider or model;
-- persist teacher/provider/model provenance with generated training material and resulting artifacts;
-- preserve bounded provider spend/call ceilings and existing authorization boundaries;
-- keep independent evaluation, holdout comparison, graduation thresholds, and promotion policy provider-independent;
-- teacher intelligence, brand, benchmark strength, or model size never expands operational authority;
-- unknown open-model licenses fail closed. The current automatically accepted open-model teacher licenses are Apache-2.0 and MIT; other licenses require an explicit policy/legal addition before paid dispatch;
-- hosted-provider adapters must not expose or embed credentials in datasets, logs, client surfaces, or portable artifacts;
-- enterprise portability requires that a buyer can disable all public hosted teachers and operate only approved private/self-hosted teacher infrastructure without changing University core code.
-
-Current teacher-pool implementation is defined by `saas/lib/ai/cos/cosUniversityTeacherPool.ts`, `cosUniversityTeacherAdapters.ts`, and `cosUniversityTeacherLicensePolicy.ts`. Runtime activation remains live configuration and must be queried before reporting which teachers are actually active.
-
-No provider may silently substitute for another when policy/configuration requires fail-closed behavior.
+RunPod is retired from the active architecture. Do not reintroduce it as a reasoner, embedding, or compute dependency merely because dormant legacy code/history mentions it.
 
 ---
 
 # COS learning / University contract
 
-`SKILLS.md` is the detailed canonical education blueprint. COS is developed as an elite multidisciplinary **generalist first**. Specialists add depth after/alongside evidence-gated foundations; they do not replace COS.
+`SKILLS.md` is the detailed canonical education blueprint. This section records the operational invariants that every implementation must preserve.
+
+COS is developed as an elite multidisciplinary **generalist first**. Specialists add depth after/alongside evidence-gated foundations; they do not replace COS.
 
 Canonical learning loop:
 
@@ -335,7 +942,6 @@ perform
 -> independent unseen exam
 -> transfer exam
 -> Production outcome evidence where applicable
--> delayed retention
 -> retain / strengthen / remediate / weaken / quarantine
 ```
 
@@ -346,42 +952,83 @@ Key rules:
 - queue counts are not learning proof;
 - self-generated practice is not independent validation;
 - model self-assessment never earns a grade;
-- failed exams trigger useful remediation, not evaluator weakening;
+- a failed exam must trigger useful remediation, not evaluator weakening;
 - mutable current-world facts remain live-evidence problems rather than timeless learned facts;
-- garbage-in/garbage-out remains controlling;
+- garbage-in/garbage-out remains controlling: learn what improves COS, a specialist, or active work—not what merely increases corpus size;
 - verified specialist lessons should flow back to COS when generalizable;
 - authority and expertise remain separate axes;
-- A/A+, Master's, and PhD labels require the independent evidence defined in `SKILLS.md`;
-- promotion requires independently measured improvement, unseen transfer, practical execution, delayed retention, and source attribution;
-- exposure, document count, embeddings, and activity volume never count as mastery.
+- A/A+ / Master's / PhD labels require independent evidence defined in `SKILLS.md`.
+- University study plans use an explicit hybrid machine-adapted learning design: supervised,
+  unsupervised, semi-supervised, self-supervised, reinforcement/verified-feedback, RAG where
+  appropriate, and controlled fine-tuning candidacy across structured, semi-structured, and
+  unstructured material;
+- promotion requires independently measured improvement, unseen transfer, practical execution,
+  delayed retention, and source attribution; exposure or embedding never counts as learning.
+
+Feed COS remains the normal owner learning intake. Material may be routed deeper to relevant specialists without requiring the owner to paste the same material into each worker.
+
+
+## University learning assurance — 2026-09-10
+
+Current branch `feat/cos-university-learning-assurance-20260910` adds three host-controlled seams:
+
+- controlled fine-tuning remains disabled/candidate-only until dataset and training approvals,
+  cryptographic training/holdout separation, independent improvement, safety and transfer passes,
+  delayed retention, a healthy Production canary, and a rollback artifact are all present;
+- every feature-gated University learning path is declared in one registry and Production proof must
+  match the deployed commit, enabled gate, successful invocation, durable evidence, host verifier,
+  and a fresh observation window;
+- learning promotion requires baseline-to-post-study gain, unseen transfer, practical evidence,
+  delayed retention, source attribution, and an improved real-world outcome with nonzero samples.
+
+The append-only `cos_university_learning_assurance_events` ledger stores host evidence for these
+decisions. This implementation is the control/evidence foundation; it is not itself a claim that a
+model was fine-tuned or that all Production paths have already produced valid receipts.
+
+Production follow-up found that the first assurance registry grouped or omitted several scheduled
+routes. The v1.84 repair enumerates subject and language A-range, Master's admission/progress, and
+PhD admission/progress independently, with a regression that fails whenever any scheduled
+`cos-university-*` route lacks an explicit assurance mapping.
+
+## Builder University Production outcomes — 2026-09-10
+
+Builder now sends every generation-fenced terminal job result into the authoritative verified
+Production-outcome recorder for the enrolled `software-specialist` and `computer_science` subject.
+Host-proven workspace execution with a proving command after the final mutation, or a healthy
+watched Production merge/deployment, may be recorded as success;
+a completed patch/review artifact without Production proof is only observed, and a terminal job
+failure remains failure. Delivery is idempotent per job claim and evidence-recording failure cannot
+undo the already-persisted Builder result.
+
+Repository repairs paused for asynchronous merge reconciliation emit no early outcome. Their
+generation-scoped evidence is written only after the lifecycle's fenced terminal merge or
+superseded-base update, preventing a pre-terminal observation from consuming the final evidence key.
+The runner infers this pending state directly from the raw repository writeback fields, before the
+database transition adds `repository_merge_pending`. A healthy Production watch records success, a
+rolled-back deployment records failure, and an unresolved or non-Production watch remains observed.
+
+This is raw real-world evidence, not an academic grade. Builder never constructs its own University
+baseline, transfer, retention, attribution, or independent-scoring envelope. The University
+controller must correlate those independent records before #2048's promotion path may treat a
+successful Builder outcome as practical learning proof.
 
 ---
 
-# University distillation / controlled training contract
+# Freshness / evidence rules
 
-Distillation is a governed learning mechanism, not a shortcut around University evidence.
+For mutable external facts, current evidence wins over pretrained/model memory.
 
-- Only rights-cleared, provenance-traceable, buyer-authorized training material may enter training.
-- Historical lessons or private Production data are not silently reclassified as training data.
-- Training/holdout identity and separation remain explicit and auditable.
-- Teacher generation, dataset preparation, and student training use bounded provider jobs and cost ceilings.
-- Paid provider dispatch remains separately authorized and fail-closed.
-- A successful training job proves only that an artifact was produced; it does not prove improvement.
-- Trained artifacts require independent holdout comparison, safety checks, unseen transfer, delayed retention where applicable, canary evidence, and rollback evidence before promotion.
-- A quality failure remains a failure even when infrastructure worked.
-- Provider cost ledgers/estimates must not be presented as authoritative external billing when they are only internal estimates.
-- Hidden chain-of-thought is not training material or persisted evidence.
-- Model distillation, agent-level learning, RAG, skills, memory, and tool-policy learning remain distinct mechanisms and should be chosen based on measured benefit rather than fashion.
+- ordinary external factual lookups live-verify by default when the fact can change;
+- historical/conceptual questions may use timeless/local reasoning where appropriate;
+- private iTMounts system-of-record questions stay internal;
+- current officeholders, law/rules, security/CVEs, releases/versions, finance, weather, sports, and similar mutable facts require fresh evidence appropriate to the claim;
+- authority-owned questions prefer first-party/institutional evidence;
+- secondary evidence must not be presented as the owning rule when authoritative evidence is absent;
+- successful retrieval is not successful synthesis;
+- a bounded retry of local synthesis does not permit weaker grounding or external/model-memory fallback;
+- source date and authority still matter even when a page was retrieved now.
 
----
-
-# Public brand contract
-
-The public product identity is **iTMounts** and the canonical public origin is `https://itmounts.com`.
-
-Public spelling is exactly **iTMounts**. Concierge is **iTMounts Concierge**. Internal repository/service/history identifiers may retain legacy names where renaming would create risk or destroy provenance; that is not permission for legacy branding to leak into customer-facing surfaces.
-
-The public-brand/domain migration must not split the backend or weaken auth, payment, callback, cookie, tenant, or evidence boundaries.
+No model-memory assertion becomes authoritative merely because the model sounds confident.
 
 ---
 
@@ -395,17 +1042,23 @@ Non-negotiable:
 - preserve tenant/org scoping and RLS/service-role assumptions;
 - no unauthenticated Production validation backdoors;
 - external/managed providers never become governance authority;
-- unknown, consequential, destructive, financial, or security-sensitive actions fail closed or require the applicable approval boundary;
+- unknown/consequential/destructive/financial/security actions fail closed or require the applicable approval boundary;
 - routine reversible work should proceed autonomously when already authorized rather than asking for unnecessary approval;
 - learned retrieval/worker/tool/skill preference cannot widen authorization;
 - specialist expertise/degree cannot widen authorization;
+- autonomous security roles remain knowledge- and authority-separated: Guardian familiarity must not contaminate blind Stranger assessments;
+- every Stranger/ethical-hacking engagement requires a host-enforced signed scope with expiry, permitted action classes, rate/blast-radius limits, audit evidence, and kill switch; AI reasoning cannot widen it;
+- defensive counterintelligence/repo patrol may preserve authorized security evidence but may not perform hack-back, retaliatory intrusion, out-of-scope surveillance, or assert identity/affiliation from weak indicators;
+- incident evidence and attribution must remain separate, with confidence-qualified inference and tamper-evident provenance/chain-of-custody support;
 - no hidden chain-of-thought persistence;
-- private certification prompts/rubrics remain protected;
-- public Concierge never inherits owner/admin/private-company context merely because a browser is owner-authenticated;
+- private certification prompts/rubrics must not be exposed or committed without an explicit protected diagnostic need;
+- public Concierge never inherits owner/admin/private-company context merely because the browser is owner-authenticated;
+- public provenance comes from recorded turn telemetry, not model reconstruction;
 - OAuth/token material remains server-side and encrypted where the connector contract requires it;
 - read-only connector scopes must not silently become write/content scopes;
 - capability discovery/grants do not themselves authorize execution;
-- training, evaluation, or deployment intelligence never expands spending, tenant, repository, Production, or provider authority.
+- Data Center Operations Phase 1 remains advisory/read-only unless a separately governed control phase is explicitly accepted;
+- a branding/domain migration must not weaken security, auth, payment, tenant, or evidence boundaries.
 
 Never weaken evidence gates, private holdouts, authorization, tenant isolation or lifecycle rules merely to make a dashboard green.
 
@@ -415,23 +1068,63 @@ Never weaken evidence gates, private holdouts, authorization, tenant isolation o
 
 Use actual states, not optimistic shorthand.
 
-**A branch is not Production. A green build is not capability acceptance.**
-
-**Verify implementation and runtime behavior from code plus live evidence before diagnosing or reporting status.**
+A branch is not Production. A green build is not capability acceptance.
+Verify implementation and runtime behavior from code plus live evidence before diagnosing or reporting status.
 
 A plan is not execution.  
+A branch is not Production.  
 A queue row is not a completed action.  
+A green build is not capability acceptance.  
 A Preview fix is not a Production fix.  
 A deployment marked READY is not proof every user flow works.  
 An encountered skill is not validated learning.  
 A self-generated practice pass is not independent validation.  
 A model claim is not host evidence.  
 A diagnostic read is not regression proof.  
-A training job marked completed is not proof the trained model improved.  
-An internal cost estimate is not authoritative provider billing.  
-A canary pass is not automatic Production promotion.  
+A successful retrieval is not necessarily successful grounded synthesis.  
+A current page may contain stale content.  
+A metadata-only Drive permission is not authorization to read Drive file contents.  
 A capability grant is not execution delegation.  
-A specialist's expertise is not permission to widen authority.
+An MCP-compatible port is not a hosted MCP endpoint.  
+A correlated alert cluster is not proven physical root cause.  
+A specialist's expertise is not permission to widen authority.  
+A legacy domain still serving the app is not the canonical public origin.  
+A public brand transform is not permission for a blind internal rename.
+
+---
+
+# Immediate iTMounts migration priorities
+
+1. Preserve exact public spelling **iTMounts** and exact homepage eyebrow **`YOUR iTMounts CONCIERGE`**.
+2. Sweep/verify rendered public surfaces for legacy SignalBoost display leakage, including translated/generated strings.
+3. Treat `https://itmounts.com` as canonical in new public code/content.
+4. Complete the hostname-dependency audit across Supabase Auth, OAuth callbacks, reset/magic links, Stripe return flows, CORS/CSP/cookies, env absolute URLs, metadata/sitemap/robots/OpenGraph, emails, docs, and true runtime hard-coded old-host references.
+5. Only after that audit is green, convert `saas.signalboostapp.com` to a path-preserving 308 redirect to `https://itmounts.com` and verify critical flows.
+6. Keep the existing backend/runtime intact; do not create a parallel iTMounts stack.
+7. Retain `signalboostapp.com` ownership for legacy/corporate/internal compatibility unless the owner separately decides otherwise.
+
+---
+
+# Immediate engineering priorities beyond branding
+
+The name/domain cutover does not suspend the active engineering/learning program. Continue current-main work only after re-querying live state.
+
+Priority themes remain:
+
+- Builder harness reliability, inference, continuity, truthful explanation, and fresh proof closure;
+- Software Specialist as the canonical coding/deep-software worker under COS;
+- COS Chief-of-Staff reliability measured by objective acceptance rather than self-report;
+- COS University remediation -> accepted study -> deliberate practice -> independent exam integrity;
+- real Production outcome evidence before claiming learned/mastered capability;
+- current-world evidence/freshness discipline;
+- specialist learning that deepens organizational competence without creating competing brains;
+- Self-Healing Supervisor integration and objective repair/outcome evidence;
+- Autonomous Security Patrol: establish signed authorization/scope, deterministic Referee enforcement, Guardian/Stranger isolation, and evidence controls before active validation capability;
+- Repo/IP/Counterintelligence Patrol: monitor runtime plus repository/supply-chain and information-exposure surfaces, preserve intrusion evidence, and train the Defensive Counterintelligence specialist under `SKILLS.md` without widening authority;
+- provider/integration hardening without widening authority;
+- Data Center Operations remains read-only/advisory until separately governed.
+
+For detailed historical implementation/acceptance chronology through v1.77, use the archived ONBOARD file and Git history rather than inflating current-state claims from memory.
 
 ---
 
@@ -439,8 +1132,29 @@ A specialist's expertise is not permission to widen authority.
 
 The public product is **iTMounts**. COS remains the internal generalist brain. Concierge is the public face. Specialists are expert workers. Builder is the Software Specialist's governed engineering harness.
 
-For the current University phase, success means COS and registered specialists improve through independently verified study, practice, exams, transfer, retention, real-world evidence, and governed distillation without confusing activity with learning or infrastructure success with model quality.
+Success means:
 
-For the deferred portable phase, success will mean a buyer can plug in different models, agents, data sources, APIs, MCP servers, providers, and private infrastructure; have supported capabilities discovered automatically; distill/train/evaluate/deploy through normalized contracts; and swap providers without rebuilding the product core.
+- users see one coherent iTMounts identity at `itmounts.com`;
+- public SignalBoost branding no longer leaks into rendered customer surfaces;
+- the old domain remains only a safe compatibility path until redirect cutover is proven;
+- the rename does not split the backend or break auth, payments, callbacks, cookies, email, or tenant boundaries;
+- COS becomes more capable through independently verified experience, learning, exams, and outcomes;
+- Builder fixes are completed with real proof and truthful narration;
+- specialists deepen execution quality while COS retains cross-domain orchestration/final judgment;
+- authority remains governed independently of intelligence;
+- developers/agents read current repo truth before acting and reconcile concurrent work rather than guessing;
+- Production claims resolve to actual merged code, READY deployment, and the live evidence appropriate to the claim.
 
-**Finish University first. Then build the plug-and-play Agent Distillation & Training Portable.**
+**iTMounts is the public product. COS is the brain. Concierge is the public face. Specialists are expert workers.**
+
+
+## Semantic identity routing — 2026-09-09
+
+Public identity is a two-layer contract:
+
+1. Deterministic handling may answer obvious identity wording immediately.
+2. Every unmatched public prompt is classified by the deep COS reasoner before domain naming or other workflows. The classifier distinguishes existing platform identity, Concierge employer identity, and actual naming work.
+3. Identity answers always render canonical static facts from `lib/public-brand.ts`; model output may select intent and language but may never supply the company name.
+4. Malformed or ambiguous semantic verdicts fail closed into normal routing.
+
+This prevents phrasing gaps from sending “What is this platform called?” into name generation while preserving deep-learning interpretation rather than expanding a permanent regex list.

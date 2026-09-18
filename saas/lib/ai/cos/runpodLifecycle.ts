@@ -89,24 +89,6 @@ export async function ensureRunpodReasonerStarted(options: RunpodStartupOptions 
     }
   }
 
-  // A stopped on-demand RunPod releases its GPU reservation. If another customer takes that capacity,
-  // restarting can fail with "not enough free GPUs on the host machine". Therefore a running Pod is
-  // never stopped automatically merely to repair its boot contract. Preserve the scarce allocation,
-  // let the normal health check decide whether inference is usable, and defer mutation until the Pod
-  // is already stopped or the workload has migrated to Serverless.
-  if (before.running && !contractMatches) {
-    console.warn('[cos-runpod-lifecycle]', JSON.stringify({
-      at: new Date().toISOString(), action: 'startup_contract_repair_deferred_running_capacity_preserved',
-      previousStatus: before.desiredStatus, desiredStatus: before.desiredStatus,
-      currentEntrypoint: runtimeConfig.dockerEntrypoint,
-      currentStartCmdCount: runtimeConfig.dockerStartCmd.length,
-    }))
-    return {
-      attempted: false, started: true, resumeRequested: false, computeStartedByRequest: false,
-      startupContractRepaired: false, previousStatus: before.desiredStatus, desiredStatus: before.desiredStatus,
-    }
-  }
-
   let startupContractRepaired = false
   let computeStartedByRequest = false
 
@@ -116,6 +98,13 @@ export async function ensureRunpodReasonerStarted(options: RunpodStartupOptions 
       previousStatus: before.desiredStatus, currentEntrypoint: runtimeConfig.dockerEntrypoint,
       currentStartCmdCount: runtimeConfig.dockerStartCmd.length,
     }))
+
+    if (before.running) {
+      const stopped = await stopPod()
+      if (stopped.desiredStatus !== 'EXITED') {
+        throw new Error(`RunPod boot-contract repair could not stop the unhealthy Pod; desiredStatus=${stopped.desiredStatus}`)
+      }
+    }
 
     const configured = await configurePodStartupContract(options)
     startupContractRepaired = true

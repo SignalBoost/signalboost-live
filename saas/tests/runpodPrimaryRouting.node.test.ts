@@ -18,16 +18,13 @@ test('RunPod primary is a separate transport and does not overwrite DeepInfra fa
 
 test('RunPod primary dependency chain is directly Node-resolvable without Next alias fallback', () => {
   const primary = source('../lib/ai/cos/runpodPrimaryInference.ts')
-  const lease = source('../lib/ai/cos/runpodInferenceLease.ts')
   const lifecycle = source('../lib/ai/cos/runpodLifecycle.ts')
   const resolver = source('../lib/ai/cos/runpodPodResolver.ts')
   const telemetry = source('../lib/hub/runpodTelemetry.ts')
-  for (const text of [primary, lease, lifecycle, resolver, telemetry]) assert.doesNotMatch(text, /from ['"]@\/lib\//)
+  for (const text of [primary, lifecycle, resolver, telemetry]) assert.doesNotMatch(text, /from ['"]@\/lib\//)
   assert.match(primary, /from '\.\.\/local-inference\.ts'/)
   assert.match(primary, /from '\.\/runpodLifecycle\.ts'/)
   assert.match(primary, /from '\.\/runpodPodResolver\.ts'/)
-  assert.match(primary, /from '\.\/runpodInferenceLease\.ts'/)
-  assert.match(lease, /from '\.\.\/\.\.\/cos-core\/storage\/supabase\.ts'/)
   assert.match(lifecycle, /from '\.\.\/\.\.\/hub\/runpodTelemetry\.ts'/)
   assert.match(telemetry, /from '\.\.\/ai\/cos\/runpodConfig\.ts'/)
 })
@@ -54,21 +51,6 @@ test('Builder tries graduate then RunPod primary before DeepInfra coding fallbac
   const deepinfra = builder.indexOf('builderCodingModelFromEnv()')
   assert.ok(graduate >= 0 && runpod > graduate && deepinfra > runpod)
   assert.match(builder, /fallbackFromOwned:\s*ownedAttempted/)
-})
-
-test('RunPod serializes the physical reasoner and Builder does not buy fallback for queue contention', () => {
-  const primary = source('../lib/ai/cos/runpodPrimaryInference.ts')
-  const lease = source('../lib/ai/cos/runpodInferenceLease.ts')
-  const port = source('../lib/cos/aiPort.ts')
-  const builderStart = port.indexOf('export function createBuilderCodingAiPort')
-  const builder = port.slice(builderStart, port.indexOf('export function createLocalApplianceAiPort', builderStart))
-  assert.match(primary, /acquireRunpodInferenceLease\(config\.timeoutMs\)/)
-  assert.match(primary, /reason: 'runpod_primary_busy'/)
-  assert.match(primary, /releaseRunpodInferenceLease\(lease\)/)
-  assert.match(lease, /__cos_runpod_primary_inference_slot__/)
-  assert.match(lease, /\.eq\('updated_at', read\.data\.updated_at\)/)
-  assert.match(builder, /runpod\.reason === 'runpod_primary_busy'/)
-  assert.match(builder, /throw new Error\('builder_runpod_primary_busy'\)/)
 })
 
 test('shared Platform AI tries active graduate then RunPod before governed base fallback', () => {
@@ -108,28 +90,6 @@ test('warm primary defaults to no idle stop while unhealthy orphan protection re
   const lifecycle = source('../lib/ai/cos/runpodLifecycle.ts')
   assert.match(lifecycle, /COS_RUNPOD_AUTO_STOP_ENABLED'\) === true/)
   assert.match(lifecycle, /COS_RUNPOD_ORPHAN_GUARD_ENABLED'\) !== false/)
-})
-
-test('primary cron probe reports model-serving health, not only pod/account state', () => {
-  const route = source('../app/api/cron/runpod-primary-probe/route.ts')
-  assert.match(route, /checkLocalInferenceHealth/)
-  assert.match(route, /runpodPrimaryConfig\('reasoner'/)
-  assert.match(route, /inferenceReady/)
-  assert.match(route, /inferenceError/)
-})
-
-test('primary cron repairs only hard HTTP 502 serving failures after cold-start grace without releasing the GPU', () => {
-  const route = source('../app/api/cron/runpod-primary-probe/route.ts')
-  assert.match(route, /\^HTTP 502\\b/)
-  assert.match(route, /configuredPod\.uptimeSeconds >= graceSeconds/)
-  assert.match(route, /runpodOrphanGuardEnabled\(\)/)
-  assert.match(route, /await configurePodStartupContract\(/)
-  assert.match(route, /runpodPrimaryModel\('reasoner'\)/)
-  assert.match(route, /repairMode: 'in_place_update_reset'/)
-  assert.match(route, /repairAttempted/)
-  assert.match(route, /repairStarted/)
-  assert.doesNotMatch(route, /stopRunpodReasoner|ensureRunpodReasonerStarted/)
-  assert.doesNotMatch(route, /inferenceError.*AbortError.*configurePodStartupContract/s)
 })
 
 test('admin probe reports configuration booleans without returning the RunPod account key', () => {

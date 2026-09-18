@@ -90,7 +90,6 @@ export type LearningPathId =
   | 'language_a_range_evidence'
   | 'delayed_retention'
   | 'graduation'
-  | 'graduate_runtime_activation'
   | 'masters_learning'
   | 'masters_admission'
   | 'masters_exams'
@@ -101,10 +100,6 @@ export type LearningPathId =
   | 'phd_research'
   | 'phd_methodology_exams'
   | 'controlled_fine_tuning'
-  | 'distilled_independent_evaluation'
-  | 'mass_distilled_independent_evaluation'
-  | 'mass_distillation_campaign'
-  | 'mass_distillation_supervision'
 
 export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId, string>> = Object.freeze({
   registered_agent_cycle: 'COS_UNIVERSITY_AUTONOMOUS_AGENT_CYCLE_ENABLED',
@@ -115,7 +110,6 @@ export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId,
   language_a_range_evidence: 'COS_UNIVERSITY_A_RANGE_ENABLED',
   delayed_retention: 'COS_UNIVERSITY_RETENTION_ENABLED',
   graduation: 'COS_UNIVERSITY_GRADUATION_ENABLED',
-  graduate_runtime_activation: 'COS_GRADUATE_ACTIVATION_ENABLED',
   masters_learning: 'COS_UNIVERSITY_MASTERS_LEARNING_ENABLED',
   masters_admission: 'COS_UNIVERSITY_ADMISSION_ENABLED',
   masters_exams: 'COS_UNIVERSITY_MASTERS_EXAMS_ENABLED',
@@ -126,10 +120,6 @@ export const COS_UNIVERSITY_FEATURE_GATED_PATHS: Readonly<Record<LearningPathId,
   phd_research: 'COS_UNIVERSITY_PHD_RESEARCH_EXECUTION_ENABLED',
   phd_methodology_exams: 'COS_UNIVERSITY_PHD_METHODOLOGY_EXAMS_ENABLED',
   controlled_fine_tuning: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
-  distilled_independent_evaluation: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
-  mass_distilled_independent_evaluation: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
-  mass_distillation_campaign: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
-  mass_distillation_supervision: 'COS_UNIVERSITY_FINE_TUNING_ENABLED',
 })
 
 export type ProductionPathReceipt = Readonly<{

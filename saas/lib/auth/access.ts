@@ -9,8 +9,6 @@ import { ownerEmailList } from '@/lib/auth/ownerEmails'
 
 export type Role = 'owner' | 'admin' | 'member' | 'guest'
 
-export const ACCESS_AUTH_TIMEOUT_MS = 5_000
-
 export type AccessContext = {
   userId: string | null
   email: string | null
@@ -96,27 +94,10 @@ export async function getAccess(): Promise<AccessContext> {
   if (isPublicDeliveryScope()) return buildContext(null, null, 'guest')
 
   const supabase = await getServerSupabase()
-  let timeout: ReturnType<typeof setTimeout> | null = null
-  try {
-    const auth = await Promise.race([
-      supabase.auth.getUser(),
-      new Promise<null>(resolve => {
-        timeout = setTimeout(() => resolve(null), ACCESS_AUTH_TIMEOUT_MS)
-      }),
-    ])
-    if (!auth) {
-      console.warn('[auth-access-timeout]', JSON.stringify({ timeoutMs: ACCESS_AUTH_TIMEOUT_MS }))
-      return buildContext(null, null, 'guest')
-    }
-    const { data: { user } } = auth
-    if (!user?.id) return buildContext(null, null, 'guest')
-    return accessFromVerifiedIdentity(user.id, user.email)
-  } catch (error) {
-    console.warn('[auth-access-failed]', error instanceof Error ? error.message : String(error))
-    return buildContext(null, null, 'guest')
-  } finally {
-    if (timeout) clearTimeout(timeout)
-  }
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user?.id) return buildContext(null, null, 'guest')
+  return accessFromVerifiedIdentity(user.id, user.email)
 }
 
 export async function requireAdmin(): Promise<GuardResult> {

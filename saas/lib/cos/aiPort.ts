@@ -100,9 +100,6 @@ export function createPlatformAiPort(): CosAiPort {
  * 1. active coder-scoped graduate;
  * 2. RunPod primary coding/reasoning model;
  * 3. DeepSeek V4 Pro on DeepInfra as bounded fallback.
- *
- * A busy RunPod is capacity contention, not provider failure. Builder waits behind the governed
- * single-GPU queue instead of converting that contention into paid DeepInfra traffic.
  */
 export function createBuilderCodingAiPort(): CosAiPort {
   return {
@@ -111,7 +108,7 @@ export function createBuilderCodingAiPort(): CosAiPort {
       if (graduate.text) return graduate.text
 
       const runpod = currentReasoningEvaluationContext()
-        ? { text: null, attempted: false, reason: 'reasoning_evaluation_context' }
+        ? { text: null, attempted: false }
         : await tryRunpodPrimaryInference({
             prompt: input.prompt,
             systemPrompt: input.systemPrompt,
@@ -122,9 +119,6 @@ export function createBuilderCodingAiPort(): CosAiPort {
             usageContext: { feature: 'builder_runpod_primary', purpose: 'coding_harness' },
           }, 'builder')
       if (runpod.text) return runpod.text
-      if (runpod.attempted && runpod.reason === 'runpod_primary_busy') {
-        throw new Error('builder_runpod_primary_busy')
-      }
 
       const config = localInferenceConfigFromEnv()
       const ownedAttempted = graduate.attempted || runpod.attempted
@@ -209,4 +203,3 @@ export function createPlatformImagePort(): CosImagePort {
     },
   }
 }
-

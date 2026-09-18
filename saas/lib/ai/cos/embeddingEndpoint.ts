@@ -24,7 +24,6 @@ type Env = Record<string, string | undefined>
 export type RunpodEmbeddingPrimaryReason =
   | 'ready'
   | 'not_configured'
-  | 'disabled'
   | 'missing_model'
   | 'missing_api_key'
   | 'invalid_url'
@@ -74,7 +73,7 @@ export function resolveEmbeddingConfig(base: EndpointConfig, env: Env = process.
 
 function runpodEmbeddingHostAllowed(hostname: string): boolean {
   const host = hostname.trim().toLowerCase()
-  return host === 'api.runpod.ai' || host.endsWith('.api.runpod.ai') || host.endsWith('.proxy.runpod.net')
+  return host === 'api.runpod.ai' || host.endsWith('.proxy.runpod.net')
 }
 
 function boundedTimeout(value: string, fallback: number): number {
@@ -83,15 +82,10 @@ function boundedTimeout(value: string, fallback: number): number {
   return Math.max(5_000, Math.min(300_000, Math.round(parsed)))
 }
 
-function runpodEmbeddingPrimaryEnabled(env: Env): boolean {
-  return trimmed(env, 'RUNPOD_PRIMARY_EMBEDDING_ENABLED').toLowerCase() === 'true'
-}
-
 /**
  * Resolve an optional RunPod embedding PRIMARY while preserving the managed config as fallback.
  *
  * Safety invariants:
- * - configuration alone never activates traffic: RUNPOD_PRIMARY_EMBEDDING_ENABLED must be true;
  * - the endpoint must be HTTPS and hosted by RunPod;
  * - it gets a dedicated embedding credential, never RUNPOD_API_KEY and never the fallback key;
  * - its model identifier must exactly match LOCAL_AI_EMBEDDING_MODEL so a 768-dimension but
@@ -111,9 +105,6 @@ export function resolveRunpodPrimaryEmbeddingConfig(
 
   if (!baseUrlRaw) {
     return { config: null, reason: 'not_configured', expectedModel, configuredModel }
-  }
-  if (!runpodEmbeddingPrimaryEnabled(env)) {
-    return { config: null, reason: 'disabled', expectedModel, configuredModel }
   }
   if (!configuredModel) {
     return { config: null, reason: 'missing_model', expectedModel, configuredModel }

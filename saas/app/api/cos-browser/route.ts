@@ -1,10 +1,9 @@
 // saas/app/api/cos-browser/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { POST as cosPrimaryPost, isFastTextTransform } from '@/app/api/cos-primary/route'
+import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
 import { POST as publicConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
-import { runDirectFastTextEdit } from '@/lib/ai/cos/fastTextEditDirect'
 import { getAccess } from '@/lib/auth/access'
 import { withPublicAuditIdentity } from '@/lib/auth/publicAuditIdentity'
 import { withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
@@ -152,33 +151,6 @@ export async function POST(req: NextRequest) {
     ? String(body.context.language).toLowerCase()
     : 'en'
 
-  // Simple, verified text transforms get one bounded direct-edit attempt before auth/specialists.
-  // Ambiguous "edit ..." questions stay on normal COS. A fast-lane miss also falls through instead
-  // of becoming a dead-end 503; the attempted header prevents a second fast-edit call downstream.
-  const fastEditAlreadyAttempted = req.headers.get('x-signalboost-fast-transform-attempted') === '1'
-  let fastEditMissed = false
-  if (!fastEditAlreadyAttempted && isFastTextTransform(prompt, { previousAssistant: priorAnswer })) {
-    const edited = await runDirectFastTextEdit(prompt)
-    if (edited) {
-      return NextResponse.json({
-        ok: true,
-        reply: edited.text,
-        source: 'cos-fast-text-edit-direct',
-        confidence_score: 1,
-        external_ai_invoked: false,
-        external_fallback_invoked: false,
-        local_model_invoked: true,
-        execution_provenance: {
-          answer_origin: { provider: null, model: edited.model, from_cache: false },
-          local_reasoning: { invoked: true, model: edited.model, elapsed_ms: edited.elapsedMs },
-        },
-        execution_allowed: false,
-        external_action_taken: false,
-      })
-    }
-    fastEditMissed = true
-  }
-
   const access = await getAccess().catch(() => null)
   const auditUserId = access?.userId ?? null
   const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
@@ -306,12 +278,8 @@ export async function POST(req: NextRequest) {
   const routedHeaders = new Headers(req.headers)
   routedHeaders.set('content-type', 'application/json')
   routedHeaders.delete('content-length')
-  if (fastEditMissed) routedHeaders.set('x-signalboost-fast-transform-attempted', '1')
-  const routedBody = attachedOperationalEvidence
-    ? { ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }
-    : body
-  const routedRequest = attachedOperationalEvidence || fastEditMissed
-    ? new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify(routedBody) })
+  const routedRequest = attachedOperationalEvidence
+    ? new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify({ ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }) })
     : req
 
   if (!operationalEvidence) {

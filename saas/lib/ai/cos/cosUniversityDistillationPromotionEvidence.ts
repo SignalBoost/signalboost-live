@@ -1,3 +1,4 @@
+import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import {
   FINE_TUNE_EVIDENCE_PROFILE,
   fineTuneRevisionKey,
@@ -21,11 +22,6 @@ export type CosUniversityArtifactTrainingMode = Readonly<{
 
 function clean(value: unknown, max = 2000): string {
   return String(value ?? '').trim().slice(0, max)
-}
-
-async function serviceDb() {
-  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
-  return cosServiceDb()
 }
 
 function validAt(row: any, now: Date): boolean {
@@ -71,7 +67,7 @@ export async function readCosUniversityArtifactTrainingMode(input: {
   trainedArtifactHash: string
   now?: Date
 }): Promise<CosUniversityArtifactTrainingMode> {
-  const db = await serviceDb()
+  const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const now = input.now || new Date()
   const revisionKey = fineTuneRevisionKey(input.revision)

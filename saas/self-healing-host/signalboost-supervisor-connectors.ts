@@ -3,7 +3,6 @@ import { createPortableCapabilityDescriptor, createPortableConnectorRuntime } fr
 import type { PortableConnectorRuntimePort } from '@/lib/supervisor/portable/host-context'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { getVercelDeployments } from '@/lib/hub/deployments-service'
-import { readUniversityMassDistillationHealth } from './university-distillation-monitoring.ts'
 
 const TENANT = 'signalboost-platform'
 const ENVIRONMENT = 'production'
@@ -19,9 +18,6 @@ function descriptor(capabilityId: string, providerId = 'signalboost-platform', c
 
 async function platformEvidence(capabilityId: string) {
   const db = getAdminSupabase()
-  if (capabilityId === 'distillation.read') {
-    return { massDistillation: await readUniversityMassDistillationHealth({ db }) }
-  }
   if (capabilityId === 'health.read' || capabilityId === 'metrics.query') {
     const limit = capabilityId === 'metrics.query' ? 64 : 16
     const { data, error } = await db.from('self_healing_native_probe_samples')
@@ -60,7 +56,7 @@ async function vercelEvidence(capabilityId: string) {
 export function createSignalBoostSupervisorConnectorRuntime(): PortableConnectorRuntimePort {
   const vercelAvailable = Boolean(process.env.VERCEL_TOKEN && process.env.VERCEL_PROJECT_ID)
   const capabilities = [
-    descriptor('health.read'), descriptor('metrics.query'), descriptor('incident.read'), descriptor('distillation.read'),
+    descriptor('health.read'), descriptor('metrics.query'), descriptor('incident.read'),
     descriptor('deployment.read', 'vercel', 'signalboost-vercel', vercelAvailable),
     descriptor('recent_changes.read', 'vercel', 'signalboost-vercel', vercelAvailable),
   ]

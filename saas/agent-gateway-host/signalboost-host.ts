@@ -17,7 +17,6 @@ import {
   createObservationPolicyRecoveryExecutor,
   reconcileObservationPolicy,
 } from './observation-policy-recovery.ts'
-import { createUniversityDistillationRecoveryExecutor } from './university-distillation-recovery.ts'
 import { GATEWAY_ALLOWLIST, GATEWAY_POLICY } from './gateway-policy.ts'
 import { createExecutionChain, createUniversalChainExecutor, createBrowserChainExecutor } from './execution-chain.ts'
 import type { ExecutableAction } from './universal-execution.ts'
@@ -37,7 +36,6 @@ export function createSignalBoostGatewayHost(): GatewayHost {
         createObservationPolicyRecoveryExecutor({
           reconcile: () => reconcileObservationPolicy(getAdminSupabase()),
         }),
-        createUniversityDistillationRecoveryExecutor({ db: () => getAdminSupabase() }),
         createRetryDeploymentExecutor({
           // Self-Healing may only claim a later production outcome when the initiating repair names
           // the exact deployment it created. A deploy hook without exact identity fails closed here.

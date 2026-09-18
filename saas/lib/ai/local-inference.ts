@@ -1,4 +1,3 @@
-// saas/lib/ai/local-inference.ts
 import { randomUUID } from 'node:crypto'
 import { recordLocalInferenceUsage, type LocalInferenceUsageContext } from './localInferenceUsage.ts'
 
@@ -18,18 +17,6 @@ export interface LocalModelCallArgs {
   jsonObject?: boolean
   /** Billing/routing attribution only. Never changes grading, authorization, or model output. */
   usageContext?: LocalInferenceUsageContext
-  /**
-   * Ask a thinking-capable model to answer without hidden reasoning (OpenAI-compatible
-   * `reasoning_effort: "none"`). Used only for the single RunPod retry after hidden reasoning
-   * consumed the whole token budget and returned no answer text.
-   */
-  disableThinking?: boolean
-  /** Caller-specific hard transport deadline. The lower of this value and config.timeoutMs wins. */
-  timeoutMs?: number
-  /** Disable the configured-model fallback after owned RunPod primary failure for latency-critical calls. */
-  allowConfiguredFallback?: boolean
-  /** Skip durable usage persistence when the caller must return without a database dependency. */
-  persistUsage?: boolean
 }
 
 /**
@@ -178,19 +165,6 @@ function eligibleForRunpodPrimary(args: LocalModelCallArgs, config: LocalInferen
   return true
 }
 
-/**
- * Measured in Production (2026-09-16, one "capital of Portugal" turn): every RunPod qwen3:30b call with
- * a small token budget first spent 8–21s on hidden reasoning, hit the limit with no answer text, and
- * only answered on the thinking-off retry (1–6s). Six such pairs cost ~74s of a ~2 minute turn. Hidden
- * reasoning cannot fit a budget this small, so RunPod calls at or below it go thinking-off from the
- * start. Larger budgets keep thinking and keep the single empty-answer retry.
- */
-export const RUNPOD_THINKING_MIN_BUDGET_TOKENS = 1024
-
-function runpodSmallBudgetThinkingOff(args: LocalModelCallArgs, provider: string): boolean {
-  return provider === 'runpod' && (args.maxTokens ?? 2048) <= RUNPOD_THINKING_MIN_BUDGET_TOKENS
-}
-
 async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInferenceConfig): Promise<string | null> {
   const startedAt = Date.now()
   const requestId = randomUUID()
@@ -209,41 +183,23 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
   let text: string | null = null
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
-  const callerTimeoutMs = Number(args.timeoutMs)
-  const effectiveTimeoutMs = Number.isFinite(callerTimeoutMs) && callerTimeoutMs > 0
-    ? Math.max(250, Math.min(config.timeoutMs, callerTimeoutMs))
-    : config.timeoutMs
-  const timeout = setTimeout(() => controller.abort(), effectiveTimeoutMs)
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
   try {
     inferenceStartedAt = Date.now()
+    // LOCAL_AI_REASONING_EFFORT is a property of the current DeepInfra deployment. Generic graduate
+    // and RunPod transports may reject that vendor-specific field, so do not leak it outside DeepInfra.
+    const reasoningEffort = provider === 'deepinfra' ? configuredReasoningEffort() : undefined
     const enforceJsonObject = strictJsonObjectRequested(args)
-    const independentEvaluation = protectedIndependentEvaluation(args)
-    // Independent scoring needs a compact verdict, not model scratch work. Pin reasoning off even if
-    // the general DeepInfra reasoner is configured differently, and do not spend novelty penalties
-    // encouraging extra JSON fields. This preserves the caller's max-token and judge-call ceilings.
-    const reasoningEffort = args.disableThinking === true || runpodSmallBudgetThinkingOff(args, provider)
-      ? 'none'
-      : provider === 'deepinfra'
-        ? (independentEvaluation ? 'none' : configuredReasoningEffort())
-        : undefined
     const parsePenalty = (value: string | undefined, fallback: number): number => {
       const n = Number(value)
       return Number.isFinite(n) ? Math.max(0, Math.min(2, n)) : fallback
     }
-    const frequencyPenalty = independentEvaluation && enforceJsonObject
-      ? 0
-      : typeof args.frequencyPenalty === 'number' && Number.isFinite(args.frequencyPenalty)
-        ? Math.max(0, Math.min(2, args.frequencyPenalty))
-        : parsePenalty(process.env.COS_REASONER_FREQUENCY_PENALTY, 0.4)
-    const presencePenalty = independentEvaluation && enforceJsonObject
-      ? 0
-      : typeof args.presencePenalty === 'number' && Number.isFinite(args.presencePenalty)
-        ? Math.max(0, Math.min(2, args.presencePenalty))
-        : parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
-    const baseSystemPrompt = args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.'
-    const systemPrompt = independentEvaluation && enforceJsonObject
-      ? `${baseSystemPrompt} Output exactly the requested JSON schema. Do not add explanations, rationale, analysis, prose, repeated inputs, or extra keys.`
-      : baseSystemPrompt
+    const frequencyPenalty = typeof args.frequencyPenalty === 'number' && Number.isFinite(args.frequencyPenalty)
+      ? Math.max(0, Math.min(2, args.frequencyPenalty))
+      : parsePenalty(process.env.COS_REASONER_FREQUENCY_PENALTY, 0.4)
+    const presencePenalty = typeof args.presencePenalty === 'number' && Number.isFinite(args.presencePenalty)
+      ? Math.max(0, Math.min(2, args.presencePenalty))
+      : parsePenalty(process.env.COS_REASONER_PRESENCE_PENALTY, 0.3)
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
@@ -257,7 +213,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
         ...(enforceJsonObject ? { response_format: { type: 'json_object' } } : {}),
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: args.systemPrompt ?? 'You are a helpful AI assistant. Return valid JSON when explicitly requested.' },
           { role: 'user', content: args.prompt },
         ],
       }),
@@ -316,7 +272,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
       success, httpStatus, error: errorText, finishReason, requestedMaxTokens,
       promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
     })
-    if (args.persistUsage !== false && shouldPersistUsage(provider, config)) {
+    if (shouldPersistUsage(provider, config)) {
       await recordLocalInferenceUsage({
         requestId, provider, model: config.model, context: usageContext,
         routeOwner,
@@ -332,18 +288,8 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
     }
   }
 
-  if (finishReason === 'length') {
-    // emptyContent distinguishes "hidden reasoning consumed the whole budget and no answer text came
-    // back" from a genuinely long answer that was cut off. The message itself is unchanged.
-    throw Object.assign(new Error(LOCAL_MODEL_OUTPUT_TRUNCATED), { emptyContent: !String(text ?? '').trim() })
-  }
+  if (finishReason === 'length') throw new Error(LOCAL_MODEL_OUTPUT_TRUNCATED)
   return text
-}
-
-function isEmptyThinkingTruncation(error: unknown): boolean {
-  return error instanceof Error
-    && error.message === LOCAL_MODEL_OUTPUT_TRUNCATED
-    && (error as Error & { emptyContent?: boolean }).emptyContent === true
 }
 
 /**
@@ -362,24 +308,8 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
       ownedAttempted = true
       const runpodConfig = await primary.resolveReadyRunpodPrimaryConfig('reasoner')
       if (runpodConfig) {
-        try {
-          const text = await callConfiguredModel(args, runpodConfig)
-          if (text?.trim()) return text
-        } catch (error) {
-          // Verified in Production (2026-09-16): qwen3:30b on the RunPod primary spent its entire
-          // 360-token budget on hidden reasoning, returned no answer text, and the turn then waited 99s
-          // for the DeepInfra fallback. Retry once on the same primary with thinking off before paying
-          // for that fallback. Any other failure, or a failed retry, keeps the existing fallback.
-          if (!isEmptyThinkingTruncation(error) || args.disableThinking === true || runpodSmallBudgetThinkingOff(args, 'runpod')) throw error
-          const feature = args.usageContext?.feature || 'unattributed_local_inference'
-          const retried = await callConfiguredModel({ ...args, disableThinking: true }, runpodConfig).catch(retryError => {
-            console.warn('[runpod-primary-thinking-retry]', JSON.stringify({ feature, contentReturned: false, error: retryError instanceof Error ? retryError.message : String(retryError) }))
-            return null
-          })
-          console.info('[runpod-primary-thinking-retry]', JSON.stringify({ feature, contentReturned: Boolean(retried?.trim()) }))
-          if (retried?.trim()) return retried
-          throw error
-        }
+        const text = await callConfiguredModel(args, runpodConfig)
+        if (text?.trim()) return text
       }
     }
   } catch (error) {
@@ -389,7 +319,6 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     }))
   }
 
-  if (args.allowConfiguredFallback === false && ownedAttempted) return null
   return callConfiguredModel(args, ownedAttempted ? { ...config, fallbackFromOwned: true } : config)
 }
 

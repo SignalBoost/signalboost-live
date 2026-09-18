@@ -7,7 +7,6 @@ import {
 import { configuredRunpodPodId, runpodControlConfigured, runpodPrimaryBaseUrl } from './runpodConfig.ts'
 import { ensureRunpodReasonerStarted } from './runpodLifecycle.ts'
 import { resolveRunpodPrimaryPodId } from './runpodPodResolver.ts'
-import { acquireRunpodInferenceLease, releaseRunpodInferenceLease } from './runpodInferenceLease.ts'
 import { runpodGatewayKey } from '../../hub/runpodTelemetry.ts'
 
 export type RunpodPrimaryWorkload = 'reasoner' | 'builder'
@@ -72,7 +71,6 @@ async function proveReady(workload: RunpodPrimaryWorkload, podId: string): Promi
     })
 
     const deadline = Date.now() + Math.min(MAX_READY_WAIT_MS, Math.max(10_000, config.timeoutMs))
-    let lastHealthError = 'not_checked'
     while (Date.now() < deadline) {
       const health = await checkLocalInferenceHealth(config)
       if (health.ok && health.model === config.model) {
@@ -81,16 +79,8 @@ async function proveReady(workload: RunpodPrimaryWorkload, podId: string): Promi
         readyUntil = Date.now() + READY_TTL_MS
         return true
       }
-      lastHealthError = health.error || `model_mismatch:${health.model}`
       await sleep(HEALTH_INTERVAL_MS)
     }
-    console.warn('[runpod-primary-readiness]', JSON.stringify({
-      workload,
-      podId,
-      model: config.model,
-      ready: false,
-      reason: lastHealthError,
-    }))
     return false
   })()
 
@@ -124,9 +114,8 @@ export async function resolveReadyRunpodPrimaryConfig(
 }
 
 /**
- * Try iTMounts-controlled RunPod first. The single physical reasoner is protected by a durable,
- * self-expiring cross-instance lease so parallel Builder/serverless work cannot create a queue that
- * pushes otherwise healthy requests past the inference timeout and into managed-provider fallback.
+ * Try iTMounts-controlled RunPod first. Failure is explicit and non-terminal: callers decide whether
+ * the existing DeepInfra runtime is an acceptable bounded fallback for that workload.
  */
 export async function tryRunpodPrimaryInference(
   args: LocalModelCallArgs,
@@ -142,26 +131,13 @@ export async function tryRunpodPrimaryInference(
     if (!config) {
       return { text: null, attempted: true, ready: false, reason: 'runpod_primary_not_ready', model }
     }
-
-    const lease = await acquireRunpodInferenceLease(config.timeoutMs)
-    if (!lease) {
-      console.info('[runpod-primary-busy]', JSON.stringify({ workload, model: config.model }))
-      return { text: null, attempted: true, ready: true, reason: 'runpod_primary_busy', model: config.model }
-    }
-
-    try {
-      const text = await callLocalModel(args, config)
-      return {
-        text: text?.trim() ? text : null,
-        attempted: true,
-        ready: true,
-        reason: text?.trim() ? 'runpod_primary_success' : 'runpod_primary_empty_response',
-        model: config.model,
-      }
-    } finally {
-      await releaseRunpodInferenceLease(lease).catch(error => {
-        console.warn('[runpod-primary-lease-release]', error instanceof Error ? error.message : String(error))
-      })
+    const text = await callLocalModel(args, config)
+    return {
+      text: text?.trim() ? text : null,
+      attempted: true,
+      ready: true,
+      reason: text?.trim() ? 'runpod_primary_success' : 'runpod_primary_empty_response',
+      model: config.model,
     }
   } catch (error) {
     return {

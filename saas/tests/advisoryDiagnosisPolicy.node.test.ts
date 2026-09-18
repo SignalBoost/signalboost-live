@@ -114,7 +114,7 @@ test('execution order is internal retrieval first, then bounded published resear
   assert.ok(retrieveIndex >= 0 && reasonIndex > retrieveIndex, 'enterprise internal retrieval must precede primary reasoner call')
 
   const publishedIndex = reasoner.indexOf('retrievePublishedDiagnosticReferences(args.prompt)')
-  const modelIndex = reasoner.indexOf("recorder.time('draft', () => callLocalModel(effectiveArgs, boundedInference())")
+  const modelIndex = reasoner.indexOf("recorder.time('draft', () => callLocalModel(effectiveArgs, inference)")
   assert.ok(publishedIndex >= 0 && modelIndex > publishedIndex, 'published reference research must precede the model draft')
   assert.match(reasoner, /published_diagnostic_research/)
   assert.match(reasoner, /incidentTelemetry:\s*false/)

@@ -208,7 +208,7 @@ test('exam lanes remain independent from continuous study cadence', () => {
   const vercel = JSON.parse(file('vercel.json')) as { env: Record<string, string>; crons: Array<{ path: string; schedule: string }> }
   assert.equal(vercel.env.COS_UNIVERSITY_CONTINUOUS_ENABLED, 'true')
   assert.deepEqual(vercel.crons.find(item => item.path === '/api/cron/cos-university-learning'), {
-    path: '/api/cron/cos-university-learning', schedule: '6,21,36,51 * * * *',
+    path: '/api/cron/cos-university-learning', schedule: '*/15 * * * *',
   })
   assert.deepEqual(vercel.crons.find(item => item.path === '/api/cron/cos-university-exam'), {
     path: '/api/cron/cos-university-exam', schedule: '0 * * * *',

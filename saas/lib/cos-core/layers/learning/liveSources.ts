@@ -8,7 +8,7 @@ import { createGdeltNewsSearch,createYouTubeMetadataSearch,createYouTubeTranscri
 import { BUILTIN_OFFICIAL_TECH_FEEDS,createFeedSearch,parseFeedList } from './feedClients.ts'
 import { createWebTrainingResearchSearch,webTrainingMinimumCredibility } from './webTrainingDataLayer.ts'
 
-export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOURCES_ENABLED?:string;COS_TECH_RSS_FEEDS?:string;COS_OFFICIAL_DOC_FEEDS?:string;COS_WEB_TRAINING_ENABLED?:string;COS_WEB_TRAINING_USE_BRAVE?:string;COS_WEB_TRAINING_MIN_CREDIBILITY?:string;BRAVE_SEARCH_API_KEY?:string;YOUTUBE_API_KEY?:string;YOUTUBE_TRANSCRIPT_API_URL?:string;YOUTUBE_TRANSCRIPT_API_TOKEN?:string;YOUTUBE_TRANSCRIPT_LANGUAGES?:string;COS_LEARNING_CAP_YOUTUBE?:string;COS_LEARNING_SOURCE_FAILURE_LIMIT?:string;COS_LEARNING_SOURCE_MIN_INTERVAL_MS?:string;LOCAL_AI_BASE_URL?:string;LOCAL_AI_API_KEY?:string }
+export type LiveLearningEnvironment={ [key:string]:string|undefined;COS_LIVE_SOURCES_ENABLED?:string;COS_TECH_RSS_FEEDS?:string;COS_OFFICIAL_DOC_FEEDS?:string;COS_WEB_TRAINING_ENABLED?:string;COS_WEB_TRAINING_USE_BRAVE?:string;COS_WEB_TRAINING_MIN_CREDIBILITY?:string;BRAVE_SEARCH_API_KEY?:string;YOUTUBE_API_KEY?:string;YOUTUBE_TRANSCRIPT_API_URL?:string;YOUTUBE_TRANSCRIPT_API_TOKEN?:string;YOUTUBE_TRANSCRIPT_LANGUAGES?:string;COS_LEARNING_SOURCE_FAILURE_LIMIT?:string;COS_LEARNING_SOURCE_MIN_INTERVAL_MS?:string;LOCAL_AI_BASE_URL?:string;LOCAL_AI_API_KEY?:string }
 // THIS IS WHY THE CORPUS BARELY GREW. Every live adapter was wrapped so that it returns NOTHING for
 // a 'daily-mining-' gap — live sources only ever served real queued knowledge gaps. Combined with an
 // empty gap queue (33 of 33 resolved on 2026-08-21), that meant the daily cycle acquired nothing at
@@ -109,10 +109,8 @@ export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.e
   // smallest part of the pool while the feeds filled their quota every tick regardless of the query.
   // Rebalancing the caps changes only which candidates are offered; every admission gate is untouched.
   // europe_pmc stays lower than its peers because each of its results may trigger a full-text XML
-  // fetch, so its cost per result is several times the others'. YouTube defaults to eight because
-  // search.list charges per request, not per returned candidate; this raises useful yield while the
-  // serialized/circuit-broken request cadence stays unchanged.
-  const cap={ crossref:learningSourceCap(env.COS_LEARNING_CAP_CROSSREF,DEFAULT_LEARNING_SOURCE_CAPS.crossref), openalex:learningSourceCap(env.COS_LEARNING_CAP_OPENALEX,DEFAULT_LEARNING_SOURCE_CAPS.openalex), europePmc:learningSourceCap(env.COS_LEARNING_CAP_EUROPE_PMC,DEFAULT_LEARNING_SOURCE_CAPS.europe_pmc), openLibrary:learningSourceCap(env.COS_LEARNING_CAP_OPEN_LIBRARY,DEFAULT_LEARNING_SOURCE_CAPS.open_library), gdelt:learningSourceCap(env.COS_LEARNING_CAP_GDELT,DEFAULT_LEARNING_SOURCE_CAPS.gdelt), officialDocs:learningSourceCap(env.COS_LEARNING_CAP_OFFICIAL_DOCS,DEFAULT_LEARNING_SOURCE_CAPS.official_docs), reference:learningSourceCap(env.COS_LEARNING_CAP_REFERENCE,DEFAULT_LEARNING_SOURCE_CAPS.reference), youtube:learningSourceCap(env.COS_LEARNING_CAP_YOUTUBE,DEFAULT_LEARNING_SOURCE_CAPS.youtube) }
+  // fetch, so its cost per result is several times the others'.
+  const cap={ crossref:learningSourceCap(env.COS_LEARNING_CAP_CROSSREF,DEFAULT_LEARNING_SOURCE_CAPS.crossref), openalex:learningSourceCap(env.COS_LEARNING_CAP_OPENALEX,DEFAULT_LEARNING_SOURCE_CAPS.openalex), europePmc:learningSourceCap(env.COS_LEARNING_CAP_EUROPE_PMC,DEFAULT_LEARNING_SOURCE_CAPS.europe_pmc), openLibrary:learningSourceCap(env.COS_LEARNING_CAP_OPEN_LIBRARY,DEFAULT_LEARNING_SOURCE_CAPS.open_library), gdelt:learningSourceCap(env.COS_LEARNING_CAP_GDELT,DEFAULT_LEARNING_SOURCE_CAPS.gdelt), officialDocs:learningSourceCap(env.COS_LEARNING_CAP_OFFICIAL_DOCS,DEFAULT_LEARNING_SOURCE_CAPS.official_docs), reference:learningSourceCap(env.COS_LEARNING_CAP_REFERENCE,DEFAULT_LEARNING_SOURCE_CAPS.reference) }
   const adapters:ContinuousLearningSourceAdapter[]=[scientificLearningConnector(crossrefScientificSearch,cap.crossref,'crossref'),scientificLearningConnector(openAlexScientificSearch,cap.openalex,'openalex'),scientificLearningConnector(europePmcScientificSearch,cap.europePmc,'europe_pmc'),libraryLearningConnector(openLibrarySearch,cap.openLibrary,'open_library'),newsLearningConnector(createGdeltNewsSearch(),cap.gdelt,'gdelt'),officialDocsLearningConnector(createFeedSearch(officialFeeds,fetch,{fullText:true}),cap.officialDocs,'official_docs'),referenceLearningConnector(createWikipediaSearch(),cap.reference,'reference')]
 
   if(env.COS_WEB_TRAINING_ENABLED!=='false'){
@@ -126,9 +124,9 @@ export function createLiveLearningAdapters(env:LiveLearningEnvironment=process.e
   if(env.YOUTUBE_API_KEY){
     const transcript=resolveYouTubeTranscriptRuntime(env)
     if(transcript.url){
-      adapters.push(youtubeLearningConnector(createYouTubeTranscriptSearch(env.YOUTUBE_API_KEY,{transcriptApiUrl:transcript.url,transcriptApiToken:transcript.token,languages:transcriptLanguages(env.YOUTUBE_TRANSCRIPT_LANGUAGES),metadataFallback:true}),cap.youtube,transcript.derived?'youtube_transcript_runpod':'youtube_transcript'))
+      adapters.push(youtubeLearningConnector(createYouTubeTranscriptSearch(env.YOUTUBE_API_KEY,{transcriptApiUrl:transcript.url,transcriptApiToken:transcript.token,languages:transcriptLanguages(env.YOUTUBE_TRANSCRIPT_LANGUAGES),metadataFallback:true}),2,transcript.derived?'youtube_transcript_runpod':'youtube_transcript'))
     }else{
-      adapters.push(youtubeLearningConnector(createYouTubeMetadataSearch(env.YOUTUBE_API_KEY),cap.youtube,'youtube_metadata'))
+      adapters.push(youtubeLearningConnector(createYouTubeMetadataSearch(env.YOUTUBE_API_KEY),2,'youtube_metadata'))
     }
   }
   const limit=failureLimit(env)

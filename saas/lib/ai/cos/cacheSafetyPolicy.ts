@@ -3,7 +3,6 @@ import { executiveDecisionDirective } from './scriptRequestIntent.ts'
 import { isPlatformSelfKnowledgePrompt } from './cosFreshnessPolicy.ts'
 import { asksForPublishedDiagnosticMethods } from './advisoryDiagnosisPolicy.ts'
 import { detectAdvisoryDiagnosisIntent } from './advisoryDiagnosisIntent.ts'
-import { COS_CONVERSATION_RECALL_MARKER } from './cosConversationRecall.ts'
 
 /**
  * Executive arbitration is high-impact, context-dependent reasoning. Replaying a prior memo can
@@ -21,7 +20,6 @@ import { COS_CONVERSATION_RECALL_MARKER } from './cosConversationRecall.ts'
  * earlier policy version must not hide a later brief.
  */
 export function semanticCacheAllowedForPrompt(prompt: string): boolean {
-  if (prompt.includes(COS_CONVERSATION_RECALL_MARKER)) return false
   if (executiveDecisionDirective(prompt)) return false
   if (isPlatformSelfKnowledgePrompt(prompt)) return false
   if (asksForPublishedDiagnosticMethods(prompt)) return false

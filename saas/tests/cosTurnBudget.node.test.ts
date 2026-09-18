@@ -1,4 +1,8 @@
 // saas/tests/cosTurnBudget.node.test.ts
+//
+// Pins the rule that keeps a slow turn from being killed at the 300s platform ceiling: optional
+// phases run while there is comfortably time and are skipped when there is not.
+
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
@@ -10,18 +14,22 @@ import {
   challengeRoundEstimateMs,
 } from '../lib/ai/cos/cosTurnBudget.ts'
 
-test('interactive COS defaults to a 45-second wall-clock budget', () => {
-  assert.equal(turnBudgetMs(), 45_000)
+test('budget never exceeds the platform ceiling minus reserved overhead', () => {
+  assert.equal(turnBudgetMs(), 255_000) // 300s ceiling - 45s reserved
   process.env.COS_TURN_BUDGET_MS = '999999'
-  assert.equal(turnBudgetMs(), 255_000, 'configuration still cannot exceed platform ceiling minus overhead')
+  assert.equal(turnBudgetMs(), 255_000, 'configuration must not restore the failure mode')
   delete process.env.COS_TURN_BUDGET_MS
 })
 
-test('default interactive budget skips expensive optional phases so the draft can run', () => {
+test('a fresh turn can afford optional phases; an exhausted one cannot', () => {
   const start = 1_000_000
   const budget = startTurnBudget(start)
-  assert.equal(hasBudgetFor(budget, localCallEstimateMs(), start), false)
-  assert.equal(hasBudgetFor(budget, challengeRoundEstimateMs(), start), false)
+  assert.ok(hasBudgetFor(budget, localCallEstimateMs(), start), 'fresh turn affords a repair pass')
+  assert.ok(hasBudgetFor(budget, challengeRoundEstimateMs(), start), 'fresh turn affords the challenge round')
+
+  const nearDeadline = start + turnBudgetMs() - 5_000
+  assert.equal(hasBudgetFor(budget, localCallEstimateMs(), nearDeadline), false, 'near deadline: skip optional work')
+  assert.equal(hasBudgetFor(budget, challengeRoundEstimateMs(), nearDeadline), false)
 })
 
 test('remaining time floors at zero and never goes negative', () => {

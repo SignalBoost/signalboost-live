@@ -90,7 +90,6 @@ function classifyStatus(input: {
   production: boolean
   commitSha: string
   deploymentId: string
-  now: Date
   row: ProductionPathEventRow | undefined
   verified: boolean
   executionBlocker: string | null
@@ -101,7 +100,7 @@ function classifyStatus(input: {
   if (row.verifier !== 'host_production_verifier') return 'wrong_verifier'
   if (row.commit_sha !== input.commitSha) return 'stale_commit'
   if (row.deployment_id !== input.deploymentId) return 'wrong_deployment'
-  if (!row.expires_at || Date.parse(row.expires_at) <= input.now.getTime()) return 'expired'
+  if (!row.expires_at || Date.parse(row.expires_at) <= Date.now()) return 'expired'
   const evidence = row.evidence || {}
   if (evidence.featureEnabled !== true) return 'flag_off'
   if (evidence.invocationSucceeded !== true) return 'invocation_failed'
@@ -151,7 +150,6 @@ export function evaluateCosUniversityUndergraduateAcceptance(input: {
       production: input.production,
       commitSha: input.commitSha,
       deploymentId: input.deploymentId,
-      now: input.now,
       row,
       verified: evaluatedPath?.verified === true,
       executionBlocker,

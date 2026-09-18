@@ -1,4 +1,3 @@
-// saas/components/Concierge.tsx
 'use client'
 
 import { usePathname } from 'next/navigation'
@@ -14,7 +13,6 @@ import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
 import BuilderFilePreviews from '@/components/BuilderFilePreviews'
 import { postWithAgentProgress, type AgentProgressEvent } from '@/lib/ai/cos/agentProgressClient'
 import VoiceInputButton from '@/components/VoiceInputButton'
-import { CONCIERGE_RESUME_KEYS, forgetResumeId, loadResumableConversation, readResumeId, rememberResumeId } from '@/lib/concierge/conversationResume'
 
 type FeedbackKind = 'positive' | 'negative' | 'correction'
 type FeedbackUiState = { status: 'idle' | 'saving' | 'saved' | 'error'; kind?: FeedbackKind; correctionOpen?: boolean; correction?: string; error?: string }
@@ -144,20 +142,6 @@ export default function Concierge() {
   useEffect(() => () => {
     requestAbortRef.current?.abort()
     requestAbortRef.current = null
-  }, [])
-
-  // Returning signed-in visitors continue the conversation this Concierge dock started in this browser.
-  useEffect(() => {
-    let cancelled = false
-    const resumeId = readResumeId(CONCIERGE_RESUME_KEYS.dock)
-    if (!resumeId) return
-    void loadResumableConversation(resumeId).then(restored => {
-      if (cancelled) return
-      if (!restored) { forgetResumeId(CONCIERGE_RESUME_KEYS.dock); return }
-      setMessages(current => current.length ? current : restored.map(message => ({ role: message.role, content: message.content })))
-      if (!conversationIdRef.current) conversationIdRef.current = resumeId
-    })
-    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -291,7 +275,6 @@ export default function Concierge() {
     setMessages([])
     setFeedbackByMessage({})
     setAttachments([])
-    forgetResumeId(CONCIERGE_RESUME_KEYS.dock)
     conversationIdRef.current = ''
   }
 
@@ -328,7 +311,6 @@ export default function Concierge() {
     if ((!content && staged.length === 0) || loading) return
 
     if (!conversationIdRef.current) conversationIdRef.current = crypto.randomUUID()
-    rememberResumeId(CONCIERGE_RESUME_KEYS.dock, conversationIdRef.current)
     const fileNote = staged.length ? `📎 ${staged.map(a => a.name).join(', ')}` : ''
     const displayContent = [content, fileNote].filter(Boolean).join('\n\n')
     const nextMessages: Message[] = [...messages, { role: 'user', content: displayContent }]

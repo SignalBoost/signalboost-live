@@ -3,7 +3,6 @@ import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { classifyProblemClass, knownProblemClasses } from '@/lib/ai/cos/cosProblemClass'
 import { FOUNDATIONAL_KNOWLEDGE_DOMAINS } from '@/lib/cos-core/layers/learning/foundational'
 import { attachTurnOutcome } from '@/lib/ai/cos/turnExperienceStore'
-import { COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE } from './cosUniversityEvidenceSupply.ts'
 import {
   recordCosUniversityRealWorldOutcome,
   type CosUniversityRealWorldOutcomeResult,
@@ -182,19 +181,6 @@ export function decideVerifiedCosProductionOutcome(
   }
 }
 
-/**
- * Academic production evidence is deliberately derived only after the verified-outcome guard above
- * has accepted an authoritative source. The raw provider/source reference is hashed so the academic
- * namespace cannot be forged by choosing words such as `test`, `benchmark`, or `exam` in a sourceRef.
- * Exact source identity remains available in the immutable cognitive-experience record.
- */
-export function verifiedProductionTurnOutcomeSource(
-  decision: Pick<CosVerifiedProductionOutcomeDecision, 'sourceClass' | 'sourceRef' | 'domain'>,
-): string {
-  const identity = sha256(`${decision.sourceClass}|${decision.sourceRef}`).slice(0, 40)
-  return `${COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE}${decision.sourceClass}:${decision.domain}:${identity}`
-}
-
 async function attachCorrelatedTurnOutcome(
   input: CosVerifiedProductionOutcomeInput,
   decision: CosVerifiedProductionOutcomeDecision,
@@ -208,7 +194,7 @@ async function attachCorrelatedTurnOutcome(
       verifiedSuccess: decision.success,
       repairNeeded: !decision.success,
     }),
-    source: verifiedProductionTurnOutcomeSource(decision),
+    source: `verified_production_outcome:${decision.sourceClass}`,
     occurredAt,
   })
 }
@@ -217,9 +203,7 @@ async function attachCorrelatedTurnOutcome(
  * Persist one idempotent verified production/business outcome as `production_use` episodic memory.
  * Duplicate delivery of the same authoritative event is ignored rather than treated as new proof.
  * If the event carries `correlation.kind = cos_turn_id`, the same evidence also enriches the durable
- * turn outcome used by metacognitive routing/source-utilization analysis and supplies the University's
- * verified-production namespace. Academic readers still apply their own enrollment, domain, source,
- * timing, transfer, and distinct-evidence gates; this bridge grants no grade or authority by itself.
+ * turn outcome used by metacognitive routing/source-utilization analysis.
  */
 export async function recordVerifiedCosProductionOutcome(
   input: CosVerifiedProductionOutcomeInput,

@@ -141,7 +141,7 @@ test('Concierge delegates coding to COS Software Specialist without repository a
 test('browser Concierge and owner Assistant both enter the canonical COS browser dispatcher', () => {
   const client = read('../lib/ai/cos/agentProgressClient.ts')
   const browser = read('../app/api/cos-browser/route.ts')
-    assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
+  assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
   assert.doesNotMatch(client, /args\.target === 'cos' \? '\/api\/cos-browser' : '\/api\/concierge'/)
   assert.match(browser, /const access = await getAccess\(\)\.catch/)
   assert.match(browser, /const executeOwnerRequest = .*cosPrimaryPost\(routedRequest\)/)

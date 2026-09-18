@@ -2,7 +2,7 @@
 //
 // The scheduler configuration is version-controlled in vercel.json. Recovery code reads the
 // deployed declaration directly instead of accepting a cadence value from an AI-generated plan.
-import vercelConfig from '../vercel.json' with { type: 'json' }
+import vercelConfig from '../vercel.json'
 
 export const VERCEL_OBSERVATION_PATH = '/api/cron/vercel-observation'
 export const NATIVE_PROACTIVE_MONITORING_PATH = '/api/cron/native-proactive-monitoring'

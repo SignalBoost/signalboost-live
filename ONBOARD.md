@@ -115,6 +115,29 @@ Evaluation may run concurrently, but it should not unnecessarily stop the next a
 
 Current provider/job/model state is mutable. **Always query live Production evidence before reporting it.** Do not infer current HF spend, RunPod state, artifact status, or evaluation status from this file.
 
+## Platform dispatch / pipeline-capacity policy — 2026-09-17
+
+Owner direction: **work is dispatched to available pipelines; capacity is an input, never a hardcoded platform law.** This is a platform architecture rule for both COS University and commercial portables, not a University-only optimization.
+
+The canonical design is a governed **dispatcher / worker-pool** model:
+
+- waiting work is ordered by the applicable queue policy and continuously matched to an available compatible pipeline;
+- every active unit owns an isolated lease for the exact artifact/job from admission through its governed terminal handoff, then releases that lease;
+- pipeline state must distinguish at least available, leased/busy, unhealthy/quarantined, and unavailable;
+- admission control must refuse lane N+1 when capacity is exhausted; provisioning or routing must not evict, retire, overwrite, or steal a healthy lease merely to start newer work;
+- capacity is a runtime/configuration/provider input. The same orchestration code must behave correctly at N=1, N=10, N=50, or buyer-selected capacity without rewriting workflow logic;
+- no portable or shared platform component may encode SignalBoost's current laboratory worker count, one-at-a-time fences, or retire-on-provision behavior as a product invariant;
+- routing may use only pipelines that are compatible with the exact artifact/model/provider/tenant and have the required authorization. Unlike a generic load balancer, the dispatcher must preserve exact-artifact binding;
+- a free compatible lane should not remain idle while eligible authorized work is waiting, subject to spend, quota, rate, safety, evidence, and provider-health controls;
+- failure of one lane must not corrupt another lane's lease or evidence. Recoverable work may be requeued or repaired under its existing authority; unhealthy lanes fail closed and are excluded from dispatch until repaired;
+- observability must expose queue depth, configured capacity, available/busy/unhealthy lanes, lease owner, wait time, throughput, and bounded failure/retry state so the Self-Healing Supervisor can diagnose and repair routing/capacity faults rather than alert only.
+
+**Speed comes from usable parallel capacity; reliability comes from isolation, leases, admission control, and truthful health.** The dispatcher directs work to existing authorized capacity; it does not itself create spending authority, provider quota, evaluation authority, Production traffic authority, or new pipelines.
+
+Current University Production behavior may remain N=1 until the dispatcher implementation is proven and current provider/account limits permit more lanes. N=1 is a valid configuration of the same architecture, not a separate single-lane design. Raising N or provisioning additional paid capacity remains subject to the existing explicit spend/provider authorization boundaries.
+
+This policy applies to University canary/evaluation/runtime flow and must be reused by the post-University Agent Distillation & Training Portable. The portable extraction must generalize the same dispatcher contract rather than fork a separate scheduler.
+
 ## University distillation Self-Healing loop
 
 University mass distillation is connected to the existing Self-Healing Supervisor rather than a

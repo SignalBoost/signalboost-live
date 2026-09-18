@@ -32,6 +32,7 @@ import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } f
 import { resolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
+import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -155,6 +156,16 @@ export async function POST(req: NextRequest) {
   const auditUserId = access?.userId ?? null
   const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
+
+  // Explicit owner text transformations are already fully classified by their command + supplied
+  // source. Send them straight to COS primary before Software Specialist, public-identity, visual,
+  // or other semantic classifiers consume the browser wait budget. Attachments stay on the normal
+  // path because they can carry separate routing/authority semantics.
+  const directTextTransformation = detectDirectTextTransformation(prompt)
+  const directTextHasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
+  if (directTextTransformation && authenticatedOwner && browserSurface === 'assistant' && !directTextHasAttachments) {
+    return cosPrimaryPost(req)
+  }
 
   if (browserSurface === 'concierge') {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)

@@ -76,6 +76,13 @@ function emptyStage() {
   return { retrieved: 0, relevant: 0, selected: 0, injected: 0, cited: 0 }
 }
 
+function isLatencySensitiveShortEdit(instruction: string, source: string, referenceContext: string | null): boolean {
+  if (referenceContext) return false
+  if (source.length > 2_500) return false
+  const mode = String(instruction || '').trim().toLowerCase()
+  return /^(?:edit|proofread|polish|correct|fix(?:\s+(?:grammar|spelling|wording|english))?)\b/.test(mode)
+}
+
 function provenance(
   reasonerLabel: string | null,
   invoked: boolean,
@@ -161,6 +168,7 @@ async function tryNeuralCommunicationTransformation(input: {
 }) {
   const context = input.referenceContext ? input.referenceContext.slice(0, 12_000) : null
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
     temperature: 0.08,
     maxTokens: 1800,
     systemPrompt: [
@@ -222,6 +230,84 @@ export async function tryDirectTextTransformation(input: {
   const editableSource = prepared.editableSource
   const anchorBlock = contextualEditAnchorBlock(prepared.anchors)
 
+  // Short explicit edits are interactive typing assistance, not an open-ended reasoning mission.
+  // Keep them to one managed-model call so a user does not lose the answer to the browser deadline.
+  // The same deterministic meaning-fidelity and layout guards still run before release.
+  if (isLatencySensitiveShortEdit(request.instruction, editableSource, referenceContext)) {
+    const resolved = resolveCosReasoner()
+    if (!resolved.config) {
+      return {
+        handled: false,
+        confidence: 0,
+        reason: 'The configured COS reasoner is unavailable for the direct text-transformation request.',
+        provenance: provenance(null, false) as any,
+      }
+    }
+
+    const reasoned = await callCosReasoner({
+      usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
+      temperature: 0.05,
+      maxTokens: 900,
+      systemPrompt: [
+        'You are COS Direct Text Editor. Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+        'Edit the supplied text into fluent, natural professional English while preserving the writer\'s exact meaning, facts, names, acronyms, uncertainty, and who did or will do what.',
+        'Correct grammar, spelling, punctuation, sentence flow, and obvious non-native phrasing. Do not add facts, promises, explanations, headings, or commentary.',
+        MEANING_FIDELITY_RULES,
+        styleBlock,
+        BUSINESS_REGISTER_RULES,
+        CORRESPONDENCE_LAYOUT_RULES,
+        anchorBlock,
+        transformationLanguageInstruction(input.language),
+      ].filter(Boolean).join('\n\n'),
+      prompt: [
+        `USER INSTRUCTION:\n${request.instruction}`,
+        `EDITABLE SOURCE TEXT:\n<<<SOURCE\n${editableSource}\nSOURCE`,
+        'Return the finished edited text now.',
+      ].join('\n\n'),
+    }).catch(() => null)
+
+    if (!reasoned?.text) {
+      return {
+        handled: false,
+        confidence: 0,
+        reason: 'The configured COS reasoner returned no text for the direct text-transformation request.',
+        provenance: provenance(resolved.config.label, false) as any,
+      }
+    }
+
+    const parsed = parseLocalResult(reasoned.text)
+    const plainDraft = String(reasoned.text || '')
+      .trim()
+      .replace(/^\x60\x60\x60(?:json|text)?\s*/i, '')
+      .replace(/\s*\x60\x60\x60$/i, '')
+      .trim()
+    let finalAnswer = parsed && !parsed.truncated && parsed.answer.trim() ? parsed.answer.trim() : plainDraft
+    if (!finalAnswer) {
+      return {
+        handled: false,
+        confidence: 0,
+        reason: 'The direct COS text-transformation result was empty or truncated.',
+        provenance: provenance(reasoned.reasoner.label, true) as any,
+      }
+    }
+
+    finalAnswer = repairContextualEditDrift({
+      originalSource: rawEditableSource,
+      referenceContext,
+      answer: finalAnswer,
+      language: input.language,
+    })
+    finalAnswer = stripEditorialSkillLabels(normalizeTextTransformationPresentation(finalAnswer))
+    finalAnswer = restoreCorrespondenceLayout(finalAnswer, rawEditableSource)
+
+    return {
+      handled: true,
+      reply: finalAnswer,
+      confidence: parsed && !parsed.truncated ? Math.max(0, Math.min(1, parsed.confidence)) : 0.6,
+      provenance: provenance(reasoned.reasoner.label, true) as any,
+    }
+  }
+
   // Register classification and validated editorial skills are supporting context. They do not write
   // the message. The writing itself is done by the configured deep-neural COS reasoner below.
   const [editorialSkills, registerProfile] = await Promise.all([
@@ -280,6 +366,7 @@ export async function tryDirectTextTransformation(input: {
     // Safe neural fallback for non-correspondence transformations or a strategic-advisor transport
     // failure. This remains neural generation; deterministic code still does not write prose.
     let reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
       temperature: 0.08,
       maxTokens: 2400,
       systemPrompt: [
@@ -317,6 +404,7 @@ export async function tryDirectTextTransformation(input: {
     // Retry once with a compact, equivalent neural editor request before reporting unavailable.
     if (!reasoned?.text) {
       reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
         temperature: 0.05,
         maxTokens: 2400,
         systemPrompt: [
@@ -414,6 +502,7 @@ export async function tryDirectTextTransformation(input: {
   // rather than throwing away the entire improved draft.
   if (contextualEditIntentViolation({ originalSource: rawEditableSource, answer: finalAnswer })) {
     const intentRepair = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
       temperature: 0,
       maxTokens: 2400,
       systemPrompt: [

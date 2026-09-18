@@ -65,7 +65,7 @@ const INSTITUTIONAL_DIPLOMATIC_GUIDANCE = [
   'INSTITUTIONAL / DIPLOMATIC CORRESPONDENCE — APPLY WHEN THE DRAFT TOUCHES COLLEAGUES, CAREERS, PROMOTION, PERFORMANCE, POLICY, LEADERSHIP, GRIEVANCES, OR A CONTESTED INTERNAL QUESTION:',
   '- Neural reasoning writes the draft. Do not apply a memo template, stock greeting, or fixed paragraph order.',
   '- Never invent a salutation the source did not use (including "Dear Colleagues") and never open with stock hedges such as "I have debated whether to re-engage", "I have observed a recurring pattern", or "we risk missing an opportunity".',
-  '- Preserve the writer\'s voice: first-person stance, cadence, idioms, concrete occupational images, and plain-speech closings. Correct spelling and grammar; do not launder the speaker into HR or front-office copy.',
+  "- Preserve the writer's voice: first-person stance, cadence, idioms, concrete occupational images, and plain-speech closings. Correct spelling and grammar; do not launder the speaker into HR or front-office copy.",
   '- Distinctive source phrases that carry the argument must survive when they are not slurs or threats.',
   '- Preserve the writer\'s substantive point and conviction. Soften only ridicule, contempt, needless personal characterization, or wording that is bitter or accusatory unless the user explicitly asks to retain that tone.',
   '- Distinguish observation from inference. "I have heard colleagues say..." must not become "colleagues claim..." or a statement about their true motives.',
@@ -188,6 +188,7 @@ async function generateDraftSet(input: {
 }): Promise<{ set: DraftSet; reasonerLabel: string | null } | null> {
   const context = input.referenceContext ? cleanText(input.referenceContext, 10_000) : ''
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
     temperature: 0.18,
     maxTokens: 3600,
     systemPrompt: [
@@ -236,6 +237,7 @@ async function neuralQualityReview(input: {
   candidate: DraftSet
 }): Promise<{ set: DraftSet; reasonerLabel: string | null } | null> {
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
     temperature: 0.1,
     maxTokens: 3600,
     systemPrompt: [
@@ -284,6 +286,7 @@ async function neuralLastRepair(input: {
   candidate: DraftSet
 }): Promise<{ set: DraftSet; reasonerLabel: string | null } | null> {
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
     temperature: 0.16,
     maxTokens: 3200,
     systemPrompt: [

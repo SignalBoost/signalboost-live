@@ -11,6 +11,14 @@ test('detects direct English text editing with hyphen-delimited source', () => {
   assert.match(detected.sourceText, /^Hi Dwight/)
 })
 
+test('detects the production owner edit that previously timed out', () => {
+  const detected = detectDirectTextTransformation('edit - i I see, sorry, they came last week - i think they call CAP or something like that - they come unclass but must be opened by cleared Americans and or a cleared amercuan must be present. I do not know who ordered.')
+  assert.ok(detected)
+  assert.equal(detected.instruction.toLowerCase(), 'edit')
+  assert.match(detected.sourceText, /they came last week/i)
+  assert.match(detected.sourceText, /cleared amercuan/i)
+})
+
 test('detects natural inline edit shorthand without a delimiter', () => {
   const detected = detectDirectTextTransformation('edit Hi Dwight, thank you for letting me know. If you are thinking about cancelling because of me, please do not worry. We will do whatever is needed to support the mission.')
   assert.ok(detected)
@@ -59,3 +67,31 @@ test('homepage renders a server reply even when the HTTP status is non-2xx', () 
   assert.match(source, /if \(!reply\) throw new Error\('concierge_unavailable'\)/)
   assert.doesNotMatch(source, /if \(!response\.ok \|\| !reply\)/)
 })
+
+test('owner direct edits bypass browser semantic routing before COS primary', () => {
+  const source = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
+  const direct = source.indexOf('detectDirectTextTransformation(prompt)')
+  const primary = source.indexOf('return cosPrimaryPost(req)')
+  const visual = source.indexOf('resolveSemanticVisualRequest(messages, prompt)')
+  assert.ok(direct >= 0)
+  assert.ok(primary > direct)
+  assert.ok(visual > primary)
+})
+
+test('shared COS entrypoint runs direct text transformation before contextual interpretation', () => {
+  const source = readFileSync(join(process.cwd(), 'lib/ai/cos/cosFirstAnswer.ts'), 'utf8')
+  const direct = source.indexOf('tryDirectTextTransformation(input)')
+  const contextual = source.indexOf('tryNeuralContextualInterpretation(input)')
+  assert.ok(direct >= 0)
+  assert.ok(contextual > direct)
+})
+
+test('direct text transformation is marked to bypass RunPod primary', () => {
+  const inference = readFileSync(join(process.cwd(), 'lib/ai/local-inference.ts'), 'utf8')
+  const direct = readFileSync(join(process.cwd(), 'lib/ai/cos/directTextTransformation.ts'), 'utf8')
+  assert.match(inference, /feature === 'direct_text_transformation'/)
+  assert.match(direct, /feature: 'direct_text_transformation'/)
+  assert.match(direct, /isLatencySensitiveShortEdit/)
+  assert.match(direct, /maxTokens: 900/)
+})
+

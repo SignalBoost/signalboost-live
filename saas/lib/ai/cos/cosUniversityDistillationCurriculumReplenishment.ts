@@ -3,6 +3,7 @@ import { ContinuousLearningDirector, type ContinuousLearningPolicy } from '@/lib
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import { createSupabaseCOSStores, cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillation.ts'
+import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
 import {
   buildMassDistillationReplenishmentGaps,
   MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
@@ -10,11 +11,15 @@ import {
 } from './cosUniversityDistillationCurriculumPlan.ts'
 import {
   HYBRID_DISTILLATION_PROFILE,
+  HYBRID_FAILURE_DERIVED_TARGET,
+  failureDerivedSourceHash,
   teacherSyntheticSourceHash,
 } from './cosUniversityHybridDistillation.ts'
 
 const DISTILLATION_OPENALEX_RESULTS_PER_QUERY = 10
 const HYBRID_SYNTHETIC_MAX_PER_SUBJECT = 20
+const HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT = Math.max(1, Math.round(20 * HYBRID_FAILURE_DERIVED_TARGET))
+const VERIFIED_FAILURE_LOOKBACK_DAYS = 30
 
 function rightsClearedPolicy(maxCandidatesPerCycle: number): ContinuousLearningPolicy {
   return {
@@ -29,6 +34,88 @@ function slotKey(now: Date): string {
   const interval = MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES * 60_000
   const slot = new Date(Math.floor(now.getTime() / interval) * interval)
   return `distillation-replenishment-${slot.toISOString().slice(0, 16).replace(/[-:T]/g, '')}`
+}
+
+async function installVerifiedFailureDerivedCurriculum(input: {
+  db: NonNullable<ReturnType<typeof cosServiceDb>>
+  supply: readonly MassDistillationSubjectSupply[]
+  now: Date
+  maxSubjects: number
+}) {
+  const since = new Date(input.now.getTime() - VERIFIED_FAILURE_LOOKBACK_DAYS * 86_400_000).toISOString()
+  const rows = await input.db.from('cos_university_learning_assurance_events')
+    .select('event_key,evidence,observed_at')
+    .eq('event_type', 'learning_outcome')
+    .gte('observed_at', since)
+    .order('observed_at', { ascending: false })
+    .limit(500)
+  if (rows.error) throw rows.error
+
+  const titleById = new Map(COS_UNIVERSITY_SUBJECTS.map(subject => [subject.id, subject.title] as const))
+  const targetTitles = new Set(
+    [...input.supply]
+      .filter(subject => subject.shortfallToBatch > 0)
+      .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch || a.subject.localeCompare(b.subject))
+      .slice(0, input.maxSubjects)
+      .map(subject => subject.subject),
+  )
+  const failuresByTitle = new Map<string, string[]>()
+  for (const row of (rows.data || []) as any[]) {
+    const evidence = row?.evidence && typeof row.evidence === 'object' ? row.evidence as Record<string, unknown> : null
+    if (!evidence || String(evidence.outcome || '') !== 'failure') continue
+    const subjects = Array.isArray(evidence.subjects) ? evidence.subjects.map(String) : []
+    const eventKey = String(row.event_key || '').trim()
+    if (!eventKey) continue
+    for (const subjectId of subjects) {
+      const title = titleById.get(subjectId as any)
+      if (!title || !targetTitles.has(title)) continue
+      const keys = failuresByTitle.get(title) || []
+      if (!keys.includes(eventKey)) keys.push(eventKey)
+      failuresByTitle.set(title, keys)
+    }
+  }
+
+  let inserted = 0
+  const bySubject: Array<{ subject: string; inserted: number }> = []
+  for (const subject of targetTitles) {
+    const evidenceKeys = failuresByTitle.get(subject) || []
+    let subjectInserted = 0
+    for (let ordinal = 0; ordinal < Math.min(HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT, evidenceKeys.length); ordinal += 1) {
+      const contentHash = failureDerivedSourceHash(subject, ordinal)
+      const row = {
+        content_hash: contentHash,
+        source_kind: 'failure_derived_curriculum',
+        source_uri: `itmounts://cos-university/failure-derived/${encodeURIComponent(subject)}/${ordinal}`,
+        source_title: `${subject} — verified-failure remediation seed ${ordinal + 1}`,
+        observed_at: input.now.toISOString(),
+        subject,
+        summary: [
+          `Verified Production failure indicates a remediation need in ${subject}.`,
+          'Generate a distinct self-contained expert teaching example that targets a common failure mode in this subject and demonstrates the corrected method.',
+          'Do not reproduce the original conversation, hidden exam, user data, private evidence, or evaluator output.',
+        ].join(' '),
+        facts: [
+          { origin: 'failure_derived', profile: HYBRID_DISTILLATION_PROFILE, ordinal },
+          { constraint: 'subject_level_remediation_only_no_raw_chat_no_hidden_exam' },
+        ],
+        confidence: 1,
+        license: 'synthetic-benchmark-fixture',
+        evidence: [{
+          profile: HYBRID_DISTILLATION_PROFILE,
+          origin: 'failure_derived',
+          sourceEventKeyHashOnly: true,
+          authorityExpanded: false,
+        }],
+      }
+      const write = await input.db.from('cos_continuous_learning')
+        .upsert(row, { onConflict: 'content_hash', ignoreDuplicates: true })
+      if (write.error) throw write.error
+      inserted += 1
+      subjectInserted += 1
+    }
+    bySubject.push({ subject, inserted: subjectInserted })
+  }
+  return Object.freeze({ inserted, bySubject: Object.freeze(bySubject) })
 }
 
 async function installTeacherSyntheticFallback(input: {
@@ -144,8 +231,9 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     )
     const result = await cycle.run(gaps, 0)
 
-    // Real rights-cleared acquisition remains first. Deterministic synthetic seeds then fill only the
-    // post-dedup batch shortfall. The existing Qwen teacher turns those seeds into actual examples.
+    // Real rights-cleared acquisition remains first. Verified failures add subject-level remediation
+    // seeds without copying raw chats or hidden evaluator material. Synthetic fallback fills the rest.
+    const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: input.supply, now, maxSubjects })
     const synthetic = await installTeacherSyntheticFallback({ db, supply: input.supply, now, maxSubjects })
 
     const completedAt = new Date().toISOString()
@@ -176,11 +264,13 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
       probationary: result.probationary,
       rejected: result.rejected,
       sourceErrors: result.sourceErrors,
+      failureDerivedInserted: failureDerived.inserted,
+      failureDerivedBySubject: failureDerived.bySubject,
       syntheticInserted: synthetic.inserted,
       syntheticBySubject: synthetic.bySubject,
-      sourceMix: ['real_source', 'teacher_synthetic'],
+      sourceMix: ['real_source', 'failure_derived', 'teacher_synthetic'],
       externalCostUsd: 0,
-      semantics: 'real_rights_cleared_material_first_then_teacher_synthetic_shortfall_fallback_with_per_item_origin_evidence_no_training_dispatch',
+      semantics: 'real_rights_cleared_material_first_then_verified_failure_subject_remediation_then_teacher_synthetic_shortfall_no_raw_chat_no_hidden_exam_no_training_dispatch',
     })
   } catch (error) {
     const message = String(error instanceof Error ? error.message : error || 'unknown_error').slice(0, 800)

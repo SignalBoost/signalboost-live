@@ -82,6 +82,17 @@ test('semantic source failures are terminal, quarantined, and excluded from sche
   assert.match(consumer, /!terminalBatchFailure\(clean\(row\.failure_reason, 300\)\)/)
 })
 
+test('recovery terminalizes pre-existing semantic failures and frees their prepared batches', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /terminalizedSemanticFailures/)
+  assert.match(consumer, /claim: 'mass_distillation_semantic_failure_terminalized'/)
+  assert.match(consumer, /status: 'quarantined'/)
+  assert.match(consumer, /retryAuthorized: false/)
+  assert.match(consumer, /dispatchAuthorized: false/)
+  assert.match(consumer, /productionTrafficAuthorized: false/)
+  assert.match(consumer, /completed_at: terminalizedAt/)
+})
+
 test('worker callbacks advance teacher to partitions to training to evaluation without promoting traffic', () => {
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
   assert.match(consumer, /teacher_dataset_registered/)

@@ -114,7 +114,7 @@ test('recovery cron and owner history resume the same approved lifecycle', () =>
   assert.match(cron, /\.limit\(1\)/)
   assert.match(cron, /audit_remediation_approvals/)
   assert.match(cron, /runApprovedAuditRemediationWithRetry/)
-  assert.match(vercel, /"path": "\/api\/cron\/audit-approved-remediation"[\s\S]*?"schedule": "\*\/10 \* \* \* \*"/)
+  assert.match(vercel, /"path": "\/api\/cron\/audit-approved-remediation"[\s\S]*?"schedule": "8,18,28,38,48,58 \* \* \* \*"/)
 
   assert.match(runs, /if \(!ctx\.isOwner \|\| !ctx\.userId\)/)
   assert.match(runs, /const newestApproved = \(runs\.data \|\| \[\]\)\.find/)

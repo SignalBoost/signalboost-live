@@ -61,7 +61,10 @@ export function buildCosLaneStatusArgs(input: {
 }
 
 export async function recordCosLaneStatus(input: {
-  db: { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ error?: unknown } | null> } | null
+  // Structural and deliberately permissive: the Supabase client's rpc() returns a
+  // PostgrestFilterBuilder, which is thenable but not a Promise, so a Promise-typed parameter
+  // rejects the real client at build time.
+  db: { rpc: (fn: string, args: any) => PromiseLike<any> } | null
   lane: string
   outcome: CosLaneOutcome
   reason: string

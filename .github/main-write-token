@@ -1,2 +1,2 @@
-base_sha=b218bb5e7b4aad0ac60680a25dcf1e832d5c5336
-branch=fix/cos-direct-edit-timeout-20260918
+base_sha=e779d0396e5cd207b7d49b741e050628d09c1c30
+branch=fix/cos-preserve-direct-edit-routing-context-20260918

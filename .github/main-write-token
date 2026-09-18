@@ -1,2 +1,2 @@
-base_sha=77045ba27e03bfd8da2ff2e94b8b91eead3713dc
-branch=fix/cos-preserve-direct-edit-routing-context-20260918
+base_sha=9ee345954eeee65cc894065514f6b20d6ccbc9ad
+branch=fix/public-direct-edit-fastpath-20260918

@@ -188,6 +188,7 @@ async function generateDraftSet(input: {
 }): Promise<{ set: DraftSet; reasonerLabel: string | null } | null> {
   const context = input.referenceContext ? cleanText(input.referenceContext, 10_000) : ''
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
     temperature: 0.18,
     maxTokens: 3600,
     systemPrompt: [
@@ -236,6 +237,7 @@ async function neuralQualityReview(input: {
   candidate: DraftSet
 }): Promise<{ set: DraftSet; reasonerLabel: string | null } | null> {
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
     temperature: 0.1,
     maxTokens: 3600,
     systemPrompt: [
@@ -284,6 +286,7 @@ async function neuralLastRepair(input: {
   candidate: DraftSet
 }): Promise<{ set: DraftSet; reasonerLabel: string | null } | null> {
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
     temperature: 0.16,
     maxTokens: 3200,
     systemPrompt: [

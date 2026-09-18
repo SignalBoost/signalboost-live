@@ -44,6 +44,7 @@ import { freshFailureReply, type FreshEvidenceInternalFailureCode } from '@/lib/
 import { buildNormativeFreshEvidenceFallback } from '@/lib/ai/cos/normativeFreshEvidenceFallback'
 import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExternalSynthesis'
 import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
+import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
 import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
@@ -103,19 +104,25 @@ export function isFastTextTransform(input:string):boolean{
 }
 
 async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
-  const result=await Promise.race([
-    callRawCosReasoner({
-      temperature:.1,
-      maxTokens:1200,
-      systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
-      prompt:input,
-    }).catch(()=>null),
-    new Promise<null>(resolve=>setTimeout(()=>resolve(null),12_000)),
-  ])
-  if(!result?.text)return null
-  const parsed=parseLocalResult(result.text)
+  const config=localInferenceConfigFromEnv()
+  const text=await callLocalModel({
+    temperature:.1,
+    maxTokens:768,
+    disableThinking:true,
+    timeoutMs:8_000,
+    allowConfiguredFallback:false,
+    persistUsage:false,
+    jsonObject:true,
+    usageContext:{feature:'cos_fast_text_transform'},
+    systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+    prompt:input,
+  },{...config,timeoutMs:Math.min(config.timeoutMs,8_000)}).catch(()=>null)
+  if(!text)return null
+  const parsed=parseLocalResult(text)
   const reply=parsed?.answer?.trim()
-  return reply?{reply,reasonerLabel:result.reasoner.label}:null
+  const resolved=resolveCosReasoner()
+  const reasonerLabel=resolved.config?.label??`independent-local:${config.model}`
+  return reply?{reply,reasonerLabel}:null
 }
 
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
@@ -515,6 +522,9 @@ export async function POST(req: NextRequest) {
     if (!payload || typeof payload !== 'object') return response
     if (hasUnsafePublicModelOutput(String(payload.reply || ''))) return publicSecurityRefusal('cos-primary-output-security-blocked')
     if (!String(payload.reply || '').trim() || !prompt) return response
+    if (String(payload.source || '').startsWith('cos-fast-text-transform')) {
+      return NextResponse.json(payload, { status: response.status, headers })
+    }
     const successful = response.ok && payload.ok !== false
     payload.suggested_followups = await suggestFollowups({
       prompt,

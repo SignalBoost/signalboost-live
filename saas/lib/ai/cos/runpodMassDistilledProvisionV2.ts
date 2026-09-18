@@ -35,7 +35,7 @@ const VLLM_IMAGE = 'vllm/vllm-openai:v0.29.0'
 const BASE_MODEL_REVISION = '1cfa9a7208912126459214e8b04321603b3df60c'
 const ROUTING = 'LOAD_BALANCER' as const
 const PUBLIC_PORT = 8000
-const IDLE_TIMEOUT_SECONDS = 60
+const IDLE_TIMEOUT_SECONDS = 180
 const REQUEST_TIMEOUT_MS = 8_000
 // Production mass-evaluation evidence on 2026-09-17 showed the exact LoRA candidate repeatedly
 // returning HTTP 502 after ~40s while the same endpoint passed the short exact-artifact canary and
@@ -155,7 +155,9 @@ async function constrainEndpointToApprovedGpu(endpointId: string) {
  * endpoint is allowed keeps the single-active-endpoint rule intact and creates nothing.
  */
 async function restoreRetiredEndpointCapacity(endpoint: Endpoint) {
-  if (Number(endpoint.workers?.max ?? Number.NaN) >= 1) return endpoint
+  const maxWorkers = Number(endpoint.workers?.max ?? Number.NaN)
+  const idleTimeout = Number(endpoint.workers?.idleTimeout ?? Number.NaN)
+  if (maxWorkers >= 1 && idleTimeout === IDLE_TIMEOUT_SECONDS) return endpoint
   const restored = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
     method: 'PATCH',
     body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),

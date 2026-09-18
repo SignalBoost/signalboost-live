@@ -47,6 +47,10 @@ test('evaluation restores the one worker a retired endpoint is allowed, before i
   assert.match(provisionV2, /body: JSON\.stringify\(\{ workers: \{ min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS \} \}\)/)
   assert.match(provisionV2, /mass_distilled_runtime_capacity_restore_rejected/)
   assert.match(provisionV2, /const endpoint = await restoreRetiredEndpointCapacity\(await constrainEndpointToApprovedGpu/)
-  // The restore never widens the endpoint policy: one worker, scale to zero, unchanged idle timeout.
+  // The evaluator keeps scale-to-zero and one worker max, but normalizes idle to 180s so a worker that finishes
+  // cold bootstrap just after one 2-minute cron cycle remains available for the next bounded retry.
   assert.doesNotMatch(provisionV2, /max: [2-9]|min: [1-9]/)
+  assert.match(provisionV2, /const IDLE_TIMEOUT_SECONDS = 180/)
+  assert.match(provisionV2, /if \(maxWorkers >= 1 && idleTimeout === IDLE_TIMEOUT_SECONDS\) return endpoint/)
+  assert.ok((180 / 3600) * 0.69 < 0.2, '180s at the approved $0.69\/hr ceiling stays below wake authority')
 })

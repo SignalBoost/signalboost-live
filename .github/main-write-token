@@ -1,2 +1,2 @@
-base_sha=4d64974425ad7d305cd7e1c59d3fcbfba11f7ffc
-branch=fix/mass-evaluator-dynamic-holdout-budget
+base_sha=c27e48bf755da1d12135d6f7a03b906fcf4ec70d
+branch=fix/mass-evaluator-warm-handoff

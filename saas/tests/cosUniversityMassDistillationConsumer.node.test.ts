@@ -96,3 +96,12 @@ test('mass campaign has a signed callback and a bounded scheduled consumer', () 
   assert.match(workflow, /maxDispatches: 3/)
   assert.match(vercel, /\/api\/cron\/cos-university-mass-distillation/)
 })
+
+test('semantic subject-recheck failures are terminalized instead of rearmed', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /mass_distillation_source_subject_recheck_/)
+  assert.match(consumer, /status: 'quarantined'/)
+  assert.match(consumer, /mass_distillation_semantic_failure_terminalized/)
+  assert.match(consumer, /retryAuthorized: false/)
+  assert.match(consumer, /\.update\(\{ status: 'failed', updated_at: terminalizedAt \}\)/)
+})

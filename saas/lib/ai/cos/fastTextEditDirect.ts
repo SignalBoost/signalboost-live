@@ -6,8 +6,8 @@
 
 export type DirectFastEditResult = { text: string; model: string; elapsedMs: number }
 
-const DEFAULT_DEADLINE_MS = 20_000
-const DEFAULT_ATTEMPT_MS = 6_000
+const DEFAULT_DEADLINE_MS = 25_000
+const DEFAULT_ATTEMPT_MS = 10_000
 const DEEPINFRA_FAST_MODEL = 'deepseek-ai/DeepSeek-V4-Flash'
 
 function deadlineMs(): number {

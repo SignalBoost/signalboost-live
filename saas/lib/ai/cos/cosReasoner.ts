@@ -149,8 +149,9 @@ export async function callRawCosReasoner(
   if (!localConfigured()) return null
 
   const config = configuredReasoner()
-  const inference = localInferenceConfigFromEnv()
   const budget = startTurnBudget()
+  const baseInference = localInferenceConfigFromEnv()
+  const boundedInference = () => ({ ...baseInference, timeoutMs: Math.max(1_000, Math.min(baseInference.timeoutMs, remainingMs(budget))) })
   const recorder = new TurnRecorder()
   const turnId = randomUUID()
   const features = extractQueryFeatures(args.prompt)
@@ -214,7 +215,8 @@ export async function callRawCosReasoner(
       recorder.skip('published_diagnostic_research', 'not_enterprise_advisory_diagnosis')
     }
 
-    if (primaryCouncilEligible(args)) {
+    const councilAffordable = hasBudgetFor(budget, localCallEstimateMs())
+    if (primaryCouncilEligible(args) && councilAffordable) {
       const council = await recorder.time('council', () => maybeBuildCognitiveCouncilAdvisory({
         prompt: args.prompt,
         reasonerLabel: config.label,
@@ -259,11 +261,14 @@ export async function callRawCosReasoner(
         recorder.skip('challenge', 'no_advisory')
       }
     } else {
-      recorder.skip('council', 'not_eligible')
-      recorder.skip('challenge', 'not_eligible')
+      const reason = primaryCouncilEligible(args) ? 'no_budget' : 'not_eligible'
+      recorder.skip('council', reason)
+      recorder.skip('challenge', reason)
+      if (reason === 'no_budget') console.warn('[cos-turn-budget] council skipped to protect the turn deadline', JSON.stringify({ remainingMs: remainingMs(budget) }))
     }
 
-    const first = await recorder.time('draft', () => callLocalModel(effectiveArgs, inference), 'model').catch(error => {
+    if (remainingMs(budget) < 1_000) return null
+    const first = await recorder.time('draft', () => callLocalModel(effectiveArgs, boundedInference()), 'model').catch(error => {
       console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
         at: new Date().toISOString(),
         phase: 'draft',
@@ -299,7 +304,7 @@ export async function callRawCosReasoner(
             ...(firstAdvisoryDefects.length ? ['', ADVISORY_DIAGNOSIS_OWNER_POLICY, '', `The rejected draft violated: ${firstAdvisoryDefects.join(', ')}.`] : []),
           ].join('\n'),
         },
-        inference,
+        boundedInference(),
       ), 'model').catch(error => {
         console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
           at: new Date().toISOString(),
@@ -369,7 +374,7 @@ export async function callRawCosReasoner(
           maxTokens: Math.max(2048, Math.min(Number(effectiveArgs.maxTokens ?? 4096), 6000)),
           prompt: buildSkillCitationRepairPrompt(effectiveArgs.prompt, parsed.answer, allowedSkillTags),
         },
-        inference,
+        boundedInference(),
       ), 'model').catch(error => {
         console.error('[cos-reasoner-local-call-failed]', JSON.stringify({
           at: new Date().toISOString(),

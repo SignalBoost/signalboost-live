@@ -69,18 +69,18 @@ test('forward migration hardens databases that already applied the rolling polic
   assert.match(sql, /notify pgrst, 'reload schema'/)
 })
 
-test('canonical workflow prepares at owner-selected throughput, then separately authorizes and dispatches', () => {
+test('canonical workflow dispatches authorized work before slower curriculum maintenance', () => {
   const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
   const throughput = workflow.indexOf('massDistillationThroughputProfile()')
   const packaging = workflow.indexOf('prepareUniversityMassDistillationCurriculum(now')
   const authorization = workflow.indexOf('authorizeNextUniversityMassDistillationCampaign()')
   const dispatch = workflow.indexOf('runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })')
   assert.ok(throughput > 0)
-  assert.ok(packaging > throughput)
-  assert.ok(authorization > packaging)
+  assert.ok(authorization > throughput)
   assert.ok(dispatch > authorization)
+  assert.ok(packaging > dispatch)
   assert.match(workflow, /massDistillationDispatchReadiness/)
-  assert.match(workflow, /owner_rolling_24h_ceiling/)
+  assert.match(workflow, /dispatch before semantic\/curriculum maintenance|Dispatch is the critical path/)
   assert.match(workflow, /throughput\.corpusScanRows/)
   assert.match(workflow, /throughput\.maxBatchesPerSweep/)
 })

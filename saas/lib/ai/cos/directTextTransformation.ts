@@ -161,6 +161,7 @@ async function tryNeuralCommunicationTransformation(input: {
 }) {
   const context = input.referenceContext ? input.referenceContext.slice(0, 12_000) : null
   const reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
     temperature: 0.08,
     maxTokens: 1800,
     systemPrompt: [
@@ -280,6 +281,7 @@ export async function tryDirectTextTransformation(input: {
     // Safe neural fallback for non-correspondence transformations or a strategic-advisor transport
     // failure. This remains neural generation; deterministic code still does not write prose.
     let reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
       temperature: 0.08,
       maxTokens: 2400,
       systemPrompt: [
@@ -317,6 +319,7 @@ export async function tryDirectTextTransformation(input: {
     // Retry once with a compact, equivalent neural editor request before reporting unavailable.
     if (!reasoned?.text) {
       reasoned = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
         temperature: 0.05,
         maxTokens: 2400,
         systemPrompt: [
@@ -414,6 +417,7 @@ export async function tryDirectTextTransformation(input: {
   // rather than throwing away the entire improved draft.
   if (contextualEditIntentViolation({ originalSource: rawEditableSource, answer: finalAnswer })) {
     const intentRepair = await callCosReasoner({
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
       temperature: 0,
       maxTokens: 2400,
       systemPrompt: [

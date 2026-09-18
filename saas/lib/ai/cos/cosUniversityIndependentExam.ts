@@ -13,7 +13,7 @@ import {
 } from './cosUniversityLanguages.ts'
 
 export const COS_UNIVERSITY_EXAM_PROFILE = 'cos_university_unseen_v1'
-export const COS_UNIVERSITY_EXAM_SCORER = 'university-host-scorer-v2'
+export const COS_UNIVERSITY_EXAM_SCORER = 'university-host-scorer-v3'
 export const COS_UNIVERSITY_MINIMUM_UNSEEN_PASSES = 2
 
 export type CosUniversityExamTarget =
@@ -24,6 +24,11 @@ export type CosUniversityExamRubric = Readonly<{
   requiredGroups: readonly (readonly string[])[]
   forbiddenTerms?: readonly string[]
   exactPatterns?: readonly string[]
+  /**
+   * Required computed values, matched numerically rather than as a literal string. A correct answer
+   * written as "3,333.33" must not fail because the host computed 3333.3333333333335 in floating point.
+   */
+  exactNumbers?: readonly Readonly<{ value: number; allowCeilInteger?: boolean }>[]
   maxWords?: number
   numberedActions?: number
   targetLanguage?: CosPlatformLanguage
@@ -100,9 +105,38 @@ function hasAny(text: string, terms: readonly string[]): boolean {
   return terms.some(term => value.includes(normalize(term)))
 }
 
-function exactNumberPattern(value: number): string {
-  const escaped = String(value).replace('.', '\\.')
-  return `(?:^|[^0-9])${escaped}(?:[^0-9]|$)`
+/**
+ * Scorer v3. v2 required the literal JavaScript string of each computed value, so a non-integer such
+ * as 100000 / 30 demanded "3333.3333333333335" and rejected every correctly rounded answer, and an
+ * integer written with a thousands separator ("6,000") was rejected too. A stated value now matches
+ * when it equals the expected value at the precision the learner wrote it:
+ *  - integers: exact after removing thousands separators ("6,000" = 6000; "6,000.00" = 6000);
+ *  - non-integers: written with at least one decimal and within half a unit of its last decimal
+ *    ("3,333.33" and "3333.3" match 3333.333…; "3333.4" does not);
+ *  - allowCeilInteger: a whole-unit answer rounded up, for counts that cannot be fractional
+ *    (break-even units: 3,334).
+ * Nothing is looser than the stated precision: a wrong number never matches.
+ */
+function statedNumbers(text: string): Array<{ value: number; decimals: number }> {
+  const found: Array<{ value: number; decimals: number }> = []
+  for (const match of text.matchAll(/(?<![0-9.,])-?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?![0-9])/g)) {
+    const raw = match[0].replace(/,/g, '')
+    const value = Number(raw)
+    if (!Number.isFinite(value)) continue
+    const dot = raw.indexOf('.')
+    found.push({ value, decimals: dot >= 0 ? raw.length - dot - 1 : 0 })
+  }
+  return found
+}
+
+export function statesExpectedNumber(text: string, expected: number, allowCeilInteger = false): boolean {
+  if (!Number.isFinite(expected)) return false
+  const integer = Number.isInteger(expected)
+  return statedNumbers(String(text ?? '')).some(({ value, decimals }) => {
+    if (integer) return value === expected
+    if (decimals === 0) return allowCeilInteger && value === Math.ceil(expected)
+    return Math.abs(value - expected) <= 0.5 * 10 ** -decimals + 1e-9
+  })
 }
 
 /**
@@ -187,7 +221,7 @@ function subjectExam(seed: string, subjectId: CosUniversitySubjectId): CosUniver
           ['causal', 'causation', 'caused'],
         ],
         forbiddenTerms: ['proves b is better', 'proves the treatment'],
-        exactPatterns: [exactNumberPattern(rateA), exactNumberPattern(rateB), exactNumberPattern(pp)],
+        exactNumbers: [{ value: rateA }, { value: rateB }, { value: pp }],
         maxWords: 220,
       },
     })
@@ -202,7 +236,7 @@ function subjectExam(seed: string, subjectId: CosUniversitySubjectId): CosUniver
       prompt: `UNSEEN UNIVERSITY EXAM. A cart starts from rest and accelerates uniformly at ${acceleration} m/s^2 for ${seconds} s. Compute its final speed and distance traveled. Show the equations used and include units.`,
       rubric: {
         requiredGroups: [['v =', 'velocity', 'speed'], ['distance', 's =', 'displacement'], ['m/s'], ['m/s^2', 'm/s²']],
-        exactPatterns: [exactNumberPattern(speed), exactNumberPattern(distance)],
+        exactNumbers: [{ value: speed }, { value: distance }],
         maxWords: 180,
       },
     })
@@ -287,7 +321,7 @@ function subjectExam(seed: string, subjectId: CosUniversitySubjectId): CosUniver
       prompt: `UNSEEN UNIVERSITY EXAM. A product has fixed annual cost $${fixed}, price $${price} per unit, and variable cost $${variable} per unit. Compute contribution margin per unit and break-even unit volume. State the formulas and do not treat break-even as profit.`,
       rubric: {
         requiredGroups: [['contribution margin'], ['break-even', 'break even'], ['fixed cost'], ['variable cost']],
-        exactPatterns: [exactNumberPattern(margin), exactNumberPattern(breakEven)],
+        exactNumbers: [{ value: margin }, { value: breakEven, allowCeilInteger: true }],
         forbiddenTerms: ['break-even is profit', 'break even is profit'],
         maxWords: 180,
       },
@@ -492,6 +526,11 @@ export function scoreCosUniversityBlindExam(
   }
   for (const pattern of exam.rubric.exactPatterns ?? []) {
     if (!new RegExp(pattern, 'i').test(text)) reasons.push(`exact_pattern_missing:${pattern}`)
+  }
+  for (const number of exam.rubric.exactNumbers ?? []) {
+    if (!statesExpectedNumber(text, number.value, number.allowCeilInteger === true)) {
+      reasons.push(`exact_number_missing:${number.value}`)
+    }
   }
   if (exam.rubric.maxWords && words(text) > exam.rubric.maxWords) {
     // Six consecutive reasoning_decision_science failures were all word_limit_exceeded on the same

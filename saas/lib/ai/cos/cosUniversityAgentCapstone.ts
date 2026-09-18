@@ -16,6 +16,12 @@ export type AgentCapstoneRequest = Readonly<{
   agentId: string; runId: string; manifestHash: string; prompt: string
   /** Host-selected non-credit training; absence preserves the existing assessment prompt. */
   purpose?: 'practice'
+  /**
+   * Public response ceiling of an independent assessment, already disclosed in the prompt. When the
+   * learner's own draft exceeds it, the same learner gets one bounded self-edit before submitting.
+   * Never used for practice, never raises or relaxes the scorer's limit.
+   */
+  responseWordLimit?: number
 }>
 
 export type AgentCapstoneExecution = Readonly<{
@@ -25,6 +31,11 @@ export type AgentCapstoneExecution = Readonly<{
   model: string; manifestHash: string; promptHash: string; responseHash: string; contextHash: string
   startedAt: string; completedAt: string; commitSha: string | null; deploymentId: string | null
   academicAuthority: 'none'
+  /** Present only when the learner self-edited an over-limit draft. The scored reply is the final text. */
+  lengthRevision?: Readonly<{
+    limit: number; draftWords: number; finalWords: number
+    draftResponseHash: string; revisionPromptHash: string; revisionApplied: boolean
+  }>
   studyMaterial?: Readonly<{ packetHash: string; learningRunId: string; planId: string; studyAttempt: number; contentHashes: readonly string[] }>
 }>
 
@@ -47,6 +58,25 @@ export function isSoftwareCapstoneIdentity(agentId: string, role: unknown): bool
 }
 
 function hash(text: string): string { return createHash('sha256').update(text).digest('hex') }
+
+/** Identical to the independent scorer's count: whitespace-separated tokens of the whole reply. */
+export function countUniversityResponseWords(value: string): number {
+  return String(value ?? '').trim().match(/\S+/g)?.length ?? 0
+}
+
+export function universityLengthRevisionPrompt(input: { limit: number; draftWords: number; casePrompt: string; draft: string }): string {
+  return [
+    `Your draft final response below has ${input.draftWords} words. The case allows at most ${input.limit} words in the entire final response, counting headings and numbered labels as words.`,
+    `Rewrite it as your final response in at most ${input.limit} words. Keep your conclusions, stated unknowns and the format the case requested. Remove repetition, restatement and filler rather than substance. Do not add new claims or facts.`,
+    'Return only the rewritten final response.',
+    '',
+    'CASE:',
+    input.casePrompt,
+    '',
+    'YOUR OVER-LIMIT DRAFT:',
+    input.draft,
+  ].join('\n')
+}
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
 }
@@ -124,10 +154,30 @@ export async function executeBoundSoftwareCapstone(request: AgentCapstoneRequest
     'HOST PRACTICE CASE (complete only this task):',
     request.prompt,
   ].join('\n') : request.prompt
+  const wordLimit = request.purpose === 'practice' ? undefined : request.responseWordLimit
+  if (wordLimit !== undefined && (!Number.isSafeInteger(wordLimit) || wordLimit <= 0)) {
+    throw new Error('invalid_agent_response_word_limit')
+  }
   const turnId = randomUUID(), startedAt = new Date().toISOString()
-  // Exactly one call through the assigned specialist model. No cache, generalist or external fallback.
-  const reply = await ports.infer({ prompt: inferencePrompt, systemPrompt, maxTokens: request.purpose === 'practice' ? 1800 : 4096 }, model)
-  if (typeof reply !== 'string' || !reply.trim()) throw new Error('agent_capstone_inference_failed')
+  // One call through the assigned specialist model. No cache, generalist or external fallback.
+  const draft = await ports.infer({ prompt: inferencePrompt, systemPrompt, maxTokens: request.purpose === 'practice' ? 1800 : 4096 }, model)
+  if (typeof draft !== 'string' || !draft.trim()) throw new Error('agent_capstone_inference_failed')
+
+  // At most one more call, by the same learner on the same model, only when its own draft exceeds the
+  // limit the case already disclosed. The scorer still counts the submitted text exactly as before.
+  let reply = draft
+  let lengthRevision: AgentCapstoneExecution['lengthRevision']
+  const draftWords = countUniversityResponseWords(draft)
+  if (wordLimit !== undefined && draftWords > wordLimit) {
+    const revisionPrompt = universityLengthRevisionPrompt({ limit: wordLimit, draftWords, casePrompt: inferencePrompt, draft })
+    const revised = await ports.infer({ prompt: revisionPrompt, systemPrompt, maxTokens: 4096 }, model)
+    const revisionApplied = typeof revised === 'string' && Boolean(revised.trim())
+    if (revisionApplied) reply = revised as string
+    lengthRevision = Object.freeze({
+      limit: wordLimit, draftWords, finalWords: countUniversityResponseWords(reply),
+      draftResponseHash: hash(draft), revisionPromptHash: hash(systemPrompt + '\n' + revisionPrompt), revisionApplied,
+    })
+  }
   if (await ports.readRole(request.agentId) !== role) throw new Error('agent_capstone_identity_changed')
   const execution: AgentCapstoneExecution = Object.freeze({
     runtime, agentId: request.agentId, role,
@@ -137,6 +187,7 @@ export async function executeBoundSoftwareCapstone(request: AgentCapstoneRequest
     commitSha: ports.commitSha || null, deploymentId: ports.deploymentId || null, academicAuthority: 'none',
     ...(studyMaterial ? { studyMaterial: { packetHash: practiceStudyMaterialHash(studyMaterial), learningRunId: studyMaterial.learningRunId,
       planId: studyMaterial.planId, studyAttempt: studyMaterial.studyAttempt, contentHashes: studyMaterial.sources.map(source => source.contentHash) } } : {}),
+    ...(lengthRevision ? { lengthRevision } : {}),
   })
   return { reply, execution }
 }

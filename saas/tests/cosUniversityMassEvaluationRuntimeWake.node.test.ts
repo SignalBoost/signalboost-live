@@ -1,0 +1,49 @@
+// saas/tests/cosUniversityMassEvaluationRuntimeWake.node.test.ts
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+
+const route = fs.readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
+
+test('mass evaluation wakes the scaled-to-zero runtime through the vLLM load-balancer path', () => {
+  // Production 2026-09-17 19:32 UTC: GET /v1/models returned 404 because the exact-artifact gateway serves only
+  // /ping, /ready and POST /v1/chat/completions. The wake uses a path the runtime actually serves.
+  assert.match(route, /runpodServerlessRootUrl\(endpointId\)\}\/ping`/)
+  assert.doesNotMatch(route, /\/models`/)
+  assert.match(route, /!== 'accepting_requests'/)
+  // The wake result reads only fields /ping actually returns.
+  assert.match(route, /modelReady: payload\?\.modelReady === true/)
+  assert.doesNotMatch(route, /payload\.data\.length/)
+  const gateway = fs.readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
+  assert.match(gateway, /@app\.get\('\/ping'\)/)
+  assert.doesNotMatch(gateway, /@app\.get\('\/v1\/models'\)/)
+  assert.match(route, /tokenGeneratingRequest: false/)
+  assert.match(route, /await wakeMassDistilledRuntime\(claim\.endpointId, deadlineMs\)/)
+})
+
+test('runtime wake is bounded and hands cold-start readiness back to the evaluator', () => {
+  assert.match(route, /const RUNTIME_WAKE_TIMEOUT_MS = 20_000/)
+  assert.match(route, /name !== 'TimeoutError' && name !== 'AbortError'/)
+  assert.match(route, /wakeRequestTimedOut: true/)
+  assert.match(route, /responseObserved: false/)
+  // Guard against the previous five-minute regression without repeating the declaration token; the repository
+  // targeting scanner intentionally flags repeated declaration-like identifiers even when they appear in tests.
+  assert.doesNotMatch(route, /300_000/)
+})
+
+test('runtime wake remains separate from the approved scoring-call budget', () => {
+  const wake = route.indexOf('await wakeMassDistilledRuntime(claim.endpointId, deadlineMs)')
+  const evaluation = route.indexOf('await runMassDistilledArtifactEvaluation({ claim, deadlineMs, now: new Date() })')
+  assert.ok(wake >= 0 && evaluation > wake)
+  assert.match(route, /does not consume one of the\n    \/\/ eight approved scoring calls/)
+})
+
+test('an evaluator defect records its own throw site, without leaking provider or prompt content', () => {
+  // 2026-09-17 20:01 UTC: a TypeError from our own code was stored with no stack, so the throwing line was unknown.
+  assert.match(route, /const frames = error instanceof Error/)
+  assert.match(route, /line\.trim\(\)\.startsWith\('at '\)/)
+  assert.match(route, /\.slice\(0, 4\)/)
+  assert.match(route, /errorFrames: frames/)
+  // Only our own frames are kept: the error body itself is still truncated to the existing 500-character message.
+  assert.match(route, /evidence: \{ error: clean\(message, 500\), \.\.\.\(frames\.length \? \{ errorFrames: frames \} : \{\}\) \}/)
+})

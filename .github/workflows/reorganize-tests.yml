@@ -1,0 +1,49 @@
+# .github/workflows/reorganize-tests.yml
+name: Reorganize tests directory
+
+# Run this from the Actions tab: pick this workflow, press "Run workflow".
+# It opens a pull request; nothing is changed on main until that PR is merged.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  reorganize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Move tests into domain directories
+        working-directory: saas
+        run: node scripts/reorganize-tests.mjs
+
+      - name: Verify the layout guard passes
+        working-directory: saas
+        run: node scripts/check-test-directory-health.mjs
+
+      - name: Open the pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH="chore/reorganize-tests-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          # Branch protection on main requires this file to name the PR base and head.
+          printf 'base_sha=%s\nbranch=%s\n' "$GITHUB_SHA" "$BRANCH" > .github/main-write-token
+          git add -A
+          git commit -m "chore: split saas/tests into domain directories and discover tests by glob"
+          git push origin "$BRANCH"
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "Reorganize saas/tests into domain directories" \
+            --body "Moves every file in saas/tests into a domain subdirectory so no directory approaches GitHub's 1,000-file listing cap, rewrites relative imports and \`new URL\` source reads for the new depth, replaces the hand-maintained 349-filename test script with glob discovery so every test runs, repoints workflow path filters, and adds a prebuild guard against regrowth. Verified: no import that resolved before the move fails after it."

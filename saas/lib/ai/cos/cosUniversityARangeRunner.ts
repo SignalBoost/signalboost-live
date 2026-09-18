@@ -13,6 +13,7 @@ import { executeBoundAgentExam, hasBoundAcademicExecutor } from './cosUniversity
 import { boundExecutionBindingFailure } from './cosUniversityExecutionBinding.ts'
 import { recordCosUniversityAssessment } from './cosUniversityStore.ts'
 import { COS_UNIVERSITY_SUBJECTS, classifyCosUniversitySubjects, type CosUniversitySubjectId } from './cosUniversity.ts'
+import { COS_OWNER_VERIFIED_SUBJECTS_PROFILE, verifiedTurnSubjectsFromLedger } from './cosOwnerVerifiedOutcomePolicy.ts'
 import {
   COS_UNIVERSITY_A_RANGE_PROFILE,
   COS_UNIVERSITY_A_RANGE_SCORER,
@@ -264,7 +265,21 @@ async function syncVerifiedProductionOutcomes(now: Date): Promise<{ candidates: 
     if (outcome.verified_success === null || !outcomeAt || !isCosUniversityVerifiedProductionSource(source)) continue
     const experience = await db.from('cos_turn_experience').select('problem_class').eq('turn_id', outcome.turn_id).maybeSingle()
     if (experience.error) throw experience.error
-    const subjects = classifyCosUniversitySubjects(experience.data?.problem_class || '')
+    // An owner-verified record carries the subjects of the actual user request, classified when it was
+    // verified. problem_class collapses politics, history or quantum requests into generic classes, so
+    // it would credit the wrong subject. Only authoritative records use this; other sources are unchanged.
+    let verifiedSubjects: CosUniversitySubjectId[] | null = null
+    if (source.startsWith('production_verified:authoritative_record:')) {
+      const recorded = await db.from('cos_university_learning_assurance_events')
+        .select('evidence')
+        .eq('event_type', 'learning_outcome')
+        .eq('verifier', 'host_controller')
+        .contains('evidence', { profile: COS_OWNER_VERIFIED_SUBJECTS_PROFILE, turnId: outcome.turn_id })
+        .limit(1)
+      if (recorded.error) throw recorded.error
+      verifiedSubjects = verifiedTurnSubjectsFromLedger((recorded.data || []) as any[], outcome.turn_id)
+    }
+    const subjects = verifiedSubjects ?? classifyCosUniversitySubjects(experience.data?.problem_class || '')
     if (!subjects.length) continue
 
     for (const subjectId of subjects.slice(0, 4)) {

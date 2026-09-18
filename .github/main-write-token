@@ -1,2 +1,2 @@
-base_sha=3afc9096e64f79ea47b9f312f239ac4a9fbef9b7
-branch=fix/runpod-embedding-primary-fallback-20260914
+base_sha=b218bb5e7b4aad0ac60680a25dcf1e832d5c5336
+branch=fix/cos-direct-edit-timeout-20260918

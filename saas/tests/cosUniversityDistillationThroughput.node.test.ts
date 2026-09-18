@@ -75,6 +75,10 @@ test('paid authorization and dispatch precede slower ready-inventory maintenance
   assert.match(workflow, /throughput\.acquisitionCandidatesPerCycle/)
   assert.match(workflow, /throughput\.corpusScanRows/)
   assert.match(workflow, /throughput\.maxBatchesPerSweep/)
+  assert.match(workflow, /slowMaintenanceDue = input\.source === 'self_healing_supervisor' \|\| now\.getUTCMinutes\(\) % 5 === 0/)
+  assert.match(workflow, /slowMaintenanceDue[\s\S]*campaign_recovery/)
+  assert.match(workflow, /slowMaintenanceDue[\s\S]*semantic_reconciliation/)
+  assert.match(workflow, /reason: 'maintenance_not_due'/)
 })
 
 test('owner throughput control remains separate from University spending and authority', () => {

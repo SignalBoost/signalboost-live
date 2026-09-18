@@ -25,7 +25,26 @@ import { reconcilePreparedMassDistillationSemanticCohesion } from './cosUniversi
 export type MassDistillationWorkflowSource = 'scheduled_cron' | 'self_healing_supervisor'
 
 function safeError(error: unknown): string {
-  return String(error instanceof Error ? error.message : error || 'unknown_error').replace(/\s+/g, ' ').trim().slice(0, 300)
+  if (error instanceof Error) return String(error.message || error.name || 'unknown_error').replace(/\s+/g, ' ').trim().slice(0, 500)
+  if (error && typeof error === 'object') {
+    const raw = error as Record<string, unknown>
+    const parts = [raw.code, raw.message, raw.details, raw.hint]
+      .map(value => String(value ?? '').replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+    if (parts.length) return parts.join(' | ').slice(0, 500)
+    try { return JSON.stringify(error).slice(0, 500) } catch {}
+  }
+  return String(error || 'unknown_error').replace(/\s+/g, ' ').trim().slice(0, 500)
+}
+
+async function isolatedStep<T extends Record<string, any>>(name: string, fn: () => Promise<T>): Promise<T | Record<string, any>> {
+  try {
+    return await fn()
+  } catch (error) {
+    const message = safeError(error)
+    console.error('[cos-university-mass-distillation-step]', JSON.stringify({ ok: false, step: name, error: message }))
+    return { ok: false, skipped: false, step: name, error: message }
+  }
 }
 
 async function consumedBatchKeys(db: any, keys: readonly string[]): Promise<Set<string>> {
@@ -94,13 +113,22 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const now = input.now || new Date()
   const throughput = massDistillationThroughputProfile()
   const teacherPool = universityTeacherPoolStatus()
-  const reconciliation = await reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 15 })
-  const diagnostics = await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })
-  const stalledDispatchRecovery = await recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 })
-  const recovery = await recoverMassDistillationCampaigns({ now, maxCampaigns: 5 })
-  const campaignClosure = await closeExpiredMassDistillationCampaigns({ now, maxCampaigns: 10 })
-  const terminalCleanup = await terminalizeFailedMassDistillationCampaignRuns({ maxCampaigns: 20 })
-  const semanticReconciliation = await reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 100 })
+  // Cleanup/closure is deliberately first and fail-isolated. A telemetry or provider-ledger error
+  // must never strand an expired active campaign and block the next authorized campaign.
+  const campaignClosure = await isolatedStep('campaign_closure', () =>
+    closeExpiredMassDistillationCampaigns({ now, maxCampaigns: 10 }))
+  const terminalCleanup = await isolatedStep('terminal_cleanup', () =>
+    terminalizeFailedMassDistillationCampaignRuns({ maxCampaigns: 20 }))
+  const reconciliation = await isolatedStep('provider_reconciliation', () =>
+    reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 15 }))
+  const diagnostics = await isolatedStep('provider_diagnostics', () =>
+    diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 }))
+  const stalledDispatchRecovery = await isolatedStep('stalled_dispatch_recovery', () =>
+    recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 }))
+  const recovery = await isolatedStep('campaign_recovery', () =>
+    recoverMassDistillationCampaigns({ now, maxCampaigns: 5 }))
+  const semanticReconciliation = await isolatedStep('semantic_reconciliation', () =>
+    reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 100 }))
   const preparedBufferTarget = throughput.preparedBatchBufferTarget
   let preparedBeforeReplenishment = 0
   let preparedAfterReplenishment = 0
@@ -185,8 +213,8 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const consumerSkipped = 'skipped' in result && result.skipped === true
   const reconciliationSkipped = 'skipped' in reconciliation && reconciliation.skipped === true
   const diagnosticsSkipped = 'skipped' in diagnostics && diagnostics.skipped === true
-  const stalledDispatchRecoverySkipped = stalledDispatchRecovery.skipped === true
-  const recoverySkipped = recovery.skipped === true
+  const stalledDispatchRecoverySkipped = 'skipped' in stalledDispatchRecovery && stalledDispatchRecovery.skipped === true
+  const recoverySkipped = 'skipped' in recovery && recovery.skipped === true
   const skipped = consumerSkipped && reconciliationSkipped && diagnosticsSkipped
     && stalledDispatchRecoverySkipped && recoverySkipped
   const invocationSucceeded = result.ok === true

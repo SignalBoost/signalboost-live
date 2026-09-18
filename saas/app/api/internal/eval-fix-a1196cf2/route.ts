@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { GET as runEvaluation } from '../../cron/cos-university-distilled-evaluation/route'
+import { GET as runEvaluation } from '../../cron/cos-university-distilled-evaluation/route.ts'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'

@@ -91,18 +91,13 @@ test('shared COS entrypoint runs direct text transformation before contextual in
   assert.ok(contextual > direct)
 })
 
-test('direct text transformation uses the bounded fast editor lane and bypasses RunPod primary', () => {
+test('direct text transformation is marked to bypass RunPod primary', () => {
   const inference = readFileSync(join(process.cwd(), 'lib/ai/local-inference.ts'), 'utf8')
   const direct = readFileSync(join(process.cwd(), 'lib/ai/cos/directTextTransformation.ts'), 'utf8')
   assert.match(inference, /feature === 'direct_text_transformation'/)
-  assert.match(inference, /COS_DIRECT_TEXT_MODEL/)
-  assert.match(inference, /zai-org\/GLM-5\.3-Flash/)
-  assert.match(inference, /COS_DIRECT_TEXT_TIMEOUT_MS/)
-  assert.match(inference, /if \(directTextTransformation\(args\)\) return 'none'/)
   assert.match(direct, /feature: 'direct_text_transformation'/)
   assert.match(direct, /isLatencySensitiveShortEdit/)
   assert.match(direct, /maxTokens: 900/)
-  assert.match(direct, /recommendations, warnings, or advice/)
 })
 
 

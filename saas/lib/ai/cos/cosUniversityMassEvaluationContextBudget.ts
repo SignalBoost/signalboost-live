@@ -95,15 +95,17 @@ function splitEvenly<T>(items: readonly T[], groups: number): T[][] {
 // group retry slot instead of entering the split-child path. Production also proves 5-case and 7-case candidate
 // requests can 502 despite fitting context, so 3-6 case holdouts start with groups no larger than two whenever
 // maxGroups permits, while 7-case holdouts use the available transport budget: 3+2+2 with maxGroups=3 and 4+3
-// with maxGroups=2. Case order/content and every scoring threshold stay fixed.
-export function planMassEvaluationGroups<T>(items: readonly T[], promptFor: (group: readonly T[]) => string, maxGroups: number): T[][] {
+// with maxGroups=2. A caller may also supply minGroups when Production evidence requires smaller requests while staying
+// inside an independently computed call budget. Case order/content and every scoring threshold stay fixed.
+export function planMassEvaluationGroups<T>(items: readonly T[], promptFor: (group: readonly T[]) => string, maxGroups: number, minGroups = 1): T[][] {
   if (!items.length) throw new Error('mass_distilled_evaluation_no_cases')
   const limit = Math.max(1, Math.min(Math.floor(maxGroups), items.length))
+  const floor = Math.max(1, Math.min(Math.floor(minGroups), limit))
   const desiredTransportGroups = items.length >= 3 && items.length <= 7
     ? Math.min(Math.ceil(items.length / 2), 3)
     : 1
   const transportGroups = Math.min(desiredTransportGroups, limit)
-  const startGroups = items.length === 2 && limit >= 2 ? 2 : transportGroups
+  const startGroups = Math.max(floor, items.length === 2 && limit >= 2 ? 2 : transportGroups)
   for (let groups = startGroups; groups <= limit; groups++) {
     const planned = splitEvenly(items, groups)
     const fits = planned.every(group => {

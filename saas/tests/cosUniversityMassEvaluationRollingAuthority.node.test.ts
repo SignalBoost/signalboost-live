@@ -78,6 +78,7 @@ test('evaluator infrastructure failures do not exhaust the artifact retry budget
   const rollingApproval = ev(artifactA.candidateId, 'host_controller', { claim: 'distilled_independent_evaluation_approved', artifactHash: hashA, authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF }, '2026-09-16T09:00:00Z', '2026-09-16T11:00:00Z')
   const failures = [
     'mass_distilled_evaluation_context_budget_insufficient:cases=8:estimatedPromptTokens=9138',
+    'mass_distilled_evaluation_endpoint_call_ceiling:0+2+15>14',
     "mass_distilled_evaluation_runpod_http_400:baseline:cases=8:{\"error\":{\"message\":\"This model's maximum context length is 8192 tokens\"}}",
     'The operation was aborted due to timeout',
     'mass_distilled_evaluation_runpod_http_502:baseline:cases=4:gateway',

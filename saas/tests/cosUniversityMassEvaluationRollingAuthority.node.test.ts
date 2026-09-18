@@ -9,6 +9,7 @@ import {
   decideRollingMassEvaluationApproval,
   type RollingEvent,
 } from '../lib/ai/cos/cosUniversityMassEvaluationRollingAuthority.ts'
+import { MASS_EVALUATION_ENDPOINT_CALLS } from '../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
 
 const now = new Date('2026-09-16T16:50:00Z')
 const hashA = '7f23dde5'.padEnd(64, 'a')
@@ -22,7 +23,7 @@ test('issues exactly the claim-compatible shape for a canary-proven artifact pas
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA)], now })
   assert.equal(decision.issue, true)
   if (!decision.issue) return
-  assert.equal(decision.evidence.maxEndpointCalls, 8)
+  assert.equal(decision.evidence.maxEndpointCalls, MASS_EVALUATION_ENDPOINT_CALLS)
   assert.equal(decision.evidence.maxJudgeCalls, 4)
   assert.equal(decision.evidence.maxRuntimeWakeAttempts, 1)
   assert.equal(decision.evidence.maxEstimatedRuntimeWakeCostUsd, 0.2)
@@ -60,7 +61,7 @@ test('the repaired 502 diagnostic suspension may resume only through the bounded
   if (!decision.issue) return
   assert.equal(decision.evidence.resumeAfterSuspension, true)
   assert.equal(decision.evidence.repairRef, 'pr_2398_24gb_evaluator_preflight')
-  assert.equal(decision.evidence.maxEndpointCalls, 8)
+  assert.equal(decision.evidence.maxEndpointCalls, MASS_EVALUATION_ENDPOINT_CALLS)
   assert.equal(decision.evidence.maxEstimatedRuntimeWakeCostUsd, 0.2)
   assert.equal(decision.evidence.productionTrafficAuthorized, false)
 })

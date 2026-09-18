@@ -34,6 +34,25 @@ Canonical latency rules:
 - University exams, controlled evaluations, training/distillation, Builder batch work, and other non-interactive workloads keep their own routing and evaluation policies.
 
 A user-facing turn that spends tens of seconds in RunPod lifecycle or RunPod inference before answering is a latency regression, not expected COS behavior.
+
+## COS Direct Editor fast capability — 2026-09-18
+
+Short explicit edit/proofread/polish requests are a bounded COS capability, not a second brain. Assistant and Concierge invoke the same Direct Editor behavior.
+
+- Direct Editor defaults to DeepInfra `zai-org/GLM-5.3-Flash`, overrideable with `COS_DIRECT_TEXT_MODEL`.
+- Direct Editor reasoning effort is `none`.
+- Direct Editor transport timeout defaults to 12 seconds via `COS_DIRECT_TEXT_TIMEOUT_MS`.
+- Existing meaning-fidelity, actor/action/recipient, terminology, layout, and presentation guards remain in force.
+- The editor must not add recommendations, warnings, advice, facts, promises, or commentary absent from the user's source.
+- General COS reasoning and University/evaluation/distillation/Builder workloads retain their own models and controls.
+
+## Authoring intent outranks incidental freshness markers — 2026-09-18
+
+Writing, drafting, translating, editing, rewriting, proofreading, and summarizing are not live-fact verification merely because the surrounding context contains `today`, `current`, `now`, a date, person, or organization.
+
+The freshness boundary recognizes polite authoring wrappers such as `please write`, `could you draft`, and `can you translate` without broadening the global execution/Builder classifier. Genuine lookup commands such as `Please check today's weather` remain live-verified.
+
+Release regression: `my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation` must not enter current-fact web retrieval, evidence grounding, verifier, or freshness-repair workflows.
 ## COS University Hugging Face Jobs training adapter — 2026-09-13
 
 The governed COS University training-executor contract now has an iTMounts Hugging Face Jobs adapter on branch `feat/itmounts-huggingface-training-adapter-20260913`. `HF_TOKEN` may back the internal signed executor without exposing the provider token as a callback credential; a separate HMAC key is derived for signed evidence callbacks. Explicit buyer-supplied executor configuration still takes precedence.

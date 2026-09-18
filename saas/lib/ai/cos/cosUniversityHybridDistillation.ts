@@ -52,6 +52,10 @@ export function planHybridDistillationMix(input: {
   return Object.freeze({ total, realSource: adjustedReal, failureDerived: adjustedFailure, teacherSynthetic })
 }
 
+export function failureDerivedSourceHash(subjectId: string, ordinal: number): string {
+  return hash({ profile: HYBRID_DISTILLATION_PROFILE, origin: 'failure_derived', subjectId, ordinal })
+}
+
 export function teacherSyntheticSourceHash(subjectId: string, ordinal: number): string {
   return hash({ profile: HYBRID_DISTILLATION_PROFILE, origin: 'teacher_synthetic', subjectId, ordinal })
 }
@@ -73,6 +77,14 @@ export function teacherSyntheticPrompt(subjectId: string, ordinal: number): Read
 export function syntheticOrdinalForHash(subjectId: string, sourceHash: string, maxOrdinal = 128): number | null {
   for (let ordinal = 0; ordinal < maxOrdinal; ordinal += 1) {
     if (teacherSyntheticSourceHash(subjectId, ordinal) === sourceHash) return ordinal
+  }
+  return null
+}
+
+
+export function failureDerivedOrdinalForHash(subjectId: string, sourceHash: string, maxOrdinal = 128): number | null {
+  for (let ordinal = 0; ordinal < maxOrdinal; ordinal += 1) {
+    if (failureDerivedSourceHash(subjectId, ordinal) === sourceHash) return ordinal
   }
   return null
 }

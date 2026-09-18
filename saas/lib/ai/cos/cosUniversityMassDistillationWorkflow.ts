@@ -20,6 +20,7 @@ import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHu
 import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUniversityHuggingFaceProviderLedger.ts'
 import { universityTeacherPoolStatus } from './cosUniversityTeacherPool.ts'
 import { terminalizeFailedMassDistillationCampaignRuns } from './cosUniversityMassDistillationTerminalCleanup.ts'
+import { reconcilePreparedMassDistillationSemanticCohesion } from './cosUniversityMassDistillationSemanticReconciliation.ts'
 
 export type MassDistillationWorkflowSource = 'scheduled_cron' | 'self_healing_supervisor'
 
@@ -99,6 +100,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const recovery = await recoverMassDistillationCampaigns({ now, maxCampaigns: 5 })
   const campaignClosure = await closeExpiredMassDistillationCampaigns({ now, maxCampaigns: 10 })
   const terminalCleanup = await terminalizeFailedMassDistillationCampaignRuns({ maxCampaigns: 20 })
+  const semanticReconciliation = await reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 100 })
   const preparedBufferTarget = throughput.preparedBatchBufferTarget
   let preparedBeforeReplenishment = 0
   let preparedAfterReplenishment = 0
@@ -194,6 +196,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     && recovery.ok === true
     && campaignClosure.ok === true
     && terminalCleanup.ok === true
+    && semanticReconciliation.ok === true
     && curriculum.ok === true
     && curriculumReplenishment.ok === true
     && rollingAuthorization.ok === true
@@ -210,6 +213,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       recovery,
       campaignClosure,
       terminalCleanup,
+      semanticReconciliation,
       curriculum,
       curriculumReplenishment,
       throughput,
@@ -219,7 +223,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       preparedAfterReplenishment,
       rollingAuthorization,
       workflowSource: input.source,
-      workflowSemantics: 'detect_diagnose_repair_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_authorize_within_owner_rolling_24h_ceiling_dispatch_verify',
+      workflowSemantics: 'detect_diagnose_repair_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_authorize_within_owner_rolling_24h_ceiling_dispatch_verify',
     },
     invocationSucceeded,
     skipped,

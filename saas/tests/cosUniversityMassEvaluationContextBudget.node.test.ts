@@ -2,7 +2,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { MASS_EVALUATION_MAX_OUTPUT_TOKENS, MASS_EVALUATION_MODEL_CONTEXT_TOKENS, MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from '../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
+import { MASS_EVALUATION_ENDPOINT_CALLS, MASS_EVALUATION_MAX_OUTPUT_TOKENS, MASS_EVALUATION_MODEL_CONTEXT_TOKENS, MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from '../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
 
 const source = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 
@@ -72,6 +72,21 @@ test('seven-case holdouts use the available transport budget instead of collapsi
   assert.deepEqual(baseline.flat().map(item => item.id), seven.map(item => item.id), 'baseline order and content preserved')
 })
 
+test('the live 13-case holdout fits the 14-call ceiling with one recovery call reserved', () => {
+  const cases = Array.from({ length: 13 }, (_, i) => ({ id: `thirteen-${i}` }))
+  const baseline = planMassEvaluationGroups(cases, () => 'short', 2)
+  assert.equal(baseline.length, 1)
+  const fixedEndpointCalls = 2
+  const recoveryReserve = 1
+  const candidateTarget = Math.min(cases.length, MASS_EVALUATION_ENDPOINT_CALLS - baseline.length - fixedEndpointCalls - recoveryReserve)
+  assert.equal(candidateTarget, 10)
+  const candidate = planMassEvaluationGroups(cases, () => 'short', candidateTarget, candidateTarget)
+  assert.equal(candidate.length, 10)
+  assert.ok(candidate.every(group => group.length <= 2))
+  assert.deepEqual(candidate.flat().map(item => item.id), cases.map(item => item.id), 'all holdout cases preserved exactly once')
+  assert.equal(baseline.length + candidate.length + fixedEndpointCalls + recoveryReserve, MASS_EVALUATION_ENDPOINT_CALLS)
+})
+
 test('a one-case batch stays one request, and one that cannot fit in the allowed requests fails explicitly', () => {
   assert.equal(planMassEvaluationGroups([{ id: 'a' }], () => 'short', 3).length, 1)
   const huge = Array.from({ length: 3 }, (_, i) => ({ id: `h${i}` }))
@@ -87,8 +102,10 @@ test('the runner stays inside the approved endpoint-call ceiling and reserves ca
   assert.match(source, /const budget:EndpointCallBudget=\{used:0,max:ENDPOINT_CALLS\}/)
   assert.match(source, /input\.budget\.used\+groups\.length\+input\.reserveCallsAfter>input\.budget\.max/)
   assert.match(source, /const reserve=remainingGroups\+input\.reserveCallsAfter/)
-  assert.match(source, /model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutCases\.length\+2/)
-  assert.match(source, /model,cases:holdoutCases,maxGroups:holdoutCases\.length,reserveCallsAfter:2/)
+  assert.match(source, /const baselineGroupCount=planMassEvaluationGroups\(holdoutCases,batchPrompt,2\)\.length/)
+  assert.match(source, /const candidateGroupTarget=Math\.min\(holdoutCases\.length,ENDPOINT_CALLS-baselineGroupCount-fixedEndpointCalls-recoveryReserve\)/)
+  assert.match(source, /model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:baselineGroupCount,reserveCallsAfter:candidateGroupTarget\+fixedEndpointCalls/)
+  assert.match(source, /model,cases:holdoutCases,maxGroups:candidateGroupTarget,minGroups:candidateGroupTarget,reserveCallsAfter:fixedEndpointCalls/)
   assert.match(source, /reserveCallsAfter:1/)
   assert.match(source, /reserveCallsAfter:0/)
   assert.equal((source.match(/await answersFor\(/g) || []).length, 4)

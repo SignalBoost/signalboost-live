@@ -65,7 +65,7 @@ const INSTITUTIONAL_DIPLOMATIC_GUIDANCE = [
   'INSTITUTIONAL / DIPLOMATIC CORRESPONDENCE — APPLY WHEN THE DRAFT TOUCHES COLLEAGUES, CAREERS, PROMOTION, PERFORMANCE, POLICY, LEADERSHIP, GRIEVANCES, OR A CONTESTED INTERNAL QUESTION:',
   '- Neural reasoning writes the draft. Do not apply a memo template, stock greeting, or fixed paragraph order.',
   '- Never invent a salutation the source did not use (including "Dear Colleagues") and never open with stock hedges such as "I have debated whether to re-engage", "I have observed a recurring pattern", or "we risk missing an opportunity".',
-  '- Preserve the writer\'s voice: first-person stance, cadence, idioms, concrete occupational images, and plain-speech closings. Correct spelling and grammar; do not launder the speaker into HR or front-office copy.',
+  "- Preserve the writer's voice: first-person stance, cadence, idioms, concrete occupational images, and plain-speech closings. Correct spelling and grammar; do not launder the speaker into HR or front-office copy.",
   '- Distinctive source phrases that carry the argument must survive when they are not slurs or threats.',
   '- Preserve the writer\'s substantive point and conviction. Soften only ridicule, contempt, needless personal characterization, or wording that is bitter or accusatory unless the user explicitly asks to retain that tone.',
   '- Distinguish observation from inference. "I have heard colleagues say..." must not become "colleagues claim..." or a statement about their true motives.',

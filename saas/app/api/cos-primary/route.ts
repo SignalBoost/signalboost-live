@@ -194,28 +194,26 @@ function freshTelemetryProvenance(invoked:boolean,reasonerLabel:string|null){ret
 export async function postCosPrimary(req:NextRequest){
   const startedAt=Date.now(),body=await req.clone().json().catch(()=>({})),input=latestUserText(body),language=languageFrom(body)
   if(!input)return legacyConciergePost(new NextRequest(req.clone()))
-  const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body),isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
-  const freshConversationContext=resolveFreshConversationContext(body, input)
-  const lookupInput=freshConversationContext.lookupInput
 
-  // Simple text transformations must never enter the long orchestration path. They are a bounded,
-  // direct COS inference job: no Builder, University, research, web, or specialist admission.
+  // Fast text transforms are deliberately the FIRST executable branch. They do not wait on
+  // Supabase auth, conversation context, memory, Builder, University, research, or any persistence.
+  // This keeps a simple edit/rewrite/translation bounded even when another subsystem is unhealthy.
   if(isFastTextTransform(input)){
     const fast=await runFastTextTransform(input)
     if(!fast){
-      const reply='COS could not complete this simple text edit within the 12-second fast-path limit. The request was stopped instead of being allowed to hang in the long orchestration path.'
-      const executionProvenance=authoritativeProvenance(null,{invoked:false})
-      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
-      await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fast-text-transform-timeout',{prompt:input,answered:false,confidence:0,branch:'fast_text_transform_timeout'})
-      return NextResponse.json({ok:false,reply,error:reply,source:'cos-fast-text-transform-timeout',confidence_score:0,external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:503})
+      const reply='COS could not complete this simple text edit within the 12-second fast-path limit.'
+      return NextResponse.json({ok:false,reply,error:reply,source:'cos-fast-text-transform-timeout',confidence_score:0,external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_allowed:false,external_action_taken:false},{status:503})
     }
     const executionProvenance=authoritativeProvenance(null,{invoked:false})
     ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:1}
     ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:fast.reasonerLabel,from_cache:false}
     const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
-    await writeCosPrimaryProvenance(userId,fast.reply,executionProvenance,'cos-fast-text-transform',{prompt:input,answered:true,confidence:1,branch:'fast_text_transform'})
     return NextResponse.json({ok:true,reply:fast.reply,source:'cos-fast-text-transform',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
   }
+
+  const access=await getAccess().catch(()=>null),userId=access?.userId||null,precedingAssistant=previousAssistantText(body),isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
+  const freshConversationContext=resolveFreshConversationContext(body, input)
+  const lookupInput=freshConversationContext.lookupInput
 
   if(access?.isOwner&&isOwnerRepoScanRequest(input)){
     const scan=await scanRepositoryForOwner()

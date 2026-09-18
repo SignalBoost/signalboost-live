@@ -81,8 +81,7 @@ async function installVerifiedFailureDerivedCurriculum(input: {
     const evidenceKeys = failuresByTitle.get(subject) || []
     let subjectInserted = 0
     for (let ordinal = 0; ordinal < Math.min(HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT, evidenceKeys.length); ordinal += 1) {
-      const evidenceKey = evidenceKeys[ordinal]
-      const contentHash = failureDerivedSourceHash(subject, evidenceKey, ordinal)
+      const contentHash = failureDerivedSourceHash(subject, ordinal)
       const row = {
         content_hash: contentHash,
         source_kind: 'failure_derived_curriculum',

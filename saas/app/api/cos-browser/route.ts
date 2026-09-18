@@ -1,7 +1,6 @@
 // saas/app/api/cos-browser/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as cosPrimaryPost } from '@/app/api/cos-primary/route'
-import { POST as publicConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
 import { getAccess } from '@/lib/auth/access'
@@ -340,8 +339,12 @@ export async function POST(req: NextRequest) {
     // bounded recent user-authored conversation context. Deterministic code only validates and
     // preserves the user's exact words; it does not infer the continuation itself.
     const directVisual = isConciergeVisualObjective(prompt)
-    const semanticResolution = directVisual ? null : await resolveSemanticVisualRequest(messages, prompt)
-    const visualObjective = directVisual ? prompt : semanticResolution?.objective ?? null
+    const semanticResolution = directVisual || browserSurface === 'assistant'
+      ? null
+      : await resolveSemanticVisualRequest(messages, prompt)
+    const visualObjective = browserSurface === 'assistant'
+      ? null
+      : directVisual ? prompt : semanticResolution?.objective ?? null
     if (visualObjective) {
       const headers = new Headers(req.headers)
       headers.set('content-type', 'application/json')
@@ -365,12 +368,13 @@ export async function POST(req: NextRequest) {
     }), prompt, auditUserId))
   }
 
-  const executeOwnerRequest = () => cosPrimaryPost(routedRequest)
-  const executePublicRequest = () => publicConciergePost(routedRequest)
-
+  // ONE BRAIN: Assistant is the owner's COS interface; Concierge is only the public mouth.
+  // Both surfaces execute the same COS reasoning endpoint. Public scope changes authority,
+  // memory/tool visibility, disclosure, and presentation — never which brain answers.
+  const executeCosRequest = () => cosPrimaryPost(routedRequest)
   const response = access?.isOwner && browserSurface === 'assistant'
-    ? await executeOwnerRequest()
-    : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => executePublicRequest()))
+    ? await executeCosRequest()
+    : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => executeCosRequest()))
   const decorated = await withSuggestedFollowups(response, prompt, auditUserId)
   return browserSurface === 'concierge' ? publicConciergePresentation(decorated) : decorated
 }

@@ -19,9 +19,14 @@ test('browser fast edits terminate before auth and never descend into COS Primar
 
   assert.match(direct, /new AbortController\(\)/)
   assert.match(direct, /signal: controller\.signal/)
-  assert.match(direct, /setTimeout\(\(\) => controller\.abort\(\), deadlineMs\(\)\)/)
-  assert.match(direct, /DEFAULT_DEADLINE_MS = 20_000/)
+  assert.match(direct, /setTimeout\(\(\) => controller\.abort\(\), input\.timeoutMs\)/)
+  assert.match(direct, /DEFAULT_DEADLINE_MS = 18_000/)
+  assert.match(direct, /DEFAULT_ATTEMPT_MS = 6_000/)
+  assert.match(direct, /COS_FAST_TEXT_MODEL/)
+  assert.match(direct, /deepseek-ai\/DeepSeek-V4-Flash/)
+  assert.match(direct, /for \(const model of modelCandidates\(baseUrl, configuredModel\)\)/)
   assert.match(direct, /LOCAL_AI_MODEL/)
+  assert.match(direct, /Math\.min\(attemptMs\(\), remainingMs\)/)
 })
 
 test('middleware still sends fast transforms to the protected fast route', () => {

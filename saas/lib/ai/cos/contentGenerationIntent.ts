@@ -37,26 +37,8 @@ const AUTHORING_VERB = [
   'напиши', 'создай', 'сгенерируй', 'отредактируй', 'перепиши', 'исправь', 'улучши', 'сократи', 'резюмируй', 'переведи',
 ].join('|')
 
-// Polite wrappers are part of the command, not a reason to hide the authoring verb from routing.
-// Keep this list narrow and command-shaped so "can you explain..." does not become authoring unless
-// the following verb is one of the explicit artifact-generation verbs above.
-const POLITE_AUTHORING_PREFIX = [
-  // English
-  'please', 'please\\s+can\\s+you', 'please\\s+could\\s+you', 'please\\s+would\\s+you',
-  'can\\s+you', 'could\\s+you', 'would\\s+you',
-  // Spanish / Portuguese
-  'por\\s+favor', 'puedes', 'podr[ií]as', 'pode', 'poderia',
-  // Polish
-  'prosz[eę]', 'czy\\s+mo[zż]esz', 'czy\\s+m[oó]g[lł]by[sś]',
-  // Russian
-  'пожалуйста', 'можешь', 'мог(?:ла|ли| бы|ла бы|ли бы)?',
-].join('|')
-
-/** Matches an authoring/transformation command at the start of the string or clause. */
-const GENERATION = new RegExp(
-  `^\\s*(?:(?:${POLITE_AUTHORING_PREFIX})(?![\\p{L}\\p{N}_])\\s+)?(?:${AUTHORING_VERB})(?![\\p{L}\\p{N}_])`,
-  'iu',
-)
+/** Matches an authoring/transformation verb at the start of the string. */
+const GENERATION = new RegExp(`^\\s*(?:${AUTHORING_VERB})(?![\\p{L}\\p{N}_])`, 'iu')
 
 /**
  * Split on sentence terminators and on clause boundaries that commonly precede an instruction

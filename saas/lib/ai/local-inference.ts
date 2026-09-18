@@ -92,21 +92,33 @@ function configuredReasoningEffort(): 'none' | 'low' | 'medium' | 'high' | undef
   return undefined
 }
 
+function directTextTransformation(args: LocalModelCallArgs): boolean {
+  return String(args.usageContext?.feature || '').trim().toLowerCase() === 'direct_text_transformation'
+}
+
 function interactiveUserResponse(args: LocalModelCallArgs): boolean {
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
   return feature === 'cos_interactive_answer' || feature === 'direct_text_transformation'
 }
 
-function interactiveReasoningEffort(): 'none' | 'low' | 'medium' | 'high' {
+function interactiveReasoningEffort(args: LocalModelCallArgs): 'none' | 'low' | 'medium' | 'high' {
+  if (directTextTransformation(args)) return 'none'
   const value = process.env.COS_INTERACTIVE_REASONING_EFFORT?.trim().toLowerCase()
   if (value === 'none' || value === 'low' || value === 'medium' || value === 'high') return value
   return 'low'
 }
 
-function interactiveModelTimeoutMs(configTimeoutMs: number): number {
-  const configured = Number(process.env.COS_INTERACTIVE_MODEL_TIMEOUT_MS || '20000')
-  const bounded = Number.isFinite(configured) ? Math.max(5000, Math.min(60000, configured)) : 20000
+function interactiveModelTimeoutMs(args: LocalModelCallArgs, configTimeoutMs: number): number {
+  const variable = directTextTransformation(args) ? 'COS_DIRECT_TEXT_TIMEOUT_MS' : 'COS_INTERACTIVE_MODEL_TIMEOUT_MS'
+  const fallback = directTextTransformation(args) ? 12000 : 20000
+  const configured = Number(process.env[variable] || String(fallback))
+  const bounded = Number.isFinite(configured) ? Math.max(3000, Math.min(60000, configured)) : fallback
   return Math.min(configTimeoutMs, bounded)
+}
+
+function modelForRequest(args: LocalModelCallArgs, config: LocalInferenceConfig, provider: string): string {
+  if (!directTextTransformation(args) || provider !== 'deepinfra') return config.model
+  return (process.env.COS_DIRECT_TEXT_MODEL || 'zai-org/GLM-5.3-Flash').trim() || config.model
 }
 
 /** Align a caller's explicit strict-JSON contract with the transport instead of relying on prose alone. */
@@ -191,6 +203,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
   const startedAt = Date.now()
   const requestId = randomUUID()
   const provider = providerFor(config)
+  const model = modelForRequest(args, config, provider)
   const routeOwner = routeOwnerFor(config)
   const usageContext: LocalInferenceUsageContext = args.usageContext || { feature: 'unattributed_local_inference' }
   let inferenceStartedAt: number | null = null
@@ -205,14 +218,14 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
   let text: string | null = null
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
-  const timeoutMs = interactiveUserResponse(args) ? interactiveModelTimeoutMs(config.timeoutMs) : config.timeoutMs
+  const timeoutMs = interactiveUserResponse(args) ? interactiveModelTimeoutMs(args, config.timeoutMs) : config.timeoutMs
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
     inferenceStartedAt = Date.now()
     // LOCAL_AI_REASONING_EFFORT is a property of the current DeepInfra deployment. Generic graduate
     // and RunPod transports may reject that vendor-specific field, so do not leak it outside DeepInfra.
     const reasoningEffort = provider === 'deepinfra'
-      ? (interactiveUserResponse(args) ? interactiveReasoningEffort() : configuredReasoningEffort())
+      ? (interactiveUserResponse(args) ? interactiveReasoningEffort(args) : configuredReasoningEffort())
       : undefined
     const enforceJsonObject = strictJsonObjectRequested(args)
     const parsePenalty = (value: string | undefined, fallback: number): number => {
@@ -230,7 +243,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
       headers: { 'Content-Type': 'application/json', ...authHeaders(config.apiKey) },
       signal: controller.signal,
       body: JSON.stringify({
-        model: config.model,
+        model,
         max_tokens: requestedMaxTokens,
         temperature: args.temperature ?? 0.2,
         frequency_penalty: frequencyPenalty,
@@ -268,7 +281,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
       const content = data.choices?.[0]?.message?.content
       if (finishReason && finishReason !== 'stop') {
         console.warn('[cos-local-inference-incomplete]', {
-          model: config.model,
+          model,
           finishReason,
           requestedMaxTokens,
           completionTokens,
@@ -288,7 +301,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
     const inferenceLatencyMs = inferenceStartedAt === null ? 0 : Math.max(0, Date.now() - inferenceStartedAt)
     const success = errorText === null && httpStatus !== null && httpStatus >= 200 && httpStatus < 300
     emitLocalInferenceTelemetry({
-      at: new Date().toISOString(), requestId, provider, model: config.model,
+      at: new Date().toISOString(), requestId, provider, model,
       feature: usageContext.feature, routeOwner,
       graduateCandidateId: config.graduateCandidateId || null,
       graduateArtifactId: config.graduateArtifactId || null,
@@ -299,7 +312,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
     })
     if (shouldPersistUsage(provider, config)) {
       await recordLocalInferenceUsage({
-        requestId, provider, model: config.model, context: usageContext,
+        requestId, provider, model, context: usageContext,
         routeOwner,
         graduateCandidateId: config.graduateCandidateId || null,
         graduateArtifactId: config.graduateArtifactId || null,

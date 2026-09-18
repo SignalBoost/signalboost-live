@@ -44,6 +44,8 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
   const error = String(event.evidence?.error || '').trim().toLowerCase()
   if (!error) return false
   return error.startsWith('mass_distilled_evaluation_context_budget_insufficient:')
+    || error.startsWith('mass_distilled_evaluation_endpoint_call_ceiling:')
+    || error.startsWith('mass_distilled_evaluation_endpoint_call_ceiling_plan:')
     || error.includes("maximum context length is 8192 tokens")
     || error === 'the operation was aborted due to timeout'
     || error.includes('mass_distilled_evaluation_call_timeout')

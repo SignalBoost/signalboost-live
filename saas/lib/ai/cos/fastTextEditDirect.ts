@@ -1,42 +1,27 @@
 // saas/lib/ai/cos/fastTextEditDirect.ts
 //
 // A simple edit / rewrite / proofread / translate request must never enter the COS reasoning chain.
-// One abortable completion owns the whole task. No council, repair passes, provider fallback,
-// Supabase, telemetry, persistence, or abandoned Promise continues after the deadline.
+//
+// The previous fast path raced a 12-second timer against callRawCosReasoner. Promise.race GIVES UP —
+// it does not cancel. The abandoned chain kept running (draft 45.9s -> quality repair 60.0s ->
+// citation repair 38.7s -> managed-provider fallback 120.0s), the invocation never closed, and the
+// platform killed it at 300s — destroying the 503 response that had already been built at 12s.
+//
+// This module issues exactly ONE abortable OpenAI-compatible completion. No council, no repair
+// passes, no fallback provider, no Supabase, no telemetry, no persistence. It either returns text
+// inside the deadline or it aborts the socket and returns null. Nothing outlives the call.
 
-export type DirectFastEditResult = {
-  text: string
-  model: string
-  provider: string
-  external: boolean
-  elapsedMs: number
-}
+export type DirectFastEditResult = { text: string; model: string; elapsedMs: number }
 
 const DEFAULT_DEADLINE_MS = 20_000
 
 function deadlineMs(): number {
   const parsed = Number(process.env.COS_FAST_EDIT_DEADLINE_MS || DEFAULT_DEADLINE_MS)
-  return Number.isFinite(parsed) && parsed >= 2_000 && parsed <= 60_000
-    ? Math.floor(parsed)
-    : DEFAULT_DEADLINE_MS
+  return Number.isFinite(parsed) && parsed >= 2_000 && parsed <= 60_000 ? Math.floor(parsed) : DEFAULT_DEADLINE_MS
 }
 
 function normalizeBaseUrl(value: string): string {
   return String(value || '').trim().replace(/\/+$/, '')
-}
-
-function selectedModel(baseUrl: string): string {
-  const explicit = String(process.env.COS_FAST_TEXT_MODEL || '').trim()
-  if (explicit) return explicit
-  if (/deepinfra/i.test(baseUrl)) return 'deepseek-ai/DeepSeek-V4-Flash'
-  return String(process.env.LOCAL_AI_MODEL || '').trim()
-}
-
-function providerLabel(baseUrl: string): { provider: string; external: boolean } {
-  const configured = String(process.env.LOCAL_AI_PROVIDER || '').trim()
-  if (/deepinfra/i.test(baseUrl) || /deepinfra/i.test(configured)) return { provider: 'deepinfra', external: true }
-  if (/runpod/i.test(baseUrl) || /runpod/i.test(configured)) return { provider: 'runpod', external: false }
-  return { provider: configured || 'self_hosted', external: configured !== '' && configured !== 'self_hosted' }
 }
 
 const SYSTEM_PROMPT = [
@@ -45,6 +30,7 @@ const SYSTEM_PROMPT = [
   'Return the edited text and nothing else. No preamble, no quotes, no markdown fences, no JSON.',
 ].join(' ')
 
+/** Reasoning models emit <think> blocks and some wrap answers in fences or JSON. Unwrap all three. */
 function stripWrapper(value: string): string {
   let text = String(value || '')
   text = text.replace(/<think>[\s\S]*?<\/think>/gi, '')
@@ -52,7 +38,7 @@ function stripWrapper(value: string): string {
   if (strayThink >= 0) text = text.slice(0, strayThink)
   text = text.trim()
 
-  const fence = text.match(/^\`\`\`[a-z]*\s*\n?([\s\S]*?)\n?\`\`\`$/i)
+  const fence = text.match(/^```[a-z]*\s*\n?([\s\S]*?)\n?```$/i)
   if (fence?.[1]) text = fence[1].trim()
 
   if (/^\{[\s\S]*\}$/.test(text)) {
@@ -64,14 +50,17 @@ function stripWrapper(value: string): string {
           ? parsed.text
           : ''
       if (answer.trim()) return answer.trim()
-    } catch {}
+    } catch {
+      // Not JSON after all — keep the literal text.
+    }
   }
+
   return text
 }
 
 export async function runDirectFastTextEdit(prompt: string): Promise<DirectFastEditResult | null> {
   const baseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || '')
-  const model = selectedModel(baseUrl)
+  const model = String(process.env.LOCAL_AI_MODEL || '').trim()
   const apiKey = String(process.env.LOCAL_AI_API_KEY || '').trim()
   const input = String(prompt || '').trim()
   if (!baseUrl || !model || !input) return null
@@ -106,8 +95,7 @@ export async function runDirectFastTextEdit(prompt: string): Promise<DirectFastE
     const raw = String(payload?.choices?.[0]?.message?.content ?? '')
     const text = stripWrapper(raw)
     if (!text) return null
-    const provider = providerLabel(baseUrl)
-    return { text, model, provider: provider.provider, external: provider.external, elapsedMs: Date.now() - startedAt }
+    return { text, model, elapsedMs: Date.now() - startedAt }
   } catch {
     return null
   } finally {

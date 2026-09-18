@@ -81,6 +81,31 @@ function normalizedSubject(value: string): string {
   return clean(value, 240).toLowerCase()
 }
 
+export function resolveMassDistillationSubject(input: {
+  subject?: unknown
+  sourceTitle?: unknown
+  summary?: unknown
+  facts?: unknown
+}): string {
+  const stored = clean(input.subject, 240)
+  const storedIds = classifyCosUniversitySubjects(stored)
+  const facts = Array.isArray(input.facts)
+    ? input.facts.map(value => typeof value === 'string' ? value : JSON.stringify(value)).join(' ')
+    : input.facts == null ? ''
+      : typeof input.facts === 'string' ? input.facts : JSON.stringify(input.facts)
+  const material = [clean(input.sourceTitle, 1000), clean(input.summary, 12_000), clean(facts, 12_000)]
+    .filter(Boolean)
+    .join(' ')
+  const materialIds = classifyCosUniversitySubjects(material)
+
+  if (storedIds.length) {
+    const storedPrimary = storedIds[0]
+    if (!materialIds.length || materialIds.includes(storedPrimary)) return cosUniversitySubjectById(storedPrimary).title
+  }
+  if (materialIds.length) return cosUniversitySubjectById(materialIds[0]).title
+  return stored
+}
+
 function distillationSubjectGroup(value: string): Readonly<{ key: string; subject: string; canonicalSubjectId: CosUniversitySubjectId | null }> {
   const raw = clean(value, 240)
   const primary = classifyCosUniversitySubjects(raw)[0]
@@ -381,7 +406,12 @@ export async function prepareUniversityMassDistillationCurriculum(
   const identities: RetainedDistillationIdentity[] = corpusRows.map((row: any) => ({
     contentHash: clean(row.content_hash, 64),
     materialHash: retainedMaterialHash({ sourceTitle: row.source_title, summary: row.summary, facts: row.facts }) || '',
-    subject: clean(row.subject, 240),
+    subject: resolveMassDistillationSubject({
+      subject: row.subject,
+      sourceTitle: row.source_title,
+      summary: row.summary,
+      facts: row.facts,
+    }),
     sourceKind: clean(row.source_kind, 80),
     license: clean(row.license, 1000),
     confidence: Number(row.confidence),

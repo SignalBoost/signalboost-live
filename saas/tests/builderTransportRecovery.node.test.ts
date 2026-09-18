@@ -52,7 +52,7 @@ test('Builder persists running before 202 and replaces it with the terminal resu
   // subsequent durable Builder observations are read-only GETs by job id. Browser COS enters the
   // canonical dispatcher with an explicit surface marker so public Concierge cannot inherit owner authority.
   assert.equal((assistantPage.match(/postWithAgentProgress\(/g) ?? []).length, 1)
-  assert.match(progressClient, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
+  assert.match(progressClient, /const endpoint = builderRequest\?\.endpoint \?\? \(directFastTextTransform \? '\/api\/cos-fast-transform' : '\/api\/cos-browser'\)/)
   assert.match(progressClient, /'x-signalboost-surface': args\.target/)
   assert.equal((progressClient.match(/\/api\/cos-primary/g) ?? []).length, 0)
   assert.equal((progressClient.match(/method: 'POST'/g) ?? []).length, 1)

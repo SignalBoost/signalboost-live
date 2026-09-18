@@ -4,9 +4,11 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { findDurableCosTurnReply, findRecoveredAssistantReply } from '../lib/ai/cos/assistantTransportRecovery.ts'
 
-test('ordinary owner COS returns a durable 202 before background inference and never replays POST', () => {
+test('signed-in ordinary COS and Concierge turns return a durable 202 before background inference and never replay POST', () => {
   const route = readFileSync(join(process.cwd(), 'app/api/cos-provenance-browser/route.ts'), 'utf8')
   assert.match(route, /enqueueDurableCosTurn/)
+  assert.match(route, /if \(access\?\.userId\)/)
+  assert.match(route, /keeps its[\s\S]*public surface header[\s\S]*cannot inherit owner privileges/)
   assert.match(route, /after\(async \(\) =>/)
   assert.match(route, /finishDurableCosTurn/)
   assert.match(route, /turnId,/)

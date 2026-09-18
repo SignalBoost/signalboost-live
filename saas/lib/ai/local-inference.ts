@@ -24,6 +24,12 @@ export interface LocalModelCallArgs {
    * consumed the whole token budget and returned no answer text.
    */
   disableThinking?: boolean
+  /** Caller-specific hard transport deadline. The lower of this value and config.timeoutMs wins. */
+  timeoutMs?: number
+  /** Disable the configured-model fallback after owned RunPod primary failure for latency-critical calls. */
+  allowConfiguredFallback?: boolean
+  /** Skip durable usage persistence when the caller must return without a database dependency. */
+  persistUsage?: boolean
 }
 
 /**
@@ -203,7 +209,11 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
   let text: string | null = null
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
+  const callerTimeoutMs = Number(args.timeoutMs)
+  const effectiveTimeoutMs = Number.isFinite(callerTimeoutMs) && callerTimeoutMs > 0
+    ? Math.max(250, Math.min(config.timeoutMs, callerTimeoutMs))
+    : config.timeoutMs
+  const timeout = setTimeout(() => controller.abort(), effectiveTimeoutMs)
   try {
     inferenceStartedAt = Date.now()
     const enforceJsonObject = strictJsonObjectRequested(args)
@@ -306,7 +316,7 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
       success, httpStatus, error: errorText, finishReason, requestedMaxTokens,
       promptTokens, completionTokens, totalTokens, cachedPromptTokens, providerEstimatedCostUsd,
     })
-    if (shouldPersistUsage(provider, config)) {
+    if (args.persistUsage !== false && shouldPersistUsage(provider, config)) {
       await recordLocalInferenceUsage({
         requestId, provider, model: config.model, context: usageContext,
         routeOwner,
@@ -379,6 +389,7 @@ export async function callLocalModel(args: LocalModelCallArgs, config = localInf
     }))
   }
 
+  if (args.allowConfiguredFallback === false && ownedAttempted) return null
   return callConfiguredModel(args, ownedAttempted ? { ...config, fallbackFromOwned: true } : config)
 }
 

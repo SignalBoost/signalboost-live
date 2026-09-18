@@ -363,7 +363,7 @@ test('merge continuation is cron-authenticated, bounded-scheduled, branch-aware,
   assert.match(route, /CRON_SECRET/)
   assert.match(route, /completePendingRepositoryRepairMerges/)
   assert.match(route, /failBuilderRepositoryRepairAfterSupersededBase/)
-  assert.match(vercel, /"\\/api\\/cron\\/builder-repair-merge"[\\s\\S]*"\\*\\/10 \\* \\* \\* \\*"/)
+  assert.match(vercel, /"\/api\/cron\/builder-repair-merge"[\s\S]*"\*\/2 \* \* \* \*"/)
   assert.match(continuation, /BUILDER_AUTO_MERGE_ENABLED/)
   assert.match(continuation, /evaluateAutoMergeDangerCategory/)
   assert.match(continuation, /evaluatePullRequestChecks/)

@@ -98,11 +98,10 @@ async function assessSelfHealingSupervisor(request:string):Promise<string|null>{
   return parsed?.answer?.trim()||null
 }
 const FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
-// Production qwen3:30b completed the same bounded edit path in ~23.9s. Eight seconds only
-// converted a healthy-but-slower completion into a guaranteed 503. Keep this interactive and
-// bounded, but leave enough headroom for the measured model latency while all persistence/fallback
-// work remains off the critical path.
-export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 35_000
+// Foreground transforms must complete the user's task, not merely fail quickly. The owned RunPod
+// remains first choice, but one stalled worker must not turn an edit into a 503. A 25s per-provider
+// budget leaves room inside the 60s direct route for the configured secondary inference path.
+export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 25_000
 
 export function isFastTextTransform(input:string):boolean{
   return FAST_TEXT_TRANSFORM.test(String(input||'').trim())
@@ -115,7 +114,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
     maxTokens:768,
     disableThinking:true,
     timeoutMs:FAST_TEXT_TRANSFORM_TIMEOUT_MS,
-    allowConfiguredFallback:false,
+    allowConfiguredFallback:true,
     persistUsage:false,
     jsonObject:true,
     usageContext:{feature:'cos_fast_text_transform'},

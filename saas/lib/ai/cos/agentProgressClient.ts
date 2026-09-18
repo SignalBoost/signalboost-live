@@ -218,7 +218,7 @@ export async function postWithAgentProgress(args: {
 
   const builderRequest = args.target === 'concierge' ? conciergeBuilderRequest(args.body) : null
   const requestBody = builderRequest?.body ?? args.body
-  const directFastTextTransform = args.target === 'cos' && DIRECT_FAST_TEXT_TRANSFORM.test(latestUserText(bodyRecord(requestBody) || {}))
+  const directFastTextTransform = DIRECT_FAST_TEXT_TRANSFORM.test(latestUserText(bodyRecord(requestBody) || {}))
   const repairRequest = isOperatorRepairRequest(requestBody)
   const progressTarget = args.target
   const builderActive = Boolean(builderRequest)
@@ -246,7 +246,7 @@ export async function postWithAgentProgress(args: {
   // /api/cos-browser remains the canonical browser ingress. The explicit surface header prevents
   // a signed-in owner using the public homepage Concierge from inheriting private owner authority;
   // only the owner Assistant surface may enter the privileged lane after server-side authentication.
-  const endpoint = builderRequest?.endpoint ?? (directFastTextTransform ? '/api/cos-fast-transform' : '/api/cos-browser')
+  const endpoint = builderRequest?.endpoint ?? '/api/cos-browser'
   let response: Response
   try {
     try {

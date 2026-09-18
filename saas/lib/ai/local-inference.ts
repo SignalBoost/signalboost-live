@@ -159,6 +159,11 @@ function protectedIndependentEvaluation(args: LocalModelCallArgs): boolean {
 
 function eligibleForRunpodPrimary(args: LocalModelCallArgs, config: LocalInferenceConfig): boolean {
   if (process.env.RUNPOD_PRIMARY_ENABLED?.trim().toLowerCase() === 'false') return false
+  // Direct user-supplied text transformations are latency-sensitive interactive work. They must
+  // use the configured managed open-model transport directly rather than spending the browser
+  // response budget on an owned RunPod attempt that may return an empty/truncated completion.
+  const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
+  if (feature === 'direct_text_transformation') return false
   if (providerFor(config) === 'runpod') return false
   if (config.fallbackFromOwned === true) return false
   if (protectedIndependentEvaluation(args)) return false

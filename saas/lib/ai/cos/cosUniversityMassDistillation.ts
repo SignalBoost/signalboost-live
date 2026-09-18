@@ -101,21 +101,34 @@ export function resolveMassDistillationSubject(input: {
   const materialIds = classifyCosUniversitySubjects(material)
 
   const storedNormalized = normalizedSubject(stored)
+  const titleNormalized = normalizedSubject(sourceTitle)
   const materialNormalized = normalizedSubject(material)
-  const literallyCorroborated = storedNormalized.length >= 3 && materialNormalized.includes(storedNormalized)
+  const titleLiterallyCorroborated = storedNormalized.length >= 3 && titleNormalized.includes(storedNormalized)
+  const materialLiterallyCorroborated = storedNormalized.length >= 3 && materialNormalized.includes(storedNormalized)
 
+  // For titled sources, the title is the admission boundary. Abstract/facts can elaborate the item,
+  // but incidental words in those fields must not assign an unrelated training subject.
+  if (sourceTitle) {
+    if (storedIds.length) {
+      const storedPrimary = storedIds[0]
+      if (titleIds.includes(storedPrimary)) return cosUniversitySubjectById(storedPrimary).title
+      if (titleIds.length) return cosUniversitySubjectById(titleIds[0]).title
+    }
+    if (titleIds.length) return cosUniversitySubjectById(titleIds[0]).title
+    if (titleLiterallyCorroborated) return stored
+    return ''
+  }
+
+  // Title-less owner/public-domain material has no stronger local identity, so retain the previous
+  // conservative material-level fallback.
   if (storedIds.length) {
     const storedPrimary = storedIds[0]
-    // A classifiable source title is the strongest local description of what this retained item is actually about.
-    // Do not let a broad stored label survive merely because its words appear somewhere in a multi-domain abstract.
-    if (titleIds.length && !titleIds.includes(storedPrimary)) return cosUniversitySubjectById(titleIds[0]).title
-    if (titleIds.includes(storedPrimary) || materialIds.includes(storedPrimary) || literallyCorroborated) {
+    if (materialIds.includes(storedPrimary) || materialLiterallyCorroborated) {
       return cosUniversitySubjectById(storedPrimary).title
     }
   }
-  if (titleIds.length) return cosUniversitySubjectById(titleIds[0]).title
   if (materialIds.length) return cosUniversitySubjectById(materialIds[0]).title
-  if (literallyCorroborated) return stored
+  if (materialLiterallyCorroborated) return stored
 
   // A stored label with no independent support from the retained teaching material is unsafe for training.
   // Fail closed: unclassifiable material stays available to RAG but is excluded from mass-distillation packaging.

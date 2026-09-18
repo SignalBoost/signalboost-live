@@ -89,6 +89,20 @@ test('mass distillation revalidates stored subjects against retained teaching ma
     sourceTitle: 'Scientific Machine Learning Through Physics-Informed Neural Networks',
     summary: 'Deep learning methods for physics-informed neural networks and scientific computing.',
   }), 'Physics & Natural Sciences')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'defensive remediation',
+    sourceTitle: 'A randomized controlled trial of cognitive remediation for forensic patients with schizophrenia',
+    summary: 'A treatment program used software-assisted exercises and outcome measurement.',
+  }), '')
+  assert.equal(resolveMassDistillationSubject({
+    subject: '200 Practice Questions and Answers',
+    sourceTitle: 'Sarcopenia: European consensus on definition and diagnosis',
+    summary: 'Clinical diagnosis and validation criteria with data analysis.',
+  }), '')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'cos data center',
+    summary: 'Advanced TypeScript and Next.js production engineering with API route tests.',
+  }), 'Computer Science & Coding')
 })
 
 test('mass distillation requires confidence, row identity, material identity and explicit rights', () => {

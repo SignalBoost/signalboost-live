@@ -2,12 +2,16 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { gunzipSync } from 'node:zlib'
+import { deriveHfWorkerDeliveryToken } from '../lib/ai/cos/cosUniversityHfWorkerDelivery.ts'
 import {
   buildHuggingFaceJobSpec,
   decodeHuggingFaceDatasetRef,
   deriveHuggingFaceTrainingExecutorSecret,
+  findHuggingFaceJobByName,
   huggingFaceJobsConfigFromEnv,
   installHuggingFaceTrainingExecutorEnv,
+  COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX,
   isHuggingFaceDatasetRef,
 } from '../lib/ai/cos/cosUniversityHuggingFaceJobs.ts'
 
@@ -52,6 +56,29 @@ test('derived callback key is deterministic and does not equal the HF provider t
   assert.equal(first, second)
   assert.match(first, /^[a-f0-9]{64}$/)
   assert.notEqual(first, token)
+})
+
+test('provider lookup recovers an accepted named Job without duplicating a known attempt', async () => {
+  let requestedUrl = ''
+  const recovered = await findHuggingFaceJobByName({
+    namespace: 'signalboost',
+    token,
+    name: 'itmounts-train-abc123',
+    excludeJobIds: ['old-job'],
+    fetchImpl: async url => {
+      requestedUrl = url
+      return new Response(JSON.stringify([
+        { id: 'old-job', url: 'https://huggingface.co/jobs/signalboost/old-job', createdAt: '2026-09-15T10:00:00Z', status: { stage: 'ERROR' } },
+        { id: 'recovered-job', url: 'https://huggingface.co/jobs/signalboost/recovered-job', createdAt: '2026-09-15T10:01:00Z', status: { stage: 'RUNNING' } },
+      ]), { status: 200, headers: { 'content-type': 'application/json' } })
+    },
+  })
+  assert.equal(new URL(requestedUrl).searchParams.get('label'), 'name=itmounts-train-abc123')
+  assert.deepEqual(recovered, {
+    jobId: 'recovered-job',
+    jobUrl: 'https://huggingface.co/jobs/signalboost/recovered-job',
+    providerStage: 'RUNNING',
+  })
 })
 
 test('HF dataset references must be explicit and revision/split aware', () => {
@@ -131,6 +158,50 @@ test('training uses bounded GPU defaults only after immutable materialized datas
   assert.ok(spec.command.join(' ').includes('itmounts_hf_worker.py'))
 })
 
+test('large teacher envelopes are gzip/base64url transported without truncating curriculum material', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv({
+    COS_UNIVERSITY_HF_WORKER_URL: 'https://workers.example.com/cos-university-hf-worker.py',
+  }))!
+  const prompts = Array.from({ length: 54 }, (_, index) => ({
+    id: `prompt-${index}`,
+    prompt: `Standalone case ${index}: ${'rights-cleared-material '.repeat(180)}`,
+  }))
+  const envelope = {
+    profile: 'cos_university_training_executor_v1',
+    operation: 'generate_teacher_dataset',
+    candidateId: 'mass:00000000-0000-4000-8000-000000000001:abcdef0123456789',
+    subjectId: 'Build a Semantic Book Recommender',
+    promptProfile: 'cos-university-mass-distillation-campaign-v1',
+    promptSetHash: 'a'.repeat(64),
+    prompts,
+    teacher: { modelId: 'Qwen/Qwen3-8B', revision: '1'.repeat(40), license: 'apache-2.0' },
+    student: { modelId: 'Qwen/Qwen3-4B', revision: '2'.repeat(40), license: 'apache-2.0' },
+    trainingRights: 'open_license',
+    studentControlledByBuyer: true,
+    containsPrivateProductionData: false,
+    callbackPath: '/api/internal/cos/mass-distillation/evidence',
+    authorityExpanded: false,
+  }
+  const spec = buildHuggingFaceJobSpec({
+    envelope,
+    callbackUrl: 'https://itmounts.com/api/internal/cos/mass-distillation/evidence',
+    idempotencyKey: 'teacher-compressed-key',
+    callbackSecret: 'k'.repeat(64),
+    config,
+  })
+  const compressed = spec.environment.ITMOUNTS_TRAINING_REQUEST_GZIP_B64
+  assert.ok(compressed)
+  assert.equal(spec.environment.ITMOUNTS_TRAINING_REQUEST_B64, undefined)
+  assert.equal(spec.environment.ITMOUNTS_TRAINING_REQUEST_ENCODING, 'gzip-base64url-v1')
+  const restored = JSON.parse(gunzipSync(Buffer.from(compressed, 'base64url')).toString('utf8'))
+  assert.deepEqual(restored, envelope)
+  const rawB64Length = Buffer.from(JSON.stringify(envelope), 'utf8').toString('base64url').length
+  assert.ok(compressed.length < rawB64Length / 2)
+  assert.match(spec.command.join(' '), /gzip\.decompress/)
+  assert.match(spec.command.join(' '), /ITMOUNTS_TRAINING_REQUEST_GZIP_B64/)
+  assert.match(spec.command.join(' '), /ITMOUNTS_TRAINING_REQUEST_B64/)
+})
+
 test('routes keep owner confirmation, signed callbacks and the global dispatch switch authoritative', () => {
   const owner = readFileSync('app/api/admin/cos-university-training-executor/route.ts', 'utf8')
   const callback = readFileSync('app/api/internal/cos/university-training-executor/evidence/route.ts', 'utf8')
@@ -147,4 +218,24 @@ test('routes keep owner confirmation, signed callbacks and the global dispatch s
   assert.match(worker, /rollback_artifact_registered/)
   assert.match(worker, /LoraConfig/)
   assert.match(worker, /load_in_4bit=True/)
+})
+
+test('HF jobs fetch the worker from the authenticated delivery route, never from raw GitHub', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv({ ITMOUNTS_PUBLIC_ORIGIN: 'https://itmounts.com' }))!
+  assert.equal(config.workerUrl, `https://itmounts.com${COS_UNIVERSITY_HF_WORKER_ROUTE_PREFIX}/${deriveHfWorkerDeliveryToken(token)}/cos-university-hf-worker.py`)
+  assert.doesNotMatch(config.workerUrl, /raw\.githubusercontent\.com/)
+  assert.ok(!config.workerUrl.includes(token), 'the HF token itself never appears in the job')
+  const source = readFileSync(new URL('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /raw\.githubusercontent\.com/)
+})
+
+test('the delivered worker URL keeps the base-worker sibling path the Python worker derives', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv())!
+  assert.match(config.workerUrl, /^https:\/\/signalboost-live-example\.vercel\.app\/api\/internal\/cos\/hf-worker\/[a-f0-9]{64}\/cos-university-hf-worker\.py$/)
+  const route = readFileSync(new URL('../app/api/internal/cos/hf-worker/[capability]/[filename]/route.ts', import.meta.url), 'utf8')
+  assert.match(route, /cos-university-hf-worker-base\.py/)
+})
+
+test('without a deployment origin or explicit worker the adapter refuses instead of guessing a source', () => {
+  assert.equal(huggingFaceJobsConfigFromEnv({ HF_TOKEN: token, VERCEL_GIT_COMMIT_SHA: commit }), null)
 })

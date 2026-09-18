@@ -179,6 +179,24 @@ test('fine tuning belongs to no calendar and is never reported dark', () => {
   }), 'gated_as_expected')
 })
 
+
+test('operational evaluation and supervision lanes are expected to run or idle, never reported as drift', () => {
+  for (const path of [
+    'distilled_independent_evaluation',
+    'mass_distilled_independent_evaluation',
+    'mass_distillation_supervision',
+  ] as const) {
+    const expectation = cosUniversityLaneExpectation({ path, timingByLevel: RESIDENCE })
+    assert.equal(expectation, 'expected_running')
+    assert.equal(classifyCosUniversityLane(expectation, {
+      path, receiptFound: true, featureEnabled: true, verified: true, executionBlocker: null,
+    }), 'running_as_expected')
+    assert.equal(classifyCosUniversityLane(expectation, {
+      path, receiptFound: true, featureEnabled: true, verified: false, executionBlocker: 'runner_not_invoked',
+    }), 'idle_no_eligible_work')
+  }
+})
+
 test('an undeclared path is never assumed healthy', () => {
   const expectation = cosUniversityLaneExpectation({
     path: 'some_future_lane' as never, timingByLevel: RESIDENCE,

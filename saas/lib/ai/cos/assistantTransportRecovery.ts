@@ -2,6 +2,7 @@ export type StoredAssistantMessage = {
   role?: unknown
   content?: unknown
   created_at?: unknown
+  provenance?: unknown
 }
 
 export const ASSISTANT_TRANSPORT_TIMEOUT_COPY = {
@@ -43,10 +44,35 @@ export function findRecoveredAssistantReply(
       const candidate = messages[j]
       if (candidate?.role === 'user') break
       if (candidate?.role !== 'assistant') continue
+      const candidateProvenance = provenanceRecord(candidate.provenance)
+      if (candidateProvenance?.schema === 'signalboost-cos-turn-v1' && candidateProvenance?.status === 'running') continue
       const reply = String(candidate.content ?? '').trim()
       if (reply) return reply
     }
   }
 
+  return null
+}
+
+
+function provenanceRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+}
+
+export function findDurableCosTurnReply(
+  messages: StoredAssistantMessage[],
+  turnId: string,
+): { content: string; status: 'succeeded' | 'failed' } | null {
+  if (!turnId || !Array.isArray(messages)) return null
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index]
+    if (message?.role !== 'assistant') continue
+    const provenance = provenanceRecord(message.provenance)
+    if (provenance?.schema !== 'signalboost-cos-turn-v1' || provenance?.turnId !== turnId) continue
+    const status = provenance.status
+    if (status !== 'succeeded' && status !== 'failed') return null
+    const content = String(message.content ?? '').trim()
+    return content ? { content, status } : null
+  }
   return null
 }

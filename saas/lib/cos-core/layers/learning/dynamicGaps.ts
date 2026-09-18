@@ -1,11 +1,12 @@
 // saas/lib/cos-core/layers/learning/dynamicGaps.ts
-import type { KnowledgeGap } from './index'
-import { generateKnowledgeGaps, type KnowledgeGapSignal } from './gaps'
+import type { KnowledgeGap } from './index.ts'
+import { generateKnowledgeGaps, type KnowledgeGapSignal } from './gaps.ts'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 
 const STOP_WORDS = new Set([
   'about','after','again','against','also','among','been','being','between','could','from','have','into','more','most','other','over','such','than','that','their','there','these','they','this','through','under','using','what','when','where','which','while','with','would','your','source','summary','system','systems','knowledge','learning','verified','evidence','cos',
 ])
+const EFFECTIVE_CORPUS_FILTER = 'fact_extraction_error.is.null,fact_extraction_error.not.ilike.relevance_rejected:%'
 
 type RetainedRow = {
   subject?: string | null
@@ -111,9 +112,18 @@ export async function generateDynamicKnowledgeGaps(limit = 12, injectedSignals: 
   if (!db) return { gaps: [], retained: 0, reasoningGaps: 0, curriculumSignals: curriculum.length }
 
   try {
+    // Relevance-rejected rows remain available for audit but are not live knowledge. Counting them here
+    // would make duplicate/quarantined material look like subject depth and suppress the very gaps COS
+    // should study next.
     const [{ data: rows }, { count }] = await Promise.all([
-      db.from('cos_continuous_learning').select('subject,summary,source_kind,source_title,observed_at,confidence').order('observed_at', { ascending: false }).limit(300),
-      db.from('cos_continuous_learning').select('*', { count: 'exact', head: true }),
+      db.from('cos_continuous_learning')
+        .select('subject,summary,source_kind,source_title,observed_at,confidence')
+        .or(EFFECTIVE_CORPUS_FILTER)
+        .order('observed_at', { ascending: false })
+        .limit(300),
+      db.from('cos_continuous_learning')
+        .select('*', { count: 'exact', head: true })
+        .or(EFFECTIVE_CORPUS_FILTER),
     ])
     const signals = [...curriculum, ...await queuedSignals()]
     const operational = generateKnowledgeGaps(signals)

@@ -19,6 +19,7 @@ import {
  */
 const CORPUS_ROW_LIMIT = 5000
 const GAP_ROW_LIMIT = 5000
+const EFFECTIVE_CORPUS_FILTER = 'fact_extraction_error.is.null,fact_extraction_error.not.ilike.relevance_rejected:%'
 
 export type ContinuityReadResult =
   | { ok: true; report: ContinuityReport }
@@ -30,9 +31,12 @@ export async function readLearningContinuity(): Promise<ContinuityReadResult> {
 
   // created_at is when COS learned the row. observed_at is the SOURCE publication date and produces
   // a nonsense "learning per day" chart — rows dated years ago on the day they were acquired.
+  // relevance_rejected rows remain in the durable audit corpus but are not live retained knowledge,
+  // so continuity must exclude them or quarantined duplicates can fabricate healthy learning volume.
   const corpusResult = await db
     .from('cos_continuous_learning')
     .select('created_at,subject,source_kind')
+    .or(EFFECTIVE_CORPUS_FILTER)
     .order('created_at', { ascending: false })
     .limit(CORPUS_ROW_LIMIT)
   if (corpusResult.error) return { ok: false, error: `cos_continuous_learning read failed: ${corpusResult.error.message}` }

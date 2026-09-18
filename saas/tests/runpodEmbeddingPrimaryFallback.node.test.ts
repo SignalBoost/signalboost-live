@@ -23,6 +23,7 @@ function configureBase(overrides: Record<string, string | undefined> = {}): void
     LOCAL_AI_EMBEDDING_MODEL: 'BAAI/bge-base-en-v1.5',
     LOCAL_AI_EMBEDDING_BASE_URL: undefined,
     LOCAL_AI_EMBEDDING_API_KEY: undefined,
+    RUNPOD_PRIMARY_EMBEDDING_ENABLED: 'true',
     RUNPOD_PRIMARY_EMBEDDING_BASE_URL: 'https://api.runpod.ai/v2/example/openai/v1',
     RUNPOD_PRIMARY_EMBEDDING_MODEL: 'BAAI/bge-base-en-v1.5',
     RUNPOD_PRIMARY_EMBEDDING_API_KEY: 'runpod-embedding-secret',
@@ -42,7 +43,7 @@ test.afterEach(() => {
   globalThis.fetch = originalFetch
 })
 
-test('RunPod primary requires an exact vector-space model match and a dedicated embedding key', () => {
+test('RunPod primary requires an explicit activation flag, exact vector-space model, and dedicated key', () => {
   const fallback = {
     baseUrl: 'https://api.deepinfra.com/v1/openai',
     model: 'BAAI/bge-base-en-v1.5',
@@ -50,9 +51,19 @@ test('RunPod primary requires an exact vector-space model match and a dedicated 
     timeoutMs: 120000,
   }
 
+  const configuredButDisabled = resolveRunpodPrimaryEmbeddingConfig(fallback, {
+    LOCAL_AI_EMBEDDING_MODEL: 'BAAI/bge-base-en-v1.5',
+    RUNPOD_PRIMARY_EMBEDDING_BASE_URL: 'https://abc123.api.runpod.ai/v1',
+    RUNPOD_PRIMARY_EMBEDDING_MODEL: 'BAAI/bge-base-en-v1.5',
+    RUNPOD_PRIMARY_EMBEDDING_API_KEY: 'dedicated-key',
+  })
+  assert.equal(configuredButDisabled.reason, 'disabled')
+  assert.equal(configuredButDisabled.config, null)
+
   const ready = resolveRunpodPrimaryEmbeddingConfig(fallback, {
     LOCAL_AI_EMBEDDING_MODEL: 'BAAI/bge-base-en-v1.5',
-    RUNPOD_PRIMARY_EMBEDDING_BASE_URL: 'https://api.runpod.ai/v2/example/openai/v1',
+    RUNPOD_PRIMARY_EMBEDDING_ENABLED: 'true',
+    RUNPOD_PRIMARY_EMBEDDING_BASE_URL: 'https://abc123.api.runpod.ai/v1',
     RUNPOD_PRIMARY_EMBEDDING_MODEL: 'BAAI/bge-base-en-v1.5',
     RUNPOD_PRIMARY_EMBEDDING_API_KEY: 'dedicated-key',
   })
@@ -62,7 +73,8 @@ test('RunPod primary requires an exact vector-space model match and a dedicated 
 
   const mismatch = resolveRunpodPrimaryEmbeddingConfig(fallback, {
     LOCAL_AI_EMBEDDING_MODEL: 'BAAI/bge-base-en-v1.5',
-    RUNPOD_PRIMARY_EMBEDDING_BASE_URL: 'https://api.runpod.ai/v2/example/openai/v1',
+    RUNPOD_PRIMARY_EMBEDDING_ENABLED: 'true',
+    RUNPOD_PRIMARY_EMBEDDING_BASE_URL: 'https://abc123.api.runpod.ai/v1',
     RUNPOD_PRIMARY_EMBEDDING_MODEL: 'nomic-embed-text',
     RUNPOD_PRIMARY_EMBEDDING_API_KEY: 'dedicated-key',
   })
@@ -71,12 +83,29 @@ test('RunPod primary requires an exact vector-space model match and a dedicated 
 
   const rootKeyOnly = resolveRunpodPrimaryEmbeddingConfig(fallback, {
     LOCAL_AI_EMBEDDING_MODEL: 'BAAI/bge-base-en-v1.5',
-    RUNPOD_PRIMARY_EMBEDDING_BASE_URL: 'https://api.runpod.ai/v2/example/openai/v1',
+    RUNPOD_PRIMARY_EMBEDDING_ENABLED: 'true',
+    RUNPOD_PRIMARY_EMBEDDING_BASE_URL: 'https://abc123.api.runpod.ai/v1',
     RUNPOD_PRIMARY_EMBEDDING_MODEL: 'BAAI/bge-base-en-v1.5',
     RUNPOD_API_KEY: 'must-not-be-reused',
   })
   assert.equal(rootKeyOnly.reason, 'missing_api_key')
   assert.equal(rootKeyOnly.config, null)
+})
+
+test('configured-but-disabled RunPod never receives embedding traffic', async () => {
+  configureBase({ RUNPOD_PRIMARY_EMBEDDING_ENABLED: undefined })
+  const urls: string[] = []
+  globalThis.fetch = (async (input: string | URL | Request) => {
+    const url = String(input)
+    urls.push(url)
+    assert.equal(url, 'https://api.deepinfra.com/v1/openai/embeddings')
+    return Response.json({ data: [{ index: 0, embedding: vector() }] })
+  }) as typeof fetch
+
+  const result = await generatePassiveLocalEmbedding('disabled-primary-regression')
+  assert.equal(result.length, LOCAL_EMBEDDING_DIMENSIONS)
+  assert.deepEqual(urls, ['https://api.deepinfra.com/v1/openai/embeddings'])
+  assert.equal(runpodPrimaryEmbeddingResolution().reason, 'disabled')
 })
 
 test('a healthy RunPod embedding primary handles the request without touching DeepInfra', async () => {

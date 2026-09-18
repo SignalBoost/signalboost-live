@@ -1,0 +1,52 @@
+name: Distillation Throughput Proof
+
+on:
+  pull_request:
+    paths:
+      - 'saas/vercel.json'
+      - 'saas/lib/ai/cos/cosUniversityMassDistillation.ts'
+      - 'saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts'
+      - 'saas/lib/ai/cos/cosUniversityDistillationCurriculumPlan.ts'
+      - 'saas/lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts'
+      - 'saas/self-healing-host/university-distillation-monitoring.ts'
+      - 'saas/tests/cosUniversityDistillationAlwaysOn.node.test.ts'
+      - 'saas/tests/cosUniversityDistillationUncappedMonitoring.node.test.ts'
+      - 'saas/tests/cosUniversityDistillationThroughput.node.test.ts'
+      - 'saas/tests/cosUniversityDistillationScale.node.test.ts'
+      - '.github/workflows/distillation-throughput-proof.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'saas/vercel.json'
+      - 'saas/lib/ai/cos/cosUniversityMassDistillation.ts'
+      - 'saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts'
+      - 'saas/lib/ai/cos/cosUniversityDistillationCurriculumPlan.ts'
+      - 'saas/lib/ai/cos/cosUniversityDistillationCurriculumReplenishment.ts'
+      - 'saas/self-healing-host/university-distillation-monitoring.ts'
+      - 'saas/tests/cosUniversityDistillationAlwaysOn.node.test.ts'
+      - 'saas/tests/cosUniversityDistillationUncappedMonitoring.node.test.ts'
+      - 'saas/tests/cosUniversityDistillationThroughput.node.test.ts'
+      - 'saas/tests/cosUniversityDistillationScale.node.test.ts'
+      - '.github/workflows/distillation-throughput-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  throughput-proof:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: saas
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: saas/package-lock.json
+      - run: npm ci
+      - name: Run owner-throughput, cadence, uncapped-monitoring, and scale proofs
+        run: node --experimental-transform-types --import ./scripts/test-alias-loader.mjs --test tests/cosUniversityDistillationAlwaysOn.node.test.ts tests/cosUniversityDistillationUncappedMonitoring.node.test.ts tests/cosUniversityDistillationThroughput.node.test.ts tests/cosUniversityDistillationScale.node.test.ts tests/cosUniversityMassDistillationRollingAuthorization.node.test.ts
+      - run: npm run typecheck

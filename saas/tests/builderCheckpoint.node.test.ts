@@ -115,13 +115,15 @@ test('scheduler accepts only its secret and resumes only server-owned paused job
   assert.match(route, /!secret \|\| request.headers.get\('authorization'\) !== `Bearer \$\{secret\}`/)
   assert.ok(route.indexOf('status: 401') < route.indexOf('await listBuilderContinuations'))
   assert.doesNotMatch(route, /request\.json|searchParams|enqueueBuilderJob/)
+  assert.match(route, /const selected = jobs\[0\] \|\| null/)
+  assert.doesNotMatch(route, /Promise\.all\(jobs\.map/)
   const store = read('../lib/builder/job-store.ts')
   assert.match(store, /\.eq\('status', 'paused'\)/)
   assert.match(store, /\.lt\('claim_generation', 4\)/)
   assert.match(store, /p_generation: input.claimGeneration/)
   assert.doesNotMatch(store.match(/const JOB_SELECT = .*/)?.[0] || '', /checkpoint/)
   const config = JSON.parse(read('../vercel.json'))
-  assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/builder-continuations').schedule, '* * * * *')
+  assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/builder-continuations').schedule, '1,6,11,16,21,26,31,36,41,46,51,56 * * * *')
 })
 
 test('an overdue model response is checkpointed before its proposed tool executes', async () => {

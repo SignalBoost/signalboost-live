@@ -28,6 +28,8 @@ import {
 } from './cosUniversityIndependentExam.ts'
 
 const DEFAULT_AGENT_ID = 'cos'
+const READY_PLAN_SCAN_MULTIPLIER = 12
+const MAX_READY_PLAN_SCAN = 24
 
 export type CosUniversityExamRunSummary = {
   runId: string | null
@@ -141,17 +143,32 @@ async function findRun(runKey: string): Promise<ExamRunRow | null> {
   return (result.data || null) as ExamRunRow | null
 }
 
+function retryableInfrastructureError(row: ExamRunRow | null): boolean {
+  if (!row || row.status !== 'error' || row.passed !== null) return false
+  const reasons = row.reasons || []
+  if (reasons.some(reason => reason.startsWith('execution_error:'))) return true
+  return reasons.includes('fresh_execution_required')
+    && (reasons.includes('empty_reply') || reasons.includes('not_handled'))
+}
+
 async function createOrFindRun(agentId: string, target: CosUniversityExamTarget, now: Date, readyStudyPlan?: ReadyStudyPlan | null): Promise<ExamRunRow | null> {
   const db = cosServiceDb()
   if (!db) return null
   const runKey = cosUniversityIndependentExamRunKey({ agentId, target, now, readyStudyPlan })
   const existing = await findRun(runKey)
-  if (existing) return existing
+  const retryable = retryableInfrastructureError(existing)
+  if (existing && !retryable) return existing
+
+  // A run that never produced a valid independent execution may receive exactly one fresh identity.
+  // Scored failures and provenance/integrity failures remain terminal and are never reopened here.
+  const effectiveRunKey = existing ? `${runKey}:infrastructure-retry:${existing.id}` : runKey
+  const retryExisting = existing ? await findRun(effectiveRunKey) : null
+  if (retryExisting) return retryExisting
 
   const seed = randomUUID()
   const exam = buildCosUniversityBlindExam(seed, target)
   const insert = await db.from('cos_university_exam_runs').insert({
-    run_key: runKey,
+    run_key: effectiveRunKey,
     profile: COS_UNIVERSITY_EXAM_PROFILE,
     scorer_version: COS_UNIVERSITY_EXAM_SCORER,
     seed,
@@ -166,7 +183,7 @@ async function createOrFindRun(agentId: string, target: CosUniversityExamTarget,
 
   if (!insert.error && insert.data) return insert.data as ExamRunRow
   if (insert.error && String((insert.error as { code?: string }).code || '') !== '23505') throw insert.error
-  return findRun(runKey)
+  return findRun(effectiveRunKey)
 }
 
 async function claimCreatedRun(row: ExamRunRow, now: Date): Promise<boolean> {
@@ -213,7 +230,10 @@ async function executeBoundExam(
   let bound: Awaited<ReturnType<typeof executeBoundAgentExam>>
   try {
     bound = await executeBoundAgentExam(
-      { agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: universityIndependentLearnerPrompt(exam) },
+      {
+        agentId, runId: row.id, manifestHash: exam.manifestHash, prompt: universityIndependentLearnerPrompt(exam),
+        responseWordLimit: universityExamResponseContract(exam)?.maxWords,
+      },
       // A language exam is generalist work; a subject exam may or may not be this role's own field.
       { subjectId: target.kind === 'subject' ? target.subjectId : null },
     )
@@ -478,23 +498,39 @@ export async function runCosUniversityIndependentExamBatch(options: {
 
   let readyPlans: ReadyStudyPlan[] = []
   try {
-    if (options.readyStudyPlansOnly) readyPlans = await loadReadyStudyPlans(agentId, maxExams)
+    if (options.readyStudyPlansOnly) {
+      const scanLimit = Math.min(MAX_READY_PLAN_SCAN, Math.max(maxExams, maxExams * READY_PLAN_SCAN_MULTIPLIER))
+      readyPlans = await loadReadyStudyPlans(agentId, scanLimit)
+    }
   } catch (error) {
     errors.push(`ready_study_plans:${error instanceof Error ? error.message : String(error)}`)
     return { enabled: true, attempted: 0, passed: 0, failed: 0, assessmentRowsWritten: 0, runs: [], errors, semantics: 'host_seeded_independent_exam_no_self_grading' }
   }
-  const targets = options.readyStudyPlansOnly
-    ? readyPlans.map((plan) => plan.target)
-    : selectCosUniversityExamTargets(rows, now).slice(0, maxExams)
+
   const runs: CosUniversityExamRunSummary[] = []
-  for (const [index, target] of targets.entries()) {
-    try {
-      const readyStudyPlan = options.readyStudyPlansOnly ? readyPlans[index] : null
-      const run = await runTarget(agentId, target, now, readyStudyPlan)
-      runs.push(run)
-      if (readyStudyPlan) await reconcileReadyStudyPlan(readyStudyPlan.id, run)
-    } catch (error) {
-      errors.push(`${targetKey(target)}:${error instanceof Error ? error.message : String(error)}`)
+  if (options.readyStudyPlansOnly) {
+    let executionSlots = 0
+    for (const readyStudyPlan of readyPlans) {
+      if (executionSlots >= maxExams) break
+      const target = readyStudyPlan.target
+      try {
+        const run = await runTarget(agentId, target, now, readyStudyPlan)
+        if (run.status === 'not_claimed') continue
+        runs.push(run)
+        await reconcileReadyStudyPlan(readyStudyPlan.id, run)
+        if (run.status === 'passed' || run.status === 'failed' || run.status === 'error') executionSlots += 1
+      } catch (error) {
+        errors.push(`${targetKey(target)}:${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+  } else {
+    const targets = selectCosUniversityExamTargets(rows, now).slice(0, maxExams)
+    for (const target of targets) {
+      try {
+        runs.push(await runTarget(agentId, target, now, null))
+      } catch (error) {
+        errors.push(`${targetKey(target)}:${error instanceof Error ? error.message : String(error)}`)
+      }
     }
   }
 

@@ -128,7 +128,7 @@ for (const required of ['primaryReasonerRequest', 'retrievePublishedDiagnosticRe
   if (!cosReasoner.includes(required)) failures.push(`advisory_diagnosis_reasoner_guard_missing:${required}`)
 }
 const publishedLookupIndex = cosReasoner.indexOf('retrievePublishedDiagnosticReferences(args.prompt)')
-const reasonerDraftIndex = cosReasoner.indexOf("recorder.time('draft', () => callLocalModel(effectiveArgs, inference)")
+const reasonerDraftIndex = cosReasoner.indexOf("recorder.time('draft', () => callLocalModel(effectiveArgs, boundedInference())")
 if (publishedLookupIndex < 0 || reasonerDraftIndex < 0 || publishedLookupIndex > reasonerDraftIndex) failures.push('advisory_diagnosis_published_lookup_must_precede_draft')
 const diagnosisReleaseGuardIndex = cosReasoner.indexOf('const remainingAdvisoryDefects = advisoryDiagnosis')
 const diagnosisCitationIndex = cosReasoner.indexOf('const allowedSkillTags = skillCitationTags')

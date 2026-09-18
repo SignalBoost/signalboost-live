@@ -1,3 +1,4 @@
+// saas/lib/ai/localInferenceUsage.ts
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 export type LocalInferenceUsageContext = Readonly<{
@@ -43,12 +44,28 @@ function clean(value: unknown, max = 240): string | null {
   return text || null
 }
 
-function nonNegativeInt(value: unknown): number | null {
+/**
+ * "The provider did not report this" and "the provider reported zero" are different facts and must stay
+ * different in the stored row. Number(null), Number(undefined ?? '') and Number(false) all coerce to a
+ * finite non-negative number, so coercing first silently manufactures a zero out of an absent value —
+ * every caller of this module was affected, not only the distilled evaluator. Reject unreported inputs
+ * before any numeric coercion; genuine zeros still store as 0.
+ */
+export function usageValueReported(value: unknown): boolean {
+  return value !== null
+    && value !== undefined
+    && typeof value !== 'boolean'
+    && !(typeof value === 'string' && value.trim() === '')
+}
+
+export function nonNegativeInt(value: unknown): number | null {
+  if (!usageValueReported(value)) return null
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
 }
 
-function nonNegativeNumber(value: unknown): number | null {
+export function nonNegativeNumber(value: unknown): number | null {
+  if (!usageValueReported(value)) return null
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? n : null
 }
@@ -65,6 +82,9 @@ function nonNegativeNumber(value: unknown): number | null {
 export async function recordLocalInferenceUsage(record: LocalInferenceUsageRecord): Promise<void> {
   const db = serviceDb()
   if (!db) return
+  // Derive cost_source from the stored value, not from a strict === null test on the input: an
+  // undefined or unparseable cost was previously labelled provider_reported while storing null.
+  const providerEstimatedCostUsd = nonNegativeNumber(record.providerEstimatedCostUsd)
   const row = {
     request_id: clean(record.requestId, 120),
     provider: clean(record.provider, 80) || 'unknown',
@@ -82,8 +102,8 @@ export async function recordLocalInferenceUsage(record: LocalInferenceUsageRecor
     completion_tokens: nonNegativeInt(record.completionTokens),
     total_tokens: nonNegativeInt(record.totalTokens),
     cached_prompt_tokens: nonNegativeInt(record.cachedPromptTokens),
-    provider_estimated_cost_usd: nonNegativeNumber(record.providerEstimatedCostUsd),
-    cost_source: record.providerEstimatedCostUsd === null ? 'unreported' : 'provider_reported',
+    provider_estimated_cost_usd: providerEstimatedCostUsd,
+    cost_source: providerEstimatedCostUsd === null ? 'unreported' : 'provider_reported',
     success: Boolean(record.success),
     http_status: record.httpStatus,
     latency_ms: Math.max(0, Math.floor(record.latencyMs || 0)),

@@ -71,6 +71,7 @@ test('assurance registry covers every scheduled University route explicitly', ()
     '/api/cron/cos-university-language-a-range': 'language_a_range_evidence',
     '/api/cron/cos-university-retention': 'delayed_retention',
     '/api/cron/cos-university-graduation': 'graduation',
+    '/api/cron/cos-university-graduate-activation': 'graduate_runtime_activation',
     '/api/cron/cos-university-masters-learning': 'masters_learning',
     '/api/cron/cos-university-masters-admission': 'masters_admission',
     '/api/cron/cos-university-masters-exam': 'masters_exams',
@@ -80,6 +81,10 @@ test('assurance registry covers every scheduled University route explicitly', ()
     '/api/cron/cos-university-phd-research': 'phd_research',
     '/api/cron/cos-university-phd-progress': 'phd_progress',
     '/api/cron/cos-university-fine-tuning': 'controlled_fine_tuning',
+    '/api/cron/cos-university-distilled-evaluation': 'distilled_independent_evaluation',
+    '/api/cron/cos-university-mass-distilled-evaluation': 'mass_distilled_independent_evaluation',
+    '/api/cron/cos-university-mass-distillation': 'mass_distillation_campaign',
+    '/api/cron/cos-university-distillation-supervisor': 'mass_distillation_supervision',
   }
   assert.deepEqual(scheduled.filter((route: string) => !pathByRoute[route]), [])
   for (const route of scheduled) assert.ok(pathByRoute[route] in COS_UNIVERSITY_FEATURE_GATED_PATHS)

@@ -212,7 +212,7 @@ test('practice route is isolated from the learner and scheduled after continuous
   assert.match(route, /Unauthorized/)
   assert.match(route, /maxExercises: 2/)
   assert.match(vercel, /COS_UNIVERSITY_PRACTICE_ENABLED/)
-  assert.match(vercel, /cos-university-learning[^\n]+\*\/15/)
+  assert.match(vercel, /cos-university-learning[^\n]+6,21,36,51/)
   assert.match(vercel, /cos-university-practice[^\n]+5,20,35,50/)
 })
 

@@ -10,8 +10,32 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { provenanceBoundarySecret } from './lib/ai/cos/provenanceBoundarySecret.ts'
 import { proxy as baseProxy } from './proxyBase.ts'
+import { isFastTextTransform } from './lib/ai/cos/fastTextTransformIntent.ts'
 
 const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
+const FAST_TRANSFORM_INTERNAL_HEADER = 'x-signalboost-fast-transform-internal'
+
+async function fastTextTransformRequest(req: NextRequest): Promise<boolean> {
+  try {
+    const body: any = await req.clone().json()
+    const messages = Array.isArray(body?.messages) ? body.messages : []
+    let latestUser = ''
+    let previousAssistant = ''
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+      if (!latestUser && message?.role === 'user' && typeof message?.content === 'string') {
+        latestUser = message.content.trim()
+        continue
+      }
+      if (latestUser && message?.role === 'assistant' && typeof message?.content === 'string') {
+        previousAssistant = message.content.trim()
+        break
+      }
+    }
+    return isFastTextTransform(latestUser, { previousAssistant })
+  } catch {}
+  return false
+}
 
 function dashboardSurface(req: NextRequest): boolean {
   const referer = req.headers.get('referer') || ''
@@ -55,12 +79,26 @@ export async function proxy(req: NextRequest) {
   if ((pathname === '/api/concierge' || pathname === '/api/cos-browser') && req.method === 'POST') {
     const gated = await baseProxy(req)
     if (gated.status !== 200) return gated
+    if (await fastTextTransformRequest(req)) {
+      const target = req.nextUrl.clone()
+      target.pathname = '/api/cos-fast-transform'
+      const headers = new Headers(req.headers)
+      headers.set(FAST_TRANSFORM_INTERNAL_HEADER, '1')
+      return NextResponse.rewrite(target, { request: { headers } })
+    }
     return provenanceRewrite(req, req.headers.get('x-signalboost-surface') === 'cos')
   }
 
   if (pathname === '/api/cos-primary' && req.method === 'POST' && fullAssistantSurface(req)) {
     const gated = await baseProxy(req)
     if (gated.status !== 200) return gated
+    if (await fastTextTransformRequest(req)) {
+      const target = req.nextUrl.clone()
+      target.pathname = '/api/cos-fast-transform'
+      const headers = new Headers(req.headers)
+      headers.set(FAST_TRANSFORM_INTERNAL_HEADER, '1')
+      return NextResponse.rewrite(target, { request: { headers } })
+    }
     return provenanceRewrite(req, true)
   }
 

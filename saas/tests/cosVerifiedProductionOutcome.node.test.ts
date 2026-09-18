@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { decideVerifiedCosProductionOutcome } from '../lib/ai/cos/cognitiveVerifiedOutcome.ts'
+import {
+  decideVerifiedCosProductionOutcome,
+  verifiedProductionTurnOutcomeSource,
+} from '../lib/ai/cos/cognitiveVerifiedOutcome.ts'
+import { isCosUniversityVerifiedProductionSource } from '../lib/ai/cos/cosUniversityARange.ts'
 
 test('verified self-healing success becomes bounded production evidence without automatic promotion', () => {
   const decision = decideVerifiedCosProductionOutcome({
@@ -23,6 +27,21 @@ test('verified self-healing success becomes bounded production evidence without 
   assert.equal(decision.evidence.semantics, 'verified_production_outcome_signal_not_factual_promotion')
   assert.equal(decision.evidence.successSemantics, 'externally_verified_real_world_outcome')
   assert.equal(decision.evidence.promotionPolicy, 'no_automatic_fact_or_skill_promotion')
+})
+
+test('guarded verified outcome derives a bounded University production source without leaking raw source text', () => {
+  const decision = decideVerifiedCosProductionOutcome({
+    sourceClass: 'production_outcome',
+    sourceRef: 'vercel-deployment:dpl_ABC123:terminal',
+    domain: 'self_healing',
+    outcomeStatus: 'success',
+    summary: 'The exact deployment reached READY.',
+    problemClass: 'incident diagnosis',
+  })
+  const source = verifiedProductionTurnOutcomeSource(decision)
+  assert.match(source, /^production_verified:production_outcome:self_healing:[a-f0-9]{40}$/)
+  assert.equal(isCosUniversityVerifiedProductionSource(source), true)
+  assert.equal(source.includes('dpl_ABC123'), false)
 })
 
 test('observed non-terminal outcome is retained without being mislabeled success', () => {

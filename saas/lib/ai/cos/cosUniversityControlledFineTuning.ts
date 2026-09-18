@@ -6,16 +6,11 @@ import { decideModelDistillationPromotion } from './cosUniversityModelDistillati
 import { readCosUniversityArtifactTrainingMode } from './cosUniversityDistillationPromotionEvidence.ts'
 import { reconcileCosUniversityDistillationCandidates } from './cosUniversityDistillationPreparation.ts'
 import { registerPromotedGraduateModel } from './cosUniversityGraduateModelRegistry.ts'
+import { reconcileLocalDistillationArtifacts, reconcileLocalDistillationCandidate } from './cosLocalDistillationArtifacts.ts'
 import { controlledFineTuneDatasetHash } from './cosUniversityTrainingIdentity.ts'
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 
-/**
- * Builds and records bounded fine-tuning candidates. Training remains impossible until separate
- * host approvals and independent post-training evidence exist. Distilled artifacts never inherit
- * ordinary fine-tune promotion: they must also satisfy the distillation-specific promotion gate.
- * Once they do, promotion is not terminal: the graduate is registered for iTMounts platform adoption.
- */
 export async function runCosUniversityControlledFineTuning(now = new Date()) {
   if (process.env.COS_UNIVERSITY_FINE_TUNING_ENABLED !== 'true') {
     return { enabled: false, considered: 0, recorded: 0, eligibleForTraining: 0, semantics: 'fine_tuning_fail_closed' }
@@ -23,17 +18,15 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
 
-  // Candidate qualification is non-spending and evidence-only. It may turn an unresolved study plan
-  // into a candidate after the existing 3/2 failure threshold is proven, but it does not attach a
-  // dataset, approve training, enable dispatch, call a provider, or expand authority.
   const distillationPreparation = await reconcileCosUniversityDistillationCandidates(now)
+  const localDistillationArtifacts = await reconcileLocalDistillationArtifacts(now, 250)
 
   const plans = await db.from('cos_university_study_plans')
     .select('id,plan_key,subject_id,failure_class,objective,methods,source_ref,evidence,attempt_count,updated_at')
     .eq('fine_tune_candidate', true)
     .in('status', ['queued', 'studying', 'ready_for_exam'])
     .order('priority', { ascending: false })
-    .limit(5)
+    .limit(20)
   if (plans.error) throw plans.error
 
   let recorded = 0
@@ -111,13 +104,17 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
         })
       : null
 
+    const localArtifact = trainingMode === 'distillation' && recordedEvidence?.trainedArtifactId
+      ? await reconcileLocalDistillationCandidate(candidateId, now)
+      : null
+
     if (decision.eligibleForTraining) eligibleForTraining += 1
     const evidence = {
       claim: 'candidate_status_observed', candidateId, planId: plan.id, datasetHash,
       lifecycleStage: decision.stage, trainedArtifactPresent: Boolean(recordedEvidence?.trainedArtifactId),
       trainingMode,
       trainingManifestHash: revision?.trainingManifestHash || null, holdoutManifestHash: revision?.holdoutManifestHash || null,
-      decision, platformAdoption, recordedClaims: recordedEvidence?.claims || [],
+      decision, platformAdoption, localArtifact, recordedClaims: recordedEvidence?.claims || [],
     }
     const evidenceHash = hash(evidence)
     const eventKey = hash(['controlled-fine-tuning-v1', candidateId, plan.updated_at, evidenceHash])
@@ -139,6 +136,7 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
       trainingMode,
       eligibleForTraining: decision.eligibleForTraining,
       eligibleForPromotion: decision.eligibleForPromotion,
+      localArtifact,
       platformAdoption,
       blockers: decision.blockers,
     })
@@ -146,6 +144,7 @@ export async function runCosUniversityControlledFineTuning(now = new Date()) {
   return {
     enabled: true, considered: (plans.data || []).length, recorded, eligibleForTraining, candidates,
     distillationPreparation,
-    semantics: 'candidate_packaging_training_requires_host_approvals_promoted_distillations_require_platform_adoption',
+    localDistillationArtifacts,
+    semantics: 'distilled_artifacts_immediately_enter_itmounts_local_library_training_still_requires_host_approval_promotion_controls_traffic',
   }
 }

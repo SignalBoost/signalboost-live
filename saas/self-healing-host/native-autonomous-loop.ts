@@ -1,12 +1,12 @@
-// Native monitoring -> connector evidence -> COS-first diagnosis -> governed Agent Gateway remediation.
+// Native monitoring -> connector evidence -> registered/COS diagnosis -> governed Agent Gateway remediation.
 import type { SupervisorIncident } from '@/lib/supervisor/incident-schema'
 import type { NormalizedIncidentPayload } from '@/lib/autonomous-supervisor/types'
 import { diagnoseIncident } from '@/lib/autonomous-supervisor/diagnostic'
 import { executeCosConnectorRecipe } from '@/lib/ai/cos/connectorDelegation'
 import { compactDelegatedEvidence } from '@/lib/ai/cos/evidenceCompaction'
-import { NATIVE_PLATFORM_INCIDENT_RECIPE } from '@/lib/ai/cos/incidentRecipeRouter'
+import { selectConnectorRecipe } from '@/lib/ai/cos/incidentRecipeRouter'
 import { createSignalBoostSupervisorConnectorRuntime, SIGNALBOOST_SUPERVISOR_CONNECTOR_TENANT } from './signalboost-supervisor-connectors.ts'
-import { createNativeRepairActionResolver } from './native-repair-action-resolver.ts'
+import { createNativeRepairActionResolver, diagnoseRegisteredNativeRecovery } from './native-repair-action-resolver.ts'
 import { nativeRemediationClass } from './remediation-experience.ts'
 import { recordCouncilOutcomesFromRepairDispatch, type CouncilOutcomeBridgeSummary } from './council-outcome-bridge.ts'
 import { SELF_HEALING_GATEWAY_POLICY } from './self-healing-gateway-policy.ts'
@@ -50,11 +50,11 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
       environmentId: incident.environment || 'production',
       portableId: 'self-healing-supervisor',
       traceId: incident.incidentId,
-      recipe: NATIVE_PLATFORM_INCIDENT_RECIPE,
+      recipe: selectConnectorRecipe(incident),
     })
     const evidence = compactDelegatedEvidence(delegated)
     const normalized = nativeIncidentToNormalized(incident, evidence)
-    const diagnostic = await diagnoseIncident(normalized)
+    const diagnostic = diagnoseRegisteredNativeRecovery(incident) ?? await diagnoseIncident(normalized)
     const repairPlan = Array.isArray(diagnostic.repair_plan) ? diagnostic.repair_plan as RepairStep[] : []
 
     // Public/customer utilities remain report-only. Incidents from separately allowlisted

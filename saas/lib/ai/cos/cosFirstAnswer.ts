@@ -15,6 +15,7 @@ import {
   restoreCriticalLanguageTokenCasing,
 } from './conciergeLanguageQuality.ts'
 import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
+import { tryDirectTextTransformation } from './directTextTransformation.ts'
 import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
 import { ownerPlatformIdentityContext } from './platformIdentityContext.ts'
 import { recordCosTurnExperience } from './cognitiveTurnExperience.ts'
@@ -617,6 +618,12 @@ function shouldRetryMalformedPublicCoreResult(result: COSFirstAnswerResult): boo
 export async function tryCOSFirstAnswer(input: COSFirstAnswerInput): Promise<COSFirstAnswerResult> {
   const imageResult = await tryCosCreativeImage(input)
   if (imageResult) return imageResult
+
+  // An explicit edit/rewrite/translation already states the task and supplies its source. Running
+  // semantic context/freshness interpretation first wastes the interactive deadline and can turn a
+  // simple edit into general reasoning. Keep the direct transformation lane ahead of classifiers.
+  const directTextTransformation = await tryDirectTextTransformation(input)
+  if (directTextTransformation) return reviewNativeLanguageQuality(input, directTextTransformation)
 
   const contextualInterpretation = await tryNeuralContextualInterpretation(input)
   if (contextualInterpretation) return reviewNativeLanguageQuality(input, contextualInterpretation)

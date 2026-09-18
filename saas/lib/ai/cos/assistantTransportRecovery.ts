@@ -44,6 +44,8 @@ export function findRecoveredAssistantReply(
       const candidate = messages[j]
       if (candidate?.role === 'user') break
       if (candidate?.role !== 'assistant') continue
+      const candidateProvenance = provenanceRecord(candidate.provenance)
+      if (candidateProvenance?.schema === 'signalboost-cos-turn-v1' && candidateProvenance?.status === 'running') continue
       const reply = String(candidate.content ?? '').trim()
       if (reply) return reply
     }

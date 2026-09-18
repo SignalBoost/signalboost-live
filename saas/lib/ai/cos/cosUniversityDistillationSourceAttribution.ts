@@ -3,7 +3,7 @@
 // WHICH source mix produced it. Two verdicts so far (0.550 vs 0.683 baseline, and 0.900 vs 0.900) say nothing about
 // whether real, failure-derived or teacher-synthetic material helped. This classifies a prepared batch's own source
 // hashes and reports the mix. It reads nothing outside the batch, decides no policy and authorizes no spend.
-import { syntheticOrdinalForHash, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
+import { failureDerivedOrdinalForHash, syntheticOrdinalForHash, type HybridDistillationOrigin } from './cosUniversityHybridDistillation.ts'
 
 export const DISTILLATION_SOURCE_ATTRIBUTION_PROFILE = 'cos-university-distillation-source-attribution-v1' as const
 export const DISTILLATION_SOURCE_ATTRIBUTION_CLAIM = 'distillation_source_attribution_recorded' as const
@@ -33,6 +33,7 @@ export function classifyDistillationSource(input: {
   if (!HEX64.test(sourceHash)) return null
   const declared = String(input.declaredOrigins?.[sourceHash] || '').trim()
   if ((ORIGINS as readonly string[]).includes(declared)) return declared as HybridDistillationOrigin
+  if (failureDerivedOrdinalForHash(String(input.subjectId || ''), sourceHash) !== null) return 'failure_derived'
   if (syntheticOrdinalForHash(String(input.subjectId || ''), sourceHash) !== null) return 'teacher_synthetic'
   return 'real_source'
 }

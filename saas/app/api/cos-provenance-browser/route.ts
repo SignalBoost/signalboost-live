@@ -11,6 +11,8 @@ import {
 } from '@/lib/ai/cos/publicAnswerProvenanceCapsule.ts'
 import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance.ts'
 import { recordLatestUserTurnProvenance } from '@/lib/ai/cos/supportTurnProvenance.ts'
+import { enqueueDurableCosTurn, finishDurableCosTurn } from '@/lib/ai/cos/durableCosTurn.ts'
+import { isConciergeBuilderObjective } from '@/lib/ai/cos/cosReasoningRolePolicy.ts'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -19,6 +21,7 @@ export const maxDuration = 300
 const PROVENANCE_COOKIE = 'sb_answer_provenance'
 const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
 const MAX_PROVENANCE_COOKIE_CHARS = 3600
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 type BrowserMessage = {
   role?: unknown
@@ -201,6 +204,85 @@ export async function POST(req: NextRequest): Promise<Response> {
         },
       })
       return finalizeAnswer(response, req, body)
+    }
+  }
+
+  // Owner Assistant ordinary turns use the same durable contract as Builder: persist a running
+  // History row, return 202 immediately, execute exactly once in after(), then update that same row.
+  // Fast edits are already removed by the proxy/direct fast lane before this point. Source-heavy
+  // coding requests stay on the existing Software Specialist/Builder lifecycle rather than nesting
+  // one durable job inside another.
+  const conversationId = String(body?.context?.conversationId || body?.conversationId || '').trim()
+  const attachments = Array.isArray(body?.attachments) ? body.attachments : []
+  const ordinaryOwnerTurn = !publicSurface(req)
+    && Boolean(prompt)
+    && UUID.test(conversationId)
+    && attachments.length === 0
+    && !isConciergeBuilderObjective(prompt, { attachmentNames: [], attachmentMimeTypes: [] })
+
+  if (ordinaryOwnerTurn) {
+    const access = await getAccess().catch(() => null)
+    if (access?.isOwner && access.userId) {
+      const turnId = crypto.randomUUID()
+      const runningReply = 'COS accepted this turn. The final response is durable in History and this request will not be replayed.'
+      try {
+        const { historyMessageId } = await enqueueDurableCosTurn({
+          turnId,
+          userId: access.userId,
+          conversationId,
+          prompt,
+          runningReply,
+        })
+
+        const workerUserId = access.userId
+        after(async () => {
+          try {
+            const workerResponse = await cosBrowserPost(downstreamRequest(req, body))
+            const payload: any = await workerResponse.clone().json().catch(() => null)
+            const reply = String(payload?.reply || payload?.error || '').trim()
+            const succeeded = workerResponse.ok && payload?.ok !== false && Boolean(reply)
+            await finishDurableCosTurn({
+              turnId,
+              historyMessageId,
+              userId: workerUserId,
+              status: succeeded ? 'succeeded' : 'failed',
+              reply: reply || 'COS completed the worker without a usable response. The request was not replayed.',
+              source: String(payload?.source || 'cos-browser-worker'),
+              executionProvenance: payload?.execution_provenance ?? null,
+              answerProvenance: payload?.answer_provenance ?? null,
+              error: succeeded ? null : String(payload?.error || `http_${workerResponse.status}`),
+            })
+          } catch (error) {
+            await finishDurableCosTurn({
+              turnId,
+              historyMessageId,
+              userId: workerUserId,
+              status: 'failed',
+              reply: 'COS could not finish this durable turn. The request was not replayed.',
+              source: 'cos-durable-worker-failed',
+              error: error instanceof Error ? error.message : 'cos_durable_worker_failed',
+            }).catch(() => undefined)
+          }
+        })
+
+        const accepted = NextResponse.json({
+          ok: true,
+          turnId,
+          status: 'running',
+          reply: runningReply,
+          source: 'cos-durable-turn-running',
+          execution_allowed: false,
+          external_action_taken: false,
+        }, { status: 202 })
+        accepted.headers.set('Cache-Control', 'no-store, max-age=0')
+        return accepted
+      } catch (error) {
+        console.error('[cos_durable_turn_enqueue_failed]', {
+          message: error instanceof Error ? error.message : 'unknown',
+        })
+        // Storage failure does not silently drop the request; fall through to the bounded
+        // synchronous path already used before this durable transport existed.
+      }
     }
   }
 

@@ -123,16 +123,17 @@ test('conversation follow-ups are resolved semantically from recent user context
   assert.match(seen[0] || '', /RECENT USER TURNS:/)
 })
 
-test('the browser ingress uses the deep semantic gate and forwards its resolved objective', async () => {
+test('the public Concierge uses the deep semantic visual gate while owner Assistant goes directly to COS', async () => {
   const route = await readRepoFile('app/api/cos-browser/route.ts')
   requireWiring(route, {
     file: 'saas/app/api/cos-browser/route.ts',
-    purpose: 'Use the deep semantic conversation verdict and preserve the exact user-authored resolved visual objective.',
-    expect: /const semanticResolution = directVisual \? null : await resolveSemanticVisualRequest\(messages, prompt\)/,
-    insert: '    const semanticResolution = directVisual ? null : await resolveSemanticVisualRequest(messages, prompt)',
+    purpose: 'Use the deep semantic conversation verdict only for the public mouth; owner Assistant is COS and must not pay a separate visual-classifier call.',
+    expect: /const semanticResolution = directVisual \|\| browserSurface === 'assistant'[\s\S]*\? null[\s\S]*: await resolveSemanticVisualRequest\(messages, prompt\)/,
+    insert: "    const semanticResolution = directVisual || browserSurface === 'assistant' ? null : await resolveSemanticVisualRequest(messages, prompt)",
     after: '    const directVisual = isConciergeVisualObjective(prompt)',
     requiresImport: "import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'",
   })
+  assert.match(route, /const visualObjective = browserSurface === 'assistant'[\s\S]*\? null/)
   assert.match(route, /body: JSON\.stringify\(\{ objective: visualObjective, semanticVisual \}\)/)
 
   const visuals = await readRepoFile('app/api/visuals/route.ts')

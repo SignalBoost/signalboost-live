@@ -14,7 +14,7 @@ import {
   preservesExplicitlyRequestedCriticalTokens,
   restoreCriticalLanguageTokenCasing,
 } from './conciergeLanguageQuality.ts'
-import { requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
+import { isPlatformSelfKnowledgePrompt, requiresFreshExternalEvidence } from './cosFreshnessPolicy.ts'
 import { tryDirectTextTransformation } from './directTextTransformation.ts'
 import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from './cosSemanticTaskIntent.ts'
 import { ownerPlatformIdentityContext } from './platformIdentityContext.ts'
@@ -343,6 +343,11 @@ async function tryOwnerNeuralSelfKnowledge(
   options: { compatibilitySignal?: boolean } = {},
 ): Promise<COSFirstAnswerResult | null> {
   if (input.privileged !== true || isPublicDeliveryScope()) return null
+  // Assistant IS COS. Do not spend a full neural call asking whether every ordinary owner turn is
+  // about COS before COS can answer it. Only invoke the self-knowledge reasoner when the shared,
+  // deterministic platform-self-knowledge policy says the request is actually about this system,
+  // or when the compatibility core emitted a concrete self-knowledge signal that needs neural repair.
+  if (!options.compatibilitySignal && !isPlatformSelfKnowledgePrompt(input.prompt)) return null
 
   const runtimeContext = ownerPlatformIdentityContext()
   const previousAssistant = String(input.previousAssistant ?? '').trim().slice(0, 8_000)

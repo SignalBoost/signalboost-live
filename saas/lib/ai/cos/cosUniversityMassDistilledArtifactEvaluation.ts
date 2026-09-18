@@ -2,7 +2,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { cosServiceDb } from '../../cos-core/storage/supabase.ts'
 import { callLocalModel, localInferenceConfigFromEnv } from '../local-inference.ts'
-import { MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from './cosUniversityMassEvaluationContextBudget.ts'
+import { MASS_EVALUATION_ENDPOINT_CALLS, MASS_EVALUATION_JUDGE_CALLS, MASS_EVALUATION_SYSTEM_PROMPT, massEvaluationOutputTokens, planMassEvaluationGroups } from './cosUniversityMassEvaluationContextBudget.ts'
 import { recoverStoppedOpenAnswer } from './cosUniversityMassEvaluationAnswerRecovery.ts'
 import { servedCandidateModelFromCanary } from './cosUniversityMassEvaluationServedModel.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
@@ -23,8 +23,8 @@ const BASE_MODEL_ID = 'Qwen/Qwen3-4B'
 const HEX40 = /^[a-f0-9]{40}$/i
 const HEX64 = /^[a-f0-9]{64}$/i
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([a-f0-9]{40})#([A-Za-z0-9_.-]+)$/i
-const ENDPOINT_CALLS = 8
-const JUDGE_CALLS = 4
+const ENDPOINT_CALLS = MASS_EVALUATION_ENDPOINT_CALLS
+const JUDGE_CALLS = MASS_EVALUATION_JUDGE_CALLS
 // Production 2026-09-17, 6h across three exact-artifact endpoints: 182 successes at 8.8-30.0s, 25 HTTP 502 failures in
 // a 35.2-40.4s band. A five-second-wide band across independent endpoints is an upstream cutoff. Waiting 120s for a
 // request the gateway abandons at ~40s spends three times the wall clock to learn nothing, and on a route deadline that
@@ -256,9 +256,10 @@ export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvalua
   const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs});const model=await servedCandidateModel(input.claim);await waitReady(input.claim.endpointId,input.deadlineMs)
   const keepaliveKey=configuredRunpodApiKey();const keepalive=keepaliveKey?setInterval(()=>{void fetch(`https://${input.claim.endpointId}.api.runpod.ai/ready`,{headers:{Authorization:`Bearer ${keepaliveKey}`},signal:AbortSignal.timeout(8_000)}).catch(()=>undefined)},30_000):null;keepalive?.unref?.()
   try{
-    const budget:EndpointCallBudget={used:0,max:ENDPOINT_CALLS};const fixedCases=[...safetyCases(),...transferCases(),...retentionCases()];const common={endpointId:input.claim.endpointId,budget,claim:input.claim,deadlineMs:input.deadlineMs};const holdoutGroupCount=planMassEvaluationGroups(holdoutCases,batchPrompt,3).length
-    const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutGroupCount+2,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
-    const holdoutCandidate=await answersFor({...common,model,cases:holdoutCases,maxGroups:3,reserveCallsAfter:2,feature:'mass_distilled_eval_holdout_candidate',candidate:true})
+    const budget:EndpointCallBudget={used:0,max:ENDPOINT_CALLS};const fixedCases=[...safetyCases(),...transferCases(),...retentionCases()];const common={endpointId:input.claim.endpointId,budget,claim:input.claim,deadlineMs:input.deadlineMs};const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutCases.length+2,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
+    // The candidate answers the SAME cases as the baseline at ~1.7x the wall time, so it gets one request per case
+    // rather than the baseline's grouping. Fewer answers per request keeps each one clear of the observed gateway cutoff.
+    const holdoutCandidate=await answersFor({...common,model,cases:holdoutCases,maxGroups:holdoutCases.length,reserveCallsAfter:2,feature:'mass_distilled_eval_holdout_candidate',candidate:true})
     const fixedBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:fixedCases,maxGroups:1,reserveCallsAfter:1,feature:'mass_distilled_eval_fixed_suites_baseline',candidate:false})
     const fixedCandidate=await answersFor({...common,model,cases:fixedCases,maxGroups:1,reserveCallsAfter:0,feature:'mass_distilled_eval_fixed_suites_candidate',candidate:true})
     const holdout=await suite({name:'holdout',cases:holdoutCases,baseline:holdoutBaseline,candidate:holdoutCandidate,deadlineMs:input.deadlineMs});const safety=await suite({name:'safety',cases:safetyCases(),baseline:fixedBaseline,candidate:fixedCandidate,deadlineMs:input.deadlineMs});const transfer=await suite({name:'transfer',cases:transferCases(),baseline:fixedBaseline,candidate:fixedCandidate,deadlineMs:input.deadlineMs});const retention=await suite({name:'retention',cases:retentionCases(),baseline:fixedBaseline,candidate:fixedCandidate,deadlineMs:input.deadlineMs})

@@ -4,6 +4,7 @@ import { POST as cosPrimaryPost, isFastTextTransform } from '@/app/api/cos-prima
 import { POST as publicConciergePost } from '@/app/api/concierge/route'
 import { POST as artifactPost } from '@/app/api/artifacts/route'
 import { POST as visualPost } from '@/app/api/visuals/route'
+import { runDirectFastTextEdit } from '@/lib/ai/cos/fastTextEditDirect'
 import { getAccess } from '@/lib/auth/access'
 import { withPublicAuditIdentity } from '@/lib/auth/publicAuditIdentity'
 import { withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
@@ -151,18 +152,42 @@ export async function POST(req: NextRequest) {
     ? String(body.context.language).toLowerCase()
     : 'en'
 
-  // Simple edit/rewrite/proofread/translate requests must reach COS Primary before any
-  // browser-ingress auth, specialist, attachment, or orchestration work. COS Primary owns the
-  // bounded text-transform path and does not require owner authority for a non-mutating rewrite.
+  // Simple edit/rewrite/proofread/translate requests terminate here. They must never descend
+  // into COS Primary: the former Promise.race path could return a timeout while the abandoned
+  // reasoner kept running until Vercel killed the invocation. One abortable completion owns the
+  // edit and nothing survives its deadline.
   if (isFastTextTransform(prompt)) {
-    const routedHeaders = new Headers(req.headers)
-    routedHeaders.set('content-type', 'application/json')
-    routedHeaders.delete('content-length')
-    return cosPrimaryPost(new NextRequest(req.url, {
-      method: 'POST',
-      headers: routedHeaders,
-      body: JSON.stringify(body),
-    }))
+    const edited = await runDirectFastTextEdit(prompt)
+    if (edited) {
+      return NextResponse.json({
+        ok: true,
+        reply: edited.text,
+        source: 'cos-fast-text-edit-direct',
+        confidence_score: 1,
+        external_ai_invoked: edited.external,
+        external_fallback_invoked: false,
+        local_model_invoked: !edited.external,
+        execution_provenance: {
+          answer_origin: { provider: edited.provider, model: edited.model, from_cache: false },
+          local_reasoning: { invoked: !edited.external, model: edited.model, elapsed_ms: edited.elapsedMs },
+        },
+        execution_allowed: false,
+        external_action_taken: false,
+      })
+    }
+    const failed = 'COS could not complete this text edit within the fast-path deadline. Nothing was sent and no action was taken.'
+    return NextResponse.json({
+      ok: false,
+      reply: failed,
+      error: failed,
+      source: 'cos-fast-text-edit-direct-timeout',
+      confidence_score: 0,
+      external_ai_invoked: false,
+      external_fallback_invoked: false,
+      local_model_invoked: false,
+      execution_allowed: false,
+      external_action_taken: false,
+    }, { status: 503 })
   }
 
   const access = await getAccess().catch(() => null)

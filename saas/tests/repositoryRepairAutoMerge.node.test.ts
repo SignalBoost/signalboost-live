@@ -353,7 +353,7 @@ test('a repair becomes terminally superseded when its feature branch advances an
   }
 })
 
-test('merge continuation is cron-authenticated, minute-scheduled, branch-aware, and controlled by the server kill switch', async () => {
+test('merge continuation is cron-authenticated, bounded-scheduled, branch-aware, and controlled by the server kill switch', async () => {
   const [route, vercel, continuation, lifecycle] = await Promise.all([
     readFile(new URL('../app/api/cron/builder-repair-merge/route.ts', import.meta.url), 'utf8'),
     readFile(new URL('../vercel.json', import.meta.url), 'utf8'),
@@ -363,7 +363,7 @@ test('merge continuation is cron-authenticated, minute-scheduled, branch-aware, 
   assert.match(route, /CRON_SECRET/)
   assert.match(route, /completePendingRepositoryRepairMerges/)
   assert.match(route, /failBuilderRepositoryRepairAfterSupersededBase/)
-  assert.match(vercel, /"\/api\/cron\/builder-repair-merge"[\s\S]*"\* \* \* \* \*"/)
+  assert.match(vercel, /"\\/api\\/cron\\/builder-repair-merge"[\\s\\S]*"\\*\\/2 \\* \\* \\* \\*"/)
   assert.match(continuation, /BUILDER_AUTO_MERGE_ENABLED/)
   assert.match(continuation, /evaluateAutoMergeDangerCategory/)
   assert.match(continuation, /evaluatePullRequestChecks/)

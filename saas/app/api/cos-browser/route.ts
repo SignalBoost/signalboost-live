@@ -32,7 +32,7 @@ import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } f
 import { resolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
-import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
+import { detectDirectTextTransformation, tryDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -152,20 +152,49 @@ export async function POST(req: NextRequest) {
     ? String(body.context.language).toLowerCase()
     : 'en'
 
+  // Explicit text transformations are fully scoped by the user's command and supplied source.
+  // They require no identity/visual/software classification and no privileged authority. Execute
+  // the bounded editor immediately on BOTH Concierge and Assistant so the homepage cannot spend
+  // ~30 seconds on unrelated semantic classifiers before the edit model call.
+  const directTextTransformation = detectDirectTextTransformation(prompt)
+  const directTextHasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
+  if (directTextTransformation && !directTextHasAttachments) {
+    const transformed = await tryDirectTextTransformation({ prompt, language })
+    if (transformed?.handled) {
+      return NextResponse.json({
+        ok: true,
+        reply: transformed.reply,
+        source: 'cos-direct-text-transformation',
+        confidence_score: transformed.confidence,
+        external_ai_invoked: false,
+        external_fallback_invoked: false,
+        local_model_invoked: transformed.provenance.localModelInvoked,
+        execution_provenance: transformed.provenance,
+        execution_allowed: false,
+        external_action_taken: false,
+      })
+    }
+    if (transformed) {
+      return NextResponse.json({
+        ok: false,
+        reply: transformed.reason,
+        error: transformed.reason,
+        source: 'cos-direct-text-transformation-unavailable',
+        confidence_score: transformed.confidence,
+        external_ai_invoked: false,
+        external_fallback_invoked: false,
+        local_model_invoked: transformed.provenance.localModelInvoked,
+        execution_provenance: transformed.provenance,
+        execution_allowed: false,
+        external_action_taken: false,
+      }, { status: 503 })
+    }
+  }
+
   const access = await getAccess().catch(() => null)
   const auditUserId = access?.userId ?? null
   const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
-
-  // Explicit owner text transformations are already fully classified by their command + supplied
-  // source. Send them straight to COS primary before Software Specialist, public-identity, visual,
-  // or other semantic classifiers consume the browser wait budget. Attachments stay on the normal
-  // path because they can carry separate routing/authority semantics.
-  const directTextTransformation = detectDirectTextTransformation(prompt)
-  const directTextHasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
-  if (directTextTransformation && authenticatedOwner && browserSurface === 'assistant' && !directTextHasAttachments) {
-    return cosPrimaryPost(req)
-  }
 
   if (browserSurface === 'concierge') {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)

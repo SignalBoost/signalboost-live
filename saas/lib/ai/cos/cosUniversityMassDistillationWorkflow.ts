@@ -68,7 +68,7 @@ async function consumedBatchKeys(db: any, keys: readonly string[]): Promise<Set<
 async function preparedMassDistillationInventory(target: number): Promise<number> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const pageSize = 500
+  const pageSize = 100
   let offset = 0
   let available = 0
   while (available < target) {
@@ -118,17 +118,17 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const campaignClosure = await isolatedStep('campaign_closure', () =>
     closeExpiredMassDistillationCampaigns({ now, maxCampaigns: 10 }))
   const terminalCleanup = await isolatedStep('terminal_cleanup', () =>
-    terminalizeFailedMassDistillationCampaignRuns({ maxCampaigns: 20 }))
+    terminalizeFailedMassDistillationCampaignRuns({ maxCampaigns: 5 }))
   const reconciliation = await isolatedStep('provider_reconciliation', () =>
-    reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 15 }))
+    reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 5 }))
   const diagnostics = await isolatedStep('provider_diagnostics', () =>
-    diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 }))
+    diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 3 }))
   const stalledDispatchRecovery = await isolatedStep('stalled_dispatch_recovery', () =>
-    recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 }))
+    recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 5 }))
   const recovery = await isolatedStep('campaign_recovery', () =>
-    recoverMassDistillationCampaigns({ now, maxCampaigns: 5 }))
+    recoverMassDistillationCampaigns({ now, maxCampaigns: 3 }))
   const semanticReconciliation = await isolatedStep('semantic_reconciliation', () =>
-    reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 100 }))
+    reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 20 }))
   const preparedBufferTarget = throughput.preparedBatchBufferTarget
   let preparedBeforeReplenishment = 0
   let preparedAfterReplenishment = 0

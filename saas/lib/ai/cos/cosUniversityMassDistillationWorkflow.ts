@@ -97,10 +97,10 @@ async function preparedMassDistillationInventory(target: number): Promise<number
 
 /**
  * One canonical distillation control loop shared by the scheduled worker and the Self-Healing
- * Supervisor. Accepted provider work is reconciled first. Non-spending curriculum preparation then
- * maintains buyer/owner-configured ready inventory independently of paid training authority, so
- * training need not wait for acquisition after capacity becomes available. Paid dispatch remains
- * bounded by the University's separate owner-approved rolling policy.
+ * Supervisor. Terminal cleanup and dispatch-critical recovery run first, then already-authorized
+ * provider work is dispatched before slower semantic/curriculum maintenance. Non-spending curriculum
+ * preparation still maintains buyer/owner-configured ready inventory independently of paid authority.
+ * Paid dispatch remains bounded by the University's separate owner-approved rolling policy.
  */
 export async function runCosUniversityMassDistillationWorkflow(input: {
   source: MassDistillationWorkflowSource
@@ -127,6 +127,33 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 5 }))
   const recovery = await isolatedStep('campaign_recovery', () =>
     recoverMassDistillationCampaigns({ now, maxCampaigns: 3 }))
+  // Dispatch is the critical path. Do it before semantic/curriculum maintenance so an already
+  // authorized prepared batch cannot be starved by slow reconciliation or replenishment work.
+  let rollingAuthorization: Record<string, unknown>
+  const dispatchReadiness = massDistillationDispatchReadiness()
+  try {
+    rollingAuthorization = dispatchReadiness.ready
+      ? { ...(await authorizeNextUniversityMassDistillationCampaign()) }
+      : {
+          ok: false,
+          authorized: false,
+          reason: dispatchReadiness.reason,
+          automaticPromotionAuthorized: false,
+          runpodMutationAuthorized: false,
+          authorityExpanded: false,
+        }
+  } catch (error) {
+    rollingAuthorization = {
+      ok: false,
+      authorized: false,
+      reason: 'rolling_authorization_failed',
+      error: safeError(error),
+      automaticPromotionAuthorized: false,
+      runpodMutationAuthorized: false,
+      authorityExpanded: false,
+    }
+  }
+  const result = await runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })
   const semanticReconciliation = await isolatedStep('semantic_reconciliation', () =>
     reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 20 }))
   const preparedBufferTarget = throughput.preparedBatchBufferTarget
@@ -185,31 +212,6 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     curriculum = { ok: false, error: safeError(error), externalCostUsd: 0, dispatchAuthorized: false }
     curriculumReplenishment = { ok: false, error: safeError(error), externalCostUsd: 0 }
   }
-  let rollingAuthorization: Record<string, unknown>
-  const dispatchReadiness = massDistillationDispatchReadiness()
-  try {
-    rollingAuthorization = dispatchReadiness.ready
-      ? { ...(await authorizeNextUniversityMassDistillationCampaign()) }
-      : {
-          ok: false,
-          authorized: false,
-          reason: dispatchReadiness.reason,
-          automaticPromotionAuthorized: false,
-          runpodMutationAuthorized: false,
-          authorityExpanded: false,
-        }
-  } catch (error) {
-    rollingAuthorization = {
-      ok: false,
-      authorized: false,
-      reason: 'rolling_authorization_failed',
-      error: safeError(error),
-      automaticPromotionAuthorized: false,
-      runpodMutationAuthorized: false,
-      authorityExpanded: false,
-    }
-  }
-  const result = await runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })
   const consumerSkipped = 'skipped' in result && result.skipped === true
   const reconciliationSkipped = 'skipped' in reconciliation && reconciliation.skipped === true
   const diagnosticsSkipped = 'skipped' in diagnostics && diagnostics.skipped === true
@@ -251,7 +253,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       preparedAfterReplenishment,
       rollingAuthorization,
       workflowSource: input.source,
-      workflowSemantics: 'detect_diagnose_repair_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_authorize_within_owner_rolling_24h_ceiling_dispatch_verify',
+      workflowSemantics: 'detect_repair_authorize_dispatch_before_maintenance_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_verify',
     },
     invocationSucceeded,
     skipped,

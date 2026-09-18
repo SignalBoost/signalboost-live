@@ -126,12 +126,15 @@ test('JSON-mode provider rejection does not silently fall back to unconstrained 
 test('direct text transformations use the dedicated DeepInfra flash editor with reasoning disabled', async () => {
   delete process.env.COS_DIRECT_TEXT_MODEL
   let observedBody: Record<string, unknown> = {}
-  globalThis.fetch = (async (_input, init) => {
-    observedBody = JSON.parse(String(init?.body)) as Record<string, unknown>
-    return Response.json({
-      choices: [{ finish_reason: 'stop', message: { content: '{"answer":"Edited text.","confidence":0.99}' } }],
-      usage: { prompt_tokens: 20, completion_tokens: 12, total_tokens: 32 },
-    })
+  globalThis.fetch = (async (input, init) => {
+    if (String(input).includes('/chat/completions')) {
+      observedBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return Response.json({
+        choices: [{ finish_reason: 'stop', message: { content: '{"answer":"Edited text.","confidence":0.99}' } }],
+        usage: { prompt_tokens: 20, completion_tokens: 12, total_tokens: 32 },
+      })
+    }
+    return Response.json({})
   }) as typeof fetch
 
   const result = await callLocalModel({
@@ -156,9 +159,12 @@ test('direct text transformations use the dedicated DeepInfra flash editor with 
 test('ordinary interactive COS answers retain the configured stronger model', async () => {
   delete process.env.COS_INTERACTIVE_REASONING_EFFORT
   let observedBody: Record<string, unknown> = {}
-  globalThis.fetch = (async (_input, init) => {
-    observedBody = JSON.parse(String(init?.body)) as Record<string, unknown>
-    return Response.json({ choices: [{ finish_reason: 'stop', message: { content: 'answer' } }] })
+  globalThis.fetch = (async (input, init) => {
+    if (String(input).includes('/chat/completions')) {
+      observedBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return Response.json({ choices: [{ finish_reason: 'stop', message: { content: 'answer' } }] })
+    }
+    return Response.json({})
   }) as typeof fetch
 
   await callLocalModel({

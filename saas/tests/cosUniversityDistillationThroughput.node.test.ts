@@ -104,3 +104,13 @@ test('empty canonical subjects rotate between slots instead of always asking the
   const at = (iso: string) => buildMassDistillationReplenishmentGaps([], new Date(iso), 3, 1).map(gap => gap.subject).join('|')
   assert.notEqual(at('2026-09-16T23:10:00.000Z'), at('2026-09-16T23:15:00.000Z'))
 })
+
+
+test('rolling authorization prioritizes prepared batches containing failure-derived curriculum hashes', () => {
+  const migration = source('../supabase/migrations/20260918023000_prioritize_failure_derived_distillation_batches.sql')
+  assert.match(migration, /source_kind = 'failure_derived_curriculum'/)
+  assert.match(migration, /cl\.content_hash = any\(b\.source_hashes\)/)
+  assert.match(migration, /case when exists[\s\S]*then 0 else 1 end,[\s\S]*b\.prepared_at asc/)
+  assert.match(migration, /v_active_campaigns >= v_policy\.max_concurrent_campaigns or v_unsettled_jobs > 0/)
+  assert.match(migration, /automaticPromotionAuthorized',false,'runpodMutationAuthorized',false,'authorityExpanded',false/)
+})

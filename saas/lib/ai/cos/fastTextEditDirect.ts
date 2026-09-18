@@ -1,135 +1,375 @@
-// saas/lib/ai/cos/fastTextEditDirect.ts
-//
-// A simple edit / rewrite / proofread / translate request must never enter the COS reasoning chain.
-//
-// The previous fast path raced a 12-second timer against callRawCosReasoner. Promise.race GIVES UP —
-// it does not cancel. The abandoned chain kept running (draft 45.9s -> quality repair 60.0s ->
-// citation repair 38.7s -> managed-provider fallback 120.0s), the invocation never closed, and the
-// platform killed it at 300s — destroying the 503 response that had already been built at 12s.
-//
-// This module issues exactly ONE abortable OpenAI-compatible completion. No council, no repair
-// passes, no fallback provider, no Supabase, no telemetry, no persistence. It either returns text
-// inside the deadline or it aborts the socket and returns null. Nothing outlives the call.
+// saas/app/api/cos-browser/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { POST as cosPrimaryPost, isFastTextTransform } from '@/app/api/cos-primary/route'
+import { POST as publicConciergePost } from '@/app/api/concierge/route'
+import { POST as artifactPost } from '@/app/api/artifacts/route'
+import { POST as visualPost } from '@/app/api/visuals/route'
+import { runDirectFastTextEdit } from '@/lib/ai/cos/fastTextEditDirect'
+import { getAccess } from '@/lib/auth/access'
+import { withPublicAuditIdentity } from '@/lib/auth/publicAuditIdentity'
+import { withPublicDeliveryScope } from '@/lib/auth/publicDeliveryScope'
+import { isProvenanceIntrospection } from '@/lib/ai/cos/cosOrchestration'
+import { readCosPrimaryPriorProvenance } from '@/lib/ai/cos/cosPrimaryTurnProvenance'
+import { renderPublicRecordedProvenance } from '@/lib/ai/cos/publicRecordedProvenance'
+import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
+import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
+import { tryCosSoftwareSpecialist } from '@/lib/ai/cos/softwareSpecialist'
+import {
+  analyzeOperationalLog,
+  compactOperationalLogForRepair,
+  hasExplicitOperationalLogRepairIntent,
+  isExplicitOperationalLogRepairRequest,
+  isOperationalLogEvidence,
+  isPastedOperationalLog,
+  operationalLogReply,
+} from '@/lib/ai/cos/pastedOperationalLog'
+import { diagnoseOperationalLog } from '@/lib/ai/cos/operationalLogDiagnostic'
+import { isOperationalLogRepairOffer } from '@/lib/ai/cos/pastedOperationalLog'
+import { isRepairConfirmation } from '@/lib/ai/cos/repairConfirmationIntent'
+import { isConciergeArtifactObjective } from '@/lib/artifacts/intent'
+import { isConciergeVisualObjective } from '@/lib/visuals/intent'
+import { resolveSemanticVisualRequest } from '@/lib/visuals/semanticIntent'
+import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } from '@/lib/ai/cos/publicConciergeIdentity'
+import { resolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
+import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
+import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 
-export type DirectFastEditResult = { text: string; model: string; elapsedMs: number }
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
-const DEFAULT_DEADLINE_MS = 35_000
+// COS is the private reasoning/orchestration layer. This object represents an authenticated owner
+// capability, not a UI-surface capability. Concierge and Assistant are delivery surfaces; neither
+// is allowed to manufacture authority, and neither is the software execution controller.
+const ownerSoftwareAuthority = Object.freeze({ allowRepositoryRepair: true })
 
-function deadlineMs(): number {
-  const parsed = Number(process.env.COS_FAST_EDIT_DEADLINE_MS || DEFAULT_DEADLINE_MS)
-  return Number.isFinite(parsed) && parsed >= 2_000 && parsed <= 40_000 ? Math.floor(parsed) : DEFAULT_DEADLINE_MS
+function isSignalBoostDeploymentContext(req: NextRequest): boolean {
+  const owner = String(process.env.VERCEL_GIT_REPO_OWNER || '').trim().toLowerCase()
+  const repo = String(process.env.VERCEL_GIT_REPO_SLUG || '').trim().toLowerCase()
+  const host = String(req.nextUrl.hostname || '').trim().toLowerCase()
+  return (owner === 'signalboost' && repo === 'signalboost-live') || host === PUBLIC_BRAND_DOMAIN || host === 'saas.signalboostapp.com'
 }
 
-function normalizeBaseUrl(value: string): string {
-  return String(value || '').trim().replace(/\/+$/, '')
-}
-
-const SYSTEM_PROMPT = [
-  'You are a text editor. Apply only the edit the user asks for: correct spelling, grammar and punctuation, or rewrite, shorten, polish, or translate as instructed.',
-  'Preserve the meaning and every fact exactly. Do not research, browse, use tools, explain your changes, or add commentary.',
-  'Return the edited text and nothing else. No preamble, no quotes, no markdown fences, no JSON.',
-].join(' ')
-
-/** Reasoning models emit <think> blocks and some wrap answers in fences or JSON. Unwrap all three. */
-function stripWrapper(value: string): string {
-  let text = String(value || '')
-  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '')
-  const strayThink = text.search(/<think>/i)
-  if (strayThink >= 0) text = text.slice(0, strayThink)
-  text = text.trim()
-
-  const fence = text.match(/^```[a-z]*\s*\n?([\s\S]*?)\n?```$/i)
-  if (fence?.[1]) text = fence[1].trim()
-
-  if (/^\{[\s\S]*\}$/.test(text)) {
-    try {
-      const parsed = JSON.parse(text)
-      const answer = typeof parsed?.answer === 'string'
-        ? parsed.answer
-        : typeof parsed?.text === 'string'
-          ? parsed.text
-          : ''
-      if (answer.trim()) return answer.trim()
-    } catch {
-      // Not JSON after all — keep the literal text.
-    }
+/**
+ * Public Concierge is the mouth, never the private brain. Internal orchestration labels are useful
+ * for server telemetry but must not become the public product identity. Keep this boundary on the
+ * canonical browser ingress so every externally delivered Concierge reply is covered, including
+ * Software Specialist status replies returned before ordinary answer synthesis.
+ */
+async function publicConciergePresentation(response: Response): Promise<NextResponse> {
+  const headers = new Headers(response.headers)
+  headers.delete('content-length')
+  let payload: any
+  try { payload = await response.clone().json() } catch {
+    return new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers })
   }
-
-  return text
-}
-
-/** One log line per failure so the next incident names itself instead of needing another round trip. */
-function warn(detail: Record<string, unknown>): void {
-  console.warn('[cos-fast-text-edit-direct]', JSON.stringify(detail))
-}
-
-export async function runDirectFastTextEdit(prompt: string): Promise<DirectFastEditResult | null> {
-  const baseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || '')
-  const model = String(process.env.LOCAL_AI_MODEL || '').trim()
-  const apiKey = String(process.env.LOCAL_AI_API_KEY || '').trim()
-  const input = String(prompt || '').trim()
-  if (!baseUrl || !model || !input) {
-    warn({ stage: 'not_configured', hasBaseUrl: Boolean(baseUrl), hasModel: Boolean(model), hasInput: Boolean(input) })
-    return null
+  if (!payload || typeof payload !== 'object') return NextResponse.json(payload, { status: response.status, headers })
+  if (typeof payload.reply === 'string') {
+    payload.reply = payload.reply
+      .replace(/\bCOS Software Specialist\b/g, 'Software Specialist')
+      .replace(/\bCOS Platform Engineer\b/g, 'Platform Engineer')
+      .replace(/\bCOS\b/g, PUBLIC_BRAND.name)
   }
+  // `orchestrator: cos` is internal execution telemetry. The public mouth may expose the selected
+  // specialist and durable job status, but it does not disclose the private reasoning layer.
+  if (payload.orchestrator === 'cos') delete payload.orchestrator
+  return NextResponse.json(payload, { status: response.status, headers })
+}
 
-  const controller = new AbortController()
-  const startedAt = Date.now()
-  const timer = setTimeout(() => controller.abort(), deadlineMs())
+export async function withSuggestedFollowups(response: Response, prompt: string, userId: string | null = null): Promise<NextResponse> {
+  const headers = new Headers(response.headers)
+  headers.delete('content-length')
+  let payload: any
+  try { payload = await response.clone().json() } catch {
+    return new NextResponse(response.body, { status: response.status, statusText: response.statusText, headers })
+  }
+  if (!payload || typeof payload !== 'object' || !String(payload.reply || '').trim()) return NextResponse.json(payload, { status: response.status, headers })
+  if (Array.isArray(payload.suggested_followups) && payload.suggested_followups.length === 2) {
+    if (userId) await attachSuggestedFollowupsToStoredTurn(userId, String(payload.reply), payload.suggested_followups)
+    return NextResponse.json(payload, { status: response.status, headers })
+  }
+  const successful = response.ok && payload.ok !== false
+  payload.suggested_followups = await suggestFollowups({
+    prompt,
+    reply: String(payload.reply),
+    sources: Array.isArray(payload.live_evidence_sources) ? payload.live_evidence_sources : [],
+    failedClosed: !successful,
+  })
+  if (userId && payload.suggested_followups.length === 2) await attachSuggestedFollowupsToStoredTurn(userId, String(payload.reply), payload.suggested_followups)
+  return NextResponse.json(payload, { status: response.status, headers })
+}
 
-  try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      cache: 'no-store',
-      signal: controller.signal,
-      headers: {
-        'content-type': 'application/json',
-        ...(apiKey ? { authorization: `Bearer ${apiKey}`, 'x-api-key': apiKey } : {}),
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0.1,
-        max_tokens: 1400,
-        stream: false,
-        // qwen3:30b is a thinking model. Measured in Production (local-inference.ts:181): with a small
-        // token budget it spends 8-21s on hidden reasoning, exhausts the budget, and returns NO answer
-        // text at all. A proofread needs no reasoning, so thinking is off from the first call -- there
-        // is no empty-answer retry to pay for and no budget for scratch work to consume.
-        reasoning_effort: 'none',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: input },
-        ],
-      }),
-    })
-
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '')
-      warn({ stage: 'http_error', status: response.status, elapsedMs: Date.now() - startedAt, detail: detail.slice(0, 300) })
-      return null
+function inlineVisualResponse(response: Response): Promise<NextResponse> {
+  return response.clone().json().then((payload: any) => {
+    const existingPreview = typeof payload?.visual?.previewUrl === 'string' ? payload.visual.previewUrl : ''
+    if (existingPreview) return NextResponse.json(payload, { status: response.status })
+    const workspaceId = typeof payload?.workspaceId === 'string' ? payload.workspaceId : ''
+    const imagePath = Array.isArray(payload?.files)
+      ? payload.files.find((path: unknown): path is string => typeof path === 'string' && /\.(?:png|jpe?g|webp)$/i.test(path))
+      : ''
+    if (!workspaceId || !imagePath || typeof payload?.reply !== 'string') {
+      if (response.ok && String(payload?.source || '').startsWith('concierge-visual')) {
+        return NextResponse.json({
+          error: 'visual_delivery_unverified',
+          reply: 'The visual could not be verified for inline display and download, so I will not claim it was delivered. Please try again.',
+          source: 'concierge-visual-delivery-unverified',
+          execution_allowed: false,
+          external_action_taken: false,
+        }, { status: 502 })
+      }
+      return NextResponse.json(payload, { status: response.status })
     }
-    const payload: any = await response.json().catch(() => null)
-    const raw = String(payload?.choices?.[0]?.message?.content ?? '')
-    const text = stripWrapper(raw)
-    if (!text) {
-      warn({
-        stage: 'empty_content',
-        elapsedMs: Date.now() - startedAt,
-        finishReason: payload?.choices?.[0]?.finish_reason ?? null,
-        rawLength: raw.length,
-        completionTokens: payload?.usage?.completion_tokens ?? null,
+    const previewUrl = `/api/builder/workspaces/${encodeURIComponent(workspaceId)}/files/${imagePath.split('/').map(encodeURIComponent).join('/')}?preview=1`
+    return NextResponse.json({
+      ...payload,
+      visual: { previewUrl, downloadUrl: previewUrl.replace('?preview=1', ''), alt: 'Generated visual' },
+    }, { status: response.status })
+  }).catch(() => new NextResponse(response.body, { status: response.status, headers: response.headers }))
+}
+
+function builderRoutingContextFromBody(body: any) {
+  const attachments = Array.isArray(body?.attachments) ? body.attachments : []
+  return {
+    attachmentNames: attachments.map((item: any) => String(item?.name || '')),
+    attachmentMimeTypes: attachments.map((item: any) => String(item?.mimeType || item?.type || '')),
+    attachmentSizes: attachments.map((item: any) => Number(item?.size || 0)),
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.clone().json().catch(() => ({}))
+  const messages = Array.isArray(body?.messages) ? body.messages : []
+  const userMessages = messages.filter((message: any) => message?.role === 'user' && typeof message?.content === 'string')
+  const latestUser = userMessages.at(-1)
+  const previousUser = userMessages.at(-2)
+  const prompt = typeof latestUser?.content === 'string' ? latestUser.content : ''
+  const previousUserPrompt = typeof previousUser?.content === 'string' ? previousUser.content : ''
+  const latestUserIndex = messages.lastIndexOf(latestUser)
+  const immediatePreviousMessage = latestUserIndex > 0 ? messages[latestUserIndex - 1] : null
+  const assistantMessages = messages.filter((message: any) => message?.role === 'assistant' && typeof message?.content === 'string')
+  const priorAnswer = typeof assistantMessages.at(-1)?.content === 'string' ? assistantMessages.at(-1).content : ''
+  const language = ['en', 'es', 'pt', 'pl', 'ru'].includes(String(body?.context?.language || '').toLowerCase())
+    ? String(body.context.language).toLowerCase()
+    : 'en'
+
+  // Simple edit/rewrite/proofread/translate requests are answered HERE by one abortable model call
+  // and never descend into the COS reasoning chain. The previous version routed to COS Primary,
+  // whose 12s Promise.race gave up without cancelling: the abandoned draft + quality repair +
+  // citation repair + managed-provider fallback kept the invocation alive until the platform killed
+  // it at 300s, taking the already-built response down with it. This branch runs before auth,
+  // specialists, attachments and orchestration, and it always returns inside the client's transport
+  // deadline — an answer, or an explicit bounded failure.
+  if (isFastTextTransform(prompt)) {
+    const edited = await runDirectFastTextEdit(prompt)
+    if (edited) {
+      return NextResponse.json({
+        ok: true,
+        reply: edited.text,
+        source: 'cos-fast-text-edit-direct',
+        confidence_score: 1,
+        external_ai_invoked: false,
+        external_fallback_invoked: false,
+        local_model_invoked: true,
+        execution_provenance: {
+          answer_origin: { provider: null, model: edited.model, from_cache: false },
+          local_reasoning: { invoked: true, model: edited.model, elapsed_ms: edited.elapsedMs },
+        },
+        execution_allowed: false,
+        external_action_taken: false,
       })
-      return null
     }
-    return { text, model, elapsedMs: Date.now() - startedAt }
-  } catch (error) {
-    warn({
-      stage: controller.signal.aborted ? 'deadline_abort' : 'transport_error',
-      elapsedMs: Date.now() - startedAt,
-      error: error instanceof Error ? error.message : String(error),
-    })
-    return null
-  } finally {
-    clearTimeout(timer)
+    const failed = 'COS could not complete this text edit within the fast-path deadline. Nothing was sent and no action was taken.'
+    return NextResponse.json({
+      ok: false,
+      reply: failed,
+      error: failed,
+      source: 'cos-fast-text-edit-direct-timeout',
+      confidence_score: 0,
+      external_ai_invoked: false,
+      external_fallback_invoked: false,
+      local_model_invoked: true,
+      execution_allowed: false,
+      external_action_taken: false,
+    }, { status: 503 })
   }
+
+  const access = await getAccess().catch(() => null)
+  const auditUserId = access?.userId ?? null
+  const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
+  const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
+
+  if (browserSurface === 'concierge') {
+    const deterministicIdentity = publicConciergeIdentityReply(prompt)
+    const semanticIdentity = deterministicIdentity ? null : await resolveSemanticPublicIdentity(prompt)
+    const identity = deterministicIdentity || (semanticIdentity
+      ? publicConciergeIdentityReplyForIntent(semanticIdentity.intent, semanticIdentity.language)
+      : null)
+    if (identity) {
+      return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
+        ...identity,
+        identity_routing: deterministicIdentity ? 'deterministic' : 'deep-semantic',
+        external_ai_invoked: false,
+        local_model_invoked: semanticIdentity !== null,
+        execution_allowed: false,
+        external_action_taken: false,
+      }), prompt, auditUserId))
+    }
+  }
+
+  const routingContext = builderRoutingContextFromBody(body)
+  const attachedOperationalEvidence = readAttachedOperationalEvidence(body?.attachments)
+  const currentOperationalPrompt = attachedOperationalEvidence ? `${prompt}\n\n${attachedOperationalEvidence}`.trim() : prompt
+
+  // The real browser transport posts directly to this canonical route. Preserve the natural
+  // passive-log -> diagnostic -> "fix it" contract server-side rather than relying on a second
+  // client wrapper. For repository repair, keep both immutable branch/commit evidence from the log
+  // head and the actual failing assertions from its tail inside Builder's 64k durable objective cap.
+  // A person answering an offer says "yes", "go", "please", "tak", "да" — or swears at
+  // it. The keyword path stays as the fast, zero-cost route; when it declines, the
+  // network reads the reply as consent or not. This is consulted ONLY when the prior
+  // assistant turn was our own repair offer and the turn before it was passive log
+  // evidence, so a log still cannot authorise itself and no authority is widened.
+  const followupOperationalRepair = hasExplicitOperationalLogRepairIntent(prompt)
+    && isPastedOperationalLog(previousUserPrompt)
+  const answeringOurRepairOffer = !followupOperationalRepair
+    && isPastedOperationalLog(previousUserPrompt)
+    && isOperationalLogRepairOffer(priorAnswer)
+  const confirmedRepairOffer = answeringOurRepairOffer && await isRepairConfirmation(prompt)
+  const reverseImmediateOperationalRepair = isPastedOperationalLog(prompt)
+    && immediatePreviousMessage?.role === 'user'
+    && typeof immediatePreviousMessage?.content === 'string'
+    && hasExplicitOperationalLogRepairIntent(immediatePreviousMessage.content)
+  const operationalPrompt = followupOperationalRepair || confirmedRepairOffer
+    ? `${prompt.trim()}\n\n${compactOperationalLogForRepair(previousUserPrompt)}`
+    : currentOperationalPrompt
+
+  const hasSourceAttachment = (routingContext.attachmentNames || []).some((name: string) =>
+    /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i.test(String(name || '')),
+  )
+  const operationalEvidence = isOperationalLogEvidence(operationalPrompt)
+  const explicitOperationalRepair = isExplicitOperationalLogRepairRequest(operationalPrompt)
+    || reverseImmediateOperationalRepair
+    || confirmedRepairOffer
+
+  const deployment = { commitSha: process.env.VERCEL_GIT_COMMIT_SHA, branch: process.env.VERCEL_GIT_COMMIT_REF }
+  // COS decides that software work belongs to the Software Specialist. From that point onward the
+  // Software Specialist owns Builder/Platform Engineer lifecycle. Repository authority follows the
+  // authenticated owner identity, never the mouth that carried the request.
+  const shouldConsultSoftwareSpecialist = !operationalEvidence || hasSourceAttachment || explicitOperationalRepair
+  const ownerRepositoryRepairAllowed = authenticatedOwner
+    && ownerSoftwareAuthority.allowRepositoryRepair
+    && (!operationalEvidence || explicitOperationalRepair)
+  const softwareSpecialist = shouldConsultSoftwareSpecialist
+    ? authenticatedOwner
+      ? await tryCosSoftwareSpecialist({
+          body,
+          objective: operationalPrompt || prompt,
+          surface: browserSurface,
+          allowRepositoryRepair: ownerSoftwareAuthority.allowRepositoryRepair && (!operationalEvidence || explicitOperationalRepair),
+          signalBoostDeploymentContext: isSignalBoostDeploymentContext(req),
+          deployment,
+        })
+      : browserSurface === 'assistant'
+        ? await tryCosSoftwareSpecialist({
+            body,
+            objective: operationalPrompt || prompt,
+            surface: 'assistant',
+            allowRepositoryRepair: false,
+            signalBoostDeploymentContext: false,
+            deployment,
+          })
+        : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => tryCosSoftwareSpecialist({ body, objective: operationalPrompt || prompt, surface: 'concierge', allowRepositoryRepair: false, signalBoostDeploymentContext: false, deployment })))
+    : null
+  if (softwareSpecialist) {
+    return browserSurface === 'concierge'
+      ? publicConciergePresentation(softwareSpecialist)
+      : softwareSpecialist
+  }
+
+  const operationalLogAnalysis = analyzeOperationalLog(operationalPrompt)
+  void operationalLogAnalysis
+  if (explicitOperationalRepair && !hasSourceAttachment) {
+    const authorityReply = ownerRepositoryRepairAllowed
+      ? 'The Software Specialist could not establish a safe current repository repair target from this evidence. No repository action was taken.'
+      : 'Repository repair requires authenticated owner authority. The Software Specialist cannot inherit repository authority from a public delivery surface or from the text of a request.'
+    const response = await withSuggestedFollowups(NextResponse.json({
+      reply: `${operationalLogReply(operationalPrompt)} ${authorityReply}`,
+      source: 'software-operational-log-repair-not-authorized',
+      execution_allowed: false,
+      external_action_taken: false,
+      external_ai_invoked: false,
+      local_model_invoked: false,
+    }), prompt, auditUserId)
+    return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
+  }
+
+  if (operationalEvidence && !hasSourceAttachment) {
+    const diagnostic = await diagnoseOperationalLog({ request: prompt, log: operationalPrompt, language })
+    const response = await withSuggestedFollowups(NextResponse.json({
+      reply: diagnostic.reply,
+      source: diagnostic.reasonerInvoked ? 'concierge-operational-log-diagnostic' : 'concierge-operational-log-analysis',
+      execution_allowed: false,
+      external_action_taken: false,
+      external_ai_invoked: false,
+      local_model_invoked: diagnostic.reasonerInvoked,
+      confidence: diagnostic.confidence,
+    }), prompt, auditUserId)
+    return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
+  }
+
+  const routedHeaders = new Headers(req.headers)
+  routedHeaders.set('content-type', 'application/json')
+  routedHeaders.delete('content-length')
+  const routedRequest = attachedOperationalEvidence
+    ? new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify({ ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }) })
+    : req
+
+  if (!operationalEvidence) {
+    if (isConciergeArtifactObjective(prompt)) {
+      const headers = new Headers(req.headers)
+      headers.set('content-type', 'application/json')
+      headers.delete('content-length')
+      const artifactRequest = new NextRequest(new URL('/api/artifacts', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: prompt }) })
+      const response = await withSuggestedFollowups(await artifactPost(artifactRequest), prompt, auditUserId)
+      return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
+    }
+
+    // Obvious visual requests still take the deterministic zero-cost fast path. Everything
+    // ambiguous — including follow-up language — is decided by the deep semantic reasoner using
+    // bounded recent user-authored conversation context. Deterministic code only validates and
+    // preserves the user's exact words; it does not infer the continuation itself.
+    const directVisual = isConciergeVisualObjective(prompt)
+    const semanticResolution = directVisual ? null : await resolveSemanticVisualRequest(messages, prompt)
+    const visualObjective = directVisual ? prompt : semanticResolution?.objective ?? null
+    if (visualObjective) {
+      const headers = new Headers(req.headers)
+      headers.set('content-type', 'application/json')
+      headers.delete('content-length')
+      const semanticVisual = !directVisual
+      const visualRequest = new NextRequest(new URL('/api/visuals', req.url), { method: 'POST', headers, body: JSON.stringify({ objective: visualObjective, semanticVisual }) })
+      const response = await withSuggestedFollowups(await inlineVisualResponse(await visualPost(visualRequest)), prompt, auditUserId)
+      return browserSurface === 'concierge' ? publicConciergePresentation(response) : response
+    }
+  }
+
+  if (!operationalEvidence && browserSurface === 'concierge' && isProvenanceIntrospection(prompt)) {
+    const recorded = await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => readCosPrimaryPriorProvenance(auditUserId, priorAnswer)))
+    const reply = renderPublicRecordedProvenance(recorded, language)
+    return publicConciergePresentation(await withSuggestedFollowups(NextResponse.json({
+      reply,
+      source: recorded ? 'concierge-public-provenance-recorded' : 'concierge-public-provenance-unavailable',
+      external_ai_invoked: false,
+      local_model_invoked: false,
+      provenance_match_verified: Boolean(recorded),
+    }), prompt, auditUserId))
+  }
+
+  const executeOwnerRequest = () => cosPrimaryPost(routedRequest)
+  const executePublicRequest = () => publicConciergePost(routedRequest)
+
+  const response = access?.isOwner && browserSurface === 'assistant'
+    ? await executeOwnerRequest()
+    : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => executePublicRequest()))
+  const decorated = await withSuggestedFollowups(response, prompt, auditUserId)
+  return browserSurface === 'concierge' ? publicConciergePresentation(decorated) : decorated
 }

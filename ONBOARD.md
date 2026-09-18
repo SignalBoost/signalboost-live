@@ -19,6 +19,21 @@ Canonical execution rule:
 
 This invariant is release-gated. A change that makes Concierge answer through a different reasoning endpoint than the owner COS/Assistant, or that makes Assistant perform a separate generalist pre-reasoning pass before COS, is an architectural regression.
 
+## Interactive COS latency profile — 2026-09-18
+
+User-facing Assistant/Concierge turns are latency-sensitive interactive work, not batch inference. They remain the same COS brain and retain COS governance, memory, evidence, release checks, and specialist delegation, but their primary answer generation must not spend the response budget waking, repairing, or waiting on the RunPod primary transport before using the configured managed open-model runtime.
+
+Canonical latency rules:
+
+- interactive COS generation is tagged `cos_interactive_answer`;
+- `cos_interactive_answer` and direct text transformations bypass RunPod-primary routing and use the configured managed open-model transport directly;
+- DeepInfra interactive generation defaults to low reasoning effort unless `COS_INTERACTIVE_REASONING_EFFORT` explicitly overrides it;
+- interactive model transport is bounded by `COS_INTERACTIVE_MODEL_TIMEOUT_MS` (default 20 seconds, never above the configured provider timeout);
+- interactive answer generation is capped by `COS_INTERACTIVE_REASONER_MAX_TOKENS` (default 2,000, also bounded by the global reasoner ceiling);
+- semantic knowledge/corpus retrieval gets a short response-path budget (`COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS`, default 1.5 seconds) and falls back to lexical retrieval rather than blocking the user;
+- University exams, controlled evaluations, training/distillation, Builder batch work, and other non-interactive workloads keep their own routing and evaluation policies.
+
+A user-facing turn that spends tens of seconds in RunPod lifecycle or RunPod inference before answering is a latency regression, not expected COS behavior.
 ## COS University Hugging Face Jobs training adapter — 2026-09-13
 
 The governed COS University training-executor contract now has an iTMounts Hugging Face Jobs adapter on branch `feat/itmounts-huggingface-training-adapter-20260913`. `HF_TOKEN` may back the internal signed executor without exposing the provider token as a callback credential; a separate HMAC key is derived for signed evidence callbacks. Explicit buyer-supplied executor configuration still takes precedence.
@@ -94,7 +109,7 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.126
+**Version:** 1.127
 **Updated:** 2026-09-18
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**

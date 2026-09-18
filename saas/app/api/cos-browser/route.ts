@@ -156,6 +156,7 @@ export async function POST(req: NextRequest) {
   // Ambiguous "edit ..." questions stay on normal COS. A fast-lane miss also falls through instead
   // of becoming a dead-end 503; the attempted header prevents a second fast-edit call downstream.
   const fastEditAlreadyAttempted = req.headers.get('x-signalboost-fast-transform-attempted') === '1'
+  let fastEditMissed = false
   if (!fastEditAlreadyAttempted && isFastTextTransform(prompt, { previousAssistant: priorAnswer })) {
     const edited = await runDirectFastTextEdit(prompt)
     if (edited) {
@@ -175,6 +176,7 @@ export async function POST(req: NextRequest) {
         external_action_taken: false,
       })
     }
+    fastEditMissed = true
   }
 
   const access = await getAccess().catch(() => null)
@@ -304,8 +306,12 @@ export async function POST(req: NextRequest) {
   const routedHeaders = new Headers(req.headers)
   routedHeaders.set('content-type', 'application/json')
   routedHeaders.delete('content-length')
-  const routedRequest = attachedOperationalEvidence
-    ? new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify({ ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }) })
+  if (fastEditMissed) routedHeaders.set('x-signalboost-fast-transform-attempted', '1')
+  const routedBody = attachedOperationalEvidence
+    ? { ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }
+    : body
+  const routedRequest = attachedOperationalEvidence || fastEditMissed
+    ? new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify(routedBody) })
     : req
 
   if (!operationalEvidence) {

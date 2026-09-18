@@ -36,6 +36,9 @@ export type RollingDecision =
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const at = (value: string | null | undefined) => Date.parse(String(value || ''))
+const evaluationStarted = (event: RollingEvent) => event.evidence?.claim === 'mass_distilled_independent_evaluation_started'
+const evaluationTerminal = (event: RollingEvent) => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
+  || event.evidence?.claim === 'mass_distilled_independent_evaluation_completed'
 
 function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
   const error = String(event.evidence?.error || '').trim().toLowerCase()
@@ -73,25 +76,46 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
 function rollingApprovalConsumesWindow(approval: RollingEvent, events: readonly RollingEvent[], nowMs: number): boolean {
   const approvalAt = at(approval.observedAt)
   if (!Number.isFinite(approvalAt)) return true
-  const nextApprovalAt = events
-    .filter(event => event.candidateId === approval.candidateId
-      && event.verifier === 'host_controller'
+  const candidateEvents = events.filter(event => event.candidateId === approval.candidateId)
+  const nextApprovalAt = candidateEvents
+    .filter(event => event.verifier === 'host_controller'
       && event.evidence?.claim === 'distilled_independent_evaluation_approved'
       && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF
       && at(event.observedAt) > approvalAt)
     .map(event => at(event.observedAt))
     .filter(Number.isFinite)
     .sort((a, b) => a - b)[0] ?? Number.POSITIVE_INFINITY
-  const terminal = events
-    .filter(event => event.candidateId === approval.candidateId
-      && at(event.observedAt) >= approvalAt
-      && at(event.observedAt) < nextApprovalAt
-      && (event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
-        || event.evidence?.claim === 'mass_distilled_independent_evaluation_completed'))
+
+  // Count the approval against the 24h window only if it actually arms a run. Bind approval -> start -> terminal,
+  // not approval -> next approval, so a shadow approval issued during a live run cannot steal the terminal event.
+  const start = candidateEvents
+    .filter(event => evaluationStarted(event) && at(event.observedAt) >= approvalAt && at(event.observedAt) < nextApprovalAt)
     .sort((a, b) => at(a.observedAt) - at(b.observedAt))[0]
-  if (!terminal) {
-    return true
+  if (!start) {
+    const priorOpenStart = candidateEvents
+      .filter(event => evaluationStarted(event) && at(event.observedAt) < approvalAt && at(event.expiresAt) > approvalAt)
+      .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+      .find(prior => !candidateEvents.some(event => evaluationTerminal(event)
+        && at(event.observedAt) >= at(prior.observedAt)
+        && at(event.observedAt) < approvalAt))
+    if (priorOpenStart) return false
+    if (Number.isFinite(nextApprovalAt)) return false
+    const approvalExpiry = at(approval.expiresAt)
+    return !Number.isFinite(approvalExpiry) || approvalExpiry > nowMs
   }
+
+  const startAt = at(start.observedAt)
+  const nextStartAt = candidateEvents
+    .filter(event => evaluationStarted(event) && at(event.observedAt) > startAt)
+    .map(event => at(event.observedAt))
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b)[0] ?? Number.POSITIVE_INFINITY
+  const terminal = candidateEvents
+    .filter(event => evaluationTerminal(event)
+      && at(event.observedAt) >= startAt
+      && at(event.observedAt) < nextStartAt)
+    .sort((a, b) => at(a.observedAt) - at(b.observedAt))[0]
+  if (!terminal) return at(start.expiresAt) > nowMs
   if (terminal.evidence?.claim === 'mass_distilled_independent_evaluation_completed') return true
   return !evaluatorInfrastructureFailure(terminal)
 }
@@ -128,6 +152,16 @@ export function decideRollingMassEvaluationApproval(input: {
       && event.evidence?.exactArtifact === true
       && event.evidence?.productionTrafficAuthorized === false)
     if (!canary) continue
+
+    // The atomic claim serializes execution, but authorization runs more often than long evaluations complete.
+    // Do not mint another approval while this exact artifact already has a live started reservation.
+    const liveStart = mine
+      .filter(event => evaluationStarted(event) && at(event.expiresAt) > nowMs)
+      .sort((a, b) => at(b.observedAt) - at(a.observedAt))
+      .find(start => !mine.some(event => evaluationTerminal(event)
+        && at(event.observedAt) >= at(start.observedAt)
+        && at(event.observedAt) <= nowMs))
+    if (liveStart) continue
 
     const firstRolling = mine
       .filter(event => event.verifier === 'host_controller' && event.evidence?.authorizationRef === MASS_EVALUATION_ROLLING_AUTHORIZATION_REF)

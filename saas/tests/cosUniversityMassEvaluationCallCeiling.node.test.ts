@@ -37,13 +37,13 @@ test('the slower candidate uses the largest budget-derived grouping that leaves 
   assert.match(evaluator, /maxGroups:candidateGroupTarget,minGroups:candidateGroupTarget,reserveCallsAfter:fixedEndpointCalls/)
 })
 
-test('a 13-case holdout fits exactly with a dedicated retry reserve', () => {
+test('the observed 13-case / two-baseline-group shape fits exactly with a dedicated retry reserve', () => {
   const holdoutCases = 13
-  const baselineGroups = 1
+  const baselineGroups = 2
   const fixedEndpointCalls = 2
   const recoveryReserve = 1
   const candidateGroups = Math.min(holdoutCases, MASS_EVALUATION_ENDPOINT_CALLS - baselineGroups - fixedEndpointCalls - recoveryReserve)
-  assert.equal(candidateGroups, 10)
+  assert.equal(candidateGroups, 9)
   assert.equal(baselineGroups + candidateGroups + fixedEndpointCalls + recoveryReserve, MASS_EVALUATION_ENDPOINT_CALLS)
 })
 

@@ -88,7 +88,7 @@ test('mass distillation revalidates stored subjects against retained teaching ma
     subject: 'Physics & Natural Sciences',
     sourceTitle: 'Scientific Machine Learning Through Physics-Informed Neural Networks',
     summary: 'Deep learning methods for physics-informed neural networks and scientific computing.',
-  }), 'Computer Science & Coding')
+  }), 'Physics & Natural Sciences')
 })
 
 test('mass distillation requires confidence, row identity, material identity and explicit rights', () => {

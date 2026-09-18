@@ -92,6 +92,23 @@ function configuredReasoningEffort(): 'none' | 'low' | 'medium' | 'high' | undef
   return undefined
 }
 
+function interactiveUserResponse(args: LocalModelCallArgs): boolean {
+  const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
+  return feature === 'cos_interactive_answer' || feature === 'direct_text_transformation'
+}
+
+function interactiveReasoningEffort(): 'none' | 'low' | 'medium' | 'high' {
+  const value = process.env.COS_INTERACTIVE_REASONING_EFFORT?.trim().toLowerCase()
+  if (value === 'none' || value === 'low' || value === 'medium' || value === 'high') return value
+  return 'low'
+}
+
+function interactiveModelTimeoutMs(configTimeoutMs: number): number {
+  const configured = Number(process.env.COS_INTERACTIVE_MODEL_TIMEOUT_MS || '20000')
+  const bounded = Number.isFinite(configured) ? Math.max(5000, Math.min(60000, configured)) : 20000
+  return Math.min(configTimeoutMs, bounded)
+}
+
 /** Align a caller's explicit strict-JSON contract with the transport instead of relying on prose alone. */
 function strictJsonObjectRequested(args: LocalModelCallArgs): boolean {
   if (args.jsonObject === true) return true
@@ -163,7 +180,7 @@ function eligibleForRunpodPrimary(args: LocalModelCallArgs, config: LocalInferen
   // use the configured managed open-model transport directly rather than spending the browser
   // response budget on an owned RunPod attempt that may return an empty/truncated completion.
   const feature = String(args.usageContext?.feature || '').trim().toLowerCase()
-  if (feature === 'direct_text_transformation') return false
+  if (interactiveUserResponse(args)) return false
   if (providerFor(config) === 'runpod') return false
   if (config.fallbackFromOwned === true) return false
   if (protectedIndependentEvaluation(args)) return false
@@ -188,12 +205,15 @@ async function callConfiguredModel(args: LocalModelCallArgs, config: LocalInfere
   let text: string | null = null
   const requestedMaxTokens = args.maxTokens ?? 2048
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), config.timeoutMs)
+  const timeoutMs = interactiveUserResponse(args) ? interactiveModelTimeoutMs(config.timeoutMs) : config.timeoutMs
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
     inferenceStartedAt = Date.now()
     // LOCAL_AI_REASONING_EFFORT is a property of the current DeepInfra deployment. Generic graduate
     // and RunPod transports may reject that vendor-specific field, so do not leak it outside DeepInfra.
-    const reasoningEffort = provider === 'deepinfra' ? configuredReasoningEffort() : undefined
+    const reasoningEffort = provider === 'deepinfra'
+      ? (interactiveUserResponse(args) ? interactiveReasoningEffort() : configuredReasoningEffort())
+      : undefined
     const enforceJsonObject = strictJsonObjectRequested(args)
     const parsePenalty = (value: string | undefined, fallback: number): number => {
       const n = Number(value)

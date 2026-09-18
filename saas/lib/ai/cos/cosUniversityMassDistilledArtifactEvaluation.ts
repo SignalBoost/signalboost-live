@@ -202,8 +202,8 @@ type ModelAnswers = Readonly<{ answers:Map<string,string>; responseHash:string }
 function transientGateway(error:unknown){return /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error instanceof Error?error.message:String(error))}
 function mergeAnswerResult(target:Map<string,string>,hashes:string[],result:ModelAnswers){for(const [id,answer] of result.answers)target.set(id,answer);hashes.push(result.responseHash)}
 
-async function answersFor(input:{endpointId:string;model:string;cases:readonly EvalCase[];maxGroups:number;reserveCallsAfter:number;budget:EndpointCallBudget;claim:MassEvaluationClaim;feature:string;candidate:boolean;deadlineMs:number}):Promise<ModelAnswers>{
-  const groups=planMassEvaluationGroups(input.cases,batchPrompt,input.maxGroups)
+async function answersFor(input:{endpointId:string;model:string;cases:readonly EvalCase[];maxGroups:number;minGroups?:number;reserveCallsAfter:number;budget:EndpointCallBudget;claim:MassEvaluationClaim;feature:string;candidate:boolean;deadlineMs:number}):Promise<ModelAnswers>{
+  const groups=planMassEvaluationGroups(input.cases,batchPrompt,input.maxGroups,input.minGroups)
   if(input.budget.used+groups.length+input.reserveCallsAfter>input.budget.max)throw new Error(`mass_distilled_evaluation_endpoint_call_ceiling:${input.budget.used}+${groups.length}+${input.reserveCallsAfter}>${input.budget.max}`)
   const answers=new Map<string,string>();const hashes:string[]=[]
   for(let index=0;index<groups.length;index+=1){
@@ -256,10 +256,20 @@ export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvalua
   const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs});const model=await servedCandidateModel(input.claim);await waitReady(input.claim.endpointId,input.deadlineMs)
   const keepaliveKey=configuredRunpodApiKey();const keepalive=keepaliveKey?setInterval(()=>{void fetch(`https://${input.claim.endpointId}.api.runpod.ai/ready`,{headers:{Authorization:`Bearer ${keepaliveKey}`},signal:AbortSignal.timeout(8_000)}).catch(()=>undefined)},30_000):null;keepalive?.unref?.()
   try{
-    const budget:EndpointCallBudget={used:0,max:ENDPOINT_CALLS};const fixedCases=[...safetyCases(),...transferCases(),...retentionCases()];const common={endpointId:input.claim.endpointId,budget,claim:input.claim,deadlineMs:input.deadlineMs};const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutCases.length+2,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
-    // The candidate answers the SAME cases as the baseline at ~1.7x the wall time, so it gets one request per case
-    // rather than the baseline's grouping. Fewer answers per request keeps each one clear of the observed gateway cutoff.
-    const holdoutCandidate=await answersFor({...common,model,cases:holdoutCases,maxGroups:holdoutCases.length,reserveCallsAfter:2,feature:'mass_distilled_eval_holdout_candidate',candidate:true})
+    const budget:EndpointCallBudget={used:0,max:ENDPOINT_CALLS};const fixedCases=[...safetyCases(),...transferCases(),...retentionCases()];const common={endpointId:input.claim.endpointId,budget,claim:input.claim,deadlineMs:input.deadlineMs}
+    // Production 2026-09-18 proved holdouts are not fixed at seven cases: this artifact has 13. Reserving one
+    // candidate call per raw case made the baseline impossible before inference (0+2+15>14). Plan from the actual
+    // holdout and the shared ceiling instead. The fixed suites consume two endpoint calls total because their 12
+    // cases are intentionally combined into one baseline request and one candidate request. Keep one additional
+    // call unallocated so the existing bounded transient-gateway recovery path remains usable.
+    const fixedEndpointCalls=2;const recoveryReserve=1
+    const baselineGroupCount=planMassEvaluationGroups(holdoutCases,batchPrompt,2).length
+    const candidateGroupTarget=Math.min(holdoutCases.length,ENDPOINT_CALLS-baselineGroupCount-fixedEndpointCalls-recoveryReserve)
+    if(candidateGroupTarget<1)throw new Error(`mass_distilled_evaluation_endpoint_call_ceiling_plan:baseline=${baselineGroupCount}:fixed=${fixedEndpointCalls}:recovery=${recoveryReserve}:max=${ENDPOINT_CALLS}`)
+    const holdoutBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:baselineGroupCount,reserveCallsAfter:candidateGroupTarget+fixedEndpointCalls,feature:'mass_distilled_eval_holdout_baseline',candidate:false})
+    // The slower candidate receives the maximum number of near-equal groups that fit the current authorization
+    // after baseline, fixed suites and one recovery slot. minGroups pins the planner to that budget-derived shape.
+    const holdoutCandidate=await answersFor({...common,model,cases:holdoutCases,maxGroups:candidateGroupTarget,minGroups:candidateGroupTarget,reserveCallsAfter:fixedEndpointCalls,feature:'mass_distilled_eval_holdout_candidate',candidate:true})
     const fixedBaseline=await answersFor({...common,model:BASE_MODEL_ID,cases:fixedCases,maxGroups:1,reserveCallsAfter:1,feature:'mass_distilled_eval_fixed_suites_baseline',candidate:false})
     const fixedCandidate=await answersFor({...common,model,cases:fixedCases,maxGroups:1,reserveCallsAfter:0,feature:'mass_distilled_eval_fixed_suites_candidate',candidate:true})
     const holdout=await suite({name:'holdout',cases:holdoutCases,baseline:holdoutBaseline,candidate:holdoutCandidate,deadlineMs:input.deadlineMs});const safety=await suite({name:'safety',cases:safetyCases(),baseline:fixedBaseline,candidate:fixedCandidate,deadlineMs:input.deadlineMs});const transfer=await suite({name:'transfer',cases:transferCases(),baseline:fixedBaseline,candidate:fixedCandidate,deadlineMs:input.deadlineMs});const retention=await suite({name:'retention',cases:retentionCases(),baseline:fixedBaseline,candidate:fixedCandidate,deadlineMs:input.deadlineMs})

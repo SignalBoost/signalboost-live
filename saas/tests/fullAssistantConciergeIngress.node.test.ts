@@ -14,6 +14,13 @@ test('Full Assistant live page uses observable progress and the canonical COS br
   assert.match(progressClient, /'x-signalboost-surface': args\.target/)
 })
 
+test('Assistant is COS: ordinary owner turns do not enter a separate Concierge brain or pre-answer visual classifier', () => {
+  assert.match(browserRoute, /const executeCosRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
+  assert.match(browserRoute, /withPublicDeliveryScope\(\(\) => executeCosRequest\(\)\)/)
+  assert.doesNotMatch(browserRoute, /publicConciergePost/)
+  assert.match(browserRoute, /directVisual \|\| browserSurface === 'assistant'[\s\S]*resolveSemanticVisualRequest/)
+})
+
 test('Full Assistant passive operational logs are diagnosis-only until explicit repair intent', () => {
   assert.match(browserRoute, /const ownerSoftwareAuthority = Object\.freeze\(\{ allowRepositoryRepair: true \}\)/)
   assert.match(browserRoute, /const shouldConsultSoftwareSpecialist = !operationalEvidence \|\| hasSourceAttachment \|\| explicitOperationalRepair/)

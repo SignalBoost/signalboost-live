@@ -40,6 +40,9 @@ test('COS is private, Concierge is presentation, and authenticated identity owns
   assert.match(route, /replace\(\/\\bCOS\\b\/g, PUBLIC_BRAND\.name\)/)
   assert.doesNotMatch(route, /replace\(\/\\bCOS\\b\/g, 'SignalBoost'\)/)
   assert.match(route, /if \(payload\.orchestrator === 'cos'\) delete payload\.orchestrator/)
+  assert.match(route, /const executeCosRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
+  assert.match(route, /withPublicDeliveryScope\(\(\) => executeCosRequest\(\)\)/)
+  assert.doesNotMatch(route, /publicConciergePost/)
 })
 
 test('direct public Concierge cannot manufacture owner repository authority', () => {
@@ -113,6 +116,9 @@ test('the architectural invariant is permanent documentation and a mandatory dep
 
   assert.match(architecture, /Status:\*\* normative, release-gated architecture/)
   assert.match(architecture, /COS is the private brain\. Concierge is the public mouth/)
+  const onboard = read('../../ONBOARD.md')
+  assert.match(onboard, /Assistant and COS are the same owner-facing intelligence/)
+  assert.match(onboard, /Concierge is the public mouth for that same COS brain/)
   assert.match(architecture, /Authority belongs to identity and policy, not UI surface/)
   assert.match(architecture, /Superseded revisions are replanning events/)
   assert.match(architecture, /explicit owner approval for an intentional architectural change/)

@@ -138,15 +138,16 @@ test('Concierge delegates coding to COS Software Specialist without repository a
   assert.doesNotMatch(source, /const builder = await directBuilder\(body, input\)/)
 })
 
-test('browser Concierge and owner Assistant both enter the canonical COS browser dispatcher', () => {
+test('browser Concierge and owner Assistant use one COS brain with public scope as the only reasoning boundary', () => {
   const client = read('../lib/ai/cos/agentProgressClient.ts')
   const browser = read('../app/api/cos-browser/route.ts')
   assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
   assert.doesNotMatch(client, /args\.target === 'cos' \? '\/api\/cos-browser' : '\/api\/concierge'/)
   assert.match(browser, /const access = await getAccess\(\)\.catch/)
-  assert.match(browser, /const executeOwnerRequest = .*cosPrimaryPost\(routedRequest\)/)
-  assert.match(browser, /const executePublicRequest = .*publicConciergePost\(routedRequest\)/)
-  assert.match(browser, /const response = access\?\.isOwner[\s\S]*withPublicDeliveryScope/)
+  assert.match(browser, /const executeCosRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
+  assert.match(browser, /withPublicDeliveryScope\(\(\) => executeCosRequest\(\)\)/)
+  assert.doesNotMatch(browser, /publicConciergePost/)
+  assert.doesNotMatch(browser, /executeOwnerRequest|executePublicRequest/)
 })
 
 test('public Concierge rebuilds the support request from parsed JSON instead of wrapping a consumed request stream', () => {
@@ -221,7 +222,7 @@ test('owner Assistant uses the same Software Specialist and no longer jumps to C
   assert.match(source, /tryCosSoftwareSpecialist/)
   assert.match(source, /surface: 'assistant'/)
   assert.match(source, /allowRepositoryRepair: true/)
-  assert.match(source, /const executeOwnerRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
+  assert.match(source, /const executeCosRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
   assert.doesNotMatch(source, /RunPod|Runpod|runpod|withRunpodWakePermission|evaluateRunpodWakePermission/)
   assert.doesNotMatch(source, /legacyConciergePost/)
 })

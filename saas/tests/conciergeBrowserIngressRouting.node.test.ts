@@ -25,16 +25,16 @@ test('common general-assistant transformation tasks stay off freshness routing',
   }
 })
 
-test('the stable public Concierge endpoint enters public scope before public dispatch with no RunPod lifecycle stage', () => {
+test('the stable public Concierge endpoint enters public scope around the same COS brain with no RunPod lifecycle stage', () => {
   const proxy = readFileSync(join(process.cwd(), 'proxy.ts'), 'utf8')
   const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
 
   assert.match(proxy, /pathname === '\/api\/concierge'/)
   assert.match(proxy, /cosBrowserUrl\.pathname = '\/api\/cos-browser'/)
   assert.match(browser, /import \{ withPublicDeliveryScope \} from '@\/lib\/auth\/publicDeliveryScope'/)
-  assert.match(browser, /const executeOwnerRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
-  assert.match(browser, /const executePublicRequest = \(\) => publicConciergePost\(routedRequest\)/)
-  assert.match(browser, /withPublicAuditIdentity\(auditUserId, \(\) => withPublicDeliveryScope\(\(\) => executePublicRequest\(\)\)\)/)
+  assert.match(browser, /const executeCosRequest = \(\) => cosPrimaryPost\(routedRequest\)/)
+  assert.match(browser, /withPublicAuditIdentity\(auditUserId, \(\) => withPublicDeliveryScope\(\(\) => executeCosRequest\(\)\)\)/)
+  assert.doesNotMatch(browser, /publicConciergePost|executeOwnerRequest|executePublicRequest/)
   assert.doesNotMatch(browser, /RunPod|Runpod|runpod|withRunpodWakePermission|evaluateRunpodWakePermission/)
 })
 

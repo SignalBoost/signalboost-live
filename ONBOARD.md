@@ -2,6 +2,23 @@
 
 # iTMounts Engineering Blueprint
 
+## COS / Assistant / Concierge single-brain invariant — 2026-09-18
+
+**Assistant and COS are the same owner-facing intelligence.** The Assistant page is the owner's UI for COS; it is not a separate agent, brain, reasoner, or fallback path.
+
+**Concierge is the public mouth for that same COS brain.** Public delivery may narrow authority, memory/tool visibility, disclosure, branding, and presentation through deterministic server-enforced public scope, but it must not select a different reasoning brain or a separate answer pipeline.
+
+Canonical execution rule:
+
+- owner Assistant -> COS;
+- public Concierge -> public-delivery scope -> the same COS;
+- COS may delegate bounded specialist/tool work and receives the result back;
+- specialists, surfaces, wrappers, providers, and fallbacks never become a competing generalist brain;
+- do not add route-level pre-reasoning model calls for ordinary owner turns when the shared COS policy can decide the condition deterministically;
+- provider fallback is replaceable compute inside COS governance, not a second Concierge/Assistant brain.
+
+This invariant is release-gated. A change that makes Concierge answer through a different reasoning endpoint than the owner COS/Assistant, or that makes Assistant perform a separate generalist pre-reasoning pass before COS, is an architectural regression.
+
 ## COS University Hugging Face Jobs training adapter — 2026-09-13
 
 The governed COS University training-executor contract now has an iTMounts Hugging Face Jobs adapter on branch `feat/itmounts-huggingface-training-adapter-20260913`. `HF_TOKEN` may back the internal signed executor without exposing the provider token as a callback credential; a separate HMAC key is derived for signed evidence callbacks. Explicit buyer-supplied executor configuration still takes precedence.
@@ -77,8 +94,8 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.125
-**Updated:** 2026-09-11
+**Version:** 1.126
+**Updated:** 2026-09-18
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
@@ -740,12 +757,17 @@ An explicit owner request such as `go`, `commit and merge`, or an already-author
 Canonical topology:
 
 ```text
-Customer / owner goal
-      |
-      v
-Concierge / Owner Assistant / delivery surface
-      |
-      v
+Owner goal                         Public customer goal
+    |                                      |
+    v                                      v
+COS / Assistant                     Concierge (public mouth)
+(same owner-facing intelligence)           |
+    |                                      v
+    |                              public-delivery scope
+    |                                      |
+    +-------------------+------------------+
+                        |
+                        v
 COS — sole generalist brain, intent owner, orchestration and final judgment
       |
       +--> Software Specialist
@@ -764,7 +786,7 @@ COS review / synthesis / governed action or answer
 
 ## COS
 
-COS means **Chief of Staff** for the owner-facing role and remains the internal reasoning/orchestration brain.
+COS means **Chief of Staff** for the owner-facing role and remains the internal reasoning/orchestration brain. **The owner Assistant is COS itself presented in the private owner UI; it is not a separate agent or reasoning path.**
 
 COS responsibilities include:
 
@@ -782,7 +804,7 @@ The public iTMounts rename does not change COS's internal name or role.
 
 ## Concierge
 
-Concierge is the **public face / delivery layer**, not a separate brain.
+Concierge is the **public face / delivery layer**, not a separate brain. It must invoke the same COS reasoning pipeline under server-enforced public scope rather than selecting a second public reasoner.
 
 Rules:
 

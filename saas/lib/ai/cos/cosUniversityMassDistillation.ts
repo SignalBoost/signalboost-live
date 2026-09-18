@@ -81,6 +81,19 @@ function normalizedSubject(value: string): string {
   return clean(value, 240).toLowerCase()
 }
 
+
+const STRONG_COMPUTER_SCIENCE_SUPPORT = /\b(computer science|software (?:engineering|development|architecture|systems?|platforms?|production|testing)|programming|algorithms?|data structures?|distributed systems?|operating systems?|apis?|devops|debug(?:ging)?|typescript|javascript|python|next\.?js|cloud computing|kubernetes|microservices?|container orchestration|computer vision|machine learning (?:methods?|models?|algorithms?|systems?|engineering)|deep learning (?:methods?|models?|architectures?|systems?)|deep neural networks?|neural network (?:methods?|models?|architectures?|training)|transformer (?:models?|architectures?)|pytorch|large language models?|llms?|retrieval[- ]augmented generation|embeddings?|vector databases?|ai agents?|computer program)\b/gi
+
+function strongComputerScienceSupportCount(value: string): number {
+  const matches = value.match(STRONG_COMPUTER_SCIENCE_SUPPORT) || []
+  return new Set(matches.map(match => match.toLowerCase())).size
+}
+
+function strictMassDistillationSubject(id: CosUniversitySubjectId, evidence: string, minimumComputerScienceSignals = 1): string {
+  if (id === 'computer_science' && strongComputerScienceSupportCount(evidence) < minimumComputerScienceSignals) return ''
+  return cosUniversitySubjectById(id).title
+}
+
 export function resolveMassDistillationSubject(input: {
   subject?: unknown
   sourceTitle?: unknown
@@ -111,10 +124,10 @@ export function resolveMassDistillationSubject(input: {
   if (sourceTitle) {
     if (storedIds.length) {
       const storedPrimary = storedIds[0]
-      if (titleIds.includes(storedPrimary)) return cosUniversitySubjectById(storedPrimary).title
-      if (titleIds.length) return cosUniversitySubjectById(titleIds[0]).title
+      if (titleIds.includes(storedPrimary)) return strictMassDistillationSubject(storedPrimary, sourceTitle)
+      if (titleIds.length) return strictMassDistillationSubject(titleIds[0], sourceTitle)
     }
-    if (titleIds.length) return cosUniversitySubjectById(titleIds[0]).title
+    if (titleIds.length) return strictMassDistillationSubject(titleIds[0], sourceTitle)
     if (titleLiterallyCorroborated) return stored
     return ''
   }
@@ -124,10 +137,10 @@ export function resolveMassDistillationSubject(input: {
   if (storedIds.length) {
     const storedPrimary = storedIds[0]
     if (materialIds.includes(storedPrimary) || materialLiterallyCorroborated) {
-      return cosUniversitySubjectById(storedPrimary).title
+      return strictMassDistillationSubject(storedPrimary, material, 2)
     }
   }
-  if (materialIds.length === 1) return cosUniversitySubjectById(materialIds[0]).title
+  if (materialIds.length === 1) return strictMassDistillationSubject(materialIds[0], material, 2)
   if (materialIds.length > 1) return ''
   if (materialLiterallyCorroborated) return stored
 

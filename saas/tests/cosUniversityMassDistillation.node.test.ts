@@ -65,6 +65,29 @@ test('mass distillation revalidates stored subjects against retained teaching ma
     summary: 'TypeScript software debugging with API route tests and production observability.',
   }), 'Computer Science & Coding')
   assert.equal(resolveMassDistillationSubject({
+    subject: 'incident triage',
+    sourceTitle: 'Application of artificial intelligence in triage in emergencies and disasters: a systematic review',
+    summary: 'A review of AI-assisted triage systems in clinical emergencies.',
+  }), '')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Computer Science & Coding',
+    sourceTitle: 'TRY – a global database of plant traits',
+    summary: 'A scientific plant-trait database used in ecology and evolutionary biology.',
+  }), '')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'The Science of Creativity',
+    summary: 'Creativity, visual arts, dopamine, meditation, storytelling, and a Neural Network Newsletter.',
+  }), '')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Cloud and Kubernetes reliability',
+    sourceTitle: 'Kubernetes Cluster for Automating Software Production Environment',
+    summary: 'Kubernetes manages containerized microservices and software deployment.',
+  }), 'Computer Science & Coding')
+  assert.equal(resolveMassDistillationSubject({
+    subject: 'Production RAG with LangChain',
+    summary: 'Build a retrieval-augmented generation pipeline with embeddings, vector databases, APIs, and Python.',
+  }), 'Computer Science & Coding')
+  assert.equal(resolveMassDistillationSubject({
     subject: 'cos data center',
     summary: 'Probability, variance, percentiles, and causal inference under uncertainty.',
   }), 'Statistics & Data Science')

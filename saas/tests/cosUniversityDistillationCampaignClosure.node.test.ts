@@ -60,7 +60,7 @@ test('closure runs in the workflow, records why, and authorizes no retry or traf
   assert.match(consumer, /claim: 'mass_distillation_campaign_closed'/)
   assert.match(consumer, /retryAuthorized: false,\n\s+trafficAuthorized: false,/)
   assert.match(workflow, /const campaignClosure = await isolatedStep\('campaign_closure', \(\) =>\s*closeExpiredMassDistillationCampaigns\(\{ now, maxCampaigns: 10 \}\)\)/)
-  assert.ok(workflow.indexOf("isolatedStep('campaign_closure'") < workflow.indexOf("isolatedStep('provider_reconciliation'"), 'campaign closure must run before provider reconciliation')
+  assert.ok(workflow.indexOf("isolatedStep('provider_reconciliation'") < workflow.indexOf("isolatedStep('campaign_closure'"), 'provider reconciliation must run before campaign closure so post-outage HF terminal evidence is observed first')
   assert.match(workflow, /async function isolatedStep/)
   assert.match(workflow, /\[cos-university-mass-distillation-step\]/)
   assert.match(workflow, /&& campaignClosure\.ok === true/)

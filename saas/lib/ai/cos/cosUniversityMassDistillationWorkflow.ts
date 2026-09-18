@@ -113,6 +113,10 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const now = input.now || new Date()
   const throughput = massDistillationThroughputProfile()
   const teacherPool = universityTeacherPoolStatus()
+  // Keep the critical dispatch/reconciliation loop live every minute, but do the expensive
+  // campaign-recovery + semantic/curriculum maintenance sweep only every five minutes.
+  // A Self-Healing Supervisor invocation bypasses the cadence so an incident repair never waits.
+  const slowMaintenanceDue = input.source === 'self_healing_supervisor' || now.getUTCMinutes() % 5 === 0
   // Cleanup/closure is deliberately first and fail-isolated. A telemetry or provider-ledger error
   // must never strand an expired active campaign and block the next authorized campaign.
   const campaignClosure = await isolatedStep('campaign_closure', () =>
@@ -125,8 +129,9 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 3 }))
   const stalledDispatchRecovery = await isolatedStep('stalled_dispatch_recovery', () =>
     recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 5 }))
-  const recovery = await isolatedStep('campaign_recovery', () =>
-    recoverMassDistillationCampaigns({ now, maxCampaigns: 3 }))
+  const recovery = slowMaintenanceDue
+    ? await isolatedStep('campaign_recovery', () => recoverMassDistillationCampaigns({ now, maxCampaigns: 3 }))
+    : { ok: true, skipped: true, step: 'campaign_recovery', reason: 'maintenance_not_due' }
   // Dispatch is the critical path. Do it before semantic/curriculum maintenance so an already
   // authorized prepared batch cannot be starved by slow reconciliation or replenishment work.
   let rollingAuthorization: Record<string, unknown>
@@ -154,13 +159,15 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     }
   }
   const result = await runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })
-  const semanticReconciliation = await isolatedStep('semantic_reconciliation', () =>
-    reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 20 }))
+  const semanticReconciliation = slowMaintenanceDue
+    ? await isolatedStep('semantic_reconciliation', () => reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 20 }))
+    : { ok: true, skipped: true, step: 'semantic_reconciliation', reason: 'maintenance_not_due' }
   const preparedBufferTarget = throughput.preparedBatchBufferTarget
   let preparedBeforeReplenishment = 0
   let preparedAfterReplenishment = 0
   let curriculum: Record<string, unknown>
   let curriculumReplenishment: Record<string, unknown> = { ok: true, skipped: true, reason: 'prepared_buffer_satisfied', externalCostUsd: 0 }
+  if (slowMaintenanceDue) {
   try {
     curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now, {
       corpusScanRows: throughput.corpusScanRows,
@@ -212,6 +219,10 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
     curriculum = { ok: false, error: safeError(error), externalCostUsd: 0, dispatchAuthorized: false }
     curriculumReplenishment = { ok: false, error: safeError(error), externalCostUsd: 0 }
   }
+  } else {
+    curriculum = { ok: true, skipped: true, reason: 'maintenance_not_due', externalCostUsd: 0, dispatchAuthorized: false }
+    curriculumReplenishment = { ok: true, skipped: true, reason: 'maintenance_not_due', externalCostUsd: 0 }
+  }
   const consumerSkipped = 'skipped' in result && result.skipped === true
   const reconciliationSkipped = 'skipped' in reconciliation && reconciliation.skipped === true
   const diagnosticsSkipped = 'skipped' in diagnostics && diagnostics.skipped === true
@@ -252,6 +263,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       preparedBeforeReplenishment,
       preparedAfterReplenishment,
       rollingAuthorization,
+      slowMaintenanceDue,
       workflowSource: input.source,
       workflowSemantics: 'detect_repair_authorize_dispatch_before_maintenance_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_verify',
     },

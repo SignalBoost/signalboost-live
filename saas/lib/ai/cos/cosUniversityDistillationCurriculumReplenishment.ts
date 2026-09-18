@@ -3,6 +3,7 @@ import { ContinuousLearningDirector, type ContinuousLearningPolicy } from '@/lib
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import { createSupabaseCOSStores, cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillation.ts'
+import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
 import {
   buildMassDistillationReplenishmentGaps,
   MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
@@ -56,9 +57,11 @@ async function installVerifiedFailureDerivedCurriculum(input: {
     .limit(500)
   if (rows.error) throw rows.error
 
+  const titleById = new Map(COS_UNIVERSITY_SUBJECTS.map(subject => [subject.id, subject.title] as const))
   const failuresByTitle = new Map<string, number>()
   for (const row of (rows.data || []) as any[]) {
-    const subject = String(row.subject_id || '').trim()
+    const rawSubject = String(row.subject_id || '').trim()
+    const subject = titleById.get(rawSubject as any) || rawSubject
     if (!targetTitles.has(subject)) continue
     // Independent evaluator verdict is the failure signal. Safety/transfer/retention remain separate
     // gates and are deliberately not weakened or reinterpreted here.

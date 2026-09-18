@@ -576,12 +576,63 @@ export async function recoverMassDistillationCampaigns(input: {
   const maxCampaigns = Math.max(1, Math.min(10, Math.floor(input.maxCampaigns ?? 5)))
   const now = (input.now || new Date()).toISOString()
   const failedRuns = await db.from('cos_university_mass_distillation_batch_runs')
-    .select('campaign_id,updated_at')
+    .select('id,campaign_id,batch_key,candidate_id,subject_id,failure_reason,updated_at')
     .eq('stage', 'failed')
     .order('updated_at', { ascending: true })
     .limit(maxCampaigns * 20)
   if (failedRuns.error) throw failedRuns.error
-  const candidateIds = [...new Set((failedRuns.data || []).map((row: any) => String(row.campaign_id)))].filter(Boolean)
+
+  const terminalSemanticFailures = (failedRuns.data || []).filter((row: any) =>
+    String(row.failure_reason || '').startsWith('mass_distillation_source_subject_recheck_'))
+  for (const row of terminalSemanticFailures as any[]) {
+    const terminalizedAt = new Date().toISOString()
+    const batch = await db.from('cos_university_distillation_curriculum_batches')
+      .update({ status: 'quarantined', updated_at: terminalizedAt })
+      .eq('batch_key', row.batch_key)
+      .eq('status', 'prepared')
+      .select('batch_key')
+      .maybeSingle()
+    if (batch.error) throw batch.error
+
+    const campaign = await db.from('cos_university_mass_distillation_campaigns')
+      .update({ status: 'failed', updated_at: terminalizedAt })
+      .eq('id', row.campaign_id)
+      .in('status', ['authorized', 'active'])
+      .select('id')
+      .maybeSingle()
+    if (campaign.error) throw campaign.error
+
+    const evidence = {
+      profile: 'cos-university-mass-distillation-semantic-terminalization-v1',
+      claim: 'mass_distillation_semantic_failure_terminalized',
+      campaignId: String(row.campaign_id || ''),
+      runId: String(row.id || ''),
+      batchKey: String(row.batch_key || ''),
+      candidateId: String(row.candidate_id || ''),
+      failureReason: String(row.failure_reason || ''),
+      retryAuthorized: false,
+      dispatchAuthorized: false,
+      productionTrafficAuthorized: false,
+      authorityExpanded: false,
+    }
+    const evidenceHash = hash(evidence)
+    const recorded = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: hash(['mass-distillation-semantic-terminalization-v1', row.id, evidenceHash]),
+      event_type: 'fine_tune',
+      subject_id: String(row.subject_id || ''),
+      candidate_id: String(row.candidate_id || ''),
+      evidence_hash: evidenceHash,
+      evidence,
+      verifier: 'host_controller',
+      observed_at: terminalizedAt,
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (recorded.error) throw recorded.error
+  }
+
+  const terminalIds = new Set(terminalSemanticFailures.map((row: any) => String(row.campaign_id)))
+  const candidateIds = [...new Set((failedRuns.data || [])
+    .map((row: any) => String(row.campaign_id))
+    .filter((campaignId: string) => campaignId && !terminalIds.has(campaignId)))]
   if (candidateIds.length === 0) {
     return {
       ok: true as const,

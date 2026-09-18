@@ -30,7 +30,7 @@ test('all three enforcement points read the shared constant, so the approval sha
 })
 
 test('the slower candidate gets one request per holdout case; the baseline keeps its grouping', () => {
-  assert.match(evaluator, /cases:holdoutCases,maxGroups:holdoutCases\.length,reserveCallsAfter:2,feature:'mass_distilled_eval_holdout_candidate'/)
+  assert.match(evaluator, /cases:holdoutCases,maxGroups:candidateMaxGroups,reserveCallsAfter:fixedSuiteCalls,feature:'mass_distilled_eval_holdout_candidate'/)
   assert.match(evaluator, /cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutCases\.length\+2,feature:'mass_distilled_eval_holdout_baseline'/)
 })
 
@@ -55,4 +55,19 @@ test('raising the CALL ceiling leaves every SPEND and promotion gate untouched',
 test('the claim validator still rejects an approval that does not match the run it authorizes', () => {
   assert.match(evaluator, /if\(input\.claim\.maxEndpointCalls!==ENDPOINT_CALLS\|\|input\.claim\.maxJudgeCalls!==JUDGE_CALLS/)
   assert.match(evaluator, /throw new Error\('mass_distilled_evaluation_claim_ceiling_invalid'\)/)
+})
+
+
+test('a 13-case holdout fits the 14-call ceiling with transport-small candidate groups and retry reserve', async () => {
+  const holdoutCases = 13
+  const baselineGroups = 2
+  const fixedSuiteCalls = 2
+  const retryReserve = 1
+  const candidateMaxGroups = Math.max(1, Math.min(holdoutCases, MASS_EVALUATION_ENDPOINT_CALLS - baselineGroups - fixedSuiteCalls - retryReserve))
+  assert.equal(candidateMaxGroups, 9)
+  const candidateGroups = Math.ceil(holdoutCases / 2)
+  assert.equal(candidateGroups, 7)
+  const plannedCalls = baselineGroups + candidateGroups + fixedSuiteCalls
+  assert.equal(plannedCalls, 11)
+  assert.ok(plannedCalls + retryReserve <= MASS_EVALUATION_ENDPOINT_CALLS)
 })

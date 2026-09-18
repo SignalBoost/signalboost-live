@@ -117,14 +117,16 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   // campaign-recovery + semantic/curriculum maintenance sweep only every five minutes.
   // A Self-Healing Supervisor invocation bypasses the cadence so an incident repair never waits.
   const slowMaintenanceDue = input.source === 'self_healing_supervisor' || now.getUTCMinutes() % 5 === 0
-  // Cleanup/closure is deliberately first and fail-isolated. A telemetry or provider-ledger error
-  // must never strand an expired active campaign and block the next authorized campaign.
+  // Reconcile accepted provider work before closing expired campaigns. After an outage, a HF job
+  // may have reached a terminal state while its callback/ledger write was missed. Observe that state
+  // first so closure cannot erase recoverable provider evidence. Every step remains fail-isolated,
+  // so a provider read failure still cannot strand an expired campaign indefinitely.
+  const reconciliation = await isolatedStep('provider_reconciliation', () =>
+    reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 5 }))
   const campaignClosure = await isolatedStep('campaign_closure', () =>
     closeExpiredMassDistillationCampaigns({ now, maxCampaigns: 10 }))
   const terminalCleanup = await isolatedStep('terminal_cleanup', () =>
     terminalizeFailedMassDistillationCampaignRuns({ maxCampaigns: 5 }))
-  const reconciliation = await isolatedStep('provider_reconciliation', () =>
-    reconcileMassDistillationHuggingFaceProviderLedger({ now, maxJobs: 5 }))
   const diagnostics = await isolatedStep('provider_diagnostics', () =>
     diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 3 }))
   const stalledDispatchRecovery = await isolatedStep('stalled_dispatch_recovery', () =>

@@ -10,7 +10,7 @@ const homepageWorkspaceCss = readFileSync(new URL('../app/concierge-workspace.cs
 test('Full Assistant live page uses observable progress and the canonical COS browser ingress', () => {
   assert.match(assistantPage, /postWithAgentProgress\(\{/)
   assert.match(assistantPage, /target: 'cos'/)
-    assert.match(progressClient, /const endpoint = builderRequest\\?\\.endpoint \\?\\? '\\/api\\/cos-browser'/)
+    assert.match(progressClient, /const endpoint = builderRequest\?\.endpoint \?\? '\/api\/cos-browser'/)
   assert.match(progressClient, /'x-signalboost-surface': args\.target/)
 })
 

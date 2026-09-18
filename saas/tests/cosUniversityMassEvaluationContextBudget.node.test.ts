@@ -72,6 +72,15 @@ test('seven-case holdouts use the available transport budget instead of collapsi
   assert.deepEqual(baseline.flat().map(item => item.id), seven.map(item => item.id), 'baseline order and content preserved')
 })
 
+test('an eight-to-thirteen case candidate can stay at two cases per request when the call budget permits', () => {
+  const thirteen = Array.from({ length: 13 }, (_, i) => ({ id: `thirteen-${i}` }))
+  const groups = planMassEvaluationGroups(thirteen, () => 'short', 9)
+  assert.equal(groups.length, 7)
+  assert.ok(groups.every(group => group.length <= 2))
+  assert.deepEqual(groups.map(group => group.length), [2, 2, 2, 2, 2, 2, 1])
+  assert.deepEqual(groups.flat().map(item => item.id), thirteen.map(item => item.id))
+})
+
 test('a one-case batch stays one request, and one that cannot fit in the allowed requests fails explicitly', () => {
   assert.equal(planMassEvaluationGroups([{ id: 'a' }], () => 'short', 3).length, 1)
   const huge = Array.from({ length: 3 }, (_, i) => ({ id: `h${i}` }))
@@ -79,16 +88,17 @@ test('a one-case batch stays one request, and one that cannot fit in the allowed
 })
 
 test('the runner stays inside the approved endpoint-call ceiling and reserves candidate recovery headroom', () => {
-  // Ceiling raised 8 -> 14 by owner decision 2026-09-17. The candidate is ~1.7x slower than the baseline on
-  // identical cases, so it is asked one case per request; the baseline keeps its grouping.
+  // Ceiling raised 8 -> 14 by owner decision 2026-09-17. Candidate groups stay transport-small and the
+  // evaluator preserves one bounded retry call even when a holdout contains 13 cases.
   assert.match(source, /const cap=massEvaluationOutputTokens\(input\.cases\.length,userPrompt\)/)
   assert.match(source, /max_tokens:cap,messages:\[\{role:'system',content:MASS_EVALUATION_SYSTEM_PROMPT\}/)
   assert.equal((source.match(/\/chat\/completions`/g) || []).length, 1)
   assert.match(source, /const budget:EndpointCallBudget=\{used:0,max:ENDPOINT_CALLS\}/)
   assert.match(source, /input\.budget\.used\+groups\.length\+input\.reserveCallsAfter>input\.budget\.max/)
   assert.match(source, /const reserve=remainingGroups\+input\.reserveCallsAfter/)
-  assert.match(source, /model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutCases\.length\+2/)
-  assert.match(source, /model,cases:holdoutCases,maxGroups:holdoutCases\.length,reserveCallsAfter:2/)
+  assert.match(source, /model:BASE_MODEL_ID,cases:holdoutCases,maxGroups:2,reserveCallsAfter:candidateMaxGroups\+fixedSuiteCalls\+retryReserve/)
+  assert.match(source, /model,cases:holdoutCases,maxGroups:candidateMaxGroups,reserveCallsAfter:fixedSuiteCalls/)
+  assert.match(source, /const fixedSuiteCalls=2;const retryReserve=1;const candidateMaxGroups=/)
   assert.match(source, /reserveCallsAfter:1/)
   assert.match(source, /reserveCallsAfter:0/)
   assert.equal((source.match(/await answersFor\(/g) || []).length, 4)

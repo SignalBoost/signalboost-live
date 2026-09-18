@@ -152,14 +152,12 @@ export async function POST(req: NextRequest) {
     ? String(body.context.language).toLowerCase()
     : 'en'
 
-  // Simple edit/rewrite/proofread/translate requests are answered HERE by one abortable model call
-  // and never descend into the COS reasoning chain. The previous version routed to COS Primary,
-  // whose 12s Promise.race gave up without cancelling: the abandoned draft + quality repair +
-  // citation repair + managed-provider fallback kept the invocation alive until the platform killed
-  // it at 300s, taking the already-built response down with it. This branch runs before auth,
-  // specialists, attachments and orchestration, and it always returns inside the client's transport
-  // deadline — an answer, or an explicit bounded failure.
-  if (isFastTextTransform(prompt)) {
+  // Simple, verified text transforms get one bounded direct-edit attempt before auth/specialists.
+  // Ambiguous "edit ..." questions stay on normal COS. A fast-lane miss also falls through instead
+  // of becoming a dead-end 503; the attempted header prevents a second fast-edit call downstream.
+  const fastEditAlreadyAttempted = req.headers.get('x-signalboost-fast-transform-attempted') === '1'
+  let fastEditMissed = false
+  if (!fastEditAlreadyAttempted && isFastTextTransform(prompt, { previousAssistant: priorAnswer })) {
     const edited = await runDirectFastTextEdit(prompt)
     if (edited) {
       return NextResponse.json({
@@ -178,19 +176,7 @@ export async function POST(req: NextRequest) {
         external_action_taken: false,
       })
     }
-    const failed = 'COS could not complete this text edit within the fast-path deadline. Nothing was sent and no action was taken.'
-    return NextResponse.json({
-      ok: false,
-      reply: failed,
-      error: failed,
-      source: 'cos-fast-text-edit-direct-timeout',
-      confidence_score: 0,
-      external_ai_invoked: false,
-      external_fallback_invoked: false,
-      local_model_invoked: true,
-      execution_allowed: false,
-      external_action_taken: false,
-    }, { status: 503 })
+    fastEditMissed = true
   }
 
   const access = await getAccess().catch(() => null)
@@ -320,8 +306,12 @@ export async function POST(req: NextRequest) {
   const routedHeaders = new Headers(req.headers)
   routedHeaders.set('content-type', 'application/json')
   routedHeaders.delete('content-length')
-  const routedRequest = attachedOperationalEvidence
-    ? new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify({ ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }) })
+  if (fastEditMissed) routedHeaders.set('x-signalboost-fast-transform-attempted', '1')
+  const routedBody = attachedOperationalEvidence
+    ? { ...body, messages: messages.map((message: any) => message === latestUser ? { ...message, content: operationalPrompt } : message) }
+    : body
+  const routedRequest = attachedOperationalEvidence || fastEditMissed
+    ? new NextRequest(req.url, { method: 'POST', headers: routedHeaders, body: JSON.stringify(routedBody) })
     : req
 
   if (!operationalEvidence) {

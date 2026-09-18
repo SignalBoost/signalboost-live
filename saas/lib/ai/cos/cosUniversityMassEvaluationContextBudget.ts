@@ -99,9 +99,11 @@ function splitEvenly<T>(items: readonly T[], groups: number): T[][] {
 export function planMassEvaluationGroups<T>(items: readonly T[], promptFor: (group: readonly T[]) => string, maxGroups: number): T[][] {
   if (!items.length) throw new Error('mass_distilled_evaluation_no_cases')
   const limit = Math.max(1, Math.min(Math.floor(maxGroups), items.length))
-  const desiredTransportGroups = items.length >= 3 && items.length <= 13
-    ? Math.min(Math.ceil(items.length / 2), items.length <= 7 ? 3 : limit)
-    : 1
+  const desiredTransportGroups = items.length >= 3 && items.length <= 7
+    ? Math.min(Math.ceil(items.length / 2), 3)
+    : items.length >= 9 && items.length <= 13
+      ? Math.min(Math.ceil(items.length / 2), limit)
+      : 1
   const transportGroups = Math.min(desiredTransportGroups, limit)
   const startGroups = items.length === 2 && limit >= 2 ? 2 : transportGroups
   for (let groups = startGroups; groups <= limit; groups++) {

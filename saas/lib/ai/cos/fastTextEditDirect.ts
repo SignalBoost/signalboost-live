@@ -147,32 +147,93 @@ async function callFastEditor(input: {
   }
 }
 
-export async function runDirectFastTextEdit(prompt: string): Promise<DirectFastEditResult | null> {
-  const baseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || '')
-  const configuredModel = String(process.env.LOCAL_AI_MODEL || '').trim()
-  const apiKey = String(process.env.LOCAL_AI_API_KEY || '').trim()
-  const input = String(prompt || '').trim()
+type FastEditEndpoint = {
+  label: string
+  baseUrl: string
+  apiKey: string
+  configuredModel: string
+}
 
-  if (!baseUrl || !configuredModel || !input) {
-    warn({ stage: 'not_configured', hasBaseUrl: Boolean(baseUrl), hasModel: Boolean(configuredModel), hasInput: Boolean(input) })
+/** Resolving the primary must never eat the edit budget, so the readiness probe is itself bounded. */
+const PRIMARY_RESOLVE_MS = 2_500
+
+/**
+ * RunPod is the iTMounts primary and the configured LOCAL_AI transport is a bounded fallback
+ * (local-inference.ts: "ordinary iTMounts text inference prefers the verified RunPod primary and
+ * uses the configured LOCAL_AI/DeepInfra transport only as a bounded fallback").
+ *
+ * This lane used to read LOCAL_AI_BASE_URL directly with a raw fetch, so it bypassed that policy
+ * entirely and every text edit was served by the FALLBACK provider while the primary sat unused.
+ * Resolve the same primary callLocalModel resolves, then keep the configured transport behind it.
+ */
+async function fastEditEndpoints(): Promise<FastEditEndpoint[]> {
+  const endpoints: FastEditEndpoint[] = []
+
+  try {
+    const primary = await import('./runpodPrimaryInference.ts')
+    const resolved = await Promise.race([
+      primary.resolveReadyRunpodPrimaryConfig('reasoner'),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), PRIMARY_RESOLVE_MS)),
+    ])
+    if (resolved?.baseUrl && resolved.model) {
+      endpoints.push({
+        label: 'runpod-primary',
+        baseUrl: normalizeBaseUrl(resolved.baseUrl),
+        apiKey: String(resolved.apiKey || '').trim(),
+        configuredModel: String(resolved.model).trim(),
+      })
+    } else {
+      warn({ stage: 'primary_unavailable', reason: 'not_ready_or_resolve_timeout' })
+    }
+  } catch (error) {
+    warn({ stage: 'primary_unavailable', reason: error instanceof Error ? error.message : String(error) })
+  }
+
+  const fallbackBaseUrl = normalizeBaseUrl(process.env.LOCAL_AI_BASE_URL || '')
+  const fallbackModel = String(process.env.LOCAL_AI_MODEL || '').trim()
+  if (fallbackBaseUrl && fallbackModel) {
+    endpoints.push({
+      label: 'configured-fallback',
+      baseUrl: fallbackBaseUrl,
+      apiKey: String(process.env.LOCAL_AI_API_KEY || '').trim(),
+      configuredModel: fallbackModel,
+    })
+  }
+
+  return endpoints
+}
+
+export async function runDirectFastTextEdit(prompt: string): Promise<DirectFastEditResult | null> {
+  const input = String(prompt || '').trim()
+  if (!input) {
+    warn({ stage: 'not_configured', hasInput: false })
     return null
   }
 
   const startedAt = Date.now()
   const totalBudgetMs = deadlineMs()
-  for (const model of modelCandidates(baseUrl, configuredModel)) {
-    const remainingMs = totalBudgetMs - (Date.now() - startedAt)
-    if (remainingMs < 1_000) break
-    const text = await callFastEditor({
-      baseUrl,
-      apiKey,
-      model,
-      prompt: input,
-      timeoutMs: Math.min(attemptMs(), remainingMs),
-    })
-    if (text) return { text, model, elapsedMs: Date.now() - startedAt }
+  const endpoints = await fastEditEndpoints()
+  if (!endpoints.length) {
+    warn({ stage: 'not_configured', hasBaseUrl: false, hasModel: false, hasInput: true })
+    return null
   }
 
-  warn({ stage: 'all_candidates_failed', elapsedMs: Date.now() - startedAt })
+  for (const endpoint of endpoints) {
+    const { baseUrl, apiKey, configuredModel } = endpoint
+    for (const model of modelCandidates(baseUrl, configuredModel)) {
+      const remainingMs = totalBudgetMs - (Date.now() - startedAt)
+      if (remainingMs < 1_000) break
+      const text = await callFastEditor({
+        baseUrl,
+        apiKey,
+        model,
+        prompt: input,
+        timeoutMs: Math.min(attemptMs(), remainingMs),
+      })
+      if (text) return { text, model, elapsedMs: Date.now() - startedAt }
+    }
+  }
+
+  warn({ stage: 'all_candidates_failed', elapsedMs: Date.now() - startedAt, endpoints: endpoints.map(e => e.label) })
   return null
 }

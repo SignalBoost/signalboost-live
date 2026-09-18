@@ -1,0 +1,41 @@
+name: Emergency Vercel Main Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/emergency-vercel-main-deploy.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: emergency-vercel-main-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact main commit
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Link existing Vercel project
+        shell: bash
+        run: |
+          mkdir -p .vercel
+          printf '%s\n' '{"orgId":"team_jgndR6Eo6QyP2Fen9UbHy2Q5","projectId":"prj_QElaxvA1fbFjhVraIzamxRha78Du"}' > .vercel/project.json
+
+      - name: Deploy current main directly to Production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          test -n "$VERCEL_TOKEN"
+          npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN"

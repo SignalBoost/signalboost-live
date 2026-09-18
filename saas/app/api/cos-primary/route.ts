@@ -98,6 +98,11 @@ async function assessSelfHealingSupervisor(request:string):Promise<string|null>{
   return parsed?.answer?.trim()||null
 }
 const FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
+// Production qwen3:30b completed the same bounded edit path in ~23.9s. Eight seconds only
+// converted a healthy-but-slower completion into a guaranteed 503. Keep this interactive and
+// bounded, but leave enough headroom for the measured model latency while all persistence/fallback
+// work remains off the critical path.
+export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 35_000
 
 export function isFastTextTransform(input:string):boolean{
   return FAST_TEXT_TRANSFORM.test(String(input||'').trim())
@@ -109,14 +114,14 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
     temperature:.1,
     maxTokens:768,
     disableThinking:true,
-    timeoutMs:8_000,
+    timeoutMs:FAST_TEXT_TRANSFORM_TIMEOUT_MS,
     allowConfiguredFallback:false,
     persistUsage:false,
     jsonObject:true,
     usageContext:{feature:'cos_fast_text_transform'},
     systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
     prompt:input,
-  },{...config,timeoutMs:Math.min(config.timeoutMs,8_000)}).catch(()=>null)
+  },{...config,timeoutMs:Math.min(config.timeoutMs,FAST_TEXT_TRANSFORM_TIMEOUT_MS)}).catch(()=>null)
   if(!text)return null
   const parsed=parseLocalResult(text)
   const reply=parsed?.answer?.trim()
@@ -208,7 +213,7 @@ export async function postCosPrimary(req:NextRequest){
   if(isFastTextTransform(input)){
     const fast=await runFastTextTransform(input)
     if(!fast){
-      const reply='COS could not complete this simple text edit within the 12-second fast-path limit.'
+      const reply='COS could not complete this simple text edit within the bounded fast-edit deadline.'
       return NextResponse.json({ok:false,reply,error:reply,source:'cos-fast-text-transform-timeout',confidence_score:0,external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_allowed:false,external_action_taken:false},{status:503})
     }
     const executionProvenance=authoritativeProvenance(null,{invoked:false})

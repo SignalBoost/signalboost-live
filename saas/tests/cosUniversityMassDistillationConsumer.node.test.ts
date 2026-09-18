@@ -70,6 +70,18 @@ test('every paid stage rechecks source semantic cohesion before dispatch', () =>
   )
 })
 
+test('semantic source failures are terminal, quarantined, and excluded from scheduled retry', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /function terminalBatchFailure/)
+  assert.match(consumer, /mass_distillation_source_subject_recheck_missing/)
+  assert.match(consumer, /mass_distillation_source_subject_recheck_failed:/)
+  assert.match(consumer, /status: 'quarantined'/)
+  assert.match(consumer, /automaticRetryAuthorized: !terminal/)
+  assert.match(consumer, /claim: terminal \? 'mass_distillation_batch_terminal_failure'/)
+  assert.match(consumer, /retryableFailedRuns = \(failedRuns\.data \|\| \[\]\)\.filter/)
+  assert.match(consumer, /!terminalBatchFailure\(clean\(row\.failure_reason, 300\)\)/)
+})
+
 test('worker callbacks advance teacher to partitions to training to evaluation without promoting traffic', () => {
   const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
   assert.match(consumer, /teacher_dataset_registered/)

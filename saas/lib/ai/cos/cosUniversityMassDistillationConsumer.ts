@@ -160,34 +160,57 @@ async function recordAssurance(input: {
   if (result.error) throw result.error
 }
 
+function terminalBatchFailure(reason: string): boolean {
+  return reason === 'mass_distillation_source_subject_recheck_missing'
+    || reason.startsWith('mass_distillation_source_subject_recheck_failed:')
+}
+
 async function markFailure(runId: string, campaignId: string, candidateId: string, subjectId: string, error: unknown) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const reason = safeError(error)
+  const terminal = terminalBatchFailure(reason)
   const now = new Date().toISOString()
   const run = await db.from('cos_university_mass_distillation_batch_runs')
     .update({ stage: 'failed', failure_reason: reason, updated_at: now })
     .eq('id', runId)
     .neq('stage', 'complete')
+    .select('batch_key')
+    .maybeSingle()
   if (run.error) throw run.error
-  // A failed batch must not stop unrelated work in the same campaign. The scheduled recovery pass
-  // re-arms it only inside the original expiration and remaining cost envelope.
+
+  if (terminal && run.data?.batch_key) {
+    const quarantined = await db.from('cos_university_distillation_curriculum_batches')
+      .update({ status: 'quarantined', updated_at: now })
+      .eq('batch_key', run.data.batch_key)
+      .eq('status', 'prepared')
+      .eq('dispatch_authorized', false)
+      .eq('authority_expanded', false)
+    if (quarantined.error) throw quarantined.error
+  }
+
   const campaign = await db.from('cos_university_mass_distillation_campaigns')
-    .update({ status: 'active', updated_at: now })
+    .update(terminal
+      ? { status: 'failed', completed_at: now, updated_at: now }
+      : { status: 'active', updated_at: now })
     .eq('id', campaignId)
     .in('status', ['authorized', 'active'])
   if (campaign.error) throw campaign.error
+
   await recordAssurance({
     candidateId,
     subjectId,
-    claim: 'mass_distillation_stage_failed',
+    claim: terminal ? 'mass_distillation_batch_terminal_failure' : 'mass_distillation_stage_failed',
     evidence: {
       campaignId,
       runId,
+      batchKey: run.data?.batch_key || null,
       reason,
-      automaticRetryAuthorized: true,
-      retryScope: 'same_campaign_expiration_and_remaining_budget',
-      retryCadence: 'next_scheduled_consumer_tick',
+      automaticRetryAuthorized: !terminal,
+      retryScope: terminal ? null : 'same_campaign_expiration_and_remaining_budget',
+      retryCadence: terminal ? null : 'next_scheduled_consumer_tick',
+      batchQuarantined: terminal,
+      productionTrafficAuthorized: false,
     },
     verifier: 'host_controller',
   }).catch(() => null)
@@ -576,12 +599,15 @@ export async function recoverMassDistillationCampaigns(input: {
   const maxCampaigns = Math.max(1, Math.min(10, Math.floor(input.maxCampaigns ?? 5)))
   const now = (input.now || new Date()).toISOString()
   const failedRuns = await db.from('cos_university_mass_distillation_batch_runs')
-    .select('campaign_id,updated_at')
+    .select('campaign_id,updated_at,failure_reason')
     .eq('stage', 'failed')
     .order('updated_at', { ascending: true })
     .limit(maxCampaigns * 20)
   if (failedRuns.error) throw failedRuns.error
-  const candidateIds = [...new Set((failedRuns.data || []).map((row: any) => String(row.campaign_id)))].filter(Boolean)
+  const retryableFailedRuns = (failedRuns.data || []).filter((row: any) =>
+    !terminalBatchFailure(clean(row.failure_reason, 300))
+  )
+  const candidateIds = [...new Set(retryableFailedRuns.map((row: any) => String(row.campaign_id)))].filter(Boolean)
   if (candidateIds.length === 0) {
     return {
       ok: true as const,

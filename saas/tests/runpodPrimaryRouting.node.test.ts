@@ -63,7 +63,7 @@ test('shared Platform AI tries active graduate then RunPod before governed base 
   assert.ok(graduate >= 0 && runpod > graduate && fallback > runpod)
 })
 
-test('ordinary shared text inference prefers RunPod and treats LOCAL_AI DeepInfra as fallback', () => {
+test('background shared text inference prefers RunPod and treats LOCAL_AI DeepInfra as fallback', () => {
   const inference = source('../lib/ai/local-inference.ts')
   const publicEntry = inference.indexOf('export async function callLocalModel')
   const health = inference.indexOf('export async function checkLocalInferenceHealth', publicEntry)
@@ -75,6 +75,19 @@ test('ordinary shared text inference prefers RunPod and treats LOCAL_AI DeepInfr
   assert.match(inference, /protectedIndependentEvaluation/)
   assert.match(inference, /independent_assessment/)
   assert.match(inference, /fallbackFromOwned: true/)
+})
+
+test('interactive COS answers bypass RunPod primary and use the bounded low-latency managed profile', () => {
+  const inference = source('../lib/ai/local-inference.ts')
+  const firstAnswer = source('../lib/ai/cos/cosFirstAnswerEnterprise.ts')
+  assert.match(inference, /feature === 'cos_interactive_answer'/)
+  assert.match(inference, /interactiveUserResponse\(args\)/)
+  assert.match(inference, /COS_INTERACTIVE_REASONING_EFFORT/)
+  assert.match(inference, /COS_INTERACTIVE_MODEL_TIMEOUT_MS/)
+  assert.match(firstAnswer, /feature:'cos_interactive_answer'/)
+  assert.match(firstAnswer, /purpose:'user_facing_response'/)
+  assert.match(firstAnswer, /COS_INTERACTIVE_REASONER_MAX_TOKENS/)
+  assert.match(firstAnswer, /COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS \|\| '1500'/)
 })
 
 test('University independent assessments never acquire RunPod primary routing', () => {

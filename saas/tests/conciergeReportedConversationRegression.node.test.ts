@@ -170,11 +170,11 @@ test('deep semantic identity routing separates current identity from naming work
   assert.match(route, /identity_routing: deterministicIdentity \? 'deterministic' : 'deep-semantic'/)
 })
 
-test('new semantic-only visual requests still reach deep semantic visual detection', async () => {
+test('new semantic-only public visual requests still reach deep semantic visual detection without pre-classifying owner Assistant', async () => {
   const source = await readFile(new URL('../app/api/cos-browser/route.ts', import.meta.url), 'utf8')
   assert.match(source, /const directVisual = isConciergeVisualObjective\(prompt\)/)
-  assert.match(source, /const semanticResolution = directVisual \? null : await resolveSemanticVisualRequest\(messages, prompt\)/)
-  assert.match(source, /const visualObjective = directVisual \? prompt : semanticResolution\?\.objective \?\? null/)
+  assert.match(source, /const semanticResolution = directVisual \|\| browserSurface === 'assistant'[\s\S]*\? null[\s\S]*: await resolveSemanticVisualRequest\(messages, prompt\)/)
+  assert.match(source, /const visualObjective = browserSurface === 'assistant'[\s\S]*\? null[\s\S]*: directVisual \? prompt : semanticResolution\?\.objective \?\? null/)
 })
 
 test('visual success copy is blocked without a renderable preview', async () => {

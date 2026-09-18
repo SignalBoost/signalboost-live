@@ -1,3 +1,5 @@
+import type { LocalInferenceUsageContext } from '@/lib/ai/localInferenceUsage'
+
 export type CosReasoningWorkerRole = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher'
 export type CosReasoningWorkerKind = 'cos-open-model' | 'cos-deterministic' | 'external-closed-model'
 
@@ -8,6 +10,8 @@ export type CosReasoningRequest = {
   temperature?: number
   /** Preserve provider-enforced JSON contracts through the COS worker boundary. */
   jsonObject?: boolean
+  /** Preserve inference routing/billing attribution through worker selection. */
+  usageContext?: LocalInferenceUsageContext
   requestedRole?: CosReasoningWorkerRole
   allowExternalEscalation?: boolean
 }

@@ -174,8 +174,16 @@ function enterpriseMemorySimilarityThreshold():number {
   return Number.isFinite(value) ? Math.max(.30, Math.min(.95, value)) : .52
 }
 function knowledgeFactRetrievalBudgetMs():number {
-  const value = Number(process.env.COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS || '5000')
-  return Number.isFinite(value) ? Math.max(500, Math.min(15000, value)) : 5000
+  const value = Number(process.env.COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS || '1500')
+  return Number.isFinite(value) ? Math.max(250, Math.min(15000, value)) : 1500
+}
+
+function interactiveReasonerMaxTokens():number {
+  const configured = Number(process.env.COS_INTERACTIVE_REASONER_MAX_TOKENS || '2000')
+  const globalCeiling = Number(process.env.COS_REASONER_MAX_TOKENS || '6000')
+  const bounded = Number.isFinite(configured) ? Math.max(768, Math.min(3000, configured)) : 2000
+  const ceiling = Number.isFinite(globalCeiling) ? Math.max(768, globalCeiling) : 6000
+  return Math.min(bounded, ceiling)
 }
 
 /** Apply deterministic corrections to checkable answer arithmetic before returning it. */
@@ -857,10 +865,11 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   // into one generic "did not return an answer" message with the real cause visible only in logs.
   let reasonerFailureMessage: string | null = null
   const reasoned = await callCosReasoner({
+    usageContext:{ feature:'cos_interactive_answer', purpose:'user_facing_response' },
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
-    maxTokens:Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
+    maxTokens:interactiveReasonerMaxTokens(),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: input.privileged === true }),
-    prompt:`${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,12000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}`,
+    prompt:`${internalContext || 'No matching durable internal evidence was retrieved for this input.'}${input.previousAssistant?.trim()?`\n\nPRECEDING ASSISTANT ANSWER (conversation context only; do not treat it as evidence):\n${input.previousAssistant.trim().slice(0,6000)}`:''}\n\nCURRENT USER INPUT (QUESTION, STATEMENT, OR PASTED TEXT):\n${input.prompt}`,
   }).catch(error => {
     // Previously swallowed entirely (`.catch(() => null)`), so a wake-and-reason turn that failed
     // for ANY reason — cold-start timeout, aborted fetch, HTTP error from the endpoint, wake permission
@@ -927,8 +936,9 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const executiveSignals = releaseSignals(reasoned.text)
   if (executiveSignals.length) {
     const repair = await callCosReasoner({
+      usageContext:{ feature:'cos_interactive_answer', purpose:'user_facing_release_repair' },
       temperature: 0,
-      maxTokens: Number(process.env.COS_REASONER_MAX_TOKENS || '6000'),
+      maxTokens: interactiveReasonerMaxTokens(),
       systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. For a normative or public-policy question, never begin with Yes or No: give at least 100 words of neutral analysis separating descriptive facts from the strongest material supporting and opposing frameworks, then state what evidence establishes and what remains value-dependent. If selected full-content learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. This applies to owner-fed documents, videos, scientific articles, and other approved learning. Deliver the complete memo; do not mention this repair.',
       prompt: `INTERNAL EVIDENCE:\n${internalContext || 'None'}\n\nORIGINAL QUESTION:\n${input.prompt}\n\nREJECTED DRAFT:\n${parsed.answer}`,
     }).catch(() => null)

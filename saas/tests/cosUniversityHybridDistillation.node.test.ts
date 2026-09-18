@@ -57,6 +57,8 @@ test('curriculum replenishment keeps real acquisition first, adds verified-failu
   assert.match(replenishment, /origin: 'failure_derived'/)
   assert.match(replenishment, /cos_university_distilled_evaluation_runs/)
   assert.match(replenishment, /\.eq\('holdout_improved', false\)/)
+  assert.match(replenishment, /titleById = new Map\(COS_UNIVERSITY_SUBJECTS\.map/)
+  assert.match(replenishment, /titleById\.get\(rawSubject as any\) \|\| rawSubject/)
   assert.match(replenishment, /no_raw_chat_no_private_holdout_no_hidden_exam/)
   assert.match(replenishment, /source_kind: 'teacher_synthetic_curriculum'/)
   assert.match(replenishment, /origin: 'teacher_synthetic'/)

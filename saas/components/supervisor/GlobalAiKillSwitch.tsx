@@ -1,11 +1,10 @@
 // saas/components/supervisor/GlobalAiKillSwitch.tsx
 //
-// THREE states, not two. The middleware in saas/proxy.ts admits a request only when it can
-// read system_status.ai_autonomous_execution_enabled === true with the ANON key: a missing
-// table, a missing row, an RLS denial or any error all mean BLOCKED. This banner used to
-// compute `!== false`, so an unreadable row rendered as "AI AUTONOMY ACTIVE" while every
-// supervisor webhook was getting a 503. The two now agree, and the third state says plainly
-// that the switch itself cannot be read rather than pretending someone engaged it.
+// THREE states, not two. The ingress gate reads system_status.ai_autonomous_execution_enabled
+// with the ANON key. Missing config/row, RLS/auth failure, or an unreadable cold start remains
+// BLOCKED. A warm instance may reuse only a very recent explicit state for a bounded 30-second
+// grace during a transport/429/5xx failure so a transient control-plane stall cannot fan out into
+// platform-wide cron 503s. This banner still reports the database state itself, including unavailable.
 'use client'
 
 import { useState } from 'react'

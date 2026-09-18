@@ -7,9 +7,17 @@ const OPERATOR_PATH = '/dashboard/operator'
 const BLOCKED_ERROR = 'AI execution globally disabled by administrator override.'
 const RATE_WINDOW_MS = 10 * 60_000
 const ANONYMOUS_MAX = 8
+const AUTONOMY_STATUS_FRESH_MS = 10_000
+const AUTONOMY_STATUS_TRANSIENT_GRACE_MS = 30_000
+const AUTONOMY_STATUS_READ_TIMEOUT_MS = 2_000
+
+type AutonomyStatusRead =
+  | { state: 'enabled' | 'disabled'; transient: false }
+  | { state: 'unavailable'; transient: boolean }
 
 const buckets = new Map<string, { count: number; resetAt: number }>()
 let autonomyStatusInFlight: Promise<boolean> | null = null
+let autonomyStatusCache: { enabled: boolean; checkedAt: number } | null = null
 
 // Owner-only access to the AI Website Operator.
 // Set OPERATOR_OWNER_EMAILS in the environment (comma-separated) to control who has access,
@@ -192,30 +200,58 @@ function limitReply(language: string): string {
   return messages[language] || messages.en
 }
 
-async function readAutonomousExecutionStatus(): Promise<boolean> {
+async function readAutonomousExecutionStatus(): Promise<AutonomyStatusRead> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) return false
+  if (!url || !key) return { state: 'unavailable', transient: false }
 
   try {
     const response = await fetch(`${url}/rest/v1/system_status?id=eq.global&select=ai_autonomous_execution_enabled`, {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
       cache: 'no-store',
+      signal: AbortSignal.timeout(AUTONOMY_STATUS_READ_TIMEOUT_MS),
     })
-    if (!response.ok) return false
+    if (!response.ok) {
+      return { state: 'unavailable', transient: response.status === 408 || response.status === 429 || response.status >= 500 }
+    }
     const rows = await response.json() as Array<{ ai_autonomous_execution_enabled?: boolean }>
-    return rows[0]?.ai_autonomous_execution_enabled === true
+    const enabled = rows[0]?.ai_autonomous_execution_enabled
+    if (enabled === true) return { state: 'enabled', transient: false }
+    if (enabled === false) return { state: 'disabled', transient: false }
+    return { state: 'unavailable', transient: false }
   } catch {
-    return false
+    return { state: 'unavailable', transient: true }
   }
 }
 
 async function autonomousExecutionIsEnabled(): Promise<boolean> {
-  // Coalesce concurrent checks inside a warm Proxy instance without caching the
-  // result. Every new request burst still observes a fresh authoritative value,
-  // so the emergency stop does not acquire a stale-allow window.
+  const now = Date.now()
+  if (autonomyStatusCache && now - autonomyStatusCache.checkedAt <= AUTONOMY_STATUS_FRESH_MS) {
+    return autonomyStatusCache.enabled
+  }
+
+  // Coalesce concurrent checks inside a warm Proxy instance. A successful explicit read still
+  // becomes authoritative immediately. Only a short transport/5xx failure may reuse a recent
+  // explicit value, preventing a transient Supabase control-plane stall from turning every cron
+  // into 503. Cold starts, missing config/row, RLS/auth failures, and expired cache still fail closed.
   if (autonomyStatusInFlight) return autonomyStatusInFlight
-  const read = readAutonomousExecutionStatus()
+  const read = (async () => {
+    const status = await readAutonomousExecutionStatus()
+    const checkedAt = Date.now()
+    if (status.state !== 'unavailable') {
+      const enabled = status.state === 'enabled'
+      autonomyStatusCache = { enabled, checkedAt }
+      return enabled
+    }
+
+    if (status.transient
+      && autonomyStatusCache
+      && checkedAt - autonomyStatusCache.checkedAt <= AUTONOMY_STATUS_TRANSIENT_GRACE_MS) {
+      console.warn('[autonomy-gate] transient status read failed; using bounded last-known explicit state')
+      return autonomyStatusCache.enabled
+    }
+    return false
+  })()
   autonomyStatusInFlight = read
   try {
     return await read

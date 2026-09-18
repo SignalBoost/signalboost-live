@@ -6,14 +6,15 @@
  * authority `verified_production`, which is written by exactly one lane, from
  * `cos_turn_outcomes` rows whose `outcome_source` sits in the `production_verified:` namespace.
  *
- * Nothing in this repository writes that namespace. It appears in four readers and three test files
- * and in no writer, no route and no migration. Whatever tags a real production turn as verified
- * lives outside the repo or does not exist yet. Until it runs, `minimumDistinctPracticalPasses: 1`
- * is unsatisfiable, so no Master's credential can be awarded for any learner — and the board reports
- * that permanent condition in the same words it uses for a learner who simply has not finished.
+ * The canonical writer is the guarded verified-production outcome recorder. It may create this
+ * namespace only for an exact `cos_turn_id` correlation after an authoritative deterministic tool,
+ * production outcome, or authoritative record has passed the existing evidence guard. Model/Council
+ * self-claims, ordinary feedback, benchmarks, exams, tests and uncorrelated events cannot manufacture
+ * this supply. The Master's reader still applies its own enrollment, recency, subject and source
+ * gates before any row can become academic practical-work evidence.
  *
- * This module does not create, infer or relax evidence. It reports supply so the two can be told
- * apart, exactly as the lane expectation layer separates a gated lane from a dark one.
+ * This module does not create, infer or relax evidence. It reports supply so "unmet" can be
+ * distinguished from a structurally unavailable evidence lane.
  */
 
 export const COS_UNIVERSITY_PRODUCTION_OUTCOME_NAMESPACE = 'production_verified:'

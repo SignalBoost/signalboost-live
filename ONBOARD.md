@@ -115,6 +115,35 @@ Evaluation may run concurrently, but it should not unnecessarily stop the next a
 
 Current provider/job/model state is mutable. **Always query live Production evidence before reporting it.** Do not infer current HF spend, RunPod state, artifact status, or evaluation status from this file.
 
+## Platform dispatch / pipeline-capacity policy — 2026-09-17
+
+Owner direction: **work is dispatched to available pipelines; capacity and provider are inputs, never hardcoded platform laws.** This is a platform architecture rule for both COS University and commercial portables, not a University-only optimization.
+
+The canonical design is a governed **multi-provider dispatcher / worker-pool** model:
+
+- waiting work is ordered by the applicable queue policy and continuously matched to an available compatible pipeline;
+- a pipeline is a **provider-qualified execution lane**, not a Hugging Face lane. Valid providers may include Hugging Face, OpenAI, Anthropic, xAI/Grok, Gemini/Google, AWS, Azure, GCP, approved private gateways, buyer GPUs/on-prem infrastructure, local vLLM/Ollama, and future registered adapters;
+- every active unit owns an isolated lease for the exact provider + model + artifact/job + tenant binding from admission through its governed terminal handoff, then releases that lease;
+- pipeline state must distinguish at least available, leased/busy, unhealthy/quarantined, and unavailable;
+- admission control must refuse lane N+1 when compatible capacity is exhausted; provisioning or routing must not evict, retire, overwrite, or steal a healthy lease merely to start newer work;
+- capacity is a runtime/configuration/provider input. The same orchestration code must behave correctly at N=1, N=10, N=50, or buyer-selected capacity without rewriting workflow logic;
+- provider mix is also a runtime/configuration input. The same dispatcher must support one provider or many providers simultaneously without separate orchestration forks;
+- no portable or shared platform component may encode SignalBoost's current laboratory worker count, one-at-a-time fences, retire-on-provision behavior, Hugging Face-only teacher assumptions, or RunPod-only serving assumptions as product invariants;
+- routing may use only pipelines that are compatible with the exact provider/model/artifact/tenant and have the required capability and authorization. Unlike a generic load balancer, the dispatcher must preserve exact-artifact and exact-provider binding;
+- provider selection must be explicit and evidence-backed. The dispatcher may choose among already-authorized compatible providers according to declared policy/capability/health/cost/latency constraints, but it must never silently substitute a different provider when policy requires fail-closed behavior;
+- teacher, trainer, evaluator, and serving/runtime provider bindings are independent axes. A valid flow may use, for example, Anthropic or OpenAI as teacher, buyer-owned GPUs for training, an independent approved evaluator, and private vLLM or another provider for serving;
+- normalized provider contracts must produce a common governed work/result envelope so downstream dataset, evidence, evaluation, and promotion logic does not fragment into provider-specific pipelines;
+- provider-qualified identities must be persisted in evidence/ledger records. Separation checks such as “evaluator must not be the teacher” must compare provider + model identity, not bare model strings;
+- a free compatible lane should not remain idle while eligible authorized work is waiting, subject to spend, quota, rate, safety, evidence, data-residency, tenant, and provider-health controls;
+- failure of one provider/lane must not corrupt another lane's lease or evidence. Recoverable work may be requeued or repaired under its existing authority; unhealthy lanes fail closed and are excluded from dispatch until repaired;
+- observability must expose queue depth, configured capacity, provider, model, available/busy/unhealthy lanes, lease owner, wait time, throughput, bounded failure/retry state, and provider-specific health so the Self-Healing Supervisor can diagnose and repair routing/capacity faults rather than alert only.
+
+**Speed comes from usable parallel capacity across compatible providers; reliability comes from provider-qualified isolation, leases, admission control, normalized contracts, and truthful health.** The dispatcher directs work to existing authorized capacity; it does not itself create spending authority, provider quota, evaluation authority, Production traffic authority, provider credentials, or new pipelines.
+
+Current University Production behavior may remain N=1 and may still use current Hugging Face/RunPod adapters until the multi-provider dispatcher implementation is proven and current provider/account limits permit more lanes. N=1 and a single provider are valid configurations of the same architecture, not separate single-lane or single-provider designs. Raising N, adding paid capacity, or enabling a new provider remains subject to the existing explicit spend/provider authorization and connector-readiness boundaries.
+
+This policy applies to University teacher generation, training, canary, evaluation, and runtime flow and must be reused by the post-University Agent Distillation & Training Portable. The portable extraction must generalize the same dispatcher and provider-binding contract rather than fork a separate scheduler or provider-specific orchestration path.
+
 ## University distillation Self-Healing loop
 
 University mass distillation is connected to the existing Self-Healing Supervisor rather than a

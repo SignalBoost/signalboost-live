@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { POST as cosPrimaryPost, isFastTextTransform } from '@/app/api/cos-primary/route'
+import { isFastTextTransform } from '@/app/api/cos-primary/route'
+import { runDirectFastTextEdit } from '@/lib/ai/cos/fastTextEditDirect'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -40,14 +41,36 @@ export async function POST(req: NextRequest) {
     }, { status: 400 })
   }
 
-  const headers = new Headers(req.headers)
-  headers.set('content-type', 'application/json')
-  headers.set('x-signalboost-surface', 'cos')
-  headers.delete('content-length')
+  const edited = await runDirectFastTextEdit(prompt)
+  if (edited) {
+    return NextResponse.json({
+      ok: true,
+      reply: edited.text,
+      source: 'cos-fast-text-edit-direct',
+      confidence_score: 1,
+      external_ai_invoked: edited.external,
+      external_fallback_invoked: false,
+      local_model_invoked: !edited.external,
+      execution_provenance: {
+        answer_origin: { provider: edited.provider, model: edited.model, from_cache: false },
+        local_reasoning: { invoked: !edited.external, model: edited.model, elapsed_ms: edited.elapsedMs },
+      },
+      execution_allowed: false,
+      external_action_taken: false,
+    })
+  }
 
-  return cosPrimaryPost(new NextRequest(new URL('/api/cos-primary', req.url), {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  }))
+  const failed = 'COS could not complete this text edit within the fast-path deadline. Nothing was sent and no action was taken.'
+  return NextResponse.json({
+    ok: false,
+    reply: failed,
+    error: failed,
+    source: 'cos-fast-text-edit-direct-timeout',
+    confidence_score: 0,
+    external_ai_invoked: false,
+    external_fallback_invoked: false,
+    local_model_invoked: false,
+    execution_allowed: false,
+    external_action_taken: false,
+  }, { status: 503 })
 }

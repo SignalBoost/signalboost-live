@@ -154,6 +154,7 @@ test('direct text transformations use the dedicated DeepInfra flash editor with 
 })
 
 test('ordinary interactive COS answers retain the configured stronger model', async () => {
+  delete process.env.COS_INTERACTIVE_REASONING_EFFORT
   let observedBody: Record<string, unknown> = {}
   globalThis.fetch = (async (_input, init) => {
     observedBody = JSON.parse(String(init?.body)) as Record<string, unknown>

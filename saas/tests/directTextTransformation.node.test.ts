@@ -68,14 +68,19 @@ test('homepage renders a server reply even when the HTTP status is non-2xx', () 
   assert.doesNotMatch(source, /if \(!response\.ok \|\| !reply\)/)
 })
 
-test('owner direct edits bypass browser semantic routing before COS primary', () => {
+test('public and owner direct edits bypass browser semantic classifiers', () => {
   const source = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
-  const direct = source.indexOf('detectDirectTextTransformation(prompt)')
-  const primary = source.indexOf('return cosPrimaryPost(req)')
+  const detect = source.indexOf('detectDirectTextTransformation(prompt)')
+  const execute = source.indexOf('await tryDirectTextTransformation({ prompt, language })')
+  const access = source.indexOf('const access = await getAccess()')
+  const identity = source.indexOf('resolveSemanticPublicIdentity(prompt)')
   const visual = source.indexOf('resolveSemanticVisualRequest(messages, prompt)')
-  assert.ok(direct >= 0)
-  assert.ok(primary > direct)
-  assert.ok(visual > primary)
+  assert.ok(detect >= 0)
+  assert.ok(execute > detect)
+  assert.ok(access > execute)
+  assert.ok(identity > execute)
+  assert.ok(visual > execute)
+  assert.doesNotMatch(source, /directTextTransformation && authenticatedOwner && browserSurface === 'assistant'/)
 })
 
 test('shared COS entrypoint runs direct text transformation before contextual interpretation', () => {

@@ -109,18 +109,21 @@ export function isFastTextTransform(input:string):boolean{
 
 async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
   const config=localInferenceConfigFromEnv()
+  // This lane intentionally skips RunPod-primary discovery/readiness. Foreground editing must remain
+  // available while University/distillation jobs saturate the owned 30B worker. The configured
+  // secondary transport is still governed by LOCAL_AI_* policy and receives the same strict bounds.
   const text=await callLocalModel({
     temperature:.1,
     maxTokens:768,
     disableThinking:true,
     timeoutMs:FAST_TEXT_TRANSFORM_TIMEOUT_MS,
-    allowConfiguredFallback:true,
+    allowConfiguredFallback:false,
     persistUsage:false,
     jsonObject:true,
     usageContext:{feature:'cos_fast_text_transform'},
     systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
     prompt:input,
-  },{...config,timeoutMs:Math.min(config.timeoutMs,FAST_TEXT_TRANSFORM_TIMEOUT_MS)}).catch(()=>null)
+  },{...config,timeoutMs:Math.min(config.timeoutMs,FAST_TEXT_TRANSFORM_TIMEOUT_MS),fallbackFromOwned:true}).catch(()=>null)
   if(!text)return null
   const parsed=parseLocalResult(text)
   const reply=parsed?.answer?.trim()

@@ -34,7 +34,7 @@ test('the actual owner Assistant live path never exposes a transient fetch loss 
   const client = readFileSync(new URL('../lib/ai/cos/agentProgressClient.ts', import.meta.url), 'utf8')
   assert.match(assistant, /postWithAgentProgress\(\{/)
   assert.match(assistant, /target: 'cos'/)
-  assert.match(client, /const endpoint = builderRequest\?\.endpoint \?\? \(directFastTextTransform \? '\/api\/cos-fast-transform' : '\/api\/cos-browser'\)/)
+    assert.match(client, /const endpoint = builderRequest\\?\\.endpoint \\?\\? '\\/api\\/cos-browser'/)
   assert.match(client, /source: 'assistant-transport-unconfirmed'/)
   assert.match(client, /Builder is still durable; a status check was lost/)
   assert.match(client, /if \(deliberateAbort\(error, args\.signal\)\) throw error/)

@@ -604,6 +604,19 @@ export async function recoverMassDistillationCampaigns(input: {
     .order('updated_at', { ascending: true })
     .limit(maxCampaigns * 20)
   if (failedRuns.error) throw failedRuns.error
+  const terminalFailedRuns = (failedRuns.data || []).filter((row: any) =>
+    terminalBatchFailure(clean(row.failure_reason, 300))
+  )
+  const terminalCampaignIds = [...new Set(terminalFailedRuns.map((row: any) => String(row.campaign_id)))].filter(Boolean)
+  if (terminalCampaignIds.length > 0) {
+    const terminalized = await db.from('cos_university_mass_distillation_campaigns')
+      .update({ status: 'failed', completed_at: now, updated_at: now })
+      .in('id', terminalCampaignIds)
+      .in('status', ['authorized', 'active'])
+      .select('id')
+    if (terminalized.error) throw terminalized.error
+  }
+
   const retryableFailedRuns = (failedRuns.data || []).filter((row: any) =>
     !terminalBatchFailure(clean(row.failure_reason, 300))
   )

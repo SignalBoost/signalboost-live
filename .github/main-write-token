@@ -1,2 +1,2 @@
-base_sha=5ed03de7082e2bbb158d4ddd109bf96083c3c779
-branch=fix/restore-rollback-hf-university-20260918
+base_sha=3dbcf8008a8b8415d0650636226d5107c37d11c5
+branch=fix/hf-restore-local-inference-contract-20260918

@@ -1,2 +1,2 @@
-base_sha=3dbcf8008a8b8415d0650636226d5107c37d11c5
-branch=fix/hf-restore-local-inference-contract-20260918
+base_sha=b2911b9e9c50acf360acc148255f29ec306ee5ae
+branch=fix/hf-restore-evaluator-transport-20260918

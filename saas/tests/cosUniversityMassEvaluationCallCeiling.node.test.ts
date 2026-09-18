@@ -12,7 +12,8 @@ const authority = readFileSync(new URL('../lib/ai/cos/cosUniversityMassEvaluatio
 const cron = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 
 // Owner decision 2026-09-17: ceiling raised 8 -> 14 so the trained candidate, measured at ~1.7x the baseline's wall
-// time on identical cases (28.4s vs 16.9s against a 35.2-40.4s gateway cutoff), can be asked one case per request.
+// time on identical cases (28.4s vs 16.9s against a 35.2-40.4s gateway cutoff), can use smaller requests while
+// preserving every holdout case, the fixed suites, and bounded recovery headroom.
 
 test('the ceiling is 14 and is defined exactly once', () => {
   assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 14)
@@ -29,20 +30,21 @@ test('all three enforcement points read the shared constant, so the approval sha
   }
 })
 
-test('the slower candidate gets one request per holdout case; the baseline keeps its grouping', () => {
-  assert.match(evaluator, /cases:holdoutCases,maxGroups:holdoutCases\.length,reserveCallsAfter:2,feature:'mass_distilled_eval_holdout_candidate'/)
-  assert.match(evaluator, /cases:holdoutCases,maxGroups:2,reserveCallsAfter:holdoutCases\.length\+2,feature:'mass_distilled_eval_holdout_baseline'/)
+test('the slower candidate uses the largest budget-derived grouping that leaves fixed-suite and recovery capacity', () => {
+  assert.match(evaluator, /const fixedEndpointCalls=2;const recoveryReserve=1/)
+  assert.match(evaluator, /const baselineGroupCount=planMassEvaluationGroups\(holdoutCases,batchPrompt,2\)\.length/)
+  assert.match(evaluator, /const candidateGroupTarget=Math\.min\(holdoutCases\.length,ENDPOINT_CALLS-baselineGroupCount-fixedEndpointCalls-recoveryReserve\)/)
+  assert.match(evaluator, /maxGroups:candidateGroupTarget,minGroups:candidateGroupTarget,reserveCallsAfter:fixedEndpointCalls/)
 })
 
-test('a 7-case holdout fits inside the raised ceiling with retry reserve left over', () => {
-  const holdoutCases = 7
-  const baselineGroups = 2
-  const candidateGroups = holdoutCases
-  const fixedGroups = 1
-  const spent = baselineGroups + candidateGroups + (fixedGroups * 2)
-  assert.equal(spent, 11)
-  assert.ok(spent < MASS_EVALUATION_ENDPOINT_CALLS, 'the run must leave calls for the bounded retry path')
-  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS - spent, 3)
+test('a 13-case holdout fits exactly with a dedicated retry reserve', () => {
+  const holdoutCases = 13
+  const baselineGroups = 1
+  const fixedEndpointCalls = 2
+  const recoveryReserve = 1
+  const candidateGroups = Math.min(holdoutCases, MASS_EVALUATION_ENDPOINT_CALLS - baselineGroups - fixedEndpointCalls - recoveryReserve)
+  assert.equal(candidateGroups, 10)
+  assert.equal(baselineGroups + candidateGroups + fixedEndpointCalls + recoveryReserve, MASS_EVALUATION_ENDPOINT_CALLS)
 })
 
 test('raising the CALL ceiling leaves every SPEND and promotion gate untouched', () => {

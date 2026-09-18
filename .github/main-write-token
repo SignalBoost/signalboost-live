@@ -1,2 +1,2 @@
-base_sha=276ea89c5de0df0dd35bdda6afec13faf54bc316
-branch=fix/auth-db-maintenance-throttle-20260918
+base_sha=afc7f0ca3cc5a043274e561f99afb6d944488cc7
+branch=fix/cos-fast-edit-reliability-20260918

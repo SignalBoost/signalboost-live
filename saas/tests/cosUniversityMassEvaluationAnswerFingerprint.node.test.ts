@@ -47,7 +47,7 @@ test('no model output, prompt or answer content can reach the fingerprint', () =
 test('the error name and the fail-closed truncation behaviour are unchanged', () => {
   assert.match(source, /throw new Error\(`mass_distilled_evaluation_answer_missing:\$\{item\.id\}`\)/)
   assert.match(source, /if\(solo\.missing\.length\)throw new Error\(solo\.errors\[id\]\)/)
-  assert.match(source, /const ENDPOINT_CALLS = 8/)
+  assert.match(source, /const ENDPOINT_CALLS = MASS_EVALUATION_ENDPOINT_CALLS/)
 })
 
 test('the requested cap is computed once and used for both the request and the fingerprint', () => {
@@ -57,7 +57,7 @@ test('the requested cap is computed once and used for both the request and the f
 })
 
 test('this evaluator repair advances the infrastructure repair epoch', () => {
-  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_seven_case_baseline_split'/)
-  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T23:26:08\.784Z'/)
+  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_judge_timeout_headroom'/)
+  assert.match(authority, /MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-18T01:48:45\.894Z'/)
   assert.match(authority, /MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4/)
 })

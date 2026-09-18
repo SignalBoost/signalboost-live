@@ -1,2 +1,2 @@
-base_sha=64118ce78b5e2dbe8c5f8cebc68a0f1fb4ed630f
-branch=revert/pr-2537-keep-cos-baseline-20260918
+base_sha=5ed03de7082e2bbb158d4ddd109bf96083c3c779
+branch=fix/restore-rollback-hf-university-20260918

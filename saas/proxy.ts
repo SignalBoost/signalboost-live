@@ -15,7 +15,8 @@ const PROVENANCE_BOUNDARY_HEADER = 'x-signalboost-provenance-boundary'
 const DIRECT_FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
 
 async function fastTextTransformRequest(req: NextRequest): Promise<boolean> {
-  if (req.headers.get('x-signalboost-surface') !== 'cos') return false
+  const ownerAssistantSurface = req.headers.get('x-signalboost-surface') === 'cos' || fullAssistantSurface(req)
+  if (!ownerAssistantSurface) return false
   try {
     const body: any = await req.clone().json()
     const messages = Array.isArray(body?.messages) ? body.messages : []

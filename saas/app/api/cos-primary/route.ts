@@ -98,11 +98,10 @@ async function assessSelfHealingSupervisor(request:string):Promise<string|null>{
   return parsed?.answer?.trim()||null
 }
 const FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
-// Production qwen3:30b completed the same bounded edit path in ~23.9s. Eight seconds only
-// converted a healthy-but-slower completion into a guaranteed 503. Keep this interactive and
-// bounded, but leave enough headroom for the measured model latency while all persistence/fallback
-// work remains off the critical path.
-export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 35_000
+// Foreground transforms must complete the user's task, not merely fail quickly. The owned RunPod
+// remains first choice, but one stalled worker must not turn an edit into a 503. A 25s per-provider
+// budget leaves room inside the 60s direct route for the configured secondary inference path.
+export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 25_000
 
 export function isFastTextTransform(input:string):boolean{
   return FAST_TEXT_TRANSFORM.test(String(input||'').trim())
@@ -110,6 +109,9 @@ export function isFastTextTransform(input:string):boolean{
 
 async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
   const config=localInferenceConfigFromEnv()
+  // This lane intentionally skips RunPod-primary discovery/readiness. Foreground editing must remain
+  // available while University/distillation jobs saturate the owned 30B worker. The configured
+  // secondary transport is still governed by LOCAL_AI_* policy and receives the same strict bounds.
   const text=await callLocalModel({
     temperature:.1,
     maxTokens:768,
@@ -121,7 +123,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
     usageContext:{feature:'cos_fast_text_transform'},
     systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
     prompt:input,
-  },{...config,timeoutMs:Math.min(config.timeoutMs,FAST_TEXT_TRANSFORM_TIMEOUT_MS)}).catch(()=>null)
+  },{...config,timeoutMs:Math.min(config.timeoutMs,FAST_TEXT_TRANSFORM_TIMEOUT_MS),fallbackFromOwned:true}).catch(()=>null)
   if(!text)return null
   const parsed=parseLocalResult(text)
   const reply=parsed?.answer?.trim()

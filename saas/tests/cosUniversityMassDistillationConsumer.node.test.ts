@@ -108,3 +108,15 @@ test('mass campaign has a signed callback and a bounded scheduled consumer', () 
   assert.match(workflow, /maxDispatches: 3/)
   assert.match(vercel, /\/api\/cron\/cos-university-mass-distillation/)
 })
+
+
+test('recovery terminalizes pre-existing semantic failures and frees their prepared batches', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /terminalizedSemanticFailures/)
+  assert.match(consumer, /claim: 'mass_distillation_semantic_failure_terminalized'/)
+  assert.match(consumer, /status: 'quarantined'/)
+  assert.match(consumer, /retryAuthorized: false/)
+  assert.match(consumer, /dispatchAuthorized: false/)
+  assert.match(consumer, /productionTrafficAuthorized: false/)
+  assert.match(consumer, /completed_at: terminalizedAt/)
+})

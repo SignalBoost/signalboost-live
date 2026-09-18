@@ -599,11 +599,50 @@ export async function recoverMassDistillationCampaigns(input: {
   const maxCampaigns = Math.max(1, Math.min(10, Math.floor(input.maxCampaigns ?? 5)))
   const now = (input.now || new Date()).toISOString()
   const failedRuns = await db.from('cos_university_mass_distillation_batch_runs')
-    .select('campaign_id,updated_at,failure_reason')
+    .select('id,campaign_id,batch_key,candidate_id,subject_id,updated_at,failure_reason')
     .eq('stage', 'failed')
     .order('updated_at', { ascending: true })
     .limit(maxCampaigns * 20)
   if (failedRuns.error) throw failedRuns.error
+
+  const terminalized: Array<{ runId: string; campaignId: string; batchKey: string }> = []
+  for (const raw of (failedRuns.data || []) as any[]) {
+    const reason = clean(raw.failure_reason, 300)
+    if (!terminalBatchFailure(reason)) continue
+    const terminalizedAt = new Date().toISOString()
+    const batchKey = clean(raw.batch_key, 64)
+    if (batchKey) {
+      const batch = await db.from('cos_university_distillation_curriculum_batches')
+        .update({ status: 'quarantined', updated_at: terminalizedAt })
+        .eq('batch_key', batchKey)
+        .eq('status', 'prepared')
+        .eq('dispatch_authorized', false)
+        .eq('authority_expanded', false)
+      if (batch.error) throw batch.error
+    }
+    const campaign = await db.from('cos_university_mass_distillation_campaigns')
+      .update({ status: 'failed', completed_at: terminalizedAt, updated_at: terminalizedAt })
+      .eq('id', raw.campaign_id)
+      .in('status', ['authorized', 'active', 'failed'])
+    if (campaign.error) throw campaign.error
+    await recordAssurance({
+      candidateId: clean(raw.candidate_id, 120),
+      subjectId: clean(raw.subject_id, 240),
+      claim: 'mass_distillation_semantic_failure_terminalized',
+      evidence: {
+        campaignId: clean(raw.campaign_id, 80),
+        runId: clean(raw.id, 80),
+        batchKey,
+        reason,
+        retryAuthorized: false,
+        dispatchAuthorized: false,
+        productionTrafficAuthorized: false,
+      },
+      verifier: 'host_controller',
+    }).catch(() => null)
+    terminalized.push({ runId: clean(raw.id, 80), campaignId: clean(raw.campaign_id, 80), batchKey })
+  }
+
   const retryableFailedRuns = (failedRuns.data || []).filter((row: any) =>
     !terminalBatchFailure(clean(row.failure_reason, 300))
   )
@@ -621,6 +660,8 @@ export async function recoverMassDistillationCampaigns(input: {
       awaitingProviderDiscoveryRuns: 0,
       recovered: [],
       failures: [],
+      terminalizedSemanticFailures: terminalized.length,
+      terminalized,
       automaticRetryAuthorized: true,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
@@ -673,6 +714,8 @@ export async function recoverMassDistillationCampaigns(input: {
     awaitingProviderDiscoveryRuns,
     recovered,
     failures,
+    terminalizedSemanticFailures: terminalized.length,
+    terminalized,
     automaticRetryAuthorized: true,
     automaticPromotionAuthorized: false,
     runpodMutationAuthorized: false,

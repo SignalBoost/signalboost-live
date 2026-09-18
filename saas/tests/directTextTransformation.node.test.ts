@@ -95,3 +95,9 @@ test('direct text transformation is marked to bypass RunPod primary', () => {
   assert.match(direct, /maxTokens: 900/)
 })
 
+
+test('COS worker preserves direct text transformation usage context into local inference', () => {
+  const source = readFileSync(join(process.cwd(), 'lib/ai/cos/cosReasoningWorkers.ts'), 'utf8')
+  assert.match(source, /request\.usageContext === undefined[\s\S]*usageContext: request\.usageContext/)
+})
+

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { decideMassCanaryRollingApproval, type CanaryEvent } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
+import { recordCosLaneStatus } from '@/lib/ai/cos/cosLaneStatus'
 import {
   MASS_DISTILLED_READY_TIMEOUT_MS,
   MASS_DISTILLED_CANARY_TIMEOUT_MS,
@@ -29,6 +30,10 @@ const FAILED = 'local_distilled_runtime_canary_failed'
 const HEX40 = /^[a-f0-9]{40}$/i
 const HEX64 = /^[a-f0-9]{64}$/i
 const MIN_BALANCE_USD = 1
+// Operational status only: never read by a gate. See lib/ai/cos/cosLaneStatus.ts for why this is not
+// recorded in the assurance ledger.
+const LANE = 'runpod-mass-distilled-local-deploy'
+const laneStatus = (outcome:'worked'|'skipped'|'failed',reason:string,detail?:Record<string,unknown>)=>recordCosLaneStatus({db:cosServiceDb(),lane:LANE,outcome,reason,detail})
 
 const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const clean = (value: unknown, max = 1000) => String(value ?? '').replace(/\s+/g,' ').trim().slice(0,max)
@@ -144,12 +149,12 @@ export async function GET(req:NextRequest){
   try{
     // Read-only balance guard comes before the transactional reservation so a low balance consumes no approval.
     const account=await queryRunpodAccountStatus()
-    if(account.clientBalance!==null&&account.clientBalance<MIN_BALANCE_USD) return NextResponse.json({ok:false,error:'runpod_balance_guard',balance:account.clientBalance},{status:402})
+    if(account.clientBalance!==null&&account.clientBalance<MIN_BALANCE_USD){await laneStatus('skipped','runpod_balance_guard',{balance:account.clientBalance,minBalanceUsd:MIN_BALANCE_USD});return NextResponse.json({ok:false,error:'runpod_balance_guard',balance:account.clientBalance},{status:402})}
 
     const rolling=await issueRollingCanaryApproval(new Date(Date.now()-1000))
     console.log('[cos-mass-distilled-rolling-canary-authorization]',JSON.stringify(rolling))
     const claim=await claimNext()
-    if(!claim) return NextResponse.json({ok:true,skipped:true,reason:'no_atomically_claimable_mass_distilled_artifact'})
+    if(!claim){await laneStatus('skipped','no_atomically_claimable_mass_distilled_artifact',{approvalIssued:Boolean((rolling as any)?.issued),approvalReason:(rolling as any)?.reason});return NextResponse.json({ok:true,skipped:true,reason:'no_atomically_claimable_mass_distilled_artifact',approval:rolling})}
     const {artifact,revisionKey}=artifactFromClaim(claim)
     const approvedCost=Number(claim.max_estimated_canary_cost_usd)
     const approvalAt=String(claim.approval_observed_at||'')
@@ -174,18 +179,21 @@ export async function GET(req:NextRequest){
 
     if(!canary.ok){
       await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:FAILED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,httpStatus:canary.httpStatus,error:clean(canary.error,300),healthAfter,readyTimeoutMs:MASS_DISTILLED_READY_TIMEOUT_MS,canaryTimeoutMs:MASS_DISTILLED_CANARY_TIMEOUT_MS,idleTimeoutSeconds:MASS_DISTILLED_IDLE_TIMEOUT_SECONDS,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}})
+      await laneStatus('failed','canary_failed',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,httpStatus:canary.httpStatus,error:clean(canary.error,300)})
       return NextResponse.json({ok:false,deployed:true,canaryPassed:false,candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,error:canary.error},{status:503})
     }
 
     const responseHash=hash(canary.text||'')
     await record({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactHash:runtimeArtifact.artifactHash,claim:PASSED,evidence:{endpointId:provisioned.endpointId,endpointName:provisioned.endpointName,model:provisioned.modelName,httpStatus:canary.httpStatus,responseHash,attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:approvedCost,exactArtifact:true,internalVllmReady:true,scaleToZero:true,authorizationObservedAt:approvalAt,reservationEventKey,runtimeKey,providerInvocationStarted:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false,healthAfter}})
     await recordFineTuneCanary({candidateId:runtimeArtifact.candidateId,subjectId:runtimeArtifact.subjectId,artifactId:runtimeArtifact.artifactId,artifactHash:runtimeArtifact.artifactHash,revisionKey,endpointId:provisioned.endpointId,responseHash})
+    await laneStatus('worked','canary_passed',{candidateId:runtimeArtifact.candidateId,endpointId:provisioned.endpointId,model:provisioned.modelName})
     return NextResponse.json({ok:true,deployed:true,canaryPassed:true,candidateId:runtimeArtifact.candidateId,artifactHash:runtimeArtifact.artifactHash,endpointId:provisioned.endpointId,model:provisioned.modelName,productionTrafficAuthorized:false})
   }catch(error){
     const message=error instanceof Error?error.message:String(error)
     if(active&&!providerInvocationStarted){
       await record({candidateId:active.artifact.candidateId,subjectId:active.artifact.subjectId,artifactHash:active.artifact.artifactHash,claim:PREFLIGHT_FAILED,evidence:{error:clean(message,300),attemptOrdinal:1,maxCanaryInvocations:1,maxEstimatedCanaryCostUsd:active.approvedCost,authorizationObservedAt:active.approvalAt,reservationEventKey:active.reservationEventKey,runtimeKey:active.runtimeKey,providerInvocationStarted:false,retryableWithinApproval:true,productionTrafficAuthorized:false,automaticPromotionAuthorized:false}}).catch(recordError=>console.error('[runpod-mass-distilled-local-deploy-preflight-record]',JSON.stringify({ok:false,error:clean(recordError instanceof Error?recordError.message:String(recordError),300)})))
     }
+    await laneStatus('failed','lane_error',{error:clean(message,300),providerInvocationStarted,candidateId:active?.artifact.candidateId})
     console.error('[runpod-mass-distilled-local-deploy]',JSON.stringify({ok:false,error:clean(message,300),claim:active?RESERVED:null,providerInvocationStarted}))
     return NextResponse.json({ok:false,error:clean(message,300),providerInvocationStarted},{status:500})
   }

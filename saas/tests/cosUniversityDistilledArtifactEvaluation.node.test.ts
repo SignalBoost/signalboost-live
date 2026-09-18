@@ -119,8 +119,8 @@ test('fresh canary authorization owns a fresh retry budget and produces promotio
 
 test('Vercel schedules evaluation independently and spaces canaries beyond their cold-start envelope', () => {
   const config = JSON.parse(source('../vercel.json'))
-  assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/cos-university-distilled-evaluation')?.schedule, '*/10 * * * *')
-  assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/runpod-distilled-local-deploy')?.schedule, '*/5 * * * *')
+  assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/cos-university-distilled-evaluation')?.schedule, '4,14,24,34,44,54 * * * *')
+  assert.equal(config.crons.find((cron: { path: string }) => cron.path === '/api/cron/runpod-distilled-local-deploy')?.schedule, '1,6,11,16,21,26,31,36,41,46,51,56 * * * *')
 })
 
 test('evaluation accepts only canonical verifier-bound production canary evidence', () => {

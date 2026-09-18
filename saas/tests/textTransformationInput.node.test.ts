@@ -34,6 +34,26 @@ test('editing, summarizing and translation are recognized across all five Signal
   }
 })
 
+test('polite authoring with incidental today stays out of live-facts verification', () => {
+  const prompt = 'my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation'
+  assert.equal(isContentGenerationRequest(prompt), true)
+  assert.equal(requiresFreshExternalEvidence(prompt), false)
+})
+
+test('polite authoring prefixes are recognized without weakening non-authoring questions', () => {
+  for (const prompt of [
+    'Please write a short message for Barbara and Richard.',
+    'Could you draft a thank-you note for them?',
+    'Can you translate this paragraph into Polish?',
+    'Por favor, escreva uma mensagem curta para eles.',
+    'Proszę napisz krótką wiadomość.',
+  ]) {
+    assert.equal(isContentGenerationRequest(prompt), true, prompt)
+  }
+  assert.equal(isContentGenerationRequest('Can you explain the current rule?'), false)
+})
+
+
 test('the exact Sarah transportation draft is implicitly edited instead of answered as the recipient', () => {
   const prompt = 'Hi Sarah, I think thee is a misunderstanding regarding transportation for tomorrow night. My understand is that we are staying at the airport or somewhere around the airpor instead of returning to the embassy about midnight. We are staying at the "airport" all night and returning to the embassy only approximately 9 AM on Thrusday morning. Please make sure to let Motor Pool knows abaout it, therefore, myself and or the coureir will not need transportation at all tomorrow night. I will let you now in case anything changes again. Thank you.'
 

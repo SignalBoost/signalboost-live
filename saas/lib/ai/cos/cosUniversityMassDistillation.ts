@@ -93,9 +93,11 @@ export function resolveMassDistillationSubject(input: {
     ? input.facts.map(value => typeof value === 'string' ? value : JSON.stringify(value)).join(' ')
     : input.facts == null ? ''
       : typeof input.facts === 'string' ? input.facts : JSON.stringify(input.facts)
-  const material = [clean(input.sourceTitle, 1000), clean(input.summary, 12_000), clean(facts, 12_000)]
+  const sourceTitle = clean(input.sourceTitle, 1000)
+  const material = [sourceTitle, clean(input.summary, 12_000), clean(facts, 12_000)]
     .filter(Boolean)
     .join(' ')
+  const titleIds = classifyCosUniversitySubjects(sourceTitle)
   const materialIds = classifyCosUniversitySubjects(material)
 
   const storedNormalized = normalizedSubject(stored)
@@ -104,8 +106,14 @@ export function resolveMassDistillationSubject(input: {
 
   if (storedIds.length) {
     const storedPrimary = storedIds[0]
-    if (materialIds.includes(storedPrimary) || literallyCorroborated) return cosUniversitySubjectById(storedPrimary).title
+    // A classifiable source title is the strongest local description of what this retained item is actually about.
+    // Do not let a broad stored label survive merely because its words appear somewhere in a multi-domain abstract.
+    if (titleIds.length && !titleIds.includes(storedPrimary)) return cosUniversitySubjectById(titleIds[0]).title
+    if (titleIds.includes(storedPrimary) || materialIds.includes(storedPrimary) || literallyCorroborated) {
+      return cosUniversitySubjectById(storedPrimary).title
+    }
   }
+  if (titleIds.length) return cosUniversitySubjectById(titleIds[0]).title
   if (materialIds.length) return cosUniversitySubjectById(materialIds[0]).title
   if (literallyCorroborated) return stored
 

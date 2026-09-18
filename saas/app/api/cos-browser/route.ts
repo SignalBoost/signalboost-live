@@ -152,10 +152,13 @@ export async function POST(req: NextRequest) {
     ? String(body.context.language).toLowerCase()
     : 'en'
 
-  // Simple edit/rewrite/proofread/translate requests terminate here. They must never descend
-  // into COS Primary: the former Promise.race path could return a timeout while the abandoned
-  // reasoner kept running until Vercel killed the invocation. One abortable completion owns the
-  // edit and nothing survives its deadline.
+  // Simple edit/rewrite/proofread/translate requests are answered HERE by one abortable model call
+  // and never descend into the COS reasoning chain. The previous version routed to COS Primary,
+  // whose 12s Promise.race gave up without cancelling: the abandoned draft + quality repair +
+  // citation repair + managed-provider fallback kept the invocation alive until the platform killed
+  // it at 300s, taking the already-built response down with it. This branch runs before auth,
+  // specialists, attachments and orchestration, and it always returns inside the client's transport
+  // deadline — an answer, or an explicit bounded failure.
   if (isFastTextTransform(prompt)) {
     const edited = await runDirectFastTextEdit(prompt)
     if (edited) {
@@ -164,12 +167,12 @@ export async function POST(req: NextRequest) {
         reply: edited.text,
         source: 'cos-fast-text-edit-direct',
         confidence_score: 1,
-        external_ai_invoked: edited.external,
+        external_ai_invoked: false,
         external_fallback_invoked: false,
-        local_model_invoked: !edited.external,
+        local_model_invoked: true,
         execution_provenance: {
-          answer_origin: { provider: edited.provider, model: edited.model, from_cache: false },
-          local_reasoning: { invoked: !edited.external, model: edited.model, elapsed_ms: edited.elapsedMs },
+          answer_origin: { provider: null, model: edited.model, from_cache: false },
+          local_reasoning: { invoked: true, model: edited.model, elapsed_ms: edited.elapsedMs },
         },
         execution_allowed: false,
         external_action_taken: false,
@@ -184,7 +187,7 @@ export async function POST(req: NextRequest) {
       confidence_score: 0,
       external_ai_invoked: false,
       external_fallback_invoked: false,
-      local_model_invoked: false,
+      local_model_invoked: true,
       execution_allowed: false,
       external_action_taken: false,
     }, { status: 503 })

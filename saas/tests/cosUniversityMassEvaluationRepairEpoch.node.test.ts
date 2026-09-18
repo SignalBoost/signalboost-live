@@ -30,7 +30,7 @@ const failure = (observedAt: string): RollingEvent => ({
   evidence: {
     claim: 'mass_distilled_independent_evaluation_failed',
     artifactHash: hash,
-    error: 'mass_distilled_evaluation_answer_missing:0ee6ecdba3940d76:finish=length',
+    error: 'mass_distilled_evaluation_call_timeout',
   },
 })
 
@@ -44,7 +44,7 @@ test('pre-repair identical infrastructure failures do not permanently suppress t
   // The epoch advances with each evaluator repair; these assert that one exists and is well formed,
   // not which repair is current, so a future repair does not have to edit this line again.
   assert.match(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF, /^[a-z0-9_]+$/)
-  assert.match(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/)
+  assert.match(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/)
   assert.ok(Number.isFinite(Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)))
   const preRepair = [4, 3, 2, 1].map(minutes => failure(beforeEpoch(minutes)))
   const decision = decideRollingMassEvaluationApproval({

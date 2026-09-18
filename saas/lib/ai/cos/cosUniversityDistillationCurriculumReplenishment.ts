@@ -36,7 +36,7 @@ function slotKey(now: Date): string {
   return `distillation-replenishment-${slot.toISOString().slice(0, 16).replace(/[-:T]/g, '')}`
 }
 
-async function installVerifiedFailureDerivedCurriculum(input: {
+export async function installVerifiedFailureDerivedCurriculum(input: {
   db: NonNullable<ReturnType<typeof cosServiceDb>>
   supply: readonly MassDistillationSubjectSupply[]
   now: Date

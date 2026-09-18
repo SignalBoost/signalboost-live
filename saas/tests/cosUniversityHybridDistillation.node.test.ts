@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
+  failureDerivedOrdinalForHash,
+  failureDerivedSourceHash,
   planHybridDistillationMix,
   syntheticOrdinalForHash,
   teacherSyntheticPrompt,
@@ -25,6 +27,14 @@ test('hybrid mix prefers grounded and failure-derived material before synthetic 
   })
 })
 
+test('failure-derived source identities are deterministic and self-attributing without raw failure content', () => {
+  const hash = failureDerivedSourceHash('Computer Science & Coding', 2)
+  assert.match(hash, /^[a-f0-9]{64}$/)
+  assert.equal(failureDerivedSourceHash('Computer Science & Coding', 2), hash)
+  assert.equal(failureDerivedOrdinalForHash('Computer Science & Coding', hash), 2)
+  assert.equal(failureDerivedOrdinalForHash('Cybersecurity', hash), null)
+})
+
 test('teacher synthetic source identities are deterministic and reversible within bounded batch ordinals', () => {
   const hash = teacherSyntheticSourceHash('Software Testing', 7)
   assert.match(hash, /^[a-f0-9]{64}$/)
@@ -40,11 +50,14 @@ test('synthetic teacher prompt is self-contained and excludes private/current-we
   assert.match(item.prompt, /Do not invent citations/i)
 })
 
-test('curriculum replenishment keeps real acquisition first and marks synthetic fallback provenance', () => {
-  assert.match(replenishment, /await cycle\.run\(gaps, 0\)[\s\S]*installTeacherSyntheticFallback/)
+test('curriculum replenishment keeps real acquisition first, adds verified-failure remediation, then synthetic fallback', () => {
+  assert.match(replenishment, /await cycle\.run\(gaps, 0\)[\s\S]*installVerifiedFailureDerivedCurriculum[\s\S]*installTeacherSyntheticFallback/)
   assert.match(replenishment, /license: 'synthetic-benchmark-fixture'/)
+  assert.match(replenishment, /source_kind: 'failure_derived_curriculum'/)
+  assert.match(replenishment, /origin: 'failure_derived'/)
+  assert.match(replenishment, /no_raw_chat_no_hidden_exam/)
   assert.match(replenishment, /source_kind: 'teacher_synthetic_curriculum'/)
   assert.match(replenishment, /origin: 'teacher_synthetic'/)
   assert.match(replenishment, /fallbackOnly: true/)
-  assert.match(replenishment, /sourceMix: \['real_source', 'teacher_synthetic'\]/)
+  assert.match(replenishment, /sourceMix: \['real_source', 'failure_derived', 'teacher_synthetic'\]/)
 })

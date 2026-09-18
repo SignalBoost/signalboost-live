@@ -1,2 +1,2 @@
-base_sha=303d6a0a8243c583d4272b00af412789a4be6a55
-branch=fix/cos-interactive-latency-20260918
+base_sha=c32d7565fee141d23197d1cb1fb3de0079dd00bc
+branch=fix/cos-direct-editor-fast-model-20260918

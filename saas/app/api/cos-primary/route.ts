@@ -110,7 +110,7 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
       systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
       prompt:input,
     }).catch(()=>null),
-    new Promise<null>(resolve=>setTimeout(()=>resolve(null),20_000)),
+    new Promise<null>(resolve=>setTimeout(()=>resolve(null),12_000)),
   ])
   if(!result?.text)return null
   const parsed=parseLocalResult(result.text)
@@ -203,7 +203,7 @@ export async function postCosPrimary(req:NextRequest){
   if(isFastTextTransform(input)){
     const fast=await runFastTextTransform(input)
     if(!fast){
-      const reply='COS could not complete this simple text edit within the 20-second fast-path limit. The request was stopped instead of being allowed to hang in the long orchestration path.'
+      const reply='COS could not complete this simple text edit within the 12-second fast-path limit. The request was stopped instead of being allowed to hang in the long orchestration path.'
       const executionProvenance=authoritativeProvenance(null,{invoked:false})
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'failed_closed',confidence:0,externalAiInvoked:false})
       await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-fast-text-transform-timeout',{prompt:input,answered:false,confidence:0,branch:'fast_text_transform_timeout'})

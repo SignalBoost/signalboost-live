@@ -68,6 +68,7 @@ function toLocalModelCallArgs(request: CosReasoningRequest, role: CosSpecialistR
     ...(maxTokens === undefined ? {} : { maxTokens }),
     ...(request.temperature === undefined ? {} : { temperature: request.temperature }),
     ...(request.jsonObject === undefined ? {} : { jsonObject: request.jsonObject }),
+    ...(request.usageContext === undefined ? {} : { usageContext: request.usageContext }),
   }
 }
 

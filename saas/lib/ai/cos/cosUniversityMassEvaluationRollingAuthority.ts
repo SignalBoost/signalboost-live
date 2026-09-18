@@ -19,8 +19,8 @@ export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
 // #2457 repaired the baseline seven-case transport regression introduced while preserving retry headroom.
 // Failures from before that Production generation must not permanently suppress the artifact; only failures observed
 // after the repaired baseline split is live count toward the identical-infrastructure circuit breaker.
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_seven_case_baseline_split' as const
-export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-17T23:26:08.784Z' as const
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_REF = 'mass_evaluation_judge_timeout_headroom' as const
+export const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT = '2026-09-18T01:48:45.894Z' as const
 const MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS = Date.parse(MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT)
 export const MASS_EVALUATION_RETENTION_DELAY_MS = 12 * 60 * 60 * 1000
 export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000

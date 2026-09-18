@@ -24,6 +24,7 @@ const PLATFORM_CEILING_MS = 300_000
  * skipped early enough that these always complete.
  */
 const RESERVED_OVERHEAD_MS = 45_000
+const DEFAULT_INTERACTIVE_TURN_BUDGET_MS = 45_000
 
 export type TurnBudget = {
   startedAt: number
@@ -37,7 +38,7 @@ function positiveInt(value: unknown, fallback: number): number {
 
 /** Total wall clock one turn may spend before optional work must stop. */
 export function turnBudgetMs(): number {
-  const configured = positiveInt(process.env.COS_TURN_BUDGET_MS, PLATFORM_CEILING_MS - RESERVED_OVERHEAD_MS)
+  const configured = positiveInt(process.env.COS_TURN_BUDGET_MS, DEFAULT_INTERACTIVE_TURN_BUDGET_MS)
   // Never allow configuration to exceed the platform ceiling minus overhead — that would restore
   // the exact failure this module exists to prevent.
   return Math.min(configured, PLATFORM_CEILING_MS - RESERVED_OVERHEAD_MS)

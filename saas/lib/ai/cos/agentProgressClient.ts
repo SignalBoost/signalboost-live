@@ -13,7 +13,6 @@ export type AgentProgressEvent = {
 const JOB_POLL_DELAY_MS = 1_500
 const JOB_POLL_ATTEMPTS = 180
 const PUBLIC_CONCIERGE_TRANSPORT_DEADLINE_MS = 45_000
-const DIRECT_FAST_TEXT_TRANSFORM = /^\s*(?:edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
 const MAX_CLIENT_FILE_BYTES = 512 * 1024
 const FENCED_SOURCE = /```([A-Za-z0-9_+#.-]*)\s*\n?([\s\S]*?)```/m
@@ -218,7 +217,6 @@ export async function postWithAgentProgress(args: {
 
   const builderRequest = args.target === 'concierge' ? conciergeBuilderRequest(args.body) : null
   const requestBody = builderRequest?.body ?? args.body
-  const directFastTextTransform = args.target === 'cos' && DIRECT_FAST_TEXT_TRANSFORM.test(latestUserText(bodyRecord(requestBody) || {}))
   const repairRequest = isOperatorRepairRequest(requestBody)
   const progressTarget = args.target
   const builderActive = Boolean(builderRequest)
@@ -246,7 +244,7 @@ export async function postWithAgentProgress(args: {
   // /api/cos-browser remains the canonical browser ingress. The explicit surface header prevents
   // a signed-in owner using the public homepage Concierge from inheriting private owner authority;
   // only the owner Assistant surface may enter the privileged lane after server-side authentication.
-  const endpoint = builderRequest?.endpoint ?? (directFastTextTransform ? '/api/cos-fast-transform' : '/api/cos-browser')
+  const endpoint = builderRequest?.endpoint ?? '/api/cos-browser'
   let response: Response
   try {
     try {

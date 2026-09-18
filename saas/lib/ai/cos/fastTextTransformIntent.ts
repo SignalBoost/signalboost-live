@@ -9,7 +9,7 @@ export type FastTextTransformContext = {
   previousAssistant?: string | null
 }
 
-const FAST_TEXT_COMMAND = /^\\s*(edit|rewrite|rephrase|proofread|polish|correct(?:\\s+the)?(?:\\s+grammar)?|fix(?:\\s+the)?(?:\\s+(?:grammar|spelling|punctuation|wording))?|translate|shorten|improve(?:\\s+the)?(?:\\s+wording)?|make\\s+(?:this|it)\\s+(?:more\\s+)?(?:professional|clear|concise|friendly|formal))\\b/i
+const FAST_TEXT_COMMAND = /^\s*(edit|rewrite|rephrase|proofread|polish|correct(?:\s+the)?(?:\s+grammar)?|fix(?:\s+the)?(?:\s+(?:grammar|spelling|punctuation|wording))?|translate|shorten|improve(?:\s+the)?(?:\s+wording)?|make\s+(?:this|it)\s+(?:more\s+)?(?:professional|clear|concise|friendly|formal))\b/i
 
 const EXPLICIT_EDIT_INSTRUCTION = /^\s*(?:rewrite|rephrase|proofread|polish|translate|shorten|correct(?:\s+the)?(?:\s+(?:grammar|spelling|punctuation|wording))?|fix\s+(?:the\s+)?(?:grammar|spelling|punctuation|wording))\b/i
 

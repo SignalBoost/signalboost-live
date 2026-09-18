@@ -80,7 +80,7 @@ async function recordObservation(input: {
   if (inserted.error) throw inserted.error
 }
 
-async function hydrateProviderLedger(maxRuns = 50) {
+async function hydrateProviderLedger(maxRuns = 8) {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const rows = await db.from('cos_university_mass_distillation_batch_runs')
@@ -150,8 +150,10 @@ export async function reconcileMassDistillationHuggingFaceProviderLedger(input: 
   const db = cosServiceDb()
   if (!db) return { ok: false as const, skipped: true as const, reason: 'service_database_unavailable' as const }
   const namespace = await resolveHuggingFaceNamespace({ token: hf.token, fetchImpl: input.fetchImpl })
-  const hydration = await hydrateProviderLedger()
-  const maxJobs = Math.max(1, Math.min(30, Math.floor(input.maxJobs ?? 15)))
+  const maxJobs = Math.max(1, Math.min(10, Math.floor(input.maxJobs ?? 5)))
+  // Ledger hydration is legacy backfill, not the dispatch critical path. Keep it deliberately small
+  // so a growing run history cannot turn every Supervisor tick into dozens of sequential PostgREST calls.
+  const hydration = await hydrateProviderLedger(Math.max(3, Math.min(8, maxJobs)))
   const now = input.now || new Date()
 
   const rows = await db.from('cos_university_mass_distillation_provider_jobs')

@@ -56,16 +56,17 @@ test('replenishment issues multiple distinct scholarly queries instead of repeat
   assert.ok(gaps.every(gap => gap.evidence.some(item => item.startsWith('query_variant='))))
 })
 
-test('ready-inventory replenishment runs before paid authorization and may overlap budget pauses', () => {
+test('paid authorization and dispatch precede slower ready-inventory maintenance', () => {
   const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
   const packageAt = workflow.indexOf('prepareUniversityMassDistillationCurriculum(now')
   const inventoryAt = workflow.indexOf('preparedMassDistillationInventory(preparedBufferTarget)')
   const replenishAt = workflow.indexOf('replenishUniversityMassDistillationCurriculum')
   const authorizeAt = workflow.indexOf('authorizeNextUniversityMassDistillationCampaign()')
   assert.ok(packageAt > 0)
+  assert.ok(authorizeAt > 0)
+  assert.ok(authorizeAt < packageAt)
   assert.ok(inventoryAt > packageAt)
   assert.ok(replenishAt > 0)
-  assert.ok(authorizeAt > inventoryAt)
   assert.match(workflow, /preparedBeforeReplenishment >= preparedBufferTarget/)
   assert.match(workflow, /installVerifiedFailureDerivedCurriculum/)
   assert.match(workflow, /failure_derived_remediation_seeded_with_prepared_buffer_satisfied/)

@@ -13,7 +13,7 @@ import {
   MASS_DISTILLATION_STUDENT_MODEL,
   prepareUniversityMassDistillationCurriculum,
 } from './cosUniversityMassDistillation.ts'
-import { replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
+import { installVerifiedFailureDerivedCurriculum, replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
 import { massDistillationThroughputProfile } from './cosUniversityDistillationCurriculumPlan.ts'
 import { authorizeNextUniversityMassDistillationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
@@ -110,7 +110,30 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       maxBatchesPerSweep: throughput.maxBatchesPerSweep,
     })) }
     preparedBeforeReplenishment = await preparedMassDistillationInventory(preparedBufferTarget)
-    if (preparedBeforeReplenishment < preparedBufferTarget) {
+    if (preparedBeforeReplenishment >= preparedBufferTarget) {
+      const failureDerived = await installVerifiedFailureDerivedCurriculum({
+        db: cosServiceDb()!,
+        supply: Array.isArray((curriculum.supply as { subjects?: unknown })?.subjects)
+          ? (curriculum.supply as { subjects: any[] }).subjects
+          : [],
+        now,
+        maxSubjects: throughput.targetSubjectsPerReplenishment,
+      })
+      curriculumReplenishment = {
+        ok: true,
+        skipped: failureDerived.inserted === 0,
+        reason: failureDerived.inserted > 0 ? 'failure_derived_remediation_seeded_with_prepared_buffer_satisfied' : 'prepared_buffer_satisfied',
+        failureDerivedInserted: failureDerived.inserted,
+        failureDerivedBySubject: failureDerived.bySubject,
+        externalCostUsd: 0,
+      }
+      if (failureDerived.inserted > 0) {
+        curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now, {
+          corpusScanRows: throughput.corpusScanRows,
+          maxBatchesPerSweep: throughput.maxBatchesPerSweep,
+        })) }
+      }
+    } else {
       curriculumReplenishment = { ...(await replenishUniversityMassDistillationCurriculum({
         supply: Array.isArray((curriculum.supply as { subjects?: unknown })?.subjects)
           ? (curriculum.supply as { subjects: any[] }).subjects

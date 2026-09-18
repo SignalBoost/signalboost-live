@@ -108,3 +108,12 @@ test('mass campaign has a signed callback and a bounded scheduled consumer', () 
   assert.match(workflow, /maxDispatches: 3/)
   assert.match(vercel, /\/api\/cron\/cos-university-mass-distillation/)
 })
+
+test('backfills parent campaign terminal state for pre-existing semantic failures', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /const terminalFailedRuns = \(failedRuns\.data \|\| \[\]\)\.filter/)
+  assert.match(consumer, /terminalBatchFailure\(clean\(row\.failure_reason, 300\)\)/)
+  assert.match(consumer, /const terminalCampaignIds = \[\.\.\.new Set\(terminalFailedRuns\.map/)
+  assert.match(consumer, /\.update\(\{ status: 'failed', completed_at: now, updated_at: now \}\)/)
+  assert.match(consumer, /\.in\('status', \['authorized', 'active'\]\)/)
+})

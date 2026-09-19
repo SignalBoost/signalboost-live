@@ -150,3 +150,37 @@ test('production config activates the bounded parallel teacher stage without emb
   const serialized = JSON.stringify(vercel)
   assert.doesNotMatch(serialized, /OPENAI_API_KEY|ANTHROPIC_API_KEY|XAI_API_KEY/)
 })
+
+
+test('no hosted credentials produces an explicit skip so the existing HF teacher lane may continue', async () => {
+  const db = memoryDb()
+  const result = await runMassHostedTeacherStage({
+    db,
+    run: {
+      id: '33333333-3333-4333-8333-333333333333',
+      candidate_id: 'mass:44444444-4444-4444-8444-444444444444:bbbbbbbbbbbbbbbb',
+      batch_key: 'd'.repeat(64),
+    },
+    prompts: Array.from({ length: 20 }, (_, index) => ({
+      id: (index.toString(16).padStart(64, '0')).slice(-64),
+      prompt: `Prompt ${index}`,
+    })),
+    promptSetHash: 'e'.repeat(64),
+    env: {
+      COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED: 'true',
+      COS_UNIVERSITY_TEACHER_OPENAI_ENABLED: 'true',
+      COS_UNIVERSITY_TEACHER_OPENAI_ADAPTER_READY: 'true',
+      COS_UNIVERSITY_TEACHER_OPENAI_MODEL: 'gpt-5.6-luna',
+    },
+  })
+  assert.equal(result.skipped, true)
+  assert.equal(result.reason, 'no_active_hosted_teacher_provider')
+  assert.equal(result.completed, false)
+  assert.equal(result.rows, 0)
+})
+
+test('mass teacher lane excludes custom gateways whose pricing is not covered by the fixed campaign ceiling', () => {
+  const source = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassHostedTeacherStage.ts'), 'utf8')
+  assert.match(source, /MASS_HOSTED_TEACHER_IDS = new Set\(\['openai', 'claude', 'grok'\]\)/)
+  assert.doesNotMatch(source, /MASS_HOSTED_TEACHER_IDS[\s\S]{0,80}'custom'/)
+})

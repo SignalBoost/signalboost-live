@@ -8,6 +8,7 @@ const tests = [
   // Red on main since an evaluator refactor because it was never gated: the mass-evaluation suite
   // contract (four suites, shared ceilings, promotion thresholds) had no enforcement.
   'tests/cosUniversityMassDistilledEvaluation.node.test.ts',
+  'tests/universityDistillationRecoveryDrillSafety.node.test.ts',
   'tests/cosUniversityTeacherPool.node.test.ts',
   'tests/cosUniversityTeacherAdapters.node.test.ts',
   'tests/cosUniversityMassHostedTeacherStage.node.test.ts',

@@ -2,6 +2,25 @@
 
 # iTMounts Engineering Blueprint
 
+## Runtime provider priority invariant — 2026-09-19
+
+The canonical iTMounts text-compute order is:
+
+```text
+active scoped/promoted iTMounts graduate (when applicable)
+-> RunPod primary iTMounts runtime
+-> DeepInfra / configured LOCAL_AI bounded fallback
+-> separately governed escalation only where explicitly authorized
+```
+
+RunPod is an active primary compute/runtime dependency for eligible platform workloads; it is **not retired**. DeepInfra is the bounded fallback/overflow provider; it is **not the default or primary platform runtime**.
+
+Latency-sensitive owner-facing paths such as `cos_interactive_answer`, interactive authoring, and direct text transformation may deliberately bypass a RunPod wake/repair/wait and invoke the configured DeepInfra/LOCAL_AI fallback directly under the Interactive COS latency profile. That is a scoped latency exception only: it does not reverse the global provider priority, retire RunPod, or authorize callers to treat DeepInfra as primary.
+
+University exact-artifact serving, canary, and evaluation paths continue to use their separately governed RunPod runtime where the current implementation specifies it. Independent University evaluation/evaluator separation remains controlling and must not silently inherit ordinary platform routing.
+
+Runtime identity and health must still be verified from live configuration/telemetry before making Production claims; this invariant defines intended routing priority, not proof that any particular provider is healthy at a given moment.
+
 
 ## University Self-Healing progress invariant — 2026-09-19
 
@@ -59,7 +78,7 @@ User-facing Assistant/Concierge turns are latency-sensitive interactive work, no
 Canonical latency rules:
 
 - interactive COS generation is tagged `cos_interactive_answer`;
-- `cos_interactive_answer` and direct text transformations bypass RunPod-primary routing and use the configured managed open-model transport directly;
+- `cos_interactive_answer`, interactive authoring, and direct text transformations may bypass RunPod-primary routing and use the configured DeepInfra/`LOCAL_AI_*` fallback directly as a bounded latency exception; this does not redefine DeepInfra as primary;
 - DeepInfra interactive generation defaults to low reasoning effort unless `COS_INTERACTIVE_REASONING_EFFORT` explicitly overrides it;
 - interactive model transport is bounded by `COS_INTERACTIVE_MODEL_TIMEOUT_MS` (default 20 seconds, never above the configured provider timeout);
 - interactive answer generation is capped by `COS_INTERACTIVE_REASONER_MAX_TOKENS` (default 2,000, also bounded by the global reasoner ceiling);
@@ -192,8 +211,8 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.128
-**Updated:** 2026-09-18
+**Version:** 1.129
+**Updated:** 2026-09-19
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**
 **Canonical public origin:** `https://itmounts.com`
@@ -1039,7 +1058,7 @@ LOCAL_AI_API_KEY   # server-side secret; never print/commit
 
 `DEEPINFRA_BUILDER_MODEL` is required for Builder/Platform Engineer execution. Missing/blank configuration fails closed; do not silently select a model from source, docs, memory, or an old accepted run.
 
-RunPod is retired from the active architecture. Do not reintroduce it as a reasoner, embedding, or compute dependency merely because dormant legacy code/history mentions it.
+RunPod remains the active iTMounts primary compute/runtime for eligible platform workloads. DeepInfra/`LOCAL_AI_*` remains the bounded fallback. Scoped latency-sensitive interactive bypasses are governed by the Interactive COS latency profile and do not change that provider priority.
 
 ---
 

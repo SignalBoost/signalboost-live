@@ -118,6 +118,8 @@ export const config = {
   matcher: [
     '/dashboard/operator/:path*',
     '/dashboard/:path*',
+    '/admin/:path*',
+    '/hub/:path*',
     '/api/admin/:path*',
     '/api/concierge',
     '/api/cos-browser',

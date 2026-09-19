@@ -3,6 +3,7 @@ import { ContinuousLearningDirector, type ContinuousLearningPolicy } from '@/lib
 import { createLiveLearningAdapters } from '@/lib/cos-core/layers/learning/liveSources'
 import { createSupabaseCOSStores, cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import type { MassDistillationSubjectSupply } from './cosUniversityMassDistillation.ts'
+import { installHostedTeacherCurriculum } from './cosUniversityHostedTeacherCurriculum.ts'
 import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
 import {
   buildMassDistillationReplenishmentGaps,
@@ -230,9 +231,12 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     )
     const result = await cycle.run(gaps, 0)
 
-    // Real rights-cleared acquisition remains first. Verified failures add subject-level remediation
-    // seeds without copying raw chats or hidden evaluator material. Synthetic fallback fills the rest.
+    // Real rights-cleared acquisition remains first. Verified failures add subject-level remediation.
+    // Explicitly enabled hosted teachers then generate real multi-provider synthetic curriculum in
+    // parallel. The zero-cost placeholder fallback remains last so unavailable hosted providers can
+    // never stop curriculum growth.
     const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: input.supply, now, maxSubjects })
+    const hostedTeachers = await installHostedTeacherCurriculum({ db, supply: input.supply, now, maxSubjects })
     const synthetic = await installTeacherSyntheticFallback({ db, supply: input.supply, now, maxSubjects })
 
     const completedAt = new Date().toISOString()
@@ -265,11 +269,18 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
       sourceErrors: result.sourceErrors,
       failureDerivedInserted: failureDerived.inserted,
       failureDerivedBySubject: failureDerived.bySubject,
+      hostedTeacherAttempted: hostedTeachers.attempted,
+      hostedTeacherInserted: hostedTeachers.inserted,
+      hostedTeacherProviders: hostedTeachers.activeProviders,
+      hostedTeacherFailures: hostedTeachers.failures,
       syntheticInserted: synthetic.inserted,
       syntheticBySubject: synthetic.bySubject,
-      sourceMix: ['real_source', 'failure_derived', 'teacher_synthetic'],
-      externalCostUsd: 0,
-      semantics: 'real_rights_cleared_material_first_then_verified_failure_subject_remediation_then_teacher_synthetic_shortfall_no_raw_chat_no_hidden_exam_no_training_dispatch',
+      sourceMix: ['real_source', 'failure_derived', 'hosted_teacher', 'teacher_synthetic'],
+      externalCostUsd: hostedTeachers.attempted > 0 ? null : 0,
+      externalCostMeasurement: hostedTeachers.attempted > 0
+        ? 'provider_billed_external_cost_not_inferred_from_token_counts'
+        : 'no_hosted_teacher_calls',
+      semantics: 'real_rights_cleared_material_first_then_verified_failure_subject_remediation_then_explicitly_authorized_multi_provider_teacher_generation_then_zero_cost_synthetic_fallback_no_raw_chat_no_hidden_exam_no_silent_provider_fallback',
     })
   } catch (error) {
     const message = String(error instanceof Error ? error.message : error || 'unknown_error').slice(0, 800)

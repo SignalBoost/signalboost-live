@@ -13,7 +13,8 @@ export type AgentProgressEvent = {
 const JOB_POLL_DELAY_MS = 1_500
 const JOB_POLL_ATTEMPTS = 180
 const COS_TURN_POLL_DELAY_MS = 1_500
-const COS_TURN_POLL_ATTEMPTS = 180
+const COS_TURN_POLL_ATTEMPTS = 4
+const COS_HISTORY_READ_DEADLINE_MS = 2_000
 const PUBLIC_CONCIERGE_TRANSPORT_DEADLINE_MS = 45_000
 const SOURCE_FILE = /\.(?:c?js|mjs|cts|mts|ts|tsx|jsx|py|html|css|json|sql|sh|bash|java|cpp|cc|cxx|cs|go|rs|php|rb|swift|kt)$/i
 const MAX_CLIENT_FILE_BYTES = 512 * 1024
@@ -307,7 +308,7 @@ export async function postWithAgentProgress(args: {
           method: 'GET',
           credentials: 'include',
           cache: 'no-store',
-          signal: args.signal,
+          signal: AbortSignal.any([args.signal, AbortSignal.timeout(COS_HISTORY_READ_DEADLINE_MS)]),
           headers: { accept: 'application/json' },
         })
         if (!history.ok) continue
@@ -335,7 +336,7 @@ export async function postWithAgentProgress(args: {
         // Read-only History polling never replays the accepted POST.
       }
     }
-    report('running', 'COS turn is still durable in History; the request was not replayed')
+    report('complete', 'COS is still finishing this durable turn in History; you can continue using the page')
     return { ok: true, status: 202, data }
   }
 

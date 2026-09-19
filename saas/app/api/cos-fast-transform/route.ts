@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { POST as provenanceBrowserPost } from '@/app/api/cos-provenance-browser/route'
-import { runDirectFastTextEdit } from '@/lib/ai/cos/fastTextEditDirect'
 import { isFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
 import { provenanceBoundarySecret } from '@/lib/ai/cos/provenanceBoundarySecret'
 
@@ -43,7 +42,7 @@ async function fallThroughToNormalCos(req: NextRequest, body: any): Promise<Resp
   headers.delete('x-signalboost-fast-transform-internal')
   headers.set('content-type', 'application/json')
   headers.set('x-signalboost-provenance-boundary', boundary)
-  headers.set('x-signalboost-fast-transform-attempted', '1')
+  headers.delete('x-signalboost-fast-transform-attempted')
   const fallback = new NextRequest(req.url, {
     method: 'POST',
     headers,
@@ -73,24 +72,8 @@ export async function POST(req: NextRequest) {
     return fallThroughToNormalCos(req, body)
   }
 
-  const edited = await runDirectFastTextEdit(prompt)
-  if (edited) {
-    return NextResponse.json({
-      ok: true,
-      reply: edited.text,
-      source: 'cos-fast-text-edit-direct',
-      confidence_score: 1,
-      external_ai_invoked: false,
-      external_fallback_invoked: false,
-      local_model_invoked: true,
-      execution_provenance: {
-        answer_origin: { provider: null, model: edited.model, from_cache: false },
-        local_reasoning: { invoked: true, model: edited.model, elapsed_ms: edited.elapsedMs },
-      },
-      execution_allowed: false,
-      external_action_taken: false,
-    })
-  }
-
+  // Middleware is only an ingress shortcut. The actual edit capability lives in canonical COS.
+  // Delegating preserves one editor implementation and lets cos-primary apply the same bounded
+  // DeepSeek fast lane for Concierge, Assistant, and direct browser traffic.
   return fallThroughToNormalCos(req, body)
 }

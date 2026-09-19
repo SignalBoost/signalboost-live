@@ -67,3 +67,19 @@ test('canonical edit lane shares the same bounded interactive budget', () => {
   assert.match(primary, /FAST_TEXT_TRANSFORM_ATTEMPT_MS = 9_000/)
   assert.match(primary, /usageContext:\{feature:'cos_fast_text_transform'/)
 })
+
+
+test('completion-first routing semantically promotes natural research requests to live evidence', () => {
+  assert.match(primary, /const semanticTaskIntent=!requestedAction/)
+  assert.match(primary, /semanticTaskIntent\.mode==='external_fact_verification'/)
+  assert.match(primary, /const semanticRequiresFreshEvidence=Boolean/)
+  assert.match(primary, /heuristicRequiresFreshEvidence\|\|semanticRequiresFreshEvidence/)
+})
+
+test('ordinary low-confidence answers are completed instead of replaced by the generic refusal', () => {
+  assert.match(primary, /completion_first_best_effort/)
+  assert.match(primary, /source:'cos-local-best-effort'/)
+  assert.match(primary, /runCompletionFirstRescue\(input,language\)/)
+  assert.match(primary, /cos-completion-first-rescue/)
+  assert.ok(primary.indexOf('completion_first_best_effort') < primary.indexOf('buildHonestRefusalReply({prompt:input'))
+})

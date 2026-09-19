@@ -101,8 +101,8 @@ async function assessSelfHealingSupervisor(request:string):Promise<string|null>{
 }
 // Foreground transforms must complete the user's task, not merely fail quickly. The owned runtime
 // remains first choice, but one stalled worker must not turn an edit into a dead-end response.
-export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 40_000
-export const FAST_TEXT_TRANSFORM_ATTEMPT_MS = 18_000
+export const FAST_TEXT_TRANSFORM_TIMEOUT_MS = 18_000
+export const FAST_TEXT_TRANSFORM_ATTEMPT_MS = 9_000
 
 export function isFastTextTransform(input:string, context:{previousAssistant?:string|null}={}):boolean{
   return classifyFastTextTransform(input, context)

@@ -199,6 +199,34 @@ test('direct text transformations use the dedicated DeepInfra flash editor with 
   assert.deepEqual(observedBody.response_format, { type: 'json_object' })
 })
 
+test('interactive authoring uses the fast managed model with reasoning disabled', async () => {
+  delete process.env.COS_INTERACTIVE_AUTHORING_MODEL
+  let observedBody: Record<string, unknown> = {}
+  globalThis.fetch = (async (input, init) => {
+    if (String(input).includes('/chat/completions')) {
+      observedBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return Response.json({ choices: [{ finish_reason: 'stop', message: { content: 'authoring answer' } }] })
+    }
+    return Response.json({})
+  }) as typeof fetch
+
+  const result = await callLocalModel({
+    prompt: 'Write a warm anniversary message in Polish and English.',
+    maxTokens: 1200,
+    usageContext: { feature: 'cos_interactive_authoring', purpose: 'user_facing_response' },
+  }, {
+    baseUrl: 'https://api.deepinfra.com/v1/openai',
+    model: 'Qwen/Qwen3.6-35B-A3B',
+    apiKey: 'test-key',
+    timeoutMs: 5000,
+    provider: 'deepinfra',
+  })
+
+  assert.equal(result, 'authoring answer')
+  assert.equal(observedBody.model, 'zai-org/GLM-5.3-Flash')
+  assert.equal(observedBody.reasoning_effort, 'none')
+})
+
 test('ordinary interactive COS answers retain the configured stronger model', async () => {
   delete process.env.COS_INTERACTIVE_REASONING_EFFORT
   let observedBody: Record<string, unknown> = {}

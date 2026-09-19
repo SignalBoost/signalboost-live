@@ -534,10 +534,37 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     if ((!hostedSource && !decodeHuggingFaceDatasetRef(teacherSourceRef)) || !HEX64.test(clean(run.dataset_hash, 64))) {
       throw new Error('mass_distillation_teacher_material_missing')
     }
-    const hostedRows = hostedSource
+    const rawHostedRows = hostedSource
       ? await readMassHostedTeacherRows({ db: cosServiceDb(), runId: run.id, promptSetHash: clean(run.prompt_set_hash, 64).toLowerCase() })
       : []
-    if (hostedSource && hostedRows.length < 20) throw new Error(`mass_distillation_hosted_teacher_rows_missing:${hostedRows.length}`)
+    if (hostedSource && rawHostedRows.length < 20) throw new Error(`mass_distillation_hosted_teacher_rows_missing:${rawHostedRows.length}`)
+    let hostedRows: readonly any[] = rawHostedRows
+    if (hostedSource) {
+      // Rebuild the deterministic rights-cleared prompt set and attach it to each persisted hosted
+      // response. text/itemHash stay bound to the existing response hash; prompt/response are extra
+      // structure used later to render the student model's own chat template.
+      const promptSet = await buildTeacherPrompts(run.subject_id, sourceHashes)
+      if (promptSet.promptSetHash !== clean(run.prompt_set_hash, 64).toLowerCase()) {
+        throw new Error('mass_distillation_hosted_prompt_set_mismatch')
+      }
+      const promptById = new Map(promptSet.prompts.map(item => [clean(item.id, 64).toLowerCase(), item.prompt] as const))
+      const structured = rawHostedRows.map(row => {
+        const prompt = promptById.get(clean(row.promptId, 64).toLowerCase())
+        const response = clean(row.text, 50_000)
+        if (!prompt || !response) throw new Error('mass_distillation_hosted_prompt_response_missing')
+        return Object.freeze({
+          ...row,
+          text: response,
+          prompt,
+          response,
+          messages: Object.freeze([
+            Object.freeze({ role: 'user', content: prompt }),
+            Object.freeze({ role: 'assistant', content: response }),
+          ]),
+        })
+      })
+      hostedRows = Object.freeze(structured)
+    }
     idempotencyKey = hash([COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE, claim.campaign_id, claim.batch_key, 'prepare', run.dataset_hash, teacherSourceRef])
     envelope = {
       profile: 'cos_university_training_executor_v1',

@@ -43,3 +43,5 @@ jobs:
       - run: npm ci
       - run: node --test tests/businessIntelligenceWikidata.node.test.ts tests/businessIntelligenceWikidataPopulation.node.test.ts
       - run: npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=7168

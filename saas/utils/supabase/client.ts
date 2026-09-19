@@ -14,6 +14,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 const anonymousSupabase = {
   auth: {
     getUser: async () => ({ data: { user: null }, error: null }),
+    getSession: async () => ({ data: { session: null }, error: null }),
     signOut: async () => ({ error: null }),
     onAuthStateChange: () => ({
       data: {

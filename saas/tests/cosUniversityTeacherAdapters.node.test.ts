@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateWithUniversityTeacher } from '../lib/ai/cos/cosUniversityTeacherAdapters.ts'
-import { UNIVERSITY_TEACHERS } from '../lib/ai/cos/cosUniversityTeacherPool.ts'
+import { UNIVERSITY_TEACHERS, universityTeacherDefinitions } from '../lib/ai/cos/cosUniversityTeacherPool.ts'
 
 const byId = (id: string) => UNIVERSITY_TEACHERS.find(item => item.id === id)!
 
@@ -117,4 +117,46 @@ test('provider HTTP failures expose status and safe provider error code without 
     }),
     /university_teacher_http_403:permission_error/,
   )
+})
+
+
+test('a buyer-added OpenAI-compatible provider uses the same transport adapter without vendor-specific code', async () => {
+  const env = {
+    BUYER_CLOUD_KEY: 'buyer_123456789012345678901234567890',
+    BUYER_CLOUD_ENABLED: 'true',
+    BUYER_CLOUD_READY: 'true',
+    BUYER_CLOUD_MODEL: 'buyer-model-v2',
+    BUYER_CLOUD_ENDPOINT: 'https://models.example.test/v1/chat/completions',
+    COS_UNIVERSITY_TEACHER_PROVIDERS_JSON: JSON.stringify([{
+      id: 'buyer-cloud',
+      provider: 'buyer-cloud',
+      transport: 'openai_compatible',
+      credentialEnv: 'BUYER_CLOUD_KEY',
+      enabledEnv: 'BUYER_CLOUD_ENABLED',
+      adapterReadyEnv: 'BUYER_CLOUD_READY',
+      modelEnv: 'BUYER_CLOUD_MODEL',
+      endpointEnv: 'BUYER_CLOUD_ENDPOINT',
+    }]),
+  }
+  const teacher = universityTeacherDefinitions(env).find(item => item.id === 'buyer-cloud')!
+  let seenUrl = ''
+  let seenModel = ''
+  const result = await generateWithUniversityTeacher({
+    teacher,
+    env,
+    request: { system: 'Teach.', prompt: 'Explain.', maxOutputTokens: 128 },
+    fetchImpl: async (input, init) => {
+      seenUrl = String(input)
+      seenModel = JSON.parse(String(init?.body || '{}')).model
+      return new Response(JSON.stringify({
+        id: 'buyer-request-1',
+        choices: [{ message: { content: 'buyer provider answer' } }],
+        usage: { prompt_tokens: 5, completion_tokens: 3 },
+      }), { status: 200, headers: { 'x-request-id': 'buyer-request-1' } })
+    },
+  })
+  assert.equal(seenUrl, 'https://models.example.test/v1/chat/completions')
+  assert.equal(seenModel, 'buyer-model-v2')
+  assert.equal(result.provider, 'buyer-cloud')
+  assert.equal(result.text, 'buyer provider answer')
 })

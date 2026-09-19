@@ -34,10 +34,13 @@ const JUDGE_CALLS = MASS_EVALUATION_JUDGE_CALLS
 // extraction, which is why the constant is named for what it measures.
 const OBSERVED_GATEWAY_CUTOFF_MS = 40_000
 const ENDPOINT_CALL_TIMEOUT_MS = 50_000
-// Production 2026-09-18: endpoint inference completed successfully, then evaluation failed at
-// the independent judge boundary. Keep the judge bounded while allowing enough headroom to finish
-// inside the 300s route and preserving the 25s route reserve.
-const JUDGE_CALL_TIMEOUT_MS = 35_000
+// Production telemetry 2026-09-19 shows the independent DeepInfra judge has a long but valid tail:
+// successful responses completed at ~98.5s and ~103.3s, while provider-side failures cluster at
+// ~120s and above. A 35s caller timeout was therefore aborting valid judge work and recycling the
+// artifact as infrastructure failure. Bound the judge at 110s: above the observed valid tail, below
+// the provider-failure band, and still capped by withinDeadline against the route's remaining budget.
+// Scoring prompts, evaluator identity, call count, thresholds, and promotion authority are unchanged.
+const JUDGE_CALL_TIMEOUT_MS = 110_000
 const READY_TIMEOUT_MS = 235_000
 const READY_POLL_MS = 3_000
 const ROUTE_RESERVE_MS = 25_000

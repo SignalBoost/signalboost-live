@@ -173,7 +173,7 @@ def generate_teacher_dataset(envelope: dict[str, Any]) -> None:
         or teacher_id == student_id
         or not HEX40.match(teacher_revision)
         or not HEX40.match(student_revision)
-        or clean(teacher.get("license"), 80).lower() != "apache-2.0"
+        or clean(teacher.get("license"), 80).lower() not in {"apache-2.0", "mit"}
         or clean(student.get("license"), 80).lower() != "apache-2.0"
         or not HEX64.match(prompt_set_hash)
         or envelope.get("trainingRights") != "open_license"

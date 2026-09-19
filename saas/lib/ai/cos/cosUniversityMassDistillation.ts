@@ -1,5 +1,11 @@
+// saas/lib/ai/cos/cosUniversityMassDistillation.ts
 import { createHash } from 'node:crypto'
-import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
+// Type-only: the alias is erased at runtime, so importing this module for its pure packaging helpers
+// (rights classification, batch building, supply analysis) does not drag in the storage layer. The Node
+// test runner cannot resolve '@/...' path aliases, and a value import here made every one of those pure
+// helpers untestable - the suite failed at import before a single assertion ran. The one place that
+// actually needs a client loads it lazily below, where Next resolves the alias normally.
+import type { cosServiceDb as CosServiceDbFactory } from '@/lib/cos-core/storage/supabase'
 import { classifyCosUniversitySubjects, cosUniversitySubjectById, type CosUniversitySubjectId } from './cosUniversity.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_PROFILE = 'cos-university-mass-distillation-v1' as const
@@ -377,7 +383,7 @@ function stringArray(value: unknown): string[] {
 }
 
 async function readMassDistillationCorpus(
-  db: NonNullable<ReturnType<typeof cosServiceDb>>,
+  db: NonNullable<ReturnType<typeof CosServiceDbFactory>>,
   maxRows = MASS_DISTILLATION_CORPUS_MAX_ROWS,
 ) {
   const requestedRows = positiveSafeInteger(maxRows, MASS_DISTILLATION_CORPUS_MAX_ROWS)
@@ -402,7 +408,7 @@ async function readMassDistillationCorpus(
   return rows
 }
 
-async function readExistingMassDistillationBatches(db: NonNullable<ReturnType<typeof cosServiceDb>>) {
+async function readExistingMassDistillationBatches(db: NonNullable<ReturnType<typeof CosServiceDbFactory>>) {
   const rows: any[] = []
   for (let offset = 0; ; offset += MASS_DISTILLATION_EXISTING_BATCH_PAGE_SIZE) {
     const page = await db.from('cos_university_distillation_curriculum_batches')
@@ -424,6 +430,7 @@ export async function prepareUniversityMassDistillationCurriculum(
   now = new Date(),
   throughput: { corpusScanRows?: number; maxBatchesPerSweep?: number } = {},
 ) {
+  const { cosServiceDb } = await import('@/lib/cos-core/storage/supabase')
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
 

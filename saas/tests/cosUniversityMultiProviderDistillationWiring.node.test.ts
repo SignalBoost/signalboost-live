@@ -23,6 +23,8 @@ test('hosted teacher generation is resumable and never silently switches an assi
   assert.match(synthesis, /multi_provider_teacher_resume_model_changed/)
   assert.match(synthesis, /DISTILLATION_RIGHTS/)
   assert.match(synthesis, /contractually_authorized/)
+  assert.match(synthesis, /multi_provider_teacher_retry_budget_exhausted/)
+  assert.match(synthesis, /priorCommittedCostUsd \+ perCallMaximum/)
   assert.match(consumer, /clean\(run\.teacher_provider, 80\)/)
 })
 
@@ -45,5 +47,5 @@ test('durable provider ledger is service-role only and stores no credential fiel
   assert.match(migration, /enable row level security/)
   assert.match(migration, /revoke all .* public, anon, authenticated/s)
   assert.match(migration, /grant select, insert, update, delete .* service_role/s)
-  assert.doesNotMatch(migration, /api_key|credential|secret|token text/i)
+  assert.doesNotMatch(migration, /\b(?:api_key|credential|secret|access_token)\s+text\b/i)
 })

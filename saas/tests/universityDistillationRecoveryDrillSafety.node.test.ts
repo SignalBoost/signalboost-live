@@ -17,6 +17,14 @@ const drillRoute = readFileSync(
   new URL('../app/api/admin/cos-university-recovery-drill/route.ts', import.meta.url),
   'utf8',
 )
+const workerDelivery = readFileSync(
+  new URL('../lib/ai/cos/cosUniversityHfWorkerDelivery.ts', import.meta.url),
+  'utf8',
+)
+const hfWorker = readFileSync(
+  new URL('../scripts/cos-university-hf-worker.py', import.meta.url),
+  'utf8',
+)
 
 test('Supervisor drill repair is bound to an armed exact fixture', () => {
   assert.match(source, /RECOVERY_DRILL_PROFILE/)
@@ -75,4 +83,19 @@ test('database evidence authority admits the Supervisor without removing existin
   assert.match(verifierMigration, /'self_healing_supervisor'/)
   assert.doesNotMatch(verifierMigration, /drop column|drop table/i)
   assert.match(drillRoute, /row\.verifier === 'self_healing_supervisor' \? 'supervisor'/)
+})
+
+
+test('Self-Healing worker preflight recognizes the current governed wrapper without weakening legacy checks', () => {
+  assert.match(workerDelivery, /legacyWorker = source\.includes\('ITMOUNTS_TRAINING_REQUEST'\)/)
+  assert.match(workerDelivery, /wrapperWorker = source\.includes\('BASE_WORKER_FILENAME = "cos-university-hf-worker-base\.py"'\)/)
+  assert.match(workerDelivery, /source\.includes\('BASE_CONTRACT_MARKERS'\)/)
+  assert.match(workerDelivery, /source\.includes\('_load_base_worker'\)/)
+  assert.match(workerDelivery, /source\.includes\('base\.main\(\)'\)/)
+  assert.match(workerDelivery, /source\.includes\('HF_TOKEN'\)/)
+  assert.match(workerDelivery, /const looksLikeWorker = legacyWorker \|\| wrapperWorker/)
+  assert.match(hfWorker, /BASE_WORKER_FILENAME = "cos-university-hf-worker-base\.py"/)
+  assert.match(hfWorker, /BASE_CONTRACT_MARKERS/)
+  assert.match(hfWorker, /def _load_base_worker\(/)
+  assert.match(hfWorker, /return int\(base\.main\(\)\)/)
 })

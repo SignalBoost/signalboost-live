@@ -49,7 +49,7 @@ test('manifest validation detects duplicate IDs, references, dependencies, and m
 })
 
 test('manifest modules remain execution-free and do not import browser, runtime, or provider SDKs', () => {
-  for (const path of ['providerHub', 'campaignStudio', 'integrationsHub', 'videoMaker', 'controlCenter', 'marketingSales', 'pressMedia', 'portableChiefOfStaff', 'browserAgentEcosystem', 'agentOperationsPlatform', 'selfHealingSupervisor', 'aiUniversity', 'aiDistillationEngine']) {
+  for (const path of ['providerHub', 'campaignStudio', 'integrationsHub', 'videoMaker', 'controlCenter', 'marketingSales', 'pressMedia', 'portableChiefOfStaff', 'browserAgentEcosystem', 'agentOperationsPlatform', 'selfHealingSupervisor', 'aiUniversity', 'aiDistillationEngine', 'dynamicPipelineRouter']) {
     const source = hydrateLocalizedSource(readFileSync(new URL(`../lib/portable-products/manifests/${path}.ts`, import.meta.url), 'utf8'))
     assert.doesNotMatch(source, /=>|\bfunction\b|process\.env|from ['"](?:.*(?:playwright|puppeteer|browser-runtime|browser-provider|node:fs|openai|anthropic|supabase|sdk)|.*provider.*sdk)['"]|fetch\s*\(/i)
   }

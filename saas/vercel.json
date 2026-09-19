@@ -86,7 +86,7 @@
     },
     {
       "path": "/api/cron/cos-university-mass-distillation",
-      "schedule": "*/1 * * * *"
+      "schedule": "* * * * *"
     },
     {
       "path": "/api/cron/cos-university-distillation-supervisor",

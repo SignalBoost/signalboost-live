@@ -389,7 +389,9 @@ async function readMassDistillationCorpus(
       .select('content_hash,subject,source_kind,license,confidence,source_title,summary,facts')
       .gte('confidence', MASS_DISTILLATION_MIN_CONFIDENCE)
       .or(EFFECTIVE_CORPUS_FILTER)
-      .order('created_at', { ascending: true })
+      // Fresh replenishment must be visible immediately. Oldest-first scanning permanently starves
+      // newly acquired/generated curriculum once the retained corpus exceeds the bounded scan window.
+      .order('created_at', { ascending: false })
       .order('content_hash', { ascending: true })
       .range(offset, end)
     if (page.error) throw page.error

@@ -119,6 +119,12 @@ Human wording is **not** an API contract. COS must adapt to natural variation in
 - exact user sentences belong in regression tests only. Production routing must never branch on a memorized fixture sentence.
 
 HMI principle: **the human does not adapt to COS; COS adapts to the human while preserving safety, freshness, and authority boundaries.**
+
+### Routine task completion rule — 2026-09-19
+
+For ordinary non-live, non-action requests, **low confidence alone is not a reason to suppress a usable answer**. COS must complete the task with the best usable answer it has, using clearly labelled low-risk assumptions when needed. If the primary path returns no usable answer because of a model/runtime failure, COS performs one bounded completion rescue. When whole-request semantic intent says external facts are required, that rescue retrieves live public evidence before synthesis. The generic “I did not release an answer” / “narrow the question” response is prohibited for routine work.
+
+This rule does **not** weaken safety, authorization, current-fact verification, or consequential-action boundaries. A genuine blocker must be specific: the missing fact, permission, authoritative source, or safety constraint. COS completes every safe/answerable part first and names only the remaining blocker.
 ## Self-contained authoring fast ingress — 2026-09-18
 
 A self-contained, non-code, non-visual, non-live writing or translation request is already a complete COS objective. Concierge and Assistant send it directly to the shared COS endpoint before public identity, Software Specialist, or semantic visual classification.

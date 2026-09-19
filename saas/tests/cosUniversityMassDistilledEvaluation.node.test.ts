@@ -7,6 +7,7 @@ import { normalizeIndependentEvaluatorPayload } from '../lib/ai/cos/cosUniversit
 const evidence = readFileSync(new URL('../lib/ai/cos/cosUniversityFineTuneEvidence.ts', import.meta.url), 'utf8')
 const independent = readFileSync(new URL('../lib/ai/cos/cosUniversityIndependentEvaluator.ts', import.meta.url), 'utf8')
 const runner = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
+const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
 const claimMigration = readFileSync(new URL('../supabase/migrations/20260918005000_mass_distilled_evaluation_claim_14.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
@@ -70,7 +71,8 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   assert.match(runner, /readPinnedHfParquetRows/)
   assert.match(runner, /sha256Raw\(text\)!==itemHash/)
   assert.match(runner, /manifestHash\(observed\)!==input\.expectedManifestHash/)
-  assert.match(runner, /itmounts-mass-distilled-\$\{artifactHash\.slice\(0,12\)/)
+  // Endpoint/model naming moved out of the evaluator into the provisioner; assert it where it lives.
+  assert.match(provision, /itmounts-mass-distilled-\$\{suffix\}/)
   assert.match(runner, /payload\?\.ready===true/)
   assert.match(runner, /const READY_TIMEOUT_MS = 235_000/)
   assert.match(runner, /teacherModelId/)
@@ -79,7 +81,8 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
 
 test('mass evaluator runs exactly four suites with shared endpoint and four judge ceilings', () => {
   assert.match(runner, /const ENDPOINT_CALLS = MASS_EVALUATION_ENDPOINT_CALLS/)
-  assert.match(runner, /const JUDGE_CALLS = 4/)
+  // The judge ceiling is now the shared constant rather than a literal, so approval cannot drift.
+  assert.match(runner, /const JUDGE_CALLS = MASS_EVALUATION_JUDGE_CALLS/)
   assert.match(runner, /name:'holdout'/)
   assert.match(runner, /name:'safety'/)
   assert.match(runner, /name:'transfer'/)

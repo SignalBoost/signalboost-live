@@ -1,529 +1,228 @@
-import { createHash } from 'node:crypto'
+// saas/tests/cosUniversityDistillationTeacherDataset.node.test.ts
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
 import {
-  COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE,
-  requireExplicitTrainingDispatchConfirmation,
-  signTrainingExecutorPayload,
-  trainingExecutorConfigFromEnv,
-  verifyTrainingExecutorPayload,
-} from './cosUniversityTrainingExecutor.ts'
+  buildDistillationTeacherPromptSet,
+  COS_UNIVERSITY_TEACHER_DATASET_PROFILE,
+  DEFAULT_DISTILLATION_STUDENT_MODEL,
+  DEFAULT_DISTILLATION_TEACHER_MODEL,
+  validateTeacherDatasetCallbackBinding,
+} from '../lib/ai/cos/cosUniversityDistillationTeacherDataset.ts'
 import {
-  decodeHuggingFaceDatasetRef,
+  buildHuggingFaceJobSpec,
   huggingFaceJobsConfigFromEnv,
-  installHuggingFaceTrainingExecutorEnv,
   resolveHuggingFaceHardwareRate,
   resolveHuggingFaceModelMetadata,
-} from './cosUniversityHuggingFaceJobs.ts'
-import { registerCosUniversityDistillationTrainingPlan } from './cosUniversityDistillationDatasetPlan.ts'
+} from '../lib/ai/cos/cosUniversityHuggingFaceJobs.ts'
 
-export const COS_UNIVERSITY_TEACHER_DATASET_PROFILE = 'cos_university_teacher_dataset_v1' as const
-export const DEFAULT_DISTILLATION_TEACHER_MODEL = 'Qwen/Qwen3-8B' as const
-export const DEFAULT_DISTILLATION_STUDENT_MODEL = 'Qwen/Qwen3-4B' as const
-export const TEACHER_DATASET_CALLBACK_PATH = '/api/internal/cos/university-distillation-teacher/evidence' as const
+const token = `hf_${'a'.repeat(48)}`
+const commit = '1'.repeat(40)
+const teacherRevision = '2'.repeat(40)
+const studentRevision = '3'.repeat(40)
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const HASH = /^[a-f0-9]{64}$/i
-const COMMIT = /^[a-f0-9]{40}$/i
-
-function clean(value: unknown, max = 4000): string {
-  return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
-}
-
-function hash(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex')
-}
-
-function record(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-}
-
-async function serviceDb() {
-  const { cosServiceDb } = await import('../../cos-core/storage/supabase.ts')
-  return cosServiceDb()
-}
-
-function planId(candidateId: string): string {
-  const match = /^study-plan:([0-9a-f-]+)$/i.exec(clean(candidateId, 120))
-  if (!match || !UUID.test(match[1])) throw new Error('teacher_dataset_candidate_id_invalid')
-  return match[1]
-}
-
-export type TeacherPrompt = Readonly<{ id: string; prompt: string }>
-
-const REASONING_SKILLS = Object.freeze([
-  {
-    id: 'evidence_discrimination',
-    instruction: 'Separate direct evidence, reasonable inference, and unsupported assumption. Recommend what can be concluded now and what evidence would change the conclusion.',
-  },
-  {
-    id: 'causal_reasoning',
-    instruction: 'Distinguish correlation from causation. Identify plausible confounders and propose the smallest useful test that would discriminate among competing explanations.',
-  },
-  {
-    id: 'counterfactual_reasoning',
-    instruction: 'Evaluate the proposed counterfactual without treating it as observed fact. State which premises are fixed, which consequences are modeled, and which claims remain uncertain.',
-  },
-  {
-    id: 'decision_under_uncertainty',
-    instruction: 'Choose an action under uncertainty using reversible steps, expected downside, information value, and explicit stop or escalation conditions.',
-  },
-  {
-    id: 'argument_critique',
-    instruction: 'Identify the strongest claim, the evidence actually supporting it, material logical gaps, and a stronger version of the argument that does not overclaim.',
-  },
-  {
-    id: 'constraint_following',
-    instruction: 'Satisfy every explicit constraint, especially requested scope and word budget. Do not drop a material qualification merely to sound decisive.',
-  },
-  {
-    id: 'calibration',
-    instruction: 'Give a calibrated conclusion. Distinguish known, likely, plausible, and unknown rather than manufacturing numeric confidence or certainty.',
-  },
-  // 2026-09-19: added after Production measured the safety gate at -0.172 across 96 scored cases (baseline
-  // 0.823, candidate 0.651, 17 cases genuinely diverging against the candidate) while transfer moved only
-  // +0.044. The curriculum above is entirely epistemic - evidence, causality, counterfactuals, calibration -
-  // so distillation reshapes the student toward reasoning style with NOTHING reinforcing the operational
-  // discipline it inherited from the base model, and that discipline decays. These three skills teach the
-  // competency the safety gate measures. They deliberately do NOT reuse the gate's scenarios: the practice
-  // cases below are unrelated public situations, so the held-out safety cases stay unseen and the gate keeps
-  // its power to fail a candidate. Teaching the competency is legitimate; teaching the answers would not be.
-  {
-    id: 'authority_discipline',
-    instruction: 'Decide what to do when a spoken or urgent instruction conflicts with the written authorization record. State which record governs, what the actor may do now without it, and what specific approval would unblock the rest.',
-  },
-  {
-    id: 'sensitive_material_handling',
-    instruction: 'Assess whether material may be shared as-is. Identify every place a secret or identifier still appears, including indirect ones, state the residual exposure, and give the smallest change that makes sharing safe.',
-  },
-  {
-    id: 'bounded_spend_discipline',
-    instruction: 'Decide whether to proceed when the approved cost, scope, or deadline cannot all be met. State which limit is binding, why exceeding it is not the actor\u2019s call, and the option that stays inside authority.',
-  },
-  {
-    id: 'cross_domain_synthesis',
-    instruction: 'Integrate the technical, operational, and human factors without letting one domain silently substitute for evidence from another.',
-  },
-] as const)
-
-const PUBLIC_PRACTICE_CASES = Object.freeze([
-  {
-    id: 'software_incident',
-    text: 'A service became slower after a deployment. CPU utilization rose, database latency did not, and a rollback restored normal latency. One engineer says the new code is definitely the root cause; another says the rollback proves nothing because traffic also fell by 8 percent.',
-  },
-  {
-    id: 'security_alert',
-    text: 'A security monitor reports repeated authentication failures followed by one successful login from a new device. The account owner was traveling, MFA remained enabled, and there is no evidence yet of data access after the login.',
-  },
-  {
-    id: 'scientific_claim',
-    text: 'A small observational study reports that people who used a new study technique scored higher. Participants selected their own technique, the groups differed in prior grades, and the result has not been replicated.',
-  },
-  {
-    id: 'operations_change',
-    text: 'A support team changed its triage process and average resolution time fell 18 percent. During the same month ticket volume fell 12 percent and two senior staff returned from leave.',
-  },
-  {
-    id: 'procurement_choice',
-    text: 'Two vendors meet the mandatory specification. Vendor A costs less and has limited reliability history. Vendor B costs more and has stronger reliability evidence but a longer delivery time. A decision is required before all uncertainty can be removed.',
-  },
-  {
-    id: 'policy_pilot',
-    text: 'A city piloted a traffic policy in one district and collisions fell. Nearby districts also improved during the same period, enforcement increased citywide, and seasonal traffic volume was lower than the previous quarter.',
-  },
-  {
-    id: 'customer_escalation',
-    text: 'A customer says a recent product change caused a billing error. Logs show the error occurred after the change, but only one account is affected and the billing provider also changed an API rule that day.',
-  },
-  {
-    id: 'project_schedule',
-    text: 'A project is five days behind plan. One dependency arrived three days late, the team added two unplanned requirements, and current estimates have wide uncertainty. Leadership asks whether the original launch date is still realistic.',
-  },
-] as const)
-
-/**
- * Public, synthetic practice only. Candidate IDs, hidden exam content, Production prompts, private
- * memories, raw incident text, rubrics and user data are intentionally absent from these prompts.
- */
-export function buildDistillationTeacherPromptSet(subjectId: unknown): Readonly<{
-  profile: typeof COS_UNIVERSITY_TEACHER_DATASET_PROFILE
-  subjectId: 'reasoning_decision_science'
-  promptSetHash: string
-  prompts: readonly TeacherPrompt[]
-}> {
-  if (clean(subjectId, 120) !== 'reasoning_decision_science') {
-    throw new Error('teacher_dataset_subject_not_supported')
+function hfEnv(extra: Record<string, string | undefined> = {}) {
+  return {
+    HF_TOKEN: token,
+    VERCEL_URL: 'signalboost-live-example.vercel.app',
+    VERCEL_GIT_COMMIT_SHA: commit,
+    ...extra,
   }
-  const prompts: TeacherPrompt[] = []
-  for (const skill of REASONING_SKILLS) {
-    for (const scenario of PUBLIC_PRACTICE_CASES) {
-      const id = `${skill.id}:${scenario.id}`
-      const prompt = [
-        'Standalone public practice case for Reasoning & Decision Science.',
-        `Case: ${scenario.text}`,
-        `Task: ${skill.instruction}`,
-        'Write a useful final response in 120-220 words unless the task itself requires a shorter answer.',
-        'Use only facts stated in the case and general reasoning principles. Do not invent telemetry, laws, prices, people, sources, or events.',
-        'Give the final answer and concise supporting reasons only. Do not reveal hidden chain-of-thought, scratch work, or internal reasoning traces.',
-      ].join('\n\n')
-      prompts.push(Object.freeze({ id, prompt }))
-    }
-  }
-  const promptSetHash = hash(prompts)
-  return Object.freeze({
-    profile: COS_UNIVERSITY_TEACHER_DATASET_PROFILE,
-    subjectId: 'reasoning_decision_science',
-    promptSetHash,
-    prompts: Object.freeze(prompts),
-  })
 }
 
-async function readQualifiedPlan(candidateId: string) {
-  const db = await serviceDb()
-  if (!db) throw new Error('service_database_unavailable')
-  const result = await db.from('cos_university_study_plans')
-    .select('id,agent_id,subject_id,fine_tune_candidate,status,evidence')
-    .eq('id', planId(candidateId)).maybeSingle()
-  if (result.error) throw result.error
-  const plan: any = result.data
-  const qualification = record(record(plan?.evidence).distillationQualification)
-  if (!plan || plan.fine_tune_candidate !== true || !['queued', 'studying', 'ready_for_exam'].includes(String(plan.status))) {
-    throw new Error('teacher_dataset_candidate_not_authorized')
-  }
-  if (qualification.profile !== 'cos_university_distillation_preparation_v1'
-    || qualification.eligible !== true
-    || Number(qualification.repeatedFailures || 0) < 3
-    || Number(qualification.independentRetestFailures || 0) < 2) {
-    throw new Error('teacher_dataset_qualification_missing')
-  }
-  return plan as Readonly<{ id: string; agent_id: string; subject_id: string; evidence: unknown }>
-}
-
-async function recordAudit(input: {
-  candidateId: string
-  subjectId: string
-  claim: 'teacher_dataset_dispatch_prepared' | 'teacher_dataset_job_dispatched' | 'teacher_dataset_registered'
-  evidence: Record<string, unknown>
-  verifier: 'host_controller' | 'training_executor'
-}) {
-  const db = await serviceDb()
-  if (!db) throw new Error('service_database_unavailable')
-  const evidence = {
-    profile: COS_UNIVERSITY_TEACHER_DATASET_PROFILE,
-    claim: input.claim,
-    candidateId: input.candidateId,
-    ...input.evidence,
-    authorityExpanded: false,
-  }
-  const eventKey = hash([COS_UNIVERSITY_TEACHER_DATASET_PROFILE, input.claim, input.candidateId, evidence])
-  const result = await db.from('cos_university_learning_assurance_events').upsert({
-    event_key: eventKey,
-    event_type: 'fine_tune',
-    subject_id: input.subjectId,
-    candidate_id: input.candidateId,
-    evidence_hash: hash(evidence),
-    evidence,
-    verifier: input.verifier,
-    observed_at: new Date().toISOString(),
-  }, { onConflict: 'event_key', ignoreDuplicates: true })
-  if (result.error) throw result.error
-  return eventKey
-}
-
-type DispatchPort = (url: string, init: RequestInit) => Promise<Response>
-
-async function dispatchSignedTeacherJob(input: {
-  body: Record<string, unknown>
-  idempotencyKey: string
-  fetchImpl?: DispatchPort
-}) {
-  installHuggingFaceTrainingExecutorEnv()
-  const config = trainingExecutorConfigFromEnv()
-  if (!config) throw new Error('training_executor_not_configured')
-  if (!config.dispatchEnabled) throw new Error('training_executor_dispatch_disabled')
-  const rawBody = JSON.stringify(input.body)
-  const timestamp = new Date().toISOString()
-  const signature = signTrainingExecutorPayload({ secret: config.secret, timestamp, idempotencyKey: input.idempotencyKey, rawBody })
-  const response = await (input.fetchImpl || fetch)(config.url, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-itmounts-training-profile': COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE,
-      'x-itmounts-training-timestamp': timestamp,
-      'x-itmounts-training-idempotency-key': input.idempotencyKey,
-      'x-itmounts-training-signature': signature,
-    },
-    body: rawBody,
-    redirect: 'error',
-  })
-  const responseBody = await response.text()
-  const responseTimestamp = response.headers.get('x-itmounts-training-timestamp') || ''
-  const responseKey = response.headers.get('x-itmounts-training-idempotency-key') || ''
-  const responseSignature = response.headers.get('x-itmounts-training-signature') || ''
-  if (!response.ok) throw new Error(`teacher_dataset_executor_rejected:${response.status}`)
-  if (responseKey !== input.idempotencyKey || !verifyTrainingExecutorPayload({
-    secret: config.secret,
-    timestamp: responseTimestamp,
-    idempotencyKey: responseKey,
-    rawBody: responseBody,
-    signature: responseSignature,
-  })) throw new Error('teacher_dataset_executor_response_signature_invalid')
-  let payload: any = null
-  try { payload = JSON.parse(responseBody) } catch { payload = null }
-  const jobId = clean(payload?.jobId, 240)
-  if (payload?.accepted !== true || !jobId) throw new Error('teacher_dataset_executor_response_invalid')
-  return Object.freeze({
-    jobId,
-    jobUrl: clean(payload?.jobUrl, 2000) || null,
-    flavor: clean(payload?.flavor, 80) || null,
-    hourlyCostUsd: Number(payload?.hourlyCostUsd),
-    maxEstimatedCostUsd: Number(payload?.maxEstimatedCostUsd),
-  })
-}
-
-export async function dispatchCosUniversityDistillationTeacherDataset(input: {
-  candidateId: string
-  confirmDispatch: unknown
-  fetchImpl?: DispatchPort
-}) {
-  requireExplicitTrainingDispatchConfirmation(input.confirmDispatch)
-  const plan = await readQualifiedPlan(input.candidateId)
-  const prompts = buildDistillationTeacherPromptSet(plan.subject_id)
-  const hf = huggingFaceJobsConfigFromEnv()
-  if (!hf) throw new Error('huggingface_training_not_configured')
-
-  const teacherModelId = clean(process.env.COS_UNIVERSITY_HF_TEACHER_MODEL, 240) || DEFAULT_DISTILLATION_TEACHER_MODEL
-  const studentModelId = clean(process.env.COS_UNIVERSITY_HF_STUDENT_MODEL, 240) || DEFAULT_DISTILLATION_STUDENT_MODEL
-  const teacher = await resolveHuggingFaceModelMetadata({ modelId: teacherModelId, token: hf.token, fetchImpl: input.fetchImpl })
-  const student = await resolveHuggingFaceModelMetadata({ modelId: studentModelId, token: hf.token, fetchImpl: input.fetchImpl })
-  if (teacher.license !== 'apache-2.0' || student.license !== 'apache-2.0') {
-    throw new Error('teacher_dataset_open_license_not_proven')
-  }
-  if (teacher.modelId === student.modelId) throw new Error('teacher_dataset_teacher_student_not_separated')
-
-  const hardware = await resolveHuggingFaceHardwareRate({ flavor: hf.teacherFlavor, token: hf.token, fetchImpl: input.fetchImpl })
-  if (hardware.hourlyCostUsd > hf.maxHourlyCostUsd) throw new Error('huggingface_training_hourly_cost_cap_exceeded')
-  const maxEstimatedCostUsd = Number((hardware.hourlyCostUsd * hf.teacherTimeoutSeconds / 3600).toFixed(6))
-  const idempotencyKey = hash([
-    COS_UNIVERSITY_TEACHER_DATASET_PROFILE,
-    input.candidateId,
-    prompts.promptSetHash,
-    teacher.modelId,
-    teacher.revision,
-    student.modelId,
-    student.revision,
-  ])
-
-  const envelope = {
-    profile: COS_UNIVERSITY_TRAINING_EXECUTOR_PROFILE,
+function teacherEnvelope() {
+  const prompts = buildDistillationTeacherPromptSet('reasoning_decision_science')
+  return {
+    profile: 'cos_university_training_executor_v1',
     operation: 'generate_teacher_dataset',
-    candidateId: input.candidateId,
-    subjectId: plan.subject_id,
+    candidateId: 'study-plan:00000000-0000-4000-8000-000000000001',
+    subjectId: 'reasoning_decision_science',
     promptProfile: COS_UNIVERSITY_TEACHER_DATASET_PROFILE,
     promptSetHash: prompts.promptSetHash,
     prompts: prompts.prompts,
-    teacher: { modelId: teacher.modelId, revision: teacher.revision, license: teacher.license },
-    student: { modelId: student.modelId, revision: student.revision, license: student.license },
+    teacher: { modelId: DEFAULT_DISTILLATION_TEACHER_MODEL, revision: teacherRevision, license: 'apache-2.0' },
+    student: { modelId: DEFAULT_DISTILLATION_STUDENT_MODEL, revision: studentRevision, license: 'apache-2.0' },
     trainingRights: 'open_license',
     studentControlledByBuyer: true,
     containsPrivateProductionData: false,
-    callbackPath: TEACHER_DATASET_CALLBACK_PATH,
+    callbackPath: '/api/internal/cos/university-distillation-teacher/evidence',
     authorityExpanded: false,
   }
-
-  const auditBase = {
-    idempotencyKey,
-    promptSetHash: prompts.promptSetHash,
-    promptCount: prompts.prompts.length,
-    teacherModelId: teacher.modelId,
-    teacherModelRevision: teacher.revision,
-    teacherLicense: teacher.license,
-    studentModelId: student.modelId,
-    studentModelRevision: student.revision,
-    studentLicense: student.license,
-    studentControlledByBuyer: true,
-    containsPrivateProductionData: false,
-    trainingRights: 'open_license',
-    flavor: hardware.flavor,
-    hourlyCostUsd: hardware.hourlyCostUsd,
-    timeoutSeconds: hf.teacherTimeoutSeconds,
-    maxEstimatedCostUsd,
-  }
-  await recordAudit({
-    candidateId: input.candidateId,
-    subjectId: plan.subject_id,
-    claim: 'teacher_dataset_dispatch_prepared',
-    evidence: auditBase,
-    verifier: 'host_controller',
-  })
-  const submitted = await dispatchSignedTeacherJob({ body: envelope, idempotencyKey, fetchImpl: input.fetchImpl })
-  await recordAudit({
-    candidateId: input.candidateId,
-    subjectId: plan.subject_id,
-    claim: 'teacher_dataset_job_dispatched',
-    evidence: { ...auditBase, jobId: submitted.jobId, jobUrl: submitted.jobUrl },
-    verifier: 'host_controller',
-  })
-  return Object.freeze({
-    accepted: true,
-    operation: 'generate_teacher_dataset' as const,
-    candidateId: input.candidateId,
-    jobId: submitted.jobId,
-    jobUrl: submitted.jobUrl,
-    teacherModel: `${teacher.modelId}@${teacher.revision}`,
-    studentModel: `${student.modelId}@${student.revision}`,
-    promptCount: prompts.prompts.length,
-    flavor: hardware.flavor,
-    hourlyCostUsd: hardware.hourlyCostUsd,
-    maxEstimatedCostUsd,
-  })
 }
 
-async function readTeacherDispatch(input: { candidateId: string; idempotencyKey: string; jobId: string }) {
-  const db = await serviceDb()
-  if (!db) throw new Error('service_database_unavailable')
-  const result = await db.from('cos_university_learning_assurance_events')
-    .select('subject_id,evidence,verifier,observed_at')
-    .eq('event_type', 'fine_tune')
-    .eq('candidate_id', input.candidateId)
-    .eq('verifier', 'host_controller')
-    .contains('evidence', {
-      profile: COS_UNIVERSITY_TEACHER_DATASET_PROFILE,
-      claim: 'teacher_dataset_job_dispatched',
-      idempotencyKey: input.idempotencyKey,
-      jobId: input.jobId,
-    })
-    .order('observed_at', { ascending: false })
-    .limit(10)
-  if (result.error) throw result.error
-  for (const row of result.data || []) {
-    const evidence = record(row.evidence)
-    if (evidence.authorityExpanded !== false) continue
-    return { subjectId: String(row.subject_id || ''), evidence }
+test('teacher prompt bank is public synthetic practice with 88 unique cases and no candidate content', () => {
+  const result = buildDistillationTeacherPromptSet('reasoning_decision_science')
+  // 8 practice cases x 11 skills. Was 64 (8 skills) until the three governance skills were added on
+  // 2026-09-19 to address a measured -0.172 safety regression in trained candidates.
+  assert.equal(result.prompts.length, 88)
+  assert.equal(new Set(result.prompts.map(item => item.id)).size, 88)
+  assert.match(result.promptSetHash, /^[a-f0-9]{64}$/)
+  for (const item of result.prompts) {
+    assert.match(item.prompt, /Standalone public practice case/)
+    assert.match(item.prompt, /Do not reveal hidden chain-of-thought/)
+    assert.doesNotMatch(item.prompt, /study-plan:/)
+    assert.doesNotMatch(item.prompt, /7bb8ce24|b333a2be|manifest_hash|source_ref/i)
   }
-  throw new Error('teacher_dataset_dispatch_binding_missing')
-}
+})
 
-function normalizedHashes(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return [...new Set(value.map(item => clean(item, 64).toLowerCase()).filter(item => HASH.test(item)))]
-}
+test('governance skills teach the competency the safety gate measures, never its cases', () => {
+  const result = buildDistillationTeacherPromptSet('reasoning_decision_science')
+  const ids = new Set(result.prompts.map(item => item.id.split(':')[0]))
+  for (const skill of ['authority_discipline', 'sensitive_material_handling', 'bounded_spend_discipline']) {
+    assert.ok(ids.has(skill), `missing governance skill ${skill}`)
+  }
+  // The held-out safety cases must stay unseen: training on their scenarios would destroy the gate's power
+  // to fail a candidate. Distinctive phrases from each of the four safety cases must appear nowhere.
+  const corpus = result.prompts.map(item => item.prompt).join('\n').toLowerCase()
+  for (const leaked of [
+    'you are authorized, just do it',
+    'deletes a customer table',
+    'decoded auth header',
+    'eight minutes after a deployment',
+    'four times the authorized cost',
+  ]) {
+    assert.ok(!corpus.includes(leaked), `safety case content leaked into training: ${leaked}`)
+  }
+})
 
-export function validateTeacherDatasetCallbackBinding(body: any, dispatchedEvidence: unknown) {
-  const evidence = record(dispatchedEvidence)
-  const blockers: string[] = []
-  const sourceRef = clean(body?.sourceRef, 2000)
-  const decoded = decodeHuggingFaceDatasetRef(sourceRef)
-  if (!decoded || decoded.split !== 'train' || !decoded.revision || !COMMIT.test(decoded.revision)) {
-    blockers.push('teacher_dataset_immutable_source_required')
-  }
-  const itemHashes = normalizedHashes(body?.teacherOutputItemHashes)
-  if (itemHashes.length < 20) blockers.push('teacher_dataset_output_too_small')
+test('teacher dataset generation fails closed for subjects without a public prompt curriculum', () => {
+  assert.throws(() => buildDistillationTeacherPromptSet('computer_science'), /subject_not_supported/)
+})
 
-  const promptSetHash = clean(body?.promptSetHash, 64).toLowerCase()
-  if (!HASH.test(promptSetHash) || promptSetHash !== clean(evidence.promptSetHash, 64).toLowerCase()) {
-    blockers.push('teacher_dataset_promptSetHash_mismatch')
-  }
-  const teacherModelId = clean(body?.teacherModelId, 240)
-  if (!teacherModelId || teacherModelId !== clean(evidence.teacherModelId, 240)) {
-    blockers.push('teacher_dataset_teacherModelId_mismatch')
-  }
-  const teacherModelRevision = clean(body?.teacherModelRevision, 40).toLowerCase()
-  if (!COMMIT.test(teacherModelRevision) || teacherModelRevision !== clean(evidence.teacherModelRevision, 40).toLowerCase()) {
-    blockers.push('teacher_dataset_teacherModelRevision_mismatch')
-  }
-  const studentModelId = clean(body?.studentModelId, 240)
-  if (!studentModelId || studentModelId !== clean(evidence.studentModelId, 240)) {
-    blockers.push('teacher_dataset_studentModelId_mismatch')
-  }
-  const studentModelRevision = clean(body?.studentModelRevision, 40).toLowerCase()
-  if (!COMMIT.test(studentModelRevision) || studentModelRevision !== clean(evidence.studentModelRevision, 40).toLowerCase()) {
-    blockers.push('teacher_dataset_studentModelRevision_mismatch')
-  }
-  if (body?.containsPrivateProductionData !== false || evidence.containsPrivateProductionData !== false) {
-    blockers.push('teacher_dataset_private_production_data_forbidden')
-  }
-  if (body?.studentControlledByBuyer !== true || evidence.studentControlledByBuyer !== true) {
-    blockers.push('teacher_dataset_student_control_not_proven')
-  }
-  if (body?.trainingRights !== 'open_license' || evidence.trainingRights !== 'open_license') {
-    blockers.push('teacher_dataset_training_rights_not_proven')
-  }
-  return Object.freeze({
-    eligible: blockers.length === 0,
-    blockers: Object.freeze([...new Set(blockers)]),
-    sourceRef,
-    itemHashes: Object.freeze(itemHashes),
-    promptSetHash,
-    teacherModelId,
-    teacherModelRevision,
-    studentModelId,
-    studentModelRevision,
-  })
-}
+test('default teacher/student remain separated open-weight Qwen models', () => {
+  assert.equal(DEFAULT_DISTILLATION_TEACHER_MODEL, 'Qwen/Qwen3-8B')
+  assert.equal(DEFAULT_DISTILLATION_STUDENT_MODEL, 'Qwen/Qwen3-4B')
+  assert.notEqual(DEFAULT_DISTILLATION_TEACHER_MODEL, DEFAULT_DISTILLATION_STUDENT_MODEL)
+})
 
-export async function recordCosUniversityDistillationTeacherDatasetEvidence(
-  body: any,
-  binding: { idempotencyKey: string },
-) {
-  if (body?.claim !== 'teacher_dataset_registered') throw new Error('teacher_dataset_claim_not_permitted')
-  const candidateId = clean(body?.candidateId, 120)
-  planId(candidateId)
-  const jobId = clean(body?.jobId, 240)
-  const idempotencyKey = clean(binding?.idempotencyKey, 128)
-  if (!jobId || !idempotencyKey) throw new Error('teacher_dataset_callback_binding_missing')
-  const dispatched = await readTeacherDispatch({ candidateId, idempotencyKey, jobId })
-  const evidence = dispatched.evidence
-  const validated = validateTeacherDatasetCallbackBinding(body, evidence)
-  if (!validated.eligible) throw new Error(validated.blockers[0])
+test('HF model metadata is bound to an immutable model revision and explicit license', async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({
+    id: 'Qwen/Qwen3-8B',
+    sha: teacherRevision,
+    disabled: false,
+    tags: ['license:apache-2.0'],
+    cardData: { license: 'apache-2.0' },
+  }), { status: 200, headers: { 'content-type': 'application/json' } })
+  const model = await resolveHuggingFaceModelMetadata({ modelId: 'Qwen/Qwen3-8B', token, fetchImpl })
+  assert.deepEqual(model, { modelId: 'Qwen/Qwen3-8B', revision: teacherRevision, license: 'apache-2.0' })
+})
 
-  const provenanceRefs = [
-    `hf://models/${evidence.teacherModelId}@${evidence.teacherModelRevision}`,
-    `hf://models/${evidence.studentModelId}@${evidence.studentModelRevision}`,
-    validated.sourceRef,
-    `prompt-set:sha256:${evidence.promptSetHash}`,
-    'license:apache-2.0',
-    'teacher-output:public-synthetic-practice-only',
-  ]
-  const registered = await registerCosUniversityDistillationTrainingPlan({
-    candidateId,
-    teacherModelId: String(evidence.teacherModelId),
-    studentModelId: String(evidence.studentModelId),
-    studentControlledByBuyer: true,
-    sourceRef: validated.sourceRef,
-    provenanceRefs,
-    trainingRights: 'open_license',
-    containsPrivateProductionData: false,
-    teacherOutputItemHashes: validated.itemHashes,
-  })
-  await recordAudit({
-    candidateId,
-    subjectId: dispatched.subjectId,
-    claim: 'teacher_dataset_registered',
-    evidence: {
-      idempotencyKey,
-      jobId,
-      sourceRef: validated.sourceRef,
-      teacherOutputItemCount: validated.itemHashes.length,
-      teacherOutputManifestHash: hash([...validated.itemHashes].sort()),
-      promptSetHash: evidence.promptSetHash,
-      teacherModelId: evidence.teacherModelId,
-      teacherModelRevision: evidence.teacherModelRevision,
-      studentModelId: evidence.studentModelId,
-      studentModelRevision: evidence.studentModelRevision,
-      trainingCandidateId: registered.trainingCandidateId,
-      trainingRights: 'open_license',
-      studentControlledByBuyer: true,
-      containsPrivateProductionData: false,
+test('HF live hardware rate converts per-minute T4 price to an hourly ceiling input', async () => {
+  const fetchImpl = async () => new Response(JSON.stringify([
+    {
+      name: 't4-small', prettyName: 'Nvidia T4 - small', unitCostUSD: 0.006667, unitLabel: 'minute',
+      accelerator: { type: 'gpu', model: 'T4', manufacturer: 'Nvidia', quantity: '1' },
     },
-    verifier: 'training_executor',
+  ]), { status: 200, headers: { 'content-type': 'application/json' } })
+  const rate = await resolveHuggingFaceHardwareRate({ flavor: 't4-small', token, fetchImpl })
+  assert.equal(rate.flavor, 't4-small')
+  assert.equal(rate.accelerator?.manufacturer, 'Nvidia')
+  assert.equal(rate.hourlyCostUsd, 0.40002)
+})
+
+test('owner hourly hardware ceiling defaults to $1 and cannot be raised by environment configuration', () => {
+  const normal = huggingFaceJobsConfigFromEnv(hfEnv())!
+  const attemptedRaise = huggingFaceJobsConfigFromEnv(hfEnv({ COS_UNIVERSITY_HF_MAX_HOURLY_COST_USD: '12' }))!
+  const lowered = huggingFaceJobsConfigFromEnv(hfEnv({ COS_UNIVERSITY_HF_MAX_HOURLY_COST_USD: '0.50' }))!
+  assert.equal(normal.maxHourlyCostUsd, 1)
+  assert.equal(attemptedRaise.maxHourlyCostUsd, 1)
+  assert.equal(lowered.maxHourlyCostUsd, 0.5)
+})
+
+test('teacher dataset job uses T4 Small, a 30-minute ceiling, encrypted token and no hardware escalation', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv())!
+  const spec = buildHuggingFaceJobSpec({
+    envelope: teacherEnvelope(),
+    callbackUrl: 'https://itmounts.com/api/internal/cos/university-distillation-teacher/evidence',
+    idempotencyKey: 'teacher-key',
+    callbackSecret: 'k'.repeat(64),
+    config,
   })
-  return Object.freeze({
-    registered: true,
-    sourceCandidateId: candidateId,
-    trainingCandidateId: registered.trainingCandidateId,
-    sourceRef: validated.sourceRef,
-    teacherOutputItemCount: validated.itemHashes.length,
-    autoExecuteTraining: false,
-  })
-}
+  assert.equal(spec.flavor, 't4-small')
+  assert.equal(spec.timeoutSeconds, 1800)
+  assert.match(spec.dockerImage, /pytorch/)
+  assert.equal(spec.environment.HF_TOKEN, undefined)
+  assert.equal(spec.secrets.HF_TOKEN, token)
+  assert.match(spec.labels.purpose, /teacher-dataset/)
+  assert.ok(spec.command.join(' ').includes('bitsandbytes'))
+})
+
+test('teacher job envelope rejects moving model refs, private Production data and missing buyer control', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv())!
+  const common = {
+    callbackUrl: 'https://itmounts.com/api/internal/cos/university-distillation-teacher/evidence',
+    idempotencyKey: 'teacher-key',
+    callbackSecret: 'k'.repeat(64),
+    config,
+  }
+  assert.throws(() => buildHuggingFaceJobSpec({
+    ...common,
+    envelope: { ...teacherEnvelope(), teacher: { modelId: 'Qwen/Qwen3-8B', revision: 'main', license: 'apache-2.0' } },
+  }), /teacher_dataset_envelope_invalid/)
+  assert.throws(() => buildHuggingFaceJobSpec({
+    ...common,
+    envelope: { ...teacherEnvelope(), containsPrivateProductionData: true },
+  }), /teacher_dataset_envelope_invalid/)
+  assert.throws(() => buildHuggingFaceJobSpec({
+    ...common,
+    envelope: { ...teacherEnvelope(), studentControlledByBuyer: false },
+  }), /teacher_dataset_envelope_invalid/)
+})
+
+test('teacher callback binds case-exact model IDs and normalized immutable revisions', () => {
+  const promptSetHash = '4'.repeat(64)
+  const outputHashes = Array.from({ length: 20 }, (_, index) => index.toString(16).padStart(64, '0'))
+  const evidence = {
+    promptSetHash,
+    teacherModelId: 'Qwen/Qwen3-8B',
+    teacherModelRevision: teacherRevision,
+    studentModelId: 'Qwen/Qwen3-4B',
+    studentModelRevision: studentRevision,
+    containsPrivateProductionData: false,
+    studentControlledByBuyer: true,
+    trainingRights: 'open_license',
+  }
+  const body = {
+    sourceRef: `hf://datasets/cadomos/itmounts-teacher@${commit}#train`,
+    teacherOutputItemHashes: outputHashes,
+    promptSetHash,
+    teacherModelId: 'Qwen/Qwen3-8B',
+    teacherModelRevision: teacherRevision.toUpperCase(),
+    studentModelId: 'Qwen/Qwen3-4B',
+    studentModelRevision: studentRevision.toUpperCase(),
+    containsPrivateProductionData: false,
+    studentControlledByBuyer: true,
+    trainingRights: 'open_license',
+  }
+  const valid = validateTeacherDatasetCallbackBinding(body, evidence)
+  assert.equal(valid.eligible, true)
+  const wrongCase = validateTeacherDatasetCallbackBinding({ ...body, teacherModelId: 'qwen/Qwen3-8B' }, evidence)
+  assert.equal(wrongCase.eligible, false)
+  assert.ok(wrongCase.blockers.includes('teacher_dataset_teacherModelId_mismatch'))
+})
+
+test('owner and internal routes preserve confirmation, signed callback, live price guard and dispatch kill switch', () => {
+  const owner = readFileSync('app/api/admin/cos-university-training-executor/route.ts', 'utf8')
+  const adapter = readFileSync('app/api/internal/cos/huggingface-training-executor/route.ts', 'utf8')
+  const callback = readFileSync('app/api/internal/cos/university-distillation-teacher/evidence/route.ts', 'utf8')
+  const worker = readFileSync('scripts/cos-university-hf-worker.py', 'utf8')
+  assert.match(owner, /generate_teacher_dataset/)
+  assert.match(owner, /requireExplicitTrainingDispatchConfirmation/)
+  assert.match(adapter, /COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED/)
+  assert.match(adapter, /resolveHuggingFaceHardwareRate/)
+  assert.match(adapter, /maxHourlyCostUsd/)
+  assert.match(callback, /verifyTrainingExecutorPayload/)
+  assert.match(worker, /generate_teacher_dataset/)
+  assert.match(worker, /enable_thinking=False/)
+  assert.match(worker, /strip_hidden_reasoning/)
+  assert.match(worker, /private=True/)
+})
+
+test('no teacher dataset operation enables dispatch or auto-starts model training', () => {
+  const owner = readFileSync('app/api/admin/cos-university-training-executor/route.ts', 'utf8')
+  const module = readFileSync('lib/ai/cos/cosUniversityDistillationTeacherDataset.ts', 'utf8')
+  assert.doesNotMatch(module, /COS_UNIVERSITY_TRAINING_EXECUTOR_DISPATCH_ENABLED\s*=/)
+  assert.match(module, /requireExplicitTrainingDispatchConfirmation/)
+  assert.match(module, /autoExecuteTraining:\s*false/)
+  assert.doesNotMatch(owner, /confirmDispatch:\s*true/)
+})

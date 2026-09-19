@@ -5,8 +5,8 @@ import test from 'node:test'
 
 const worker = readFileSync(new URL('../scripts/cos-university-hf-worker.py', import.meta.url), 'utf8')
 
-test('training profile v2 increases optimizer exposure only for small datasets', () => {
-  assert.match(worker, /TRAINING_PROFILE = "cos_university_small_batch_training_v2"/)
+test('training profile v3 increases optimizer exposure only for small datasets', () => {
+  assert.match(worker, /TRAINING_PROFILE = "cos_university_small_batch_training_v3"/)
   assert.match(worker, /TRAINING_SMALL_MAX_ITEMS = 64/)
   assert.match(worker, /TRAINING_MEDIUM_MAX_ITEMS = 128/)
   assert.match(worker, /TRAINING_SMALL_EPOCHS = 3\.0/)
@@ -16,7 +16,7 @@ test('training profile v2 increases optimizer exposure only for small datasets',
   assert.match(worker, /TRAINING_DEFAULT_GRADIENT_ACCUMULATION = 8/)
 })
 
-test('training profile v2 lowers learning rate and adds bounded scheduler controls', () => {
+test('training profile v3 lowers learning rate and adds bounded scheduler controls', () => {
   assert.match(worker, /TRAINING_LEARNING_RATE = 1e-4/)
   assert.match(worker, /TRAINING_WARMUP_RATIO = 0\.10/)
   assert.match(worker, /TRAINING_LR_SCHEDULER = "cosine"/)
@@ -33,6 +33,7 @@ test('v2 preserves the proven LoRA shape so the experiment isolates optimizer ex
   assert.match(worker, /"loraAlpha": 32/)
   assert.match(worker, /"loraDropout": 0\.05/)
   assert.match(worker, /"targetModules": "all-linear"/)
+  assert.match(worker, /TRAINING_INPUT_PROFILE = "student_chat_template_v1"/)
 })
 
 test('the exact training recipe becomes immutable artifact evidence', () => {

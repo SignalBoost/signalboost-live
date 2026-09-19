@@ -165,6 +165,34 @@ test('consumer bypasses the single HF teacher job only after hosted teacher comp
   assert.match(migration, /unique \(run_id, prompt_id\)/)
 })
 
+test('hosted teacher preparation restores prompt-response structure without changing governed hashes', () => {
+  const consumer = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassDistillationConsumer.ts'), 'utf8')
+  const base = fs.readFileSync(path.join(import.meta.dirname, '../scripts/cos-university-hf-worker-base.py'), 'utf8')
+  const worker = fs.readFileSync(path.join(import.meta.dirname, '../scripts/cos-university-hf-worker.py'), 'utf8')
+
+  assert.match(consumer, /const promptSet = await buildTeacherPrompts\(run\.subject_id, sourceHashes\)/)
+  assert.match(consumer, /mass_distillation_hosted_prompt_set_mismatch/)
+  assert.match(consumer, /promptById/)
+  assert.match(consumer, /text: response/)
+  assert.match(consumer, /role: 'user'/)
+  assert.match(consumer, /role: 'assistant'/)
+
+  assert.match(base, /"text": text/)
+  assert.match(base, /"item_hash": digest/)
+  assert.match(base, /"prompt": prompt/)
+  assert.match(base, /"response": response/)
+  assert.match(base, /ordered = sorted\(by_hash\.items\(\), key=lambda item: item\[0\]\)/)
+
+  assert.match(worker, /TRAINING_INPUT_PROFILE = "student_chat_template_v1"/)
+  assert.match(worker, /tokenizer\.apply_chat_template/)
+  assert.match(worker, /add_generation_prompt=False/)
+  assert.match(worker, /enable_thinking=False/)
+  assert.match(worker, /dataset_text_field="training_text"/)
+  assert.match(worker, /train_dataset=training_for_trainer/)
+  assert.match(worker, /"structuredItems"/)
+  assert.match(worker, /"fallbackItems"/)
+  assert.doesNotMatch(worker, /safety-attribution-discriminating|safety-spend-deadline|transfer-simpson/)
+})
 test('production config activates the bounded parallel teacher stage without embedding credentials', () => {
   const vercel = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../vercel.json'), 'utf8'))
   assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED, 'true')

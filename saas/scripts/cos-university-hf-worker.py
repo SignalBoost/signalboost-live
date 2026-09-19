@@ -24,7 +24,8 @@ TEACHER_MIN_DATASET_ITEMS = 20
 TEACHER_MAX_NEW_TOKENS = 384
 TEACHER_RETRY_MAX_NEW_TOKENS = 512
 
-TRAINING_PROFILE = "cos_university_small_batch_training_v2"
+TRAINING_PROFILE = "cos_university_small_batch_training_v3"
+TRAINING_INPUT_PROFILE = "student_chat_template_v1"
 TRAINING_SMALL_MAX_ITEMS = 64
 TRAINING_MEDIUM_MAX_ITEMS = 128
 TRAINING_SMALL_EPOCHS = 3.0
@@ -419,6 +420,7 @@ def _training_recipe(training_items: int) -> dict[str, Any]:
         "loraAlpha": 32,
         "loraDropout": 0.05,
         "targetModules": "all-linear",
+        "inputProfile": TRAINING_INPUT_PROFILE,
     }
 
 
@@ -444,6 +446,40 @@ def _warmup_arguments(config_cls, recipe: dict[str, Any]) -> dict[str, Any]:
     return {"warmup_steps": max(1, math.ceil(total_steps * ratio)) if ratio > 0 else 0}
 
 
+def _student_training_text(base, tokenizer, row: dict[str, Any]) -> tuple[str, bool]:
+    """Render structured SFT examples with the student model's own chat contract.
+
+    Dataset identity remains row["text"]; this creates only the model-facing representation.
+    Old prepared datasets without structure fall back to their original text.
+    """
+    prompt = base.clean(row.get("prompt"), 100_000)
+    response = base.clean(row.get("response"), 100_000)
+    if prompt and response:
+        messages = [
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": response},
+        ]
+        try:
+            rendered = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=False,
+                enable_thinking=False,
+            )
+        except TypeError:
+            rendered = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=False,
+            )
+        rendered = str(rendered or "").strip()
+        if rendered:
+            return rendered, True
+    fallback = base.clean(row.get("text"), 500_000)
+    if not fallback:
+        raise RuntimeError("worker_training_text_missing")
+    return fallback, False
+
 def train_student(base, envelope: dict[str, Any]) -> None:
     import torch
     from huggingface_hub import HfApi
@@ -451,6 +487,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
     from trl import SFTConfig, SFTTrainer
 
+    from datasets import Dataset
     token = os.environ["HF_TOKEN"]
     revision = envelope.get("revision") if isinstance(envelope.get("revision"), dict) else {}
     base_model = base.clean(revision.get("baseModel"), 240)
@@ -482,6 +519,20 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     tokenizer = AutoTokenizer.from_pretrained(base_model, token=token, use_fast=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
+
+    rendered_training: list[dict[str, str]] = []
+    structured_items = 0
+    for row in training:
+        training_text, structured = _student_training_text(base, tokenizer, dict(row))
+        rendered_training.append({"training_text": training_text})
+        if structured:
+            structured_items += 1
+    if not rendered_training:
+        raise RuntimeError("worker_training_dataset_empty")
+    training_for_trainer = Dataset.from_list(rendered_training)
+    recipe["structuredItems"] = structured_items
+    recipe["fallbackItems"] = len(rendered_training) - structured_items
+
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
         token=token,
@@ -507,7 +558,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
         bf16=use_bf16,
         fp16=not use_bf16,
         gradient_checkpointing=True,
-        dataset_text_field="text",
+        dataset_text_field="training_text",
         max_length=recipe["maxLength"],
     )
     peft_config = LoraConfig(
@@ -521,7 +572,7 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     trainer = SFTTrainer(
         model=model,
         args=args,
-        train_dataset=training,
+        train_dataset=training_for_trainer,
         processing_class=tokenizer,
         peft_config=peft_config,
     )

@@ -343,14 +343,37 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
         source = load_dataset(repo_id, revision=revision, split=split, token=token)
         source = source.select(range(min(len(source), max_items)))
 
-    by_hash: dict[str, str] = {}
+    # Preserve prompt/response structure alongside immutable source text. Hashes and partition
+    # manifests continue to bind only text, so structure cannot rewrite dataset identity or move
+    # an item between train and holdout.
+    by_hash: dict[str, dict[str, Any]] = {}
     for raw_row in source:
         if not isinstance(raw_row, dict):
             continue
         text = row_text(raw_row)
         if not text:
             continue
-        by_hash.setdefault(sha256(text), text)
+        digest = sha256(text)
+        prompt = clean(raw_row.get("prompt"), 100_000)
+        response = clean(raw_row.get("response"), 100_000)
+        if not prompt or not response:
+            messages = raw_row.get("messages")
+            if isinstance(messages, list):
+                for message in messages:
+                    if not isinstance(message, dict):
+                        continue
+                    role = clean(message.get("role"), 40).lower()
+                    content = clean(message.get("content"), 100_000)
+                    if role == "user" and content and not prompt:
+                        prompt = content
+                    elif role == "assistant" and content:
+                        response = content
+        by_hash.setdefault(digest, {
+            "text": text,
+            "item_hash": digest,
+            "prompt": prompt,
+            "response": response,
+        })
     if len(by_hash) < 20:
         raise RuntimeError("worker_dataset_too_small")
 
@@ -361,8 +384,8 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
     if not training_pairs or not holdout_pairs:
         raise RuntimeError("worker_partition_invalid")
 
-    training = Dataset.from_list([{"text": text, "item_hash": digest} for digest, text in training_pairs])
-    holdout = Dataset.from_list([{"text": text, "item_hash": digest} for digest, text in holdout_pairs])
+    training = Dataset.from_list([row for _, row in training_pairs])
+    holdout = Dataset.from_list([row for _, row in holdout_pairs])
 
     api = HfApi(token=token)
     namespace = api.whoami()["name"]

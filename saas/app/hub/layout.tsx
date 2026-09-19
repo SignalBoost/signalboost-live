@@ -4,13 +4,13 @@
 
 import { redirect } from 'next/navigation'
 import { getAccess } from '@/lib/auth/access'
-import { LocalizedText } from '@/components/i18n/LocalizedText'
+import { AuthUnavailableNotice } from '@/components/auth/AuthUnavailableNotice'
 
 export default async function HubLayout({ children }: { children: React.ReactNode }) {
   const access = await getAccess()
 
   if (access.authState === 'unavailable') {
-    return <main role="alert"><LocalizedText fallback="Authentication is temporarily unavailable. Please reload in a moment." /></main>
+    return <main role="alert"><AuthUnavailableNotice /></main>
   }
   if (access.role === 'guest') redirect('/')
   if (!access.isAdmin) redirect('/dashboard')

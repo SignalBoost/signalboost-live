@@ -4129,6 +4129,7 @@
     "send": "Abrir solicitação de e-mail"
   },
   "auth": {
+    "temporarilyUnavailable": "A autenticação está temporariamente indisponível. Recarregue a página em instantes.",
     "errorNoName": "Por favor, digite seu nome.",
     "passwordPlaceholder": "Senha",
     "errorEmailExists": "Já existe uma conta com este e-mail. Em vez disso, faça login.",

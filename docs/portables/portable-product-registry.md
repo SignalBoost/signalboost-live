@@ -24,6 +24,8 @@ A descriptor-only compatibility target is not a live product. It can describe a 
 
 | ID | Name | Status | Public | Licensable |
 | --- | --- | --- | --- | --- |
+| provider-hub | Provider Connection Hub Software | preview | yes | yes |
+| dynamic-pipeline-router | Dynamic Pipeline Router Software | preview | yes | no |
 | campaign-studio | Campaign Studio | live | yes | yes |
 | integrations-hub | Integrations Hub | live | yes | yes |
 | video-maker | Video Maker | live | yes | yes |

@@ -136,6 +136,8 @@ The canonical Universal Provider Framework under `saas/lib/provider-framework/` 
 
 These capabilities must not introduce automatic approval, unbounded spend, secret exposure, silent provider mutation, or production execution outside existing governance.
 
+Dynamic workload selection is implemented as a separate `dynamic-pipeline-router` portable. Provider Hub supplies bounded capability/health metadata; it does not become the scheduler or lease manager.
+
 ## Consumers
 
 Provider Hub is a shared dependency for portables that require external resources, including:

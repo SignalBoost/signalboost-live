@@ -87,6 +87,10 @@
       "aiDistillation": {
         "name": "AI Distillation Engine Software",
         "desc": "Turn an approved curriculum into governed training batches, evaluated model artifacts, and rollback-ready evidence."
+      },
+      "dynamicRouter": {
+        "name": "Dynamic Pipeline Router Software",
+        "desc": "Routes incoming work to compatible healthy capacity instead of waiting for one fixed provider or pipeline."
       }
     },
     "portableMaturity": {
@@ -202,6 +206,10 @@
       "aiDistillation": {
         "name": "Software de Motor de Destilación de IA",
         "desc": "Convierte un currículo aprobado en lotes de entrenamiento gobernados, artefactos de modelo evaluados y evidencia lista para reversión."
+      },
+      "dynamicRouter": {
+        "name": "Software de Enrutador Dinámico de Pipelines",
+        "desc": "Dirige el trabajo entrante a capacidad compatible y saludable en lugar de esperar a un proveedor o pipeline fijo."
       }
     },
     "portableMaturity": {
@@ -317,6 +325,10 @@
       "aiDistillation": {
         "name": "Software de Motor de Destilação de IA",
         "desc": "Transforma um currículo aprovado em lotes de treinamento governados, artefatos de modelo avaliados e evidências prontas para reversão."
+      },
+      "dynamicRouter": {
+        "name": "Software de Roteador Dinâmico de Pipelines",
+        "desc": "Direciona o trabalho recebido para capacidade compatível e saudável em vez de esperar por um provedor ou pipeline fixo."
       }
     },
     "portableMaturity": {
@@ -432,6 +444,10 @@
       "aiDistillation": {
         "name": "Oprogramowanie Silnika Destylacji AI",
         "desc": "Przekształca zatwierdzony program nauczania w nadzorowane partie treningowe, ocenione artefakty modeli i dowody gotowe do wycofania."
+      },
+      "dynamicRouter": {
+        "name": "Oprogramowanie Dynamicznego Routera Potoków",
+        "desc": "Kieruje przychodzącą pracę do zgodnych i zdrowych zasobów zamiast czekać na jednego stałego dostawcę lub potok."
       }
     },
     "portableMaturity": {
@@ -547,6 +563,10 @@
       "aiDistillation": {
         "name": "Программное обеспечение движка дистилляции ИИ",
         "desc": "Преобразует утверждённую учебную программу в управляемые обучающие пакеты, оценённые артефакты моделей и доказательства, готовые к откату."
+      },
+      "dynamicRouter": {
+        "name": "Программное обеспечение динамического маршрутизатора конвейеров",
+        "desc": "Направляет входящую работу на совместимые доступные мощности вместо ожидания одного фиксированного поставщика или конвейера."
       }
     },
     "portableMaturity": {

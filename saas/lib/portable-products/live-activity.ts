@@ -122,6 +122,7 @@ export const PORTABLE_ACTIVITY_SOURCES: Readonly<Record<string, readonly Portabl
  */
 export const NO_LIVE_SOURCE_REASONS: Readonly<Record<string, string>> = Object.freeze({
   'provider-hub': 'Provider Hub records connections through the integrations engine rather than a table of its own, so it has no independent operational signal.',
+  'dynamic-pipeline-router': 'The router currently emits routing evidence through its consuming systems, including University distillation, but does not yet have a buyer-neutral independent routing-decision ledger. The portable needs that telemetry sink before it can claim its own live operational signal.',
   'browser-agent-ecosystem':
     'A portable_browser_activity table and a Supabase adapter both exist, but nothing anywhere calls the adapter — and no browser runtime exists to generate events in the first place, since Chromium cannot run in a serverless function. The row count cannot move until a real browser host runs work.',
   'agent-operations-platform':

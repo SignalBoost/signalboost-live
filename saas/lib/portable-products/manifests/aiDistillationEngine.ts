@@ -15,7 +15,7 @@ export const aiDistillationEngineManifest: PortableProductManifest = Object.free
   targetAudience: Object.freeze(['ML engineering teams', 'AI platform teams', 'enterprises operating private models', 'software vendors']),
   requiredCapabilities: Object.freeze(['curriculum-snapshot-input', 'training-rights-gates', 'batch-assembly', 'artifact-evaluation', 'baseline-comparison', 'rollback-evidence']),
   optionalCapabilities: Object.freeze(['hugging-face-jobs', 'buyer-training-runtime', 'self-healing-supervision', 'ai-university-curriculum-port']),
-  dependencies: Object.freeze(['portable-kernel']),
+  dependencies: Object.freeze(['portable-kernel', 'dynamic-pipeline-router']),
   exclusions: Object.freeze(['training-without-rights-evidence', 'automatic-model-promotion', 'automatic-authority-expansion', 'vendor-locked-training-provider']),
   architectureReferences: Object.freeze(['saas/lib/ai/cos/cosUniversityMassDistillation.ts', 'saas/lib/ai/cos/cosUniversityMassDistillationWorkflow.ts', 'saas/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts']),
   documentationReferences: Object.freeze(['docs/ONBOARD-SNAPSHOT-2026-09-15-PRE-DISTILLATION-PORTABLE.md', 'docs/portables/ai-university-distillation-suite.md']),

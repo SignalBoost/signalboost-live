@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { createDynamicPipelineCandidate, rankDynamicPipelineCandidates } from '../../dynamic-pipeline-router/index.ts'
 import {
   universityTeacherPoolStatus,
   type UniversityTeacherDefinition,
@@ -120,22 +121,47 @@ export async function runMassHostedTeacherStage(input: {
 
   const missing = input.prompts.filter(prompt => !byPrompt.has(clean(prompt.id, 64).toLowerCase()))
   const failures: Array<{ promptId: string; teacherId: string; error: string }> = []
-  const promptIndex = new Map(
-    input.prompts.map((prompt, index) => [clean(prompt.id, 64).toLowerCase(), index] as const),
-  )
 
-  // Dynamic topology: maxCalls is a per-invocation attempt budget, not a lifetime row cap.
-  // Build provider chains in waves so every missing prompt gets one fair first attempt before
-  // spare capacity is used to reroute failures to another compatible active provider.
+  // The shared Dynamic Pipeline Router owns selection policy. This stage only supplies active,
+  // authorized teacher pipelines and executes the returned order. Provider names are data, not
+  // routing branches.
+  const teacherByPipeline = new Map(teachers.map(teacher => [teacher.id, teacher] as const))
+  const routerCandidates = teachers.map(teacher => createDynamicPipelineCandidate({
+    pipelineId: teacher.id,
+    providerId: teacher.provider,
+    capabilityIds: Object.freeze(['ai.teacher.generate']),
+    availability: 'available',
+    maxConcurrency: config.parallelism,
+    activeLeases: 0,
+    queueDepth: 0,
+    recentFailureRate: 0,
+    environments: Object.freeze(['production']),
+    metadata: Object.freeze({ transport: teacher.transport }),
+  }))
+  const rankedByPrompt = new Map<string, readonly UniversityTeacherDefinition[]>()
+  for (const prompt of missing) {
+    const promptId = clean(prompt.id, 64).toLowerCase()
+    const ranked = rankDynamicPipelineCandidates({
+      workloadId: promptId,
+      capabilityId: 'ai.teacher.generate',
+      environment: 'production',
+    }, routerCandidates)
+    rankedByPrompt.set(promptId, Object.freeze(
+      ranked.map(item => teacherByPipeline.get(item.candidate.pipelineId)).filter((item): item is UniversityTeacherDefinition => Boolean(item)),
+    ))
+  }
+
+  // maxCalls is a per-invocation attempt budget, not a lifetime row cap. Allocate attempts in
+  // waves so every missing prompt gets one fair first route before spare budget is used for
+  // another compatible pipeline.
   const providerChains = new Map<string, UniversityTeacherDefinition[]>()
   let remainingAttempts = config.maxCalls
   for (let wave = 0; wave < teachers.length && remainingAttempts > 0; wave += 1) {
     for (const prompt of missing) {
       if (remainingAttempts <= 0) break
       const promptId = clean(prompt.id, 64).toLowerCase()
-      const index = promptIndex.get(promptId)
-      if (!Number.isInteger(index)) throw new Error('mass_hosted_teacher_prompt_index_missing')
-      const teacher = teachers[((index as number) + wave) % teachers.length]
+      const teacher = rankedByPrompt.get(promptId)?.[wave]
+      if (!teacher) continue
       const chain = providerChains.get(promptId) || []
       if (chain.some(item => item.id === teacher.id)) continue
       chain.push(teacher)
@@ -245,7 +271,7 @@ export async function runMassHostedTeacherStage(input: {
     minimumRows: MIN_TEACHER_ROWS,
     activeProviders: teachers.map(item => item.id),
     providerMix: Object.freeze(providerMix),
-    routingMode: 'dynamic_compatible_provider' as const,
+    routingMode: 'dynamic-pipeline-router-v1' as const,
     attemptedCalls,
     reroutedPrompts,
     failures: Object.freeze(failures),

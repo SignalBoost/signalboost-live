@@ -24,6 +24,7 @@ export interface PortableArchitectureClosureReport {
 
 const declared = Object.freeze<Record<string, Omit<PortableArchitectureEntry, 'productId'>>>({
   'provider-hub': { coreBoundary: 'saas/provider-hub-core', hostBoundary: 'saas/provider-hub-host', state: 'complete', blockers: Object.freeze([]) },
+  'dynamic-pipeline-router': { coreBoundary: 'saas/lib/dynamic-pipeline-router', hostBoundary: 'buyer-injected capability discovery + durable lease/dispatch ports', state: 'partial', blockers: Object.freeze(['buyer-host-durable-lease-adapter-pending', 'router-telemetry-ledger-pending']) },
   'campaign-studio': { coreBoundary: 'saas/lib/agency', hostBoundary: 'saas/app/agency', state: 'complete', blockers: Object.freeze([]) },
   'integrations-hub': { coreBoundary: 'saas/lib/provider-framework', hostBoundary: 'saas/app/dashboard/integrations', state: 'complete', blockers: Object.freeze([]) },
   'video-maker': { coreBoundary: 'saas/render-core', hostBoundary: 'saas/render-host', state: 'complete', blockers: Object.freeze([]) },

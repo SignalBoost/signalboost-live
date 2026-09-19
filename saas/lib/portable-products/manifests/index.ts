@@ -5,6 +5,7 @@ import { aiUniversityManifest } from './aiUniversity.ts'
 import { browserAgentEcosystemManifest } from './browserAgentEcosystem.ts'
 import { campaignStudioManifest } from './campaignStudio.ts'
 import { controlCenterManifest } from './controlCenter.ts'
+import { dynamicPipelineRouterManifest } from './dynamicPipelineRouter.ts'
 import { integrationsHubManifest } from './integrationsHub.ts'
 import { marketingSalesManifest } from './marketingSales.ts'
 import { portableChiefOfStaffManifest } from './portableChiefOfStaff.ts'
@@ -13,10 +14,10 @@ import { providerHubManifest } from './providerHub.ts'
 import { selfHealingSupervisorManifest } from './selfHealingSupervisor.ts'
 import { videoMakerManifest } from './videoMaker.ts'
 
-export { agentOperationsPlatformManifest, aiDistillationEngineManifest, aiUniversityManifest, browserAgentEcosystemManifest, campaignStudioManifest, controlCenterManifest, integrationsHubManifest, marketingSalesManifest, portableChiefOfStaffManifest, pressMediaManifest, providerHubManifest, selfHealingSupervisorManifest, videoMakerManifest }
+export { agentOperationsPlatformManifest, aiDistillationEngineManifest, aiUniversityManifest, browserAgentEcosystemManifest, campaignStudioManifest, controlCenterManifest, dynamicPipelineRouterManifest, integrationsHubManifest, marketingSalesManifest, portableChiefOfStaffManifest, pressMediaManifest, providerHubManifest, selfHealingSupervisorManifest, videoMakerManifest }
 
 export const portableProductManifests = Object.freeze([
-  providerHubManifest, campaignStudioManifest, integrationsHubManifest, videoMakerManifest, controlCenterManifest,
+  providerHubManifest, dynamicPipelineRouterManifest, campaignStudioManifest, integrationsHubManifest, videoMakerManifest, controlCenterManifest,
   marketingSalesManifest, pressMediaManifest, portableChiefOfStaffManifest,
   browserAgentEcosystemManifest, agentOperationsPlatformManifest, selfHealingSupervisorManifest,
   aiUniversityManifest, aiDistillationEngineManifest,

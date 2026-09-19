@@ -2,6 +2,23 @@
 
 # iTMounts Engineering Blueprint
 
+
+## Dynamic Pipeline Router invariant — 2026-09-19
+
+Incoming eligible work is **work-driven, not vendor-lane-driven**. A workload requests capabilities and policy constraints; it must not wait for one named provider when another compatible, approved, healthy route has capacity.
+
+Canonical separation:
+
+- **Provider Hub / Universal Provider Framework**: provider identity, capability, connection, health and bounded metadata. It is not the workload scheduler.
+- **Dynamic Pipeline Router** (`saas/lib/dynamic-pipeline-router/`): deterministic compatibility/capacity routing and rerouting. Provider names are data, never hard-coded routing branches.
+- **Supervisor / workflow coordination**: durable queues, leases, fencing, stale-owner recovery and work ownership. The router must not create a competing queue database.
+- **MCP**: capability/tool exposure and invocation protocol. MCP is not a load balancer or traffic scheduler.
+- **Product execution code**: remains authoritative for approvals, spend ceilings, data/training rights, consequential actions, promotion and Production traffic.
+
+A failed or full pipeline may be excluded and the same work may move to another compatible pipeline when the consuming product already authorizes such rerouting. Rerouting never expands authority or silently bypasses buyer/provider policy.
+
+COS University hosted-teacher distillation is the first live consumer of the shared router. New workloads should reuse this shared routing boundary rather than implement private provider-selection algorithms.
+
 ## COS / Assistant / Concierge single-brain invariant — 2026-09-18
 
 **Assistant and COS are the same owner-facing intelligence.** The Assistant page is the owner's UI for COS; it is not a separate agent, brain, reasoner, or fallback path.

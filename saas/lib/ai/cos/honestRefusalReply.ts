@@ -13,8 +13,8 @@
 // principle and the missing pieces were nameable — training duration, cluster power draw,
 // network bandwidth.
 //
-// This module builds the replacement: a short reply that names the inputs that would make the
-// question answerable and offers the standing-assumptions route so the reader is never stuck.
+// This module is now reserved for genuinely blocked turns: it names the specific missing input
+// and never asks the user to narrow an otherwise routine task.
 // For diagnosis, owner policy is stricter: useful next checks come first and the statement that a
 // single cause cannot yet be supported is the final sentence. It NEVER invents a cause or number.
 //
@@ -152,34 +152,34 @@ const COPY: Record<RefusalLanguage, {
   generic: string
 }> = {
   en: {
-    opening: 'I did not release an answer to this, because I could not stand behind one.',
+    opening: 'A reliable answer requires a specific input that is not available yet.',
     needsLead: 'To answer it properly I need',
-    assumptions: 'If you would rather I proceed anyway, say so and I will work it through on clearly stated standard assumptions, with each one labelled so you can override it.',
-    generic: 'Tell me which parts matter most, or narrow the question, and I will take it from there. If you would rather I proceed on clearly stated standard assumptions, say so and I will label each one so you can override it.',
+    assumptions: 'I will use clearly labelled standard assumptions wherever that is safe; only genuinely situational facts must come from the user or an authorized source.',
+    generic: 'I will not ask you to narrow a routine task. Only a specific fact, permission, or source that materially changes the result should block completion.',
   },
   es: {
-    opening: 'No publiqué una respuesta a esto, porque no podía respaldarla.',
+    opening: 'Una respuesta fiable requiere un dato específico que todavía no está disponible.',
     needsLead: 'Para responder correctamente necesito',
-    assumptions: 'Si prefieres que avance igualmente, dímelo y lo resolveré sobre supuestos estándar claramente indicados, cada uno etiquetado para que puedas cambiarlo.',
-    generic: 'Dime qué partes importan más, o acota la pregunta, y sigo desde ahí. Si prefieres que avance sobre supuestos estándar claramente indicados, dímelo y etiquetaré cada uno para que puedas cambiarlo.',
+    assumptions: 'Usaré supuestos estándar claramente indicados cuando sea seguro; solo los datos realmente situacionales deben venir del usuario o de una fuente autorizada.',
+    generic: 'No pediré que se acote una tarea rutinaria. Solo un dato, permiso o fuente específica que cambie materialmente el resultado debe bloquear la finalización.',
   },
   pt: {
-    opening: 'Não publiquei uma resposta a isto, porque não poderia sustentá-la.',
+    opening: 'Uma resposta confiável exige um dado específico que ainda não está disponível.',
     needsLead: 'Para responder corretamente preciso de',
-    assumptions: 'Se preferir que eu avance mesmo assim, diga e eu resolvo com base em pressupostos padrão claramente indicados, cada um rotulado para que possa alterá-lo.',
-    generic: 'Diga-me que partes importam mais, ou restrinja a pergunta, e sigo a partir daí. Se preferir que eu avance com pressupostos padrão claramente indicados, diga e rotularei cada um para que possa alterá-lo.',
+    assumptions: 'Usarei pressupostos padrão claramente identificados quando isso for seguro; somente fatos realmente situacionais precisam vir do usuário ou de uma fonte autorizada.',
+    generic: 'Não pedirei que uma tarefa rotineira seja restringida. Apenas um fato, permissão ou fonte específica que altere materialmente o resultado deve bloquear a conclusão.',
   },
   pl: {
-    opening: 'Nie opublikowałem odpowiedzi na to pytanie, ponieważ nie mógłbym za nią ręczyć.',
+    opening: 'Rzetelna odpowiedź wymaga konkretnej informacji, której jeszcze brakuje.',
     needsLead: 'Aby odpowiedzieć rzetelnie, potrzebuję',
-    assumptions: 'Jeśli wolisz, żebym mimo to kontynuował, powiedz — policzę to na jasno wskazanych standardowych założeniach, każde oznaczone, abyś mógł je zmienić.',
-    generic: 'Powiedz, które części są najważniejsze, albo zawęź pytanie, a podejmę temat. Jeśli wolisz, żebym kontynuował na jasno wskazanych standardowych założeniach, powiedz — oznaczę każde z nich.',
+    assumptions: 'Użyję jasno oznaczonych standardowych założeń tam, gdzie jest to bezpieczne; tylko fakty zależne od konkretnej sytuacji muszą pochodzić od użytkownika lub uprawnionego źródła.',
+    generic: 'Nie poproszę o zawężenie rutynowego zadania. Tylko konkretna informacja, uprawnienie lub źródło, które istotnie zmienia wynik, powinno blokować wykonanie.',
   },
   ru: {
-    opening: 'Я не выпустил ответ на этот вопрос, потому что не смог бы за него поручиться.',
+    opening: 'Для надёжного ответа нужен конкретный ввод, которого пока нет.',
     needsLead: 'Чтобы ответить корректно, мне нужно',
-    assumptions: 'Если хотите, чтобы я всё же продолжил, скажите — я разберу задачу на явно указанных стандартных допущениях, каждое из которых помечу, чтобы вы могли его изменить.',
-    generic: 'Скажите, какие части важнее всего, или сузьте вопрос — и я продолжу. Если предпочитаете, чтобы я работал на явно указанных стандартных допущениях, скажите, и я помечу каждое из них.',
+    assumptions: 'Я буду использовать явно обозначенные стандартные допущения там, где это безопасно; только действительно ситуационные факты должны поступать от пользователя или из разрешённого источника.',
+    generic: 'Я не буду просить сужать обычную задачу. Выполнение должен блокировать только конкретный факт, разрешение или источник, который существенно меняет результат.',
   },
 }
 

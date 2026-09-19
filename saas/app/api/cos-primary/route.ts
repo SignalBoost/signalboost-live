@@ -46,7 +46,7 @@ import { synthesizeFreshEvidenceExternally } from '@/lib/ai/cos/freshEvidenceExt
 import { callCosReasoner, callRawCosReasoner, resolveCosReasoner } from '@/lib/ai/cos/cosReasoner'
 import { callLocalModel, localInferenceConfigFromEnv } from '@/lib/ai/local-inference'
 import { parseLocalResult } from '@/lib/ai/cos/reasonerOutput'
-import { getExternalInfo } from '@/lib/ai/tools/getExternalInfo'
+import { getExternalInfo, formatExternalInfoForAI } from '@/lib/ai/tools/getExternalInfo'
 import { readPublicPages } from '@/lib/ai/tools/publicWebAgent'
 import { constructDatedRoster, deepenClaimResearch } from '@/lib/ai/cos/cosClaimResearch'
 import { listRepoFiles, readRepoFile } from '@/lib/ai/tools/repoReader'
@@ -184,6 +184,67 @@ async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabe
   return null
 }
 
+
+export const TASK_COMPLETION_RESCUE_TIMEOUT_MS = 20_000
+export const TASK_COMPLETION_RESCUE_ATTEMPT_MS = 10_000
+
+function completionRescueAllowed(reason:{code:string;detail:string}):boolean{
+  return [
+    'confidence_below_threshold',
+    'local_reasoner_exception',
+    'local_reasoner_not_configured',
+    'local_reasoner_no_answer',
+    'local_reasoner_unparseable',
+    'runpod_gpu_capacity_unavailable',
+    'cos_first_unavailable',
+  ].includes(reason.code)
+}
+
+async function runTaskCompletionRescue(input:string,evidence=''):Promise<{reply:string;reasonerLabel:string}|null>{
+  const config=localInferenceConfigFromEnv()
+  const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
+  const preferredModel=process.env.COS_TASK_COMPLETION_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
+  const models=[...new Set([preferredModel,config.model].filter(Boolean))]
+  const startedAt=Date.now()
+  for(const model of models){
+    const remaining=Math.max(0,TASK_COMPLETION_RESCUE_TIMEOUT_MS-(Date.now()-startedAt))
+    if(remaining<1_000)break
+    const attemptMs=Math.min(TASK_COMPLETION_RESCUE_ATTEMPT_MS,remaining)
+    const text=await callLocalModel({
+      temperature:.2,
+      maxTokens:1800,
+      disableThinking:true,
+      timeoutMs:attemptMs,
+      allowConfiguredFallback:false,
+      persistUsage:false,
+      jsonObject:true,
+      usageContext:{feature:'cos_task_completion_rescue',purpose:model===preferredModel?'completion_primary':'completion_retry'},
+      systemPrompt:[
+        'You are COS task-completion rescue. Complete the user\'s request directly instead of asking them to narrow a routine task.',
+        'Use reasonable low-risk assumptions when they do not materially change correctness, and state an assumption only when it matters.',
+        'If LIVE WEB EVIDENCE is supplied, ground external factual claims and named recommendations in that evidence and include the source URLs naturally.',
+        'Do not invent current facts, sources, actions, permissions, or tool results. Never claim an action was executed unless the supplied evidence says it was.',
+        'If a real safety, authorization, or missing-situational-fact boundary blocks one part, complete every safe part first and state only the specific blocker.',
+        'Return ONLY strict JSON: {"answer":"...","confidence":0.90}.',
+      ].join(' '),
+      prompt:evidence
+        ? `USER REQUEST:\n${input}\n\nLIVE WEB EVIDENCE:\n${evidence}`
+        : input,
+    },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
+    if(!text)continue
+    const parsed=parseLocalResult(text)
+    const reply=parsed?.answer?.trim()
+    if(reply){
+      const provider=String(config.provider||'').trim()
+      const reasonerLabel=provider&&provider!=='self_hosted'
+        ? `managed-open-model:${provider}:${model}`
+        : `independent-local:${model}`
+      return{reply,reasonerLabel}
+    }
+  }
+  return null
+}
+
 function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;reasonerLabel:string},source='cos-fast-authoring'){
   const executionProvenance=authoritativeProvenance(null,{invoked:false})
   ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:1}
@@ -251,9 +312,11 @@ function freshEvidenceUnavailableReply(language:string,input=''):string{const co
 function freshSynthesisRejectedReply(language:string,input=''):string{const continuity=securityReleaseContinuityReply(input);if(continuity)return continuity;return buildFreshVerificationUnavailableReply({prompt:input,language})}
 function securityScenarioEvidenceIsSpecific(input:string,sources:FreshEvidenceSource[]):boolean{if(!/\b(?:zero[- ]day|vulnerabilit|infosec|tenant\s+metadata)\b/i.test(input))return true;const locator=input.match(/\bCVE-\d{4}-\d{4,}\b|\b(?:npm|pypi|maven|cargo|gem|composer)\s*[:/]\s*[@\w./-]+/i)?.[0];if(!locator)return false;return sources.some(source=>new RegExp(locator.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(`${source.title}\n${source.snippet}\n${source.url}`))}
 
-function lowConfidenceDraftReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { detail: string }): string | null {
+function bestEffortCompletionReply(cos: Awaited<ReturnType<typeof tryCOSFirstAnswer>>, reason: { code: string }): string | null {
+  if (reason.code !== 'confidence_below_threshold') return null
   if (!cos || cos.handled || !('bestEffortReply' in cos) || !cos.bestEffortReply) return null
-  return [`⚠️ Low-confidence draft (COS confidence ${cos.confidence.toFixed(2)}, below the ${confidenceThreshold().toFixed(2)} threshold; no external model was available to do better). ${reason.detail}`,'',cos.bestEffortReply].join('\n')
+  const reply=String(cos.bestEffortReply).trim()
+  return reply||null
 }
 function localDraft(cos:Awaited<ReturnType<typeof tryCOSFirstAnswer>>|null):string|null{if(!cos)return null;if(cos.handled)return cos.reply;return 'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'?cos.bestEffortReply:null}
 function localReasonerLabel():string{const resolved=resolveCosReasoner();return resolved.config?.label??`independent-local:${(process.env.LOCAL_AI_MODEL||'local-model').trim()}`}
@@ -506,11 +569,12 @@ export async function postCosPrimary(req:NextRequest){
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
   // If ordinary COS could not complete a non-live, non-action turn, use neural semantic intent
-  // before the generic failed-closed reply. This catches natural human requests such as “help me say
-  // something warm” or “come up with a greeting” without hard-coding those phrasings into routing.
-  if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)&&!fastAuthoringEligible){
-    const rescueIntent=semanticTaskIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
-    if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)){
+  // before any failed-closed reply. Routine tasks get a bounded completion rescue rather than a
+  // generic request to narrow the question. Safety/authorization/policy refusals are not rescued.
+  let completionRescueIntent=semanticTaskIntent
+  if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)){
+    completionRescueIntent=completionRescueIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
+    if(!fastAuthoringEligible&&semanticIntentIsSelfContainedContentGeneration(completionRescueIntent)){
       const semanticFast=await runFastAuthoring(input)
       if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic-rescue')
     }
@@ -523,6 +587,25 @@ export async function postCosPrimary(req:NextRequest){
   const reason=freshHardFail?{code:freshFailureCode!,detail:freshFailureCode === 'local_synthesis_failed'
     ? 'Authoritative live evidence was retrieved, but bounded local synthesis failed after transport retries.'
     : 'Authoritative live evidence was retrieved, but no completed synthesis satisfied the grounding contract.'}:escalationReason(cos,localError,requestedAction)
+
+  if(!freshHardFail&&!requestedAction&&!hasAttachments&&!isCosCodingObjective(input)&&completionRescueAllowed(reason)){
+    const bestEffort=bestEffortCompletionReply(cos,reason)
+    if(bestEffort){
+      const executionProvenance=authoritativeProvenance(cos,{invoked:false})
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:bestEffort,source:'local_cos_reasoning',confidence:cos?.confidence??null,provenance:cos?.provenance,externalAiInvoked:false})
+      await writeCosPrimaryProvenance(userId,bestEffort,executionProvenance,'cos-best-effort-completion',{prompt:input,answered:true,confidence:cos?.confidence??0,branch:'best_effort_completion'})
+      return NextResponse.json({ok:true,reply:bestEffort,source:'cos-best-effort-completion',confidence_score:cos?.confidence??0,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos?.provenance?.localModelInvoked??false,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+    }
+
+    let rescueEvidence=''
+    if(completionRescueIntent?.externalFactsRequired){
+      const live=await getExternalInfo(input,8,{bypassCache:true}).catch(()=>null)
+      if(live?.ok&&live.results.length)rescueEvidence=formatExternalInfoForAI(input,live.results)
+    }
+    const completion=await runTaskCompletionRescue(input,rescueEvidence)
+    if(completion)return fastAuthoringResponse(startedAt,input,completion,'cos-task-completion-rescue')
+  }
+
   logEscalation({event:'external_escalation_decision',reason_code:reason.code,reason:reason.detail,confidence:cos?.confidence??null,threshold:confidenceThreshold(),local_model_invoked:requiresFreshEvidence?freshLocalAttempted:(cos?.provenance?.localModelInvoked??false),local_model:requiresFreshEvidence?freshLocalModel:(cos?.provenance?.reasonerLabel??null),semantic_cache_hit:cos?.provenance?.responseSource==='semantic_cache'||cos?.provenance?.responseSource==='semantic_similarity',knowledge_facts_used:cos?.provenance?.knowledgeFactsUsed??0,learned_items_used:cos?.provenance?.learnedItemsUsed??0,external_action_requested:requestedAction,fallback_enabled:externalFallbackEnabled(),fresh_evidence_required:requiresFreshEvidence,fresh_documents_acquired:freshSources.length})
 
   if(!externalFallbackEnabled()){
@@ -534,7 +617,7 @@ export async function postCosPrimary(req:NextRequest){
     if(requiresFreshEvidence)Object.assign(executionProvenance as any,{policy:'fresh_live_data_local_first',assistant_text_used_for_resolution:false})
     const normativeEvidenceFallback=freshHardFail?buildNormativeFreshEvidenceFallback({input:lookupInput,sources:freshSources,language}):null
     const partialCompletion=Boolean(requiresFreshEvidence&&(partialFreshOfficeHolderReply||normativeEvidenceFallback))
-    const reply=partialFreshOfficeHolderReply??normativeEvidenceFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(lowConfidenceDraftReply(cos,reason)??buildHonestRefusalReply({prompt:input,language}))),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
+    const reply=partialFreshOfficeHolderReply??normativeEvidenceFallback??(freshHardFail?(freshFailureReply(freshFailureCode!,language) ?? freshEvidenceUnavailableReply(language,lookupInput)):(bestEffortCompletionReply(cos,reason)??buildHonestRefusalReply({prompt:input,language}))),liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:partialCompletion?'deterministic':'failed_closed',confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):(cos?.confidence??0),provenance:requiresFreshEvidence?freshTelemetryProvenance(freshLocalAttempted,freshLocalModel):cos?.provenance,externalAiInvoked:false})
     const completionSource=normativeEvidenceFallback?'cos-fresh-normative-evidence-map':partialCompletion?'cos-fresh-partial-grounded':'failed_closed'
     await writeCosPrimaryProvenance(userId,reply,executionProvenance,completionSource,{prompt:requiresFreshEvidence?lookupInput:input,answered:partialCompletion,confidence:partialCompletion?(normativeEvidenceFallback?0.75:0.99):0,branch:normativeEvidenceFallback?'fresh_normative_evidence_map':partialCompletion?'fresh_partial_grounded':'failed_closed'})
     return NextResponse.json({ok:partialCompletion,reply,error:partialCompletion?undefined:reply,source:completionSource,partial_completion:partialCompletion,cos_first_attempted:requiresFreshEvidence?freshLocalAttempted:(Boolean(cos)||Boolean(localError)),cos_first_handled:false,cos_first_confidence:cos?.confidence??0,confidence_threshold:confidenceThreshold(),cos_first_reason:reason.detail,escalation_reason_code:reason.code,fresh_failure_class:freshFailureCode,independent_reasoner:await independentReasonerHealth(),external_ai_invoked:false,external_fallback_invoked:false,isolation_mode:true,execution_provenance:executionProvenance,live_evidence_retrieved_this_turn:requiresFreshEvidence,live_evidence_sources:requiresFreshEvidence?freshSources.map(source=>({id:source.id,title:source.title,url:source.url})):[],live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false},{status:partialCompletion||freshFailureCode!=='local_synthesis_failed'?200:503})
@@ -577,7 +660,7 @@ export async function postCosPrimary(req:NextRequest){
       : embeddedMatchesGenerator
         ? embedded!
         : authoritativeProvenance(cos,{invoked:externalInvoked,provider:external.provider,model:external.model})
-    const reply=continuityFailed?(lowConfidenceDraftReply(cos,reason)??`COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`):rawReply
+    const reply=continuityFailed?(bestEffortCompletionReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})):rawReply
     const innerSource=String(payload?.source||'').trim()
     const responseSource=continuityFailed?'cos-independent-reasoner-unavailable':externalInvoked?'external_fallback':innerSource&&innerSource!=='external_fallback'?innerSource:'cos-local-retry'
     const finalConfidence=finiteNumber(payload?.confidence_score)??finiteNumber((executionProvenance as any)?.local_reasoning?.confidence)??(continuityFailed?cos?.confidence??0:null)

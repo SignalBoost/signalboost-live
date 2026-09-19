@@ -41,6 +41,7 @@ type WorkerPreflight = typeof preflightHfWorkerDelivery
 
 
 const MASS_RUNS = 'cos_university_mass_distillation_batch_runs'
+const CURRICULUM_BATCHES = 'cos_university_distillation_curriculum_batches'
 const ASSURANCE_EVENTS = 'cos_university_learning_assurance_events'
 const DRILL_DISPATCH_STAGES = ['teacher_dispatching', 'preparation_dispatching', 'training_dispatching'] as const
 
@@ -68,7 +69,7 @@ async function repairVerifiedRecoveryDrillFixture(input: {
   if (!input.before.reasons.includes('dispatch_claim_stalled') || input.before.activeCampaignIds.length === 0) return null
 
   const rowsResult = await input.db.from(MASS_RUNS)
-    .select('id,campaign_id,subject_id,stage,drill_id')
+    .select('id,campaign_id,batch_key,subject_id,stage,drill_id')
     .in('campaign_id', input.before.activeCampaignIds)
     .in('stage', [...DRILL_DISPATCH_STAGES])
     .not('drill_id', 'is', null)
@@ -112,6 +113,16 @@ async function repairVerifiedRecoveryDrillFixture(input: {
     if (removed.error) throw new Error(`university_recovery_drill_clear_failed:${String(removed.error.message || 'unknown').slice(0, 180)}`)
     if ((removed.data || []).length !== 1) throw new Error('university_recovery_drill_clear_not_exact')
 
+    const batchKey = String(raw.batch_key || '').trim().toLowerCase()
+    if (!/^[a-f0-9]{64}$/.test(batchKey)) throw new Error('university_recovery_drill_batch_identity_invalid')
+    const batchRemoved = await input.db.from(CURRICULUM_BATCHES)
+      .delete()
+      .eq('batch_key', batchKey)
+      .eq('source_policy', 'recovery_drill_fixture_v1')
+      .select('batch_key')
+    if (batchRemoved.error) throw new Error(`university_recovery_drill_batch_clear_failed:${String(batchRemoved.error.message || 'unknown').slice(0, 180)}`)
+    if ((batchRemoved.data || []).length !== 1) throw new Error('university_recovery_drill_batch_clear_not_exact')
+
     const evidence = {
       profile: RECOVERY_DRILL_PROFILE,
       claim: 'recovery_drill_repair_applied',
@@ -120,6 +131,8 @@ async function repairVerifiedRecoveryDrillFixture(input: {
       campaignId,
       faultKind: 'dispatch_claim_stalled',
       repairKind: 'remove_inert_stalled_dispatch_fixture',
+      batchKey,
+      curriculumFixtureRemoved: true,
       dispatchAuthorized: false,
       spendAuthorized: false,
       productionTrafficAuthorized: false,

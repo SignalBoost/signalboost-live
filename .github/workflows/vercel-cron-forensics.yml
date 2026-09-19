@@ -1,6 +1,9 @@
 name: Vercel Cron Disable Forensics
 
 on:
+  push:
+    branches:
+      - forensics/vercel-cron-disable-20260918
   pull_request:
     branches: [main]
     paths:

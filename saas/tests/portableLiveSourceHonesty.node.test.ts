@@ -70,6 +70,7 @@ test('EVERY portable without a source has a stated reason', () => {
     'browser-agent-ecosystem',
     'campaign-studio',
     'control-center',
+    'dynamic-pipeline-router',
     'integrations-hub',
     'marketing-sales',
     'portable-ai-chief-of-staff',
@@ -101,6 +102,7 @@ test('an unreadable table makes a portable unknown, never healthy', async () => 
 test('the reasons name what has to be built, so the card is also the backlog', () => {
   assert.match(NO_LIVE_SOURCE_REASONS['browser-agent-ecosystem'], /browser host/i)
   assert.match(NO_LIVE_SOURCE_REASONS['agent-operations-platform'], /lib\/agent-runtime/)
+  assert.match(NO_LIVE_SOURCE_REASONS['dynamic-pipeline-router'], /routing-decision ledger/i)
 })
 
 test('loadAllPortableActivity preserves the order it was given', async () => {

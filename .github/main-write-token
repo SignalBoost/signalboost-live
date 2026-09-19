@@ -1,2 +1,2 @@
-base_sha=2296c845745b219e8dd8662e7e633b25ff5396b2
-branch=fix/reregister-university-distillation-cron-20260918
+base_sha=7df37908a4b452206988b5f04d0e0647aee4ee62
+branch=fix/cos-writing-latency-rebase-20260918

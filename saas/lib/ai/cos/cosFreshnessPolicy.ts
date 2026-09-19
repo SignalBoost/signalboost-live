@@ -197,6 +197,21 @@ function isLocalDeterministicUtility(text: string): boolean {
   return LOCAL_ARITHMETIC.test(text) || LOCAL_CLOCK_OR_DATE.test(text)
 }
 
+// Freshness-only normalization for polite authoring commands. Do not broaden the global
+// content-generation classifier because it also participates in execution/Builder routing.
+const POLITE_AUTHORING_PREFIX = /^(?:(?:please|kindly)\s+(?:(?:can|could|would)\s+you\s+)?|(?:can|could|would)\s+you\s+(?:please\s+)?|por\s+favor\s+|prosz[eę]\s+|пожалуйста\s+)/iu
+
+function isPoliteAuthoringForFreshness(input: string): boolean {
+  return String(input || '')
+    .split(/(?:[.!?;:]|\n+)/u)
+    .map(part => part.trim())
+    .filter(Boolean)
+    .some(clause => {
+      const stripped = clause.replace(POLITE_AUTHORING_PREFIX, '').trim()
+      return stripped !== clause && isContentGenerationRequest(stripped)
+    })
+}
+
 
 function isGovernedPublicGuidance(text: string): boolean {
   return GOVERNED_GUIDANCE_TOPIC.test(text) && GUIDANCE_REQUEST.test(text)
@@ -260,7 +275,7 @@ export function requiresFreshExternalEvidence(input: string): boolean {
   if (looksLikeInternalOperationalState(text)) return false
   if (isLocalDeterministicUtility(text)) return false
   if (HIGH_STAKES_SECURITY_RELEASE.test(text) && !SECURITY_DECISION_SCENARIO.test(text)) return true
-  if (isContentGenerationRequest(text)) return false
+  if (isContentGenerationRequest(text) || isPoliteAuthoringForFreshness(input)) return false
 
   // A moral/civic/public-policy proposition is not itself a request for the current law. Route the
   // whole class consistently through the normative answer contract instead of letting one keyword

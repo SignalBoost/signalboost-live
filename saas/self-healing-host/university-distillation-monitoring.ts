@@ -176,7 +176,7 @@ export function deriveCurriculumPackagingProgress(receipts: readonly ReceiptRow[
       replenishment.failureDerivedBySubject,
       replenishment.hostedTeacherBySubject,
       replenishment.acceptedBySubject,
-    ].reduce((sum, value) => sum + bySubjectInserted(value, subject), 0)
+    ].reduce<number>((sum, value) => sum + bySubjectInserted(value, subject), 0)
     if (insertedForSubject >= shortfallToBatch) {
       return Object.freeze({ stalled: true, observedAt: maintenance.observed_at, subject, shortfallToBatch, insertedForSubject, preparedBefore, preparedAfter })
     }

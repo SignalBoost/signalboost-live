@@ -171,14 +171,20 @@ test('runtime keeps examiner authority separate from learner and feeds failures 
 
 test('cron is secret-gated, scheduled after study, and never returns prompt, reply, or rubric', () => {
   const route = file('../app/api/cron/cos-university-exam/route.ts')
-  const vercel = file('../vercel.json')
+  const vercel = JSON.parse(file('../vercel.json')) as {
+    env?: Record<string, string>
+    crons?: Array<{ path?: string; schedule?: string }>
+  }
   assert.match(route, /auth !== `Bearer \$\{secret\}`/)
   assert.match(route, /runCosUniversityIndependentExamBatch\(\{ maxExams: 2 \}\)/)
   assert.doesNotMatch(route, /prompt:/)
   assert.doesNotMatch(route, /reply:/)
   assert.doesNotMatch(route, /rubric:/)
-  assert.match(vercel, /"COS_UNIVERSITY_EXAMS_ENABLED": "true"/)
-  assert.match(vercel, /"\/api\/cron\/cos-university-exam", "schedule": "0 \* \* \* \*"/)
+  assert.equal(vercel.env?.COS_UNIVERSITY_EXAMS_ENABLED, 'true')
+  assert.ok(vercel.crons?.some(cron =>
+    cron.path === '/api/cron/cos-university-exam'
+      && cron.schedule === '0 * * * *'
+  ))
 })
 
 test('ready exam queue recovers one no-valid-execution error and scans past blocked rows', () => {

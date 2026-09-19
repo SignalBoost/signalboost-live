@@ -78,6 +78,25 @@ export async function GET(req: NextRequest) {
   ]
   const result = await runNativeMonitoring({ context: { provider: 'signalboost-platform', environment: 'production', metadata: { source: 'native-proactive-monitoring-cron', readOnly: true, providerMutations: false } }, collectors, nativeEnabled: process.env.SELF_HEALING_NATIVE_MONITORING_ENABLED !== 'false', externalConnected: process.env.SELF_HEALING_EXTERNAL_MONITORING_CONNECTED === 'true' })
 
+  // Temporary Sep 18 cron-control-plane forensics: piggyback on this already-registered cron so
+  // evidence collection does not change the Vercel cron fleet. The target is CRON_SECRET-protected,
+  // read-only, and redacts secret-like fields. Remove this block with the forensic route after capture.
+  const forensicSecret = String(process.env.CRON_SECRET || '').trim()
+  if (forensicSecret) {
+    try {
+      const forensicResponse = await fetch(`${baseUrl}/api/cron/vercel-cron-forensics`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${forensicSecret}`, 'User-Agent': 'SignalBoost-Self-Healing-Forensics/1.0' },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(55_000),
+      })
+      console.log('[vercel-cron-forensics-piggyback]', { status: forensicResponse.status })
+      try { await forensicResponse.body?.cancel() } catch {}
+    } catch (error) {
+      console.warn('[vercel-cron-forensics-piggyback] failed', error instanceof Error ? error.message : String(error))
+    }
+  }
+
   // Configuration drift is investigated independently of any displayed percentage. When it is
   // present it is the root condition; suppress the derivative confidence incident for this cycle.
   const configurationIncident = await collectConfigurationDriftIncident(db).catch(() => null)

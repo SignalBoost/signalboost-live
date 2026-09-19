@@ -1,4 +1,4 @@
-// saas/proxy.ts
+// saas/proxyBase.ts
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
@@ -26,6 +26,42 @@ const OWNER_EMAILS = (process.env.OPERATOR_OWNER_EMAILS || 'cadomos@gmail.com')
   .split(',')
   .map(e => e.trim().toLowerCase())
   .filter(Boolean)
+
+/**
+ * Renew the Supabase access token onto a continuing response. Shared by the operator guard and by
+ * every other authenticated surface so there is one refresh implementation, not two.
+ */
+async function supabaseForRefresh(req: NextRequest) {
+  let res = NextResponse.next({ request: { headers: req.headers } })
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return req.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            res.cookies.set(name, value, options)
+          })
+        },
+      },
+    }
+  )
+  return { supabase, response: () => res }
+}
+
+async function refreshAuthCookies(req: NextRequest) {
+  try {
+    const { supabase, response } = await supabaseForRefresh(req)
+    await supabase.auth.getUser()
+    return response()
+  } catch {
+    // An auth outage must not take the site down; serve the request with the cookies it arrived with.
+    return NextResponse.next()
+  }
+}
 
 export async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname
@@ -87,30 +123,30 @@ export async function proxy(req: NextRequest) {
     return NextResponse.rewrite(specialistUrl)
   }
 
-  // Only guard the operator path beyond autonomous API ingress and the public spend gate.
+  // Authenticated surfaces that are not the operator path still need their Supabase access token
+  // renewed. Tokens are short-lived and are refreshed by WRITING new cookies; every server-side client
+  // in this app swallows that write, because Server Components are forbidden from setting cookies:
+  //
+  //     setAll(cookiesToSet) { try { ... } catch { /* Server Component - safe to ignore. */ } }
+  //
+  // Until now only the operator path ran anywhere that could persist the refresh, so on every other
+  // surface an expiring session was simply lost. Production 2026-09-19: a ~90-second window of 503s
+  // and 401s left the owner signed out of /dashboard and /api/admin until a manual /auth/callback,
+  // and the same fault would sign out any customer. Refresh runs here, where writes are allowed.
+  //
+  // This branch decides NOTHING: no redirect, no authorization, no owner check. Those stay in
+  // lib/auth/access.ts. It renews a token that is already valid and continues the request.
+  const authenticatedSurface = pathname.startsWith('/dashboard') || pathname.startsWith('/api/admin')
   if (!pathname.startsWith(OPERATOR_PATH)) {
-    return NextResponse.next()
+    // Requests carrying no session cost one cookie check and no network call, so public traffic and
+    // the 63 scheduled crons are unaffected.
+    if (!authenticatedSurface || !hasSessionCookie(req)) return NextResponse.next()
+    return refreshAuthCookies(req)
   }
 
   // Prepare a response we can attach refreshed auth cookies to.
-  let res = NextResponse.next({ request: { headers: req.headers } })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            res.cookies.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
+  const { supabase, response } = await supabaseForRefresh(req)
+  const res = response()
 
   const { data } = await supabase.auth.getUser()
   const email = data?.user?.email?.toLowerCase() || ''
@@ -265,6 +301,8 @@ export const config = {
   // autonomy gate, public-model spend gate/routing, Phase 5 COS routing, or operator authentication.
   matcher: [
     '/dashboard/operator/:path*',
+    '/dashboard/:path*',
+    '/api/admin/:path*',
     '/api/concierge',
     '/api/cos-browser',
     '/api/support',

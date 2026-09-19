@@ -4129,6 +4129,7 @@
     "send": "Abrir solicitud de correo electrónico"
   },
   "auth": {
+    "temporarilyUnavailable": "La autenticación no está disponible temporalmente. Vuelve a cargar la página en un momento.",
     "errorNoName": "Por favor ingrese su nombre.",
     "passwordPlaceholder": "Contraseña",
     "errorEmailExists": "Ya existe una cuenta con este correo electrónico. En su lugar, inicie sesión.",

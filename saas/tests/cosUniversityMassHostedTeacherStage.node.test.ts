@@ -193,10 +193,13 @@ test('no hosted credentials produces an explicit skip so the existing HF teacher
   assert.equal(result.rows, 0)
 })
 
-test('mass teacher lane excludes custom gateways whose pricing is not covered by the fixed campaign ceiling', () => {
+test('mass teacher lane uses provider-declared eligibility rather than a hard-coded vendor ID list', () => {
   const source = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassHostedTeacherStage.ts'), 'utf8')
-  assert.match(source, /MASS_HOSTED_TEACHER_IDS = new Set\(\['openai', 'claude', 'grok'\]\)/)
-  assert.doesNotMatch(source, /MASS_HOSTED_TEACHER_IDS[\s\S]{0,80}'custom'/)
+  assert.doesNotMatch(source, /MASS_HOSTED_TEACHER_IDS/)
+  assert.match(source, /item\.massDistillationEligible === true/)
+  assert.match(source, /'openai_responses'/)
+  assert.match(source, /'openai_compatible'/)
+  assert.match(source, /'anthropic_messages'/)
 })
 
 

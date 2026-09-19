@@ -67,6 +67,16 @@ async function readJson(response: Response): Promise<any> {
   try { return text ? JSON.parse(text) : {} } catch { throw new Error('university_teacher_response_invalid_json') }
 }
 
+function providerErrorDetail(payload: any): string {
+  const type = clean(payload?.error?.code || payload?.error?.type || 'unknown', 80)
+    .replace(/[^A-Za-z0-9._-]/g, '_')
+  const message = clean(payload?.error?.message, 180)
+    .replace(/[^A-Za-z0-9 _.,:;()\/'-]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return message ? `${type}:${message}` : type
+}
+
 async function callOpenAiResponses(input: {
   teacher: UniversityTeacherDefinition
   request: TeacherGenerationRequest
@@ -101,8 +111,7 @@ async function callOpenAiResponses(input: {
   })
   const payload = await readJson(response)
   if (!response.ok) {
-    const code = clean(payload?.error?.code || payload?.error?.type || 'unknown', 80).replace(/[^A-Za-z0-9._-]/g, '_')
-    throw new Error(`university_teacher_http_${response.status}:${code}`)
+    throw new Error(`university_teacher_http_${response.status}:${providerErrorDetail(payload)}`)
   }
   const outputText = clean(payload?.output_text)
     || clean(Array.isArray(payload?.output)
@@ -195,8 +204,7 @@ async function callAnthropic(input: {
   })
   const payload = await readJson(response)
   if (!response.ok) {
-    const code = clean(payload?.error?.type || payload?.error?.code || 'unknown', 80).replace(/[^A-Za-z0-9._-]/g, '_')
-    throw new Error(`university_teacher_http_${response.status}:${code}`)
+    throw new Error(`university_teacher_http_${response.status}:${providerErrorDetail(payload)}`)
   }
   const text = clean(Array.isArray(payload?.content)
     ? payload.content.filter((item: any) => item?.type === 'text').map((item: any) => item.text).join('\n')

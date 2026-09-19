@@ -213,34 +213,27 @@ test('zero hosted rows are an explicit governed HF fallback, while partial hoste
 })
 
 
-test('provider assignment remains stable across partial retries and failure telemetry names the attempted teacher', async () => {
+test('missing teacher work reroutes to another available provider instead of waiting for the original provider', async () => {
   const db = memoryDb()
   const prompts = Array.from({ length: 20 }, (_, index) => ({
     id: (index + 1).toString(16).padStart(64, '0'),
-    prompt: `Stable prompt ${index + 1}`,
+    prompt: `Dynamic prompt ${index + 1}`,
   }))
   const retryEnv = {
     ...env,
     XAI_API_KEY: undefined,
     COS_UNIVERSITY_TEACHER_XAI_ENABLED: 'false',
   }
-  let claudeAvailable = false
 
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const body = JSON.parse(String(init?.body || '{}'))
     const model = String(body.model)
     if (url.includes('anthropic.com')) {
-      if (!claudeAvailable) {
-        return new Response(JSON.stringify({
-          type: 'error',
-          error: { type: 'credit_error', message: 'temporarily unavailable' },
-        }), { status: 400 })
-      }
       return new Response(JSON.stringify({
-        content: [{ type: 'text', text: `claude-${model}` }],
-        usage: { input_tokens: 10, output_tokens: 5 },
-      }), { status: 200, headers: { 'request-id': 'anthropic-retry' } })
+        type: 'error',
+        error: { type: 'credit_error', message: 'temporarily unavailable' },
+      }), { status: 400 })
     }
     return new Response(JSON.stringify({
       id: 'resp-openai',
@@ -250,7 +243,7 @@ test('provider assignment remains stable across partial retries and failure tele
         content: [{ type: 'output_text', text: `openai-${model}` }],
       }],
       usage: { input_tokens: 10, output_tokens: 5 },
-    }), { status: 200, headers: { 'x-request-id': 'openai-retry' } })
+    }), { status: 200, headers: { 'x-request-id': 'openai-reroute' } })
   }
 
   const run = {
@@ -266,21 +259,21 @@ test('provider assignment remains stable across partial retries and failure tele
   assert.equal(first.completed, false)
   assert.deepEqual(first.activeProviders, ['openai', 'claude'])
   assert.equal(first.providerMix.openai, 10)
-  assert.equal(first.providerMix.claude, undefined)
   assert.ok(first.failures.every(item => item.teacherId === 'claude'))
 
-  claudeAvailable = true
+  // The next tick sees only the ten missing prompts. Its 20-call budget gives each missing prompt
+  // a second compatible route, so Claude failures immediately spill to OpenAI without waiting for
+  // Claude to recover.
   const second = await runMassHostedTeacherStage({
     db, run, prompts, promptSetHash: '1'.repeat(64), env: retryEnv, fetchImpl,
   })
   assert.equal(second.rows, 20)
   assert.equal(second.completed, true)
-  assert.equal(second.providerMix.openai, 10)
-  assert.equal(second.providerMix.claude, 10)
-  assert.equal(second.failures.length, 0)
-
-  for (let index = 0; index < prompts.length; index += 1) {
-    const stored = db.rows.find(row => row.prompt_id === prompts[index].id)
-    assert.equal(stored.teacher_id, index % 2 === 0 ? 'openai' : 'claude')
-  }
+  assert.equal(second.providerMix.openai, 20)
+  assert.equal(second.providerMix.claude, undefined)
+  assert.equal(second.reroutedPrompts, 10)
+  assert.equal(second.attemptedCalls, 20)
+  assert.equal(second.failures.length, 10)
+  assert.ok(second.failures.every(item => item.teacherId === 'claude'))
 })
+

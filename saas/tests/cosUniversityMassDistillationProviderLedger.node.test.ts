@@ -13,7 +13,7 @@ test('mass cron settles durable provider ledger before diagnostics and new paid 
   const diagnoseAt = workflow.indexOf('await diagnoseFailedMassDistillationHuggingFaceJobs({ maxJobs: 5 })')
   const stalledAt = workflow.indexOf('await recoverStalledMassDistillationDispatchClaims({ now, maxRuns: 10 })')
   const recoverAt = workflow.indexOf('await recoverMassDistillationCampaigns({ now, maxCampaigns: 5 })')
-  const consumeAt = workflow.indexOf('await runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })')
+  const consumeAt = workflow.indexOf('await runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })')
   assert.ok(reconcileAt >= 0 && diagnoseAt > reconcileAt && stalledAt > diagnoseAt && recoverAt > stalledAt && consumeAt > recoverAt)
 })
 

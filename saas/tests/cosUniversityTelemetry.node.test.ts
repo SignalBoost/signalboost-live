@@ -33,3 +33,16 @@ test('University telemetry dashboard watches multi-provider calls and the HF pip
   assert.match(copy, /read-only/i)
   for (const lang of ['en', 'es', 'pt', 'pl', 'ru']) assert.match(copy, new RegExp('\\b' + lang + ': \\{'))
 })
+
+
+test('University telemetry seeds active hosted teachers before live rows so new providers are visible at zero', () => {
+  const route = source('app/api/admin/cos-university-telemetry/route.ts')
+  const page = source('app/dashboard/cos-university-telemetry/page.tsx')
+  assert.match(route, /universityTeacherPoolStatus\(process\.env\)/)
+  assert.match(route, /teacher\.transport === 'huggingface_job'/)
+  assert.match(route, /teacher\.massDistillationEligible !== true/)
+  assert.match(route, /calls:\s*0/)
+  assert.match(route, /teacher\.endsWith\('-api'\)/)
+  assert.match(page, /'gemini'/)
+  assert.match(page, /'deepseek'/)
+})

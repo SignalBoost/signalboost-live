@@ -101,6 +101,17 @@ test('twenty prompts fan out across OpenAI, Claude and Grok and persist exact ro
           usage: { input_tokens: 10, output_tokens: 5 },
         }), { status: 200, headers: { 'request-id': `anthropic-${calls}` } })
       }
+      if (url.includes('api.openai.com/v1/responses')) {
+        return new Response(JSON.stringify({
+          id: `resp-${calls}`,
+          output: [{
+            type: 'message',
+            role: 'assistant',
+            content: [{ type: 'output_text', text }],
+          }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }), { status: 200, headers: { 'x-request-id': `openai-${calls}` } })
+      }
       return new Response(JSON.stringify({
         choices: [{ message: { content: text } }],
         usage: { prompt_tokens: 10, completion_tokens: 5 },
@@ -129,6 +140,9 @@ test('consumer bypasses the single HF teacher job only after hosted teacher comp
 
   assert.match(consumer, /runMassHostedTeacherStage/)
   assert.match(consumer, /mass_distillation_hosted_teacher_dataset_registered/)
+  assert.match(consumer, /mass_distillation_hosted_teacher_zero_row_fallback/)
+  assert.match(consumer, /all_hosted_teacher_calls_failed_before_any_teacher_row/)
+  assert.match(consumer, /explicitFallbackPath: 'existing_huggingface_teacher_stage'/)
   assert.match(consumer, /teacher_model_id: 'multi-provider-hosted'/)
   assert.match(consumer, /stage: 'preparation_pending'/)
   assert.match(consumer, /teacherRows: hostedRows/)
@@ -183,4 +197,14 @@ test('mass teacher lane excludes custom gateways whose pricing is not covered by
   const source = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassHostedTeacherStage.ts'), 'utf8')
   assert.match(source, /MASS_HOSTED_TEACHER_IDS = new Set\(\['openai', 'claude', 'grok'\]\)/)
   assert.doesNotMatch(source, /MASS_HOSTED_TEACHER_IDS[\s\S]{0,80}'custom'/)
+})
+
+
+test('zero hosted rows are an explicit governed HF fallback, while partial hosted success still fails closed', () => {
+  const consumer = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassDistillationConsumer.ts'), 'utf8')
+  assert.match(consumer, /hosted\.rows === 0 && !hosted\.completed/)
+  assert.match(consumer, /successfulHostedRows: 0/)
+  assert.match(consumer, /silentFallbackAllowed: false/)
+  assert.match(consumer, /else if \(!hosted\.completed \|\| !hosted\.datasetHash \|\| hosted\.outputHashes\.length < 20\)/)
+  assert.match(consumer, /mass_distillation_hosted_teacher_incomplete/)
 })

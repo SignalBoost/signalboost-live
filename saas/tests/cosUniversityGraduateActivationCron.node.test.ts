@@ -11,7 +11,7 @@ test('the activation caller exists and is scheduled — promoted graduates canno
   // activateGraduateRuntime had zero callers: promotion wrote pending_runtime, COS routing read
   // active, and nothing bridged them. This cron is that bridge.
   assert.match(route, /activateGraduateRuntime\(\{/)
-  assert.match(vercel, /"\/api\/cron\/cos-university-graduate-activation", "schedule": "\*\/10 \* \* \* \*"/)
+  assert.match(vercel, /"path": "\/api\/cron\/cos-university-graduate-activation",[\s\S]{0,120}"schedule": "7,17,27,37,47,57 \* \* \* \*"/)
 })
 
 test('fail-closed owner switch, no new approval SQL class', () => {

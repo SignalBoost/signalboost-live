@@ -117,6 +117,13 @@ function armedApproval(own: readonly CanaryEvent[], nowMs: number): boolean {
     if (approval.verifier !== 'host_controller' || claim(approval) !== MASS_CANARY_APPROVAL_CLAIM) return false
     const approvedAt = at(approval.observedAt)
     if (!Number.isFinite(approvedAt) || !(at(approval.expiresAt) > nowMs)) return false
+    // A rolling approval accidentally re-issued after this exact artifact already passed its canary
+    // cannot be consumed: the atomic claim correctly refuses a second canary. Treat that duplicate
+    // approval as stale unless it explicitly carries the endpoint-refresh authority produced after
+    // repeated evaluator lifecycle failures. Otherwise one bad approval becomes a queue-wide deadlock.
+    const alreadyPassed = own.some(event => claim(event) === 'local_distilled_runtime_canary_passed'
+      && at(event.observedAt) <= approvedAt)
+    if (alreadyPassed && approval.evidence?.endpointRefresh !== true) return false
     const after = own.filter(event => at(event.observedAt) >= approvedAt)
     if (after.some(event => claim(event) === 'local_distilled_runtime_canary_invocation_started')) return false
     return after.filter(event => claim(event) === 'local_distilled_runtime_canary_preflight_failed').length < 3

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { createDynamicPipelineCandidate, rankDynamicPipelineCandidates } from '@/lib/dynamic-pipeline-router'
+import { createDynamicPipelineCandidate, rankDynamicPipelineCandidates } from '../../dynamic-pipeline-router/index.ts'
 import {
   universityTeacherPoolStatus,
   type UniversityTeacherDefinition,

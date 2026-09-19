@@ -101,14 +101,19 @@ test('Browser Agent Ecosystem is architecture-complete while production executio
   assert.equal(descriptor?.route, undefined)
 })
 
-test('University and distillation are registered with explicit extraction blockers instead of false commercial closure', () => {
+test('University, distillation, and Dynamic Pipeline Router remain fail-closed on their explicit portability blockers', () => {
   const report = createPortableArchitectureClosureReport()
   const university = report.entries.find(entry => entry.productId === 'ai-university')
   const distillation = report.entries.find(entry => entry.productId === 'ai-distillation-engine')
+  const router = report.entries.find(entry => entry.productId === 'dynamic-pipeline-router')
   assert.equal(university?.state, 'partial')
   assert.ok(university?.blockers.includes('buyer-neutral-host-extraction-pending'))
   assert.equal(distillation?.state, 'partial')
   assert.ok(distillation?.blockers.includes('buyer-neutral-training-provider-port-pending'))
+  assert.equal(router?.state, 'partial')
+  assert.equal(router?.coreBoundary, 'saas/lib/dynamic-pipeline-router')
+  assert.ok(router?.blockers.includes('buyer-host-durable-lease-adapter-pending'))
+  assert.ok(router?.blockers.includes('router-telemetry-ledger-pending'))
   assert.equal(report.closed, false)
-  assert.equal(report.completeCount, report.totalCount - 2)
+  assert.equal(report.completeCount, report.totalCount - 3)
 })

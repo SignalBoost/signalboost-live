@@ -83,8 +83,8 @@ export function universityTeacherPricingFor(
 
 function conservativeInputTokens(system: string, prompt: string): number {
   // Deliberately conservative for pre-dispatch spend authorization. Actual provider usage replaces
-  // this estimate after a successful call; two characters/token leaves headroom for punctuation,
-  // code, non-English material, and provider-specific tokenization.
+  // this estimate after a successful call; one character/token is intentionally pessimistic for
+  // punctuation, code, non-English material, and provider-specific tokenization.
   return Math.max(1, system.length + prompt.length)
 }
 

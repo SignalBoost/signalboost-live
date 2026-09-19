@@ -12,8 +12,12 @@ const pool = source('lib/ai/cos/cosUniversityTeacherPool.ts')
 
 test('multi-provider hosted teachers are wired into live curriculum replenishment', () => {
   assert.match(replenishment, /installHostedTeacherCurriculum/)
-  assert.ok(replenishment.indexOf('installVerifiedFailureDerivedCurriculum') < replenishment.indexOf('installHostedTeacherCurriculum'))
-  assert.ok(replenishment.indexOf('installHostedTeacherCurriculum') < replenishment.indexOf('installTeacherSyntheticFallback'))
+  const failureCall = replenishment.indexOf('const failureDerived = await installVerifiedFailureDerivedCurriculum')
+  const hostedCall = replenishment.indexOf('const hostedTeachers = await installHostedTeacherCurriculum')
+  const syntheticCall = replenishment.indexOf('const synthetic = await installTeacherSyntheticFallback')
+  assert.ok(failureCall >= 0 && hostedCall >= 0 && syntheticCall >= 0)
+  assert.ok(failureCall < hostedCall)
+  assert.ok(hostedCall < syntheticCall)
   assert.match(replenishment, /'hosted_teacher'/)
   assert.match(replenishment, /hostedTeacherInserted/)
 })
@@ -44,4 +48,12 @@ test('every requested enterprise provider remains represented in the pool', () =
   for (const marker of ["id: 'qwen'", "id: 'deepseek'", "id: 'openai'", "id: 'claude'", "id: 'grok'", "id: 'custom'"]) {
     assert.ok(pool.includes(marker), `missing ${marker}`)
   }
+})
+
+
+test('hosted teacher activation is bounded in Vercel production config', () => {
+  const vercel = JSON.parse(source('vercel.json'))
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_HOSTED_MAX_CALLS_PER_CYCLE, '8')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_HOSTED_MAX_OUTPUT_TOKENS, '1200')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_HOSTED_PARALLELISM, '4')
 })

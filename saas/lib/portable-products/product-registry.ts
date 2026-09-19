@@ -1,6 +1,6 @@
 // saas/lib/portable-products/product-registry.ts
 import type { PortableProductManifest } from './manifestTypes.ts'
-import { portableProductManifests, providerHubManifest, campaignStudioManifest, integrationsHubManifest, videoMakerManifest, controlCenterManifest, marketingSalesManifest, pressMediaManifest, portableChiefOfStaffManifest, browserAgentEcosystemManifest, agentOperationsPlatformManifest, selfHealingSupervisorManifest, aiUniversityManifest, aiDistillationEngineManifest } from './manifests/index.ts'
+import { portableProductManifests, providerHubManifest, campaignStudioManifest, integrationsHubManifest, videoMakerManifest, controlCenterManifest, marketingSalesManifest, pressMediaManifest, portableChiefOfStaffManifest, browserAgentEcosystemManifest, agentOperationsPlatformManifest, selfHealingSupervisorManifest, aiUniversityManifest, aiDistillationEngineManifest, dynamicPipelineRouterManifest } from './manifests/index.ts'
 import { validatePortableProductManifests } from './manifestValidation.ts'
 import type { PortableProductDescriptor } from './product-types.ts'
 import { validatePortableProductRegistry } from './product-validation.ts'
@@ -11,6 +11,7 @@ validatePortableProductManifests(portableProductManifests)
 /** Canonical presentation catalog. Product metadata lives only in the referenced manifests. */
 export const portableProductRegistry = Object.freeze([
   product(providerHubManifest, { localizationKey: 'providerHub', glyph: '⌘', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 5, route: '/dashboard/provider-hub' }),
+  product(dynamicPipelineRouterManifest, { localizationKey: 'dynamicRouter', glyph: '⇄', implementationStatus: 'preview', implementationClassification: 'preview_product', sortOrder: 7 }),
   product(campaignStudioManifest, { localizationKey: 'campaign', glyph: '✦', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 10, route: '/agency' }),
   product(integrationsHubManifest, { localizationKey: 'integrations', glyph: '⛓', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 20 }),
   product(videoMakerManifest, { localizationKey: 'render', glyph: '◍', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 30 }),

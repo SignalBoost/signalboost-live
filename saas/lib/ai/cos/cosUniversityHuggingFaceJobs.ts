@@ -62,6 +62,8 @@ type TrainingEnvelope = Readonly<Record<string, unknown>> & {
 
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:@([A-Za-z0-9._-]+))?#([A-Za-z0-9_.-]+)$/
 const COMMIT_SHA = /^[a-f0-9]{40}$/i
+const HEX64 = /^[a-f0-9]{64}$/i
+const DISTILLATION_OPEN_LICENSES = new Set(['apache-2.0', 'mit'])
 const MAX_WORKER_REQUEST_JSON_BYTES = 1_400_000
 
 function clean(value: unknown, max = 4096): string {
@@ -201,7 +203,7 @@ function teacherEnvelopeValid(envelope: TrainingEnvelope): boolean {
   const prompts = (envelope as any)?.prompts
   return Boolean(
     teacher && student
-    && clean(teacher.modelId, 240) && COMMIT_SHA.test(clean(teacher.revision, 40)) && clean(teacher.license, 80) === 'apache-2.0'
+    && clean(teacher.modelId, 240) && COMMIT_SHA.test(clean(teacher.revision, 40)) && DISTILLATION_OPEN_LICENSES.has(clean(teacher.license, 80).toLowerCase())
     && clean(student.modelId, 240) && COMMIT_SHA.test(clean(student.revision, 40)) && clean(student.license, 80) === 'apache-2.0'
     && clean(teacher.modelId, 240) !== clean(student.modelId, 240)
     && Array.isArray(prompts) && prompts.length >= 20 && prompts.length <= 256
@@ -211,6 +213,35 @@ function teacherEnvelopeValid(envelope: TrainingEnvelope): boolean {
     && (envelope as any)?.containsPrivateProductionData === false
     && COMMIT_SHA.test(clean(teacher.revision, 40))
     && COMMIT_SHA.test(clean(student.revision, 40))
+  )
+}
+
+function hostedTeacherEnvelopeValid(envelope: TrainingEnvelope): boolean {
+  const teacher = (envelope as any)?.teacher
+  const student = (envelope as any)?.student
+  const examples = (envelope as any)?.examples
+  const manifestHash = clean((envelope as any)?.providerManifestHash, 64)
+  return Boolean(
+    teacher && student
+    && clean(teacher.provider, 80)
+    && clean(teacher.modelId, 240)
+    && COMMIT_SHA.test(clean(teacher.revision, 40))
+    && clean(student.modelId, 240)
+    && COMMIT_SHA.test(clean(student.revision, 40))
+    && clean(student.license, 80) === 'apache-2.0'
+    && HEX64.test(manifestHash)
+    && Array.isArray(examples) && examples.length >= 20 && examples.length <= 256
+    && examples.every((item: any) =>
+      clean(item?.promptId, 160)
+      && clean(item?.prompt, 12000)
+      && clean(item?.response, 20000).length >= 80
+      && HEX64.test(clean(item?.responseHash, 64))
+      && clean(item?.provider, 80) === clean(teacher.provider, 80)
+      && clean(item?.model, 240) === clean(teacher.modelId, 240)
+    )
+    && (envelope as any)?.trainingRights === 'provider_output_contractually_authorized'
+    && (envelope as any)?.studentControlledByBuyer === true
+    && (envelope as any)?.containsPrivateProductionData === false
   )
 }
 
@@ -248,6 +279,15 @@ export function buildHuggingFaceJobSpec(input: {
       'transformers>=4.55,<6',
       'accelerate>=1.10,<2',
       'bitsandbytes>=0.46,<1',
+    ])
+  } else if (operation === 'materialize_teacher_dataset') {
+    if (!hostedTeacherEnvelopeValid(input.envelope)) throw new Error('huggingface_hosted_teacher_envelope_invalid')
+    dockerImage = 'python:3.12-slim'
+    flavor = input.config.preparationFlavor
+    timeoutSeconds = input.config.preparationTimeoutSeconds
+    command = workerBootstrap([
+      'huggingface_hub>=0.34,<2',
+      'datasets>=3,<5',
     ])
   } else if (operation === 'prepare_dataset') {
     const source = (input.envelope as any)?.candidate?.source
@@ -287,7 +327,7 @@ export function buildHuggingFaceJobSpec(input: {
   const digest = requestDigest(input.envelope)
   const purpose = operation === 'train'
     ? 'governed-model-training'
-    : operation === 'generate_teacher_dataset'
+    : operation === 'generate_teacher_dataset' || operation === 'materialize_teacher_dataset'
       ? 'governed-teacher-dataset'
       : 'governed-dataset-preparation'
   return Object.freeze({

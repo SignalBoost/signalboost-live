@@ -21,6 +21,10 @@ import {
 } from './cosUniversityHuggingFaceJobs.ts'
 import { trainingExecutorConfigFromEnv } from './cosUniversityTrainingExecutor.ts'
 import {
+  selectUniversityTeacherForBatch,
+  synthesizeHostedTeacherBatch,
+} from './cosUniversityMultiProviderTeacherSynthesis.ts'
+import {
   DISTILLATION_SOURCE_ATTRIBUTION_CLAIM,
   attributeDistillationSources,
 } from './cosUniversityDistillationSourceAttribution.ts'
@@ -42,7 +46,7 @@ const HEX40 = /^[a-f0-9]{40}$/i
 const MASS_CANDIDATE = /^mass:([0-9a-f-]{36}):([a-f0-9]{16})$/i
 
 type Stage = 'teacher_dispatching' | 'preparation_dispatching' | 'training_dispatching'
-type FetchPort = (url: string, init?: RequestInit) => Promise<Response>
+type FetchPort = (url: string | URL, init?: RequestInit) => Promise<Response>
 
 export type MassDistillationDispatchReadiness = Readonly<{
   ready: boolean
@@ -350,40 +354,148 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
   let preDispatch: Record<string, unknown> = {}
   let distinctPrompts: number | null = null
   let promptSetHash: string | null = null
+  let teacherProvider: string | null = null
+  let teacherTransport: string | null = null
+  let hostedTeacherEstimatedCostUsd = 0
+  let hostedTeacherMaximumCostUsd = 0
+  let hfCostCeilingUsd = expectedCeiling
+  let boundedStage: Stage = claim.stage
 
   if (claim.stage === 'teacher_dispatching') {
     const promptSet = await buildTeacherPrompts(run.subject_id, sourceHashes)
     distinctPrompts = promptSet.distinctPrompts
     promptSetHash = promptSet.promptSetHash
-    const teacherModelId = clean(process.env.COS_UNIVERSITY_HF_TEACHER_MODEL, 240) || MASS_DISTILLATION_TEACHER_MODEL
-    const teacher = await resolveHuggingFaceModelMetadata({ modelId: teacherModelId, token: hf.token, fetchImpl })
     const student = await resolveHuggingFaceModelMetadata({ modelId: MASS_DISTILLATION_STUDENT_MODEL, token: hf.token, fetchImpl })
-    if (teacher.license !== 'apache-2.0' || student.license !== 'apache-2.0' || teacher.modelId === student.modelId) {
-      throw new Error('mass_distillation_model_rights_invalid')
+    if (student.license !== 'apache-2.0') throw new Error('mass_distillation_student_model_rights_invalid')
+
+    // Hosted teacher outputs still need a small HF CPU job to materialize the governed private
+    // dataset. Reserve the minimum five-minute provider cost before selecting any hosted teacher,
+    // so hosted API fan-out plus materialization can never exceed the existing $0.20 stage ceiling.
+    const preparationPrice = await resolveHuggingFaceHardwareRate({ flavor: hf.preparationFlavor, token: hf.token, fetchImpl })
+    const materializationMinimumCostUsd = Number((preparationPrice.hourlyCostUsd * 300 / 3600).toFixed(8))
+    const maxHostedCostUsd = Math.max(0, Number((expectedCeiling - materializationMinimumCostUsd).toFixed(8)))
+
+    let selection: Awaited<ReturnType<typeof selectUniversityTeacherForBatch>> | null = null
+    try {
+      selection = await selectUniversityTeacherForBatch({
+        runId: run.id,
+        routingKey: run.batch_key,
+        prompts: promptSet.prompts,
+        maxHostedCostUsd,
+        preferredModelId: clean(run.teacher_model_id, 240) || null,
+      })
+    } catch (error) {
+      // Compatibility only: pre-pool deployments already authorized Qwen/HF work. If no governed
+      // pool provider is configured yet, preserve that exact pre-existing teacher rather than stall
+      // the University. Once any pool assignment exists, provider failure never falls back.
+      if (safeError(error) !== 'multi_provider_teacher_no_executable_provider'
+        || clean(run.teacher_provider, 80)) throw error
     }
-    idempotencyKey = hash([COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE, claim.campaign_id, claim.batch_key, 'teacher', promptSet.promptSetHash, teacher.revision, student.revision])
-    envelope = {
-      profile: 'cos_university_training_executor_v1',
-      operation: 'generate_teacher_dataset',
-      candidateId: run.candidate_id,
-      subjectId: run.subject_id,
-      promptProfile: COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
-      promptSetHash: promptSet.promptSetHash,
-      prompts: promptSet.prompts,
-      teacher: { modelId: teacher.modelId, revision: teacher.revision, license: teacher.license },
-      student: { modelId: student.modelId, revision: student.revision, license: student.license },
-      trainingRights: 'open_license',
-      studentControlledByBuyer: true,
-      containsPrivateProductionData: false,
-      callbackPath: MASS_DISTILLATION_CALLBACK_PATH,
-      authorityExpanded: false,
-    }
-    hardwareFlavor = hf.teacherFlavor
-    preDispatch = {
-      teacher_model_id: teacher.modelId,
-      teacher_model_revision: teacher.revision,
-      student_model_revision: student.revision,
-      prompt_set_hash: promptSet.promptSetHash,
+
+    if (!selection || selection.teacher.transport === 'huggingface_job') {
+      const teacherModelId = selection?.model
+        || clean(process.env.COS_UNIVERSITY_HF_TEACHER_MODEL, 240)
+        || MASS_DISTILLATION_TEACHER_MODEL
+      const teacher = await resolveHuggingFaceModelMetadata({ modelId: teacherModelId, token: hf.token, fetchImpl })
+      if (!['apache-2.0', 'mit'].includes(teacher.license) || teacher.modelId === student.modelId) {
+        throw new Error('mass_distillation_model_rights_invalid')
+      }
+      teacherProvider = 'huggingface'
+      teacherTransport = 'huggingface_job'
+      idempotencyKey = hash([
+        COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
+        claim.campaign_id,
+        claim.batch_key,
+        'teacher',
+        teacher.modelId,
+        promptSet.promptSetHash,
+        teacher.revision,
+        student.revision,
+      ])
+      envelope = {
+        profile: 'cos_university_training_executor_v1',
+        operation: 'generate_teacher_dataset',
+        candidateId: run.candidate_id,
+        subjectId: run.subject_id,
+        promptProfile: COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
+        promptSetHash: promptSet.promptSetHash,
+        prompts: promptSet.prompts,
+        teacher: { modelId: teacher.modelId, revision: teacher.revision, license: teacher.license },
+        student: { modelId: student.modelId, revision: student.revision, license: student.license },
+        trainingRights: 'open_license',
+        studentControlledByBuyer: true,
+        containsPrivateProductionData: false,
+        callbackPath: MASS_DISTILLATION_CALLBACK_PATH,
+        authorityExpanded: false,
+      }
+      hardwareFlavor = hf.teacherFlavor
+      preDispatch = {
+        teacher_model_id: teacher.modelId,
+        teacher_model_revision: teacher.revision,
+        teacher_provider: teacherProvider,
+        teacher_transport: teacherTransport,
+        teacher_training_rights: 'open_license',
+        teacher_provider_manifest_hash: null,
+        student_model_revision: student.revision,
+        prompt_set_hash: promptSet.promptSetHash,
+      }
+    } else {
+      const synthesis = await synthesizeHostedTeacherBatch({
+        runId: run.id,
+        candidateId: run.candidate_id,
+        teacher: selection.teacher,
+        prompts: promptSet.prompts,
+        maximumAuthorizedHostedCostUsd: maxHostedCostUsd,
+        fetchImpl,
+      })
+      teacherProvider = synthesis.provider
+      teacherTransport = synthesis.transport
+      hostedTeacherEstimatedCostUsd = synthesis.estimatedCostUsd
+      hostedTeacherMaximumCostUsd = synthesis.maximumAuthorizedHostedCostUsd
+      hfCostCeilingUsd = Number((expectedCeiling - hostedTeacherMaximumCostUsd).toFixed(8))
+      boundedStage = 'preparation_dispatching'
+      if (hfCostCeilingUsd <= 0) throw new Error('multi_provider_teacher_materialization_budget_exhausted')
+      idempotencyKey = hash([
+        COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
+        claim.campaign_id,
+        claim.batch_key,
+        'hosted-teacher-materialization',
+        synthesis.providerManifestHash,
+        student.revision,
+      ])
+      envelope = {
+        profile: 'cos_university_training_executor_v1',
+        operation: 'materialize_teacher_dataset',
+        candidateId: run.candidate_id,
+        subjectId: run.subject_id,
+        promptProfile: COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
+        promptSetHash: promptSet.promptSetHash,
+        providerManifestHash: synthesis.providerManifestHash,
+        examples: synthesis.examples,
+        teacher: {
+          provider: synthesis.provider,
+          transport: synthesis.transport,
+          modelId: synthesis.model,
+          revision: synthesis.teacherModelRevision,
+        },
+        student: { modelId: student.modelId, revision: student.revision, license: student.license },
+        trainingRights: 'provider_output_contractually_authorized',
+        studentControlledByBuyer: true,
+        containsPrivateProductionData: false,
+        callbackPath: MASS_DISTILLATION_CALLBACK_PATH,
+        authorityExpanded: false,
+      }
+      hardwareFlavor = hf.preparationFlavor
+      preDispatch = {
+        teacher_model_id: synthesis.model,
+        teacher_model_revision: synthesis.teacherModelRevision,
+        teacher_provider: synthesis.provider,
+        teacher_transport: synthesis.transport,
+        teacher_training_rights: 'provider_output_contractually_authorized',
+        teacher_provider_manifest_hash: synthesis.providerManifestHash,
+        student_model_revision: student.revision,
+        prompt_set_hash: promptSet.promptSetHash,
+      }
     }
   } else if (claim.stage === 'preparation_dispatching') {
     if (!decodeHuggingFaceDatasetRef(run.teacher_source_ref) || !HEX64.test(clean(run.dataset_hash, 64))) {
@@ -431,8 +543,12 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
         teacherModelId: run.teacher_model_id,
         studentModelId: run.student_model_id,
         datasetHash,
-        provenanceRefs: [`mass-batch:${run.batch_key}`, `mass-campaign:${run.campaign_id}`],
-        trainingRights: 'open_license',
+        provenanceRefs: [
+          `mass-batch:${run.batch_key}`,
+          `mass-campaign:${run.campaign_id}`,
+          ...(clean(run.teacher_provider_manifest_hash, 64) ? [`teacher-manifest:${clean(run.teacher_provider_manifest_hash, 64)}`] : []),
+        ],
+        trainingRights: clean(run.teacher_training_rights, 80) || 'open_license',
         studentControlledByBuyer: true,
         containsPrivateProductionData: false,
       },
@@ -444,7 +560,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
   }
 
   const price = await resolveHuggingFaceHardwareRate({ flavor: hardwareFlavor, token: hf.token, fetchImpl })
-  const bounded = boundedConfigForStage(hf, claim.stage, price.hourlyCostUsd, expectedCeiling)
+  const bounded = boundedConfigForStage(hf, boundedStage, price.hourlyCostUsd, hfCostCeilingUsd)
   const callbackUrl = new URL(MASS_DISTILLATION_CALLBACK_PATH, executor.url).toString()
   const spec = buildHuggingFaceJobSpec({
     envelope,
@@ -453,7 +569,8 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     callbackSecret: executor.secret,
     config: bounded,
   })
-  const maxEstimatedCostUsd = Number((price.hourlyCostUsd * spec.timeoutSeconds / 3600).toFixed(6))
+  const providerJobMaxEstimatedCostUsd = Number((price.hourlyCostUsd * spec.timeoutSeconds / 3600).toFixed(8))
+  const maxEstimatedCostUsd = Number((providerJobMaxEstimatedCostUsd + hostedTeacherMaximumCostUsd).toFixed(8))
   if (maxEstimatedCostUsd > expectedCeiling + 1e-9) throw new Error('mass_distillation_stage_cost_ceiling_exceeded')
 
   const db = cosServiceDb()
@@ -487,8 +604,15 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       flavor: price.flavor,
       hourlyCostUsd: price.hourlyCostUsd,
       timeoutSeconds: spec.timeoutSeconds,
+      providerJobMaxEstimatedCostUsd,
+      hostedTeacherEstimatedCostUsd,
+      hostedTeacherMaximumCostUsd,
       maxEstimatedCostUsd,
-      reservedCostCeilingUsd: expectedCeiling,
+      teacherProvider,
+      teacherTransport,
+      reservedCostCeilingUsd: hfCostCeilingUsd,
+      stageReservedCostCeilingUsd: expectedCeiling,
+      hostedTeacherCommittedCeilingUsd: hostedTeacherMaximumCostUsd,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
     },
@@ -500,7 +624,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
   const knownJobs = await db.from('cos_university_mass_distillation_provider_jobs')
     .select('job_id')
     .eq('run_id', claim.run_id)
-    .eq('operation', operation === 'generate_teacher_dataset' ? 'teacher' : operation === 'prepare_dataset' ? 'preparation' : 'training')
+    .eq('operation', operation === 'generate_teacher_dataset' || operation === 'materialize_teacher_dataset' ? 'teacher' : operation === 'prepare_dataset' ? 'preparation' : 'training')
   if (knownJobs.error) throw knownJobs.error
   const currentJobId = claim.stage === 'teacher_dispatching'
     ? clean(run.teacher_job_id, 240)
@@ -564,11 +688,20 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       flavor: price.flavor,
       hourlyCostUsd: price.hourlyCostUsd,
       timeoutSeconds: spec.timeoutSeconds,
+      providerJobMaxEstimatedCostUsd,
       maxEstimatedCostUsd,
-      reservedCostCeilingUsd: expectedCeiling,
+      reservedCostCeilingUsd: hfCostCeilingUsd,
+      stageReservedCostCeilingUsd: expectedCeiling,
+      hostedTeacherCommittedCeilingUsd: hostedTeacherMaximumCostUsd,
       sourceCount: sourceHashes.length,
-      promptCount: claim.stage === 'teacher_dispatching' ? ((envelope as any).prompts?.length ?? null) : null,
+      promptCount: claim.stage === 'teacher_dispatching'
+        ? (((envelope as any).prompts?.length ?? (envelope as any).examples?.length) ?? null)
+        : null,
       distinctPrompts,
+      teacherProvider,
+      teacherTransport,
+      hostedTeacherEstimatedCostUsd,
+      hostedTeacherMaximumCostUsd,
       promptSetHash,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
@@ -586,7 +719,9 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     jobUrl: submitted.jobUrl,
     hourlyCostUsd: price.hourlyCostUsd,
     maxEstimatedCostUsd,
-    reservedCostCeilingUsd: expectedCeiling,
+    reservedCostCeilingUsd: hfCostCeilingUsd,
+    stageReservedCostCeilingUsd: expectedCeiling,
+    hostedTeacherCommittedCeilingUsd: hostedTeacherMaximumCostUsd,
   })
 }
 
@@ -952,11 +1087,18 @@ export async function recordMassDistillationWorkerEvidence(
     if (!decodeHuggingFaceDatasetRef(sourceRef) || !outputHashes || promptSetHash !== clean(run.prompt_set_hash, 64).toLowerCase()) {
       throw new Error('mass_distillation_teacher_callback_invalid')
     }
+    const expectedTrainingRights = clean(run.teacher_training_rights, 80) || 'open_license'
+    const expectedProviderManifestHash = clean(run.teacher_provider_manifest_hash, 64).toLowerCase()
+    const callbackProviderManifestHash = clean(body.teacherProviderManifestHash, 64).toLowerCase()
+    const expectedProvider = clean(run.teacher_provider, 80)
+    const callbackProvider = clean(body.teacherProvider, 80)
     if (clean(body.teacherModelId, 240) !== run.teacher_model_id
       || clean(body.teacherModelRevision, 40).toLowerCase() !== clean(run.teacher_model_revision, 40).toLowerCase()
       || clean(body.studentModelId, 240) !== run.student_model_id
       || clean(body.studentModelRevision, 40).toLowerCase() !== clean(run.student_model_revision, 40).toLowerCase()
-      || body.trainingRights !== 'open_license'
+      || body.trainingRights !== expectedTrainingRights
+      || (expectedProviderManifestHash && callbackProviderManifestHash !== expectedProviderManifestHash)
+      || (expectedProvider && expectedProvider !== 'huggingface' && callbackProvider !== expectedProvider)
       || body.studentControlledByBuyer !== true
       || body.containsPrivateProductionData !== false) {
       throw new Error('mass_distillation_teacher_callback_provenance_mismatch')
@@ -976,7 +1118,19 @@ export async function recordMassDistillationWorkerEvidence(
     if (updated.error) throw updated.error
     await recordAssurance({
       candidateId, subjectId: run.subject_id, claim,
-      evidence: { campaignId: run.campaign_id, batchKey: run.batch_key, jobId, sourceRef, datasetHash, promptSetHash, outputCount: outputHashes.length },
+      evidence: {
+        campaignId: run.campaign_id,
+        batchKey: run.batch_key,
+        jobId,
+        sourceRef,
+        datasetHash,
+        promptSetHash,
+        outputCount: outputHashes.length,
+        teacherProvider: expectedProvider || null,
+        teacherTransport: clean(run.teacher_transport, 80) || null,
+        trainingRights: expectedTrainingRights,
+        providerManifestHash: expectedProviderManifestHash || null,
+      },
       verifier: 'training_executor',
     })
     return { ok: true as const, campaignId: run.campaign_id, batchKey: run.batch_key, nextStage: 'preparation_pending' as const }

@@ -173,7 +173,7 @@ def generate_teacher_dataset(envelope: dict[str, Any]) -> None:
         or teacher_id == student_id
         or not HEX40.match(teacher_revision)
         or not HEX40.match(student_revision)
-        or clean(teacher.get("license"), 80).lower() != "apache-2.0"
+        or clean(teacher.get("license"), 80).lower() not in {"apache-2.0", "mit"}
         or clean(student.get("license"), 80).lower() != "apache-2.0"
         or not HEX64.match(prompt_set_hash)
         or envelope.get("trainingRights") != "open_license"
@@ -314,6 +314,133 @@ def generate_teacher_dataset(envelope: dict[str, Any]) -> None:
         "studentModelId": student_id,
         "studentModelRevision": student_revision,
         "trainingRights": "open_license",
+        "studentControlledByBuyer": True,
+        "containsPrivateProductionData": False,
+    })
+
+
+
+def materialize_teacher_dataset(envelope: dict[str, Any]) -> None:
+    from datasets import Dataset
+    from huggingface_hub import HfApi
+
+    teacher = envelope.get("teacher") if isinstance(envelope.get("teacher"), dict) else {}
+    student = envelope.get("student") if isinstance(envelope.get("student"), dict) else {}
+    examples = envelope.get("examples") if isinstance(envelope.get("examples"), list) else []
+
+    teacher_id = clean(teacher.get("modelId"), 240)
+    teacher_revision = clean(teacher.get("revision"), 40).lower()
+    teacher_provider = clean(teacher.get("provider"), 80)
+    student_id = clean(student.get("modelId"), 240)
+    student_revision = clean(student.get("revision"), 40).lower()
+    prompt_set_hash = clean(envelope.get("promptSetHash"), 64).lower()
+    provider_manifest_hash = clean(envelope.get("providerManifestHash"), 64).lower()
+
+    if (
+        not teacher_id
+        or not teacher_provider
+        or not HEX40.match(teacher_revision)
+        or not student_id
+        or not HEX40.match(student_revision)
+        or clean(student.get("license"), 80).lower() != "apache-2.0"
+        or not HEX64.match(prompt_set_hash)
+        or not HEX64.match(provider_manifest_hash)
+        or envelope.get("trainingRights") != "provider_output_contractually_authorized"
+        or envelope.get("studentControlledByBuyer") is not True
+        or envelope.get("containsPrivateProductionData") is not False
+        or len(examples) < 20
+        or len(examples) > 256
+    ):
+        raise RuntimeError("worker_hosted_teacher_dataset_contract_invalid")
+
+    rows: list[dict[str, Any]] = []
+    item_hashes: list[str] = []
+    seen_prompt_ids: set[str] = set()
+    for item in examples:
+        if not isinstance(item, dict):
+            raise RuntimeError("worker_hosted_teacher_example_invalid")
+        prompt_id = clean(item.get("promptId"), 160)
+        prompt = clean(item.get("prompt"), 12_000)
+        response = clean(item.get("response"), 20_000)
+        response_hash = clean(item.get("responseHash"), 64).lower()
+        provider = clean(item.get("provider"), 80)
+        model = clean(item.get("model"), 240)
+        request_id = clean(item.get("requestId"), 240)
+        if (
+            not prompt_id
+            or prompt_id in seen_prompt_ids
+            or not prompt
+            or len(response) < 80
+            or provider != teacher_provider
+            or model != teacher_id
+            or not HEX64.match(response_hash)
+            or re.search(r"</?think>", response, flags=re.I)
+        ):
+            raise RuntimeError("worker_hosted_teacher_example_invalid")
+        text = f"<user>\n{prompt}\n\n<assistant>\n{response}"
+        digest = sha256(text)
+        if digest != response_hash:
+            raise RuntimeError("worker_hosted_teacher_example_hash_mismatch")
+        if digest in item_hashes:
+            continue
+        seen_prompt_ids.add(prompt_id)
+        item_hashes.append(digest)
+        rows.append({
+            "prompt_id": prompt_id,
+            "prompt": prompt,
+            "response": response,
+            "text": text,
+            "messages": [
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": response},
+            ],
+            "item_hash": digest,
+            "teacher_provider": teacher_provider,
+            "teacher_model": teacher_id,
+            "teacher_revision": teacher_revision,
+            "provider_request_id": request_id or None,
+            "student_model": student_id,
+            "student_revision": student_revision,
+            "training_rights": "provider_output_contractually_authorized",
+            "contains_private_production_data": False,
+            "prompt_profile": clean(envelope.get("promptProfile"), 120),
+            "prompt_set_hash": prompt_set_hash,
+            "provider_manifest_hash": provider_manifest_hash,
+        })
+
+    if len(rows) < 20:
+        raise RuntimeError("worker_hosted_teacher_dataset_too_small")
+
+    token = os.environ["HF_TOKEN"]
+    api = HfApi(token=token)
+    namespace = api.whoami()["name"]
+    candidate_id = clean(envelope.get("candidateId"), 200)
+    job_id = clean(os.environ.get("JOB_ID"), 240)
+    if not candidate_id or not job_id:
+        raise RuntimeError("worker_hosted_teacher_identity_missing")
+    output_repo = f"{namespace}/itmounts-teacher-{sha256(candidate_id + ':' + job_id)[:12]}"
+    api.create_repo(output_repo, repo_type="dataset", private=True, exist_ok=True, token=token)
+    Dataset.from_list(rows).push_to_hub(output_repo, split="train", private=True, token=token)
+    info = api.dataset_info(output_repo, token=token)
+    pinned_revision = clean(getattr(info, "sha", None), 40).lower()
+    if not HEX40.match(pinned_revision):
+        raise RuntimeError("worker_hosted_teacher_dataset_revision_missing")
+
+    source_ref = f"hf://datasets/{output_repo}@{pinned_revision}#train"
+    callback({
+        "claim": "teacher_dataset_registered",
+        "candidateId": candidate_id,
+        "jobId": job_id,
+        "sourceRef": source_ref,
+        "teacherOutputItemHashes": item_hashes,
+        "promptSetHash": prompt_set_hash,
+        "teacherModelId": teacher_id,
+        "teacherModelRevision": teacher_revision,
+        "teacherProvider": teacher_provider,
+        "teacherProviderManifestHash": provider_manifest_hash,
+        "studentModelId": student_id,
+        "studentModelRevision": student_revision,
+        "trainingRights": "provider_output_contractually_authorized",
         "studentControlledByBuyer": True,
         "containsPrivateProductionData": False,
     })
@@ -509,6 +636,8 @@ def main() -> int:
     operation = clean(envelope.get("operation"), 40)
     if operation == "generate_teacher_dataset":
         generate_teacher_dataset(envelope)
+    elif operation == "materialize_teacher_dataset":
+        materialize_teacher_dataset(envelope)
     elif operation == "prepare_dataset":
         prepare_dataset(envelope)
     elif operation == "train":

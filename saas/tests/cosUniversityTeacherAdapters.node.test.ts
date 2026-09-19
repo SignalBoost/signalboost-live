@@ -65,3 +65,43 @@ test('local/Hugging Face teachers must use the governed local executor, not host
     /university_teacher_transport_requires_local_executor/,
   )
 })
+
+test('xAI/Grok adapter uses the OpenAI-compatible contract with exact buyer model and idempotency key', async () => {
+  let seenUrl = ''
+  let seenHeaders: any = null
+  let seenBody: any = null
+  const result = await generateWithUniversityTeacher({
+    teacher: byId('grok'),
+    env: {
+      XAI_API_KEY: 'xai_123456789012345678901234567890',
+      COS_UNIVERSITY_TEACHER_XAI_MODEL: 'buyer-approved-grok-model',
+    },
+    request: { system: 'Teach carefully.', prompt: 'Explain Z.', maxOutputTokens: 300, requestKey: 'a'.repeat(64) },
+    fetchImpl: async (input, init) => {
+      seenUrl = String(input)
+      seenHeaders = init?.headers
+      seenBody = JSON.parse(String(init?.body || '{}'))
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: 'grok answer' } }],
+        usage: { prompt_tokens: 11, completion_tokens: 7 },
+      }), { status: 200, headers: { 'x-request-id': 'req-x' } })
+    },
+  })
+  assert.equal(seenUrl, 'https://api.x.ai/v1/chat/completions')
+  assert.equal(seenBody.model, 'buyer-approved-grok-model')
+  assert.match(JSON.stringify(seenHeaders), /Idempotency-Key/)
+  assert.equal(result.provider, 'xai')
+  assert.equal(result.requestId, 'req-x')
+})
+
+test('hosted teacher refuses placeholder or missing model configuration', async () => {
+  await assert.rejects(
+    generateWithUniversityTeacher({
+      teacher: byId('openai'),
+      env: { OPENAI_API_KEY: 'sk_123456789012345678901234567890' },
+      request: { system: 'x', prompt: 'y', maxOutputTokens: 64 },
+      fetchImpl: async () => new Response('{}'),
+    }),
+    /university_teacher_not_configured/,
+  )
+})

@@ -186,6 +186,12 @@ function interactiveReasonerMaxTokens():number {
   return Math.min(bounded, ceiling)
 }
 
+function interactiveReasonerFeature(prompt:string):'cos_interactive_answer'|'cos_interactive_authoring' {
+  return classifyProblemClass(prompt) === 'writing and content'
+    ? 'cos_interactive_authoring'
+    : 'cos_interactive_answer'
+}
+
 /** Apply deterministic corrections to checkable answer arithmetic before returning it. */
 function cleanAnswerText(answer: string): string {
   return correctCompoundingArithmetic(stripInternalEvidenceIds(answer)).text
@@ -865,7 +871,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   // into one generic "did not return an answer" message with the real cause visible only in logs.
   let reasonerFailureMessage: string | null = null
   const reasoned = await callCosReasoner({
-    usageContext:{ feature:'cos_interactive_answer', purpose:'user_facing_response' },
+    usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_response' },
     temperature:Number(process.env.COS_REASONER_TEMPERATURE ?? '0'),
     maxTokens:interactiveReasonerMaxTokens(),
     systemPrompt:COS_REASONER_SYSTEM_PROMPT(input.language || 'English', { privileged: input.privileged === true }),
@@ -936,7 +942,7 @@ export async function tryCOSFirstAnswer(input:{prompt:string;previousAssistant?:
   const executiveSignals = releaseSignals(reasoned.text)
   if (executiveSignals.length) {
     const repair = await callCosReasoner({
-      usageContext:{ feature:'cos_interactive_answer', purpose:'user_facing_release_repair' },
+      usageContext:{ feature:interactiveReasonerFeature(input.prompt), purpose:'user_facing_release_repair' },
       temperature: 0,
       maxTokens: interactiveReasonerMaxTokens(),
       systemPrompt: 'EXECUTIVE RELEASE REPAIR. Return ONLY strict JSON: {"answer":"...","confidence":0.0}. Rewrite the draft using only the supplied facts and the supplied internal evidence. Remove unsupported commercial certainty and invented numeric limits, timelines, feature gates, market claims, legal conclusions, forecasts, and unstated security frameworks. For a normative or public-policy question, never begin with Yes or No: give at least 100 words of neutral analysis separating descriptive facts from the strongest material supporting and opposing frameworks, then state what evidence establishes and what remains value-dependent. If selected full-content learned-corpus evidence is supplied, use it materially and cite its [CL#] label in the draft. This applies to owner-fed documents, videos, scientific articles, and other approved learning. Deliver the complete memo; do not mention this repair.',

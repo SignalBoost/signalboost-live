@@ -53,6 +53,23 @@ Writing, drafting, translating, editing, rewriting, proofreading, and summarizin
 The freshness boundary, problem-class taxonomy, and reasoning-worker selector all recognize authoring intent before incidental temporal vocabulary. Polite authoring wrappers such as `please write`, `could you draft`, and `can you translate` must not become `current public facts` or select the verifier merely because the surrounding context contains `today` or `current`. This exception applies only when there is no explicit live lookup or volatile-fact object; genuine requests such as `Please write a short summary of today's weather` still select live verification.
 
 Release regression: `my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation` must not enter current-fact web retrieval, evidence grounding, verifier, or freshness-repair workflows.
+
+## Self-contained authoring fast ingress — 2026-09-18
+
+A self-contained, non-code, non-visual, non-live writing or translation request is already a complete COS objective. Concierge and Assistant must send it directly to the shared COS endpoint before public identity, Software Specialist, or semantic visual classification.
+
+This is not a separate Concierge intelligence. Public Concierge still applies public audit identity, public delivery scope, and public presentation around the same `cosPrimaryPost` reasoning endpoint.
+
+Latency/model contract:
+
+- authoring turns are tagged `cos_interactive_authoring`;
+- DeepInfra authoring defaults to `zai-org/GLM-5.3-Flash`, overrideable with `COS_INTERACTIVE_AUTHORING_MODEL`;
+- authoring reasoning effort is `none`;
+- authoring transport timeout defaults to 15 seconds via `COS_INTERACTIVE_AUTHORING_TIMEOUT_MS`;
+- ordinary interactive COS reasoning retains the stronger configured model;
+- code/Builder, visual generation, live-fact verification, operational logs, provenance introspection, University evaluation, and distillation keep their own routing.
+
+The exact anniversary-writing regression must reach shared COS before `resolveSemanticPublicIdentity`, `tryCosSoftwareSpecialist`, and `resolveSemanticVisualRequest`.
 ## COS University Hugging Face Jobs training adapter — 2026-09-13
 
 The governed COS University training-executor contract now has an iTMounts Hugging Face Jobs adapter on branch `feat/itmounts-huggingface-training-adapter-20260913`. `HF_TOKEN` may back the internal signed executor without exposing the provider token as a callback credential; a separate HMAC key is derived for signed evidence callbacks. Explicit buyer-supplied executor configuration still takes precedence.

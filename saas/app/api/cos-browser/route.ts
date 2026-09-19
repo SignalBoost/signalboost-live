@@ -32,6 +32,7 @@ import { resolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdent
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
 import { detectDirectTextTransformation, tryDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
+import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -197,6 +198,28 @@ export async function POST(req: NextRequest) {
   const auditUserId = access?.userId ?? null
   const browserSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
   const authenticatedOwner = access?.isOwner === true && Boolean(access.userId)
+  const routingContext = builderRoutingContextFromBody(body)
+
+  // Self-contained writing/translation is already a complete COS objective. Do not spend the
+  // interactive response budget asking unrelated public identity, Software Specialist, or visual
+  // classifiers to reinterpret it. This is not a separate Concierge brain: both surfaces still
+  // execute cosPrimaryPost; public Concierge retains public audit/delivery scope and presentation.
+  const fastAuthoringIngress = !directTextHasAttachments
+    && isAuthoringObjectiveWithoutLiveLookup(prompt)
+    && !isCosCodingObjective(prompt, routingContext)
+    && !isConciergeArtifactObjective(prompt)
+    && !isConciergeVisualObjective(prompt)
+    && !isProvenanceIntrospection(prompt)
+    && !isOperationalLogEvidence(prompt)
+  if (fastAuthoringIngress) {
+    const executeAuthoring = () => cosPrimaryPost(req)
+    const authoringResponse = access?.isOwner && browserSurface === 'assistant'
+      ? await executeAuthoring()
+      : await withPublicAuditIdentity(auditUserId, () => withPublicDeliveryScope(() => executeAuthoring()))
+    return browserSurface === 'concierge'
+      ? publicConciergePresentation(authoringResponse)
+      : authoringResponse
+  }
 
   if (browserSurface === 'concierge') {
     const deterministicIdentity = publicConciergeIdentityReply(prompt)
@@ -216,7 +239,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const routingContext = builderRoutingContextFromBody(body)
   const attachedOperationalEvidence = readAttachedOperationalEvidence(body?.attachments)
   const currentOperationalPrompt = attachedOperationalEvidence ? `${prompt}\n\n${attachedOperationalEvidence}`.trim() : prompt
 

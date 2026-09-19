@@ -1,0 +1,30 @@
+name: Vercel Cron Disable Forensics
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/scripts/vercel-cron-forensics.mjs'
+      - '.github/workflows/vercel-cron-forensics.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  forensics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate script
+        run: node --check .github/scripts/vercel-cron-forensics.mjs
+      - name: Query Vercel activity
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: prj_QElaxvA1fbFjhVraIzamxRha78Du
+          VERCEL_TEAM_ID: team_jgndR6Eo6QyP2Fen9UbHy2Q5
+        run: node .github/scripts/vercel-cron-forensics.mjs

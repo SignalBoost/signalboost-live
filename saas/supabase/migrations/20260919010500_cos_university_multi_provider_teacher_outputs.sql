@@ -3,6 +3,24 @@
 -- synthetic teacher outputs after a governed provider selection. Service role only; no credentials,
 -- hidden reasoning, or private production data are permitted here.
 
+alter table public.cos_university_mass_distillation_batch_runs
+  add column if not exists teacher_provider text,
+  add column if not exists teacher_transport text,
+  add column if not exists teacher_training_rights text,
+  add column if not exists teacher_provider_manifest_hash text;
+
+alter table public.cos_university_mass_distillation_batch_runs
+  drop constraint if exists cos_university_mass_distillation_teacher_training_rights_check;
+alter table public.cos_university_mass_distillation_batch_runs
+  add constraint cos_university_mass_distillation_teacher_training_rights_check
+  check (teacher_training_rights is null or teacher_training_rights in ('open_license','provider_output_contractually_authorized'));
+
+alter table public.cos_university_mass_distillation_batch_runs
+  drop constraint if exists cos_university_mass_distillation_teacher_manifest_hash_check;
+alter table public.cos_university_mass_distillation_batch_runs
+  add constraint cos_university_mass_distillation_teacher_manifest_hash_check
+  check (teacher_provider_manifest_hash is null or teacher_provider_manifest_hash ~ '^[a-f0-9]{64}$');
+
 create table if not exists public.cos_university_mass_distillation_teacher_outputs (
   run_id uuid not null references public.cos_university_mass_distillation_batch_runs(id) on delete cascade,
   prompt_id text not null check (length(btrim(prompt_id)) between 8 and 160),

@@ -59,3 +59,14 @@ The University owns curriculum selection and academic evidence. The Distillation
 ## Current commercial status
 
 Both products are registered as public **preview** portables. They are not marked licensable yet because buyer-neutral packaging, clean-environment installation evidence, licensing enforcement, and buyer acceptance still need commercial closure. Internal production operation is not treated as proof that a buyer can install and operate the portable independently.
+
+
+## Provider-neutral plug-and-play model providers
+
+Neither portable is tied to OpenAI, Anthropic, xAI, Hugging Face, or any other single vendor.
+
+The University/Distillation host resolves teacher providers through a provider definition plus a transport adapter. Built-in providers are reference configurations. Buyers can add another provider through configuration when it supports an existing protocol, or supply a host adapter for a different protocol.
+
+Provider credentials remain buyer-owned. A provider must be explicitly enabled, adapter-ready, credential-ready, model-ready, and endpoint-ready before it can be selected. Provider failures do not silently widen authority or switch to an unapproved vendor.
+
+This makes provider choice a buyer configuration decision instead of a fork of the University or Distillation Engine.

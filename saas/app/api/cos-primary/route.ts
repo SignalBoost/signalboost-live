@@ -192,6 +192,37 @@ function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;
   return NextResponse.json({ok:true,reply:fast.reply,source,confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
 }
 
+async function runCompletionFirstRescue(input:string,language:string):Promise<{reply:string;reasonerLabel:string;confidence:number}|null>{
+  const result=await callCosReasoner({
+    temperature:.2,
+    maxTokens:2200,
+    systemPrompt:[
+      'You are COS completion rescue. Complete the user task now instead of asking them to narrow a broad but answerable request.',
+      'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+      'Use reasonable low-risk assumptions when they do not materially change correctness, and label material uncertainty inside the answer.',
+      'Give a useful partial answer when full completion is impossible. Never emit internal routing, confidence-gate, release-gate, provider, or fallback language.',
+      'Do not invent mutable current-world facts in this lane; current external facts must be handled by live retrieval before this rescue is reached.',
+      'Do not bypass safety, authorization, privacy, or destructive-action boundaries. When a boundary genuinely prevents the requested action, explain the concrete limitation briefly and give the closest useful safe alternative.',
+      'Do not ask a clarifying question unless no meaningful partial answer can be given without the missing fact.',
+      language ? 'Respond in the user language when appropriate: '+language+'.' : '',
+    ].filter(Boolean).join(' '),
+    prompt:input,
+  }).catch(()=>null)
+  const parsed=result?.text?parseLocalResult(result.text):null
+  const reply=parsed?.answer?.trim()||''
+  if(!reply||hasUnsafePublicModelOutput(reply))return null
+  const resolved=resolveCosReasoner()
+  return{reply,reasonerLabel:resolved.config?.label??'cos-reasoner',confidence:Math.max(.01,Math.min(1,parsed?.confidence??.5))}
+}
+
+function completionFirstResponse(startedAt:number,input:string,result:{reply:string;reasonerLabel:string;confidence:number},source:string){
+  const executionProvenance=authoritativeProvenance(null,{invoked:false})
+  ;(executionProvenance as any).local_reasoning={invoked:true,model:result.reasonerLabel,confidence:result.confidence,completion_first:true}
+  ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:result.reasonerLabel,from_cache:false}
+  const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:result.reply,source:'local_cos_reasoning',confidence:result.confidence,provenance:executionProvenance,externalAiInvoked:false})
+  return NextResponse.json({ok:true,reply:result.reply,source,confidence_score:result.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+}
+
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
 function languageFrom(body:any):string{const value=String(body?.context?.language||'en').toLowerCase();return['en','es','pt','pl','ru'].includes(value)?value:'en'}
 function providerFromPayload(payload:any):{provider:string|null;model:string|null}{for(const item of[payload?.execution,payload?.metadata,payload?.provenance,payload]){if(!item||typeof item!=='object')continue;const provider=typeof item.provider==='string'?item.provider:typeof item.ai_provider==='string'?item.ai_provider:typeof item.external_provider==='string'?item.external_provider:null;const model=typeof item.model==='string'?item.model:typeof item.ai_model==='string'?item.ai_model:typeof item.external_model==='string'?item.external_model:null;if(provider||model)return{provider,model}}return{provider:null,model:null}}
@@ -350,10 +381,20 @@ export async function postCosPrimary(req:NextRequest){
   const requestedAction=requestsExternalAction(input)
   // A question about an earlier conversation with this user is answered from their own history, never from the public web.
   const conversationRecallRequested=Boolean(userId)&&detectConversationRecallIntent(input)
-  const baselineRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested
-  const semanticTaskIntent=baselineRequiresFreshEvidence&&!requestedAction
+  const heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested
+  // Completion-first routing: natural human phrasing is not an API contract. Classify every
+  // ordinary non-action task semantically so research/current-fact requests cannot miss live
+  // retrieval merely because their wording did not match a freshness regex.
+  const semanticTaskIntent=!requestedAction
     ? await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     : null
+  const semanticRequiresFreshEvidence=Boolean(
+    semanticTaskIntent
+      && semanticTaskIntent.mode==='external_fact_verification'
+      && semanticTaskIntent.externalFactsRequired
+      && semanticTaskIntent.confidence>=0.72,
+  )
+  const baselineRequiresFreshEvidence=(heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested
   // HMI semantic rescue: if incidental temporal wording made a human writing request look fresh,
   // trust whole-request semantic intent rather than forcing the user to know COS routing phrases.
   if(!hasAttachments&&!isCosCodingObjective(input)&&semanticIntentIsSelfContainedContentGeneration(semanticTaskIntent)){
@@ -505,6 +546,18 @@ export async function postCosPrimary(req:NextRequest){
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
 
+  // A low confidence score is learning/calibration telemetry, not permission to throw away a
+  // useful guarded answer. For ordinary non-live, non-action tasks, release the best-effort answer
+  // that already survived the normal COS pipeline instead of replacing it with a generic refusal.
+  if(!requestedAction&&!requiresFreshEvidence&&cos&&!cos.handled&&'bestEffortReply' in cos&&typeof cos.bestEffortReply==='string'&&cos.bestEffortReply.trim()){
+    const reply=cos.bestEffortReply.trim()
+    const executionProvenance=authoritativeProvenance(cos,{invoked:false})
+    ;(executionProvenance as any).completion_first={released_best_effort:true,confidence:cos.confidence,threshold:confidenceThreshold()}
+    const liveTelemetry=emitRequestTelemetry({startedAt,input,reply,source:'local_cos_reasoning',confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false})
+    await writeCosPrimaryProvenance(userId,reply,executionProvenance,'cos-local-best-effort',{prompt:input,answered:true,confidence:cos.confidence,branch:'completion_first_best_effort'})
+    return NextResponse.json({ok:true,reply,source:'cos-local-best-effort',confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+  }
+
   // If ordinary COS could not complete a non-live, non-action turn, use neural semantic intent
   // before the generic failed-closed reply. This catches natural human requests such as “help me say
   // something warm” or “come up with a greeting” without hard-coding those phrasings into routing.
@@ -514,6 +567,14 @@ export async function postCosPrimary(req:NextRequest){
       const semanticFast=await runFastAuthoring(input)
       if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic-rescue')
     }
+  }
+
+  // Last ordinary-task rescue before any failed-closed path. This is intentionally broader than
+  // authoring: explanation, analysis, planning, and other low-risk tasks should still receive a
+  // useful answer when the primary confidence gate declined to release one.
+  if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)){
+    const completionRescue=await runCompletionFirstRescue(input,language)
+    if(completionRescue)return completionFirstResponse(startedAt,input,completionRescue,'cos-completion-first-rescue')
   }
 
   const freshHardFail=requiresFreshEvidence&&!freshMissUseLocal

@@ -3,6 +3,22 @@
 # iTMounts Engineering Blueprint
 
 
+## University Self-Healing progress invariant — 2026-09-19
+
+Self-Healing Supervisor must distinguish **lack of supply** from **failure to convert valid upstream progress into downstream work**.
+
+Canonical University recovery order:
+
+- zero prepared batches by itself is ordinary `waiting_for_curriculum`; SHS must not manufacture work or weaken curriculum gates;
+- when the latest slow-maintenance receipt proves a canonical subject received enough newly inserted governed curriculum to satisfy its recorded batch shortfall, but packaging still produces zero prepared batches, that is `curriculum_packaging_stalled` and requires recovery;
+- SHS first executes the registered bounded runtime recovery and independently verifies the Production health state;
+- only when runtime recovery cannot restore the progress invariant may SHS enqueue Software Specialist / Platform Engineer on the exact deployed revision;
+- repository repair must reproduce before edit, preserve the 20-item batch minimum, rights/provenance/confidence/deduplication/semantic-cohesion gates, Dynamic Pipeline Router neutrality, spend ceilings, and promotion/Production authority;
+- Platform Engineer repairs remain pinned, deduplicated, retry-bounded, PR/CI governed, checkpoint-gated for main auto-merge, deployment-watched, and rollback-capable;
+- SHS code repair never authorizes model promotion, RunPod mutation, new provider authority, a higher cost ceiling, or wider Production traffic.
+
+This is a cross-stage progress contract: **upstream progress without required downstream progress is a repair signal, not a reason to wait forever.**
+
 ## Dynamic Pipeline Router invariant — 2026-09-19
 
 Incoming eligible work is **work-driven, not vendor-lane-driven**. A workload requests capabilities and policy constraints; it must not wait for one named provider when another compatible, approved, healthy route has capacity.

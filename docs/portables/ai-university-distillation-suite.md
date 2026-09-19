@@ -70,3 +70,14 @@ The University/Distillation host resolves teacher providers through a provider d
 Provider credentials remain buyer-owned. A provider must be explicitly enabled, adapter-ready, credential-ready, model-ready, and endpoint-ready before it can be selected. Provider failures do not silently widen authority or switch to an unapproved vendor.
 
 This makes provider choice a buyer configuration decision instead of a fork of the University or Distillation Engine.
+
+
+## Dynamic work-driven distillation topology
+
+Distillation is work-driven rather than tied to one fixed pipeline. When eligible curriculum arrives, the control loop fills available campaign capacity and dispatches each stage to any compatible available lane.
+
+A stalled provider or campaign does not globally block unrelated prepared work. Hosted teacher prompts may reroute to another explicitly enabled compatible provider when the originally selected provider fails. Hugging Face preparation/training jobs remain fenced to their own run and campaign.
+
+Current Production policy admits up to four independent campaigns concurrently, while keeping one batch per campaign and the existing per-campaign/per-stage hard cost ceilings. The concurrency value is stored in the durable rolling policy and constrained to 1–8 so buyers can tune capacity without redesigning the scheduler.
+
+Dynamic routing does not authorize silent vendor fallback, automatic model promotion, Production traffic, RunPod mutation, use of material without training rights, or authority expansion.

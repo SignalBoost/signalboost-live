@@ -8,6 +8,7 @@ import { cookies } from 'next/headers'
 import { ownerEmailList } from '@/lib/auth/ownerEmails'
 
 export type Role = 'owner' | 'admin' | 'member' | 'guest'
+export type AuthState = 'verified' | 'anonymous' | 'unavailable'
 
 export const ACCESS_AUTH_TIMEOUT_MS = 5_000
 
@@ -15,6 +16,7 @@ export type AccessContext = {
   userId: string | null
   email: string | null
   role: Role
+  authState: AuthState
   isOwner: boolean
   isAdmin: boolean
   isMember: boolean
@@ -64,12 +66,13 @@ async function getServerSupabase() {
   )
 }
 
-function buildContext(userId: string | null, email: string | null, role: Role): AccessContext {
+function buildContext(userId: string | null, email: string | null, role: Role, authState: AuthState): AccessContext {
   const isOwner = role === 'owner'
   return {
     userId,
     email,
     role,
+    authState,
     isOwner,
     // Protected admin surfaces are intentionally owner-only. The legacy admin
     // role remains a label for non-protected workflows but grants no owner access.
@@ -86,14 +89,14 @@ export function accessFromVerifiedIdentity(
   emailValue: string | null | undefined,
 ): AccessContext {
   const email = String(emailValue || '').trim().toLowerCase()
-  return buildContext(userId, email || null, envRole(email))
+  return buildContext(userId, email || null, envRole(email), 'verified')
 }
 
 export async function getAccess(): Promise<AccessContext> {
   // Concierge is a public delivery surface. Even if the browser belongs to the
   // owner, public-delivery execution must never inherit owner/admin identity,
   // private memory, internal tools, metrics, repo access, or Chief-of-Staff mode.
-  if (isPublicDeliveryScope()) return buildContext(null, null, 'guest')
+  if (isPublicDeliveryScope()) return buildContext(null, null, 'guest', 'anonymous')
 
   const supabase = await getServerSupabase()
   let timeout: ReturnType<typeof setTimeout> | null = null
@@ -106,14 +109,14 @@ export async function getAccess(): Promise<AccessContext> {
     ])
     if (!auth) {
       console.warn('[auth-access-timeout]', JSON.stringify({ timeoutMs: ACCESS_AUTH_TIMEOUT_MS }))
-      return buildContext(null, null, 'guest')
+      return buildContext(null, null, 'guest', 'unavailable')
     }
     const { data: { user } } = auth
-    if (!user?.id) return buildContext(null, null, 'guest')
+    if (!user?.id) return buildContext(null, null, 'guest', 'anonymous')
     return accessFromVerifiedIdentity(user.id, user.email)
   } catch (error) {
     console.warn('[auth-access-failed]', error instanceof Error ? error.message : String(error))
-    return buildContext(null, null, 'guest')
+    return buildContext(null, null, 'guest', 'unavailable')
   } finally {
     if (timeout) clearTimeout(timeout)
   }
@@ -121,6 +124,7 @@ export async function getAccess(): Promise<AccessContext> {
 
 export async function requireAdmin(): Promise<GuardResult> {
   const ctx = await getAccess()
+  if (ctx.authState === 'unavailable') return { ok: false, status: 503, error: 'Authentication temporarily unavailable.', ctx }
   if (ctx.role === 'guest') return { ok: false, status: 401, error: 'Not signed in.', ctx }
   if (!ctx.isOwner) return { ok: false, status: 403, error: 'Owner access required.', ctx }
   return { ok: true, status: 200, error: '', ctx }
@@ -128,6 +132,7 @@ export async function requireAdmin(): Promise<GuardResult> {
 
 export async function requireOwner(): Promise<GuardResult> {
   const ctx = await getAccess()
+  if (ctx.authState === 'unavailable') return { ok: false, status: 503, error: 'Authentication temporarily unavailable.', ctx }
   if (ctx.role === 'guest') return { ok: false, status: 401, error: 'Not signed in.', ctx }
   if (!ctx.isOwner) return { ok: false, status: 403, error: 'Owner access required.', ctx }
   return { ok: true, status: 200, error: '', ctx }

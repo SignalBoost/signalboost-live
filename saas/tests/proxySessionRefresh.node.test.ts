@@ -13,6 +13,11 @@ import { existsSync } from 'node:fs'
 
 const base = readFileSync(new URL('../proxyBase.ts', import.meta.url), 'utf8')
 const proxy = readFileSync(new URL('../proxy.ts', import.meta.url), 'utf8')
+const access = readFileSync(new URL('../lib/auth/access.ts', import.meta.url), 'utf8')
+const adminLayout = readFileSync(new URL('../app/admin/layout.tsx', import.meta.url), 'utf8')
+const hubLayout = readFileSync(new URL('../app/hub/layout.tsx', import.meta.url), 'utf8')
+const navbar = readFileSync(new URL('../components/PremiumCustomerNavbarV2.tsx', import.meta.url), 'utf8')
+const authMe = readFileSync(new URL('../app/api/auth/me/route.ts', import.meta.url), 'utf8')
 const code = base.split('\n')
   .filter(line => !line.trim().startsWith('//') && !line.trim().startsWith('*') && !line.trim().startsWith('/*'))
   .join('\n')
@@ -64,7 +69,7 @@ test('the operator guard keeps its owner check and its redirect', () => {
 test('both matchers cover the surfaces that need refreshing, and stay in step', () => {
   for (const source of [proxy, base]) {
     const matcher = source.slice(source.indexOf('matcher'))
-    for (const path of ['/dashboard/:path*', '/api/admin/:path*', '/dashboard/operator/:path*']) {
+    for (const path of ['/dashboard/:path*', '/admin/:path*', '/hub/:path*', '/api/admin/:path*', '/dashboard/operator/:path*']) {
       assert.ok(matcher.includes(path), `matcher must include ${path}`)
     }
   }
@@ -75,4 +80,36 @@ test('the existing ingress routing is untouched', () => {
   assert.match(proxy, /pathname === '\/api\/concierge'/)
   assert.match(proxy, /cos-provenance-browser/)
   assert.match(proxy, /return baseProxy\(req\)/)
+})
+
+
+test('transient auth failures are unavailable, never guest', () => {
+  assert.match(access, /authState: AuthState/)
+  assert.match(access, /'guest', 'unavailable'/)
+  assert.match(access, /status: 503, error: 'Authentication temporarily unavailable\.'/)
+})
+
+test('transient refresh failures discard cookie mutations', () => {
+  assert.match(base, /error && isTransientAuthError\(error\)/)
+  assert.match(base, /return NextResponse\.next\(\{ request: \{ headers: req\.headers \} \}\)/)
+})
+
+test('protected layouts do not redirect while auth is unavailable', () => {
+  for (const layout of [adminLayout, hubLayout]) {
+    assert.match(layout, /access\.authState === 'unavailable'/)
+    const unavailable = layout.indexOf("access.authState === 'unavailable'")
+    const redirectGuest = layout.indexOf("access.role === 'guest'")
+    assert.ok(unavailable >= 0 && redirectGuest > unavailable)
+  }
+})
+
+test('browser navbar preserves last known user on retryable auth failures', () => {
+  assert.match(navbar, /supabase\.auth\.getSession\(\)/)
+  assert.match(navbar, /if \(error && isTransientAuthError\(error\)\) return/)
+})
+
+test('/api/auth/me returns 503 instead of guest on transient auth failure', () => {
+  assert.match(authMe, /auth_temporarily_unavailable/)
+  assert.match(authMe, /status: 503/)
+  assert.match(authMe, /cookieStore\.set\(name, value, options\)/)
 })

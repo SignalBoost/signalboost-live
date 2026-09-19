@@ -236,6 +236,11 @@ function itemIsActive(pathname: string | null, href?: string) {
   return pathname === path || (path !== '/' && pathname.startsWith(`${path}/`))
 }
 
+function isTransientAuthError(error: unknown): boolean {
+  const status = Number((error as { status?: number } | null)?.status || 0)
+  return status === 0 || status === 408 || status === 429 || status >= 500
+}
+
 export default function PremiumCustomerNavbarV2() {
   const navRef = useRef<HTMLElement>(null)
   const pathname = usePathname()
@@ -278,9 +283,44 @@ export default function PremiumCustomerNavbarV2() {
   const searchResults = searchableItems.filter(item => item.label.toLocaleLowerCase().includes(normalizedQuery))
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data?.user ?? null))
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => setUser(session?.user ?? null))
-    return () => listener.subscription.unsubscribe()
+    let mounted = true
+
+    // Local session state is only a UI continuity hint; server authorization still uses getUser().
+    // It prevents a temporary Auth outage from making an already signed-in browser look logged out.
+    void supabase.auth.getSession().then(({ data }) => {
+      if (mounted && data?.session?.user) setUser(data.session.user)
+    })
+
+    void supabase.auth.getUser().then(({ data, error }) => {
+      if (!mounted) return
+      if (error) {
+        if (!isTransientAuthError(error)) setUser(null)
+        return
+      }
+      setUser(data?.user ?? null)
+    })
+
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return
+      if (session?.user) {
+        setUser(session.user)
+        return
+      }
+      if (event !== 'SIGNED_OUT') return
+
+      // SIGNED_OUT can follow a failed refresh. Verify before changing UI state: retryable
+      // Auth failures preserve the last known user, while a confirmed missing/invalid session clears it.
+      void supabase.auth.getUser().then(({ data, error }) => {
+        if (!mounted) return
+        if (error && isTransientAuthError(error)) return
+        setUser(data?.user ?? null)
+      })
+    })
+
+    return () => {
+      mounted = false
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {

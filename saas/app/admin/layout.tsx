@@ -3,11 +3,15 @@
 
 import { redirect } from 'next/navigation'
 import { getAccess } from '@/lib/auth/access'
+import { LocalizedText } from '@/components/i18n/LocalizedText'
 import AdminLayoutShell from '@/components/admin/AdminLayoutShell'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const access = await getAccess()
 
+  if (access.authState === 'unavailable') {
+    return <main role="alert"><LocalizedText fallback="Authentication is temporarily unavailable. Please reload in a moment." /></main>
+  }
   if (access.role === 'guest') redirect('/')
   if (!access.isOwner) redirect('/dashboard')
 

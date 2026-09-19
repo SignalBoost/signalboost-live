@@ -33,7 +33,14 @@ test('shadow approvals during live infrastructure-failed runs do not exhaust the
     events.push(approval(`2026-09-17T21:${minute}:00Z`, `2026-09-17T21:${shadowMinute}:50Z`))
     events.push(ev('mass_distilled_independent_evaluation_started', `2026-09-17T21:${minute}:10Z`, `2026-09-17T21:${shadowMinute}:40Z`))
     events.push(approval(`2026-09-17T21:${shadowMinute}:00Z`, `2026-09-17T21:${shadowMinute}:30Z`))
-    events.push(ev('mass_distilled_independent_evaluation_failed', `2026-09-17T21:${shadowMinute}:20Z`, null, { error: 'mass_distilled_evaluation_judge_unavailable' }))
+    // Alternate two genuine infrastructure errors. Repeating ONE error is what the separate identical-failure
+    // circuit breaker exists to stop (MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4), and this fixture
+    // generates far more than four pairs. Before this alternation the artifact was skipped by that unrelated
+    // breaker, so the shadow-approval property under test was never actually exercised.
+    const infrastructureError = i % 4 === 0
+      ? 'mass_distilled_evaluation_judge_unavailable'
+      : 'mass_distilled_evaluation_judge_timeout:judge'
+    events.push(ev('mass_distilled_independent_evaluation_failed', `2026-09-17T21:${shadowMinute}:20Z`, null, { error: infrastructureError }))
   }
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifact], events, now: new Date('2026-09-17T22:00:00Z') })
   assert.equal(decision.issue, true)

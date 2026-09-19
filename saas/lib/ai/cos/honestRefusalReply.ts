@@ -152,31 +152,31 @@ const COPY: Record<RefusalLanguage, {
   generic: string
 }> = {
   en: {
-    opening: 'I did not release an answer to this, because I could not stand behind one.',
+    opening: 'I can still help, but a reliable specific answer needs one more concrete input.',
     needsLead: 'To answer it properly I need',
     assumptions: 'If you would rather I proceed anyway, say so and I will work it through on clearly stated standard assumptions, with each one labelled so you can override it.',
     generic: 'Tell me which parts matter most, or narrow the question, and I will take it from there. If you would rather I proceed on clearly stated standard assumptions, say so and I will label each one so you can override it.',
   },
   es: {
-    opening: 'No publiqué una respuesta a esto, porque no podía respaldarla.',
+    opening: 'Aún puedo ayudar, pero una respuesta específica y fiable necesita un dato concreto más.',
     needsLead: 'Para responder correctamente necesito',
     assumptions: 'Si prefieres que avance igualmente, dímelo y lo resolveré sobre supuestos estándar claramente indicados, cada uno etiquetado para que puedas cambiarlo.',
     generic: 'Dime qué partes importan más, o acota la pregunta, y sigo desde ahí. Si prefieres que avance sobre supuestos estándar claramente indicados, dímelo y etiquetaré cada uno para que puedas cambiarlo.',
   },
   pt: {
-    opening: 'Não publiquei uma resposta a isto, porque não poderia sustentá-la.',
+    opening: 'Ainda posso ajudar, mas uma resposta específica e confiável precisa de mais um dado concreto.',
     needsLead: 'Para responder corretamente preciso de',
     assumptions: 'Se preferir que eu avance mesmo assim, diga e eu resolvo com base em pressupostos padrão claramente indicados, cada um rotulado para que possa alterá-lo.',
     generic: 'Diga-me que partes importam mais, ou restrinja a pergunta, e sigo a partir daí. Se preferir que eu avance com pressupostos padrão claramente indicados, diga e rotularei cada um para que possa alterá-lo.',
   },
   pl: {
-    opening: 'Nie opublikowałem odpowiedzi na to pytanie, ponieważ nie mógłbym za nią ręczyć.',
+    opening: 'Nadal mogę pomóc, ale rzetelna konkretna odpowiedź wymaga jeszcze jednej informacji.',
     needsLead: 'Aby odpowiedzieć rzetelnie, potrzebuję',
     assumptions: 'Jeśli wolisz, żebym mimo to kontynuował, powiedz — policzę to na jasno wskazanych standardowych założeniach, każde oznaczone, abyś mógł je zmienić.',
     generic: 'Powiedz, które części są najważniejsze, albo zawęź pytanie, a podejmę temat. Jeśli wolisz, żebym kontynuował na jasno wskazanych standardowych założeniach, powiedz — oznaczę każde z nich.',
   },
   ru: {
-    opening: 'Я не выпустил ответ на этот вопрос, потому что не смог бы за него поручиться.',
+    opening: 'Я всё ещё могу помочь, но для надёжного конкретного ответа нужен ещё один точный вводный факт.',
     needsLead: 'Чтобы ответить корректно, мне нужно',
     assumptions: 'Если хотите, чтобы я всё же продолжил, скажите — я разберу задачу на явно указанных стандартных допущениях, каждое из которых помечу, чтобы вы могли его изменить.',
     generic: 'Скажите, какие части важнее всего, или сузьте вопрос — и я продолжу. Если предпочитаете, чтобы я работал на явно указанных стандартных допущениях, скажите, и я помечу каждое из них.',

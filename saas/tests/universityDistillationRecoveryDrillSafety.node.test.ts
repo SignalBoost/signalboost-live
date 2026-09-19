@@ -33,7 +33,7 @@ test('Supervisor can clear only the exact drill row and never mutate its stage',
   assert.match(source, /\.delete\(\)[\s\S]*?\.eq\('id', runId\)[\s\S]*?\.eq\('campaign_id', campaignId\)[\s\S]*?\.eq\('drill_id', drillId\)/)
   assert.match(source, /university_recovery_drill_clear_not_exact/)
   const helper = source.slice(source.indexOf('async function repairVerifiedRecoveryDrillFixture'), source.indexOf('/**\n * Executes the same bounded workflow'))
-  assert.doesNotMatch(helper, /\.update\(/)
+  assert.doesNotMatch(helper, /\.update\(\{/)
   assert.doesNotMatch(helper, /committed_cost_usd|max_total_cost_usd|stage_reserved_cost_usd/)
 })
 

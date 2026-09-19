@@ -390,6 +390,32 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
           },
           verifier: 'host_controller',
         })
+      } else if (hosted.rows === 0 && !hosted.completed) {
+        const failureClasses = [...new Set(hosted.failures.map((failure: any) => {
+          const parts = String(failure.error || 'unknown_error').split(':')
+          return parts.slice(0, 2).join(':')
+        }))].slice(0, 8)
+        await recordAssurance({
+          candidateId: run.candidate_id,
+          subjectId: run.subject_id,
+          claim: 'mass_distillation_hosted_teacher_zero_row_fallback',
+          evidence: {
+            campaignId: run.campaign_id,
+            batchKey: run.batch_key,
+            reason: 'all_hosted_teacher_calls_failed_before_any_teacher_row',
+            activeProviders: hosted.activeProviders,
+            attemptedCalls: hosted.failures.length,
+            successfulHostedRows: 0,
+            failureClasses,
+            explicitFallbackPath: 'existing_huggingface_teacher_stage',
+            reservedCostCeilingUsd: expectedCeiling,
+            automaticPromotionAuthorized: false,
+            runpodMutationAuthorized: false,
+            authorityExpanded: false,
+            silentFallbackAllowed: false,
+          },
+          verifier: 'host_controller',
+        })
       } else if (!hosted.completed || !hosted.datasetHash || hosted.outputHashes.length < 20) {
         throw new Error(`mass_distillation_hosted_teacher_incomplete:${hosted.rows}/${hosted.minimumRows}:${hosted.activeProviders.join(',') || 'none'}`)
       } else {

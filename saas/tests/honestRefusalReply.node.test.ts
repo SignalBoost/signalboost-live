@@ -23,12 +23,13 @@ test('never names an input the prompt already supplied', () => {
   assert.deepEqual(missingInputKeys(withEverything), [])
 })
 
-test('a fully specified prompt falls back to the generic offer, not a false list', () => {
+test('a fully specified blocked prompt never asks the user to narrow a routine task', () => {
   const reply = buildHonestRefusalReply({
     prompt: 'Over 1000 hours a 1280 kW cluster moves 12 TB every 6 hours at $0.04 per GB over a 100 Gbps link. Break-even cost?',
     language: 'en',
   })
-  assert.match(reply, /narrow the question/)
+  assert.doesNotMatch(reply, /narrow the question|did not release|could not stand behind/i)
+  assert.match(reply, /specific fact, permission, or source/i)
   assert.ok(!/I need\b/.test(reply))
 })
 
@@ -49,9 +50,10 @@ test('no internal vocabulary reaches the public surface', () => {
 })
 
 test('the dead-end phrasing is gone', () => {
-  const reply = buildHonestRefusalReply({ prompt: MIGRATION, language: 'en' })
-  assert.ok(!/could not complete this request/i.test(reply))
-  assert.ok(!/external AI/i.test(reply))
+  for (const prompt of [MIGRATION, 'hello']) {
+    const reply = buildHonestRefusalReply({ prompt, language: 'en' })
+    assert.doesNotMatch(reply, /could not complete this request|external AI|did not release|could not stand behind|narrow the question/i)
+  }
 })
 
 test('all five languages produce distinct non-empty replies', () => {

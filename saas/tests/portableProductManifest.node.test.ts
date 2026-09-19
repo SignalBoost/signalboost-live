@@ -49,8 +49,42 @@ test('manifest validation detects duplicate IDs, references, dependencies, and m
 })
 
 test('manifest modules remain execution-free and do not import browser, runtime, or provider SDKs', () => {
-  for (const path of ['providerHub', 'campaignStudio', 'integrationsHub', 'videoMaker', 'controlCenter', 'marketingSales', 'pressMedia', 'portableChiefOfStaff', 'browserAgentEcosystem', 'agentOperationsPlatform', 'selfHealingSupervisor']) {
+  for (const path of ['providerHub', 'campaignStudio', 'integrationsHub', 'videoMaker', 'controlCenter', 'marketingSales', 'pressMedia', 'portableChiefOfStaff', 'browserAgentEcosystem', 'agentOperationsPlatform', 'selfHealingSupervisor', 'aiUniversity', 'aiDistillationEngine']) {
     const source = hydrateLocalizedSource(readFileSync(new URL(`../lib/portable-products/manifests/${path}.ts`, import.meta.url), 'utf8'))
     assert.doesNotMatch(source, /=>|\bfunction\b|process\.env|from ['"](?:.*(?:playwright|puppeteer|browser-runtime|browser-provider|node:fs|openai|anthropic|supabase|sdk)|.*provider.*sdk)['"]|fetch\s*\(/i)
   }
+})
+
+
+test('AI University portable exposes a mandatory common core plus configurable major, electives, and organization courses', async () => {
+  const curriculum = await import('../lib/portable-university/curriculum.ts')
+  assert.ok(curriculum.PORTABLE_UNIVERSITY_MANDATORY_CORE.length >= 8)
+  assert.ok(curriculum.PORTABLE_UNIVERSITY_MANDATORY_CORE.every((course: any) => course.stage === 'mandatory_core' && course.yearBand === 'years_1_2' && course.required))
+  const organizationCourse = Object.freeze({
+    id: 'organization-acme-procedures',
+    title: 'ACME Procedures',
+    stage: 'organization' as const,
+    yearBand: 'years_3_4' as const,
+    required: false,
+    prerequisites: Object.freeze(['core-communication-hmi']),
+    topics: Object.freeze(['buyer procedures']),
+  })
+  const profile = curriculum.createPortableUniversityCurriculumProfile({
+    profileId: 'buyer:student-1',
+    majorId: 'software_engineering',
+    selectedElectiveIds: ['elective-ai-systems-safety'],
+    organizationCourses: [organizationCourse],
+  })
+  const resolved = curriculum.resolvePortableUniversityCurriculum(profile)
+  assert.ok(resolved.mandatoryCore.some((course: any) => course.id === 'core-reasoning-evidence'))
+  assert.ok(resolved.major.some((course: any) => course.id === 'major-software-engineering'))
+  assert.ok(resolved.electives.some((course: any) => course.id === 'elective-ai-systems-safety'))
+  assert.ok(resolved.organization.some((course: any) => course.id === 'organization-acme-procedures'))
+  const snapshot = curriculum.createDistillationCurriculumSnapshot(profile)
+  assert.deepEqual(snapshot.courseIds, resolved.allCourses.map((course: any) => course.id))
+  assert.throws(() => curriculum.createPortableUniversityCurriculumProfile({
+    profileId: 'buyer:student-1',
+    majorId: 'software_engineering',
+    selectedElectiveIds: ['not-a-course'],
+  }), /unknown_university_elective/)
 })

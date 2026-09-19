@@ -47,5 +47,7 @@ test('durable provider ledger is service-role only and stores no credential fiel
   assert.match(migration, /enable row level security/)
   assert.match(migration, /revoke all .* public, anon, authenticated/s)
   assert.match(migration, /grant select, insert, update, delete .* service_role/s)
+  assert.match(migration, /preserve_cos_university_hosted_teacher_committed_cost/)
+  assert.match(migration, /greatest\(coalesce\(new\.committed_cost_usd,0\), v_hosted_cost\)/)
   assert.doesNotMatch(migration, /\b(?:api_key|credential|secret|access_token)\s+text\b/i)
 })

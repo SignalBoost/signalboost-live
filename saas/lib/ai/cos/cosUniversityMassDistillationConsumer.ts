@@ -397,7 +397,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
         || clean(process.env.COS_UNIVERSITY_HF_TEACHER_MODEL, 240)
         || MASS_DISTILLATION_TEACHER_MODEL
       const teacher = await resolveHuggingFaceModelMetadata({ modelId: teacherModelId, token: hf.token, fetchImpl })
-      if (teacher.license !== 'apache-2.0' || teacher.modelId === student.modelId) {
+      if (!['apache-2.0', 'mit'].includes(teacher.license) || teacher.modelId === student.modelId) {
         throw new Error('mass_distillation_model_rights_invalid')
       }
       teacherProvider = 'huggingface'

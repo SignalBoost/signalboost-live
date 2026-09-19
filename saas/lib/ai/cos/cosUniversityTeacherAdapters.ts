@@ -31,7 +31,7 @@ function positiveInt(value: unknown, fallback: number, min: number, max: number)
 }
 
 export function universityTeacherModelFor(teacher: UniversityTeacherDefinition, env: Env = process.env): string {
-  if (teacher.id === 'openai') return clean(env.COS_UNIVERSITY_TEACHER_OPENAI_MODEL, 240) || teacher.model
+  if (teacher.id === 'openai') return clean(env.COS_UNIVERSITY_TEACHER_OPENAI_MODEL, 240)
   if (teacher.id === 'claude') return clean(env.COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL, 240)
   if (teacher.id === 'grok') return clean(env.COS_UNIVERSITY_TEACHER_XAI_MODEL, 240)
   if (teacher.id === 'custom') return clean(env.COS_UNIVERSITY_TEACHER_CUSTOM_MODEL, 240)

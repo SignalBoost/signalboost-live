@@ -36,8 +36,10 @@ test('only one drill may be armed at a time', () => {
   assert.match(code, /no_active_campaign_to_drill/)
 })
 
-test('the fixture is marked as a drill row so the database guards apply', () => {
+test('the fixture satisfies the live batch-row contract and remains a drill row', () => {
   assert.match(code, /drill_id: drillId/)
+  assert.match(code, /student_model_id: 'Qwen\/Qwen3-4B'/)
+  assert.match(code, /source_count: 0/)
   assert.match(code, /stage: 'teacher_dispatching'/)
 })
 

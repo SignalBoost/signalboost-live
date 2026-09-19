@@ -245,6 +245,7 @@ export async function runMassHostedTeacherStage(input: {
     minimumRows: MIN_TEACHER_ROWS,
     activeProviders: teachers.map(item => item.id),
     providerMix: Object.freeze(providerMix),
+    routingMode: 'dynamic_compatible_provider' as const,
     attemptedCalls,
     reroutedPrompts,
     failures: Object.freeze(failures),

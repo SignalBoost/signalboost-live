@@ -267,6 +267,12 @@ test('duplicate-material Production fence quarantines stale batches and blocks c
   assert.doesNotMatch(migration, /max_total_cost_usd\s*=|automatic_promotion_authorized\s*=\s*true|runpod_mutation_authorized\s*=\s*true/)
 })
 
+test('bounded corpus scan prioritizes fresh replenishment instead of starving appended curriculum', () => {
+  const packager = source('../lib/ai/cos/cosUniversityMassDistillation.ts')
+  assert.match(packager, /\.order\('created_at', \{ ascending: false \}\)/)
+  assert.doesNotMatch(packager, /\.order\('created_at', \{ ascending: true \}\)/)
+})
+
 test('frequent University learning lane packages unique material without provider dispatch', () => {
   const route = source('../app/api/cron/cos-university-learning/route.ts')
   const packager = source('../lib/ai/cos/cosUniversityMassDistillation.ts')

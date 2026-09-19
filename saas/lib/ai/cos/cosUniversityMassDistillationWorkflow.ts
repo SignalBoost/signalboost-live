@@ -212,7 +212,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
         curriculumReplenishment.failureDerivedInserted,
         curriculumReplenishment.hostedTeacherInserted,
         curriculumReplenishment.syntheticInserted,
-      ].reduce((sum, value) => sum + Math.max(0, Number(value || 0)), 0)
+      ].reduce<number>((sum, value) => sum + Math.max(0, Number(value || 0)), 0)
       if (replenishmentMaterialInserted > 0) {
         curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now, {
           corpusScanRows: throughput.corpusScanRows,

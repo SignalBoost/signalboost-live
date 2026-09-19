@@ -372,9 +372,27 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
         promptSetHash: promptSet.promptSetHash,
         fetchImpl: fetchImpl as typeof fetch | undefined,
       })
-      if (!hosted.completed || !hosted.datasetHash || hosted.outputHashes.length < 20) {
+      if (hosted.skipped && hosted.reason === 'no_active_hosted_teacher_provider') {
+        await recordAssurance({
+          candidateId: run.candidate_id,
+          subjectId: run.subject_id,
+          claim: 'mass_distillation_hosted_teacher_unavailable',
+          evidence: {
+            campaignId: run.campaign_id,
+            batchKey: run.batch_key,
+            reason: hosted.reason,
+            activeProviders: hosted.activeProviders,
+            explicitFallbackPath: 'existing_huggingface_teacher_stage',
+            reservedCostCeilingUsd: expectedCeiling,
+            automaticPromotionAuthorized: false,
+            runpodMutationAuthorized: false,
+            authorityExpanded: false,
+          },
+          verifier: 'host_controller',
+        })
+      } else if (!hosted.completed || !hosted.datasetHash || hosted.outputHashes.length < 20) {
         throw new Error(`mass_distillation_hosted_teacher_incomplete:${hosted.rows}/${hosted.minimumRows}:${hosted.activeProviders.join(',') || 'none'}`)
-      }
+      } else {
       const hostedIdempotencyKey = hash([
         COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
         claim.campaign_id,
@@ -445,6 +463,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
         reservedCostCeilingUsd: expectedCeiling,
         nextStage: 'preparation_pending',
       })
+      }
     }
 
     const teacherModelId = clean(process.env.COS_UNIVERSITY_HF_TEACHER_MODEL, 240) || MASS_DISTILLATION_TEACHER_MODEL

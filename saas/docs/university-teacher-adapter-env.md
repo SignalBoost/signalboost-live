@@ -1,6 +1,6 @@
 # University teacher adapter environment contract
 
-All hosted teacher providers are opt-in and buyer-owned. No provider is used unless both its enable gate and adapter-ready gate are true and the required credential is present.
+All hosted teacher providers are opt-in and buyer-owned. No provider is used unless its enable gate, adapter-ready gate, required credential, explicit model, contractual distillation-rights gate, and explicit token pricing are all present. A missing field fails closed; the University never silently substitutes another provider.
 
 ## OpenAI
 
@@ -9,6 +9,9 @@ All hosted teacher providers are opt-in and buyer-owned. No provider is used unl
 - `OPENAI_API_KEY=<buyer secret>`
 - `COS_UNIVERSITY_TEACHER_OPENAI_MODEL=<buyer-approved model>`
 - optional `COS_UNIVERSITY_TEACHER_OPENAI_ENDPOINT=<HTTPS OpenAI-compatible endpoint>`
+- `COS_UNIVERSITY_TEACHER_OPENAI_DISTILLATION_RIGHTS=contractually_authorized` only when the buyer's provider agreement expressly permits this training/distillation use
+- `COS_UNIVERSITY_TEACHER_OPENAI_INPUT_USD_PER_MILLION=<verified rate>`
+- `COS_UNIVERSITY_TEACHER_OPENAI_OUTPUT_USD_PER_MILLION=<verified rate>`
 
 ## Anthropic / Claude
 
@@ -17,6 +20,9 @@ All hosted teacher providers are opt-in and buyer-owned. No provider is used unl
 - `ANTHROPIC_API_KEY=<buyer secret>`
 - `COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL=<buyer-approved model>`
 - optional `COS_UNIVERSITY_TEACHER_ANTHROPIC_ENDPOINT=<HTTPS Messages endpoint>`
+- `COS_UNIVERSITY_TEACHER_ANTHROPIC_DISTILLATION_RIGHTS=contractually_authorized` only when the buyer's provider agreement expressly permits this training/distillation use
+- `COS_UNIVERSITY_TEACHER_ANTHROPIC_INPUT_USD_PER_MILLION=<verified rate>`
+- `COS_UNIVERSITY_TEACHER_ANTHROPIC_OUTPUT_USD_PER_MILLION=<verified rate>`
 
 ## xAI / Grok
 
@@ -25,6 +31,9 @@ All hosted teacher providers are opt-in and buyer-owned. No provider is used unl
 - `XAI_API_KEY=<buyer secret>`
 - `COS_UNIVERSITY_TEACHER_XAI_MODEL=<buyer-approved model>`
 - optional `COS_UNIVERSITY_TEACHER_XAI_ENDPOINT=<HTTPS OpenAI-compatible endpoint>`
+- `COS_UNIVERSITY_TEACHER_XAI_DISTILLATION_RIGHTS=contractually_authorized` only when the buyer's provider agreement expressly permits this training/distillation use
+- `COS_UNIVERSITY_TEACHER_XAI_INPUT_USD_PER_MILLION=<verified rate>`
+- `COS_UNIVERSITY_TEACHER_XAI_OUTPUT_USD_PER_MILLION=<verified rate>`
 
 ## Open/self-hosted Hugging Face teachers
 
@@ -40,5 +49,12 @@ These teachers remain behind the existing signed Hugging Face training executor 
 - `COS_UNIVERSITY_TEACHER_CUSTOM_ENDPOINT=<buyer HTTPS endpoint>`
 - `COS_UNIVERSITY_TEACHER_CUSTOM_MODEL=<buyer model identifier>`
 - `COS_UNIVERSITY_TEACHER_CUSTOM_TOKEN=<buyer secret>`
+- `COS_UNIVERSITY_TEACHER_CUSTOM_DISTILLATION_RIGHTS=contractually_authorized`
+- `COS_UNIVERSITY_TEACHER_CUSTOM_INPUT_USD_PER_MILLION=<verified rate>`
+- `COS_UNIVERSITY_TEACHER_CUSTOM_OUTPUT_USD_PER_MILLION=<verified rate>`
 
 This custom surface is intended for Azure OpenAI gateways, Bedrock/Vertex bridges, on-prem vLLM, private model gateways, or equivalent buyer infrastructure. The core never silently switches providers.
+
+## Runtime behavior
+
+Eligible teachers are sharded deterministically by curriculum batch, so multiple batches can synthesize in parallel across different providers. Hosted-provider prompt outputs are durable and resumable; a retry stays on the originally assigned provider/model. Hosted calls are generated concurrently within a batch, then materialized into a private Hugging Face dataset for the existing governed preparation/training/evaluation chain. Provider/model/request-id/token/cost and manifest evidence are retained; credentials and hidden reasoning are not.

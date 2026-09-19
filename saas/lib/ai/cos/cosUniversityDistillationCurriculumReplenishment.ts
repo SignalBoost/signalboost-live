@@ -8,6 +8,7 @@ import { COS_UNIVERSITY_SUBJECTS } from './cosUniversity.ts'
 import {
   buildMassDistillationReplenishmentGaps,
   MASS_DISTILLATION_DEFAULT_QUERIES_PER_SUBJECT,
+  MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS,
   MASS_DISTILLATION_REPLENISHMENT_INTERVAL_MINUTES,
 } from './cosUniversityDistillationCurriculumPlan.ts'
 import {
@@ -194,6 +195,25 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
   const gaps = buildMassDistillationReplenishmentGaps(input.supply, now, maxSubjects, queriesPerSubject)
   if (!gaps.length) return Object.freeze({ ok: true, skipped: true, reason: 'no_targetable_subject_shortfall', targets: [], externalCostUsd: 0 })
 
+  // The planner deliberately rotates canonical subjects that have zero currently batchable items.
+  // Those subjects do not exist in input.supply, so passing the raw supply to fallback installers
+  // silently produced zero hosted/failure-derived/synthetic work after real-source saturation.
+  // Reconstruct the exact unique planner targets here and use them for every fallback layer.
+  const plannedSubjects = [...new Set(gaps.map(gap => gap.subject))]
+  const replenishmentSupply: MassDistillationSubjectSupply[] = plannedSubjects.map(subjectTitle => {
+    const existing = input.supply.find(item => item.subject === subjectTitle)
+    if (existing) return existing
+    const canonical = COS_UNIVERSITY_SUBJECTS.find(subject => subject.title === subjectTitle)
+    if (!canonical) throw new Error(`mass_distillation_replenishment_subject_unmapped:${subjectTitle}`)
+    return {
+      subjectKey: canonical.id,
+      subject: canonical.title,
+      canonicalSubjectId: canonical.id,
+      uniqueBatchableItems: 0,
+      shortfallToBatch: MASS_DISTILLATION_REPLENISHMENT_BATCH_ITEMS,
+    }
+  })
+
   const db = cosServiceDb()
   const stores = createSupabaseCOSStores()
   if (!db || !stores?.continuousLearning) throw new Error('persistent_learning_store_unavailable')
@@ -236,9 +256,9 @@ export async function replenishUniversityMassDistillationCurriculum(input: {
     // Explicitly enabled hosted teachers then generate real multi-provider synthetic curriculum in
     // parallel. The zero-cost placeholder fallback remains last so unavailable hosted providers can
     // never stop curriculum growth.
-    const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: input.supply, now, maxSubjects })
-    const hostedTeachers = await installHostedTeacherCurriculum({ db, supply: input.supply, now, maxSubjects })
-    const synthetic = await installTeacherSyntheticFallback({ db, supply: input.supply, now, maxSubjects })
+    const failureDerived = await installVerifiedFailureDerivedCurriculum({ db, supply: replenishmentSupply, now, maxSubjects })
+    const hostedTeachers = await installHostedTeacherCurriculum({ db, supply: replenishmentSupply, now, maxSubjects })
+    const synthetic = await installTeacherSyntheticFallback({ db, supply: replenishmentSupply, now, maxSubjects })
 
     const completedAt = new Date().toISOString()
     const update = await db.from('cos_university_continuous_runs').update({

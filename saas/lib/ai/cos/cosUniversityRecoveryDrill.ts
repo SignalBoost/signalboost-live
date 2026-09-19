@@ -42,7 +42,12 @@ export type RecoveryDrillRecord = Readonly<{
 
 export type RecoveryDrillSnapshot = Readonly<{
   checkedAt: string
-  state: 'healthy' | 'repair_required'
+  /**
+   * Deliberately widened: the monitor reports healthy, repair_required, waiting_for_curriculum,
+   * budget_paused and authorization_required, and it may gain more. The drill decides from `reasons`
+   * alone, so narrowing this to the two states it happens to care about only breaks the caller.
+   */
+  state: string
   reasons: readonly string[]
 }>
 

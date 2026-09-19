@@ -610,7 +610,9 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       maxEstimatedCostUsd,
       teacherProvider,
       teacherTransport,
-      reservedCostCeilingUsd: expectedCeiling,
+      reservedCostCeilingUsd: hfCostCeilingUsd,
+      stageReservedCostCeilingUsd: expectedCeiling,
+      hostedTeacherCommittedCeilingUsd: hostedTeacherMaximumCostUsd,
       automaticPromotionAuthorized: false,
       runpodMutationAuthorized: false,
     },
@@ -714,7 +716,9 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     jobUrl: submitted.jobUrl,
     hourlyCostUsd: price.hourlyCostUsd,
     maxEstimatedCostUsd,
-    reservedCostCeilingUsd: expectedCeiling,
+    reservedCostCeilingUsd: hfCostCeilingUsd,
+    stageReservedCostCeilingUsd: expectedCeiling,
+    hostedTeacherCommittedCeilingUsd: hostedTeacherMaximumCostUsd,
   })
 }
 

@@ -44,7 +44,7 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
   })
 
   const pending = await db.from('cos_university_mass_distillation_batch_runs')
-    .select('id,campaign_id,candidate_id,subject_id,stage')
+    .select('id,campaign_id,batch_key,candidate_id,subject_id,stage')
     .in('campaign_id', campaignIds)
     .not('stage', 'in', '("complete","failed")')
     .order('updated_at', { ascending: true })
@@ -109,13 +109,80 @@ export async function terminalizeFailedMassDistillationCampaignRuns(input: { max
     })
   }
 
+  // A failed parent campaign terminally consumes its batch identity. Keeping that batch marked
+  // "prepared" is misleading and can make inventory/monitoring report stock that rolling
+  // authorization is forbidden to reuse. Quarantine every still-prepared batch whose run is
+  // already terminal-failed under a failed campaign.
+  const failedRuns = await db.from('cos_university_mass_distillation_batch_runs')
+    .select('id,campaign_id,batch_key,candidate_id,subject_id,stage,failure_reason')
+    .in('campaign_id', campaignIds)
+    .eq('stage', 'failed')
+    .limit(500)
+  if (failedRuns.error) throw failedRuns.error
+
+  const quarantinedBatches: Array<{ batchKey: string; runId: string; campaignId: string }> = []
+  for (const raw of failedRuns.data || []) {
+    const row: any = raw
+    const batchKey = String(row.batch_key || '')
+    if (!batchKey) continue
+    const now = new Date().toISOString()
+    const quarantined = await db.from('cos_university_distillation_curriculum_batches')
+      .update({ status: 'quarantined', updated_at: now })
+      .eq('batch_key', batchKey)
+      .eq('status', 'prepared')
+      .eq('dispatch_authorized', false)
+      .eq('authority_expanded', false)
+      .select('batch_key')
+      .maybeSingle()
+    if (quarantined.error) throw quarantined.error
+    if (!quarantined.data) continue
+
+    const evidence = {
+      profile: MASS_DISTILLATION_TERMINAL_CLEANUP_PROFILE,
+      claim: 'mass_distillation_failed_batch_quarantined',
+      campaignId: String(row.campaign_id),
+      runId: String(row.id),
+      batchKey,
+      candidateId: String(row.candidate_id || ''),
+      reason: String(row.failure_reason || 'terminal_failed_campaign_batch_consumed'),
+      retryAuthorized: false,
+      dispatchAuthorized: false,
+      productionTrafficAuthorized: false,
+      reusablePreparedInventory: false,
+      authorityExpanded: false,
+    }
+    const evidenceHash = hash(evidence)
+    const eventKey = hash([MASS_DISTILLATION_TERMINAL_CLEANUP_PROFILE, 'failed-batch-quarantine', batchKey, evidenceHash])
+    const recorded = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: eventKey,
+      event_type: 'fine_tune',
+      subject_id: String(row.subject_id || ''),
+      candidate_id: String(row.candidate_id || ''),
+      evidence_hash: evidenceHash,
+      evidence,
+      verifier: 'host_controller',
+      observed_at: now,
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (recorded.error) throw recorded.error
+
+    quarantinedBatches.push({
+      batchKey,
+      runId: String(row.id),
+      campaignId: String(row.campaign_id),
+    })
+  }
+
   return Object.freeze({
     ok: true as const,
-    skipped: terminalized.length === 0,
-    reason: terminalized.length === 0 ? 'no_orphaned_nonterminal_failed_campaign_run' : null,
+    skipped: terminalized.length === 0 && quarantinedBatches.length === 0,
+    reason: terminalized.length === 0 && quarantinedBatches.length === 0
+      ? 'no_orphaned_nonterminal_failed_campaign_run'
+      : null,
     campaignsInspected: campaignIds.length,
     terminalizedRuns: terminalized.length,
     runs: Object.freeze(terminalized),
+    quarantinedBatches: quarantinedBatches.length,
+    batchQuarantines: Object.freeze(quarantinedBatches),
     retryAuthorized: false,
     dispatchAuthorized: false,
     productionTrafficAuthorized: false,

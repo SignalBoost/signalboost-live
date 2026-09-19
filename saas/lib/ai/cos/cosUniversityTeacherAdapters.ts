@@ -38,7 +38,7 @@ function modelFor(teacher: UniversityTeacherDefinition, env: Env): string {
 }
 
 function endpointFor(teacher: UniversityTeacherDefinition, env: Env): string {
-  if (teacher.id === 'openai') return clean(env.COS_UNIVERSITY_TEACHER_OPENAI_ENDPOINT, 2000) || 'https://api.openai.com/v1/chat/completions'
+  if (teacher.id === 'openai') return clean(env.COS_UNIVERSITY_TEACHER_OPENAI_ENDPOINT, 2000) || 'https://api.openai.com/v1/responses'
   if (teacher.id === 'grok') return clean(env.COS_UNIVERSITY_TEACHER_XAI_ENDPOINT, 2000) || 'https://api.x.ai/v1/chat/completions'
   if (teacher.id === 'claude') return clean(env.COS_UNIVERSITY_TEACHER_ANTHROPIC_ENDPOINT, 2000) || 'https://api.anthropic.com/v1/messages'
   if (teacher.id === 'custom') return clean(env.COS_UNIVERSITY_TEACHER_CUSTOM_ENDPOINT, 2000)
@@ -67,6 +67,61 @@ async function readJson(response: Response): Promise<any> {
   try { return text ? JSON.parse(text) : {} } catch { throw new Error('university_teacher_response_invalid_json') }
 }
 
+async function callOpenAiResponses(input: {
+  teacher: UniversityTeacherDefinition
+  request: TeacherGenerationRequest
+  env: Env
+  fetchImpl: FetchPort
+}): Promise<TeacherGenerationResult> {
+  const model = modelFor(input.teacher, input.env)
+  const credential = credentialFor(input.teacher, input.env)
+  if (!model || credential.length < 20) throw new Error('university_teacher_not_configured')
+  const endpoint = validateHttpsEndpoint(endpointFor(input.teacher, input.env))
+  const timeoutMs = positiveInt(input.env.COS_UNIVERSITY_TEACHER_REQUEST_TIMEOUT_MS, 120_000, 5_000, 300_000)
+  const maxOutputTokens = positiveInt(input.request.maxOutputTokens, 1200, 64, 8192)
+  const response = await input.fetchImpl(endpoint, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${credential}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      reasoning: { effort: 'none' },
+      max_output_tokens: maxOutputTokens,
+      input: [
+        {
+          role: 'system',
+          content: [{ type: 'input_text', text: clean(input.request.system, 20_000) }],
+        },
+        {
+          role: 'user',
+          content: [{ type: 'input_text', text: clean(input.request.prompt, 100_000) }],
+        },
+      ],
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  const payload = await readJson(response)
+  if (!response.ok) {
+    const code = clean(payload?.error?.code || payload?.error?.type || 'unknown', 80).replace(/[^A-Za-z0-9._-]/g, '_')
+    throw new Error(`university_teacher_http_${response.status}:${code}`)
+  }
+  const outputText = clean(payload?.output_text)
+    || clean(Array.isArray(payload?.output)
+      ? payload.output.flatMap((item: any) => Array.isArray(item?.content) ? item.content : [])
+        .filter((item: any) => item?.type === 'output_text')
+        .map((item: any) => item?.text)
+        .join('\n')
+      : '')
+  if (!outputText) throw new Error('university_teacher_empty_response')
+  return Object.freeze({
+    provider: input.teacher.provider,
+    model,
+    text: outputText,
+    inputTokens: Number.isInteger(payload?.usage?.input_tokens) ? payload.usage.input_tokens : null,
+    outputTokens: Number.isInteger(payload?.usage?.output_tokens) ? payload.usage.output_tokens : null,
+    requestId: clean(response.headers.get('x-request-id'), 240) || clean(payload?.id, 240) || null,
+  })
+}
+
 async function callOpenAiCompatible(input: {
   teacher: UniversityTeacherDefinition
   request: TeacherGenerationRequest
@@ -79,44 +134,26 @@ async function callOpenAiCompatible(input: {
   const endpoint = validateHttpsEndpoint(endpointFor(input.teacher, input.env))
   const timeoutMs = positiveInt(input.env.COS_UNIVERSITY_TEACHER_REQUEST_TIMEOUT_MS, 120_000, 5_000, 300_000)
   const maxOutputTokens = positiveInt(input.request.maxOutputTokens, 1200, 64, 8192)
-  const requestBody = input.teacher.id === 'openai'
-    ? {
-        model,
-        reasoning_effort: 'none',
-        max_completion_tokens: maxOutputTokens,
-        messages: [
-          { role: 'system', content: clean(input.request.system, 20_000) },
-          { role: 'user', content: clean(input.request.prompt, 100_000) },
-        ],
-      }
-    : input.teacher.id === 'grok'
-      ? {
-          model,
-          reasoning_effort: 'low',
-          temperature: input.request.temperature ?? 0.2,
-          max_tokens: maxOutputTokens,
-          messages: [
-            { role: 'system', content: clean(input.request.system, 20_000) },
-            { role: 'user', content: clean(input.request.prompt, 100_000) },
-          ],
-        }
-      : {
-          model,
-          temperature: input.request.temperature ?? 0.2,
-          max_tokens: maxOutputTokens,
-          messages: [
-            { role: 'system', content: clean(input.request.system, 20_000) },
-            { role: 'user', content: clean(input.request.prompt, 100_000) },
-          ],
-        }
   const response = await input.fetchImpl(endpoint, {
     method: 'POST',
     headers: { Authorization: `Bearer ${credential}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify({
+      model,
+      reasoning_effort: input.teacher.id === 'grok' ? 'low' : undefined,
+      temperature: input.request.temperature ?? 0.2,
+      max_tokens: maxOutputTokens,
+      messages: [
+        { role: 'system', content: clean(input.request.system, 20_000) },
+        { role: 'user', content: clean(input.request.prompt, 100_000) },
+      ],
+    }),
     signal: AbortSignal.timeout(timeoutMs),
   })
   const payload = await readJson(response)
-  if (!response.ok) throw new Error(`university_teacher_http_${response.status}`)
+  if (!response.ok) {
+    const code = clean(payload?.error?.code || payload?.error?.type || 'unknown', 80).replace(/[^A-Za-z0-9._-]/g, '_')
+    throw new Error(`university_teacher_http_${response.status}:${code}`)
+  }
   const text = clean(payload?.choices?.[0]?.message?.content)
   if (!text) throw new Error('university_teacher_empty_response')
   return Object.freeze({
@@ -157,7 +194,10 @@ async function callAnthropic(input: {
     signal: AbortSignal.timeout(timeoutMs),
   })
   const payload = await readJson(response)
-  if (!response.ok) throw new Error(`university_teacher_http_${response.status}`)
+  if (!response.ok) {
+    const code = clean(payload?.error?.type || payload?.error?.code || 'unknown', 80).replace(/[^A-Za-z0-9._-]/g, '_')
+    throw new Error(`university_teacher_http_${response.status}:${code}`)
+  }
   const text = clean(Array.isArray(payload?.content)
     ? payload.content.filter((item: any) => item?.type === 'text').map((item: any) => item.text).join('\n')
     : '')
@@ -184,6 +224,9 @@ export async function generateWithUniversityTeacher(input: {
 }): Promise<TeacherGenerationResult> {
   const env = input.env || process.env
   const fetchImpl = input.fetchImpl || fetch
+  if (input.teacher.id === 'openai') {
+    return callOpenAiResponses({ teacher: input.teacher, request: input.request, env, fetchImpl })
+  }
   if (input.teacher.transport === 'openai_compatible') {
     return callOpenAiCompatible({ teacher: input.teacher, request: input.request, env, fetchImpl })
   }

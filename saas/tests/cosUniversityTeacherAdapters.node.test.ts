@@ -5,7 +5,7 @@ import { UNIVERSITY_TEACHERS } from '../lib/ai/cos/cosUniversityTeacherPool.ts'
 
 const byId = (id: string) => UNIVERSITY_TEACHERS.find(item => item.id === id)!
 
-test('OpenAI-compatible adapter uses buyer-configured model and never falls back', async () => {
+test('OpenAI GPT-5.6 teacher uses the Responses API and never falls back', async () => {
   let seenUrl = ''
   let seenBody: any = null
   const result = await generateWithUniversityTeacher({
@@ -19,15 +19,22 @@ test('OpenAI-compatible adapter uses buyer-configured model and never falls back
       seenUrl = String(input)
       seenBody = JSON.parse(String(init?.body || '{}'))
       return new Response(JSON.stringify({
-        choices: [{ message: { content: 'answer' } }],
-        usage: { prompt_tokens: 10, completion_tokens: 5 },
+        id: 'resp-1',
+        output: [{
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'answer' }],
+        }],
+        usage: { input_tokens: 10, output_tokens: 5 },
       }), { status: 200, headers: { 'x-request-id': 'req-1' } })
     },
   })
-  assert.equal(seenUrl, 'https://api.openai.com/v1/chat/completions')
+  assert.equal(seenUrl, 'https://api.openai.com/v1/responses')
   assert.equal(seenBody.model, 'buyer-approved-openai-model')
-  assert.equal(seenBody.reasoning_effort, 'none')
-  assert.equal(seenBody.max_completion_tokens, 300)
+  assert.deepEqual(seenBody.reasoning, { effort: 'none' })
+  assert.equal(seenBody.max_output_tokens, 300)
+  assert.equal(seenBody.input[0].content[0].type, 'input_text')
+  assert.equal(seenBody.input[1].content[0].type, 'input_text')
   assert.equal(seenBody.max_tokens, undefined)
   assert.equal(result.text, 'answer')
   assert.equal(result.requestId, 'req-1')
@@ -91,4 +98,23 @@ test('xAI adapter uses Grok-compatible low-reasoning Chat Completions payload', 
   assert.equal(body.reasoning_effort, 'low')
   assert.equal(body.max_tokens, 384)
   assert.equal(result.text, 'grok answer')
+})
+
+
+test('provider HTTP failures expose status and safe provider error code without response body', async () => {
+  await assert.rejects(
+    generateWithUniversityTeacher({
+      teacher: byId('claude'),
+      env: {
+        ANTHROPIC_API_KEY: 'sk-ant-123456789012345678901234567890',
+        COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL: 'claude-sonnet-4-6',
+      },
+      request: { system: 'x', prompt: 'y', maxOutputTokens: 128 },
+      fetchImpl: async () => new Response(JSON.stringify({
+        type: 'error',
+        error: { type: 'permission_error', message: 'sensitive provider detail' },
+      }), { status: 403 }),
+    }),
+    /university_teacher_http_403:permission_error/,
+  )
 })

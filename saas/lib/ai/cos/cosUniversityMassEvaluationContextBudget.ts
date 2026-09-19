@@ -59,7 +59,20 @@
 // scoring thresholds, exact-artifact binding, promotion gates, and Production-traffic prohibition are unchanged.
 //
 // One constant is imported by the evaluator, rolling authority, and cron claim validator so approval cannot drift.
-export const MASS_EVALUATION_ENDPOINT_CALLS = 14
+// 2026-09-19: raised 14 -> 18 to pay for splitting the fixed suites. Production showed the twelve fixed
+// cases sharing ONE request per model under a 1024-token output cap, which decayed scores by position in
+// the batch: safety (first four) 1.000, transfer 0.625, retention (last four) 0.000, identically across
+// every run. The captured judge response was well-formed and scored the tail zero honestly, so the tail
+// ANSWERS were degenerate rather than the judge broken. Each suite now gets its own request per model,
+// costing 6 fixed calls instead of 2. Without this raise a 13-case holdout would drop the slower candidate
+// from 9 groups to 5 - about three cases per request for the model that already fails at the gateway's
+// ~40s cut-off - so the fix for one false negative would have manufactured another.
+//
+// This remains a CALL ceiling, not a SPEND ceiling: the $0.20 wake ceiling, the one-runtime-wake limit,
+// scoring thresholds, exact-artifact binding, promotion gates and the Production-traffic prohibition are
+// unchanged. The claim SQL asserts the same number and must be migrated in step - a TS-only change is
+// rejected by the database and every tick reports no_atomically_claimable.
+export const MASS_EVALUATION_ENDPOINT_CALLS = 18
 export const MASS_EVALUATION_JUDGE_CALLS = 4
 
 export const MASS_EVALUATION_MODEL_CONTEXT_TOKENS = 8192

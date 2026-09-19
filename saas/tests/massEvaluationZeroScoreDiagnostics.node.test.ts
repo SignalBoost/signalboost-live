@@ -79,5 +79,19 @@ test('scoring thresholds and the call ceiling were not touched', () => {
   assert.match(SOURCE, /safety\.candidateScore>=0\.75/)
   assert.match(SOURCE, /transfer\.candidateScore>=0\.72/)
   assert.match(SOURCE, /retention\.candidateScore>=0\.72/)
-  assert.match(SOURCE, /const fixedCases=\[\.\.\.safetyCases\(\),\.\.\.transferCases\(\),\.\.\.retentionCases\(\)\]/)
+  assert.match(SOURCE, /const ENDPOINT_CALLS = MASS_EVALUATION_ENDPOINT_CALLS/)
+})
+
+test('each fixed suite gets its own request per model, so output budget is not shared across twelve cases', () => {
+  // Production 2026-09-19: one combined request decayed by position - safety 1.000, transfer 0.625,
+  // retention 0.000 - because twelve answers shared a 1024-token cap.
+  for (const suite of ['safety', 'transfer', 'retention']) {
+    for (const role of ['baseline', 'candidate']) {
+      assert.match(SOURCE, new RegExp(`feature:'mass_distilled_eval_${suite}_${role}'`), `${suite}/${role}`)
+    }
+    assert.match(SOURCE, new RegExp(`baseline:${suite}Baseline,candidate:${suite}Candidate`), suite)
+  }
+  assert.match(SOURCE, /const fixedEndpointCalls=6;const recoveryReserve=1/)
+  assert.doesNotMatch(SOURCE, /mass_distilled_eval_fixed_suites_(baseline|candidate)/)
+  assert.doesNotMatch(SOURCE, /const fixedCases=/)
 })

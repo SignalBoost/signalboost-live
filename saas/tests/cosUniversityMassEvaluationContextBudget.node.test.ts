@@ -72,12 +72,14 @@ test('seven-case holdouts use the available transport budget instead of collapsi
   assert.deepEqual(baseline.flat().map(item => item.id), seven.map(item => item.id), 'baseline order and content preserved')
 })
 
-test('the live 13-case holdout shape fits the 14-call ceiling with one recovery call reserved', () => {
+test('the live 13-case holdout shape fits the 18-call ceiling with one recovery call reserved', () => {
   const cases = Array.from({ length: 13 }, (_, i) => ({ id: `thirteen-${i}`, text: 'x'.repeat(1700) }))
   const promptFor = (group: readonly { text: string }[]) => group.map(item => item.text).join('\n')
   const baseline = planMassEvaluationGroups(cases, promptFor, 2)
   assert.equal(baseline.length, 2, 'the full 13-case prompt must not collapse into one baseline request')
-  const fixedEndpointCalls = 2
+  // Six fixed calls against the 18-call ceiling leaves the candidate the same nine groups it had
+  // under 14 with two fixed calls.
+  const fixedEndpointCalls = 6
   const recoveryReserve = 1
   const candidateTarget = Math.min(cases.length, MASS_EVALUATION_ENDPOINT_CALLS - baseline.length - fixedEndpointCalls - recoveryReserve)
   assert.equal(candidateTarget, 9)
@@ -109,7 +111,8 @@ test('the runner stays inside the approved endpoint-call ceiling and reserves ca
   assert.match(source, /model,cases:holdoutCases,maxGroups:candidateGroupTarget,minGroups:candidateGroupTarget,reserveCallsAfter:fixedEndpointCalls/)
   assert.match(source, /reserveCallsAfter:1/)
   assert.match(source, /reserveCallsAfter:0/)
-  assert.equal((source.match(/await answersFor\(/g) || []).length, 4)
+  // 2 holdout + 6 fixed (three suites x two models)
+  assert.equal((source.match(/await answersFor\(/g) || []).length, 8)
   assert.equal((source.match(/await suite\(\{name:'(holdout|safety|transfer|retention)'/g) || []).length, 4)
   assert.match(source, /endpointCalls:budget\.used/)
 })

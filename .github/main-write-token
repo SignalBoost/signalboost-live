@@ -1,2 +1,2 @@
-base_sha=8c3594f7677376729bbfa097f8d59ff54ed30501
-branch=fix/cos-freshness-routing-tests-20260919
+base_sha=5c68ecbc3d5d3969834bc5a36f8348d1417d74d1
+branch=fix/university-canary-stale-approval-deadlock-v2-20260919

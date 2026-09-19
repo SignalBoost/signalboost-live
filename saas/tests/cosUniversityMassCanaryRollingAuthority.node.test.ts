@@ -156,3 +156,27 @@ test('the armed approval remains a queue-wide semaphore', () => {
   assert.deepEqual(decideMassCanaryRollingApproval({ artifacts:[a,b], events:[armed], now, enabled:true }),
     { issue:false, reason:'mass_canary_approval_already_armed' })
 })
+
+
+test('a duplicate approval issued after an exact-artifact canary pass is stale and cannot freeze the queue', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const passed = event(a, 'local_distilled_runtime_canary_passed', '2026-09-17T15:00:00.000Z')
+  const duplicate = event(a, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T16:00:00.000Z',
+    { expiresAt: '2026-09-17T18:00:00.000Z' },
+    { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF, canaryAuthorized: true })
+  const decision = decideMassCanaryRollingApproval({ artifacts:[a,b], events:[passed,duplicate], now, enabled:true })
+  assert.ok('artifact' in decision)
+  assert.equal(decision.artifact.candidateId, b.candidateId)
+})
+
+test('an explicit endpoint-refresh approval after a prior pass remains the queue semaphore', () => {
+  const a = artifact(1, '2026-09-15T00:00:00.000Z')
+  const b = artifact(2, '2026-09-15T01:00:00.000Z')
+  const passed = event(a, 'local_distilled_runtime_canary_passed', '2026-09-17T15:00:00.000Z')
+  const refresh = event(a, MASS_CANARY_APPROVAL_CLAIM, '2026-09-17T16:00:00.000Z',
+    { expiresAt: '2026-09-17T18:00:00.000Z' },
+    { authorizationRef: MASS_CANARY_ROLLING_AUTHORIZATION_REF, canaryAuthorized: true, endpointRefresh: true })
+  assert.deepEqual(decideMassCanaryRollingApproval({ artifacts:[a,b], events:[passed,refresh], now, enabled:true }),
+    { issue:false, reason:'mass_canary_approval_already_armed' })
+})

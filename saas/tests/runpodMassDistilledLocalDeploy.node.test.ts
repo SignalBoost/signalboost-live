@@ -127,3 +127,14 @@ test('mass-distilled route is scheduled independently from legacy and v6 single-
   assert.match(vercel, /\/api\/cron\/runpod-distilled-local-deploy/)
   assert.match(vercel, /\/api\/cron\/runpod-distilled-v6-local-deploy/)
 })
+
+
+test('rolling canary evidence loading cannot truncate old pass evidence behind unrelated fine-tune history', () => {
+  assert.match(route, /ROLLING_EVENT_PROFILES/)
+  assert.match(route, /MASS_CANARY_PROFILE/)
+  assert.match(route, /cos_mass_distilled_independent_evaluation_runtime_v1/)
+  assert.match(route, /cos_distilled_independent_evaluation_authorization_v1/)
+  assert.match(route, /\.contains\('evidence',\{profile\}\)/)
+  assert.match(route, /\.range\(from,from\+ROLLING_EVENT_PAGE_SIZE-1\)/)
+  assert.doesNotMatch(route, /\.order\('observed_at',\{ascending:false\}\)\.limit\(5000\)/)
+})

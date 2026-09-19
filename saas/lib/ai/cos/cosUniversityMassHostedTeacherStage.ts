@@ -14,8 +14,8 @@ const HOSTED_TRANSPORTS: readonly UniversityTeacherTransport[] = Object.freeze([
 const MIN_TEACHER_ROWS = 20
 const DEFAULT_MAX_CALLS = 24
 const HARD_MAX_CALLS = 64
-const DEFAULT_MAX_OUTPUT_TOKENS = 512
-const HARD_MAX_OUTPUT_TOKENS = 1024
+const DEFAULT_MAX_OUTPUT_TOKENS = 384
+const HARD_MAX_OUTPUT_TOKENS = 512
 const DEFAULT_PARALLELISM = 8
 const HARD_MAX_PARALLELISM = 16
 
@@ -118,7 +118,7 @@ export async function runMassHostedTeacherStage(input: {
             'Use the supplied rights-cleared learning case only.',
             'Return a rigorous final teaching response without hidden chain-of-thought, citations, private data, or claims of external access.',
           ].join(' '),
-          prompt: prompt.prompt,
+          prompt: String(prompt.prompt || '').slice(0, 4000),
           maxOutputTokens: config.maxOutputTokens,
           temperature: 0.2,
         },

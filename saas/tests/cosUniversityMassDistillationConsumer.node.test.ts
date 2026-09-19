@@ -105,7 +105,7 @@ test('mass campaign has a signed callback and a bounded scheduled consumer', () 
   assert.match(cron, /runCosUniversityMassDistillationWorkflow/)
   assert.match(workflow, /recoverStalledMassDistillationDispatchClaims\(\{ now, maxRuns: 10 \}\)/)
   assert.match(workflow, /recoverMassDistillationCampaigns\(\{ now, maxCampaigns: 5 \}\)/)
-  assert.match(workflow, /maxDispatches: 3/)
+  assert.match(workflow, /maxDispatches: 5/)
   assert.match(vercel, /\/api\/cron\/cos-university-mass-distillation/)
 })
 

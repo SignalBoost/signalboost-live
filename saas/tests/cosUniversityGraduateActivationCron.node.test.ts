@@ -11,7 +11,7 @@ test('the activation caller exists and is scheduled — promoted graduates canno
   // activateGraduateRuntime had zero callers: promotion wrote pending_runtime, COS routing read
   // active, and nothing bridged them. This cron is that bridge.
   assert.match(route, /activateGraduateRuntime\(\{/)
-  assert.match(vercel, /"\/api\/cron\/cos-university-graduate-activation", "schedule": "\*\/10 \* \* \* \*"/)
+  assert.match(vercel, /"path": "\/api\/cron\/cos-university-graduate-activation",[\s\S]{0,120}"schedule": "7,17,27,37,47,57 \* \* \* \*"/)
 })
 
 test('fail-closed owner switch, no new approval SQL class', () => {
@@ -35,9 +35,23 @@ test('initial scope is narrow and per-subject; an undeclared subject halts rathe
   assert.doesNotMatch(route, /'primary'/)
 })
 
-test('the served identity is the runtime serving name, not the artifact repo id', () => {
-  assert.match(route, /runtimeModelId: DISTILLED_MODEL_NAME/)
+test('activation binds to the exact canary-proven RunPod endpoint and served model', () => {
+  assert.match(route, /servedCandidateModelFromCanary/)
+  assert.match(route, /COS_GRADUATE_AI_BASE_URL/)
+  assert.match(route, /api\\.runpod\\.ai/)
+  assert.match(route, /claim: 'local_distilled_runtime_canary_passed'/)
+  assert.match(route, /exactArtifact: true/)
+  assert.match(route, /endpointId/)
+  assert.match(route, /runtimeModelId: serving\.modelId/)
+  assert.doesNotMatch(route, /DISTILLED_MODEL_NAME/)
   assert.doesNotMatch(route, /DISTILLED_ADAPTER_MODEL_ID/)
+  assert.doesNotMatch(route, /provisionMassDistilledRuntime|ensureMassDistilledEndpoint24Gb/)
+})
+
+test('exact serving identity is resolved only after the owner activation switch', () => {
+  const flag = route.indexOf("process.env[ACTIVATION_ENABLED_FLAG]")
+  const resolver = route.indexOf('const serving = await resolvePendingGraduateServingIdentity')
+  assert.ok(flag >= 0 && resolver > flag)
 })
 
 test('outcomes are recorded either way — success, blockers, and throws all leave evidence', () => {

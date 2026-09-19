@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { activateGraduateRuntime } from '@/lib/ai/cos/cosUniversityGraduateRuntime'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
-import { DISTILLED_MODEL_NAME } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
+import { servedCandidateModelFromCanary, type CanaryEventRow } from '@/lib/ai/cos/cosUniversityMassEvaluationServedModel'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { registerPromotedGraduateModel } from '@/lib/ai/cos/cosUniversityGraduateModelRegistry'
 import { decideMassGraduateRegistration, type MassGraduateEvent } from '@/lib/ai/cos/cosUniversityMassGraduateRegistration'
@@ -25,6 +25,56 @@ export const maxDuration = 300
  * owner switch is the environment flag below — fail-closed when absent.
  */
 const ACTIVATION_ENABLED_FLAG = 'COS_GRADUATE_ACTIVATION_ENABLED'
+
+
+const RUNPOD_SERVERLESS_HOST = /^([a-z0-9]+)\.api\.runpod\.ai$/i
+
+function configuredGraduateRunpodEndpointId(): string | null {
+  const raw = String(process.env.COS_GRADUATE_AI_BASE_URL || '').trim()
+  if (!raw) return null
+  try {
+    const url = new URL(raw)
+    const match = RUNPOD_SERVERLESS_HOST.exec(url.hostname)
+    if (!match || url.protocol !== 'https:' || !/^\/v1\/?$/.test(url.pathname)) return null
+    return match[1].toLowerCase()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Bind activation to the exact mass-artifact serving identity already proven by its canary.
+ * The configured graduate endpoint must itself be that canary endpoint; activation never guesses
+ * a model name, provisions an endpoint, restores RunPod capacity, or mutates provider state.
+ */
+async function resolvePendingGraduateServingIdentity(db: any, graduate: {
+  candidate_id: unknown
+  trained_artifact_hash: unknown
+}): Promise<{ endpointId: string; modelId: string }> {
+  const endpointId = configuredGraduateRunpodEndpointId()
+  if (!endpointId) throw new Error('graduate_runtime_exact_runpod_endpoint_not_configured')
+
+  const candidateId = String(graduate.candidate_id || '').trim()
+  const artifactHash = String(graduate.trained_artifact_hash || '').trim().toLowerCase()
+  if (!candidateId || !/^[a-f0-9]{64}$/.test(artifactHash)) throw new Error('graduate_runtime_identity_invalid')
+
+  const canaries = await db.from('cos_university_learning_assurance_events')
+    .select('verifier,evidence,observed_at')
+    .eq('event_type', 'fine_tune')
+    .eq('candidate_id', candidateId)
+    .eq('verifier', 'host_controller')
+    .contains('evidence', { claim: 'local_distilled_runtime_canary_passed', exactArtifact: true, endpointId })
+    .order('observed_at', { ascending: false })
+    .limit(100)
+  if (canaries.error) throw canaries.error
+
+  const modelId = servedCandidateModelFromCanary((canaries.data || []) as CanaryEventRow[], {
+    candidateId,
+    artifactHash,
+    endpointId,
+  })
+  return { endpointId, modelId }
+}
 
 /**
  * Initial capability scope per subject, deliberately narrow: the reasoning graduate advises as
@@ -201,12 +251,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ ok: false, error: 'graduate_subject_scope_undeclared', subjectId: graduate.subject_id }, { status: 422 })
     }
 
+    const serving = await resolvePendingGraduateServingIdentity(db, graduate)
     const result = await activateGraduateRuntime({
       candidateId: String(graduate.candidate_id || ''),
       trainedArtifactHash: String(graduate.trained_artifact_hash || ''),
-      // The served identity is the LoRA's serving name on the runtime, not the artifact repo id:
-      // the /models identity check compares against what the endpoint actually lists.
-      runtimeModelId: DISTILLED_MODEL_NAME,
+      // The exact served identity comes from this artifact's passing host canary on the same
+      // configured RunPod endpoint; never infer it from an artifact hash or a static legacy name.
+      runtimeModelId: serving.modelId,
       runtimeProfile: 'graduate_ai',
       workerRoles: scope.workerRoles as never,
       problemClasses: scope.problemClasses,
@@ -221,6 +272,8 @@ export async function GET(req: NextRequest) {
         subjectId: graduate.subject_id,
         activated: result.activated,
         blockers: result.blockers,
+        servingEndpointId: serving.endpointId,
+        servingModelId: serving.modelId,
         ...(result.activated ? {
           provider: (result as any).provider,
           healthEvidenceHash: (result as any).healthEvidenceHash,

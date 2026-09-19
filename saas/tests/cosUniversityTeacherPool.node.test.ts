@@ -69,3 +69,46 @@ test('teacher selection is deterministic and preserves provenance', () => {
   assert.equal(provenance.silentFallbackAllowed, false)
   assert.equal(provenance.authorityExpanded, false)
 })
+
+
+test('buyers can add an OpenAI-compatible teacher provider through configuration without changing the pool code', () => {
+  const env = {
+    BUYER_CLOUD_KEY: 'buyer_123456789012345678901234567890',
+    BUYER_CLOUD_ENABLED: 'true',
+    BUYER_CLOUD_READY: 'true',
+    BUYER_CLOUD_MODEL: 'buyer-model-v1',
+    BUYER_CLOUD_ENDPOINT: 'https://models.example.test/v1/chat/completions',
+    COS_UNIVERSITY_TEACHER_PROVIDERS_JSON: JSON.stringify([{
+      id: 'buyer-cloud',
+      provider: 'buyer-cloud',
+      transport: 'openai_compatible',
+      credentialEnv: 'BUYER_CLOUD_KEY',
+      enabledEnv: 'BUYER_CLOUD_ENABLED',
+      adapterReadyEnv: 'BUYER_CLOUD_READY',
+      modelEnv: 'BUYER_CLOUD_MODEL',
+      endpointEnv: 'BUYER_CLOUD_ENDPOINT',
+      massDistillationEligible: true,
+    }]),
+  }
+  const status = universityTeacherPoolStatus(env)
+  const provider = status.activeProviders.find(item => item.id === 'buyer-cloud')
+  assert.ok(provider)
+  assert.equal(provider?.provider, 'buyer-cloud')
+  assert.equal(provider?.transport, 'openai_compatible')
+  assert.equal(provider?.massDistillationEligible, true)
+  assert.deepEqual(status.configurationErrors, [])
+  assert.equal(status.configDrivenProviders, true)
+})
+
+test('malformed buyer provider definitions fail closed', () => {
+  const status = universityTeacherPoolStatus({
+    COS_UNIVERSITY_TEACHER_PROVIDERS_JSON: JSON.stringify([{
+      id: 'bad provider',
+      provider: 'bad provider',
+      transport: 'openai_compatible',
+      credentialEnv: 'literal-secret-is-not-an-env-name',
+    }]),
+  })
+  assert.equal(status.activeProviders.some(item => item.id === 'bad provider'), false)
+  assert.ok(status.configurationErrors.length > 0)
+})

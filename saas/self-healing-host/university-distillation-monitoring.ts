@@ -150,38 +150,53 @@ function bySubjectInserted(value: unknown, subject: string): number {
  * packaging pass still produced no prepared batch.
  */
 export function deriveCurriculumPackagingProgress(receipts: readonly ReceiptRow[]): CurriculumPackagingProgress {
-  const maintenance = receipts.find(row => record(row.evidence)?.slowMaintenanceDue === true) || null
-  if (!maintenance) {
+  const maintenanceReceipts = receipts.filter(row => record(row.evidence)?.slowMaintenanceDue === true)
+  if (!maintenanceReceipts.length) {
     return Object.freeze({ stalled: false, observedAt: null, subject: null, shortfallToBatch: 0, insertedForSubject: 0, preparedBefore: 0, preparedAfter: 0 })
   }
-  const evidence = record(maintenance.evidence) || {}
-  const curriculum = record(evidence.curriculum) || {}
-  const supply = record(curriculum.supply) || {}
-  const replenishment = record(evidence.curriculumReplenishment) || {}
-  const preparedBefore = Math.max(0, Math.floor(finite(evidence.preparedBeforeReplenishment)))
-  const preparedAfter = Math.max(0, Math.floor(finite(evidence.preparedAfterReplenishment)))
-  const batchesPrepared = Math.max(0, Math.floor(finite(curriculum.batchesPrepared)))
-  if (preparedAfter > 0 || batchesPrepared > 0) {
-    return Object.freeze({ stalled: false, observedAt: maintenance.observed_at, subject: null, shortfallToBatch: 0, insertedForSubject: 0, preparedBefore, preparedAfter })
-  }
 
-  const subjects = Array.isArray(supply.subjects) ? supply.subjects : []
-  for (const raw of subjects) {
-    const item = record(raw)
-    const subject = String(item?.subject || '').trim()
-    const shortfallToBatch = Math.max(0, Math.floor(finite(item?.shortfallToBatch)))
-    if (!subject || shortfallToBatch <= 0) continue
-    const insertedForSubject = [
-      replenishment.syntheticBySubject,
-      replenishment.failureDerivedBySubject,
-      replenishment.hostedTeacherBySubject,
-      replenishment.acceptedBySubject,
-    ].reduce<number>((sum, value) => sum + bySubjectInserted(value, subject), 0)
-    if (insertedForSubject >= shortfallToBatch) {
-      return Object.freeze({ stalled: true, observedAt: maintenance.observed_at, subject, shortfallToBatch, insertedForSubject, preparedBefore, preparedAfter })
+  // Receipts are newest first. A real prepared batch resolves older contradictions; a newer no-op
+  // does not erase an earlier same-subject replenishment that still has no downstream package.
+  let latestNoProgress: CurriculumPackagingProgress | null = null
+  for (const maintenance of maintenanceReceipts) {
+    const evidence = record(maintenance.evidence) || {}
+    const curriculum = record(evidence.curriculum) || {}
+    const supply = record(curriculum.supply) || {}
+    const replenishment = record(evidence.curriculumReplenishment) || {}
+    const preparedBefore = Math.max(0, Math.floor(finite(evidence.preparedBeforeReplenishment)))
+    const preparedAfter = Math.max(0, Math.floor(finite(evidence.preparedAfterReplenishment)))
+    const batchesPrepared = Math.max(0, Math.floor(finite(curriculum.batchesPrepared)))
+    if (preparedAfter > 0 || batchesPrepared > 0) {
+      return Object.freeze({ stalled: false, observedAt: maintenance.observed_at, subject: null, shortfallToBatch: 0, insertedForSubject: 0, preparedBefore, preparedAfter })
+    }
+    latestNoProgress ||= Object.freeze({
+      stalled: false,
+      observedAt: maintenance.observed_at,
+      subject: null,
+      shortfallToBatch: 0,
+      insertedForSubject: 0,
+      preparedBefore,
+      preparedAfter,
+    })
+
+    const subjects = Array.isArray(supply.subjects) ? supply.subjects : []
+    for (const raw of subjects) {
+      const item = record(raw)
+      const subject = String(item?.subject || '').trim()
+      const shortfallToBatch = Math.max(0, Math.floor(finite(item?.shortfallToBatch)))
+      if (!subject || shortfallToBatch <= 0) continue
+      const insertedForSubject = [
+        replenishment.syntheticBySubject,
+        replenishment.failureDerivedBySubject,
+        replenishment.hostedTeacherBySubject,
+        replenishment.acceptedBySubject,
+      ].reduce<number>((sum, value) => sum + bySubjectInserted(value, subject), 0)
+      if (insertedForSubject >= shortfallToBatch) {
+        return Object.freeze({ stalled: true, observedAt: maintenance.observed_at, subject, shortfallToBatch, insertedForSubject, preparedBefore, preparedAfter })
+      }
     }
   }
-  return Object.freeze({ stalled: false, observedAt: maintenance.observed_at, subject: null, shortfallToBatch: 0, insertedForSubject: 0, preparedBefore, preparedAfter })
+  return latestNoProgress!
 }
 
 export function evaluateUniversityMassDistillationHealth(input: {
@@ -265,16 +280,18 @@ export function evaluateUniversityMassDistillationHealth(input: {
     if (reasons.length > 0) {
       state = 'repair_required'
       automaticRecoveryAuthorized = true
+    } else if (preparedBatches === 0 && curriculumPackagingStalled) {
+      // Packaging repair is a bounded code/runtime recovery. It must not be suppressed by paid
+      // campaign authorization or rolling-budget state because the repair itself dispatches no job.
+      state = 'repair_required'
+      reasons.push('curriculum_packaging_stalled')
+      automaticRecoveryAuthorized = true
     } else if (!rollingPolicyEnabled) {
       state = 'authorization_required'
       reasons.push('rolling_authorization_disabled')
     } else if (!rollingBatchAffordable) {
       state = 'budget_paused'
       reasons.push('rolling_budget_exhausted')
-    } else if (preparedBatches === 0 && curriculumPackagingStalled) {
-      state = 'repair_required'
-      reasons.push('curriculum_packaging_stalled')
-      automaticRecoveryAuthorized = true
     } else if (preparedBatches === 0) {
       state = 'waiting_for_curriculum'
       reasons.push('curriculum_supply_waiting')

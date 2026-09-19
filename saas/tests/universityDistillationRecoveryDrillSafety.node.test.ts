@@ -9,6 +9,14 @@ const source = readFileSync(
   new URL('../agent-gateway-host/university-distillation-recovery.ts', import.meta.url),
   'utf8',
 )
+const verifierMigration = readFileSync(
+  new URL('../supabase/migrations/20260919191500_cos_university_self_healing_verifier.sql', import.meta.url),
+  'utf8',
+)
+const drillRoute = readFileSync(
+  new URL('../app/api/admin/cos-university-recovery-drill/route.ts', import.meta.url),
+  'utf8',
+)
 
 test('Supervisor drill repair is bound to an armed exact fixture', () => {
   assert.match(source, /RECOVERY_DRILL_PROFILE/)
@@ -56,4 +64,15 @@ test('a separate real fault still falls through to the ordinary governed recover
   assert.match(source, /const workerPreflight = await preflightWorker\(\)/)
   assert.match(source, /runCosUniversityMassDistillationWorkflow/)
   assert.match(source, /workerPreflightPassed: true/)
+})
+
+
+test('database evidence authority admits the Supervisor without removing existing verifiers', () => {
+  assert.match(verifierMigration, /'host_controller'/)
+  assert.match(verifierMigration, /'host_production_verifier'/)
+  assert.match(verifierMigration, /'independent_scorer'/)
+  assert.match(verifierMigration, /'training_executor'/)
+  assert.match(verifierMigration, /'self_healing_supervisor'/)
+  assert.doesNotMatch(verifierMigration, /drop column|drop table/i)
+  assert.match(drillRoute, /row\.verifier === 'self_healing_supervisor' \? 'supervisor'/)
 })

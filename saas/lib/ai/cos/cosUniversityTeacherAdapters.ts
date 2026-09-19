@@ -39,8 +39,14 @@ function positiveInt(value: unknown, fallback: number, min: number, max: number)
 }
 
 function modelFor(teacher: UniversityTeacherDefinition, env: Env): string {
-  if (teacher.modelEnv) return clean(env[teacher.modelEnv], 240) || (teacher.model === 'buyer-configured' ? '' : teacher.model)
-  return teacher.model === 'buyer-configured' ? '' : clean(teacher.model, 240)
+  const configured = teacher.modelEnv
+    ? clean(env[teacher.modelEnv], 240) || (teacher.model === 'buyer-configured' ? '' : teacher.model)
+    : teacher.model === 'buyer-configured' ? '' : clean(teacher.model, 240)
+
+  // Production briefly advertised the non-API label "deepseek-flash". Preserve configuration
+  // compatibility while sending DeepSeek's canonical chat model identifier to the API.
+  if (teacher.id === 'deepseek-api' && configured.toLowerCase() === 'deepseek-flash') return 'deepseek-chat'
+  return configured
 }
 
 function endpointFor(teacher: UniversityTeacherDefinition, env: Env): string {

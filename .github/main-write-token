@@ -1,2 +1,2 @@
-base_sha=1b0fb9dcaa059598662858acd66d06e0c68bf8ab
-branch=fix/shs-retry-claim-fence-20260919
+base_sha=f115e71f6193e7683458c7844fa76b273fad9f50
+branch=fix/university-self-healing-stall-precedence-20260919

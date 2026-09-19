@@ -161,6 +161,72 @@ test('same-subject replenishment that satisfies the shortfall but yields zero pa
   assert.equal(incident.metadata.recoveryPreauthorized, true)
 })
 
+test('newer no-op maintenance does not hide an unresolved packaging contradiction', () => {
+  const progress = deriveCurriculumPackagingProgress([{
+    observed_at: '2026-09-15T11:59:00.000Z',
+    commit_sha: 'new-no-op',
+    evidence: {
+      slowMaintenanceDue: true,
+      preparedBeforeReplenishment: 0,
+      preparedAfterReplenishment: 0,
+      curriculum: { batchesPrepared: 0, supply: { subjects: [] } },
+      curriculumReplenishment: {},
+    },
+  }, {
+    observed_at: '2026-09-15T11:56:00.000Z',
+    commit_sha: 'stalled',
+    evidence: {
+      slowMaintenanceDue: true,
+      preparedBeforeReplenishment: 0,
+      preparedAfterReplenishment: 0,
+      curriculum: { batchesPrepared: 0, supply: { subjects: [{ subject: 'Statistics & Data Science', shortfallToBatch: 16 }] } },
+      curriculumReplenishment: { syntheticBySubject: [{ subject: 'Statistics & Data Science', inserted: 16 }] },
+    },
+  }])
+  assert.equal(progress.stalled, true)
+  assert.equal(progress.observedAt, '2026-09-15T11:56:00.000Z')
+  assert.equal(progress.subject, 'Statistics & Data Science')
+})
+
+test('packaging repair takes precedence over paid authorization and rolling-budget gates', () => {
+  const progress = {
+    stalled: true,
+    observedAt: '2026-09-15T11:56:00.000Z',
+    subject: 'Statistics & Data Science',
+    shortfallToBatch: 16,
+    insertedForSubject: 16,
+    preparedBefore: 0,
+    preparedAfter: 0,
+  }
+  for (const continuity of [{
+    preparedBatches: 0,
+    rollingPolicyEnabled: false,
+    rollingMaximumAuthorizedCostUsd: 0,
+    rollingAuthorizedCostUsd: 0,
+    nextBudgetReleaseAt: null,
+  }, {
+    preparedBatches: 0,
+    rollingPolicyEnabled: true,
+    rollingMaximumAuthorizedCostUsd: 25,
+    rollingAuthorizedCostUsd: 25,
+    nextBudgetReleaseAt: '2026-09-16T16:31:41.969Z',
+  }]) {
+    const snapshot = evaluateUniversityMassDistillationHealth({
+      now,
+      expectedIntervalSeconds: 300,
+      campaigns: [],
+      receipt,
+      workflowRuns: [],
+      providerJobs: [],
+      curriculumProgress: progress,
+      continuity,
+    })
+    assert.equal(snapshot.state, 'repair_required')
+    assert.deepEqual(snapshot.reasons, ['curriculum_packaging_stalled'])
+    assert.equal(snapshot.automaticRecoveryAuthorized, true)
+  }
+})
+
 test('freshly satisfied packaging progress clears the defect instead of replaying an old contradiction', () => {
   const progress = deriveCurriculumPackagingProgress([{
     observed_at: '2026-09-15T11:56:00.000Z',

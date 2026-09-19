@@ -15,8 +15,9 @@ const cron = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled
 // time on identical cases (28.4s vs 16.9s against a 35.2-40.4s gateway cutoff), can use smaller requests while
 // preserving every holdout case, the fixed suites, and bounded recovery headroom.
 
-test('the ceiling is 14 and is defined exactly once', () => {
-  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 14)
+test('the ceiling is 18 and is defined exactly once', () => {
+  // 14 -> 18: the four extra calls pay for one request per fixed suite per model.
+  assert.equal(MASS_EVALUATION_ENDPOINT_CALLS, 18)
   assert.equal(MASS_EVALUATION_JUDGE_CALLS, 4)
 })
 
@@ -31,7 +32,7 @@ test('all three enforcement points read the shared constant, so the approval sha
 })
 
 test('the slower candidate uses the largest budget-derived grouping that leaves fixed-suite and recovery capacity', () => {
-  assert.match(evaluator, /const fixedEndpointCalls=2;const recoveryReserve=1/)
+  assert.match(evaluator, /const fixedEndpointCalls=6;const recoveryReserve=1/)
   assert.match(evaluator, /const baselineGroupCount=planMassEvaluationGroups\(holdoutCases,batchPrompt,2\)\.length/)
   assert.match(evaluator, /const candidateGroupTarget=Math\.min\(holdoutCases\.length,ENDPOINT_CALLS-baselineGroupCount-fixedEndpointCalls-recoveryReserve\)/)
   assert.match(evaluator, /maxGroups:candidateGroupTarget,minGroups:candidateGroupTarget,reserveCallsAfter:fixedEndpointCalls/)
@@ -40,7 +41,8 @@ test('the slower candidate uses the largest budget-derived grouping that leaves 
 test('the observed 13-case / two-baseline-group shape fits exactly with a dedicated retry reserve', () => {
   const holdoutCases = 13
   const baselineGroups = 2
-  const fixedEndpointCalls = 2
+  // Six: one request per fixed suite per model.
+  const fixedEndpointCalls = 6
   const recoveryReserve = 1
   const candidateGroups = Math.min(holdoutCases, MASS_EVALUATION_ENDPOINT_CALLS - baselineGroups - fixedEndpointCalls - recoveryReserve)
   assert.equal(candidateGroups, 9)

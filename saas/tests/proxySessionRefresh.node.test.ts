@@ -28,7 +28,7 @@ test('there is no middleware.ts: Next 16 permits only proxy.ts', () => {
 })
 
 test('authenticated surfaces beyond the operator path refresh their session', () => {
-  assert.match(code, /pathname\.startsWith\('\/dashboard'\) \|\| pathname\.startsWith\('\/api\/admin'\)/)
+  assert.match(code, /authenticatedSurface = pathname\.startsWith\('\/dashboard'\) \|\| pathname\.startsWith\('\/admin'\) \|\| pathname\.startsWith\('\/hub'\) \|\| pathname\.startsWith\('\/api\/admin'\)/)
   assert.match(code, /return refreshAuthCookies\(req\)/)
   assert.match(code, /await supabase\.auth\.getUser\(\)/)
 })
@@ -51,7 +51,7 @@ test('requests without a session do no work', () => {
 })
 
 test('an auth outage never takes the site down', () => {
-  assert.match(code, /catch \{[\s\S]{0,200}return NextResponse\.next\(\)/)
+  assert.match(code, /catch \{[\s\S]{0,200}return NextResponse\.next\(\{ request: \{ headers: req\.headers \} \}\)/)
 })
 
 test('the refresh decides nothing: no redirect, no authorization', () => {

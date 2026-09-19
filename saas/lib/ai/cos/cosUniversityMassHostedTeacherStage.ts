@@ -80,10 +80,20 @@ export async function runMassHostedTeacherStage(input: {
   const teachers = hostedActiveTeachers(env)
 
   if (!config.enabled) {
-    return Object.freeze({ ok: true, skipped: true, reason: 'mass_hosted_teacher_disabled', completed: false, rows: 0, activeProviders: [] })
+    return Object.freeze({
+      ok: true, skipped: true, reason: 'mass_hosted_teacher_disabled', completed: false,
+      rows: 0, minimumRows: MIN_TEACHER_ROWS, activeProviders: [], providerMix: Object.freeze({}),
+      failures: Object.freeze([]), outputHashes: Object.freeze([]), datasetHash: null, config,
+      authorityExpanded: false, silentFallbackAllowed: false,
+    })
   }
   if (!teachers.length) {
-    return Object.freeze({ ok: true, skipped: true, reason: 'no_active_hosted_teacher_provider', completed: false, rows: 0, activeProviders: [] })
+    return Object.freeze({
+      ok: true, skipped: true, reason: 'no_active_hosted_teacher_provider', completed: false,
+      rows: 0, minimumRows: MIN_TEACHER_ROWS, activeProviders: [], providerMix: Object.freeze({}),
+      failures: Object.freeze([]), outputHashes: Object.freeze([]), datasetHash: null, config,
+      authorityExpanded: false, silentFallbackAllowed: false,
+    })
   }
 
   const existing = await input.db.from('cos_university_mass_hosted_teacher_rows')

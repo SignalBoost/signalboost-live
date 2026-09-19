@@ -33,8 +33,23 @@ test('hosted provider becomes eligible only when its explicit adapter gate is re
     OPENAI_API_KEY: 'sk_123456789012345678901234567890',
     COS_UNIVERSITY_TEACHER_OPENAI_ENABLED: 'true',
     COS_UNIVERSITY_TEACHER_OPENAI_ADAPTER_READY: 'true',
+    COS_UNIVERSITY_TEACHER_OPENAI_MODEL: 'gpt-5.6-luna',
   }
   assert.deepEqual(universityTeacherPoolStatus(env).activeProviders.map(item => item.id), ['openai'])
+})
+
+test('hosted provider stays inactive when model configuration is missing', () => {
+  const env = {
+    OPENAI_API_KEY: 'sk_123456789012345678901234567890',
+    COS_UNIVERSITY_TEACHER_OPENAI_ENABLED: 'true',
+    COS_UNIVERSITY_TEACHER_OPENAI_ADAPTER_READY: 'true',
+  }
+  const status = universityTeacherPoolStatus(env)
+  const openai = status.providers.find(item => item.id === 'openai')
+  assert.equal(openai?.credentialReady, true)
+  assert.equal(openai?.adapterReady, true)
+  assert.equal(openai?.modelReady, false)
+  assert.equal(openai?.active, false)
 })
 
 test('teacher selection is deterministic and preserves provenance', () => {

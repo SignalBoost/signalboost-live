@@ -15,7 +15,7 @@ import {
 } from './cosUniversityMassDistillation.ts'
 import { installVerifiedFailureDerivedCurriculum, replenishUniversityMassDistillationCurriculum } from './cosUniversityDistillationCurriculumReplenishment.ts'
 import { massDistillationThroughputProfile } from './cosUniversityDistillationCurriculumPlan.ts'
-import { authorizeNextUniversityMassDistillationCampaign } from './cosUniversityMassDistillationRollingAuthorization.ts'
+import { authorizeAvailableUniversityMassDistillationCampaigns } from './cosUniversityMassDistillationRollingAuthorization.ts'
 import { diagnoseFailedMassDistillationHuggingFaceJobs } from './cosUniversityHuggingFaceJobDiagnostics.ts'
 import { reconcileMassDistillationHuggingFaceProviderLedger } from './cosUniversityHuggingFaceProviderLedger.ts'
 import { universityTeacherPoolStatus } from './cosUniversityTeacherPool.ts'
@@ -138,7 +138,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
   const dispatchReadiness = massDistillationDispatchReadiness()
   try {
     rollingAuthorization = dispatchReadiness.ready
-      ? { ...(await authorizeNextUniversityMassDistillationCampaign()) }
+      ? { ...(await authorizeAvailableUniversityMassDistillationCampaigns()) }
       : {
           ok: false,
           authorized: false,
@@ -158,7 +158,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       authorityExpanded: false,
     }
   }
-  const result = await runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })
+  const result = await runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })
   const semanticReconciliation = slowMaintenanceDue
     ? await isolatedStep('semantic_reconciliation', () => reconcilePreparedMassDistillationSemanticCohesion({ maxBatches: 20 }))
     : { ok: true, skipped: true, step: 'semantic_reconciliation', reason: 'maintenance_not_due' }
@@ -271,7 +271,7 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
       rollingAuthorization,
       slowMaintenanceDue,
       workflowSource: input.source,
-      workflowSemantics: 'detect_repair_authorize_dispatch_before_maintenance_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_verify',
+      workflowSemantics: 'detect_repair_fill_available_dynamic_capacity_dispatch_any_compatible_lane_before_maintenance_revalidate_prepared_semantics_package_maintain_buyer_controlled_prepared_inventory_diversify_rights_cleared_shortfall_queries_expose_enterprise_teacher_pool_verify',
     },
     invocationSucceeded,
     skipped,

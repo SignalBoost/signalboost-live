@@ -660,7 +660,7 @@ export async function postCosPrimary(req:NextRequest){
       : embeddedMatchesGenerator
         ? embedded!
         : authoritativeProvenance(cos,{invoked:externalInvoked,provider:external.provider,model:external.model})
-    const reply=continuityFailed?(bestEffortCompletionReply(cos,reason)??`COS independent reasoning could not complete this request: ${reason.detail} External fallback was also unavailable. No action was executed.`):rawReply
+    const reply=continuityFailed?(bestEffortCompletionReply(cos,reason)??buildHonestRefusalReply({prompt:input,language})):rawReply
     const innerSource=String(payload?.source||'').trim()
     const responseSource=continuityFailed?'cos-independent-reasoner-unavailable':externalInvoked?'external_fallback':innerSource&&innerSource!=='external_fallback'?innerSource:'cos-local-retry'
     const finalConfidence=finiteNumber(payload?.confidence_score)??finiteNumber((executionProvenance as any)?.local_reasoning?.confidence)??(continuityFailed?cos?.confidence??0:null)

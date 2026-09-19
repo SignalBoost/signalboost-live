@@ -137,7 +137,7 @@ function executableCandidates(input: {
       if (teacher.transport === 'huggingface_job') return true
       const model = universityTeacherModelFor(teacher, input.env)
       const maximum = maximumHostedTeacherBatchCostUsd({ teacher, prompts: input.prompts, env: input.env })
-      return Boolean(model && maximum != null && maximum <= input.maxHostedCostUsd + 1e-9)
+      return Boolean(model && model !== 'buyer-configured' && maximum != null && maximum <= input.maxHostedCostUsd + 1e-9)
     })
     .sort((a, b) => a.id.localeCompare(b.id)))
 }
@@ -174,7 +174,7 @@ export async function selectUniversityTeacherForBatch(input: {
       throw new Error('multi_provider_teacher_resume_rights_unavailable')
     }
     const model = universityTeacherModelFor(teacher, env)
-    if (!model || model !== clean(existing.data.model, 240)) {
+    if (!model || model === 'buyer-configured' || model !== clean(existing.data.model, 240)) {
       throw new Error('multi_provider_teacher_resume_model_changed')
     }
     const maximum = maximumHostedTeacherBatchCostUsd({ teacher, prompts: input.prompts, env })
@@ -253,7 +253,7 @@ export async function synthesizeHostedTeacherBatch(input: {
   }
   const model = universityTeacherModelFor(input.teacher, env)
   const pricing = universityTeacherPricingFor(input.teacher, env)
-  if (!model || !pricing) throw new Error('multi_provider_teacher_not_configured')
+  if (!model || model === 'buyer-configured' || !pricing) throw new Error('multi_provider_teacher_not_configured')
   const maximumBatchCost = maximumHostedTeacherBatchCostUsd({ teacher: input.teacher, prompts: input.prompts, env })
   if (maximumBatchCost == null || maximumBatchCost > input.maximumAuthorizedHostedCostUsd + 1e-9) {
     throw new Error('multi_provider_teacher_cost_ceiling_exceeded')

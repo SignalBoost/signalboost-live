@@ -8,11 +8,16 @@
 -- it. Without a guard, a drill would hand a fabricated job to the dispatcher and spend real training
 -- money. A self-healing test that buys a fake HF Job is worse than having no test.
 --
--- Two layers, because the claim path has ten call sites in TypeScript and one missed predicate is a paid
--- mistake:
+-- Two layers, because the claim path has multiple call sites and one missed predicate is a paid mistake:
 --   1. the single SQL claim function excludes drill rows, and
 --   2. a trigger refuses ANY stage transition on a drill row, so no code path can dispatch one whatever
 --      it believes it is doing.
+--
+-- Reconciliation note (2026-09-19): this migration had not reached Production while the governed claim
+-- function continued evolving. Its claim definition is therefore reconciled to the current Production/
+-- current-main contract before adding the drill predicate. Do not restore an older claim implementation
+-- here: authorization time, prepared-batch eligibility, no-promotion/no-RunPod-mutation fences, rounded
+-- budget accounting, failure reset, and row-lock semantics must remain intact.
 --
 -- Nothing here grants authority: drill rows carry no budget, cannot be claimed, cannot change stage, and
 -- are deleted by the drill's own rollback obligation.
@@ -23,15 +28,10 @@ alter table public.cos_university_mass_distillation_batch_runs
 comment on column public.cos_university_mass_distillation_batch_runs.drill_id is
   'Non-null marks a Self-Healing recovery drill fixture: visible to the monitor, never claimable, never dispatchable, removed by the drill rollback.';
 
--- The monitor scans by campaign and stage; this keeps drill lookups and cleanup cheap without widening
--- any existing access path.
 create index if not exists cos_university_mass_distillation_batch_runs_drill_idx
   on public.cos_university_mass_distillation_batch_runs (drill_id)
   where drill_id is not null;
 
--- Backstop: a drill row is frozen at the stage it was injected with. Any attempt to advance it - by the
--- consumer, a reconciler, a repair path, or a future caller that does not know drills exist - fails loudly
--- instead of quietly becoming real work.
 create or replace function public.guard_cos_university_mass_distillation_drill_row()
 returns trigger
 language plpgsql
@@ -56,8 +56,8 @@ create trigger cos_university_mass_distillation_drill_guard
   for each row
   execute function public.guard_cos_university_mass_distillation_drill_row();
 
--- Recreated with the drill exclusion. Every other predicate, ceiling, budget check and return shape is
--- unchanged from 20260914180000.
+-- Keep the current governed claim contract and add exactly one eligibility restriction:
+-- drill rows are observable recovery fixtures, never dispatchable work.
 create or replace function public.claim_cos_university_mass_distillation_stage(p_campaign_id uuid)
 returns table (
   run_id uuid,
@@ -76,18 +76,20 @@ as $$
 declare
   v_campaign public.cos_university_mass_distillation_campaigns%rowtype;
   v_run public.cos_university_mass_distillation_batch_runs%rowtype;
-  v_new_stage text;
-  v_ceiling numeric(10,6);
+  v_cost numeric(10,6);
+  v_next_stage text;
+  v_now timestamptz := clock_timestamp();
 begin
   select c.* into v_campaign
   from public.cos_university_mass_distillation_campaigns c
   where c.id=p_campaign_id
   for update;
   if not found then raise exception 'mass_distillation_campaign_missing'; end if;
-  if v_campaign.status not in ('authorized','active') then return; end if;
-  if v_campaign.expires_at <= clock_timestamp() then
-    update public.cos_university_mass_distillation_campaigns c
-      set status='expired',updated_at=clock_timestamp() where c.id=p_campaign_id;
+  if v_campaign.status not in ('authorized','active')
+    or v_campaign.authorized_at is null or v_campaign.authorized_at > v_now
+    or v_campaign.expires_at is null or v_campaign.expires_at <= v_now
+    or v_campaign.automatic_promotion_authorized <> false
+    or v_campaign.runpod_mutation_authorized <> false then
     return;
   end if;
 
@@ -95,47 +97,39 @@ begin
   from public.cos_university_mass_distillation_batch_runs r
   where r.campaign_id=p_campaign_id
     and r.stage in ('teacher_pending','preparation_pending','training_pending')
-    -- Self-healing drill rows are observable faults, never work. They must remain visible to the
-    -- monitor and invisible to dispatch; the trigger below is the backstop if any caller forgets.
     and r.drill_id is null
+    and exists (
+      select 1
+      from public.cos_university_distillation_curriculum_batches b
+      where b.batch_key=r.batch_key and b.status='prepared'
+    )
     and not exists (
       select 1 from public.cos_university_mass_distillation_provider_jobs j
       where j.run_id=r.id and j.settled_at is null
     )
-  order by r.batch_key
-  for update skip locked
+  order by r.batch_key asc
+  for update of r skip locked
   limit 1;
+  if not found then return; end if;
 
-  if not found then
-    if not exists (
-      select 1 from public.cos_university_mass_distillation_batch_runs r
-      where r.campaign_id=p_campaign_id and r.stage <> 'complete'
-    ) then
-      update public.cos_university_mass_distillation_campaigns c
-      set status='completed',completed_at=coalesce(c.completed_at,clock_timestamp()),updated_at=clock_timestamp()
-      where c.id=p_campaign_id;
-    end if;
-    return;
-  end if;
+  if v_run.stage='teacher_pending' then v_cost:=0.200000; v_next_stage:='teacher_dispatching';
+  elsif v_run.stage='preparation_pending' then v_cost:=0.015000; v_next_stage:='preparation_dispatching';
+  else v_cost:=1.610000; v_next_stage:='training_dispatching'; end if;
 
-  if v_run.stage='teacher_pending' then v_new_stage:='teacher_dispatching'; v_ceiling:=0.200000;
-  elsif v_run.stage='preparation_pending' then v_new_stage:='preparation_dispatching'; v_ceiling:=0.015000;
-  elsif v_run.stage='training_pending' then v_new_stage:='training_dispatching'; v_ceiling:=1.610000;
-  else raise exception 'mass_distillation_campaign_stage_invalid'; end if;
-
-  if v_campaign.committed_cost_usd+v_ceiling > v_campaign.max_total_cost_usd then
+  if round(v_campaign.committed_cost_usd+v_cost,6) > round(v_campaign.max_total_cost_usd,6) then
     raise exception 'mass_distillation_campaign_budget_exhausted';
   end if;
 
   update public.cos_university_mass_distillation_campaigns c
-  set status='active',committed_cost_usd=c.committed_cost_usd+v_ceiling,updated_at=clock_timestamp()
-  where c.id=p_campaign_id;
+  set committed_cost_usd=round(c.committed_cost_usd+v_cost,6), status='active', updated_at=v_now
+  where c.id=v_campaign.id;
   update public.cos_university_mass_distillation_batch_runs r
-  set stage=v_new_stage,stage_reserved_cost_usd=v_ceiling,claimed_at=clock_timestamp(),updated_at=clock_timestamp()
+  set stage=v_next_stage, stage_reserved_cost_usd=v_cost, failure_reason=null,
+      claimed_at=v_now, updated_at=v_now
   where r.id=v_run.id;
 
-  return query select v_run.id,v_run.campaign_id,v_run.batch_key,v_run.candidate_id,
-    v_run.subject_id,v_run.student_model_id,v_new_stage,v_ceiling;
+  return query select v_run.id, v_run.campaign_id, v_run.batch_key, v_run.candidate_id,
+    v_run.subject_id, v_run.student_model_id, v_next_stage, v_cost;
 end;
 $$;
 

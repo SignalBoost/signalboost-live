@@ -118,8 +118,9 @@ test('fallback curriculum receives the same empty-subject targets selected by th
   assert.match(replenishment, /installHostedTeacherCurriculum\(\{ db, supply: replenishmentSupply/)
   assert.match(replenishment, /installTeacherSyntheticFallback\(\{ db, supply: replenishmentSupply/)
   // Cost-bearing hosted calls remain separately fail-closed; this handoff does not grant budget.
-  assert.match(replenishment, /COS_UNIVERSITY_TEACHER_HOSTED_MAX_CALLS_PER_CYCLE/)
-  assert.match(replenishment, /if \(maxCalls === 0\)/)
+  const hostedTeacher = source('../lib/ai/cos/cosUniversityHostedTeacherCurriculum.ts')
+  assert.match(hostedTeacher, /COS_UNIVERSITY_TEACHER_HOSTED_MAX_CALLS_PER_CYCLE/)
+  assert.match(hostedTeacher, /if \(maxCalls === 0\)/)
 })
 
 test('empty canonical subjects rotate between slots instead of always asking the same three', () => {

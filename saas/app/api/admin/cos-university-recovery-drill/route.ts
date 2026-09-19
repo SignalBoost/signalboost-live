@@ -182,6 +182,11 @@ export async function POST(request: Request) {
     batch_key: `${drillId}-fixture`,
     candidate_id: `drill:${drillId}`,
     subject_id: 'Reasoning & Decision Science',
+    // Live batch-run schema requires the normal student identity and a source_count. The drill is
+    // deliberately not a real curriculum batch, so source_count stays 0; SQL claim guards and drill_id
+    // exclusion make it non-dispatchable regardless.
+    student_model_id: 'Qwen/Qwen3-4B',
+    source_count: 0,
     stage: 'teacher_dispatching',
     drill_id: drillId,
     claimed_at: injectedAt,

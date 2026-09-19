@@ -56,7 +56,16 @@ export async function preflightHfWorkerDelivery(input: {
     })
     const source = await response.text()
     const bytes = Buffer.byteLength(source, 'utf8')
-    const looksLikeWorker = source.includes('ITMOUNTS_TRAINING_REQUEST') && source.includes('HF_TOKEN')
+    // Accept both worker generations. The current governed worker is a small wrapper that fetches
+    // and verifies the immutable base worker before delegating request parsing, so it intentionally
+    // no longer contains the legacy ITMOUNTS_TRAINING_REQUEST marker in the wrapper source itself.
+    const legacyWorker = source.includes('ITMOUNTS_TRAINING_REQUEST') && source.includes('HF_TOKEN')
+    const wrapperWorker = source.includes('BASE_WORKER_FILENAME = "cos-university-hf-worker-base.py"')
+      && source.includes('BASE_CONTRACT_MARKERS')
+      && source.includes('_load_base_worker')
+      && source.includes('base.main()')
+      && source.includes('HF_TOKEN')
+    const looksLikeWorker = legacyWorker || wrapperWorker
     if (!response.ok || bytes < 256 || !looksLikeWorker) {
       return Object.freeze({
         ok: false,

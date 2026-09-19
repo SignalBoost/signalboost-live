@@ -128,6 +128,28 @@ function assertEndpointSafetyPolicy(endpoint: Endpoint) {
   }
 }
 
+function runpodWorkerQuotaError(error: unknown) {
+  return (error instanceof Error ? error.message : String(error))
+    .toLowerCase().includes('max workers across all endpoints must not exceed your workers quota')
+}
+
+async function releaseOtherMassEndpointCapacity(activeEndpointId: string) {
+  const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
+  const retired = (listed.endpoints || []).filter(endpoint =>
+    clean(endpoint.id, 160) !== activeEndpointId
+    && clean(endpoint.name, 240).startsWith('itmounts-mass-distilled-')
+    && Number(endpoint.workers?.max ?? 0) > 0)
+  for (const endpoint of retired) {
+    if (!endpoint.id) continue
+    const idleTimeout = Math.min(Number(endpoint.workers?.idleTimeout ?? IDLE_TIMEOUT_SECONDS), IDLE_TIMEOUT_SECONDS)
+    await requestV2<Endpoint>(`/serverless/${encodeURIComponent(endpoint.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ workers: { min: 0, max: 0, idleTimeout } }),
+    })
+  }
+  return retired.length
+}
+
 async function constrainEndpointToApprovedGpu(endpointId: string) {
   const listed = await requestV2<{ endpoints?: Endpoint[] }>('/serverless')
   let endpoint = (listed.endpoints || []).find(item => clean(item.id, 160) === endpointId)
@@ -137,10 +159,17 @@ async function constrainEndpointToApprovedGpu(endpointId: string) {
   if (!currentPools.includes(APPROVED_POOLS[0])) throw new Error('mass_distilled_runtime_24gb_pool_unavailable')
   if (currentPools.length === APPROVED_POOLS.length && APPROVED_POOLS.every(pool => currentPools.includes(pool))) return endpoint
 
-  endpoint = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(endpoint.id)}`, {
+  const patchGpu = () => requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint?.id))}`, {
     method: 'PATCH',
     body: JSON.stringify({ gpu: { pools: [...APPROVED_POOLS], count: 1 } }),
   })
+  try {
+    endpoint = await patchGpu()
+  } catch (error) {
+    if (!runpodWorkerQuotaError(error)) throw error
+    await releaseOtherMassEndpointCapacity(String(endpoint.id))
+    endpoint = await patchGpu()
+  }
   if (!endpoint?.id) throw new Error('mass_distilled_runtime_gpu_pool_rebind_missing')
   assertEndpointSafetyPolicy(endpoint)
   return endpoint
@@ -158,10 +187,18 @@ async function restoreRetiredEndpointCapacity(endpoint: Endpoint) {
   const maxWorkers = Number(endpoint.workers?.max ?? Number.NaN)
   const idleTimeout = Number(endpoint.workers?.idleTimeout ?? Number.NaN)
   if (maxWorkers >= 1 && idleTimeout === IDLE_TIMEOUT_SECONDS) return endpoint
-  const restored = await requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
+  const restore = () => requestV2<Endpoint>(`/serverless/${encodeURIComponent(String(endpoint.id))}`, {
     method: 'PATCH',
     body: JSON.stringify({ workers: { min: 0, max: 1, idleTimeout: IDLE_TIMEOUT_SECONDS } }),
   })
+  let restored: Endpoint
+  try {
+    restored = await restore()
+  } catch (error) {
+    if (!runpodWorkerQuotaError(error)) throw error
+    await releaseOtherMassEndpointCapacity(String(endpoint.id))
+    restored = await restore()
+  }
   if (!restored?.id) throw new Error('mass_distilled_runtime_capacity_restore_missing')
   if (Number(restored.workers?.max ?? Number.NaN) !== 1) throw new Error('mass_distilled_runtime_capacity_restore_rejected')
   assertEndpointSafetyPolicy(restored)

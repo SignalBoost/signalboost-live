@@ -192,3 +192,34 @@ test('the same infrastructure failure repeating on one artifact stops instead of
   const different = [...repeated, failure(14, 'mass_distilled_evaluation_runtime_not_ready:network')]
   assert.ok('artifact' in decideRollingMassEvaluationApproval({ artifacts: [artifact], events: different, now, enabled: true } as Parameters<typeof decideRollingMassEvaluationApproval>[0]))
 })
+
+
+test('RunPod max-worker quota preflight failures do not consume the paid evaluation rolling window', () => {
+  const infraEvents: RollingEvent[] = []
+  for (let i = 0; i < MASS_EVALUATION_ROLLING_MAX_APPROVALS; i++) {
+    const candidateId = `mass:quota:${i}`
+    const minute = String(i).padStart(2, '0')
+    const artifactHash = 'f'.repeat(64)
+    infraEvents.push(ev(candidateId, 'host_controller', {
+      claim: 'distilled_independent_evaluation_approved',
+      authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+      artifactHash,
+    }, `2026-09-16T12:${minute}:00Z`, `2026-09-16T14:${minute}:00Z`))
+    infraEvents.push(ev(candidateId, 'host_controller', {
+      claim: 'mass_distilled_independent_evaluation_started',
+      artifactHash,
+    }, `2026-09-16T12:${minute}:10Z`, `2026-09-16T14:${minute}:10Z`))
+    infraEvents.push(ev(candidateId, 'host_controller', {
+      claim: 'mass_distilled_independent_evaluation_failed',
+      artifactHash,
+      error: 'RunPod PATCH /serverless/example HTTP 400: Max workers across all endpoints must not exceed your workers quota (10).',
+    }, `2026-09-16T12:${minute}:20Z`))
+  }
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [artifactA],
+    events: [canary(artifactA), ...infraEvents],
+    now,
+  })
+  assert.equal(decision.issue, true)
+})

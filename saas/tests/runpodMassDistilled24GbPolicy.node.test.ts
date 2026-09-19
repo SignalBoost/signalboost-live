@@ -54,3 +54,14 @@ test('evaluation restores the one worker a retired endpoint is allowed, before i
   assert.match(provisionV2, /if \(maxWorkers >= 1 && idleTimeout === IDLE_TIMEOUT_SECONDS\) return endpoint/)
   assert.ok((180 / 3600) * 0.69 < 0.2, '180s at the approved $0.69\/hr ceiling stays below wake authority')
 })
+
+
+test('evaluator quota repair only releases sibling mass-distilled worker reservations and retries boundedly', () => {
+  assert.match(provisionV2, /function runpodWorkerQuotaError/)
+  assert.match(provisionV2, /max workers across all endpoints must not exceed your workers quota/)
+  assert.match(provisionV2, /clean\(endpoint\.name, 240\)\.startsWith\('itmounts-mass-distilled-'\)/)
+  assert.match(provisionV2, /clean\(endpoint\.id, 160\) !== activeEndpointId/)
+  assert.match(provisionV2, /workers: \{ min: 0, max: 0, idleTimeout \}/)
+  assert.match(provisionV2, /await releaseOtherMassEndpointCapacity\(String\(endpoint\.id\)\)/)
+  assert.doesNotMatch(provisionV2, /max: 2|min: 1/)
+})

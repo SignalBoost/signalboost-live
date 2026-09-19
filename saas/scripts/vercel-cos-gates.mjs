@@ -44,6 +44,7 @@ const tests = [
   'tests/builderTaskCompletion.node.test.ts',
   'tests/localOpenModelInference.node.test.ts',
   'tests/runpodPrimaryRouting.node.test.ts',
+  'tests/cosFastWritingCanonical.node.test.ts',
   'tests/builderRepairClassification.node.test.ts',
   'tests/builderProjectContext.node.test.ts',
   'tests/builderExecutionEvidence.node.test.ts',

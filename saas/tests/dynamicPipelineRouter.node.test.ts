@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
@@ -82,4 +83,13 @@ test('Provider Hub capability metadata adapts into router candidates without bec
 
 test('secret-like router metadata is rejected',()=>{
   assert.throws(()=>candidate({metadata:Object.freeze({apiKey:'do-not-store'})}),/secret_metadata_rejected/)
+})
+
+
+test('University distillation consumes the shared router instead of a private vendor modulo',()=>{
+  const source=readFileSync(new URL('../lib/ai/cos/cosUniversityMassHostedTeacherStage.ts',import.meta.url),'utf8')
+  assert.match(source,/rankDynamicPipelineCandidates/)
+  assert.match(source,/capabilityId: 'ai\.teacher\.generate'/)
+  assert.match(source,/routingMode: 'dynamic-pipeline-router-v1'/)
+  assert.doesNotMatch(source,/teachers\[\(\(index as number\) \+ wave\) % teachers\.length\]/)
 })

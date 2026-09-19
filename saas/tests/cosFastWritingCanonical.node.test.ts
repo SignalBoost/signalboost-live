@@ -67,3 +67,24 @@ test('canonical edit lane shares the same bounded interactive budget', () => {
   assert.match(primary, /FAST_TEXT_TRANSFORM_ATTEMPT_MS = 9_000/)
   assert.match(primary, /usageContext:\{feature:'cos_fast_text_transform'/)
 })
+
+
+test('routine COS failures complete instead of emitting a low-confidence refusal wrapper', () => {
+  assert.match(primary, /function bestEffortCompletionReply/)
+  assert.match(primary, /source:'cos-best-effort-completion'/)
+  assert.doesNotMatch(primary, /Low-confidence draft \(COS confidence/)
+})
+
+test('ordinary no-answer turns receive a bounded completion rescue, with live search when external facts are needed', () => {
+  assert.match(primary, /function completionRescueAllowed/)
+  assert.match(primary, /runTaskCompletionRescue\(input,rescueEvidence\)/)
+  assert.match(primary, /completionRescueIntent\?\.externalFactsRequired/)
+  assert.match(primary, /getExternalInfo\(input,8,\{bypassCache:true\}\)/)
+  assert.match(primary, /formatExternalInfoForAI\(input,live\.results\)/)
+  assert.match(primary, /cos-task-completion-rescue/)
+  assert.match(primary, /cos_task_completion_rescue/)
+})
+
+test('completion rescue does not bypass fresh-fact or external-action gates', () => {
+  assert.match(primary, /if\(!freshHardFail&&!requestedAction&&!hasAttachments&&!isCosCodingObjective\(input\)&&completionRescueAllowed\(reason\)\)/)
+})

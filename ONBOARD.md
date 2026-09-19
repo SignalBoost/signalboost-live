@@ -54,6 +54,19 @@ The freshness boundary, problem-class taxonomy, and reasoning-worker selector al
 
 Release regression: `my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation` must not enter current-fact web retrieval, evidence grounding, verifier, or freshness-repair workflows.
 
+## HMI semantic authoring resilience — 2026-09-18
+
+Human wording is **not** an API contract. COS must adapt to natural variation in phrasing rather than requiring users to learn routing vocabulary.
+
+- deterministic authoring detection is a latency optimization, not the sole authority on intent;
+- common multilingual writing requests may take the bounded fast-authoring lane immediately;
+- when ordinary COS cannot complete a non-live, non-action turn, whole-request neural semantic intent is consulted before the generic failed-closed reply;
+- a high-confidence `content_generation` decision with no required external facts may use the bounded authoring lane even when the user's wording did not match a routing phrase;
+- semantic content generation suppresses incidental freshness words such as `today` only when no live external facts are required;
+- requests that actually need current weather, prices, office holders, news, availability, or other mutable facts retain live-evidence protection;
+- exact user sentences belong in regression tests only. Production routing must never branch on a memorized fixture sentence.
+
+HMI principle: **the human does not adapt to COS; COS adapts to the human while preserving safety, freshness, and authority boundaries.**
 ## Self-contained authoring fast ingress — 2026-09-18
 
 A self-contained, non-code, non-visual, non-live writing or translation request is already a complete COS objective. Concierge and Assistant send it directly to the shared COS endpoint before public identity, Software Specialist, or semantic visual classification.
@@ -146,7 +159,7 @@ graduation decisions, admissions, or fine-tuning work.
 
 ## Cognitive Operating System (COS)
 
-**Version:** 1.127
+**Version:** 1.128
 **Updated:** 2026-09-18
 **Canonical repository:** `SignalBoost/signalboost-live` (internal implementation name; not the public product brand)
 **Canonical public product:** **iTMounts**

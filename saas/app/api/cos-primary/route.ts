@@ -12,7 +12,7 @@ import { tryDeterministicUtility } from '@/lib/ai/cos/deterministicUtilities'
 import { tryDomainAvailabilityLookup } from '@/lib/ai/cos/domainAvailability'
 import { runOwnerDomainBrainstorm } from '@/lib/ai/cos/domainBrainstorm'
 import { requiresFreshExternalEvidence } from '@/lib/ai/cos/cosFreshnessPolicy'
-import { classifyCosSemanticTaskIntent, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
+import { classifyCosSemanticTaskIntent, semanticIntentIsSelfContainedContentGeneration, semanticIntentSuppressesFreshness } from '@/lib/ai/cos/cosSemanticTaskIntent'
 import {
   classifyAuthoritativeVolatileFact,
   groundAuthoritativeVolatileFact,
@@ -184,6 +184,14 @@ async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabe
   return null
 }
 
+function fastAuthoringResponse(startedAt:number,input:string,fast:{reply:string;reasonerLabel:string},source='cos-fast-authoring'){
+  const executionProvenance=authoritativeProvenance(null,{invoked:false})
+  ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:1}
+  ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:fast.reasonerLabel,from_cache:false}
+  const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
+  return NextResponse.json({ok:true,reply:fast.reply,source,confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+}
+
 function previousAssistantText(body:any):string{const messages=Array.isArray(body?.messages)?body.messages:[];for(let i=messages.length-1;i>=0;i-=1){if(messages[i]?.role==='assistant'&&typeof messages[i]?.content==='string'&&messages[i].content.trim())return messages[i].content.trim()}return''}
 function languageFrom(body:any):string{const value=String(body?.context?.language||'en').toLowerCase();return['en','es','pt','pl','ru'].includes(value)?value:'en'}
 function providerFromPayload(payload:any):{provider:string|null;model:string|null}{for(const item of[payload?.execution,payload?.metadata,payload?.provenance,payload]){if(!item||typeof item!=='object')continue;const provider=typeof item.provider==='string'?item.provider:typeof item.ai_provider==='string'?item.ai_provider:typeof item.external_provider==='string'?item.external_provider:null;const model=typeof item.model==='string'?item.model:typeof item.ai_model==='string'?item.ai_model:typeof item.external_model==='string'?item.external_model:null;if(provider||model)return{provider,model}}return{provider:null,model:null}}
@@ -282,13 +290,7 @@ export async function postCosPrimary(req:NextRequest){
     && !isCosCodingObjective(input)
   if(fastAuthoringEligible){
     const fast=await runFastAuthoring(input)
-    if(fast){
-      const executionProvenance=authoritativeProvenance(null,{invoked:false})
-      ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:1}
-      ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:fast.reasonerLabel,from_cache:false}
-      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
-      return NextResponse.json({ok:true,reply:fast.reply,source:'cos-fast-authoring',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
-    }
+    if(fast)return fastAuthoringResponse(startedAt,input,fast)
   }
 
   const access=await getAccess().catch(()=>null),userId=access?.userId||null,isPrivileged=Boolean(access?.isOwner||access?.isAdmin)
@@ -352,6 +354,12 @@ export async function postCosPrimary(req:NextRequest){
   const semanticTaskIntent=baselineRequiresFreshEvidence&&!requestedAction
     ? await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
     : null
+  // HMI semantic rescue: if incidental temporal wording made a human writing request look fresh,
+  // trust whole-request semantic intent rather than forcing the user to know COS routing phrases.
+  if(!hasAttachments&&!isCosCodingObjective(input)&&semanticIntentIsSelfContainedContentGeneration(semanticTaskIntent)){
+    const semanticFast=await runFastAuthoring(input)
+    if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic')
+  }
   const requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness(semanticTaskIntent)
   if(baselineRequiresFreshEvidence&&!requiresFreshEvidence){
     logEscalation({event:'freshness_semantic_intent_suppressed',semantic_task_mode:semanticTaskIntent?.mode??null,semantic_task_confidence:semanticTaskIntent?.confidence??null,supplied_context_primary:semanticTaskIntent?.suppliedContextPrimary??null,external_facts_required:semanticTaskIntent?.externalFactsRequired??null,external_ai_invoked:false,local_model_invoked:true})
@@ -496,6 +504,17 @@ export async function postCosPrimary(req:NextRequest){
     try{cos=await tryCOSFirstAnswer({prompt:reasoningPrompt,previousAssistant:precedingAssistant||null,userId,language,privileged:isPrivileged,disableCache:strategyProfileRequest})}catch(error){localError=error instanceof Error?error.message:String(error);console.error('[cos-local-reasoner-error]',localError)}
   }
   if(cos?.handled){const executionProvenance=authoritativeProvenance(cos,{invoked:false}),source:CosLiveResponseSource=cos.provenance.responseSource as CosLiveResponseSource,liveTelemetry=emitRequestTelemetry({startedAt,input,reply:cos.reply,source,confidence:cos.confidence,provenance:cos.provenance,externalAiInvoked:false}),responseSource=cos.provenance.responseSource==='semantic_cache'||cos.provenance.responseSource==='semantic_similarity'?'cos-semantic-cache':'cos-local-primary';await writeCosPrimaryProvenance(userId,cos.reply,executionProvenance,responseSource);return NextResponse.json({reply:cos.reply,source:responseSource,confidence_score:cos.confidence,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:cos.provenance.localModelInvoked,execution_provenance:executionProvenance,provenance:cos.provenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})}
+
+  // If ordinary COS could not complete a non-live, non-action turn, use neural semantic intent
+  // before the generic failed-closed reply. This catches natural human requests such as “help me say
+  // something warm” or “come up with a greeting” without hard-coding those phrasings into routing.
+  if(!requestedAction&&!requiresFreshEvidence&&!hasAttachments&&!isCosCodingObjective(input)&&!fastAuthoringEligible){
+    const rescueIntent=semanticTaskIntent??await classifyCosSemanticTaskIntent({input,language,previousUserContext:freshConversationContext.previousUserText,previousAssistant:precedingAssistant||null})
+    if(semanticIntentIsSelfContainedContentGeneration(rescueIntent)){
+      const semanticFast=await runFastAuthoring(input)
+      if(semanticFast)return fastAuthoringResponse(startedAt,input,semanticFast,'cos-fast-authoring-semantic-rescue')
+    }
+  }
 
   const freshHardFail=requiresFreshEvidence&&!freshMissUseLocal
   const freshFailureCode: FreshEvidenceInternalFailureCode | null = freshHardFail

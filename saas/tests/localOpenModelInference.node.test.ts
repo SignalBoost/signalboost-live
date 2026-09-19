@@ -165,6 +165,66 @@ test('JSON-mode provider rejection does not silently fall back to unconstrained 
   assert.equal(calls, 1)
 })
 
+test('direct text transformations use the dedicated DeepInfra flash editor with reasoning disabled', async () => {
+  delete process.env.COS_DIRECT_TEXT_MODEL
+  let observedBody: Record<string, unknown> = {}
+  globalThis.fetch = (async (input, init) => {
+    if (String(input).includes('/chat/completions')) {
+      observedBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return Response.json({
+        choices: [{ finish_reason: 'stop', message: { content: '{"answer":"Edited text.","confidence":0.99}' } }],
+        usage: { prompt_tokens: 20, completion_tokens: 12, total_tokens: 32 },
+      })
+    }
+    return Response.json({})
+  }) as typeof fetch
+
+  const result = await callLocalModel({
+    prompt: 'Edit this text.',
+    systemPrompt: 'Return ONLY strict JSON: {"answer":"...","confidence":0.0}.',
+    maxTokens: 900,
+    usageContext: { feature: 'direct_text_transformation', purpose: 'user_supplied_text_transformation' },
+  }, {
+    baseUrl: 'https://api.deepinfra.com/v1/openai',
+    model: 'Qwen/Qwen3.6-35B-A3B',
+    apiKey: 'test-key',
+    timeoutMs: 5000,
+    provider: 'deepinfra',
+  })
+
+  assert.equal(result, '{"answer":"Edited text.","confidence":0.99}')
+  assert.equal(observedBody.model, 'zai-org/GLM-5.3-Flash')
+  assert.equal(observedBody.reasoning_effort, 'none')
+  assert.equal(observedBody.max_tokens, 900)
+  assert.deepEqual(observedBody.response_format, { type: 'json_object' })
+})
+
+test('ordinary interactive COS answers retain the configured stronger model', async () => {
+  delete process.env.COS_INTERACTIVE_REASONING_EFFORT
+  let observedBody: Record<string, unknown> = {}
+  globalThis.fetch = (async (input, init) => {
+    if (String(input).includes('/chat/completions')) {
+      observedBody = JSON.parse(String(init?.body)) as Record<string, unknown>
+      return Response.json({ choices: [{ finish_reason: 'stop', message: { content: 'answer' } }] })
+    }
+    return Response.json({})
+  }) as typeof fetch
+
+  await callLocalModel({
+    prompt: 'Answer a normal owner question.',
+    usageContext: { feature: 'cos_interactive_answer', purpose: 'user_facing_response' },
+  }, {
+    baseUrl: 'https://api.deepinfra.com/v1/openai',
+    model: 'Qwen/Qwen3.6-35B-A3B',
+    apiKey: 'test-key',
+    timeoutMs: 5000,
+    provider: 'deepinfra',
+  })
+
+  assert.equal(observedBody.model, 'Qwen/Qwen3.6-35B-A3B')
+  assert.equal(observedBody.reasoning_effort, 'low')
+})
+
 test('health check verifies the configured served model', async () => {
   globalThis.fetch = (async () => new Response(JSON.stringify({ data: [{ id: 'signalboost-local-brain' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } })) as typeof fetch
   const health = await checkLocalInferenceHealth({ baseUrl: 'http://127.0.0.1:8000/v1', model: 'signalboost-local-brain', timeoutMs: 5000 })

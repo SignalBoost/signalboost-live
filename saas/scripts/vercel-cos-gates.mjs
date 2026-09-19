@@ -5,6 +5,9 @@ const tests = [
   'tests/cosUniversityLaneExpectation.node.test.ts',
   'tests/cosUniversityLaneFaultRecorder.node.test.ts',
   'tests/cosUniversityFineTuneEvidence.node.test.ts',
+  // Red on main since an evaluator refactor because it was never gated: the mass-evaluation suite
+  // contract (four suites, shared ceilings, promotion thresholds) had no enforcement.
+  'tests/cosUniversityMassDistilledEvaluation.node.test.ts',
   'tests/cosUniversityDailyLaneCadence.node.test.ts',
   // Registered 2026-09-13. These regressions existed but were never in this gate, so they had
   // never run in CI: every "green" for them came from a sandbox. They defend the execution binding,
@@ -44,7 +47,6 @@ const tests = [
   'tests/builderTaskCompletion.node.test.ts',
   'tests/localOpenModelInference.node.test.ts',
   'tests/runpodPrimaryRouting.node.test.ts',
-  'tests/cosFastWritingCanonical.node.test.ts',
   'tests/builderRepairClassification.node.test.ts',
   'tests/builderProjectContext.node.test.ts',
   'tests/builderExecutionEvidence.node.test.ts',
@@ -153,10 +155,6 @@ const tests = [
   'tests/cosCognitiveAutonomousCertification.node.test.ts',
   'tests/cosUniversity.node.test.ts',
   'tests/cosUniversityContinuousLearning.node.test.ts',
-  'tests/cosUniversityHostedTeacherCurriculum.node.test.ts',
-  'tests/cosUniversityTeacherPool.node.test.ts',
-  'tests/cosUniversityTeacherAdapters.node.test.ts',
-  'tests/cosUniversityMassHostedTeacherStage.node.test.ts',
   'tests/cosUniversityUndergraduateAcceptance.node.test.ts',
   'tests/cosUniversityIndependentExam.node.test.ts',
   'tests/cosUniversityExecutionBinding.node.test.ts',

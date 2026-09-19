@@ -12,8 +12,8 @@ const HOSTED_TRANSPORTS: readonly UniversityTeacherTransport[] = Object.freeze([
   'custom_adapter',
 ])
 const MIN_TEACHER_ROWS = 20
-const DEFAULT_MAX_CALLS = 24
-const HARD_MAX_CALLS = 64
+const DEFAULT_MAX_CALLS = 20
+const HARD_MAX_CALLS = 20
 const DEFAULT_MAX_OUTPUT_TOKENS = 384
 const HARD_MAX_OUTPUT_TOKENS = 512
 const DEFAULT_PARALLELISM = 8
@@ -118,7 +118,7 @@ export async function runMassHostedTeacherStage(input: {
             'Use the supplied rights-cleared learning case only.',
             'Return a rigorous final teaching response without hidden chain-of-thought, citations, private data, or claims of external access.',
           ].join(' '),
-          prompt: String(prompt.prompt || '').slice(0, 4000),
+          prompt: String(prompt.prompt || '').slice(0, 3000),
           maxOutputTokens: config.maxOutputTokens,
           temperature: 0.2,
         },
@@ -183,7 +183,7 @@ export async function runMassHostedTeacherStage(input: {
     providerMix: Object.freeze(providerMix),
     failures: Object.freeze(failures),
     outputHashes: Object.freeze(rows.map(row => clean(row.response_hash, 64).toLowerCase())),
-    datasetHash: rows.length >= MIN_TEACHER_ROWS ? hash(rows.map(row => clean(row.response_hash, 64).toLowerCase())) : null,
+    datasetHash: rows.length >= MIN_TEACHER_ROWS ? hash({ items: rows.map(row => clean(row.response_hash, 64).toLowerCase()).sort() }) : null,
     config,
     authorityExpanded: false,
     silentFallbackAllowed: false,

@@ -389,7 +389,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       // pool provider is configured yet, preserve that exact pre-existing teacher rather than stall
       // the University. Once any pool assignment exists, provider failure never falls back.
       if (safeError(error) !== 'multi_provider_teacher_no_executable_provider'
-        || clean(run.teacher_model_id, 240)) throw error
+        || clean(run.teacher_provider, 80)) throw error
     }
 
     if (!selection || selection.teacher.transport === 'huggingface_job') {

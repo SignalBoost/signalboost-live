@@ -111,7 +111,7 @@ export function isFastTextTransform(input:string, context:{previousAssistant?:st
 async function runFastTextTransform(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
   const config=localInferenceConfigFromEnv()
   const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
-  const preferredModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash':config.model)
+  const preferredModel=process.env.COS_FAST_TEXT_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
   const startedAt=Date.now()
   for(const model of models){
@@ -151,7 +151,7 @@ export const FAST_AUTHORING_ATTEMPT_MS = 9_000
 async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
   const config=localInferenceConfigFromEnv()
   const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
-  const preferredModel=process.env.COS_FAST_AUTHORING_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash':config.model)
+  const preferredModel=process.env.COS_FAST_AUTHORING_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash-0731':config.model)
   const models=[...new Set([preferredModel,config.model].filter(Boolean))]
   const startedAt=Date.now()
   for(const model of models){

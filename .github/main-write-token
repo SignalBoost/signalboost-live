@@ -1,2 +1,2 @@
-base_sha=82611c040483561b6c095a7309e6846c6377ace8
-branch=fix/shs-builder-private-repo-auth-20260919
+base_sha=1b0fb9dcaa059598662858acd66d06e0c68bf8ab
+branch=fix/shs-retry-claim-fence-20260919

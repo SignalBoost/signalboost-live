@@ -1,2 +1,2 @@
-base_sha=e285b8beeec08799b0ea0eaef11d08a775f9f809
-branch=feat/university-deepseek-gemini-distillation-20260919
+base_sha=1ddf159bb69b35c5516f96fa38bcc03b0552bed8
+branch=fix/ci-explicit-typecheck-heap-20260919

@@ -1,6 +1,7 @@
 // saas/lib/ai/cos/cosReasoningRolePolicy.ts
 import { MAX_BUILDER_OBJECTIVE_CHARS } from '../../builder/request-contract.ts'
 import { isOperationalLogEvidence } from './pastedOperationalLog.ts'
+import { isContentGenerationRequest } from './contentGenerationIntent.ts'
 
 export type CosSpecialistRole = 'primary' | 'coder' | 'critic' | 'verifier' | 'researcher'
 
@@ -182,7 +183,11 @@ const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|differ
 
 export function isAuthoringObjectiveWithoutLiveLookup(prompt: string): boolean {
   const objective = cosRoutingObjective(prompt)
-  if (!AUTHORING_SIGNAL.test(objective)) return false
+  // HMI rule: common authoring intent is recognized from the shared multilingual content-generation
+  // classifier as well as the compact routing vocabulary. The exact wording of a user's request is
+  // never an interface contract; the keyword signal is only a cheap positive hint.
+  const authoringIntent = AUTHORING_SIGNAL.test(objective) || isContentGenerationRequest(objective)
+  if (!authoringIntent) return false
   const liveLookup = CURRENT_SIGNAL.test(objective)
     && (VOLATILE_FACT_OBJECT.test(objective) || EXPLICIT_LOOKUP_ACTION.test(objective))
   return !liveLookup

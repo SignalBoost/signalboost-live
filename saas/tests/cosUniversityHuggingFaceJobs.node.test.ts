@@ -1,5 +1,6 @@
 // saas/tests/cosUniversityHuggingFaceJobs.node.test.ts
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import { gunzipSync } from 'node:zlib'
@@ -117,6 +118,46 @@ test('dataset preparation stays CPU-bound and refuses arbitrary/non-HF source ma
   assert.equal(spec.dockerImage, 'python:3.12-slim')
   assert.equal(spec.environment.HF_TOKEN, undefined)
   assert.equal(spec.secrets.HF_TOKEN, token)
+})
+
+test('dataset preparation accepts only hash-verified hosted teacher rows for the internal hosted source', () => {
+  const config = huggingFaceJobsConfigFromEnv(hfEnv())!
+  const base = {
+    callbackUrl: 'https://itmounts.com/api/internal/cos/university-training-executor/evidence',
+    idempotencyKey: 'hosted-prepare-key',
+    callbackSecret: 'k'.repeat(64),
+    config,
+  }
+  const teacherRows = Array.from({ length: 20 }, (_, index) => {
+    const text = `Hosted teacher answer ${index + 1}`
+    return {
+      promptId: createHash('sha256').update(`prompt-${index + 1}`).digest('hex'),
+      teacherId: index % 2 === 0 ? 'openai' : 'claude',
+      provider: index % 2 === 0 ? 'openai' : 'anthropic',
+      model: index % 2 === 0 ? 'gpt-5.6-luna' : 'claude-sonnet-4-6',
+      text,
+      itemHash: createHash('sha256').update(text).digest('hex'),
+    }
+  })
+  const envelope = {
+    operation: 'prepare_dataset',
+    candidateId: 'mass:00000000-0000-4000-8000-000000000001:abcdef0123456789',
+    candidate: {
+      source: 'itmounts://cos-university/mass-hosted-teacher/11111111-1111-4111-8111-111111111111',
+      teacherRows,
+    },
+    authorityExpanded: false,
+  }
+  const spec = buildHuggingFaceJobSpec({ ...base, envelope })
+  assert.equal(spec.flavor, 'cpu-upgrade')
+  assert.equal(spec.dockerImage, 'python:3.12-slim')
+
+  const corrupted = structuredClone(envelope)
+  corrupted.candidate.teacherRows[0].itemHash = '0'.repeat(64)
+  assert.throws(
+    () => buildHuggingFaceJobSpec({ ...base, envelope: corrupted }),
+    /source_dataset_ref_required/,
+  )
 })
 
 test('training defaults to the lowest-cost NVIDIA T4 and never auto-upgrades', () => {

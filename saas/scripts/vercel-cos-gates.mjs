@@ -10,6 +10,7 @@ const tests = [
   'tests/cosUniversityMassDistilledEvaluation.node.test.ts',
   'tests/cosUniversityGraduateActivationCron.node.test.ts',
   'tests/universityDistillationRecoveryDrillSafety.node.test.ts',
+  'tests/cosUniversityRecoveryDrill.node.test.ts',
   'tests/cosUniversityTeacherPool.node.test.ts',
   'tests/cosUniversityTeacherAdapters.node.test.ts',
   'tests/cosUniversityMassHostedTeacherStage.node.test.ts',

@@ -4,33 +4,22 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { isFastTextTransform } from '../lib/ai/cos/fastTextTransformIntent.ts'
 
-test('browser fast edits stay bounded but fall through after a miss', () => {
-  const browser = readFileSync(join(process.cwd(), 'app/api/cos-browser/route.ts'), 'utf8')
+test('middleware fast edits delegate to the canonical COS editor', () => {
   const fast = readFileSync(join(process.cwd(), 'app/api/cos-fast-transform/route.ts'), 'utf8')
-  const direct = readFileSync(join(process.cwd(), 'lib/ai/cos/fastTextEditDirect.ts'), 'utf8')
+  const primary = readFileSync(join(process.cwd(), 'app/api/cos-primary/route.ts'), 'utf8')
 
-  const fastBranch = browser.indexOf("if (!fastEditAlreadyAttempted && isFastTextTransform")
-  const auth = browser.indexOf('const access = await getAccess()')
-  assert.ok(fastBranch >= 0 && auth > fastBranch, 'verified fast edit must run before auth')
-  assert.match(browser, /x-signalboost-fast-transform-attempted/)
-  assert.doesNotMatch(browser, /cos-fast-text-edit-direct-timeout/)
-
-  assert.match(fast, /fallThroughToNormalCos/)
   assert.match(fast, /provenanceBrowserPost/)
-  assert.match(fast, /x-signalboost-fast-transform-attempted/)
-  assert.doesNotMatch(fast, /cos-fast-text-edit-direct-timeout/)
+  assert.match(fast, /headers\.delete\('x-signalboost-fast-transform-attempted'\)/)
+  assert.doesNotMatch(fast, /runDirectFastTextEdit/)
+  assert.doesNotMatch(fast, /cos-fast-text-edit-direct/)
 
-  assert.match(direct, /new AbortController\(\)/)
-  assert.match(direct, /signal: controller\.signal/)
-  assert.match(direct, /setTimeout\(\(\) => controller\.abort\(\), input\.timeoutMs\)/)
-  assert.match(direct, /DEFAULT_DEADLINE_MS = 20_000/)
-  assert.match(direct, /DEFAULT_ATTEMPT_MS = 6_000/)
-  assert.match(direct, /reasoning_effort: 'none'/)
-  assert.match(direct, /COS_FAST_TEXT_MODEL/)
-  assert.match(direct, /deepseek-ai\/DeepSeek-V4-Flash/)
-  assert.match(direct, /for \(const model of modelCandidates\(baseUrl, configuredModel\)\)/)
-  assert.match(direct, /Math\.min\(attemptMs\(\), remainingMs\)/)
+  assert.match(primary, /if\(!fastEditAlreadyAttempted&&isFastTextTransform/)
+  assert.match(primary, /feature:'cos_fast_text_transform'/)
+  assert.match(primary, /deepseek-ai\/DeepSeek-V4-Flash-0731/)
+  assert.match(primary, /FAST_TEXT_TRANSFORM_ATTEMPT_MS = 9_000/)
+  assert.match(primary, /FAST_TEXT_TRANSFORM_TIMEOUT_MS = 18_000/)
 })
+
 
 test('middleware uses the shared contextual classifier', () => {
   const proxy = readFileSync(join(process.cwd(), 'proxy.ts'), 'utf8')

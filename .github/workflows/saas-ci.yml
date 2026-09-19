@@ -242,6 +242,19 @@ jobs:
       - name: Verify named marks use authoritative assets and never generative reconstruction
         run: npx --yes tsx --test tests/conciergeVisuals.node.test.ts
 
+  vercel-cos-gate:
+    name: Vercel COS release gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run the exact Vercel COS pre-build gate
+        run: node scripts/vercel-cos-gates.mjs
+
   build:
     name: Production build (next build)
     runs-on: ubuntu-latest

@@ -31,7 +31,7 @@ import { publicConciergeIdentityReply, publicConciergeIdentityReplyForIntent } f
 import { resolveSemanticPublicIdentity } from '@/lib/ai/cos/publicConciergeIdentityIntent'
 import { PUBLIC_BRAND, PUBLIC_BRAND_DOMAIN } from '@/lib/public-brand'
 import { readAttachedOperationalEvidence } from '@/lib/ai/cos/attachedOperationalEvidence'
-import { detectDirectTextTransformation, tryDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
+import { detectDirectTextTransformation } from '@/lib/ai/cos/directTextTransformation'
 import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 
 export const runtime = 'nodejs'
@@ -159,39 +159,18 @@ export async function POST(req: NextRequest) {
   const directTextTransformation = detectDirectTextTransformation(prompt)
   const directTextHasAttachments = Array.isArray(body?.attachments) && body.attachments.length > 0
   if (directTextTransformation && !directTextHasAttachments) {
-    const transformed = await tryDirectTextTransformation({ prompt, language })
-    if (transformed?.handled) {
-      return NextResponse.json({
-        ok: true,
-        reply: transformed.reply,
-        source: 'cos-direct-text-transformation',
-        confidence_score: transformed.confidence,
-        external_ai_invoked: false,
-        external_fallback_invoked: false,
-        local_model_invoked: transformed.provenance.localModelInvoked,
-        execution_provenance: transformed.provenance,
-        execution_allowed: false,
-        external_action_taken: false,
-      })
-    }
-    if (transformed) {
-      const reason = 'reason' in transformed
-        ? String(transformed.reason || 'The direct text editor was unavailable.')
-        : 'The direct text editor was unavailable.'
-      return NextResponse.json({
-        ok: false,
-        reply: reason,
-        error: reason,
-        source: 'cos-direct-text-transformation-unavailable',
-        confidence_score: transformed.confidence,
-        external_ai_invoked: false,
-        external_fallback_invoked: false,
-        local_model_invoked: transformed.provenance.localModelInvoked,
-        execution_provenance: transformed.provenance,
-        execution_allowed: false,
-        external_action_taken: false,
-      }, { status: 503 })
-    }
+    // There is one editor capability, inside canonical COS. Browser ingress must never run a
+    // competing editor and fail the turn before COS gets a chance to use its proven fast lane.
+    const directAccess = await getAccess().catch(() => null)
+    const directAuditUserId = directAccess?.userId ?? null
+    const directSurface: 'concierge' | 'assistant' = req.headers.get('x-signalboost-surface') === 'cos' ? 'assistant' : 'concierge'
+    const executeDirect = () => cosPrimaryPost(req)
+    const response = directAccess?.isOwner && directSurface === 'assistant'
+      ? await executeDirect()
+      : await withPublicAuditIdentity(directAuditUserId, () => withPublicDeliveryScope(() => executeDirect()))
+    return directSurface === 'concierge'
+      ? publicConciergePresentation(response)
+      : response
   }
 
   const access = await getAccess().catch(() => null)

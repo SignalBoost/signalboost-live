@@ -37,14 +37,14 @@ A user-facing turn that spends tens of seconds in RunPod lifecycle or RunPod inf
 
 ## COS Direct Editor fast capability — 2026-09-18
 
-Short explicit edit/proofread/polish requests are a bounded COS capability, not a second brain. Assistant and Concierge invoke the same Direct Editor behavior.
+Short explicit edit/proofread/polish requests are a bounded COS capability, not a second brain. Assistant and Concierge invoke the same canonical editor inside `cos-primary`; browser ingress must not run a competing text reasoner and fail the turn before COS gets it.
 
-- Direct Editor defaults to DeepInfra `zai-org/GLM-5.3-Flash`, overrideable with `COS_DIRECT_TEXT_MODEL`.
-- Direct Editor reasoning effort is `none`.
-- Direct Editor transport timeout defaults to 12 seconds via `COS_DIRECT_TEXT_TIMEOUT_MS`.
-- Existing meaning-fidelity, actor/action/recipient, terminology, layout, and presentation guards remain in force.
-- The editor must not add recommendations, warnings, advice, facts, promises, or commentary absent from the user's source.
-- General COS reasoning and University/evaluation/distillation/Builder workloads retain their own models and controls.
+- canonical foreground editor defaults to DeepInfra `deepseek-ai/DeepSeek-V4-Flash-0731`, overrideable with `COS_FAST_TEXT_MODEL`;
+- the model call disables thinking and uses strict JSON output;
+- canonical edit budget is 18 seconds total, with at most 9 seconds per model attempt;
+- existing meaning-fidelity, actor/action/recipient, terminology, layout, and presentation guards remain in force;
+- the editor must not add recommendations, warnings, advice, facts, promises, or commentary absent from the user's source;
+- general COS reasoning and University/evaluation/distillation/Builder workloads retain their own models and controls.
 
 ## Authoring intent outranks incidental freshness markers — 2026-09-18
 
@@ -56,20 +56,21 @@ Release regression: `my inlaws today celebrate their wedding 50 aniversary. Plea
 
 ## Self-contained authoring fast ingress — 2026-09-18
 
-A self-contained, non-code, non-visual, non-live writing or translation request is already a complete COS objective. Concierge and Assistant must send it directly to the shared COS endpoint before public identity, Software Specialist, or semantic visual classification.
+A self-contained, non-code, non-visual, non-live writing or translation request is already a complete COS objective. Concierge and Assistant send it directly to the shared COS endpoint before public identity, Software Specialist, or semantic visual classification.
 
 This is not a separate Concierge intelligence. Public Concierge still applies public audit identity, public delivery scope, and public presentation around the same `cosPrimaryPost` reasoning endpoint.
 
-Latency/model contract:
+Canonical authoring contract:
 
-- authoring turns are tagged `cos_interactive_authoring`;
-- DeepInfra authoring defaults to `zai-org/GLM-5.3-Flash`, overrideable with `COS_INTERACTIVE_AUTHORING_MODEL`;
-- authoring reasoning effort is `none`;
-- authoring transport timeout defaults to 15 seconds via `COS_INTERACTIVE_AUTHORING_TIMEOUT_MS`;
+- `cos-primary` recognizes eligible self-contained authoring before auth-dependent retrieval and enterprise reasoning;
+- foreground authoring uses the same proven low-latency DeepInfra model family as the fast editor: `deepseek-ai/DeepSeek-V4-Flash-0731`, overrideable with `COS_FAST_AUTHORING_MODEL`;
+- authoring disables thinking, uses strict JSON, and gets 18 seconds total with at most 9 seconds per attempt;
+- it uses only facts supplied by the user and must provide every requested language/version;
+- if the bounded fast authoring call fails, the turn may continue through ordinary COS rather than inventing a response;
 - ordinary interactive COS reasoning retains the stronger configured model;
 - code/Builder, visual generation, live-fact verification, operational logs, provenance introspection, University evaluation, and distillation keep their own routing.
 
-The exact anniversary-writing regression must reach shared COS before `resolveSemanticPublicIdentity`, `tryCosSoftwareSpecialist`, and `resolveSemanticVisualRequest`.
+The exact anniversary-writing regression must reach shared COS before `resolveSemanticPublicIdentity`, `tryCosSoftwareSpecialist`, and `resolveSemanticVisualRequest`, and must hit `runFastAuthoring` before enterprise retrieval/reasoning.
 ## COS University Hugging Face Jobs training adapter — 2026-09-13
 
 The governed COS University training-executor contract now has an iTMounts Hugging Face Jobs adapter on branch `feat/itmounts-huggingface-training-adapter-20260913`. `HF_TOKEN` may back the internal signed executor without exposing the provider token as a callback credential; a separate HMAC key is derived for signed evidence callbacks. Explicit buyer-supplied executor configuration still takes precedence.

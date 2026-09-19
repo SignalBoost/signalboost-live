@@ -207,13 +207,22 @@ test('practice uses a training-specific local reasoning seam rather than the own
 
 test('practice route is isolated from the learner and scheduled after continuous acquisition', () => {
   const route = file('app/api/cron/cos-university-practice/route.ts')
-  const vercel = file('vercel.json')
+  const vercel = JSON.parse(file('vercel.json')) as {
+    env?: Record<string, string>
+    crons?: Array<{ path?: string; schedule?: string }>
+  }
   assert.match(route, /CRON_SECRET/)
   assert.match(route, /Unauthorized/)
   assert.match(route, /maxExercises: 2/)
-  assert.match(vercel, /COS_UNIVERSITY_PRACTICE_ENABLED/)
-  assert.match(vercel, /cos-university-learning[^\n]+6,21,36,51/)
-  assert.match(vercel, /cos-university-practice[^\n]+5,20,35,50/)
+  assert.equal(vercel.env?.COS_UNIVERSITY_PRACTICE_ENABLED, 'true')
+  assert.deepEqual(
+    vercel.crons?.find(cron => cron.path === '/api/cron/cos-university-learning'),
+    { path: '/api/cron/cos-university-learning', schedule: '6,21,36,51 * * * *' },
+  )
+  assert.deepEqual(
+    vercel.crons?.find(cron => cron.path === '/api/cron/cos-university-practice'),
+    { path: '/api/cron/cos-university-practice', schedule: '5,20,35,50 * * * *' },
+  )
 })
 
 test('deliberate-practice regression is part of the mandatory COS deployment gate', () => {

@@ -9,8 +9,8 @@ import { generateWithUniversityTeacher } from './cosUniversityTeacherAdapters.ts
 const HOSTED_TRANSPORTS: readonly UniversityTeacherTransport[] = Object.freeze([
   'openai_compatible',
   'anthropic_messages',
-  'custom_adapter',
 ])
+const MASS_HOSTED_TEACHER_IDS = new Set(['openai', 'claude', 'grok'])
 const MIN_TEACHER_ROWS = 20
 const DEFAULT_MAX_CALLS = 20
 const HARD_MAX_CALLS = 20
@@ -42,7 +42,7 @@ function truthy(value: unknown): boolean {
 
 function hostedActiveTeachers(env: Env): UniversityTeacherDefinition[] {
   return universityTeacherPoolStatus(env).activeProviders
-    .filter(item => HOSTED_TRANSPORTS.includes(item.transport))
+    .filter(item => HOSTED_TRANSPORTS.includes(item.transport) && MASS_HOSTED_TEACHER_IDS.has(item.id))
     .map(item => ({
       id: item.id,
       provider: item.provider,

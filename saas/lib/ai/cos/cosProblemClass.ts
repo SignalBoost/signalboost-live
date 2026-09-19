@@ -27,7 +27,7 @@
 // QUESTION / Original question. Normalize all of those seams here before taxonomy matching.
 
 import { nearestFoundationalSubject } from '@/lib/cos-core/layers/learning/foundational'
-import { cosRoutingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
+import { cosRoutingObjective, isAuthoringObjectiveWithoutLiveLookup } from '@/lib/ai/cos/cosReasoningRolePolicy'
 
 /**
  * General classes used when a prompt does not belong to a foundational study domain. Kept small
@@ -83,6 +83,11 @@ export function classifyProblemClass(prompt: string): string {
 
   const foundational = nearestFoundationalSubject(text)
   if (foundational) return foundational
+
+  // Intent outranks incidental temporal vocabulary. "My in-laws today ... please write a message"
+  // is writing, not current-public-fact verification. Genuine live lookups still fall through to
+  // the current-public-facts class via the shared routing helper.
+  if (isAuthoringObjectiveWithoutLiveLookup(text)) return 'writing and content'
 
   for (const entry of GENERAL_PROBLEM_CLASSES) {
     if (entry.test.test(text)) return entry.id

@@ -46,7 +46,7 @@ const HEX40 = /^[a-f0-9]{40}$/i
 const MASS_CANDIDATE = /^mass:([0-9a-f-]{36}):([a-f0-9]{16})$/i
 
 type Stage = 'teacher_dispatching' | 'preparation_dispatching' | 'training_dispatching'
-type FetchPort = (url: string, init?: RequestInit) => Promise<Response>
+type FetchPort = (url: string | URL, init?: RequestInit) => Promise<Response>
 
 export type MassDistillationDispatchReadiness = Readonly<{
   ready: boolean

@@ -28,6 +28,11 @@ import {
   DISTILLATION_CAMPAIGN_CLOSURE_PROFILE,
   decideDistillationCampaignClosures,
 } from './cosUniversityDistillationCampaignClosure.ts'
+import {
+  massHostedTeacherStageConfig,
+  readMassHostedTeacherRows,
+  runMassHostedTeacherStage,
+} from './cosUniversityMassHostedTeacherStage.ts'
 
 export const COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE = 'cos-university-mass-distillation-campaign-v1' as const
 export const MASS_DISTILLATION_CALLBACK_PATH = '/api/internal/cos/mass-distillation/evidence' as const
@@ -355,6 +360,93 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
     const promptSet = await buildTeacherPrompts(run.subject_id, sourceHashes)
     distinctPrompts = promptSet.distinctPrompts
     promptSetHash = promptSet.promptSetHash
+
+    const hostedConfig = massHostedTeacherStageConfig()
+    if (hostedConfig.enabled) {
+      const student = await resolveHuggingFaceModelMetadata({ modelId: MASS_DISTILLATION_STUDENT_MODEL, token: hf.token, fetchImpl })
+      if (student.license !== 'apache-2.0') throw new Error('mass_distillation_student_model_rights_invalid')
+      const hosted = await runMassHostedTeacherStage({
+        db: cosServiceDb(),
+        run,
+        prompts: promptSet.prompts,
+        promptSetHash: promptSet.promptSetHash,
+        fetchImpl: fetchImpl as typeof fetch | undefined,
+      })
+      if (!hosted.completed || !hosted.datasetHash || hosted.outputHashes.length < 20) {
+        throw new Error(`mass_distillation_hosted_teacher_incomplete:${hosted.rows}/${hosted.minimumRows}:${hosted.activeProviders.join(',') || 'none'}`)
+      }
+      const hostedIdempotencyKey = hash([
+        COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE,
+        claim.campaign_id,
+        claim.batch_key,
+        'hosted-teacher',
+        promptSet.promptSetHash,
+        hosted.datasetHash,
+      ])
+      const hostedSourceRef = `itmounts://cos-university/mass-hosted-teacher/${run.id}`
+      const db = cosServiceDb()
+      if (!db) throw new Error('service_database_unavailable')
+      const hostedUpdated = await db.from('cos_university_mass_distillation_batch_runs').update({
+        teacher_model_id: 'multi-provider-hosted',
+        teacher_model_revision: null,
+        student_model_revision: student.revision,
+        prompt_set_hash: promptSet.promptSetHash,
+        teacher_job_id: null,
+        teacher_job_url: null,
+        teacher_source_ref: hostedSourceRef,
+        teacher_output_hashes: [...hosted.outputHashes],
+        dataset_hash: hosted.datasetHash,
+        stage: 'preparation_pending',
+        stage_reserved_cost_usd: 0,
+        stage_idempotency_key: null,
+        claimed_at: null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', claim.run_id).eq('stage', claim.stage).select('id').maybeSingle()
+      if (hostedUpdated.error) throw hostedUpdated.error
+      if (!hostedUpdated.data) throw new Error('mass_distillation_hosted_teacher_fence_lost')
+
+      await recordAssurance({
+        candidateId: run.candidate_id,
+        subjectId: run.subject_id,
+        claim: 'mass_distillation_hosted_teacher_dataset_registered',
+        evidence: {
+          campaignId: run.campaign_id,
+          batchKey: run.batch_key,
+          sourceRef: hostedSourceRef,
+          datasetHash: hosted.datasetHash,
+          promptSetHash: promptSet.promptSetHash,
+          outputCount: hosted.outputHashes.length,
+          providerMix: hosted.providerMix,
+          activeProviders: hosted.activeProviders,
+          maxCalls: hosted.config.maxCalls,
+          maxOutputTokens: hosted.config.maxOutputTokens,
+          parallelism: hosted.config.parallelism,
+          reservedCostCeilingUsd: expectedCeiling,
+          idempotencyKey: hostedIdempotencyKey,
+          automaticPromotionAuthorized: false,
+          runpodMutationAuthorized: false,
+          authorityExpanded: false,
+          silentFallbackAllowed: false,
+        },
+        verifier: 'host_controller',
+      })
+
+      return Object.freeze({
+        runId: claim.run_id,
+        campaignId: claim.campaign_id,
+        batchKey: claim.batch_key,
+        subjectId: run.subject_id,
+        stage: claim.stage,
+        provider: 'hosted_parallel',
+        providerMix: hosted.providerMix,
+        outputCount: hosted.outputHashes.length,
+        datasetHash: hosted.datasetHash,
+        maxEstimatedCostUsd: expectedCeiling,
+        reservedCostCeilingUsd: expectedCeiling,
+        nextStage: 'preparation_pending',
+      })
+    }
+
     const teacherModelId = clean(process.env.COS_UNIVERSITY_HF_TEACHER_MODEL, 240) || MASS_DISTILLATION_TEACHER_MODEL
     const teacher = await resolveHuggingFaceModelMetadata({ modelId: teacherModelId, token: hf.token, fetchImpl })
     const student = await resolveHuggingFaceModelMetadata({ modelId: MASS_DISTILLATION_STUDENT_MODEL, token: hf.token, fetchImpl })
@@ -386,10 +478,16 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       prompt_set_hash: promptSet.promptSetHash,
     }
   } else if (claim.stage === 'preparation_dispatching') {
-    if (!decodeHuggingFaceDatasetRef(run.teacher_source_ref) || !HEX64.test(clean(run.dataset_hash, 64))) {
+    const teacherSourceRef = clean(run.teacher_source_ref, 2000)
+    const hostedSource = teacherSourceRef.startsWith('itmounts://cos-university/mass-hosted-teacher/')
+    if ((!hostedSource && !decodeHuggingFaceDatasetRef(teacherSourceRef)) || !HEX64.test(clean(run.dataset_hash, 64))) {
       throw new Error('mass_distillation_teacher_material_missing')
     }
-    idempotencyKey = hash([COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE, claim.campaign_id, claim.batch_key, 'prepare', run.dataset_hash, run.teacher_source_ref])
+    const hostedRows = hostedSource
+      ? await readMassHostedTeacherRows({ db: cosServiceDb(), runId: run.id, promptSetHash: clean(run.prompt_set_hash, 64).toLowerCase() })
+      : []
+    if (hostedSource && hostedRows.length < 20) throw new Error(`mass_distillation_hosted_teacher_rows_missing:${hostedRows.length}`)
+    idempotencyKey = hash([COS_UNIVERSITY_MASS_DISTILLATION_CAMPAIGN_PROFILE, claim.campaign_id, claim.batch_key, 'prepare', run.dataset_hash, teacherSourceRef])
     envelope = {
       profile: 'cos_university_training_executor_v1',
       operation: 'prepare_dataset',
@@ -397,7 +495,7 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       subjectId: run.subject_id,
       baseModel: run.student_model_id,
       datasetHash: run.dataset_hash,
-      candidate: { source: run.teacher_source_ref },
+      candidate: hostedSource ? { source: teacherSourceRef, teacherRows: hostedRows } : { source: teacherSourceRef },
       callbackPath: MASS_DISTILLATION_CALLBACK_PATH,
       authorityExpanded: false,
     }

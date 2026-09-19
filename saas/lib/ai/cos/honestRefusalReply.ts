@@ -152,34 +152,34 @@ const COPY: Record<RefusalLanguage, {
   generic: string
 }> = {
   en: {
-    opening: 'A reliable answer requires a specific input that is not available yet.'
+    opening: 'A reliable answer requires a specific input that is not available yet.',
     needsLead: 'To answer it properly I need',
-    assumptions: 'I will use clearly labelled standard assumptions wherever that is safe; only genuinely situational facts must come from the user or an authorized source.'
-    generic: 'I will not ask you to narrow a routine task. Only a specific fact, permission, or source that materially changes the result should block completion.'
+    assumptions: 'I will use clearly labelled standard assumptions wherever that is safe; only genuinely situational facts must come from the user or an authorized source.',
+    generic: 'I will not ask you to narrow a routine task. Only a specific fact, permission, or source that materially changes the result should block completion.',
   },
   es: {
-    opening: 'Una respuesta fiable requiere un dato específico que todavía no está disponible.'
+    opening: 'Una respuesta fiable requiere un dato específico que todavía no está disponible.',
     needsLead: 'Para responder correctamente necesito',
-    assumptions: 'Usaré supuestos estándar claramente indicados cuando sea seguro; solo los datos realmente situacionales deben venir del usuario o de una fuente autorizada.'
-    generic: 'No pediré que se acote una tarea rutinaria. Solo un dato, permiso o fuente específica que cambie materialmente el resultado debe bloquear la finalización.'
+    assumptions: 'Usaré supuestos estándar claramente indicados cuando sea seguro; solo los datos realmente situacionales deben venir del usuario o de una fuente autorizada.',
+    generic: 'No pediré que se acote una tarea rutinaria. Solo un dato, permiso o fuente específica que cambie materialmente el resultado debe bloquear la finalización.',
   },
   pt: {
-    opening: 'Uma resposta confiável exige um dado específico que ainda não está disponível.'
+    opening: 'Uma resposta confiável exige um dado específico que ainda não está disponível.',
     needsLead: 'Para responder corretamente preciso de',
-    assumptions: 'Usarei pressupostos padrão claramente identificados quando isso for seguro; somente fatos realmente situacionais precisam vir do usuário ou de uma fonte autorizada.'
-    generic: 'Não pedirei que uma tarefa rotineira seja restringida. Apenas um fato, permissão ou fonte específica que altere materialmente o resultado deve bloquear a conclusão.'
+    assumptions: 'Usarei pressupostos padrão claramente identificados quando isso for seguro; somente fatos realmente situacionais precisam vir do usuário ou de uma fonte autorizada.',
+    generic: 'Não pedirei que uma tarefa rotineira seja restringida. Apenas um fato, permissão ou fonte específica que altere materialmente o resultado deve bloquear a conclusão.',
   },
   pl: {
-    opening: 'Rzetelna odpowiedź wymaga konkretnej informacji, której jeszcze brakuje.'
+    opening: 'Rzetelna odpowiedź wymaga konkretnej informacji, której jeszcze brakuje.',
     needsLead: 'Aby odpowiedzieć rzetelnie, potrzebuję',
-    assumptions: 'Użyję jasno oznaczonych standardowych założeń tam, gdzie jest to bezpieczne; tylko fakty zależne od konkretnej sytuacji muszą pochodzić od użytkownika lub uprawnionego źródła.'
-    generic: 'Nie poproszę o zawężenie rutynowego zadania. Tylko konkretna informacja, uprawnienie lub źródło, które istotnie zmienia wynik, powinno blokować wykonanie.'
+    assumptions: 'Użyję jasno oznaczonych standardowych założeń tam, gdzie jest to bezpieczne; tylko fakty zależne od konkretnej sytuacji muszą pochodzić od użytkownika lub uprawnionego źródła.',
+    generic: 'Nie poproszę o zawężenie rutynowego zadania. Tylko konkretna informacja, uprawnienie lub źródło, które istotnie zmienia wynik, powinno blokować wykonanie.',
   },
   ru: {
-    opening: 'Для надёжного ответа нужен конкретный ввод, которого пока нет.'
+    opening: 'Для надёжного ответа нужен конкретный ввод, которого пока нет.',
     needsLead: 'Чтобы ответить корректно, мне нужно',
-    assumptions: 'Я буду использовать явно обозначенные стандартные допущения там, где это безопасно; только действительно ситуационные факты должны поступать от пользователя или из разрешённого источника.'
-    generic: 'Я не буду просить сужать обычную задачу. Выполнение должен блокировать только конкретный факт, разрешение или источник, который существенно меняет результат.'
+    assumptions: 'Я буду использовать явно обозначенные стандартные допущения там, где это безопасно; только действительно ситуационные факты должны поступать от пользователя или из разрешённого источника.',
+    generic: 'Я не буду просить сужать обычную задачу. Выполнение должен блокировать только конкретный факт, разрешение или источник, который существенно меняет результат.',
   },
 }
 

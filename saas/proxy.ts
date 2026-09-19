@@ -1,3 +1,4 @@
+// saas/proxy.ts
 // Provider-independent network ingress wrapper.
 // The mature proxy implementation remains in proxyBase.ts. This wrapper closes legacy/browser
 // paths through the mandatory answer-provenance boundary without weakening proxyBase's spend gates.
@@ -116,6 +117,8 @@ export async function proxy(req: NextRequest) {
 export const config = {
   matcher: [
     '/dashboard/operator/:path*',
+    '/dashboard/:path*',
+    '/api/admin/:path*',
     '/api/concierge',
     '/api/cos-browser',
     '/api/support',

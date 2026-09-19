@@ -31,7 +31,8 @@ All hosted teacher providers are opt-in and buyer-owned. No provider is used unl
 - `COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENABLED=true`
 - `COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ADAPTER_READY=true`
 - `DEEPSEEK_API_KEY=<buyer secret>`
-- `COS_UNIVERSITY_TEACHER_DEEPSEEK_API_MODEL=deepseek-flash`
+- `COS_UNIVERSITY_TEACHER_DEEPSEEK_API_MODEL=deepseek-chat`
+- legacy `deepseek-flash` values are normalized server-side to `deepseek-chat` so existing Production configuration does not create a zero-output teacher lane
 - optional `COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENDPOINT=<HTTPS OpenAI-compatible endpoint>`
 
 ## Google Gemini

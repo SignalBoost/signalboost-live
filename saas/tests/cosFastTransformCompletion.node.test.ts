@@ -17,7 +17,7 @@ test('Supabase access cannot hold a request for the full Vercel runtime', () => 
   assert.match(access, /ACCESS_AUTH_TIMEOUT_MS = 5_000/)
   assert.match(access, /Promise\.race\(\[/)
   assert.match(access, /\[auth-access-timeout\]/)
-  assert.match(access, /return buildContext\(null, null, 'guest'\)/)
+  assert.match(access, /return buildContext\(null, null, 'guest', 'unavailable'\)/)
 })
 
 test('homepage Concierge and owner Assistant both enter the server fast-transform detector', () => {

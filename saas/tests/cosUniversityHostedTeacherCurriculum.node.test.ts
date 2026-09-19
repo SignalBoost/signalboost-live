@@ -45,3 +45,11 @@ test('every requested enterprise provider remains represented in the pool', () =
     assert.ok(pool.includes(marker), `missing ${marker}`)
   }
 })
+
+
+test('hosted teacher activation is bounded in Vercel production config', () => {
+  const vercel = JSON.parse(source('vercel.json'))
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_HOSTED_MAX_CALLS_PER_CYCLE, '8')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_HOSTED_MAX_OUTPUT_TOKENS, '1200')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_HOSTED_PARALLELISM, '4')
+})

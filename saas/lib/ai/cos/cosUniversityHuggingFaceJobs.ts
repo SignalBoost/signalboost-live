@@ -214,6 +214,35 @@ function teacherEnvelopeValid(envelope: TrainingEnvelope): boolean {
   )
 }
 
+function hostedTeacherEnvelopeValid(envelope: TrainingEnvelope): boolean {
+  const teacher = (envelope as any)?.teacher
+  const student = (envelope as any)?.student
+  const examples = (envelope as any)?.examples
+  const manifestHash = clean((envelope as any)?.providerManifestHash, 64)
+  return Boolean(
+    teacher && student
+    && clean(teacher.provider, 80)
+    && clean(teacher.modelId, 240)
+    && COMMIT_SHA.test(clean(teacher.revision, 40))
+    && clean(student.modelId, 240)
+    && COMMIT_SHA.test(clean(student.revision, 40))
+    && clean(student.license, 80) === 'apache-2.0'
+    && HEX64.test(manifestHash)
+    && Array.isArray(examples) && examples.length >= 20 && examples.length <= 256
+    && examples.every((item: any) =>
+      clean(item?.promptId, 160)
+      && clean(item?.prompt, 12000)
+      && clean(item?.response, 20000).length >= 80
+      && HEX64.test(clean(item?.responseHash, 64))
+      && clean(item?.provider, 80) === clean(teacher.provider, 80)
+      && clean(item?.model, 240) === clean(teacher.modelId, 240)
+    )
+    && (envelope as any)?.trainingRights === 'provider_output_contractually_authorized'
+    && (envelope as any)?.studentControlledByBuyer === true
+    && (envelope as any)?.containsPrivateProductionData === false
+  )
+}
+
 /**
  * Builds, but never submits, a Hugging Face Job. Submission remains behind the existing global
  * dispatch flag plus explicit owner confirmation in the University training executor.
@@ -248,6 +277,15 @@ export function buildHuggingFaceJobSpec(input: {
       'transformers>=4.55,<6',
       'accelerate>=1.10,<2',
       'bitsandbytes>=0.46,<1',
+    ])
+  } else if (operation === 'materialize_teacher_dataset') {
+    if (!hostedTeacherEnvelopeValid(input.envelope)) throw new Error('huggingface_hosted_teacher_envelope_invalid')
+    dockerImage = 'python:3.12-slim'
+    flavor = input.config.preparationFlavor
+    timeoutSeconds = input.config.preparationTimeoutSeconds
+    command = workerBootstrap([
+      'huggingface_hub>=0.34,<2',
+      'datasets>=3,<5',
     ])
   } else if (operation === 'prepare_dataset') {
     const source = (input.envelope as any)?.candidate?.source
@@ -287,7 +325,7 @@ export function buildHuggingFaceJobSpec(input: {
   const digest = requestDigest(input.envelope)
   const purpose = operation === 'train'
     ? 'governed-model-training'
-    : operation === 'generate_teacher_dataset'
+    : operation === 'generate_teacher_dataset' || operation === 'materialize_teacher_dataset'
       ? 'governed-teacher-dataset'
       : 'governed-dataset-preparation'
   return Object.freeze({

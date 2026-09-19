@@ -26,6 +26,9 @@ test('OpenAI-compatible adapter uses buyer-configured model and never falls back
   })
   assert.equal(seenUrl, 'https://api.openai.com/v1/chat/completions')
   assert.equal(seenBody.model, 'buyer-approved-openai-model')
+  assert.equal(seenBody.reasoning_effort, 'none')
+  assert.equal(seenBody.max_completion_tokens, 300)
+  assert.equal(seenBody.max_tokens, undefined)
   assert.equal(result.text, 'answer')
   assert.equal(result.requestId, 'req-1')
 })
@@ -64,4 +67,28 @@ test('local/Hugging Face teachers must use the governed local executor, not host
     }),
     /university_teacher_transport_requires_local_executor/,
   )
+})
+
+
+test('xAI adapter uses Grok-compatible low-reasoning Chat Completions payload', async () => {
+  let body: any = null
+  const result = await generateWithUniversityTeacher({
+    teacher: byId('grok'),
+    env: {
+      XAI_API_KEY: 'xai_123456789012345678901234567890',
+      COS_UNIVERSITY_TEACHER_XAI_MODEL: 'grok-4.6',
+    },
+    request: { system: 'Teach carefully.', prompt: 'Explain Z.', maxOutputTokens: 384 },
+    fetchImpl: async (_input, init) => {
+      body = JSON.parse(String(init?.body || '{}'))
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: 'grok answer' } }],
+        usage: { prompt_tokens: 14, completion_tokens: 7 },
+      }), { status: 200, headers: { 'x-request-id': 'req-g' } })
+    },
+  })
+  assert.equal(body.model, 'grok-4.6')
+  assert.equal(body.reasoning_effort, 'low')
+  assert.equal(body.max_tokens, 384)
+  assert.equal(result.text, 'grok answer')
 })

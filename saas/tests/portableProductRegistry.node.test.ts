@@ -8,7 +8,7 @@ test('registry is frozen and preserves stable customer-facing manifest IDs', () 
   assert.ok(Object.isFrozen(portableProductRegistry))
   const ids = portableProductRegistry.map(product => product.manifest.productId)
   assert.equal(new Set(ids).size, ids.length)
-  assert.ok(ids.includes('agent-operations-platform')); assert.ok(ids.includes('browser-agent-ecosystem')); assert.ok(!ids.includes('agentRuntime'))
+  assert.ok(ids.includes('agent-operations-platform')); assert.ok(ids.includes('browser-agent-ecosystem')); assert.ok(ids.includes('ai-university')); assert.ok(ids.includes('ai-distillation-engine')); assert.ok(!ids.includes('agentRuntime'))
   for (const product of portableProductRegistry) assert.ok(Object.isFrozen(product) && Object.isFrozen(product.manifest))
 })
 test('selectors are deterministic and apply manifest visibility and licensing rules', () => {

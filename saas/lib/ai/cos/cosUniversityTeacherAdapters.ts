@@ -78,18 +78,41 @@ async function callOpenAiCompatible(input: {
   if (!model || credential.length < 20) throw new Error('university_teacher_not_configured')
   const endpoint = validateHttpsEndpoint(endpointFor(input.teacher, input.env))
   const timeoutMs = positiveInt(input.env.COS_UNIVERSITY_TEACHER_REQUEST_TIMEOUT_MS, 120_000, 5_000, 300_000)
+  const maxOutputTokens = positiveInt(input.request.maxOutputTokens, 1200, 64, 8192)
+  const requestBody = input.teacher.id === 'openai'
+    ? {
+        model,
+        reasoning_effort: 'none',
+        max_completion_tokens: maxOutputTokens,
+        messages: [
+          { role: 'system', content: clean(input.request.system, 20_000) },
+          { role: 'user', content: clean(input.request.prompt, 100_000) },
+        ],
+      }
+    : input.teacher.id === 'grok'
+      ? {
+          model,
+          reasoning_effort: 'low',
+          temperature: input.request.temperature ?? 0.2,
+          max_tokens: maxOutputTokens,
+          messages: [
+            { role: 'system', content: clean(input.request.system, 20_000) },
+            { role: 'user', content: clean(input.request.prompt, 100_000) },
+          ],
+        }
+      : {
+          model,
+          temperature: input.request.temperature ?? 0.2,
+          max_tokens: maxOutputTokens,
+          messages: [
+            { role: 'system', content: clean(input.request.system, 20_000) },
+            { role: 'user', content: clean(input.request.prompt, 100_000) },
+          ],
+        }
   const response = await input.fetchImpl(endpoint, {
     method: 'POST',
     headers: { Authorization: `Bearer ${credential}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      temperature: input.request.temperature ?? 0.2,
-      max_tokens: positiveInt(input.request.maxOutputTokens, 1200, 64, 8192),
-      messages: [
-        { role: 'system', content: clean(input.request.system, 20_000) },
-        { role: 'user', content: clean(input.request.prompt, 100_000) },
-      ],
-    }),
+    body: JSON.stringify(requestBody),
     signal: AbortSignal.timeout(timeoutMs),
   })
   const payload = await readJson(response)

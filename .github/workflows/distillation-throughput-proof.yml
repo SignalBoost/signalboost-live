@@ -50,3 +50,5 @@ jobs:
       - name: Run owner-throughput, cadence, uncapped-monitoring, and scale proofs
         run: node --experimental-transform-types --import ./scripts/test-alias-loader.mjs --test tests/cosUniversityDistillationAlwaysOn.node.test.ts tests/cosUniversityDistillationUncappedMonitoring.node.test.ts tests/cosUniversityDistillationThroughput.node.test.ts tests/cosUniversityDistillationScale.node.test.ts tests/cosUniversityMassDistillationRollingAuthorization.node.test.ts
       - run: npm run typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=7168

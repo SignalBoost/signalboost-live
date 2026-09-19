@@ -142,20 +142,24 @@ export function decideMassCanaryRollingApproval(input: {
     .filter(artifact => artifact.candidateId.startsWith('mass:') && HEX64.test(artifact.artifactHash) && artifact.subjectId)
     .sort((a, b) => at(a.createdAt) - at(b.createdAt) || a.candidateId.localeCompare(b.candidateId))
 
-  // Keep the exact endpoint alive until independent evaluation is done with it. Provisioning a new
-  // canary retires older mass endpoints, so allowing overlap would turn a healthy endpoint into a
-  // runtime_not_ready/network failure for the evaluator. Repeated lifecycle failure is the exception:
-  // that stale binding must be replaced rather than reserved forever.
-  if (valid.some(artifact => evaluationHandoffPending(input.events, artifact))) {
-    return { issue: false, reason: 'mass_canary_waiting_for_independent_evaluation' }
-  }
-
-  // The claim serves one reservation at a time; issuing a second approval while one is armed only queues spend.
+  // The live approval is the real global semaphore: only one canary endpoint may exist at a time, so no
+  // second approval is issued until this one is consumed, expired or released. This stays queue-wide.
   if (valid.some(artifact => armedApproval(forArtifact(input.events, artifact), nowMs))) {
     return { issue: false, reason: 'mass_canary_approval_already_armed' }
   }
 
+  // Awaiting independent evaluation is an ARTIFACT-LOCAL lifecycle condition and is excluded per
+  // artifact inside the loop below, not queue-wide. Production 2026-09-19 showed why: six artifacts
+  // had passed their canary and were waiting for evaluation, and the previous queue-wide
+  // `some(evaluationHandoffPending) -> return` turned that into a deadlock which left 45 aged
+  // artifacts with no canary attempt at all. Once a canary's evidence is durably captured, that
+  // artifact no longer owns the canary semaphore; the armed-approval check above still guarantees a
+  // single canary in flight.
+
   for (const artifact of valid) {
+    // Artifact-local: this one is done canarying and is waiting on the evaluator. Skip it and keep
+    // searching the queue rather than stopping the whole issuer.
+    if (evaluationHandoffPending(input.events, artifact)) continue
     const own = forArtifact(input.events, artifact).sort((a, b) => at(a.observedAt) - at(b.observedAt))
     const refreshEndpoint = endpointRefreshRequired(input.events, artifact)
     if (own.some(event => claim(event) === 'local_distilled_runtime_canary_passed') && !refreshEndpoint) continue

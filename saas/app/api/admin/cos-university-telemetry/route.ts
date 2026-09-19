@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import { requireOwner } from '@/lib/auth/access'
 import { getAdminSupabase } from '@/utils/supabase/server'
+import { universityTeacherPoolStatus } from '@/lib/ai/cos/cosUniversityTeacherPool'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -31,11 +32,23 @@ function iso(value: unknown): string | null {
 
 function providerName(row: any): string {
   const teacher = text(row?.teacher_id, 80).toLowerCase()
-  if (teacher) return teacher
   const provider = text(row?.provider, 80).toLowerCase()
+  if (teacher) {
+    // Avoid redundant UI names such as "deepseek-api" when the declared provider is "deepseek".
+    // This affects telemetry identity only; provider routing continues to use the exact teacher id.
+    if (teacher.endsWith('-api') && provider === teacher.slice(0, -4)) return provider
+    return teacher
+  }
   if (provider === 'anthropic') return 'claude'
   if (provider === 'xai') return 'grok'
   return provider || 'unknown'
+}
+
+function configuredTeacherModel(row: any): string {
+  const modelEnv = text(row?.modelEnv, 120)
+  if (modelEnv) return text(process.env[modelEnv], 240)
+  const model = text(row?.model, 240)
+  return model === 'buyer-configured' ? '' : model
 }
 
 function stageBucket(stage: unknown): 'complete' | 'failed' | 'in_flight' {
@@ -118,6 +131,25 @@ export async function GET() {
       outputTokens: number
       latestAt: string | null
     }>()
+
+    // Seed every currently active hosted mass-distillation teacher before applying the 24-hour
+    // observations. A newly enabled provider therefore appears immediately with zero calls instead
+    // of being invisible until its first successful teacher row is persisted.
+    const teacherPool = universityTeacherPoolStatus(process.env)
+    for (const teacher of teacherPool.activeProviders) {
+      if (teacher.transport === 'huggingface_job' || teacher.massDistillationEligible !== true) continue
+      const id = providerName({ teacher_id: teacher.id, provider: teacher.provider })
+      providers.set(id, {
+        id,
+        provider: text(teacher.provider, 80),
+        model: configuredTeacherModel(teacher),
+        calls: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        latestAt: null,
+      })
+    }
+
     for (const row of recentTeachers) {
       const id = providerName(row)
       const current = providers.get(id) || {

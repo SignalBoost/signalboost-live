@@ -225,7 +225,7 @@ export default function CosUniversityTelemetryPage() {
                   </td>
                   <td className="py-3 pr-4">
                     <span className={'inline-block rounded-full border px-2 py-1 text-xs ' + stageClass(run.stageBucket)}>
-                      {run.stage || 'unknown'}
+                      {run.stage || copy.unknownStage}
                     </span>
                   </td>
                   <td className="py-3 pr-4 font-mono text-xs">{mixLabel(run.providerMix)}</td>

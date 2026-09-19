@@ -8,7 +8,7 @@ import {
 } from '../lib/ai/cos/cosUniversityTeacherPool.ts'
 
 test('teacher pool registers enterprise providers without provider lock-in', () => {
-  assert.deepEqual(UNIVERSITY_TEACHERS.map(item => item.id), ['qwen', 'deepseek', 'openai', 'claude', 'grok', 'custom'])
+  assert.deepEqual(UNIVERSITY_TEACHERS.map(item => item.id), ['qwen', 'deepseek', 'openai', 'claude', 'grok', 'deepseek-api', 'gemini', 'custom'])
   assert.ok(UNIVERSITY_TEACHERS.every(item => item.buyerOwnedCredential))
   assert.ok(UNIVERSITY_TEACHERS.every(item => item.provenanceRequired))
   assert.ok(UNIVERSITY_TEACHERS.every(item => item.costCeilingRequired))
@@ -36,6 +36,22 @@ test('hosted provider becomes eligible only when its explicit adapter gate is re
     COS_UNIVERSITY_TEACHER_OPENAI_MODEL: 'gpt-5.6-luna',
   }
   assert.deepEqual(universityTeacherPoolStatus(env).activeProviders.map(item => item.id), ['openai'])
+})
+
+test('DeepSeek API and Gemini become active hosted teachers only with explicit production gates', () => {
+  const env = {
+    DEEPSEEK_API_KEY: 'dsk_123456789012345678901234567890',
+    GEMINI_API_KEY: 'gai_123456789012345678901234567890',
+    COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENABLED: 'true',
+    COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ADAPTER_READY: 'true',
+    COS_UNIVERSITY_TEACHER_DEEPSEEK_API_MODEL: 'deepseek-flash',
+    COS_UNIVERSITY_TEACHER_GEMINI_ENABLED: 'true',
+    COS_UNIVERSITY_TEACHER_GEMINI_ADAPTER_READY: 'true',
+    COS_UNIVERSITY_TEACHER_GEMINI_MODEL: 'gemini-3.8-flash',
+  }
+  const active = universityTeacherPoolStatus(env).activeProviders
+  assert.deepEqual(active.map(item => item.id), ['deepseek-api', 'gemini'])
+  assert.ok(active.every(item => item.massDistillationEligible === true))
 })
 
 test('hosted provider stays inactive when model configuration is missing', () => {

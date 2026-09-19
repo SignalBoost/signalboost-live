@@ -183,6 +183,17 @@ export async function runMassHostedTeacherStage(input: {
   const providerMix: Record<string, number> = {}
   for (const row of rows) providerMix[row.teacher_id] = (providerMix[row.teacher_id] || 0) + 1
 
+  if (failures.length > 0) {
+    console.error('[cos-university-mass-hosted-teacher-failures]', JSON.stringify({
+      runId: String(input.run.id || ''),
+      candidateId: String(input.run.candidate_id || ''),
+      activeProviders: teachers.map(item => item.id),
+      completedRows: rows.length,
+      failures: failures.slice(0, 20),
+      authorityExpanded: false,
+    }))
+  }
+
   return Object.freeze({
     ok: rows.length >= MIN_TEACHER_ROWS,
     skipped: false,

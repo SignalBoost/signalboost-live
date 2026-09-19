@@ -1,2 +1,2 @@
-base_sha=7df37908a4b452206988b5f04d0e0647aee4ee62
-branch=fix/cos-writing-latency-rebase-20260918
+base_sha=16d0ce74f8a8d108dec4d991ecc05395aefa2692
+branch=fix/cos-authoring-problem-class-20260918

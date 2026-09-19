@@ -79,6 +79,10 @@ test('paid authorization and dispatch precede slower ready-inventory maintenance
   assert.match(workflow, /slowMaintenanceDue[\s\S]*campaign_recovery/)
   assert.match(workflow, /slowMaintenanceDue[\s\S]*semantic_reconciliation/)
   assert.match(workflow, /reason: 'maintenance_not_due'/)
+  assert.match(workflow, /replenishmentMaterialInserted/)
+  assert.match(workflow, /curriculumReplenishment\.hostedTeacherInserted/)
+  assert.match(workflow, /curriculumReplenishment\.syntheticInserted/)
+  assert.match(workflow, /if \(replenishmentMaterialInserted > 0\)/)
 })
 
 test('owner throughput control remains separate from University spending and authority', () => {

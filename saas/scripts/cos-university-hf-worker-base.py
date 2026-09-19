@@ -324,11 +324,24 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
     from huggingface_hub import HfApi
 
     candidate = envelope.get("candidate") if isinstance(envelope.get("candidate"), dict) else {}
-    repo_id, revision, split = parse_dataset_ref(candidate.get("source"))
     token = os.environ["HF_TOKEN"]
-    source = load_dataset(repo_id, revision=revision, split=split, token=token)
     max_items = max(20, min(20_000, int(os.environ.get("ITMOUNTS_HF_MAX_DATASET_ITEMS", "5000"))))
-    source = source.select(range(min(len(source), max_items)))
+    embedded_rows = candidate.get("teacherRows") if isinstance(candidate.get("teacherRows"), list) else None
+    if embedded_rows is not None:
+        if len(embedded_rows) < 20 or len(embedded_rows) > 128:
+            raise RuntimeError("worker_embedded_teacher_rows_invalid")
+        source = embedded_rows[:max_items]
+        for raw_row in source:
+            if not isinstance(raw_row, dict):
+                raise RuntimeError("worker_embedded_teacher_row_invalid")
+            text = row_text(raw_row)
+            declared_hash = clean(raw_row.get("itemHash"), 64).lower()
+            if not text or not HEX64.match(declared_hash) or sha256(text) != declared_hash:
+                raise RuntimeError("worker_embedded_teacher_row_hash_mismatch")
+    else:
+        repo_id, revision, split = parse_dataset_ref(candidate.get("source"))
+        source = load_dataset(repo_id, revision=revision, split=split, token=token)
+        source = source.select(range(min(len(source), max_items)))
 
     by_hash: dict[str, str] = {}
     for raw_row in source:

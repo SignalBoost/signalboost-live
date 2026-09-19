@@ -131,16 +131,17 @@ async function installTeacherSyntheticFallback(input: {
     .sort((a, b) => a.shortfallToBatch - b.shortfallToBatch || a.subject.localeCompare(b.subject))
     .slice(0, input.maxSubjects)
 
+  const generationKey = slotKey(input.now)
   for (const target of targets) {
     const needed = Math.min(HYBRID_SYNTHETIC_MAX_PER_SUBJECT, Math.max(0, target.shortfallToBatch))
     let subjectInserted = 0
     for (let ordinal = 0; ordinal < needed; ordinal += 1) {
-      const contentHash = teacherSyntheticSourceHash(target.subject, ordinal)
+      const contentHash = teacherSyntheticSourceHash(target.subject, ordinal, generationKey)
       const row = {
         content_hash: contentHash,
         source_kind: 'teacher_synthetic_curriculum',
-        source_uri: `itmounts://cos-university/hybrid-distillation/${encodeURIComponent(target.subject)}/${ordinal}`,
-        source_title: `${target.subject} — teacher-generated practice seed ${ordinal + 1}`,
+        source_uri: `itmounts://cos-university/hybrid-distillation/${encodeURIComponent(target.subject)}/${generationKey}/${ordinal}`,
+        source_title: `${target.subject} — teacher-generated practice seed ${ordinal + 1} (${generationKey})`,
         observed_at: input.now.toISOString(),
         subject: target.subject,
         summary: [
@@ -150,7 +151,7 @@ async function installTeacherSyntheticFallback(input: {
           'The teacher must not claim current-web access, private context, hidden exams, user memories, or external citations.',
         ].join(' '),
         facts: [
-          { origin: 'teacher_synthetic', profile: HYBRID_DISTILLATION_PROFILE, ordinal },
+          { origin: 'teacher_synthetic', profile: HYBRID_DISTILLATION_PROFILE, generationKey, ordinal },
           { constraint: 'self_contained_no_private_or_current_web_claims' },
         ],
         confidence: 1,

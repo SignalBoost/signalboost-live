@@ -5,6 +5,10 @@ const tests = [
   'tests/cosUniversityLaneExpectation.node.test.ts',
   'tests/cosUniversityLaneFaultRecorder.node.test.ts',
   'tests/cosUniversityFineTuneEvidence.node.test.ts',
+  'tests/cosUniversityTeacherAdapters.node.test.ts',
+  'tests/cosUniversityMultiProviderTeacherSynthesis.node.test.ts',
+  'tests/cosUniversityHostedTeacherMaterialization.node.test.ts',
+  'tests/cosUniversityMultiProviderDistillationWiring.node.test.ts',
   'tests/cosUniversityDailyLaneCadence.node.test.ts',
   // Registered 2026-09-13. These regressions existed but were never in this gate, so they had
   // never run in CI: every "green" for them came from a sandbox. They defend the execution binding,

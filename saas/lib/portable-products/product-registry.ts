@@ -1,6 +1,6 @@
 // saas/lib/portable-products/product-registry.ts
 import type { PortableProductManifest } from './manifestTypes.ts'
-import { portableProductManifests, providerHubManifest, campaignStudioManifest, integrationsHubManifest, videoMakerManifest, controlCenterManifest, marketingSalesManifest, pressMediaManifest, portableChiefOfStaffManifest, browserAgentEcosystemManifest, agentOperationsPlatformManifest, selfHealingSupervisorManifest } from './manifests/index.ts'
+import { portableProductManifests, providerHubManifest, campaignStudioManifest, integrationsHubManifest, videoMakerManifest, controlCenterManifest, marketingSalesManifest, pressMediaManifest, portableChiefOfStaffManifest, browserAgentEcosystemManifest, agentOperationsPlatformManifest, selfHealingSupervisorManifest, aiUniversityManifest, aiDistillationEngineManifest } from './manifests/index.ts'
 import { validatePortableProductManifests } from './manifestValidation.ts'
 import type { PortableProductDescriptor } from './product-types.ts'
 import { validatePortableProductRegistry } from './product-validation.ts'
@@ -21,5 +21,7 @@ export const portableProductRegistry = Object.freeze([
   product(browserAgentEcosystemManifest, { localizationKey: 'browserAgents', glyph: '◇', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 80 }),
   product(agentOperationsPlatformManifest, { localizationKey: 'agentOperations', glyph: '⌁', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 90, route: '/dashboard/portable-products' }),
   product(selfHealingSupervisorManifest, { localizationKey: 'selfHealing', glyph: '⟲', implementationStatus: 'implemented', implementationClassification: 'implemented_product', sortOrder: 100, route: '/self-healing-supervisor' }),
+  product(aiUniversityManifest, { localizationKey: 'aiUniversity', glyph: '◫', implementationStatus: 'preview', implementationClassification: 'preview_product', sortOrder: 110 }),
+  product(aiDistillationEngineManifest, { localizationKey: 'aiDistillation', glyph: '⋈', implementationStatus: 'preview', implementationClassification: 'preview_product', sortOrder: 120 }),
 ])
 validatePortableProductRegistry(portableProductRegistry)

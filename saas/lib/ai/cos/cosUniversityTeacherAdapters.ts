@@ -19,6 +19,15 @@ export type TeacherGenerationResult = Readonly<{
 type Env = Record<string, string | undefined>
 type FetchPort = typeof fetch
 
+export type UniversityTeacherAdapterInput = Readonly<{
+  teacher: UniversityTeacherDefinition
+  request: TeacherGenerationRequest
+  env: Env
+  fetchImpl: FetchPort
+}>
+export type UniversityTeacherAdapter = (input: UniversityTeacherAdapterInput) => Promise<TeacherGenerationResult>
+export type UniversityTeacherAdapterRegistry = Readonly<Record<string, UniversityTeacherAdapter>>
+
 function clean(value: unknown, max = 200_000): string {
   return String(value ?? '').trim().slice(0, max)
 }
@@ -30,27 +39,17 @@ function positiveInt(value: unknown, fallback: number, min: number, max: number)
 }
 
 function modelFor(teacher: UniversityTeacherDefinition, env: Env): string {
-  if (teacher.id === 'openai') return clean(env.COS_UNIVERSITY_TEACHER_OPENAI_MODEL, 240) || teacher.model
-  if (teacher.id === 'claude') return clean(env.COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL, 240)
-  if (teacher.id === 'grok') return clean(env.COS_UNIVERSITY_TEACHER_XAI_MODEL, 240)
-  if (teacher.id === 'custom') return clean(env.COS_UNIVERSITY_TEACHER_CUSTOM_MODEL, 240)
-  return teacher.model
+  if (teacher.modelEnv) return clean(env[teacher.modelEnv], 240) || (teacher.model === 'buyer-configured' ? '' : teacher.model)
+  return teacher.model === 'buyer-configured' ? '' : clean(teacher.model, 240)
 }
 
 function endpointFor(teacher: UniversityTeacherDefinition, env: Env): string {
-  if (teacher.id === 'openai') return clean(env.COS_UNIVERSITY_TEACHER_OPENAI_ENDPOINT, 2000) || 'https://api.openai.com/v1/responses'
-  if (teacher.id === 'grok') return clean(env.COS_UNIVERSITY_TEACHER_XAI_ENDPOINT, 2000) || 'https://api.x.ai/v1/chat/completions'
-  if (teacher.id === 'claude') return clean(env.COS_UNIVERSITY_TEACHER_ANTHROPIC_ENDPOINT, 2000) || 'https://api.anthropic.com/v1/messages'
-  if (teacher.id === 'custom') return clean(env.COS_UNIVERSITY_TEACHER_CUSTOM_ENDPOINT, 2000)
-  return ''
+  const configured = teacher.endpointEnv ? clean(env[teacher.endpointEnv], 2000) : ''
+  return configured || clean(teacher.defaultEndpoint, 2000)
 }
 
 function credentialFor(teacher: UniversityTeacherDefinition, env: Env): string {
-  if (teacher.id === 'openai') return clean(env.OPENAI_API_KEY, 4096)
-  if (teacher.id === 'grok') return clean(env.XAI_API_KEY, 4096)
-  if (teacher.id === 'claude') return clean(env.ANTHROPIC_API_KEY, 4096)
-  if (teacher.id === 'custom') return clean(env.COS_UNIVERSITY_TEACHER_CUSTOM_TOKEN, 4096)
-  return ''
+  return teacher.credentialEnv ? clean(env[teacher.credentialEnv], 4096) : ''
 }
 
 function validateHttpsEndpoint(raw: string): URL {
@@ -77,12 +76,7 @@ function providerErrorDetail(payload: any): string {
   return message ? `${type}:${message}` : type
 }
 
-async function callOpenAiResponses(input: {
-  teacher: UniversityTeacherDefinition
-  request: TeacherGenerationRequest
-  env: Env
-  fetchImpl: FetchPort
-}): Promise<TeacherGenerationResult> {
+async function callOpenAiResponses(input: UniversityTeacherAdapterInput): Promise<TeacherGenerationResult> {
   const model = modelFor(input.teacher, input.env)
   const credential = credentialFor(input.teacher, input.env)
   if (!model || credential.length < 20) throw new Error('university_teacher_not_configured')
@@ -97,22 +91,14 @@ async function callOpenAiResponses(input: {
       reasoning: { effort: 'none' },
       max_output_tokens: maxOutputTokens,
       input: [
-        {
-          role: 'system',
-          content: [{ type: 'input_text', text: clean(input.request.system, 20_000) }],
-        },
-        {
-          role: 'user',
-          content: [{ type: 'input_text', text: clean(input.request.prompt, 100_000) }],
-        },
+        { role: 'system', content: [{ type: 'input_text', text: clean(input.request.system, 20_000) }] },
+        { role: 'user', content: [{ type: 'input_text', text: clean(input.request.prompt, 100_000) }] },
       ],
     }),
     signal: AbortSignal.timeout(timeoutMs),
   })
   const payload = await readJson(response)
-  if (!response.ok) {
-    throw new Error(`university_teacher_http_${response.status}:${providerErrorDetail(payload)}`)
-  }
+  if (!response.ok) throw new Error(`university_teacher_http_${response.status}:${providerErrorDetail(payload)}`)
   const outputText = clean(payload?.output_text)
     || clean(Array.isArray(payload?.output)
       ? payload.output.flatMap((item: any) => Array.isArray(item?.content) ? item.content : [])
@@ -131,12 +117,7 @@ async function callOpenAiResponses(input: {
   })
 }
 
-async function callOpenAiCompatible(input: {
-  teacher: UniversityTeacherDefinition
-  request: TeacherGenerationRequest
-  env: Env
-  fetchImpl: FetchPort
-}): Promise<TeacherGenerationResult> {
+async function callOpenAiCompatible(input: UniversityTeacherAdapterInput): Promise<TeacherGenerationResult> {
   const model = modelFor(input.teacher, input.env)
   const credential = credentialFor(input.teacher, input.env)
   if (!model || credential.length < 20) throw new Error('university_teacher_not_configured')
@@ -148,7 +129,7 @@ async function callOpenAiCompatible(input: {
     headers: { Authorization: `Bearer ${credential}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      reasoning_effort: input.teacher.id === 'grok' ? 'low' : undefined,
+      reasoning_effort: input.teacher.provider === 'xai' ? 'low' : undefined,
       temperature: input.request.temperature ?? 0.2,
       max_tokens: maxOutputTokens,
       messages: [
@@ -171,16 +152,11 @@ async function callOpenAiCompatible(input: {
     text,
     inputTokens: Number.isInteger(payload?.usage?.prompt_tokens) ? payload.usage.prompt_tokens : null,
     outputTokens: Number.isInteger(payload?.usage?.completion_tokens) ? payload.usage.completion_tokens : null,
-    requestId: clean(response.headers.get('x-request-id'), 240) || null,
+    requestId: clean(response.headers.get('x-request-id'), 240) || clean(payload?.id, 240) || null,
   })
 }
 
-async function callAnthropic(input: {
-  teacher: UniversityTeacherDefinition
-  request: TeacherGenerationRequest
-  env: Env
-  fetchImpl: FetchPort
-}): Promise<TeacherGenerationResult> {
+async function callAnthropic(input: UniversityTeacherAdapterInput): Promise<TeacherGenerationResult> {
   const model = modelFor(input.teacher, input.env)
   const credential = credentialFor(input.teacher, input.env)
   if (!model || credential.length < 20) throw new Error('university_teacher_not_configured')
@@ -203,9 +179,7 @@ async function callAnthropic(input: {
     signal: AbortSignal.timeout(timeoutMs),
   })
   const payload = await readJson(response)
-  if (!response.ok) {
-    throw new Error(`university_teacher_http_${response.status}:${providerErrorDetail(payload)}`)
-  }
+  if (!response.ok) throw new Error(`university_teacher_http_${response.status}:${providerErrorDetail(payload)}`)
   const text = clean(Array.isArray(payload?.content)
     ? payload.content.filter((item: any) => item?.type === 'text').map((item: any) => item.text).join('\n')
     : '')
@@ -220,29 +194,29 @@ async function callAnthropic(input: {
   })
 }
 
+export const BUILTIN_UNIVERSITY_TEACHER_ADAPTERS: UniversityTeacherAdapterRegistry = Object.freeze({
+  openai_responses: callOpenAiResponses,
+  openai_compatible: callOpenAiCompatible,
+  anthropic_messages: callAnthropic,
+  custom_adapter: callOpenAiCompatible,
+})
+
 /**
- * Hosted teacher adapter. Callers must already have selected an explicitly enabled provider and
- * applied their own spend/call authorization. This function never falls back to another teacher.
+ * Hosted teacher adapter. Provider identity is data, while transport selects the protocol adapter.
+ * Buyers can add providers that speak a supported protocol through configuration only. A portable
+ * host may also inject/override a transport adapter without changing the University curriculum core.
  */
 export async function generateWithUniversityTeacher(input: {
   teacher: UniversityTeacherDefinition
   request: TeacherGenerationRequest
   env?: Env
   fetchImpl?: FetchPort
+  adapterRegistry?: UniversityTeacherAdapterRegistry
 }): Promise<TeacherGenerationResult> {
   const env = input.env || process.env
   const fetchImpl = input.fetchImpl || fetch
-  if (input.teacher.id === 'openai') {
-    return callOpenAiResponses({ teacher: input.teacher, request: input.request, env, fetchImpl })
-  }
-  if (input.teacher.transport === 'openai_compatible') {
-    return callOpenAiCompatible({ teacher: input.teacher, request: input.request, env, fetchImpl })
-  }
-  if (input.teacher.transport === 'anthropic_messages') {
-    return callAnthropic({ teacher: input.teacher, request: input.request, env, fetchImpl })
-  }
-  if (input.teacher.transport === 'custom_adapter') {
-    return callOpenAiCompatible({ teacher: input.teacher, request: input.request, env, fetchImpl })
-  }
-  throw new Error('university_teacher_transport_requires_local_executor')
+  if (input.teacher.transport === 'huggingface_job') throw new Error('university_teacher_transport_requires_local_executor')
+  const adapter = input.adapterRegistry?.[input.teacher.transport] || BUILTIN_UNIVERSITY_TEACHER_ADAPTERS[input.teacher.transport]
+  if (!adapter) throw new Error('university_teacher_transport_adapter_unavailable')
+  return adapter({ teacher: input.teacher, request: input.request, env, fetchImpl })
 }

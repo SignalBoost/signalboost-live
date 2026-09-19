@@ -65,6 +65,8 @@ test('a portable with rows is active and reports them', async () => {
 test('EVERY portable without a source has a stated reason', () => {
   const allIds = [
     'agent-operations-platform',
+    'ai-university',
+    'ai-distillation-engine',
     'browser-agent-ecosystem',
     'campaign-studio',
     'control-center',

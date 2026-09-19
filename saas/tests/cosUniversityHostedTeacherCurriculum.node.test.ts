@@ -25,6 +25,7 @@ test('multi-provider hosted teachers are wired into live curriculum replenishmen
 test('hosted teacher fan-out uses the enterprise selector and real provider adapters', () => {
   assert.match(hosted, /selectUniversityTeacher/)
   assert.match(hosted, /generateWithUniversityTeacher/)
+  assert.match(hosted, /'openai_responses'/)
   assert.match(hosted, /'openai_compatible'/)
   assert.match(hosted, /'anthropic_messages'/)
   assert.match(hosted, /'custom_adapter'/)

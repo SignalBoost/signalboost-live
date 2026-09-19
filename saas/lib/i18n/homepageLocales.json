@@ -79,6 +79,14 @@
       "agentOperations": {
         "name": "Agent Operations Platform Software",
         "desc": "Guarded workflows with quotas, audit, idempotency, recovery, and provider-neutral adapters."
+      },
+      "aiUniversity": {
+        "name": "AI University Software",
+        "desc": "A governed AI university with a shared core, majors, electives, organization courses, exams, retention, and evidence."
+      },
+      "aiDistillation": {
+        "name": "AI Distillation Engine Software",
+        "desc": "Turn an approved curriculum into governed training batches, evaluated model artifacts, and rollback-ready evidence."
       }
     },
     "portableMaturity": {
@@ -186,6 +194,14 @@
       "agentOperations": {
         "name": "Software de Plataforma de Operaciones de Agentes",
         "desc": "Flujos protegidos con cuotas, auditoría, idempotencia, recuperación y adaptadores neutrales al proveedor."
+      },
+      "aiUniversity": {
+        "name": "Software de Universidad de IA",
+        "desc": "Una universidad de IA gobernada con núcleo común, especializaciones, optativas, cursos de la organización, exámenes, retención y evidencia."
+      },
+      "aiDistillation": {
+        "name": "Software de Motor de Destilación de IA",
+        "desc": "Convierte un currículo aprobado en lotes de entrenamiento gobernados, artefactos de modelo evaluados y evidencia lista para reversión."
       }
     },
     "portableMaturity": {
@@ -293,6 +309,14 @@
       "agentOperations": {
         "name": "Software de Plataforma de Operações de Agentes",
         "desc": "Fluxos protegidos com cotas, auditoria, idempotência, recuperação e adaptadores neutros ao provedor."
+      },
+      "aiUniversity": {
+        "name": "Software de Universidade de IA",
+        "desc": "Uma universidade de IA governada com núcleo comum, especializações, optativas, cursos da organização, exames, retenção e evidências."
+      },
+      "aiDistillation": {
+        "name": "Software de Motor de Destilação de IA",
+        "desc": "Transforma um currículo aprovado em lotes de treinamento governados, artefatos de modelo avaliados e evidências prontas para reversão."
       }
     },
     "portableMaturity": {
@@ -400,6 +424,14 @@
       "agentOperations": {
         "name": "Oprogramowanie Platformy Operacji Agentów",
         "desc": "Chronione przepływy pracy z limitami, audytem, idempotencją, odzyskiwaniem i adapterami neutralnymi dla dostawcy."
+      },
+      "aiUniversity": {
+        "name": "Oprogramowanie Uniwersytetu AI",
+        "desc": "Nadzorowany uniwersytet AI ze wspólnym rdzeniem, kierunkami, przedmiotami do wyboru, kursami organizacji, egzaminami, retencją i dowodami."
+      },
+      "aiDistillation": {
+        "name": "Oprogramowanie Silnika Destylacji AI",
+        "desc": "Przekształca zatwierdzony program nauczania w nadzorowane partie treningowe, ocenione artefakty modeli i dowody gotowe do wycofania."
       }
     },
     "portableMaturity": {
@@ -507,6 +539,14 @@
       "agentOperations": {
         "name": "Программное обеспечение платформы операций агентов",
         "desc": "Защищённые рабочие процессы с квотами, аудитом, идемпотентностью, восстановлением и независимыми от поставщика адаптерами."
+      },
+      "aiUniversity": {
+        "name": "Программное обеспечение Университета ИИ",
+        "desc": "Управляемый университет ИИ с общим ядром, специализациями, факультативами, курсами организации, экзаменами, проверкой удержания знаний и доказательствами."
+      },
+      "aiDistillation": {
+        "name": "Программное обеспечение движка дистилляции ИИ",
+        "desc": "Преобразует утверждённую учебную программу в управляемые обучающие пакеты, оценённые артефакты моделей и доказательства, готовые к откату."
       }
     },
     "portableMaturity": {

@@ -34,6 +34,8 @@ A descriptor-only compatibility target is not a live product. It can describe a 
 | browser-agent-ecosystem | Browser Agent Ecosystem | preview / descriptor-only | yes | no |
 | agent-operations-platform | Agent Operations Platform | preview | yes | no |
 | self-healing-supervisor | Self-Healing Supervisor | preview | yes | no |
+| ai-university | AI University Software | preview | yes | no |
+| ai-distillation-engine | AI Distillation Engine Software | preview | yes | no |
 
 ## Adding or renaming a portable
 

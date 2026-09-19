@@ -18,6 +18,11 @@ on:
 permissions:
   contents: read
 
+# The repository now exceeds Node's default ~2 GB heap during full TypeScript/Next analysis.
+# Keep CI failures about code, not V8 allocation limits; hosted runners have sufficient RAM.
+env:
+  NODE_OPTIONS: '--max-old-space-size=6144'
+
 defaults:
   run:
     working-directory: saas

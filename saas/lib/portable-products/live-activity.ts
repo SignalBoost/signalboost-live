@@ -87,6 +87,15 @@ export const PORTABLE_ACTIVITY_SOURCES: Readonly<Record<string, readonly Portabl
     { table: 'video_jobs', timestampColumn: 'created_at', meaning: 'video render and export jobs' },
     { table: 'video_storage', timestampColumn: 'created_at', meaning: 'video artifacts stored' },
   ]),
+  'ai-university': Object.freeze([
+    { table: 'cos_university_study_plans', timestampColumn: 'created_at', meaning: 'University study plans created' },
+    { table: 'cos_university_exam_runs', timestampColumn: 'created_at', meaning: 'University exam runs recorded' },
+  ]),
+  'ai-distillation-engine': Object.freeze([
+    { table: 'cos_university_mass_distillation_batch_runs', timestampColumn: 'created_at', meaning: 'mass-distillation batch runs created' },
+    { table: 'cos_university_mass_hosted_teacher_rows', timestampColumn: 'created_at', meaning: 'hosted teacher rows retained for governed distillation' },
+    { table: 'cos_local_distillation_artifacts', timestampColumn: 'created_at', meaning: 'trained distillation artifacts recorded' },
+  ]),
   'marketing-sales': Object.freeze([
     // The department's own lifecycle tables, plus the Social Outreach Connector's —
     // the connector ships INSIDE this product and is never sold apart from it, so the

@@ -77,3 +77,39 @@ The fixed mass-campaign teacher ceiling remains $0.20. To preserve that ceiling,
 If no hosted provider is credential-ready, the controller records `mass_distillation_hosted_teacher_unavailable` and explicitly continues through the existing governed Hugging Face teacher job. If at least one hosted provider is active but the hosted stage cannot produce 20 valid rows, the run fails/retries; it does not silently switch providers.
 
 The resulting hosted rows are handed to the existing Hugging Face preparation worker for deterministic train/holdout partitioning. Student training, rollback evidence, independent evaluation, canary validation, and promotion gates are unchanged.
+
+
+## Plug-and-play additional providers
+
+The University teacher pool is provider-neutral. OpenAI, Anthropic/Claude, xAI/Grok, Hugging Face, and the custom enterprise gateway are built-in reference providers, not a closed vendor list.
+
+A buyer may add additional hosted providers through `COS_UNIVERSITY_TEACHER_PROVIDERS_JSON` without editing University or distillation code when the provider uses one of the supported transport protocols:
+
+- `openai_responses`
+- `openai_compatible`
+- `anthropic_messages`
+- `custom_adapter` (OpenAI-compatible by default; a portable host may inject another adapter)
+
+Each configured provider supplies only metadata and environment-variable names: provider ID, transport, credential env name, enable gate, adapter-ready gate, model env name, endpoint env name, and optionally a default HTTPS endpoint. Secrets remain in the buyer's normal secret store and are never embedded in the provider JSON.
+
+Example metadata shape:
+
+```json
+[
+  {
+    "id": "buyer-model-cloud",
+    "provider": "buyer-model-cloud",
+    "transport": "openai_compatible",
+    "credentialEnv": "BUYER_MODEL_CLOUD_API_KEY",
+    "enabledEnv": "COS_UNIVERSITY_TEACHER_BUYER_MODEL_CLOUD_ENABLED",
+    "adapterReadyEnv": "COS_UNIVERSITY_TEACHER_BUYER_MODEL_CLOUD_ADAPTER_READY",
+    "modelEnv": "COS_UNIVERSITY_TEACHER_BUYER_MODEL_CLOUD_MODEL",
+    "endpointEnv": "COS_UNIVERSITY_TEACHER_BUYER_MODEL_CLOUD_ENDPOINT",
+    "massDistillationEligible": false
+  }
+]
+```
+
+Additional providers are fail-closed: malformed definitions, missing credentials/models/endpoints, disabled adapters, or missing readiness gates do not become active. They never inherit authority from another provider and never trigger silent fallback.
+
+The mass-distillation teacher stage no longer keys eligibility to the literal names OpenAI, Claude, or Grok. It reads `massDistillationEligible` from the provider definition. Built-in OpenAI, Claude, and Grok remain eligible. Buyer-added providers default to ineligible unless the buyer explicitly opts them into that bounded stage and accepts the same cost/provenance controls.

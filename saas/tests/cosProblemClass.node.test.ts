@@ -66,6 +66,15 @@ test('ordinary turns split into real classes instead of one giant bucket', () =>
   assert.equal(classifyProblemClass('Should we prioritise hiring or fundraising next quarter?'), 'planning and strategy')
 })
 
+test('anniversary writing with today is writing, not current public facts', () => {
+  const prompt = 'my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation'
+  assert.equal(classifyProblemClass(prompt), 'writing and content')
+})
+
+test('live-fact authoring requests still classify as current public facts', () => {
+  assert.equal(classifyProblemClass("Please write a short summary of today's weather in Warsaw."), 'current public facts')
+})
+
 test('a foundational domain outranks a general intent when both match', () => {
   assert.match(
     classifyProblemClass('Should we prioritise the latency fix or the corpus work?'),

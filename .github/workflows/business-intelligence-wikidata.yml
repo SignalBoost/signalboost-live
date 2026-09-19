@@ -42,6 +42,4 @@ jobs:
           cache-dependency-path: saas/package-lock.json
       - run: npm ci
       - run: node --test tests/businessIntelligenceWikidata.node.test.ts tests/businessIntelligenceWikidataPopulation.node.test.ts
-      - run: npm run typecheck
-        env:
-          NODE_OPTIONS: --max-old-space-size=7168
+      - run: node --max-old-space-size=7168 ./node_modules/typescript/bin/tsc --noEmit

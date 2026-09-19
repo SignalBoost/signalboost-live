@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
 import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
-import { decideMassCanaryRollingApproval, type CanaryEvent } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
+import { MASS_CANARY_PROFILE, decideMassCanaryRollingApproval, type CanaryEvent } from '@/lib/ai/cos/cosUniversityMassCanaryRollingAuthority'
 import { recordCosLaneStatus } from '@/lib/ai/cos/cosLaneStatus'
 import { describeThrownValue } from '@/lib/ai/cos/describeThrownValue'
 import {
@@ -82,6 +82,32 @@ function artifactRevision(evidenceRef: unknown){
   return match?.[1]?.toLowerCase() || ''
 }
 
+const ROLLING_EVENT_PROFILES = [
+  MASS_CANARY_PROFILE,
+  'cos_mass_distilled_independent_evaluation_runtime_v1',
+  'cos_distilled_independent_evaluation_authorization_v1',
+] as const
+const ROLLING_EVENT_PAGE_SIZE = 1000
+
+async function readRollingCanaryEvents(db:any,candidateIds:string[]){
+  const rows:any[]=[]
+  for(const profile of ROLLING_EVENT_PROFILES){
+    for(let from=0;;from+=ROLLING_EVENT_PAGE_SIZE){
+      const page=await db.from('cos_university_learning_assurance_events')
+        .select('candidate_id,observed_at,expires_at,verifier,evidence')
+        .eq('event_type','fine_tune').in('candidate_id',candidateIds)
+        .contains('evidence',{profile})
+        .order('observed_at',{ascending:false})
+        .range(from,from+ROLLING_EVENT_PAGE_SIZE-1)
+      if(page.error) throw page.error
+      const data=page.data||[]
+      rows.push(...data)
+      if(data.length<ROLLING_EVENT_PAGE_SIZE) break
+    }
+  }
+  return rows
+}
+
 // Issues at most one bounded canary approval per tick before the unchanged atomic claim.
 // Kill switch: COS_MASS_CANARY_ROLLING_AUTHORIZATION=false.
 async function issueRollingCanaryApproval(now:Date){
@@ -93,18 +119,16 @@ async function issueRollingCanaryApproval(now:Date){
   if(artifacts.error) throw artifacts.error
   const candidateIds=(artifacts.data||[]).map((row:any)=>String(row.candidate_id))
   if(!candidateIds.length) return {issued:false,reason:'no_evaluation_pending_mass_artifacts'}
-  // Include both canary and independent-evaluation events. The rolling policy must know when a
-  // passed canary still owns its exact endpoint so the next canary cannot retire it mid-evaluation.
-  const events=await db.from('cos_university_learning_assurance_events')
-    .select('candidate_id,observed_at,expires_at,verifier,evidence')
-    .eq('event_type','fine_tune').in('candidate_id',candidateIds)
-    .order('observed_at',{ascending:false}).limit(5000)
-  if(events.error) throw events.error
+  // Read only the three policy-relevant evidence streams and page each stream completely.
+  // The old global .limit(5000) mixed in teacher/training/provider history; as that history grew,
+  // an older exact-artifact canary pass fell out of the window and the issuer re-approved the same
+  // already-passed artifact. That approval was intentionally unclaimable and froze the queue.
+  const eventRows=await readRollingCanaryEvents(db,candidateIds)
   const decision=decideMassCanaryRollingApproval({
     enabled:process.env.COS_MASS_CANARY_ROLLING_AUTHORIZATION!=='false',
     now,
     artifacts:(artifacts.data||[]).map((row:any)=>({candidateId:String(row.candidate_id),subjectId:String(row.subject_id||''),artifactHash:String(row.trained_artifact_hash||''),createdAt:String(row.created_at||'')})),
-    events:(events.data||[]).map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),
+    events:eventRows.map((row:any):CanaryEvent=>({candidateId:String(row.candidate_id),observedAt:String(row.observed_at),expiresAt:row.expires_at?String(row.expires_at):null,verifier:String(row.verifier||''),evidence:row.evidence&&typeof row.evidence==='object'?row.evidence:null})),
   })
   if(!('artifact' in decision)) return {issued:false,reason:decision.reason}
   const evidenceHash=hash(decision.evidence)

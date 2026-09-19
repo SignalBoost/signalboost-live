@@ -36,8 +36,16 @@ test('only one drill may be armed at a time', () => {
   assert.match(code, /no_active_campaign_to_drill/)
 })
 
-test('the fixture is marked as a drill row so the database guards apply', () => {
+test('the fixture satisfies live curriculum and batch-row contracts while remaining non-dispatchable', () => {
+  assert.match(code, /const BATCHES = 'cos_university_distillation_curriculum_batches'/)
+  assert.match(code, /source_policy: 'recovery_drill_fixture_v1'/)
+  assert.match(code, /source_hashes: sourceHashes/)
+  assert.match(code, /source_count: sourceHashes\.length/)
+  assert.match(code, /rights_classes: \['recovery_drill_fixture'\]/)
+  assert.match(code, /status: 'quarantined'/)
+  assert.match(code, /dispatch_authorized: false/)
   assert.match(code, /drill_id: drillId/)
+  assert.match(code, /student_model_id: 'Qwen\/Qwen3-4B'/)
   assert.match(code, /stage: 'teacher_dispatching'/)
 })
 
@@ -74,4 +82,11 @@ test('the route grants no spend or promotion authority', () => {
     assert.ok(!code.includes(forbidden), `drill route must not reference ${forbidden}`)
   }
   assert.match(code, /authorityExpanded: false/)
+})
+
+
+test('rollback removes both the exact drill run and its quarantined curriculum fixture', () => {
+  assert.match(code, /source_policy', 'recovery_drill_fixture_v1'/)
+  assert.match(code, /drill_curriculum_rollback_failed/)
+  assert.match(code, /batchKey/)
 })

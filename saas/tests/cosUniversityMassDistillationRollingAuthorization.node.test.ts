@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   MASS_DISTILLATION_ROLLING_BATCHES_PER_CAMPAIGN,
+  MASS_DISTILLATION_DYNAMIC_AUTHORIZATIONS_PER_TICK,
+  MASS_DISTILLATION_DYNAMIC_MAX_CONCURRENT_CAMPAIGNS,
   MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD,
   MASS_DISTILLATION_ROLLING_WINDOW_HOURS,
   normalizeMassDistillationRollingAuthorization,
@@ -32,6 +34,8 @@ test('rolling authorization response remains bounded and never carries promotion
   assert.equal(MASS_DISTILLATION_ROLLING_WINDOW_HOURS, 24)
   assert.equal(MASS_DISTILLATION_ROLLING_MAX_AUTHORIZED_COST_USD, null)
   assert.equal(MASS_DISTILLATION_ROLLING_BATCHES_PER_CAMPAIGN, 1)
+  assert.equal(MASS_DISTILLATION_DYNAMIC_MAX_CONCURRENT_CAMPAIGNS, 4)
+  assert.equal(MASS_DISTILLATION_DYNAMIC_AUTHORIZATIONS_PER_TICK, 4)
   assert.equal(normalized.ok, true)
   assert.equal(normalized.authorized, true)
   assert.equal(normalized.rollingRemainingAuthorizedCostUsd, 12.225)
@@ -73,8 +77,8 @@ test('canonical workflow dispatches authorized work before slower curriculum mai
   const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
   const throughput = workflow.indexOf('massDistillationThroughputProfile()')
   const packaging = workflow.indexOf('prepareUniversityMassDistillationCurriculum(now')
-  const authorization = workflow.indexOf('authorizeNextUniversityMassDistillationCampaign()')
-  const dispatch = workflow.indexOf('runMassDistillationCampaignConsumer({ now, maxDispatches: 3 })')
+  const authorization = workflow.indexOf('authorizeAvailableUniversityMassDistillationCampaigns()')
+  const dispatch = workflow.indexOf('runMassDistillationCampaignConsumer({ now, maxDispatches: 5 })')
   assert.ok(throughput > 0)
   assert.ok(authorization > throughput)
   assert.ok(dispatch > authorization)
@@ -109,4 +113,31 @@ test('an uncapped response reports no ceiling instead of a misleading zero remai
   assert.equal(normalized.rollingRemainingAuthorizedCostUsd, null)
   assert.equal(normalized.rollingAuthorizedCostUsd, 27.375)
   assert.equal(normalized.automaticPromotionAuthorized, false)
+})
+
+
+test('dynamic topology forward migration admits unrelated work while another provider job is unsettled', () => {
+  const sql = source('../supabase/migrations/20260919142000_cos_university_dynamic_distillation_topology.sql')
+  assert.match(sql, /max_concurrent_campaigns between 1 and 8/)
+  assert.match(sql, /set max_concurrent_campaigns = 4/)
+  assert.match(sql, /reason','dynamic_capacity_full'/)
+  assert.match(sql, /v_active_campaigns >= v_policy\.max_concurrent_campaigns/)
+  assert.match(sql, /select count\(\*\) into v_unsettled_jobs/)
+  assert.doesNotMatch(sql, /v_active_campaigns >= v_policy\.max_concurrent_campaigns or v_unsettled_jobs > 0/)
+  assert.match(sql, /for update skip locked/)
+  assert.match(sql, /failure_derived_curriculum/)
+  assert.match(sql, /automaticPromotionAuthorized',false/)
+  assert.match(sql, /runpodMutationAuthorized',false/)
+  assert.match(sql, /authorityExpanded',false/)
+})
+
+test('workflow fills dynamic campaign capacity before dispatching available work', () => {
+  const auth = source('../lib/ai/cos/cosUniversityMassDistillationRollingAuthorization.ts')
+  const workflow = source('../lib/ai/cos/cosUniversityMassDistillationWorkflow.ts')
+  assert.match(auth, /authorizeAvailableUniversityMassDistillationCampaigns/)
+  assert.match(auth, /for \(let index = 0; index < limit; index \+= 1\)/)
+  assert.match(auth, /if \(!last\.ok \|\| !last\.authorized\) break/)
+  assert.match(workflow, /authorizeAvailableUniversityMassDistillationCampaigns\(\)/)
+  assert.match(workflow, /maxDispatches: 5/)
+  assert.match(workflow, /fill_available_dynamic_capacity_dispatch_any_compatible_lane/)
 })

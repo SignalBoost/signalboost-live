@@ -20,7 +20,7 @@ test('public audit identity survives nested public-delivery isolation and remain
 
 test('authorization source still forces every public-delivery request to guest authority', () => {
   const source = readFileSync(new URL('../lib/auth/access.ts', import.meta.url), 'utf8')
-  assert.match(source, /if \(isPublicDeliveryScope\(\)\) return buildContext\(null, null, 'guest'\)/)
+  assert.match(source, /if \(isPublicDeliveryScope\(\)\) return buildContext\(null, null, 'guest', 'anonymous'\)/)
   assert.doesNotMatch(source, /publicAuditUserId/)
 })
 

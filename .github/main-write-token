@@ -1,2 +1,2 @@
-base_sha=f115e71f6193e7683458c7844fa76b273fad9f50
-branch=fix/university-self-healing-stall-precedence-20260919
+base_sha=4873419ba49da0d164c79f3c751298f92bd83f45
+branch=fix/auth-transient-outage-resilience-20260919

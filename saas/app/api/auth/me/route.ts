@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
 
+function isTransientAuthError(error: unknown): boolean {
+  const status = Number((error as { status?: number } | null)?.status || 0)
+  return status === 0 || status === 408 || status === 429 || status >= 500
+}
+
 export async function GET() {
   try {
     const cookieStore = await cookies()
@@ -11,12 +16,20 @@ export async function GET() {
       {
         cookies: {
           getAll() { return cookieStore.getAll() },
-          setAll() {},
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+          },
         },
       }
     )
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError && isTransientAuthError(authError)) {
+      return NextResponse.json(
+        { error: 'auth_temporarily_unavailable' },
+        { status: 503, headers: { 'Retry-After': '2' } },
+      )
+    }
     if (!user) return NextResponse.json({ isAdmin: false, isOwner: false, role: 'guest', plan: 'free', tier: 'free' })
 
     const { data: sub } = await supabase
@@ -34,6 +47,9 @@ export async function GET() {
 
     return NextResponse.json({ isAdmin, isOwner, role: isOwner ? 'owner' : isAdmin ? 'admin' : 'user', plan, tier: plan })
   } catch {
-    return NextResponse.json({ isAdmin: false, isOwner: false, role: 'guest', plan: 'free', tier: 'free' })
+    return NextResponse.json(
+      { error: 'auth_temporarily_unavailable' },
+      { status: 503, headers: { 'Retry-After': '2' } },
+    )
   }
 }

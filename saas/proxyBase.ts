@@ -52,14 +52,27 @@ async function supabaseForRefresh(req: NextRequest) {
   return { supabase, response: () => res }
 }
 
+function isTransientAuthError(error: unknown): boolean {
+  const status = Number((error as { status?: number } | null)?.status || 0)
+  return status === 0 || status === 408 || status === 429 || status >= 500
+}
+
 async function refreshAuthCookies(req: NextRequest) {
   try {
     const { supabase, response } = await supabaseForRefresh(req)
-    await supabase.auth.getUser()
+    const { error } = await supabase.auth.getUser()
+
+    // Supabase may attempt cookie mutations while refreshing. A retryable transport/5xx/429
+    // failure is NOT evidence that the user's session is invalid, so discard every mutation
+    // produced by that failed attempt and continue with the cookies that arrived on the request.
+    if (error && isTransientAuthError(error)) {
+      return NextResponse.next({ request: { headers: req.headers } })
+    }
+
     return response()
   } catch {
-    // An auth outage must not take the site down; serve the request with the cookies it arrived with.
-    return NextResponse.next()
+    // A transport exception is also indeterminate, not a logout signal.
+    return NextResponse.next({ request: { headers: req.headers } })
   }
 }
 
@@ -136,7 +149,7 @@ export async function proxy(req: NextRequest) {
   //
   // This branch decides NOTHING: no redirect, no authorization, no owner check. Those stay in
   // lib/auth/access.ts. It renews a token that is already valid and continues the request.
-  const authenticatedSurface = pathname.startsWith('/dashboard') || pathname.startsWith('/api/admin')
+  const authenticatedSurface = pathname.startsWith('/dashboard') || pathname.startsWith('/admin') || pathname.startsWith('/hub') || pathname.startsWith('/api/admin')
   if (!pathname.startsWith(OPERATOR_PATH)) {
     // Requests carrying no session cost one cookie check and no network call, so public traffic and
     // the 63 scheduled crons are unaffected.
@@ -148,7 +161,13 @@ export async function proxy(req: NextRequest) {
   const { supabase, response } = await supabaseForRefresh(req)
   const res = response()
 
-  const { data } = await supabase.auth.getUser()
+  const { data, error } = await supabase.auth.getUser()
+  if (error && isTransientAuthError(error)) {
+    return NextResponse.json(
+      { error: 'auth_temporarily_unavailable' },
+      { status: 503, headers: { 'Retry-After': '2' } },
+    )
+  }
   const email = data?.user?.email?.toLowerCase() || ''
 
   if (email && OWNER_EMAILS.includes(email)) {
@@ -302,6 +321,8 @@ export const config = {
   matcher: [
     '/dashboard/operator/:path*',
     '/dashboard/:path*',
+    '/admin/:path*',
+    '/hub/:path*',
     '/api/admin/:path*',
     '/api/concierge',
     '/api/cos-browser',

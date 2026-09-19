@@ -35,7 +35,7 @@ test('Concierge enters public-only scope before parsing or dispatching the reque
 })
 
 test('public delivery is downgraded before Supabase identity can grant owner privileges', () => {
-  const publicGuard = position(accessSource, "if (isPublicDeliveryScope()) return buildContext(null, null, 'guest')")
+  const publicGuard = position(accessSource, "if (isPublicDeliveryScope()) return buildContext(null, null, 'guest', 'anonymous')")
   const supabase = position(accessSource, 'const supabase = await getServerSupabase()')
   assert.ok(publicGuard < supabase)
 })

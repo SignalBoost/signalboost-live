@@ -82,7 +82,7 @@ function short(value: string | null | undefined, length = 12): string {
 }
 
 function mixLabel(mix: Record<string, number>): string {
-  const preferred = ['openai', 'claude', 'grok', 'qwen', 'deepseek']
+  const preferred = ['openai', 'claude', 'grok', 'gemini', 'deepseek', 'qwen']
   const entries = Object.entries(mix)
   entries.sort(([a], [b]) => {
     const ai = preferred.indexOf(a)

@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: node --max-old-space-size=7168 ./node_modules/typescript/bin/tsc --noEmit
 
   cos-fresh-routing:
     name: COS fresh-data routing policy

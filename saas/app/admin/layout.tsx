@@ -8,6 +8,9 @@ import AdminLayoutShell from '@/components/admin/AdminLayoutShell'
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const access = await getAccess()
 
+  if (access.authState === 'unavailable') {
+    return <main role="alert">Authentication is temporarily unavailable. Please reload in a moment.</main>
+  }
   if (access.role === 'guest') redirect('/')
   if (!access.isOwner) redirect('/dashboard')
 

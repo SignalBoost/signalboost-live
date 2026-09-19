@@ -61,8 +61,18 @@ export function semanticIntentRequiresClarification(intent: CosSemanticTaskInten
   return Boolean(intent && intent.mode === 'clarification_required' && intent.confidence >= 0.72)
 }
 
+export function semanticIntentIsSelfContainedContentGeneration(intent: CosSemanticTaskIntent | null): boolean {
+  return Boolean(
+    intent
+      && intent.mode === 'content_generation'
+      && !intent.externalFactsRequired
+      && intent.confidence >= 0.72,
+  )
+}
+
 export function semanticIntentSuppressesFreshness(intent: CosSemanticTaskIntent | null): boolean {
   if (semanticIntentRequiresClarification(intent)) return true
+  if (semanticIntentIsSelfContainedContentGeneration(intent)) return true
   return Boolean(
     intent
       && intent.mode === 'contextual_interpretation'

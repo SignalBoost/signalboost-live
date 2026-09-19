@@ -8,6 +8,9 @@ import { getAccess } from '@/lib/auth/access'
 export default async function HubLayout({ children }: { children: React.ReactNode }) {
   const access = await getAccess()
 
+  if (access.authState === 'unavailable') {
+    return <main role="alert">Authentication is temporarily unavailable. Please reload in a moment.</main>
+  }
   if (access.role === 'guest') redirect('/')
   if (!access.isAdmin) redirect('/dashboard')
 

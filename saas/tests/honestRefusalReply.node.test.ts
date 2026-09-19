@@ -51,6 +51,7 @@ test('no internal vocabulary reaches the public surface', () => {
 test('the dead-end phrasing is gone', () => {
   const reply = buildHonestRefusalReply({ prompt: MIGRATION, language: 'en' })
   assert.ok(!/could not complete this request/i.test(reply))
+  assert.ok(!/I did not release an answer/i.test(reply))
   assert.ok(!/external AI/i.test(reply))
 })
 

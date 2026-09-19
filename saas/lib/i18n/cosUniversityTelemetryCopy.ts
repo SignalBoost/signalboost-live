@@ -33,6 +33,7 @@ type Copy = Readonly<{
   noRuns: string
   footer: string
   unknownSubject: string
+  unknownStage: string
 }>
 
 export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguage, Copy> = {
@@ -68,6 +69,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     noRuns: 'No runs found.',
     footer: 'This surface is read-only. It does not authorize spend, retrigger jobs, change providers, or promote artifacts.',
     unknownSubject: 'Unknown subject',
+    unknownStage: 'Unknown',
   },
   es: {
     title: 'COS University — Telemetría de destilación',
@@ -101,6 +103,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     noRuns: 'No se encontraron ejecuciones.',
     footer: 'Esta vista es de solo lectura. No autoriza gasto, reintentos de trabajos, cambios de proveedor ni promoción de artefactos.',
     unknownSubject: 'Materia desconocida',
+    unknownStage: 'Desconocida',
   },
   pt: {
     title: 'COS University — Telemetria de destilação',
@@ -134,6 +137,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     noRuns: 'Nenhuma execução encontrada.',
     footer: 'Esta tela é somente leitura. Ela não autoriza gastos, reexecução de jobs, troca de provedores ou promoção de artefatos.',
     unknownSubject: 'Assunto desconhecido',
+    unknownStage: 'Desconhecida',
   },
   pl: {
     title: 'COS University — Telemetria destylacji',
@@ -167,6 +171,7 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     noRuns: 'Nie znaleziono przebiegów.',
     footer: 'Ten widok jest tylko do odczytu. Nie autoryzuje wydatków, ponawiania zadań, zmian dostawców ani promocji artefaktów.',
     unknownSubject: 'Nieznany temat',
+    unknownStage: 'Nieznany',
   },
   ru: {
     title: 'COS University — Телеметрия дистилляции',
@@ -200,5 +205,6 @@ export const COS_UNIVERSITY_TELEMETRY_COPY: Record<CosUniversityTelemetryLanguag
     noRuns: 'Запуски не найдены.',
     footer: 'Этот экран только для чтения. Он не разрешает расходы, перезапуск задач, смену провайдеров или продвижение артефактов.',
     unknownSubject: 'Неизвестный предмет',
+    unknownStage: 'Неизвестен',
   },
 }

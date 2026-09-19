@@ -56,6 +56,7 @@ import { buildConversationRecallContext, detectConversationRecallIntent } from '
 import { searchPastConversations } from '@/lib/ai/tools/conversationHistory'
 import { suggestFollowups } from '@/lib/ai/cos/suggestedFollowups'
 import { isFastTextTransform as classifyFastTextTransform } from '@/lib/ai/cos/fastTextTransformIntent'
+import { isAuthoringObjectiveWithoutLiveLookup, isCosCodingObjective } from '@/lib/ai/cos/cosReasoningRolePolicy'
 import { PUBLIC_CONCIERGE_SECURITY_REFUSAL, hasUnsafePublicModelOutput, isPublicPromptExfiltrationAttempt } from '@/lib/ai/cos/publicPromptSecurity'
 import { attachSuggestedFollowupsToStoredTurn } from '@/lib/ai/cos/supportTurnProvenance'
 import {
@@ -127,6 +128,46 @@ async function runFastTextTransform(input:string):Promise<{reply:string;reasoner
       jsonObject:true,
       usageContext:{feature:'cos_fast_text_transform',purpose:model===preferredModel?'fast_editor_primary':'fast_editor_retry'},
       systemPrompt:'You are COS fast text editor. Perform only the requested edit, rewrite, proofreading, shortening, polishing, or translation. Preserve the user\'s intended meaning and factual content. Do not research, browse, invoke tools, discuss the editing process, or add commentary. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
+      prompt:input,
+    },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
+    if(!text)continue
+    const parsed=parseLocalResult(text)
+    const reply=parsed?.answer?.trim()
+    if(reply){
+      const provider=String(config.provider||'').trim()
+      const reasonerLabel=provider&&provider!=='self_hosted'
+        ? `managed-open-model:${provider}:${model}`
+        : `independent-local:${model}`
+      return{reply,reasonerLabel}
+    }
+  }
+  return null
+}
+
+
+export const FAST_AUTHORING_TIMEOUT_MS = 18_000
+export const FAST_AUTHORING_ATTEMPT_MS = 9_000
+
+async function runFastAuthoring(input:string):Promise<{reply:string;reasonerLabel:string}|null>{
+  const config=localInferenceConfigFromEnv()
+  const deepInfra=/deepinfra/i.test(String(config.provider||''))||/deepinfra\.com/i.test(config.baseUrl)
+  const preferredModel=process.env.COS_FAST_AUTHORING_MODEL?.trim()||(deepInfra?'deepseek-ai/DeepSeek-V4-Flash':config.model)
+  const models=[...new Set([preferredModel,config.model].filter(Boolean))]
+  const startedAt=Date.now()
+  for(const model of models){
+    const remaining=Math.max(0,FAST_AUTHORING_TIMEOUT_MS-(Date.now()-startedAt))
+    if(remaining<1_000)break
+    const attemptMs=Math.min(FAST_AUTHORING_ATTEMPT_MS,remaining)
+    const text=await callLocalModel({
+      temperature:.35,
+      maxTokens:900,
+      disableThinking:true,
+      timeoutMs:attemptMs,
+      allowConfiguredFallback:false,
+      persistUsage:false,
+      jsonObject:true,
+      usageContext:{feature:'cos_fast_authoring',purpose:model===preferredModel?'fast_authoring_primary':'fast_authoring_retry'},
+      systemPrompt:'You are COS fast authoring. Complete the user\'s self-contained writing, drafting, composition, or translation request using only facts the user supplied. If the user asks for multiple languages or versions, provide every requested version. Do not research, browse, verify incidental facts, invoke tools, add warnings, or discuss your process. Return ONLY strict JSON: {"answer":"...","confidence":0.99}.',
       prompt:input,
     },{...config,model,timeoutMs:attemptMs,fallbackFromOwned:true}).catch(()=>null)
     if(!text)continue
@@ -232,6 +273,21 @@ export async function postCosPrimary(req:NextRequest){
       ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:fast.reasonerLabel,from_cache:false}
       const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
       return NextResponse.json({ok:true,reply:fast.reply,source:'cos-fast-text-transform',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
+    }
+  }
+
+  const hasAttachments=Array.isArray(body?.attachments)&&body.attachments.length>0
+  const fastAuthoringEligible=!hasAttachments
+    && isAuthoringObjectiveWithoutLiveLookup(input)
+    && !isCosCodingObjective(input)
+  if(fastAuthoringEligible){
+    const fast=await runFastAuthoring(input)
+    if(fast){
+      const executionProvenance=authoritativeProvenance(null,{invoked:false})
+      ;(executionProvenance as any).local_reasoning={invoked:true,model:fast.reasonerLabel,confidence:1}
+      ;(executionProvenance as any).answer_origin={...(executionProvenance as any).answer_origin,provider:null,model:fast.reasonerLabel,from_cache:false}
+      const liveTelemetry=emitRequestTelemetry({startedAt,input,reply:fast.reply,source:'local_cos_reasoning',confidence:1,provenance:executionProvenance,externalAiInvoked:false})
+      return NextResponse.json({ok:true,reply:fast.reply,source:'cos-fast-authoring',confidence_score:1,confidence_threshold:confidenceThreshold(),external_ai_invoked:false,external_fallback_invoked:false,local_model_invoked:true,execution_provenance:executionProvenance,live_telemetry:liveTelemetry,execution_allowed:false,external_action_taken:false})
     }
   }
 
@@ -539,7 +595,8 @@ export async function POST(req: NextRequest) {
     if (!payload || typeof payload !== 'object') return response
     if (hasUnsafePublicModelOutput(String(payload.reply || ''))) return publicSecurityRefusal('cos-primary-output-security-blocked')
     if (!String(payload.reply || '').trim() || !prompt) return response
-    if (String(payload.source || '').startsWith('cos-fast-text-transform')) {
+    if (String(payload.source || '').startsWith('cos-fast-text-transform')
+      || String(payload.source || '').startsWith('cos-fast-authoring')) {
       return NextResponse.json(payload, { status: response.status, headers })
     }
     const successful = response.ok && payload.ok !== false

@@ -4129,6 +4129,7 @@
     "send": "Otwórz prośbę e-mailową"
   },
   "auth": {
+    "temporarilyUnavailable": "Uwierzytelnianie jest chwilowo niedostępne. Odśwież stronę za chwilę.",
     "errorNoName": "Proszę wpisać swoje imię i nazwisko.",
     "passwordPlaceholder": "Hasło",
     "errorEmailExists": "Konto z tym adresem e-mail już istnieje. Zamiast tego zaloguj się.",

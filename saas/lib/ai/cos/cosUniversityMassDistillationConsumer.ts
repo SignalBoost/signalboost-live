@@ -688,8 +688,11 @@ async function dispatchClaim(claim: Claim, fetchImpl?: FetchPort) {
       flavor: price.flavor,
       hourlyCostUsd: price.hourlyCostUsd,
       timeoutSeconds: spec.timeoutSeconds,
+      providerJobMaxEstimatedCostUsd,
       maxEstimatedCostUsd,
-      reservedCostCeilingUsd: expectedCeiling,
+      reservedCostCeilingUsd: hfCostCeilingUsd,
+      stageReservedCostCeilingUsd: expectedCeiling,
+      hostedTeacherCommittedCeilingUsd: hostedTeacherMaximumCostUsd,
       sourceCount: sourceHashes.length,
       promptCount: claim.stage === 'teacher_dispatching'
         ? (((envelope as any).prompts?.length ?? (envelope as any).examples?.length) ?? null)

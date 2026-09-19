@@ -340,6 +340,36 @@ test('expired or overspent authority can be diagnosed but cannot be auto-repaire
   }
 })
 
+test('terminalized failed campaigns and their failed runs are historical, not live repair incidents', () => {
+  const terminal = {
+    ...campaign,
+    status: 'failed',
+    completed_at: '2026-09-15T11:45:00.000Z',
+  }
+  const snapshot = health({
+    campaigns: [terminal],
+    workflowRuns: [{
+      id: 'terminal-run',
+      campaign_id: terminal.id,
+      stage: 'failed',
+      updated_at: '2026-09-15T10:00:00.000Z',
+      failure_reason: 'campaign_budget_exhausted',
+    }],
+    providerJobs: [],
+    continuity: {
+      preparedBatches: 0,
+      rollingPolicyEnabled: true,
+      rollingMaximumAuthorizedCostUsd: null,
+      rollingAuthorizedCostUsd: 5,
+      nextBudgetReleaseAt: null,
+    },
+  })
+  assert.equal(snapshot.failedCampaigns, 0)
+  assert.equal(snapshot.failedRuns, 0)
+  assert.ok(!snapshot.reasons.includes('campaign_failed'))
+  assert.ok(!snapshot.reasons.includes('failed_stage_recovery_stalled'))
+})
+
 test('monitor detects stalled claimable work, interrupted dispatch, failed campaigns, and overdue jobs', () => {
   const workflowRuns = [
     { id: 'run-1', campaign_id: 'campaign-1', stage: 'teacher_pending', updated_at: '2026-09-15T11:30:00.000Z', failure_reason: null },

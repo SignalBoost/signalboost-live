@@ -1,2 +1,2 @@
-base_sha=bcc63498455eb0c4997d21d1a08cb1af7d8241ad
-branch=fix/university-canary-stale-approval-deadlock-20260919
+base_sha=de8616d75ccddfa5c41a6fb12a2372b5a45605e1
+branch=fix/university-evaluator-runpod-quota-20260919

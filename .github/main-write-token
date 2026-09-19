@@ -1,2 +1,2 @@
-base_sha=4964bdefa22ab23fe3ba0c8392b17e0254031453
-branch=fix/auth-unavailable-locale-gate-20260919
+base_sha=8c3594f7677376729bbfa097f8d59ff54ed30501
+branch=fix/cos-freshness-routing-tests-20260919

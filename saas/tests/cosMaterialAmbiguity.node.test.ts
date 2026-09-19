@@ -3,6 +3,7 @@ import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import {
   parseCosSemanticTaskIntent,
+  semanticIntentIsSelfContainedContentGeneration,
   semanticIntentRequiresClarification,
   semanticIntentSuppressesFreshness,
 } from '../lib/ai/cos/cosSemanticTaskIntent.ts'
@@ -32,6 +33,32 @@ test('low-confidence ambiguity does not bypass fail-safe freshness', () => {
 
   assert.ok(intent)
   assert.equal(semanticIntentRequiresClarification(intent), false)
+  assert.equal(semanticIntentSuppressesFreshness(intent), false)
+})
+
+test('semantic content-generation intent overrides incidental freshness without requiring exact phrasing', () => {
+  const intent = parseCosSemanticTaskIntent(JSON.stringify({
+    mode: 'content_generation',
+    confidence: 0.96,
+    suppliedContextPrimary: true,
+    externalFactsRequired: false,
+  }))
+
+  assert.ok(intent)
+  assert.equal(semanticIntentIsSelfContainedContentGeneration(intent), true)
+  assert.equal(semanticIntentSuppressesFreshness(intent), true)
+})
+
+test('content generation that actually needs live facts keeps freshness protection', () => {
+  const intent = parseCosSemanticTaskIntent(JSON.stringify({
+    mode: 'content_generation',
+    confidence: 0.96,
+    suppliedContextPrimary: false,
+    externalFactsRequired: true,
+  }))
+
+  assert.ok(intent)
+  assert.equal(semanticIntentIsSelfContainedContentGeneration(intent), false)
   assert.equal(semanticIntentSuppressesFreshness(intent), false)
 })
 

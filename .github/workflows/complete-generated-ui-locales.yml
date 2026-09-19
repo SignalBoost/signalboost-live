@@ -19,6 +19,9 @@ on:
 permissions:
   contents: read
 
+env:
+  NODE_OPTIONS: '--max-old-space-size=7168'
+
 concurrency:
   group: validate-generated-ui-locales-${{ github.event.pull_request.number }}
   cancel-in-progress: true

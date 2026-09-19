@@ -174,12 +174,24 @@ export function isConciergeBuilderObjective(prompt: string, context?: CosCodingR
 }
 
 const CURRENT_SIGNAL = /\b(current|currently|today|right now|as of now|latest|most recent|this (?:year|month|week)|live evidence|verify current|office holder)\b/i
+const AUTHORING_SIGNAL = /\b(?:write|draft|rewrite|compose|polish|proofread|translate|message|email|letter|caption|post|headline|copy)\b/i
+const VOLATILE_FACT_OBJECT = /\b(?:weather|forecast|price|stock|score|standings|schedule|office holder|president|prime minister|ceo|leader|news|exchange rate|availability)\b/i
+const EXPLICIT_LOOKUP_ACTION = /\b(?:check|find|verify|look\s*up|search|research|confirm|retrieve|fetch)\b/i
 const CRITIC_SIGNAL = /\b(diagnos|root cause|troubleshoot|incident|outage|latency|p9[59]|timeout|regression|failure mode|why (?:is|are|did|does).*(?:slow|fail|error|down|spike)|critique|audit|stress[- ]?test|find (?:the )?(?:flaw|weakness|problem))\b/i
 const RESEARCH_SIGNAL = /\b(research|evidence|sources?|compare|comparison|difference between|what (?:is|are)|define|definition|who (?:is|was|are|were)|company|organization|organisation|architecture|mechanism|explain)\b/i
+
+export function isAuthoringObjectiveWithoutLiveLookup(prompt: string): boolean {
+  const objective = cosRoutingObjective(prompt)
+  if (!AUTHORING_SIGNAL.test(objective)) return false
+  const liveLookup = CURRENT_SIGNAL.test(objective)
+    && (VOLATILE_FACT_OBJECT.test(objective) || EXPLICIT_LOOKUP_ACTION.test(objective))
+  return !liveLookup
+}
 
 export function selectCosReasoningWorkerRole(prompt: string, context?: CosCodingRoutingContext): CosReasoningRoleDecision {
   const objective = cosRoutingObjective(prompt)
   if (isCosCodingObjective(prompt, context)) return { role: 'coder', reason: 'code_or_implementation_signal', objective }
+  if (isAuthoringObjectiveWithoutLiveLookup(objective)) return { role: 'primary', reason: 'authoring_without_live_lookup', objective }
   if (CURRENT_SIGNAL.test(objective)) return { role: 'verifier', reason: 'current_or_live_verification_signal', objective }
   if (CRITIC_SIGNAL.test(objective)) return { role: 'critic', reason: 'diagnostic_or_critical_reasoning_signal', objective }
   if (RESEARCH_SIGNAL.test(objective)) return { role: 'researcher', reason: 'research_or_explanatory_signal', objective }

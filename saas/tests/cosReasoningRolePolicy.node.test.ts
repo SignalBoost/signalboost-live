@@ -32,6 +32,18 @@ test('stable explanatory research routes to researcher', () => {
   assert.equal(selectCosReasoningWorkerRole('What is semantic caching and how does it work?').role, 'researcher')
 })
 
+test('authoring with incidental today stays on primary instead of verifier', () => {
+  const prompt = 'my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation'
+  const decision = selectCosReasoningWorkerRole(prompt)
+  assert.equal(decision.role, 'primary')
+  assert.equal(decision.reason, 'authoring_without_live_lookup')
+})
+
+test('authoring that actually depends on live facts still uses verifier', () => {
+  assert.equal(selectCosReasoningWorkerRole("Please write a short summary of today's weather in Warsaw.").role, 'verifier')
+  assert.equal(selectCosReasoningWorkerRole('Please write the current CEO of Apple in one sentence.').role, 'verifier')
+})
+
 test('ordinary reasoning stays on primary', () => {
   assert.equal(selectCosReasoningWorkerRole('Give me three sensible priorities for tomorrow.').role, 'primary')
 })

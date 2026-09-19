@@ -33,6 +33,13 @@ function bounded(value: string, maximum = 16_000): string {
   return String(value || '').slice(0, maximum)
 }
 
+function githubFetchAuthArgs(): readonly string[] {
+  const token = String(process.env.GITHUB_TOKEN || '').trim()
+  if (!token) throw new Error('builder_repository_github_credential_unavailable')
+  const basic = Buffer.from(`x-access-token:${token}`, 'utf8').toString('base64')
+  return Object.freeze(['-c', `http.https://github.com/.extraheader=AUTHORIZATION: basic ${basic}`])
+}
+
 function absoluteDeadline(value: unknown): number | null {
   const numeric = Number(value)
   return Number.isFinite(numeric) ? numeric : null
@@ -170,7 +177,11 @@ export class VercelRepositoryRepairSession implements BuilderWorkspacePort, Buil
     try {
       await session.requireSetupSuccess('git', ['init', '--quiet', REPOSITORY_ROOT], '/tmp')
       await session.requireSetupSuccess('git', ['-C', REPOSITORY_ROOT, 'remote', 'add', 'origin', SIGNALBOOST_REPOSITORY_URL], '/tmp')
-      await session.requireSetupSuccess('git', ['-C', REPOSITORY_ROOT, 'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', fullCommitSha], '/tmp')
+      // The private repository fetch is authenticated by the host for this fixed bootstrap command only.
+      // The token is never placed in Sandbox.create env, persistent git config, the checked-out tree, or
+      // any model-visible workspace. After dependency bootstrap, network is denied before model execution.
+      const githubAuthArgs = githubFetchAuthArgs()
+      await session.requireSetupSuccess('git', [...githubAuthArgs, '-C', REPOSITORY_ROOT, 'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', fullCommitSha], '/tmp')
       await session.requireSetupSuccess('git', ['-C', REPOSITORY_ROOT, 'checkout', '--quiet', '--detach', 'FETCH_HEAD'], '/tmp')
       await session.assertPinnedRevision()
 

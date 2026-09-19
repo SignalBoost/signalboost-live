@@ -57,3 +57,23 @@ Cost-bearing hosted generation remains fail-closed until this cycle budget is ex
 The per-provider enable, adapter-ready, credential and model settings above still apply. A failed provider call is recorded for that exact teacher; the University does not silently retry it through a different provider. Hugging Face Qwen/DeepSeek remain on the governed local/HF executor path and continue in parallel with hosted-teacher curriculum generation.
 
 Provider-billed dollar cost is deliberately not inferred from token counts because pricing differs by provider/model and can change. The run records request/token provenance while the explicit maximum call count and output-token ceiling bound each replenishment cycle.
+
+
+## Parallel mass-distillation teacher stage
+
+The mass-distillation campaign can now use OpenAI, Claude, and Grok as the actual teacher stage, not only as curriculum replenishment sources.
+
+Production contract:
+
+- `COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED=true`
+- `COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS=20`
+- `COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS=384`
+- `COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM=8`
+
+The stage requires 20 distinct persisted teacher responses before the run advances to dataset preparation. Each row records provider, exact model, request ID, token counts, response hash, prompt identity, and batch/run identity. OpenAI, Claude, and Grok are rotated across prompts when they are credential-ready.
+
+The fixed mass-campaign teacher ceiling remains $0.20. To preserve that ceiling, the unpriced custom gateway is excluded from this direct mass-teacher stage. Custom gateways remain available to the general hosted curriculum lane.
+
+If no hosted provider is credential-ready, the controller records `mass_distillation_hosted_teacher_unavailable` and explicitly continues through the existing governed Hugging Face teacher job. If at least one hosted provider is active but the hosted stage cannot produce 20 valid rows, the run fails/retries; it does not silently switch providers.
+
+The resulting hosted rows are handed to the existing Hugging Face preparation worker for deterministic train/holdout partitioning. Student training, rollback evidence, independent evaluation, canary validation, and promotion gates are unchanged.

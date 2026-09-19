@@ -62,6 +62,15 @@ function credentialPresent(definition: UniversityTeacherDefinition, env: Env): b
   return String(env[definition.credentialEnv] ?? '').trim().length >= 20
 }
 
+function configuredModelPresent(definition: UniversityTeacherDefinition, env: Env): boolean {
+  if (definition.transport === 'huggingface_job') return Boolean(definition.model)
+  if (definition.id === 'openai') return String(env.COS_UNIVERSITY_TEACHER_OPENAI_MODEL ?? '').trim().length > 0
+  if (definition.id === 'claude') return String(env.COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL ?? '').trim().length > 0
+  if (definition.id === 'grok') return String(env.COS_UNIVERSITY_TEACHER_XAI_MODEL ?? '').trim().length > 0
+  if (definition.id === 'custom') return String(env.COS_UNIVERSITY_TEACHER_CUSTOM_MODEL ?? '').trim().length > 0
+  return false
+}
+
 export function universityTeacherPoolStatus(env: Env = process.env) {
   const providers = UNIVERSITY_TEACHERS.map(definition => {
     const explicitlyEnabled = truthy(env[definition.enabledEnv])
@@ -71,12 +80,14 @@ export function universityTeacherPoolStatus(env: Env = process.env) {
         ? truthy(env.COS_UNIVERSITY_TEACHER_CUSTOM_ADAPTER_READY)
         : truthy(env[`COS_UNIVERSITY_TEACHER_${definition.id.toUpperCase()}_ADAPTER_READY`])
     const credentialReady = credentialPresent(definition, env)
+    const modelReady = configuredModelPresent(definition, env)
     return Object.freeze({
       ...definition,
       explicitlyEnabled,
       adapterReady,
       credentialReady,
-      active: explicitlyEnabled && adapterReady && credentialReady,
+      modelReady,
+      active: explicitlyEnabled && adapterReady && credentialReady && modelReady,
     })
   })
   return Object.freeze({

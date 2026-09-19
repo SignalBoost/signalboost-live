@@ -61,7 +61,7 @@ test('paid authorization and dispatch precede slower ready-inventory maintenance
   const packageAt = workflow.indexOf('prepareUniversityMassDistillationCurriculum(now')
   const inventoryAt = workflow.indexOf('preparedMassDistillationInventory(preparedBufferTarget)')
   const replenishAt = workflow.indexOf('replenishUniversityMassDistillationCurriculum')
-  const authorizeAt = workflow.indexOf('authorizeNextUniversityMassDistillationCampaign()')
+  const authorizeAt = workflow.indexOf('authorizeAvailableUniversityMassDistillationCampaigns()')
   assert.ok(packageAt > 0)
   assert.ok(authorizeAt > 0)
   assert.ok(authorizeAt < packageAt)

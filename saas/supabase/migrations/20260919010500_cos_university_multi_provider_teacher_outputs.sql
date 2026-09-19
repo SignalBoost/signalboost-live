@@ -56,3 +56,40 @@ grant select, insert, update, delete on table public.cos_university_mass_distill
 
 comment on table public.cos_university_mass_distillation_teacher_outputs is
   'Durable, resumable hosted-provider teacher outputs for University mass distillation. Provider selection is fixed per run; no silent fallback is permitted.';
+
+
+-- Existing retry recovery releases a stage reservation when no Hugging Face Job was accepted.
+-- Hosted teacher calls happen before the materialization Job, so their pessimistic durable cost must
+-- survive that release. This trigger is a lower-bound guard: it never increases authority or the
+-- campaign maximum; it only prevents committed_cost_usd from falling below already-incurred hosted
+-- teacher cost recorded for this campaign.
+create or replace function public.preserve_cos_university_hosted_teacher_committed_cost()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_hosted_cost numeric(12,8);
+begin
+  select coalesce(sum(o.estimated_cost_usd),0)
+    into v_hosted_cost
+  from public.cos_university_mass_distillation_teacher_outputs o
+  join public.cos_university_mass_distillation_batch_runs r on r.id=o.run_id
+  where r.campaign_id=old.id;
+
+  new.committed_cost_usd := greatest(coalesce(new.committed_cost_usd,0), v_hosted_cost);
+  return new;
+end;
+$$;
+
+revoke all on function public.preserve_cos_university_hosted_teacher_committed_cost()
+  from public, anon, authenticated;
+grant execute on function public.preserve_cos_university_hosted_teacher_committed_cost()
+  to service_role;
+
+drop trigger if exists preserve_cos_university_hosted_teacher_committed_cost
+  on public.cos_university_mass_distillation_campaigns;
+create trigger preserve_cos_university_hosted_teacher_committed_cost
+before update of committed_cost_usd on public.cos_university_mass_distillation_campaigns
+for each row execute function public.preserve_cos_university_hosted_teacher_committed_cost();

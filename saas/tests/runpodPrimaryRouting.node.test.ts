@@ -77,14 +77,18 @@ test('background shared text inference prefers RunPod and treats LOCAL_AI DeepIn
   assert.match(inference, /fallbackFromOwned: true/)
 })
 
-test('interactive COS answers bypass RunPod primary and use the bounded low-latency managed profile', () => {
+test('interactive COS answers and authoring bypass RunPod primary and use bounded managed profiles', () => {
   const inference = source('../lib/ai/local-inference.ts')
   const firstAnswer = source('../lib/ai/cos/cosFirstAnswerEnterprise.ts')
   assert.match(inference, /feature === 'cos_interactive_answer'/)
+  assert.match(inference, /feature === 'cos_interactive_authoring'/)
   assert.match(inference, /interactiveUserResponse\(args\)/)
   assert.match(inference, /COS_INTERACTIVE_REASONING_EFFORT/)
   assert.match(inference, /COS_INTERACTIVE_MODEL_TIMEOUT_MS/)
-  assert.match(firstAnswer, /feature:'cos_interactive_answer'/)
+  assert.match(inference, /COS_INTERACTIVE_AUTHORING_TIMEOUT_MS/)
+  assert.match(inference, /COS_INTERACTIVE_AUTHORING_MODEL/)
+  assert.match(firstAnswer, /function interactiveReasonerFeature/)
+  assert.match(firstAnswer, /'cos_interactive_authoring'/)
   assert.match(firstAnswer, /purpose:'user_facing_response'/)
   assert.match(firstAnswer, /COS_INTERACTIVE_REASONER_MAX_TOKENS/)
   assert.match(firstAnswer, /COS_KNOWLEDGE_FACT_RETRIEVAL_BUDGET_MS \|\| '1500'/)

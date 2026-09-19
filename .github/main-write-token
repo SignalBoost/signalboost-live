@@ -1,2 +1,2 @@
-base_sha=8b95af15e49f166555366ff39623f2beca06182e
-branch=fix/cos-authoring-fast-ingress-20260918
+base_sha=d55763d451c75ebab48395aa2f2c61c7d34d1b60
+branch=fix/cos-fast-writing-canonical-rebase-20260918

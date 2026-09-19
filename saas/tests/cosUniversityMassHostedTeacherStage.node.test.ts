@@ -1,0 +1,152 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import {
+  massHostedTeacherStageConfig,
+  runMassHostedTeacherStage,
+} from '../lib/ai/cos/cosUniversityMassHostedTeacherStage.ts'
+
+function memoryDb() {
+  const rows: any[] = []
+  return {
+    rows,
+    from(table: string) {
+      assert.equal(table, 'cos_university_mass_hosted_teacher_rows')
+      return {
+        select() {
+          const filters: Record<string, unknown> = {}
+          const chain: any = {
+            eq(key: string, value: unknown) { filters[key] = value; return chain },
+            order() {
+              return Promise.resolve({
+                data: rows.filter(row => Object.entries(filters).every(([key, value]) => row[key] === value)),
+                error: null,
+              })
+            },
+          }
+          return chain
+        },
+        upsert(row: any) {
+          const index = rows.findIndex(item => item.run_id === row.run_id && item.prompt_id === row.prompt_id)
+          if (index >= 0) rows[index] = row
+          else rows.push(row)
+          return {
+            select() {
+              return {
+                single() { return Promise.resolve({ data: row, error: null }) },
+              }
+            },
+          }
+        },
+      }
+    },
+  }
+}
+
+const env = {
+  OPENAI_API_KEY: 'sk_123456789012345678901234567890',
+  ANTHROPIC_API_KEY: 'sk-ant-123456789012345678901234567890',
+  XAI_API_KEY: 'xai_123456789012345678901234567890',
+  COS_UNIVERSITY_TEACHER_OPENAI_ENABLED: 'true',
+  COS_UNIVERSITY_TEACHER_OPENAI_ADAPTER_READY: 'true',
+  COS_UNIVERSITY_TEACHER_OPENAI_MODEL: 'gpt-5.6-luna',
+  COS_UNIVERSITY_TEACHER_ANTHROPIC_ENABLED: 'true',
+  COS_UNIVERSITY_TEACHER_CLAUDE_ADAPTER_READY: 'true',
+  COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL: 'claude-sonnet-4-6',
+  COS_UNIVERSITY_TEACHER_XAI_ENABLED: 'true',
+  COS_UNIVERSITY_TEACHER_GROK_ADAPTER_READY: 'true',
+  COS_UNIVERSITY_TEACHER_XAI_MODEL: 'grok-4.6',
+  COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED: 'true',
+  COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS: '20',
+  COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS: '384',
+  COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM: '8',
+}
+
+test('mass hosted teacher stage is hard-bounded to the existing teacher ceiling envelope', () => {
+  const config = massHostedTeacherStageConfig(env)
+  assert.equal(config.enabled, true)
+  assert.equal(config.maxCalls, 20)
+  assert.equal(config.maxOutputTokens, 384)
+  assert.equal(config.parallelism, 8)
+  assert.equal(config.minimumRows, 20)
+})
+
+test('twenty prompts fan out across OpenAI, Claude and Grok and persist exact rows', async () => {
+  const db = memoryDb()
+  const prompts = Array.from({ length: 20 }, (_, index) => ({
+    id: String(index + 1).padStart(64, 'a').slice(-64),
+    prompt: `Teaching prompt ${index + 1}`,
+  }))
+  let calls = 0
+  const result = await runMassHostedTeacherStage({
+    db,
+    run: {
+      id: '11111111-1111-4111-8111-111111111111',
+      candidate_id: 'mass:22222222-2222-4222-8222-222222222222:aaaaaaaaaaaaaaaa',
+      batch_key: 'b'.repeat(64),
+    },
+    prompts,
+    promptSetHash: 'c'.repeat(64),
+    env,
+    fetchImpl: async (input, init) => {
+      calls += 1
+      const url = String(input)
+      const body = JSON.parse(String(init?.body || '{}'))
+      const model = String(body.model)
+      const text = `answer-${calls}-${model}`
+      if (url.includes('anthropic.com')) {
+        return new Response(JSON.stringify({
+          content: [{ type: 'text', text }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        }), { status: 200, headers: { 'request-id': `anthropic-${calls}` } })
+      }
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: text } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5 },
+      }), { status: 200, headers: { 'x-request-id': `compatible-${calls}` } })
+    },
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.completed, true)
+  assert.equal(result.rows, 20)
+  assert.equal(calls, 20)
+  assert.equal(db.rows.length, 20)
+  assert.deepEqual(result.activeProviders, ['openai', 'claude', 'grok'])
+  assert.ok((result.providerMix.openai || 0) > 0)
+  assert.ok((result.providerMix.claude || 0) > 0)
+  assert.ok((result.providerMix.grok || 0) > 0)
+  assert.match(String(result.datasetHash), /^[a-f0-9]{64}$/)
+  assert.ok(db.rows.every(row => /^[a-f0-9]{64}$/.test(row.response_hash)))
+  assert.ok(db.rows.every(row => row.authority_expanded === false && row.silent_fallback_allowed === false))
+})
+
+test('consumer bypasses the single HF teacher job only after hosted teacher completion', () => {
+  const consumer = fs.readFileSync(path.join(import.meta.dirname, '../lib/ai/cos/cosUniversityMassDistillationConsumer.ts'), 'utf8')
+  const worker = fs.readFileSync(path.join(import.meta.dirname, '../scripts/cos-university-hf-worker-base.py'), 'utf8')
+  const migration = fs.readFileSync(path.join(import.meta.dirname, '../supabase/migrations/20260919021500_cos_university_mass_hosted_teacher_rows.sql'), 'utf8')
+
+  assert.match(consumer, /runMassHostedTeacherStage/)
+  assert.match(consumer, /mass_distillation_hosted_teacher_dataset_registered/)
+  assert.match(consumer, /teacher_model_id: 'multi-provider-hosted'/)
+  assert.match(consumer, /stage: 'preparation_pending'/)
+  assert.match(consumer, /teacherRows: hostedRows/)
+  assert.match(worker, /worker_embedded_teacher_rows_invalid/)
+  assert.match(worker, /worker_embedded_teacher_row_hash_mismatch/)
+  assert.match(migration, /cos_university_mass_hosted_teacher_rows/)
+  assert.match(migration, /unique \(run_id, prompt_id\)/)
+})
+
+test('production config activates the bounded parallel teacher stage without embedding credentials', () => {
+  const vercel = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../vercel.json'), 'utf8'))
+  assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED, 'true')
+  assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS, '20')
+  assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS, '384')
+  assert.equal(vercel.env.COS_UNIVERSITY_MASS_HOSTED_TEACHER_PARALLELISM, '8')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_OPENAI_MODEL, 'gpt-5.6-luna')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL, 'claude-sonnet-4-6')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_XAI_MODEL, 'grok-4.6')
+  const serialized = JSON.stringify(vercel)
+  assert.doesNotMatch(serialized, /OPENAI_API_KEY|ANTHROPIC_API_KEY|XAI_API_KEY/)
+})

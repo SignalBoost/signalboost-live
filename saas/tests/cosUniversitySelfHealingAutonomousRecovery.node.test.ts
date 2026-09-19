@@ -6,6 +6,9 @@ import { preflightHfWorkerDelivery } from '../lib/ai/cos/cosUniversityHfWorkerDe
 const recovery = readFileSync(new URL('../agent-gateway-host/university-distillation-recovery.ts', import.meta.url), 'utf8')
 const resolver = readFileSync(new URL('../self-healing-host/native-repair-action-resolver.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/cos-university-distillation-supervisor/route.ts', import.meta.url), 'utf8')
+const nativeLoop = readFileSync(new URL('../self-healing-host/native-autonomous-loop.ts', import.meta.url), 'utf8')
+const universityCodeRepair = readFileSync(new URL('../self-healing-host/university-distillation-autonomous-repair.ts', import.meta.url), 'utf8')
+const continuations = readFileSync(new URL('../app/api/cron/builder-continuations/route.ts', import.meta.url), 'utf8')
 
 test('University registered recovery is autonomous and does not require owner approval', () => {
   assert.match(resolver, /requires_human_approval:\s*false/)
@@ -52,4 +55,38 @@ test('worker delivery preflight accepts only a plausible signed worker artifact 
   assert.equal(result.status, 200)
   assert.ok(result.sha256)
   assert.ok(result.bytes >= 256)
+})
+
+
+test('University packaging defect tries bounded runtime recovery before Platform Engineer escalation', () => {
+  const dispatchAt = nativeLoop.indexOf('const dispatched = await dispatchRepairPlan({')
+  const escalationAt = nativeLoop.indexOf('enqueueUniversityDistillationPackagingRepair(incident, diagnostic.diagnosis)', dispatchAt)
+  assert.ok(dispatchAt >= 0)
+  assert.ok(escalationAt > dispatchAt)
+  assert.match(nativeLoop, /!dispatched\.completed && universityPackagingIncident/)
+  assert.match(nativeLoop, /Registered runtime recovery did not restore packaging progress/)
+  assert.match(nativeLoop, /Registered runtime recovery failed verification/)
+})
+
+test('University Platform Engineer escalation is exact, pinned, deduplicated, and authority preserving', () => {
+  assert.match(universityCodeRepair, /curriculum_packaging_stalled/)
+  assert.match(universityCodeRepair, /curriculumPackagingStalled === true/)
+  assert.match(universityCodeRepair, /recoveryPreauthorized === true/)
+  assert.match(universityCodeRepair, /authorityExpanded === false/)
+  assert.match(universityCodeRepair, /automaticPromotionAuthorized === false/)
+  assert.match(universityCodeRepair, /runpodMutationAuthorized === false/)
+  assert.match(universityCodeRepair, /process\.env\.VERCEL_GIT_COMMIT_SHA/)
+  assert.match(universityCodeRepair, /enqueueSignalBoostRepositoryRepairJob/)
+  assert.match(universityCodeRepair, /selfHealingUniversityDistillation: true/)
+  assert.match(universityCodeRepair, /MAX_AUTOMATIC_RETRIES = 3/)
+  assert.match(universityCodeRepair, /Do not lower the 20-item batch minimum/)
+  assert.match(universityCodeRepair, /do not.*expand provider\/spend\/promotion\/Production authority/i)
+})
+
+test('Builder continuation worker executes and retries University Self-Healing repository jobs', () => {
+  assert.match(continuations, /selfHealingUniversityDistillation/)
+  assert.match(continuations, /retryFailedUniversityDistillationRepair/)
+  assert.match(continuations, /universityDistillationRepairQueued/)
+  assert.match(continuations, /universityDistillationRepairRetried/)
+  assert.match(continuations, /const selected = jobs\[0\] \|\| null/)
 })

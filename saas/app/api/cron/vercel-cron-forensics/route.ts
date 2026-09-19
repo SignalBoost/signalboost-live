@@ -10,7 +10,10 @@ const TEAM_ID = 'team_jgndR6Eo6QyP2Fen9UbHy2Q5'
 
 function authorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET
-  return Boolean(secret && req.headers.get('authorization') === `Bearer ${secret}`)
+  const cronAuthorized = Boolean(secret && req.headers.get('authorization') === `Bearer ${secret}`)
+  const isolatedPreview = process.env.VERCEL_ENV === 'preview'
+    && process.env.VERCEL_GIT_COMMIT_REF === 'forensics/vercel-preview-event-probe-20260918'
+  return cronAuthorized || isolatedPreview
 }
 
 function redact(value: any, key = ''): any {
@@ -127,7 +130,9 @@ export async function GET(req: NextRequest) {
     }
 
     console.log('[vercel-cron-forensics]', JSON.stringify(result))
-    return NextResponse.json(result)
+    // Never disclose activity evidence through the preview HTTP response. Evidence is available only
+    // in authenticated Vercel runtime logs for this isolated forensic deployment.
+    return NextResponse.json({ ok: true, capturedEvents: events.length, evidenceLogged: true })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('[vercel-cron-forensics] failed', message)

@@ -18,7 +18,7 @@ export type TeacherGenerationResult = Readonly<{
 }>
 
 type Env = Record<string, string | undefined>
-type FetchPort = typeof fetch
+type FetchPort = (url: string | URL, init?: RequestInit) => Promise<Response>
 
 function clean(value: unknown, max = 200_000): string {
   return String(value ?? '').trim().slice(0, max)

@@ -2,6 +2,24 @@
 
 # iTMounts Engineering Blueprint
 
+## University multi-provider distillation execution — 2026-09-18
+
+The University mass-distillation teacher stage is no longer a single-provider Qwen/Hugging Face lane. Prepared curriculum batches are deterministically sharded across the governed enterprise teacher pool so independent batches can synthesize concurrently.
+
+Canonical rules:
+
+- supported teacher classes are Hugging Face/open-model (Qwen/DeepSeek), OpenAI-compatible, Anthropic/Claude, xAI/Grok, and buyer custom adapters;
+- assignment is deterministic per batch and durable; after a provider/model is assigned, retries resume that exact provider/model and never silently switch;
+- hosted providers require explicit enablement, buyer-owned credentials, explicit model identity, adapter readiness, verified input/output pricing, and `DISTILLATION_RIGHTS=contractually_authorized`; missing authorization fails closed;
+- hosted prompt generation is resumable per prompt and bounded by the existing teacher-stage cost ceiling; the hosted maximum remains committed when the separate Hugging Face materialization job settles;
+- hosted outputs are materialized into a private immutable Hugging Face teacher dataset before the existing preparation/training chain;
+- provenance records provider, exact model, provider request id where available, token usage, bounded/estimated cost, prompt/output hashes, and provider-manifest hash; secrets and hidden chain-of-thought are never retained;
+- Hugging Face/open-model teachers must pass the explicit open-license gate (currently Apache-2.0 or MIT); unknown licenses fail closed;
+- provider diversity changes only teacher synthesis throughput. Student-model identity, partitioning, independent evaluation, safety/transfer/retention, exact-artifact canary, rollback, and graduation gates are unchanged.
+
+Release invariant: registering an adapter is not sufficient. Production acceptance requires the mass-distillation consumer to call the provider selector/synthesis path, durable resume evidence, provider-cost accounting, and successful provider-specific regression tests.
+
+
 ## COS / Assistant / Concierge single-brain invariant — 2026-09-18
 
 **Assistant and COS are the same owner-facing intelligence.** The Assistant page is the owner's UI for COS; it is not a separate agent, brain, reasoner, or fallback path.

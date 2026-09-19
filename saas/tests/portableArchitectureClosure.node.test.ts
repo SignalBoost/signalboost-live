@@ -101,9 +101,14 @@ test('Browser Agent Ecosystem is architecture-complete while production executio
   assert.equal(descriptor?.route, undefined)
 })
 
-test('all registered portable architecture boundaries are closed', () => {
+test('University and distillation are registered with explicit extraction blockers instead of false commercial closure', () => {
   const report = createPortableArchitectureClosureReport()
-  assert.equal(report.completeCount, report.totalCount)
-  assert.equal(report.completionPercent, 100)
-  assert.equal(report.closed, true)
+  const university = report.entries.find(entry => entry.productId === 'ai-university')
+  const distillation = report.entries.find(entry => entry.productId === 'ai-distillation-engine')
+  assert.equal(university?.state, 'partial')
+  assert.ok(university?.blockers.includes('buyer-neutral-host-extraction-pending'))
+  assert.equal(distillation?.state, 'partial')
+  assert.ok(distillation?.blockers.includes('buyer-neutral-training-provider-port-pending'))
+  assert.equal(report.closed, false)
+  assert.equal(report.completeCount, report.totalCount - 2)
 })

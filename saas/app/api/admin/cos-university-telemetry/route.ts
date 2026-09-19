@@ -168,7 +168,7 @@ export async function GET() {
       return {
         runId,
         campaignId: text(run.campaign_id, 80),
-        subject: text(run.subject_id, 240) || 'Unknown subject',
+        subject: text(run.subject_id, 240),
         stage: text(run.stage, 80),
         stageBucket: stageBucket(run.stage),
         failureReason: text(run.failure_reason, 300) || null,

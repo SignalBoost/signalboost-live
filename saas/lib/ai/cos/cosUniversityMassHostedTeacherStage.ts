@@ -7,10 +7,10 @@ import {
 import { generateWithUniversityTeacher } from './cosUniversityTeacherAdapters.ts'
 
 const HOSTED_TRANSPORTS: readonly UniversityTeacherTransport[] = Object.freeze([
+  'openai_responses',
   'openai_compatible',
   'anthropic_messages',
 ])
-const MASS_HOSTED_TEACHER_IDS = new Set(['openai', 'claude', 'grok'])
 const MIN_TEACHER_ROWS = 20
 const DEFAULT_MAX_CALLS = 20
 const HARD_MAX_CALLS = 20
@@ -41,15 +41,24 @@ function truthy(value: unknown): boolean {
 }
 
 function hostedActiveTeachers(env: Env): UniversityTeacherDefinition[] {
+  // Eligibility is declared by the provider definition rather than a vendor-ID whitelist. This
+  // keeps OpenAI/Claude/Grok working while allowing a buyer to add another compatible provider
+  // without changing the mass-distillation engine. Dynamic providers remain excluded by default
+  // unless the buyer explicitly marks that provider as eligible for the bounded mass stage.
   return universityTeacherPoolStatus(env).activeProviders
-    .filter(item => HOSTED_TRANSPORTS.includes(item.transport) && MASS_HOSTED_TEACHER_IDS.has(item.id))
-    .map(item => ({
+    .filter(item => HOSTED_TRANSPORTS.includes(item.transport) && item.massDistillationEligible === true)
+    .map(item => Object.freeze({
       id: item.id,
       provider: item.provider,
       transport: item.transport,
       model: item.model,
       credentialEnv: item.credentialEnv,
       enabledEnv: item.enabledEnv,
+      adapterReadyEnv: item.adapterReadyEnv,
+      modelEnv: item.modelEnv,
+      endpointEnv: item.endpointEnv,
+      defaultEndpoint: item.defaultEndpoint,
+      massDistillationEligible: true,
       buyerOwnedCredential: true,
       provenanceRequired: true,
       costCeilingRequired: true,

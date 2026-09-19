@@ -46,3 +46,5 @@ A descriptor-only compatibility target is not a live product. It can describe a 
 5. Run the registry tests and typecheck.
 
 To rename a product safely, retain its `productId`, update `fallbackName` and translations, and update this catalog table. A new ID is only appropriate for a genuinely new customer-facing product. This separation keeps future marketplace/catalog consumers compatible without implying checkout, entitlement, or fulfillment behavior.
+
+| dynamic-pipeline-router | Dynamic Pipeline Router Software | preview | yes | no |

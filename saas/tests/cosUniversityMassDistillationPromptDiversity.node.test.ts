@@ -25,7 +25,9 @@ test('teacher prompt diversity is durably evidenced before paid provider submiss
   assert.match(consumer, /distinctPrompts,/)
   assert.match(consumer, /promptSetHash,/)
   assert.match(consumer, /maxEstimatedCostUsd,/)
-  assert.match(consumer, /reservedCostCeilingUsd: expectedCeiling/)
+  assert.match(consumer, /reservedCostCeilingUsd: hfCostCeilingUsd/)
+  assert.match(consumer, /stageReservedCostCeilingUsd: expectedCeiling/)
+  assert.match(consumer, /hostedTeacherCommittedCeilingUsd: hostedTeacherMaximumCostUsd/)
 
   const fence = consumer.indexOf("mass_distillation_pre_dispatch_fence_lost")
   const preDispatchEvidence = consumer.indexOf("claim: 'mass_distillation_pre_dispatch_validated'")

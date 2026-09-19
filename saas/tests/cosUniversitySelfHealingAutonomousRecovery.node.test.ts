@@ -29,6 +29,14 @@ test('Self-Healing Supervisor preflights worker delivery before any paid recover
   assert.match(recovery, /authorityExpanded:\s*false/)
 })
 
+test('Self-Healing retry claims use an optimistic updated_at fence instead of JSONB string equality', () => {
+  const university = readFileSync(new URL('../self-healing-host/university-distillation-autonomous-repair.ts', import.meta.url), 'utf8')
+  const audit = readFileSync(new URL('../self-healing-host/owned-audit-self-healing.ts', import.meta.url), 'utf8')
+  assert.match(university, /\.eq\('updated_at', row\.updated_at\)/)
+  assert.match(audit, /\.eq\('updated_at', row\.updated_at\)/)
+  assert.doesNotMatch(audit, /\.eq\('metadata', JSON\.stringify\(metadata\)\)/)
+})
+
 test('worker delivery preflight blocks an HTTP 404 before provider spending', async () => {
   const result = await preflightHfWorkerDelivery({
     env: {

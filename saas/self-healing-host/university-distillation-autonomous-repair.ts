@@ -195,7 +195,7 @@ export async function retryFailedUniversityDistillationRepair(admin: any): Promi
   const attempt = Number(metadata.universityRepairRetryAttempt || 0) + 1
   const claimed = await admin.from('builder_jobs').update({
     metadata: { ...metadata, universityRepairRetryClaimedAt: new Date().toISOString() },
-  }).eq('id', row.id).eq('status', 'failed').select('id').maybeSingle()
+  }).eq('id', row.id).eq('status', 'failed').eq('updated_at', row.updated_at).select('id').maybeSingle()
   if (claimed.error || !claimed.data) {
     return { retried: false, jobId: '', sourceJobId: String(row.id || ''), attempt, error: claimed.error?.message || '' }
   }

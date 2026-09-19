@@ -285,7 +285,7 @@ export async function retryFailedOwnedAuditEngineRepair(admin: any): Promise<Own
   const attempt = Number(metadata.auditEngineRetryAttempt || 0) + 1
   const claimedMetadata = { ...metadata, auditEngineRetryClaimedAt: new Date().toISOString() }
   const claimed = await admin.from('builder_jobs').update({ metadata: claimedMetadata })
-    .eq('id', row.id).eq('status', 'failed').eq('metadata', JSON.stringify(metadata)).select('id').maybeSingle()
+    .eq('id', row.id).eq('status', 'failed').eq('updated_at', row.updated_at).select('id').maybeSingle()
   if (claimed.error || !claimed.data) return { retried: false, jobId: '', sourceJobId: String(row.id || ''), attempt, error: claimed.error?.message || '' }
 
   try {

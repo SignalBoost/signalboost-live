@@ -16,6 +16,7 @@ type CampaignRow = {
   expires_at: string
   max_total_cost_usd: number
   committed_cost_usd: number
+  completed_at?: string | null
 }
 
 type ReceiptRow = {
@@ -213,9 +214,15 @@ export function evaluateUniversityMassDistillationHealth(input: {
   const expectedIntervalSeconds = Math.max(60, Math.min(3600, Math.floor(input.expectedIntervalSeconds)))
   const maximumHeartbeatAgeSeconds = Math.max(15 * 60, expectedIntervalSeconds * 3)
   const failedRunGraceSeconds = Math.max(20 * 60, expectedIntervalSeconds * 4)
-  const campaignIds = unique(input.campaigns.map(campaign => String(campaign.id)).filter(Boolean))
+  // A failed campaign with completed_at is terminal history, not live recovery work. Production
+  // rolling authority already uses this lifecycle rule; the monitor must use the same rule or it
+  // will page/repair forever until the old campaign's expires_at even after terminal evidence exists.
+  const campaigns = input.campaigns.filter(campaign =>
+    !(campaign.status === 'failed' && Boolean(campaign.completed_at)))
+  const campaignIds = unique(campaigns.map(campaign => String(campaign.id)).filter(Boolean))
+  const workflowRuns = input.workflowRuns.filter(run => campaignIds.includes(String(run.campaign_id)))
   const activeProviderJobs = input.providerJobs.filter(job => campaignIds.includes(String(job.campaign_id)))
-  const failedCampaigns = input.campaigns.filter(campaign => campaign.status === 'failed')
+  const failedCampaigns = campaigns.filter(campaign => campaign.status === 'failed')
   const evidence = input.receipt?.evidence && typeof input.receipt.evidence === 'object'
     ? input.receipt.evidence
     : null
@@ -223,14 +230,14 @@ export function evaluateUniversityMassDistillationHealth(input: {
   const invocationSucceeded = evidence && typeof evidence.invocationSucceeded === 'boolean'
     ? evidence.invocationSucceeded
     : null
-  const failedRuns = input.workflowRuns.filter(run => run.stage === 'failed')
-  const claimableRuns = input.workflowRuns.filter(run => ['teacher_pending', 'preparation_pending', 'training_pending'].includes(run.stage))
-  const stalledDispatchRuns = input.workflowRuns.filter(run => {
+  const failedRuns = workflowRuns.filter(run => run.stage === 'failed')
+  const claimableRuns = workflowRuns.filter(run => ['teacher_pending', 'preparation_pending', 'training_pending'].includes(run.stage))
+  const stalledDispatchRuns = workflowRuns.filter(run => {
     if (!['teacher_dispatching', 'preparation_dispatching', 'training_dispatching'].includes(run.stage)) return false
     const age = ageSeconds(run.updated_at, nowMs)
     return age != null && age > maximumHeartbeatAgeSeconds
   })
-  const workflowActivityTimes = input.workflowRuns
+  const workflowActivityTimes = workflowRuns
     .map(run => Date.parse(String(run.updated_at || '')))
     .filter(Number.isFinite)
   const workflowProgressAgeSeconds = workflowActivityTimes.length
@@ -249,8 +256,8 @@ export function evaluateUniversityMassDistillationHealth(input: {
       && !['COMPLETED', 'CANCELED', 'ERROR', 'DELETED'].includes(stage)
       && nowMs > dispatchedAt + (timeoutSeconds + 120) * 1000
   })
-  const authorizedCostUsd = input.campaigns.reduce((sum, campaign) => sum + finite(campaign.max_total_cost_usd), 0)
-  const committedCostUsd = input.campaigns.reduce((sum, campaign) => sum + finite(campaign.committed_cost_usd), 0)
+  const authorizedCostUsd = campaigns.reduce((sum, campaign) => sum + finite(campaign.max_total_cost_usd), 0)
+  const committedCostUsd = campaigns.reduce((sum, campaign) => sum + finite(campaign.committed_cost_usd), 0)
   const remainingAuthorizedCostUsd = Math.max(0, authorizedCostUsd - committedCostUsd)
   const preparedBatches = Math.max(0, Math.floor(finite(input.continuity?.preparedBatches)))
   const curriculumProgress = input.curriculumProgress ?? Object.freeze({ stalled: false, observedAt: null, subject: null, shortfallToBatch: 0, insertedForSubject: 0, preparedBefore: 0, preparedAfter: 0 })
@@ -344,7 +351,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
   if (staleFailedRuns.length > 0) reasons.push('failed_stage_recovery_stalled')
   if (overdueProviderJobs.length > 0) reasons.push('provider_job_overdue')
 
-  const authorityIntact = input.campaigns.every(campaign => {
+  const authorityIntact = campaigns.every(campaign => {
     const expiresAt = Date.parse(String(campaign.expires_at || ''))
     const maximum = finite(campaign.max_total_cost_usd)
     const committed = finite(campaign.committed_cost_usd)
@@ -366,7 +373,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
     latestCommitSha: input.receipt?.commit_sha ?? null,
     latestInvocationSucceeded: invocationSucceeded,
     receiptAgeSeconds,
-    workflowRuns: input.workflowRuns.length,
+    workflowRuns: workflowRuns.length,
     claimableRuns: claimableRuns.length,
     stalledDispatchRuns: stalledDispatchRuns.length,
     workflowProgressAgeSeconds,
@@ -412,7 +419,7 @@ export async function readUniversityMassDistillationHealth(input: {
   const windowStart = new Date(now.getTime() - 24 * 60 * 60_000).toISOString()
   const [campaignsResult, receiptResult, progressReceiptsResult, policyResult, windowResult, preparedResult, providerResult] = await Promise.all([
     input.db.from('cos_university_mass_distillation_campaigns')
-      .select('id,status,authorized_at,expires_at,max_total_cost_usd,committed_cost_usd')
+      .select('id,status,authorized_at,expires_at,max_total_cost_usd,committed_cost_usd,completed_at')
       .in('status', ['authorized', 'active', 'failed'])
       .gt('expires_at', now.toISOString())
       .order('authorized_at', { ascending: true })
@@ -458,7 +465,8 @@ export async function readUniversityMassDistillationHealth(input: {
       .limit(200),
   ])
   if (campaignsResult.error) throw new Error(`university_distillation_campaign_health_read_failed:${String(campaignsResult.error.message || 'unknown').slice(0, 180)}`)
-  const campaigns = (campaignsResult.data || []) as CampaignRow[]
+  const campaigns = ((campaignsResult.data || []) as CampaignRow[])
+    .filter(campaign => !(campaign.status === 'failed' && Boolean(campaign.completed_at)))
   if (receiptResult.error) throw new Error(`university_distillation_heartbeat_read_failed:${String(receiptResult.error.message || 'unknown').slice(0, 180)}`)
   if (progressReceiptsResult.error) throw new Error(`university_distillation_progress_receipts_read_failed:${String(progressReceiptsResult.error.message || 'unknown').slice(0, 180)}`)
   if (policyResult.error) throw new Error(`university_distillation_rolling_policy_read_failed:${String(policyResult.error.message || 'unknown').slice(0, 180)}`)

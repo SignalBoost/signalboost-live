@@ -37,6 +37,7 @@ export const maxDuration = 60
 
 const NO_STORE = { 'Cache-Control': 'no-store, max-age=0' }
 const RUNS = 'cos_university_mass_distillation_batch_runs'
+const BATCHES = 'cos_university_distillation_curriculum_batches'
 const EVENTS = 'cos_university_learning_assurance_events'
 const DRILL_TTL_SECONDS = 900
 const DETECTION_DEADLINE_SECONDS = 300
@@ -164,6 +165,10 @@ export async function POST(request: Request) {
   const now = new Date()
   const drillId = `drill-${now.toISOString().replace(/[^0-9]/g, '').slice(0, 14)}`
   const injectedAt = new Date(now.getTime() - INJECTED_AGE_SECONDS * 1000).toISOString()
+  const sourceHashes = Array.from({ length: 20 }, (_, index) =>
+    createHash('sha256').update(`${RECOVERY_DRILL_PROFILE}:${drillId}:source:${index}`).digest('hex'))
+  const batchKey = createHash('sha256').update(`${RECOVERY_DRILL_PROFILE}:${drillId}:batch`).digest('hex')
+  const curriculumHash = createHash('sha256').update(JSON.stringify(sourceHashes)).digest('hex')
   const drill: RecoveryDrillRecord = {
     drillId,
     faultKind: 'dispatch_claim_stalled',
@@ -176,26 +181,53 @@ export async function POST(request: Request) {
   // Refuse an unbounded drill before anything is written.
   assertRecoveryDrillBounded(drill)
 
+  // The live run table now has a batch-key foreign key and 20-item source minimum. Create a
+  // quarantined curriculum fixture first: it satisfies relational integrity but can never qualify for
+  // dispatch because status != prepared. drill_id on the run remains the independent second fence.
+  const curriculum = await db.from(BATCHES).insert({
+    batch_key: batchKey,
+    curriculum_hash: curriculumHash,
+    subject_id: 'Reasoning & Decision Science',
+    student_model_id: 'Qwen/Qwen3-4B',
+    source_policy: 'recovery_drill_fixture_v1',
+    source_hashes: sourceHashes,
+    source_count: sourceHashes.length,
+    rights_classes: ['recovery_drill_fixture'],
+    minimum_confidence: 1,
+    status: 'quarantined',
+    dispatch_authorized: false,
+    authority_expanded: false,
+    prepared_at: injectedAt,
+    updated_at: injectedAt,
+  })
+  if (curriculum.error) return fail(`drill_curriculum_fixture_insert_failed:${text(curriculum.error.message)}`, 500)
+
   const inserted = await db.from(RUNS).insert({
     id: drill.injectedRunId,
     campaign_id: campaign.data.id,
-    batch_key: `${drillId}-fixture`,
+    batch_key: batchKey,
     candidate_id: `drill:${drillId}`,
     subject_id: 'Reasoning & Decision Science',
-    // Live batch-run schema requires the normal student identity and a source_count. The drill is
-    // deliberately not a real curriculum batch, so source_count stays 0; SQL claim guards and drill_id
-    // exclusion make it non-dispatchable regardless.
     student_model_id: 'Qwen/Qwen3-4B',
-    source_count: 0,
+    source_count: sourceHashes.length,
     stage: 'teacher_dispatching',
     drill_id: drillId,
     claimed_at: injectedAt,
     updated_at: injectedAt,
     created_at: injectedAt,
   })
-  if (inserted.error) return fail(`drill_fixture_insert_failed:${text(inserted.error.message)}`, 500)
+  if (inserted.error) {
+    await db.from(BATCHES).delete().eq('batch_key', batchKey).eq('source_policy', 'recovery_drill_fixture_v1')
+    return fail(`drill_fixture_insert_failed:${text(inserted.error.message)}`, 500)
+  }
 
-  await record(db, drill, 'recovery_drill_armed', { drill, campaignId: campaign.data.id })
+  try {
+    await record(db, drill, 'recovery_drill_armed', { drill, campaignId: campaign.data.id, batchKey })
+  } catch (error) {
+    await db.from(RUNS).delete().eq('id', drill.injectedRunId).eq('drill_id', drillId)
+    await db.from(BATCHES).delete().eq('batch_key', batchKey).eq('source_policy', 'recovery_drill_fixture_v1')
+    throw error
+  }
   return NextResponse.json({ ok: true, drill }, { headers: NO_STORE })
 }
 
@@ -222,8 +254,23 @@ export async function GET() {
   if (plan.step === 'rollback_fault') {
     // The drill removes only its own fixture. The trigger has kept it frozen, so nothing else can have
     // become entangled with it.
+    const armedBatch = await db.from(EVENTS)
+      .select('evidence')
+      .eq('event_type', 'fine_tune')
+      .eq('candidate_id', `drill:${existing.drill.drillId}`)
+      .contains('evidence', { profile: RECOVERY_DRILL_PROFILE, claim: 'recovery_drill_armed', drillId: existing.drill.drillId })
+      .order('observed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (armedBatch.error) return fail(`drill_batch_lookup_failed:${text(armedBatch.error.message)}`, 500)
+    const batchKey = text(armedBatch.data?.evidence?.batchKey, 64)
+
     const removed = await db.from(RUNS).delete().eq('id', existing.drill.injectedRunId).eq('drill_id', existing.drill.drillId)
     if (removed.error) return fail(`drill_rollback_failed:${text(removed.error.message)}`, 500)
+    if (batchKey) {
+      const batchRemoved = await db.from(BATCHES).delete().eq('batch_key', batchKey).eq('source_policy', 'recovery_drill_fixture_v1')
+      if (batchRemoved.error) return fail(`drill_curriculum_rollback_failed:${text(batchRemoved.error.message)}`, 500)
+    }
     await record(db, existing.drill, 'recovery_drill_completed', {
       drill: existing.drill,
       verdict,

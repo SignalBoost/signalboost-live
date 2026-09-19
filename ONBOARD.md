@@ -50,7 +50,7 @@ Short explicit edit/proofread/polish requests are a bounded COS capability, not 
 
 Writing, drafting, translating, editing, rewriting, proofreading, and summarizing are not live-fact verification merely because the surrounding context contains `today`, `current`, `now`, a date, person, or organization.
 
-The freshness boundary recognizes polite authoring wrappers such as `please write`, `could you draft`, and `can you translate` without broadening the global execution/Builder classifier. Genuine lookup commands such as `Please check today's weather` remain live-verified.
+The freshness boundary, problem-class taxonomy, and reasoning-worker selector all recognize authoring intent before incidental temporal vocabulary. Polite authoring wrappers such as `please write`, `could you draft`, and `can you translate` must not become `current public facts` or select the verifier merely because the surrounding context contains `today` or `current`. This exception applies only when there is no explicit live lookup or volatile-fact object; genuine requests such as `Please write a short summary of today's weather` still select live verification.
 
 Release regression: `my inlaws today celebrate their wedding 50 aniversary. Please write a nice messsage to them in Polish and show me the english translation` must not enter current-fact web retrieval, evidence grounding, verifier, or freshness-repair workflows.
 ## COS University Hugging Face Jobs training adapter — 2026-09-13

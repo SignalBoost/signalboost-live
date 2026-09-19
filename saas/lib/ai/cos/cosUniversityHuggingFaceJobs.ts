@@ -62,6 +62,7 @@ type TrainingEnvelope = Readonly<Record<string, unknown>> & {
 
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:@([A-Za-z0-9._-]+))?#([A-Za-z0-9_.-]+)$/
 const COMMIT_SHA = /^[a-f0-9]{40}$/i
+const HEX64 = /^[a-f0-9]{64}$/i
 const MAX_WORKER_REQUEST_JSON_BYTES = 1_400_000
 
 function clean(value: unknown, max = 4096): string {

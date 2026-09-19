@@ -5,6 +5,7 @@ export type TeacherGenerationRequest = Readonly<{
   prompt: string
   maxOutputTokens: number
   temperature?: number
+  requestKey?: string
 }>
 
 export type TeacherGenerationResult = Readonly<{
@@ -29,7 +30,7 @@ function positiveInt(value: unknown, fallback: number, min: number, max: number)
   return Math.max(min, Math.min(max, Math.floor(parsed)))
 }
 
-function modelFor(teacher: UniversityTeacherDefinition, env: Env): string {
+export function universityTeacherModelFor(teacher: UniversityTeacherDefinition, env: Env = process.env): string {
   if (teacher.id === 'openai') return clean(env.COS_UNIVERSITY_TEACHER_OPENAI_MODEL, 240) || teacher.model
   if (teacher.id === 'claude') return clean(env.COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL, 240)
   if (teacher.id === 'grok') return clean(env.COS_UNIVERSITY_TEACHER_XAI_MODEL, 240)
@@ -73,14 +74,18 @@ async function callOpenAiCompatible(input: {
   env: Env
   fetchImpl: FetchPort
 }): Promise<TeacherGenerationResult> {
-  const model = modelFor(input.teacher, input.env)
+  const model = universityTeacherModelFor(input.teacher, input.env)
   const credential = credentialFor(input.teacher, input.env)
   if (!model || credential.length < 20) throw new Error('university_teacher_not_configured')
   const endpoint = validateHttpsEndpoint(endpointFor(input.teacher, input.env))
   const timeoutMs = positiveInt(input.env.COS_UNIVERSITY_TEACHER_REQUEST_TIMEOUT_MS, 120_000, 5_000, 300_000)
   const response = await input.fetchImpl(endpoint, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${credential}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bearer ${credential}`,
+      'Content-Type': 'application/json',
+      ...(clean(input.request.requestKey, 128) ? { 'Idempotency-Key': clean(input.request.requestKey, 128) } : {}),
+    },
     body: JSON.stringify({
       model,
       temperature: input.request.temperature ?? 0.2,
@@ -112,7 +117,7 @@ async function callAnthropic(input: {
   env: Env
   fetchImpl: FetchPort
 }): Promise<TeacherGenerationResult> {
-  const model = modelFor(input.teacher, input.env)
+  const model = universityTeacherModelFor(input.teacher, input.env)
   const credential = credentialFor(input.teacher, input.env)
   if (!model || credential.length < 20) throw new Error('university_teacher_not_configured')
   const endpoint = validateHttpsEndpoint(endpointFor(input.teacher, input.env))

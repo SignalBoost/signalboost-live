@@ -45,6 +45,7 @@ test('changed-file certification rejects every path outside the staged saas proj
 test('the host pins and installs the repository before permanently denying network access', () => {
   const source = readFileSync(new URL('../lib/builder/vercel-repository-repair-session.ts', import.meta.url), 'utf8')
   const allow = source.indexOf("networkPolicy: 'allow-all'")
+  const auth = source.indexOf('const githubAuthArgs = githubFetchAuthArgs()')
   const exactFetch = source.indexOf("'fetch', '--quiet', '--depth', '1', '--no-tags', 'origin', fullCommitSha")
   const revisionCall = source.indexOf('await session.assertPinnedRevision()', exactFetch)
   const revisionCheck = source.indexOf("revision.stdout.trim().toLowerCase() !== expected")
@@ -52,8 +53,19 @@ test('the host pins and installs the repository before permanently denying netwo
   const deny = source.indexOf("sandbox.update({ networkPolicy: 'deny-all' })")
   const locked = source.indexOf('session.networkLocked = true', deny)
   const modelGuard = source.indexOf("if (!this.networkLocked) throw new Error('builder_repository_network_not_locked')")
-  assert.ok(allow >= 0); assert.ok(exactFetch > allow); assert.ok(revisionCall > exactFetch); assert.ok(install > revisionCall)
+  assert.ok(allow >= 0); assert.ok(auth > allow); assert.ok(exactFetch > auth); assert.ok(revisionCall > exactFetch); assert.ok(install > revisionCall)
   assert.ok(deny > install); assert.ok(locked > deny); assert.ok(modelGuard > locked); assert.ok(revisionCheck >= 0)
+})
+
+test('private repository bootstrap uses host-only GitHub auth without credential inheritance', () => {
+  const source = readFileSync(new URL('../lib/builder/vercel-repository-repair-session.ts', import.meta.url), 'utf8')
+  const createBlock = source.slice(source.indexOf('Sandbox.create({'), source.indexOf('})', source.indexOf('Sandbox.create({')) + 2)
+  assert.match(source, /process\.env\.GITHUB_TOKEN/)
+  assert.match(source, /x-access-token:/)
+  assert.match(source, /http\.https:\/\/github\.com\/\.extraheader=AUTHORIZATION: basic/)
+  assert.match(source, /builder_repository_github_credential_unavailable/)
+  assert.doesNotMatch(createBlock, /GITHUB_TOKEN|Authorization|x-access-token/)
+  assert.doesNotMatch(source, /credential\.helper|remote\.origin\.url.*x-access-token/)
 })
 
 test('Builder file writes use argument-safe Node I/O and reject an existing symlink target', () => {

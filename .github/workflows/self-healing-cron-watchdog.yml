@@ -1,0 +1,40 @@
+name: External Self-Healing Cron Watchdog
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: external-self-healing-cron-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    if: github.repository == 'SignalBoost/signalboost-live'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate watchdog syntax
+        run: node --check .github/scripts/vercel-cron-watchdog.mjs
+
+      - name: Detect and recover Vercel Cron Jobs
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          VERCEL_PROJECT_ID: prj_QElaxvA1fbFjhVraIzamxRha78Du
+          VERCEL_TEAM_ID: team_jgndR6Eo6QyP2Fen9UbHy2Q5
+          SIGNALBOOST_PRODUCTION_URL: https://itmounts.com
+          WATCHDOG_REPAIR_WAIT_MS: '480000'
+        run: node .github/scripts/vercel-cron-watchdog.mjs

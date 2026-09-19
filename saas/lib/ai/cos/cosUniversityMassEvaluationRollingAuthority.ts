@@ -9,7 +9,24 @@ import { MASS_EVALUATION_ENDPOINT_CALLS } from './cosUniversityMassEvaluationCon
 
 export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention' as const
 export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
-export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 12
+// 2026-09-19: raised 12 -> 24 by owner decision. Production stopped evaluating at 02:31 with 27
+// canary-proven artifacts waiting and 59 pending: not a defect, the rolling window was simply spent
+// (17 approvals recorded in the trailing 24h against a cap of 12, the extra ones pre-dating the cap).
+// At 12/day a 59-artifact backlog takes about five days; 24/day clears it in about two and a half.
+//
+// The owner chose 24 over 60 deliberately: each approval authorizes at most $0.20 of runtime wake, so
+// 24/day is up to $4.80/day of wake authorization where 60/day would be up to $12/day, and 24 leaves
+// room to observe whether the repaired 18-call evaluator stays stable under increased load before
+// going further.
+//
+// This is a THROUGHPUT ceiling only. Per-evaluation limits are untouched: maxRuntimeWakeAttempts 1,
+// maxEstimatedRuntimeWakeCostUsd 0.20, maxJudgeCalls 4, the 12-hour retention delay, exact-artifact
+// binding, one verdict per artifact, and the Production-traffic prohibition all stand.
+//
+// Unlike the endpoint-call ceiling, this constant has NO database counterpart: the claim function
+// asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the cost ceiling, but never the
+// rolling cap, which is enforced here alone. Verified against supabase/migrations before changing it.
+export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 24
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
 // resumes. That is only true while the failures differ. mass:8f5af666 reproduced the SAME truncated case

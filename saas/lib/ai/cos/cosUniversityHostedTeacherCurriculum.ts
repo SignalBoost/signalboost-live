@@ -12,6 +12,7 @@ import {
 } from './cosUniversityTeacherAdapters.ts'
 
 const HOSTED_TRANSPORTS: readonly UniversityTeacherTransport[] = Object.freeze([
+  'openai_responses',
   'openai_compatible',
   'anthropic_messages',
   'custom_adapter',

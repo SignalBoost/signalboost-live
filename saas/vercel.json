@@ -289,10 +289,6 @@
     {
       "path": "/api/cron/cos-learning-continuity",
       "schedule": "45 7 * * *"
-    },
-    {
-      "path": "/api/cron/vercel-cron-forensics",
-      "schedule": "*/1 * * * *"
     }
   ]
 }

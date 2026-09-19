@@ -185,13 +185,17 @@ test('semantic task intent fails safe when classification is missing, malformed,
   assert.match(semanticTaskIntent, /prefer external_fact_verification so freshness protection fails safe/i)
 })
 
-test('primary routing lets semantic task intent decide whether a baseline freshness hit is really a verification task', () => {
-  const baseline = primaryRoute.indexOf('baselineRequiresFreshEvidence=requiresFreshExternalEvidence(input)')
+test('primary routing lets semantic task intent decide whether a freshness signal is really a verification task', () => {
+  const heuristic = primaryRoute.indexOf('heuristicRequiresFreshEvidence=requiresFreshExternalEvidence(input)&&!conversationRecallRequested')
   const semantic = primaryRoute.indexOf('? await classifyCosSemanticTaskIntent')
+  const semanticFresh = primaryRoute.indexOf('semanticRequiresFreshEvidence=Boolean(')
+  const baseline = primaryRoute.indexOf('baselineRequiresFreshEvidence=(heuristicRequiresFreshEvidence||semanticRequiresFreshEvidence)&&!conversationRecallRequested')
   const finalGate = primaryRoute.indexOf('requiresFreshEvidence=baselineRequiresFreshEvidence&&!semanticIntentSuppressesFreshness')
-  assert.ok(baseline >= 0)
-  assert.ok(semantic > baseline)
-  assert.ok(finalGate > semantic)
+  assert.ok(heuristic >= 0)
+  assert.ok(semantic > heuristic)
+  assert.ok(semanticFresh > semantic)
+  assert.ok(baseline > semanticFresh)
+  assert.ok(finalGate > baseline)
   assert.match(primaryRoute, /event:'freshness_semantic_intent_suppressed'/)
 })
 

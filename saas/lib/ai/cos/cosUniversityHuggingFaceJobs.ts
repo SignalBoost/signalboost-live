@@ -195,6 +195,32 @@ function workerBootstrap(packages: readonly string[]): readonly string[] {
   return Object.freeze(['bash', '-lc', shell])
 }
 
+function embeddedHostedTeacherRowsValid(candidate: any): boolean {
+  const source = clean(candidate?.source, 2000)
+  const rows = candidate?.teacherRows
+  if (!/^itmounts:\/\/cos-university\/mass-hosted-teacher\/[0-9a-f-]{36}$/i.test(source)) return false
+  if (!Array.isArray(rows) || rows.length < 20 || rows.length > 128) return false
+  const promptIds = new Set<string>()
+  const itemHashes = new Set<string>()
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') return false
+    const promptId = clean(row.promptId, 64).toLowerCase()
+    const teacherId = clean(row.teacherId, 80)
+    const provider = clean(row.provider, 80)
+    const model = clean(row.model, 240)
+    const text = clean(row.text, 50_000)
+    const itemHash = clean(row.itemHash, 64).toLowerCase()
+    if (!/^[a-f0-9]{64}$/.test(promptId) || !teacherId || !provider || !model || !text || !/^[a-f0-9]{64}$/.test(itemHash)) {
+      return false
+    }
+    if (createHash('sha256').update(text).digest('hex') !== itemHash) return false
+    if (promptIds.has(promptId) || itemHashes.has(itemHash)) return false
+    promptIds.add(promptId)
+    itemHashes.add(itemHash)
+  }
+  return true
+}
+
 function teacherEnvelopeValid(envelope: TrainingEnvelope): boolean {
   const teacher = (envelope as any)?.teacher
   const student = (envelope as any)?.student
@@ -250,8 +276,13 @@ export function buildHuggingFaceJobSpec(input: {
       'bitsandbytes>=0.46,<1',
     ])
   } else if (operation === 'prepare_dataset') {
-    const source = (input.envelope as any)?.candidate?.source
-    if (!isHuggingFaceDatasetRef(source)) throw new Error('huggingface_training_source_dataset_ref_required')
+    const candidate = (input.envelope as any)?.candidate
+    const source = candidate?.source
+    const hasPinnedHfSource = isHuggingFaceDatasetRef(source)
+    const hasEmbeddedHostedRows = embeddedHostedTeacherRowsValid(candidate)
+    if (!hasPinnedHfSource && !hasEmbeddedHostedRows) {
+      throw new Error('huggingface_training_source_dataset_ref_required')
+    }
     dockerImage = 'python:3.12-slim'
     flavor = input.config.preparationFlavor
     timeoutSeconds = input.config.preparationTimeoutSeconds

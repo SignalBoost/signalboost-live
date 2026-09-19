@@ -113,11 +113,25 @@ export async function runMassHostedTeacherStage(input: {
   const callTargets = missing.slice(0, Math.max(0, config.maxCalls - byPrompt.size))
   const failures: Array<{ promptId: string; teacherId: string; error: string }> = []
 
+  const promptIndex = new Map(
+    input.prompts.map((prompt, index) => [clean(prompt.id, 64).toLowerCase(), index] as const),
+  )
+
   for (let offset = 0; offset < callTargets.length; offset += config.parallelism) {
     const chunk = callTargets.slice(offset, offset + config.parallelism)
-    const settled = await Promise.allSettled(chunk.map(async (prompt, localIndex) => {
-      const globalIndex = offset + localIndex + byPrompt.size
-      const teacher = teachers[globalIndex % teachers.length]
+    const assignments = chunk.map(prompt => {
+      const promptId = clean(prompt.id, 64).toLowerCase()
+      const index = promptIndex.get(promptId)
+      if (!Number.isInteger(index)) throw new Error('mass_hosted_teacher_prompt_index_missing')
+      return Object.freeze({
+        prompt,
+        promptId,
+        teacher: teachers[(index as number) % teachers.length],
+      })
+    })
+
+    const settled = await Promise.allSettled(assignments.map(async assignment => {
+      const { prompt, promptId, teacher } = assignment
       const result = await generateWithUniversityTeacher({
         teacher,
         env,
@@ -140,7 +154,7 @@ export async function runMassHostedTeacherStage(input: {
         run_id: input.run.id,
         candidate_id: input.run.candidate_id,
         batch_key: input.run.batch_key,
-        prompt_id: clean(prompt.id, 64).toLowerCase(),
+        prompt_id: promptId,
         prompt_set_hash: input.promptSetHash,
         teacher_id: teacher.id,
         provider: result.provider,
@@ -162,14 +176,13 @@ export async function runMassHostedTeacherStage(input: {
     }))
 
     settled.forEach((entry, index) => {
-      const prompt = chunk[index]
-      const teacher = teachers[(offset + index + byPrompt.size) % teachers.length]
+      const assignment = assignments[index]
       if (entry.status === 'fulfilled') {
-        byPrompt.set(clean(prompt.id, 64).toLowerCase(), entry.value)
+        byPrompt.set(assignment.promptId, entry.value)
       } else {
         failures.push({
-          promptId: clean(prompt.id, 64).toLowerCase(),
-          teacherId: teacher.id,
+          promptId: assignment.promptId,
+          teacherId: assignment.teacher.id,
           error: clean(entry.reason instanceof Error ? entry.reason.message : entry.reason, 300) || 'unknown_error',
         })
       }

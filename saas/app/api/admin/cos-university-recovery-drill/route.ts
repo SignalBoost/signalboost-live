@@ -84,7 +84,13 @@ async function snapshots(db: any, drill: RecoveryDrillRecord): Promise<RecoveryD
   const recorded = ((history.data || []) as Array<{ evidence: any }>)
     .filter(row => row.evidence?.claim === 'recovery_drill_observation' && row.evidence?.snapshot)
     .map(row => row.evidence.snapshot as RecoveryDrillSnapshot)
-  return [...recorded, { checkedAt: live.checkedAt, state: live.state, reasons: live.reasons }]
+  return [...recorded, {
+    checkedAt: live.checkedAt,
+    // Recovery-drill snapshots intentionally collapse the broader lane-health taxonomy to the
+    // binary state the drill evaluator models; exact detection still comes from the preserved reasons.
+    state: live.state === 'repair_required' ? 'repair_required' : 'healthy',
+    reasons: live.reasons,
+  }]
 }
 
 /**

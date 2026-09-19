@@ -48,6 +48,8 @@ const env = {
   OPENAI_API_KEY: 'sk_123456789012345678901234567890',
   ANTHROPIC_API_KEY: 'sk-ant-123456789012345678901234567890',
   XAI_API_KEY: 'xai_123456789012345678901234567890',
+  DEEPSEEK_API_KEY: 'dsk_123456789012345678901234567890',
+  GEMINI_API_KEY: 'gai_123456789012345678901234567890',
   COS_UNIVERSITY_TEACHER_OPENAI_ENABLED: 'true',
   COS_UNIVERSITY_TEACHER_OPENAI_ADAPTER_READY: 'true',
   COS_UNIVERSITY_TEACHER_OPENAI_MODEL: 'gpt-5.6-luna',
@@ -57,6 +59,12 @@ const env = {
   COS_UNIVERSITY_TEACHER_XAI_ENABLED: 'true',
   COS_UNIVERSITY_TEACHER_GROK_ADAPTER_READY: 'true',
   COS_UNIVERSITY_TEACHER_XAI_MODEL: 'grok-4.6',
+  COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENABLED: 'true',
+  COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ADAPTER_READY: 'true',
+  COS_UNIVERSITY_TEACHER_DEEPSEEK_API_MODEL: 'deepseek-flash',
+  COS_UNIVERSITY_TEACHER_GEMINI_ENABLED: 'true',
+  COS_UNIVERSITY_TEACHER_GEMINI_ADAPTER_READY: 'true',
+  COS_UNIVERSITY_TEACHER_GEMINI_MODEL: 'gemini-3.8-flash',
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_ENABLED: 'true',
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_CALLS: '20',
   COS_UNIVERSITY_MASS_HOSTED_TEACHER_MAX_OUTPUT_TOKENS: '384',
@@ -72,7 +80,7 @@ test('mass hosted teacher stage is hard-bounded to the existing teacher ceiling 
   assert.equal(config.minimumRows, 20)
 })
 
-test('twenty prompts fan out across OpenAI, Claude and Grok and persist exact rows', async () => {
+test('twenty prompts fan out across all active hosted teachers and persist exact rows', async () => {
   const db = memoryDb()
   const prompts = Array.from({ length: 20 }, (_, index) => ({
     id: String(index + 1).padStart(64, 'a').slice(-64),
@@ -101,6 +109,12 @@ test('twenty prompts fan out across OpenAI, Claude and Grok and persist exact ro
           usage: { input_tokens: 10, output_tokens: 5 },
         }), { status: 200, headers: { 'request-id': `anthropic-${calls}` } })
       }
+      if (url.includes('generativelanguage.googleapis.com')) {
+        return new Response(JSON.stringify({
+          candidates: [{ content: { parts: [{ text }] } }],
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
+        }), { status: 200, headers: { 'x-goog-request-id': `gemini-${calls}` } })
+      }
       if (url.includes('api.openai.com/v1/responses')) {
         return new Response(JSON.stringify({
           id: `resp-${calls}`,
@@ -124,10 +138,9 @@ test('twenty prompts fan out across OpenAI, Claude and Grok and persist exact ro
   assert.equal(result.rows, 20)
   assert.equal(calls, 20)
   assert.equal(db.rows.length, 20)
-  assert.deepEqual(result.activeProviders, ['openai', 'claude', 'grok'])
-  assert.ok((result.providerMix.openai || 0) > 0)
-  assert.ok((result.providerMix.claude || 0) > 0)
-  assert.ok((result.providerMix.grok || 0) > 0)
+  assert.deepEqual(result.activeProviders, ['openai', 'claude', 'grok', 'deepseek-api', 'gemini'])
+  assert.equal(Object.values(result.providerMix).reduce((sum, value) => sum + value, 0), 20)
+  assert.ok(Object.keys(result.providerMix).every(id => result.activeProviders.includes(id)))
   assert.match(String(result.datasetHash), /^[a-f0-9]{64}$/)
   assert.ok(db.rows.every(row => /^[a-f0-9]{64}$/.test(row.response_hash)))
   assert.ok(db.rows.every(row => row.authority_expanded === false && row.silent_fallback_allowed === false))
@@ -161,8 +174,12 @@ test('production config activates the bounded parallel teacher stage without emb
   assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_OPENAI_MODEL, 'gpt-5.6-luna')
   assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_ANTHROPIC_MODEL, 'claude-sonnet-4-6')
   assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_XAI_MODEL, 'grok-4.6')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_DEEPSEEK_API_MODEL, 'deepseek-flash')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_GEMINI_MODEL, 'gemini-3.8-flash')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENABLED, 'true')
+  assert.equal(vercel.env.COS_UNIVERSITY_TEACHER_GEMINI_ENABLED, 'true')
   const serialized = JSON.stringify(vercel)
-  assert.doesNotMatch(serialized, /OPENAI_API_KEY|ANTHROPIC_API_KEY|XAI_API_KEY/)
+  assert.doesNotMatch(serialized, /OPENAI_API_KEY|ANTHROPIC_API_KEY|XAI_API_KEY|DEEPSEEK_API_KEY|GEMINI_API_KEY/)
 })
 
 
@@ -200,6 +217,7 @@ test('mass teacher lane uses provider-declared eligibility rather than a hard-co
   assert.match(source, /'openai_responses'/)
   assert.match(source, /'openai_compatible'/)
   assert.match(source, /'anthropic_messages'/)
+  assert.match(source, /'gemini_generate_content'/)
 })
 
 
@@ -222,7 +240,11 @@ test('missing teacher work reroutes to another available provider instead of wai
   const retryEnv = {
     ...env,
     XAI_API_KEY: undefined,
+    DEEPSEEK_API_KEY: undefined,
+    GEMINI_API_KEY: undefined,
     COS_UNIVERSITY_TEACHER_XAI_ENABLED: 'false',
+    COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENABLED: 'false',
+    COS_UNIVERSITY_TEACHER_GEMINI_ENABLED: 'false',
   }
 
   const fetchImpl = async (input: RequestInfo | URL, init?: RequestInit) => {

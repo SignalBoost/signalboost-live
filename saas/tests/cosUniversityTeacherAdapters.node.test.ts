@@ -101,6 +101,73 @@ test('xAI adapter uses Grok-compatible low-reasoning Chat Completions payload', 
 })
 
 
+test('DeepSeek API teacher uses the OpenAI-compatible chat contract', async () => {
+  let seenUrl = ''
+  let seenHeaders: HeadersInit | undefined
+  let body: any = null
+  const result = await generateWithUniversityTeacher({
+    teacher: byId('deepseek-api'),
+    env: {
+      DEEPSEEK_API_KEY: 'dsk_123456789012345678901234567890',
+      COS_UNIVERSITY_TEACHER_DEEPSEEK_API_MODEL: 'deepseek-flash',
+    },
+    request: { system: 'Teach carefully.', prompt: 'Explain D.', maxOutputTokens: 384 },
+    fetchImpl: async (input, init) => {
+      seenUrl = String(input)
+      seenHeaders = init?.headers
+      body = JSON.parse(String(init?.body || '{}'))
+      return new Response(JSON.stringify({
+        id: 'deepseek-1',
+        choices: [{ message: { content: 'deepseek answer' } }],
+        usage: { prompt_tokens: 15, completion_tokens: 8 },
+      }), { status: 200, headers: { 'x-request-id': 'req-d' } })
+    },
+  })
+  assert.equal(seenUrl, 'https://api.deepseek.com/chat/completions')
+  assert.match(JSON.stringify(seenHeaders), /Bearer dsk_123456789012345678901234567890/)
+  assert.equal(body.model, 'deepseek-flash')
+  assert.equal(body.max_tokens, 384)
+  assert.equal(result.text, 'deepseek answer')
+  assert.equal(result.provider, 'deepseek')
+})
+
+test('Gemini teacher uses native GenerateContent with bounded low thinking', async () => {
+  let seenUrl = ''
+  let seenHeaders: HeadersInit | undefined
+  let body: any = null
+  const result = await generateWithUniversityTeacher({
+    teacher: byId('gemini'),
+    env: {
+      GEMINI_API_KEY: 'gai_123456789012345678901234567890',
+      COS_UNIVERSITY_TEACHER_GEMINI_MODEL: 'gemini-3.8-flash',
+    },
+    request: { system: 'Teach carefully.', prompt: 'Explain G.', maxOutputTokens: 384, temperature: 0.2 },
+    fetchImpl: async (input, init) => {
+      seenUrl = String(input)
+      seenHeaders = init?.headers
+      body = JSON.parse(String(init?.body || '{}'))
+      return new Response(JSON.stringify({
+        candidates: [{ content: { parts: [
+          { thought: true, text: 'internal summary' },
+          { text: 'gemini answer' },
+        ] } }],
+        usageMetadata: { promptTokenCount: 16, candidatesTokenCount: 9 },
+      }), { status: 200, headers: { 'x-goog-request-id': 'req-gemini' } })
+    },
+  })
+  assert.equal(seenUrl, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent')
+  assert.match(JSON.stringify(seenHeaders), /x-goog-api-key/)
+  assert.equal(body.systemInstruction.parts[0].text, 'Teach carefully.')
+  assert.equal(body.contents[0].parts[0].text, 'Explain G.')
+  assert.equal(body.generationConfig.maxOutputTokens, 384)
+  assert.equal(body.generationConfig.thinkingConfig.thinkingLevel, 'low')
+  assert.equal(body.generationConfig.temperature, undefined)
+  assert.equal(result.text, 'gemini answer')
+  assert.equal(result.inputTokens, 16)
+  assert.equal(result.outputTokens, 9)
+  assert.equal(result.requestId, 'req-gemini')
+})
+
 test('provider HTTP failures expose status and safe provider error code without response body', async () => {
   await assert.rejects(
     generateWithUniversityTeacher({

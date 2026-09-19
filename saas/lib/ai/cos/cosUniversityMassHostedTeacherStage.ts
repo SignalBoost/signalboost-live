@@ -11,6 +11,7 @@ const HOSTED_TRANSPORTS: readonly UniversityTeacherTransport[] = Object.freeze([
   'openai_responses',
   'openai_compatible',
   'anthropic_messages',
+  'gemini_generate_content',
 ])
 const MIN_TEACHER_ROWS = 20
 const DEFAULT_MAX_CALLS = 20
@@ -43,7 +44,7 @@ function truthy(value: unknown): boolean {
 
 function hostedActiveTeachers(env: Env): UniversityTeacherDefinition[] {
   // Eligibility is declared by the provider definition rather than a vendor-ID whitelist. This
-  // keeps OpenAI/Claude/Grok working while allowing a buyer to add another compatible provider
+  // keeps protocol-compatible hosted teachers working while allowing a buyer to add another provider
   // without changing the mass-distillation engine. Dynamic providers remain excluded by default
   // unless the buyer explicitly marks that provider as eligible for the bounded mass stage.
   return universityTeacherPoolStatus(env).activeProviders

@@ -6,6 +6,7 @@ export type UniversityTeacherTransport =
   | 'openai_responses'
   | 'openai_compatible'
   | 'anthropic_messages'
+  | 'gemini_generate_content'
   | 'custom_adapter'
 
 export type UniversityTeacherDefinition = Readonly<{
@@ -71,6 +72,26 @@ export const UNIVERSITY_TEACHERS: readonly UniversityTeacherDefinition[] = Objec
     buyerOwnedCredential: true, provenanceRequired: true, costCeilingRequired: true, silentFallbackAllowed: false,
   }),
   Object.freeze({
+    id: 'deepseek-api', provider: 'deepseek', transport: 'openai_compatible', model: 'buyer-configured',
+    credentialEnv: 'DEEPSEEK_API_KEY', enabledEnv: 'COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENABLED',
+    adapterReadyEnv: 'COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ADAPTER_READY',
+    modelEnv: 'COS_UNIVERSITY_TEACHER_DEEPSEEK_API_MODEL',
+    endpointEnv: 'COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENDPOINT',
+    defaultEndpoint: 'https://api.deepseek.com/chat/completions',
+    massDistillationEligible: true,
+    buyerOwnedCredential: true, provenanceRequired: true, costCeilingRequired: true, silentFallbackAllowed: false,
+  }),
+  Object.freeze({
+    id: 'gemini', provider: 'gemini', transport: 'gemini_generate_content', model: 'buyer-configured',
+    credentialEnv: 'GEMINI_API_KEY', enabledEnv: 'COS_UNIVERSITY_TEACHER_GEMINI_ENABLED',
+    adapterReadyEnv: 'COS_UNIVERSITY_TEACHER_GEMINI_ADAPTER_READY',
+    modelEnv: 'COS_UNIVERSITY_TEACHER_GEMINI_MODEL',
+    endpointEnv: 'COS_UNIVERSITY_TEACHER_GEMINI_ENDPOINT',
+    defaultEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models',
+    massDistillationEligible: true,
+    buyerOwnedCredential: true, provenanceRequired: true, costCeilingRequired: true, silentFallbackAllowed: false,
+  }),
+  Object.freeze({
     id: 'custom', provider: 'custom', transport: 'custom_adapter', model: 'buyer-configured',
     credentialEnv: 'COS_UNIVERSITY_TEACHER_CUSTOM_TOKEN', enabledEnv: 'COS_UNIVERSITY_TEACHER_CUSTOM_ENABLED',
     adapterReadyEnv: 'COS_UNIVERSITY_TEACHER_CUSTOM_ADAPTER_READY',
@@ -89,6 +110,7 @@ const CONFIGURABLE_TRANSPORTS = new Set<UniversityTeacherTransport>([
   'openai_responses',
   'openai_compatible',
   'anthropic_messages',
+  'gemini_generate_content',
   'custom_adapter',
 ])
 

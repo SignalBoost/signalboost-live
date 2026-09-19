@@ -156,6 +156,47 @@ async function callOpenAiCompatible(input: UniversityTeacherAdapterInput): Promi
   })
 }
 
+async function callGeminiGenerateContent(input: UniversityTeacherAdapterInput): Promise<TeacherGenerationResult> {
+  const model = modelFor(input.teacher, input.env)
+  const credential = credentialFor(input.teacher, input.env)
+  if (!model || credential.length < 20) throw new Error('university_teacher_not_configured')
+  const baseEndpoint = validateHttpsEndpoint(endpointFor(input.teacher, input.env))
+  const basePath = baseEndpoint.pathname.replace(/\/$/, '')
+  baseEndpoint.pathname = `${basePath}/${encodeURIComponent(model)}:generateContent`
+  const timeoutMs = positiveInt(input.env.COS_UNIVERSITY_TEACHER_REQUEST_TIMEOUT_MS, 120_000, 5_000, 300_000)
+  const maxOutputTokens = positiveInt(input.request.maxOutputTokens, 1200, 64, 8192)
+  const response = await input.fetchImpl(baseEndpoint, {
+    method: 'POST',
+    headers: { 'x-goog-api-key': credential, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: clean(input.request.system, 20_000) }] },
+      contents: [{ role: 'user', parts: [{ text: clean(input.request.prompt, 100_000) }] }],
+      generationConfig: {
+        maxOutputTokens,
+        thinkingConfig: { thinkingLevel: 'low' },
+      },
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+  const payload = await readJson(response)
+  if (!response.ok) throw new Error(`university_teacher_http_${response.status}:${providerErrorDetail(payload)}`)
+  const text = clean(Array.isArray(payload?.candidates?.[0]?.content?.parts)
+    ? payload.candidates[0].content.parts
+      .filter((item: any) => item?.text && item?.thought !== true)
+      .map((item: any) => item.text)
+      .join('\n')
+    : '')
+  if (!text) throw new Error('university_teacher_empty_response')
+  return Object.freeze({
+    provider: input.teacher.provider,
+    model,
+    text,
+    inputTokens: Number.isInteger(payload?.usageMetadata?.promptTokenCount) ? payload.usageMetadata.promptTokenCount : null,
+    outputTokens: Number.isInteger(payload?.usageMetadata?.candidatesTokenCount) ? payload.usageMetadata.candidatesTokenCount : null,
+    requestId: clean(response.headers.get('x-goog-request-id'), 240) || clean(response.headers.get('x-request-id'), 240) || null,
+  })
+}
+
 async function callAnthropic(input: UniversityTeacherAdapterInput): Promise<TeacherGenerationResult> {
   const model = modelFor(input.teacher, input.env)
   const credential = credentialFor(input.teacher, input.env)
@@ -198,6 +239,7 @@ export const BUILTIN_UNIVERSITY_TEACHER_ADAPTERS: UniversityTeacherAdapterRegist
   openai_responses: callOpenAiResponses,
   openai_compatible: callOpenAiCompatible,
   anthropic_messages: callAnthropic,
+  gemini_generate_content: callGeminiGenerateContent,
   custom_adapter: callOpenAiCompatible,
 })
 

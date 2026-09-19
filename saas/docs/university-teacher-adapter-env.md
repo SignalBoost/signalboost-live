@@ -26,6 +26,22 @@ All hosted teacher providers are opt-in and buyer-owned. No provider is used unl
 - `COS_UNIVERSITY_TEACHER_XAI_MODEL=<buyer-approved model>`
 - optional `COS_UNIVERSITY_TEACHER_XAI_ENDPOINT=<HTTPS OpenAI-compatible endpoint>`
 
+## DeepSeek API
+
+- `COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENABLED=true`
+- `COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ADAPTER_READY=true`
+- `DEEPSEEK_API_KEY=<buyer secret>`
+- `COS_UNIVERSITY_TEACHER_DEEPSEEK_API_MODEL=deepseek-flash`
+- optional `COS_UNIVERSITY_TEACHER_DEEPSEEK_API_ENDPOINT=<HTTPS OpenAI-compatible endpoint>`
+
+## Google Gemini
+
+- `COS_UNIVERSITY_TEACHER_GEMINI_ENABLED=true`
+- `COS_UNIVERSITY_TEACHER_GEMINI_ADAPTER_READY=true`
+- `GEMINI_API_KEY=<buyer secret>`
+- `COS_UNIVERSITY_TEACHER_GEMINI_MODEL=gemini-3.8-flash`
+- optional `COS_UNIVERSITY_TEACHER_GEMINI_ENDPOINT=<HTTPS models base endpoint>`
+
 ## Open/self-hosted Hugging Face teachers
 
 - `HF_TOKEN=<buyer secret>`

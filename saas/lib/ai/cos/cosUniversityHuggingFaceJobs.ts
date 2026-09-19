@@ -63,6 +63,7 @@ type TrainingEnvelope = Readonly<Record<string, unknown>> & {
 const HF_DATASET_REF = /^hf:\/\/datasets\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)(?:@([A-Za-z0-9._-]+))?#([A-Za-z0-9_.-]+)$/
 const COMMIT_SHA = /^[a-f0-9]{40}$/i
 const HEX64 = /^[a-f0-9]{64}$/i
+const DISTILLATION_OPEN_LICENSES = new Set(['apache-2.0', 'mit'])
 const MAX_WORKER_REQUEST_JSON_BYTES = 1_400_000
 
 function clean(value: unknown, max = 4096): string {
@@ -202,7 +203,7 @@ function teacherEnvelopeValid(envelope: TrainingEnvelope): boolean {
   const prompts = (envelope as any)?.prompts
   return Boolean(
     teacher && student
-    && clean(teacher.modelId, 240) && COMMIT_SHA.test(clean(teacher.revision, 40)) && clean(teacher.license, 80) === 'apache-2.0'
+    && clean(teacher.modelId, 240) && COMMIT_SHA.test(clean(teacher.revision, 40)) && DISTILLATION_OPEN_LICENSES.has(clean(teacher.license, 80).toLowerCase())
     && clean(student.modelId, 240) && COMMIT_SHA.test(clean(student.revision, 40)) && clean(student.license, 80) === 'apache-2.0'
     && clean(teacher.modelId, 240) !== clean(student.modelId, 240)
     && Array.isArray(prompts) && prompts.length >= 20 && prompts.length <= 256

@@ -99,3 +99,11 @@ test('Self-Healing worker preflight recognizes the current governed wrapper with
   assert.match(hfWorker, /def _load_base_worker\(/)
   assert.match(hfWorker, /return int\(base\.main\(\)\)/)
 })
+
+
+test('Supervisor removes the exact quarantined curriculum fixture after the drill run', () => {
+  assert.match(source, /CURRICULUM_BATCHES/)
+  assert.match(source, /source_policy', 'recovery_drill_fixture_v1'/)
+  assert.match(source, /university_recovery_drill_batch_clear_not_exact/)
+  assert.match(source, /curriculumFixtureRemoved: true/)
+})

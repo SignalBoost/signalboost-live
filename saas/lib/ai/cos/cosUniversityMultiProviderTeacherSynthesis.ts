@@ -11,7 +11,7 @@ export const COS_UNIVERSITY_MULTI_PROVIDER_TEACHER_PROFILE = 'cos-university-mul
 export const MULTI_PROVIDER_TEACHER_MAX_OUTPUT_TOKENS = 384 as const
 
 type Env = Record<string, string | undefined>
-type FetchPort = typeof fetch
+type FetchPort = (url: string | URL, init?: RequestInit) => Promise<Response>
 export type TeacherPrompt = Readonly<{ id: string; prompt: string }>
 
 export type HostedTeacherSynthesis = Readonly<{
@@ -85,7 +85,7 @@ function conservativeInputTokens(system: string, prompt: string): number {
   // Deliberately conservative for pre-dispatch spend authorization. Actual provider usage replaces
   // this estimate after a successful call; two characters/token leaves headroom for punctuation,
   // code, non-English material, and provider-specific tokenization.
-  return Math.max(1, Math.ceil((system.length + prompt.length) / 2))
+  return Math.max(1, system.length + prompt.length)
 }
 
 const TEACHER_SYSTEM = [
@@ -297,6 +297,17 @@ export async function synthesizeHostedTeacherBatch(input: {
     const row: any = rows.get(clean(prompt.id, 160))
     return row?.state !== 'complete'
   })
+  const alreadyCommittedCostUsd = [...rows.values()].reduce(
+    (sum: number, row: any) => sum + Math.max(0, Number(row?.estimated_cost_usd || 0)),
+    0,
+  )
+  const nextAttemptMaximumCostUsd = pending.reduce(
+    (sum, prompt) => sum + estimatedCallMaximumCostUsd(prompt, pricing),
+    0,
+  )
+  if (alreadyCommittedCostUsd + nextAttemptMaximumCostUsd > input.maximumAuthorizedHostedCostUsd + 1e-9) {
+    throw new Error('multi_provider_teacher_retry_budget_exhausted')
+  }
   const concurrency = Math.max(1, Math.min(16, Math.floor(Number(env.COS_UNIVERSITY_MULTI_PROVIDER_TEACHER_CONCURRENCY || 8))))
   let cursor = 0
   const failures: string[] = []
@@ -306,6 +317,7 @@ export async function synthesizeHostedTeacherBatch(input: {
       const prompt = pending[cursor++]
       const row: any = rows.get(clean(prompt.id, 160))
       const perCallMaximum = estimatedCallMaximumCostUsd(prompt, pricing)
+      const priorCommittedCostUsd = Math.max(0, Number(row?.estimated_cost_usd || 0))
       try {
         const result = await generateWithUniversityTeacher({
           teacher: input.teacher,
@@ -325,12 +337,13 @@ export async function synthesizeHostedTeacherBatch(input: {
         const response = sanitizeTeacherResponse(result.text)
         if (!response) throw new Error('multi_provider_teacher_response_invalid')
         const responseHash = sha256(`<user>\n${prompt.prompt}\n\n<assistant>\n${response}`)
-        const estimatedCostUsd = actualCostUsd(
+        const callCostUsd = actualCostUsd(
           result.inputTokens,
           result.outputTokens,
           pricing,
           perCallMaximum,
         )
+        const estimatedCostUsd = Number((priorCommittedCostUsd + callCostUsd).toFixed(8))
         const updated = await db.from('cos_university_mass_distillation_teacher_outputs')
           .update({
             state: 'complete',
@@ -416,6 +429,6 @@ export async function synthesizeHostedTeacherBatch(input: {
     inputTokens,
     outputTokens,
     estimatedCostUsd,
-    maximumAuthorizedHostedCostUsd: Number(maximumBatchCost.toFixed(8)),
+    maximumAuthorizedHostedCostUsd: estimatedCostUsd,
   })
 }

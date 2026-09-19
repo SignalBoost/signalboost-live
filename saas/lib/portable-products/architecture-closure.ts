@@ -34,6 +34,8 @@ const declared = Object.freeze<Record<string, Omit<PortableArchitectureEntry, 'p
   'browser-agent-ecosystem': { coreBoundary: 'saas/lib/portable-browser', hostBoundary: 'PortableBrowserRuntimeCoordinator + buyer-injected ports', state: 'complete', blockers: Object.freeze([]) },
   'agent-operations-platform': { coreBoundary: 'saas/lib/agent-runtime', hostBoundary: 'saas/agent-operations-host', state: 'complete', blockers: Object.freeze([]) },
   'self-healing-supervisor': { coreBoundary: 'saas/lib/supervisor/portable', hostBoundary: 'HostContext + createSupervisorDispatcher', state: 'complete', blockers: Object.freeze([]) },
+  'ai-university': { coreBoundary: 'saas/lib/portable-university', hostBoundary: 'saas/lib/ai/cos + scheduled University routes', state: 'partial', blockers: Object.freeze(['buyer-neutral-host-extraction-pending']) },
+  'ai-distillation-engine': { coreBoundary: 'saas/lib/ai/cos/cosUniversityMassDistillation*', hostBoundary: 'scheduled distillation + evaluator + buyer training provider', state: 'partial', blockers: Object.freeze(['buyer-neutral-training-provider-port-pending']) },
 })
 
 function freezeEntry(productId: string, value: Omit<PortableArchitectureEntry, 'productId'>): PortableArchitectureEntry {

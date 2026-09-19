@@ -35,12 +35,22 @@ test('failure-derived source identities are deterministic and self-attributing w
   assert.equal(failureDerivedOrdinalForHash('Cybersecurity', hash), null)
 })
 
-test('teacher synthetic source identities are deterministic and reversible within bounded batch ordinals', () => {
+test('teacher synthetic source identities keep legacy reversibility and support fresh per-slot generations', () => {
   const hash = teacherSyntheticSourceHash('Software Testing', 7)
   assert.match(hash, /^[a-f0-9]{64}$/)
   assert.equal(teacherSyntheticSourceHash('Software Testing', 7), hash)
   assert.equal(syntheticOrdinalForHash('Software Testing', hash), 7)
   assert.equal(syntheticOrdinalForHash('Different Subject', hash), null)
+
+  const slotA = teacherSyntheticSourceHash('Software Testing', 7, 'distillation-replenishment-202609190230')
+  const slotB = teacherSyntheticSourceHash('Software Testing', 7, 'distillation-replenishment-202609190235')
+  assert.match(slotA, /^[a-f0-9]{64}$/)
+  assert.notEqual(slotA, hash)
+  assert.notEqual(slotA, slotB)
+  assert.equal(
+    teacherSyntheticSourceHash('Software Testing', 7, 'distillation-replenishment-202609190230'),
+    slotA,
+  )
 })
 
 test('synthetic teacher prompt is self-contained and excludes private/current-web claims', () => {
@@ -63,5 +73,7 @@ test('curriculum replenishment keeps real acquisition first, adds verified-failu
   assert.match(replenishment, /source_kind: 'teacher_synthetic_curriculum'/)
   assert.match(replenishment, /origin: 'teacher_synthetic'/)
   assert.match(replenishment, /fallbackOnly: true/)
-  assert.match(replenishment, /sourceMix: \['real_source', 'failure_derived', 'teacher_synthetic'\]/)
+  assert.match(replenishment, /const generationKey = slotKey\(input\.now\)/)
+  assert.match(replenishment, /teacherSyntheticSourceHash\(target\.subject, ordinal, generationKey\)/)
+  assert.match(replenishment, /sourceMix: \['real_source', 'failure_derived', 'hosted_teacher', 'teacher_synthetic'\]/)
 })

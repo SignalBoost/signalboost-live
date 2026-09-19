@@ -77,3 +77,15 @@ test('closure runs in the workflow, records why, and authorizes no retry or traf
   assert.match(workflow, /&& terminalCleanup\.ok === true/)
   assert.equal(DISTILLATION_CAMPAIGN_CLOSURE_PROFILE, 'cos-university-distillation-campaign-closure-v1')
 })
+
+
+test('terminal cleanup quarantines already-consumed prepared batches from failed campaigns', () => {
+  const cleanup = source('../lib/ai/cos/cosUniversityMassDistillationTerminalCleanup.ts')
+  assert.match(cleanup, /mass_distillation_failed_batch_quarantined/)
+  assert.match(cleanup, /\.eq\('stage', 'failed'\)/)
+  assert.match(cleanup, /status: 'quarantined'/)
+  assert.match(cleanup, /\.eq\('status', 'prepared'\)/)
+  assert.match(cleanup, /reusablePreparedInventory: false/)
+  assert.match(cleanup, /quarantinedBatches/)
+  assert.doesNotMatch(cleanup, /dispatch_authorized:\s*true/)
+})

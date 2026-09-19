@@ -207,7 +207,13 @@ export async function runCosUniversityMassDistillationWorkflow(input: {
         queriesPerSubject: throughput.queriesPerSubject,
         maxCandidatesPerCycle: throughput.acquisitionCandidatesPerCycle,
       })) }
-      if (Number(curriculumReplenishment.accepted || 0) > 0) {
+      const replenishmentMaterialInserted = [
+        curriculumReplenishment.accepted,
+        curriculumReplenishment.failureDerivedInserted,
+        curriculumReplenishment.hostedTeacherInserted,
+        curriculumReplenishment.syntheticInserted,
+      ].reduce<number>((sum, value) => sum + Math.max(0, Number(value || 0)), 0)
+      if (replenishmentMaterialInserted > 0) {
         curriculum = { ok: true, ...(await prepareUniversityMassDistillationCurriculum(now, {
           corpusScanRows: throughput.corpusScanRows,
           maxBatchesPerSweep: throughput.maxBatchesPerSweep,

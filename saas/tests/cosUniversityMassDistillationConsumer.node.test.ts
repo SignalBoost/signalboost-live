@@ -120,3 +120,12 @@ test('recovery terminalizes pre-existing semantic failures and frees their prepa
   assert.match(consumer, /productionTrafficAuthorized: false/)
   assert.match(consumer, /completed_at: terminalizedAt/)
 })
+
+
+test('artifact source attribution uses stored source kinds so rotating synthetic hashes remain correctly classified', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /select\('content_hash,source_kind'\)/)
+  assert.match(consumer, /sourceKind === 'failure_derived_curriculum'/)
+  assert.match(consumer, /sourceKind === 'teacher_synthetic_curriculum' \|\| sourceKind === 'teacher_hosted_curriculum'/)
+  assert.match(consumer, /declaredOrigins,/)
+})

@@ -56,8 +56,15 @@ export function failureDerivedSourceHash(subjectId: string, ordinal: number): st
   return hash({ profile: HYBRID_DISTILLATION_PROFILE, origin: 'failure_derived', subjectId, ordinal })
 }
 
-export function teacherSyntheticSourceHash(subjectId: string, ordinal: number): string {
-  return hash({ profile: HYBRID_DISTILLATION_PROFILE, origin: 'teacher_synthetic', subjectId, ordinal })
+export function teacherSyntheticSourceHash(subjectId: string, ordinal: number, generationKey?: string): string {
+  const identity: Record<string, unknown> = {
+    profile: HYBRID_DISTILLATION_PROFILE,
+    origin: 'teacher_synthetic',
+    subjectId,
+    ordinal,
+  }
+  if (generationKey) identity.generationKey = generationKey
+  return hash(identity)
 }
 
 export function teacherSyntheticPrompt(subjectId: string, ordinal: number): Readonly<{ id: string; prompt: string }> {

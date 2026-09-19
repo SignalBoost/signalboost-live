@@ -1268,9 +1268,32 @@ export async function recordMassDistillationWorkerEvidence(
       .eq('batch_key', run.batch_key)
       .maybeSingle()
     if (!batch.error && batch.data) {
+      const sourceHashes = Array.isArray(batch.data.source_hashes)
+        ? batch.data.source_hashes.map((value: unknown) => String(value))
+        : []
+      const declaredOrigins: Record<string, 'real_source' | 'failure_derived' | 'teacher_synthetic'> = {}
+      if (sourceHashes.length) {
+        const sources = await db.from('cos_continuous_learning')
+          .select('content_hash,source_kind')
+          .in('content_hash', sourceHashes)
+          .limit(128)
+        if (!sources.error) {
+          for (const source of sources.data || []) {
+            const contentHash = clean((source as any).content_hash, 64).toLowerCase()
+            const sourceKind = clean((source as any).source_kind, 80)
+            if (!HEX64.test(contentHash)) continue
+            declaredOrigins[contentHash] = sourceKind === 'failure_derived_curriculum'
+              ? 'failure_derived'
+              : sourceKind === 'teacher_synthetic_curriculum' || sourceKind === 'teacher_hosted_curriculum'
+                ? 'teacher_synthetic'
+                : 'real_source'
+          }
+        }
+      }
       const attribution = attributeDistillationSources({
         subjectId: String(run.subject_id || ''),
-        sourceHashes: Array.isArray(batch.data.source_hashes) ? batch.data.source_hashes.map((value: unknown) => String(value)) : [],
+        sourceHashes,
+        declaredOrigins,
       })
       await recordAssurance({
         candidateId, subjectId: run.subject_id, claim: DISTILLATION_SOURCE_ATTRIBUTION_CLAIM,

@@ -317,3 +317,25 @@ test('repository write-back rechecks branch freshness immediately before mutatio
   assert.equal(result.error, 'builder_repository_write_target_superseded')
   assert.equal(requests.length, 1)
 })
+
+
+test('self-contained writing bypasses public identity, Software Specialist and visual semantic classifiers before shared COS', () => {
+  const source = read('../app/api/cos-browser/route.ts')
+  const fast = source.indexOf('const fastAuthoringIngress =')
+  const identity = source.indexOf('resolveSemanticPublicIdentity(prompt)')
+  const specialist = source.indexOf('await tryCosSoftwareSpecialist({')
+  const visual = source.indexOf('await resolveSemanticVisualRequest(messages, prompt)')
+  const sharedCos = source.indexOf('cosPrimaryPost(req)', fast)
+
+  assert.ok(fast >= 0)
+  assert.ok(sharedCos > fast)
+  assert.ok(identity > fast)
+  assert.ok(specialist > fast)
+  assert.ok(visual > fast)
+  assert.ok(sharedCos < identity)
+  assert.ok(sharedCos < specialist)
+  assert.ok(sharedCos < visual)
+  assert.match(source, /isAuthoringObjectiveWithoutLiveLookup\(prompt\)/)
+  assert.match(source, /!isCosCodingObjective\(prompt, routingContext\)/)
+  assert.match(source, /!isConciergeVisualObjective\(prompt\)/)
+})

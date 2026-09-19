@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import {
   buildUniversityMassDistillationIncident,
+  deriveCurriculumPackagingProgress,
   evaluateUniversityMassDistillationHealth,
   UNIVERSITY_DISTILLATION_RECOVERY_TARGET,
 } from '../self-healing-host/university-distillation-monitoring.ts'
@@ -108,6 +109,87 @@ test('continuity states distinguish supply wait, repairable campaign gap, rollin
   })
   assert.equal(unauthorized.state, 'authorization_required')
   assert.deepEqual(unauthorized.reasons, ['rolling_authorization_disabled'])
+})
+
+test('same-subject replenishment that satisfies the shortfall but yields zero packages is a repairable progress defect', () => {
+  const progress = deriveCurriculumPackagingProgress([{
+    observed_at: '2026-09-15T11:56:00.000Z',
+    commit_sha: 'abc123',
+    evidence: {
+      slowMaintenanceDue: true,
+      preparedBeforeReplenishment: 0,
+      preparedAfterReplenishment: 0,
+      curriculum: {
+        batchesPrepared: 0,
+        supply: { subjects: [{ subject: 'Statistics & Data Science', shortfallToBatch: 16 }] },
+      },
+      curriculumReplenishment: {
+        failureDerivedBySubject: [{ subject: 'Statistics & Data Science', inserted: 2 }],
+        syntheticBySubject: [{ subject: 'Statistics & Data Science', inserted: 16 }],
+      },
+    },
+  }])
+  assert.equal(progress.stalled, true)
+  assert.equal(progress.subject, 'Statistics & Data Science')
+  assert.equal(progress.shortfallToBatch, 16)
+  assert.equal(progress.insertedForSubject, 18)
+
+  const snapshot = evaluateUniversityMassDistillationHealth({
+    now,
+    expectedIntervalSeconds: 300,
+    campaigns: [],
+    receipt,
+    workflowRuns: [],
+    providerJobs: [],
+    curriculumProgress: progress,
+    continuity: {
+      preparedBatches: 0,
+      rollingPolicyEnabled: true,
+      rollingMaximumAuthorizedCostUsd: null,
+      rollingAuthorizedCostUsd: 10.95,
+      nextBudgetReleaseAt: null,
+    },
+  })
+  assert.equal(snapshot.state, 'repair_required')
+  assert.deepEqual(snapshot.reasons, ['curriculum_packaging_stalled'])
+  assert.equal(snapshot.automaticRecoveryAuthorized, true)
+  assert.equal(snapshot.curriculumProgressSubject, 'Statistics & Data Science')
+  const incident = buildUniversityMassDistillationIncident(snapshot)
+  assert.equal(incident.severity, 'critical')
+  assert.equal(incident.metadata.curriculumPackagingStalled, true)
+  assert.equal(incident.metadata.curriculumProgressInsertedForSubject, 18)
+  assert.equal(incident.metadata.recoveryPreauthorized, true)
+})
+
+test('freshly satisfied packaging progress clears the defect instead of replaying an old contradiction', () => {
+  const progress = deriveCurriculumPackagingProgress([{
+    observed_at: '2026-09-15T11:56:00.000Z',
+    commit_sha: 'abc123',
+    evidence: {
+      slowMaintenanceDue: true,
+      preparedBeforeReplenishment: 0,
+      preparedAfterReplenishment: 2,
+      curriculum: {
+        batchesPrepared: 2,
+        supply: { subjects: [{ subject: 'Statistics & Data Science', shortfallToBatch: 16 }] },
+      },
+      curriculumReplenishment: {
+        syntheticBySubject: [{ subject: 'Statistics & Data Science', inserted: 16 }],
+      },
+    },
+  }, {
+    observed_at: '2026-09-15T11:51:00.000Z',
+    commit_sha: 'old',
+    evidence: {
+      slowMaintenanceDue: true,
+      preparedBeforeReplenishment: 0,
+      preparedAfterReplenishment: 0,
+      curriculum: { batchesPrepared: 0, supply: { subjects: [{ subject: 'Statistics & Data Science', shortfallToBatch: 16 }] } },
+      curriculumReplenishment: { syntheticBySubject: [{ subject: 'Statistics & Data Science', inserted: 16 }] },
+    },
+  }])
+  assert.equal(progress.stalled, false)
+  assert.equal(progress.preparedAfter, 2)
 })
 
 test('a broken control-loop heartbeat is repairable even while curriculum supply is empty', () => {

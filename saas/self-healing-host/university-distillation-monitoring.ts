@@ -47,6 +47,16 @@ type RollingContinuityInput = Readonly<{
   nextBudgetReleaseAt: string | null
 }>
 
+export type CurriculumPackagingProgress = Readonly<{
+  stalled: boolean
+  observedAt: string | null
+  subject: string | null
+  shortfallToBatch: number
+  insertedForSubject: number
+  preparedBefore: number
+  preparedAfter: number
+}>
+
 export type UniversityDistillationHealthReason =
   | 'heartbeat_missing'
   | 'heartbeat_stale'
@@ -58,6 +68,7 @@ export type UniversityDistillationHealthReason =
   | 'provider_job_unsettled'
   | 'provider_job_overdue'
   | 'prepared_campaign_not_authorized'
+  | 'curriculum_packaging_stalled'
   | 'curriculum_supply_waiting'
   | 'rolling_budget_exhausted'
   | 'rolling_authorization_disabled'
@@ -87,6 +98,13 @@ export interface UniversityDistillationHealthSnapshot {
   committedCostUsd: number
   remainingAuthorizedCostUsd: number
   preparedBatches: number
+  curriculumPackagingStalled: boolean
+  curriculumProgressObservedAt: string | null
+  curriculumProgressSubject: string | null
+  curriculumProgressShortfallToBatch: number
+  curriculumProgressInsertedForSubject: number
+  curriculumProgressPreparedBefore: number
+  curriculumProgressPreparedAfter: number
   rollingPolicyEnabled: boolean
   rollingMaximumAuthorizedCostUsd: number | null
   rollingCeilingRemoved: boolean
@@ -111,6 +129,61 @@ const ageSeconds = (timestamp: unknown, nowMs: number): number | null => {
 
 const unique = <T>(values: readonly T[]): T[] => [...new Set(values)]
 
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+}
+
+function bySubjectInserted(value: unknown, subject: string): number {
+  if (!Array.isArray(value)) return 0
+  return value.reduce((sum, row) => {
+    const item = record(row)
+    return item && String(item.subject || '').trim() === subject
+      ? sum + Math.max(0, Math.floor(finite(item.inserted)))
+      : sum
+  }, 0)
+}
+
+/**
+ * Detect an exact upstream-to-downstream progress contradiction from the latest slow-maintenance
+ * receipt. Empty supply alone is not a defect. The invariant trips only when the same canonical
+ * subject received enough newly inserted curriculum to satisfy its recorded shortfall, yet the
+ * packaging pass still produced no prepared batch.
+ */
+export function deriveCurriculumPackagingProgress(receipts: readonly ReceiptRow[]): CurriculumPackagingProgress {
+  const maintenance = receipts.find(row => record(row.evidence)?.slowMaintenanceDue === true) || null
+  if (!maintenance) {
+    return Object.freeze({ stalled: false, observedAt: null, subject: null, shortfallToBatch: 0, insertedForSubject: 0, preparedBefore: 0, preparedAfter: 0 })
+  }
+  const evidence = record(maintenance.evidence) || {}
+  const curriculum = record(evidence.curriculum) || {}
+  const supply = record(curriculum.supply) || {}
+  const replenishment = record(evidence.curriculumReplenishment) || {}
+  const preparedBefore = Math.max(0, Math.floor(finite(evidence.preparedBeforeReplenishment)))
+  const preparedAfter = Math.max(0, Math.floor(finite(evidence.preparedAfterReplenishment)))
+  const batchesPrepared = Math.max(0, Math.floor(finite(curriculum.batchesPrepared)))
+  if (preparedAfter > 0 || batchesPrepared > 0) {
+    return Object.freeze({ stalled: false, observedAt: maintenance.observed_at, subject: null, shortfallToBatch: 0, insertedForSubject: 0, preparedBefore, preparedAfter })
+  }
+
+  const subjects = Array.isArray(supply.subjects) ? supply.subjects : []
+  for (const raw of subjects) {
+    const item = record(raw)
+    const subject = String(item?.subject || '').trim()
+    const shortfallToBatch = Math.max(0, Math.floor(finite(item?.shortfallToBatch)))
+    if (!subject || shortfallToBatch <= 0) continue
+    const insertedForSubject = [
+      replenishment.syntheticBySubject,
+      replenishment.failureDerivedBySubject,
+      replenishment.hostedTeacherBySubject,
+      replenishment.acceptedBySubject,
+    ].reduce<number>((sum, value) => sum + bySubjectInserted(value, subject), 0)
+    if (insertedForSubject >= shortfallToBatch) {
+      return Object.freeze({ stalled: true, observedAt: maintenance.observed_at, subject, shortfallToBatch, insertedForSubject, preparedBefore, preparedAfter })
+    }
+  }
+  return Object.freeze({ stalled: false, observedAt: maintenance.observed_at, subject: null, shortfallToBatch: 0, insertedForSubject: 0, preparedBefore, preparedAfter })
+}
+
 export function evaluateUniversityMassDistillationHealth(input: {
   now: Date
   expectedIntervalSeconds: number
@@ -119,6 +192,7 @@ export function evaluateUniversityMassDistillationHealth(input: {
   workflowRuns: readonly WorkflowRunRow[]
   providerJobs: readonly ProviderJobRow[]
   continuity?: RollingContinuityInput
+  curriculumProgress?: CurriculumPackagingProgress
 }): UniversityDistillationHealthSnapshot {
   const nowMs = input.now.getTime()
   const expectedIntervalSeconds = Math.max(60, Math.min(3600, Math.floor(input.expectedIntervalSeconds)))
@@ -164,6 +238,8 @@ export function evaluateUniversityMassDistillationHealth(input: {
   const committedCostUsd = input.campaigns.reduce((sum, campaign) => sum + finite(campaign.committed_cost_usd), 0)
   const remainingAuthorizedCostUsd = Math.max(0, authorizedCostUsd - committedCostUsd)
   const preparedBatches = Math.max(0, Math.floor(finite(input.continuity?.preparedBatches)))
+  const curriculumProgress = input.curriculumProgress ?? Object.freeze({ stalled: false, observedAt: null, subject: null, shortfallToBatch: 0, insertedForSubject: 0, preparedBefore: 0, preparedAfter: 0 })
+  const curriculumPackagingStalled = curriculumProgress.stalled === true
   const rollingPolicyEnabled = input.continuity?.rollingPolicyEnabled === true
   const rollingCeilingRemoved = rollingPolicyEnabled && input.continuity?.rollingMaximumAuthorizedCostUsd == null
   const rollingMaximumAuthorizedCostUsd = rollingCeilingRemoved
@@ -195,6 +271,10 @@ export function evaluateUniversityMassDistillationHealth(input: {
     } else if (!rollingBatchAffordable) {
       state = 'budget_paused'
       reasons.push('rolling_budget_exhausted')
+    } else if (preparedBatches === 0 && curriculumPackagingStalled) {
+      state = 'repair_required'
+      reasons.push('curriculum_packaging_stalled')
+      automaticRecoveryAuthorized = true
     } else if (preparedBatches === 0) {
       state = 'waiting_for_curriculum'
       reasons.push('curriculum_supply_waiting')
@@ -211,7 +291,15 @@ export function evaluateUniversityMassDistillationHealth(input: {
       workflowProgressAgeSeconds: null, failedRuns: 0, staleFailedRuns: 0,
       unsettledProviderJobs: input.providerJobs.length, overdueProviderJobs: overdueProviderJobs.length,
       authorizedCostUsd: 0, committedCostUsd: 0, remainingAuthorizedCostUsd: 0,
-      preparedBatches, rollingPolicyEnabled,
+      preparedBatches,
+      curriculumPackagingStalled,
+      curriculumProgressObservedAt: curriculumProgress.observedAt,
+      curriculumProgressSubject: curriculumProgress.subject,
+      curriculumProgressShortfallToBatch: curriculumProgress.shortfallToBatch,
+      curriculumProgressInsertedForSubject: curriculumProgress.insertedForSubject,
+      curriculumProgressPreparedBefore: curriculumProgress.preparedBefore,
+      curriculumProgressPreparedAfter: curriculumProgress.preparedAfter,
+      rollingPolicyEnabled,
       rollingMaximumAuthorizedCostUsd: rollingMaximumAuthorizedCostUsd == null
         ? null
         : Number(rollingMaximumAuthorizedCostUsd.toFixed(6)),
@@ -273,6 +361,13 @@ export function evaluateUniversityMassDistillationHealth(input: {
     committedCostUsd: Number(committedCostUsd.toFixed(6)),
     remainingAuthorizedCostUsd: Number(remainingAuthorizedCostUsd.toFixed(6)),
     preparedBatches,
+    curriculumPackagingStalled,
+    curriculumProgressObservedAt: curriculumProgress.observedAt,
+    curriculumProgressSubject: curriculumProgress.subject,
+    curriculumProgressShortfallToBatch: curriculumProgress.shortfallToBatch,
+    curriculumProgressInsertedForSubject: curriculumProgress.insertedForSubject,
+    curriculumProgressPreparedBefore: curriculumProgress.preparedBefore,
+    curriculumProgressPreparedAfter: curriculumProgress.preparedAfter,
     rollingPolicyEnabled,
     rollingMaximumAuthorizedCostUsd: rollingMaximumAuthorizedCostUsd == null
       ? null
@@ -298,7 +393,7 @@ export async function readUniversityMassDistillationHealth(input: {
   const cadence = hostCronCadence(COS_UNIVERSITY_MASS_DISTILLATION_CRON_PATH)
   const expectedIntervalSeconds = cadence?.maximumIntervalSeconds ?? 60
   const windowStart = new Date(now.getTime() - 24 * 60 * 60_000).toISOString()
-  const [campaignsResult, receiptResult, policyResult, windowResult, preparedResult, providerResult] = await Promise.all([
+  const [campaignsResult, receiptResult, progressReceiptsResult, policyResult, windowResult, preparedResult, providerResult] = await Promise.all([
     input.db.from('cos_university_mass_distillation_campaigns')
       .select('id,status,authorized_at,expires_at,max_total_cost_usd,committed_cost_usd')
       .in('status', ['authorized', 'active', 'failed'])
@@ -312,6 +407,13 @@ export async function readUniversityMassDistillationHealth(input: {
       .order('observed_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    input.db.from('cos_university_learning_assurance_events')
+      .select('observed_at,commit_sha,evidence')
+      .eq('event_type', 'production_path')
+      .eq('path_id', 'mass_distillation_campaign')
+      .gte('observed_at', new Date(now.getTime() - 30 * 60_000).toISOString())
+      .order('observed_at', { ascending: false })
+      .limit(30),
     input.db.from('cos_university_mass_distillation_rolling_policy')
       .select('enabled,max_authorized_cost_usd,rolling_window')
       .eq('policy_key', 'owner-rolling-24h-v1')
@@ -341,6 +443,7 @@ export async function readUniversityMassDistillationHealth(input: {
   if (campaignsResult.error) throw new Error(`university_distillation_campaign_health_read_failed:${String(campaignsResult.error.message || 'unknown').slice(0, 180)}`)
   const campaigns = (campaignsResult.data || []) as CampaignRow[]
   if (receiptResult.error) throw new Error(`university_distillation_heartbeat_read_failed:${String(receiptResult.error.message || 'unknown').slice(0, 180)}`)
+  if (progressReceiptsResult.error) throw new Error(`university_distillation_progress_receipts_read_failed:${String(progressReceiptsResult.error.message || 'unknown').slice(0, 180)}`)
   if (policyResult.error) throw new Error(`university_distillation_rolling_policy_read_failed:${String(policyResult.error.message || 'unknown').slice(0, 180)}`)
   if (windowResult.error) throw new Error(`university_distillation_rolling_window_read_failed:${String(windowResult.error.message || 'unknown').slice(0, 180)}`)
   if (preparedResult.error) throw new Error(`university_distillation_prepared_queue_read_failed:${String(preparedResult.error.message || 'unknown').slice(0, 180)}`)
@@ -380,6 +483,8 @@ export async function readUniversityMassDistillationHealth(input: {
     workflowRuns = (runsResult.data || []) as WorkflowRunRow[]
   }
 
+  const curriculumProgress = deriveCurriculumPackagingProgress((progressReceiptsResult.data || []) as ReceiptRow[])
+
   return evaluateUniversityMassDistillationHealth({
     now,
     expectedIntervalSeconds,
@@ -387,6 +492,7 @@ export async function readUniversityMassDistillationHealth(input: {
     receipt: (receiptResult.data || null) as ReceiptRow | null,
     workflowRuns,
     providerJobs,
+    curriculumProgress,
     continuity: {
       preparedBatches,
       rollingPolicyEnabled: policy?.enabled === true,
@@ -425,6 +531,13 @@ async function recordHealthSample(db: any, snapshot: UniversityDistillationHealt
       unsettledProviderJobs: snapshot.unsettledProviderJobs,
       overdueProviderJobs: snapshot.overdueProviderJobs,
       preparedBatches: snapshot.preparedBatches,
+      curriculumPackagingStalled: snapshot.curriculumPackagingStalled,
+      curriculumProgressObservedAt: snapshot.curriculumProgressObservedAt,
+      curriculumProgressSubject: snapshot.curriculumProgressSubject,
+      curriculumProgressShortfallToBatch: snapshot.curriculumProgressShortfallToBatch,
+      curriculumProgressInsertedForSubject: snapshot.curriculumProgressInsertedForSubject,
+      curriculumProgressPreparedBefore: snapshot.curriculumProgressPreparedBefore,
+      curriculumProgressPreparedAfter: snapshot.curriculumProgressPreparedAfter,
       rollingPolicyEnabled: snapshot.rollingPolicyEnabled,
       rollingMaximumAuthorizedCostUsd: snapshot.rollingMaximumAuthorizedCostUsd,
       rollingCeilingRemoved: snapshot.rollingCeilingRemoved,
@@ -446,11 +559,13 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
     reasons: snapshot.reasons,
     receipt: snapshot.latestReceiptAt,
     preparedBatches: snapshot.preparedBatches,
+    curriculumProgressObservedAt: snapshot.curriculumProgressObservedAt,
     rollingAuthorizedCostUsd: snapshot.rollingAuthorizedCostUsd,
   })).digest('hex').slice(0, 20)
   const critical = snapshot.reasons.some(reason => [
     'heartbeat_missing', 'heartbeat_stale', 'workflow_failed', 'campaign_failed',
     'claimable_stage_stalled', 'dispatch_claim_stalled', 'provider_job_overdue',
+    'curriculum_packaging_stalled',
   ].includes(reason))
   return incidentSchema.parse({
     incidentId: `cos-university-distillation-${fingerprint}-${Math.floor(Date.parse(snapshot.checkedAt) / 300_000)}`,
@@ -480,6 +595,11 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
         summary: `${snapshot.claimableRuns} claimable run(s); ${snapshot.stalledDispatchRuns} stalled dispatch claim(s); ${snapshot.staleFailedRuns} stale failed run(s); ${snapshot.overdueProviderJobs} overdue unsettled provider job(s).`,
         reference: COS_UNIVERSITY_MASS_DISTILLATION_CRON_PATH,
       },
+      ...(snapshot.curriculumPackagingStalled ? [{
+        evidenceId: `${fingerprint}:packaging`, type: 'university_distillation_packaging_progress', capturedAt: snapshot.checkedAt,
+        summary: `Packaging progress invariant failed for ${snapshot.curriculumProgressSubject || 'unknown subject'}: recorded shortfall ${snapshot.curriculumProgressShortfallToBatch}, same-subject inserted ${snapshot.curriculumProgressInsertedForSubject}, prepared before ${snapshot.curriculumProgressPreparedBefore}, prepared after ${snapshot.curriculumProgressPreparedAfter}.`,
+        reference: 'db://cos_university_learning_assurance_events/mass_distillation_campaign',
+      }] : []),
       {
         evidenceId: `${fingerprint}:continuity`, type: 'university_distillation_rolling_authority', capturedAt: snapshot.checkedAt,
         summary: snapshot.rollingCeilingRemoved
@@ -502,7 +622,15 @@ export function buildUniversityMassDistillationIncident(snapshot: UniversityDist
       unsettledProviderJobs: snapshot.unsettledProviderJobs, overdueProviderJobs: snapshot.overdueProviderJobs,
       authorizedCostUsd: snapshot.authorizedCostUsd, committedCostUsd: snapshot.committedCostUsd,
       remainingAuthorizedCostUsd: snapshot.remainingAuthorizedCostUsd,
-      preparedBatches: snapshot.preparedBatches, rollingPolicyEnabled: snapshot.rollingPolicyEnabled,
+      preparedBatches: snapshot.preparedBatches,
+      curriculumPackagingStalled: snapshot.curriculumPackagingStalled,
+      curriculumProgressObservedAt: snapshot.curriculumProgressObservedAt,
+      curriculumProgressSubject: snapshot.curriculumProgressSubject,
+      curriculumProgressShortfallToBatch: snapshot.curriculumProgressShortfallToBatch,
+      curriculumProgressInsertedForSubject: snapshot.curriculumProgressInsertedForSubject,
+      curriculumProgressPreparedBefore: snapshot.curriculumProgressPreparedBefore,
+      curriculumProgressPreparedAfter: snapshot.curriculumProgressPreparedAfter,
+      rollingPolicyEnabled: snapshot.rollingPolicyEnabled,
       rollingMaximumAuthorizedCostUsd: snapshot.rollingMaximumAuthorizedCostUsd,
       rollingCeilingRemoved: snapshot.rollingCeilingRemoved,
       rollingAuthorizedCostUsd: snapshot.rollingAuthorizedCostUsd,

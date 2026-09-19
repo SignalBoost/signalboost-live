@@ -3,16 +3,17 @@ import { listBuilderContinuations } from '@/lib/builder/job-store'
 import { runBuilderJob } from '@/lib/builder/job-runner'
 import { getAdminSupabase } from '@/utils/supabase/server'
 import { retryFailedOwnedAuditEngineRepair } from '@/self-healing-host/owned-audit-self-healing'
+import { retryFailedUniversityDistillationRepair } from '@/self-healing-host/university-distillation-autonomous-repair'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
-type OwnedRepairKind = 'site' | 'audit'
+type OwnedRepairKind = 'site' | 'audit' | 'university'
 type QueuedOwnedRepair = { id: string; userId: string; kind: OwnedRepairKind; createdAt: string }
 
 async function queuedOwnedRepair(
-  metadataKey: 'selfHealingOwnedSite' | 'selfHealingOwnedAudit',
+  metadataKey: 'selfHealingOwnedSite' | 'selfHealingOwnedAudit' | 'selfHealingUniversityDistillation',
   kind: OwnedRepairKind,
 ): Promise<QueuedOwnedRepair | null> {
   const db = getAdminSupabase()
@@ -34,11 +35,12 @@ async function queuedOwnedRepair(
 }
 
 async function queuedOwnedSelfHealingRepairs(): Promise<QueuedOwnedRepair[]> {
-  const [site, audit] = await Promise.all([
+  const [site, audit, university] = await Promise.all([
     queuedOwnedRepair('selfHealingOwnedSite', 'site'),
     queuedOwnedRepair('selfHealingOwnedAudit', 'audit'),
+    queuedOwnedRepair('selfHealingUniversityDistillation', 'university'),
   ])
-  return [site, audit].filter((job): job is QueuedOwnedRepair => Boolean(job))
+  return [site, audit, university].filter((job): job is QueuedOwnedRepair => Boolean(job))
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
@@ -52,7 +54,11 @@ export async function GET(request: Request) {
   // authentication completes before this explicit continuation read. Owned Self-Healing recovery lanes
   // are then evaluated separately so they cannot weaken or obscure the normal continuation path.
   const continuations = await listBuilderContinuations()
-  const auditRetry = await retryFailedOwnedAuditEngineRepair(getAdminSupabase())
+  const admin = getAdminSupabase()
+  const [auditRetry, universityRetry] = await Promise.all([
+    retryFailedOwnedAuditEngineRepair(admin),
+    retryFailedUniversityDistillationRepair(admin),
+  ])
   const ownedRepairs = await queuedOwnedSelfHealingRepairs()
   const unique = new Map<string, { id: string; userId: string }>()
   for (const job of [...continuations, ...ownedRepairs]) unique.set(job.id, { id: job.id, userId: job.userId })
@@ -71,7 +77,10 @@ export async function GET(request: Request) {
     deferred: Math.max(0, jobs.length - (selected ? 1 : 0)),
     ownedSiteRepairQueued: ownedRepairs.some(job => job.kind === 'site'),
     ownedAuditRepairQueued: ownedRepairs.some(job => job.kind === 'audit'),
+    universityDistillationRepairQueued: ownedRepairs.some(job => job.kind === 'university'),
     ownedAuditRepairRetried: auditRetry.retried,
     ownedAuditRepairRetryAttempt: auditRetry.attempt,
+    universityDistillationRepairRetried: universityRetry.retried,
+    universityDistillationRepairRetryAttempt: universityRetry.attempt,
   })
 }

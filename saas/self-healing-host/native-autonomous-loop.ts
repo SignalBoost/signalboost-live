@@ -17,6 +17,10 @@ import {
   isOwnedSiteCybersecurityIncident,
   isOwnedSiteOptimizationIncident,
 } from './owned-site-autonomous-repair.ts'
+import {
+  enqueueUniversityDistillationPackagingRepair,
+  isUniversityDistillationPackagingStallIncident,
+} from './university-distillation-autonomous-repair.ts'
 import { createSignalBoostGatewayHost } from '@/agent-gateway-host/signalboost-host'
 import { dispatchRepairPlan, type RepairStep } from '@/agent-gateway-host/supervisor-repair'
 import { resolveSupervisorRepairParams, summarizeRepairDispatch } from '@/agent-gateway-host/supervisor-actions'
@@ -63,6 +67,7 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
     // editing, opens a PR, runs CI, and relies on governed merge/deployment verification.
     const optimizerIncident = isOwnedSiteOptimizationIncident(incident)
     const cybersecurityIncident = isOwnedSiteCybersecurityIncident(incident)
+    const universityPackagingIncident = isUniversityDistillationPackagingStallIncident(incident)
     if (optimizerIncident || cybersecurityIncident) {
       try {
         const repair = optimizerIncident
@@ -132,6 +137,37 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
         remediationMemory,
       })
       const summary = summarizeRepairDispatch(dispatched, repairPlan.length)
+      if (!dispatched.completed && universityPackagingIncident) {
+        try {
+          const repair = await enqueueUniversityDistillationPackagingRepair(incident, diagnostic.diagnosis)
+          const action = repair.disposition === 'queued'
+            ? `Registered runtime recovery did not restore packaging progress; Platform Engineer repair job ${repair.jobId} was queued on the pinned Production revision.`
+            : repair.disposition === 'already_active'
+              ? `Registered runtime recovery did not restore packaging progress; Platform Engineer job ${repair.jobId} is already active and duplicate execution was suppressed.`
+              : `Registered runtime recovery did not restore packaging progress; a recent Platform Engineer attempt ${repair.jobId} is retry-suppressed while Production is re-observed.`
+          results.push({
+            incidentId: incident.incidentId,
+            diagnosisConfidence: diagnostic.confidence_score,
+            diagnosis: diagnostic.diagnosis,
+            repairSteps: repairPlan.length + 1,
+            outcome: 'staged',
+            message: action,
+            objectiveOutcomes,
+          })
+          continue
+        } catch (error) {
+          results.push({
+            incidentId: incident.incidentId,
+            diagnosisConfidence: diagnostic.confidence_score,
+            diagnosis: diagnostic.diagnosis,
+            repairSteps: repairPlan.length + 1,
+            outcome: 'unavailable',
+            message: `Runtime recovery was incomplete and bounded Platform Engineer escalation failed: ${error instanceof Error ? error.message : 'unknown error'}`,
+            objectiveOutcomes,
+          })
+          continue
+        }
+      }
       results.push({
         incidentId: incident.incidentId,
         diagnosisConfidence: diagnostic.confidence_score,
@@ -142,6 +178,32 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
         objectiveOutcomes,
       })
     } catch (error) {
+      if (universityPackagingIncident) {
+        try {
+          const repair = await enqueueUniversityDistillationPackagingRepair(incident, diagnostic.diagnosis)
+          results.push({
+            incidentId: incident.incidentId,
+            diagnosisConfidence: diagnostic.confidence_score,
+            diagnosis: diagnostic.diagnosis,
+            repairSteps: repairPlan.length + 1,
+            outcome: 'staged',
+            message: repair.disposition === 'queued'
+              ? `Registered runtime recovery failed verification; Platform Engineer repair job ${repair.jobId} was queued on the pinned Production revision.`
+              : `Registered runtime recovery failed verification; Platform Engineer repair job ${repair.jobId} is ${repair.disposition.replace('_', ' ')}.`,
+          })
+          continue
+        } catch (escalationError) {
+          results.push({
+            incidentId: incident.incidentId,
+            diagnosisConfidence: diagnostic.confidence_score,
+            diagnosis: diagnostic.diagnosis,
+            repairSteps: repairPlan.length + 1,
+            outcome: 'unavailable',
+            message: `Registered runtime recovery failed (${error instanceof Error ? error.message : 'unknown error'}) and Platform Engineer escalation failed (${escalationError instanceof Error ? escalationError.message : 'unknown error'}).`,
+          })
+          continue
+        }
+      }
       results.push({ incidentId: incident.incidentId, diagnosisConfidence: diagnostic.confidence_score, diagnosis: diagnostic.diagnosis, repairSteps: repairPlan.length, outcome: 'unavailable', message: error instanceof Error ? error.message : 'governed remediation failed' })
     }
   }

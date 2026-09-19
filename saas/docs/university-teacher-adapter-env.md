@@ -42,3 +42,18 @@ These teachers remain behind the existing signed Hugging Face training executor 
 - `COS_UNIVERSITY_TEACHER_CUSTOM_TOKEN=<buyer secret>`
 
 This custom surface is intended for Azure OpenAI gateways, Bedrock/Vertex bridges, on-prem vLLM, private model gateways, or equivalent buyer infrastructure. The core never silently switches providers.
+
+
+## Multi-provider distillation fan-out
+
+Hosted teachers are now part of the live University curriculum replenishment path, between verified-failure remediation and the zero-cost synthetic fallback. The pipeline can fan out across every explicitly enabled hosted provider and persist the generated lesson with provider/model/request/token provenance.
+
+Cost-bearing hosted generation remains fail-closed until this cycle budget is explicitly configured:
+
+- `COS_UNIVERSITY_TEACHER_HOSTED_MAX_CALLS_PER_CYCLE=<1..48>`
+- optional `COS_UNIVERSITY_TEACHER_HOSTED_MAX_OUTPUT_TOKENS=<128..2048>` (default 1200)
+- optional `COS_UNIVERSITY_TEACHER_HOSTED_PARALLELISM=<1..6>` (default 3)
+
+The per-provider enable, adapter-ready, credential and model settings above still apply. A failed provider call is recorded for that exact teacher; the University does not silently retry it through a different provider. Hugging Face Qwen/DeepSeek remain on the governed local/HF executor path and continue in parallel with hosted-teacher curriculum generation.
+
+Provider-billed dollar cost is deliberately not inferred from token counts because pricing differs by provider/model and can change. The run records request/token provenance while the explicit maximum call count and output-token ceiling bound each replenishment cycle.

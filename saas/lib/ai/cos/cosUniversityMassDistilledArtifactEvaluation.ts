@@ -8,6 +8,7 @@ import { recoverStoppedOpenAnswer } from './cosUniversityMassEvaluationAnswerRec
 import { servedCandidateModelFromCanary } from './cosUniversityMassEvaluationServedModel.ts'
 import { recordLocalInferenceUsage } from '../localInferenceUsage.ts'
 import { readPinnedHfParquetRows } from './hfPinnedParquetRows.ts'
+import { buildTeacherPrompts } from './cosUniversityMassDistillationConsumer.ts'
 import { configuredRunpodApiKey } from './runpodConfig.ts'
 import { runpodServerlessOpenAiBaseUrl } from './runpodServerlessDistilledProvision.ts'
 import { fineTuneRevisionKey, type FineTuneRevision } from './cosUniversityFineTuneEvidence.ts'
@@ -151,7 +152,7 @@ function retentionCases():EvalCase[]{return[
 async function massRun(claim:MassEvaluationClaim,now:Date){
   const db=cosServiceDb();if(!db)throw new Error('service_database_unavailable')
   const result=await db.from('cos_university_mass_distillation_batch_runs')
-    .select('student_model_id,student_model_revision,teacher_model_id,dataset_hash,training_manifest_hash,holdout_manifest_hash,revision_key,holdout_data_ref,trained_artifact_id,trained_artifact_hash,stage,completed_at')
+    .select('id,batch_key,subject_id,student_model_id,student_model_revision,teacher_model_id,prompt_set_hash,teacher_source_ref,dataset_hash,training_manifest_hash,holdout_manifest_hash,revision_key,holdout_data_ref,trained_artifact_id,trained_artifact_hash,stage,completed_at')
     .eq('candidate_id',claim.candidateId).maybeSingle()
   if(result.error)throw result.error
   const run:any=result.data
@@ -161,10 +162,107 @@ async function massRun(claim:MassEvaluationClaim,now:Date){
   const revision:FineTuneRevision={baseModel:clean(run.student_model_id,500),baseModelRevision:clean(run.student_model_revision,40).toLowerCase(),datasetHash:clean(run.dataset_hash,64).toLowerCase(),trainingManifestHash:clean(run.training_manifest_hash,64).toLowerCase(),holdoutManifestHash:clean(run.holdout_manifest_hash,64).toLowerCase()}
   if(revision.baseModel!==BASE_MODEL_ID||!HEX40.test(revision.baseModelRevision||'')||!HEX64.test(revision.datasetHash)||!HEX64.test(revision.trainingManifestHash)||!HEX64.test(revision.holdoutManifestHash)||fineTuneRevisionKey(revision)!==claim.revisionKey||revision.datasetHash!==claim.datasetHash||clean(run.trained_artifact_id,500)!==claim.artifactId||clean(run.trained_artifact_hash,64).toLowerCase()!==claim.artifactHash)throw new Error('mass_distilled_evaluation_revision_binding_mismatch')
   const teacherModelId=clean(run.teacher_model_id,240);if(!teacherModelId)throw new Error('mass_distilled_evaluation_teacher_identity_missing')
-  return {revision,teacherModelId,holdoutDataRef:clean(run.holdout_data_ref,2000),trainedAt:completedAt}
+  return {
+    revision,
+    teacherModelId,
+    holdoutDataRef: clean(run.holdout_data_ref, 2000),
+    trainedAt: completedAt,
+    legacyHosted: Object.freeze({
+      runId: clean(run.id, 100),
+      batchKey: clean(run.batch_key, 64).toLowerCase(),
+      subjectId: clean(run.subject_id, 240),
+      promptSetHash: clean(run.prompt_set_hash, 64).toLowerCase(),
+      teacherSourceRef: clean(run.teacher_source_ref, 2000),
+    }),
+  }
 }
 
-async function pinnedHoldout(input:{holdoutDataRef:string;expectedManifestHash:string;deadlineMs:number}):Promise<EvalCase[]>{
+type LegacyHostedHoldoutContext = Readonly<{
+  runId: string
+  batchKey: string
+  subjectId: string
+  promptSetHash: string
+  teacherSourceRef: string
+}>
+
+function normalizedHashList(value: unknown, min = 1, max = 128): string[] | null {
+  if (!Array.isArray(value) || value.length < min || value.length > max) return null
+  const hashes = value.map(item => clean(item, 64).toLowerCase())
+  if (hashes.some(item => !HEX64.test(item)) || new Set(hashes).size !== hashes.length) return null
+  return hashes
+}
+
+/**
+ * Older hosted-teacher preparation stored immutable parquet text as the teacher response only and
+ * item_hash as the response hash. Recover only the missing prompt from the same durable University
+ * evidence that originally generated it. Every binding is checked and the immutable row/manifest
+ * validation still happens before this resolver runs.
+ */
+async function legacyHostedPromptByResponseHash(input: {
+  candidateId: string
+  context: LegacyHostedHoldoutContext
+  itemHashes: readonly string[]
+}): Promise<Map<string, string>> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const { context } = input
+  if (!context.runId || !HEX64.test(context.batchKey) || !context.subjectId || !HEX64.test(context.promptSetHash)) {
+    throw new Error('mass_distilled_evaluation_legacy_hosted_context_invalid')
+  }
+  const expectedSourceRef = `itmounts://cos-university/mass-hosted-teacher/${context.runId}`
+  if (context.teacherSourceRef !== expectedSourceRef) {
+    throw new Error('mass_distilled_evaluation_holdout_format_invalid')
+  }
+
+  const batchResult = await db.from('cos_university_distillation_curriculum_batches')
+    .select('subject_id,source_hashes')
+    .eq('batch_key', context.batchKey)
+    .maybeSingle()
+  if (batchResult.error) throw batchResult.error
+  const batch: any = batchResult.data
+  const sourceHashes = normalizedHashList(batch?.source_hashes, 20, 128)
+  if (!batch || clean(batch.subject_id, 240) !== context.subjectId || !sourceHashes) {
+    throw new Error('mass_distilled_evaluation_legacy_hosted_batch_binding_invalid')
+  }
+
+  const promptSet = await buildTeacherPrompts(context.subjectId, sourceHashes)
+  if (promptSet.promptSetHash !== context.promptSetHash) {
+    throw new Error('mass_distilled_evaluation_legacy_hosted_prompt_set_mismatch')
+  }
+  const promptById = new Map(promptSet.prompts.map(item => [clean(item.id, 64).toLowerCase(), item.prompt] as const))
+
+  const hosted = await db.from('cos_university_mass_hosted_teacher_rows')
+    .select('prompt_id,response_hash')
+    .eq('run_id', context.runId)
+    .eq('candidate_id', input.candidateId)
+    .in('response_hash', [...input.itemHashes])
+  if (hosted.error) throw hosted.error
+
+  const promptByResponseHash = new Map<string, string>()
+  for (const row of hosted.data || []) {
+    const responseHash = clean((row as any).response_hash, 64).toLowerCase()
+    const promptId = clean((row as any).prompt_id, 64).toLowerCase()
+    const prompt = promptById.get(promptId)
+    if (!HEX64.test(responseHash) || !HEX64.test(promptId) || !prompt) continue
+    const existing = promptByResponseHash.get(responseHash)
+    if (existing && existing !== prompt) {
+      throw new Error('mass_distilled_evaluation_legacy_hosted_response_ambiguous')
+    }
+    promptByResponseHash.set(responseHash, prompt)
+  }
+  if (input.itemHashes.some(hash => !promptByResponseHash.has(hash))) {
+    throw new Error('mass_distilled_evaluation_legacy_hosted_prompt_binding_missing')
+  }
+  return promptByResponseHash
+}
+
+async function pinnedHoldout(input:{
+  holdoutDataRef:string
+  expectedManifestHash:string
+  deadlineMs:number
+  candidateId:string
+  legacyHosted:LegacyHostedHoldoutContext
+}):Promise<EvalCase[]>{
   const token=clean(process.env.HF_TOKEN,4096);if(token.length<20)throw new Error('mass_distilled_evaluation_hf_token_missing')
   const match=HF_DATASET_REF.exec(input.holdoutDataRef);if(!match)throw new Error('mass_distilled_evaluation_holdout_ref_invalid')
   const [,repoId,revision,split]=match;if(!HEX40.test(revision))throw new Error('mass_distilled_evaluation_holdout_revision_invalid')
@@ -173,10 +271,43 @@ async function pinnedHoldout(input:{holdoutDataRef:string;expectedManifestHash:s
   const metadata:any=await metadataResponse.json();if(clean(metadata?.sha,40).toLowerCase()!==revision.toLowerCase())throw new Error('mass_distilled_evaluation_holdout_revision_moved')
   const rows=await withinDeadline(readPinnedHfParquetRows({repoId,revision,split,token,siblings:Array.isArray(metadata?.siblings)?metadata.siblings:[]}),input.deadlineMs,60_000)
   if(!rows.length||rows.length>100)throw new Error('mass_distilled_evaluation_holdout_count_invalid')
-  const observed:string[]=[];const cases:EvalCase[]=[]
-  for(const row of rows){const text=clean(row.text,500_000);const itemHash=clean(row.item_hash,64).toLowerCase();if(!text||!HEX64.test(itemHash)||sha256Raw(text)!==itemHash)throw new Error('mass_distilled_evaluation_holdout_integrity_failed');const structuredPrompt=clean(row.prompt,100_000);const structuredReference=clean(row.response,100_000);const parsed=structuredPrompt&&structuredReference?{prompt:structuredPrompt,reference:structuredReference}:parseTrainingText(text);if(!parsed)throw new Error('mass_distilled_evaluation_holdout_format_invalid');observed.push(itemHash);cases.push(Object.freeze({id:itemHash.slice(0,16),prompt:parsed.prompt,reference:parsed.reference}))}
-  if(new Set(observed).size!==observed.length||manifestHash(observed)!==input.expectedManifestHash)throw new Error('mass_distilled_evaluation_holdout_manifest_mismatch')
-  return cases
+
+  const normalized = rows.map(row => {
+    const text = clean(row.text, 500_000)
+    const itemHash = clean(row.item_hash, 64).toLowerCase()
+    if (!text || !HEX64.test(itemHash) || sha256Raw(text) !== itemHash) {
+      throw new Error('mass_distilled_evaluation_holdout_integrity_failed')
+    }
+    const structuredPrompt = clean(row.prompt, 100_000)
+    const structuredReference = clean(row.response, 100_000)
+    const parsed = structuredPrompt && structuredReference
+      ? { prompt: structuredPrompt, reference: structuredReference }
+      : parseTrainingText(text)
+    return Object.freeze({ text, itemHash, parsed })
+  })
+
+  const observed = normalized.map(row => row.itemHash)
+  if (new Set(observed).size !== observed.length || manifestHash(observed) !== input.expectedManifestHash) {
+    throw new Error('mass_distilled_evaluation_holdout_manifest_mismatch')
+  }
+
+  const needsLegacy = normalized.filter(row => !row.parsed)
+  const legacyPrompts = needsLegacy.length
+    ? await legacyHostedPromptByResponseHash({
+        candidateId: input.candidateId,
+        context: input.legacyHosted,
+        itemHashes: needsLegacy.map(row => row.itemHash),
+      })
+    : new Map<string, string>()
+
+  return normalized.map(row => {
+    const parsed = row.parsed || {
+      prompt: legacyPrompts.get(row.itemHash) || '',
+      reference: row.text,
+    }
+    if (!parsed.prompt || !parsed.reference) throw new Error('mass_distilled_evaluation_holdout_format_invalid')
+    return Object.freeze({ id: row.itemHash.slice(0, 16), prompt: parsed.prompt, reference: parsed.reference })
+  })
 }
 
 async function waitReady(endpointId:string,deadlineMs:number){
@@ -305,7 +436,7 @@ async function submitClaim(input:{claim:IndependentEvaluatorClaim;candidateId:st
 export async function runMassDistilledArtifactEvaluation(input:{claim:MassEvaluationClaim;deadlineMs:number;now?:Date}){
   if(input.claim.maxEndpointCalls!==ENDPOINT_CALLS||input.claim.maxJudgeCalls!==JUDGE_CALLS||input.claim.maxRuntimeWakeAttempts!==1||input.claim.maxEstimatedRuntimeWakeCostUsd<=0||input.claim.maxEstimatedRuntimeWakeCostUsd>0.2)throw new Error('mass_distilled_evaluation_claim_ceiling_invalid')
   const now=input.now||new Date();const training=await massRun(input.claim,now);const age=now.getTime()-training.trainedAt;if(age<MASS_DISTILLED_RETENTION_DELAY_MS)throw new Error('mass_distilled_evaluation_retention_delay_not_met')
-  const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs});const model=await servedCandidateModel(input.claim);await waitReady(input.claim.endpointId,input.deadlineMs)
+  const holdoutCases=await pinnedHoldout({holdoutDataRef:training.holdoutDataRef,expectedManifestHash:training.revision.holdoutManifestHash,deadlineMs:input.deadlineMs,candidateId:input.claim.candidateId,legacyHosted:training.legacyHosted});const model=await servedCandidateModel(input.claim);await waitReady(input.claim.endpointId,input.deadlineMs)
   const keepaliveKey=configuredRunpodApiKey();const keepalive=keepaliveKey?setInterval(()=>{void fetch(`https://${input.claim.endpointId}.api.runpod.ai/ready`,{headers:{Authorization:`Bearer ${keepaliveKey}`},signal:AbortSignal.timeout(8_000)}).catch(()=>undefined)},30_000):null;keepalive?.unref?.()
   try{
     const budget:EndpointCallBudget={used:0,max:ENDPOINT_CALLS};const common={endpointId:input.claim.endpointId,budget,claim:input.claim,deadlineMs:input.deadlineMs}

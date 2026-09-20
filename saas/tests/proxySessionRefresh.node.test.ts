@@ -18,6 +18,7 @@ const adminLayout = readFileSync(new URL('../app/admin/layout.tsx', import.meta.
 const hubLayout = readFileSync(new URL('../app/hub/layout.tsx', import.meta.url), 'utf8')
 const navbar = readFileSync(new URL('../components/PremiumCustomerNavbarV2.tsx', import.meta.url), 'utf8')
 const authMe = readFileSync(new URL('../app/api/auth/me/route.ts', import.meta.url), 'utf8')
+const credits = readFileSync(new URL('../app/api/credits/route.ts', import.meta.url), 'utf8')
 const code = base.split('\n')
   .filter(line => !line.trim().startsWith('//') && !line.trim().startsWith('*') && !line.trim().startsWith('/*'))
   .join('\n')
@@ -30,10 +31,12 @@ test('there is no middleware.ts: Next 16 permits only proxy.ts', () => {
 test('authenticated surfaces beyond the operator path refresh their session', () => {
   assert.match(code, /authenticatedSurface = pathname\.startsWith\('\/dashboard'\) \|\| pathname\.startsWith\('\/admin'\) \|\| pathname\.startsWith\('\/hub'\) \|\| pathname\.startsWith\('\/api\/admin'\)/)
   assert.match(code, /return refreshAuthCookies\(req\)/)
-  assert.match(code, /await supabase\.auth\.getUser\(\)/)
+  assert.match(code, /await supabase\.auth\.getClaims\(\)/)
+  assert.doesNotMatch(code, /refreshAuthCookies[\s\S]{0,1200}auth\.getUser\(\)/)
 })
 
-test('the refresh writes cookies onto a continuing response', () => {
+test('the refresh writes cookies into both the current request and continuing response', () => {
+  assert.match(code, /req\.cookies\.set\(name, value\)/)
   assert.match(code, /res\.cookies\.set\(name, value, options\)/)
   assert.match(code, /NextResponse\.next\(\{ request: \{ headers: req\.headers \} \} \)|NextResponse\.next\(\{ request: \{ headers: req\.headers \} \}\)/)
 })
@@ -85,6 +88,8 @@ test('the existing ingress routing is untouched', () => {
 
 test('transient auth failures are unavailable, never guest', () => {
   assert.match(access, /authState: AuthState/)
+  assert.match(access, /supabase\.auth\.getClaims\(\)/)
+  assert.doesNotMatch(access, /supabase\.auth\.getUser\(\)/)
   assert.match(access, /'guest', 'unavailable'/)
   assert.match(access, /status: 503, error: 'Authentication temporarily unavailable\.'/)
 })
@@ -108,8 +113,17 @@ test('browser navbar preserves last known user on retryable auth failures', () =
   assert.match(navbar, /if \(error && isTransientAuthError\(error\)\) return/)
 })
 
-test('/api/auth/me returns 503 instead of guest on transient auth failure', () => {
+test('/api/auth/me verifies signed claims and returns 503 instead of guest on transient auth failure', () => {
+  assert.match(authMe, /auth\.getClaims\(\)/)
+  assert.doesNotMatch(authMe, /auth\.getUser\(\)/)
   assert.match(authMe, /auth_temporarily_unavailable/)
   assert.match(authMe, /status: 503/)
   assert.match(authMe, /cookieStore\.set\(name, value, options\)/)
+})
+
+test('/api/credits verifies signed claims instead of doing a regional Auth user lookup', () => {
+  assert.match(credits, /auth\.getClaims\(\)/)
+  assert.doesNotMatch(credits, /auth\.getUser\(\)/)
+  assert.match(credits, /auth_temporarily_unavailable/)
+  assert.match(credits, /accessFromVerifiedIdentity\(userId, email\)/)
 })

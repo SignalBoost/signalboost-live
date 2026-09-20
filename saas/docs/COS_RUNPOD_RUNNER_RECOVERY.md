@@ -19,7 +19,7 @@ Default guardrails:
 - maximum loaded models: 2
 - flash attention: enabled
 
-The persistent wrapper is `/workspace/cos-runpod-reasoner.sh`, which the existing RunPod cold-start contract already prefers. The settings therefore survive future container restarts.
+The standard bootstrap at `/workspace/cos-runpod-reasoner.sh` now applies the same bounded Ollama guardrails itself, so cold starts and manual recovery use one governed configuration.
 
 A successful repair ends with:
 

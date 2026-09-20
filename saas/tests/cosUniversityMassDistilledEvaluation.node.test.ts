@@ -167,7 +167,7 @@ test('rolling evaluation evidence is scoped to the pending candidate set so API 
 test('legacy invalid holdouts are terminally quarantined instead of retried', () => {
   assert.match(route, /async function quarantineLegacyInvalidHoldout\(claim: MassEvaluationClaim\)/)
   assert.match(route, /status: 'quarantined'/)
-  assert.match(route, /const legacyInvalidHoldout = message === 'mass_distilled_evaluation_holdout_format_invalid'/)
+  assert.match(route, /const legacyInvalidHoldout = message\.startsWith\('mass_distilled_evaluation_holdout_format_invalid'\)/)
   assert.match(route, /terminalDataDefect: true/)
   assert.match(route, /nextStatus: 'quarantined'/)
   assert.match(route, /quarantined: true/)

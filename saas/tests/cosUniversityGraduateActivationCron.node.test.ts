@@ -35,14 +35,15 @@ test('initial scope is narrow and per-subject; an undeclared subject halts rathe
   assert.doesNotMatch(route, /'primary'/)
 })
 
-test('activation binds to the exact canary-proven RunPod endpoint and served model', () => {
+test('activation binds to the exact canary-proven RunPod endpoint and served model without static endpoint config', () => {
   assert.match(route, /servedCandidateModelFromCanary/)
-  assert.match(route, /COS_GRADUATE_AI_BASE_URL/)
-  assert.match(route, /api\\.runpod\\.ai/)
   assert.match(route, /claim: 'local_distilled_runtime_canary_passed'/)
   assert.match(route, /exactArtifact: true/)
-  assert.match(route, /endpointId/)
+  assert.match(route, /artifactHash/)
+  assert.match(route, /baseUrl: \`https:\/\/\$\{endpointId\}\.api\.runpod\.ai\/v1\`/)
   assert.match(route, /runtimeModelId: serving\.modelId/)
+  assert.match(route, /runtimeBaseUrl: serving\.baseUrl/)
+  assert.doesNotMatch(route, /COS_GRADUATE_AI_BASE_URL/)
   assert.doesNotMatch(route, /DISTILLED_MODEL_NAME/)
   assert.doesNotMatch(route, /DISTILLED_ADAPTER_MODEL_ID/)
   assert.doesNotMatch(route, /provisionMassDistilledRuntime|ensureMassDistilledEndpoint24Gb/)

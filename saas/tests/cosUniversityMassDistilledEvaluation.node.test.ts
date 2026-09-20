@@ -9,7 +9,7 @@ const independent = readFileSync(new URL('../lib/ai/cos/cosUniversityIndependent
 const runner = readFileSync(new URL('../lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation.ts', import.meta.url), 'utf8')
 const provision = readFileSync(new URL('../lib/ai/cos/runpodMassDistilledProvision.ts', import.meta.url), 'utf8')
 const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-const claimMigration = readFileSync(new URL('../supabase/migrations/20260918005000_mass_distilled_evaluation_claim_14.sql', import.meta.url), 'utf8')
+const claimMigration = readFileSync(new URL('../supabase/migrations/20260919030000_mass_distilled_evaluation_claim_18.sql', import.meta.url), 'utf8')
 const vercel = readFileSync(new URL('../vercel.json', import.meta.url), 'utf8')
 
 const MASS_REVISION = Object.freeze({
@@ -55,7 +55,7 @@ test('mass evaluation claim is globally atomic, delayed-retention gated, exact-c
   assert.match(claimMigration, /claim_next_mass_distilled_evaluation\(\)/)
   assert.match(claimMigration, /pg_advisory_xact_lock\(pg_catalog\.hashtextextended\('mass-distilled-independent-evaluation-global'/)
   assert.match(claimMigration, /a\.created_at <= v_now - interval '12 hours'/)
-  assert.match(claimMigration, /v_max_endpoint<>14 or v_max_judge<>4 or v_max_wake<>1/)
+  assert.match(claimMigration, /v_max_endpoint<>18 or v_max_judge<>4 or v_max_wake<>1/)
   assert.match(claimMigration, /v_max_cost<=0 or v_max_cost>0\.200000/)
   assert.match(claimMigration, /evidence->>'exactArtifact'='true'/)
   assert.match(claimMigration, /evidence->>'internalVllmReady'='true'/)

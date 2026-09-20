@@ -337,27 +337,24 @@ export async function GET(req: NextRequest) {
 
     const rolling = await ensureRollingMassEvaluationApproval()
     console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
-    // No provider/runtime work may occur unless this invocation actually obtained rolling
-    // authorization. Treat every non-issued decision as a hard stop, not only today's known
-    // reason strings, so a new authority reason cannot accidentally fall through to claim/wake.
-    if (!rolling.issued) {
-      await recordProduction(true, {
-        runnerInvoked: false,
-        skipped: true,
-        status: 'not_claimed',
-        reason: rolling.reason,
-      }).catch(() => undefined)
-      return NextResponse.json({ ok: true, skipped: true, reason: rolling.reason })
-    }
+    // A prior tick may already have minted a still-valid bounded approval but been unable to claim it
+    // because another evaluation held the global reservation. The atomic database claim is the authority
+    // boundary: it revalidates approval TTL, exact canary identity, call/judge/wake/cost ceilings and the
+    // global reservation. Therefore always give it a chance to consume an existing valid approval even
+    // when this tick did not mint a new one. Provider/runtime work still cannot occur without a successful
+    // atomic claim.
     claim = await claimNext()
     if (!claim) {
+      const reason = rolling.issued
+        ? 'no_atomically_claimable_mass_distilled_evaluation'
+        : rolling.reason
       await recordProduction(true, {
         runnerInvoked: false,
         skipped: true,
         status: 'not_claimed',
-        reason: 'no_atomically_claimable_mass_distilled_evaluation',
+        reason,
       }).catch(() => undefined)
-      return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
+      return NextResponse.json({ ok: true, skipped: true, reason })
     }
 
     // The evaluator must not depend on a separate canary cron having already applied the current GPU policy.

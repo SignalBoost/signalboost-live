@@ -84,6 +84,7 @@ test('HF worker uses stable on-policy DistillationTrainer and fails closed on to
 
 test('HF frontier runtime pins the stable TRL distillation API', () => {
   const jobs = source('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts')
+  assert.match(jobs, /'transformers>=4\.56\.2,<6'/)
   assert.match(jobs, /'trl==1\.10\.0'/)
 })
 

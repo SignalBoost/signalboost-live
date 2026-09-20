@@ -21,6 +21,13 @@ const artifactB = { candidateId: 'mass:cyber:1', subjectId: 'Cybersecurity', art
 const ev = (candidateId: string, verifier: string, evidence: Record<string, unknown>, observedAt = '2026-09-16T10:00:00Z', expiresAt: string | null = null): RollingEvent => ({ candidateId, verifier, evidence, observedAt, expiresAt })
 const canary = (a: typeof artifactA) => ev(a.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: a.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
 
+test('rolling throughput ceiling matches the owner-approved backlog-drain budget', () => {
+  assert.equal(MASS_EVALUATION_ROLLING_MAX_APPROVALS, 300)
+  // 300 approvals * the unchanged $0.20 per-evaluation wake ceiling = $60/day maximum authorization.
+  // This test pins throughput authority; the per-evaluation claim test below pins the $0.20 boundary itself.
+})
+
+
 test('issues exactly the claim-compatible shape for a canary-proven artifact past the 12h retention delay', () => {
   const decision = decideRollingMassEvaluationApproval({ enabled: true, artifacts: [artifactA], events: [canary(artifactA)], now })
   assert.equal(decision.issue, true)

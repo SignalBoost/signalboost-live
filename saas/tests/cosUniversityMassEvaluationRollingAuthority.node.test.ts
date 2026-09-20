@@ -40,7 +40,7 @@ test('frontier proof sampling is bounded and then returns to oldest-first order'
     artifacts: [legacy, frontier],
     events: [canary(legacy as typeof artifactA), frontierCanary],
     now,
-    frontierProofStarts: 0,
+    frontierProofCompletions: 0,
   })
   assert.equal(proof.issue && proof.artifact.candidateId, frontier.candidateId)
 
@@ -49,17 +49,47 @@ test('frontier proof sampling is bounded and then returns to oldest-first order'
     artifacts: [legacy, frontier],
     events: [canary(legacy as typeof artifactA), frontierCanary],
     now,
-    frontierProofStarts: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+    frontierProofCompletions: MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
   })
   assert.equal(normal.issue && normal.artifact.candidateId, legacy.candidateId)
 })
 
-test('cron scans the full bounded pending population and measures frontier proof starts durably', () => {
+test('an infrastructure-failed frontier start remains proof-prioritized until a real result exists', () => {
+  const legacy = { ...artifactB, createdAt: '2026-09-14T18:26:00Z' }
+  const frontier = { ...artifactA, candidateId: 'mass:frontier:retry', artifactHash: '7'.repeat(64), createdAt: '2026-09-15T22:34:00Z', frontierRecipe: true }
+  const frontierCanary = ev(frontier.candidateId, 'host_production_verifier', { claim: 'production_canary_healthy', artifactHash: frontier.artifactHash, exactArtifact: true, productionTrafficAuthorized: false })
+  const priorApproval = ev(frontier.candidateId, 'host_controller', {
+    claim: 'distilled_independent_evaluation_approved',
+    artifactHash: frontier.artifactHash,
+    authorizationRef: MASS_EVALUATION_ROLLING_AUTHORIZATION_REF,
+  }, '2026-09-16T14:00:00Z', '2026-09-16T15:00:00Z')
+  const priorStart = ev(frontier.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_started',
+    artifactHash: frontier.artifactHash,
+  }, '2026-09-16T14:00:10Z', '2026-09-16T14:12:10Z')
+  const infraFailure = ev(frontier.candidateId, 'host_controller', {
+    claim: 'mass_distilled_independent_evaluation_failed',
+    artifactHash: frontier.artifactHash,
+    error: 'mass_distilled_evaluation_runtime_not_ready:network',
+  }, '2026-09-16T14:05:00Z')
+
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: true,
+    artifacts: [legacy, frontier],
+    events: [canary(legacy as typeof artifactA), frontierCanary, priorApproval, priorStart, infraFailure],
+    now,
+    frontierProofCompletions: 1,
+  })
+  assert.equal(decision.issue && decision.artifact.candidateId, frontier.candidateId)
+})
+
+test('cron scans the full bounded pending population and measures frontier proof completions durably', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.match(route, /\.select\('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use'\)/)
   assert.match(route, /\.limit\(500\)/)
   assert.match(route, /frontierRecipe: row\.intended_use\?\.trainingReceipt\?\.profile === 'cos_university_frontier_gkd_v1'/)
-  assert.match(route, /frontierProofStarts = new Set/)
+  assert.match(route, /cos_university_distilled_evaluation_runs/)
+  assert.match(route, /frontierProofCompletions = new Set/)
   assert.match(route, /MASS_EVALUATION_FRONTIER_PROOF_SAMPLE/)
 })
 
@@ -419,15 +449,15 @@ test('mass evaluator evidence reads have a candidate-first fine_tune index', () 
 
 test('frontier proof claim priority is enforced atomically before returning to oldest-first', () => {
   const migration = readFileSync(
-    new URL('../supabase/migrations/20260920222000_frontier_evaluation_atomic_claim_priority.sql', import.meta.url),
+    new URL('../supabase/migrations/20260920225500_frontier_evaluation_proof_completions.sql', import.meta.url),
     'utf8',
   )
-  assert.match(migration, /v_frontier_starts integer := 0/)
+  assert.match(migration, /v_frontier_completions integer := 0/)
   assert.match(migration, /cos_university_frontier_gkd_v1/)
-  assert.match(migration, /v_frontier_starts < 4/)
+  assert.match(migration, /v_frontier_completions < 4/)
   assert.match(
     migration,
-    /case[\s\S]*v_frontier_starts < 4[\s\S]*cos_university_frontier_gkd_v1[\s\S]*then 0 else 1[\s\S]*a\.created_at asc/i,
+    /case[\s\S]*v_frontier_completions < 4[\s\S]*cos_university_frontier_gkd_v1[\s\S]*then 0 else 1[\s\S]*a\.created_at asc/i,
   )
   assert.match(migration, /v_active_reservations >= 4/)
   assert.match(migration, /a\.created_at <= v_now - interval '12 hours'/)

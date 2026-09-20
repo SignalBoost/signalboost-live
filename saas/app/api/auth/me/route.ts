@@ -23,25 +23,29 @@ export async function GET() {
       }
     )
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: claimsData, error: authError } = await supabase.auth.getClaims()
     if (authError && isTransientAuthError(authError)) {
       return NextResponse.json(
         { error: 'auth_temporarily_unavailable' },
         { status: 503, headers: { 'Retry-After': '2' } },
       )
     }
-    if (!user) return NextResponse.json({ isAdmin: false, isOwner: false, role: 'guest', plan: 'free', tier: 'free' })
+    if (authError) return NextResponse.json({ isAdmin: false, isOwner: false, role: 'guest', plan: 'free', tier: 'free' })
+
+    const claims = claimsData?.claims as { sub?: string; email?: string } | undefined
+    const userId = String(claims?.sub || '').trim()
+    if (!userId) return NextResponse.json({ isAdmin: false, isOwner: false, role: 'guest', plan: 'free', tier: 'free' })
 
     const { data: sub } = await supabase
       .from('subscriptions')
       .select('plan, status')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle()
 
     const plan = sub?.plan || 'free'
     const ownerEmails = (process.env.OWNER_EMAILS || '').split(',').map(e => e.trim().toLowerCase())
     const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase())
-    const email = user.email?.toLowerCase() || ''
+    const email = String(claims?.email || '').toLowerCase()
     const isOwner = ownerEmails.includes(email)
     const isAdmin = isOwner || adminEmails.includes(email)
 

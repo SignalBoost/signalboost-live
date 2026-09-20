@@ -15,7 +15,9 @@ import {
 } from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
 import {
   MASS_EVALUATION_APPROVAL_TTL_MS,
+  decideExhaustedMassEvaluationArtifacts,
   decideRollingMassEvaluationApproval,
+  type ExhaustedMassEvaluationArtifact,
   type RollingArtifact,
   type RollingEvent,
 } from '@/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority'
@@ -27,6 +29,7 @@ export const maxDuration = 600
 const PROFILE = 'cos_mass_distilled_independent_evaluation_runtime_v1'
 const COMPLETED = 'mass_distilled_independent_evaluation_completed'
 const FAILED = 'mass_distilled_independent_evaluation_failed'
+const EXHAUSTED = 'mass_distilled_evaluation_attempts_exhausted'
 const ROUTE_BUDGET_MS = 570_000
 const ROUTE_RESERVE_MS = 25_000
 const RUNTIME_WAKE_TIMEOUT_MS = 20_000
@@ -120,7 +123,68 @@ type RawClaim = Readonly<{
   reservation_event_key: string
 }>
 
-async function ensureRollingMassEvaluationApproval() {
+// An artifact that has spent its substantive attempt budget can never be approved again, yet nothing moved it
+// out of `evaluation_pending`. It stayed in this lane's selection window - the OLDEST 50 pending rows - so a
+// run of dead artifacts at the front of the queue starves every newer artifact behind them, while the lane
+// reports them as waiting. Give them the terminal status their verdict already implies, and record WHY in the
+// same ledger the evaluation writes to, so a real failure is visible to curriculum work instead of vanishing.
+//
+// The status write is conditioned on `evaluation_pending`, so re-running it changes nothing, and the event is
+// upserted on a deterministic key. This disposes; it never evaluates, scores, promotes or spends.
+async function disposeExhaustedArtifacts(
+  items: readonly ExhaustedMassEvaluationArtifact[],
+  now: Date,
+): Promise<ExhaustedMassEvaluationArtifact[]> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const disposed: ExhaustedMassEvaluationArtifact[] = []
+  for (const item of items) {
+    const updated = await db.from('cos_local_distillation_artifacts')
+      .update({ status: 'quarantined', updated_at: now.toISOString() })
+      .eq('candidate_id', item.candidateId)
+      .eq('trained_artifact_hash', item.artifactHash)
+      .eq('status', 'evaluation_pending')
+    if (updated.error) throw updated.error
+
+    const body = {
+      profile: PROFILE,
+      claim: EXHAUSTED,
+      candidateId: item.candidateId,
+      artifactHash: item.artifactHash,
+      reason: item.reason,
+      failedAttempts: item.failedAttempts,
+      lastError: clean(item.lastError, 500),
+      nextStatus: 'quarantined',
+      terminalDisposition: true,
+      evaluationPassed: false,
+      productionTrafficAuthorized: false,
+      authorityExpanded: false,
+    }
+    const inserted = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: hash([PROFILE, EXHAUSTED, item.candidateId, item.artifactHash]),
+      event_type: 'fine_tune',
+      subject_id: item.subjectId || null,
+      candidate_id: item.candidateId,
+      evidence_hash: hash(body),
+      evidence: body,
+      verifier: 'host_controller',
+      observed_at: now.toISOString(),
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (inserted.error) throw inserted.error
+    disposed.push(item)
+  }
+  return disposed
+}
+
+type RollingOutcome = Readonly<{
+  issued: boolean
+  reason?: string
+  candidateId?: string
+  artifactHash?: string
+  disposed?: number
+}>
+
+async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
   const artifacts = await db.from('cos_local_distillation_artifacts')
@@ -189,13 +253,28 @@ async function ensureRollingMassEvaluationApproval() {
     verifier: clean(row.verifier, 80), evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,
   }))
   const now = new Date()
+  // Clear artifacts the approval policy has already refused permanently before choosing this tick's work, so
+  // the selection window holds only artifacts that can still be evaluated.
+  const exhausted = decideExhaustedMassEvaluationArtifacts({ artifacts: rows, events: all, now })
+  const disposed = exhausted.length ? await disposeExhaustedArtifacts(exhausted, now) : []
+  if (disposed.length) {
+    console.info('[cos-mass-distilled-exhausted-disposition]', JSON.stringify({
+      disposed: disposed.length,
+      candidates: disposed.map(item => item.candidateId).slice(0, 20),
+    }))
+  }
+  const remaining = disposed.length
+    ? rows.filter(row => !disposed.some(item => item.candidateId === row.candidateId
+      && item.artifactHash === row.artifactHash))
+    : rows
+  if (!remaining.length) return { issued: false, reason: 'no_mass_artifact_pending', disposed: disposed.length }
   const decision = decideRollingMassEvaluationApproval({
     enabled: process.env.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false',
-    artifacts: rows,
+    artifacts: remaining,
     events: all,
     now,
   })
-  if ('reason' in decision) return { issued: false, reason: decision.reason }
+  if ('reason' in decision) return { issued: false, reason: decision.reason, disposed: disposed.length }
   const inserted = await db.from('cos_university_learning_assurance_events').insert({
     event_key: hash(['mass-rolling-evaluation-approval', decision.artifact.candidateId, decision.artifact.artifactHash, now.toISOString()]),
     event_type: 'fine_tune',
@@ -208,7 +287,7 @@ async function ensureRollingMassEvaluationApproval() {
     expires_at: new Date(now.getTime() + MASS_EVALUATION_APPROVAL_TTL_MS).toISOString(),
   })
   if (inserted.error) throw inserted.error
-  return { issued: true, candidateId: decision.artifact.candidateId, artifactHash: decision.artifact.artifactHash }
+  return { issued: true, candidateId: decision.artifact.candidateId, artifactHash: decision.artifact.artifactHash, disposed: disposed.length }
 }
 
 async function claimNext(): Promise<MassEvaluationClaim | null> {

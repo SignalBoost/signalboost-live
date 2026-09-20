@@ -129,10 +129,12 @@ test('infrastructure-failed approvals are released from the rolling window while
 test('the cron issues at most one approval before the unchanged atomic claim, with an env kill switch', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
   assert.ok(route.indexOf('await ensureRollingMassEvaluationApproval()') < route.indexOf('claim = await claimNext()'))
-  assert.match(route, /rolling\.reason === 'rolling_mass_evaluation_window_exhausted'/)
-  assert.match(route, /rolling\.reason === 'rolling_mass_evaluation_authorization_disabled'/)
-  assert.match(route, /rolling\.reason === 'no_mass_artifact_pending'/)
-  assert.ok(route.indexOf('if (hardRollingDenial)') < route.indexOf('claim = await claimNext()'))
+  // 2026-09-20: the route no longer enumerates the three known denial reasons; EVERY non-issued decision is a
+  // hard stop, so a newly added authority reason cannot fall through to claim/wake. Strictly stronger.
+  assert.match(route, /if \(!rolling\.issued\) \{/)
+  assert.ok(route.indexOf('if (!rolling.issued)') < route.indexOf('claim = await claimNext()'))
+  assert.match(route, /status: 'not_claimed'/)
+  assert.match(route, /reason: rolling\.reason/)
   assert.match(route, /enabled: process\.env\.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false'/)
   assert.match(route, /verifier: 'host_controller'/)
   assert.match(route, /db\.rpc\('claim_next_mass_distilled_evaluation'\)/)
@@ -233,13 +235,12 @@ test('RunPod max-worker quota preflight failures do not consume the paid evaluat
 
 test('a hard rolling denial exits before the atomic claim while an armed/no-eligible state may still be claimed', () => {
   const route = readFileSync(new URL('../app/api/cron/cos-university-mass-distilled-evaluation/route.ts', import.meta.url), 'utf8')
-  const denial = route.indexOf('if (hardRollingDenial)')
+  const denial = route.indexOf('if (!rolling.issued)')
   const claim = route.indexOf('claim = await claimNext()')
   const preflight = route.indexOf('ensureMassDistilledEndpoint24Gb(claim.endpointId)')
   const wake = route.indexOf('wakeMassDistilledRuntime(claim.endpointId')
   assert.ok(denial >= 0 && claim > denial && preflight > claim && wake > preflight)
-  assert.match(route, /rolling_mass_evaluation_window_exhausted/)
-  assert.doesNotMatch(route.slice(route.indexOf('const hardRollingDenial'), claim), /no_mass_artifact_eligible_for_rolling_evaluation/)
+  assert.match(route, /return NextResponse\.json\(\{ ok: true, skipped: true, reason: rolling\.reason \}\)/)
 })
 
 

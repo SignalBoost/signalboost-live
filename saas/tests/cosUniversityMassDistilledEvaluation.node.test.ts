@@ -122,9 +122,13 @@ test('evaluation route claims once, checks balance before reservation and writes
   assert.match(route, /productionTrafficAuthorized: false/)
 })
 
-test('dedicated mass canary and mass evaluation crons are both scheduled', () => {
-  assert.match(vercel, /\/api\/cron\/runpod-mass-distilled-local-deploy/)
-  assert.match(vercel, /\/api\/cron\/cos-university-mass-distilled-evaluation/)
+test('dedicated mass canary is scheduled and mass evaluation polls every minute to drain backlog without extra workers', () => {
+  const config = JSON.parse(vercel)
+  const canary = config.crons.find((item: any) => item.path === '/api/cron/runpod-mass-distilled-local-deploy')
+  const evaluation = config.crons.find((item: any) => item.path === '/api/cron/cos-university-mass-distilled-evaluation')
+  assert.ok(canary)
+  assert.ok(evaluation)
+  assert.equal(evaluation.schedule, '* * * * *')
 })
 
 

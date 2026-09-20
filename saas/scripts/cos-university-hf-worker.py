@@ -628,8 +628,10 @@ def train_student(base, envelope: dict[str, Any]) -> None:
     recipe["holdoutItems"] = len(holdout)
     recipe["trainingMode"] = training_mode or "unknown"
 
-    use_bf16 = bool(torch.cuda.is_available() and torch.cuda.is_bf16_supported())
-    compute_dtype = torch.bfloat16 if use_bf16 else torch.float16
+    # Production 2026-09-20: on-policy PEFT generation failed with a BF16/Float dtype mismatch.
+    # Keep the governed training lane deterministic in FP16 on the current T4-class HF hardware.
+    use_bf16 = False
+    compute_dtype = torch.float16
     quantization = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",

@@ -1,2 +1,2 @@
-base_sha=19e70cf04257eb50b211d720079f0c4e3437dc86
-branch=fix/university-evaluator-drain-armed-approvals-v2-20260920
+base_sha=81dc4d6419bc85d05aee0b4f979aa96cbe56075f
+branch=hotfix/hf-distillation-fp16-finalize-v2

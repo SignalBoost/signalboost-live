@@ -74,6 +74,7 @@ Production distillation runtime invariant (2026-09-20 hotfix):
 - HF datasets and trained adapters use a bounded buyer-owned repository pool. A normal campaign must **reuse a repository and write an isolated per-run branch**, then pin the exact returned Hub commit SHA in evidence. It must not create one Hub repository per batch, teacher output, or trained artifact.
 - Repository pooling may create at most one bootstrap pool repository only when no compatible pool repository exists; a provider 429/rate-limit response fails closed rather than launching repeated repository-creation attempts.
 - Exact-artifact identity remains `repo + immutable Hub commit revision + artifact hash`; pooling may reduce repository count but may never weaken exact-artifact canary, evaluation, provenance, rollback, or promotion gates.
+- HF job bootstrap is deployment-atomic: the job specification, pinned Python dependency contract, primary worker and base-worker sibling must resolve from the same immutable Vercel deployment hostname. A moving Production/public alias must never let an in-flight job install dependencies from deployment A and execute worker code from deployment B.
 
 ## University Self-Healing progress invariant — 2026-09-19
 

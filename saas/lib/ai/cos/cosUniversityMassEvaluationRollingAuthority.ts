@@ -28,6 +28,7 @@ export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
 // but never the rolling cap, which is enforced here alone.
 export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
 export const MASS_EVALUATION_MAX_IN_FLIGHT = 4
+export const MASS_EVALUATION_FRONTIER_PROOF_SAMPLE = 4
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
 // resumes. That is only true while the failures differ. mass:8f5af666 reproduced the SAME truncated case
@@ -76,7 +77,7 @@ export const MASS_EVALUATION_APPROVAL_TTL_MS = 2 * 60 * 60 * 1000
 export const MASS_EVALUATION_24GB_REPAIR_REF = 'pr_2398_24gb_evaluator_preflight' as const
 const REPAIRED_SUSPENSION_REASON = 'candidate_502_pending_runpod_worker_logs' as const
 
-export type RollingArtifact = Readonly<{ candidateId: string; subjectId: string; artifactHash: string; createdAt: string }>
+export type RollingArtifact = Readonly<{ candidateId: string; subjectId: string; artifactHash: string; createdAt: string; frontierRecipe?: boolean }>
 export type RollingEvent = Readonly<{ candidateId: string; observedAt: string; expiresAt: string | null; verifier: string; evidence: Record<string, unknown> | null }>
 
 export type RollingDecision =
@@ -307,6 +308,7 @@ export function decideRollingMassEvaluationApproval(input: {
   artifacts: readonly RollingArtifact[]
   events: readonly RollingEvent[]
   now: Date
+  frontierProofStarts?: number
 }): RollingDecision {
   if (!input.enabled) return { issue: false, reason: 'rolling_mass_evaluation_authorization_disabled' }
   const nowMs = input.now.getTime()
@@ -318,7 +320,21 @@ export function decideRollingMassEvaluationApproval(input: {
   const issuedInWindow = rollingApprovalsInWindow.filter(approval => rollingApprovalConsumesWindow(approval, input.events, nowMs)).length
   if (issuedInWindow >= MASS_EVALUATION_ROLLING_MAX_APPROVALS) return { issue: false, reason: 'rolling_mass_evaluation_window_exhausted' }
 
-  const ordered = [...input.artifacts].sort((a, b) => at(a.createdAt) - at(b.createdAt))
+  const proofStarts = Math.max(0, Math.floor(Number(input.frontierProofStarts ?? MASS_EVALUATION_FRONTIER_PROOF_SAMPLE)))
+  const frontierProofNeeded = proofStarts < MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
+  const ordered = [...input.artifacts].sort((a, b) => {
+    // Until four current-recipe artifacts have received a first independent start, give an unstarted
+    // frontier artifact precedence over legacy retries. This is a bounded scheduling preference only.
+    // After the sample is reached, strict oldest-first ordering resumes automatically.
+    if (frontierProofNeeded) {
+      const aStarted = input.events.some(event => event.candidateId === a.candidateId && evaluationStarted(event))
+      const bStarted = input.events.some(event => event.candidateId === b.candidateId && evaluationStarted(event))
+      const aProof = a.frontierRecipe === true && !aStarted
+      const bProof = b.frontierRecipe === true && !bStarted
+      if (aProof !== bProof) return aProof ? -1 : 1
+    }
+    return at(a.createdAt) - at(b.createdAt)
+  })
   for (const artifact of ordered) {
     if (!artifact.candidateId.startsWith('mass:') || !HEX64.test(artifact.artifactHash)) continue
     if (nowMs - at(artifact.createdAt) < MASS_EVALUATION_RETENTION_DELAY_MS) continue

@@ -8,6 +8,7 @@ import {
 } from '@/lib/ai/local-inference'
 import { classifyProblemClass } from '@/lib/ai/cos/cosProblemClass'
 import { classifyInferenceHost } from '@/lib/ai/cos/reasonerHostingDisclosure'
+import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
 import type { CosReasonerConfig } from '@/lib/ai/cos/cosReasoner'
 import type { CosReasoningWorkerRole } from '@/lib/ai/cos/cosReasoningControlPlane'
 
@@ -35,6 +36,7 @@ export type GraduateRuntimeBindingInput = Readonly<{
   trainedArtifactHash: string
   runtimeProfile: GraduateRuntimeProfile
   runtimeModelId: string
+  runtimeBaseUrl?: string
   workerRoles: readonly CosReasoningWorkerRole[]
   problemClasses: readonly string[]
   now: Date
@@ -42,6 +44,7 @@ export type GraduateRuntimeBindingInput = Readonly<{
 
 const HEX64 = /^[a-f0-9]{64}$/i
 const ROLES = new Set<CosReasoningWorkerRole>(['primary', 'coder', 'critic', 'verifier', 'researcher'])
+const RUNPOD_SERVERLESS_HOST = /^([a-z0-9]+)\.api\.runpod\.ai$/i
 
 function clean(value: unknown, limit = 500): string {
   return String(value ?? '').trim().slice(0, limit)
@@ -59,13 +62,28 @@ function normalizeProvider(value: unknown): string {
   return clean(value, 120).toLowerCase().replace(/[^a-z0-9._-]+/g, '-')
 }
 
-function graduateManagedConfig(model: string): { inference: LocalInferenceConfig; provider: string; reasoner: CosReasonerConfig } {
-  const baseUrlRaw = clean(process.env.COS_GRADUATE_AI_BASE_URL, 2000)
+function exactRunpodEndpointId(value: unknown): string | null {
+  const raw = clean(value, 2000)
+  if (!raw) return null
+  try {
+    const url = new URL(raw)
+    const match = RUNPOD_SERVERLESS_HOST.exec(url.hostname)
+    if (!match || url.protocol !== 'https:' || !/^\/v1\/?$/.test(url.pathname) || url.username || url.password || url.search || url.hash) return null
+    return match[1].toLowerCase()
+  } catch {
+    return null
+  }
+}
+
+function graduateManagedConfig(model: string, runtimeBaseUrl?: string): { inference: LocalInferenceConfig; provider: string; reasoner: CosReasonerConfig } {
+  const explicitBaseUrl = clean(runtimeBaseUrl, 2000)
+  const baseUrlRaw = explicitBaseUrl || clean(process.env.COS_GRADUATE_AI_BASE_URL, 2000)
   if (!baseUrlRaw) throw new Error('graduate_runtime_base_url_not_configured')
   const url = new URL(baseUrlRaw)
   const host = url.hostname.trim().toLowerCase().replace(/^\[|\]$/g, '')
   const classification = classifyInferenceHost(baseUrlRaw)
-  const apiKey = clean(process.env.COS_GRADUATE_AI_API_KEY, 4000) || undefined
+  const exactRunpod = explicitBaseUrl ? exactRunpodEndpointId(explicitBaseUrl) : null
+  const apiKey = clean(process.env.COS_GRADUATE_AI_API_KEY, 4000) || (exactRunpod ? configuredRunpodApiKey() || undefined : undefined)
 
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error('graduate_runtime_invalid_protocol')
   if (!classification.selfHosted) {
@@ -75,7 +93,7 @@ function graduateManagedConfig(model: string): { inference: LocalInferenceConfig
         .map(value => value.trim().toLowerCase())
         .filter(Boolean),
     )
-    if (!allowedHosts.has(host)) throw new Error('graduate_runtime_host_not_allowed')
+    if (!exactRunpod && !allowedHosts.has(host)) throw new Error('graduate_runtime_host_not_allowed')
     if (url.protocol !== 'https:') throw new Error('graduate_runtime_remote_https_required')
     if (!apiKey) throw new Error('graduate_runtime_api_key_required')
   }
@@ -88,7 +106,9 @@ function graduateManagedConfig(model: string): { inference: LocalInferenceConfig
 
   const provider = classification.selfHosted
     ? 'self_hosted'
-    : normalizeProvider(process.env.COS_GRADUATE_AI_MANAGED_PROVIDER) || classification.provider || 'managed-open-model'
+    : exactRunpod
+      ? 'runpod'
+      : normalizeProvider(process.env.COS_GRADUATE_AI_MANAGED_PROVIDER) || classification.provider || 'managed-open-model'
   const baseUrl = url.toString().replace(/\/$/, '')
   const inference: LocalInferenceConfig = { baseUrl, model, apiKey, timeoutMs: timeoutValue, provider }
   const reasoner: CosReasonerConfig = classification.selfHosted
@@ -97,7 +117,7 @@ function graduateManagedConfig(model: string): { inference: LocalInferenceConfig
   return { inference, provider, reasoner }
 }
 
-export function resolveGraduateRuntimeProfile(profile: GraduateRuntimeProfile, modelInput: string) {
+export function resolveGraduateRuntimeProfile(profile: GraduateRuntimeProfile, modelInput: string, runtimeBaseUrl?: string) {
   const model = clean(modelInput, 240)
   if (!model) throw new Error('graduate_runtime_model_missing')
 
@@ -114,7 +134,7 @@ export function resolveGraduateRuntimeProfile(profile: GraduateRuntimeProfile, m
     return { inference, provider, reasoner }
   }
 
-  return graduateManagedConfig(model)
+  return graduateManagedConfig(model, runtimeBaseUrl)
 }
 
 /**
@@ -247,7 +267,7 @@ export async function activateGraduateRuntime(input: GraduateRuntimeBindingInput
   if (!clean(row.rollback_artifact_ref, 1000)) throw new Error('graduate_runtime_rollback_missing')
   if (!['pending_runtime', 'canary', 'active'].includes(clean(row.status, 40))) throw new Error('graduate_runtime_status_not_bindable')
 
-  const runtime = resolveGraduateRuntimeProfile(input.runtimeProfile, decision.runtimeModelId)
+  const runtime = resolveGraduateRuntimeProfile(input.runtimeProfile, decision.runtimeModelId, input.runtimeBaseUrl)
   const health = input.runtimeProfile === 'graduate_ai'
     ? await proveGraduateServedIdentity(runtime.inference, decision.runtimeModelId)
     : await checkLocalInferenceHealth(runtime.inference)
@@ -264,6 +284,7 @@ export async function activateGraduateRuntime(input: GraduateRuntimeBindingInput
     runtimeProfile: input.runtimeProfile,
     provider: runtime.provider,
     model: decision.runtimeModelId,
+    baseUrl: runtime.inference.baseUrl,
     health: { ok: health.ok, model: health.model },
   })
   const activationEvidenceHash = hash({
@@ -290,6 +311,7 @@ export async function activateGraduateRuntime(input: GraduateRuntimeBindingInput
       orchestrator: 'cos',
       workerRoles: decision.workerRoles,
       problemClasses: decision.problemClasses,
+      ...(input.runtimeProfile === 'graduate_ai' ? { runtimeBaseUrl: runtime.inference.baseUrl } : {}),
     },
     activated_at: input.now.toISOString(),
     updated_at: input.now.toISOString(),
@@ -308,6 +330,11 @@ export async function activateGraduateRuntime(input: GraduateRuntimeBindingInput
     healthEvidenceHash,
     activationEvidenceHash,
   }
+}
+
+function scopeString(scope: unknown, key: string, limit = 2000): string {
+  if (!scope || typeof scope !== 'object' || Array.isArray(scope)) return ''
+  return clean((scope as Record<string, unknown>)[key], limit)
 }
 
 function scopeArray(scope: unknown, key: string): string[] {
@@ -347,10 +374,11 @@ export async function activeGraduateRuntimesForRole(
     if (!['local_ai', 'graduate_ai'].includes(runtimeProfile)) continue
     const runtimeModelId = clean(row.runtime_model_id, 240)
     const storedProvider = normalizeProvider(row.runtime_provider)
+    const runtimeBaseUrl = scopeString(row.platform_scope, 'runtimeBaseUrl')
     if (!runtimeModelId || !storedProvider) continue
 
     try {
-      const runtime = resolveGraduateRuntimeProfile(runtimeProfile, runtimeModelId)
+      const runtime = resolveGraduateRuntimeProfile(runtimeProfile, runtimeModelId, runtimeBaseUrl || undefined)
       if (runtime.provider !== storedProvider) continue
       const candidateId = clean(row.candidate_id, 240)
       const artifactId = clean(row.trained_artifact_id, 500)

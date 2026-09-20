@@ -59,3 +59,15 @@ test('graduate worker usage remains distinguishable from ordinary runtime usage'
   assert.match(workers, /graduateArtifactHash/)
   assert.match(workers, /graduateRuntimeProvider/)
 })
+
+
+test('canary-derived RunPod runtime is persisted and re-used without a static graduate base URL', () => {
+  const runtime = readFileSync(new URL('../lib/ai/cos/cosUniversityGraduateRuntime.ts', import.meta.url), 'utf8')
+  assert.match(runtime, /configuredRunpodApiKey/)
+  assert.match(runtime, /runtimeBaseUrl\?: string/)
+  assert.match(runtime, /function exactRunpodEndpointId/)
+  assert.match(runtime, /exactRunpod \? configuredRunpodApiKey\(\)/)
+  assert.match(runtime, /runtimeBaseUrl: runtime\.inference\.baseUrl/)
+  assert.match(runtime, /scopeString\(row\.platform_scope, 'runtimeBaseUrl'\)/)
+  assert.match(runtime, /resolveGraduateRuntimeProfile\(runtimeProfile, runtimeModelId, runtimeBaseUrl \|\| undefined\)/)
+})

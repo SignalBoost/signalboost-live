@@ -25,3 +25,10 @@ test('cold-start wait is bounded and fits the activation route ceiling', () => {
   assert.match(runtime, /Math\.min\(options\.waitMs \?\? GRADUATE_RUNTIME_READY_WAIT_MS, 280_000\)/)
   assert.match(route, /export const maxDuration = 300/)
 })
+
+
+test('explicit canary runtime URL reaches the existing identity proof rather than bypassing it', () => {
+  assert.match(runtime, /resolveGraduateRuntimeProfile\(input\.runtimeProfile, decision\.runtimeModelId, input\.runtimeBaseUrl\)/)
+  assert.match(runtime, /await proveGraduateServedIdentity\(runtime\.inference, decision\.runtimeModelId\)/)
+  assert.match(runtime, /baseUrl: runtime\.inference\.baseUrl/)
+})

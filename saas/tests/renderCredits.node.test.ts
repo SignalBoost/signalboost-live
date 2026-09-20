@@ -67,7 +67,7 @@ test('credits status reuses the already-verified identity instead of repeating a
   ])
 
   assert.match(access, /export function accessFromVerifiedIdentity/)
-  assert.match(route, /accessFromVerifiedIdentity\(user\.id, user\.email\)/)
+  assert.match(route, /accessFromVerifiedIdentity\(userId, email\)/)
   assert.doesNotMatch(route, /\bgetAccess\b/)
   assert.match(route, /getCreditState\(user\.id, \{ verifiedEmail: user\.email \}\)/)
   assert.match(credits, /export function isPrivilegedCreditEmail/)

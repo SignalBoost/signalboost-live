@@ -1,2 +1,2 @@
-base_sha=4b74f85cef66962c050c961552ea091eb844dfce
-branch=fix/frontier-proof-completions
+base_sha=00d7276edd254950f3e6739f3e97286a3d430dd9
+branch=fix/mass-evaluator-runpod-timeout-recovery-v3

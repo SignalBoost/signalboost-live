@@ -1,2 +1,2 @@
-base_sha=6dbeadd6f13f46f8d30046d59fb590bc55811d12
-branch=fix/university-evaluator-pinned-holdout-20260920
+base_sha=0a497a04565e069c6f2ef95a961ebbb538719d95
+branch=fix/university-evaluator-throughput-300-20260920

@@ -369,7 +369,11 @@ export async function activeGraduateRuntimesForRole(
     const workerRoles = scopeArray(row.platform_scope, 'workerRoles')
     const problemClasses = scopeArray(row.platform_scope, 'problemClasses')
     if (!workerRoles.includes(role)) continue
-    const universityScoped = universitySubjects.some(subjectId => problemClasses.includes(`university:${subjectId}`))
+    // Backward compatibility: pre-namespace activations stored the exact canonical University
+    // subject id directly. Accept only that exact classifier id or the new namespaced marker.
+    const universityScoped = universitySubjects.some(subjectId =>
+      problemClasses.includes(`university:${subjectId}`) || problemClasses.includes(subjectId),
+    )
     if (!(problemClasses.includes(problemClass) || problemClasses.includes('*') || universityScoped)) continue
     if (!HEX64.test(clean(row.runtime_health_evidence_hash, 64))) continue
     if (!HEX64.test(clean(row.activation_evidence_hash, 64))) continue

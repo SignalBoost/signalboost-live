@@ -36,6 +36,16 @@ test('the English UI does not send canonical untagged English content through th
   assert.match(client, /if \(!needsServerTranslation\(entry, targetLanguage\)\)/)
 })
 
+test('unauthenticated generated-content translation backs off after the first 401', () => {
+  const client = read('../components/i18n/GeneratedContentLocalizer.tsx')
+
+  assert.match(client, /TRANSLATION_AUTH_BACKOFF_MS = 60_000/)
+  assert.match(client, /Date\.now\(\) < translationAuthRetryAfter/)
+  assert.match(client, /response\.status === 401/)
+  assert.match(client, /translationAuthRetryAfter = Date\.now\(\) \+ TRANSLATION_AUTH_BACKOFF_MS/)
+  assert.match(client, /if \(translated === null\)/)
+})
+
 test('generated-content translation pauses while the browser tab is hidden and resumes when visible', () => {
   const client = read('../components/i18n/GeneratedContentLocalizer.tsx')
 

@@ -1,2 +1,2 @@
-base_sha=84a1c1c86c80cb8d697f1fba9591bc65bcb58b37
-branch=fix/private-repo-runtime-bootstrap
+base_sha=057792a4f1475de4f2f870f7ee4e29768cbd7099
+branch=fix/restore-main-integration-discipline

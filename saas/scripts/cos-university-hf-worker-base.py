@@ -409,8 +409,28 @@ def prepare_dataset(envelope: dict[str, Any]) -> None:
     api = HfApi(token=token)
     namespace = api.whoami()["name"]
     candidate_id = clean(envelope.get("candidateId"), 200)
-    output_repo = f"{namespace}/itmounts-training-{sha256(candidate_id)[:12]}"
-    api.create_repo(output_repo, repo_type="dataset", private=True, exist_ok=True, token=token)
+
+    # Reuse the buyer-owned private training-repository pool. Creating one repository per batch
+    # hit Hugging Face's 300-repositories/day creation limit in Production on 2026-09-20 and
+    # stopped preparation even though storage itself was healthy. Every dataset remains immutable
+    # to downstream training because callbacks pin the exact Hub commit revision below.
+    existing_training_repos = sorted({
+        clean(getattr(dataset, "id", None), 240)
+        for dataset in api.list_datasets(
+            author=namespace,
+            search="itmounts-training-",
+            limit=500,
+            token=token,
+        )
+        if clean(getattr(dataset, "id", None), 240).startswith(f"{namespace}/itmounts-training-")
+    })
+    if existing_training_repos:
+        pool_index = int(sha256(candidate_id)[:8], 16) % len(existing_training_repos)
+        output_repo = existing_training_repos[pool_index]
+    else:
+        output_repo = f"{namespace}/itmounts-training-{sha256(candidate_id)[:12]}"
+        api.create_repo(output_repo, repo_type="dataset", private=True, exist_ok=True, token=token)
+
     DatasetDict({"train": training, "holdout": holdout}).push_to_hub(output_repo, private=True, token=token)
     info = api.dataset_info(output_repo, token=token)
     pinned_revision = clean(getattr(info, "sha", None), 120)

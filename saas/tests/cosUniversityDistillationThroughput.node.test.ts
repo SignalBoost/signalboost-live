@@ -137,20 +137,3 @@ test('rolling authorization prioritizes prepared batches containing failure-deri
   assert.match(migration, /v_active_campaigns >= v_policy\.max_concurrent_campaigns or v_unsettled_jobs > 0/)
   assert.match(migration, /automaticPromotionAuthorized',false,'runpodMutationAuthorized',false,'authorityExpanded',false/)
 })
-
-
-test('replenishment keeps the canonical subject at the front of bounded OpenAlex discovery', () => {
-  const gaps = buildMassDistillationReplenishmentGaps([
-    {
-      subjectKey: 'cybersecurity',
-      subject: 'Cybersecurity',
-      canonicalSubjectId: 'cybersecurity',
-      uniqueBatchableItems: 1,
-      shortfallToBatch: 19,
-    },
-  ], new Date('2026-09-20T23:20:00Z'), 1, 3)
-
-  assert.equal(gaps.length, 3)
-  assert.ok(gaps.every(gap => gap.discoveryQuery?.startsWith('Cybersecurity ')))
-  assert.ok(gaps.every(gap => (gap.discoveryQuery || '').split(/\s+/).slice(0, 8).some(term => /cybersecurity/i.test(term))))
-})

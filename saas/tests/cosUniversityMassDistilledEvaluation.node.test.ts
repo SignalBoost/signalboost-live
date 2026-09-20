@@ -138,14 +138,15 @@ test('structured evaluator errors retain bounded code and message instead of [ob
 })
 
 
-test('every non-issued rolling decision exits before claim, RunPod preflight or wake', () => {
-  const denial = route.indexOf('if (!rolling.issued)')
+test('an existing valid rolling approval can be atomically claimed on a later tick', () => {
+  const rolling = route.indexOf('const rolling = await ensureRollingMassEvaluationApproval()')
   const claim = route.indexOf('claim = await claimNext()')
   const preflight = route.indexOf('ensureMassDistilledEndpoint24Gb(claim.endpointId)')
   const wake = route.indexOf('wakeMassDistilledRuntime(claim.endpointId')
-  assert.ok(denial >= 0 && claim > denial && preflight > claim && wake > preflight)
-  assert.match(route, /return NextResponse\.json\(\{ ok: true, skipped: true, reason: rolling\.reason \}\)/)
-  assert.doesNotMatch(route, /const hardRollingDenial/)
+  assert.ok(rolling >= 0 && claim > rolling && preflight > claim && wake > preflight)
+  assert.doesNotMatch(route, /if \(!rolling\.issued\)[\s\S]{0,800}return NextResponse\.json/)
+  assert.match(route, /const reason = rolling\.issued[\s\S]{0,200}'no_atomically_claimable_mass_distilled_evaluation'[\s\S]{0,200}rolling\.reason/)
+  assert.match(route, /Provider\/runtime work still cannot occur without a successful[\s\S]{0,100}atomic claim/)
 })
 
 

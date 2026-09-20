@@ -66,17 +66,19 @@ test('worker delivery preflight accepts only a plausible signed worker artifact 
 })
 
 
-test('University packaging defect tries bounded runtime recovery before Platform Engineer escalation', () => {
+test('Any trusted University defect escalates to Platform Engineer when bounded runtime recovery cannot restore health', () => {
   const dispatchAt = nativeLoop.indexOf('const dispatched = await dispatchRepairPlan({')
-  const escalationAt = nativeLoop.indexOf('enqueueUniversityDistillationPackagingRepair(incident, diagnostic.diagnosis)', dispatchAt)
+  const escalationAt = nativeLoop.indexOf('enqueueUniversityDistillationRepair(incident, diagnostic.diagnosis)', dispatchAt)
   assert.ok(dispatchAt >= 0)
   assert.ok(escalationAt > dispatchAt)
-  assert.match(nativeLoop, /!dispatched\.completed && universityPackagingIncident/)
-  assert.match(nativeLoop, /Registered runtime recovery did not restore packaging progress/)
+  assert.match(nativeLoop, /!dispatched\.completed && universityDistillationIncident/)
+  assert.match(nativeLoop, /Registered runtime recovery did not restore University health/)
   assert.match(nativeLoop, /Registered runtime recovery failed verification/)
 })
 
 test('University Platform Engineer escalation is exact, pinned, deduplicated, and authority preserving', () => {
+  assert.match(universityCodeRepair, /isUniversityDistillationRepairableIncident/)
+  assert.match(universityCodeRepair, /healthReasons/)
   assert.match(universityCodeRepair, /curriculum_packaging_stalled/)
   assert.match(universityCodeRepair, /curriculumPackagingStalled === true/)
   assert.match(universityCodeRepair, /recoveryPreauthorized === true/)
@@ -97,4 +99,9 @@ test('Builder continuation worker executes and retries University Self-Healing r
   assert.match(continuations, /universityDistillationRepairQueued/)
   assert.match(continuations, /universityDistillationRepairRetried/)
   assert.match(continuations, /const selected = jobs\[0\] \|\| null/)
+})
+
+
+test('Supervisor persists remediation messages so unavailable repairs are diagnosable without manual log archaeology', () => {
+  assert.match(route, /remediationMessages: remediation\.map\(result => result\.message\)\.slice\(0, 4\)/)
 })

@@ -76,14 +76,17 @@ test('HF worker uses stable on-policy DistillationTrainer and fails closed on to
   assert.match(worker, /teacher_model=teacher_model/)
   assert.match(worker, /beta=recipe\["beta"\]/)
   assert.match(worker, /max_completion_length=recipe\["maxNewTokens"\]/)
-  assert.match(worker, /use_bf16 = False/)
-  assert.match(worker, /compute_dtype = torch\.float16/)
+  const trainingFunction = worker.slice(worker.indexOf('def train_student'), worker.indexOf('def main()'))
+  assert.match(trainingFunction, /use_bf16 = False/)
+  assert.match(trainingFunction, /compute_dtype = torch\.float16/)
+  assert.doesNotMatch(trainingFunction, /torch\.cuda\.is_bf16_supported\(\)/)
   assert.match(worker, /worker_frontier_distillation_tokenizer_mismatch_requires_gold/)
   assert.match(worker, /legacy_bootstrap_sft/)
 })
 
 test('HF frontier runtime pins the stable TRL distillation API', () => {
   const jobs = source('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts')
+  assert.match(jobs, /'transformers>=4\.56\.2,<6'/)
   assert.match(jobs, /'trl==1\.10\.0'/)
 })
 

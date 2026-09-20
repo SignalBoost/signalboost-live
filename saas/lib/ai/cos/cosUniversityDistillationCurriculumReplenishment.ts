@@ -14,6 +14,7 @@ import {
 import {
   HYBRID_DISTILLATION_PROFILE,
   HYBRID_FAILURE_DERIVED_TARGET,
+  failedEvaluationRemediationGates,
   failureDerivedSourceHash,
   teacherSyntheticSourceHash,
 } from './cosUniversityHybridDistillation.ts'
@@ -54,48 +55,61 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
   const rows = await input.db.from('cos_university_distilled_evaluation_runs')
     .select('candidate_id,subject_id,holdout_improved,safety_passed,unseen_transfer_passed,delayed_retention_passed,created_at')
     .gte('created_at', since)
-    .eq('holdout_improved', false)
     .order('created_at', { ascending: false })
     .limit(500)
   if (rows.error) throw rows.error
 
   const titleById = new Map(COS_UNIVERSITY_SUBJECTS.map(subject => [subject.id, subject.title] as const))
-  const failuresByTitle = new Map<string, number>()
+  const failuresByTitle = new Map<string, Array<{ candidateId: string; gates: readonly string[] }>>()
   for (const row of (rows.data || []) as any[]) {
     const rawSubject = String(row.subject_id || '').trim()
     const subject = titleById.get(rawSubject as any) || rawSubject
     if (!targetTitles.has(subject)) continue
-    // Independent evaluator verdict is the failure signal. Safety/transfer/retention remain separate
-    // gates and are deliberately not weakened or reinterpreted here.
-    failuresByTitle.set(subject, (failuresByTitle.get(subject) || 0) + 1)
+    const gates = failedEvaluationRemediationGates({
+      holdoutImproved: row.holdout_improved,
+      safetyPassed: row.safety_passed,
+      unseenTransferPassed: row.unseen_transfer_passed,
+      delayedRetentionPassed: row.delayed_retention_passed,
+    })
+    if (!gates.length) continue
+    const candidateId = String(row.candidate_id || '').trim()
+    if (!candidateId) continue
+    const failures = failuresByTitle.get(subject) || []
+    failures.push({ candidateId, gates })
+    failuresByTitle.set(subject, failures)
   }
 
   let inserted = 0
   const bySubject: Array<{ subject: string; inserted: number }> = []
   for (const target of targets) {
-    const verifiedFailures = failuresByTitle.get(target.subject) || 0
+    const verifiedFailures = failuresByTitle.get(target.subject) || []
     const needed = Math.min(
       HYBRID_FAILURE_DERIVED_MAX_PER_SUBJECT,
-      verifiedFailures,
+      verifiedFailures.length,
       Math.max(0, target.shortfallToBatch),
     )
     let subjectInserted = 0
     for (let ordinal = 0; ordinal < needed; ordinal += 1) {
-      const contentHash = failureDerivedSourceHash(target.subject, ordinal)
+      const failure = verifiedFailures[ordinal]
+      if (!failure) continue
+      // Bind remediation identity to the independently evaluated artifact + failed gate classes.
+      // Re-running the same evidence is idempotent; a newly failed artifact produces fresh curriculum.
+      const remediationKey = `${failure.candidateId}:${failure.gates.join(',')}`
+      const contentHash = failureDerivedSourceHash(target.subject, ordinal, remediationKey)
       const row = {
         content_hash: contentHash,
         source_kind: 'failure_derived_curriculum',
-        source_uri: `itmounts://cos-university/failure-derived/${encodeURIComponent(target.subject)}/${ordinal}`,
+        source_uri: `itmounts://cos-university/failure-derived/${encodeURIComponent(target.subject)}/${contentHash.slice(0, 16)}/${ordinal}`,
         source_title: `${target.subject} — independently verified remediation seed ${ordinal + 1}`,
         observed_at: input.now.toISOString(),
         subject: target.subject,
         summary: [
-          `Independent holdout evaluation shows a remediation need in ${target.subject}.`,
-          'Generate a distinct self-contained expert teaching example that targets a common failure mode in this subject and demonstrates the corrected method.',
+          `Independent evaluation shows a remediation need in ${target.subject} for graduation gate classes: ${failure.gates.join(', ')}.`,
+          'Generate a distinct self-contained expert teaching example that targets the relevant failure class while preserving correct, safe, transferable, and retainable behavior.',
           'Do not reproduce training examples, raw conversations, private holdouts, hidden exams, evaluator output, user data, or private evidence.',
         ].join(' '),
         facts: [
-          { origin: 'failure_derived', profile: HYBRID_DISTILLATION_PROFILE, ordinal },
+          { origin: 'failure_derived', profile: HYBRID_DISTILLATION_PROFILE, ordinal, remediationGates: failure.gates },
           { constraint: 'subject_level_remediation_only_no_raw_chat_no_private_holdout_no_hidden_exam' },
         ],
         confidence: 1,
@@ -104,6 +118,8 @@ export async function installVerifiedFailureDerivedCurriculum(input: {
           profile: HYBRID_DISTILLATION_PROFILE,
           origin: 'failure_derived',
           independentEvaluationFailure: true,
+          remediationGates: failure.gates,
+          sourceEvaluationCandidateId: failure.candidateId,
           sourceDetailsCopied: false,
           authorityExpanded: false,
         }],

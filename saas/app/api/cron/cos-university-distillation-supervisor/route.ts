@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
         signalsObserved: monitoring.signalsObserved,
         incidentsObserved: monitoring.incidents.length,
         remediationOutcomes: remediation.map(result => result.outcome),
+        remediationMessages: remediation.map(result => result.message).slice(0, 4),
         collectorErrors: monitoring.collectorErrors,
         repairIncomplete,
         automaticPromotionAuthorized: false,

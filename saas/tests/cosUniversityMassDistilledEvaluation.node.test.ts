@@ -138,14 +138,17 @@ test('structured evaluator errors retain bounded code and message instead of [ob
 })
 
 
-test('every non-issued rolling decision exits before claim, RunPod preflight or wake', () => {
-  const denial = route.indexOf('if (!rolling.issued)')
+test('bounded queue-state denials may drain existing approvals while unknown or disabled denials still stop before provider work', () => {
+  const drain = route.indexOf('const mayDrainExistingApproval')
+  const denial = route.indexOf('if (!rolling.issued && !mayDrainExistingApproval)')
   const claim = route.indexOf('claim = await claimNext()')
   const preflight = route.indexOf('ensureMassDistilledEndpoint24Gb(claim.endpointId)')
   const wake = route.indexOf('wakeMassDistilledRuntime(claim.endpointId')
-  assert.ok(denial >= 0 && claim > denial && preflight > claim && wake > preflight)
+  assert.ok(drain >= 0 && denial > drain && claim > denial && preflight > claim && wake > preflight)
+  assert.match(route, /rolling\.reason === 'no_mass_artifact_eligible_for_rolling_evaluation'/)
+  assert.match(route, /rolling\.reason === 'rolling_mass_evaluation_window_exhausted'/)
+  assert.match(route, /if \(!rolling\.issued && !mayDrainExistingApproval\)/)
   assert.match(route, /return NextResponse\.json\(\{ ok: true, skipped: true, reason: rolling\.reason \}\)/)
-  assert.doesNotMatch(route, /const hardRollingDenial/)
 })
 
 

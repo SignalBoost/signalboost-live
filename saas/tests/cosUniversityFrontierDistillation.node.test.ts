@@ -83,3 +83,12 @@ test('HF frontier runtime pins the validated TRL GKD API', () => {
   const jobs = source('../lib/ai/cos/cosUniversityHuggingFaceJobs.ts')
   assert.match(jobs, /'trl==0\.23\.0'/)
 })
+
+
+test('mass artifact evidence durably records the executed frontier training recipe', () => {
+  const consumer = source('../lib/ai/cos/cosUniversityMassDistillationConsumer.ts')
+  assert.match(consumer, /function durableTrainingReceipt/)
+  assert.match(consumer, /trainingReceipt = durableTrainingReceipt\(body\.trainingProfile, body\.trainingRecipe\)/)
+  assert.match(consumer, /trainingMode: 'distillation', trainingReceipt/)
+  assert.match(consumer, /teacherModel: run\.teacher_model_id \|\| null,[\s\S]*trainingReceipt,[\s\S]*nextGate: 'independent_evaluation'/)
+})

@@ -75,6 +75,10 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     // after the evaluator is repaired without consuming the model's substantive-attempt budget or the rolling approval window.
     || error.startsWith('mass_distilled_evaluation_answer_missing:')
     || error.startsWith('mass_distilled_evaluation_answer_empty:')
+    // Prepared holdouts may preserve immutable source text in a legacy shape while carrying the
+    // canonical prompt/response as structured columns. Rejecting that transport shape is an
+    // evaluator compatibility defect, not evidence about model quality.
+    || error === 'mass_distilled_evaluation_holdout_format_invalid'
     // The pre-fix evaluator reconstructed a bare hash-only candidate name. The exact runtime serves a runtime-keyed alias,
     // so this 404 proves evaluator/runtime identity drift, not model quality. Keep the exclusion narrow to that known shape.
     || (/^mass_distilled_evaluation_runpod_http_404:candidate:/.test(error)

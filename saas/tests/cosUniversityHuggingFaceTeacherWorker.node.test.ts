@@ -78,3 +78,13 @@ test('wrapper preserves the proven preparation and training implementation uncha
 test('teacher throughput and diagnostics do not encode provider budget or timeout expansion', () => {
   assert.doesNotMatch(worker, /teacherTimeoutSeconds|maxHourlyCostUsd|reservedCostCeilingUsd|1\.61|9\.125/)
 })
+
+
+test('dataset preparation reuses the existing private training repo pool before creating another repo', () => {
+  assert.match(base, /api\.list_datasets\(/)
+  assert.match(base, /search="itmounts-training-"/)
+  assert.match(base, /existing_training_repos/)
+  assert.match(base, /pool_index = int\(sha256\(candidate_id\)\[:8\], 16\) % len\(existing_training_repos\)/)
+  assert.ok(base.indexOf('api.list_datasets(') < base.indexOf('api.create_repo('))
+  assert.match(base, /pinned_revision = clean\(getattr\(info, "sha", None\), 120\)/)
+})

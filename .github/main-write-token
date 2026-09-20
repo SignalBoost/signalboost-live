@@ -1,2 +1,2 @@
-base_sha=5711a1a626106fccde205a7093b51d86d37d0418
-branch=fix/university-openalex-subject-anchor-v2
+base_sha=9c53b78bf0a5a89c15765af77f92da973ac6df23
+branch=fix/restore-supabase-load-shed-cadence

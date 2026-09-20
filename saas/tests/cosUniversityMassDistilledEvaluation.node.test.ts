@@ -70,11 +70,12 @@ test('mass evaluator binds exact governed training revision, pinned holdout and 
   assert.match(runner, /cos_university_mass_distillation_batch_runs/)
   assert.match(runner, /fineTuneRevisionKey\(revision\)!==claim\.revisionKey/)
   assert.match(runner, /readPinnedHfParquetRows/)
-  assert.match(runner, /sha256Raw\(text\)!==itemHash/)
-  assert.match(runner, /structuredPrompt=clean\(row\.prompt,100_000\)/)
-  assert.match(runner, /structuredReference=clean\(row\.response,100_000\)/)
-  assert.match(runner, /structuredPrompt&&structuredReference\?\{prompt:structuredPrompt,reference:structuredReference\}:parseTrainingText\(text\)/)
-  assert.match(runner, /manifestHash\(observed\)!==input\.expectedManifestHash/)
+  assert.match(runner, /sha256Raw\(text\)\s*!==\s*itemHash/)
+  assert.match(runner, /const structuredPrompt = clean\(row\.prompt, 100_000\)/)
+  assert.match(runner, /const structuredReference = clean\(row\.response, 100_000\)/)
+  assert.match(runner, /structuredPrompt && structuredReference/)
+  assert.match(runner, /parseTrainingText\(text\)/)
+  assert.match(runner, /manifestHash\(observed\)\s*!==\s*input\.expectedManifestHash/)
   // Endpoint/model naming moved out of the evaluator into the provisioner; assert it where it lives.
   assert.match(provision, /itmounts-mass-distilled-\$\{suffix\}/)
   assert.match(runner, /payload\?\.ready===true/)
@@ -153,7 +154,8 @@ test('system-prefixed holdout rows remain parseable instead of blocking the back
   assert.match(runner, /text\.indexOf\('\\n\\n'\+prefix\)/)
   assert.match(runner, /if\(userAt<0\)return null/)
   assert.match(runner, /if\(!opensWithUser\)text=text\.slice\(userAt\+2\)/)
-  assert.match(runner, /structuredPrompt&&structuredReference\?\{prompt:structuredPrompt,reference:structuredReference\}:parseTrainingText\(text\)/)
+  assert.match(runner, /structuredPrompt && structuredReference/)
+  assert.match(runner, /parseTrainingText\(text\)/)
 })
 
 

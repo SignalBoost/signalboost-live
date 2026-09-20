@@ -163,7 +163,7 @@ async function pinnedHoldout(input:{holdoutDataRef:string;expectedManifestHash:s
   const rows=await withinDeadline(readPinnedHfParquetRows({repoId,revision,split,token,siblings:Array.isArray(metadata?.siblings)?metadata.siblings:[]}),input.deadlineMs,60_000)
   if(!rows.length||rows.length>100)throw new Error('mass_distilled_evaluation_holdout_count_invalid')
   const observed:string[]=[];const cases:EvalCase[]=[]
-  for(const row of rows){const text=clean(row.text,500_000);const itemHash=clean(row.item_hash,64).toLowerCase();if(!text||!HEX64.test(itemHash)||sha256Raw(text)!==itemHash)throw new Error('mass_distilled_evaluation_holdout_integrity_failed');const parsed=parseTrainingText(text);if(!parsed)throw new Error('mass_distilled_evaluation_holdout_format_invalid');observed.push(itemHash);cases.push(Object.freeze({id:itemHash.slice(0,16),prompt:parsed.prompt,reference:parsed.reference}))}
+  for(const row of rows){const text=clean(row.text,500_000);const itemHash=clean(row.item_hash,64).toLowerCase();if(!text||!HEX64.test(itemHash)||sha256Raw(text)!==itemHash)throw new Error('mass_distilled_evaluation_holdout_integrity_failed');const structuredPrompt=clean(row.prompt,100_000);const structuredReference=clean(row.response,100_000);const parsed=structuredPrompt&&structuredReference?{prompt:structuredPrompt,reference:structuredReference}:parseTrainingText(text);if(!parsed)throw new Error('mass_distilled_evaluation_holdout_format_invalid');observed.push(itemHash);cases.push(Object.freeze({id:itemHash.slice(0,16),prompt:parsed.prompt,reference:parsed.reference}))}
   if(new Set(observed).size!==observed.length||manifestHash(observed)!==input.expectedManifestHash)throw new Error('mass_distilled_evaluation_holdout_manifest_mismatch')
   return cases
 }

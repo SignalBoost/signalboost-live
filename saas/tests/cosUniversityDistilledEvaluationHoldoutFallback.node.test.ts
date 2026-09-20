@@ -26,6 +26,9 @@ test('direct Hub parquet reader is exact-revision, split-scoped, and resource bo
   assert.match(helper, /total > maxBytes/)
   assert.match(helper, /reader\.cancel\('distilled_evaluation_hf_pinned_parquet_size_ceiling'\)/)
   assert.match(helper, /parquetReadObjects\(\{ file \}\)/)
+  assert.match(helper, /prompt\?: string; response\?: string/)
+  assert.match(helper, /const prompt = clean\(row\.prompt, 100_000\)/)
+  assert.match(helper, /const reference = clean\(row\.response, 100_000\)/)
   assert.equal(pkg.dependencies.hyparquet, '1.26.0')
 })
 
@@ -41,5 +44,15 @@ test('transport fallback does not weaken pinned holdout integrity gates', () => 
   assert.match(evaluator, /payload\.rows\.length !== input\.expectedHashes\.length/)
   assert.match(evaluator, /sha256Raw\(text\) !== itemHash/)
   assert.match(evaluator, /distilled_evaluation_holdout_identity_mismatch/)
+  assert.match(evaluator, /manifestHash\(observed\) !== input\.expectedManifestHash/)
+})
+
+
+test('structured holdout columns are interpretation-only and never replace immutable text identity', () => {
+  assert.match(evaluator, /const structuredPrompt = clean\(row\?\.prompt, 100_000\)/)
+  assert.match(evaluator, /const structuredReference = clean\(row\?\.response, 100_000\)/)
+  assert.match(evaluator, /structuredPrompt && structuredReference/)
+  assert.match(evaluator, /parseTrainingText\(text\)/)
+  assert.match(evaluator, /sha256Raw\(text\) !== itemHash/)
   assert.match(evaluator, /manifestHash\(observed\) !== input\.expectedManifestHash/)
 })

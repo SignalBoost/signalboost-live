@@ -18,8 +18,8 @@ import {
   isOwnedSiteOptimizationIncident,
 } from './owned-site-autonomous-repair.ts'
 import {
-  enqueueUniversityDistillationPackagingRepair,
-  isUniversityDistillationPackagingStallIncident,
+  enqueueUniversityDistillationRepair,
+  isUniversityDistillationRepairableIncident,
 } from './university-distillation-autonomous-repair.ts'
 import { createSignalBoostGatewayHost } from '@/agent-gateway-host/signalboost-host'
 import { dispatchRepairPlan, type RepairStep } from '@/agent-gateway-host/supervisor-repair'
@@ -67,7 +67,7 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
     // editing, opens a PR, runs CI, and relies on governed merge/deployment verification.
     const optimizerIncident = isOwnedSiteOptimizationIncident(incident)
     const cybersecurityIncident = isOwnedSiteCybersecurityIncident(incident)
-    const universityPackagingIncident = isUniversityDistillationPackagingStallIncident(incident)
+    const universityDistillationIncident = isUniversityDistillationRepairableIncident(incident)
     if (optimizerIncident || cybersecurityIncident) {
       try {
         const repair = optimizerIncident
@@ -137,14 +137,14 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
         remediationMemory,
       })
       const summary = summarizeRepairDispatch(dispatched, repairPlan.length)
-      if (!dispatched.completed && universityPackagingIncident) {
+      if (!dispatched.completed && universityDistillationIncident) {
         try {
-          const repair = await enqueueUniversityDistillationPackagingRepair(incident, diagnostic.diagnosis)
+          const repair = await enqueueUniversityDistillationRepair(incident, diagnostic.diagnosis)
           const action = repair.disposition === 'queued'
-            ? `Registered runtime recovery did not restore packaging progress; Platform Engineer repair job ${repair.jobId} was queued on the pinned Production revision.`
+            ? `Registered runtime recovery did not restore University health; Platform Engineer repair job ${repair.jobId} was queued on the pinned Production revision.`
             : repair.disposition === 'already_active'
-              ? `Registered runtime recovery did not restore packaging progress; Platform Engineer job ${repair.jobId} is already active and duplicate execution was suppressed.`
-              : `Registered runtime recovery did not restore packaging progress; a recent Platform Engineer attempt ${repair.jobId} is retry-suppressed while Production is re-observed.`
+              ? `Registered runtime recovery did not restore University health; Platform Engineer job ${repair.jobId} is already active and duplicate execution was suppressed.`
+              : `Registered runtime recovery did not restore University health; a recent Platform Engineer attempt ${repair.jobId} is retry-suppressed while Production is re-observed.`
           results.push({
             incidentId: incident.incidentId,
             diagnosisConfidence: diagnostic.confidence_score,
@@ -178,9 +178,9 @@ export async function remediateNativeIncidents(incidents: readonly SupervisorInc
         objectiveOutcomes,
       })
     } catch (error) {
-      if (universityPackagingIncident) {
+      if (universityDistillationIncident) {
         try {
-          const repair = await enqueueUniversityDistillationPackagingRepair(incident, diagnostic.diagnosis)
+          const repair = await enqueueUniversityDistillationRepair(incident, diagnostic.diagnosis)
           results.push({
             incidentId: incident.incidentId,
             diagnosisConfidence: diagnostic.confidence_score,

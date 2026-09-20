@@ -1,742 +1,436 @@
-// saas/app/api/cron/cos-university-distilled-evaluation/route.ts
+// saas/app/api/cron/cos-university-mass-distilled-evaluation/route.ts
 import { createHash } from 'node:crypto'
+import { MASS_EVALUATION_ENDPOINT_CALLS } from '../../../../lib/ai/cos/cosUniversityMassEvaluationContextBudget.ts'
+import { isTerminalHoldoutDataDefect } from '@/lib/ai/cos/cosUniversityMassEvaluationTerminalDefect'
+import { REQUIRED_EVALUATION_RUN_COLUMNS, isMissingColumnError, missingColumnsFromError } from '@/lib/ai/cos/cosUniversityEvaluationSchemaPreflight'
 import { NextRequest, NextResponse } from 'next/server'
 import { cosServiceDb } from '@/lib/cos-core/storage/supabase'
-import { readPinnedHfParquetRows } from '@/lib/ai/cos/hfPinnedParquetRows'
-import {
-  distilledEvaluationCallUsageFromError,
-  runUniversityDistilledArtifactEvaluation,
-} from '@/lib/ai/cos/cosUniversityDistilledArtifactEvaluation'
+import { queryRunpodAccountStatus } from '@/lib/hub/runpodTelemetry'
 import { independentEvaluatorConfig } from '@/lib/ai/cos/cosUniversityIndependentEvaluator'
 import { recordCosUniversityProductionPath } from '@/lib/ai/cos/cosUniversityProductionAssurance'
+import { ensureMassDistilledEndpoint24Gb } from '@/lib/ai/cos/runpodMassDistilledProvisionV2'
 import { configuredRunpodApiKey } from '@/lib/ai/cos/runpodConfig'
-import { DISTILLED_ADAPTER_MODEL_ID } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
-import { isDistilledEvaluationApprovalEvidence } from '@/lib/ai/cos/cosUniversityRuntimeApprovalPolicy'
+import { runpodServerlessRootUrl } from '@/lib/ai/cos/runpodServerlessDistilledProvision'
+import {
+  runMassDistilledArtifactEvaluation,
+  type MassEvaluationClaim,
+} from '@/lib/ai/cos/cosUniversityMassDistilledArtifactEvaluation'
+import {
+  MASS_EVALUATION_APPROVAL_TTL_MS,
+  MASS_EVALUATION_FRONTIER_PROOF_SAMPLE,
+  decideExhaustedMassEvaluationArtifacts,
+  decideRollingMassEvaluationApproval,
+  type ExhaustedMassEvaluationArtifact,
+  type RollingArtifact,
+  type RollingEvent,
+} from '@/lib/ai/cos/cosUniversityMassEvaluationRollingAuthority'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 600
 
-const HF_HUB_ORIGIN = 'https://huggingface.co'
-const HF_ROWS_ORIGIN = 'https://datasets-server.huggingface.co'
-// The exact v6 worker has repeatedly needed just over 220 seconds from scale-to-zero to model-ready.
-// Allow the gateway's full bounded bootstrap window; the shared 570-second route deadline remains
-// authoritative and no additional inference call is used to warm the worker.
-const RUNPOD_READY_TIMEOUT_MS = 300_000
-const RUNPOD_READY_POLL_MS = 3_000
-const RUNPOD_INFERENCE_TIMEOUT_MS = 120_000
-const RUNPOD_KEEPALIVE_INTERVAL_MS = 30_000
-const RUNPOD_ENDPOINT_PREFLIGHT_TIMEOUT_MS = 8_000
-const EVALUATION_ROUTE_BUDGET_MS = 570_000
-const EVALUATION_ROUTE_RESERVE_MS = 30_000
-const RUNPOD_MAX_GPU_PRICE_USD = 0.69
-const RUNPOD_IDLE_TIMEOUT_SECONDS = 60
-const MAX_RUNTIME_WAKE_ATTEMPTS = 1
-const MAX_RUNTIME_WAKE_COST_USD = 0.2
-const RUNTIME_ATTEMPT_PROFILE = 'cos_distilled_independent_evaluation_runtime_v1'
-const RUNTIME_ATTEMPT_CLAIM = 'distilled_independent_evaluation_attempt_started'
-const RUNPOD_PREFLIGHT_PROFILE = 'cos_distilled_evaluation_runpod_endpoint_preflight_v1'
-const RUNPOD_PREFLIGHT_CLAIM = 'runpod_endpoint_preflight_classified'
-const HEX40 = /^[a-f0-9]{40}$/i
+const PROFILE = 'cos_mass_distilled_independent_evaluation_runtime_v1'
+const COMPLETED = 'mass_distilled_independent_evaluation_completed'
+const FAILED = 'mass_distilled_independent_evaluation_failed'
+const EXHAUSTED = 'mass_distilled_evaluation_attempts_exhausted'
+const ROUTE_BUDGET_MS = 570_000
+const ROUTE_RESERVE_MS = 25_000
+const RUNTIME_WAKE_TIMEOUT_MS = 20_000
+const MIN_BALANCE_USD = 1
+const ROLLING_EVENT_PAGE_SIZE = 1000
+const ROLLING_EVENT_MAX_PAGES = 10
 const HEX64 = /^[a-f0-9]{64}$/i
-const RUNPOD_ENDPOINT_HOST = /^[A-Za-z0-9_-]{3,120}\.api\.runpod\.ai$/
-const RUNTIME_WAKE_WORST_CASE_COST_USD = (
-  ((EVALUATION_ROUTE_BUDGET_MS / 1000) + RUNPOD_IDLE_TIMEOUT_SECONDS) * RUNPOD_MAX_GPU_PRICE_USD
-) / 3600
+const ENDPOINT_ID = /^[A-Za-z0-9_-]{3,120}$/
 
-type PinnedDatasetMetadata = Readonly<{
-  revision: string
-  siblings: ReadonlyArray<Readonly<{ rfilename?: unknown }>>
-}>
+const hash = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
+const clean = (value: unknown, max = 1000) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max)
 
-type RuntimeAttemptClaim = Readonly<{
-  ok: true
-  candidateId: string
-  artifactHash: string
-  authorizationObservedAt: string
-  authorizationExpiresAt: string
-  maxEstimatedRuntimeWakeCostUsd: number
-  holdoutCaseCount: number
-  maxEndpointCalls: number
-  maxJudgeCalls: number
-  maxSoloRetryCalls: number
-}> | Readonly<{
-  ok: false
-  reason: string
-}>
-
-type SuccessfulRuntimeAttempt = Extract<RuntimeAttemptClaim, { ok: true }>
-type EvaluationTransportAudit = Readonly<{
-  runtimeAttempt: SuccessfulRuntimeAttempt | null
-  endpointCalls: number
-}>
-
-type RunpodEndpointClassification = 'available' | 'stale' | 'transient'
-
-type RunpodEndpointPreflight = Readonly<{
-  classification: RunpodEndpointClassification
-  httpStatus: number | null
-  errorName: string | null
-  errorMessage: string | null
-}>
-
-const TRANSPORT_AUDIT_ERROR_FIELD = 'distilledEvaluationTransportAudit' as const
-
-class RuntimeAttemptSkip extends Error {
-  constructor(readonly reason: string) {
-    super(reason)
-    this.name = 'RuntimeAttemptSkip'
+function boundedErrorMessage(error: unknown): string {
+  if (error instanceof Error) return clean(error.message, 500)
+  if (error && typeof error === 'object') {
+    const row = error as Record<string, unknown>
+    const code = clean(row.code, 80)
+    const message = clean(row.message, 400)
+    if (message) return clean(code ? `${code}:${message}` : message, 500)
+    const name = clean(row.name, 80)
+    if (name) return name
+    return 'structured_error_without_message'
   }
+  return clean(String(error), 500)
 }
 
-function attachEvaluationTransportAudit(error: unknown, audit: EvaluationTransportAudit): Error {
-  const failure = error instanceof Error ? error : new Error(String(error))
+async function recordProduction(invocationSucceeded: boolean, evidence: Record<string, unknown>) {
+  await recordCosUniversityProductionPath({
+    path: 'mass_distilled_independent_evaluation',
+    invocationSucceeded,
+    evidence,
+  })
+}
+
+async function wakeMassDistilledRuntime(endpointId: string, deadlineMs: number) {
+  const key = configuredRunpodApiKey()
+  if (!key) throw new Error('mass_distilled_evaluation_runpod_key_missing')
+  const remainingMs = deadlineMs - Date.now() - ROUTE_RESERVE_MS
+  if (remainingMs <= 0) throw new Error('mass_distilled_evaluation_route_deadline_exceeded')
+  const timeoutMs = Math.max(1, Math.min(RUNTIME_WAKE_TIMEOUT_MS, remainingMs))
+  // /ping is only a scale-from-zero trigger. A cold RunPod LB request can stay open until a worker is
+  // routable, so waiting minutes for its response consumes the evaluator's entire route budget. Dispatch
+  // it briefly, then let the evaluator's /ready loop own startup readiness and the remaining deadline.
   try {
-    Object.defineProperty(failure, TRANSPORT_AUDIT_ERROR_FIELD, {
-      value: Object.freeze({ ...audit }),
-      configurable: true,
+    const response = await fetch(`${runpodServerlessRootUrl(endpointId)}/ping`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(timeoutMs),
     })
-    return failure
-  } catch {
-    const wrapper = new Error(failure.message) as Error & Record<string, unknown>
-    wrapper.cause = error
-    wrapper[TRANSPORT_AUDIT_ERROR_FIELD] = Object.freeze({ ...audit })
-    return wrapper
+    if (!response.ok) {
+      const detail = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
+      throw new Error(`mass_distilled_evaluation_runtime_wake_http_${response.status}:${detail}`)
+    }
+    const payload: any = await response.json().catch(() => null)
+    if (String(payload?.status || '') !== 'accepting_requests') {
+      throw new Error('mass_distilled_evaluation_runtime_wake_invalid')
+    }
+    return Object.freeze({
+      ok: true as const,
+      endpointId,
+      responseObserved: true,
+      modelReady: payload?.modelReady === true,
+      tokenGeneratingRequest: false,
+    })
+  } catch (error) {
+    const name = error instanceof Error ? error.name : ''
+    if (name !== 'TimeoutError' && name !== 'AbortError') throw error
+    return Object.freeze({
+      ok: true as const,
+      endpointId,
+      responseObserved: false,
+      modelReady: false,
+      wakeRequestTimedOut: true,
+      tokenGeneratingRequest: false,
+    })
   }
 }
 
-function evaluationTransportAuditFromError(error: unknown): EvaluationTransportAudit | null {
-  const audit = error && typeof error === 'object'
-    ? (error as Record<string, unknown>)[TRANSPORT_AUDIT_ERROR_FIELD]
-    : null
-  if (!audit || typeof audit !== 'object' || Array.isArray(audit)) return null
-  const value = audit as Record<string, unknown>
-  return Number.isInteger(value.endpointCalls) && Number(value.endpointCalls) >= 0
-    ? audit as EvaluationTransportAudit
-    : null
-}
+type RawClaim = Readonly<{
+  candidate_id: string
+  subject_id: string
+  artifact_id: string
+  artifact_hash: string
+  revision_key: string
+  dataset_hash: string
+  endpoint_id: string
+  approval_observed_at: string
+  max_endpoint_calls: number
+  max_judge_calls: number
+  max_runtime_wake_attempts: number
+  max_estimated_runtime_wake_cost_usd: number
+  reservation_event_key: string
+}>
 
-function hash(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value)).digest('hex')
-}
-
-function requestUrl(input: Parameters<typeof fetch>[0]): string {
-  return input instanceof URL
-    ? input.toString()
-    : typeof input === 'string'
-      ? input
-      : input.url
-}
-
-function metadataRepoId(url: URL): string | null {
-  if (url.origin !== HF_HUB_ORIGIN) return null
-  const match = /^\/api\/datasets\/([^/]+)\/([^/]+)$/.exec(url.pathname)
-  if (!match) return null
-  try {
-    return `${decodeURIComponent(match[1])}/${decodeURIComponent(match[2])}`
-  } catch {
-    return null
-  }
-}
-
-function isRunpodEvaluationInference(url: URL | null, init?: RequestInit): url is URL {
-  if (!url || url.protocol !== 'https:' || !RUNPOD_ENDPOINT_HOST.test(url.hostname)) return false
-  const method = String(init?.method || 'GET').toUpperCase()
-  return method === 'POST' && url.pathname === '/v1/chat/completions'
-}
-
-function requestSignal(input: Parameters<typeof fetch>[0], init?: RequestInit): AbortSignal | null {
-  if (init?.signal) return init.signal
-  if (typeof input !== 'string' && !(input instanceof URL)) return input.signal
-  return null
-}
-
-function boundedSignal(existing: AbortSignal | null, timeoutMs: number): AbortSignal {
-  const timeout = AbortSignal.timeout(Math.max(1, Math.floor(timeoutMs)))
-  return existing ? AbortSignal.any([existing, timeout]) : timeout
-}
-
-function routeDeadlineSignal(routeDeadlineMs: number): AbortSignal {
-  const remaining = routeDeadlineMs - Date.now() - EVALUATION_ROUTE_RESERVE_MS
-  if (remaining <= 0) throw new Error('distilled_evaluation_route_deadline_exceeded')
-  return AbortSignal.timeout(Math.max(1, Math.floor(remaining)))
-}
-
-async function withinRouteDeadline<T>(work: Promise<T>, routeDeadlineMs: number): Promise<T> {
-  const remaining = routeDeadlineMs - Date.now() - EVALUATION_ROUTE_RESERVE_MS
-  if (remaining <= 0) throw new Error('distilled_evaluation_route_deadline_exceeded')
-  let timer: ReturnType<typeof setTimeout> | null = null
-  try {
-    return await Promise.race([
-      work,
-      new Promise<T>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('distilled_evaluation_route_deadline_exceeded')), remaining)
-        timer.unref?.()
-      }),
-    ])
-  } finally {
-    if (timer) clearTimeout(timer)
-  }
-}
-
-async function claimRuntimeEvaluationAttempt(now: Date, routeDeadlineMs: number): Promise<RuntimeAttemptClaim> {
-  if (RUNTIME_WAKE_WORST_CASE_COST_USD > MAX_RUNTIME_WAKE_COST_USD) {
-    throw new Error('distilled_evaluation_runtime_cost_model_exceeds_ceiling')
-  }
+// An artifact that has spent its substantive attempt budget can never be approved again, yet nothing moved it
+// out of `evaluation_pending`. It stayed in this lane's selection window - the bounded pending selection window - so a
+// run of dead artifacts at the front of the queue starves every newer artifact behind them, while the lane
+// reports them as waiting. Give them the terminal status their verdict already implies, and record WHY in the
+// same ledger the evaluation writes to, so a real failure is visible to curriculum work instead of vanishing.
+//
+// The status write is conditioned on `evaluation_pending`, so re-running it changes nothing, and the event is
+// upserted on a deterministic key. This disposes; it never evaluates, scores, promotes or spends.
+async function disposeExhaustedArtifacts(
+  items: readonly ExhaustedMassEvaluationArtifact[],
+  now: Date,
+): Promise<ExhaustedMassEvaluationArtifact[]> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
+  const disposed: ExhaustedMassEvaluationArtifact[] = []
+  for (const item of items) {
+    const updated = await db.from('cos_local_distillation_artifacts')
+      .update({ status: 'quarantined', updated_at: now.toISOString() })
+      .eq('candidate_id', item.candidateId)
+      .eq('trained_artifact_hash', item.artifactHash)
+      .eq('status', 'evaluation_pending')
+    if (updated.error) throw updated.error
 
-  const artifactResult = await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
+    const body = {
+      profile: PROFILE,
+      claim: EXHAUSTED,
+      candidateId: item.candidateId,
+      artifactHash: item.artifactHash,
+      reason: item.reason,
+      failedAttempts: item.failedAttempts,
+      lastError: clean(item.lastError, 500),
+      nextStatus: 'quarantined',
+      terminalDisposition: true,
+      evaluationPassed: false,
+      productionTrafficAuthorized: false,
+      authorityExpanded: false,
+    }
+    const inserted = await db.from('cos_university_learning_assurance_events').upsert({
+      event_key: hash([PROFILE, EXHAUSTED, item.candidateId, item.artifactHash]),
+      event_type: 'fine_tune',
+      subject_id: item.subjectId || null,
+      candidate_id: item.candidateId,
+      evidence_hash: hash(body),
+      evidence: body,
+      verifier: 'host_controller',
+      observed_at: now.toISOString(),
+    }, { onConflict: 'event_key', ignoreDuplicates: true })
+    if (inserted.error) throw inserted.error
+    disposed.push(item)
+  }
+  return disposed
+}
+
+type RollingOutcome = Readonly<{
+  issued: boolean
+  reason?: string
+  candidateId?: string
+  artifactHash?: string
+  disposed?: number
+}>
+
+async function ensureRollingMassEvaluationApproval(): Promise<RollingOutcome> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const artifacts = await db.from('cos_local_distillation_artifacts')
+    .select('candidate_id,subject_id,trained_artifact_hash,created_at,intended_use')
     .eq('status', 'evaluation_pending')
-    .eq('trained_artifact_id', DISTILLED_ADAPTER_MODEL_ID)
+    .like('candidate_id', 'mass:%')
     .order('created_at', { ascending: true })
-    .limit(1)
-    .abortSignal(routeDeadlineSignal(routeDeadlineMs))
-    .maybeSingle()
-  if (artifactResult.error) throw artifactResult.error
-  if (!artifactResult.data) return { ok: false, reason: 'no_supported_evaluation_pending_artifact' }
+    .limit(500)
+  if (artifacts.error) throw artifacts.error
+  const rows: RollingArtifact[] = (artifacts.data || []).map((row: any) => ({
+    candidateId: clean(row.candidate_id, 240), subjectId: clean(row.subject_id, 240),
+    artifactHash: clean(row.trained_artifact_hash, 64).toLowerCase(), createdAt: String(row.created_at || ''),
+    frontierRecipe: row.intended_use?.trainingReceipt?.profile === 'cos_university_frontier_gkd_v1',
+  }))
+  if (!rows.length) return { issued: false, reason: 'no_mass_artifact_pending' }
+  // Scope evidence to the pending candidates being evaluated this tick. Supabase/PostgREST can cap
+  // broad result sets below the requested limit; a global newest-events query can therefore evict
+  // older exact-canary evidence and make eligible artifacts appear permanently ineligible.
+  const candidateIds = rows.map(row => row.candidateId)
+  // A single global row cap silently drops the OLDEST rows first, which is exactly where an artifact's exact
+  // canary lives. Scope every read to the candidates actually under consideration and page through them, so an
+  // older canary can never fall out of the window and make a genuinely eligible artifact look unproven.
+  const eventRows: any[] = []
+  for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
+    const from = page * ROLLING_EVENT_PAGE_SIZE
+    const to = from + ROLLING_EVENT_PAGE_SIZE - 1
+    const result = await db.from('cos_university_learning_assurance_events')
+      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+      .eq('event_type', 'fine_tune')
+      .in('candidate_id', candidateIds)
+      .in('verifier', ['host_controller', 'host_production_verifier', 'independent_scorer'])
+      .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+      .order('observed_at', { ascending: false })
+      .range(from, to)
+    if (result.error) throw result.error
+    const batch = result.data || []
+    eventRows.push(...batch)
+    if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+  }
+  const reservationRows: any[] = []
+  for (let page = 0; page < ROLLING_EVENT_MAX_PAGES; page += 1) {
+    const from = page * ROLLING_EVENT_PAGE_SIZE
+    const to = from + ROLLING_EVENT_PAGE_SIZE - 1
+    const result = await db.from('cos_university_learning_assurance_events')
+      .select('event_key,candidate_id,observed_at,expires_at,verifier,evidence')
+      .eq('event_type', 'fine_tune')
+      .in('candidate_id', candidateIds)
+      .contains('evidence', { profile: 'cos_mass_distilled_independent_evaluation_runtime_v1' })
+      .gte('observed_at', new Date(Date.now() - 30 * 86_400_000).toISOString())
+      .order('observed_at', { ascending: false })
+      .range(from, to)
+    if (result.error) throw result.error
+    const batch = result.data || []
+    reservationRows.push(...batch)
+    if (batch.length < ROLLING_EVENT_PAGE_SIZE) break
+  }
+  const seenEventKeys = new Set<string>()
+  const uniqueRows = [...eventRows, ...reservationRows].filter((row: any) => {
+    const key = String(row?.event_key || '')
+    if (!key) return true
+    if (seenEventKeys.has(key)) return false
+    seenEventKeys.add(key)
+    return true
+  })
+  const all: RollingEvent[] = uniqueRows.map((row: any) => ({
+    candidateId: clean(row.candidate_id, 240), observedAt: String(row.observed_at || ''), expiresAt: row.expires_at ? String(row.expires_at) : null,
+    verifier: clean(row.verifier, 80), evidence: row.evidence && typeof row.evidence === 'object' ? row.evidence : null,
+  }))
+  const now = new Date()
 
-  const candidateId = String(artifactResult.data.candidate_id || '').trim()
-  const subjectId = String(artifactResult.data.subject_id || '').trim()
-  const artifactHash = String(artifactResult.data.trained_artifact_hash || '').trim().toLowerCase()
-  if (!candidateId || !subjectId || !HEX64.test(artifactHash)) {
-    throw new Error('distilled_evaluation_runtime_artifact_identity_invalid')
+  // The current frontier recipe cannot improve itself until it receives independent measurements.
+  // A start is not proof: Production 2026-09-20 launched four frontier reservations, but three ended in
+  // RunPod readiness failures before any evaluation row existed. Count distinct durable evaluation results
+  // across all frontier artifact statuses so infrastructure failures remain retryable/preferred until the
+  // bounded four-result proof cohort actually exists. Failure to read this optional scheduling signal falls
+  // back to normal oldest-first order rather than blocking evaluation.
+  let frontierProofCompletions = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
+  try {
+    const frontierArtifacts = await db.from('cos_local_distillation_artifacts')
+      .select('candidate_id')
+      .contains('intended_use', { trainingReceipt: { profile: 'cos_university_frontier_gkd_v1' } })
+      .like('candidate_id', 'mass:%')
+      .limit(500)
+    if (!frontierArtifacts.error) {
+      const frontierIds = (frontierArtifacts.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)
+      if (frontierIds.length) {
+        const frontierResults = await db.from('cos_university_distilled_evaluation_runs')
+          .select('candidate_id')
+          .in('candidate_id', frontierIds)
+          .limit(1000)
+        if (!frontierResults.error) frontierProofCompletions = new Set((frontierResults.data || []).map((row: any) => clean(row.candidate_id, 240)).filter(Boolean)).size
+      }
+    }
+  } catch {
+    frontierProofCompletions = MASS_EVALUATION_FRONTIER_PROOF_SAMPLE
   }
 
-  const approvalsResult = await db.from('cos_university_learning_assurance_events')
-    .select('evidence,verifier,observed_at,expires_at')
-    .eq('event_type', 'fine_tune')
-    .eq('candidate_id', candidateId)
-    .order('observed_at', { ascending: false })
-    .limit(100)
-    .abortSignal(routeDeadlineSignal(routeDeadlineMs))
-  if (approvalsResult.error) throw approvalsResult.error
-  const nowMs = now.getTime()
-  const approval = (approvalsResult.data || []).find((row: any) => {
-    const evidence = row?.evidence || {}
-    const observedAt = Date.parse(String(row?.observed_at || ''))
-    const expiresAt = Date.parse(String(row?.expires_at || ''))
-    const runtimeCostCeiling = Number(evidence?.maxEstimatedRuntimeWakeCostUsd || 0)
-    return row?.verifier === 'host_controller'
-      && isDistilledEvaluationApprovalEvidence(evidence, { candidateId, artifactHash })
-      && Number(evidence?.maxRuntimeWakeAttempts || 0) === MAX_RUNTIME_WAKE_ATTEMPTS
-      && runtimeCostCeiling >= RUNTIME_WAKE_WORST_CASE_COST_USD
-      && runtimeCostCeiling <= MAX_RUNTIME_WAKE_COST_USD
-      && evidence?.productionTrafficAuthorized === false
-      && evidence?.authorityExpanded === false
-      && Number.isFinite(observedAt) && observedAt <= nowMs
-      && Number.isFinite(expiresAt) && expiresAt > nowMs
-  }) as any
-  if (!approval) return { ok: false, reason: 'bounded_runtime_evaluation_authorization_missing_or_expired' }
-
-  const authorizationObservedAt = String(approval.observed_at || '')
-  const authorizationExpiresAt = String(approval.expires_at || '')
-  const maxEstimatedRuntimeWakeCostUsd = Number(approval.evidence?.maxEstimatedRuntimeWakeCostUsd || 0)
-  const holdoutCaseCount = Number(approval.evidence?.holdoutCaseCount)
-  const maxEndpointCalls = Number(approval.evidence?.maxEndpointCalls)
-  const maxJudgeCalls = Number(approval.evidence?.maxJudgeCalls)
-  const maxSoloRetryCalls = Number(approval.evidence?.maxSoloRetryCalls)
-  const eventKey = hash([
-    RUNTIME_ATTEMPT_PROFILE,
-    RUNTIME_ATTEMPT_CLAIM,
-    candidateId,
-    artifactHash,
-    authorizationObservedAt,
-  ])
-  const evidence = {
-    profile: RUNTIME_ATTEMPT_PROFILE,
-    claim: RUNTIME_ATTEMPT_CLAIM,
-    candidateId,
-    artifactHash,
-    authorizationObservedAt,
-    authorizationExpiresAt,
-    maxRuntimeWakeAttempts: MAX_RUNTIME_WAKE_ATTEMPTS,
-    maxEstimatedRuntimeWakeCostUsd,
-    worstCaseRuntimeWakeCostUsd: Number(RUNTIME_WAKE_WORST_CASE_COST_USD.toFixed(6)),
-    routeBudgetMs: EVALUATION_ROUTE_BUDGET_MS,
-    routeReserveMs: EVALUATION_ROUTE_RESERVE_MS,
-    readyTimeoutMs: RUNPOD_READY_TIMEOUT_MS,
-    keepaliveIntervalMs: RUNPOD_KEEPALIVE_INTERVAL_MS,
-    holdoutCaseCount,
-    endpointCallsCeiling: maxEndpointCalls,
-    judgeCallsCeiling: maxJudgeCalls,
-    soloRetryCallsCeiling: maxSoloRetryCalls,
-    productionTrafficAuthorized: false,
-    authorityExpanded: false,
+  // Clear artifacts the approval policy has already refused permanently before choosing this tick's work, so
+  // the selection window holds only artifacts that can still be evaluated.
+  const exhausted = decideExhaustedMassEvaluationArtifacts({ artifacts: rows, events: all, now })
+  const disposed = exhausted.length ? await disposeExhaustedArtifacts(exhausted, now) : []
+  if (disposed.length) {
+    console.info('[cos-mass-distilled-exhausted-disposition]', JSON.stringify({
+      disposed: disposed.length,
+      candidates: disposed.map(item => item.candidateId).slice(0, 20),
+    }))
   }
-  const insert = await db.from('cos_university_learning_assurance_events').insert({
-    event_key: eventKey,
+  const remaining = disposed.length
+    ? rows.filter(row => !disposed.some(item => item.candidateId === row.candidateId
+      && item.artifactHash === row.artifactHash))
+    : rows
+  if (!remaining.length) return { issued: false, reason: 'no_mass_artifact_pending', disposed: disposed.length }
+  const decision = decideRollingMassEvaluationApproval({
+    enabled: process.env.COS_MASS_EVALUATION_ROLLING_AUTHORIZATION !== 'false',
+    artifacts: remaining,
+    events: all,
+    now,
+    frontierProofCompletions,
+  })
+  if ('reason' in decision) return { issued: false, reason: decision.reason, disposed: disposed.length }
+  const inserted = await db.from('cos_university_learning_assurance_events').insert({
+    event_key: hash(['mass-rolling-evaluation-approval', decision.artifact.candidateId, decision.artifact.artifactHash, now.toISOString()]),
     event_type: 'fine_tune',
-    subject_id: subjectId,
-    candidate_id: candidateId,
-    evidence_hash: hash(evidence),
-    evidence,
+    subject_id: decision.artifact.subjectId || null,
+    candidate_id: decision.artifact.candidateId,
+    evidence_hash: hash(decision.evidence),
+    evidence: decision.evidence,
     verifier: 'host_controller',
     observed_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + MASS_EVALUATION_APPROVAL_TTL_MS).toISOString(),
   })
-    .select('event_key')
-    .abortSignal(routeDeadlineSignal(routeDeadlineMs))
-    .single()
-  if (insert.error) {
-    if (String((insert.error as any)?.code || '') === '23505') {
-      return { ok: false, reason: 'bounded_runtime_evaluation_attempt_already_consumed' }
-    }
-    throw insert.error
-  }
-
-  return {
-    ok: true,
-    candidateId,
-    artifactHash,
-    authorizationObservedAt,
-    authorizationExpiresAt,
-    maxEstimatedRuntimeWakeCostUsd,
-    holdoutCaseCount,
-    maxEndpointCalls,
-    maxJudgeCalls,
-    maxSoloRetryCalls,
-  }
+  if (inserted.error) throw inserted.error
+  return { issued: true, candidateId: decision.artifact.candidateId, artifactHash: decision.artifact.artifactHash, disposed: disposed.length }
 }
 
-type RunpodWorkerSnapshot = Readonly<{
-  atMs: number
-  httpStatus: number | null
-  workers: unknown
-  jobs: unknown
-  error: string | null
-}>
-
-type RunpodReadinessTrace = {
-  endpointId: string
-  windowMs: number
-  elapsedMs: number
-  probes: number
-  statusCounts: Record<string, number>
-  timeouts: number
-  networkErrors: number
-  lastErrorName: string | null
-  lastErrorMessage: string | null
-  firstHttpResponseAtMs: number | null
-  snapshots: RunpodWorkerSnapshot[]
-}
-
-// Diagnostic only: the failure receipt of the most recent readiness wait in this invocation.
-// The RunPod control-plane health read never wakes billed compute.
-let lastRunpodReadinessTrace: RunpodReadinessTrace | null = null
-const RUNPOD_HEALTH_SNAPSHOT_INTERVAL_MS = 60_000
-const RUNPOD_HEALTH_SNAPSHOT_LIMIT = 7
-
-async function runpodWorkerSnapshot(input: {
-  endpointId: string
-  key: string
-  fetchImpl: typeof fetch
-  startedAt: number
-}): Promise<RunpodWorkerSnapshot> {
-  const atMs = Date.now() - input.startedAt
-  try {
-    const response = await input.fetchImpl(`https://api.runpod.ai/v2/${input.endpointId}/health`, {
-      headers: { Authorization: `Bearer ${input.key}` },
-      signal: AbortSignal.timeout(8_000),
-    })
-    const raw = (await response.text()).slice(0, 2_000)
-    let parsed: any = null
-    try { parsed = raw ? JSON.parse(raw) : null } catch { parsed = null }
-    return {
-      atMs,
-      httpStatus: response.status,
-      workers: parsed?.workers ?? null,
-      jobs: parsed?.jobs ?? null,
-      error: parsed ? null : raw.replace(/\s+/g, ' ').slice(0, 200) || null,
-    }
-  } catch (error) {
-    const name = error instanceof Error ? error.name : 'Error'
-    const message = error instanceof Error ? error.message : String(error)
-    return { atMs, httpStatus: null, workers: null, jobs: null, error: `${name}:${message}`.slice(0, 200) }
-  }
-}
-
-async function persistRunpodEndpointClassification(input: {
-  endpointId: string
-  routeDeadlineMs: number
-  preflight: RunpodEndpointPreflight
-}): Promise<void> {
+async function claimNext(): Promise<MassEvaluationClaim | null> {
   const db = cosServiceDb()
   if (!db) throw new Error('service_database_unavailable')
-  const artifact = await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,subject_id,trained_artifact_hash,created_at')
-    .eq('status', 'evaluation_pending')
-    .eq('trained_artifact_id', DISTILLED_ADAPTER_MODEL_ID)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .abortSignal(routeDeadlineSignal(input.routeDeadlineMs))
-    .maybeSingle()
-  if (artifact.error) throw artifact.error
-  if (!artifact.data) return
+  const result = await db.rpc('claim_next_mass_distilled_evaluation')
+  if (result.error) throw result.error
+  const row = Array.isArray(result.data) ? result.data[0] as RawClaim | undefined : undefined
+  if (!row) return null
 
-  const candidateId = String(artifact.data.candidate_id || '').trim()
-  const subjectId = String(artifact.data.subject_id || '').trim()
-  const artifactHash = String(artifact.data.trained_artifact_hash || '').trim().toLowerCase()
-  if (!candidateId || !subjectId || !HEX64.test(artifactHash)) return
+  const candidateId = clean(row.candidate_id, 240)
+  const subjectId = clean(row.subject_id, 240)
+  const artifactId = clean(row.artifact_id, 500)
+  const artifactHash = clean(row.artifact_hash, 64).toLowerCase()
+  const revisionKey = clean(row.revision_key, 64).toLowerCase()
+  const datasetHash = clean(row.dataset_hash, 64).toLowerCase()
+  const endpointId = clean(row.endpoint_id, 120)
+  const approvalObservedAt = clean(row.approval_observed_at, 80)
+  const reservationEventKey = clean(row.reservation_event_key, 64)
+  const maxEndpointCalls = Number(row.max_endpoint_calls)
+  const maxJudgeCalls = Number(row.max_judge_calls)
+  const maxRuntimeWakeAttempts = Number(row.max_runtime_wake_attempts)
+  const maxEstimatedRuntimeWakeCostUsd = Number(row.max_estimated_runtime_wake_cost_usd)
 
-  const evidence = {
-    profile: RUNPOD_PREFLIGHT_PROFILE,
-    claim: RUNPOD_PREFLIGHT_CLAIM,
+  if (!candidateId.startsWith('mass:') || !subjectId || !artifactId
+    || !HEX64.test(artifactHash) || !HEX64.test(revisionKey) || !HEX64.test(datasetHash)
+    || !ENDPOINT_ID.test(endpointId) || !approvalObservedAt || !HEX64.test(reservationEventKey)
+    || maxEndpointCalls !== MASS_EVALUATION_ENDPOINT_CALLS || maxJudgeCalls !== 4 || maxRuntimeWakeAttempts !== 1
+    || !Number.isFinite(maxEstimatedRuntimeWakeCostUsd)
+    || maxEstimatedRuntimeWakeCostUsd <= 0 || maxEstimatedRuntimeWakeCostUsd > 0.2) {
+    throw new Error('mass_distilled_evaluation_atomic_claim_invalid')
+  }
+
+  return Object.freeze({
     candidateId,
+    subjectId,
+    artifactId,
     artifactHash,
-    endpointId: input.endpointId,
-    classification: input.preflight.classification,
-    httpStatus: input.preflight.httpStatus,
-    errorName: input.preflight.errorName,
-    errorMessage: input.preflight.errorMessage,
-    paidRuntimeAttemptConsumed: false,
+    revisionKey,
+    datasetHash,
+    endpointId,
+    approvalObservedAt,
+    maxEndpointCalls,
+    maxJudgeCalls,
+    maxRuntimeWakeAttempts,
+    maxEstimatedRuntimeWakeCostUsd,
+    reservationEventKey,
+  })
+}
+
+// One bounded read, before any claim, wake or model call. The evaluator writes its verdict only at the END of
+// a run, so a column that exists in the code but not yet in the database turns a complete evaluation - wake,
+// inference, judge - into a lost run that also spends an artifact attempt and a rolling approval. Checking the
+// write surface first makes that mistake cost one cheap select instead.
+async function evaluationSchemaMissingColumns(): Promise<string[] | null> {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const probe = await db.from('cos_university_distilled_evaluation_runs')
+    .select(REQUIRED_EVALUATION_RUN_COLUMNS.join(','))
+    .limit(1)
+  if (!probe.error) return null
+  // Only an unknown column means the migration is pending. Auth, network and timeouts are real failures and
+  // must keep their own error rather than being reported as a schema problem.
+  if (!isMissingColumnError(probe.error)) throw probe.error
+  return missingColumnsFromError(probe.error)
+}
+
+async function quarantineTerminalHoldoutDefect(claim: MassEvaluationClaim) {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const updated = await db.from('cos_local_distillation_artifacts')
+    .update({ status: 'quarantined', updated_at: new Date().toISOString() })
+    .eq('candidate_id', claim.candidateId)
+    .eq('trained_artifact_hash', claim.artifactHash)
+    .eq('status', 'evaluation_pending')
+  if (updated.error) throw updated.error
+}
+
+async function recordTerminal(input: {
+  claim: MassEvaluationClaim
+  eventClaim: typeof COMPLETED | typeof FAILED
+  evidence: Record<string, unknown>
+}) {
+  const db = cosServiceDb()
+  if (!db) throw new Error('service_database_unavailable')
+  const body = {
+    profile: PROFILE,
+    claim: input.eventClaim,
+    candidateId: input.claim.candidateId,
+    artifactHash: input.claim.artifactHash,
+    revisionKey: input.claim.revisionKey,
+    endpointId: input.claim.endpointId,
+    reservationEventKey: input.claim.reservationEventKey,
+    authorizationObservedAt: input.claim.approvalObservedAt,
+    ...input.evidence,
     productionTrafficAuthorized: false,
     authorityExpanded: false,
   }
-  const eventKey = hash([
-    RUNPOD_PREFLIGHT_PROFILE,
-    RUNPOD_PREFLIGHT_CLAIM,
-    candidateId,
-    artifactHash,
-    input.endpointId,
-    input.preflight.classification,
-    input.preflight.httpStatus,
-    input.preflight.errorName,
-  ])
-  const insert = await db.from('cos_university_learning_assurance_events').insert({
-    event_key: eventKey,
+  const evidenceHash = hash(body)
+  const result = await db.from('cos_university_learning_assurance_events').upsert({
+    event_key: hash([PROFILE, input.eventClaim, input.claim.candidateId, input.claim.artifactHash, input.claim.reservationEventKey]),
     event_type: 'fine_tune',
-    subject_id: subjectId,
-    candidate_id: candidateId,
-    evidence_hash: hash(evidence),
-    evidence,
+    subject_id: input.claim.subjectId,
+    candidate_id: input.claim.candidateId,
+    evidence_hash: evidenceHash,
+    evidence: body,
     verifier: 'host_controller',
     observed_at: new Date().toISOString(),
-  })
-    .select('event_key')
-    .abortSignal(routeDeadlineSignal(input.routeDeadlineMs))
-    .single()
-  if (insert.error && String((insert.error as any)?.code || '') !== '23505') throw insert.error
-}
-
-async function hasPersistedStaleRunpodEndpoint(input: {
-  endpointId: string
-  routeDeadlineMs: number
-}): Promise<boolean> {
-  const db = cosServiceDb()
-  if (!db) throw new Error('service_database_unavailable')
-  const artifact = await db.from('cos_local_distillation_artifacts')
-    .select('candidate_id,trained_artifact_hash,created_at')
-    .eq('status', 'evaluation_pending')
-    .eq('trained_artifact_id', DISTILLED_ADAPTER_MODEL_ID)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .abortSignal(routeDeadlineSignal(input.routeDeadlineMs))
-    .maybeSingle()
-  if (artifact.error) throw artifact.error
-  if (!artifact.data) return false
-
-  const candidateId = String(artifact.data.candidate_id || '').trim()
-  const artifactHash = String(artifact.data.trained_artifact_hash || '').trim().toLowerCase()
-  if (!candidateId || !HEX64.test(artifactHash)) return false
-
-  const events = await db.from('cos_university_learning_assurance_events')
-    .select('evidence,observed_at')
-    .eq('event_type', 'fine_tune')
-    .eq('candidate_id', candidateId)
-    .order('observed_at', { ascending: false })
-    .limit(100)
-    .abortSignal(routeDeadlineSignal(input.routeDeadlineMs))
-  if (events.error) throw events.error
-  return (events.data || []).some((row: any) => {
-    const evidence = row?.evidence || {}
-    return evidence?.profile === RUNPOD_PREFLIGHT_PROFILE
-      && evidence?.claim === RUNPOD_PREFLIGHT_CLAIM
-      && String(evidence?.artifactHash || '').toLowerCase() === artifactHash
-      && String(evidence?.endpointId || '') === input.endpointId
-      && evidence?.classification === 'stale'
-  })
-}
-
-async function preflightRunpodEndpoint(input: {
-  origin: string
-  fetchImpl: typeof fetch
-  routeDeadlineMs: number
-}): Promise<void> {
-  const key = configuredRunpodApiKey()
-  if (!key) throw new Error('distilled_evaluation_runpod_key_missing')
-  const endpointId = new URL(input.origin).hostname.split('.')[0] || ''
-  if (!endpointId) throw new Error('distilled_evaluation_runpod_endpoint_invalid')
-
-  if (await hasPersistedStaleRunpodEndpoint({ endpointId, routeDeadlineMs: input.routeDeadlineMs })) {
-    throw new RuntimeAttemptSkip('distilled_evaluation_runpod_endpoint_stale')
-  }
-
-  let preflight: RunpodEndpointPreflight
-  try {
-    const response = await input.fetchImpl(`https://api.runpod.ai/v2/${endpointId}/health`, {
-      headers: { Authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(RUNPOD_ENDPOINT_PREFLIGHT_TIMEOUT_MS),
-    })
-    preflight = {
-      classification: response.status >= 200 && response.status < 300
-        ? 'available'
-        : response.status === 404 || response.status === 410
-          ? 'stale'
-          : 'transient',
-      httpStatus: response.status,
-      errorName: null,
-      errorMessage: response.ok ? null : (await response.text()).replace(/\s+/g, ' ').slice(0, 200) || null,
-    }
-  } catch (error) {
-    preflight = {
-      classification: 'transient',
-      httpStatus: null,
-      errorName: error instanceof Error ? error.name : 'Error',
-      errorMessage: (error instanceof Error ? error.message : String(error)).slice(0, 200),
-    }
-  }
-
-  await persistRunpodEndpointClassification({
-    endpointId,
-    routeDeadlineMs: input.routeDeadlineMs,
-    preflight,
-  })
-
-  if (preflight.classification === 'stale') {
-    throw new RuntimeAttemptSkip('distilled_evaluation_runpod_endpoint_stale')
-  }
-  if (preflight.classification === 'transient') {
-    throw new RuntimeAttemptSkip('distilled_evaluation_runpod_endpoint_preflight_transient')
-  }
-}
-
-async function proveRunpodReady(input: {
-  origin: string
-  fetchImpl: typeof fetch
-  routeDeadlineMs: number
-}): Promise<void> {
-  const key = configuredRunpodApiKey()
-  if (!key) throw new Error('distilled_evaluation_runpod_key_missing')
-  const latestReadyDeadline = input.routeDeadlineMs - EVALUATION_ROUTE_RESERVE_MS
-  const deadline = Math.min(Date.now() + RUNPOD_READY_TIMEOUT_MS, latestReadyDeadline)
-  if (deadline <= Date.now()) throw new Error('distilled_evaluation_route_deadline_exceeded')
-  let lastStatus: number | null = null
-  const startedAt = Date.now()
-  const endpointId = new URL(input.origin).hostname.split('.')[0] || ''
-  const trace: RunpodReadinessTrace = {
-    endpointId,
-    windowMs: deadline - startedAt,
-    elapsedMs: 0,
-    probes: 0,
-    statusCounts: {},
-    timeouts: 0,
-    networkErrors: 0,
-    lastErrorName: null,
-    lastErrorMessage: null,
-    firstHttpResponseAtMs: null,
-    snapshots: [],
-  }
-  lastRunpodReadinessTrace = trace
-  let nextSnapshotAt = startedAt
-  const takeSnapshot = async () => {
-    if (trace.snapshots.length >= RUNPOD_HEALTH_SNAPSHOT_LIMIT) return
-    trace.snapshots.push(await runpodWorkerSnapshot({ endpointId, key, fetchImpl: input.fetchImpl, startedAt }))
-  }
-
-  while (Date.now() < deadline) {
-    if (Date.now() >= nextSnapshotAt) {
-      nextSnapshotAt = Date.now() + RUNPOD_HEALTH_SNAPSHOT_INTERVAL_MS
-      await takeSnapshot().catch(() => undefined)
-    }
-    const remaining = Math.max(1_000, deadline - Date.now())
-    trace.probes += 1
-    try {
-      const response = await input.fetchImpl(`${input.origin}/ready`, {
-        headers: { Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(Math.min(15_000, remaining)),
-      })
-      lastStatus = response.status
-      trace.statusCounts[String(response.status)] = (trace.statusCounts[String(response.status)] || 0) + 1
-      if (trace.firstHttpResponseAtMs === null) trace.firstHttpResponseAtMs = Date.now() - startedAt
-      if (response.status === 200) return
-      if (response.status === 503) {
-        const detail = (await response.text()).slice(0, 1_000)
-        if (detail.includes('distilled_bootstrap_failed')) {
-          throw new Error('distilled_evaluation_runtime_bootstrap_failed')
-        }
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message === 'distilled_evaluation_runtime_bootstrap_failed') throw error
-      const name = error instanceof Error ? error.name : 'Error'
-      if (name === 'TimeoutError' || name === 'AbortError') trace.timeouts += 1
-      else trace.networkErrors += 1
-      trace.lastErrorName = name
-      trace.lastErrorMessage = (error instanceof Error ? error.message : String(error)).slice(0, 200)
-      if (Date.now() >= latestReadyDeadline) throw new Error('distilled_evaluation_route_deadline_exceeded')
-      lastStatus = null
-    }
-    if (Date.now() < deadline) {
-      await new Promise(resolve => setTimeout(resolve, Math.min(RUNPOD_READY_POLL_MS, deadline - Date.now())))
-    }
-  }
-
-  await takeSnapshot().catch(() => undefined)
-  trace.elapsedMs = Date.now() - startedAt
-  if (Date.now() >= latestReadyDeadline) throw new Error('distilled_evaluation_route_deadline_exceeded')
-  throw new Error(`distilled_evaluation_runtime_not_ready:${lastStatus ?? 'network'}`)
-}
-
-/**
- * Private datasets do not reliably expose Dataset Viewer `/rows` or `/first-rows`. Capture the exact
- * Hub revision already fetched by the evaluator, then on a Dataset Viewer provider 5xx read only the
- * pinned holdout Parquet shards from the private Hub repo and synthesize the same `{ rows: [{row}] }`
- * transport shape. The evaluator still performs the authoritative revision, count, SHA-256 item,
- * identity-set, and manifest checks before any model call.
- *
- * All no-cost evaluator preflight runs before a runtime attempt is consumed. Immediately before the
- * first exact RunPod evaluation inference POST can wake billed compute, the route validates the RunPod
- * key, fences stale/nonexistent endpoints through the RunPod control plane, consumes the one durable
- * bounded attempt, and then proves the same origin is `/ready = 200`. A persisted stale classification
- * prevents the same dead endpoint from re-entering the long readiness loop on later cron invocations.
- * The inference timeout starts only after readiness succeeds, so cold-start time cannot consume the
- * request's inference budget before the POST is forwarded. Once ready, a 30-second keepalive prevents
- * the 60-second scale-to-zero runtime from going cold across independent-judge calls. The successful
- * evaluation's manifest-derived approval is also enforced as a hard inference-POST ceiling here.
- */
-async function runWithEvaluationTransportGuards<T>(input: {
-  runner: () => Promise<T>
-  routeDeadlineMs: number
-}): Promise<{ result: T; runtimeAttempt: SuccessfulRuntimeAttempt | null; endpointCalls: number }> {
-  const originalFetch = globalThis.fetch
-  const pinned = new Map<string, PinnedDatasetMetadata>()
-  const keepalives = new Map<string, ReturnType<typeof setInterval>>()
-  const key = configuredRunpodApiKey()
-  let runtimeAttempt: SuccessfulRuntimeAttempt | null = null
-  let endpointCalls = 0
-
-  const routeBoundFetch: typeof fetch = async (request, init) => {
-    const remaining = input.routeDeadlineMs - Date.now()
-    if (remaining <= EVALUATION_ROUTE_RESERVE_MS) {
-      throw new Error('distilled_evaluation_route_deadline_exceeded')
-    }
-    const existing = requestSignal(request, init)
-    return originalFetch(request, {
-      ...init,
-      signal: boundedSignal(existing, remaining - EVALUATION_ROUTE_RESERVE_MS),
-    })
-  }
-
-  const ensureKeepalive = (origin: string) => {
-    if (keepalives.has(origin) || !key) return
-    const timer = setInterval(() => {
-      if (Date.now() >= input.routeDeadlineMs - EVALUATION_ROUTE_RESERVE_MS) return
-      void routeBoundFetch(`${origin}/ready`, {
-        headers: { Authorization: `Bearer ${key}` },
-        signal: AbortSignal.timeout(10_000),
-      }).catch(() => undefined)
-    }, RUNPOD_KEEPALIVE_INTERVAL_MS)
-    timer.unref?.()
-    keepalives.set(origin, timer)
-  }
-
-  const patchedFetch: typeof fetch = async (request, init) => {
-    const rawUrl = requestUrl(request)
-    let url: URL | null = null
-    let guardedInit = init
-    try { url = new URL(rawUrl) } catch { url = null }
-
-    if (isRunpodEvaluationInference(url, init)) {
-      if (!key) throw new Error('distilled_evaluation_runpod_key_missing')
-      if (!runtimeAttempt) {
-        await preflightRunpodEndpoint({ origin: url.origin, fetchImpl: routeBoundFetch, routeDeadlineMs: input.routeDeadlineMs })
-        const claimed = await claimRuntimeEvaluationAttempt(new Date(), input.routeDeadlineMs)
-        if (claimed.ok === false) throw new RuntimeAttemptSkip(claimed.reason)
-        runtimeAttempt = claimed
-      }
-      await proveRunpodReady({ origin: url.origin, fetchImpl: routeBoundFetch, routeDeadlineMs: input.routeDeadlineMs })
-      ensureKeepalive(url.origin)
-      if (endpointCalls >= runtimeAttempt.maxEndpointCalls) {
-        throw new Error('distilled_evaluation_endpoint_call_ceiling_exceeded')
-      }
-      endpointCalls += 1
-
-      const inferenceBudget = input.routeDeadlineMs - Date.now() - EVALUATION_ROUTE_RESERVE_MS
-      if (inferenceBudget <= 0) {
-        throw new Error('distilled_evaluation_route_deadline_exceeded')
-      }
-      guardedInit = {
-        ...init,
-        signal: AbortSignal.timeout(Math.min(RUNPOD_INFERENCE_TIMEOUT_MS, inferenceBudget)),
-      }
-    }
-
-    const response = await routeBoundFetch(request, guardedInit)
-
-    if (url && response.ok) {
-      const repoId = metadataRepoId(url)
-      if (repoId) {
-        try {
-          const metadata: any = await response.clone().json()
-          const revision = String(metadata?.sha || '').trim().toLowerCase()
-          if (HEX40.test(revision)) {
-            pinned.set(repoId, {
-              revision,
-              siblings: Array.isArray(metadata?.siblings) ? metadata.siblings : [],
-            })
-          }
-        } catch {
-          // The evaluator owns metadata validation; absence here simply disables the transport fallback.
-        }
-      }
-    }
-
-    if (response.ok || response.status < 500 || !url) return response
-    if (url.origin !== HF_ROWS_ORIGIN || url.pathname !== '/rows') return response
-
-    const repoId = url.searchParams.get('dataset')?.trim() || ''
-    const split = url.searchParams.get('split')?.trim() || ''
-    const metadata = pinned.get(repoId)
-    const token = process.env.HF_TOKEN?.trim() || ''
-    if (!metadata || !repoId || !split || token.length < 20) return response
-
-    const rows = await readPinnedHfParquetRows({
-      repoId,
-      revision: metadata.revision,
-      split,
-      token,
-      siblings: metadata.siblings,
-      fetchImpl: routeBoundFetch,
-    })
-    return new Response(JSON.stringify({
-      rows: rows.map((row, rowIdx) => ({ row_idx: rowIdx, row })),
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
-    })
-  }
-
-  globalThis.fetch = patchedFetch
-  try {
-    const result = await input.runner()
-    return { result, runtimeAttempt, endpointCalls }
-  } catch (error) {
-    throw attachEvaluationTransportAudit(error, { runtimeAttempt, endpointCalls })
-  } finally {
-    for (const timer of keepalives.values()) clearInterval(timer)
-    globalThis.fetch = originalFetch
-  }
-}
-
-async function recordSkip(reason: string) {
-  const result = { ok: true as const, skipped: true as const, reason }
-  await recordCosUniversityProductionPath({
-    path: 'distilled_independent_evaluation',
-    invocationSucceeded: true,
-    evidence: { ...result, runnerInvoked: false, skipped: true },
-  })
-  console.info('[cos-distilled-independent-evaluation]', JSON.stringify(result))
-  return NextResponse.json(result, { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0' } })
+  }, { onConflict: 'event_key', ignoreDuplicates: true })
+  if (result.error) throw result.error
 }
 
 export async function GET(req: NextRequest) {
@@ -744,74 +438,177 @@ export async function GET(req: NextRequest) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
   }
-  const routeDeadlineMs = Date.now() + EVALUATION_ROUTE_BUDGET_MS
-  lastRunpodReadinessTrace = null
+
+  let claim: MassEvaluationClaim | null = null
   try {
-    // Confirm evaluator signing is available before any billed runtime attempt can be consumed.
-    const evaluator = await withinRouteDeadline(independentEvaluatorConfig(), routeDeadlineMs)
-    if (!evaluator) return recordSkip('independent_evaluator_not_configured')
+    const evaluator = await independentEvaluatorConfig()
+    if (!evaluator) {
+      await recordProduction(true, {
+        runnerInvoked: false,
+        skipped: true,
+        status: 'not_claimed',
+        reason: 'independent_evaluator_not_configured',
+      }).catch(() => undefined)
+      return NextResponse.json({ ok: true, skipped: true, reason: 'independent_evaluator_not_configured' })
+    }
     if (!process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET) {
       process.env.COS_UNIVERSITY_INDEPENDENT_EVALUATOR_SECRET = evaluator.secret
     }
 
-    const guarded = await runWithEvaluationTransportGuards({
-      routeDeadlineMs,
-      runner: () => runUniversityDistilledArtifactEvaluation(new Date()),
-    })
-    const result = guarded.result
-    const runtimeAttempt = guarded.runtimeAttempt
-    const skipped = 'skipped' in result && result.skipped === true
-    await recordCosUniversityProductionPath({
-      path: 'distilled_independent_evaluation',
-      invocationSucceeded: result.ok === true,
+    const missingColumns = await evaluationSchemaMissingColumns()
+    if (missingColumns) {
+      await recordProduction(false, {
+        runnerInvoked: false,
+        blocked: 'evaluation_schema_migration_pending',
+        missingColumns,
+      }).catch(() => undefined)
+      console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({
+        ok: false,
+        error: 'evaluation_schema_migration_pending',
+        missingColumns,
+      }))
+      return NextResponse.json({
+        ok: false,
+        error: 'evaluation_schema_migration_pending',
+        missingColumns,
+      }, { status: 503 })
+    }
+
+    const account = await queryRunpodAccountStatus()
+    if (account.clientBalance !== null && account.clientBalance < MIN_BALANCE_USD) {
+      await recordProduction(false, {
+        runnerInvoked: false,
+        blocked: 'runpod_balance_guard',
+        balance: account.clientBalance,
+      }).catch(() => undefined)
+      return NextResponse.json({ ok: false, error: 'runpod_balance_guard', balance: account.clientBalance }, { status: 402 })
+    }
+
+    const rolling = await ensureRollingMassEvaluationApproval()
+    console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
+    // A previous tick may already have issued a bounded approval that has not yet been atomically
+    // claimed. Draining that approval does not mint new authority or expand spend: claimNext() re-validates
+    // the exact unexpired approval, canary, artifact identity, 18-call ceiling, 4 judge calls, 1 wake and
+    // <= $0.20 wake budget under the database advisory lock.
+    //
+    // Only the two queue-state reasons below may fall through to the existing-approval claim path:
+    // - no_mass_artifact_eligible_for_rolling_evaluation: commonly means every eligible artifact is already armed;
+    // - rolling_mass_evaluation_window_exhausted: no NEW approval may be issued, but already-issued approvals
+    //   inside that same window must still be allowed to execute.
+    //
+    // The authorization kill switch, no-pending-work state and any future/unknown denial remain fail-closed.
+    const mayDrainExistingApproval = !rolling.issued
+      && (rolling.reason === 'no_mass_artifact_eligible_for_rolling_evaluation'
+        || rolling.reason === 'rolling_mass_evaluation_window_exhausted')
+    if (!rolling.issued && !mayDrainExistingApproval) {
+      await recordProduction(true, {
+        runnerInvoked: false,
+        skipped: true,
+        status: 'not_claimed',
+        reason: rolling.reason,
+      }).catch(() => undefined)
+      return NextResponse.json({ ok: true, skipped: true, reason: rolling.reason })
+    }
+    claim = await claimNext()
+    if (!claim) {
+      await recordProduction(true, {
+        runnerInvoked: false,
+        skipped: true,
+        status: 'not_claimed',
+        reason: 'no_atomically_claimable_mass_distilled_evaluation',
+      }).catch(() => undefined)
+      return NextResponse.json({ ok: true, skipped: true, reason: 'no_atomically_claimable_mass_distilled_evaluation' })
+    }
+
+    // The evaluator must not depend on a separate canary cron having already applied the current GPU policy.
+    // Re-assert the exact endpoint's existing scale-to-zero/one-worker safety envelope and narrow its provider
+    // GPU pool to AMPERE_24 before waking or any score-generating model request.
+    const runtimePolicy = await ensureMassDistilledEndpoint24Gb(claim.endpointId)
+    console.info('[cos-mass-distilled-runtime-preflight]', JSON.stringify(runtimePolicy))
+
+    const deadlineMs = Date.now() + ROUTE_BUDGET_MS
+    // `/ready` is a worker-local probe. When the serverless endpoint has scaled fully to zero, repeatedly
+    // polling it can produce network-only failures without ever creating a worker. Wake through the actual
+    // load-balancer path first, using a route the exact-artifact gateway actually serves; `/ping` generates no
+    // tokens and does not consume one of the
+    // approved scoring calls. It does, however, realize the already-approved single runtime wake attempt.
+    const runtimeWake = await wakeMassDistilledRuntime(claim.endpointId, deadlineMs)
+    console.info('[cos-mass-distilled-runtime-wake]', JSON.stringify(runtimeWake))
+
+    const result = await runMassDistilledArtifactEvaluation({ claim, deadlineMs, now: new Date() })
+    await recordTerminal({
+      claim,
+      eventClaim: COMPLETED,
       evidence: {
-        ...result,
-        runnerInvoked: !skipped,
-        skipped,
-        runtimeAttemptAuthorizationObservedAt: runtimeAttempt?.authorizationObservedAt ?? null,
-        runtimeWakeCostCeilingUsd: runtimeAttempt?.maxEstimatedRuntimeWakeCostUsd ?? null,
-        runtimeEndpointCalls: guarded.endpointCalls,
-        runtimeEndpointCallsCeiling: runtimeAttempt?.maxEndpointCalls ?? null,
+        evaluationPassed: result.evaluationPassed,
+        nextStatus: result.nextStatus,
+        evaluatorId: result.evaluatorId,
+        model: result.model,
+        endpointCalls: result.endpointCalls,
+        judgeCalls: result.judgeCalls,
+        holdout: result.holdout,
+        safety: result.safety,
+        transfer: result.transfer,
+        retention: result.retention,
       },
     })
-    console.info('[cos-distilled-independent-evaluation]', JSON.stringify(result))
-    return NextResponse.json(result, {
-      status: result.ok ? 200 : 503,
-      headers: { 'Cache-Control': 'no-store, max-age=0' },
-    })
+    await recordProduction(true, {
+      runnerInvoked: true,
+      attempted: 1,
+      status: 'completed',
+      candidateId: claim.candidateId,
+      artifactHash: claim.artifactHash,
+      evaluationPassed: result.evaluationPassed,
+      nextStatus: result.nextStatus,
+      endpointCalls: result.endpointCalls,
+      judgeCalls: result.judgeCalls,
+    }).catch(() => undefined)
+    console.info('[cos-mass-distilled-independent-evaluation]', JSON.stringify(result))
+    return NextResponse.json(result, { status: 200, headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (error) {
-    if (error instanceof RuntimeAttemptSkip) return recordSkip(error.reason)
-    const message = error instanceof Error ? error.message : String(error)
-    const failureAudit = evaluationTransportAuditFromError(error)
-    const runtimeAttempt = failureAudit?.runtimeAttempt ?? null
-    const callUsage = distilledEvaluationCallUsageFromError(error)
-    const readinessTrace = message.startsWith('distilled_evaluation_runtime_not_ready')
-      || message === 'distilled_evaluation_route_deadline_exceeded'
-      ? lastRunpodReadinessTrace
-      : null
-    await recordCosUniversityProductionPath({
-      path: 'distilled_independent_evaluation',
-      invocationSucceeded: false,
-      evidence: {
-        error: message,
-        runnerInvoked: true,
-        runtimeAttemptAuthorizationObservedAt: runtimeAttempt?.authorizationObservedAt ?? null,
-        runtimeWakeCostCeilingUsd: runtimeAttempt?.maxEstimatedRuntimeWakeCostUsd ?? null,
-        runtimeEndpointCalls: failureAudit?.endpointCalls ?? 0,
-        runtimeEndpointCallsCeiling: runtimeAttempt?.maxEndpointCalls ?? null,
-        endpointCalls: callUsage?.endpointCalls ?? failureAudit?.endpointCalls ?? 0,
-        judgeCalls: callUsage?.judgeCalls ?? 0,
-        soloRetryCalls: callUsage?.soloRetryCalls ?? 0,
-        callCeilings: callUsage ? {
-          holdoutCaseCount: callUsage.holdoutCaseCount,
-          maxEndpointCalls: callUsage.maxEndpointCalls,
-          maxJudgeCalls: callUsage.maxJudgeCalls,
-          maxSoloRetryCalls: callUsage.maxSoloRetryCalls,
-        } : null,
-        ...(readinessTrace ? { readinessTrace } : {}),
-      },
-    }).catch(() => null)
-    console.error('[cos-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: message, readinessTrace }))
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+    const message = boundedErrorMessage(error)
+    // A defect in our own code (2026-09-17 20:01 UTC: "Cannot read properties of undefined (reading 'length')")
+    // is indistinguishable from a provider failure without the throw site. Record the first frames of our own
+    // stack, and nothing else from the error: no provider bodies, prompts, answers or credentials.
+    const frames = error instanceof Error
+      ? String(error.stack || '').split('\n').filter(line => line.trim().startsWith('at ')).slice(0, 4)
+        .map(line => clean(line.replace(/^\s*at\s+/, ''), 160)).filter(Boolean)
+      : []
+    // A holdout is pinned to an immutable commit, so a failure that is a property of that frozen data can
+    // never succeed on a later attempt: every retry re-reads the same bytes, spends another RunPod wake and
+    // reaches the same verdict. Only the malformed-format case was recognised here; the rest of that family
+    // now ends the same way instead of circling on the retry ladder. Availability failures and reader
+    // ceilings are deliberately excluded and stay retryable - see the predicate for why.
+    const terminalDataDefect = isTerminalHoldoutDataDefect(message)
+    if (claim) {
+      if (terminalDataDefect) {
+        await quarantineTerminalHoldoutDefect(claim).catch(() => undefined)
+      }
+      await recordTerminal({
+        claim,
+        eventClaim: FAILED,
+        evidence: {
+          error: clean(message, 500),
+          ...(terminalDataDefect ? { terminalDataDefect: true, nextStatus: 'quarantined' } : {}),
+          ...(frames.length ? { errorFrames: frames } : {}),
+        },
+      }).catch(() => undefined)
+    }
+    await recordProduction(false, {
+      runnerInvoked: Boolean(claim),
+      error: clean(message, 500),
+      ...(frames.length ? { errorFrames: frames } : {}),
+      ...(claim ? { candidateId: claim.candidateId, artifactHash: claim.artifactHash } : {}),
+    }).catch(() => undefined)
+    console.error('[cos-mass-distilled-independent-evaluation]', JSON.stringify({ ok: false, error: clean(message, 500) }))
+    if (claim && terminalDataDefect) {
+      return NextResponse.json({
+        ok: false,
+        quarantined: true,
+        error: clean(message, 500),
+        nextStatus: 'quarantined',
+      }, { status: 200 })
+    }
+    return NextResponse.json({ ok: false, error: clean(message, 500) }, { status: 500 })
   }
 }

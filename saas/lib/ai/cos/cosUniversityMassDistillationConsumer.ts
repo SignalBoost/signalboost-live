@@ -942,9 +942,12 @@ export async function recoverMassDistillationCampaigns(input: {
     }
   }
   const campaigns = await db.from('cos_university_mass_distillation_campaigns')
-    .select('id,status,expires_at')
+    .select('id,status,expires_at,completed_at')
     .in('id', candidateIds)
     .in('status', ['authorized', 'active', 'failed'])
+    // A terminal campaign must never consume recovery budget again. Provider settlement may leave
+    // a retryable failure with completed_at=null; only those failed campaigns remain eligible.
+    .is('completed_at', null)
     .gt('expires_at', now)
     .order('updated_at', { ascending: true })
     .limit(maxCampaigns)

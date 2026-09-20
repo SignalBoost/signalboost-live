@@ -22,20 +22,18 @@ function publicOrigin(env: Record<string, string | undefined>): string | null {
   }
 }
 
-export function deriveRunpodBootstrapDeliveryToken(apiKey: string, podId: string): string {
+export function deriveRunpodBootstrapDeliveryToken(apiKey: string): string {
   const key = clean(apiKey)
-  const id = clean(podId, 240)
-  if (key.length < 20 || !id) throw new Error('runpod_bootstrap_delivery_token_invalid')
-  return createHmac('sha256', key).update(`${CONTEXT}:${id}`).digest('hex')
+  if (key.length < 20) throw new Error('runpod_bootstrap_delivery_token_invalid')
+  return createHmac('sha256', key).update(CONTEXT).digest('hex')
 }
 
 export function verifyRunpodBootstrapDeliveryToken(
   candidate: string,
   apiKey: string,
-  podId: string,
 ): boolean {
   try {
-    const expected = Buffer.from(deriveRunpodBootstrapDeliveryToken(apiKey, podId))
+    const expected = Buffer.from(deriveRunpodBootstrapDeliveryToken(apiKey))
     const supplied = Buffer.from(clean(candidate, 128))
     return supplied.length === expected.length && timingSafeEqual(supplied, expected)
   } catch {
@@ -47,9 +45,8 @@ export function runpodBootstrapDeliveryUrl(
   env: Record<string, string | undefined> = process.env,
 ): string | null {
   const apiKey = clean(env.RUNPOD_API_KEY)
-  const podId = clean(env.RUNPOD_PRIMARY_POD_ID || env.RUNPOD_POD_ID, 240)
   const origin = publicOrigin(env)
-  if (apiKey.length < 20 || !podId || !origin) return null
-  const capability = deriveRunpodBootstrapDeliveryToken(apiKey, podId)
+  if (apiKey.length < 20 || !origin) return null
+  const capability = deriveRunpodBootstrapDeliveryToken(apiKey)
   return `${origin}${RUNPOD_BOOTSTRAP_ROUTE_PREFIX}/${capability}/${RUNPOD_BOOTSTRAP_FILENAME}`
 }

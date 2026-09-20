@@ -15,7 +15,8 @@ export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
 // healthy, so the queue grows by design.
 //
 // Set the rolling ceiling to 300/day: above the observed 245/day training rate with enough headroom to
-// reduce the existing backlog while preserving the existing globally single-active claim lane.
+// reduce the existing backlog. Claim concurrency is separately bounded so minute ticks may use the approved
+// budget without creating an unbounded evaluator fan-out.
 //
 // Financial boundary: every evaluation still authorizes at most one RunPod wake and at most $0.20 of
 // estimated wake cost. Therefore 300/day is a hard theoretical wake-authorization ceiling of $60/day
@@ -26,6 +27,7 @@ export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
 // asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the per-evaluation cost ceiling,
 // but never the rolling cap, which is enforced here alone.
 export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
+export const MASS_EVALUATION_MAX_IN_FLIGHT = 4
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
 // resumes. That is only true while the failures differ. mass:8f5af666 reproduced the SAME truncated case

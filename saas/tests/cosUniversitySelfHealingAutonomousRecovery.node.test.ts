@@ -105,3 +105,25 @@ test('Builder continuation worker executes and retries University Self-Healing r
 test('Supervisor persists remediation messages so unavailable repairs are diagnosable without manual log archaeology', () => {
   assert.match(route, /remediationMessages: remediation\.map\(result => result\.message\)\.slice\(0, 4\)/)
 })
+
+
+test('University Self-Healing repair queue is single-flight across changing incident keys', () => {
+  assert.match(universityCodeRepair, /contains\('metadata', \{ selfHealingUniversityDistillation: true \}\)/)
+  assert.doesNotMatch(universityCodeRepair, /contains\('metadata', \{ selfHealingUniversityDistillation: true, selfHealingKey: key \}\)/)
+  assert.match(universityCodeRepair, /Never create retry-job fan-out while an existing repair is queued\/running\/paused/)
+})
+
+test('Self-Healing Builder capacity contention requeues the same job instead of terminal failure', () => {
+  const runner = readFileSync(new URL('../lib/builder/job-runner.ts', import.meta.url), 'utf8')
+  const store = readFileSync(new URL('../lib/builder/job-store.ts', import.meta.url), 'utf8')
+  const migration = readFileSync(new URL('../supabase/migrations/20260920041000_builder_self_healing_capacity_deferral.sql', import.meta.url), 'utf8')
+  assert.match(runner, /deferSelfHealingCapacity\(job, error, safeTrace\)/)
+  assert.match(runner, /builder_self_healing_capacity_deferred/)
+  assert.match(store, /defer_builder_job_capacity/)
+  assert.match(migration, /status = 'queued'/)
+  assert.match(migration, /builderCapacityDeferrals/)
+  assert.match(migration, /builder_runpod_primary_busy/)
+  assert.match(migration, /owner_authorized = true/)
+  assert.match(migration, /selfHealingUniversityDistillation/)
+  assert.match(migration, /status = 'paused'[\s\S]*claim_generation < 4/)
+})

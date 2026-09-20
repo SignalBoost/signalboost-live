@@ -9,33 +9,59 @@ import { MASS_EVALUATION_ENDPOINT_CALLS } from './cosUniversityMassEvaluationCon
 
 export const MASS_EVALUATION_ROLLING_AUTHORIZATION_REF = 'owner_explicit_direction_2026-09-16_mass_evaluation_without_manual_intervention' as const
 export const MASS_EVALUATION_ROLLING_WINDOW_HOURS = 24
-// 2026-09-20 owner direction: remove the evaluator throughput bottleneck after Production measured
-// 245 completed mass-training runs in 24h, 46 evaluator completions, 173 evaluation_pending artifacts,
-// and 43 already past the 12h retention delay. A 24/day cap cannot keep pace even when the evaluator is
-// healthy, so the queue grows by design.
+// 2026-09-19: raised 12 -> 24 by owner decision. Production stopped evaluating at 02:31 with 27
+// canary-proven artifacts waiting and 59 pending: not a defect, the rolling window was simply spent
+// (17 approvals recorded in the trailing 24h against a cap of 12, the extra ones pre-dating the cap).
+// At 12/day a 59-artifact backlog takes about five days; 24/day clears it in about two and a half.
 //
-// Set the rolling ceiling to 300/day: above the observed 245/day training rate with enough headroom to
-// reduce the existing backlog while preserving the existing single-evaluation claim lane. The evaluator
-// still issues at most one bounded approval per cron decision and the database claim still serializes live
-// work. This changes throughput authority only; it does not change scoring, cases, exact-artifact binding,
-// retry limits, retention, promotion, rollback, or Production-traffic authority.
+// The owner chose 24 over 60 deliberately: each approval authorizes at most $0.20 of runtime wake, so
+// 24/day is up to $4.80/day of wake authorization where 60/day would be up to $12/day, and 24 leaves
+// room to observe whether the repaired 18-call evaluator stays stable under increased load before
+// going further.
 //
-// Financial boundary: every evaluation still authorizes at most one RunPod wake and at most $0.20 of
-// estimated wake cost. Therefore 300/day represents a hard theoretical wake-authorization ceiling of
-// $60/day if every approval used the full bound. Observed independent-judge telemetry immediately before
-// this change was 190 DeepInfra calls / $0.0668 estimated over 24h; that observation is telemetry, not a
-// future-cost guarantee.
+// This is a THROUGHPUT ceiling only. Per-evaluation limits are untouched: maxRuntimeWakeAttempts 1,
+// maxEstimatedRuntimeWakeCostUsd 0.20, maxJudgeCalls 4, the 12-hour retention delay, exact-artifact
+// binding, one verdict per artifact, and the Production-traffic prohibition all stand.
 //
 // Unlike the endpoint-call ceiling, this constant has NO database counterpart: the claim function
-// asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the per-evaluation cost ceiling,
-// but never the rolling cap, which is enforced here alone.
-export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 300
+// asserts maxEndpointCalls, maxJudgeCalls, maxRuntimeWakeAttempts and the cost ceiling, but never the
+// rolling cap, which is enforced here alone. Verified against supabase/migrations before changing it.
+export const MASS_EVALUATION_ROLLING_MAX_APPROVALS = 24
 export const MASS_EVALUATION_MAX_FAILED_ATTEMPTS_PER_ARTIFACT = 3
 // An infrastructure failure is retried indefinitely on purpose: the evaluator gets repaired and the artifact
 // resumes. That is only true while the failures differ. mass:8f5af666 reproduced the SAME truncated case
 // (answer_missing:0ee6ecdba3940d76:finish=length) at 21:06, 21:08, 21:10 and 21:12 UTC on 2026-09-17, waking paid
 // compute each time and learning nothing. Identical repeats stop; a different failure resets the count.
 export const MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES = 4
+// The identical-failure stop above had no time bound: once four identical failures were recorded, the artifact
+// was skipped on every subsequent tick forever, with nothing in the system able to release it except a
+// hand-inserted reopen event. That is correct for a permanent defect and wrong for a transient one, and the
+// most common infrastructure failure on this lane - mass_distilled_evaluation_runtime_not_ready - is exactly
+// the transient kind: RunPod scheduling or a cold image pull leaves no worker bound inside the ready window,
+// the artifact is untouched, and four unlucky ticks permanently sideline an artifact that nothing is wrong with.
+//
+// So the stop becomes a decaying cooldown rather than a wall. Past the fourth identical failure the artifact
+// waits, and each further identical failure waits longer, capped. A transient condition clears itself without a
+// human; a genuinely permanent one settles at roughly two attempts a day instead of one every two minutes.
+// A different failure still resets the run to zero, as before.
+//
+// This changes WHEN an artifact may be retried and nothing else: the substantive-attempt budget, the 24h
+// rolling approval cap, the per-evaluation wake and judge ceilings, exact-artifact binding, one verdict per
+// artifact and every promotion gate are untouched.
+const MASS_EVALUATION_IDENTICAL_FAILURE_COOLDOWNS_MS = Object.freeze([
+  30 * 60_000,
+  60 * 60_000,
+  2 * 3_600_000,
+  4 * 3_600_000,
+  12 * 3_600_000,
+])
+
+export function identicalInfrastructureFailureCooldownMs(identical: number): number {
+  if (!Number.isFinite(identical) || identical < MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES) return 0
+  const step = Math.floor(identical) - MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES
+  const ladder = MASS_EVALUATION_IDENTICAL_FAILURE_COOLDOWNS_MS
+  return ladder[Math.min(step, ladder.length - 1)]
+}
 // #2457 repaired the baseline seven-case transport regression introduced while preserving retry headroom.
 // Failures from before that Production generation must not permanently suppress the artifact; only failures observed
 // after the repaired baseline split is live count toward the identical-infrastructure circuit breaker.
@@ -240,11 +266,11 @@ export function decideRollingMassEvaluationApproval(input: {
     const infrastructureGenerationStart = Math.max(reopenedAt, nowMs >= MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
       ? MASS_EVALUATION_INFRASTRUCTURE_REPAIR_AT_MS
       : Number.NEGATIVE_INFINITY)
-    const recentErrors = mine
+    const recentFailures = mine
       .filter(event => event.evidence?.claim === 'mass_distilled_independent_evaluation_failed'
         && at(event.observedAt) >= infrastructureGenerationStart)
       .sort((a, b) => at(b.observedAt) - at(a.observedAt))
-      .map(event => String(event.evidence?.error || '').trim().toLowerCase())
+    const recentErrors = recentFailures.map(event => String(event.evidence?.error || '').trim().toLowerCase())
     const newest = recentErrors[0]
     if (newest) {
       let identical = 0
@@ -252,7 +278,13 @@ export function decideRollingMassEvaluationApproval(input: {
         if (error !== newest) break
         identical += 1
       }
-      if (identical >= MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES) continue
+      if (identical >= MASS_EVALUATION_MAX_IDENTICAL_INFRASTRUCTURE_FAILURES) {
+        // Wait out the cooldown instead of skipping forever. An unreadable timestamp is treated as still
+        // cooling: releasing an artifact on evidence we cannot read is the unsafe reading.
+        const newestFailureAt = at(recentFailures[0].observedAt)
+        if (!Number.isFinite(newestFailureAt)) continue
+        if (nowMs - newestFailureAt < identicalInfrastructureFailureCooldownMs(identical)) continue
+      }
     }
 
     const controls = mine

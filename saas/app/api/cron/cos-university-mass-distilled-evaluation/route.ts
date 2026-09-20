@@ -301,12 +301,10 @@ export async function GET(req: NextRequest) {
 
     const rolling = await ensureRollingMassEvaluationApproval()
     console.info('[cos-mass-distilled-rolling-authorization]', JSON.stringify(rolling))
-    const hardRollingDenial = !rolling.issued && (
-      rolling.reason === 'rolling_mass_evaluation_authorization_disabled'
-      || rolling.reason === 'rolling_mass_evaluation_window_exhausted'
-      || rolling.reason === 'no_mass_artifact_pending'
-    )
-    if (hardRollingDenial) {
+    // No provider/runtime work may occur unless this invocation actually obtained rolling
+    // authorization. Treat every non-issued decision as a hard stop, not only today's known
+    // reason strings, so a new authority reason cannot accidentally fall through to claim/wake.
+    if (!rolling.issued) {
       await recordProduction(true, {
         runnerInvoked: false,
         skipped: true,

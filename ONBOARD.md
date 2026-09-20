@@ -45,15 +45,17 @@ University training
 -> exact-artifact Production canary + rollback proof
 -> graduate registry (pending_runtime)
 -> evidence-gated runtime activation
--> subject-relevant COS / Builder worker routing
+-> COS-primary generalist routing or subject-relevant COS / Builder worker routing
 -> provider + graduate ownership telemetry
 -> verified Production outcomes
 -> continuing education / remediation / recertification
 ```
 
-Production configuration explicitly enables `COS_GRADUATE_ACTIVATION_ENABLED=true`; the activation route still fails closed when the switch is absent and cannot bypass promotion, rollback, served-identity, health, or authority gates.
+Production configuration explicitly enables `COS_GRADUATE_ACTIVATION_ENABLED=true`; the activation route still fails closed when the switch is absent and cannot bypass promotion, rollback, served-identity, health, or authority gates. `COS_GENERALIST_PRIMARY_ACTIVATION_ENABLED=true` separately permits COS-primary adoption only after the generalist gate below is satisfied.
 
-Every canonical COS University subject has an explicit bounded activation scope. Activation never grants `primary` authority by itself. Computer Science and Cybersecurity graduates may enter the `coder` lane for Builder work; other qualified graduates enter subject-relevant critic/verifier/researcher lanes. Runtime selection matches both the existing bounded problem-class taxonomy and `university:<subject_id>` scope markers produced from the same University subject classifier that drives curriculum. Unknown subjects remain blocked rather than receiving a wildcard scope.
+Every canonical COS University subject has an explicit bounded activation scope. Computer Science and Cybersecurity graduates may enter the `coder` lane for Builder work; other qualified subject graduates enter critic/verifier/researcher lanes. The single deliberate primary exception is a promoted `reasoning_decision_science` artifact for COS itself: it may receive `primary` plus generalist (`*`) routing only when COS holds an awarded A/A+ generalist undergraduate credential, current generalist competence is still A/A+, and undergraduate remediation is clear. Artifact-level improvement, safety, unseen-transfer, delayed-retention, exact-canary, rollback, served-identity and runtime-health gates remain mandatory. If the generalist gate is absent, stale, or unreadable, the artifact remains a bounded specialist rather than silently becoming the brain.
+
+This makes the architecture operational rather than nominal: once the qualified COS-primary graduate is active, it is selected ahead of the base reasoner for ordinary primary reasoning; specialists remain subordinate expert workers; the ordinary RunPod model remains fallback compute; DeepInfra remains bounded fallback/exception compute rather than COS's default intelligence. Runtime selection for specialists still matches the bounded problem-class taxonomy and `university:<subject_id>` markers. Unknown subjects remain blocked rather than receiving wildcard scope.
 
 A graduate that fails its independent gates remains quarantined and receives no Production traffic. An active graduate that fails or becomes unhealthy must fall back to the ordinary approved runtime and retain exact candidate/artifact attribution for outcome measurement and rollback.
 

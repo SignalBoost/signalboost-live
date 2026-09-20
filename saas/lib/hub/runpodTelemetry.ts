@@ -1,7 +1,11 @@
 // saas/lib/hub/runpodTelemetry.ts
 import { createHmac } from 'node:crypto'
 import { configuredRunpodApiKey, configuredRunpodPodId, runpodControlConfigured } from '../ai/cos/runpodConfig.ts'
-import { runpodBootstrapDeliveryUrl } from '../ai/cos/runpodBootstrapDelivery.ts'
+import {
+  RUNPOD_REPAIR_FILENAME,
+  runpodArtifactDeliveryUrl,
+  runpodBootstrapDeliveryUrl,
+} from '../ai/cos/runpodBootstrapDelivery.ts'
 
 const GRAPHQL_ENDPOINT = 'https://api.runpod.io/graphql'
 const REST_ENDPOINT = 'https://rest.runpod.io/v1'
@@ -85,12 +89,15 @@ export function desiredRunpodStartupContract(options: RunpodStartupOptions = {})
   const embeddingModel = safeModelName(options.embeddingModel || process.env.RUNPOD_PRIMARY_EMBEDDING_MODEL, 'nomic-embed-text')
   const gatewayKey = runpodGatewayKey()
   const bootstrapUrl = runpodBootstrapDeliveryUrl(process.env)
-  if (!bootstrapUrl) throw new Error('runpod_bootstrap_delivery_not_configured')
+  const repairUrl = runpodArtifactDeliveryUrl(RUNPOD_REPAIR_FILENAME, process.env)
+  if (!bootstrapUrl || !repairUrl) throw new Error('runpod_bootstrap_delivery_not_configured')
   const command = [
     'set -euo pipefail',
     'if [ -x /start.sh ]; then nohup /start.sh >/workspace/runpod-base-start.log 2>&1 & fi',
     `curl -fsSL --max-time 30 '${bootstrapUrl}' -o /workspace/cos-runpod-reasoner.sh`,
     'chmod 700 /workspace/cos-runpod-reasoner.sh',
+    `curl -fsSL --max-time 30 '${repairUrl}' -o /workspace/repair-cos-runpod-runner.sh`,
+    'chmod 700 /workspace/repair-cos-runpod-runner.sh',
     `printf '%s' '${gatewayKey}' > /workspace/cos-api-key`,
     'chmod 600 /workspace/cos-api-key',
     `export COS_REASONER_MODEL='${reasonerModel}'`,

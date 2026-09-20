@@ -18,6 +18,10 @@ set -euo pipefail
 # matching the existing SignalBoost LOCAL_AI_API_KEY client behavior.
 
 MODEL="${COS_REASONER_MODEL:-qwen3:30b}"
+CONTEXT_LENGTH="${COS_REASONER_CONTEXT_LENGTH:-16384}"
+NUM_PARALLEL="${COS_REASONER_NUM_PARALLEL:-1}"
+MAX_LOADED_MODELS="${COS_REASONER_MAX_LOADED_MODELS:-2}"
+FLASH_ATTENTION="${COS_REASONER_FLASH_ATTENTION:-1}"
 WORKSPACE="${COS_REASONER_WORKSPACE:-/workspace}"
 MODEL_DIR="${COS_REASONER_MODEL_DIR:-$WORKSPACE/ollama-models}"
 KEY_FILE="${COS_REASONER_KEY_FILE:-$WORKSPACE/cos-api-key}"
@@ -26,6 +30,22 @@ OLLAMA_LOG="$WORKSPACE/cos-ollama.log"
 GATEWAY_LOG="$WORKSPACE/cos-gateway.log"
 OLLAMA_PID_FILE="$WORKSPACE/cos-ollama.pid"
 GATEWAY_PID_FILE="$WORKSPACE/cos-gateway.pid"
+
+for pair in \
+  "COS_REASONER_CONTEXT_LENGTH:$CONTEXT_LENGTH" \
+  "COS_REASONER_NUM_PARALLEL:$NUM_PARALLEL" \
+  "COS_REASONER_MAX_LOADED_MODELS:$MAX_LOADED_MODELS"; do
+  name="${pair%%:*}"
+  value="${pair#*:}"
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    printf '[cos-runpod] ERROR: %s must be a positive integer; got %q.\n' "$name" "$value" >&2
+    exit 2
+  fi
+done
+if [[ "$FLASH_ATTENTION" != "0" && "$FLASH_ATTENTION" != "1" ]]; then
+  printf '[cos-runpod] ERROR: COS_REASONER_FLASH_ATTENTION must be 0 or 1; got %q.\n' "$FLASH_ATTENTION" >&2
+  exit 2
+fi
 
 mkdir -p "$WORKSPACE" "$MODEL_DIR"
 umask 077
@@ -110,6 +130,10 @@ nohup env \
   OLLAMA_MODELS="$MODEL_DIR" \
   OLLAMA_HOST="127.0.0.1:11435" \
   OLLAMA_KEEP_ALIVE="10m" \
+  OLLAMA_CONTEXT_LENGTH="$CONTEXT_LENGTH" \
+  OLLAMA_NUM_PARALLEL="$NUM_PARALLEL" \
+  OLLAMA_MAX_LOADED_MODELS="$MAX_LOADED_MODELS" \
+  OLLAMA_FLASH_ATTENTION="$FLASH_ATTENTION" \
   ollama serve >"$OLLAMA_LOG" 2>&1 &
 echo $! > "$OLLAMA_PID_FILE"
 

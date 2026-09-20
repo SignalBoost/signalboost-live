@@ -38,12 +38,28 @@ function hasHardcodedEnglish(content: string): boolean {
 
 type ListResult = { ok: boolean; files: string[]; error?: string }
 
-async function listComponentTsx(): Promise<ListResult> {
+function githubReadToken(): string {
+  return String(process.env.GITHUB_TOKEN || process.env.GITHUB_WRITE_TOKEN || '').trim()
+}
+
+function githubHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: 'application/vnd.github+json',
     'User-Agent': 'signalboost-i18n-sweep',
+    'X-GitHub-Api-Version': '2022-11-28',
   }
-  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+  const token = githubReadToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
+
+function decodeGithubContent(value: unknown): string | null {
+  if (typeof value !== 'string' || !value) return null
+  return Buffer.from(value.replace(/\\n/g, ''), 'base64').toString('utf8')
+}
+
+async function listComponentTsx(): Promise<ListResult> {
+  const headers = githubHeaders()
   try {
     const res = await fetch(
       `https://api.github.com/repos/${REPO}/git/trees/main?recursive=1`,
@@ -65,11 +81,7 @@ async function listComponentTsx(): Promise<ListResult> {
 }
 
 async function branchExists(branch: string): Promise<boolean> {
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'signalboost-i18n-sweep',
-  }
-  if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
+  const headers = githubHeaders()
   try {
     const res = await fetch(`https://api.github.com/repos/${REPO}/branches/${encodeURIComponent(branch)}`, { headers, cache: 'no-store' })
     return res.ok
@@ -80,9 +92,17 @@ async function branchExists(branch: string): Promise<boolean> {
 
 async function readFileOnBranch(path: string, branch: string): Promise<string | null> {
   try {
-    const res = await fetch(`https://raw.githubusercontent.com/${REPO}/${branch}/${encodeURI(path)}`, { cache: 'no-store' })
+    const clean = String(path || '').trim().replace(/^\\/+/, '')
+    if (!clean || clean.includes('..')) return null
+    const encodedPath = clean.split('/').map(part => encodeURIComponent(part)).join('/')
+    const res = await fetch(
+      `https://api.github.com/repos/${REPO}/contents/${encodedPath}?ref=${encodeURIComponent(branch)}`,
+      { headers: githubHeaders(), cache: 'no-store' },
+    )
     if (!res.ok) return null
-    return await res.text()
+    const data = await res.json()
+    if (!data || data.type !== 'file' || data.encoding !== 'base64') return null
+    return decodeGithubContent(data.content)
   } catch {
     return null
   }

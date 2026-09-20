@@ -98,6 +98,7 @@ function evaluatorInfrastructureFailure(event: RollingEvent): boolean {
     || error.startsWith('mass_distilled_evaluation_endpoint_call_ceiling_plan:')
     || error.includes("maximum context length is 8192 tokens")
     || error === 'the operation was aborted due to timeout'
+    || error.startsWith('mass_distilled_evaluation_runpod_timeout:')
     || error.includes('mass_distilled_evaluation_call_timeout')
     || /^mass_distilled_evaluation_runpod_http_(502|503|504):/.test(error)
     // A missing judge result after the inference provider rejects/overloads the request is evaluator infrastructure,
